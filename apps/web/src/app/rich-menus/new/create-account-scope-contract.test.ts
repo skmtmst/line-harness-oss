@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const CREATE = readFileSync(join(HERE, 'create-v8.tsx'), 'utf8')
+const CREATE = readFileSync(new URL('create-v8.tsx', import.meta.url), 'utf8')
 
 /**
  * R23・m18r を V8 の作る画面で引き継ぐ（v7 作る本体は 2026-10-05 に撤去）。

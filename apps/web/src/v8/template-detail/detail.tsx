@@ -52,6 +52,11 @@ const PUBLISH_VISIBLE = 4
 const BLOCKED_VISIBLE = 2
 
 export default function TemplateDetailV8() {
+  const params = useSearchParams()
+  const { selectedAccountId } = useAccount()
+  return <TemplateDetailScreen key={`${selectedAccountId}:${params.get('id')}`} />
+}
+function TemplateDetailScreen() {
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
@@ -87,19 +92,28 @@ export default function TemplateDetailV8() {
   const [canMutate] = useState(() => (typeof window === 'undefined' ? true : isOwnerOrAdmin()))
   usePageTitle(template?.name ?? null)
 
-  const loadVersions = useCallback(async () => {
+  const identity = useRef('')
+  const currentIdentity = `${selectedAccountId ?? ''}:${id}`
+  identity.current = currentIdentity
+  const generation = useRef(0)
+  const loadVersions = useCallback(async (request = generation.current) => {
+    const target = currentIdentity
     if (!id) return
     setVersionsError('')
     try {
       const res = await api.templates.versions(id)
+      if (request !== generation.current || identity.current !== target) return
       if (res.success) setVersions(res.data)
       else setVersionsError('版の履歴を読み込めませんでした。もう一度お試しください。')
     } catch {
+      if (request !== generation.current || identity.current !== target) return
       setVersionsError('版の履歴を読み込めませんでした。もう一度お試しください。')
     }
-  }, [id])
+  }, [id, currentIdentity])
 
   const reload = useCallback(async () => {
+    const request = ++generation.current
+    const target = currentIdentity
     setMissing(false)
     setError('')
     setTemplate(null)
@@ -109,24 +123,29 @@ export default function TemplateDetailV8() {
     setLoading(true)
     try {
       const detail = await api.templates.get(id)
+      if (request !== generation.current || identity.current !== target) return
       if (detail.success && isTemplateDetailData(detail.data)) setTemplate(detail.data)
       else if (!detail.success) setError('テンプレートを読み込めませんでした。もう一度お試しください。')
       else setMissing(true)
     } catch (caught) {
+      if (request !== generation.current || identity.current !== target) return
       if (caught instanceof ApiError && caught.status === 404) setMissing(true)
       else setError('テンプレートを読み込めませんでした。もう一度お試しください。')
     } finally {
-      setLoading(false)
+      if (request === generation.current && identity.current === target) setLoading(false)
     }
-    void loadVersions()
-  }, [id, loadVersions])
+    if (request === generation.current && identity.current === target) void loadVersions(request)
+  }, [id, loadVersions, currentIdentity])
 
   useEffect(() => {
     if (!id) {
       setLoading(false)
       return
     }
+    setPublishOpen(false); setDeleteOpen(false); setBlockedOpen(false); setRevertTarget(null)
+    setPublishError(''); setRevertError(''); setDuplicateError(''); setVersionsError(''); setMonthlySends(undefined); setFolderName(null)
     void reload()
+    return () => { generation.current += 1 }
   }, [id, reload])
 
   /* フォルダ名と今月送った数は詳細口に無いので、持っている口で拾う。 */
@@ -163,6 +182,7 @@ export default function TemplateDetailV8() {
 
   const doPublish = useCallback(async () => {
     if (publishing || !template) return
+    const request = generation.current
     setPublishing(true)
     setPublishError('')
     try {
@@ -170,10 +190,12 @@ export default function TemplateDetailV8() {
         expectedVersion: template.publishedVersion ?? 0,
         expectedDraftRevision: template.draftRevision ?? 0,
       })
+      if (request !== generation.current) return
       if (!res.success) throw new Error(res.error)
       setPublishOpen(false)
       await reload()
     } catch (caught) {
+      if (request !== generation.current) return
       if (caught instanceof ApiError && caught.status === 409) {
         setPublishError('ほかの人が先に公開・編集しました。最新の状態を読み直したので、内容を確かめてからもう一度お試しください。')
         void reload()
@@ -187,10 +209,12 @@ export default function TemplateDetailV8() {
 
   const doRevert = useCallback(async () => {
     if (reverting || revertTarget === null || !template) return
+    const request = generation.current
     setReverting(true)
     setRevertError('')
     try {
       const res = await api.templates.revert(id, { versionNumber: revertTarget, expectedVersion: template.publishedVersion })
+      if (request !== generation.current) return
       if (!res.success) throw new Error(res.error)
       setRevertTarget(null)
       setCompareTarget(null)
@@ -206,10 +230,12 @@ export default function TemplateDetailV8() {
 
   const remove = useCallback(async () => {
     if (deleting || usageCount > 0 || !template) return
+    const request = generation.current
     setDeleting(true)
     setDeleteError('')
     try {
       const res = await api.templates.delete(id)
+      if (request !== generation.current) return
       if (!res.success) throw new Error(res.error)
       setDeleteOpen(false)
       router.push('/templates')
@@ -225,25 +251,56 @@ export default function TemplateDetailV8() {
    * 直しかけの下書きは写さない（公開前の中身が別の名前で出回らないように）。
    * 公開済みの版が無いときは押せる口を出さない。
    */
+  const duplicateAttempt = useRef<{ target: string; id: string } | null>(null)
   const duplicate = useCallback(async () => {
     if (duplicating || !template || !inUseVersion || !selectedAccountId) return
     setDuplicating(true)
     setDuplicateError('')
+    const target = identity.current, request = generation.current
     try {
-      const res = await api.templates.create({
-        accountId: selectedAccountId,
-        name: `${template.name}のコピー`,
-        category: template.category,
-        messageType: inUseVersion.messageType ?? template.messageType,
-        messageContent: inUseVersion.messageContent,
-        folderId: template.folderId ?? null,
-        ...(inUseVersion.carouselActions !== undefined ? { carouselActions: inUseVersion.carouselActions } : {}),
-        ...(inUseVersion.carouselTapLimitMode === 'none' || inUseVersion.carouselTapLimitMode === 'once' ? { carouselTapLimitMode: inUseVersion.carouselTapLimitMode } : {}),
-        ...(inUseVersion.carouselTapLimitText !== undefined ? { carouselTapLimitText: inUseVersion.carouselTapLimitText } : {}),
-      })
-      if (!res.success) throw new Error(res.error)
-      router.push(`/templates/detail?id=${encodeURIComponent(res.data.id)}`)
+      let copyId = duplicateAttempt.current?.target === target ? duplicateAttempt.current.id : null
+      if (!copyId) {
+        const res = await api.templates.create({
+          accountId: selectedAccountId,
+          name: `${template.name}のコピー`,
+          category: template.category,
+          messageType: inUseVersion.messageType ?? template.messageType,
+          messageContent: inUseVersion.messageContent,
+          folderId: template.folderId ?? null,
+          question: inUseVersion.question as TemplateDetailData['question'],
+          questionStatus: 'draft',
+          ...(inUseVersion.carouselActions !== undefined ? { carouselActions: inUseVersion.carouselActions } : {}),
+          ...(inUseVersion.carouselTapLimitMode === 'none' || inUseVersion.carouselTapLimitMode === 'once' ? { carouselTapLimitMode: inUseVersion.carouselTapLimitMode } : {}),
+          ...(inUseVersion.carouselTapLimitText !== undefined ? { carouselTapLimitText: inUseVersion.carouselTapLimitText } : {}),
+        })
+        if (!res.success) throw new Error(res.error)
+        copyId = res.data.id
+        duplicateAttempt.current = { target, id: copyId }
+      }
+      if (identity.current !== target || request !== generation.current) return
+      if ((inUseVersion.messageType ?? template.messageType) === 'carousel') {
+        const content = JSON.parse(inUseVersion.messageContent)
+        const rebind = (value: unknown): unknown => {
+          if (Array.isArray(value)) return value.map(rebind)
+          if (!value || typeof value !== 'object') return value
+          const record = value as Record<string, unknown>
+          const result = Object.fromEntries(Object.entries(record).map(([key, item]) => [key, rebind(item)]))
+          if (record.type === 'postback' && typeof record.data === 'string') {
+            result.data = record.data.replace(/(^|&)ctpl=([^&]*)/, (match, prefix: string, original: string) => original === template.id ? `${prefix}ctpl=${copyId}` : match)
+          }
+          return result
+        }
+        const contentText = JSON.stringify(rebind(content))
+        if (contentText !== inUseVersion.messageContent) {
+          const updated = await api.templates.update(copyId, { messageContent: contentText })
+          if (!updated.success) throw new Error(updated.error)
+        }
+      }
+      if (identity.current !== target || request !== generation.current) return
+      duplicateAttempt.current = null
+      router.push(`/templates/detail?id=${encodeURIComponent(copyId)}`)
     } catch {
+      if (identity.current !== target || request !== generation.current) return
       setDuplicateError('複製できませんでした。もう一度お試しください。')
     } finally {
       setDuplicating(false)
@@ -312,7 +369,7 @@ export default function TemplateDetailV8() {
       <span className={styles.usageState}>{row.status ?? '—'}</span>
       {row.href
         ? <Link href={row.href} className={styles.ghostButton}><ExternalLink size={14} aria-hidden="true" />開く</Link>
-        : <span className={styles.ghostSpacer} aria-hidden="true" />}
+        : <span className={styles.usageState}>開ける画面がありません</span>}
     </div>
   )
 
@@ -477,6 +534,7 @@ export default function TemplateDetailV8() {
                   ) : null}
                 </div>
               ) : null}
+              {versions?.length === 0 ? <p className={styles.empty}>版はまだありません。</p> : null}
               {(versions ?? []).map((version) => (
                 <div key={version.versionNumber} className={version.status === 'in_use' ? styles.versionInUse : styles.versionPast}>
                   <span className={styles.versionNum}>版{version.versionNumber}</span>

@@ -12,8 +12,8 @@ import { describe, expect, it } from 'vitest'
 const here = dirname(fileURLToPath(import.meta.url))
 const src = (...parts: string[]) => readFileSync(join(here, '..', '..', 'app', ...parts), 'utf8')
 
-const contents = src('contents', 'page.tsx')
-const vars = src('contents', 'vars', 'page.tsx')
+const contents = readFileSync(join(here, '../../v8/contents/list.tsx'), 'utf8')
+const vars = readFileSync(join(here, '../../v8/common-vars/list.tsx'), 'utf8')
 const broadcasts = readFileSync(join(here, '..', '..', 'v8', 'broadcasts', 'list.tsx'), 'utf8')
 
 describe('m18s FolderPanelの見出しに絞り込み件数を出さない', () => {
@@ -28,8 +28,8 @@ describe('m18s FolderPanelの見出しに絞り込み件数を出さない', () 
     // 登録メディア: フッターの ListRange（絞り込み後の total）
     expect(contents).toContain('<ListRange total={total}')
     // 共通情報: フッターの ListRange（絞り込み後の filtered.length）
-    expect(vars).toContain('<ListRange')
-    expect(vars).toContain('total={filtered.length}')
+    expect(vars).toContain('filtered.length')
+    expect(vars).toContain('pagination={listPager}')
     // 一斉配信: 表の上の ListRange（タイトル・日付で絞った visibleBroadcasts）
     expect(broadcasts).toContain('<Pagination')
     expect(broadcasts).toContain("resultTotal ?? visibleBroadcasts.length")

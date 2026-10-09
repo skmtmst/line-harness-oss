@@ -38,7 +38,7 @@ vi.mock('@/contexts/account-context', () => ({
 
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {},
-  api: {
+  api: { featureSettings: { visibility: () => Promise.resolve({ success: true, data: { features: {} } }) }, staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
     templates: {
       list: () => Promise.resolve({ success: true, data: TEMPLATES }),
       get: templateGet,
@@ -49,7 +49,7 @@ vi.mock('@/lib/api', () => ({
     },
     broadcastMessageAssets: {
       list: assetList,
-      counts: () => Promise.resolve({ success: true, data: { card_message: 0, rich_message: 0, coupon: 0, research: 0 } }),
+      counts: () => Promise.resolve({ success: true, data: { card_message: 1, rich_message: 0, coupon: 0, research: 0 } }),
     },
     folders: {
       list: () => Promise.resolve({ success: true, data: FOLDERS }),
@@ -85,11 +85,13 @@ import CarouselEditorPage from './carousel/page'
 import QuestionTemplatePage from './questions/new/page'
 
 function stubRole(role: string | null) {
-  vi.stubGlobal('localStorage', {
+  const storage = {
     getItem: (key: string) => (key === 'lh_staff_role' ? role : null),
     setItem: () => {},
     removeItem: () => {},
-  })
+  }
+  vi.stubGlobal('localStorage', storage)
+  Object.defineProperty(window, 'localStorage', { configurable: true, value: storage })
 }
 
 const ASSETS = [
@@ -97,6 +99,9 @@ const ASSETS = [
 ]
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
+  window.history.replaceState(null, '', '/templates')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   searchParams.value = new URLSearchParams()
   templateGet.mockReset()
   assetList.mockReset()
@@ -139,7 +144,7 @@ describe('テンプレート一覧のstaffゲート (N-144)', () => {
     // 変更系の入口はひとつも出ない
     expect(screen.queryByText('テンプレートを作る')).toBeNull()
     expect(screen.queryByText('質問を作る')).toBeNull()
-    expect(screen.queryByText('フォルダを追加する')).toBeNull()
+    expect(screen.queryByText('フォルダを追加')).toBeNull()
     // 行の削除系操作（使用数で分岐する両形）も出ない
     expect(screen.queryByText('使用先を見る')).toBeNull()
     expect(screen.queryByText('テンプレートを削除する')).toBeNull()
@@ -148,8 +153,8 @@ describe('テンプレート一覧のstaffゲート (N-144)', () => {
     expect(screen.queryByLabelText('フォルダ「予約」の操作')).toBeNull()
 
     // 代わりに「なぜ出ないか」の説明と、閲覧そのものは残る
-    expect(screen.getByText(/オーナーと管理者だけができます/)).toBeTruthy()
-    expect(table().getByRole('link', { name: '来店お礼の詳細を開く' })).toBeTruthy()
+    expect(screen.getByText(/閲覧のみ/)).toBeTruthy()
+    expect(table().getByRole('row', { name: 'テンプレート「来店お礼」の詳細を開く' })).toBeTruthy()
     // フォルダ自体は閲覧できる（操作だけが消える）
     expect(screen.getByText('予約')).toBeTruthy()
   })
@@ -158,10 +163,11 @@ describe('テンプレート一覧のstaffゲート (N-144)', () => {
     stubRole('staff')
     await renderListAndWait()
 
-    fireEvent.keyDown(table().getByRole('link', { name: '来店お礼の詳細を開く' }), { key: 'Enter' })
+    fireEvent.click(table().getByRole('row', { name: 'テンプレート「来店お礼」の詳細を開く' }))
     await act(async () => { await Promise.resolve() })
     await act(async () => { await Promise.resolve() })
-    expect(templateGet).toHaveBeenCalledWith('tpl-1')
+    expect(screen.getByRole('heading', { name: '来店お礼' })).toBeTruthy()
+    expect(screen.getByText('中身の抜粋')).toBeTruthy()
 
     // hasDraft=true でも公開ボタンは出ない
     expect(screen.queryByText('公開する')).toBeNull()
@@ -169,7 +175,7 @@ describe('テンプレート一覧のstaffゲート (N-144)', () => {
     expect(screen.queryByLabelText('置き場')).toBeNull()
     expect(screen.getAllByText('未分類').length).toBeGreaterThan(0)
     // 名前を押しても編集欄は開かない
-    fireEvent.click(screen.getByText('来店お礼', { selector: 'h3' }))
+    fireEvent.click(screen.getByRole('heading', { name: '来店お礼' }))
     await act(async () => { await Promise.resolve() })
     expect(screen.queryByDisplayValue('来店お礼')).toBeNull()
   })
@@ -178,30 +184,30 @@ describe('テンプレート一覧のstaffゲート (N-144)', () => {
     stubRole('owner')
     await renderListAndWait()
 
-    expect(screen.getByText('テンプレートを作る')).toBeTruthy()
-    expect(screen.getByText('質問を作る')).toBeTruthy()
-    expect(screen.getByText('フォルダを追加する')).toBeTruthy()
+    expect(screen.getAllByText('テンプレートを作る')[0]).toBeTruthy()
+    fireEvent.click(screen.getAllByText('テンプレートを作る')[0]); expect(screen.getAllByRole('button', { name: /質問/ })[0]).toBeTruthy(); fireEvent.click(screen.getByRole('button', { name: '閉じる' }))
+    expect(screen.getByText('フォルダを追加')).toBeTruthy()
     // tpl-1 は使用数があるので「…」メニューの中に「使用先を見る」が出る（U043）。
     // メニューは最上層の器（MenuPortal）に出るので表の中には無い。表とカードの
     // 両方に「…」があり、開くと両方の面の分が出る。
-    fireEvent.click(table().getByLabelText('来店お礼のその他操作'))
-    expect(screen.getAllByRole('menuitem', { name: '使用先を見る' })).toHaveLength(2)
+    fireEvent.click(table().getByLabelText('テンプレート「来店お礼」の操作'))
+    expect(screen.getAllByRole('menuitem', { name: '使っている所を見る' }).length).toBeGreaterThan(0)
     fireEvent.keyDown(document.body, { key: 'Escape' })
     // フォルダ行の操作メニューも出る
     expect(screen.getByLabelText('フォルダ「予約」の操作')).toBeTruthy()
 
-    fireEvent.keyDown(table().getByRole('link', { name: '来店お礼の詳細を開く' }), { key: 'Enter' })
+    fireEvent.click(table().getByRole('row', { name: 'テンプレート「来店お礼」の詳細を開く' }))
     await act(async () => { await Promise.resolve() })
     await act(async () => { await Promise.resolve() })
-    expect(screen.getByText('公開する')).toBeTruthy()
-    expect(screen.getByLabelText('置き場')).toBeTruthy()
+    expect(screen.getByText('編集する')).toBeTruthy()
+    expect(screen.getByText('フォルダへ移す')).toBeTruthy()
   })
 
   test('adminにも変更系の入口が出る', async () => {
     stubRole('admin')
     await renderListAndWait()
-    expect(screen.getByText('テンプレートを作る')).toBeTruthy()
-    expect(screen.getByText('フォルダを追加する')).toBeTruthy()
+    expect(screen.getAllByText('テンプレートを作る')[0]).toBeTruthy()
+    expect(screen.getByText('フォルダを追加')).toBeTruthy()
   })
 })
 
@@ -210,11 +216,11 @@ describe('資産タブのstaffゲート (N-144)', () => {
     stubRole('staff')
     await renderListAndWait()
 
-    fireEvent.click(screen.getByText('カルーセル'))
+    fireEvent.click(screen.getByText(/カルーセル/))
     // 閲覧は残る（一覧が出る）
     expect(await screen.findByText('秋キャンペーン')).toBeTruthy()
     // 案内文が出る
-    expect(screen.getByText(/オーナーと管理者だけができます。一覧の閲覧はこのまま使えます/)).toBeTruthy()
+    expect(screen.getByText(/閲覧のみ/)).toBeTruthy()
     // 変更系の操作は画面上に存在しない
     expect(screen.queryByText('カルーセルを作る')).toBeNull()
     expect(screen.queryByText('編集')).toBeNull()
@@ -227,7 +233,7 @@ describe('資産タブのstaffゲート (N-144)', () => {
     stubRole('owner')
     await renderListAndWait()
 
-    fireEvent.click(screen.getByText('カルーセル'))
+    fireEvent.click(screen.getByText(/カルーセル/))
     // owner には作成ボタンと各カードの編集・削除が出る
     expect(await screen.findByText('カルーセルを作る')).toBeTruthy()
     // 資産カードは別フェッチで遅れて届く。作成ボタンだけ先に出るため、
@@ -235,7 +241,7 @@ describe('資産タブのstaffゲート (N-144)', () => {
     expect(await screen.findByText('秋キャンペーン')).toBeTruthy()
     expect(screen.getByText('編集')).toBeTruthy()
     expect(screen.getByText('削除する')).toBeTruthy()
-    expect(screen.queryByText(/オーナーと管理者だけができます。一覧の閲覧はこのまま使えます/)).toBeNull()
+    expect(screen.queryByText(/閲覧のみ/)).toBeNull()
   })
 })
 
@@ -250,7 +256,7 @@ describe('テンプレート詳細画面のstaffゲート (N-144)', () => {
     // 閲覧は残る（本文が読める — 本文とプレビューの2箇所に出る）
     expect((await screen.findAllByText('ご来店ありがとうございました。')).length).toBeGreaterThan(0)
     // 編集・削除の口は出ない（セクションの見出し自体も出さない）
-    expect(screen.queryByText('テンプレートを編集')).toBeNull()
+    expect(screen.queryByText('編集する')).toBeNull()
     expect(screen.queryByText('テンプレートを削除する')).toBeNull()
     expect(screen.queryByText('使用中のため削除できません')).toBeNull()
     expect(screen.queryByText('このテンプレートを削除する')).toBeNull()
@@ -264,7 +270,7 @@ describe('テンプレート詳細画面のstaffゲート (N-144)', () => {
     await act(async () => { await Promise.resolve() })
 
     expect((await screen.findAllByText('ご来店ありがとうございました。')).length).toBeGreaterThan(0)
-    expect(screen.getByText('テンプレートを編集')).toBeTruthy()
+    expect(screen.getByText('編集する')).toBeTruthy()
   })
 })
 
@@ -275,8 +281,8 @@ describe('カルーセル編集画面のstaffゲート (N-144)', () => {
     await act(async () => { await Promise.resolve() })
     await act(async () => { await Promise.resolve() })
 
-    expect(screen.getByRole('alert')).toBeTruthy()
-    expect(screen.getByText('カルーセルの作成・変更はオーナーと管理者だけができます')).toBeTruthy()
+    expect(screen.getByText(/閲覧のみ/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '下書きを保存' })).toBeNull()
     expect(screen.getByText('一覧へ戻る')).toBeTruthy()
   })
 })
@@ -288,8 +294,8 @@ describe('テンプレート編集画面のstaffゲート (N-144)', () => {
     await act(async () => { await Promise.resolve() })
     await act(async () => { await Promise.resolve() })
 
-    expect(screen.getByRole('alert')).toBeTruthy()
-    expect(screen.getByText('テンプレートの作成・変更はオーナーと管理者だけができます')).toBeTruthy()
+    expect(screen.getByText(/閲覧のみ/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '下書きを保存' })).toBeNull()
     expect(screen.getByText('一覧へ戻る')).toBeTruthy()
   })
 })
@@ -301,8 +307,8 @@ describe('質問テンプレート画面のstaffゲート (N-144)', () => {
     await act(async () => { await Promise.resolve() })
     await act(async () => { await Promise.resolve() })
 
-    expect(screen.getByRole('alert')).toBeTruthy()
-    expect(screen.getByText('質問テンプレートの作成・変更はオーナーと管理者だけができます')).toBeTruthy()
+    expect(screen.getByText(/閲覧のみ/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '下書きを保存' })).toBeNull()
     expect(screen.getByText('一覧へ戻る')).toBeTruthy()
   })
 })

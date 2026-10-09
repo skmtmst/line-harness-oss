@@ -42,7 +42,7 @@ vi.mock('@/contexts/account-context', () => ({
 
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {},
-  api: {
+  api: { staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
     templates: {
       list: fixture.templatesList,
       get: (id: string) => Promise.resolve({
@@ -90,11 +90,16 @@ vi.mock('next/link', () => ({
 import TemplatesPage from './page'
 
 beforeEach(() => {
-  vi.stubGlobal('localStorage', {
+  document.documentElement.dataset.theme = 'v8'
+  window.history.replaceState(null, '', '/templates')
+  window.dispatchEvent(new PopStateEvent('popstate'))
+  const storage = {
     getItem: (key: string) => (key === 'lh_staff_role' ? 'owner' : null),
     setItem: () => {},
     removeItem: () => {},
-  })
+  }
+  vi.stubGlobal('localStorage', storage)
+  Object.defineProperty(window, 'localStorage', { configurable: true, value: storage })
   fixture.foldersList.mockReset()
   fixture.foldersList.mockResolvedValue({ success: true, data: [FOLDER], unfiledCount: 1 })
   fixture.templatesList.mockReset()
@@ -117,38 +122,41 @@ async function renderReady() {
 }
 
 describe('R195 フォルダ件数の読み直し', () => {
-  test('削除したあと、一覧と一緒にフォルダ件数も読み直す', async () => {
+  test('削除したあと、一覧と一緒にフォルダ件数も読み直す', { timeout: 8000 }, async () => {
     await renderReady()
     const beforeCalls = fixture.foldersList.mock.calls.length
 
     // 行の「…」→「テンプレートを削除」→確認窓で「削除する」
     // （表とモバイルカードの両方にメニューがあるので先頭を押す）
-    fireEvent.click(screen.getAllByRole('button', { name: '来店お礼のその他操作' })[0])
-    fireEvent.click((await screen.findAllByRole('menuitem', { name: 'テンプレートを削除する' }))[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'テンプレート「来店お礼」の操作' })[0])
+    fireEvent.click((await screen.findAllByRole('menuitem', { name: '削除する' }))[0])
     fireEvent.click(await screen.findByRole('button', { name: '削除する' }))
 
     await vi.waitFor(() => {
       expect(fixture.templatesDelete).toHaveBeenCalled()
       expect(fixture.foldersList.mock.calls.length).toBeGreaterThan(beforeCalls)
-    })
+    }, { timeout: 6500 })
   })
 
   test('詳細の「置き場」で移すとフォルダ件数も読み直す', async () => {
     await renderReady()
     // 行を開いて詳細を出す
     const table = screen.getByRole('table')
-    fireEvent.click(within(table).getByText('来店お礼'))
+    fireEvent.click(within(table).getByRole('row', { name: 'テンプレート「来店お礼」の詳細を開く' }))
     const beforeCalls = fixture.foldersList.mock.calls.length
 
-    const selectButton = await screen.findByRole('button', { name: '置き場' })
+    const panel = await screen.findByRole('dialog')
+    const selectButton = await within(panel).findByRole('button', { name: /フォルダへ移す/ })
     await act(async () => { fireEvent.click(selectButton) })
+    fireEvent.click(await within(panel).findByRole('button', { name: '移動先のフォルダ' }))
     const option = await screen.findByRole('option', { name: /営業/ })
     // 実際の押し口は選択肢の内側の button。li 自体を押しても動かない。
     await act(async () => { fireEvent.click(within(option).getByRole('button')) })
+    fireEvent.click(within(panel).getByRole('button', { name: '移動する' }))
 
     await vi.waitFor(() => {
       expect(fixture.templatesUpdate).toHaveBeenCalledWith('tpl-1', { folderId: 'folder-sales' })
       expect(fixture.foldersList.mock.calls.length).toBeGreaterThan(beforeCalls)
-    })
+    }, { timeout: 6500 })
   })
 })

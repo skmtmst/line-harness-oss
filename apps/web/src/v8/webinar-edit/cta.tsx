@@ -62,11 +62,18 @@ function isConflict(cause: unknown): boolean {
   return cause instanceof ApiError && cause.status === 409 && (!cause.code || /version_conflict/i.test(cause.code))
 }
 
-export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { ctx: EditContext; chrome: WizardChrome } & PaneSaveProps) {
+type CtaPaneProps = { ctx: EditContext; chrome: WizardChrome } & PaneSaveProps
+
+export default function CtaPane(props: CtaPaneProps) {
+  return <CtaPaneState key={`${props.ctx.webinar.accountId}:${props.ctx.webinar.id}`} {...props} />
+}
+
+function CtaPaneState({ ctx, chrome, onDirtyChange, registerSave }: CtaPaneProps) {
   const { webinar, editor, readOnly } = ctx
   const webinarId = webinar.id
   const accountId = webinar.accountId
   const [ctas, setCtas] = useState<WebinarCtaCard[] | null>(null)
+  const [ctaVersion, setCtaVersion] = useState<number | null>(null)
   const [times, setTimes] = useState<string[]>([])
   const [selected, setSelected] = useState(0)
   const [message, setMessage] = useState<string | null>(null)
@@ -91,12 +98,15 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
   const loadCtas = useCallback(async () => {
     const id = ++requestId.current
     setCtas(null)
+    setCtaVersion(null)
     setMessage(null)
     setLoadFailed(false)
     try {
       const res = await webinarApi.ctas(webinarId)
       if (id !== requestId.current) return
       if (!Array.isArray(res.data)) throw new Error('cta_list_not_array')
+      if (!Number.isInteger(res.version) || res.version < 0) throw new Error('cta_version_missing')
+      setCtaVersion(res.version)
       setCtas(res.data)
       setTimes(res.data.map((card) => fmtMinSec(card.atSeconds)))
       setSavedCards(JSON.stringify([res.data, res.data.map((card) => fmtMinSec(card.atSeconds))]))
@@ -138,12 +148,15 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
 
   /* 下書きを保存：カードは読めていれば今の中身をそのまま保存する（同時編集の 409 はここでも見つける）。 */
   const saveCards = async (): Promise<boolean> => {
-    if (ctas === null) return false
+    if (ctas === null || ctaVersion === null) return false
     const problems = cardProblems(ctas, times, webinar.durationSeconds)
     if (problems.length > 0) { setMessage(problems[0]); return false }
+    const request = requestId.current
     const next = ctas.map((card, i) => ({ ...card, atSeconds: parseMinSec(times[i]) ?? 0 }))
     try {
-      await webinarApi.saveCtas(webinarId, next)
+      const response = await webinarApi.saveCtas(webinarId, next, ctaVersion)
+      if (request !== requestId.current) return false
+      setCtaVersion(response.data.version)
       setCtas(next)
       setTimes(next.map((card) => fmtMinSec(card.atSeconds)))
       setSavedCards(JSON.stringify([next, next.map((card) => fmtMinSec(card.atSeconds))]))
@@ -151,12 +164,14 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
       onCtasReport(next)
       return true
     } catch (cause) {
+      if (request !== requestId.current) return false
       if (isConflict(cause)) { setConflict(true); setLatest(null); return false }
       setMessage('CTA カードを保存できませんでした。入力は残っています。もう一度保存してください。')
       return false
     }
   }
   const saveForm = async (): Promise<boolean> => {
+    const request = requestId.current
     if (forms.state !== 'ready') { setRegistrationError('回答フォームの候補を読み込んでから保存してください。'); return false }
     if (registrationFormId && !published.some((item) => item.id === registrationFormId)) { setRegistrationError('選んだ申込フォームは今の候補にありません。公開中のフォームを選び直してください。'); return false }
     setRegistrationError('')
@@ -166,12 +181,15 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
         ...(editor.updatedAt ? { expectedUpdatedAt: editor.updatedAt } : null),
         registrationFormId: registrationFormId || null,
       })
+      if (request !== requestId.current) return false
       ctx.onEditorChange(response.data)
       setSavedForm(registrationFormId)
       return true
     } catch (cause) {
-      if (isConflict(cause)) { setConflict(true); setLatest(null); return false }
-      if (cause instanceof ApiError && ['form_inactive_or_missing', 'form_account_mismatch'].includes(cause.code ?? '')) loadForms()
+      if (request !== requestId.current) return false
+      const candidateRejected = cause instanceof ApiError && ['form_inactive_or_missing', 'form_account_mismatch'].includes(cause.code ?? '')
+      if (candidateRejected) loadForms()
+      else if (isConflict(cause)) { setConflict(true); setLatest(null); return false }
       setRegistrationError(webinarErrorText(cause, '申込フォームを保存できませんでした。入力は残っています。'))
       return false
     }
@@ -204,20 +222,25 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
   /* 同時編集：最新を読んで見比べる → 最新を読み込んで続ける（自分のカードの入力は残さない／申込フォームは最新へ）。 */
   const readLatest = async () => {
     if (reading) return
+    const request = requestId.current
     setReading(true)
     try {
       const [editorRes, ctasRes] = await Promise.all([webinarApi.editor(webinarId), webinarApi.ctas(webinarId).catch(() => null)])
+      if (request !== requestId.current) return
       setLatest({ editor: editorRes.data, ctas: ctasRes && Array.isArray(ctasRes.data) ? ctasRes.data : null })
       setCompareOpen(true)
     } catch {
+      if (request !== requestId.current) return
       setRegistrationError('最新版を読み込めませんでした。入力は残っています。もう一度お試しください。')
     } finally {
-      setReading(false)
+      if (request === requestId.current) setReading(false)
     }
   }
   const acceptLatest = async () => {
+    const request = requestId.current
     setReplaceConfirm(false)
     const next = latest ?? await webinarApi.editor(webinarId).then((res) => ({ editor: res.data, ctas: null })).catch(() => null)
+    if (request !== requestId.current) return
     if (!next) { setRegistrationError('最新版を読み込めませんでした。もう一度お試しください。'); return }
     ctx.onEditorChange(next.editor)
     setRegistrationFormId(next.editor.registrationFormId ?? '')
@@ -244,7 +267,9 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
       /* 競合の間は「下書きを保存」を「比べてから保存」に替える（押すと違いを比べる窓。絵 pvimJ）。 */
       footerActions={conflict && chrome.footerWithDraft
         ? chrome.footerWithDraft(<Button disabled={busy} busy={reading} onClick={() => void readLatest()}>比べてから保存</Button>)
-        : chrome.footerActions}
+        : chrome.footerWithDraft ? chrome.footerWithDraft(
+          <Button disabled={busy || ctas === null || forms.state !== 'ready'} busy={saving} onClick={() => void saveCurrent.current()}>下書きを保存</Button>,
+        ) : chrome.footerActions}
       status={chrome.status}
       /* 競合の帯は左右の列の上に横いっぱい（絵 pvimJ）。 */
       notice={conflict ? (

@@ -86,6 +86,7 @@ export function WizardSteps({
     <Steps
       label="ウェビナーを作る進み方"
       currentKey={current}
+      allowSelectTodo={Boolean(onSelect)}
       steps={STEPS.map((step) => {
         const state = stateOf(step.key)
         return {

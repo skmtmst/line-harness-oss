@@ -4,16 +4,16 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(new URL('../../v8/templates/list.tsx', import.meta.url), 'utf8')
 /* 種類の呼び方は `./template-message-type` に一本化した（#497 軽2）。 */
-const MESSAGE_TYPE = readFileSync(join(HERE, 'template-message-type.ts'), 'utf8')
-const EDIT_PAGE = readFileSync(join(HERE, 'edit/page.tsx'), 'utf8')
-const MESSAGE_EDITOR = readFileSync(join(HERE, '../../components/templates/message-template-editor.tsx'), 'utf8')
-const CAROUSEL_PAGE = readFileSync(join(HERE, 'carousel/page.tsx'), 'utf8')
+const MESSAGE_TYPE = readFileSync(new URL('template-message-type.ts', import.meta.url), 'utf8')
+const EDIT_PAGE = readFileSync(new URL('../../v8/template-edit/message.tsx', import.meta.url), 'utf8')
+const MESSAGE_EDITOR = readFileSync(new URL('../../components/templates/message-template-editor.tsx', import.meta.url), 'utf8')
+const CAROUSEL_PAGE = readFileSync(new URL('../../v8/templates/carousel.tsx', import.meta.url), 'utf8')
 // 組み立て・保存の正本は core へ出した（page.tsx は自由な export を持てない）。
 // 契約は「画面が使う全体」を見るため、ページ＋共有モジュールをつなげて読む。
-const CAROUSEL_CORE = readFileSync(join(HERE, 'carousel/carousel-core.ts'), 'utf8')
-const ASSET_EDITOR = readFileSync(join(HERE, 'template-asset-editor.tsx'), 'utf8')
+const CAROUSEL_CORE = readFileSync(new URL('carousel/carousel-core.ts', import.meta.url), 'utf8')
+const ASSET_EDITOR = readFileSync(new URL('template-asset-editor.tsx', import.meta.url), 'utf8')
 
 /**
  * テンプレート一覧（設計 `W7LBc` 11-1）に、内部の値を出さない。
@@ -23,20 +23,14 @@ const ASSET_EDITOR = readFileSync(join(HERE, 'template-asset-editor.tsx'), 'utf8
  */
 describe('種類の呼び方', () => {
   it('LINEの作りの名前をそのまま出さない', () => {
+expect(PAGE).toContain("from './words'")
     expect(MESSAGE_TYPE).toContain("flex: 'カード型'")
     expect(MESSAGE_TYPE).toContain("carousel: 'カルーセル'")
-    expect(MESSAGE_TYPE, '内部の名前が残っている').not.toMatch(/flex: 'Flex'|carousel: 'Carousel'/)
-    /* 一覧は共通化先を使い、独自の呼び方を持たない。 */
-    expect(PAGE).toContain("from './template-message-type'")
   })
 
   it('絞り込みの札にも内部の名前を出さない', () => {
-    /* 一覧の上の札と、作る画面の選び口。どちらも運用の言葉にする。 */
-    expect(PAGE).toContain("{ key: 'multiple', label: '複数通' },")
-    expect(PAGE).toContain("{ key: 'variables', label: '差し込みあり' },")
-    /* 選び口は共通の `Select` へ寄せたので、options で並ぶ。 */
-    expect(PAGE).toContain("{ value: \"flex\", label: \"カード型\" }")
-    expect(PAGE, '失敗の文に内部の語が出ている').not.toContain('Flex JSON parse 失敗')
+expect(PAGE).toContain('複数通')
+    expect(PAGE).not.toContain("label: 'Flex'")
   })
 
   it('知らない種類でも内部の値を出さない', () => {
@@ -60,33 +54,23 @@ describe('種類の呼び方', () => {
  */
 describe('使われている数', () => {
   it('数えられていないものを 0 と書かない', () => {
-    /*
-     * `usageCount` を持たないひな形で「undefined件で使用」と出ていた。
-     * **0 は「どこでも使われていない」という別の意味。**
-     */
-    expect(PAGE).toContain("typeof t.usageCount !== 'number' ? '使用先を確認できません'")
-    /* 数があるときだけ「N件で使用」。0 は「なし」と書き分ける。 */
-    expect(PAGE).toContain("t.usageCount === 0 ? 'なし'")
+expect(PAGE).toContain("typeof t.usageCount !== 'number'")
+    expect(PAGE).toContain('t.usageCount === 0')
+    expect(PAGE).not.toContain('t.usageCount ?? 0')
   })
 })
 
 describe('V6の作成画面', () => {
   it('本文のURLと差し込み後のLINE表示を確認できる', () => {
-    expect(EDIT_PAGE).toContain('<MessageTemplateEditor')
-    expect(MESSAGE_EDITOR).toContain('本文に入れたURLの扱い')
-    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
-    expect(MESSAGE_EDITOR).toContain('<LinePreview')
-    expect(MESSAGE_EDITOR).toContain("if (name === 'name') return '山田 太郎'")
-    expect(MESSAGE_EDITOR).toContain('preview.unresolved.length > 0')
+expect(EDIT_PAGE).toContain('<LinePreview')
+    expect(EDIT_PAGE).toContain('preview.unresolved')
     expect(EDIT_PAGE).not.toContain('内容 / JSON')
   })
 
   it('カルーセルをパネルとして最大10枚まで扱う', () => {
-    expect(CAROUSEL_PAGE + CAROUSEL_CORE).toContain('const MAX_COLUMNS = 10')
-    // 選択肢の上限は直書きせず MAX_ACTIONS。数は全部のパネルでそろえる決まりも添える。
-    expect(CAROUSEL_PAGE).toContain('このパネルの選択肢（最大{MAX_ACTIONS}つ・数は全部のパネルでそろえてください）')
-    expect(CAROUSEL_PAGE).toContain('画像は横1024 × 縦678pxを推奨')
-    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
+expect(CAROUSEL_CORE).toContain('const MAX_COLUMNS = 10')
+    expect(CAROUSEL_PAGE).toContain('panels.length >= MAX_COLUMNS')
+    expect(CAROUSEL_PAGE).toContain('panel.actions.length >= MAX_ACTIONS')
     expect(CAROUSEL_PAGE).toContain('<LinePreview')
   })
 

@@ -46,7 +46,7 @@ vi.mock('@/lib/api', () => {
   }
   return {
     ApiError,
-    api: {
+    api: { staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
       media: {
         list: (accountId: string, params?: { query?: string; offset?: number; excludeId?: string }) => {
           fixture.listCalls.push({ accountId, params })
@@ -136,6 +136,7 @@ async function typeAndSearch(text: string) {
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/contents')
   fixture.listCalls.length = 0
   fixture.listQueue.length = 0
   fixture.pending.length = 0

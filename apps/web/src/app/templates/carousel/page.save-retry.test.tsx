@@ -101,6 +101,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
+      staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
       folders: { ...actual.api.folders, list: calls.foldersList },
       tags: { ...actual.api.tags, list: empty },
       friendFields: { ...actual.api.friendFields, list: empty },
@@ -153,9 +154,9 @@ function byText(tag: string, text: string): HTMLElement | null {
   return all(tag).find((element) => element.textContent?.trim() === text) ?? null
 }
 
-const saveButton = () => byText('button', '保存する')
-const retryButton = () => byText('button', 'もう一度保存する')
-const nameInput = () => document.getElementById('cr-name') as HTMLInputElement | null
+const saveButton = () => byText('button', '下書きを保存')
+const retryButton = () => screenText().includes('入力した内容はそのまま残っています') ? saveButton() : null
+const nameInput = () => document.getElementById('cr-template-name') as HTMLInputElement | null
 const screenText = () => container.textContent ?? ''
 
 /** 入力の欄へ、画面と同じく入力の出来事で入れる。 */
@@ -188,6 +189,7 @@ const okCreate = () => Promise.resolve({ success: true as const, data: { id: 'tp
 const okUpdate = () => Promise.resolve({ success: true as const, data: { id: 'tpl-new' } })
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   routing.pushed = []
   calls.templatesGet.mockReset()
   calls.templatesCreate.mockReset()
@@ -260,7 +262,10 @@ describe('N-149: 保存に失敗しても下書きを保持して再試行でき
       // ボタンの文字を入れて「押されたときに何かする」へ替えると postback
       // になり、保存は2段階になる。
       typeInto(choiceLabelInput()!, '詳しく見る')
-      click(byText('button', '押されたときに何かする')!)
+      document.getElementById('cr-action-0-0-kind')!.click()
+    })
+    await act(async () => {
+      Array.from(document.querySelectorAll<HTMLElement>('[role=option]')).find(el => el.textContent?.includes('動きを実行する'))!.querySelector('button')!.click()
     })
     await settle()
 

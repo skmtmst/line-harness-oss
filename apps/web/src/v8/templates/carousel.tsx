@@ -16,6 +16,8 @@
  */
 import { Suspense, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
 import Link from 'next/link'
+import { useFieldValidation } from '@/lib/use-field-validation'
+import { TextField } from '@/components/shared/text-field'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CalendarCheck, CalendarPlus, ChevronDown, ClipboardList, Copy, ExternalLink, ImageIcon, MessageSquare, Plus, Send, Trash2, TriangleAlert, Zap, type LucideIcon } from 'lucide-react'
 import type { Folder, MediaItem, MessageTemplateMediaDefinition } from '@line-crm/shared'
@@ -158,6 +160,19 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   const [uploadedMedia, setUploadedMedia] = useState<MessageTemplateMediaDefinition[]>([])
   const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState('')
+  const fields = useFieldValidation()
+  const reject = (id: string, message: string, card?: number) => {
+    setError('')
+    if (card !== undefined) setSelected(card)
+    fields.reject(id, message)
+  }
+  const rejectChoice = (message: string) => {
+    const match = message.match(/カード(\d+)のボタン(\d+)/)
+    const card = Math.max(0, Number(match?.[1] ?? 1) - 1)
+    const action = Math.max(0, Number(match?.[2] ?? 1) - 1)
+    const part = message.includes('送る文') ? 'text' : message.includes('回答フォームを選んで') ? 'form' : 'kind'
+    reject(`cr-action-${card}-${action}-${part}`, message, card)
+  }
   const [loadFailed, setLoadFailed] = useState(false)
   const [createdId, setCreatedId] = useState<string | null>(null)
   const [saveFailed, setSaveFailed] = useState(false)
@@ -258,10 +273,10 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
     if (savingRef.current || uploadLock.current) return null
     if (loadFailed) { setError('読み込めませんでした。開き直してください。'); return null }
     if (!id && !createdId && !selectedAccountId) { setError('上のバーでLINE公式アカウントを選んでください'); return null }
-    if (!name.trim()) { setError('名前を入力してください'); return null }
+    if (!name.trim()) { reject('cr-template-name', '名前を入力してください'); return null }
     const problems = carouselChoiceProblems(panels, liffId)
-    if (problems.length > 0) { setError(problems[0]); return null }
-    if (panels.some((p) => p.thumbnailImageUrl.trim()) && panels.some((p) => !p.thumbnailImageUrl.trim())) { setError('画像は全部のカードに入れるか、全部入れないかにしてください'); return null }
+    if (problems.length > 0) { rejectChoice(problems[0]); return null }
+    if (panels.some((p) => p.thumbnailImageUrl.trim()) && panels.some((p) => !p.thumbnailImageUrl.trim())) { setUrlOpen(true); reject('cr-image-url', '画像は全部のカードに入れるか、全部入れないかにしてください', panels.findIndex((panel) => !panel.thumbnailImageUrl.trim())); return null }
     savingRef.current = true
     setSaving(true)
     setError('')
@@ -314,12 +329,12 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   /* 統括の入口：中身を組み立てて呼ぶ側へ渡す。選択肢は URL を開く・テキストを送るだけ（ほかは配った先で動かせない）。 */
   const hostSave = (distribute: boolean) => {
     if (!host || uploadLock.current || host.busy) return
-    if (!name.trim()) { setError('名前を入力してください'); return }
+    if (!name.trim()) { reject('cr-template-name', '名前を入力してください'); return }
     if (panels.some((p) => p.actions.some((a) => a.label.trim() && !HOST_ALLOWED.includes(a.kind)))) { setError('統括のカルーセルのボタンは「URLを開く」か「テキストを送る」にしてください'); return }
     const problems = carouselChoiceProblems(panels, null)
-    if (problems.length > 0) { setError(problems[0]); return }
-    if (panels.some((p) => p.thumbnailImageUrl.trim()) && panels.some((p) => !p.thumbnailImageUrl.trim())) { setError('画像は全部のカードに入れるか、全部入れないかにしてください'); return }
-    if (panels.some((p) => !p.text.trim())) { setError('すべてのカードに本文を入力してください'); return }
+    if (problems.length > 0) { rejectChoice(problems[0]); return }
+    if (panels.some((p) => p.thumbnailImageUrl.trim()) && panels.some((p) => !p.thumbnailImageUrl.trim())) { setUrlOpen(true); reject('cr-image-url', '画像は全部のカードに入れるか、全部入れないかにしてください', panels.findIndex((panel) => !panel.thumbnailImageUrl.trim())); return }
+    if (panels.some((p) => !p.text.trim())) { reject('cr-panel-text', 'すべてのカードに本文を入力してください', panels.findIndex((panel) => !panel.text.trim())); return }
     setError('')
     disarm()
     host.onSave({ kind: 'carousel', name: name.trim(), messageContent: buildCarouselContent(panels, 'hq'), tapLimitMode, tapLimitText: tapLimitText.trim() || null, media: uploadedMedia.filter((media) => panels.some((p) => p.thumbnailImageUrl === media.publicUrl)) }, distribute)
@@ -344,7 +359,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   if (host ? host.readOnly : !canMutate) {
     return (
       <TemplateEditFrame boardId="J60utH" title="カルーセル" description="カルーセルの作成・変更はオーナーと管理者だけができます" side={null}>
-        <p className={styles.note}>一覧で中身を確認できます。</p>
+        <p className={styles.note} role="status">閲覧のみで見ています。一覧で中身を確認できます。</p>
         <Link href="/templates" className={styles.back}>一覧へ戻る</Link>
       </TemplateEditFrame>
     )
@@ -430,7 +445,8 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
               <div className={styles.row}>
                 <label className={`${styles.field} ${styles.grow}`}>
                   <span className={styles.label}>テンプレート名</span>
-                  <input className={styles.input} value={name} placeholder="例：夏の定番5点" onChange={(event) => setName(event.target.value)} />
+                  <TextField id="cr-template-name" {...fields.attributes('cr-template-name')} className={styles.input} value={name} placeholder="例：夏の定番5点" onChange={(event) => setName(event.target.value)} />
+                  {fields.error('cr-template-name') ? <p id="cr-template-name-error" role="alert" className={styles.fieldError}>{fields.error('cr-template-name')}</p> : null}
                 </label>
                 <div className={`${styles.field} ${styles.folder}`}>
                   <span className={styles.pickLabel}>フォルダ</span>
@@ -508,11 +524,12 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                   <div className={own.textCol}>
                     <label className={styles.field}>
                       <span className={styles.label}>{`タイトル（${TITLE_MAX}文字まで）`}</span>
-                      <input className={styles.input} value={panel.title} onChange={(event) => update(selectedIndex, { title: event.target.value })} />
+                      <input id="cr-panel-title" className={styles.input} value={panel.title} onChange={(event) => update(selectedIndex, { title: event.target.value })} />
                     </label>
                     <label className={styles.field}>
                       <span className={styles.label}>{panel.title.trim() || panel.thumbnailImageUrl.trim() ? `本文（タイトルか画像があると${TEXT_MAX_WITH_IMAGE}文字まで）` : `本文（${TEXT_MAX_WITHOUT_IMAGE}文字まで）`}</span>
-                      <input className={styles.input} value={panel.text} onChange={(event) => update(selectedIndex, { text: event.target.value })} />
+                      <TextField id="cr-panel-text" title={`${[...panel.text].length} / ${textMaxFor(panel)}`} {...fields.attributes('cr-panel-text')} className={styles.input} value={panel.text} onChange={(event) => update(selectedIndex, { text: event.target.value })} />
+                      {fields.error('cr-panel-text') ? <p id="cr-panel-text-error" role="alert" className={styles.fieldError}>{fields.error('cr-panel-text')}</p> : null}
                     </label>
                     {[...panel.title].length > TITLE_MAX || [...panel.text].length > textMaxFor(panel) ? (
                       <p className={own.over} role="alert">{`タイトル ${[...panel.title].length} / ${TITLE_MAX}・本文 ${[...panel.text].length} / ${textMaxFor(panel)} 文字。多すぎる分を減らしてください。`}</p>
@@ -522,7 +539,8 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                 {urlOpen ? (
                   <label className={styles.field}>
                     <span className={styles.label}>画像の URL</span>
-                    <input className={styles.input} type="url" value={panel.thumbnailImageUrl} placeholder="https://example.com/a.png" onChange={(event) => update(selectedIndex, { thumbnailImageUrl: event.target.value })} />
+                    <TextField id="cr-image-url" {...fields.attributes('cr-image-url')} className={styles.input} type="url" value={panel.thumbnailImageUrl} placeholder="https://example.com/a.png" onChange={(event) => update(selectedIndex, { thumbnailImageUrl: event.target.value })} />
+                    {fields.error('cr-image-url') ? <p id="cr-image-url-error" role="alert" className={styles.fieldError}>{fields.error('cr-image-url')}</p> : null}
                   </label>
                 ) : null}
 
@@ -537,16 +555,19 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                   return (
                     <div key={ai} className={own.buttonRow}>
                       <input className={`${styles.input} ${own.colLabel}`} value={action.label} placeholder="ボタンの文字" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の文字`} onChange={(event) => setAction({ label: event.target.value })} />
+                      {fields.error(`cr-action-${selectedIndex}-${ai}-kind`) ? <p id={`cr-action-${selectedIndex}-${ai}-kind-error`} role="alert" className={styles.fieldError}>{fields.error(`cr-action-${selectedIndex}-${ai}-kind`)}</p> : null}
+                      {fields.error(`cr-action-${selectedIndex}-${ai}-text`) ? <p id={`cr-action-${selectedIndex}-${ai}-text-error`} role="alert" className={styles.fieldError}>{fields.error(`cr-action-${selectedIndex}-${ai}-text`)}</p> : null}
                       <span className={own.colKind}>
-                        <Select size="full" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の動き`} value={action.kind} onChange={(value) => setAction({ kind: value as ChoiceKind })} options={choiceKindOptions({ host: Boolean(host), hasLiff: Boolean(liffId), current: action.kind }).map(({ value, label, icon: Icon }) => ({ value, label, leading: <Icon className={own.kindIcon} /> }))} />
+                        <Select id={`cr-action-${selectedIndex}-${ai}-kind`} {...fields.attributes(`cr-action-${selectedIndex}-${ai}-kind`)} size="full" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の動き`} value={action.kind} onChange={(value) => setAction({ kind: value as ChoiceKind })} options={choiceKindOptions({ host: Boolean(host), hasLiff: Boolean(liffId), current: action.kind }).map(({ value, label, icon: Icon }) => ({ value, label, leading: <Icon className={own.kindIcon} /> }))} />
                       </span>
                       {action.kind === 'uri' ? (
                         <input className={`${styles.input} ${own.colBody}`} type="url" value={action.uri} placeholder="https://example.com" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}のURL`} onChange={(event) => setAction({ uri: event.target.value })} />
                       ) : action.kind === 'message' ? (
-                        <input className={`${styles.input} ${own.colBody}`} value={action.text} placeholder={`押した人が送る文（${MESSAGE_TEXT_MAX}文字まで）`} aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の送る文`} aria-invalid={[...action.text].length > MESSAGE_TEXT_MAX || undefined} title={action.text || undefined} onChange={(event) => setAction({ text: event.target.value })} />
+                        <TextField id={`cr-action-${selectedIndex}-${ai}-text`} {...fields.attributes(`cr-action-${selectedIndex}-${ai}-text`)} className={`${styles.input} ${own.colBody}`} value={action.text} placeholder={`押した人が送る文（${MESSAGE_TEXT_MAX}文字まで）`} aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の送る文`} aria-invalid={[...action.text].length > MESSAGE_TEXT_MAX || undefined} title={action.text || undefined} onChange={(event) => setAction({ text: event.target.value })} />
                       ) : action.kind === 'form' ? (
                         <span className={own.colBody}>
-                          <Select size="full" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の回答フォーム`} value={action.formId} onChange={(value) => setAction({ formId: value })} options={formOptions(action.formId)} />
+                          {fields.error(`cr-action-${selectedIndex}-${ai}-form`) ? <p id={`cr-action-${selectedIndex}-${ai}-form-error`} role="alert" className={styles.fieldError}>{fields.error(`cr-action-${selectedIndex}-${ai}-form`)}</p> : null}
+                          <Select id={`cr-action-${selectedIndex}-${ai}-form`} {...fields.attributes(`cr-action-${selectedIndex}-${ai}-form`)} size="full" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の回答フォーム`} value={action.formId} onChange={(value) => setAction({ formId: value })} options={formOptions(action.formId)} />
                         </span>
                       ) : action.kind === 'booking' || action.kind === 'booking_history' ? (
                         <span className={`${own.colBody} ${own.fixedBody}`}>{action.kind === 'booking' ? 'このアカウントの予約ページを開きます' : 'このアカウントの予約履歴を開きます'}</span>

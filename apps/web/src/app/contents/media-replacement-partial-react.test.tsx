@@ -91,7 +91,7 @@ vi.mock('@/lib/api', () => {
   }
   return {
     ApiError,
-    api: {
+    api: { staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
       media: {
         list: () => Promise.resolve({
           success: true,
@@ -172,6 +172,7 @@ async function waitForDialogText(text: string) {
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/contents')
   fixture.impact = null
   fixture.replaceCalls.length = 0
   fixture.completed.length = 0

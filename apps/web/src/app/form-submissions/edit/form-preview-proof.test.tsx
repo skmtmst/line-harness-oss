@@ -20,7 +20,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   return {
     ...actual,
     fetchApi: vi.fn(async () => ({ success: true, data: [] })),
-    api: {
+    api: { staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
       ...actual.api,
       // 「予約を入れる」欄のメニュー・担当読み。予約を使わない店では空。
       // 素通しすると実通信で試験が環境へ依存するので、ここで空を返す。
@@ -58,9 +58,9 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', () => ({ usePathname: () => '/',
   useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
-  useSearchParams: () => new URLSearchParams('id=form-1&tab=basic'),
+  useSearchParams: () => new URLSearchParams('id=form-1&tab=content'),
 }))
 vi.mock('next/link', () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) =>
@@ -73,7 +73,7 @@ vi.mock('@/contexts/account-context', () => ({
     loading: false,
   }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => undefined, usePageTitle: () => {} }))
 
 const { default: EditFormPage } = await import('./page')
 
@@ -132,6 +132,11 @@ async function click(label: string) {
     findButton(label).click()
   })
   await flush()
+  if (label === 'この版を公開') {
+    const confirm = [...document.querySelectorAll<HTMLButtonElement>('[role=dialog] button')].find(b => b.textContent?.includes(label))
+    if (confirm) await act(async () => { confirm.click() })
+    await flush()
+  }
 }
 
 async function inputValue(input: HTMLInputElement, value: string) {
@@ -144,6 +149,7 @@ async function inputValue(input: HTMLInputElement, value: string) {
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   net.layout = validLayout()
   net.updates = []
   net.publishCount = 0
@@ -161,21 +167,21 @@ describe('N-174 公開前プレビューと検証の実React対照', () => {
   it('顧客プレビューを常時表示し、質問の編集を保存前に即時反映する', async () => {
     await renderPage()
 
-    const preview = container.querySelector('[data-design="Preview"]')
+    const preview = container.querySelector('[aria-label="お客さまに見える形"]')
     expect(preview).toBeTruthy()
-    expect(preview!.textContent).toContain('実際にお客さまが見る画面です')
+    expect(preview!.textContent).toContain('お客さまに見える形')
     expect(preview!.textContent).toContain('参加方法')
     expect(preview!.textContent).toContain('会場参加')
 
     const title = container.querySelector(
-      '[data-design="Inspector"] input[value="参加方法"]',
+      '[data-block-kind] input[value="参加方法"]',
     ) as HTMLInputElement | null
     expect(title).toBeTruthy()
     await inputValue(title!, 'ご希望の参加方法')
 
-    const previewParagraphs = [...preview!.querySelectorAll('p')]
+    const previewParagraphs = [...preview!.querySelectorAll('span')]
       .map((node) => node.textContent)
-    expect(previewParagraphs).toContain('ご希望の参加方法必須')
+    expect(preview!.textContent).toContain('ご希望の参加方法')
     expect(previewParagraphs).not.toContain('参加方法必須')
     expect(net.updates).toHaveLength(0)
   })
@@ -212,7 +218,7 @@ describe('N-174 公開前プレビューと検証の実React対照', () => {
       net.layout = layout
       await renderPage()
 
-      await click('下書きを保存する')
+      await click('下書きを保存')
       expect(container.textContent).toContain(invalid.message)
       await click('この版を公開')
       expect(container.textContent).toContain(invalid.message)

@@ -29,6 +29,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
+      staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
       commonVars: {
         ...actual.api.commonVars,
         detail: api.detail,
@@ -50,7 +51,7 @@ vi.mock('next/link', () => ({
 }))
 
 const navigation = vi.hoisted(() => ({ query: 'id=var-1' }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', () => ({ usePathname: () => '/',
   useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(navigation.query),
 }))
@@ -110,12 +111,10 @@ function byExactText(tag: string, text: string): HTMLElement {
 }
 
 /** 編集画面の社内メモ欄。id/aria-labelを持たないためplaceholderで探す。 */
-function memoInput(): HTMLInputElement {
-  const found = Array.from(document.querySelectorAll('input')).find(
-    (el) => el.getAttribute('placeholder') === '運用上の注意や、この値の使い方を書きます',
-  )
+function memoInput(): HTMLTextAreaElement {
+  const found = document.getElementById('cv-memo') as HTMLTextAreaElement | null
   if (!found) throw new Error('編集画面の社内メモ欄が見つかりません')
-  return found as HTMLInputElement
+  return found
 }
 
 async function setValue(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string) {
@@ -146,6 +145,7 @@ const scheduleRow = {
 }
 
 beforeEach(() => {
+  vi.stubGlobal('localStorage', { getItem: (key: string) => key === 'lh_staff_role' ? 'owner' : null, setItem: vi.fn(), removeItem: vi.fn() })
   vi.clearAllMocks()
   navigation.query = 'id=var-1'
   api.foldersList.mockResolvedValue({ success: true, data: [] })
@@ -174,7 +174,9 @@ describe('共通情報: 更新スケジュールの操作で入力中の内容�
     await setValue(byId('cv-value'), '入力中の値')
     await setValue(memoInput(), '入力中のメモ')
 
-    await click(byExactText('button', '予定を削除する'))
+    await click(byExactText('button', '予定を消す'))
+    expect(api.deleteSchedule).not.toHaveBeenCalled()
+    await click(byExactText('button', 'すべて削除する'))
     await settle()
 
     expect(api.deleteSchedule).toHaveBeenCalledWith('var-1', 's-1', 'account-1')
@@ -194,7 +196,7 @@ describe('共通情報: 更新スケジュールの操作で入力中の内容�
     await setValue(byId('cv-value'), '入力中の値')
 
     // チェックを付けると予定の入力窓が開く。
-    const checkbox = document.querySelector('input[type="checkbox"]') as HTMLInputElement
+    const checkbox = byExactText('button', '予定を足す')
     await act(async () => { checkbox.click() })
     await setValue(byId('sc-value'), '切替後の値')
     await click(byExactText('button', '登録する'))
@@ -211,12 +213,12 @@ describe('共通情報: 更新スケジュールの操作で入力中の内容�
     await mount(React.createElement(EditCommonVarPage))
     await settle()
 
-    const checkbox = document.querySelector('input[type="checkbox"]') as HTMLInputElement
-    expect(checkbox.checked).toBe(true)
+    const checkbox = byExactText('button', '予定を足す')
+    expect(byExactText('button', '予定を消す')).toBeTruthy()
 
-    await act(async () => { checkbox.click() })
+    await click(byExactText('button', '予定を消す'))
     // 確認窓が開き、まだ消していない。
-    expect(document.body.textContent).toContain('更新の予定をすべて消しますか')
+    expect(document.body.textContent).toContain('更新の予定を消しますか')
     expect(api.deleteSchedule).not.toHaveBeenCalled()
 
     // 確認すると全件消して一覧を取り直す。入力中の値は残る。
@@ -232,12 +234,15 @@ describe('共通情報: 更新スケジュールの操作で入力中の内容�
     await mount(React.createElement(EditCommonVarPage))
     await settle()
 
-    const checkbox = document.querySelector('input[type="checkbox"]') as HTMLInputElement
+    const checkbox = byExactText('button', '予定を足す')
     await act(async () => { checkbox.click() }) // 開く
-    expect(document.querySelector('[aria-label="スケジュール設定"]')).not.toBeNull()
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull()
 
-    await act(async () => { checkbox.click() }) // 閉じる
-    expect(document.querySelector('[aria-label="スケジュール設定"]')).toBeNull()
-    expect(document.body.textContent).not.toContain('更新の予定をすべて消しますか')
+    await click(byExactText('button', 'キャンセル')) // 閉じる
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(document.body.textContent).not.toContain('更新の予定を消しますか')
   })
 })
+
+// These scenarios exercise owner actions; permission restrictions are covered separately.
+vi.mock('@/lib/staff-capability', async (importOriginal) => ({ ...await importOriginal<typeof import('@/lib/staff-capability')>(), isOwnerOrAdmin: () => true }))

@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest'
  * - 案内の帯は段の外（左の直下）。
  */
 const HERE = dirname(fileURLToPath(import.meta.url))
-const src = readFileSync(join(HERE, 'create-v8.tsx'), 'utf8')
+const src = readFileSync(new URL('create-v8.tsx', import.meta.url), 'utf8')
 
 describe('リッチメニュー作る④公開は板 F4gELj の段の形どおり', () => {
   it('終わりを決めるは枠の箱', () => {

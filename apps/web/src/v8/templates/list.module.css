@@ -182,19 +182,6 @@
   padding-inline-start: var(--tpl-folder-dot-indent);
 }
 
-/* 種類の札（白い地・薄い枠・角6）。 */
-.kindBadge {
-  display: inline-block;
-  padding: var(--tpl-tl-badge-pad);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--tpl-tl-kind-radius);
-  background: var(--color-canvas);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-tl-badge-lh);
-  white-space: nowrap;
-}
-
 /* 公開の札（公開中・未公開の変更・下書きだけ）。点＋太字。 */
 .publishPill {
   display: inline-flex;

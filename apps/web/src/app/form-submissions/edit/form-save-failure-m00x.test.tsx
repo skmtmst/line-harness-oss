@@ -50,7 +50,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   return {
     ...actual,
     fetchApi: vi.fn(async () => ({ success: true, data: [] })),
-    api: {
+    api: { staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
       ...actual.api,
       // 「予約を入れる」欄のメニュー・担当読み。予約を使わない店では空。
       // 素通しすると実通信で試験が環境へ依存するので、ここで空を返す。
@@ -94,8 +94,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
-const navigation = vi.hoisted(() => ({ query: 'id=form-1&tab=basic' }))
-vi.mock('next/navigation', () => ({
+const navigation = vi.hoisted(() => ({ query: 'id=form-1&tab=appearance' }))
+vi.mock('next/navigation', () => ({ usePathname: () => '/',
   useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(navigation.query),
 }))
@@ -106,7 +106,7 @@ vi.mock('next/link', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-1', selectedAccount: { name: 'テスト店' }, loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => undefined, usePageTitle: () => {} }))
 
 const { default: EditFormPage } = await import('./page')
 
@@ -136,12 +136,13 @@ async function renderPage() {
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   net.putCount = 0
   net.getCount = 0
   net.updateBehavior = 'ok'
   net.loadBehavior = 'ok'
   net.reconcileContent = 'same'
-  navigation.query = 'id=form-1&tab=basic'
+  navigation.query = 'id=form-1&tab=appearance'
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -159,7 +160,7 @@ describe('M001 保存の失敗は日本語の理由と立て直し方で出す',
     net.updateBehavior = 'forbidden'
     await renderPage()
     await act(async () => {
-      findButton('下書きを保存する')!.click()
+      findButton('下書きを保存')!.click()
     })
     await flush()
     expect(container.textContent).toContain('権限')
@@ -170,7 +171,7 @@ describe('M001 保存の失敗は日本語の理由と立て直し方で出す',
     net.updateBehavior = 'serverError'
     await renderPage()
     await act(async () => {
-      findButton('下書きを保存する')!.click()
+      findButton('下書きを保存')!.click()
     })
     await flush()
     expect(container.textContent).toContain('時間をおいて')
@@ -181,7 +182,7 @@ describe('M001 保存の失敗は日本語の理由と立て直し方で出す',
     net.updateBehavior = 'offline'
     await renderPage()
     await act(async () => {
-      findButton('下書きを保存する')!.click()
+      findButton('下書きを保存')!.click()
     })
     await flush()
     expect(container.textContent).not.toContain('Failed to fetch')
@@ -207,7 +208,7 @@ describe('M003 応答消失後の再送は保存済みとして扱う', () => {
     net.reconcileContent = 'same'
     await renderPage()
     await act(async () => {
-      findButton('下書きを保存する')!.click()
+      findButton('下書きを保存')!.click()
     })
     await flush()
     await flush()
@@ -224,11 +225,11 @@ describe('M003 応答消失後の再送は保存済みとして扱う', () => {
     net.reconcileContent = 'other'
     await renderPage()
     await act(async () => {
-      findButton('下書きを保存する')!.click()
+      findButton('下書きを保存')!.click()
     })
     await flush()
     await flush()
     expect(container.textContent).toContain('ほかの人が')
-    expect(container.querySelector('[data-qa="form-edit-conflict-reload"]')).toBeTruthy()
+    expect(findButton('最新を読み込んで続ける')).toBeTruthy()
   })
 })

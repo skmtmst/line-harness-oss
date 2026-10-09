@@ -69,6 +69,7 @@ import VersionCompare from '@/components/shared/version-compare'
 import LinePreview from '@/components/shared/line-preview'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import { CanvasEditor, areaDisplayName, type Area } from '@/components/rich-menus/canvas-editor'
+import { pruneStaleAreaTags, pruneStaleAreaTemplates } from '@/components/rich-menus/action-drafts'
 import { AreaProperties, intentLabelOf, intentOf } from '@/components/rich-menus/area-properties'
 import {
   NEW_MENU_INTENTS_WITH_SWITCH,
@@ -512,7 +513,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const [chatBarTextError, setChatBarTextError] = useState<string | null>(null)
 
   /* 手順③ */
-  const [audience, setAudience] = useState<'all' | 'targeted'>('all')
+  const [audience, setAudience] = useState<'all' | 'targeted' | 'none'>('all')
   const [targetingCondition, setTargetingCondition] = useState<SegmentCondition | null>(null)
   const [targetingPriority, setTargetingPriority] = useState(0)
   const [defaultOpen, setDefaultOpen] = useState(true)
@@ -616,6 +617,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     [group, draftSignature, createInputSignature],
   )
 
+  const signatureRef = useRef(signatureNow())
+  signatureRef.current = signatureNow()
   const [baselineSignature, setBaselineSignature] = useState<string | null>(null)
   // 初期署名は1回だけ（最初のレンダーの値）。useState 初期化で一度だけ計算。
   useEffect(() => {
@@ -629,11 +632,23 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
     dirty,
     busy: saving || publishing,
+    onDiscard: () => {
+      if (group) clearPublishPlanDraft(group.id)
+      setPublishPlan(DEFAULT_PUBLISH_PLAN)
+      setPublishBaseline(DEFAULT_PUBLISH_PLAN)
+      setEndEnabled(false)
+    },
   })
 
   /* ---------- 読み込み ---------- */
 
+  const [referencesReady, setReferencesReady] = useState(false)
+  const [candidatePruneNotice, setCandidatePruneNotice] = useState<string | null>(null)
+  const referenceRequest = useRef(0)
   const load = useCallback(async () => {
+    const request = ++referenceRequest.current
+    setReferencesReady(false)
+    setTags([]); setTemplates([]); setForms([]); setFolders([]); setTrackedLinks([]); setOtherMenus([])
     setLoadError(null)
     setLoadFailedKinds([])
     if (host) {
@@ -657,6 +672,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         accountId ? api.richMenuGroups.list(accountId) : Promise.resolve({ success: true as const, data: [] }),
         api.staff.me(),
       ])
+    if (request !== referenceRequest.current) return
+    setReferencesReady(tagRes.status === 'fulfilled' && tagRes.value.success && templateRes.status === 'fulfilled' && templateRes.value.success)
     const failed: string[] = []
     let firstError: unknown = null
     const noteFailure = (label: string, res: unknown) => {
@@ -701,7 +718,20 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
 
   useEffect(() => {
     void load()
+    return () => { referenceRequest.current += 1 }
   }, [load])
+
+  useEffect(() => {
+    if (host || !referencesReady) return
+    const drafts = Object.fromEntries(pages.map((page) => [page.id, page.areas]))
+    const tagPruned = pruneStaleAreaTags(drafts, new Set(tags.map((tag) => tag.id)))
+    const templatePruned = pruneStaleAreaTemplates(tagPruned.next, new Set(templates.map((item) => item.id)))
+    const removed = tagPruned.removed + templatePruned.removed
+    if (!removed) return
+    setPages((prev) => prev.map((page) => ({ ...page, areas: templatePruned.next[page.id] ?? page.areas })))
+    setCandidatePruneNotice(`選んでいた候補のうち${removed}件は、今のアカウントにないため外しました。選び直してください。`)
+  }, [host, referencesReady, pages, tags, templates])
+
 
   /* 統括：直すときは保存してある中身を、画面の中の下書きにする（サーバーの下書きは作らない）。 */
   const hostSeeded = useRef(false)
@@ -748,13 +778,13 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     if (!name.trim()) {
       setNameError('名前を入力してください')
       setError(null)
-      requestAnimationFrame(() => document.getElementById('rm-name')?.focus())
+      requestAnimationFrame(() => { const field = document.getElementById('rm-name'); field?.focus(); field?.scrollIntoView?.({ block: 'center' }) })
       return false
     }
     if (!chatBarText.trim()) {
       setChatBarTextError('トーク画面の下の文言を入力してください')
       setError(null)
-      requestAnimationFrame(() => document.getElementById('rm-chatbar')?.focus())
+      requestAnimationFrame(() => { const field = document.getElementById('rm-chatbar'); field?.focus(); field?.scrollIntoView?.({ block: 'center' }) })
       return false
     }
     return true
@@ -783,14 +813,14 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     setChatBarText(g.chatBarText)
     setFolderId(g.folderId ?? '')
     setDefaultOpen(g.defaultOpen)
-    setAudience(g.targetingEnabled ? 'targeted' : 'all')
+    setAudience(g.targetingEnabled ? 'targeted' : g.isDefaultForAll ? 'all' : 'none')
     setTargetingCondition(parseStoredCondition(g.targetingCondition))
     setTargetingPriority(g.targetingPriority)
     /*
      * 基準署名は draftSignature と同じ投影で組み立てる（audience の写像・
      * 条件の prune が違うと、保存直後なのに未保存と出る）。
      */
-    const hydratedAudience = g.targetingEnabled ? 'targeted' : 'all'
+    const hydratedAudience = g.targetingEnabled ? 'targeted' : g.isDefaultForAll ? 'all' : 'none'
     const hydratedCondition = parseStoredCondition(g.targetingCondition)
     setBaselineSignature(
       JSON.stringify({
@@ -815,10 +845,19 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     )
   }
 
-  async function reloadGroup(groupId: string) {
+  async function reloadGroup(groupId: string, sentSignature?: string) {
     const res = await api.richMenuGroups.get(groupId)
     if (!res.success) throw new Error(res.error ?? '取得失敗')
-    hydrate(res.data as Group)
+    const next = res.data as Group
+    if (sentSignature && signatureRef.current !== sentSignature) {
+      // 保存中の追加入力を保ち、保存した版と新しいページIDだけを受け取る。
+      setGroup(next)
+      const sent = JSON.parse(sentSignature) as { pages: Array<{ id: string }> }
+      const ids = new Map(sent.pages.map((page, i) => [page.id, next.pages[i]?.id ?? page.id]))
+      setPages(current => current.map(page => ({ ...page, id: ids.get(page.id) ?? page.id })))
+      sent.pages = sent.pages.map(page => ({ ...page, id: ids.get(page.id) ?? page.id }))
+      setBaselineSignature(JSON.stringify(sent))
+    } else hydrate(next)
   }
 
   /*
@@ -834,7 +873,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     resumeIdRef.current = null
     reloadGroup(id)
       // 開いた手順より前は済み（①は下書きがある＝済み）。後ろは未着手のまま。
-      .then(() => setMaxStepIndex(Math.max(1, STEP_KEYS.indexOf(step))))
+      .then(() => setMaxStepIndex(editGroupId ? STEP_KEYS.length - 1 : Math.max(1, STEP_KEYS.indexOf(step))))
       .catch(() => setError('作りかけの下書きを開けませんでした。一覧から開き直してください。'))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -866,6 +905,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   }
 
   /** 手順①の内容で下書きを作る。作れたら true。 */
+  const createdAttempt = useRef<{ id: string; pageId?: string; imageUploaded: boolean } | null>(null)
   async function createDraft(): Promise<boolean> {
     if (host) {
       const seed = await hostSeedFromShape()
@@ -889,36 +929,40 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       setError('出す相手の条件を設定してください。')
       return false
     }
-    const res = await api.richMenuGroups.create({
-      accountId,
-      name: name.trim(),
-      chatBarText: chatBarText.trim(),
-      size,
-      folderId: folderId || null,
-      defaultPageIndex: 0,
-      isDefaultForAll: audience === 'all',
-      targetingEnabled: audience === 'targeted',
-      targetingCondition: condition ? JSON.stringify(condition) : null,
-      targetingPriority,
-      defaultOpen,
-      imageMediaId: selectedMedia?.id,
-      pages: Array.from({ length: tabCount + 1 }, (_, index) => ({
-        name: index === 0 ? 'トップ' : `タブ ${String.fromCharCode(65 + index - 1)}`,
-        orderIndex: index,
-        areas,
-      })),
-    })
-    if (!res.success) throw new Error(res.error ?? '作成失敗')
-    const createdId = res.data.id
+    if (!createdAttempt.current) {
+      const res = await api.richMenuGroups.create({
+        accountId,
+        name: name.trim(),
+        chatBarText: chatBarText.trim(),
+        size,
+        folderId: folderId || null,
+        defaultPageIndex: 0,
+        isDefaultForAll: audience === 'all',
+        targetingEnabled: audience === 'targeted',
+        targetingCondition: condition ? JSON.stringify(condition) : null,
+        targetingPriority,
+        defaultOpen,
+        imageMediaId: selectedMedia?.id,
+        pages: Array.from({ length: tabCount + 1 }, (_, index) => ({
+          name: index === 0 ? 'トップ' : `タブ ${String.fromCharCode(65 + index - 1)}`,
+          orderIndex: index,
+          areas,
+        })),
+      })
+      if (!res.success) throw new Error(res.error ?? '作成失敗')
+      createdAttempt.current = { id: res.data.id, pageId: res.data.pages[0]?.id, imageUploaded: false }
+    }
+    const createdId = createdAttempt.current.id
     // ファイルを直接選んでいたら既定ページへ上げる。
-    if (pendingFile) {
-      const defaultPageId = res.data.pages[0]?.id
+    if (pendingFile && !createdAttempt.current.imageUploaded) {
+      const defaultPageId = createdAttempt.current.pageId
       if (defaultPageId) {
         try {
           await api.richMenuGroups.uploadImage(createdId, defaultPageId, pendingFile)
+          createdAttempt.current.imageUploaded = true
         } catch (e) {
           // 下書き自体はできている。画像だけ失敗として知らせる。
-          setError(imageUploadErrorText(e))
+          throw new Error(imageUploadErrorText(e))
         }
       }
     }
@@ -961,6 +1005,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     setSaving(true)
     setError(null)
     setNotice('')
+    const sentSignature = draftSignature()
     try {
       if (!group) {
         const ok = await createDraft()
@@ -977,7 +1022,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           return false
         }
         await persistDraft()
-        if (!host) await reloadGroup(group.id)
+        if (!host) await reloadGroup(group.id, sentSignature)
       }
       if (host) return true
       setNotice('下書きを保存しました。')
@@ -1278,7 +1323,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   /* ---------- 手順④：公開 ---------- */
 
   const loadChecks = useCallback(async () => {
-    if (!group) return
+    if (!group) return false
     setChecksLoading(true)
     try {
       const res = await api.richMenuGroups.prepublishCheck(group.id)
@@ -1296,8 +1341,11 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         pages: { state: data.pageCount <= data.maxPages ? 'ok' : 'ng', count: data.pageCount, max: data.maxPages },
       }))
       setChecksError(false)
+      return data.selfCheck.ok && data.pageCount <= data.maxPages && data.deviceConfirmed
     } catch {
       setChecksError(true)
+      setChecks(null)
+      return false
     } finally {
       setChecksLoading(false)
     }
@@ -1324,18 +1372,27 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
    */
   const groupId = group?.id ?? null
   const planLoadedRef = useRef<string | null>(null)
+  const skipPlanPersistRef = useRef(false)
   useEffect(() => {
     if (!groupId || planLoadedRef.current === groupId) return
     planLoadedRef.current = groupId
+    skipPlanPersistRef.current = true
     const saved = loadPublishPlanDraft(groupId)
     if (saved) {
       setPublishPlan(saved)
       setPublishBaseline(saved)
       setEndEnabled(saved.mode === 'period')
+    } else {
+      setPublishPlan(DEFAULT_PUBLISH_PLAN)
+      setPublishBaseline(DEFAULT_PUBLISH_PLAN)
+      setEndEnabled(false)
     }
   }, [groupId])
   useEffect(() => {
-    if (groupId && !host) savePublishPlanDraft(groupId, publishPlan)
+    if (skipPlanPersistRef.current) { skipPlanPersistRef.current = false; return }
+    if (!groupId || host) return
+    if (JSON.stringify(publishPlan) === JSON.stringify(DEFAULT_PUBLISH_PLAN)) clearPublishPlanDraft(groupId)
+    else savePublishPlanDraft(groupId, publishPlan)
   }, [groupId, publishPlan, host])
 
   async function validateWithLine() {
@@ -1429,14 +1486,16 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       await persistDraft()
       draftSaved = true
       // 保存で内容が変わると実機確認の fingerprint が変わる。保存し直した状態で再確認する。
-      await loadChecks()
+      if (!(await loadChecks())) throw new Error('公開前の確認がそろいませんでした。検査をやり直してください。')
       await reloadGroup(group.id)
       const res = await api.richMenuGroups.publish(group.id, idempotencyKey)
       if (!res.success) throw new Error(res.error ?? 'publish failed')
       publishAttempt.current.succeed()
       setDone('published')
       setNotice(
-        audience === 'all'
+        audience === 'none'
+          ? 'LINEへの登録が終わりました。友だちの画面は変わりません。一覧の「表示先」から操作してください。'
+          : audience === 'all'
           ? 'LINEへの登録が終わり、すべての友だちの既定メニューになりました。'
           : 'LINEへの登録が終わりました。条件に当てはまる人の画面には、その人に関係する出来事（友だち追加・タグ付けなど）が起きたタイミングで順次出ます。',
       )
@@ -1659,10 +1718,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     <CreatePage boardId={
         host ? (step === 'shape' ? 'gobhu' : step === 'buttons' ? 'egdGx' : step === 'audience' ? 'K0gu1' : 'gQabc')
           : step === 'shape' ? 'JeINq' : step === 'buttons' ? 'Z0uO6' : step === 'audience' ? 'OxEMM' : 'F4gELj'
-      } headingSize="large" title={<>リッチメニューを作る</>} description={<>{headNote}{conflict ? (
+      } headingSize="large" title={<>リッチメニューを作る</>} description={headNote} noticeSpacing="band" notice={conflict ? (
           /* 板 `r8dGXT`：帯は頭の説明の下に横いっぱい（右の列の上まで）。見た目は共通部品（save-conflict）。比べる窓はこの画面の要約の比べ（VersionCompare）。 */
-          <div className={styles.conflictSlot}>
-            <SaveConflictBand
+          <SaveConflictBand
               title="ほかの人がこのメニューを更新しました"
               description="あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。"
               designNode="r8dGXT"
@@ -1670,8 +1728,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               onCompare={() => setCompareOpen(true)}
               onReload={acceptLatestAndContinue}
             />
-          </div>
-        ) : null}</>} identity={host ? (
+        ) : candidatePruneNotice ? <p role="status">{candidatePruneNotice}</p> : null} identity={host ? (
           <button type="button" className={styles.backLink} onClick={host.onCancel}>← リッチメニューへ</button>
         ) : <Link href="/rich-menus" className={styles.backLink}>
           ← リッチメニューへ
@@ -1716,8 +1773,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                     disabled={
                       busy ||
                       !canOperate ||
-                      (checks !== null && publishPlan.mode === 'now' && !checksAllOk) ||
-                      (checks !== null && publishPlan.mode !== 'now' && !scheduleGateOk)
+                      checksLoading || checksError || checks === null ||
+                      (publishPlan.mode === 'now' && !checksAllOk) ||
+                      (publishPlan.mode !== 'now' && !scheduleGateOk)
                     }
                     busy={publishing || saving}
                     busyLabel={publishPlan.mode === 'now' ? '公開しています…' : '予約しています…'}
@@ -2234,6 +2292,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                   : '配った先では下書きのまま届きます。どの友だちに出すかは、各アカウントで条件を決めます。'}
               </span>
             </div>
+          ) : audience === 'none' ? (
+            <p className={styles.fieldHint}>LINEへの登録だけでは、友だちのトーク画面は変わりません。出す相手を選ぶか、「表示先」で出す相手を決めてください。</p>
           ) : audience === 'all' ? (
             <div className={styles.infoBand}>
               <span className={styles.infoBandIcon}><Repeat size={16} aria-hidden /></span>
@@ -2503,8 +2563,12 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             <span className={styles.infoBandIcon}><Repeat size={16} aria-hidden /></span>
             <span>
               {audience === 'all'
-                ? `公開すると、すべての友だちの既定のメニューが入れ替わります。`
-                : '公開すると、条件に当てはまる人にこのメニューが出ます。'}
+                ? '公開すると、すべての友だちの既定のメニューが入れ替わります（個別指定のメニューがある人を除く）。'
+                : audience === 'none'
+                  ? 'LINEへの登録だけでは、友だちのトーク画面は変わりません。「表示先」で出す相手を決めてください。'
+                  : conditionEmpty
+                    ? '条件が空なので、公開しても今は誰の画面にも出ません（0人）。'
+                    : '条件に当てはまる人の画面は、友だち追加やタグ付けなどの出来事のタイミングで順次切り替わります。すぐ全員に出るわけではありません。'}
               {targetPreview?.higherMenus && targetPreview.higherMenus.length > 0 && targetPreview.overlap?.value
                 ? `${targetPreview.higherMenus[0]}の${formatNumber(targetPreview.overlap.value)}人には、いままでどおり上のメニューが出ます。`
                 : ''}

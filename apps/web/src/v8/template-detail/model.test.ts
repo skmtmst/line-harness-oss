@@ -26,9 +26,10 @@ describe('テンプレートの詳細の計算', () => {
     expect(publishRowState(rows[1])).toBe('')
   })
 
-  it('変わるところ：消えた行は－、増えた行は＋。同じ行と空の行は出さない', () => {
+  it('変わるところ：消えた行は－、増えた行は＋。同じ行だけ省き、空の行も比べる', () => {
     expect(lineChanges('A\nB\n\nC', 'A\nB2\nC\nD')).toEqual([
       { kind: 'removed', text: 'B' },
+      { kind: 'removed', text: '' },
       { kind: 'added', text: 'B2' },
       { kind: 'added', text: 'D' },
     ])
@@ -41,4 +42,10 @@ describe('テンプレートの詳細の計算', () => {
     expect(shortStamp('2025-08-21T09:02:00Z', new Date('2026-10-01T00:00:00Z'))).toBe('2025年8月21日 18:02')
     expect(shortStamp(null)).toBe('—')
   })
+})
+
+// WEB-099: 並び・重複・空行も公開する本文の差。
+it.each([['A\nB', 'B\nA'], ['A\nA', 'A'], ['A\n\nB', 'A\nB'], ['A ', 'A']])('本文の差を消さない: %s → %s', (before, after) => {
+  const changes = lineChanges(before, after)
+  expect(changes.length).toBeGreaterThan(0)
 })

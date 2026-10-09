@@ -28,12 +28,6 @@
 
 /* 画面名＋手順の段は型に任せる。画面側に見出しの箱・文字の大きさを書かない。 */
 
-/* 板 `r8dGXT` の競合の帯の置き場（頭の説明の下・横いっぱい）。帯の見た目は共通部品（save-conflict）が持つ。 */
-.conflictSlot {
-  display: block;
-  margin: var(--tpl-eds-band-mt) 0 var(--tpl-eds-band-mb);
-}
-
 /* 左=白カードの縦積み、右=説明カード＋スマホ。 */
 .grid {
   display: grid;

@@ -36,11 +36,11 @@ const MEDIA: MediaItem = {
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.accountId, loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => undefined, usePageTitle: () => undefined }))
 const emptyList = () => Promise.resolve({ success: true, data: [] })
 
 vi.mock('@/lib/api', () => ({
-  api: {
+  api: { staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
     broadcastMessageAssets: {
       create: (input: { lineAccountId: string; kind: string; name: string; payload: Record<string, unknown> }) => {
         fixture.createCalls.push(input)
@@ -107,6 +107,8 @@ async function waitForDialogText(text: string) {
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/templates')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   fixture.accountId = 'account-a'
   fixture.listCalls.length = 0
   fixture.createCalls.length = 0
@@ -209,3 +211,5 @@ describe('テンプレート作成の「登録メディアから選ぶ」（N-19
     expect(fixture.createCalls[0].payload.imageMediaKind).toBeNull()
   })
 })
+
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/templates' }))

@@ -31,3 +31,12 @@ it('共通情報の予定登録中は×・キャンセル・Escを止める', as
   expect(screen.getByRole('dialog')).toBeTruthy()
   await act(async () => resolve({ success: true, data: {} }))
 })
+
+it('WEB-128: 登録を同じ瞬間に2回押しても予定は1件だけ送る', async () => {
+ add.mockReset().mockImplementation(() => new Promise(() => {}))
+ render(<Editor />)
+ fireEvent.click(await screen.findByRole('button', { name: '予定を足す' }))
+ const button = screen.getByRole('button', { name: '登録する' })
+ act(() => { fireEvent.click(button); fireEvent.click(button) })
+ expect(add).toHaveBeenCalledTimes(1)
+})

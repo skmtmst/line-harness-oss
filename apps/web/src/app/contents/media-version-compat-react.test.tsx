@@ -20,7 +20,7 @@ class ApiError extends Error {
 
 vi.mock('@/lib/api', () => ({
   ApiError,
-  api: {
+  api: { staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
     media: {
       deleteImpact: () => Promise.resolve({
         success: true,
@@ -158,6 +158,7 @@ async function clickButton(text: string) {
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/contents')
   fixture.preparedFiles.length = 0
   fixture.createdVersions.length = 0
   fixture.previewBlockers = ['incompatible_dimensions']

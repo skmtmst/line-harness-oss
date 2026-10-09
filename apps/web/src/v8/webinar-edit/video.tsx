@@ -28,6 +28,7 @@ import {
   type WebinarVideoAsset,
 } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
+import VideoMediaLabel from './video-media-label'
 import { fmtJaDuration } from './helpers'
 import { ReadValue } from './parts'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
@@ -226,7 +227,6 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
     return () => registerSave(null)
   }, [registerSave, readOnly])
 
-  const fileName = webinar.videoPrefix ? (webinar.videoPrefix.split('/').pop() ?? webinar.videoPrefix) : null
   const showStages = asset !== undefined && asset !== null && asset.stage !== 'ready'
   const stageIndex = asset ? STAGE_ORDER.indexOf(asset.stage) : -1
   const firstOnce = webinar.schedule.find((rule) => rule.type === 'once' && rule.at)
@@ -284,10 +284,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
         <div className={form.cardHead}><h2 id="webinar-video-title" className={form.cardTitle}>動画</h2></div>
         <div className={styles.videoRow}>
           <span className={styles.thumb} aria-hidden="true"><Play size={18} /></span>
-          <span className={styles.videoText}>
-            <span className={styles.videoName} title={fileName ?? undefined}>{fileName ?? '動画がまだ選ばれていません'}</span>
-            <span className={styles.videoMeta}>{hasVideo ? `${fmtJaDuration(webinar.durationSeconds)}・16:9・自動再生なし` : '差し替えるから登録メディアの動画を選びます'}</span>
-          </span>
+          <VideoMediaLabel webinar={webinar} />
           {readOnly ? null : <Button onClick={() => setReplaceOpen(true)}><Upload size={15} aria-hidden="true" />{hasVideo ? '差し替える' : '動画を選ぶ'}</Button>}
         </div>
         {showStages && asset ? <>

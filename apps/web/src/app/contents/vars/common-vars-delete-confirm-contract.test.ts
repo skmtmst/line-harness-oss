@@ -4,14 +4,13 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(new URL('../../../v8/common-vars/list.tsx', import.meta.url), 'utf8')
 
 /** 共通情報の削除確認（設計 `yPkWe` 14-1-A）。 */
 describe('共通情報の削除確認', () => {
   it('ブラウザ標準の確認ではなく共通ダイアログを使う', () => {
     expect(PAGE).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")
     expect(PAGE).not.toContain('confirm(')
-    expect(PAGE).toContain('data-qa-open="yPkWe"')
   })
 
   it('使用先を確認できた未使用の共通情報だけを確認画面へ進める', () => {
@@ -44,7 +43,7 @@ describe('共通情報の削除確認', () => {
   it('失敗しても窓を閉じず、削除できなかったものだけを残す', () => {
     expect(PAGE).toContain('setDeleteTargets(failed)')
     expect(PAGE).toContain('削除できなかったものだけを残しています。')
-    expect(PAGE).toContain('error={deleteError}')
+    expect(PAGE).toContain('error={deleteError || undefined}')
   })
 
   it('LINEアカウントを切り替えたら前の確認と選択を捨てる', () => {

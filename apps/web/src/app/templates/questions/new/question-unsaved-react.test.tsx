@@ -8,8 +8,8 @@ const fixture = vi.hoisted(() => ({
   foldersList: vi.fn(),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
-vi.mock('next/navigation', () => ({
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => undefined, usePageTitle: vi.fn() }))
+vi.mock('next/navigation', () => ({ usePathname: () => '/',
   useRouter: () => ({ push: fixture.routerPush }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -17,7 +17,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-1', loading: false }),
 }))
 vi.mock('@/lib/api', () => ({
-  api: {
+  api: { staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
     templates: {},
     folders: { list: fixture.foldersList },
     tags: { list: async () => ({ success: true, data: [] }) },
@@ -30,6 +30,7 @@ vi.mock('@/lib/staff-capability', () => ({ isOwnerOrAdmin: () => true }))
 import QuestionTemplatePage from './page'
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   fixture.foldersList.mockResolvedValue({ success: true, data: [] })
 })
 
@@ -45,15 +46,15 @@ describe('R136: 質問の書きかけがある間の離脱確認', () => {
     </>)
     const nameBox = await screen.findByPlaceholderText('例：継続の意思をうかがう')
     fireEvent.change(nameBox, { target: { value: '継続の意思' } })
-    fireEvent.change(screen.getByPlaceholderText('例：体調はいかがですか？'), { target: { value: '続けますか？' } })
+    fireEvent.change(screen.getByPlaceholderText('来月も定期便を続けますか？'), { target: { value: '続けますか？' } })
 
-    fireEvent.click(screen.getByRole('link', { name: 'シナリオで使う' }))
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
     await screen.findByText('保存していない変更があります')
     expect(fixture.routerPush).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
     await waitFor(() => expect(screen.queryByText('保存していない変更があります')).toBeNull())
-    expect((screen.getByPlaceholderText('例：体調はいかがですか？') as HTMLInputElement).value).toBe('続けますか？')
+    expect((screen.getByPlaceholderText('来月も定期便を続けますか？') as HTMLInputElement).value).toBe('続けますか？')
   })
 
   it('破棄を選んだときだけ一覧へ進む', async () => {
@@ -61,11 +62,11 @@ describe('R136: 質問の書きかけがある間の離脱確認', () => {
     const nameBox = await screen.findByPlaceholderText('例：継続の意思をうかがう')
     fireEvent.change(nameBox, { target: { value: '継続の意思' } })
 
-    fireEvent.click(screen.getByRole('link', { name: 'シナリオで使う' }))
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
     await screen.findByText('保存していない変更があります')
 
     fireEvent.click(screen.getByRole('button', { name: '保存せずに移る' }))
-    await waitFor(() => expect(fixture.routerPush).toHaveBeenCalledWith('/scenarios'))
+    await waitFor(() => expect(fixture.routerPush).toHaveBeenCalledWith('/templates'))
   })
 
   it('何も変えていなければ確認を出さない', async () => {

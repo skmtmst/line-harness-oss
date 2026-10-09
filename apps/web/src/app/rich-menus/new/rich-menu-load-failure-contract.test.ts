@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 /* 作るの v7 本体は 2026-10-05 に撤去。読み込みは `create-v8` が担う。 */
-const page = readFileSync(join(HERE, 'create-v8.tsx'), 'utf8')
+const page = readFileSync(new URL('create-v8.tsx', import.meta.url), 'utf8')
 
 describe('rich-menus/new 5種の読み込み失敗', () => {
   it('5種の取得失敗を理由つきで出し、同じ条件で読み直せる', () => {

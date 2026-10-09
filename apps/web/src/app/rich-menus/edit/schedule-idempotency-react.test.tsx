@@ -23,7 +23,7 @@ const net = vi.hoisted(() => ({
 vi.mock('next/link', () => ({
   default: ({ children }: { children?: React.ReactNode }) => <span>{children}</span>,
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', () => ({ usePathname: () => '/',
   useSearchParams: () => new URLSearchParams(''),
   useRouter: () => ({ push: () => {}, replace: () => {} }),
 }))
@@ -58,6 +58,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
+      staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
       richMenuGroups: {
         ...actual.api.richMenuGroups,
         list: async () => ({ success: true, data: [] }),
@@ -84,44 +85,14 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
-const { default: RichMenuEditPage } = await import('./page')
 const { useScheduleSubmit, SCHEDULE_SAVED_MESSAGE, SCHEDULE_FAILED_MESSAGE } = await import('./schedule-submit')
 
-const { PublishStep } = (RichMenuEditPage as unknown as {
-  __testing: { PublishStep: React.ComponentType<Record<string, unknown>> }
-}).__testing
+import DateTimeField from '@/components/shared/date-time-field'
+import Button from '@/components/shared/button'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 
-const group = {
-  id: 'menu-1',
-  accountId: 'account-1',
-  name: 'キャンペーン',
-  chatBarText: 'メニュー',
-  size: 'large' as const,
-  defaultPageId: null,
-  isDefaultForAll: false,
-  status: 'draft' as const,
-  publishingAt: null,
-  targetingCondition: null,
-  targetingPriority: 0,
-  targetingEnabled: false,
-  folderId: null,
-  pages: [],
-}
-
-const pages = [
-  {
-    id: 'p1',
-    orderIndex: 0,
-    name: '1枚目',
-    aliasId: 'lhx-menu-1-0',
-    lineRichmenuId: null,
-    imageR2Key: 'img',
-    imageContentType: 'image/jpeg',
-    areas: [],
-  },
-]
-
-/** 本物の hook と本物の PublishStep を組み合わせた画面。 */
+/** V8 が使う予約 hook の送信・再試行を、共通入力部品で操作する。 */
 function Harness() {
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
@@ -134,7 +105,7 @@ function Harness() {
     restoreGroupId: string
   }>({ mode: 'now', startsAt: '', endsAt: '', restoreGroupId: '' })
   const submit = useScheduleSubmit({
-    groupId: group.id,
+    groupId: 'menu-1',
     persistDraft: async () => {},
     onSaving: setSaving,
     onSaved: (message) => {
@@ -150,20 +121,12 @@ function Harness() {
     <div>
       <p data-testid="notice">{notice}</p>
       <p data-testid="error">{error}</p>
-      <PublishStep
-        group={group}
-        pages={pages}
-        preview={null}
-        saving={saving}
-        publishing={false}
-        publish={publish}
-        onPublishChange={(patch: Record<string, unknown>) =>
-          setPublish((prev) => ({ ...prev, ...patch }))
-        }
-        onSave={() => {}}
-        onPublishNow={() => {}}
-        onSchedule={submit}
-      />
+      <RadioCardGroup legend="いつ公開するか">
+        <RadioCard name="publish-mode" value="now" title="いますぐ公開する" checked={publish.mode === 'now'} onChange={() => setPublish(p => ({ ...p, mode: 'now' }))} />
+        <RadioCard name="publish-mode" value="scheduled" title="日時を決めて公開する" checked={publish.mode === 'scheduled'} onChange={() => setPublish(p => ({ ...p, mode: 'scheduled' }))} />
+      </RadioCardGroup>
+      <DateTimeField aria-label="公開する日時" value={publish.startsAt} onChange={startsAt => setPublish(p => ({ ...p, startsAt }))} />
+      <Button disabled={saving || publish.mode !== 'scheduled' || !publish.startsAt} onClick={() => void submit({ mode: 'scheduled', startsAt: datetimeLocalJstToUtcIso(publish.startsAt), endsAt: null, restoreGroupId: null })}>この内容で予約する</Button>
     </div>
   )
 }
@@ -189,14 +152,14 @@ function findByText<T extends Element>(selector: string, text: string): T {
   return found as T
 }
 
-/** 出しはじめを日時の選択（★V7）で選ぶ。値は今までどおり YYYY-MM-DDTHH:mm。 */
+/** 出しはじめを日時の選択（V8）で選ぶ。値は今までどおり YYYY-MM-DDTHH:mm。 */
 async function pickStartsAt(startsAt: string) {
   const [date, time] = startsAt.split('T')
   const [hour, minute] = time.split(':')
   const [y, mo, d] = date.split('-').map(Number)
   const week = '日月火水木金土'[new Date(y, mo - 1, d).getDay()]
   await act(async () => {
-    container.querySelector<HTMLElement>('button[aria-label="出しはじめ"]')!.click()
+    container.querySelector<HTMLElement>('button[aria-label="公開する日時"]')!.click()
   })
   // 日時の選択箱は最上層（MenuPortal→document.body）に出る。器の中にはいない。
   const picker = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!

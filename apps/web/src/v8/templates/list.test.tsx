@@ -5,7 +5,7 @@
  * 使っていない（0か所）ものは窓なしで外して5秒は元に戻せる・数が分からないものは削除の確認（V6JFnd）、使っているものは削除できない窓（Z0g3si）。
  */
 import React, { act } from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const listTemplates = vi.hoisted(() => vi.fn())
@@ -45,7 +45,7 @@ vi.mock('@/lib/api', () => ({
   fetchApi,
   api: {
     templates: { list: listTemplates, usages, delete: removeTemplate },
-    broadcastMessageAssets: { counts: () => Promise.resolve({ success: true, data: { card_message: 4 } }) },
+    broadcastMessageAssets: { list: async () => ({ success: true, data: [] }), counts: () => Promise.resolve({ success: true, data: { card_message: 4 } }) },
     folders: { list: () => Promise.resolve({ success: true, data: [], unfiledCount: 2 }) },
   },
 }))
@@ -137,12 +137,13 @@ describe('V8 テンプレートの一覧', () => {
     expect(screen.queryByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')).toBeNull()
   })
 
-  it('使っていない（0か所と分かっている）ものは窓を出さずに一覧から外し、5秒たってから消す', async () => {
+  it('使っていないものは確認後に一覧から外し、5秒たってから消す', async () => {
     await renderList()
     render(<ToastHost />)
     vi.useFakeTimers()
     openMenuAndDelete('秋の新商品（画像）')
-    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    act(() => { within(screen.getByRole('dialog')).getByRole('button', { name: '削除する' }).click() })
     expect(screen.queryByText('秋の新商品（画像）')).toBeNull()
     expect(screen.getByText('テンプレート「秋の新商品（画像）」を削除しました')).toBeTruthy()
     await act(async () => { await vi.advanceTimersByTimeAsync(4999) })
@@ -151,11 +152,12 @@ describe('V8 テンプレートの一覧', () => {
     expect(removeTemplate).toHaveBeenCalledWith('t-unused')
   })
 
-  it('窓なしで外したものは「元に戻す」で行が戻り、消さない', async () => {
+  it('確認後に外したものは「元に戻す」で行が戻り、消さない', async () => {
     await renderList()
     render(<ToastHost />)
     vi.useFakeTimers()
     openMenuAndDelete('秋の新商品（画像）')
+    act(() => { within(screen.getByRole('dialog')).getByRole('button', { name: '削除する' }).click() })
     expect(screen.queryByText('秋の新商品（画像）')).toBeNull()
     act(() => { screen.getByRole('button', { name: '元に戻す' }).click() })
     expect(screen.getByText('秋の新商品（画像）')).toBeTruthy()
@@ -223,6 +225,19 @@ describe('テンプレートの種類を選ぶ窓（R9XUMr）：見本から作�
     expect(push).toHaveBeenCalledWith('/templates/edit?example=template-example-booking')
   })
 
+  it('WEB-109: 見本を読んでいる間に窓を閉じても、開き直すと完了した見本が出る', async () => {
+    let finish!: (value: unknown) => void
+    fetchApi.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    await renderList()
+    fireEvent.click(screen.getAllByRole('button', { name: /テンプレートを作る/ })[0])
+    await act(async () => { await Promise.resolve() })
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+    await act(async () => finish({ success: true, data: [{ id: 'booking', name: '見本の予約', body: '予約の本文' }] }))
+    fireEvent.click(screen.getAllByRole('button', { name: /テンプレートを作る/ })[0])
+    expect(screen.getByRole('button', { name: /見本の予約/ })).toBeTruthy()
+    expect(fetchApi).toHaveBeenCalledTimes(1)
+  })
+
   it('見本が読めないときは段を出さず、種類のカードはそのまま押せる', async () => {
     fetchApi.mockRejectedValue(new Error('network'))
     await renderList()
@@ -233,4 +248,14 @@ describe('テンプレートの種類を選ぶ窓（R9XUMr）：見本から作�
     expect(screen.queryByRole('heading', { name: '見本から作る' })).toBeNull()
     expect(screen.getByRole('button', { name: /カルーセル/ })).toBeTruthy()
   })
+})
+
+it('WEB-108: 新しいカルーセルはメッセージの数に入れず、カルーセルから編集できる', async () => {
+ listTemplates.mockResolvedValue({ success: true, data: [{ ...unused, id: 'carousel-new', name: '新しいカルーセル', messageType: 'carousel' }] })
+ await renderList()
+ fireEvent.click(screen.getByRole('tab', { name: /カルーセル/ }))
+ expect(await screen.findByText('新しいカルーセル')).toBeTruthy()
+ fireEvent.click(screen.getByRole('button', { name: 'テンプレート「新しいカルーセル」の操作' }))
+ fireEvent.click(screen.getByText('編集する'))
+ expect(push).toHaveBeenCalledWith('/templates/carousel?id=carousel-new')
 })

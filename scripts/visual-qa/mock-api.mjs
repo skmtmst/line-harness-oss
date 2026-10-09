@@ -6075,7 +6075,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (/^\/api\/webinars\/[^/]+\/publish-validation$/.test(pathname)) return { success: true, data: WEBINAR_PUBLISH_VALIDATION }
   if (/^\/api\/webinars\/[^/]+\/participants$/.test(pathname)) return { success: true, data: WEBINAR_PARTICIPANTS }
   if (/^\/api\/webinars\/[^/]+\/notifications$/.test(pathname)) return { success: true, data: WEBINAR_NOTIFICATIONS }
-  if (/^\/api\/webinars\/[^/]+\/ctas$/.test(pathname)) return { success: true, data: WEBINAR_CTAS }
+  if (/^\/api\/webinars\/[^/]+\/ctas$/.test(pathname)) return { success: true, data: WEBINAR_CTAS, version: 1, updatedBy: null, updatedAt: null }
   if (/^\/api\/webinars\/[^/]+\/actions$/.test(pathname)) return { success: true, data: WEBINAR_ACTIONS }
   if (/^\/api\/webinars\/[^/]+\/comments$/.test(pathname)) return { success: true, data: WEBINAR_COMMENTS }
   if (/^\/api\/webinars\/[^/]+\/user-comments$/.test(pathname)) return { success: true, data: [] }
@@ -6375,6 +6375,24 @@ const server = createServer((req, res) => {
     res.setHeader('Content-Type', 'image/jpeg')
     res.setHeader('Cache-Control', 'no-store')
     res.writeHead(200).end(jpeg)
+    return
+  }
+
+  // 管理画面の画像は公開URLではなく、実際の認証付き表示口から読む。
+  const mediaContent = /^\/api\/media\/([^/]+)\/content$/.exec(url.pathname)
+  if (method === 'GET' && mediaContent) {
+    const item = MEDIA_ITEMS.find((media) => media.id === decodeURIComponent(mediaContent[1]))
+    if (!item || url.searchParams.get('accountId') !== item.lineAccountId) {
+      res.writeHead(404).end()
+      return
+    }
+    if (item.kind === 'image' && item.url.startsWith('data:image/svg+xml,')) {
+      res.setHeader('Content-Type', 'image/svg+xml')
+      res.setHeader('Cache-Control', 'no-store')
+      res.writeHead(200).end(decodeURIComponent(item.url.slice('data:image/svg+xml,'.length)))
+      return
+    }
+    res.writeHead(404).end()
     return
   }
 

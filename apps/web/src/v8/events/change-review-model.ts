@@ -116,10 +116,29 @@ export function useChangeReview(eventId: string) {
   const [applyBusy, setApplyBusy] = useState(false)
   const [applyError, setApplyError] = useState<string | null>(null)
   const [applied, setApplied] = useState<{ notified: number; confirmed: number; waiting: number } | null>(null)
+  const identity = `${selectedAccountId ?? ''}:${eventId}`
+  const targetRef = useRef(identity)
+  targetRef.current = identity
+  const loadSeq = useRef(0)
+  const applyLock = useRef(false)
+  const previewSeqRef = useRef(0)
+  const inputs = JSON.stringify({ edits, venueName, venueUrl })
+  const inputsRef = useRef(inputs)
+  inputsRef.current = inputs
+  const adopt = (detail: EventDetail, items: EventSlot[], replaceInputs = true) => {
+    setEvent(detail); setSlots(items)
+    if (!replaceInputs) return
+    setEdits(Object.fromEntries(items.map(slot => [slot.id, { startsAt: isoToLocalInput(slot.starts_at), endsAt: isoToLocalInput(slot.ends_at), capacity: slot.capacity == null ? '' : String(slot.capacity), isActive: slot.is_active === 1 }])))
+    setVenueName(detail.venue_name ?? ''); setVenueUrl(detail.venue_url ?? '')
+  }
   const idempotencyKeyRef = useRef<string>(crypto.randomUUID())
 
   const refresh = useCallback(async () => {
-    if (!selectedAccountId) return
+    const target = identity, seq = ++loadSeq.current
+    previewSeqRef.current += 1
+    setEvent(null); setSlots(null); setEdits({}); setReason(''); setApplyBusy(false); applyLock.current = false
+    setPreviewBusy(false); setPreviewError('')
+    if (!selectedAccountId) { setStatus('ready'); return }
     setStatus('loading')
     setPreview(null)
     setApplied(null)
@@ -129,23 +148,12 @@ export function useChangeReview(eventId: string) {
         eventsApi.getEvent(selectedAccountId, eventId),
         eventsApi.listSlots(selectedAccountId, eventId),
       ])
-      setEvent(detail)
-      setSlots(slotList.items)
-      const next: Record<string, SlotEdit> = {}
-      for (const slot of slotList.items) {
-        next[slot.id] = {
-          startsAt: isoToLocalInput(slot.starts_at),
-          endsAt: isoToLocalInput(slot.ends_at),
-          capacity: slot.capacity == null ? '' : String(slot.capacity),
-          isActive: slot.is_active === 1,
-        }
-      }
-      setEdits(next)
-      setVenueName(detail.venue_name ?? '')
-      setVenueUrl(detail.venue_url ?? '')
+      if (target !== targetRef.current || seq !== loadSeq.current) return
+      adopt(detail, slotList.items)
       idempotencyKeyRef.current = crypto.randomUUID()
       setStatus('ready')
     } catch (error) {
+      if (target !== targetRef.current || seq !== loadSeq.current) return
       if ((error as { status?: number }).status === 404) {
         setStatus('not-found')
       } else {
@@ -156,13 +164,13 @@ export function useChangeReview(eventId: string) {
 
   useEffect(() => {
     void refresh()
+    return () => { loadSeq.current += 1; previewSeqRef.current += 1 }
   }, [refresh])
 
   const slotList = slots ?? []
   const isPublished = event?.is_published === 1
 
   // ★V8：自動で確かめるので、古い問い合わせの返事が新しい結果を上書きしないよう番号で見分ける。
-  const previewSeqRef = useRef(0)
   const touchEdits = useCallback(() => {
     previewSeqRef.current += 1
     setPreviewBusy(false)
@@ -218,6 +226,7 @@ export function useChangeReview(eventId: string) {
 
   const runPreview = useCallback(async () => {
     if (!selectedAccountId) return
+    const target = identity
     const seq = ++previewSeqRef.current
     setPreviewError('')
     setPreview(null)
@@ -236,16 +245,19 @@ export function useChangeReview(eventId: string) {
         slot_changes: slotChanges,
         event_changes: eventChanges,
       })
-      if (seq === previewSeqRef.current) setPreview(result)
+      if (seq === previewSeqRef.current && target === targetRef.current) setPreview(result)
     } catch {
-      if (seq === previewSeqRef.current) setPreviewError('確かめられませんでした。時間をおいて、もう一度お試しください。')
+      if (seq === previewSeqRef.current && target === targetRef.current) setPreviewError('確かめられませんでした。時間をおいて、もう一度お試しください。')
     } finally {
-      if (seq === previewSeqRef.current) setPreviewBusy(false)
+      if (seq === previewSeqRef.current && target === targetRef.current) setPreviewBusy(false)
     }
   }, [selectedAccountId, buildChanges, eventId])
 
   const runApply = useCallback(async () => {
-    if (!selectedAccountId || applyBusy || !preview || preview.blocked) return
+    if (!selectedAccountId || applyBusy || applyLock.current || !preview || preview.blocked) return
+    applyLock.current = true
+    const target = identity, generation = loadSeq.current, sentInputs = inputsRef.current
+    let didApply = false
     setApplyError(null)
     const { slotChanges, eventChanges } = buildChanges()
     setApplyBusy(true)
@@ -257,19 +269,25 @@ export function useChangeReview(eventId: string) {
         slot_changes: slotChanges,
         event_changes: eventChanges,
       })
+      if (target !== targetRef.current || generation !== loadSeq.current) return
+      didApply = true
       setApplied({
         notified: result.notified ?? 0,
         confirmed: result.affected_confirmed ?? 0,
         waiting: result.affected_waiting ?? 0,
       })
       setPreview(null)
-      const detail = await eventsApi.getEvent(selectedAccountId, eventId)
-      setEvent(detail)
+      const [detail, updatedSlots] = await Promise.all([eventsApi.getEvent(selectedAccountId, eventId), eventsApi.listSlots(selectedAccountId, eventId)])
+      if (target !== targetRef.current || generation !== loadSeq.current) return
+      adopt(detail, updatedSlots.items, inputsRef.current === sentInputs)
+      idempotencyKeyRef.current = crypto.randomUUID()
     } catch (error) {
+      if (target !== targetRef.current || generation !== loadSeq.current) return
+      if (didApply) { setApplyError('変更は適用済みですが、表示を読み直せませんでした。再読み込みしてください。'); setStatus('error'); return }
       const code = (error as { body?: { error?: string } }).body?.error ?? null
       setApplyError(applyErrorMessage(code))
     } finally {
-      setApplyBusy(false)
+      if (target === targetRef.current && generation === loadSeq.current) { applyLock.current = false; setApplyBusy(false) }
     }
   }, [selectedAccountId, applyBusy, preview, buildChanges, eventId, event, reason])
 

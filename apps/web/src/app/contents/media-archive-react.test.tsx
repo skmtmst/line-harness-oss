@@ -122,7 +122,7 @@ async function waitForText(text: string) {
   for (let index = 0; index < 20 && !host.textContent?.includes(text); index += 1) {
     await act(async () => { await settle() })
   }
-  expect(host.textContent).toContain(text)
+  expect(host.textContent, host.textContent ?? '').toContain(text)
 }
 
 function buttonByLabel(label: string): HTMLButtonElement {
@@ -141,13 +141,16 @@ async function openCardMenu() {
 }
 
 async function clickChip(label: string) {
-  const chip = [...document.querySelectorAll<HTMLButtonElement>('button')]
-    .find((candidate) => candidate.textContent?.trim() === label)
-  if (!chip) throw new Error(`絞り込みがありません: ${label}`)
-  await act(async () => { chip.click(); await settle() })
+  const select = document.querySelector<HTMLElement>('button[aria-label="よく使う絞り込み"]')
+  if (!select) throw new Error('よく使う絞り込みがありません: ' + host.textContent)
+  await act(async () => { select.click(); await settle() })
+  const option = [...document.querySelectorAll<HTMLElement>('[role=option]')].find(el => el.textContent?.includes(label))
+  if (!option) throw new Error(`絞り込みがありません: ${label}`)
+  await act(async () => { option.querySelector<HTMLButtonElement>('button')!.click(); await settle() })
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   fixture.accountId = 'account-a'
   fixture.role = 'owner'
   fixture.listCalls.length = 0

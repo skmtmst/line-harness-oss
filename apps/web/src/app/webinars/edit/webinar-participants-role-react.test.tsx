@@ -37,7 +37,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ accounts: [{ id: fixture.accountId, liffId: 'liff' }], loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => undefined, usePageTitle: () => undefined }))
 vi.mock('@/components/webinars/webinar-form', () => ({ default: () => <div>基本設定</div> }))
 vi.mock('@/components/webinars/webinar-notifications', () => ({ default: () => <div>通知設定</div> }))
 vi.mock('@/components/shared/select', () => ({
@@ -183,7 +183,7 @@ function csvLinks(): string[] {
  */
 function csvButton(label = 'CSVで書き出す'): HTMLButtonElement | null {
   return Array.from(host.querySelectorAll('button'))
-    .find((b) => b.textContent?.includes(label)) as HTMLButtonElement | undefined ?? null
+    .find((b) => b.textContent?.replace(/\s/g, '').includes(label.replace(/\s/g, ''))) as HTMLButtonElement | undefined ?? null
 }
 
 describe('ウェビナー編集の参加者導線と権限 (N-118)', () => {
@@ -237,7 +237,7 @@ describe('ウェビナー編集の参加者導線と権限 (N-118)', () => {
 
     expect(host.querySelector('[data-design-node="uNsEy"]')).not.toBeNull()
     expect(host.textContent).toContain(FRIEND_NAME)
-    expect(host.textContent).toContain('CSVで書き出す')
+    expect(host.textContent?.replace(/\s/g, '')).toContain('CSVで書き出す')
     // 直リンクのaタグは無く、押すと認証付きで取る（#1053）。
     expect(csvLinks()).toEqual([])
     const callsBefore = net.calls.length
