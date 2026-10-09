@@ -98,8 +98,19 @@ describe('統括のアカウント', () => {
     const card = container.querySelector('article')!
     const reason = card.querySelector('[title*="old.example.test"]')
     expect(reason?.textContent).toContain('Webhook の URL がこの環境と違います')
+    const band = reason!.closest('[data-design-part="notice"]')!
+    expect(band.closest('article')).toBe(card)
+    expect(card.querySelector('dl')!.compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(band.compareDocumentPosition(card.querySelector('button[aria-label$="へ入る"]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(band.querySelector('svg')).toBeTruthy()
     expect(card.textContent).not.toContain('LINE ID・接続状態を確かめてください')
     expect([...card.querySelectorAll('button')].some((button) => button.textContent === '更新する')).toBe(true)
+  })
+
+  it('正常のカードには理由の帯を出さない', async () => {
+    accounts.mockResolvedValue({ success: true, data: [{ ...warnedAccount, connection: { status: 'ok', issues: [] } }] })
+    await render()
+    expect(container.querySelector('article [data-design-part="notice"]')).toBeNull()
   })
 
   it('閲覧のみには「更新する」を置かない', async () => {

@@ -28,6 +28,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import StatusBadge from '@/components/shared/status-badge'
 import Notice from '@/components/shared/notice'
+import TagPill from '@/components/shared/tag-pill'
 import Select from '@/components/shared/select'
 import FolderSelect from '@/components/shared/folder-select'
 import { Th } from '@/components/shared/table'
@@ -574,6 +575,10 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     await save(false, next, nextName, nextDescription, andAnother)
   }
   const summary = contentSummary(type, definition)
+  const tagFolder = 'tag' in definition
+    ? definition.folders.find((folder) => folder.id === definition.tag.folderId)
+    : null
+  const tagColor = tagFolder ? tagFolder.color ?? null : folders.find((folder) => folder.id === folderId)?.color
 
   const notices = <>
     {!canEdit && stage === 'list' ? <p className={styles.readonlyBand} role="note">閲覧のみで見ています。変える操作は管理者に頼んでください。</p> : null}
@@ -619,7 +624,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         }}
         onCreate={startCreate}
         onEdit={(row) => open(row.id, 'edit')}
-        onOpen={type === 'template' ? (row) => open(row.id, 'detail') : undefined}
+        onOpen={type === 'template' || type === 'tag' ? (row) => open(row.id, 'detail') : undefined}
         folderContents={templates}
         onDistributeFolder={(id, folderName) => void perform(async () => {
           if (!canEdit || type === 'scenario') return
@@ -636,11 +641,12 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         notices={notices}
         overlays={(
           <>
-          {folderDistribution ? <FolderDistributionDialog name={folderDistribution.name} templates={folderDistribution.templates} accounts={accounts} busy={busy} error={error}
+          {folderDistribution ? <FolderDistributionDialog name={folderDistribution.name} templates={folderDistribution.templates} templateFolders={folders} accounts={accounts} busy={busy} error={error}
             onCancel={() => { if (!busy) { setFolderDistribution(null); setError('') } }}
             onConfirm={(rows, ids) => startFolderDistribution(folderDistribution.name, rows, ids)} /> : null}
           {stage === 'saved' ? <SavedDistributionDialog accounts={accounts} folders={accountFolders} selected={selected} onChange={setSelected}
             filter={accountFolder} onFilter={setAccountFolder} search={search} onSearch={setSearch} received={received} receivedFailed={receivedFailed} busy={busy}
+            notice={type === 'tag' ? <TagPill name={name} color={tagColor} /> : undefined}
             error={error} onLater={toList} onDistribute={() => checkStores(selected)} /> : null}
           <ConfirmDialog
             open={!!remove}
@@ -673,6 +679,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         row={listRow}
         accounts={accounts}
         folderName={folders.find((folder) => folder.id === detail.template.folder_id)?.name ?? '未分類'}
+        folderColor={folders.find((folder) => folder.id === detail.template.folder_id)?.color}
         canEdit={canEdit}
         busy={busy}
         notices={notices}
@@ -951,7 +958,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   }
 
   if (stage === 'result' && folderBatch) return <FolderDistributionResult name={folderBatch.name} runs={[...folderBatch.history, ...folderBatch.runs]}
-    accounts={accounts} busy={busy} error={error}
+    accounts={accounts} folders={folders} busy={busy} error={error}
     onBack={toList} onRefresh={() => void perform(() => executeFolder(folderBatch))}
     onRetry={() => retryFolder()} onRecheck={() => retryFolder(true)} />
 
@@ -986,7 +993,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
 
   return (
     <PageFrame kind="wizard" boardId={stage === 'result' ? 'dEvJM' : 'meBRB'}>
-      <PageHeading title={pageTitle} help="1つのアカウントだけ、または複数のアカウントを選んで一括で配れます。一括設定のあと、必要な項目だけアカウントごとに変えられます。" />
+      <PageHeading title={type === 'tag' ? <>アカウントへ配る：<TagPill name={name} color={tagColor} /></> : pageTitle} help="1つのアカウントだけ、または複数のアカウントを選んで一括で配れます。一括設定のあと、必要な項目だけアカウントごとに変えられます。" />
       {folderBatch ? <p className={styles.distributionNotice}>{`フォルダ「${folderBatch.name}」：${folderBatch.index + 1} / ${folderBatch.runs.length} 件目の配布方法を確かめています。すべて確かめてから配ります。`}</p> : null}
       {error || message ? <div className={styles.distributionNotice}>{notices}</div> : null}
       <ListPageBody
@@ -1046,7 +1053,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                     </td>
                     <td>
                       {on ? <span className={styles.cellLine}>
-                        <span className={styles.cell}>{`${summary}（${textOverrides[account.id] !== undefined || store?.textOverride !== undefined ? '個別の本文' : '一括と同じ'}）`}</span>
+                        <span className={styles.cell}>{type === 'tag' ? <TagPill name={name} color={tagColor} size="sm" /> : `${summary}（${textOverrides[account.id] !== undefined || store?.textOverride !== undefined ? '個別の本文' : '一括と同じ'}）`}</span>
                         {textMessage && stage === 'accounts' ? <Button size="compact" variant="text" disabled={busy} onClick={() => setOverrideOpen(overrideOpen === account.id ? null : account.id)}>本文を変える</Button> : null}
                       </span> : <span className={`${styles.cell} ${styles.cellEmpty}`}>—</span>}
                     </td>
@@ -1073,7 +1080,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                   ) : null,
                   ...extraItems.map((item) => (
                     <tr key={choiceKey(account.id, item.sourceId)} className={styles.subRow}>
-                      <td /><td><span className={styles.sub}>{`参照先：${item.name}`}</span></td>
+                      <td /><td><span className={styles.sub}>参照先：{item.itemKind === 'tag' ? <TagPill name={item.name} size="sm" /> : item.name}</span></td>
                       <td><span className={styles.cell}>{item.itemKind === 'folder' ? 'タググループ' : item.itemKind === 'rich_menu' ? 'リッチメニュー' : item.itemKind === 'form' ? '回答フォーム' : item.itemKind === 'media' ? '登録メディア' : item.itemKind === 'template' ? 'テンプレート' : item.itemKind}</span></td>
                       <td><span className={styles.cell}>{item.expectedRevision != null ? `版 ${item.expectedRevision}` : '新規'}</span></td>
                       <td><span className={styles.modePick}><Select aria-label={`${account.name} ${item.name}の配布方法`} size="full" disabled={busy || stage !== 'duplicates'} value={choices[choiceKey(account.id, item.sourceId)] ?? ''} onChange={(next) => setChoices((current) => ({ ...current, [choiceKey(account.id, item.sourceId)]: next as DistributionMode }))} options={[{ value: '', label: '選んでください' }, ...(item.operation === 'reuse' ? ['overwrite'] as const : ['overwrite', 'alias'] as const).filter((m) => item.allowedModes.includes(m)).map((m) => ({ value: m, label: item.operation === 'reuse' && m === 'overwrite' ? '既存を使う' : MODE_LABELS[m] }))]} /></span></td>
@@ -1120,6 +1127,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       <DistributionResultDialog
         open={Boolean(result && done && resultDialogFor === `${result.runId}:${result.status}`)}
         title={`配った結果：${detail?.template.name ?? ''}`}
+        tag={type === 'tag' ? { name, color: tagColor } : undefined}
         summary={result ? `${result.stores.length} アカウントへ配りました。成功 ${successes.length}・失敗 ${failures.length}。${successes.length ? '成功した所はもう使えます。' : ''}` : ''}
         rows={(result?.stores ?? []).map((store) => ({ key: store.accountId, name: store.accountName ?? accountName(accounts, store.accountId), store }))}
         busy={busy} onClose={() => setResultDialogFor(null)}

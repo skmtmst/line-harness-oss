@@ -48,6 +48,8 @@ export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
   density?: 'compact'
   /** 2行の競合通知。既定の案内帯は変えない。 */
   heading?: ReactNode
+  /** カード内などの小さな帯。本文を1行に省略し、title で全文を渡す。 */
+  compact?: boolean
   /** 本文（1〜2文）。`children` があるときはそちらが勝つ。 */
   message?: string
   children?: ReactNode
@@ -82,6 +84,7 @@ export default function Notice({
   tone,
   density,
   heading,
+  compact = false,
   message,
   children,
   action,
@@ -105,6 +108,7 @@ export default function Notice({
       // 呼び出し側が role を指定したらそれを優先する（下書きの競合帯の alert など）。
       // 指定がないときだけ、種類から既定（危険＝alert、ほかは note）を決める。
       role={role ?? (canonical === 'danger' ? 'alert' : 'note')}
+      data-compact={compact || undefined}
       data-design-part="notice"
       data-density={density}
       data-design-node={node}

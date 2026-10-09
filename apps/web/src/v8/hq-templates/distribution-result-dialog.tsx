@@ -3,6 +3,7 @@
 import { RotateCw } from 'lucide-react'
 import type { DistributionResult } from '@/lib/hq-templates-api'
 import Dialog from '@/components/shared/dialog'
+import TagPill, { type TagPillProps } from '@/components/shared/tag-pill'
 import StatusBadge from '@/components/shared/status-badge'
 import { failedStatus } from './folder-distribution'
 import styles from './console.module.css'
@@ -15,9 +16,10 @@ export function resultSentence(store: DistributionResult['stores'][number]): str
   if ((store.counts.reused ?? 0) > 0) return '今あるものを使いました'
   return '配りました'
 }
-export default function DistributionResultDialog({ open, title, summary, rows, busy, onClose, onRetry }: {
+export default function DistributionResultDialog({ open, title, summary, rows, tag, busy, onClose, onRetry }: {
   open: boolean; title: string; summary: string
-  rows: Array<{ key: string; name: string; store: DistributionResult['stores'][number] }>
+  rows: Array<{ key: string; name: string; tag?: Pick<TagPillProps, 'name' | 'color'>; store: DistributionResult['stores'][number] }>
+  tag?: Pick<TagPillProps, 'name' | 'color'>
   busy: boolean; onClose: () => void; onRetry: () => void
 }) {
   const failures = rows.filter((row) => failedStatus(row.store.status))
@@ -25,13 +27,18 @@ export default function DistributionResultDialog({ open, title, summary, rows, b
     busy={busy} cancelLabel="閉じる" onCancel={onClose}
     {...(failures.length ? { confirmLabel: `失敗した ${failures.length} 件をやり直す`, confirmIcon: <RotateCw size={15} />,
       onConfirm: onRetry } : {})}>
+    {tag ? <TagPill {...tag} /> : null}
     <p className={styles.resultSummary}>{summary}</p>
     <div className={styles.resultList}>
-      {rows.map(({ key, name, store }) => {
+      {rows.map(({ key, name, tag: rowTag, store }) => {
         const failed = failedStatus(store.status)
+        const resultTag = rowTag ?? tag
+        const sentence = resultTag && store.status === 'succeeded' && store.counts.aliased > 0 && store.createdName
+          ? <>同じ名前があったため「<TagPill name={store.createdName} color={resultTag.color} size="sm" />」で作りました</>
+          : resultSentence(store)
         return <div key={key} className={styles.resultRow}>
-          <span className={styles.resultName} title={name}>{name}</span>
-          <span className={styles.resultText}>{failed ? (store.reason || '配布できませんでした。アカウントの現在版を再確認してください。') : resultSentence(store)}</span>
+          <span className={styles.resultName} title={name}>{rowTag ? <><TagPill {...rowTag} size="sm" /> · {store.accountName ?? name}</> : name}</span>
+          <span className={styles.resultText}>{failed ? (store.reason || '配布できませんでした。アカウントの現在版を再確認してください。') : sentence}</span>
           <StatusBadge size="compact" tone={store.status === 'succeeded' ? 'success' : failed ? 'danger' : 'neutral'}>{store.status === 'succeeded' ? '成功' : failed ? '失敗' : '作成中'}</StatusBadge>
         </div>
       })}
