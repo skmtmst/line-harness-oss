@@ -54,6 +54,7 @@ import styles from './mileage.module.css'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError } from '@/components/shared/form-controls'
 import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
 
 
 const BAND_LABELS: Record<ActionScoreBand, string> = {
@@ -652,7 +653,7 @@ export default function ScoreTab() {
                 return (
                   <Tr key={rule.id} className={styles.row} data-table-layout="columns">
                     <Td className={styles.colName}>
-                      <span className={styles.rowNameInk} title={rule.name}>{rule.name}</span>
+                      <span className={styles.rowNameInk} ><TruncatedText value={String(rule.name ?? '')} /></span>
                       <span className={styles.rowSub}>{frequencyText(rule)}</span>
                     </Td>
                     <Td className={styles.colGives}><span className={styles.cellMain}>{ruleValueText(rule)}</span></Td>

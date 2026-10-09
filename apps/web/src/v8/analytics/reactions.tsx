@@ -17,6 +17,7 @@ import { formatNumber } from '@/lib/format'
 import { KpiMenu, RangePickerV8, dataRangeCaption, shortDateTime } from './common'
 import { METRIC_STATE_TEXT, downloadCsv, metricText, rangeFor, shownValue, useOverview, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /** 表の数。集計待ち・取得できない数は 0 にせず「—」と理由（title）。 */
 export function MetricText({ metric, percent, currency }: { metric: AnalyticsMetric<number | string>; percent?: boolean; currency?: boolean }) {
@@ -98,7 +99,7 @@ export default function ReactionsV8({ accountId }: { accountId: string }) {
         {overview.campaigns.length === 0
           ? <div className={styles.emptyRow} role="row"><span role="cell">この期間の配信はありません</span></div>
           : overview.campaigns.map((item) => <div key={`${item.kind}:${item.id}`} className={styles.trow} role="row" data-h="two">
-            <span role="cell" className={styles.colMain}><span className={styles.cellText} title={item.name}>{item.name}</span></span>
+            <span role="cell" className={styles.colMain}><span className={styles.cellText} ><TruncatedText value={String(item.name ?? '')} /></span></span>
             <span role="cell" className={styles.colType}><strong className={styles.cellStrong}>{item.kind === 'broadcast' ? '一斉配信' : 'シナリオ'}</strong><span className={styles.cellSub}>{shortDateTime(item.sentAt)}</span></span>
             <span role="cell" className={styles.num} data-w="80"><MetricText metric={item.targetPeople} />{item.kind === 'scenario' ? <span className={styles.cellSub}>送信 {metricText(item.sentMessages)}通</span> : null}</span>
             <span role="cell" className={styles.num} data-w="80"><MetricText metric={item.delivered} /></span>

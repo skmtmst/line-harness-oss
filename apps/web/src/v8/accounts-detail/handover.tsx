@@ -36,6 +36,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { DIFFERENT_PROVIDER_DETAIL, DIFFERENT_PROVIDER_LEAD, HANDOVER_PILLS, countsLine, decisionLabel, handoverPill, totalsMatch } from './handover-view'
 import styles from './handover.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type HandoverDecisionView = AccountHandoverDecision & {
   sourceName?: string
@@ -483,7 +484,7 @@ export default function AccountHandoverV8() {
           return (
             <Tr key={decision.id}>
               <Td className={styles.colName}><div className={styles.nameStack}>
-                <span className={styles.name} title={name}>{name}</span>
+                <span className={styles.name} ><TruncatedText value={String(name ?? '')} /></span>
                 <span className={styles.sub}>元の友だち</span>
               </div></Td>
               <Td className={styles.colName}><div className={styles.nameStack}>

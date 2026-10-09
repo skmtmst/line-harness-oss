@@ -60,6 +60,7 @@ import {
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import { eventLabel, isHttpsUrl, maskedUrl, payloadLabel, shortDateTime, urlHost } from './words'
 import styles from './outgoing.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type SavedFilter = '' | 'active' | 'paused' | 'failed'
 type SortKey = 'volume' | 'name'
@@ -577,9 +578,9 @@ export default function WebhooksOutgoingV8() {
                 const nameNode = (
                   <FolderDotName folder={folderDotFor(folders, item.folderId)}>
                     {canManage ? (
-                      <Link href={`/webhooks/edit?id=${item.id}`} className={styles.name} title={item.name}>{item.name}</Link>
+                      <Link href={`/webhooks/edit?id=${item.id}`} className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></Link>
                     ) : (
-                      <span className={styles.name} title={item.name}>{item.name}</span>
+                      <span className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></span>
                     )}
                   </FolderDotName>
                 )
@@ -629,9 +630,9 @@ export default function WebhooksOutgoingV8() {
                       {/* 名前の前に左の列と同じフォルダの色の丸（未分類は色の無い輪）。 */}
                       <FolderDotName folder={folderDotFor(folders, item.folderId)}>
                         {canManage ? (
-                          <Link href={`/webhooks/edit?id=${item.id}`} className={styles.name} title={item.name}>{item.name}</Link>
+                          <Link href={`/webhooks/edit?id=${item.id}`} className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></Link>
                         ) : (
-                          <span className={styles.name} title={item.name}>{item.name}</span>
+                          <span className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></span>
                         )}
                       </FolderDotName>
                       <span className={`${styles.sub} ${styles.nameSub}`} title={item.url}>{maskedUrl(item.url)}</span>

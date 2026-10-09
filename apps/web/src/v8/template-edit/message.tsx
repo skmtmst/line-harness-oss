@@ -65,6 +65,7 @@ import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared
 import { referenceTokenNames } from '@/components/shared/insert-tokens'
 import { loadTemplateExamples } from '@/v8/templates/examples'
 import styles from './edit.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 const snapshot = (draft: TemplateDraft) => JSON.stringify(draft)
 
@@ -646,7 +647,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                   {urls.map((url) => (
                     <div key={url} className={styles.urlRow}>
                       <Link2 size={14} aria-hidden="true" className={styles.urlIcon} />
-                      <span className={styles.urlText} title={url}>{url}</span>
+                      <span className={styles.urlText} ><TruncatedText value={String(url ?? '')} url /></span>
                       <span className={styles.urlNote}>短縮して、押された数を数える</span>
                       <Toggle checked locked label={`${url}を短縮して数える（いつもオン）`} />
                     </div>

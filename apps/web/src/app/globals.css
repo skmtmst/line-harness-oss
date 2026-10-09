@@ -469,6 +469,11 @@
 /* B-152・仕上げ7：操作の反応 */
 /* B-152・仕上げ8：読み込み中 */
 :root {
+  --polish-tooltip-width: 288px;
+  --polish-tooltip-gap: 8px;
+  --polish-tooltip-bg: #1d1d1f;
+  --polish-tooltip-ink: #fff;
+  --polish-tooltip-z: 10000;
   --polish-radius-small: 6px;
   --polish-radius-control: 10px;
   --polish-radius-card: 12px;

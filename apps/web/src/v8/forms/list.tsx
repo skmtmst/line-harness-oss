@@ -85,6 +85,7 @@ import {
   type FormSort,
 } from './model'
 import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 const VIEWER_NOTE = '閲覧のみで見ています。変える操作は管理者に頼んでください。'
 
@@ -1208,7 +1209,7 @@ export default function FormsListV8() {
               const pendingCount = form.pendingPostActionCount ?? 0
               const answerUrl = formAnswerUrl(selectedAccount?.liffId, form.id)
               const nameNode = reviewMode ? (
-                <span className={styles.cellTitle} title={name}>{name}</span>
+                <span className={styles.cellTitle} ><TruncatedText value={String(name ?? '')} /></span>
               ) : (
                 <button
                   type="button"

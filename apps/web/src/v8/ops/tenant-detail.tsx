@@ -21,6 +21,7 @@ import { useOpsReadOnly } from './use-ops-read-only'
 import parts from './parts.module.css'
 import styles from './tenant-detail.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
 
 
 /**
@@ -207,7 +208,7 @@ function DetailContent() {
                 </div>
                 {accounts.map((a) => (
                   <div key={a.id} className={`${parts.miniRow} ${styles.accountRow}`} role="row">
-                    <span className={parts.grow} role="cell" title={a.name}>{a.name}</span>
+                    <span className={parts.grow} role="cell" ><TruncatedText value={String(a.name ?? '')} /></span>
                     <span className={`${parts.fixed} ${styles.col90}`} role="cell">{a.archived_at || !a.is_active ? <StatusBadge tone="neutral">止めている</StatusBadge> : <StatusBadge tone="success">接続中</StatusBadge>}</span>
                     <span className={`${parts.num} ${styles.col80}`} role="cell">{a.archived_at ? '—' : formatNumber(a.friend_count)}</span>
                     <span className={`${parts.fixed} ${styles.col80}`} role="cell">{a.archived_at ? <StatusBadge tone="neutral">アーカイブ</StatusBadge> : a.is_active ? <StatusBadge tone="success">有効</StatusBadge> : <StatusBadge tone="neutral">停止</StatusBadge>}</span>
@@ -234,7 +235,7 @@ function DetailContent() {
                 </div>
                 {members.map((m) => (
                   <div key={m.id} className={parts.miniRow} role="row">
-                    <span className={parts.grow} role="cell" title={m.name}>{m.name}</span>
+                    <span className={parts.grow} role="cell" ><TruncatedText value={String(m.name ?? '')} /></span>
                     <span className={`${parts.fixed} ${styles.colMail}`} role="cell" title={m.email ?? ''}>{m.email ?? '—'}</span>
                     <span className={`${parts.fixed} ${styles.col90}`} role="cell">{ROLE_LABEL[m.role] ?? m.role}{m.access_level === 'read_only' ? '（閲覧）' : ''}</span>
                     <span className={`${parts.fixed} ${styles.col80}`} role="cell">{m.is_active ? <StatusBadge tone="success">有効</StatusBadge> : <StatusBadge tone="neutral">停止</StatusBadge>}</span>
@@ -262,7 +263,7 @@ function DetailContent() {
                 {audit.map((row) => (
                   <div key={row.id} className={parts.miniRow} role="row">
                     <span className={`${parts.fixed} ${styles.colAt}`} role="cell" title={formatDateTime(row.created_at)}>{shortDateTime(row.created_at)}</span>
-                    <span className={`${parts.fixed} ${styles.col80}`} role="cell" title={row.staff_name}>{row.staff_name}</span>
+                    <span className={`${parts.fixed} ${styles.col80}`} role="cell" ><TruncatedText value={String(row.staff_name ?? '')} /></span>
                     <span className={`${parts.fixed} ${styles.colWhat}`} role="cell">{AUDIT_WORD[row.action] ?? AUDIT_ACTION_LABEL[row.action]?.label ?? row.action}</span>
                     <span className={parts.grow} role="cell" title={row.reason ?? ''}>{row.reason ?? '—'}</span>
                   </div>

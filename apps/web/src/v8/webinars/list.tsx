@@ -86,6 +86,7 @@ import {
 } from './helpers'
 import styles from './list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type SortKey = 'updated' | 'created' | 'name'
 type SavedFilter = '' | 'active' | 'draft' | 'archived'
@@ -906,7 +907,7 @@ function WebinarList() {
                           </button>
                         </FolderDotName>
                       </ContextMenu>
-                      <span className={styles.slug} title={publicPath(w)}>{publicPath(w)}</span>
+                      <span className={styles.slug} ><TruncatedText value={String(publicPath(w) ?? '')} /></span>
                     </Td>
                     <Td className={styles.colStatus}><StatusPill webinar={w} /></Td>
                     <Td className={styles.colCount}>

@@ -59,6 +59,7 @@ import { ListPage } from '@/components/templates'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type MediaSort = 'newest' | 'oldest' | 'name' | 'size' | 'usage'
 const UNGROUPED = '__ungrouped__'
@@ -1809,8 +1810,8 @@ function MediaCardV8({
               <span className={styles.nameDot}>
                 <FolderDot folder={folder} />
               </span>
-              <span className={styles.fileName} title={item.filename}>
-                {item.filename}
+              <span className={styles.fileName} >
+                <TruncatedText value={String(item.filename ?? '')} />
               </span>
             </span>
             <p className={styles.meta} title={formatMediaDetails(item)}>

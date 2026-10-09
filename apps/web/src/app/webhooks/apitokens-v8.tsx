@@ -36,6 +36,7 @@ import {
   WebhooksV8Band, WebhooksV8Head, outgoingKpiCells, useV8BandData,
 } from './outgoing-v8'
 import styles from './apitokens-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'disabled'
 
@@ -439,7 +440,7 @@ function ApiTokensV8Inner() {
                     {tokens.map((token) => (
                       <tr key={token.id} data-ctx-row={token.id}>
                         <td className={styles.nameCell} title={token.name}>{token.name}</td>
-                        <td><span className={styles.nameCell} title={token.scopes.map(scopeLabel).join('・')}>{token.scopes.map(scopeLabel).join('・')}</span></td>
+                        <td><span className={styles.nameCell} ><TruncatedText value={String(token.scopes.map(scopeLabel).join('・') ?? '')} /></span></td>
                         <td className={styles.dimCell}>{formatDateTime(token.createdAt)}</td>
                         <td className={styles.dimCell}>{formatDateTime(token.lastUsedAt)}</td>
                         <td><span className={`${styles.pill} ${styles.pillActive}`}>● 使っている</span></td>

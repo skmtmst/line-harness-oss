@@ -15,6 +15,7 @@ import type { RestaurantSnapshot } from '@/lib/restaurant-test-api'
 import RestaurantFrame from '../common-a/frame'
 import { HalfGrid, Panel, PanelAside, Stat, StatRow, Status } from '../common-a/parts'
 import styles from './stores.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 
 export function DashboardBoard({ data }: { data: RestaurantSnapshot }) {
@@ -64,7 +65,7 @@ export function DashboardBoard({ data }: { data: RestaurantSnapshot }) {
             return (
               <div key={item.id} role="row" className={styles.row}>
                 <span role="cell" className={`${styles.cell} ${styles.colStore}`}>
-                  <span className={styles.storeName} title={item.name}>{item.name}</span>
+                  <span className={styles.storeName} ><TruncatedText value={String(item.name ?? '')} /></span>
                   <span className={styles.storeCode}>{item.code}</span>
                 </span>
                 <span role="cell" className={`${styles.cell} ${styles.colArea}`}>{item.area || '—'}</span>

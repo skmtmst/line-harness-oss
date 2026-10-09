@@ -33,6 +33,7 @@ import shared from './screen.module.css'
 import styles from './identity.module.css'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type View = 'all' | 'candidate' | 'none' | 'conflict'
 type Sort = 'newest' | 'confidence'
@@ -215,7 +216,7 @@ export default function EcIdentityCandidatesScreen() {
             return (
               <Tr key={item.id} selected={selected}>
                 <Td><span className={shared.stack}>
-                  <span className={styles.name} title={item.left.label}>{item.left.label}</span>
+                  <span className={styles.name} ><TruncatedText value={String(item.left.label ?? '')} /></span>
                   <span className={shared.sub} title={leftSub}>{leftSub}</span>
                 </span></Td>
                 <Td><span className={shared.stack}>

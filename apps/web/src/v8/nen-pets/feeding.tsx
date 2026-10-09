@@ -26,6 +26,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { nenRanksApi, type NenFeedingData, type NenFeedingKind } from '@/lib/nen-ranks-api'
 import { Pill } from './parts'
 import styles from './pets.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /** 係数の説明（Worker `services/nen-feeding.ts` の ENERGY_FACTORS と同じ値）。 */
 const FACTOR_ROWS: Array<{ label: string; dog: string; cat: string }> = [
@@ -287,7 +288,7 @@ function ProductTable({
               ) : canEdit ? (
                 <button type="button" disabled={busy} className={styles.productNameButton} title={`${row.name}を直す`} onClick={() => onUpdate(row.key, { editing: true })}>{row.name}</button>
               ) : (
-                <span className={styles.cell} title={row.name}>{row.name}</span>
+                <span className={styles.cell} ><TruncatedText value={String(row.name ?? '')} /></span>
               )}
             </span>
             <span className={styles.productKcal} role="cell">

@@ -81,6 +81,7 @@ import { addTimeWindow, MESSAGE_TYPE_LABEL, removeTimeWindow, updateTimeWindow }
 import { resendSuppressionText } from './text'
 import styles from './editor.module.css'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type Step = 'basic' | 'routes' | 'message' | 'actions' | 'preview'
 type EditorRule = {
@@ -1042,7 +1043,7 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
           if (!canEdit) {
             return (
               <p key={route.id} className={styles.readOnlyRoute}>
-                <span className={styles.readOnlyRouteName} title={route.name}>{route.name}</span>
+                <span className={styles.readOnlyRouteName} ><TruncatedText value={String(route.name ?? '')} /></span>
                 <span className={styles.routeSub}>{route.kind ? `QR・URL｜${route.kind}` : 'QR・URL'}</span>
               </p>
             )

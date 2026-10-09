@@ -79,6 +79,7 @@ import { ExternalImportWorkspace, type LineMenu } from './external-import'
 import { richMenuError, richMenuErrorAll } from './errors'
 import BlockedDeleteDialog, { type BlockedRow } from './blocked-dialog'
 import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /** フォルダに入れていないものを選ぶための、内部だけの値。 */
 const UNFILED = '__unfiled__'
@@ -1089,15 +1090,15 @@ export default function RichMenusListV8() {
                     <FolderDotName folder={folderDotOf(g.folderId)}>
                       <Link
                         href={`/rich-menus/edit?id=${g.id}`}
-                        title={g.name}
+
                         className={styles.name}
                         onClick={(event) => event.stopPropagation()}
                       >
-                        {g.name}
+                        <TruncatedText value={String(g.name ?? '')} />
                       </Link>
                     </FolderDotName>
-                    <span className={`${styles.sub} ${styles.nameSub}`} title={`${shape}・ボタン「${g.chatBarText}」・${formatDay(g.updatedAt)} 更新`}>
-                      {`${shape}・ボタン「${g.chatBarText}」・${formatDay(g.updatedAt)} 更新`}
+                    <span className={`${styles.sub} ${styles.nameSub}`} >
+                      <TruncatedText value={String(`${shape}・ボタン「${g.chatBarText}」・${formatDay(g.updatedAt)} 更新`)} />
                     </span>
                   </Td>
                   <Td className={styles.audienceCell}>

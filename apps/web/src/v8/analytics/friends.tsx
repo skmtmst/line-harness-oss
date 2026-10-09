@@ -31,6 +31,7 @@ import {
   useRegisterExport,
 } from './parts'
 import styles from './analytics.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type Day = AnalyticsFriendsOverview['data']['days'][number]
 type Campaign = AnalyticsFriendsOverview['data']['campaigns'][number]
@@ -72,7 +73,7 @@ function RouteBreakdown({ accountId, from, to }: { accountId: string; from: stri
   const max = Math.max(1, ...routes.map((route) => shownValue(route.friendAdds) ?? 0))
   if (routes.length === 0) return <p className={styles.sideNote}>この期間に流入リンクから増えた友だちはいません</p>
   return <ul className={styles.routeRows}>{routes.map((route) => <li key={route.id} className={styles.routeRow}>
-    <div className={styles.sideRow}><span className={styles.sideName} title={route.name}>{route.name}</span><strong className={styles.sideValue}>{`${metricText(route.friendAdds)} 人`}</strong></div>
+    <div className={styles.sideRow}><span className={styles.sideName} ><TruncatedText value={String(route.name ?? '')} /></span><strong className={styles.sideValue}>{`${metricText(route.friendAdds)} 人`}</strong></div>
     <div className={styles.track} title={`現在 ${metricText(route.currentFriends)}人・1人あたり ${metricText(route.costPerFriend)}円`}><span style={{ width: `${(shownValue(route.friendAdds) ?? 0) / max * 100}%` }} /></div>
   </li>)}</ul>
 }

@@ -28,6 +28,7 @@ import {
 } from './media-direct-upload'
 import { formatDateTime } from '@/lib/format'
 import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
 
 
 /** 版追加を止めた理由を、互換基準ごとに運用者へ説明する。 */
@@ -425,7 +426,7 @@ export default function MediaDetailDialog({
             <span aria-hidden="true">›</span>
             <span>{folderName}</span>
             <span aria-hidden="true">›</span>
-            <span className="text-ink-faint max-w-md truncate" title={item.filename}>{item.filename}</span>
+            <span className="text-ink-faint max-w-md truncate" ><TruncatedText value={String(item.filename ?? '')} /></span>
           </nav>
           <h2 className="text-ink mt-3 truncate text-xl font-bold" title={item.filename}>{item.filename}</h2>
         </div>

@@ -41,6 +41,7 @@ import {
 import { errorMessage, formatShortDay, formatShortStamp } from './format'
 import type { GoogleNav } from './google'
 import styles from './google.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /** 端末からのアップロードの道具（今の画面の app/contents/media-direct-upload を入口が渡す）。 */
 export interface MediaUploadHelpers {
@@ -193,7 +194,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
                 return (
                   <div key={post.id} className={styles.postRow}>
                     <KindChip kind={post.kind} />
-                    <span className={styles.postTitle} title={name}>{name}</span>
+                    <span className={styles.postTitle} ><TruncatedText value={String(name ?? '')} /></span>
                     {post.origin === 'google' ? <span className={styles.postMeta}>Googleで作成</span> : null}
                     <span className={styles.postMeta}>{postWhen(post)}</span>
                     <Chip tone={badge.tone === 'success' ? 'ok' : badge.tone === 'warning' ? 'warn' : badge.tone === 'danger' ? 'danger' : badge.tone === 'info' ? 'info' : 'neutral'}>{badge.label}</Chip>

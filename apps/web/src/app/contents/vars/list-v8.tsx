@@ -83,6 +83,7 @@ import {
 } from './list-model'
 import VarsExportPanel from './export-panel'
 import styles from './list-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -1303,10 +1304,10 @@ function CommonVarsListV8Inner() {
                             <td onClick={(event) => event.stopPropagation()}>
                               <Link
                                 href={`/contents/vars/edit?id=${item.id}`}
-                                title={item.name}
+
                                 className={styles.nameLink}
                               >
-                                {item.name}
+                                <TruncatedText value={String(item.name ?? '')} />
                               </Link>
                               <span className={styles.keyRow}>
                                 <code title={placeholderText(item.varKey)} className={styles.keyCode}>

@@ -24,6 +24,7 @@ import RestaurantShell, { Panel, Stat, StatRow, Status, type RestaurantV8Context
 import { DialogField, DialogNote, RowMore, RsDialog } from '../booking-kit/parts'
 import styles from './menu.module.css'
 import { formatDateTime as polishFormatDateTime } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
 
 
 export function safeArray(value: string): string[] {
@@ -165,7 +166,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
                   <Td className={`${styles.td} ${styles.colName}`}>
                     {canEdit ? (
                       <button type="button" className={styles.name} title={item.name} onClick={() => openEdit(item)}>{item.name}</button>
-                    ) : <span className={styles.name} title={item.name}>{item.name}</span>}
+                    ) : <span className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></span>}
                   </Td>
                   <Td className={styles.td}>{item.kind === 'course' ? 'コース' : '単品'}</Td>
                   <Td className={`${styles.td} ${styles.colPrice}`} align="right">{formatYen(item.price)}</Td>

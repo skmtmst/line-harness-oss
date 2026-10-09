@@ -44,6 +44,7 @@ import {
 } from './helpers'
 import type { DetailChrome, EditContext } from './types'
 import styles from './participants.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type LoadState = 'loading' | 'ready' | 'error' | 'denied'
 
@@ -197,7 +198,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
             return (
               <Tr key={participant.friendId} className={styles.row} data-table-layout="columns">
                 <Td className={styles.colName}>
-                  <Link href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`} title={name} className={styles.name}>{name}</Link>
+                  <Link href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`}  className={styles.name}><TruncatedText value={String(name ?? '')} /></Link>
                   <span className={styles.sub}>{`${joinNote(participant)}${joinKindLabel(participant)}`}</span>
                 </Td>
                 <Td className={styles.colWhen}><span className={styles.main}>{shortDateTime(participant.latestJoinedAt)}</span></Td>

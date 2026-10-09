@@ -47,6 +47,7 @@ import { FIELD_TYPE_LABELS, destinationLabel, fieldDeletionBlockedReason, knownU
 import styles from './list.module.css'
 
 import type { AttributeListHost } from './attribute-host'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -433,11 +434,11 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
                     <div className={styles.nameRow}>
                       <FolderDotName folder={folderDotOf(field.folderId)}>
                         {canEdit && !host ? (
-                          <Link href={`/tags/fields/edit?id=${encodeURIComponent(field.id)}`} className={styles.name} title={field.name} onClick={(event) => event.stopPropagation()}>{field.name}</Link>
-                        ) : host && canEdit ? <Link href="#" className={styles.name} title={field.name} onClick={(event) => { event.preventDefault(); event.stopPropagation(); host.onEdit(field.id) }}>{field.name}</Link> : <span className={styles.name} title={field.name}>{field.name}</span>}
+                          <Link href={`/tags/fields/edit?id=${encodeURIComponent(field.id)}`} className={styles.name}  onClick={(event) => event.stopPropagation()}><TruncatedText value={String(field.name ?? '')} /></Link>
+                        ) : host && canEdit ? <Link href="#" className={styles.name}  onClick={(event) => { event.preventDefault(); event.stopPropagation(); host.onEdit(field.id) }}><TruncatedText value={String(field.name ?? '')} /></Link> : <span className={styles.name} ><TruncatedText value={String(field.name ?? '')} /></span>}
                       </FolderDotName>
                     </div>
-                    <p className={`${styles.sub} ${styles.fieldKey}`} title={key}>{key}</p>
+                    <p className={`${styles.sub} ${styles.fieldKey}`} ><TruncatedText value={String(key ?? '')} /></p>
                   </ContextMenu>
                 </Td>
                 <Td className={styles.fieldColType}><span className={styles.cellText}>{fieldTypeWord(field.type)}</span></Td>

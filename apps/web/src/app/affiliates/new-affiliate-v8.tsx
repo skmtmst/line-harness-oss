@@ -30,6 +30,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import Notice from '@/components/shared/notice'
 import { formatNumber } from '@/lib/format'
 import './create-v8.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 const FRIEND_PAGE_SIZE = 20
 const AFFILIATE_LIST_PATH = '/conversions?tab=affiliates'
@@ -552,7 +553,7 @@ export function NewAffiliateV8() {
                 <dd className="af-create-kvValue">
                   {previewUrl ? (
                     <span className="af-create-urlRow">
-                      <span className="af-create-urlText" title={previewUrl}>{previewUrl}</span>
+                      <span className="af-create-urlText" ><TruncatedText value={String(previewUrl ?? '')} url /></span>
                       <Button
                         variant="secondary"
                         size="compact"

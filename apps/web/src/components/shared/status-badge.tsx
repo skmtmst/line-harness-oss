@@ -1,5 +1,6 @@
 import React, { type HTMLAttributes, type ReactNode } from 'react'
 import HelpTip from './help-tip'
+import TruncatedText from './truncated-text'
 import styles from './status-badge.module.css'
 
 export type StatusBadgeTone = 'neutral' | 'info' | 'warning' | 'success' | 'danger'
@@ -44,7 +45,7 @@ export default function StatusBadge({
   const heading = helpLabel ?? (typeof children === 'string' ? children : 'この状態')
   return (
     <span className={classes} data-tone={tone} data-design-node="xRvDB" data-surface={surface} {...props}>
-      {children}
+      {typeof children === 'string' ? <TruncatedText value={children} /> : children}
       {hasHelp ? (
         <HelpTip label={`${heading}の説明`}>
           {help}

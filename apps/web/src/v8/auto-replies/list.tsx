@@ -100,6 +100,7 @@ import {
 } from './words'
 import QuickCreateV8 from './quick-create'
 import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -1225,7 +1226,7 @@ export default function AutoRepliesListV8() {
                       <FolderDotName folder={folderDotOf(r)}>
                         <Link
                           href={`/auto-replies/edit?id=${r.id}`}
-                          title={name}
+
                           className={styles.cellTitle}
                           onClick={(event) => {
                             event.stopPropagation()
@@ -1234,7 +1235,7 @@ export default function AutoRepliesListV8() {
                             goEdit(r.id)
                           }}
                         >
-                          {name}
+                          <TruncatedText value={String(name ?? '')} />
                         </Link>
                       </FolderDotName>
                       {conflicts > 0 && (

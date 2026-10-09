@@ -25,6 +25,7 @@ import { Status } from '../booking-kit/shell'
 import { DialogNote, RsDialog } from '../booking-kit/parts'
 import { dayLabelParen, formatAt } from './format'
 import styles from './inventory.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 export type RestaurantChannel = {
   id: string
@@ -220,7 +221,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
             return (
               <Tr key={channel.id}>
                 <Td>
-                  <p className={styles.channelName} title={channel.name}>{channel.name}</p>
+                  <p className={styles.channelName} ><TruncatedText value={String(channel.name ?? '')} /></p>
                   <p className={styles.channelSub}>{METHOD_SUB[channel.receiveMethod]}</p>
                 </Td>
                 <Td>{preparing && channel.receiveMethod === 'email_forward' ? 'メール転送（未設定）' : METHOD_LABEL[channel.receiveMethod]}</Td>

@@ -22,6 +22,7 @@ import {
 import type { BookingStaff } from '@/lib/api'
 import styles from './settings.module.css'
 import ch from './channels.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -69,7 +70,7 @@ function ChannelStatusChip({ channel }: { channel: BookingChannel }) {
 
 /** 1行で収め、はみ出す分は「…」にして title で全文を見せる。 */
 function OneLine({ text, tone }: { text: string; tone?: 'name' | 'sub' }) {
-  return <span className={tone === 'name' ? `${ch.oneLine} ${ch.name}` : tone === 'sub' ? `${ch.oneLine} ${ch.sub}` : ch.oneLine} title={text}>{text}</span>
+  return <span className={tone === 'name' ? `${ch.oneLine} ${ch.name}` : tone === 'sub' ? `${ch.oneLine} ${ch.sub}` : ch.oneLine} ><TruncatedText value={String(text ?? '')} /></span>
 }
 
 /** つながっているカレンダーの中身（「予定を見る」）。つなぎ直す口もここに置く。 */

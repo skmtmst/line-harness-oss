@@ -22,6 +22,7 @@ import type { HqAccount, HqTemplateListItem, TemplateDetail } from '@/lib/hq-tem
 import { KIND_TABS, sentLabel } from './store-list'
 import styles from '../template-detail/detail.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
 
 
 /** 「8月21日 18:02」（日本時間）。 */
@@ -281,7 +282,7 @@ export default function HqTemplateDetail({
               {distributedNames.map((name) => (
                 <div key={name} className={styles.usageRow}>
                   <span className={styles.usageKind} title={name}>{shortName(name)}</span>
-                  <span className={styles.usageNameQuiet} title={name}>{name}</span>
+                  <span className={styles.usageNameQuiet} ><TruncatedText value={String(name ?? '')} /></span>
                   <span className={styles.usageVersion}>—</span>
                   <span className={styles.usageState}>受け取り済み</span>
                   {enterButton(accountIdOf(name))}

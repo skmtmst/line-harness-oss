@@ -41,6 +41,7 @@ import type { SavedSearchConditionLabels } from '@/components/friends/saved-sear
 import { filterSavedSearches, savedSearchKpiValues, type SavedSearchUsageFilter } from '@/components/friend-fields/saved-search-kpis'
 import { formatDay, formatNumber } from '@/lib/format'
 import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 const PAGE_SIZES = [10, 20, 50]
 const MAX_SAVED = 50
@@ -373,11 +374,11 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
                   <ContextMenu label={`保存した検索「${search.name}」の操作`} items={searchContextItems(search)}>
                     <div className={styles.nameRow}>
                       {editHref ? (
-                        <Link href={editHref} className={`${styles.name} ${styles.nameLink}`} title={search.name} onClick={(event) => event.stopPropagation()}>
-                          {search.name}
+                        <Link href={editHref} className={`${styles.name} ${styles.nameLink}`}  onClick={(event) => event.stopPropagation()}>
+                          <TruncatedText value={String(search.name ?? '')} />
                         </Link>
                       ) : (
-                        <span className={styles.name} title={search.name}>{search.name}</span>
+                        <span className={styles.name} ><TruncatedText value={String(search.name ?? '')} /></span>
                       )}
                       {!search.lineAccountId ? (
                         <StatusBadge tone="warning" size="annotation" dot={false}>対象アカウント未割り当て</StatusBadge>

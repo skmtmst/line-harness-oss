@@ -36,6 +36,7 @@ import { AffiliateArchiveDialog } from './dialogs'
 import { AffiliateFrame, useAffiliateShell } from './frame'
 import { AffiliateToolbar, RetryButton, RowMenu, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import styles from './affiliates.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type ViewKey = 'affiliate' | 'offer'
 
@@ -301,7 +302,7 @@ export default function ReportTab() {
                   {view === 'affiliate' ? (
                     <button type="button" className={styles.rowLink} title={row.name} onClick={() => openDrawer(row.id)}>{row.name}</button>
                   ) : (
-                    <span className={styles.rowLinkText} title={row.name}>{row.name}</span>
+                    <span className={styles.rowLinkText} ><TruncatedText value={String(row.name ?? '')} /></span>
                   )}
                   <span className={styles.rowPlan}>{row.sub ?? '—'}</span>
                 </span>

@@ -81,6 +81,7 @@ import { formatNumber } from '@/lib/format'
 import styles from './edit.module.css'
 import { focusFieldById } from '@/lib/use-form-errors'
 import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
 
 
 /** 予定の日時（`YYYY-MM-DDTHH:mm`・日本時間）を「10/1 0:00」の形にする。 */
@@ -1505,7 +1506,7 @@ function ImpactRows({
             <div key={`${row.kind}-${row.name}-${index}`} className={styles.impactRow}>
               <div className={styles.impactHead}>
                 <span className={styles.impactKind}>{row.kindLabel}</span>
-                <span className={styles.impactName} title={row.name}>{row.name}</span>
+                <span className={styles.impactName} ><TruncatedText value={String(row.name ?? '')} /></span>
                 <span className={styles.impactSpacer} aria-hidden="true" />
                 <span className={usageTone(row.status) === 'warning' ? styles.impactStatusWarn : styles.impactStatus}>{row.status}</span>
               </div>

@@ -58,6 +58,7 @@ import {
   type BandCell,
 } from './shell'
 import styles from './common-actions.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type Filter = 'all' | 'published' | 'draft' | 'old_version' | 'unused' | 'archived'
 type Summary = {
@@ -324,7 +325,7 @@ export default function CommonActionsV8() {
                     <Td className={styles.colName}>
                       {/* 名前の前にフォルダの丸（共通アクションはフォルダに入れないので未分類の輪）。説明は名前の頭にそろえる。 */}
                       <FolderDotName folder={null}>
-                        <a className={styles.name} href={versionsHref(item.id)} title={item.name} onClick={(event) => { event.preventDefault(); router.push(versionsHref(item.id)) }}>{item.name}</a>
+                        <a className={styles.name} href={versionsHref(item.id)}  onClick={(event) => { event.preventDefault(); router.push(versionsHref(item.id)) }}><TruncatedText value={String(item.name ?? '')} /></a>
                       </FolderDotName>
                       <span className={`${styles.sub} ${styles.subIndent}`} title={item.description ?? undefined}>{item.description || '説明はありません'}</span>
                     </Td>

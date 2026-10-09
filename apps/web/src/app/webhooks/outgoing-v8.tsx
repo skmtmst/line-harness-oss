@@ -51,6 +51,7 @@ import { formatDateTime, formatNumber } from '@/lib/format'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import styles from './outgoing-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 type OutgoingFilter = 'all' | 'active' | 'paused' | 'failed'
@@ -931,7 +932,7 @@ function OutgoingV8Table({ items, canManage, canTest, manageReason, menuId, setM
             return (
               <tr key={item.id} data-ctx-row={item.id}>
                 <td className={styles.nameCell}>
-                  <span className={styles.nameText} title={item.name}>{item.name}</span>
+                  <span className={styles.nameText} ><TruncatedText value={String(item.name ?? '')} /></span>
                   <span className={styles.urlText} title={item.url}>{maskedUrl(item.url)}</span>
                 </td>
                 <td><span className={styles.cellSub} title={firstEventLabel(item)}>{firstEventLabel(item)}</span></td>

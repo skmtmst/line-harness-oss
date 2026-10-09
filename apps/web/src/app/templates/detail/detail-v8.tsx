@@ -37,6 +37,7 @@ import { templateDeleteDescription } from '../template-delete-message'
 import { messageTypeText } from '../template-message-type'
 import { isTemplateDetailData, type TemplateDetailData } from '../template-detail-data'
 import styles from './detail-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type Usage = NonNullable<TemplateDetailData['usedBy']>
 
@@ -554,7 +555,7 @@ export default function TemplateDetailV8() {
                           <tr key={row.key}>
                             <td className={styles.usageKind}>{row.kind}</td>
                             <td className={styles.usageName}>
-                              <span className={styles.usageCellText} title={row.name}>{row.name}</span>
+                              <span className={styles.usageCellText} ><TruncatedText value={String(row.name ?? '')} /></span>
                             </td>
                             <td className={`${styles.usageVersion} ${row.fixed ? styles.usageVersionFixed : ''}`}>
                               {row.version}
@@ -789,7 +790,7 @@ export default function TemplateDetailV8() {
               {publishUsageRows.map((row) => (
                 <div key={row.key} className={styles.publishRow}>
                   <span className={styles.publishRowKind}>{row.kind}</span>
-                  <span className={styles.publishRowName} title={row.name}>{row.name}</span>
+                  <span className={styles.publishRowName} ><TruncatedText value={String(row.name ?? '')} /></span>
                   <span className={`${styles.publishRowState} ${row.fixed ? styles.publishRowStateFixed : ''}`}>
                     {row.fixed
                       ? `${row.status ?? ''}${row.status ? '・' : ''}${row.version.replace('で固定', 'のまま')}`

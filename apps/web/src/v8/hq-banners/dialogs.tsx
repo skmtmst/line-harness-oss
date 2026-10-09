@@ -16,6 +16,7 @@ import { api } from '@/lib/api'
 import { readFileAsBase64, type BannerProject } from '@/lib/hq-banners'
 import BannerDialogFrame from './frame'
 import styles from './dialogs.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /** 取り込める画像（API と同じ）。 */
 export const BANNER_UPLOAD_ACCEPT = ['image/png', 'image/jpeg', 'image/webp']
@@ -232,7 +233,7 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
               onFile={(next) => pickFile(next)}
               onRemove={() => setFile(null)}
             />
-            {file ? <p className={styles.dropText} title={file.name}>{file.name}</p> : null}
+            {file ? <p className={styles.dropText} ><TruncatedText value={String(file.name ?? '')} /></p> : null}
           </>
         )}
     </BannerDialogFrame>

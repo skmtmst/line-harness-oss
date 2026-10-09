@@ -58,6 +58,7 @@ import {
 import styles from './operator-edit.module.css'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError } from '@/components/shared/form-controls'
+import TruncatedText from '@/components/shared/truncated-text'
 
 function OperatorEditInner() {
   const editId = useSearchParams().get('id')
@@ -704,7 +705,7 @@ function OperatorEditInner() {
           <ul className={styles.confirmList} aria-label="受け取る人">
             {selectedRecipients.map((recipient) => (
               <li key={recipient.id} className={styles.confirmRow}>
-                <span className={styles.confirmName} title={recipient.name}>{recipient.name}</span>
+                <span className={styles.confirmName} ><TruncatedText value={String(recipient.name ?? '')} /></span>
                 <span className={styles.confirmRole}>{recipientRole(recipient, staffRoles)}</span>
                 <StatusBadge tone={recipient.channels.line ? 'success' : 'neutral'}>
                   {recipient.channels.line ? 'LINE' : '画面だけ'}

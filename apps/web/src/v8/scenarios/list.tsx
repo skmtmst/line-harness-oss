@@ -81,6 +81,7 @@ import ReorderHandle from '@/components/shared/reorder-handle'
 import { MoveReferrersNotice } from '@/components/scenarios/scenario-dialogs'
 import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/duplicate-scenario'
 import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -965,7 +966,7 @@ export default function ScenariosListV8() {
                           <FolderDotName folder={rowFolder ? { name: rowFolder.name, color: rowFolder.color } : null}>
                             <Link
                               href={`/scenarios/detail?id=${s.id}`}
-                              title={s.name}
+
                               className={styles.cellTitle}
                               onClick={(event) => {
                                 event.stopPropagation()
@@ -974,7 +975,7 @@ export default function ScenariosListV8() {
                                 goDetail(s.id)
                               }}
                             >
-                              {s.name}
+                              <TruncatedText value={String(s.name ?? '')} />
                             </Link>
                           </FolderDotName>
                           {s.lineAccountId === null && (

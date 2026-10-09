@@ -95,6 +95,7 @@ import {
 } from './words'
 import styles from './list.module.css'
 import { formatDate as polishFormatDate, formatListDateTime as polishFormatListDateTime } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
 
 
 /** 一覧のタブ。message/question は同じテンプレートの束を中身で分ける。 */
@@ -1183,8 +1184,8 @@ export default function TemplatesListV8() {
                       name={
                         <div className={styles.dotLine}>
                           <FolderDotName folder={folderDotOf(t)}>
-                            <Link href={detailHref(t)} title={t.name} className={styles.cellTitle} onClick={(event) => event.stopPropagation()}>
-                              {t.name}
+                            <Link href={detailHref(t)}  className={styles.cellTitle} onClick={(event) => event.stopPropagation()}>
+                              <TruncatedText value={String(t.name ?? '')} />
                             </Link>
                           </FolderDotName>
                         </div>

@@ -47,6 +47,7 @@ import {
 } from './view'
 import styles from './accounts.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
 
 
 const TITLE = 'LINEアカウント'
@@ -251,7 +252,7 @@ export default function AccountsV8() {
               return (
                 <Tr key={account.id} interactive>
                   <Td className={styles.colName}><div className={styles.nameStack}>
-                    <span className={styles.name} title={account.name}>{account.name}</span>
+                    <span className={styles.name} ><TruncatedText value={String(account.name ?? '')} /></span>
                     <span className={styles.sub}>{`チャネル ${account.channelId}`}</span>
                   </div></Td>
                   <Td className={styles.colConn}><StatusBadge tone={connection.tone}>{connection.label}</StatusBadge></Td>

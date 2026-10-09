@@ -80,6 +80,7 @@ import {
 import { templateDeleteDescription } from './template-delete-message'
 import { messageTypeText } from './template-message-type'
 import styles from './list-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /** 一覧のタブ。message/question は同じテンプレートの束を中身で分ける。 */
 type Section = 'message' | 'question' | BroadcastAssetKind
@@ -1206,11 +1207,11 @@ export default function TemplatesListV8() {
                   <td>
                     <Link
                       href={detailHref(t)}
-                      title={t.name}
+
                       className={styles.cellTitle}
                       onClick={(event) => event.stopPropagation()}
                     >
-                      {t.name}
+                      <TruncatedText value={String(t.name ?? '')} />
                     </Link>
                     {/* R194: 抜粋は最新（下書きがあれば下書き）。 */}
                     <p className={styles.cellSub}>

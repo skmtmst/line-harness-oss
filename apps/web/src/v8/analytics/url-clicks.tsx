@@ -1,5 +1,7 @@
 'use client'
 
+import TruncatedText from '@/components/shared/truncated-text'
+
 /*
  * ★V8 分析「URLクリック」（Pencil `iK4cQ`）。
  * 数の帯 → 道具の段（探す・状態・期間・CSV）→ URLごとの表 → 数え方の注。
@@ -37,7 +39,6 @@ function sourceOf(item: Link): { kind: string; name: string; all: string } {
   return match ? { kind: match[1], name: `${match[2]}${more}`, all } : { kind: first, name: more.trim(), all }
 }
 
-const shortUrl = (url: string) => url.replace(/^https?:\/\//, '')
 
 export default function UrlClicksV8({ accountId }: { accountId: string }) {
   const [pageSize, setPageSize] = useState(10)
@@ -115,7 +116,7 @@ export default function UrlClicksV8({ accountId }: { accountId: string }) {
             const actions = [item.actions?.tagName, item.actions?.scenarioName].filter(Boolean).join('・')
             const when = `最初 ${item.firstClickedAt ? formatAnalyticsDateTime(item.firstClickedAt.value) : '—'} ／ 最後 ${item.lastClickedAt ? formatAnalyticsDateTime(item.lastClickedAt.value) : '—'}`
             return <div key={item.trackedLinkId} className={styles.trow} role="row" data-h="two">
-              <span role="cell" className={styles.colMain} title={when}><strong className={styles.cellStrong}>{item.name}</strong><span className={styles.cellSub} title={item.originalUrl}>{shortUrl(item.originalUrl)}</span></span>
+              <span role="cell" className={styles.colMain} title={when}><strong className={styles.cellStrong}>{item.name}</strong><TruncatedText className={styles.cellSub} value={item.originalUrl} url /></span>
               <span role="cell" className={styles.colType} data-w="170" title={source.all || undefined}><strong className={styles.cellStrong}>{source.kind}</strong>{source.name ? <span className={styles.cellSub}>{source.name}</span> : null}</span>
               <span role="cell" className={styles.num} data-w="100"><MetricText metric={item.clicks} /></span>
               <span role="cell" className={styles.num} data-w="90" title={`届いた人数 ${shownValue(item.deliveredPeople) ?? '—'}`}><MetricText metric={item.knownClickPeople} /></span>

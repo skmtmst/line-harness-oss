@@ -62,6 +62,7 @@ import {
   rateText,
 } from './display'
 import styles from './detail.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /** 送るまでの6段階。承認が絡まない・予約しない配信はその段を省く。 */
 const DELIVERY_STEPS: ReadonlyArray<{ key: string; label: string }> = [
@@ -725,7 +726,7 @@ function Overview({
                     <div className={styles.linkTop}>
                       <div className={styles.linkText}>
                         <p className={styles.linkTitle} title={link.label}>{link.label}</p>
-                        <p className={styles.linkUrl} title={link.url}>{link.url}</p>
+                        <p className={styles.linkUrl} ><TruncatedText value={String(link.url ?? '')} url /></p>
                       </div>
                       <p className={styles.linkCount}>
                         {`押した ${formatNumber(link.uniqueClickCount)} 人（${rateText(link.clickRate)}）`}

@@ -19,6 +19,7 @@ import { isWalkIn } from '../front-desk/walk-in'
 import { sourceName } from '../reservations/format'
 import { canMarkVisited, visitState } from './summarize'
 import styles from './dashboard.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 function hm(iso: string): string {
   const day = new Date(iso)
@@ -76,7 +77,7 @@ export function TodayTable({ rows, canWrite, busyId, onVisited, onUndo }: {
               return (
                 <Tr key={r.id} className={styles.row} data-table-layout="columns">
                   <Td className={styles.colTime}><span className={styles.time}>{hm(r.starts_at)}</span></Td>
-                  <Td className={styles.colName}><span className={styles.name} title={r.customer_name}>{r.customer_name}</span></Td>
+                  <Td className={styles.colName}><span className={styles.name} ><TruncatedText value={String(r.customer_name ?? '')} /></span></Td>
                   <Td className={styles.colGuests}>{`${r.guest_count}名`}</Td>
                   <Td className={styles.colTable}>{r.table_label || '未配席'}</Td>
                   <Td className={styles.colRoute}><span className={styles.route}>{routeLabel(r)}</span></Td>

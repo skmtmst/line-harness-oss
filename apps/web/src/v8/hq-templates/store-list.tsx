@@ -48,6 +48,7 @@ import hqStyles from './store-list.module.css'
 import attributeStyles from './attribute-tabs.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
 
 
 /** 店のテンプレートと同じ6種類（上のタブ）。 */
@@ -479,7 +480,7 @@ export default function HqStoreList(props: HqStoreListProps) {
                       ) : <FolderDotName folder={folder ? { name: folder.name, color: folder.color } : null}>
                         {canEdit ? (
                           <button type="button" className={`${storeStyles.cellTitle} ${hqStyles.hqNameButton}`} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}>{row.name}</button>
-                        ) : <span className={storeStyles.cellTitle} title={row.name}>{row.name}</span>}
+                        ) : <span className={storeStyles.cellTitle} ><TruncatedText value={String(row.name ?? '')} /></span>}
                       </FolderDotName>}
                     </div>
                   )}

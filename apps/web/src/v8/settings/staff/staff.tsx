@@ -51,6 +51,7 @@ import { applyScopeRowChange, findPartialScopeRows, restoreSavedLevels, scopePii
 import { CONVERSION_APPROVAL_EDIT_KEY, PERMISSION_LABELS, normalizeStaffPermissionKeys, permissionLabel, toggleStaffPermissionKey } from './permission-labels'
 import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import { formatDateTime } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type Channel = { email: boolean; line: boolean }
 type CopyableAccessUser = AccessUserItem & { roleBundle: Exclude<AccessRoleBundle, 'custom'> }
@@ -1149,7 +1150,7 @@ function StaffPageHost() {
                   const state = twoFactorState(user)
                   return (
                     <div key={user.id} className={styles.example}>
-                      <p className={styles.exampleHead}><span className={styles.exampleName} title={user.name}>{user.name}</span><StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge></p>
+                      <p className={styles.exampleHead}><span className={styles.exampleName} ><TruncatedText value={String(user.name ?? '')} /></span><StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge></p>
                       <p className={styles.exampleLine}>{`${V8_ROLE_LABEL[roleOf(user)]}・${user.jobTitle ?? '—'}`}</p>
                       <p className={styles.exampleLine} title={accessScopeLabel(user, accountNames)}>{`見せる範囲：${user.roleBundle === 'administrator' ? 'すべて' : `${accessFeatureLabel(user)}／${scopeShort(user, accountNames)}`}`}</p>
                       <p className={styles.exampleLine} title={`最後のログイン：${formatStaffDate(user.lastLoginAt ?? undefined)}${user.lastActionAt ? `／最後の操作：${formatStaffDate(user.lastActionAt)}` : ''}`}>{`最後に入った：${shortWhen(user.lastLoginAt, nowMs)}${user.lastActionAt ? `（最後の操作 ${formatStaffDate(user.lastActionAt)}）` : ''}`}</p>

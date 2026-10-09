@@ -1,0 +1,4 @@
+.text { display: block; min-width: 0; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.text:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus-color); outline-offset: var(--polish-focus-offset); }
+.tooltip { position: fixed; z-index: var(--polish-tooltip-z); width: max-content; max-width: min(var(--polish-tooltip-width), calc(100vw - var(--polish-space-card))); padding: var(--polish-space-row) var(--polish-space-field); border-radius: var(--polish-radius-small); background: var(--polish-tooltip-bg); color: var(--polish-tooltip-ink); box-shadow: var(--shadow-float); font-family: var(--font-sans); font-size: var(--polish-text-support); font-weight: var(--polish-weight-body); line-height: var(--text-lh); white-space: normal; overflow-wrap: anywhere; transform: translateY(-100%); }
+.tooltip[data-below='true'] { transform: none; }

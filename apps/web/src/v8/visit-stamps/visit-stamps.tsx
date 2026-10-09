@@ -50,6 +50,7 @@ import {
 import { BonusDialog, MultiplierDialog, PhotoDialog, PinDialog, RankDialog, ReasonDialog, RewardDialog, StoresDialog } from './dialogs'
 import styles from './visit-stamps.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
 
 
 type PaperRow = { id: string; card_id?: string; friend_id: string; photo_url: string; stamps: number; status: string; created_at?: string }
@@ -478,7 +479,7 @@ function VisitStampsScreen() {
                     <div key={reward.id} className={styles.reward}>
                       <span className={styles.count}>{reward.stamps} 個</span>
                       <span className={styles.texts}>
-                        <span className={styles.name} title={reward.name}>{reward.name}</span>
+                        <span className={styles.name} ><TruncatedText value={String(reward.name ?? '')} /></span>
                         <span className={styles.sub}>{rewardNote(reward, settings)}</span>
                       </span>
                       {ro ? null : (
@@ -504,7 +505,7 @@ function VisitStampsScreen() {
                     {settings.backgroundImageUrl ? <img className={styles.cardImage} src={settings.backgroundImageUrl} alt="" /> : null}
                     <div className={styles.customerCardContent}>
                       <div className={styles.cardTitle} style={settings.backgroundImageUrl ? { backgroundColor: cardColor } : undefined}>
-                        <span title={name}>{name}</span><span>{`${filled} / ${slotCount(settings)}`}</span>
+                        <span ><TruncatedText value={String(name ?? '')} /></span><span>{`${filled} / ${slotCount(settings)}`}</span>
                       </div>
                       <div className={styles.slots}>
                         {previewSlots(settings, filled).map(slot => <span key={slot.n} className={`${styles.slot} ${slot.state === 'done' ? styles.slotDone : ''}`} aria-label={slot.state === 'done' ? `${slot.n}個目 済み` : slot.state === 'reward' ? `${slot.n}個目 特典` : `${slot.n}個目`}>
@@ -638,7 +639,7 @@ function VisitStampsScreen() {
                                 </Td>
                                 <Td>
                                   <span className={styles.texts}>
-                                    <span className={styles.name} title={names.name}>{names.name}</span>
+                                    <span className={styles.name} ><TruncatedText value={String(names.name ?? '')} /></span>
                                     {names.line ? <span className={styles.sub}>{`LINE：${names.line}`}</span> : null}
                                   </span>
                                 </Td>

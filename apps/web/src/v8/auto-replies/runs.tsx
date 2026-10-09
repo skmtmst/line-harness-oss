@@ -42,6 +42,7 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
 import styles from './runs.module.css'
 import { formatListDateTime as polishFormatListDateTime } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
 
 
 /* 再実行・一時停止は owner/admin だけ（R530・再実行POST・停止口の requireRole と同じ境目）。 */
@@ -552,9 +553,9 @@ export default function AutoReplyRunsV8() {
                     <Td className={styles.colFriend}>
                       <span className={styles.face} aria-hidden="true">{initialOf(item.friendName)}</span>
                       {item.friendId ? (
-                        <Link className={styles.friendName} href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`} title={name}>{name}</Link>
+                        <Link className={styles.friendName} href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`} ><TruncatedText value={String(name ?? '')} /></Link>
                       ) : (
-                        <span className={styles.friendName} title={name}>{name}</span>
+                        <span className={styles.friendName} ><TruncatedText value={String(name ?? '')} /></span>
                       )}
                     </Td>
                     <Td className={styles.colInput}>

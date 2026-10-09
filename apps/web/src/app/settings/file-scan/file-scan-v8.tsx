@@ -15,6 +15,7 @@ import ListRange from '@/components/ui/list-range'
 import { FILE_SCAN_PAGE_SIZE, useFileScan } from './use-file-scan'
 import { SettingsShellV8 } from '../settings-nav-v8'
 import styles from '../settings-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /* 板 `PfA4o` の札。`使えません`・`使えます` の絞り込みは v7 の画面に残す。 */
 const STATUS_CHIPS = [
@@ -254,9 +255,9 @@ export function FileScanV8() {
             <tbody>
               {items.map((item) => (
                 <Tr key={item.id}>
-                  <Td><span className={styles.urlCell} title={item.filename}>{item.filename}</span>{item.releasedAt && <StatusBadge tone="neutral" size="compact">戻した</StatusBadge>}</Td>
-                  <Td><span className={styles.urlCell} title={item.uploaderLabel ?? '—'}>{item.uploaderLabel ?? '—'}</span></Td>
-                  <Td><span className={styles.urlCell} title={item.reasonLabel ?? '確認が必要です'}>{item.reasonLabel ?? '確認が必要です'}</span></Td>
+                  <Td><span className={styles.urlCell} ><TruncatedText value={String(item.filename ?? '')} url /></span>{item.releasedAt && <StatusBadge tone="neutral" size="compact">戻した</StatusBadge>}</Td>
+                  <Td><span className={styles.urlCell} ><TruncatedText value={String(item.uploaderLabel ?? '—')} url /></span></Td>
+                  <Td><span className={styles.urlCell} ><TruncatedText value={String(item.reasonLabel ?? '確認が必要です')} url /></span></Td>
                   <Td className={styles.tdRight}>
                     {item.status === 'quarantined' ? (
                       <RowActions

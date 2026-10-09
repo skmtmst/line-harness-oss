@@ -43,6 +43,7 @@ import HelpTip from '@/components/shared/help-tip'
 import { daysUntilIso, eventRowState, isLowApplication, summarizeEventAttention } from './event-attention'
 import { formatDateTime, formatDay } from '@/lib/format'
 import styles from './events-list-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /*
  * R601: 読み込みの失敗は「権限不足」と「通信失敗」を分ける。
@@ -707,7 +708,7 @@ export default function EventsListV8() {
                               </FolderDotName>
                             </ContextMenu>
                             {e.venue_name ? (
-                              <span className={`${styles.venue} ${styles.nameSub}`} title={e.venue_name}>{e.venue_name}</span>
+                              <span className={`${styles.venue} ${styles.nameSub}`} ><TruncatedText value={String(e.venue_name ?? '')} /></span>
                             ) : null}
                           </td>
                           <td className="truncate px-2 py-3 tabular-nums" title={formatJpDate(e.next_slot_starts_at)}>
@@ -758,8 +759,8 @@ export default function EventsListV8() {
                             {!e.visible_tag_id ? (
                               <span className="text-ink-faint mt-1 block max-w-32 truncate text-xs">全員</span>
                             ) : e.visible_tag_name ? (
-                              <span className="text-ink-faint mt-1 block max-w-32 truncate text-xs" title={e.visible_tag_name}>
-                                {e.visible_tag_name}
+                              <span className="text-ink-faint mt-1 block max-w-32 truncate text-xs" >
+                                <TruncatedText value={String(e.visible_tag_name ?? '')} />
                               </span>
                             ) : (
                               <span className="text-warning mt-1 block max-w-32 truncate text-xs">消えたタグ</span>

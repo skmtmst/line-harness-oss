@@ -40,6 +40,7 @@ import { PhotoReviewDetail } from './detail'
 import PhotoPolicyHistoryV8 from './policy-history'
 import styles from './review.module.css'
 import { formatListDay as polishFormatListDay } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
 
 
 type PhotoStatus = 'pending' | 'adopted' | 'rejected'
@@ -875,7 +876,7 @@ function PhotoCardV8({ photo, status, ...props }: { photo: Record<string, unknow
         ) : null}
       </div>
       <div className={styles.cardNameRow}>
-        <p className={styles.cardName} title={name}>{name}</p>
+        <p className={styles.cardName} ><TruncatedText value={String(name ?? '')} /></p>
         <span className={styles.cardDate} title={formatPhotoReceivedAt(photo.created_at)}>{Number.isFinite(received) ? polishFormatListDay(new Date(received)) : '日時不明'}</span>
       </div>
       <p className={styles.cardOwner} title={ownerLine}>{ownerLine}</p>

@@ -19,6 +19,7 @@ import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-pan
 import Toggle from '@/components/shared/toggle'
 import SearchField from '@/components/shared/search-field'
 import styles from './inbox-chat.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 export type TemplatePickerSideKey = 'frequent' | 'all' | 'none' | `folder:${string}`
 
@@ -119,7 +120,7 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
                               : <span className={styles.tpBox} aria-hidden="true" />
                           ) : null}
                           <span className={styles.tpCardText}>
-                            <span className={styles.tpCardName} title={template.name}>{template.name}</span>
+                            <span className={styles.tpCardName} ><TruncatedText value={String(template.name ?? '')} /></span>
                             <span className={styles.tpCardBody}>{template.content}</span>
                           </span>
                         </button>

@@ -15,6 +15,7 @@ import { OpsHead } from './shell'
 import parts from './parts.module.css'
 import styles from './audit.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
 
 
 /**
@@ -170,7 +171,7 @@ export default function OpsAuditV8() {
             {rows.map((row) => (
               <div key={row.id} className={parts.miniRow} role="row">
                 <span className={`${parts.fixed} ${styles.colAt}`} role="cell" title={formatDateTime(row.created_at)}>{shortDateTime(row.created_at)}</span>
-                <span className={`${parts.fixed} ${styles.colWho}`} role="cell" title={row.staff_name}>{row.staff_name}</span>
+                <span className={`${parts.fixed} ${styles.colWho}`} role="cell" ><TruncatedText value={String(row.staff_name ?? '')} /></span>
                 <span className={`${parts.fixed} ${styles.colWhat}`} role="cell">{actionWord(row.action)}</span>
                 <span className={`${parts.fixed} ${styles.colTenant}`} role="cell" title={row.tenant_name ?? ''}>{row.tenant_name ?? '—'}</span>
                 <span className={parts.grow} role="cell" title={row.reason ?? ''}>{row.reason ?? '—'}</span>

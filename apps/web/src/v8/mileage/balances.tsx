@@ -42,6 +42,7 @@ import {
 import { MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import styles from './mileage.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 function dateOnlyDaysAgo(days: number) {
   const date = new Date()
@@ -466,7 +467,7 @@ export default function BalancesTab() {
               >
                 <Td className={styles.colName}>
                   <span className={styles.rowName} title={member.displayName}>{member.displayName}</span>
-                  <span className={styles.rowSub} title={member.lineAccount.name}>{member.lineAccount.name}</span>
+                  <span className={styles.rowSub} ><TruncatedText value={String(member.lineAccount.name ?? '')} /></span>
                 </Td>
                 <Td className={styles.colRank}><span className={styles.cellMain} title={member.rankReason}>{rankLabel(member.rank) ?? '—'}</span></Td>
                 <Td className={`${styles.colBalance} ${styles.num}`}>

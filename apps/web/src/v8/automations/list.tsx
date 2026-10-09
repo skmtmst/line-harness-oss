@@ -66,6 +66,7 @@ import {
 } from './shell'
 import styles from './list.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
 
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
@@ -497,7 +498,7 @@ export default function AutomationListV8() {
                   <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
                     <Td className={styles.colName}>
                       <FolderDotName folder={null}>
-                        <span className={styles.name} title={item.name}>{item.name}</span>
+                        <span className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></span>
                       </FolderDotName>
                     </Td>
                     <Td className={styles.colTrigger}><span className={styles.cell} title={trigger}>{trigger}</span></Td>

@@ -83,6 +83,7 @@ import { completeReorder } from '@/lib/complete-reorder'
 import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
 import { formatTriggerOffset } from './reminder-timing'
 import styles from './list-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -934,7 +935,7 @@ export default function RemindersListV8() {
                         <FolderDotName folder={folderDotOf(row)}>
                           <Link
                             href={detailHref(row.id)}
-                            title={row.name}
+
                             className={styles.cellTitle}
                             onClick={(event) => {
                               event.stopPropagation()
@@ -943,7 +944,7 @@ export default function RemindersListV8() {
                               goDetail(detailHref(row.id))
                             }}
                           >
-                            {row.name}
+                            <TruncatedText value={String(row.name ?? '')} />
                           </Link>
                         </FolderDotName>
                         {row.hasFailure || (row.failedCount ?? 0) > 0 ? (

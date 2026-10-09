@@ -38,6 +38,7 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './screen.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 export type MediaRow = {
   code: string
@@ -392,7 +393,7 @@ export default function BookingMediaPage() {
                 <Td className={styles.colName}>
                   <span className={styles.nameCell}>
                     <span className={styles.mark} aria-hidden="true">{row.name.slice(0, 1)}</span>
-                    <span className={styles.name} title={row.name}>{row.name}</span>
+                    <span className={styles.name} ><TruncatedText value={String(row.name ?? '')} /></span>
                   </span>
                 </Td>
                 <Td className={styles.colPage}><UrlCell url={row.pageUrl} /></Td>

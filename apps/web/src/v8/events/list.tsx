@@ -46,6 +46,7 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { daysUntilIso, eventRowState, isLowApplication, summarizeEventAttention, type EventRowState } from './attention'
 import { jstDay, jstTime } from './shared'
 import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -516,7 +517,7 @@ export default function EventsListV8() {
                         </FolderDotName>
                       </ContextMenu>
                     )}
-                    sub={<span className={styles.cellSub} title={e.venue_name ?? '場所は未設定'}>{e.venue_name ?? '場所は未設定'}</span>}
+                    sub={<span className={styles.cellSub} ><TruncatedText value={String(e.venue_name ?? '場所は未設定')} /></span>}
                   />
                   <Td>
                     <span className={styles.whenMain} title={when}>{when}</span>

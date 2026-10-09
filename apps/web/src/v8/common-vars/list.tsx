@@ -92,6 +92,7 @@ import {
 import VarsExportPanel from './export-panel'
 import styles from './list.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
 
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
@@ -1291,11 +1292,11 @@ function CommonVarsListInner() {
                           <FolderDotName folder={folderDotOf(item)}>
                             <Link
                               href={`/contents/vars/edit?id=${item.id}`}
-                              title={item.name}
+
                               className={styles.nameLink}
                               onClick={(event) => event.stopPropagation()}
                             >
-                              {item.name}
+                              <TruncatedText value={String(item.name ?? '')} />
                             </Link>
                           </FolderDotName>
                         </div>

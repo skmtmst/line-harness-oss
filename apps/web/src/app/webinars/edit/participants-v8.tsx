@@ -27,6 +27,7 @@ import {
   percent,
   type ParticipantRow,
 } from './participants-shared'
+import TruncatedText from '@/components/shared/truncated-text'
 
 export type ParticipantExport = { download: () => void; busy: boolean; available: boolean }
 
@@ -338,7 +339,7 @@ export default function ParticipantsV8({
                         <span className="flex min-w-0 items-center gap-3">
                           <ParticipantAvatar name={name} pictureUrl={participant.pictureUrl} size="sm" />
                           <span className="min-w-0">
-                            <a href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`} title={name} className="text-action block truncate font-semibold">{name}</a>
+                            <a href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`}  className="text-action block truncate font-semibold"><TruncatedText value={String(name ?? '')} /></a>
                             <span className="text-ink-faint block truncate text-xs">
                               {joinNote(participant)}
                               {joinKindLabel(participant)}

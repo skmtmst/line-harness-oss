@@ -42,6 +42,7 @@ import { connectionReasonLine } from './connection-reasons'
 import styles from './home.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/folder-colors'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type StatusFilter = 'all' | 'ok' | 'warn' | 'archived'
 type View = 'cards' | 'table'
@@ -559,7 +560,7 @@ export default function HqHomeV8() {
                 <span role="cell" className={styles.rowName}>
                   <span className={styles.logo} aria-hidden="true">{brandInitial(tenantName || name)}</span>
                   <span className={styles.cardName}>
-                    <span className={styles.name} title={name}>{name}</span>
+                    <span className={styles.name} ><TruncatedText value={String(name ?? '')} /></span>
                     <span className={styles.meta}>{metaOf(account)}</span>
                   </span>
                 </span>

@@ -22,6 +22,7 @@ import { formatNumber } from '@/lib/format'
 import { KpiMenu, StatePill, shortDateTime, shortDay } from './common'
 import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 const SAVED_STATE_LABELS: Record<SavedAnalyticsSnapshot['state'], string> = { available: '利用可能', partial: '一部集計', unavailable: '未取得', failed: '失敗' }
 const REPORT_STATUS_LABELS: Record<AnalyticsReportSchedule['status'], string> = { active: '動いている', paused: '止めている', archived: 'しまった' }
@@ -310,7 +311,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
             <span role="columnheader" className={styles.colOps}>操作</span>
           </div>
           {schedules.map((schedule) => <div key={schedule.id} className={styles.trow} role="row" data-h="button">
-            <span role="cell" className={styles.colMain}><span className={styles.cellText} title={schedule.name}>{schedule.name}</span></span>
+            <span role="cell" className={styles.colMain}><span className={styles.cellText} ><TruncatedText value={String(schedule.name ?? '')} /></span></span>
             <span role="cell" className={styles.colType} data-w="90"><span>{schedule.isOneTime ? '1回だけ' : cadenceLabel(schedule)}</span></span>
             <span role="cell" className={styles.colType} data-w="130"><span>{schedule.status === 'paused' ? '—' : shortDateTime(schedule.nextRunAt).replace(/ 0(\d):/, ' $1:')}</span></span>
             <span role="cell" className={styles.colType} data-w="90"><span><StatePill tone={schedule.status === 'active' ? 'ok' : 'neutral'}>{REPORT_STATUS_LABELS[schedule.status]}</StatePill></span></span>
@@ -327,7 +328,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
       {recentOneTime.length > 0 ? <section className={styles.table} aria-label="1回だけ送った結果">
         <div className={styles.thead}><span className={styles.colMain}>{`1回だけ送った結果（${recentOneTime.length}件）`}</span></div>
         {recentOneTime.map((item) => <div key={item.schedule.id} className={styles.trow} data-h="button">
-          <span className={styles.colMain}><strong className={styles.cellStrong} title={item.schedule.name}>{item.schedule.name}</strong><span className={styles.cellSub}>{item.lastRun ? `${RUN_STATE_LABELS[item.lastRun.state] ?? item.lastRun.state}${runErrorLabel(item.lastRun.errorCode, item.lastRun.state) ? `：${runErrorLabel(item.lastRun.errorCode, item.lastRun.state)}` : ''}` : 'まだ送信されていません'}</span></span>
+          <span className={styles.colMain}><strong className={styles.cellStrong} ><TruncatedText value={String(item.schedule.name ?? '')} /></strong><span className={styles.cellSub}>{item.lastRun ? `${RUN_STATE_LABELS[item.lastRun.state] ?? item.lastRun.state}${runErrorLabel(item.lastRun.errorCode, item.lastRun.state) ? `：${runErrorLabel(item.lastRun.errorCode, item.lastRun.state)}` : ''}` : 'まだ送信されていません'}</span></span>
           <span className={styles.colOps}><Button href={`/analytics/reports/new?id=${item.schedule.id}`} variant="secondary">結果を見る</Button></span>
         </div>)}
       </section> : null}

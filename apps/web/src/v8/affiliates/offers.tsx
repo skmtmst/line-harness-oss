@@ -54,6 +54,7 @@ import {
   ToolbarNotices,
 } from './parts'
 import styles from './affiliates.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type FilterKey = 'open' | 'draft'
 type FolderKey = 'all' | 'tag' | 'scenario' | 'miles' | 'none'
@@ -479,7 +480,7 @@ export default function OffersTab() {
                   <span className={narrow ? styles.stack : `${styles.stack} ${styles.dotStack}`}>
                     <FolderDotName folder={null} dot={!narrow}>
                       {readonly ? (
-                        <span className={styles.rowNameText} title={offer.name}>{offer.name}</span>
+                        <span className={styles.rowNameText} ><TruncatedText value={String(offer.name ?? '')} /></span>
                       ) : (
                         <button type="button" className={styles.rowName} title={offer.name} onClick={() => { setEditTarget(offer); setFormOpen(true) }}>{offer.name}</button>
                       )}

@@ -61,6 +61,7 @@ import SegmentedControl from '@/components/shared/segmented'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import styles from './dashboard-editor.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 const CARD_DEFINITION_MAP = new Map(DASHBOARD_CARD_DEFINITIONS.map((card) => [card.id, card]))
 const GROUPS: DashboardGroup[] = ['today', 'main', 'right']
@@ -104,7 +105,7 @@ function CardRow({ item, definition, canMoveUp, canMoveDown, disabled, onMove, o
         <GripVertical aria-hidden="true" />
       </ReorderHandle> : <span className={styles.grip} aria-hidden="true" />}
       <div className={styles.names}>
-        <span className={styles.name} title={definition.label}>{definition.label}</span>
+        <span className={styles.name} ><TruncatedText value={String(definition.label ?? '')} /></span>
         <span className={styles.where} title={definition.description}>{definition.description}</span>
       </div>
       <div role="group" aria-label={`${definition.label}の順番`} className={styles.moves}>

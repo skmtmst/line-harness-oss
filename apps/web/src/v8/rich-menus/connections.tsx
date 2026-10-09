@@ -26,6 +26,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import { formatNumber } from '@/lib/format'
 import { analyzeConnections, type ConnectionAnalysis, type ConnectionPage } from './connection-analysis'
 import styles from './connections.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 const MAX_PAGES = 10
 
@@ -208,7 +209,7 @@ function Connections() {
           {entry ? (
             <article className={styles.menu} data-entry="">
               <span className={styles.menuImage} aria-hidden="true" />
-              <strong className={styles.menuName} title={entry.name}>{entry.name}</strong>
+              <strong className={styles.menuName} ><TruncatedText value={String(entry.name ?? '')} /></strong>
               <span className={styles.menuSub}>このメニュー・タブA</span>
             </article>
           ) : null}
@@ -223,7 +224,7 @@ function Connections() {
                 </span>
                 <article className={styles.menu} data-broken={returns ? undefined : ''}>
                   <span className={styles.menuImage} aria-hidden="true" />
-                  <strong className={styles.menuName} title={page.name}>{page.name}</strong>
+                  <strong className={styles.menuName} ><TruncatedText value={String(page.name ?? '')} /></strong>
                   <span className={styles.menuSub}>{`タブ${tabLetter(index + 1)}・${returns ? '戻るタブあり' : '戻るタブなし'}`}</span>
                 </article>
               </div>

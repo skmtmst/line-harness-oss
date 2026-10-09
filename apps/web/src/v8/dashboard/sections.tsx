@@ -20,6 +20,7 @@ import type { AccountWithStats } from '@/contexts/account-context'
 import { connectionReasonLine } from '@/v8/hq/connection-reasons'
 import { RetryLabel } from '@/components/shared/retry-label'
 import styles from './dashboard.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type Section = NonNullable<DashboardOverview['sections']>[keyof NonNullable<DashboardOverview['sections']>]
 
@@ -372,8 +373,8 @@ export function Upcoming({ accountId, bookings, loading, today, jstDay, startLoa
       ) : legacy.slice(0, 3).map((booking) => (
         <div key={booking.id} className={styles.plan}>
           <span className={styles.planText}>
-            <span className={styles.planTitle} title={booking.menu_name}>{booking.menu_name}</span>
-            <span className={styles.planKind} title={booking.friend_name ?? '名前未設定'}>{booking.friend_name ?? '名前未設定'}</span>
+            <span className={styles.planTitle} ><TruncatedText value={String(booking.menu_name ?? '')} /></span>
+            <span className={styles.planKind} ><TruncatedText value={String(booking.friend_name ?? '名前未設定')} /></span>
           </span>
           <span className={styles.planTime}>{upcomingTime(booking.starts_at, today, jstDay)}</span>
         </div>

@@ -32,6 +32,7 @@ import { mileStatusLabel, reviewVersionOf, text } from './photo-text'
 import { PhotoReviewDetail } from './photo-review-detail'
 import PhotoPolicyHistoryV8 from './photo-policy-history-v8'
 import styles from './photo-review-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type PhotoStatus = 'pending' | 'adopted' | 'rejected'
 type PhotoView = 'list' | 'detail' | 'publications'
@@ -808,7 +809,7 @@ function PhotoCardV8({ photo, status, ...props }: { photo: Record<string, unknow
       </div>
       <div className={styles.cardBody}>
         <div className={styles.cardNameRow}>
-          <p className={styles.cardName} title={name}>{name}</p>
+          <p className={styles.cardName} ><TruncatedText value={String(name ?? '')} /></p>
           <span className={styles.cardDate} title={formatPhotoReceivedAt(photo.created_at)}>{Number.isFinite(Date.parse(text(photo.created_at))) ? new Date(text(photo.created_at)).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }) : '日時不明'}</span>
         </div>
         <p className={styles.cardOwner} title={`${text(photo.owner_name)} ${text(photo.customer_id)}`}>{text(photo.owner_name) || '名前未取得'}{text(photo.customer_id) ? `・EC-${text(photo.customer_id)}` : ''}</p>

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { X } from 'lucide-react'
+import TruncatedText from './truncated-text'
 import styles from './tag-pill.module.css'
 
 export interface TagPillProps {
@@ -19,7 +20,7 @@ export interface TagPillProps {
 function TagName({ name, color }: Pick<TagPillProps, 'name' | 'color'>) {
   return <>
     <span className={styles.dot} style={color ? { backgroundColor: color } : undefined} aria-hidden="true" />
-    <span className={styles.name} title={name}>{name}</span>
+    <TruncatedText className={styles.name} value={name} />
   </>
 }
 
@@ -28,7 +29,7 @@ export default function TagPill({ name, color, size = 'md', compactAtNarrow, hre
   return (
     <span className={styles.pill} data-size={size} data-compact-narrow={compactAtNarrow || undefined} role="group" aria-label={ariaLabel ?? `タグ「${name}」`}>
       {href ? (
-        <Link className={styles.link} href={href} title={name} aria-label={`タグ「${name}」を編集`} onClick={(event) => event.stopPropagation()}>
+        <Link className={styles.link} href={href} aria-label={`タグ「${name}」を編集`} onClick={(event) => event.stopPropagation()}>
           <TagName name={name} color={color} />
         </Link>
       ) : <TagName name={name} color={color} />}

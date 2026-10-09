@@ -15,6 +15,7 @@ import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import styles from './qr-dialog.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 const WORKER_BASE = process.env.NEXT_PUBLIC_API_URL ?? ''
 
@@ -103,7 +104,7 @@ export default function QrDialog({ route, onClose }: { route: QrRoute; onClose: 
             <img src={qrBase} alt={`${route.name}のQRコード`} className={styles.qr} />
           </div>
           <div className={styles.urlRow}>
-            <span className={styles.url} title={url}>{url}</span>
+            <span className={styles.url} ><TruncatedText value={String(url ?? '')} url /></span>
             <Button variant="text" onClick={() => void copy()} aria-label={`${route.name}のURLをコピー`}>
               <Copy size={15} aria-hidden="true" />
               {copyState === 'copied' ? 'コピーしました' : copyState === 'failed' ? 'コピー失敗' : 'コピー'}

@@ -23,6 +23,7 @@ import { useOpsReadOnly } from './use-ops-read-only'
 import parts from './parts.module.css'
 import styles from './tenants.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
 
 
 /**
@@ -200,7 +201,7 @@ export default function OpsTenantsV8() {
               return (
                 <div key={row.id} className={`${parts.miniRow} ${styles.row}`} role="row">
                   <span className={parts.grow} role="cell">
-                    <Link href={tenantDetailHref(row.id)} className={parts.link} title={row.name}>{row.name}</Link>
+                    <Link href={tenantDetailHref(row.id)} className={parts.link} ><TruncatedText value={String(row.name ?? '')} /></Link>
                   </span>
                   <span className={`${parts.fixed} ${styles.col90}`} role="cell">{row.plan_status === 'trialing' && !row.plan_key ? 'トライアル' : planLabel(row.plan_key)}</span>
                   <span className={`${parts.fixed} ${styles.col90}`} role="cell"><StatusBadge tone={state.tone}>{state.label}</StatusBadge></span>

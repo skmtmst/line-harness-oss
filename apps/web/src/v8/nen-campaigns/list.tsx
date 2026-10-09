@@ -79,6 +79,7 @@ import {
 } from './display'
 import StatusBadge from '@/components/shared/status-badge'
 import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 export type { NenTab } from './display'
 
@@ -431,7 +432,7 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
                   <Tr key={setting.campaignKey} className={styles.row} data-table-layout="columns">
                     <Td className={styles.colName}>
                       {canEdit ? (
-                        <Link href={`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`} className={styles.name} title={setting.label}>{setting.label}</Link>
+                        <Link href={`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`} className={styles.name} ><TruncatedText value={String(setting.label ?? '')} /></Link>
                       ) : (
                         <button type="button" className={styles.name} title={setting.label} onClick={() => props.onPreviewCampaign(setting.campaignKey)}>{setting.label}</button>
                       )}

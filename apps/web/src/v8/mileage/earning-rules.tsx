@@ -55,6 +55,7 @@ import {
 import { CreateButton, MileageFrame, useMileageShell } from './frame'
 import { notifyToast } from '@/components/shared/toast'
 import styles from './mileage.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 const EVENT_LABELS: Record<string, string> = {
   friend_added: '友だち追加',
@@ -810,7 +811,7 @@ export default function EarningRulesTab() {
                 <Td className={styles.colName}>
                   <div className={styles.rowNameLine}>
                     <FolderDotName folder={null}>
-                      <span className={styles.rowName} title={rule.draft.name}>{rule.draft.name}</span>
+                      <span className={styles.rowName} ><TruncatedText value={String(rule.draft.name ?? '')} /></span>
                     </FolderDotName>
                   </div>
                   <span className={narrow ? styles.rowSub : `${styles.rowSub} ${styles.dotIndent}`}>
