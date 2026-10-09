@@ -52,6 +52,7 @@ import VideoPane from './video'
 import CtaPane from './cta'
 import NotificationsPane from './notifications'
 import ReviewPane from './review'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 
 const STEP_KEYS = STEPS.map((step) => step.key) as readonly string[]
 const DETAIL_KEYS = ['participants', 'analytics', 'comments'] as const
@@ -353,7 +354,7 @@ function EditInner() {
       const response = await webinarApi.pause(id, pauseVersion)
       setLoaded(current => current?.id === id ? { ...current, webinar: response.data } : current)
       setPauseVersion(null); setReloadKey(value => value + 1)
-    } catch (error) { setPauseError(error instanceof Error ? error.message : '停止できませんでした') }
+    } catch (error) { setPauseError(japaneseDetailOf(error) || '停止できませんでした。もう一度お試しください。') }
     finally { setPausing(false) }
   }
   const menuActions = !readOnly && webinar.status === 'active' ? <RowMenu label="ウェビナーの操作" triggerProps={{ disabled: pausing || savingForNav !== false }} items={[{ id: 'pause', label: '停止', onSelect: () => { setPauseError(''); setPauseVersion(editor.version) } }]} /> : null

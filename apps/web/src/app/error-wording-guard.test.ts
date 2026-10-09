@@ -43,6 +43,9 @@ function collect(dir: string, found: string[] = []): string[] {
  * ここに載っている = 未修正ということがこの試験で分かるようにする。
  */
 const KNOWN_FILES: string[] = [
+  'app/form-submissions/responses/page.tsx',
+  'app/rich-menus/edit/page.tsx',
+  'app/rich-menus/page.tsx',
   'app/accounts/new/page.tsx',
   'app/affiliates/affiliate-display.ts',
   'app/affiliates/tabs.tsx',

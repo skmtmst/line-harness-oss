@@ -209,7 +209,8 @@ describe('V8 登録メディア一覧（O7hUt7）の切り替え', () => {
     staffRole = 'staff'
     document.documentElement.dataset.theme = 'v8'
     await renderPage()
-    const dots = [...(host?.querySelectorAll('[data-design-node="O7hUt7"] [data-folder-dot]') ?? [])]
+    // 左のフォルダの列（nav）にも色の丸がある（fcolall）。ここでは一覧の札の丸だけを数える。
+    const dots = [...(host?.querySelectorAll('[data-design-node="O7hUt7"] [data-folder-dot]') ?? [])].filter((dot) => !dot.closest('nav'))
     expect(dots).toHaveLength(mediaItems.length)
     expect(dots.map((dot) => dot.getAttribute('aria-label'))).toEqual(['フォルダ：01_商品写真', 'フォルダ：未分類', 'フォルダ：未分類'])
     expect(dots[0].getAttribute('data-folder-dot')).toBe('filed')

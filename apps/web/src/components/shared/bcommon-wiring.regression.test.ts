@@ -8,7 +8,9 @@ it('WEB-019: 自動応答の未接続のつまみを描かない', () => {
   expect(read('components/auto-replies/inline-action-rows-v8.tsx')).not.toContain('<GripVertical')
 })
 it('共通点検1: 未分類は開いたフォルダ', () => {
-  expect(read('v8/inbox-chat/template-picker-view.tsx')).toMatch(/sideRow\('none', '未分類', <FolderOpen/)
+  // 選ぶ窓のフォルダの列は共通の FolderPanel（pickfold）。未分類の印は部品が開いたフォルダで描く。
+  expect(read('v8/inbox-chat/template-picker-view.tsx')).toContain('<FolderPanel readOnly')
+  expect(read('components/shared/folder-panel.tsx')).toMatch(/kind === 'unfiled' \? <FolderOpen/)
 })
 it('共通点検2: タグ編集の切替は共通Toggle', () => {
   const source = read('components/friend-fields/tag-editor-v4.tsx')

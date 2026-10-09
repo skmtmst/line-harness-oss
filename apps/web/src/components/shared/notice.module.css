@@ -138,7 +138,7 @@
   padding: 6px 10px;
   gap: 6px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-mini);
   font-size: var(--text-micro);
   line-height: 20px;
 }

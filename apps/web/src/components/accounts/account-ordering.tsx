@@ -155,7 +155,7 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange }: {
       if (response.success) await load()
       else setError(response.error)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '構成を保存できませんでした。もう一度お試しください。')
+      setError(cause instanceof Error && cause.message && !cause.message.startsWith('API error') ? cause.message : '構成を保存できませんでした。もう一度お試しください。')
     } finally {
       setSaving(false)
     }

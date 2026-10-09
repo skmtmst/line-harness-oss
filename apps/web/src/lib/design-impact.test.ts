@@ -111,6 +111,7 @@ describe('共通部品の影響範囲', () => {
       // 取れていないときに「1 / 1」と出て、1ページぶんは取れたように見えていた。
       'app/events/bookings/page.tsx',
       'app/events/page.tsx',
+      'app/form-submissions/responses/page.tsx',
       // 統括の入口は src/v8/hq/home.tsx に統一した。旧一覧は利用先に数えない。
       // IDEA-18 (#1036): 経路別の注文明細が増えても画面を重くしないよう
       // サーバが数えた総数でページ送りを出すため共通へ寄せた。

@@ -864,7 +864,7 @@ function FriendAddList() {
           onSelect={(id) => selectFolder(id || null)}
           onAddFolder={canEdit ? () => { setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setEditingFolder(null); setFolderError(''); setFolderDialogOpen(true) } : undefined}
           addFolderLabel="フォルダを追加"
-          addFolderDisabled={canEdit && folderBusy}
+          addFolderDisabled={folderBusy}
           rows={folderRows}
         >
           <p className={styles.folderNote}>フォルダを消しても、中の設定は未分類に残ります</p>

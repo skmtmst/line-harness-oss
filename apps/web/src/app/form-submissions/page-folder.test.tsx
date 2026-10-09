@@ -209,6 +209,8 @@ async function clickMenuItem(label: string) {
 
 describe('箱の作成・名前変更・移動が選んだアカウントでつながる（R25・実マウント）', () => {
   it('箱を追加すると選んだアカウント付きで作る', async () => {
+    // 管理画面は V8 だけ。共通の追加窓（role=dialog）は V8 の見た目で出る。
+    document.documentElement.dataset.theme = 'v8'
     await act(async () => {
       root.render(<FormSubmissionsPage />)
     })

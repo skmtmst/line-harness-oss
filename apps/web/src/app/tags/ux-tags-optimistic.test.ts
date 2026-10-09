@@ -17,14 +17,9 @@ const FIELDS = read('fields-tab-v8.tsx')
  * 共通 Toast 以外の自前通知は作らない。
  */
 describe('UXタグ B 楽観的＋元に戻す', () => {
-  it('タグの重要は押した瞬間に変わり、失敗は知らせから元に戻せる', () => {
-    // 楽観的：保存（await）の前に一覧の星を付けておく
-    const starAt = TAB.indexOf('isStarred: next } : item')
-    const awaitAt = TAB.indexOf('await api.tags.update', starAt)
-    expect(starAt).toBeGreaterThan(-1)
-    expect(awaitAt).toBeGreaterThan(starAt)
-    expect(TAB).toContain('aria-pressed')
-    expect(TAB).toContain('友だち一覧に表示する')
+  it('タグの星（重要）の列と切り替えは置かない（tagstar・2026-10-09）。知らせから元に戻す口は残す', () => {
+    expect(TAB).not.toContain('isStarred: next } : item')
+    expect(TAB).not.toContain('★のみ表示')
     expect(TAB).toContain('元に戻す')
     expect(TAB).toContain('notifyToast')
   })

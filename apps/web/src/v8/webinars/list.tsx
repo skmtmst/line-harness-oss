@@ -1011,7 +1011,7 @@ function WebinarList() {
           onSelect={(id) => { setSelectedFolder(id); setPage(1) }}
           onAddFolder={canEdit ? () => { setFolderError(''); closeDetail(); setFolderFormOpen(true) } : undefined}
           addFolderLabel="フォルダを追加"
-          addFolderDisabled={canEdit && !selectedAccountId}
+          addFolderDisabled={!selectedAccountId}
           rows={folderRows}
         >
           <p className={styles.folderNote}>フォルダを消しても、中のウェビナーは未分類に残ります</p>
