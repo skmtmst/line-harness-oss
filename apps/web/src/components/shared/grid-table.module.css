@@ -41,3 +41,10 @@
 .row:last-child:not([data-head]) { box-shadow: none; }
 .cell { min-width: 0; }
 }
+
+/* B-152・仕上げ3 */
+[data-theme='v8'] .row { min-height: var(--polish-table-row); font-size: var(--polish-text-body); padding-block: var(--polish-space-row); }
+[data-theme='v8'] .row[data-head] { min-height: var(--polish-table-head); height: var(--polish-table-head); padding-block: 0; background: var(--polish-table-head-bg); font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); }
+[data-theme='v8'] .row:not([data-head]):hover { background: var(--polish-table-hover); }
+[data-theme='v8'] .cell[data-align='right'] { text-align: right; font-family: var(--font-sans); font-variant-numeric: tabular-nums; }
+[data-theme='v8'] .cell[data-align='right'] + .cell { padding-inline-start: var(--polish-table-number-gap); }
