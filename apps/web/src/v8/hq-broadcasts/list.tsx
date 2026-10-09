@@ -27,7 +27,8 @@ import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
 import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { deleteFolderDescription } from '@/components/shared/folder-row-actions'
-import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import { describeFolderFailure } from '@/components/shared/folder-failure'
+import { notifyToast } from '@/components/shared/toast'
 import type { FolderPanelRow } from '@/components/shared/folder-panel'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
@@ -174,7 +175,7 @@ export default function HqBroadcastList() {
       color: folder.color,
       count: ready ? countIn(folder.id) : null,
       ...(canManage ? {
-        onEdit: () => { setFolderError(''); setFolderName(folder.name); setFolderColor(folder.color ?? null); setFolderDialog({ editing: folder }) },
+        onEdit: () => { setFolderError(''); setFolderNameError(''); setFolderName(folder.name); setFolderColor(folder.color ?? null); setFolderDialog({ editing: folder }) },
         onDelete: () => { setFolderError(''); setDeletingFolder(folder) },
       } : {}),
     })),
@@ -182,17 +183,30 @@ export default function HqBroadcastList() {
     ...(folders ? [{ kind: 'unfiled' as const, id: 'none', label: '未分類', count: ready ? countIn('none') : null }] : []),
   ]
   const selectFolder = (id: string) => { setFolderFilter(id); setPage(1) }
+  /* 送る版（revision）はいつも今の一覧から引く。409 で読み直したあとの2回目の保存が新しい版で通る。 */
+  const latestFolder = <F extends { id: string }>(folder: F): F => ((folders ?? []).find((f) => f.id === folder.id) as F | undefined) ?? folder
+  const [folderNameError, setFolderNameError] = useState('')
   const saveFolder = async () => {
     const name = folderName.trim()
     if (!name || folderBusy || !folderDialog) return
-    setFolderBusy(true); setFolderError('')
+    setFolderBusy(true); setFolderError(''); setFolderNameError('')
     try {
-      if (folderDialog.editing) await hqBroadcastsApi.updateFolder(folderDialog.editing.id, name, folderDialog.editing.revision, folderColor)
+      if (folderDialog.editing) await hqBroadcastsApi.updateFolder(folderDialog.editing.id, name, latestFolder(folderDialog.editing).revision, folderColor)
       else await hqBroadcastsApi.createFolder(name, folderColor)
       await loadFolders()
       setFolderDialog(null)
     } catch (caught) {
-      setFolderError(japaneseDetailOf(caught) || 'フォルダを保存できませんでした')
+      // 理由ごとに言い分ける（共通の describeFolderFailure）。入力した名前と色は残す。
+      const failure = describeFolderFailure(caught, 'save')
+      if (failure.kind === 'missing') {
+        notifyToast(failure.message, { tone: 'error' })
+        await loadFolders()
+        setFolderDialog(null)
+        return
+      }
+      if (failure.kind === 'conflict') await loadFolders()
+      if (failure.nameError) setFolderNameError(failure.nameError)
+      else setFolderError(failure.message)
     } finally {
       setFolderBusy(false)
     }
@@ -201,11 +215,19 @@ export default function HqBroadcastList() {
     if (!deletingFolder || folderBusy) return
     setFolderBusy(true); setFolderError('')
     try {
-      await hqBroadcastsApi.deleteFolder(deletingFolder.id, deletingFolder.revision)
+      await hqBroadcastsApi.deleteFolder(deletingFolder.id, latestFolder(deletingFolder).revision)
       await loadFolders()
       setDeletingFolder(null); setFolderFilter('all')
     } catch (caught) {
-      setFolderError(japaneseDetailOf(caught) || 'フォルダを消せませんでした')
+      const failure = describeFolderFailure(caught, 'delete')
+      if (failure.kind === 'missing') {
+        notifyToast(failure.message, { tone: 'error' })
+        await loadFolders()
+        setDeletingFolder(null)
+        return
+      }
+      if (failure.kind === 'conflict') await loadFolders()
+      setFolderError(failure.message)
     } finally {
       setFolderBusy(false)
     }
@@ -357,7 +379,7 @@ export default function HqBroadcastList() {
           createAction={createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
           activeId={folderFilter}
           onSelect={selectFolder}
-          onAddFolder={canManage ? () => { setFolderError(''); setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setFolderDialog({ editing: null }) } : undefined}
+          onAddFolder={canManage ? () => { setFolderError(''); setFolderNameError(''); setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setFolderDialog({ editing: null }) } : undefined}
           addFolderLabel="フォルダを追加"
           rows={folderRows}
         >
@@ -368,7 +390,8 @@ export default function HqBroadcastList() {
       overlays={(
         <>
           <FolderEditorDialog
-            name={folderName} onNameChange={setFolderName} color={folderColor} onColorChange={setFolderColor} allowClear
+            name={folderName} onNameChange={(next) => { setFolderName(next); setFolderNameError('') }} color={folderColor} onColorChange={setFolderColor} allowClear
+            nameError={folderNameError || undefined}
             open={folderDialog !== null}
             title={folderDialog?.editing ? 'フォルダを直す' : 'フォルダを追加'}
             description="一括配信を分けてしまう箱です。消しても、中の配信は未分類に残ります。"

@@ -250,6 +250,7 @@ export default function ManagedFolderPanel({
           placeholder={placeholder}
           onClose={() => setAdding(false)}
           onAdded={(created) => { setAdding(false); if (created) onAdded?.(created); void onChanged() }}
+          onReload={onChanged}
         />
       ) : null}
       {actions.dialogs}

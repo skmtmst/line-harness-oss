@@ -18,6 +18,8 @@ import Button from '@/components/shared/button'
 import { isImeComposing } from './ime'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import FolderEditorDialog from './folder-editor-dialog'
+import { describeFolderFailure } from './folder-failure'
+import { notifyToast } from './toast'
 
 /** フォルダの色。全画面で同じ8色を使う。 */
 export const FOLDER_COLORS = [
@@ -59,6 +61,11 @@ export interface FolderAddDialogProps {
   onClose: () => void
   /** 追加できたら呼ぶ。一覧を読み直す。 */
   onAdded: (folder?: Folder) => void
+  /**
+   * ほかの人が先に直した・消した（409・404）ときにフォルダの一覧を読み直す。
+   * 消されていたときは読み直したあと窓を閉じる（onClose）。
+   */
+  onReload?: () => void | Promise<void>
 }
 
 export default function FolderAddDialog({
@@ -69,18 +76,21 @@ export default function FolderAddDialog({
   placeholder = '例: 01_キャンペーン',
   onClose,
   onAdded,
+  onReload,
 }: FolderAddDialogProps) {
   const theme = useAdminTheme()
   const [name, setName] = useState(folder?.name ?? '')
   const [color, setColor] = useState<string | null>(theme === 'v8' ? (folder ? folder.color ?? null : FOLDER_SELECT_COLORS[0].value) : folder?.color ?? FOLDER_COLORS[0])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [nameError, setNameError] = useState('')
 
   const add = async () => {
     const trimmed = name.trim()
     if (!trimmed || saving) return
     setSaving(true)
     setError('')
+    setNameError('')
     try {
       // `api.folders.update` の実体は部分更新をそのまま送る。変数にまとめて、
       // 名前だけ直して選んだ色を捨てる以前の挙動へ戻さない。
@@ -94,8 +104,18 @@ export default function FolderAddDialog({
       }
       onAdded(res.data)
       onClose()
-    } catch {
-      setError(folder ? 'フォルダを直せませんでした' : 'フォルダを追加できませんでした')
+    } catch (caught) {
+      // 理由ごとに言い分ける（共通の describeFolderFailure）。入力した名前と色は残す。
+      const failure = describeFolderFailure(caught, 'save')
+      if (failure.kind === 'missing') {
+        notifyToast(failure.message, { tone: 'error' })
+        await onReload?.()
+        onClose()
+        return
+      }
+      if (failure.kind === 'conflict') await onReload?.()
+      if (failure.nameError) setNameError(failure.nameError)
+      else setError(failure.message)
     } finally {
       setSaving(false)
     }
@@ -103,7 +123,8 @@ export default function FolderAddDialog({
 
   if (theme === 'v8') return <FolderEditorDialog open
     title={folder ? 'フォルダを直す' : 'フォルダを追加'} description={note}
-    name={name} onNameChange={setName} color={color} onColorChange={setColor}
+    name={name} onNameChange={(next) => { setName(next); setNameError('') }} color={color} onColorChange={setColor}
+    nameError={nameError || undefined}
     allowClear
     placeholder={placeholder} busy={saving} error={error || undefined}
     onCancel={onClose} onConfirm={() => void add()} confirmLabel={folder ? '保存する' : '追加する'}

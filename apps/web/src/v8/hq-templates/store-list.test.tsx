@@ -220,3 +220,57 @@ it.each(['template', 'rich_menu', 'form', 'tag', 'scenario'] as const)('%s の�
   expect(h.onRenameFolder).toHaveBeenCalledWith(expect.objectContaining({ id: 'f-1', revision: 1 }), 'お問い合わせ', '#ec4899')
   await waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull())
 })
+
+it('フォルダの保存が 409（ほかの人が先に直した）なら理由を出して一覧を読み直し、入力は残したまま2回目は新しい版で通る（2026-10-09）', async () => {
+  const { HqTemplatesApiError } = await import('@/lib/hq-templates-api')
+  const onRenameFolder = vi.fn()
+    .mockRejectedValueOnce(new HqTemplatesApiError('内容が更新されました。', 409, true, true, 'VERSION_CONFLICT'))
+    .mockResolvedValueOnce(undefined)
+  const onReloadFolders = vi.fn(async () => { reload() })
+  let reload: () => void = () => {}
+  const base = handlers()
+  function Harness() {
+    const [folders, setFolders] = React.useState([{ id: 'f-1', name: 'お問い合わせ', revision: 1 }])
+    reload = () => setFolders([{ id: 'f-1', name: 'お問い合わせ', revision: 2 }])
+    return <HqStoreList type="tag" rows={ROWS} ready busy={false} canEdit accountTotal={4} folders={folders} folderLoadFailed={false} folderFilter="all"
+      {...base} onRenameFolder={onRenameFolder} onReloadFolders={onReloadFolders} />
+  }
+  await act(async () => { root.render(<Harness />) })
+  await act(async () => (host.querySelector('[aria-label="フォルダ「お問い合わせ」の操作"]') as HTMLButtonElement).click())
+  await act(async () => ([...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent === '名前を変える') as HTMLElement).click())
+  const input = document.querySelector('[role="dialog"] input') as HTMLInputElement
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    setter.call(input, 'テスト')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await act(async () => (buttons().find((el) => el.textContent === '保存する') as HTMLButtonElement).click())
+  expect(onRenameFolder).toHaveBeenNthCalledWith(1, expect.objectContaining({ revision: 1 }), 'テスト', null)
+  expect(onReloadFolders).toHaveBeenCalledTimes(1)
+  const alert = document.querySelector('[role="dialog"] [data-folder-dialog-error]') as HTMLElement
+  expect(alert.textContent).toContain('ほかの人が先に直しました。最新の内容を読み込みました。もう一度保存してください。')
+  expect((document.querySelector('[role="dialog"] input') as HTMLInputElement).value).toBe('テスト')
+  await act(async () => (buttons().find((el) => el.textContent === '保存する') as HTMLButtonElement).click())
+  expect(onRenameFolder).toHaveBeenNthCalledWith(2, expect.objectContaining({ revision: 2 }), 'テスト', null)
+  await waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull())
+})
+
+it('同じ名前（409 FOLDER_NAME_CONFLICT）は名前の欄に、読めない理由は状態番号と符号を添えて出す', async () => {
+  const { HqTemplatesApiError } = await import('@/lib/hq-templates-api')
+  const onAddFolder = vi.fn()
+    .mockRejectedValueOnce(new HqTemplatesApiError('x', 409, true, true, 'FOLDER_NAME_CONFLICT'))
+    .mockRejectedValueOnce(new HqTemplatesApiError('x', 500, true, false, 'UNAVAILABLE'))
+  await render({ onAddFolder })
+  await waitFor(() => expect(buttons().find((el) => el.textContent?.includes('フォルダを追加'))).toBeTruthy())
+  await act(async () => (buttons().find((el) => el.textContent?.includes('フォルダを追加')) as HTMLButtonElement).click())
+  const input = document.querySelector('[role="dialog"] input') as HTMLInputElement
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '季節')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await act(async () => (buttons().find((el) => el.textContent === '追加する') as HTMLButtonElement).click())
+  expect((document.querySelector('[role="dialog"] input') as HTMLInputElement).getAttribute('aria-invalid')).toBe('true')
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('同じ名前のフォルダがあります。')
+  await act(async () => (buttons().find((el) => el.textContent === '追加する') as HTMLButtonElement).click())
+  expect(document.querySelector('[data-folder-dialog-error]')?.textContent).toBe('フォルダを保存できませんでした。（状態 500・UNAVAILABLE）')
+})
