@@ -38,6 +38,7 @@ import styles from './form.module.css'
 import { FieldError } from '@/components/shared/form-controls'
 import { useFieldValidation } from '@/lib/use-field-validation'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import { tapActionLiffUrl } from '@/lib/tap-actions'
 
 /** きっかけの短い言い方（配信フローの札・日数の選ぶ欄）。 */
 const TRIGGER_SHORT: Record<string, string> = {
@@ -76,7 +77,8 @@ function previewBody(value: string): string {
 
 function openFormUrl(liffId: string | null | undefined, formId: string): string | null {
   if (!liffId) return null
-  return `https://liff.line.me/${liffId}/?page=form&id=${encodeURIComponent(formId)}`
+  // 回答フォームの LIFF の URL は lib/tap-actions.ts の1か所で組み立てる（押したらの欄と同じ形）。
+  return tapActionLiffUrl(liffId, 'form', formId)
 }
 
 /** 選べない値（誕生日の固定・閲覧のみの人）は、押せない部品を置かずに箱で見せる。 */

@@ -8,7 +8,7 @@
  * 保存済みの画像・カルーセルは、形を切り替えずに共通の MessageTemplateEditor で編集する。
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Plus } from 'lucide-react'
+import { ImageIcon, PlayCircle, Plus, X } from 'lucide-react'
 import type { HqMessageCard, HqMessageReference, HqTemplateFolder } from '@line-crm/shared'
 import { hqTemplatesApi, type MessageTemplateDefinition } from '@/lib/hq-templates-api'
 import { withMessageCard, withUploadedImage } from '@/lib/hq-template-authoring'
@@ -18,16 +18,30 @@ import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import MediaSlot from '@/components/shared/media-slot'
 import Select from '@/components/shared/select'
+import TapActionField from '@/components/shared/tap-action-field'
+import type { TapActionKind, TapActionValue } from '@/lib/tap-actions'
 import FolderSelect from '@/components/shared/folder-select'
 import { decodeImageSize, type TemplateMedia } from './definition'
 import styles from './console.module.css'
 
-const ACTIONS: Array<{ value: HqMessageCard['buttons'][number]['action']; label: string }> = [
-  { value: 'url', label: 'URL を開く' },
-  { value: 'message', label: 'メッセージを送る' },
-  { value: 'form', label: '回答フォームを開く' },
-  { value: 'scenario', label: 'シナリオを始める' },
-]
+/*
+ * ボタンの押したら（共通の欄 TapActionField・YPzmo・B-129）。保存の形（HqMessageCard の action・value）は今のまま。
+ * 予約・予約履歴・来店スタンプは、統括カードの型（shared/hq-message-card.ts）と配る口が持てないので出さない
+ * （要る API：action に booking・booking_history・visit_stamp を足し、配るときに各店の LIFF の URL に置き換える）。
+ */
+type CardAction = HqMessageCard['buttons'][number]['action']
+const CARD_TAP_KINDS: readonly TapActionKind[] = ['uri', 'message', 'form']
+const SCENARIO_KIND = [{ value: 'scenario', label: 'シナリオを始める', description: '作ってあるシナリオを始める', icon: PlayCircle }] as const
+const TAP_OF: Record<CardAction, string> = { url: 'uri', message: 'message', form: 'form', scenario: 'scenario' }
+const ACTION_OF: Record<string, CardAction> = { uri: 'url', message: 'message', form: 'form', scenario: 'scenario' }
+function cardTapValue(button: HqMessageCard['buttons'][number]): TapActionValue {
+  return {
+    kind: TAP_OF[button.action],
+    uri: button.action === 'url' ? button.value : '',
+    text: button.action === 'message' ? button.value : '',
+    refId: button.action === 'form' || button.action === 'scenario' ? button.value : '',
+  }
+}
 
 export interface MessageFormProps {
   name: string
@@ -129,49 +143,52 @@ export default function MessageForm({
               {referenceError && <Notice tone="warn" message={referenceError} action={<Button disabled={disabled} onClick={() => void loadReferences()}>参照先を再読み込み</Button>} />}
               {card.buttons.map((button, index) => (
                 <div key={button.id} className={styles.buttonEdit}>
-                  <div className={styles.twoCol}>
-                    <label className={styles.field}>
+                  <label className={styles.field}>
+                    <span className={styles.labelRow}>
                       <span className={styles.label}>ボタンの文字</span>
-                      <input className={styles.input} aria-label={`ボタン${index + 1}の文字`} maxLength={20} disabled={disabled} value={button.label} onChange={(event) => updateButton(button.id, { label: event.target.value })} />
-                    </label>
-                    <div className={styles.field}>
-                      <span className={styles.smallLabel}>押したとき</span>
-                      <Select aria-label={`ボタン${index + 1}を押したとき`} size="full" disabled={disabled} value={button.action} onChange={(next) => updateButton(button.id, { action: next as typeof button.action, value: '' })} options={ACTIONS} />
-                    </div>
+                      {disabled ? null : <button type="button" className={styles.textButton} onClick={() => updateCard({ ...card, buttons: card.buttons.filter((row) => row.id !== button.id) })}>{`ボタン${index + 1}を外す`}</button>}
+                    </span>
+                    <input className={styles.input} aria-label={`ボタン${index + 1}の文字`} maxLength={20} disabled={disabled} value={button.label} onChange={(event) => updateButton(button.id, { label: event.target.value })} />
+                  </label>
+                  <div className={styles.field}>
+                    <span className={styles.smallLabel}>押したとき</span>
+                    <TapActionField
+                      name={`ボタン${index + 1}`}
+                      kindLabel={`ボタン${index + 1}を押したとき`}
+                      value={cardTapValue(button)}
+                      onChange={(patch) => {
+                        if (patch.kind !== undefined) { updateButton(button.id, { action: ACTION_OF[patch.kind] ?? 'url', value: '' }); return }
+                        const next = patch.uri ?? patch.text ?? patch.refId
+                        if (next !== undefined) updateButton(button.id, { value: next })
+                      }}
+                      kinds={CARD_TAP_KINDS}
+                      extraKinds={SCENARIO_KIND}
+                      scope="hq"
+                      hasLiff
+                      readOnly={disabled}
+                      textMax={300}
+                      sources={referenceError ? {} : { form: references.filter((row) => row.kind === 'form').map((row) => ({ id: row.id, name: `${row.name}（${row.accountName}）` })) }}
+                      renderBody={(kind) => kind !== 'scenario' ? undefined : (
+                        <Select
+                          aria-label={`ボタン${index + 1}の参照先`} size="full"
+                          disabled={disabled || Boolean(referenceError)}
+                          value={button.value}
+                          onChange={(next) => updateButton(button.id, { value: next })}
+                          options={[
+                            { value: '', label: 'シナリオを選んでください' },
+                            ...(button.value && !references.some((row) => row.kind === 'scenario' && row.id === button.value) ? [{ value: button.value, label: '保存済みの参照先（候補を確認してください）' }] : []),
+                            ...references.filter((row) => row.kind === 'scenario').map((row) => ({ value: row.id, label: `${row.name}（${row.accountName}）` })),
+                          ]}
+                        />
+                      )}
+                    />
                   </div>
-                  {button.action === 'form' || button.action === 'scenario' ? (
-                    <div className={styles.field}>
-                      <span className={styles.labelRow}>
-                        <span className={styles.label}>参照先</span>
-                        <button type="button" className={styles.textButton} disabled={disabled} onClick={() => updateCard({ ...card, buttons: card.buttons.filter((row) => row.id !== button.id) })}>{`ボタン${index + 1}を外す`}</button>
-                      </span>
-                      <Select
-                        aria-label={`ボタン${index + 1}の参照先`} size="full"
-                        disabled={disabled || Boolean(referenceError)}
-                        value={button.value}
-                        onChange={(next) => updateButton(button.id, { value: next })}
-                        options={[
-                          { value: '', label: '選択してください' },
-                          ...(button.value && !references.some((row) => row.kind === button.action && row.id === button.value) ? [{ value: button.value, label: '保存済みの参照先（候補を確認してください）' }] : []),
-                          ...references.filter((row) => row.kind === button.action).map((row) => ({ value: row.id, label: `${row.name}（${row.accountName}）` })),
-                        ]}
-                      />
-                    </div>
-                  ) : (
-                    <div className={styles.field}>
-                      <span className={styles.labelRow}>
-                        <label className={styles.label} htmlFor={`hq-button-value-${button.id}`}>{button.action === 'url' ? 'タップ先URL' : '送るメッセージ'}</label>
-                        <button type="button" className={styles.textButton} disabled={disabled} onClick={() => updateCard({ ...card, buttons: card.buttons.filter((row) => row.id !== button.id) })}>{`ボタン${index + 1}を外す`}</button>
-                      </span>
-                      <input id={`hq-button-value-${button.id}`} className={styles.input} aria-label={`ボタン${index + 1}の内容`} maxLength={button.action === 'message' ? 300 : 2000} disabled={disabled} value={button.value} onChange={(event) => updateButton(button.id, { value: event.target.value })} />
-                    </div>
-                  )}
                 </div>
               ))}
               <span className={styles.addButtonRow}>
                 <Button disabled={disabled || card.buttons.length >= 3} onClick={() => updateCard({ ...card, buttons: [...card.buttons, { id: crypto.randomUUID(), label: '', action: 'url', value: '' }] })}><Plus size={15} aria-hidden="true" />ボタンを足す</Button>
               </span>
-              <p className={styles.note}>押したときは URL を開く・メッセージを送る・回答フォームを開く・シナリオを始める から選べます</p>
+              <p className={styles.note}>押したときは URLを開く・テキストを送る・回答フォーム・シナリオを始める から選べます</p>
               <p className={styles.noteStrong}>タグ・回答フォームがあるかは、アカウントへ配る前の確認で調べます（ない所は配る前に知らせます）。</p>
             </div>
           )}

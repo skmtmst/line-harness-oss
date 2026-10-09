@@ -1,0 +1,258 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+
+/*
+ * 「押したら」の共通の欄（YPzmo）。値は globals.css の [data-theme="v8"] の --tap-action-*。
+ * 画面側で上書きしない（幅は呼び出し側の箱で決める）。
+ */
+.root {
+  display: flex;
+  min-width: 0;
+  gap: var(--tap-action-gap);
+}
+
+.row {
+  align-items: center;
+}
+
+.stack {
+  flex-direction: column;
+}
+
+.row .kind {
+  flex: 0 0 var(--tap-action-kind-w);
+  min-width: 0;
+}
+
+.row .kind :global(*) {
+  max-width: 100%;
+}
+
+.body {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  min-width: 0;
+}
+
+.stack .body {
+  flex: none;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--tap-action-gap);
+}
+
+.icon {
+  width: var(--tap-action-icon);
+  height: var(--tap-action-icon);
+  flex: none;
+}
+
+.readKind,
+.readBody {
+  display: flex;
+  align-items: center;
+  gap: var(--tap-action-gap);
+  min-width: 0;
+  min-height: var(--tap-action-row-h);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+}
+
+.readKind {
+  font-weight: 600;
+}
+
+.readText,
+.readBody {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fixed {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tap-action-row-h);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 作ってあるものを選ぶ1行（選んだもの＋［選ぶ］／［変える］）。 */
+.pickRow {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--tap-action-gap);
+  width: 100%;
+  min-width: 0;
+  height: var(--tap-action-row-h);
+  padding: var(--tap-action-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+.pickText {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: baseline;
+  gap: var(--tap-action-gap);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.pickName {
+  flex: none;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--text-body);
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+
+.pickNote,
+.pickEmpty {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  text-overflow: ellipsis;
+}
+
+.pickEmpty {
+  color: var(--color-ink-faint);
+  font-size: var(--text-body);
+}
+
+/* LIFF が無い店で LIFF の要る動きを選んだとき。 */
+.liffNote {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--tap-action-gap);
+  width: 100%;
+  min-width: 0;
+  min-height: var(--tap-action-row-h);
+  margin: 0;
+  padding: var(--tap-action-note-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
+  font-size: var(--text-caption);
+}
+
+.liffText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.liffLink {
+  flex: none;
+  margin-left: auto;
+  color: var(--color-action);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.liffLink:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+
+/* 選ぶ窓（仮の窓。共通の選ぶ窓ができたら差し替える）。 */
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tap-action-gap);
+  min-width: 0;
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  max-height: var(--tap-action-list-max-h);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  list-style: none;
+}
+
+.options > li + li {
+  border-top: 1px solid var(--color-hairline);
+}
+
+.option {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--tap-action-gap);
+  width: 100%;
+  padding: var(--tap-action-option-pad);
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.option:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.option[aria-pressed='true'] {
+  background: var(--color-surface-pearl);
+  font-weight: 600;
+}
+
+.option:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: -2px;
+}
+
+.optionText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.optionName,
+.optionNote {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.optionName {
+  font-size: var(--text-body);
+}
+
+.optionNote {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 400;
+}
+
+.optionCheck {
+  width: var(--tap-action-icon);
+  height: var(--tap-action-icon);
+  flex: none;
+  color: var(--color-accent-deep);
+}
+
+.pickerEmpty {
+  margin: 0;
+  padding: var(--tap-action-option-pad);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+}

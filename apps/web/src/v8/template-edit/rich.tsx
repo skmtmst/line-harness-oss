@@ -11,7 +11,7 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronDown, Send } from 'lucide-react'
+import { CircleSlash, Send } from 'lucide-react'
 import type { Folder, MediaItem, TemplateImagemapUpload } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -31,9 +31,9 @@ import FolderSelect, { folderByName, folderCreator, hostFolderCreate } from '@/c
 import { TextField } from '@/components/shared/text-field'
 import { notifyToast } from '@/components/shared/toast'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
-import InlineActionRowsV8, { actionRowTitle } from '@/components/auto-replies/inline-action-rows-v8'
-import { useActionOptions } from '@/components/auto-replies/inline-action-list'
-import { newActionKey, readInlineActions, toActionPayload, type InlineAction } from '@/components/auto-replies/draft-fields'
+import TapActionField from '@/components/shared/tap-action-field'
+import { useTapActionSources } from '@/components/shared/use-tap-action-sources'
+import { TAP_ACTION_KINDS, tapActionDef, tapActionFromSavedUri, tapActionLiffUrl, tapActionNeedsLiff, tapActionProblem, type TapActionKind } from '@/lib/tap-actions'
 import { TemplateEditFrame } from './frame'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import MediaSlot from '@/components/shared/media-slot'
@@ -80,24 +80,28 @@ export function areaPlace(area: RichArea, all: RichArea[]): string {
   return `${h}${v}` || '全体'
 }
 
-export type AreaActionKind = 'none' | 'uri' | 'actions'
-export interface AreaDraft { kind: AreaActionKind; uri: string; actions: InlineAction[] }
-export const emptyAreaDraft = (): AreaDraft => ({ kind: 'none', uri: '', actions: [] })
+/*
+ * 面を押したら（共通の欄 TapActionField・YPzmo）：未設定＋6つ。LINE のリッチメッセージ（イメージマップ）は
+ * URL とメッセージしか持てない（postback は保存で断られる：packages/shared の richMessageActions
+ * 「イメージマップはpostbackに対応していません」）ので、前の「動きを実行する」は外した。
+ * 予約・回答フォーム・予約履歴・来店スタンプはアカウントの LIFF の URL（uri）で保存する。
+ */
+export type AreaActionKind = 'none' | TapActionKind
+export interface AreaDraft { kind: AreaActionKind; uri: string; text: string; refId: string }
+export const emptyAreaDraft = (): AreaDraft => ({ kind: 'none', uri: '', text: '', refId: '' })
 export const areaDraftConfigured = (draft: AreaDraft | undefined): boolean => Boolean(draft && draft.kind !== 'none')
 
-const AREA_KIND_OPTIONS = [
-  { value: 'none', label: '未設定' },
-  { value: 'uri', label: 'URLを開く' },
-  { value: 'actions', label: '動きを実行する' },
-]
-/* 統括（host）：動きの中身（タグ・シナリオ等）は配った先の ID に直せないので、URL だけ。 */
-const HOST_AREA_KIND_OPTIONS = AREA_KIND_OPTIONS.filter((option) => option.value !== 'actions')
+/** 統括（host）：URL・テキストだけ（配った先の LIFF に付け替える口がまだ無い。できたら6つにする）。 */
+const HOST_AREA_KINDS: readonly TapActionKind[] = ['uri', 'message']
+const AREA_NONE_KIND = [{ value: 'none', label: '未設定', description: '押しても何も起きない', icon: CircleSlash }] as const
+/** リッチメッセージで送れる文の長さ（packages/shared richMessageActions と同じ）。 */
+export const RICH_MESSAGE_TEXT_MAX = 400
 
-/** 見本の中身（?visual=1）。絵 EFV8l：上下2面・上は URL・下は動き。 */
+/** 見本の中身（?visual=1）。絵 EFV8l：上下2面・上は URL・下はテキスト。 */
 function visualAreas(): Record<string, AreaDraft> {
   return {
-    A: { kind: 'uri', uri: 'https://nen.example/summer', actions: [] },
-    B: { kind: 'actions', uri: '', actions: [{ key: newActionKey(), actionType: 'tag', config: { op: 'add', tagIds: [] }, onFailure: 'continue' }] },
+    A: { kind: 'uri', uri: 'https://nen.example/summer', text: '', refId: '' },
+    B: { kind: 'message', uri: '', text: '夏のセットについて知りたい', refId: '' },
   }
 }
 
@@ -107,11 +111,16 @@ export function buildRichPayload(input: {
   pickedMedia: MediaItem | null
   shape: RichShape
   areas: Record<string, AreaDraft>
+  /** 保存先アカウントの LIFF ID（予約・回答フォーム・予約履歴・来店スタンプの URL に入れる）。 */
+  liffId?: string | null
 }): { payload: Record<string, unknown> } | { error: string } {
   if (!input.imageUrl.trim()) return { error: '画像を設定してください。' }
   for (const area of input.shape.areas) {
     const draft = input.areas[area.label]
-    if (draft?.kind === 'uri' && !draft.uri.trim()) return { error: `面 ${area.label} のURLを入力してください。` }
+    if (!draft || draft.kind === 'none') continue
+    if (draft.kind === 'uri' && !draft.uri.trim()) return { error: `面 ${area.label} のURLを入力してください。` }
+    const problem = tapActionProblem(draft, { where: `面 ${area.label} `, hasLiff: Boolean(input.liffId), textMax: RICH_MESSAGE_TEXT_MAX })
+    if (problem) return { error: `${problem}。` }
   }
   return {
     payload: {
@@ -127,9 +136,10 @@ export function buildRichPayload(input: {
           y: area.y,
           width: area.width,
           height: area.height,
-          actionType: draft.kind === 'uri' ? 'uri' : draft.kind === 'actions' ? 'postback' : 'none',
+          actionType: draft.kind === 'none' ? 'none' : draft.kind === 'message' ? 'message' : 'uri',
           ...(draft.kind === 'uri' ? { uri: draft.uri.trim() } : {}),
-          ...(draft.kind === 'actions' ? { actions: draft.actions.map(toActionPayload) } : {}),
+          ...(draft.kind === 'message' ? { text: draft.text.trim() } : {}),
+          ...(tapActionNeedsLiff(draft.kind) && input.liffId ? { uri: tapActionLiffUrl(input.liffId, draft.kind, draft.refId) } : {}),
         }
       }),
     },
@@ -148,8 +158,11 @@ function richInitial(host: TemplateEditHost | undefined) {
   const areas: Record<string, AreaDraft> = {}
   shape.areas.forEach((area, index) => {
     const tap = taps.find((item) => item.label === area.label) ?? taps[index]
-    if (tap?.actionType === 'uri' && typeof tap.uri === 'string') areas[area.label] = { kind: 'uri', uri: tap.uri, actions: [] }
-    else if (tap?.actionType === 'postback') areas[area.label] = { kind: 'actions', uri: '', actions: readInlineActions(Array.isArray(tap.actions) ? tap.actions : null) }
+    if (tap?.actionType === 'uri' && typeof tap.uri === 'string') {
+      const back = tapActionFromSavedUri(tap.uri)
+      areas[area.label] = { kind: back.kind as AreaActionKind, uri: back.uri, text: '', refId: back.refId }
+    }
+    if (tap?.actionType === 'message' && typeof tap.text === 'string') areas[area.label] = { kind: 'message', uri: '', text: tap.text, refId: '' }
   })
   const imageUrl = typeof payload.imageUrl === 'string' ? payload.imageUrl : typeof payload.baseUrl === 'string' ? `${payload.baseUrl}/1040` : ''
   return { name: content.name, shape: shape.value, areas, imageUrl, uploaded: { media: content.media, payload } as TemplateImagemapUpload }
@@ -166,7 +179,13 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   const canMutate = host ? !host.readOnly : role === null || canManageRole(role)
   const { selectedAccountId, accounts } = useAccount()
   usePageTitle(host?.composer ? null : host ? 'テンプレート' : 'リッチメッセージを作る', !host?.composer)
-  const actionOptions = useActionOptions()
+  /*
+   * 予約・回答フォーム・予約履歴・来店スタンプの URL に入れる LIFF ID と、中身で選ぶもの。
+   * 店（店の作成の引き出しは選んだアカウント）だけ。統括（配った先が決まっていない）は持たない。
+   */
+  const tapAccountId = hqHost ? null : (host?.composer?.accountId ?? selectedAccountId)
+  const liffId = tapAccountId ? (accounts.find((account) => account.id === tapAccountId)?.liffId ?? null) || null : null
+  const tapSources = useTapActionSources(tapAccountId)
 
   /* 統括の編集（host.initialContent）：保存してある画像（5サイズ）・形・面の URL から始める。 */
   const [hostInitial] = useState(() => richInitial(host))
@@ -179,7 +198,6 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   const [shapeValue, setShapeValue] = useState(hostInitial ? hostInitial.shape : visual ? '2v' : '3')
   const [pendingShape, setPendingShape] = useState<string | null>(null)
   const [areas, setAreas] = useState<Record<string, AreaDraft>>(() => (hostInitial ? hostInitial.areas : visual ? visualAreas() : {}))
-  const [actionsFor, setActionsFor] = useState<string | null>(null)
   /* 採用案 Wmch0：画像の上か右の一覧で選んだ面（記号）。下にその面の動きだけを出す。 */
   const [selectedLabel, setSelectedLabel] = useState('A')
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -250,7 +268,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   const save = async (): Promise<boolean> => {
     if (!selectedAccountId) { setError('上のバーでLINE公式アカウントを選んでください。'); return false }
     if (!name.trim()) { setError('リッチメッセージ名を入力してください。'); return false }
-    const built = buildRichPayload({ imageUrl, pickedMedia, shape: shapeDef, areas })
+    const built = buildRichPayload({ imageUrl, pickedMedia, shape: shapeDef, areas, liffId })
     if ('error' in built) { setError(built.error); return false }
     setSaving(true)
     setError('')
@@ -280,7 +298,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
     if (!host || busy) return
     if (!name.trim()) { setError('リッチメッセージ名を入力してください。'); return }
     if (hqHost && !uploaded) { setError('画像を選んでください。'); return }
-    const built = buildRichPayload({ imageUrl, pickedMedia: hqHost ? null : pickedMedia, shape: shapeDef, areas })
+    const built = buildRichPayload({ imageUrl, pickedMedia: hqHost ? null : pickedMedia, shape: shapeDef, areas, liffId })
     if ('error' in built) { setError(built.error); return }
     const { imageMediaId: _id, imageMediaKind: _kind, ...rest } = built.payload
     void _id; void _kind
@@ -325,18 +343,15 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   const busy = saving || publishing || uploading || Boolean(host?.busy)
   const imageSet = /^https?:\/\//.test(imageUrl.trim())
   const unsetAreas = shapeDef.areas.filter((area) => !areaDraftConfigured(areas[area.label]))
-  const actionsSummary = (draft: AreaDraft) => {
-    if (draft.actions.length === 0) return '動きを選ぶ'
-    const first = actionRowTitle(draft.actions[0], actionOptions)
-    return draft.actions.length > 1 ? `${first} ほか${draft.actions.length - 1}件` : first
-  }
-  const editingArea = actionsFor ? (areas[actionsFor] ?? emptyAreaDraft()) : null
   /* 形を変えて選んでいた面が無くなったら、最初の面を選ぶ。 */
   const selectedShapeArea = shapeDef.areas.find((area) => area.label === selectedLabel) ?? shapeDef.areas[0]
   const areaSummary = (draft: AreaDraft | undefined): string | null => {
     if (!draft || draft.kind === 'none') return null
     if (draft.kind === 'uri') return draft.uri.trim() || 'URLを開く'
-    return draft.actions.length > 0 ? actionsSummary(draft) : '動きを実行する'
+    if (draft.kind === 'message') return draft.text.trim() || 'テキストを送る'
+    const def = tapActionDef(draft.kind)
+    const picked = draft.refId ? tapSources[draft.kind as 'form' | 'booking' | 'visit_stamp']?.find((item) => item.id === draft.refId)?.name : ''
+    return picked ? `${def?.label ?? ''}：${picked}` : def?.label ?? null
   }
 
   const sideCard = (
@@ -537,31 +552,22 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                   </div>
                   <div className={rich.areaRow} role="group" aria-label={`面 ${area.label}`}>
                     <span className={rich.areaChip} data-unset={draft.kind === 'none' || undefined}>{`${area.label} ${areaPlace(area, shapeDef.areas)}`}</span>
-                    <div className={rich.areaKind}>
-                      <Select
-                        aria-label={`面 ${area.label} を押したら`}
-                        value={draft.kind}
-                        onChange={(value) => updateArea(area.label, { kind: value as AreaActionKind })}
-                        options={hqHost ? HOST_AREA_KIND_OPTIONS : AREA_KIND_OPTIONS}
+                    <div className={rich.areaTap}>
+                      <TapActionField
+                        name={`面 ${area.label} `}
+                        kindLabel={`面 ${area.label} を押したら`}
+                        value={draft}
+                        onChange={(patch) => updateArea(area.label, patch as Partial<AreaDraft>)}
+                        kinds={hqHost ? HOST_AREA_KINDS : TAP_ACTION_KINDS}
+                        extraKinds={AREA_NONE_KIND}
+                        renderBody={(kind) => kind !== 'none' ? undefined : <p className={rich.areaNone}>押しても何も起きません</p>}
+                        scope={hqHost ? 'hq' : 'shop'}
+                        hasLiff={Boolean(liffId)}
+                        liffSettingsHref={tapAccountId ? `/accounts/detail?id=${encodeURIComponent(tapAccountId)}` : '/accounts'}
+                        readOnly={!canMutate}
+                        sources={tapSources}
+                        textMax={RICH_MESSAGE_TEXT_MAX}
                       />
-                    </div>
-                    <div className={rich.areaBody}>
-                      {draft.kind === 'uri' ? (
-                        <TextField
-                          type="url"
-                          value={draft.uri}
-                          onChange={(event) => updateArea(area.label, { uri: event.target.value })}
-                          placeholder="https://example.com"
-                          aria-label={`面 ${area.label} のURL`}
-                        />
-                      ) : draft.kind === 'actions' ? (
-                        <button type="button" className={rich.actionPick} onClick={() => setActionsFor(area.label)} aria-haspopup="dialog">
-                          <span className={rich.actionPickText}>{actionsSummary(draft)}</span>
-                          <ChevronDown size={14} aria-hidden="true" />
-                        </button>
-                      ) : (
-                        <p className={rich.areaNone}>押しても何も起きません</p>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -575,18 +581,6 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
           ) : null}
         </Card>
       </TemplateEditFrame>
-
-      <Dialog
-        open={actionsFor !== null}
-        title={actionsFor ? `面 ${actionsFor} を押したときの動き` : '面を押したときの動き'}
-        description="上から順に行います。"
-        cancelLabel="閉じる"
-        onCancel={() => setActionsFor(null)}
-      >
-        {actionsFor && editingArea ? (
-          <InlineActionRowsV8 actions={editingArea.actions} onChange={(next) => updateArea(actionsFor, { actions: next })} {...actionOptions} />
-        ) : null}
-      </Dialog>
 
       <Dialog open={previewOpen} title="LINEでの見え方" cancelLabel="閉じる" onCancel={() => setPreviewOpen(false)}>
         <div className={styles.previewDialog}>{phone}</div>

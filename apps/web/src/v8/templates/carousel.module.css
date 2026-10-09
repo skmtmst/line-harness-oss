@@ -124,44 +124,19 @@
 }
 
 .colKind {
-  width: var(--tpl-tg2-col-kind);
+  width: var(--tap-action-kind-w);
   flex-shrink: 0;
 }
 
-.colKind :global(*) {
-  max-width: 100%;
+/* 押したら＋中身（共通の欄 TapActionField）。見出しの「押したら」の幅は部品と同じ値。 */
+.colTap {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .colBody {
   flex: 1 1 0;
   min-width: 0;
-}
-
-/* 「押したら」の開いた中身の行の先頭の印（絵 JkLOF：14px・灰）。 */
-.kindIcon {
-  width: var(--select-menu-check);
-  height: var(--select-menu-check);
-  color: var(--color-ink-secondary);
-}
-
-/* 「予約ページを開く」「予約履歴を開く」の中身：入れる欄は無く、開く先の1行だけ。 */
-.fixedBody {
-  display: flex;
-  align-items: center;
-  min-height: var(--tpl-cn-control-h);
-  overflow: hidden;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-/* LIFF の無いアカウント：選べない動きの理由を操作のそばに書く（出す＝使える）。 */
-.liffNote {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-cn-sub-lh);
 }
 
 .iconButton {

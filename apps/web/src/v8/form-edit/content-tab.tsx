@@ -30,6 +30,7 @@ import { ADD_GROUPS, blockKindLine, blockTitleLine, inputTypeLabel, isChoiceType
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import MediaSlot from '@/components/shared/media-slot'
 import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
+import UriTapActionField from '@/components/shared/uri-tap-action-field'
 import styles from './edit.module.css'
 
 type Props = {
@@ -459,6 +460,16 @@ function BookingFields({ block, refs, set }: { block: FormInputBlock; refs: Form
   )
 }
 
+/* リンクのボタンの押したら（共通の欄・YPzmo・B-129）。保存は今のまま開く URL の文字だけ。 */
+function ButtonTapField({ id, url, accountId, onChange }: { id: string; url: string; accountId: string | null; onChange: (url: string) => void }) {
+  return (
+    <div className={`${styles.field} ${styles.decoTap}`} id={`${id}-url`}>
+      <span className={styles.fieldLabel}>押したら</span>
+      <UriTapActionField name="このボタン" url={url} accountId={accountId} onChange={onChange} />
+    </div>
+  )
+}
+
 function DecoFields({ block, patch, accountId }: { block: FormBlock; patch: (next: Partial<FormBlock>) => void; accountId: string | null }) {
   const [picking, setPicking] = useState(false)
   const id = `fe-deco-${block.id}`
@@ -486,9 +497,7 @@ function DecoFields({ block, patch, accountId }: { block: FormBlock; patch: (nex
           <Labeled label="ボタンの文字" htmlFor={id}>
             <TextField id={id} value={block.label} onChange={(e) => patch({ label: e.target.value } as Partial<FormBlock>)} />
           </Labeled>
-          <Labeled label="開くURL" htmlFor={`${id}-url`}>
-            <TextField id={`${id}-url`} type="url" placeholder="https://..." value={block.url} onChange={(e) => patch({ url: e.target.value } as Partial<FormBlock>)} />
-          </Labeled>
+          <ButtonTapField id={id} url={block.url} accountId={accountId} onChange={(url) => patch({ url } as Partial<FormBlock>)} />
         </div>
       )
     case 'image':

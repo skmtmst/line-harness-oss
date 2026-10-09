@@ -14,7 +14,7 @@
 .areaHead, .areaRow { display: flex; align-items: center; gap: var(--tpl-wa-rich-col-gap); width: 100%; }
 .areaHead { color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-wa-rich-head-lh); }
 .areaColChip { flex: 0 0 var(--tpl-wa-rich-chip-w); }
-.areaColKind { flex: 0 0 var(--tpl-wa-rich-kind-w); }
+.areaColKind { flex: 0 0 var(--tap-action-kind-w); }
 .areaColBody { flex: 1 1 0; min-width: 0; }
 .areaChip {
   display: inline-flex; align-items: center; justify-content: center; flex: 0 0 var(--tpl-wa-rich-chip-w);
@@ -23,19 +23,8 @@
   font-size: var(--text-caption); font-weight: 600; white-space: nowrap;
 }
 .areaChip[data-unset] { background: var(--color-canvas-sunken); color: var(--color-ink-secondary); }
-.areaKind { flex: 0 0 var(--tpl-wa-rich-kind-w); min-width: 0; }
-.areaKind :global(*) { max-width: 100%; }
-.areaBody { flex: 1 1 0; min-width: 0; }
+.areaTap { flex: 1 1 0; min-width: 0; }
 .areaNone { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
-.actionPick {
-  display: flex; align-items: center; gap: var(--tpl-wa-rich-pick-gap); width: 100%;
-  height: var(--tpl-wa-rich-h); padding: var(--tpl-wa-rich-pick-pad);
-  border: 0; border-radius: var(--radius-control);
-  outline: 1px solid var(--color-control-border); outline-offset: -1px;
-  background: var(--color-canvas); color: var(--color-ink); font-size: var(--text-label); text-align: left; cursor: pointer;
-}
-.actionPick:focus-visible { outline: var(--tpl-te-focus) solid var(--color-action); }
-.actionPickText { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .warn {
   margin: 0; padding: var(--tpl-wa-rich-warn-pad);
   border-radius: var(--radius-control);

@@ -105,7 +105,7 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     expect(screen.getAllByRole('button', { name: /^面 [A-F]、動きは/ })).toHaveLength(6)
     selectArea('A'); pickIntent('URLを開く')
     fireEvent.change(screen.getByPlaceholderText('https://...'), { target: { value: 'https://example.com/booking' } })
-    selectArea('B'); pickIntent('メッセージを送る')
+    selectArea('B'); pickIntent('テキストを送る')
     fireEvent.change(screen.getByLabelText(/^送るテキスト/), { target: { value: '予約を確認する' } })
     await save()
     expect(saved().pages[0].imageR2Key).toBeNull()
@@ -136,7 +136,7 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     const tabs = () => within(screen.getByRole('group', { name: '直すタブ' }))
     for (const [index, letter] of ['A', 'B', 'C'].entries()) {
       fireEvent.click(tabs().getByRole('button', { name: `タブ${index + 1}「タブ ${letter}」` }))
-      selectArea('A'); pickIntent('メッセージを送る')
+      selectArea('A'); pickIntent('テキストを送る')
       fireEvent.change(screen.getByLabelText(/^送るテキスト/), { target: { value: `内容${letter}` } })
     }
     await save()
@@ -172,7 +172,7 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
   it('①でタブを減らすとき、消えるタブに動きがあれば確かめ、取り消すと残す', async () => {
     await start('3つ')
     fireEvent.click(within(screen.getByRole('group', { name: '直すタブ' })).getByRole('button', { name: 'タブ3「タブ C」' }))
-    selectArea('A'); pickIntent('メッセージを送る')
+    selectArea('A'); pickIntent('テキストを送る')
     fireEvent.change(screen.getByLabelText(/^送るテキスト/), { target: { value: '消えるタブ' } })
     click('タブの数・名前・画像は ①形と画像 で変えます')
     fireEvent.click(within(screen.getByRole('group', { name: '切替タブの数' })).getByRole('button', { name: '2つ' }))

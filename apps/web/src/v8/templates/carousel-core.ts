@@ -5,6 +5,7 @@
  */
 import { api } from '@/lib/api'
 import { toActionPayload, type InlineAction } from '@/components/auto-replies/draft-fields'
+import { tapActionDef, tapActionFromUri, tapActionLiffUrl, tapActionNeedsLiff, type LiffTapActionKind } from '@/lib/tap-actions'
 
 export const MAX_COLUMNS = 10
 export const MAX_ACTIONS = 3
@@ -12,8 +13,8 @@ export const TITLE_MAX = 40
 export const TEXT_MAX_WITH_IMAGE = 60
 export const TEXT_MAX_WITHOUT_IMAGE = 120
 
-/** ボタン1つの「押したら」。 */
-export type ChoiceKind = 'uri' | 'message' | 'form' | 'booking' | 'booking_history' | 'action'
+/** ボタン1つの「押したら」。6つ（lib/tap-actions.ts）と、店だけの「動きを実行する」（action）。 */
+export type ChoiceKind = 'uri' | 'message' | 'form' | 'booking' | 'booking_history' | 'visit_stamp' | 'action'
 
 /*
  * LINE のテンプレートのボタン（message アクション）で送れる文の長さ。
@@ -27,47 +28,40 @@ export interface Choice {
   /**
    * 'uri'（URLを開く）・'message'（テキストを送る）・'form'（回答フォームを開く）・
    * 'booking'（予約ページを開く）・'booking_history'（予約履歴を開く）・'action'（押されたときに何かする）。
-   * form・booking・booking_history は LINE では uri のボタン（このアカウントの LIFF の URL）になる。
+   * 'visit_stamp'（来店スタンプを開く）。
+   * form・booking・booking_history・visit_stamp は LINE では uri のボタン（このアカウントの LIFF の URL）になる。
    */
   kind: ChoiceKind
   uri: string
   /** kind='message' のときに送る文。 */
   text: string
-  /** kind='form' のときに開く回答フォーム。 */
+  /**
+   * 開く作ってあるもの：kind='form' は回答フォーム（必須）、'booking' は予約メニュー（任意）、
+   * 'visit_stamp' はスタンプカード（任意）の ID。共通の欄（TapActionField）の refId。
+   */
   formId: string
   /** kind='action' のときに実行する並び。 */
   actions: InlineAction[]
 }
 
 /*
- * LIFF のページの URL。予約・予約履歴は管理画面の予約設定が配る URL と同じページ
- * （page=salon-book・履歴は view=history）、回答フォームは回答フォームの公開 URL と同じ形。
+ * LIFF のページの URL・読み戻しは lib/tap-actions.ts の1か所（Codex の packages/shared の関数ができたらそこで差し替える）。
  * 店のカルーセルは、保存するときにそのアカウントの LIFF ID を入れて作る
  * （{{liff_id}} は一斉配信でしか置き換わらず、シナリオ・自動応答・受信箱などでは置き換わらないため）。
  */
-const LIFF_ORIGIN = 'https://liff.line.me/'
-
-export function liffPageUrl(liffId: string, kind: 'form' | 'booking' | 'booking_history', formId = ''): string {
-  const base = `${LIFF_ORIGIN}${liffId}/`
-  if (kind === 'form') return `${base}?page=form&id=${encodeURIComponent(formId)}`
-  if (kind === 'booking_history') return `${base}?page=salon-book&view=history`
-  return `${base}?page=salon-book`
+export function liffPageUrl(liffId: string, kind: LiffTapActionKind, formId = ''): string {
+  return tapActionLiffUrl(liffId, kind, formId)
 }
 
 /** 保存してある uri のボタンが LIFF のどのページか（読み戻し用）。当たらなければ 'uri'。 */
 export function choiceFromUri(uri: string): Pick<Choice, 'kind' | 'formId'> {
-  const match = /^https:\/\/liff\.line\.me\/[^/?#]+\/?\?([^#]*)$/.exec(uri.trim())
-  if (!match) return { kind: 'uri', formId: '' }
-  const query = new URLSearchParams(match[1])
-  const page = query.get('page')
-  if (page === 'form' && query.get('id')) return { kind: 'form', formId: query.get('id') ?? '' }
-  if (page === 'salon-book') return { kind: query.get('view') === 'history' ? 'booking_history' : 'booking', formId: '' }
-  return { kind: 'uri', formId: '' }
+  const parsed = tapActionFromUri(uri)
+  return { kind: parsed.kind as ChoiceKind, formId: parsed.refId }
 }
 
 /** LIFF のページを開く動き（アカウントに LIFF が無いと作れない）。 */
-export function needsLiff(kind: ChoiceKind): boolean {
-  return kind === 'form' || kind === 'booking' || kind === 'booking_history'
+export function needsLiff(kind: ChoiceKind): kind is LiffTapActionKind {
+  return tapActionNeedsLiff(kind)
 }
 
 export interface Panel {
@@ -131,7 +125,7 @@ export function buildChoiceAction(a: Choice, postbackData: string, liffId: strin
   const label = a.label.trim()
   if (a.kind === 'action') return { type: 'postback', label, data: postbackData }
   if (a.kind === 'message') return { type: 'message', label, text: a.text.trim() }
-  if (needsLiff(a.kind)) return { type: 'uri', label, uri: liffPageUrl(liffId || '{{liff_id}}', a.kind as 'form' | 'booking' | 'booking_history', a.formId) }
+  if (needsLiff(a.kind)) return { type: 'uri', label, uri: liffPageUrl(liffId || '{{liff_id}}', a.kind, a.formId) }
   return { type: 'uri', label, uri: a.uri.trim() }
 }
 
@@ -150,7 +144,7 @@ export function carouselChoiceProblems(panels: Panel[], liffId: string | null): 
         else if ([...a.text.trim()].length > MESSAGE_TEXT_MAX) problems.push(`${where}の送る文は${MESSAGE_TEXT_MAX}文字までです`)
       }
       if (a.kind === 'form' && !a.formId) problems.push(`${where}の回答フォームを選んでください`)
-      if (needsLiff(a.kind) && !liffId) problems.push(`${where}：このアカウントに LIFF が登録されていないため、回答フォーム・予約ページ・予約履歴は開けません`)
+      if (needsLiff(a.kind) && !liffId) problems.push(`${where}：このアカウントに LIFF が登録されていないため、「${tapActionDef(a.kind)?.label}」は開けません`)
     })
   })
   return problems
