@@ -860,3 +860,17 @@ describe('監査 L10：選んだ時刻に開始の瞬間と店のタイムゾー
     });
   });
 });
+
+it('L3：月だけでも日から時刻へ進み、月へ戻って別の日を選べる', async () => {
+  mockSettings('list', 60, 'month-only');
+  const { onSelect } = renderPicker();
+  await screen.findByText('2026年10月');
+  fireEvent.click(await screen.findByRole('button', { name: /10月16日/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'この日の時間を選ぶ' }));
+  const time = await screen.findByRole('button', { name: /^10:00/ });
+  fireEvent.click(time);
+  expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ date: '2026-10-16', start: '10:00' }));
+  fireEvent.click(screen.getByRole('button', { name: '日を選び直す' }));
+  expect(await screen.findByText('2026年10月')).toBeTruthy();
+  expect(screen.queryByRole('radiogroup', { name: '表示の切り替え' })).toBeNull();
+});
