@@ -196,6 +196,7 @@ export default function FileScanScreen() {
         <ConfirmDialog
           open
           title="ファイルを削除する"
+          deleteName={deleteTarget.filename}
           description={`${deleteTarget.filename} を消します。中身は画面に出ません。監査の記録は残ります。`}
           confirmLabel="削除する"
           cancelLabel="キャンセル"

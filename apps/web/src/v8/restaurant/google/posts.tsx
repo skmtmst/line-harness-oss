@@ -255,6 +255,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
       <ConfirmDialog
         open={confirmRemove !== null}
         title="この投稿をGoogleから削除しますか？"
+        deleteName={confirmRemove?.title || confirmRemove?.summary || 'この投稿'}
         description="削除すると元に戻せません。もう一度公開するには、新しく投稿を作り直してください。"
         confirmLabel="削除する"
         destructive

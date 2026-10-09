@@ -702,6 +702,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           <ConfirmDialog
             open={!!remove}
             title="ひな形を削除"
+            deleteName={remove?.name ?? ''}
             description={`「${remove?.name ?? ''}」を削除します。配布済みのアカウントデータは残ります。`}
             destructive
             confirmLabel="削除する"

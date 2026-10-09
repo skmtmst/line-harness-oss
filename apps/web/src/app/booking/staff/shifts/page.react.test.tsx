@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
@@ -624,10 +624,10 @@ describe('登録済みの休業日の修正・削除 (#953 E-09)', () => {
     fireEvent.click(screen.getByRole('button', { name: '削除する' }))
 
     // 確認するまでAPIは呼ばない。
-    expect(await screen.findByText('この休業日を消しますか？')).toBeTruthy()
+    expect(await screen.findByText('「年末休業」を削除しますか？')).toBeTruthy()
     expect(fixture.deleteException).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: '休業日を削除する' }))
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '削除する', exact: true }))
     await waitFor(() => expect(fixture.deleteException).toHaveBeenCalledWith('account-a', 'exception-a', 2))
     await waitFor(() => expect(screen.queryByText('年末休業')).toBeNull())
   })
@@ -636,7 +636,7 @@ describe('登録済みの休業日の修正・削除 (#953 E-09)', () => {
     fixture.deleteException.mockRejectedValueOnce(new ApiError(409, 'version_conflict', 'version_conflict'))
     await renderWithException()
     fireEvent.click(screen.getByRole('button', { name: '削除する' }))
-    fireEvent.click(screen.getByRole('button', { name: '休業日を削除する' }))
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '削除する', exact: true }))
 
     expect((await screen.findByRole('alert')).textContent).toContain('ほかの担当者が先にこの休業日を変更しました')
     // 一覧は消さず、確認をやり直せる状態のままにする。

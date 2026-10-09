@@ -76,7 +76,7 @@ describe('V8 ダッシュボード編集', () => {
     fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
     expect(onReset).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: '初期状態に戻す' }))
-    fireEvent.click(screen.getByRole('button', { name: /削除して初期状態へ戻す/ }))
+    fireEvent.click(screen.getByRole('button', { name: '削除する', exact: true }))
     expect(onReset).toHaveBeenCalledTimes(1)
   })
 

@@ -1199,6 +1199,7 @@ function StoreShiftsView() {
       <ConfirmDialog
         open={deleteTarget !== null}
         title="この休業日を消しますか？"
+        deleteName={deleteTarget?.reason || deleteTarget?.dateFrom || deleteTarget?.date || undefined}
         description="削除すると、その期間は曜日の決めごとどおりの受付に戻ります。すでに入っている予約はそのまま残ります。"
         confirmLabel="休業日を削除する"
         destructive
