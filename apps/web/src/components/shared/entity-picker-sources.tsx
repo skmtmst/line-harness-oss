@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import type { FormLayout } from '@line-crm/shared'
 import { api } from '@/lib/api'
-import { useOptionalAccount } from '@/contexts/account-context'
+import * as accountContext from '@/contexts/account-context'
 import FlexPreview from '@/components/flex-preview'
 import LinePreview, { LinePreviewMessage } from './line-preview'
 import ListState from './list-state'
@@ -107,6 +107,18 @@ export function toPickerItems(kind: EntityKind, rows: ReadonlyArray<EntityLike>,
   })
 }
 
+/**
+ * 上のバーで選んでいるアカウント。Provider の外（部品の試験など）では null。
+ * 試験の差し替えで useOptionalAccount が無いときは useAccount を使う。
+ */
+type AccountValue = ReturnType<typeof accountContext.useAccount>
+function useMaybeAccount(): AccountValue | null {
+  let hook: (() => AccountValue | null) | undefined
+  try { hook = accountContext.useOptionalAccount } catch { hook = undefined }
+  if (typeof hook !== 'function') { try { hook = accountContext.useAccount } catch { hook = undefined } }
+  return typeof hook === 'function' ? hook() ?? null : null
+}
+
 /** 窓を開いたときにフォルダを読む。読めなくても選べる（すべてから選ぶ）。 */
 export function useEntityFolders(kind: EntityKind, accountId?: string | null) {
   const [folders, setFolders] = useState<EntityPickerFolder[] | undefined>(undefined)
@@ -196,7 +208,7 @@ type KindFieldBase = {
  */
 export function EntityKindField(props: KindFieldBase & ({ multiple?: false; value: string | null | undefined; onChange: (id: string) => void; clearable?: boolean } | { multiple: true; value: string[]; onChange: (ids: string[]) => void; allowEmpty?: boolean })) {
   const { kind, label, options, meta, placeholder, disabled, readOnly, invalid, description, id, noPreview } = props
-  const account = useOptionalAccount()
+  const account = useMaybeAccount()
   const accountId = props.accountId ?? account?.selectedAccountId ?? null
   const accountName = account?.selectedAccount?.name
   const def = ENTITY_KINDS[kind]
