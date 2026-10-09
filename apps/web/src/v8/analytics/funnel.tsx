@@ -293,7 +293,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
         presetConversion: editTarget ? null : (presetConversion ?? null),
         onCancel: () => { setCreating(false); setEditTarget(null) },
         onCreated: (id, usageWarnings) => {
-          setCreating(false); setEditTarget(null)
+          if (!editTarget) setCreating(false)
           setUsageNotice(usageWarnings && usageWarnings.length > 0 ? `作成はできましたが、成果地点への利用先記録に失敗しました：${usageWarnings.join('、')}。成果地点側の利用先一覧には出ていません。` : '')
           void reloadFunnels(id)
         },

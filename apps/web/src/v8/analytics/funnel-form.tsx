@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, X } from 'lucide-react'
 import { ApiError, api } from '@/lib/api'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
+import { notifySaved } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
@@ -276,10 +277,14 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
           else setError(explainSaveError(res.error, res.error))
           return
         }
+        setExpectedVersion(res.data.versionNumber)
+        conflict.clear()
+        notifySaved()
         onCreated(edit.funnelId, res.data.usageWarnings)
       } else {
         const res = await api.analytics.v6Funnels.create(accountId, { name: name.trim(), windowDays: Number(windowDays), steps: payloadSteps })
         if (!res.success) return setError(res.error)
+        notifySaved()
         onCreated(res.data.funnelId, res.data.usageWarnings)
       }
     } catch (caught) {
