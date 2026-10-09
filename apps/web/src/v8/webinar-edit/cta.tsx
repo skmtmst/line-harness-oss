@@ -21,6 +21,10 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
 import { ApiError, fetchApi, webinarApi, type WebinarCtaCard, type WebinarEditor } from '@/lib/api'
+import { useFormErrors } from '@/lib/use-form-errors'
+import { ErrorCountBadge } from '@/components/shared/error-count-badge'
+import ValidationSummary from '@/components/shared/validation-summary'
+import { FieldError } from '@/components/shared/form-controls'
 import { ReadValue } from './parts'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import form from './form.module.css'
@@ -37,25 +41,20 @@ function parseMinSec(text: string): number | null {
 }
 const EMPTY_CARD = (atSeconds: number): WebinarCtaCard => ({ atSeconds, kind: 'form', title: '', body: null, buttonLabel: '', autoOpen: false, formId: null, url: null })
 
-/** 保存前の確かめ（app/webinars/edit/cta-card-validation と同じ）。1件でもあれば保存は呼ばない。 */
-function cardProblems(ctas: WebinarCtaCard[], times: string[], durationSeconds: number): string[] {
-  const problems: string[] = []
-  ctas.forEach((card, i) => {
-    const label = `${i + 1}枚目`
-    const at = parseMinSec(times[i] ?? '')
-    if (at === null) problems.push(`${label}: 出す時刻は 分:秒 で入れてください（例: 45:00）`)
-    else if (durationSeconds > 0 && at > durationSeconds) problems.push(`${label}: 出す時刻が動画の長さ（${Math.floor(durationSeconds / 60)}分）を超えています。動画の中の時刻に直してください`)
-    if (!card.title?.trim()) problems.push(`${label}: 見出しが空です。カードの見出しを入れてください`)
-    if (!card.buttonLabel?.trim()) problems.push(`${label}: ボタンの言葉が空です。ボタンに出す文字を入れてください`)
-    if (card.kind === 'form') {
-      if (!card.formId) problems.push(`${label}: フォームが選ばれていません。公開中のフォームを選ぶか、種類を URL へ変えてください`)
-    } else {
-      const url = card.url?.trim() ?? ''
-      if (!url) problems.push(`${label}: URL が空です。https:// から始まる URL を入れてください`)
-      else if (!/^https:\/\//.test(url)) problems.push(`${label}: URL は https:// で始めてください（http は使えません）`)
-    }
-  })
-  return problems
+/** 1枚のカードの欄ごとの誤り（B-139）。欄の真下に出すので「n枚目」は付けない。 */
+function cardFieldProblems(card: WebinarCtaCard, time: string, durationSeconds: number): { time: string | null; title: string | null; button: string | null; link: string | null } {
+  const at = parseMinSec(time)
+  const url = card.url?.trim() ?? ''
+  return {
+    time: at === null
+      ? '出す時刻は 分:秒 で入れてください（例: 45:00）'
+      : durationSeconds > 0 && at > durationSeconds ? `出す時刻が動画の長さ（${Math.floor(durationSeconds / 60)}分）を超えています。動画の中の時刻に直してください` : null,
+    title: card.title?.trim() ? null : 'カードの見出しを入れてください',
+    button: card.buttonLabel?.trim() ? null : 'ボタンに出す文字を入れてください',
+    link: card.kind === 'form'
+      ? (card.formId ? null : '公開中のフォームを選ぶか、種類を URL へ変えてください')
+      : !url ? 'https:// から始まる URL を入れてください' : !/^https:\/\//.test(url) ? 'URL は https:// で始めてください（http は使えません）' : null,
+  }
 }
 
 function isConflict(cause: unknown): boolean {
@@ -136,11 +135,24 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
   const published = forms.items.filter((item) => item.isActive)
   const update = (index: number, patch: Partial<WebinarCtaCard>) => setCtas((prev) => (prev ? prev.map((card, j) => (j === index ? { ...card, ...patch } : card)) : prev))
 
+  /*
+   * 保存で落ちた欄（B-139）。カードは1枚ずつしか開いていないので、落ちた欄が別のカードなら
+   * そのカードを選んでから移る。カードの行には直す欄の数の赤い丸を付ける。
+   */
+  const fields = useFormErrors()
+  ;(ctas ?? []).forEach((card, i) => {
+    const check = () => cardFieldProblems(card, times[i] ?? '', webinar.durationSeconds)
+    const opts = { reveal: () => setSelected(i), group: `card-${i}` }
+    fields.define(`cta-${i}-title`, `カード${i + 1}の見出し`, () => check().title, opts)
+    fields.define(`cta-${i}-time`, `カード${i + 1}の出す時刻`, () => check().time, opts)
+    fields.define(`cta-${i}-button`, `カード${i + 1}のボタンの言葉`, () => check().button, opts)
+    fields.define(`cta-${i}-link`, card.kind === 'form' ? `カード${i + 1}の使うフォーム` : `カード${i + 1}の開く URL`, () => check().link, opts)
+  })
+
   /* 下書きを保存：カードは読めていれば今の中身をそのまま保存する（同時編集の 409 はここでも見つける）。 */
   const saveCards = async (): Promise<boolean> => {
     if (ctas === null) return false
-    const problems = cardProblems(ctas, times, webinar.durationSeconds)
-    if (problems.length > 0) { setMessage(problems[0]); return false }
+    if (fields.submit().length > 0) { setMessage(null); return false }
     const next = ctas.map((card, i) => ({ ...card, atSeconds: parseMinSec(times[i]) ?? 0 }))
     try {
       await webinarApi.saveCtas(webinarId, next)
@@ -230,6 +242,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
 
   const currentIndex = ctas === null ? 0 : Math.min(selected, Math.max(ctas.length - 1, 0))
   const current = ctas === null ? null : ctas[currentIndex] ?? null
+  const errId = (part: 'title' | 'time' | 'button' | 'link') => (fields.invalid(`cta-${currentIndex}-${part}`) ? `cta-${part}-error` : undefined)
   const formName = (id: string | null | undefined) => (id ? forms.items.find((item) => item.id === id)?.name ?? '選んだフォーム' : '未設定')
   const busy = saving || reading
 
@@ -275,6 +288,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
         <div className={form.cardHeadRow}><h2 id="webinar-cta-title" className={form.cardTitle}>{ctas === null ? 'CTA カード' : `CTA カード ${ctas.length}枚`}</h2></div>
         <p className={styles.desc}>動画の途中で出す申し込みボタンです。出す時刻は 分:秒 で入れます。</p>
         {message ? <Notice tone="danger">{message}</Notice> : null}
+        <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
         {loadFailed ? (
           <ListState kind="error" title="CTA カードを読み込めませんでした" description="読み込めるまで保存はできません。" action={<Button onClick={() => void loadCtas()}>もう一度読み込む</Button>} />
         ) : ctas === null ? <ListState kind="loading" /> : <>
@@ -284,6 +298,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
                 <span className={styles.cardTime}>{times[index] ?? fmtMinSec(card.atSeconds)}</span>
                 <span className={`${form.rowMain} ${form.ellipsis}`} title={card.title}>{card.title || '（見出しなし）'}</span>
                 <span className={form.pill} data-tone={card.kind === 'form' ? 'success' : undefined}><span className={form.pillDot} aria-hidden="true" />{card.kind === 'form' ? '回答フォーム' : 'URL'}</span>
+                <ErrorCountBadge count={fields.countIn(`card-${index}`)} label={`カード${index + 1}`} />
               </button>
               {readOnly ? null : (
                 <div className={form.menuBox}>
@@ -304,10 +319,10 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
               {/* 閲覧のみ：文字の欄は読み取りだけ、選ぶ部品は選んでいる値を文字で見せる（2026-10-06 オーナー決定）。 */}
               <p className={styles.editorTitle}>{`選んでいるカード：${times[currentIndex] ?? fmtMinSec(current.atSeconds)}`}</p>
               <div className={form.pair}>
-                <label className={form.field}><span className={form.label}>見出し</span><TextField value={current.title} readOnly={readOnly} onChange={(event) => update(currentIndex, { title: event.target.value })} /></label>
-                <label className={form.field}><span className={form.label}>出す時刻（分:秒）</span><TextField value={times[currentIndex] ?? ''} readOnly={readOnly} inputMode="numeric" placeholder="12:00" onChange={(event) => setTimes((prev) => prev.map((value, j) => (j === currentIndex ? event.target.value : value)))} /></label>
+                <div className={form.field}><label htmlFor="cta-title" className={form.label}>見出し</label><TextField {...fields.bind(`cta-${currentIndex}-title`)} id="cta-title" value={current.title} readOnly={readOnly} invalid={fields.invalid(`cta-${currentIndex}-title`)} aria-describedby={errId('title')} onChange={(event) => update(currentIndex, { title: event.target.value })} /><FieldError id="cta-title-error">{fields.error(`cta-${currentIndex}-title`)}</FieldError></div>
+                <div className={form.field}><label htmlFor="cta-time" className={form.label}>出す時刻（分:秒）</label><TextField {...fields.bind(`cta-${currentIndex}-time`)} id="cta-time" value={times[currentIndex] ?? ''} readOnly={readOnly} inputMode="numeric" placeholder="12:00" invalid={fields.invalid(`cta-${currentIndex}-time`)} aria-describedby={errId('time')} onChange={(event) => setTimes((prev) => prev.map((value, j) => (j === currentIndex ? event.target.value : value)))} /><FieldError id="cta-time-error">{fields.error(`cta-${currentIndex}-time`)}</FieldError></div>
               </div>
-              <label className={form.field}><span className={form.label}>ボタンの言葉</span><TextField value={current.buttonLabel} readOnly={readOnly} onChange={(event) => update(currentIndex, { buttonLabel: event.target.value })} /></label>
+              <div className={form.field}><label htmlFor="cta-button" className={form.label}>ボタンの言葉</label><TextField {...fields.bind(`cta-${currentIndex}-button`)} id="cta-button" value={current.buttonLabel} readOnly={readOnly} invalid={fields.invalid(`cta-${currentIndex}-button`)} aria-describedby={errId('button')} onChange={(event) => update(currentIndex, { buttonLabel: event.target.value })} /><FieldError id="cta-button-error">{fields.error(`cta-${currentIndex}-button`)}</FieldError></div>
               <div className={form.pair}>
                 <div className={form.field}>
                   <span className={form.labelSmall}>リンクの種類</span>
@@ -320,10 +335,11 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
                     <span className={form.labelSmall}>使うフォーム</span>
                     {readOnly
                       ? <ReadValue label="使うフォーム">{formName(current.formId)}</ReadValue>
-                      : <Select aria-label="使うフォーム" size="full" value={current.formId ?? ''} onChange={(value) => update(currentIndex, { formId: value || null })} options={[{ value: '', label: 'フォームを選ぶ' }, ...published.map((item) => ({ value: item.id, label: `${item.name}（公開中）` }))]} />}
+                      : <div {...fields.bind(`cta-${currentIndex}-link`)}><Select aria-label="使うフォーム" size="full" value={current.formId ?? ''} error={fields.error(`cta-${currentIndex}-link`) ?? undefined} onChange={(value) => update(currentIndex, { formId: value || null })} options={[{ value: '', label: 'フォームを選ぶ' }, ...published.map((item) => ({ value: item.id, label: `${item.name}（公開中）` }))]} /></div>}
+                    <FieldError id="cta-link-error">{fields.error(`cta-${currentIndex}-link`)}</FieldError>
                   </div>
                 ) : (
-                  <label className={form.field}><span className={form.labelSmall}>開く URL</span><TextField value={current.url ?? ''} readOnly={readOnly} inputMode="url" placeholder="https://" onChange={(event) => update(currentIndex, { url: event.target.value })} /></label>
+                  <div className={form.field}><label htmlFor="cta-url" className={form.labelSmall}>開く URL</label><TextField {...fields.bind(`cta-${currentIndex}-link`)} id="cta-url" value={current.url ?? ''} readOnly={readOnly} inputMode="url" placeholder="https://" invalid={fields.invalid(`cta-${currentIndex}-link`)} aria-describedby={errId('link')} onChange={(event) => update(currentIndex, { url: event.target.value })} /><FieldError id="cta-link-error">{fields.error(`cta-${currentIndex}-link`)}</FieldError></div>
                 )}
               </div>
               <div className={styles.toggleRow}>

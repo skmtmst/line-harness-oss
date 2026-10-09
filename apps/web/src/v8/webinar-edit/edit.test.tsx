@@ -234,6 +234,32 @@ describe('V8 ウェビナーの編集', () => {
     ] })
     expect(host.textContent).toContain('2件保存しました')
   })
+  it('B-139 CTA：別のカードに足りない欄があると、そのカードを開いて見出しの欄へ移り、カードの行に赤い印を付ける', async () => {
+    nav.search = 'id=webinar-1&pane=cta'
+    await render(<WebinarEditV8 />)
+    await act(async () => { buttonText('CTA カードを足す')!.click() })
+    // 1枚目（足りている）へ戻ってから保存する
+    const picks = () => [...host.querySelectorAll('[data-wc-pane="cta"] button[aria-current], [data-wc-pane="cta"] button')].filter((b) => b.className.includes('cardPick')) as HTMLButtonElement[]
+    await act(async () => { picks()[0].click() })
+    expect((host.querySelector('#cta-title') as HTMLInputElement).value).toBe('資料')
+    const before = puts.length
+    await act(async () => { buttonText('下書きを保存')!.click() })
+    for (let i = 0; i < 4; i += 1) await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    expect(puts.length).toBe(before)
+    expect(picks()[1].getAttribute('aria-current')).toBe('true')
+    const title = host.querySelector('#cta-title') as HTMLInputElement
+    expect(title.value).toBe('')
+    expect(title.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(title)
+    expect(host.querySelector('#cta-title-error')?.textContent).toBe('カードの見出しを入れてください')
+    expect(host.querySelector('#cta-button-error')?.textContent).toBe('ボタンに出す文字を入れてください')
+    expect(host.querySelector('#cta-link-error')?.textContent).toContain('公開中のフォームを選ぶ')
+    const badges = [...host.querySelectorAll('[data-design-part="error-count-badge"]')]
+    expect(badges.map((b) => b.getAttribute('aria-label'))).toEqual(['カード2に直す欄が3か所'])
+    await act(async () => { picks()[0].click() })
+    expect(host.querySelector('#cta-title')?.getAttribute('aria-invalid')).toBeNull()
+  })
+
   it('CTA（pvimJ）：保存が競合したら帯を左右の列の上に出し、下書きの保存を「比べてから保存」に替える', async () => {
     conflictState.ctas = true
     nav.search = 'id=webinar-1&pane=cta'
