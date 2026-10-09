@@ -54,6 +54,29 @@ beforeEach(() => {
   dbMocks.getEntryRouteByRefCodeAny.mockResolvedValue(null);
 });
 
+describe('/r/:ref — クーポンQRの所属', () => {
+  it('既定プール・転送先に流れず、クーポンの店のLIFFとrefへ送る', async () => {
+    dbMocks.getEntryRouteByRefCode.mockResolvedValue({ id: 'r', ref_code: 'coupon', is_active: 1,
+      coupon_enabled: 1, coupon_asset_id: 'c', line_account_id: 'a', pool_id: 'other-pool', redirect_url: 'https://other.example' });
+    dbMocks.getLineAccountById.mockResolvedValue({ id: 'a', liff_id: '2000000000-CouponAA' });
+    const response = await get('/r/coupon');
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('2000000000-CouponAA');
+    expect(html).toContain('couponRef=coupon');
+    expect(html).not.toContain('1000000000-DefaultAA');
+    expect(dbMocks.getTrafficPoolBySlug).not.toHaveBeenCalled();
+    expect(dbMocks.getTrafficPoolById).not.toHaveBeenCalled();
+  });
+  it('所属のLIFFが無ければ、別の店へ落とさず利用不可にする', async () => {
+    dbMocks.getEntryRouteByRefCode.mockResolvedValue({ id: 'r', is_active: 1,
+      coupon_enabled: 1, coupon_asset_id: 'c', line_account_id: 'a' });
+    dbMocks.getLineAccountById.mockResolvedValue({ id: 'a', liff_id: null });
+    expect((await get('/r/coupon')).status).toBe(503);
+    expect(dbMocks.getTrafficPoolBySlug).not.toHaveBeenCalled();
+  });
+});
+
 describe('/r/:ref — N-244 stopped entry routes', () => {
   it('active 経路は通常の公開URL受付を行う', async () => {
     dbMocks.getEntryRouteByRefCode.mockResolvedValue({

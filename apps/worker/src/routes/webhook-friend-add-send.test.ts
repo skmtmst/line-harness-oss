@@ -99,6 +99,7 @@ async function postFollow(
   webhookEventId: string,
   useDb: D1Database = db,
   extraEnv: Record<string, unknown> = {},
+  timestamp = Date.now(),
 ): Promise<void> {
   const app = new Hono();
   app.route('/', webhook);
@@ -108,7 +109,7 @@ async function postFollow(
     headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
     body: JSON.stringify({
       events: [{
-        type: 'follow', webhookEventId, timestamp: Date.now(),
+        type: 'follow', webhookEventId, timestamp,
         source: { type: 'user', userId: 'U-1' }, replyToken: `reply-${webhookEventId}`,
         follow: { isUnblocked: false },
       }],
@@ -912,5 +913,41 @@ describe('POST /webhook — 流入リンクの案内の共通情報 (N-189)', ()
     // テキスト型の本文は {"text":"…"} のJSONで保持される
     expect(messages[0].text).toContain('営業時間は10時から18時です');
     expect(messages[0].text).not.toContain('{{var.');
+  });
+});
+
+describe('クーポンQRからの初回追加', () => {
+  function seedEntryCoupon() {
+    raw.prepare(`INSERT INTO broadcast_message_assets(id,line_account_id,kind,name,payload_json,published_version,created_at,updated_at)
+      VALUES('entry-coupon','account-1','coupon','店頭10%オフ',?,1,'2026-10-01','2026-10-01')`)
+      .run(JSON.stringify({ description: '10%オフ', startsAt: '2020-01-01', endsAt: '2099-01-01', oncePerFriend: true }));
+    raw.exec("UPDATE entry_routes SET coupon_enabled=1,coupon_asset_id='entry-coupon' WHERE id='route-1'");
+  }
+  test('追加時にこの経路のクーポンを送る。別IDのfollowが再び届いても2枚目は送らない', async () => {
+    seedEntryCoupon();
+    await postFollow('coupon-follow');
+    const coupons = () => lineClientMocks.pushMessage.mock.calls.filter((call) => JSON.stringify(call).includes('coupon_use:entry-coupon:'));
+    expect(coupons()).toHaveLength(1);
+    const receipt = raw.prepare('SELECT id,status FROM entry_route_coupon_receipts').get() as { id: string; status: string };
+    expect(receipt.status).toBe('sent');
+    expect(coupons()[0][2]).toBe(receipt.id);
+    await postFollow('coupon-follow-duplicate');
+    expect(coupons()).toHaveLength(1);
+  });
+  test.each(['draft', 'returning'])('未公開と再フォローには送らない: %s', async (kind) => {
+    seedEntryCoupon();
+    if (kind === 'draft') raw.exec("UPDATE broadcast_message_assets SET published_version=0 WHERE id='entry-coupon'");
+    else raw.exec("UPDATE friends SET unfollow_count=1 WHERE id='friend-1'");
+    await postFollow('coupon-blocked');
+    expect(lineClientMocks.pushMessage.mock.calls.filter((call) => JSON.stringify(call).includes('coupon_use:entry-coupon:'))).toHaveLength(0);
+    expect(raw.prepare('SELECT COUNT(*) AS n FROM entry_route_coupon_receipts').get()).toEqual({ n: 0 });
+  });
+  test('追加イベントの到着が遅れ、送信時に期限切れなら発行しない', async () => {
+    seedEntryCoupon();
+    raw.prepare("UPDATE broadcast_message_assets SET payload_json=? WHERE id='entry-coupon'")
+      .run(JSON.stringify({ description: '10%オフ', startsAt: '2020-01-01', endsAt: new Date(Date.now() - 60_000).toISOString(), oncePerFriend: true }));
+    await postFollow('coupon-delayed', db, {}, Date.now() - 120_000);
+    expect(lineClientMocks.pushMessage.mock.calls.filter((call) => JSON.stringify(call).includes('coupon_use:entry-coupon:'))).toHaveLength(0);
+    expect(raw.prepare('SELECT COUNT(*) AS n FROM entry_route_coupon_receipts').get()).toEqual({ n: 0 });
   });
 });
