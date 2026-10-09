@@ -130,7 +130,7 @@ describe('下部追従バーの並びを部品で固定する', () => {
   it('フォルダ作成は共通窓の確定とキャンセルへ接続する', () => {
     const source = readWithParts(path.join(SRC, 'app/tags/folders/new/page.tsx'))
     expect(source).toContain('<FolderEditorDialog')
-    expect(source).toContain('onConfirm={() => void save()}')
+    expect(source).toMatch(/onConfirm=\{(?:save|\(\) => save\(\))\}/)
     expect(source).toContain('onCancel={close}')
   })
 
