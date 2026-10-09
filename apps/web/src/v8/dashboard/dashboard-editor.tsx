@@ -344,6 +344,7 @@ export default function DashboardEditorV8({ open, preferences, saving = false, s
         width="editor"
         title="ダッシュボード編集"
         description="表示するカードと位置を変更します"
+        dirty={JSON.stringify(draft) !== JSON.stringify(preferences)}
         busy={saving}
         onClose={close}
         toolbar={(
@@ -366,7 +367,7 @@ export default function DashboardEditorV8({ open, preferences, saving = false, s
               初期状態に戻す
             </button>
             <span className={styles.spacer} />
-            <Button onClick={onCancel} disabled={saving}>閉じる</Button>
+            <Button onClick={close} disabled={saving}>閉じる</Button>
             <Button variant="primary" onClick={apply} busy={saving}>ダッシュボードに反映</Button>
           </div>
         )}

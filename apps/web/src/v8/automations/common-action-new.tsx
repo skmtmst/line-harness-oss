@@ -9,7 +9,7 @@
  * 見せ方を絵に合わせた：処理は番号つきの1行（何を・どれを）で並べ、行を押すとその処理の設定を開く。
  * 並べ替え・削除は閉じた行の右端から行う。「失敗したとき」は全部の処理の「失敗したとき」をまとめて決める（行ごとに変えることもできる）。
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowDown, ArrowUp, Save, Trash2 } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
@@ -92,6 +92,7 @@ export function CommonActionNew() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [actions, setActions] = useState<CommonActionStep[]>([newCommonActionStep()])
+  const initialActions = useRef(JSON.stringify(actions))
   const [openId, setOpenId] = useState<string | null>(null)
   const [resources, setResources] = useState<CommonActionResources>(EMPTY_RESOURCES)
   const [resourcesLoading, setResourcesLoading] = useState(true)
@@ -251,6 +252,8 @@ export function CommonActionNew() {
 
   return (
     <CreatePage
+      dirty={Boolean(name || description || JSON.stringify(actions) !== initialActions.current)}
+      busy={saving}
       boardId="j2hfkS"
       title="共通アクションを作る"
       description="いくつもの所から呼び出せる「処理のまとまり」を作ります。ここでは下書きを保存し、公開は版の画面から行います。使う所はいまの版のまま。使う所ごとに新しい版へ更新します。"

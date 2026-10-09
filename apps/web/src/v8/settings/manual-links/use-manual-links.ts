@@ -3,6 +3,7 @@
 /* app/settings/manual-links/use-manual-links.ts から写した（src/v8 は @/app を読めない）。動きは同じ。 */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { ApiError, api, type ManualLink } from '@/lib/api'
 import {
   STATUS_FILTERS,
@@ -94,12 +95,13 @@ export function useManualLinks() {
     }
   }
 
-  const startEdit = (key: string) => {
+  const guard = useUnsavedGuard({ dirty: editingKey !== null && editingUrl !== (links.find((item) => item.key === editingKey)?.url ?? ''), busy: saving })
+  const startEdit = (key: string) => guard.guarded(() => {
     const link = links.find((item) => item.key === key)
     if (!link) return
     setEditingKey(key)
     setEditingUrl(link.url ?? '')
-  }
+  })
 
   const saveEdit = async () => {
     if (!editingKey || saving) return
@@ -144,6 +146,7 @@ export function useManualLinks() {
   }
 
   return {
+    guard,
     staff,
     rows,
     shown,
@@ -164,7 +167,7 @@ export function useManualLinks() {
     loadInitial,
     checkAll,
     startEdit,
-    cancelEdit: () => setEditingKey(null),
+    cancelEdit: () => guard.guarded(() => setEditingKey(null)),
     saveEdit,
     statusFilters: STATUS_FILTERS,
   }

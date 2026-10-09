@@ -11,6 +11,7 @@ import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Link from 'next/link'
+import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 import React, { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
@@ -1284,6 +1285,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
 
   return (
     <div className="space-y-4" data-design="V3 Emergency control">
+      <FormLeaveGuard dirty={!isStopped && Boolean(reasonDetail || reason !== '障害対応' || targetAccountId !== 'all' || JSON.stringify(targets) !== JSON.stringify({ broadcasts: true, scenarios: true, reminders: true, automations: false }))} busy={mutationLocked} />
       <EmergencyControlFeedback message={message} needsReload={needsReload} reloading={reloading} previewSettled={previewSettled} stopBlockers={stopBlockers} onReload={() => void reloadControl()} />
       <div className="flex flex-col items-start gap-4 xl:flex-row">
         <div className="min-w-0 flex-1 space-y-4">

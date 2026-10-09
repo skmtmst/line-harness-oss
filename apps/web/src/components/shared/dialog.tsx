@@ -7,6 +7,7 @@ import Button from './button'
 import IconButton from './icon-button'
 import { OverlayDepthContext, useOverlayFocus, useV8Leave } from './overlay-utils'
 import styles from './dialog.module.css'
+import { useOverlayDiscard } from './overlay-discard'
 import { useStepMotion } from './use-step-motion'
 
 export type DialogProps = {
@@ -63,6 +64,7 @@ export type DialogProps = {
   descriptionBand?: 'warning' | 'danger'
   /** 入力の誤りがある欄など、開いた窓のフォーカス先。省けば従来どおり。 */
   initialFocusId?: string
+  dirty?: boolean
   busy?: boolean
   /** 実行ボタンを押せない形で出す（確かめのチェックが入るまで、など）。処理中の busy とは別。 */
   confirmDisabled?: boolean
@@ -123,6 +125,7 @@ export default function Dialog({
   description,
   tone = 'default',
   descriptionBand,
+  dirty = false,
   busy = false,
   initialFocusId,
   error,
@@ -143,6 +146,7 @@ export default function Dialog({
   footerAlign,
   designFooterGap,
 }: DialogProps) {
+  const discard = useOverlayDiscard(open, dirty, busy, onCancel)
   const depth = useContext(OverlayDepthContext)
   const titleId = useId()
   const descriptionId = useId()
@@ -159,7 +163,7 @@ export default function Dialog({
   const cancelRef = useRef<HTMLButtonElement>(null)
   const panelRef = useOverlayFocus(
     open && modal && mounted,
-    onCancel,
+    discard.requestClose,
     busy,
     // 主が取消の窓は、開いた直後の標的を主のボタンへ寄せる。Enter を押しても
     // 残る方が動く向きにする（×と背景は従来どおり取消）。
@@ -239,7 +243,7 @@ export default function Dialog({
           ) : (tone === 'destructive' && !confirmation) || descriptionBand === 'warning' ? <div className={`${styles.callout} ${descriptionBand === 'warning' ? styles.calloutWarning : ''}`} data-qa-dialog-callout>{heading}</div> : heading}
         </div>
         {/* 閉じ方は必ず右上の×。フッターの「閉じる」ボタンは置かない（UI-25）。 */}
-        <IconButton aria-label="閉じる" title="閉じる" className={styles.close} onClick={onCancel} disabled={busy}>
+        <IconButton aria-label="閉じる" title="閉じる" className={styles.close} onClick={discard.requestClose} disabled={busy}>
           <X aria-hidden="true" size={18} />
         </IconButton>
       </div>
@@ -247,7 +251,12 @@ export default function Dialog({
       {steps ? <div className={styles.steps}>{steps}</div> : null}
       {children ? <div className={styles.content} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
-      <div className={styles.footer}>
+      <div className={styles.footer} onClickCapture={(event) => {
+        const button = (event.target as Element).closest?.('button')
+        if (dirty && button && /^(閉じる|キャンセル)$/.test(button.textContent?.trim() ?? '')) {
+          event.preventDefault(); event.stopPropagation(); discard.requestClose()
+        }
+      }}>
       {footer != null ? (layout === 'account-inset' ? <div className={styles.insetActions}>{footer}</div> : footer) : (onConfirm ? (
         /*
          * 実行・取消は共通Buttonの役割（primary/danger/secondary）をそのまま
@@ -263,7 +272,7 @@ export default function Dialog({
             variant={primaryAction === 'cancel' ? 'primary' : undefined}
             className={styles.designButton}
             ref={primaryAction === 'cancel' ? cancelRef : undefined}
-            onClick={onCancel}
+            onClick={discard.requestClose}
             disabled={busy}
           >
             {cancelLabel}
@@ -283,15 +292,16 @@ export default function Dialog({
     </div>
   )
 
-  if (!modal) return <OverlayDepthContext.Provider value={depth + 1}>{panel}</OverlayDepthContext.Provider>
+  const discardDialog = discard.confirming ? <Dialog open={discard.confirming} title="入力を破棄しますか？" description="保存していない入力が消えます。" primaryAction="cancel" cancelLabel="編集を続ける" confirmLabel="破棄する" onCancel={discard.continueEditing} onConfirm={discard.discard} busy={busy} confirmation compact /> : null
+  if (!modal) return <OverlayDepthContext.Provider value={depth + 1}>{panel}{discardDialog}</OverlayDepthContext.Provider>
   const overlay = (
     <div className={`${styles.overlay} ${confirmation && compact ? styles.confirmationOverlay : ''}`} role="presentation" data-closing={leaving || undefined} data-design-node={designNode} data-design-top={designTop ? '' : undefined} style={designTop ? ({ '--dialog-design-top': `${designTop}px` } as CSSProperties) : undefined} onMouseDown={(event) => {
-      if (!busy && event.target === event.currentTarget) onCancel()
+      if (!busy && event.target === event.currentTarget) discard.requestClose()
     }}>
       {panel}
     </div>
   )
-  return <OverlayDepthContext.Provider value={depth + 1}>{mounted && typeof document !== 'undefined' ? createPortal(overlay, document.body) : overlay}</OverlayDepthContext.Provider>
+  return <OverlayDepthContext.Provider value={depth + 1}>{discardDialog}{mounted && typeof document !== 'undefined' ? createPortal(overlay, document.body) : overlay}</OverlayDepthContext.Provider>
 }
 
 /** q3DPdz の手順。済みは戻れるボタン、現在は aria-current で伝える。 */

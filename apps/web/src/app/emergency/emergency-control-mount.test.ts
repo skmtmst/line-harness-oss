@@ -22,6 +22,7 @@
 import { act } from 'react'
 import { createElement } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 import type { LineAccount } from '@line-crm/shared'
 import type { OperationControl, OperationImpactPreview } from '@/lib/api'
 

@@ -5,6 +5,7 @@
  * 接続・再接続は Google の認可画面へ移る。解除・取り消し・切り替えは確認の小窓を経る。
  * 接続を管理できない人には、接続・解除のボタンを置かない。
  */
+import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 import { useState } from 'react'
 import { Link2, RefreshCw } from 'lucide-react'
 import Card from '@/components/shared/card'
@@ -23,6 +24,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState('')
   const [confirmDisconnect, setConfirmDisconnect] = useState(false)
+  const [locationSaved, setLocationSaved] = useState(false)
   const [selectedLocation, setSelectedLocation] = useState('')
   const [confirmSwitch, setConfirmSwitch] = useState(false)
   const { connection } = data
@@ -48,6 +50,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
     setActionError('')
     try {
       await restaurantGoogleApi.selectLocation(accountId, selectedLocation, confirmedSwitch)
+      setLocationSaved(true)
       setConfirmSwitch(false)
       onChanged()
     } catch (err) {
@@ -94,6 +97,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
   if (connection.status === 'pending_location') {
     return (
       <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="google-location-title">
+        <FormLeaveGuard dirty={Boolean(selectedLocation) && !locationSaved} busy={busy} />
         <SectionHeader size="small" title={<span id="google-location-title">接続する店舗を選ぶ</span>} />
         <p className={styles.muted}>{`Googleアカウントの認証は完了しています${connection.googleAccountEmail ? `（${connection.googleAccountEmail}）` : ''}`}</p>
         <p className={styles.preText}>{`このLINEアカウント（${data.store.name}）に接続する店舗を1つ選んでください。接続後は、選んだ店舗だけを表示します。`}</p>
@@ -107,7 +111,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
               name="location"
               value={candidate.locationName}
               checked={selectedLocation === candidate.locationName}
-              onChange={() => setSelectedLocation(candidate.locationName)}
+              onChange={() => { setSelectedLocation(candidate.locationName); setLocationSaved(false) }}
               title={candidate.locationTitle}
               note={candidate.addressText ?? undefined}
             />

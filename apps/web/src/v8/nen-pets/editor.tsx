@@ -102,6 +102,7 @@ export default function PetEditorV8({ accountId, pet, onClose, onSaved }: {
       confirmIcon={<Check size={15} aria-hidden="true" />}
       title="ペットの情報を直す"
       description="間違っている項目を直して保存します。誕生日を変えると、予約済みの誕生日クーポン配信は新しい誕生日で組み直されます。"
+      dirty={name !== pet.name || animalType !== pet.animalType || gender !== pet.gender || birthday !== (pet.birthday ?? '') || breed !== pet.breed || weight !== (pet.weightKg == null ? '' : `${pet.weightKg} kg`)}
       busy={saving}
       error={error}
       confirmLabel="保存する"

@@ -72,6 +72,7 @@ import { useAttributeTab } from './attribute-tabs'
 import HqStoreList from './store-list'
 import HqTagEditorV8 from './tag-editor'
 import HqTemplateDetail, { inUseVersionOf } from './detail'
+import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 import styles from './console.module.css'
 
 const PAGE_TITLES: Record<TemplateType, string> = { tag: 'タグ', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム', scenario: 'シナリオ' }
@@ -141,6 +142,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [definition, setDefinition] = useState<TemplateDefinition>(() => freshDefinition(type))
+  const editBaseline = useRef(JSON.stringify({ name, description, definition, folderId }))
   const [selected, setSelected] = useState<string[]>([])
   const [search, setSearch] = useState('')
   const [accountFolder, setAccountFolder] = useState(ALL_ACCOUNTS)
@@ -302,6 +304,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const referenceOptions = (kind: TemplateType) => (catalog ?? []).filter((item) => item.template_type === kind).map((item) => ({ id: item.id, name: item.name }))
   const loadDetailIntoForm = (loaded: TemplateDetail) => {
     if (loaded.template.template_type !== type || loaded.definition.schemaVersion !== 1 || !definitionName(type, loaded.definition)) throw new Error('ひな形の種類または保存内容を確認できません。')
+    editBaseline.current = JSON.stringify({ name: loaded.template.name, description: loaded.template.description ?? '', definition: loaded.definition, folderId: loaded.template.folder_id ?? null })
     setFolderId(loaded.template.folder_id ?? null); setDetail(loaded); setName(loaded.template.name); setDescription(loaded.template.description ?? ''); setDefinition(loaded.definition)
   }
   const open = (id: string, next: Stage) => void perform(async () => {
@@ -312,7 +315,9 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   })
   const startCreate = () => {
     createAttempt.current = null; sessionUploads.current = []; setMenuTargets([])
-    setDetail(null); setFolderId(folderFilter !== 'all' && folderFilter !== 'none' ? folderFilter : null); setName(''); setDescription(''); setDefinition(freshDefinition(type)); setStage('edit'); setError(''); setConflict(false)
+    const fresh = freshDefinition(type), nextFolder = folderFilter !== 'all' && folderFilter !== 'none' ? folderFilter : null
+    editBaseline.current = JSON.stringify({ name: '', description: '', definition: fresh, folderId: nextFolder })
+    setDetail(null); setFolderId(nextFolder); setName(''); setDescription(''); setDefinition(fresh); setStage('edit'); setError(''); setConflict(false)
   }
   /* 店のひな形（テキスト・カード）の保存で落ちた欄（B-139）。MessageForm が欄ごとに検査し、1つ目へ移る。 */
   const messageFields = useFormErrors()
@@ -903,6 +908,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       </>
     return (
       <PageFrame kind="wizard" boardId="X4JcOf">
+        <FormLeaveGuard dirty={JSON.stringify({ name, description, definition, folderId }) !== editBaseline.current} busy={busy} />
         <PageHeading title={type === 'template' ? editTitle : editTitle} description="保存したひな形は、一覧の「配る」で各 LINE アカウントへ配ります。" />
         <div className={styles.body}>
           {notices}
