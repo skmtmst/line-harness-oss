@@ -75,3 +75,4 @@ export * from './liff-state.js';
 export * from './research-form.js';
 export * from './hq-delivery-templates.js';
 export * from './tap-extras.js';
+export * from "./fixed-friend-fields";

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   enrollFriendInReminder: vi.fn(),
   enrollFriendInScenario: vi.fn(),
   getFriendFieldById: vi.fn(),
+  getFixedFriendField: vi.fn(),
   getMessageTemplateById: vi.fn(),
   removeTagFromFriend: vi.fn(),
   setFriendFieldValue: vi.fn(),
@@ -23,6 +24,7 @@ vi.mock('@line-crm/db', async (importOriginal) => {
     enrollFriendInReminder: mocks.enrollFriendInReminder,
     enrollFriendInScenario: mocks.enrollFriendInScenario,
     getFriendFieldById: mocks.getFriendFieldById,
+    getFixedFriendField: mocks.getFixedFriendField,
     getMessageTemplateById: mocks.getMessageTemplateById,
     removeTagFromFriend: mocks.removeTagFromFriend,
     setFriendFieldValue: mocks.setFriendFieldValue,
@@ -87,6 +89,7 @@ beforeEach(() => {
     type: 'text',
     options_json: null,
   });
+  mocks.getFixedFriendField.mockResolvedValue({ id: 'fixed-name', type: 'text', ec_is_master: 0 });
   mocks.setFriendFieldValue.mockResolvedValue(undefined);
 });
 
@@ -289,9 +292,10 @@ describe('回答を配る', () => {
     expect(calls).toHaveLength(2);
     expect(calls[0].sql).toContain('INSERT INTO chats');
     expect(calls[0].binds[2]).toBe('山田太郎');
-    expect(calls[1].sql).toContain('real_name = ?');
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(db, expect.objectContaining({ fieldId: 'fixed-name', value: '山田太郎', updatedBy: 'form' }));
     expect(calls[1].sql).toContain('system_display_name = ?');
-    expect(calls[1].binds.slice(0, 2)).toEqual(['山田太郎', '山田太郎']);
+    expect(calls[1].sql).not.toContain('private_memo = ?');
+    expect(calls[1].binds[0]).toBe('山田太郎');
   });
 
   test('選んだ選択肢のタグだけを付ける', async () => {
@@ -1092,6 +1096,9 @@ describe('住所・予約の登録先は読める文字で保存する', () => {
       layout: layoutWith([input({ name: 'answer', type, destinations: { friendFieldIds: ['ff-1'], realName: true, displayName: true, note: true } })]),
     });
     expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ value: expected }));
-    expect(calls.find((c) => c.sql.startsWith('UPDATE friends'))?.binds.slice(0, 3)).toEqual([expected, expected, expected]);
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ fieldId: 'fixed-name', value: expected }));
+    expect(calls.find((c) => c.sql.includes('INSERT INTO chats'))?.binds[2]).toBe(expected);
+    expect(calls.find((c) => c.sql.startsWith('UPDATE friends'))?.binds[0]).toBe(expected);
+    expect(calls.find((c) => c.sql.startsWith('UPDATE friends'))?.sql).not.toContain('private_memo');
   });
 });

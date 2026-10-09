@@ -1,4 +1,6 @@
 import { beforeEach, afterEach, describe, expect, test } from 'vitest';
+import { emptyLayout } from '@line-crm/shared';
+import { applyFormLayoutEffects } from '../form-layout-effects';
 import { publishFormVersion, updateForm } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../../test-utils/d1-sqlite.js';
 import { createFormHqTemplateAdapter, inspectFormTemplate, formTemplatePublicUrl, formTemplateSnapshot, formTemplateSnapshotToken, parseFormTemplateDefinition, type FormTemplateDependencies } from './form.js';
@@ -245,4 +247,22 @@ test.each([0, 1])('上書き配布は店の公開状態 %s を保つ', async (is
     fixture.raw.prepare('UPDATE forms SET is_active=? WHERE id=?').run(isActive, id);
     await commit(await plan((await preflight('a1', 'overwrite')).context));
     expect(fixture.raw.prepare('SELECT is_active FROM forms WHERE id=?').get(id)).toEqual({ is_active: isActive });
+});
+
+test('HQ fixed fields and public image survive distribution and answers save into the destination friend', async () => {
+  const layout=emptyLayout();
+  layout.sections[0].blocks=[
+    {id:'name',kind:'input',type:'text',name:'name',label:'名前',fixedField:'name'},
+    {id:'img',kind:'image',mediaUrl:'https://cdn.example.test/images/banner.png',size:'full',alt:'案内'},
+  ];
+  const source={...input,definitionJson:JSON.stringify({schemaVersion:1,form:{name:'基本登録',fields:[],layout}})};
+  const {context}=await preflight('a1','create',source);
+  const id=await commit(await plan(context,source));
+  const row = fixture.raw.prepare('SELECT layout FROM forms WHERE id=?').get(id) as { layout: string };
+  const saved=JSON.parse(row.layout);
+  expect(saved.sections[0].blocks[1]).toMatchObject({mediaUrl:'https://cdn.example.test/images/banner.png',alt:'案内',size:'full'});
+  fixture.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES ('fixed-friend','line-fixed','a1')");
+  const result=await applyFormLayoutEffects({db:fixture.db,layout:saved,friendId:'fixed-friend',formId:id,answers:{name:'配布先の名前'}});
+  expect(result.failedEffects).toEqual([]);
+  expect(fixture.raw.prepare("SELECT value,source_id FROM friend_field_values WHERE friend_id='fixed-friend' AND field_id='fixed-name'").get()).toEqual({value:'配布先の名前',source_id:id});
 });

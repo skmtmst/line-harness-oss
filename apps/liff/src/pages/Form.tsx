@@ -1046,9 +1046,9 @@ function BlockView({
     const image = (
       <img
         src={block.mediaUrl}
-        alt=""
+        alt={block.alt ?? ""}
         className={
-          cover
+          cover && block.size !== 'full'
             ? 'h-24 w-full rounded-xl object-cover'
             : block.size === 'full'
               ? 'w-full rounded-lg'
@@ -1057,7 +1057,7 @@ function BlockView({
       />
     );
     return block.linkUrl ? (
-      <a href={block.linkUrl} target="_blank" rel="noreferrer">
+      <a href={block.linkUrl} target="_blank" rel="noreferrer" aria-label={block.alt || "画像のリンクを開く"}>
         {image}
       </a>
     ) : (

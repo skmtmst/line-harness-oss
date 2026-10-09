@@ -3318,6 +3318,11 @@ CREATE TABLE friend_fields (
   )), type_v8 TEXT
   CHECK (type_v8 IS NULL OR type_v8 = 'time'));
 
+CREATE TABLE friend_fixed_fields (
+  fixed_key TEXT PRIMARY KEY CHECK (fixed_key IN ('name','kana','birthday','age','email','tel','address')),
+  field_id TEXT NOT NULL UNIQUE REFERENCES friend_fields(id) ON DELETE RESTRICT
+);
+
 CREATE TABLE friend_identity_links (
   id TEXT PRIMARY KEY,
   tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
@@ -10426,6 +10431,42 @@ WHEN EXISTS (
 )
 BEGIN SELECT RAISE(ABORT, 'conversion point with events or usages cannot be deleted'); END;
 
+CREATE TRIGGER fixed_friend_field_definition_guard BEFORE UPDATE ON friend_fields
+WHEN EXISTS (SELECT 1 FROM friend_fixed_fields WHERE field_id = OLD.id)
+  AND (NEW.name IS NOT OLD.name OR NEW.field_key IS NOT OLD.field_key
+    OR NEW.type IS NOT OLD.type OR NEW.type_v6 IS NOT OLD.type_v6 OR NEW.type_v8 IS NOT OLD.type_v8
+    OR NEW.folder_id IS NOT NULL OR NEW.is_personal <> 1 OR NEW.ec_is_master <> 0 OR NEW.status <> 'active')
+BEGIN SELECT RAISE(ABORT, 'FIXED_FRIEND_FIELD_IMMUTABLE'); END;
+
+CREATE TRIGGER fixed_name_friend_insert AFTER INSERT ON friends
+WHEN NEW.real_name IS NOT NULL AND TRIM(NEW.real_name) <> ''
+BEGIN   INSERT INTO friend_field_values (friend_id, field_id, value, updated_by, updated_at)
+  VALUES (NEW.id, 'fixed-name', NEW.real_name, 'manual', NEW.updated_at); END;
+
+CREATE TRIGGER fixed_name_friend_update AFTER UPDATE OF real_name ON friends
+WHEN OLD.real_name IS NOT NEW.real_name
+BEGIN   DELETE FROM friend_field_values WHERE friend_id = NEW.id AND field_id = 'fixed-name'
+    AND (NEW.real_name IS NULL OR TRIM(NEW.real_name) = '');   INSERT INTO friend_field_values (friend_id, field_id, value, updated_by, updated_at, source_type, source_id)
+  SELECT NEW.id, 'fixed-name', NEW.real_name, 'manual', NEW.updated_at, NULL, NULL
+  WHERE NEW.real_name IS NOT NULL AND TRIM(NEW.real_name) <> ''
+  ON CONFLICT(friend_id, field_id) DO UPDATE SET value = excluded.value,
+    updated_by = excluded.updated_by, updated_at = excluded.updated_at, source_type = NULL, source_id = NULL
+  WHERE friend_field_values.value IS NOT excluded.value; END;
+
+CREATE TRIGGER fixed_name_value_delete AFTER DELETE ON friend_field_values
+WHEN OLD.field_id = 'fixed-name'
+BEGIN   UPDATE friends SET real_name = NULL WHERE id = OLD.friend_id AND real_name IS NOT NULL; END;
+
+CREATE TRIGGER fixed_name_value_insert AFTER INSERT ON friend_field_values
+WHEN NEW.field_id = 'fixed-name'
+BEGIN   UPDATE friends SET real_name = NEW.value, updated_at = NEW.updated_at
+  WHERE id = NEW.friend_id AND real_name IS NOT NEW.value; END;
+
+CREATE TRIGGER fixed_name_value_update AFTER UPDATE OF value ON friend_field_values
+WHEN NEW.field_id = 'fixed-name'
+BEGIN   UPDATE friends SET real_name = NEW.value, updated_at = NEW.updated_at
+  WHERE id = NEW.friend_id AND real_name IS NOT NEW.value; END;
+
 CREATE TRIGGER folders_friend_add_rename AFTER UPDATE OF name ON folders WHEN NEW.kind='friend_add_rule' AND NEW.name IS NOT OLD.name BEGIN UPDATE friend_add_rules SET folder_name=NEW.name,lock_version=lock_version+1,updated_at=NEW.updated_at WHERE folder_id=NEW.id AND line_account_id=NEW.account_id; END;
 
 CREATE TRIGGER folders_friend_add_rule_legacy_delete AFTER DELETE ON folders WHEN OLD.kind='friend_add_rule' BEGIN DELETE FROM friend_add_rule_folders WHERE id=OLD.id AND line_account_id=OLD.account_id; END;
@@ -10457,6 +10498,11 @@ CREATE TRIGGER friend_add_rules_folder_name_insert AFTER INSERT ON friend_add_ru
 CREATE TRIGGER friend_add_rules_folder_name_update AFTER UPDATE OF folder_name ON friend_add_rules WHEN NEW.folder_name IS NOT OLD.folder_name BEGIN INSERT INTO folders(id,kind,account_id,name) SELECT 'friend-add-name-'||hex(NEW.line_account_id)||'-'||hex(NEW.folder_name)||'-'||lower(hex(randomblob(8))),'friend_add_rule',NEW.line_account_id,NEW.folder_name WHERE NEW.folder_name IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE kind='friend_add_rule' AND account_id=NEW.line_account_id AND name=NEW.folder_name); UPDATE friend_add_rules SET folder_id=(SELECT id FROM folders WHERE kind='friend_add_rule' AND account_id=NEW.line_account_id AND name=NEW.folder_name) WHERE id=NEW.id; END;
 
 CREATE TRIGGER friend_add_rules_folder_update BEFORE UPDATE OF folder_id,line_account_id ON friend_add_rules WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE id=NEW.folder_id AND kind='friend_add_rule' AND account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
+
+CREATE TRIGGER friend_field_value_source_clear AFTER UPDATE OF value, updated_by, updated_at ON friend_field_values
+WHEN NEW.updated_by IS NOT 'form' AND NEW.source_type = 'form'
+BEGIN   UPDATE friend_field_values SET source_type = NULL, source_id = NULL
+  WHERE friend_id = NEW.friend_id AND field_id = NEW.field_id; END;
 
 CREATE TRIGGER hq_attribute_skip_insert BEFORE INSERT ON hq_template_preflight_resolutions
 WHEN NEW.friend_attribute_mode IS NOT NULL AND NOT EXISTS (
@@ -11285,3 +11331,18 @@ CREATE VIEW rt_inventory_occupancy AS SELECT i.*,
 -- Seed data required by tenant-aware inserts on a fresh database.
 INSERT OR IGNORE INTO tenants (id, name) VALUES
   ('00000000-0000-4000-8000-000000000001', '既定の統括');
+
+INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-name','名前','fixed_name','text','form',1,-7);
+INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('name','fixed-name');
+INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-kana','ふりがな','fixed_kana','text','form',1,-6);
+INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('kana','fixed-kana');
+INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-birthday','生年月日','fixed_birthday','date','form',1,-5);
+INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('birthday','fixed-birthday');
+INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-age','年齢','fixed_age','number','form',1,-4);
+INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('age','fixed-age');
+INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-email','メール','fixed_email','email','form',1,-3);
+INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('email','fixed-email');
+INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-tel','電話','fixed_tel','tel','form',1,-2);
+INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('tel','fixed-tel');
+INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-address','住所','fixed_address','textarea','form',1,-1);
+INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('address','fixed-address');

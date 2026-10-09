@@ -16,6 +16,7 @@ import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import type { FriendDetailState } from './use-friend-detail'
 import type { FriendDetailPermissions } from './permissions'
+import { fixedFieldValue } from '@/components/shared/fixed-friend-field-values'
 import styles from './detail.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
@@ -95,13 +96,13 @@ export default function InfoTab({ friendId, group, data, perms }: {
   }
 
   // 「基本」は分類のない項目、「すべて」は分類をまたいだ全項目。★つきは基本のときだけ先頭へ。
-  const inGroup = group === ALL_GROUP ? fields : group === BASIC_GROUP ? fields.filter((f) => !f.folderId) : fields.filter((f) => f.folderId === group)
+  const inGroup = group === ALL_GROUP ? fields : group === BASIC_GROUP ? fields.filter((f) => f.fixedKey || !f.folderId) : fields.filter((f) => f.folderId === group)
   const ordered = group === BASIC_GROUP ? [...inGroup.filter((f) => f.isStarred), ...inGroup.filter((f) => !f.isStarred)] : inGroup
 
   const folderCount = new Map<string, number>()
   let unfiled = 0
   for (const f of fields) {
-    if (!f.folderId) unfiled += 1
+    if (f.fixedKey || !f.folderId) unfiled += 1
     else folderCount.set(f.folderId, (folderCount.get(f.folderId) ?? 0) + 1)
   }
   const folderIds = new Set(fieldFolders.map((f) => f.id))
@@ -150,6 +151,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
           <div className={styles.fieldGrid}>
             {ordered.map((field) => {
               const id = `ff-${field.id}`
+              const fixed = field.fixedKey ? fixedFieldValue(fields.map(f => ({ ...f, value: values[f.id] ?? f.value, valueSource: (values[f.id] ?? '') === (f.value ?? '') ? f.valueSource : null })), field.fixedKey) : null
               const changed = (field.value ?? '') !== (values[field.id] ?? '')
               return (
                 <div key={field.id} className={styles.field} data-changed={changed || undefined}>
@@ -161,10 +163,11 @@ export default function InfoTab({ friendId, group, data, perms }: {
                   <FieldInput
                     id={id}
                     field={field}
-                    value={values[field.id] ?? ''}
+                    value={fixed?.derived ? fixed.value ?? '' : values[field.id] ?? ''}
                     onChange={(v) => setValues((prev) => ({ ...prev, [field.id]: v }))}
-                    disabled={!perms.canEditField(field)}
+                    disabled={!perms.canEditField(field) || !!fixed?.derived}
                   />
+                  {fixed?.source ? <p className={styles.fieldNote}>{fixed.source}</p> : null}
                   {field.type === 'multi_select' ? <p className={styles.fieldNote}>複数選択の項目はこの画面では変更できません。</p> : null}
                   {field.ecIsMaster ? <p className={styles.fieldNote}>EC側の値が正のため、ここからは変更できません。</p> : null}
                 </div>

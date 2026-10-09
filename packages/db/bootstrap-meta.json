@@ -564,7 +564,8 @@
     "619_hq_folder_display_order.sql",
     "620_migrate_private_memo_to_chat_notes.sql",
     "621_form_submission_files.sql",
-    "622_hq_delivery_templates.sql"
+    "622_hq_delivery_templates.sql",
+    "623_form_fixed_friend_fields.sql"
   ],
-  "migrationCount": 565
+  "migrationCount": 566
 }

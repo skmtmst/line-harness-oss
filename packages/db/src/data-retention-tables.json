@@ -1557,6 +1557,9 @@
       "parentColumn": "id"
     }
   },
+  "friend_fixed_fields": {
+    "category": "global"
+  },
   "friend_identity_links": {
     "category": "purge",
     "scope": {

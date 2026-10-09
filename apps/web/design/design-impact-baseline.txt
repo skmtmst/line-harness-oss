@@ -755,3 +755,4 @@ shared-button-importer components/shared/list-state.tsx
 
 shared-button-importer components/shared/form-file-attachments.tsx
 shared-button-importer components/shared/form-document-retention.tsx
+shared-button-importer components/shared/customer-info-panel.tsx
