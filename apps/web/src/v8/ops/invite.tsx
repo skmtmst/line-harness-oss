@@ -115,10 +115,10 @@ export default function OpsInviteV8() {
             : '運営コンソールに招待されました（有効期限は24時間）。名前とパスワードを決めると、次に2要素認証を設定します。'}
         </p>
         {state === 'loading' ? (
-          <ListState kind="loading" title="招待を確認しています" />
+          <ListState permissionScope="hq" kind="loading" title="招待を確認しています" />
         ) : state === 'invalid' ? (
           <>
-            <ListState
+            <ListState permissionScope="hq"
               kind="error"
               title={inviteCode === 'used' ? 'この招待はすでに使われています' : inviteCode === 'expired' ? 'この招待は期限切れです' : 'この招待は使えません'}
               description={isForbiddenOrRateLimited(checkFailed) ? undefined : message}

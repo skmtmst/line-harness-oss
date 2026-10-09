@@ -187,7 +187,7 @@ describe('V8 成果地点を作る', () => {
   it('閲覧のみ：帯を出し、保存のボタン・使う場所を足すは置かない', async () => {
     role.value = 'staff'
     await mount()
-    expect(screen.getByText('閲覧のみで見ています。作る操作は管理者に頼んでください。')).toBeTruthy()
+    expect(screen.getByText('閲覧のみで見ています。作る操作はオーナーか管理者に頼んでください。')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /保存して/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /使う場所を足す/ })).toBeNull()
     expect(screen.getByRole('link', { name: '一覧へ戻る' })).toBeTruthy()

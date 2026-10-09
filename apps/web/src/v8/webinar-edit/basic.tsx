@@ -15,6 +15,8 @@ import { folderById, folderCreator } from '@/components/shared/folder-select'
 import { BasicForm, BasicPreview, SLUG_PATTERN, type BasicValues } from './basic-form'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import styles from './form.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: { ctx: EditContext; chrome: WizardChrome } & PaneSaveProps) {
   const { webinar, editor, readOnly } = ctx
@@ -115,7 +117,7 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
       }
       return true
     } catch (cause) {
-      setError(describeSaveFailure(cause))
+      setError(withPermissionFailure(cause, describeSaveFailure(cause), 'store'))
       return false
     } finally {
       lock.current = false
@@ -140,7 +142,7 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
       setTestResult(`通知テスト：成功 ${response.data.sent}件・失敗 ${response.data.failed}件`)
       setTestConfirm(false)
     } catch (cause) {
-      setError(describeSaveFailure(cause))
+      setError(withPermissionFailure(cause, describeSaveFailure(cause), 'store'))
     } finally {
       setTesting(false)
     }

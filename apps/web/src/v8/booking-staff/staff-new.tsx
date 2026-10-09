@@ -35,6 +35,7 @@ import layout from './layout.module.css'
 import styles from './staff-new.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /** 一度に見せるメニューの数。残りは「ほかのメニュー」で開く（1行に収める）。 */
 const MENU_FOLD = 4
@@ -285,7 +286,7 @@ export default function StaffNewV8() {
           <ListState
             kind="error"
             title="予約設定の変更権限がありません"
-            description="予約スタッフの登録は、予約設定の権限を持つログインユーザーだけが実行できます。管理者へ権限の確認を依頼してください。"
+            description={permissionDeniedMessage('store')}
           />
         </div>
       </div>

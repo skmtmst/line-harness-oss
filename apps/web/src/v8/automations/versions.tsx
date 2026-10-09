@@ -27,6 +27,7 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { useAutomationManage } from './shell'
 import { describeVersionChanges } from './version-diff'
 import styles from './versions.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /** 利用先の種類（今の画面と同じ言葉）。 */
 const CONSUMER_LABELS: Record<string, string> = {
@@ -159,7 +160,7 @@ function VersionsInner() {
         setError('この共通アクションは削除されたか、別のLINEアカウントのものです。')
         setLoadFailure('missing')
       } else if (caught instanceof ApiError && caught.status === 403) {
-        setError('この共通アクションを表示する権限がありません。')
+        setError(permissionDeniedMessage('store'))
         setLoadFailure('forbidden')
       } else {
         setError(caught instanceof Error && caught.message && !caught.message.startsWith('API error:')

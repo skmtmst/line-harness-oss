@@ -145,7 +145,7 @@ describe('役割はサーバーで決める', () => {
     fixture.role = 'staff'
     fixture.myStaff = [STAFF]
     render(<StaffShiftsV8 staffId="bs-1" />)
-    expect(await screen.findByText('佐々木 亮太（トリマー）としてひも付いています。ひも付けを変えるときは管理者に頼んでください。')).toBeTruthy()
+    expect(await screen.findByText('佐々木 亮太（トリマー）としてひも付いています。ひも付けを変えるときはオーナーか管理者に頼んでください。')).toBeTruthy()
     expect(screen.getByRole('heading', { name: '自分の勤務' })).toBeTruthy()
     expect(screen.queryByRole('link', { name: '← 担当スタッフへ' })).toBeNull()
   })

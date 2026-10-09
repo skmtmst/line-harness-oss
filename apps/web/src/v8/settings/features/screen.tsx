@@ -44,6 +44,7 @@ import {
   type UsageCategory,
 } from './use-feature-settings'
 import styles from './screen.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 const TITLE = '機能設定'
 const DESCRIPTION = '使わない機能をオフにすると、左のメニューから消えます。作ったデータは消えません'

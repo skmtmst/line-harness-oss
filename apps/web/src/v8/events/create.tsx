@@ -31,6 +31,7 @@ import ApplicationPreview from './application-preview'
 import { EVENT_DEFAULT_DRAFT, ENTRY_CUTOFF_OPTIONS, NONE, jstToUtcIso, todayJst } from './shared'
 import styles from './create.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 const PER_FRIEND_OPTIONS = [
   { value: NONE, label: '制限なし' },
@@ -169,7 +170,7 @@ function EventsCreateV8Inner() {
       router.push(`/events?highlight=${encodeURIComponent(eventId)}`)
     } catch (cause) {
       const reason = cause instanceof ApiError && cause.status === 403
-        ? 'イベントを作れるのは統括と管理者だけです。'
+        ? permissionDeniedMessage('store')
         : cause instanceof Error ? cause.message : '保存できませんでした。もう一度お試しください。'
       setError(eventId
         ? `イベントは下書きで作りましたが、最初の予約枠を作れませんでした。もう一度押すと続きから作ります。（${reason}）`
@@ -221,7 +222,7 @@ function EventsCreateV8Inner() {
         help="中身・回と定員・申し込みのきまりを決めます。下書きのあいだは、お客さまには見えません。"
         footerActions={<Button href="/events">一覧へ戻る</Button>}
       >
-        <Notice tone="info">イベントを作れるのは統括と管理者だけです。必要なときは統括に頼んでください。</Notice>
+        <Notice tone="info">{permissionDeniedMessage('store')}</Notice>
       </CreatePage>
     )
   }

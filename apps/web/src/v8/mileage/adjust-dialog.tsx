@@ -26,12 +26,13 @@ import { formatNumber } from '@/lib/format'
 import { FieldError } from '@/components/shared/form-controls'
 import { useFormErrors } from '@/lib/use-form-errors'
 import styles from './mileage.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /** 手でマイルを動かすときの失敗の言葉（app/mileage/friends/detail/mileage-adjustment-dialog.tsx から写した）。 */
 export function mileageAdjustmentErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 400) return error.message
-    if (error.status === 403) return 'マイルを変更する権限がありません。'
+    if (error.status === 403) return permissionDeniedMessage('store')
     if (error.status === 404) return '対象の友だちまたはLINEアカウントを確認できませんでした。'
     if (error.status === 405) return 'この環境ではマイル変更を実行できません。'
     if (error.status === 409) return '同じ操作との競合を確認しました。画面を読み直してからやり直してください。'

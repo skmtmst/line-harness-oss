@@ -178,11 +178,11 @@ function BillingInner() {
     </ListPage>
   )
 
-  if (status === 'loading') return frame(<ListState kind="loading" title="契約状況を読み込んでいます" />)
+  if (status === 'loading') return frame(<ListState permissionScope="hq" kind="loading" title="契約状況を読み込んでいます" />)
   // 担当者は見られない（権限表: 課金プランは担当者 不可。閲覧のみは閲覧できる）。
-  if (status === 'forbidden' || role === 'staff') return frame(<ListState kind="forbidden" />)
+  if (status === 'forbidden' || role === 'staff') return frame(<ListState permissionScope="hq" kind="forbidden" />)
   if (status === 'error' || !summary) {
-    return frame(<ListState kind="error" title="契約状況を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />)
+    return frame(<ListState permissionScope="hq" kind="error" title="契約状況を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />)
   }
 
   const banner = billingBanner(summary)
@@ -326,7 +326,7 @@ function BillingInner() {
       <section className={styles.history} data-design="History">
         <h2 className={styles.historyTitle}>支払い履歴</h2>
         {invoiceFailed ? (
-          <ListState
+          <ListState permissionScope="hq"
             kind="error"
             title={invoiceUnreachable ? '決済サービスにつながりませんでした' : '支払い履歴を読み込めませんでした'}
             description={invoiceUnreachable ? '少し待って、もう一度読み込んでください。' : undefined}

@@ -46,13 +46,14 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { daysUntilIso, eventRowState, isLowApplication, summarizeEventAttention, type EventRowState } from './attention'
 import { jstDay, jstTime } from './shared'
 import styles from './list.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
 /** 未分類を表す印。裏側（events.ts）が `__ungrouped__` で受ける。 */
 const UNFILED = '__ungrouped__'
 const PAGE_SIZES = [10, 20, 50]
-const VIEWER_NOTE = '閲覧のみで見ています。イベントを作る・直す・消す操作は管理者に頼んでください。'
+const VIEWER_NOTE = '閲覧のみで見ています。イベントを作る・直す・消す操作はオーナーか管理者に頼んでください。'
 
 /*
  * よく使う絞り込み（絵の選ぶ欄）。並びと「満席の回がある」をここから選ぶ。

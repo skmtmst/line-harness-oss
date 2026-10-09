@@ -9,6 +9,7 @@ import AnalyticsFunnelV8 from './analytics-funnel-v8'
 import RetentionSection from './retention-section'
 import ViewerComments from './viewer-comments'
 import AnalyticsDetails from './analytics-details'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 export default function AnalyticsV8({ webinarId, durationSeconds, analytics, analyticsState, onRetry, onExportChange }: {
   webinarId: string
@@ -49,7 +50,7 @@ export default function AnalyticsV8({ webinarId, durationSeconds, analytics, ana
       if (request !== generation.current) return
       if (cause instanceof ApiError && cause.status === 403) {
         setPermission('denied')
-        setError('参加者のCSVを書き出す権限がありません。管理者に確認してください。')
+        setError(permissionDeniedMessage('store'))
       } else setError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。')
     }).finally(() => {
       locked.current = false

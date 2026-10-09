@@ -50,6 +50,7 @@ import {
 import { BonusDialog, MultiplierDialog, PhotoDialog, PinDialog, RankDialog, ReasonDialog, RewardDialog, StoresDialog } from './dialogs'
 import styles from './visit-stamps.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 type PaperRow = { id: string; card_id?: string; friend_id: string; photo_url: string; stamps: number; status: string; created_at?: string }
 type FriendLite = { id: string; displayName?: string | null; metadata?: Record<string, unknown> | null }
@@ -69,7 +70,7 @@ const STAMP_TABS = [
 
 /* 口の日本語の理由があればそれ。英語の内部文（API error など）は出さず、運用者の言葉にする。 */
 const message = (caught: unknown, fallback: string) => {
-  const text = describeSaveFailure(caught)
+  const text = withPermissionFailure(caught, describeSaveFailure(caught), 'store')
   return /[ぁ-んァ-ヶ一-龠]/u.test(text) ? text : fallback
 }
 

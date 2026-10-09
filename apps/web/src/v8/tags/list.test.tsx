@@ -101,7 +101,7 @@ describe('V8 タグ タグの一覧', () => {
     narrow.value = false
     await render(<TagsList fixture={fixture} />)
     expect(container.querySelector('[data-design-node="fkGUR"]')).not.toBeNull()
-    expect(screen.getByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')).toBeTruthy()
+    expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'CSVで一括登録する' })).toBeNull()
     expect(screen.queryAllByRole('button', { name: 'タグを作る' })).toHaveLength(0)
     expect(screen.queryAllByRole('link', { name: 'タグを作る' })).toHaveLength(0)

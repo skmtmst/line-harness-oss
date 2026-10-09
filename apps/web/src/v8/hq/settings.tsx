@@ -93,7 +93,7 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
     } catch (caught) {
       // M026：再試行の言葉がない代替文にしない。共通の状態別案内へ渡す。
       setError(japaneseDetailOf(caught) || describeApiFailure(caught, '統括名の保存', {
-        forbidden: '統括名の変更は管理者だけができます。必要なときは管理者の方に操作してもらってください。',
+        scope: 'hq',
       }))
     } finally {
       setSaving(false)

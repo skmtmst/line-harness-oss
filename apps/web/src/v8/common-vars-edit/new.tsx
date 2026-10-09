@@ -45,6 +45,8 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './new.module.css'
 import { focusFieldById } from '@/lib/use-form-errors'
 import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 /*
  * 種別8つ。板 `p82v9` のカードの並び（標準・長文・数値・URL／
@@ -365,7 +367,7 @@ export default function NewCommonVarV8() {
         setError('その差し込み名は既に使われています')
         focusField('cv-key')
       } else {
-        setError(describeSaveFailure(e))
+        setError(withPermissionFailure(e, describeSaveFailure(e), 'store'))
         if (e instanceof ApiError && (e.status === 400 || e.status === 422)) {
           const target = e.status === 422 ? 'cv-key' : focusTargetForReason(e.message)
           if (target) focusField(target)
@@ -458,7 +460,7 @@ export default function NewCommonVarV8() {
       {canWrite ? null : (
         <div className={styles.roBand} role="status">
           <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+          <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
         </div>
       )}
 

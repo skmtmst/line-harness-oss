@@ -37,6 +37,7 @@ import { describeTagDiff } from './conflict-diff'
 import styles from './edit.module.css'
 
 import { TagEditForm } from './edit-form'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 export default function TagEditV8() {
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'タグ', href: '/tags' }])
@@ -162,7 +163,7 @@ export default function TagEditV8() {
     } catch (reason) {
       if (!stillHere()) return
       if (reason instanceof ApiError && reason.status === 409) setConflictValues(values)
-      else setError(describeSaveFailure(reason))
+      else setError(withPermissionFailure(reason, describeSaveFailure(reason), 'store'))
     } finally {
       if (targetRef.current === savingTarget && targetGenerationRef.current === targetGeneration) setSaving(false)
     }

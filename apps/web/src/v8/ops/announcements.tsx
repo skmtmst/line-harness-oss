@@ -386,14 +386,14 @@ export default function OpsAnnouncementsV8() {
             <HelpTip label="契約者専用LINEの登録状況">{linked ? `契約者専用LINEの登録 ${linked.linked}人 / ${linked.total}人` : '登録状況を読み込んでいます'}</HelpTip>
           </div>
           {!loaded ? (
-            <ListState kind="loading" title="読み込んでいます" />
+            <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />
           ) : loadError ? (
             <div className={parts.panel}>
-              <ListState kind="error" title="お知らせを表示できませんでした" description={loadDescription(loadError)} error={loadError ?? undefined} onRetry={() => void load()} />
+              <ListState permissionScope="hq" kind="error" title="お知らせを表示できませんでした" description={loadDescription(loadError)} error={loadError ?? undefined} onRetry={() => void load()} />
             </div>
           ) : rows.length === 0 ? (
             <div className={parts.panel}>
-              <ListState kind="empty" title="まだお知らせはありません" description="左で作って「今すぐ送る」か「配信を予約する」を押すと、ここに並びます。" />
+              <ListState permissionScope="hq" kind="empty" title="まだお知らせはありません" description="左で作って「今すぐ送る」か「配信を予約する」を押すと、ここに並びます。" />
             </div>
           ) : (
             <div className={parts.mini} role="table" aria-label="配信済み・予約・下書き">

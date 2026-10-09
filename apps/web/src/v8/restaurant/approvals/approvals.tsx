@@ -27,6 +27,7 @@ import RestaurantFrame, { type RestaurantContext } from '../common-a/frame'
 import { formatStamp, Stat, StatRow, Status } from '../common-a/parts'
 import styles from './approvals.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 const kindLabel: Record<RestaurantApproval['kind'], string> = {
   gbp_post: 'Google投稿',
@@ -204,7 +205,7 @@ function ApprovalsBoard({ ctx }: { ctx: RestaurantContext }) {
   return (
     <>
       {readOnly ? (
-        <div className={styles.readOnly} role="note"><Eye aria-hidden className={styles.readOnlyIcon} /><span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span></div>
+        <div className={styles.readOnly} role="note"><Eye aria-hidden className={styles.readOnlyIcon} /><span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span></div>
       ) : null}
       <StatRow>
         <Stat label="承認待ち" value={`${pending.length}`} note="対応が必要" warning={pending.length > 0} />

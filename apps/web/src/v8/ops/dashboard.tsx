@@ -114,7 +114,7 @@ export default function OpsDashboardV8() {
 
       {!data && error ? (
         <div className={parts.panel}>
-          <ListState kind="error" title="ダッシュボードを表示できませんでした" description={error} onRetry={() => void load()} />
+          <ListState permissionScope="hq" kind="error" title="ダッシュボードを表示できませんでした" description={error} onRetry={() => void load()} />
         </div>
       ) : (
         <div className={parts.stack}>
@@ -141,11 +141,11 @@ export default function OpsDashboardV8() {
                   <AlertRow label="LINEのトークン期限が近い店舗" count={data.alerts.lineTokenExpiring} href="/ops/tenants" />
                   <AlertRow label="未返信のお問い合わせ" count={data.alerts.unansweredTickets} href="/ops/support" />
                 </div>
-              ) : <ListState kind="loading" title="読み込んでいます" />}
+              ) : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
             </section>
             <section aria-label="月ごとの売上" className={parts.panel}>
               <h3 className={parts.panelTitle}>月ごとの売上</h3>
-              {data ? <RevenueColumns rows={data.revenueByMonth} /> : <ListState kind="loading" title="読み込んでいます" />}
+              {data ? <RevenueColumns rows={data.revenueByMonth} /> : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
               <div className={styles.chartFoot}>
                 <p className={parts.note}>単位：千円（月額の合計）・{data ? revenueSourceLabel(data.pricing, data.lastSyncedAt) : '—'}</p>
                 {canSyncBilling ? (
@@ -161,9 +161,9 @@ export default function OpsDashboardV8() {
             <section aria-label="上限に近い契約先" className={parts.panel}>
               <h3 className={parts.panelTitle}>上限に近い契約先</h3>
               {!data ? (
-                <ListState kind="loading" title="読み込んでいます" />
+                <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />
               ) : data.usage.length === 0 ? (
-                <ListState kind="empty" title="今月はまだ使用量がありません" description="配信・バナー生成・メディア登録があると、上限に近い契約先から順に並びます。" />
+                <ListState permissionScope="hq" kind="empty" title="今月はまだ使用量がありません" description="配信・バナー生成・メディア登録があると、上限に近い契約先から順に並びます。" />
               ) : (
                 <div className={parts.mini}>
                   <div className={parts.miniHead}>
@@ -196,14 +196,14 @@ export default function OpsDashboardV8() {
                   </div>
                   <Link href="/ops/support" className={parts.textLink}>すべて見る →</Link>
                 </>
-              ) : <ListState kind="loading" title="読み込んでいます" />}
+              ) : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
             </section>
           </div>
 
           <div className={parts.row}>
             <section aria-label="プラン別の契約" className={parts.panel}>
               <h3 className={parts.panelTitle}>プラン別の契約</h3>
-              {data ? <p className={parts.line}>{planShareLine(data.planShare.rows)}</p> : <ListState kind="loading" title="読み込んでいます" />}
+              {data ? <p className={parts.line}>{planShareLine(data.planShare.rows)}</p> : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
             </section>
             <section aria-label="契約者専用LINEに未登録の権限者" className={parts.panel}>
               <h3 className={parts.panelTitle}>契約者専用LINEに未登録の権限者</h3>
@@ -216,7 +216,7 @@ export default function OpsDashboardV8() {
                     </button>
                   ) : null}
                 </div>
-              ) : <ListState kind="loading" title="読み込んでいます" />}
+              ) : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
             </section>
           </div>
         </div>
@@ -243,8 +243,8 @@ export default function OpsDashboardV8() {
             </div>
           )
         ) : unregisteredError ? (
-          <ListState kind="error" title="未登録の人を表示できませんでした" description={unregisteredError} onRetry={() => void openUnregistered()} />
-        ) : <ListState kind="loading" title="読み込んでいます" />}
+          <ListState permissionScope="hq" kind="error" title="未登録の人を表示できませんでした" description={unregisteredError} onRetry={() => void openUnregistered()} />
+        ) : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
       </Dialog>
     </div>
   )

@@ -163,7 +163,7 @@ export default function RankSettingsV8({
         await showConflict()
       } else {
         setError(describeApiFailure(caught, 'ランク設定の保存', {
-          forbidden: 'ランク設定を保存する権限がありません。権限を確認してください。',
+          scope: 'store',
         }))
       }
     } finally {
@@ -210,7 +210,7 @@ export default function RankSettingsV8({
         await showConflict()
       } else {
         setError(describeApiFailure(caught, 'ランクの削除', {
-          forbidden: 'ランクを削除する権限がありません。権限を確認してください。',
+          scope: 'store',
         }))
       }
     } finally {
@@ -239,7 +239,7 @@ export default function RankSettingsV8({
       setNotice(res.data.sync?.status === 'synced' ? 'ECへ同期しました。' : `ECへの同期に失敗しました：${res.data.sync?.error ?? ''}`)
     } catch (caught) {
       setError(describeApiFailure(caught, 'ECへの同期', {
-        forbidden: 'ECへ同期する権限がありません。権限を確認してください。',
+        scope: 'store',
       }))
     } finally {
       setBusy(false)

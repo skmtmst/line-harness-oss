@@ -33,6 +33,7 @@ import SavedV8 from './saved'
 import FunnelV8, { type FunnelFormSlot, type FunnelSaveSlot } from './funnel'
 import CrossV8 from './cross'
 import styles from './analytics.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 export const ANALYTICS_TABS = ['friends', 'reactions', 'routes', 'usage', 'cross', 'funnel', 'url-clicks', 'saved'] as const
 export type AnalyticsTabV8 = (typeof ANALYTICS_TABS)[number] | 'conversion-report'
@@ -112,7 +113,7 @@ function AnalyticsInnerV8({ slots }: { slots?: AnalyticsSlotsV8 }) {
   </>
   const tabs = <>
     <Navigation active={tab} savedCount={savedCount} />
-    {readOnly ? <div className={styles.viewerBand} role="status"><Eye size={16} aria-hidden="true" /><span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span></div> : null}
+    {readOnly ? <div className={styles.viewerBand} role="status"><Eye size={16} aria-hidden="true" /><span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span></div> : null}
   </>
   const content = tab === 'friends' ? <FriendsV8 key={selectedAccountId} accountId={selectedAccountId} />
     : tab === 'reactions' ? <ReactionsV8 key={selectedAccountId} accountId={selectedAccountId} />

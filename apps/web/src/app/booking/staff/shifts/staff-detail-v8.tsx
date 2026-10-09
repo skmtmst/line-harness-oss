@@ -46,6 +46,7 @@ import { formatDay } from '@/lib/format'
 import { LiffPhoneDatetimeStep } from '../../menus/liff-phone-v8'
 import shell from '../../menus/settings-v8.module.css'
 import styles from './staff-detail-v8.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -86,7 +87,7 @@ function addDays(date: string, days: number): string {
 
 function staffErrorMessage(error: unknown, action: string): string {
   if (error instanceof ApiError) {
-    if (error.status === 403) return `担当者の設定を${action}する権限がありません。オーナーか管理者に頼んでください。`
+    if (error.status === 403) return permissionDeniedMessage('store')
     if (error.status === 404) return '担当者が見つかりませんでした。削除された可能性があります。一覧に戻って選び直してください。'
     if (error.status === 409) return 'ほかの変更と重なりました。最新の状態を読み直したので、確かめてからもう一度保存してください。'
   }

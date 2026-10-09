@@ -40,6 +40,7 @@ import {
   type BandCell,
 } from './shell'
 import styles from './runs.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 type RunStatus = AutomationRunDetail['status']
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
@@ -572,7 +573,7 @@ export default function AutomationRunsV8() {
   const runDetail = selectedDetail
   const deepLinkMessage = !run && deepLinkRunId
     ? deepLinkLoading ? '読み込んでいます'
-      : deepLinkError === 'forbidden' ? 'この実行を見る権限がありません。'
+      : deepLinkError === 'forbidden' ? permissionDeniedMessage('store')
         : deepLinkError === 'error' ? '詳細を読み込めませんでした。記録は消えていません。' : null
     : null
 

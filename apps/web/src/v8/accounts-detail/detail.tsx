@@ -48,6 +48,7 @@ import {
   type AccountDetailView,
 } from './view'
 import styles from './detail.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 type Skipped = Array<{ id: string; kind: string; title: string | null; skippedAt: string }>
 

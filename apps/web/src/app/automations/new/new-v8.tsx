@@ -48,6 +48,7 @@ import {
 import { WeekdaySelect } from './weekday-select'
 import { FriendMultiSelect } from './friend-multi-select'
 import { formatNumber, formatTime } from '@/lib/format'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /**
  * ルールを作る。Pencil ★V6 `Rv8Jv`（25-1-A つくる）。
@@ -1197,7 +1198,7 @@ export function NewAutomationV8({
           setError('指定された下書きは見つかりませんでした。削除された可能性があります。')
         } else if (caught instanceof ApiError && caught.status === 403) {
           setResumeErrorKind('forbidden')
-          setError('指定された下書きを開く権限がありません。')
+          setError(permissionDeniedMessage('store'))
         } else {
           setResumeErrorKind('network')
           setError('下書きを読み込めませんでした。通信状態を確かめて、もう一度お試しください。')

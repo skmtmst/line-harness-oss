@@ -51,6 +51,7 @@ import shell from './settings.module.css'
 import styles from './menu-form.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -743,7 +744,7 @@ export default function MenuFormV8() {
           <ListState
             kind="error"
             title="予約メニューの変更権限がありません"
-            description="メニューの作成・変更は、予約メニューの権限を持つログインユーザーだけが実行できます。管理者へ権限の確認を依頼してください。"
+            description={permissionDeniedMessage('store')}
           />
         </div>
       </div>
@@ -936,7 +937,7 @@ export default function MenuFormV8() {
               <div className="space-y-2">
                 <p className="text-ink-faint text-sm">
                   {classifyApiFailure(staffError) === 'forbidden'
-                    ? '担当スタッフを見る権限がありません。オーナーか管理者に追加を依頼してください。'
+                    ? permissionDeniedMessage('store')
                     : '担当を読み込めませんでした。入力はそのまま残っています。'}
                 </p>
                 {classifyApiFailure(staffError) !== 'forbidden' && selectedAccountId && (
@@ -1248,7 +1249,7 @@ export default function MenuFormV8() {
 
 function bookingErrorText(error: unknown, action: '読み込み' | '保存'): string {
   if (error instanceof ApiError) {
-    if (error.status === 403) return `予約メニューを${action}する権限がありません。`
+    if (error.status === 403) return permissionDeniedMessage('store')
     if (error.status === 409) return `ほかの変更と重なったため、予約メニューを${action}できませんでした。`
   }
   return `予約メニューを${action}できませんでした。通信状態を確認して、もう一度お試しください。`

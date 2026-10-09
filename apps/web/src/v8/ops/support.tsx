@@ -391,11 +391,11 @@ export default function OpsSupportV8() {
             <Select aria-label="並び替え" options={SORT_OPTIONS} value={sort} onChange={(value) => setSort(value as typeof sort)} size="full" />
           </div>
           {loading && tickets.length === 0 ? (
-            <ListState kind="loading" title="チケットを読み込んでいます" />
+            <ListState permissionScope="hq" kind="loading" title="チケットを読み込んでいます" />
           ) : listFailed && tickets.length === 0 ? (
-            <ListState kind="error" title="チケットを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。" onRetry={() => void loadList()} />
+            <ListState permissionScope="hq" kind="error" title="チケットを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。" onRetry={() => void loadList()} />
           ) : tickets.length === 0 ? (
-            <ListState kind="empty" title="チケットがありません" description="統括の管理画面「お問い合わせ」から送られると、ここに新規として並びます。" />
+            <ListState permissionScope="hq" kind="empty" title="チケットがありません" description="統括の管理画面「お問い合わせ」から送られると、ここに新規として並びます。" />
           ) : (
             <ul className={styles.tickets}>
               {tickets.map((t) => (
@@ -419,9 +419,9 @@ export default function OpsSupportV8() {
 
         <section aria-label="内容と返信" className={styles.detail}>
           {!ticket ? (
-            detailLoading ? <ListState kind="loading" title="内容を読み込んでいます" /> : detailFailed ? (
-              <ListState kind="error" title="内容を読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。" onRetry={selectedId ? () => void loadDetail(selectedId) : undefined} />
-            ) : <ListState kind="empty" title="チケットを選んでください" description="左の一覧から開きます。" />
+            detailLoading ? <ListState permissionScope="hq" kind="loading" title="内容を読み込んでいます" /> : detailFailed ? (
+              <ListState permissionScope="hq" kind="error" title="内容を読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。" onRetry={selectedId ? () => void loadDetail(selectedId) : undefined} />
+            ) : <ListState permissionScope="hq" kind="empty" title="チケットを選んでください" description="左の一覧から開きます。" />
           ) : (
             <>
               <div className={styles.detailHead}>

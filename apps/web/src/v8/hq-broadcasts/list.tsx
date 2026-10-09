@@ -273,8 +273,8 @@ export default function HqBroadcastList() {
   )
 
   let content
-  if (error && !runs) content = <ListState kind="error" error={error} onRetry={() => void load()} />
-  else if (!runs) content = <ListState kind="loading" />
+  if (error && !runs) content = <ListState permissionScope="hq" kind="error" error={error} onRetry={() => void load()} />
+  else if (!runs) content = <ListState permissionScope="hq" kind="loading" />
   else if (filtered.length === 0) {
     content = (
       <EmptyList

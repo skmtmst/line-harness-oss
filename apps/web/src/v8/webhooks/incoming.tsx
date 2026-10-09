@@ -55,6 +55,7 @@ import {
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import { shortDateTime } from './words'
 import styles from './incoming.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -311,7 +312,7 @@ export default function WebhooksIncomingV8() {
       if (accountRef.current !== accountId) { clear(); return }
       const forbidden = caught instanceof ApiError && caught.status === 403
       fail(forbidden
-        ? `「${item.name}」は統括だけが切り替えできます。必要なときは統括に頼んでください。状態は変わっていません。`
+        ? permissionDeniedMessage('store')
         : `「${item.name}」は切り替えに失敗しました。状態は変わっていません。時間をおいて、もう一度お試しください。`)
     } finally {
       togglingRef.current.delete(item.id)
@@ -339,7 +340,7 @@ export default function WebhooksIncomingV8() {
       if (accountRef.current !== accountId) return
       const forbidden = caught instanceof ApiError && caught.status === 403
       setDeleteError(forbidden
-        ? 'この受け取り口の削除は統括だけができます。必要なときは統括に頼んでください。'
+        ? permissionDeniedMessage('store')
         : 'この受け取り口を削除できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
       setDeleting(false)
@@ -378,7 +379,7 @@ export default function WebhooksIncomingV8() {
       }
       if (accountRef.current !== accountId) return
       setRotateError(describeApiFailure(caught, 'シークレットの更新', {
-        forbidden: '合言葉の更新は統括だけができます。必要なときは統括に頼んでください。',
+        scope: 'store',
       }))
     } finally {
       setRotating(false)
@@ -437,7 +438,7 @@ export default function WebhooksIncomingV8() {
       if (accountRef.current !== accountId) return
       setCreateFieldError({
         form: describeApiFailure(caught, '作成', {
-          forbidden: '受け取り口の作成は統括だけができます。必要なときは統括に頼んでください。',
+          scope: 'store',
         }),
       })
     } finally {
@@ -475,7 +476,7 @@ export default function WebhooksIncomingV8() {
         setUnmatchedActionError({
           id: item.id,
           message: describeApiFailure(caught, '確認', {
-            forbidden: 'この操作は統括または管理者だけができます。必要なときは統括に頼んでください。',
+            scope: 'store',
           }),
         })
         return
@@ -509,7 +510,7 @@ export default function WebhooksIncomingV8() {
       }
       setTestResult(res.data)
     } catch (caught) {
-      setTestError(describeApiFailure(caught, '試し', { forbidden: 'この操作を行う権限がありません。統括に頼んでください。' }))
+      setTestError(describeApiFailure(caught, '試し', { scope: 'store' }))
       setTestResult(null)
     } finally {
       setTestBusy(false)

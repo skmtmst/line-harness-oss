@@ -304,11 +304,11 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
   )
 
   const body = status === 'loading' ? (
-    <ListState kind="loading" title="プロジェクトを読み込んでいます" />
+    <ListState permissionScope="hq" kind="loading" title="プロジェクトを読み込んでいます" />
   ) : status === 'forbidden' ? (
-    <ListState kind="forbidden" description="バナー生成は統括の管理者・オーナーだけが使えます。" />
+    <ListState permissionScope="hq" kind="forbidden" description="バナー生成は統括の管理者・オーナーだけが使えます。" />
   ) : status === 'error' ? (
-    <ListState
+    <ListState permissionScope="hq"
       kind="error"
       title="一覧を読み込めませんでした"
       description="通信の状態を確認して、もう一度お試しください。何度も続く場合はお問い合わせから知らせてください。"
@@ -316,9 +316,9 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
     />
   ) : projects.length === 0 ? (
     archivedMode ? (
-      <ListState kind="empty" title="アーカイブしたプロジェクトはありません" description="進行中の一覧でアーカイブすると、ここに移ります。" />
+      <ListState permissionScope="hq" kind="empty" title="アーカイブしたプロジェクトはありません" description="進行中の一覧でアーカイブすると、ここに移ります。" />
     ) : (
-      <ListState
+      <ListState permissionScope="hq"
         kind="empty"
         title="まだプロジェクトがありません"
         description="案件やキャンペーンごとにプロジェクトを作り、その中で画像を生成します。作った画像はアカウントへ配れます。"
@@ -331,7 +331,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
     )
   ) : visible.length === 0 ? (
     // R605: 検索・絞り込みの結果が0件。条件を外す口を付ける（作る口は出さない）。
-    <ListState kind="empty" emptyPreset="filtered" action={<Button onClick={() => { setQuery(''); setView('all') }}>条件を外す</Button>} />
+    <ListState permissionScope="hq" kind="empty" emptyPreset="filtered" action={<Button onClick={() => { setQuery(''); setView('all') }}>条件を外す</Button>} />
   ) : (
     <div className={styles.projectGrid}>
       {visible.map((project) => (
@@ -628,11 +628,11 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
   const last = page * LIBRARY_PAGE + images.length
 
   const body = status === 'loading' ? (
-    <ListState kind="loading" title="画像を読み込んでいます" />
+    <ListState permissionScope="hq" kind="loading" title="画像を読み込んでいます" />
   ) : status === 'forbidden' ? (
-    <ListState kind="forbidden" description="バナー生成は統括の管理者・オーナーだけが使えます。" />
+    <ListState permissionScope="hq" kind="forbidden" description="バナー生成は統括の管理者・オーナーだけが使えます。" />
   ) : status === 'error' ? (
-    <ListState
+    <ListState permissionScope="hq"
       kind="error"
       title="一覧を読み込めませんでした"
       description="通信の状態を確認して、もう一度お試しください。何度も続く場合はお問い合わせから知らせてください。"
@@ -640,8 +640,8 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
     />
   ) : images.length === 0 ? (
     query || shape || view !== 'all'
-      ? <ListState kind="empty" emptyPreset="filtered" action={<Button onClick={() => { setQuery(''); setShape(null); setView('all'); resetPage() }}>条件を外す</Button>} />
-      : <ListState kind="empty" title="まだ画像がありません" description="プロジェクトの中で生成した画像と、取り込んだ画像がここに並びます。" />
+      ? <ListState permissionScope="hq" kind="empty" emptyPreset="filtered" action={<Button onClick={() => { setQuery(''); setShape(null); setView('all'); resetPage() }}>条件を外す</Button>} />
+      : <ListState permissionScope="hq" kind="empty" title="まだ画像がありません" description="プロジェクトの中で生成した画像と、取り込んだ画像がここに並びます。" />
   ) : (
     <>
       <div className={styles.imageGrid}>

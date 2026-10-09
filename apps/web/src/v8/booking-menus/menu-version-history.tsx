@@ -8,6 +8,7 @@ import VersionHistory, { type HistoryVersion } from '@/components/shared/version
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { notifyToast } from '@/components/shared/toast'
 import { ApiError, bookingApi, type BookingMenuVersion } from '@/lib/api'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /**
  * T: 予約メニューの版の履歴（右から出る欄）。
@@ -103,7 +104,7 @@ export default function MenuVersionHistory({
         setRevertError('ほかの人が先に保存しました。最新の版を読み直しました。内容を確かめてから、もう一度お試しください。')
         await load({ keepError: true })
       } else if (error instanceof ApiError && error.status === 403) {
-        setRevertError('版を戻す権限がありません。')
+        setRevertError(permissionDeniedMessage('store'))
       } else {
         setRevertError('版を戻せませんでした。通信状態を確認して、もう一度お試しください。')
       }

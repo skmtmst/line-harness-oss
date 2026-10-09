@@ -100,6 +100,7 @@ import {
 } from './words'
 import QuickCreateV8 from './quick-create'
 import styles from './list.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -562,7 +563,7 @@ export default function AutoRepliesListV8() {
           : `${ids.length}件の自動応答を停止しました`
     const failedMessage = (targetKind: 'stop' | 'resume', forbidden: boolean) =>
       forbidden
-        ? `${NO_WRITE_PERMISSION.label}。自動応答を止めたり動かしたりするには権限が要ります。`
+        ? permissionDeniedMessage('store')
         : targetKind === 'stop'
           ? '自動応答を停止できませんでした。状態を読み直してからお試しください。'
           : '自動応答を再開できませんでした。状態を読み直してからお試しください。'
@@ -1620,7 +1621,7 @@ export default function AutoRepliesListV8() {
         {!canEdit && (
           <div className={styles.viewerBand} role="status" data-design-node="Q5lOCc">
             <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
           </div>
         )}
         {/* 数の帯 4つ。並びと間は共有の帯（KpiStrip）に任せ、画面CSSで書かない。 */}

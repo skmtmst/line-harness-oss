@@ -144,14 +144,14 @@ export default function OpsMembersV8() {
             {error && !listFailed ? <p role="alert" className={parts.alert}>{error}</p> : null}
 
             {!loaded ? (
-              <ListState kind="loading" title="運営メンバーを読み込んでいます" />
+              <ListState permissionScope="hq" kind="loading" title="運営メンバーを読み込んでいます" />
             ) : listFailed ? (
               <div className={parts.panel}>
-                <ListState kind="error" title="運営メンバーを表示できませんでした" description={error} onRetry={() => void load()} />
+                <ListState permissionScope="hq" kind="error" title="運営メンバーを表示できませんでした" description={error} onRetry={() => void load()} />
               </div>
             ) : members.length === 0 ? (
               <div className={parts.panel}>
-                <ListState kind="empty" title="運営メンバーがいません" description="最初の 1 人は、自分のメールアドレスを入れて「招待メールを送る」を押して登録します。" />
+                <ListState permissionScope="hq" kind="empty" title="運営メンバーがいません" description="最初の 1 人は、自分のメールアドレスを入れて「招待メールを送る」を押して登録します。" />
               </div>
             ) : (
               <div className={parts.mini} role="table" aria-label="運営メンバー">

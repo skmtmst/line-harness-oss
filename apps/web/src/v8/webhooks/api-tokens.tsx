@@ -231,7 +231,7 @@ export default function WebhooksApiTokensV8() {
       }
       if (selectedAccountIdRef.current !== requestAccountId) return
       setCreateError(describeApiFailure(caught, '発行', {
-        forbidden: '鍵の発行は統括だけができます。必要なときは統括に頼んでください。',
+        scope: 'store',
       }))
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setCreating(false)
@@ -272,7 +272,7 @@ export default function WebhooksApiTokensV8() {
         return
       }
       setDialogError(describeApiFailure(caught, '入れ替え', {
-        forbidden: '鍵の入れ替えは統括だけができます。必要なときは統括に頼んでください。',
+        scope: 'store',
       }))
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setMutating(false)
@@ -305,7 +305,7 @@ export default function WebhooksApiTokensV8() {
       }
       if (selectedAccountIdRef.current !== requestAccountId) return
       setDialogError(describeApiFailure(caught, '停止', {
-        forbidden: '鍵の停止は統括だけができます。必要なときは統括に頼んでください。',
+        scope: 'store',
       }))
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setMutating(false)

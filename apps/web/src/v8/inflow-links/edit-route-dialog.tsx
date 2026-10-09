@@ -24,6 +24,7 @@ import type {
   Scenario,
   Tag,
 } from '@line-crm/shared'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 interface MessageTemplate {
   id: string
@@ -160,7 +161,7 @@ export default function EditRouteModal({
       else setError(res.error ?? '保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } catch (err) {
       // 400系はAPIの理由、403・5xxは運用の言葉へ写す（WRITE-01）。
-      setError(describeSaveFailure(err))
+      setError(withPermissionFailure(err, describeSaveFailure(err), 'store'))
     } finally {
       // 失敗時に「保存中…」のまま固まらないよう、必ず戻す。
       setSubmitting(false)

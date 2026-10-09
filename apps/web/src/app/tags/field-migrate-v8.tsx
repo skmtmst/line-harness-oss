@@ -27,6 +27,7 @@ import { createResponseGate } from '@/lib/latest-request'
 import { FIELD_TYPE_HINTS, FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import { formatDateTime } from '@/lib/format'
 import styles from './field-migrate-v8.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 const TYPES = Object.keys(FIELD_TYPE_LABELS) as FriendFieldType[]
 
@@ -134,7 +135,7 @@ export default function FieldMigrateV8() {
         // ATTR-11: 失敗は loadError へ。項目未発見（!source）と混ぜない。
         if (!active) return
         if (reason instanceof ApiError && reason.status === 403) {
-          setLoadError('友だち情報欄を見る権限がありません。オーナーか管理者に確認してください。')
+          setLoadError(permissionDeniedMessage('store'))
           setLoadForbidden(true)
         } else {
           setLoadError('項目を読み込めませんでした')

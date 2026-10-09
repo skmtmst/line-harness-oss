@@ -83,6 +83,7 @@ import {
 } from './list-model'
 import VarsExportPanel from './export-panel'
 import styles from './list-v8.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -242,7 +243,7 @@ function CommonVarsListV8Inner() {
       if (accountAtRequest === latestAccountRef.current) {
         setListFailure(e)
         setError(e instanceof ApiError && e.status === 403
-          ? 'この一覧を見る権限がありません。管理者に権限を申請してください。'
+          ? permissionDeniedMessage('store')
           : '読み込みに失敗しました。接続を確かめて、もう一度お試しください。')
       }
     } finally {

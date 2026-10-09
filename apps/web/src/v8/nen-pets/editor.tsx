@@ -86,7 +86,7 @@ export default function PetEditorV8({ accountId, pet, onClose, onSaved }: {
         return
       }
       setError(describeApiFailure(caught, 'ペットの保存', {
-        forbidden: 'ペットの情報を変える権限がありません。権限を確認してください。',
+        scope: 'store',
       }))
     } finally {
       setSaving(false)

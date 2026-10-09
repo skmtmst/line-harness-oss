@@ -151,14 +151,14 @@ export default function OpsAuditV8() {
         {error && rows.length > 0 ? <p role="alert" className={parts.alert}>{error}</p> : null}
 
         {loading && rows.length === 0 ? (
-          <ListState kind="loading" title="記録を読み込んでいます" />
+          <ListState permissionScope="hq" kind="loading" title="記録を読み込んでいます" />
         ) : error && rows.length === 0 ? (
           <div className={parts.panel}>
-            <ListState kind="error" title="記録を表示できませんでした" description={error} onRetry={() => void load()} />
+            <ListState permissionScope="hq" kind="error" title="記録を表示できませんでした" description={error} onRetry={() => void load()} />
           </div>
         ) : rows.length === 0 ? (
           <div className={parts.panel}>
-            <ListState kind="empty" title="記録がありません" description="運営が操作を行うと、ここに残ります。" />
+            <ListState permissionScope="hq" kind="empty" title="記録がありません" description="運営が操作を行うと、ここに残ります。" />
           </div>
         ) : (
           <div className={parts.mini} role="table" aria-label="監査ログ">

@@ -419,13 +419,13 @@ export default function HqHomeV8() {
   const body = loadError ? (
     <Notice
       tone="danger"
-      message={loadFailureNotice(loadError, '統括のアカウント情報')}
+      message={loadFailureNotice(loadError, '統括のアカウント情報', 'hq')}
       action={classifyApiFailure(loadError) === 'forbidden' ? undefined : (
         <Button type="button" onClick={() => { setLoading(true); setReloadKey((key) => key + 1) }}>再読み込み</Button>
       )}
     />
   ) : loading ? (
-    <ListState kind="loading" title="アカウントを読み込んでいます" />
+    <ListState permissionScope="hq" kind="loading" title="アカウントを読み込んでいます" />
   ) : accounts.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */
     <EmptyList

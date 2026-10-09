@@ -122,10 +122,10 @@ export default function OpsTwoFactorV8() {
         <h1 id="ops-totp-title" className={styles.title}>2要素認証を設定</h1>
         <p className={styles.lead}>認証アプリ（Google Authenticator など）で QR を読み取り、表示された6桁を入れます。</p>
         {state === 'loading' ? (
-          <ListState kind="loading" title="準備しています" />
+          <ListState permissionScope="hq" kind="loading" title="準備しています" />
         ) : state === 'denied' ? (
           <>
-            <ListState kind="forbidden" title="この画面は運営メンバーだけが開けます" description="招待メールのリンクから進んでください。" />
+            <ListState permissionScope="hq" kind="forbidden" title="この画面は運営メンバーだけが開けます" description="招待メールのリンクから進んでください。" />
             <Button href="/ops/login" className={styles.wide}>運営のログインへ</Button>
           </>
         ) : state === 'done' ? (

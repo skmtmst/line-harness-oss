@@ -73,6 +73,8 @@ import styles from './create.module.css'
 import MessageComposer, { MessageComposerPage } from '@/components/shared/message-composer'
 import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 type Store = BroadcastAccount
 /** 配信対象（店の一斉配信と同じ4つ。名前は店の口と同じ：詳細条件は advanced）。 */
@@ -99,9 +101,9 @@ const KIND_LABEL = HQ_KIND_LABEL
 
 function errorText(caught: unknown, fallback: string): string {
   if (caught instanceof ApiError) {
-    if (caught.status === 403) return '統括全体の編集権限がある人だけが一括配信を作れます。'
+    if (caught.status === 403) return permissionDeniedMessage('hq')
     if (caught.status === 409) return japaneseDetailOf(caught) || 'ほかの人が先に操作しました。もう一度確かめてください。'
-    return describeSaveFailure(caught)
+    return withPermissionFailure(caught, describeSaveFailure(caught), 'hq')
   }
   // 「API error: 500」のような内部の文は出さない。
   return japaneseDetailOf(caught) || fallback
@@ -855,7 +857,7 @@ export default function HqBroadcastCreate() {
               <section id="broadcast-step-audience" className={formStyles.section}>
                 <div className={styles.accounts} data-design-node="J5DH6o">
                   <h3>送るアカウント</h3>
-                  {loadError && !stores ? <ListState kind="error" error={loadError} onRetry={() => window.location.reload()} /> : !stores ? <ListState kind="loading" /> : (
+                  {loadError && !stores ? <ListState permissionScope="hq" kind="error" error={loadError} onRetry={() => window.location.reload()} /> : !stores ? <ListState permissionScope="hq" kind="loading" /> : (
                     <div className={styles.accountSelection} aria-live="polite">
                       <EntityPickerSummary label="送るアカウント" noun="送るアカウント" icon={Building2} name={chosen.length ? `${formatNumber(chosen.length)} アカウント` : ''} meta={accountSummary}
                         readOnly={!canManage} buttonRef={accountPickerTrigger} onOpen={() => setAccountPickerOpen(true)} />

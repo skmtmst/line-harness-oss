@@ -22,6 +22,7 @@ import { DetailHead } from './chrome'
 import { fmtSec, percent, thisMonthReservations } from './helpers'
 import type { DetailChrome, EditContext } from './types'
 import styles from './analytics.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 export default function AnalyticsPane({ ctx, chrome }: { ctx: EditContext; chrome: DetailChrome }) {
   const { webinar, analytics, analyticsState } = ctx
@@ -56,7 +57,7 @@ export default function AnalyticsPane({ ctx, chrome }: { ctx: EditContext; chrom
       if (request !== generation.current) return
       if (cause instanceof ApiError && cause.status === 403) {
         setPermission('denied')
-        setError('参加者のCSVを書き出す権限がありません。管理者に確認してください。')
+        setError(permissionDeniedMessage('store'))
       } else setError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。')
     }).finally(() => {
       locked.current = false
@@ -264,7 +265,7 @@ function ViewerComments({ webinarId }: { webinarId: string }) {
       if (!Array.isArray(response.data)) throw new Error('invalid_comments')
       if (active) setComments(response.data)
     }).catch((cause) => {
-      if (active) setError(cause instanceof ApiError && cause.status === 403 ? '視聴者コメントを確認する権限がありません。管理者に確認してください。' : '視聴者コメントを読み込めませんでした。')
+      if (active) setError(cause instanceof ApiError && cause.status === 403 ? permissionDeniedMessage('store') : '視聴者コメントを読み込めませんでした。')
     })
     return () => { active = false }
   }, [webinarId, attempt])

@@ -41,10 +41,11 @@ import { api, ApiError } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
 import styles from './runs.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /* 再実行・一時停止は owner/admin だけ（R530・再実行POST・停止口の requireRole と同じ境目）。 */
 const NO_MANAGE_NOTE = '閲覧のみで見ています。再実行・一時停止はオーナーと管理者だけができます。実行結果の確認と書き出しはこのまま使えます。'
-const NO_RETRY_PERMISSION = '再実行する権限がありません。オーナーか管理者に頼んでください。'
+const NO_RETRY_PERMISSION = permissionDeniedMessage('store')
 
 /* 絵の札の言葉（成功・確認待ち・失敗・見送り）。表に無い状態は「確認中」で出す（白い画面にしない）。 */
 const STATUS: Record<ExecutionRunStatus, { label: string; tone: StatusBadgeTone }> = {

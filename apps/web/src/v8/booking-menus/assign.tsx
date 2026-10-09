@@ -44,6 +44,7 @@ import shell from './settings.module.css'
 import styles from './assign.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 /* 予約設定の5タブ（settings-v8.tsx の V8_TABS と同じ並び）。 */
 const V8_TABS = [
@@ -236,7 +237,7 @@ export default function AssignMatrixV8() {
       })
     } catch (e) {
       setError(
-        `${describeSaveFailure(e)}（保存は取り消されました。画面を再読み込みして最新の状態を確認してください）`,
+        `${withPermissionFailure(e, describeSaveFailure(e), 'store')}（保存は取り消されました。画面を再読み込みして最新の状態を確認してください）`,
       )
     } finally {
       setSaving(false)
@@ -261,7 +262,7 @@ export default function AssignMatrixV8() {
       notifyToast('元に戻しました')
     } catch (e) {
       setError(
-        `${describeSaveFailure(e)}（元に戻せませんでした。画面を再読み込みして最新の状態を確認してください）`,
+        `${withPermissionFailure(e, describeSaveFailure(e), 'store')}（元に戻せませんでした。画面を再読み込みして最新の状態を確認してください）`,
       )
     } finally {
       setSaving(false)

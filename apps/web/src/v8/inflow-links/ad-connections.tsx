@@ -24,6 +24,7 @@ import { adMappingReturns, groupAdMappings, useAdLogs, type AdMappingRow } from 
 import adsStyles from './ads.module.css'
 import styles from './ad-pages.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 const STEPS = [
   { title: 'クリックの目印を持ち帰る', text: '広告から中継リンクを通った人の目印を残します。中継リンクを通らないと広告と結びつきません。' },
@@ -180,7 +181,7 @@ export default function AdConnectionsV8() {
         actions={<><Button href="/inflow-links?tab=connections&view=history"><History size={15} aria-hidden="true" />送信履歴を見る</Button></>} />
       <div className={adsStyles.body}>
         {readonly ? (
-          <p className={adsStyles.viewerBand} role="status"><Eye size={16} aria-hidden="true" />閲覧のみで見ています。変える操作は管理者に頼んでください。</p>
+          <p className={adsStyles.viewerBand} role="status"><Eye size={16} aria-hidden="true" />閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>
         ) : null}
         <h2 className={adsStyles.sectionTitle}>返すしくみ</h2>
         <ol className={styles.steps} aria-label="返すしくみ">

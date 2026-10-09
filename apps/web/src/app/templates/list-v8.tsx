@@ -80,6 +80,7 @@ import {
 import { templateDeleteDescription } from './template-delete-message'
 import { messageTypeText } from './template-message-type'
 import styles from './list-v8.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /** 一覧のタブ。message/question は同じテンプレートの束を中身で分ける。 */
 type Section = 'message' | 'question' | BroadcastAssetKind
@@ -819,7 +820,7 @@ export default function TemplatesListV8() {
     } catch (reason) {
       setMoveError(
         reason instanceof ApiError && reason.status === 403
-          ? 'テンプレートを移すには権限が要ります。オーナーか管理者に頼んでください。'
+          ? permissionDeniedMessage('store')
           : 'フォルダへ移せませんでした。状態を読み直してからお試しください。',
       )
     } finally {
@@ -858,7 +859,7 @@ export default function TemplatesListV8() {
     } catch (reason) {
       setDuplicateError(
         reason instanceof ApiError && reason.status === 403
-          ? 'テンプレートを作るには権限が要ります。オーナーか管理者に頼んでください。'
+          ? permissionDeniedMessage('store')
           : '複製できませんでした。状態を読み直してからお試しください。',
       )
     } finally {
@@ -889,7 +890,7 @@ export default function TemplatesListV8() {
     } catch (reason) {
       setBulkDeleteError(
         reason instanceof ApiError && reason.status === 403
-          ? 'テンプレートを削除するには権限が要ります。オーナーか管理者に頼んでください。'
+          ? permissionDeniedMessage('store')
           : '削除できませんでした。状態を読み直してからお試しください。',
       )
     } finally {

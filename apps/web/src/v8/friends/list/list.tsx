@@ -74,6 +74,7 @@ import { csvExportLine } from './csv-export'
 import { readFriendsListSnapshot, writeFriendsListSnapshot } from './list-state'
 import { lastContactOf, monthDay, monthDayTime, statusOf, messageWord, splitTags } from './words'
 import styles from './list.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
 type PageSize = (typeof PAGE_SIZE_OPTIONS)[number]
@@ -92,7 +93,7 @@ const COLUMNS: Array<{ key: Column; label: string }> = [
   { key: 'last', label: '最終接触' },
 ]
 
-const VIEWER_NOTE = '閲覧のみで見ています。変える操作は管理者に頼んでください。'
+const VIEWER_NOTE = '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'
 
 function scoreBoundary(raw: string | null) {
   if (raw === null || !/^-?\d+$/.test(raw)) return undefined

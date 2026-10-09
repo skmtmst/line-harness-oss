@@ -8,6 +8,7 @@ import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 export type BulkRouteAction = 'pause' | 'resume' | 'move'
 
@@ -73,7 +74,7 @@ export default function BulkRoutesDialog({
         failed.push({
           route,
           error: cause instanceof ApiError && cause.status === 403
-            ? 'この操作を行う権限がありません'
+            ? permissionDeniedMessage('store')
             : '通信できませんでした',
         })
       }

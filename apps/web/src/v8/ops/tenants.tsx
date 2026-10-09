@@ -175,14 +175,14 @@ export default function OpsTenantsV8() {
         </div>
 
         {loading && rows.length === 0 ? (
-          <ListState kind="loading" title="契約先を読み込んでいます" />
+          <ListState permissionScope="hq" kind="loading" title="契約先を読み込んでいます" />
         ) : listLoadError && rows.length === 0 ? (
           <div className={parts.panel}>
-            <ListState kind="error" title="契約先を表示できませんでした" description={loadDescription(listLoadError)} error={listLoadError ?? undefined} onRetry={() => void load()} />
+            <ListState permissionScope="hq" kind="error" title="契約先を表示できませんでした" description={loadDescription(listLoadError)} error={listLoadError ?? undefined} onRetry={() => void load()} />
           </div>
         ) : visible.length === 0 ? (
           <div className={parts.panel}>
-            <ListState kind="empty" title="該当する契約先がありません" description="検索の言葉や絞り込みを変えてください。" />
+            <ListState permissionScope="hq" kind="empty" title="該当する契約先がありません" description="検索の言葉や絞り込みを変えてください。" />
           </div>
         ) : (
           <div className={parts.mini} role="table" aria-label="契約先">

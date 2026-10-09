@@ -251,7 +251,7 @@ function CsvExportButton({ accountId }: { accountId: string }) {
       URL.revokeObjectURL(url)
     } catch (caught) {
       setError(describeApiFailure(caught, 'CSVの書き出し', {
-        forbidden: 'CSVを書き出す権限がありません。権限を確認してください。',
+        scope: 'store',
       }))
     } finally {
       setBusy(false)
@@ -664,7 +664,7 @@ export function RankSettingsTabV8({
         : 'ランク設定を保存しました。ECへの同期は失敗したので、右の「もう一度同期」で送り直せます。')
     } catch (caught) {
       setError(describeApiFailure(caught, 'ランク設定の保存', {
-        forbidden: 'ランク設定を保存する権限がありません。権限を確認してください。',
+        scope: 'store',
       }))
     } finally {
       setBusy(false)
@@ -700,7 +700,7 @@ export function RankSettingsTabV8({
         setRemoveTarget(null)
       } else {
         setError(describeApiFailure(caught, 'ランクの削除', {
-          forbidden: 'ランクを削除する権限がありません。権限を確認してください。',
+          scope: 'store',
         }))
       }
     } finally {
@@ -729,7 +729,7 @@ export function RankSettingsTabV8({
       setNotice(res.data.sync?.status === 'synced' ? 'ECへ同期しました。' : `ECへの同期に失敗しました：${res.data.sync?.error ?? ''}`)
     } catch (caught) {
       setError(describeApiFailure(caught, 'ECへの同期', {
-        forbidden: 'ECへ同期する権限がありません。権限を確認してください。',
+        scope: 'store',
       }))
     } finally {
       setBusy(false)
@@ -1016,7 +1016,7 @@ function LifetimeTabV8({
       setNotice(res.data.sync?.status === 'synced' ? '節目を保存し、ECへ同期しました。' : '節目を保存しました。ECへの同期は失敗したので、ランク設定の「もう一度同期」で送り直せます。')
     } catch (caught) {
       setError(describeApiFailure(caught, '節目の保存', {
-        forbidden: '節目を保存する権限がありません。権限を確認してください。',
+        scope: 'store',
       }))
     } finally {
       setBusy(false)

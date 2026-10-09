@@ -46,6 +46,7 @@ import { CreateButton, MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import { notifyToast } from '@/components/shared/toast'
 import styles from './mileage.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 const KIND_LABEL: Record<MileageRewardKind, string> = {
   coupon: 'クーポン',
@@ -738,7 +739,7 @@ export default function RewardsTab() {
         <ListState
           kind={redemptionsLoad}
           description={redemptionsLoad === 'forbidden'
-            ? '要対応の交換を見る権限がありません。オーナーか管理者に確認してください。'
+            ? permissionDeniedMessage('store')
             : '要対応の交換を読み込めませんでした。'}
           onRetry={redemptionsLoad === 'error' ? () => void loadFailed(redemptionsPage) : undefined}
         />
@@ -808,7 +809,7 @@ export default function RewardsTab() {
   const body = status === 'loading' ? (
     <ListState kind="loading" title="使い道を読み込んでいます" />
   ) : status === 'forbidden' ? (
-    <StateCard title="使い道を見る権限がありません" description="オーナーか管理者に確認してください。" />
+    <StateCard title="使い道を見る権限がありません" description={permissionDeniedMessage('store')} />
   ) : status === 'error' ? (
     <StateCard tone="error" title="使い道を読み込めませんでした" description="数の帯は「—」にしています。道具はそのまま使えます。" action={<RetryButton onRetry={() => void load()} />} />
   ) : visible.length === 0 ? (

@@ -133,14 +133,14 @@ export default function OpsKnowledgeV8() {
         {actionError ? <p role="alert" className={parts.alert}>{actionError}</p> : null}
 
         {!loaded && rows.length === 0 ? (
-          <ListState kind="loading" />
+          <ListState permissionScope="hq" kind="loading" />
         ) : error ? (
           <div className={parts.panel}>
-            <ListState kind="error" description={loadDescription(error)} error={error ?? undefined} onRetry={() => void load()} />
+            <ListState permissionScope="hq" kind="error" description={loadDescription(error)} error={error ?? undefined} onRetry={() => void load()} />
           </div>
         ) : rows.length === 0 ? (
           <div className={parts.panel}>
-            <ListState kind="empty" emptyPreset="readonly" title="記事はありません" description="解決した問い合わせの確認結果がここに並びます。" />
+            <ListState permissionScope="hq" kind="empty" emptyPreset="readonly" title="記事はありません" description="解決した問い合わせの確認結果がここに並びます。" />
           </div>
         ) : (
           <div className={parts.mini} role="table" aria-label="ナレッジの記事">

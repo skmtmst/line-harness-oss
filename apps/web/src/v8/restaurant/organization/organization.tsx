@@ -31,6 +31,7 @@ import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import RestaurantFrame, { type RestaurantContext } from '../common-a/frame'
 import { formatStamp, Panel, Stat, StatRow, Status } from '../common-a/parts'
 import styles from './organization.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 const roleLabel: Record<RestaurantMembership['role'], string> = {
   super_admin: 'SuperAdmin',
@@ -47,7 +48,7 @@ const MATRIX: [string, boolean, boolean, boolean][] = [
 
 function intakeAddressError(error: unknown): string {
   if (error instanceof ApiError && error.status === 503) return '取り込み用ドメインが未設定です'
-  if (error instanceof ApiError && error.status === 403) return '取り込みアドレスはオーナーまたは管理者だけが確認できます。'
+  if (error instanceof ApiError && error.status === 403) return permissionDeniedMessage('store')
   return '取り込みアドレスを読み込めませんでした。'
 }
 
@@ -368,7 +369,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
   return (
     <>
       {readOnly ? (
-        <div className={styles.readOnly} role="note"><Eye aria-hidden className={styles.readOnlyIcon} /><span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span></div>
+        <div className={styles.readOnly} role="note"><Eye aria-hidden className={styles.readOnlyIcon} /><span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span></div>
       ) : null}
       <div className={styles.layout}>
         {prompt}

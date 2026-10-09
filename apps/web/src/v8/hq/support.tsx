@@ -156,7 +156,7 @@ export default function HqSupportV8() {
     } catch (caught) {
       // M027：原文のまま出さず、共通の状態別案内へ渡す。
       setError(japaneseDetailOf(caught) || describeApiFailure(caught, '送信', {
-        forbidden: 'お問い合わせの送信はオーナー・管理者・担当者だけができます。',
+        scope: 'hq',
       }))
       // 確定応答を失った再送でも履歴で確かめられるよう、履歴を読み直す（重複は口側 M028 が防ぐ）。
       void loadHistory()

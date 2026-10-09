@@ -49,6 +49,7 @@ import MenuVersionHistory from '../menu-version-history'
 import { LiffPhoneMenuStep } from '../liff-phone-v8'
 import shell from '../settings-v8.module.css'
 import styles from './menu-form-v8.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -1292,7 +1293,7 @@ export default function MenuFormV8() {
 
 function bookingErrorText(error: unknown, action: '読み込み' | '保存'): string {
   if (error instanceof ApiError) {
-    if (error.status === 403) return `予約メニューを${action}する権限がありません。`
+    if (error.status === 403) return permissionDeniedMessage('store')
     if (error.status === 409) return `ほかの変更と重なったため、予約メニューを${action}できませんでした。`
   }
   return `予約メニューを${action}できませんでした。通信状態を確認して、もう一度お試しください。`

@@ -21,6 +21,7 @@ import RestaurantFrame, { type RestaurantContext } from '../common-a/frame'
 import { Panel, Stat, StatRow } from '../common-a/parts'
 import styles from './line-followup.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /** 数の並びに出す4種（本物の flow_type）と、カードの頭の名前。 */
 const FLOW_KINDS: Record<string, { stat: string; note: string; title: string }> = {
@@ -113,7 +114,7 @@ function LineFollowupBoard({ ctx }: { ctx: RestaurantContext }) {
         <span>いまは「確認用」です。保存しても、お客さまへはまだ送りません。本当に送るのは、本送信の準備ができてから（司令塔の確認のあと）切り替えます。</span>
       </div>
       {readOnly ? (
-        <div className={styles.readOnly} role="note"><Eye aria-hidden className={styles.cautionIcon} /><span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span></div>
+        <div className={styles.readOnly} role="note"><Eye aria-hidden className={styles.cautionIcon} /><span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span></div>
       ) : null}
       <StatRow>
         <Stat size="small" label="フロー" value={`${flows.length}`} note="カードテンプレート" />

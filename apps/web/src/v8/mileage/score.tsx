@@ -54,6 +54,7 @@ import styles from './mileage.module.css'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError } from '@/components/shared/form-controls'
 import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 const BAND_LABELS: Record<ActionScoreBand, string> = {
   high: '点が高い',
@@ -122,7 +123,7 @@ type FriendsItem = ActionScoreOverview['items'][number]
 function actionScoreAdjustmentErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 400) return error.message
-    if (error.status === 403) return '点数を変更する権限がありません。'
+    if (error.status === 403) return permissionDeniedMessage('store')
     if (error.status === 404) return '対象の友だちまたはLINEアカウントを確認できませんでした。'
     if (error.status === 405) return 'この環境では点数を変更できません。'
     if (error.status === 409) return '同じ操作がすでに記録されています。画面を読み直してからやり直してください。'

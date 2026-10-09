@@ -45,6 +45,8 @@ import { AttributeKindGuide, findDuplicateNames } from '@/components/friend-fiel
 import { ArchiveMarkDialog } from '@/components/friend-fields/mark-list'
 import MarkBasicFields from './mark-basic-fields'
 import styles from './create.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 const COLORS = [
   { value: '#EF4B55', name: '赤' },
@@ -304,7 +306,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
       const code = (reason as { code?: string } | null)?.code
       if (status === 403) {
         setSaveForbidden(true)
-        setError(describeSaveFailure(reason))
+        setError(withPermissionFailure(reason, describeSaveFailure(reason), 'store'))
         return
       }
       if (status === 409 && code === 'SUPPORT_MARK_VERSION_CONFLICT') {
@@ -325,7 +327,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         setError('ほかの担当者が先に変更しました。最新の内容を確認してから保存し直してください。')
         return
       }
-      setError(describeSaveFailure(reason))
+      setError(withPermissionFailure(reason, describeSaveFailure(reason), 'store'))
     } finally {
       setSaving(false)
     }
@@ -377,7 +379,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
 
   const blockedReason =
     loadState === 'error' ? '一覧を読み込めませんでした。再読み込みしてください'
-      : loadState === 'forbidden' ? '対応マークを見る権限がありません'
+      : loadState === 'forbidden' ? permissionDeniedMessage('store')
         : roleBlocked ? '対応マークを作る権限がありません'
           : saveForbidden ? '対応マークを保存する権限がありません'
             : loadState === 'ready' && loadedAccountRef.current !== selectedAccountId ? 'アカウントを切り替えています。一覧を読み込むまでお待ちください'
@@ -447,7 +449,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         {hideForm ? (
           <ListState
             kind="forbidden"
-            description={editing ? '対応マークを編集する権限がありません。オーナーか管理者に確認してください。' : '対応マークを作る権限がありません。オーナーか管理者に確認してください。'}
+            description={editing ? permissionDeniedMessage('store') : permissionDeniedMessage('store')}
           />
         ) : null}
         {!hideForm && loadState === 'error' ? (
@@ -472,7 +474,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
               {editing ? (
                 <>
                   {rulesState === 'not-connected' ? <p className={styles.fieldNote}>自動で変えるきまりは、まだこの環境で使えません。</p> : null}
-                  {rulesState === 'forbidden' ? <p className={styles.fieldNote}>きまりを見る権限がありません。オーナーか管理者に確認してください。</p> : null}
+                  {rulesState === 'forbidden' ? <p className={styles.fieldNote}>{permissionDeniedMessage('store')}</p> : null}
                   {rulesState === 'error' ? (
                     <div className={styles.inlineRetry}>
                       <p className={styles.fieldError} role="alert">きまりを読み込めませんでした。</p>

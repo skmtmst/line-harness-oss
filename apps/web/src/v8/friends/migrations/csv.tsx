@@ -24,6 +24,7 @@ import { slashDateTime } from '../duplicates/words'
 import { csvExportLine } from '../list/csv-export'
 import { formatImportBytes, JOB_STATUS_LABELS, MANAGE_FORBIDDEN, useFriendMigrations } from './use-friend-migrations'
 import styles from './migrations.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 const COLUMN_CHOICES = [
   ['basic', '基本（LINEユーザーID・表示名・本名・登録日）', false],
@@ -60,7 +61,7 @@ export default function CsvMigrationsV8() {
   const body = m.status === 'loading' ? (
     <ListState kind="loading" title="書き出し・取り込みを読み込んでいます" />
   ) : m.status === 'forbidden' ? (
-    <ListState kind="forbidden" title="書き出し・取り込みを見る権限がありません" description="見るには権限が要ります。オーナーか管理者の方に確認してください。" />
+    <ListState kind="forbidden" title="書き出し・取り込みを見る権限がありません" description={permissionDeniedMessage('store')} />
   ) : m.status === 'error' ? (
     <ListState kind="error" title="書き出し・取り込みを表示できませんでした" description="履歴は消えていません。" onRetry={() => void m.load()} />
   ) : (

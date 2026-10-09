@@ -40,6 +40,7 @@ import { ArchiveMarkDialog, autoRuleLabel, isUsed, usageLabel } from '@/componen
 import styles from './list.module.css'
 
 import type { AttributeListHost } from './attribute-host'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 type MarkRow = SupportMarkListItem
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -330,7 +331,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
     <div className={styles.stateCard}>
       <AlertCircle className={styles.stateIconError} aria-hidden="true" />
       <p className={styles.stateTitle}>対応マークを見る権限がありません</p>
-      <p className={styles.stateDesc}>オーナーか管理者に確認してください。</p>
+      <p className={styles.stateDesc}>{permissionDeniedMessage('store')}</p>
     </div>
   ) : status === 'error' ? (
     <div className={styles.stateCard}>

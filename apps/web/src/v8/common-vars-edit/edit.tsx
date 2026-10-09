@@ -81,6 +81,7 @@ import { formatNumber } from '@/lib/format'
 import styles from './edit.module.css'
 import { focusFieldById } from '@/lib/use-form-errors'
 import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /** 予定の日時（`YYYY-MM-DDTHH:mm`・日本時間）を「10/1 0:00」の形にする。 */
 export function scheduleStamp(value: string): string {
@@ -1115,7 +1116,7 @@ function EditCommonVarV8Inner() {
       {canWrite ? null : (
         <div className={styles.roBand} role="status">
           <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+          <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
         </div>
       )}
 

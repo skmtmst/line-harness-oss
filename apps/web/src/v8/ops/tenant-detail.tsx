@@ -57,7 +57,7 @@ function shortDateTime(value: string | null | undefined): string {
 
 export default function OpsTenantDetailV8() {
   return (
-    <Suspense fallback={<ListState kind="loading" title="契約先を読み込んでいます" />}>
+    <Suspense fallback={<ListState permissionScope="hq" kind="loading" title="契約先を読み込んでいます" />}>
       <DetailContent />
     </Suspense>
   )
@@ -121,8 +121,8 @@ function DetailContent() {
         <OpsHead title="契約先アカウント" environment={environment} actions={<BackToList />} />
         <div className={parts.panel}>
           {error
-            ? <ListState kind="error" title="契約先を表示できませんでした" description={error} onRetry={() => void load()} />
-            : <ListState kind="loading" title="契約先を読み込んでいます" />}
+            ? <ListState permissionScope="hq" kind="error" title="契約先を表示できませんでした" description={error} onRetry={() => void load()} />
+            : <ListState permissionScope="hq" kind="loading" title="契約先を読み込んでいます" />}
         </div>
       </div>
     )
@@ -200,7 +200,7 @@ function DetailContent() {
           <section className={parts.panel} aria-label="店舗（LINE公式アカウント）">
             <h3 className={parts.panelTitle}>店舗（LINE公式アカウント）</h3>
             {accounts.length === 0 ? (
-              <ListState kind="empty" title="店舗がありません" description="この契約先にはまだ LINE 公式アカウントがつながっていません。" />
+              <ListState permissionScope="hq" kind="empty" title="店舗がありません" description="この契約先にはまだ LINE 公式アカウントがつながっていません。" />
             ) : (
               <div className={parts.mini} role="table" aria-label="店舗">
                 <div className={parts.miniHead} role="row">
@@ -226,7 +226,7 @@ function DetailContent() {
           <section className={parts.panel} aria-label="権限者">
             <h3 className={parts.panelTitle}>権限者</h3>
             {members.length === 0 ? (
-              <ListState kind="empty" title="権限者がいません" description="この契約先にはまだ権限者が登録されていません。" />
+              <ListState permissionScope="hq" kind="empty" title="権限者がいません" description="この契約先にはまだ権限者が登録されていません。" />
             ) : (
               <div className={parts.mini} role="table" aria-label="権限者">
                 <div className={parts.miniHead} role="row">
@@ -254,7 +254,7 @@ function DetailContent() {
           <section className={parts.panel} aria-label="運営の操作（監査）">
             <h3 className={parts.panelTitle}>運営の操作（監査）</h3>
             {audit.length === 0 ? (
-              <ListState kind="empty" title="運営の操作はまだありません" description="運営がこの契約先に対して行った操作が、ここに残ります。" />
+              <ListState permissionScope="hq" kind="empty" title="運営の操作はまだありません" description="運営がこの契約先に対して行った操作が、ここに残ります。" />
             ) : (
               <div className={parts.mini} role="table" aria-label="運営の操作">
                 <div className={parts.miniHead} role="row">

@@ -30,6 +30,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { Field } from '@/components/shared/form-controls'
 import StatusBadge from '@/components/shared/status-badge'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /* 絵の並び（注文完了・発送完了・入金確認完了・返金完了・注文キャンセル・ペット情報更新）。 */
 const CONNECTOR_EVENT_TYPES = [
@@ -82,7 +83,7 @@ function when(value: string | null | undefined): string {
   return Number.isNaN(date.valueOf()) ? '—' : formatDateTime(date)
 }
 
-const READONLY_REASON = '見るだけの権限では設定を変えられません。変えるにはオーナーか管理者に頼んでください。'
+const READONLY_REASON = permissionDeniedMessage('store')
 
 export default function EcConnector({ accountId, canEdit = true }: { accountId: string | null; canEdit?: boolean }) {
   const [data, setData] = useState<EcConnectorOverview | null>(null)

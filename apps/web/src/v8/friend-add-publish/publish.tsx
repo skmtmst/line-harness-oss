@@ -37,6 +37,7 @@ import { resendSuppressionText } from '@/v8/friend-add/text'
 import { actionSummaryText, blockedReason, canPublish, firstSendText, idempotencyKeyFor, PUBLISH_STEPS, editStepHref } from './flow'
 import FriendAddDoneV8 from './done'
 import styles from './publish.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 type Phase = 'loading' | 'ready' | 'empty' | 'error' | 'forbidden' | 'missing'
 type RuleDetail = {
@@ -160,7 +161,7 @@ function FriendAddPublish() {
         // 404 は「確認する下書きがない」。失敗と混ぜない。
         if (caught instanceof ApiError && caught.status === 404) { setPhase('empty'); return }
         if (caught instanceof ApiError && caught.status === 403) {
-          setFailure({ title: 'この設定を公開する権限がありません', description: '見るには権限が要ります。オーナーか管理者に追加を依頼してください。' })
+          setFailure({ title: 'この設定を公開する権限がありません', description: permissionDeniedMessage('store') })
           setPhase('forbidden')
           return
         }
@@ -221,7 +222,7 @@ function FriendAddPublish() {
     } catch (caught) {
       if (!stillHere()) return
       setError(caught instanceof ApiError && caught.status === 403
-        ? 'この設定を公開する権限がありません。オーナーか管理者に依頼してください。'
+        ? permissionDeniedMessage('store')
         : '有効化できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
       if (stillHere()) setBusy(false)
@@ -385,7 +386,7 @@ function FriendAddPublish() {
         <Button href="/friend-add-settings">一覧へ戻る</Button>
       )}
     >
-      {!canEdit ? <p className={styles.viewerBand} role="status">閲覧のみで見ています。有効にする操作は管理者に頼んでください。</p> : null}
+      {!canEdit ? <p className={styles.viewerBand} role="status">閲覧のみで見ています。有効にする操作はオーナーか管理者に頼んでください。</p> : null}
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       {notice ? <Notice tone="success" message={notice} onClose={() => setNotice('')} /> : null}
 

@@ -79,6 +79,7 @@ import {
 } from './display'
 import StatusBadge from '@/components/shared/status-badge'
 import styles from './list.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 export type { NenTab } from './display'
 
@@ -138,7 +139,7 @@ export type NenCampaignsListProps = {
 
 const BOARD: Record<NenTab, string> = { auto: 'MuhWR', paused: 'MuhWR', columns: 'Jxmqh', history: 'Tj7n4' }
 const PAGE_SIZES = [10, 20, 50]
-const NO_MANAGE_NOTE = '閲覧のみのため変えられません。変える操作は管理者に頼んでください。'
+const NO_MANAGE_NOTE = '閲覧のみのため変えられません。変える操作はオーナーか管理者に頼んでください。'
 
 /* 自動配信の CSV（一覧に出ている決めごとをそのまま出す）。 */
 function autoSettingsToCsv(settings: NenCampaignSetting[], sentByKey: Map<string, number>): string {

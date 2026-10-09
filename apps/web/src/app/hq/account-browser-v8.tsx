@@ -316,7 +316,7 @@ export default function AccountBrowser({
         </div>
 
         {shown.length === 0 ? (
-          <ListState kind="empty" title="該当するアカウントがありません" description="検索の言葉や絞り込みを変えてください。" />
+          <ListState permissionScope="hq" kind="empty" title="該当するアカウントがありません" description="検索の言葉や絞り込みを変えてください。" />
         ) : view === 'cards' ? (
           <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
             {shown.map((account) => {

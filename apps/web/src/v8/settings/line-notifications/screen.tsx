@@ -57,6 +57,7 @@ import {
   isForbiddenOrRateLimited,
   loadFailureNotice,
 } from '@/components/shared/api-error-message'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 const customerFilters = [
   ['all', 'すべて'],
   ['enabled', '出している'],

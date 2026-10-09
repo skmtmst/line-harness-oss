@@ -51,6 +51,8 @@ import { applyScopeRowChange, findPartialScopeRows, restoreSavedLevels, scopePii
 import { CONVERSION_APPROVAL_EDIT_KEY, PERMISSION_LABELS, normalizeStaffPermissionKeys, permissionLabel, toggleStaffPermissionKey } from './permission-labels'
 import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import { formatDateTime } from '@/lib/format'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 type Channel = { email: boolean; line: boolean }
 type CopyableAccessUser = AccessUserItem & { roleBundle: Exclude<AccessRoleBundle, 'custom'> }
@@ -458,7 +460,7 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
       }
       // R497-SAVE-WORDING: 見せる範囲の保存だけは既存 helper で言い分ける。
       // 生の API error:<status> を出さない。他の messageOf 呼びは変えない。
-      const message = describeSaveFailure(caught)
+      const message = withPermissionFailure(caught, describeSaveFailure(caught), 'store')
       setSaveError(message)
       setSaveConfirmError(message)
     } finally {
@@ -1083,7 +1085,7 @@ function StaffPageHost() {
       />
       {viewer ? (
         <div className={styles.viewerBandRow}>
-          <Notice tone="info" icon={<Eye size={16} aria-hidden="true" />}>閲覧のみで見ています。変える操作は管理者に頼んでください。</Notice>
+          <Notice tone="info" icon={<Eye size={16} aria-hidden="true" />}>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</Notice>
         </div>
       ) : null}
       <div className={styles.body}>

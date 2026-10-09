@@ -47,6 +47,7 @@ import {
 } from './view'
 import styles from './accounts.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 const TITLE = 'LINEアカウント'
 const DESCRIPTION = 'musubo でつないでいる LINE 公式アカウントです。既定のアカウントと、親子（本店と支店など）を決めます。'
@@ -145,7 +146,7 @@ export default function AccountsV8() {
         setStepUp({ purpose: 'line_account.credentials', action: `「${restoreTarget.name}」をアーカイブから戻す`, retry: runRestore })
         return
       }
-      setDialogError(describeSaveFailure(caught))
+      setDialogError(withPermissionFailure(caught, describeSaveFailure(caught), 'store'))
     } finally {
       setBusy(false)
     }
@@ -334,7 +335,7 @@ function archiveFailureMessage(caught: unknown): string {
     if (messages.length > 0) return messages.join(' / ')
     return 'このアカウントはいまアーカイブできません。止まっているか、既定でないかを確かめてください。'
   }
-  return describeSaveFailure(caught)
+  return withPermissionFailure(caught, describeSaveFailure(caught), 'store')
 }
 
 const ARCHIVE_BLOCKER_MESSAGES: Record<string, string> = {

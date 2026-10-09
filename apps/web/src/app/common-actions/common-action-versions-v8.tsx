@@ -27,6 +27,7 @@ import { sumBindingCount, usageSummaryDetail } from './usage-summary'
 import { ACTION_LABELS, describeVersionChanges, versionChangeLines, versionChangeSummary } from './version-diff'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 import styles from '@/app/automations/automations-v8.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 const CONSUMER_LABELS: Record<string, string> = {
   scenario: 'シナリオ配信',
@@ -117,7 +118,7 @@ function VersionsV8Inner() {
         setError('この共通アクションは削除されたか、別のLINEアカウントのものです。')
         setLoadFailure('missing')
       } else if (caught instanceof ApiError && caught.status === 403) {
-        setError('この共通アクションを表示する権限がありません。')
+        setError(permissionDeniedMessage('store'))
         setLoadFailure('forbidden')
       } else {
         setError(caught instanceof Error && caught.message && !caught.message.startsWith('API error:')

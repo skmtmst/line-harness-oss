@@ -137,7 +137,7 @@ describe('V8 リッチメニュー一覧', () => {
   test('見るだけの人には閲覧のみの帯が出て、メニューを作るは出さない', async () => {
     fixture.role = 'staff'
     const view = render(<RichMenusListV8 />)
-    await view.findByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')
+    await view.findByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')
     expect(view.queryAllByRole('button', { name: /メニューを作る/ })).toHaveLength(0)
   })
 

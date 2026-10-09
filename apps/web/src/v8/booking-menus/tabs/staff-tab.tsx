@@ -22,6 +22,7 @@ import {
   type LoadStatus,
 } from './shared'
 import styles from '../settings.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 const STAFF_PAGE_SIZE = 4
 
@@ -76,7 +77,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
       onReload()
     } catch (cause) {
       setPauseError(cause instanceof ApiError && cause.status === 403
-        ? 'スタッフの受付状態を変える権限がありません。'
+        ? permissionDeniedMessage('store')
         : '変更できませんでした。もう一度お試しください。')
     } finally {
       setPausing(false)
@@ -94,7 +95,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
       onReload()
     } catch (cause) {
       setRemoveError(cause instanceof ApiError && cause.status === 403
-        ? 'スタッフを消す権限がありません。'
+        ? permissionDeniedMessage('store')
         : '消せませんでした。もう一度お試しください。')
     } finally {
       setRemoving(false)

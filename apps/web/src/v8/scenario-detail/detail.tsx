@@ -145,6 +145,7 @@ import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError } from '@/components/shared/form-controls'
 import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -2402,7 +2403,7 @@ export default function ScenarioDetailV8({
           {!canEdit ? (
             <div className={styles.viewerBand} role="status">
               <Eye aria-hidden />
-              <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+              <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
             </div>
           ) : null}
 

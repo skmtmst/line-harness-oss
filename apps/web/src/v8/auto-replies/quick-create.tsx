@@ -21,6 +21,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { isImeComposing } from '@/components/shared/ime'
 import styles from './quick-create.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 /* 1欄ぶんの確かめ。文は「何をすれば直るか」を1文で書く。 */
 function validateKeywords(keywords: string[]): string | null {
@@ -191,7 +192,7 @@ export default function QuickCreateV8({
       onCreated()
       onClose()
     } catch (cause) {
-      setSaveError(cause instanceof Error ? cause.message : describeSaveFailure(cause))
+      setSaveError(cause instanceof Error ? cause.message : withPermissionFailure(cause, describeSaveFailure(cause), 'store'))
       setPhase(draftIdRef.current ? 'confirming' : 'editing')
     } finally {
       savingRef.current = false

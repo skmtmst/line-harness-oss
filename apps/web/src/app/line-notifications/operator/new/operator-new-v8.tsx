@@ -32,6 +32,7 @@ import {
 } from '../../operator-event-options'
 import type { OperatorNotificationTeam } from '@line-crm/shared'
 import styles from './operator-new-v8.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 const THRESHOLD_OPTIONS = [
   { value: 'one', label: '1件でも' },
@@ -210,7 +211,7 @@ function NewOperatorNotificationV8Inner() {
         if (!active) return
         setRuleLoading(false)
         if (caught instanceof ApiError && caught.status === 403) {
-          setError('このLINEアカウントのお知らせを表示する権限がありません。')
+          setError(permissionDeniedMessage('store'))
         } else if (caught instanceof ApiError && caught.status === 404) {
           setError('お知らせが見つかりません。アカウントが違うか、削除された可能性があります。')
         } else {
@@ -355,7 +356,7 @@ function NewOperatorNotificationV8Inner() {
       return result.data.id
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 403) {
-        setError('このLINEアカウントのお知らせを変更する権限がありません。')
+        setError(permissionDeniedMessage('store'))
       } else if (caught instanceof ApiError && caught.status === 404) {
         // 一覧から開いたあとに消された等。新規作成へ逃がすと別物が増える。
         setError('お知らせが見つかりません。一覧へ戻って開き直してください。')
@@ -396,7 +397,7 @@ function NewOperatorNotificationV8Inner() {
       router.push(`/line-notifications?tab=operator&highlight=${encodeURIComponent(ruleId)}`)
     } catch (caught) {
       setError(describeApiFailure(caught, '公開', {
-        forbidden: 'このLINEアカウントのお知らせを公開する権限がありません。',
+        scope: 'store',
       }))
     } finally {
       setPublishing(false)
@@ -415,7 +416,7 @@ function NewOperatorNotificationV8Inner() {
       setNotice(result.data.accepted > 0 ? '自分へのテスト送信を受け付けました。' : '受け取れる通知方法がありません。受信設定を確認してください。')
     } catch (caught) {
       setError(describeApiFailure(caught, 'テスト送信', {
-        forbidden: 'このLINEアカウントのお知らせをテスト送信する権限がありません。',
+        scope: 'store',
       }))
     } finally { setSaving(false) }
   }

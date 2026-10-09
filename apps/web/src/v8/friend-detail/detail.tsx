@@ -42,6 +42,7 @@ import MilesTab from './miles-tab'
 import RichMenuTab from './rich-menu-tab'
 import styles from './detail.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /** タブ10個（並びと URL の値は今の画面と同じ）。 */
 export const FRIEND_DETAIL_TABS = [
@@ -125,7 +126,7 @@ function FriendDetailV8Inner() {
   }
   if (!data.loading && data.loadForbidden) {
     // 403 は見つからない案内より先に分ける（監査 228-003）。押しても直らないので再試行は出さない。
-    return <TargetMissing kind="error" title="この友だちを見る権限がありません" description="見るには権限が要ります。オーナーか管理者の方に確認してください。" backHref="/friends" backLabel="友だち一覧へ戻る" />
+    return <TargetMissing kind="error" title="この友だちを見る権限がありません" description={permissionDeniedMessage('store')} backHref="/friends" backLabel="友だち一覧へ戻る" />
   }
   if (!data.loading && (data.friendMissing || (!data.error && !friend))) {
     return <TargetMissing kind="not-found" title="この友だちは見つかりません" description="削除されたか、別の LINE アカウントの人です。一覧から選び直してください。" accountName={selectedAccount?.name} backHref="/friends" backLabel="友だち一覧へ戻る" />

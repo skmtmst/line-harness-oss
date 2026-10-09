@@ -51,6 +51,7 @@ import type { SegmentCondition } from '@/lib/segment-condition'
 import { originInfoOf } from './origin-labels'
 import { createLatestPreviewRequestGate, type LatestPreviewRequest } from './latest-preview-request'
 import styles from './create.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /* 数えるきっかけ6種（今の作る画面と同じ中身）。 */
 type TriggerKind = 'order' | 'form' | 'booking' | 'page' | 'video' | 'tag'
@@ -477,7 +478,7 @@ function ConversionCreate() {
             const stateText = result.state === 'loading' || result.state === 'idle'
               ? '読み込み中'
               : result.state === 'forbidden'
-                ? '見る権限なし'
+                ? permissionDeniedMessage('store')
                 : result.state === 'error'
                   ? '読み込めません'
                   : all === 0
@@ -551,7 +552,7 @@ function ConversionCreate() {
       footerActions={footerActions}
     >
       {viewerOnly ? (
-        <div className={styles.viewerBand} role="status">閲覧のみで見ています。作る操作は管理者に頼んでください。</div>
+        <div className={styles.viewerBand} role="status">閲覧のみで見ています。作る操作はオーナーか管理者に頼んでください。</div>
       ) : null}
       {savedNotice ? <Notice tone="success">{savedNotice}</Notice> : null}
       {saveError ? <Notice tone="danger">{saveError}</Notice> : null}
@@ -783,7 +784,7 @@ function ConversionCreate() {
                 ) : (
                   <p className={styles.fieldNote}>
                     {result.state === 'ok' ? `使える${group.label}がまだありません`
-                      : result.state === 'forbidden' ? `このアカウントの${group.label}を見る権限がありません`
+                      : result.state === 'forbidden' ? permissionDeniedMessage('store')
                         : result.state === 'error' ? `使える${group.label}を読み込めませんでした`
                           : '候補を読み込んでいます'}
                   </p>

@@ -28,6 +28,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import { richMenuError, richMenuErrorAll } from '@/v8/rich-menus/errors'
 import { audienceOf, progressStatusText, runAudienceText, runStamp, type ProgressStep, type ReconcileDiff } from './model'
 import styles from './detail.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 type Group = {
   id: string
@@ -113,7 +114,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
       setRuns(res.data.runs)
       setRunsError('')
     } catch (caught) {
-      setRunsError(caught instanceof ApiError && caught.status === 403 ? '公開の履歴を見る権限がありません。' : '公開の履歴を読み込めませんでした。')
+      setRunsError(caught instanceof ApiError && caught.status === 403 ? permissionDeniedMessage('store') : '公開の履歴を読み込めませんでした。')
     }
   }, [groupId])
 

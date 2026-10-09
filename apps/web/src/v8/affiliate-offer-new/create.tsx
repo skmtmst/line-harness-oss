@@ -32,6 +32,7 @@ import ValidationSummary from '@/components/shared/validation-summary'
 import { FieldError } from '@/components/shared/form-controls'
 import styles from './create.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 const OFFER_LIST_PATH = '/conversions?tab=offers'
 
@@ -270,7 +271,7 @@ export default function AffiliateOfferCreateV8() {
         </>
       )}
     >
-      {canEdit ? null : <p className={styles.viewerBand} role="status">閲覧のみで見ています。案件を作るのは管理者に頼んでください。</p>}
+      {canEdit ? null : <p className={styles.viewerBand} role="status">閲覧のみで見ています。案件を作るのはオーナーか管理者に頼んでください。</p>}
       {saveError ? <p className={styles.error} role="alert">{saveError}</p> : null}
       {saveNote ? <p className={styles.note} role="status">{saveNote}</p> : null}
       <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />

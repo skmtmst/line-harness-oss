@@ -20,6 +20,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { formatNumber } from '@/lib/format'
 import styles from './shell.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 export type WebhookTabKey = 'outgoing' | 'incoming' | 'api-tokens' | 'sheets' | 'interactions' | 'notify'
 export type LoadStatus = 'loading' | 'ready' | 'error'
@@ -31,7 +32,7 @@ export const SAMPLE_COUNT = 9
 export const WEBHOOKS_DESCRIPTION = 'ほかのシステムと、友だちの動きをやり取りします。送る・受け取る・API・Google Sheets をここで決めます。'
 
 /** 変更は統括だけ（v7 と同じ R32）。見るだけの人への一言。 */
-export const MANAGE_REASON = '統括だけが変更できます。必要なときは統括に頼んでください。'
+export const MANAGE_REASON = permissionDeniedMessage('store')
 
 /*
  * タブ（絵の並び）。行き先は今と同じ ?tab=。送るタブだけ素の /webhooks（今と同じ）。
@@ -215,7 +216,7 @@ export function WebhookBand({ cells }: { cells: BandCell[] }) {
 export function ViewerBand() {
   return (
     <div className={styles.viewerRow}>
-      <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />}>閲覧のみで見ています。変える操作は統括に頼んでください。</Notice>
+      <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />}>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</Notice>
     </div>
   )
 }

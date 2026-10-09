@@ -21,6 +21,7 @@ import {
   useWebhookOverview,
 } from './shell'
 import styles from './samples.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /* 受け取る側の見本（どこから来るか）。 */
 export const INCOMING_SAMPLES = [
@@ -117,7 +118,7 @@ export default function WebhooksSamplesV8() {
             ))}
           </ul>
         </section>
-        {!canManage ? <p className={styles.askNote}>見本から作るのは統括だけができます。必要なときは統括に頼んでください。</p> : null}
+        {!canManage ? <p className={styles.askNote}>{permissionDeniedMessage('store')}</p> : null}
       </div>
     </ListPage>
   )

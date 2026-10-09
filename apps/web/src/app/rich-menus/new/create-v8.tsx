@@ -1045,7 +1045,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         /targetingPriority/.test(raw)
           ? '出す順番は1以上の整数で入力してください。小数は使えません。'
           : describeApiFailure(e, '下書きの保存', {
-              forbidden: 'リッチメニューを保存できるのは、権限を持つ人だけです。必要なときは統括に頼んでください。',
+              scope: 'store',
             }),
       )
       return false

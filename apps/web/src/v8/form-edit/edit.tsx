@@ -696,7 +696,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       }
       if (silent) return false
       setError(describeApiFailure(e, '保存', {
-        forbidden: 'このLINEアカウントや権限では保存できません。選んでいるアカウントと権限を確認してください。',
+        scope: 'store',
       }))
       return false
     } finally {

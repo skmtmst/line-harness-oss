@@ -44,6 +44,7 @@ import {
   type UsageRow,
 } from './model'
 import styles from './detail.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /** 表にまず見せる行数。残りは「ほか N か所を見る」で開く。 */
 const USAGE_VISIBLE = 4
@@ -388,7 +389,7 @@ export default function TemplateDetailV8() {
         description={[messageTypeText(template.messageType), folderLabel, `更新 ${shortStamp(template.updatedAt)}`].join('・')}
         preview={side}
       >
-        {canMutate ? null : <p className={styles.roBand} role="note">閲覧のみで見ています。編集・公開・削除は管理者に頼んでください。</p>}
+        {canMutate ? null : <p className={styles.roBand} role="note">閲覧のみで見ています。編集・公開・削除はオーナーか管理者に頼んでください。</p>}
         {template.hasDraft ? (
           <div className={styles.draftBand} role="status">
             <CircleAlert size={18} aria-hidden="true" className={styles.draftIcon} />

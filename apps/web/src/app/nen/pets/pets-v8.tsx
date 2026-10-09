@@ -583,7 +583,7 @@ function FeedingV8({ accountId }: { accountId: string }) {
         : '主食を保存しました。')
     } catch (caught) {
       setError(describeApiFailure(caught, '主食の保存', {
-        forbidden: '主食を保存する権限がありません。権限を確認してください。',
+        scope: 'store',
       }))
     } finally {
       setBusy(false)

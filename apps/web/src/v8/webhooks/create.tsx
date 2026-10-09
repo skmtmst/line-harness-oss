@@ -32,6 +32,7 @@ import Select from '@/components/shared/select'
 import { isStepUpRequired, useStepUpGate } from '@/components/step-up-prompt'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import styles from './create.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /*
  * 送る出来事。正本は packages/db/src/webhooks.ts の KNOWN_OUTGOING_EVENT_TYPES。
@@ -193,7 +194,7 @@ function WebhooksCreateV8Inner() {
 
   async function save(next: 'draft' | 'active') {
     if (staffRole !== null && staffRole !== 'owner') {
-      setError('送り先の作成は統括だけができます。必要なときは統括に頼んでください。')
+      setError(permissionDeniedMessage('store'))
       return
     }
     const accountId = selectedAccountId
@@ -257,7 +258,7 @@ function WebhooksCreateV8Inner() {
         res = await create()
       } catch (caught) {
         if (!isStepUpRequired(caught)) {
-          if (caught instanceof ApiError && caught.status === 403) throw new Error('送り先の作成は統括だけができます。必要なときは統括に頼んでください。')
+          if (caught instanceof ApiError && caught.status === 403) throw new Error(permissionDeniedMessage('store'))
           throw caught
         }
         const token = await gate('webhook.secret', 'Webhookを登録する')
@@ -301,7 +302,7 @@ function WebhooksCreateV8Inner() {
         help="友だちの動きを、決めたタイミングでほかのシステムへ送ります。試しに送ってから動かすと安心です。"
         footerActions={<Button href="/webhooks">一覧へ戻る</Button>}
       >
-        <Notice tone="info">送り先の作成は統括だけができます。必要なときは統括に頼んでください。</Notice>
+        <Notice tone="info">{permissionDeniedMessage('store')}</Notice>
       </CreatePage>
     )
   }

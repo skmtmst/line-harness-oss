@@ -82,6 +82,7 @@ import {
 import styles from './settings.module.css'
 import ChannelsTabV8 from './channels-tab'
 import { PageHeading } from '@/components/templates/page-frame'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /*
  * 速さのため、使わないタブの中身は後から読む（動的 import）。
@@ -519,7 +520,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
 
         {accountId && tabReadOnly ? (
           <div className={styles.readOnlyRow} data-design="Bar">
-            <Band tone="hint">閲覧のみで見ています。変える操作は管理者に頼んでください。</Band>
+            <Band tone="hint">閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</Band>
           </div>
         ) : null}
 

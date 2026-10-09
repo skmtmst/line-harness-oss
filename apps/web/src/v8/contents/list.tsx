@@ -60,6 +60,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import styles from './list.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 type MediaSort = 'newest' | 'oldest' | 'name' | 'size' | 'usage'
 const UNGROUPED = '__ungrouped__'
@@ -991,7 +992,7 @@ export default function MediaLibraryListV8() {
         <ListState
           kind="forbidden"
           title="メディアの詳細を見る権限がありません"
-          description="見るには権限が要ります。オーナーか管理者に追加を依頼してください。"
+          description={permissionDeniedMessage('store')}
           action={<Button type="button" onClick={() => setDetailUrl(null)}>登録メディア一覧へ戻る</Button>}
         />
       )
@@ -1149,7 +1150,7 @@ export default function MediaLibraryListV8() {
               <div role="alert">
                 <p>
                   {folderForbidden
-                    ? 'フォルダを見る権限がありません。オーナーか管理者に追加を依頼してください。'
+                    ? permissionDeniedMessage('store')
                     : 'フォルダを読み込めませんでした。登録したメディアは消えていません。'}
                 </p>
                 {folderForbidden ? null : (

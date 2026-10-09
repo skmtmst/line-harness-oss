@@ -191,7 +191,7 @@ function useMembersCsv(accountId: string) {
       URL.revokeObjectURL(url)
     } catch (caught) {
       setError(describeApiFailure(caught, 'CSVの書き出し', {
-        forbidden: 'CSVを書き出す権限がありません。権限を確認してください。',
+        scope: 'store',
       }))
     } finally {
       setBusy(false)

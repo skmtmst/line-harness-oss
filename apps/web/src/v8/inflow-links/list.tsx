@@ -79,6 +79,7 @@ import {
   type TrackedLinkRow,
 } from './rows'
 import styles from './list.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 interface MessageTemplate {
   id: string
@@ -363,7 +364,7 @@ export default function InflowListV8({
     } catch (cause) {
       setActive(!nextActive)
       notifyToast(
-        cause instanceof ApiError && cause.status === 403 ? 'この操作を行う権限がありません' : '受付を切り替えられませんでした。',
+        cause instanceof ApiError && cause.status === 403 ? permissionDeniedMessage('store') : '受付を切り替えられませんでした。',
         { tone: 'error', actionLabel: 'もう一度', onAction: () => { void toggleRouteActive(entryRouteId, nextActive, name) } },
       )
     }
@@ -862,7 +863,7 @@ export default function InflowListV8({
         {readonly ? (
           <div className={styles.viewerBand} role="status">
             <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
           </div>
         ) : null}
         <KpiBand>

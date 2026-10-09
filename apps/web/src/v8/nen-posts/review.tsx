@@ -40,6 +40,7 @@ import { PhotoReviewDetail } from './detail'
 import PhotoPolicyHistoryV8 from './policy-history'
 import styles from './review.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 type PhotoStatus = 'pending' | 'adopted' | 'rejected'
 type PhotoView = 'list' | 'detail' | 'publications'
@@ -181,7 +182,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
         setHasMorePhotos(false)
         const forbidden = error instanceof ApiError && error.status === 403
         setLoadForbidden(forbidden)
-        setLoadError(forbidden ? '写真を見る権限がありません。' : '写真を読み込めませんでした。')
+        setLoadError(forbidden ? permissionDeniedMessage('store') : '写真を読み込めませんでした。')
       }
     } finally {
       if (sequence === loadSequence.current) setLoading(false)

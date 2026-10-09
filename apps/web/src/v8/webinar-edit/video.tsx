@@ -36,6 +36,7 @@ import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './video.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
 
@@ -157,7 +158,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
       ctx.onWebinarSaved(res.data)
       return true
     } catch (cause) {
-      setPeriodError(describeSaveFailure(cause))
+      setPeriodError(withPermissionFailure(cause, describeSaveFailure(cause), 'store'))
       return false
     } finally {
       periodLock.current = false
@@ -180,7 +181,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
       ctx.onWebinarSaved(res.data)
       return true
     } catch (cause) {
-      setError(describeSaveFailure(cause))
+      setError(withPermissionFailure(cause, describeSaveFailure(cause), 'store'))
       return false
     } finally {
       setBusy(false)
@@ -564,7 +565,7 @@ function ReplaceVideoDialog({ ctx, asset, onAsset, onClose }: { ctx: EditContext
       ctx.onWebinarSaved(res.data)
       onClose()
     } catch (cause) {
-      setError(describeSaveFailure(cause))
+      setError(withPermissionFailure(cause, describeSaveFailure(cause), 'store'))
     } finally {
       setBusy(false)
     }

@@ -110,9 +110,9 @@ export default function HqBroadcastSourcePicker({ mode, initialId, onTemplate, o
     description={mode === 'template' ? '統括のテンプレートから1つ選びます。選ぶと右に LINE での見え方が出ます。' : '過去の配信から1つ選びます。中身を写し、宛先と日時は写しません。'}
     confirmLabel={mode === 'template' ? 'このテンプレートを使う' : 'この配信を写す'}
     initialId={initialId} items={items} folders={folders} categories={mode === 'template' ? KINDS : STATES}
-    state={loading ? <ListState kind="loading" /> : loadError ? <ListState kind="error" error={loadError} onRetry={() => setAttempt((value) => value + 1)} /> : undefined}
+    state={loading ? <ListState permissionScope="hq" kind="loading" /> : loadError ? <ListState permissionScope="hq" kind="error" error={loadError} onRetry={() => setAttempt((value) => value + 1)} /> : undefined}
     preview={<LinePreview fit empty={!selected ? '候補を選ぶと見え方が出ます' : false}>
-      {mode === 'template' ? previewLoading ? <ListState kind="loading" /> : previewError ? previewBlocked ? <Notice tone="warn">{previewError}</Notice> : <ListState kind="error" error={previewError} onRetry={() => setPreviewAttempt((value) => value + 1)} /> : preview
+      {mode === 'template' ? previewLoading ? <ListState permissionScope="hq" kind="loading" /> : previewError ? previewBlocked ? <Notice tone="warn">{previewError}</Notice> : <ListState permissionScope="hq" kind="error" error={previewError} onRetry={() => setPreviewAttempt((value) => value + 1)} /> : preview
         : selectedRun ? renderBroadcast(selectedRun) : null}
     </LinePreview>}
     confirmDisabled={mode === 'template' && (previewLoading || Boolean(previewError) || !preview)} busy={busy} error={error}

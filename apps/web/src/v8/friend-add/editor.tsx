@@ -82,6 +82,8 @@ import { resendSuppressionText } from './text'
 import styles from './editor.module.css'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 type Step = 'basic' | 'routes' | 'message' | 'actions' | 'preview'
 type EditorRule = {
@@ -427,7 +429,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       if (caught instanceof ApiError && caught.status === 409) {
         setConflict(true)
       } else {
-        setError(describeSaveFailure(caught))
+        setError(withPermissionFailure(caught, describeSaveFailure(caught), 'store'))
       }
       return null
     } finally {
@@ -729,7 +731,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       )}
     >
       {!canEdit ? (
-        <p className={styles.viewerBand} role="status">閲覧のみで見ています。変える操作は管理者に頼んでください。</p>
+        <p className={styles.viewerBand} role="status">閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>
       ) : null}
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       {notice ? <Notice tone="success" message={notice} onClose={() => setNotice('')} /> : null}

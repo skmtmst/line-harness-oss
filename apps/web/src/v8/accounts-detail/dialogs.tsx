@@ -26,6 +26,7 @@ import StepUpPrompt, { isStepUpRequired, stepUpFailureMessage, type StepUpReques
 import TestRecipientsSetting from '@/components/accounts/test-recipients-setting'
 import { ARCHIVE_BLOCKER_MESSAGES, parseCount, type AccountDetailView } from './view'
 import styles from './dialogs.module.css'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 /** 窓の枠。題・右上の×・中身・下の操作（右寄せ）。 */
 function Frame({ open, node, width, top, title, busy, onCancel, actions, children }: {
@@ -131,7 +132,7 @@ export function StopDialog({ account, onClose, onDone }: {
         return
       }
       // 接続が通らなくて再開できない等の理由は、API の言葉をそのまま見せる。
-      setError(describeSaveFailure(caught))
+      setError(withPermissionFailure(caught, describeSaveFailure(caught), 'store'))
     } finally {
       setBusy(false)
     }
@@ -189,7 +190,7 @@ function archiveFailureMessage(caught: unknown): string {
     if (messages.length > 0) return messages.join(' / ')
     return 'このアカウントはいまアーカイブできません。止まっているか、既定でないかを確かめてください。'
   }
-  return describeSaveFailure(caught)
+  return withPermissionFailure(caught, describeSaveFailure(caught), 'store')
 }
 
 export function ArchiveDialog({ account, onClose, onDone }: {
@@ -322,7 +323,7 @@ export function RestoreDialog({ account, onClose, onDone }: {
         setStepUp({ purpose: 'line_account.credentials', action: `「${account.name}」をアーカイブから戻す`, retry: run })
         return
       }
-      setError(describeSaveFailure(caught))
+      setError(withPermissionFailure(caught, describeSaveFailure(caught), 'store'))
     } finally {
       setBusy(false)
     }

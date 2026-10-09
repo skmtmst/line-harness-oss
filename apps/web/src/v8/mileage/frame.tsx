@@ -14,6 +14,7 @@ import { ListPage, type ListFolderNav } from '@/components/templates'
 import { Tabs } from '@/components/shared/tabs'
 import Button from '@/components/shared/button'
 import styles from './mileage.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 export const MILEAGE_TABS = [
   { key: 'earning-rules', label: 'たまる決めごと', board: 'OC0gy' },
@@ -58,7 +59,7 @@ export function ViewerBand() {
   return (
     <p className={styles.viewerBand} role="note">
       <Eye size={16} aria-hidden="true" />
-      <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+      <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
     </p>
   )
 }

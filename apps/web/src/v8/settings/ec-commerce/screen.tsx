@@ -47,6 +47,7 @@ import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-ba
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import OrderDrawer from './order-drawer'
 import styles from './screen.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 export type EcTabKey = 'events' | 'identity' | 'subscriptions' | 'connector'
 
@@ -358,7 +359,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
       {kpiDetailMissing ? (
         <p className={styles.minor} role="status">
           {overviewState === 'forbidden'
-            ? '集計を表示する権限がありません。一覧は取得できた範囲で表示しています。'
+            ? permissionDeniedMessage('store')
             : '集計だけを読み込めませんでした。一覧は取得できた範囲で表示しています。'}
           {overviewState === 'error' ? <Button variant="text" onClick={() => void loadOverview(false)}>集計をもう一度読む</Button> : null}
         </p>

@@ -45,6 +45,7 @@ import {
 } from './sections'
 import { RetryLabel } from '@/components/shared/retry-label'
 import styles from './dashboard.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /* 編集の引き出し（mcOqK・dnd-kit を含む重い部品）は開くまで読まない。V8 だけの作り（v7 の部品は使わない）。 */
 const DashboardEditor = dynamic(() => import('./dashboard-editor').then((module) => module.default), {
@@ -149,7 +150,7 @@ export default function DashboardV8() {
       const state = override != null ? 'ready' : d.pendingPhotosState
       const forbidden = state === 'forbidden'
       const href = forbidden ? '/staff' : '/nen-members?tab=photos&status=pending_review'
-      const action = forbidden ? '権限を確認する' : '審査する'
+      const action = forbidden ? permissionDeniedMessage('store') : '審査する'
       return {
         node: <KpiCard
           key={id}
@@ -161,11 +162,11 @@ export default function DashboardV8() {
           unit="件"
           loading={state === 'loading'}
           delta={state === 'ready' ? <Tag>ポイント付与あり</Tag> : forbidden ? <Tag tone="danger">権限なし</Tag> : null}
-          detail={forbidden ? '写真を見る権限がありません' : state === 'error' ? STATE_TEXT.error : value === null ? STATE_TEXT.loading : `確認待ち ${value}件`}
+          detail={forbidden ? permissionDeniedMessage('store') : state === 'error' ? STATE_TEXT.error : value === null ? STATE_TEXT.loading : `確認待ち ${value}件`}
           action={{ label: action, href }}
         />,
         detail: <span>{forbidden
-          ? '写真を見る権限がありません。権限を確認してください。'
+          ? permissionDeniedMessage('store')
           : state === 'ready' && value !== null && value > 0
             ? `確認待ちが${formatNumber(value)}件あります。審査するとポイントが付きます。`
             : '確認待ちの写真はありません。'}</span>,
@@ -351,7 +352,7 @@ export default function DashboardV8() {
       {viewer ? (
         <div className={styles.viewerBand} role="status">
           <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+          <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
         </div>
       ) : null}
       {start.summary ? <FirstStepsCard summary={start.summary} folded={start.folded} onToggle={start.toggle} /> : null}

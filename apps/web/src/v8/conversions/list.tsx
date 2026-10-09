@@ -92,6 +92,8 @@ import {
 import { notifyToast } from '@/components/shared/toast'
 import { focusConversionField, type ConversionFieldIssue } from './field-issue'
 import styles from './list.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 type StatusFilter = 'all' | ConversionDefinitionFilter
 /** フォルダの列の「未分類」（`?folder=unfiled`）。 */
@@ -505,7 +507,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       const message = error instanceof Error ? error.message : ''
       setEditError(message.includes('更新されています')
         ? 'ほかの人がこの成果地点を先に直しました。上書きしていません。画面を閉じて読み直してから、もう一度お試しください。'
-        : describeSaveFailure(error))
+        : withPermissionFailure(error, describeSaveFailure(error), 'store'))
     } finally {
       setEditSaving(false)
     }
@@ -1159,7 +1161,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
         {!canEdit && role !== null ? (
           <div className={styles.viewerBand} role="status">
             <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
           </div>
         ) : null}
         {exportError ? <div className={styles.statsNotice}><Notice tone="warn">{exportError}</Notice></div> : null}

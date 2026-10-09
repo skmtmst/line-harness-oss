@@ -30,6 +30,7 @@ import {
 } from './shared'
 import styles from '../settings.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 export function HoursTabV8({ accountId, settings, settingsStatus, settingsError, resources, resourcesStatus, resourcesError, canEdit, menus, onSaved, onReload, onResourceSaved, onResourceCreated, onResourceDeleted, onResourcesRetry }: {
   accountId: string
@@ -555,7 +556,7 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
       if (requestId !== requestRef.current) return
       setResult(null)
       setCheckError(error instanceof ApiError && error.status === 403
-        ? 'このアカウントの予約を確かめる権限がありません。'
+        ? permissionDeniedMessage('store')
         : '空き状況を確かめられませんでした。もう一度お試しください。')
     } finally {
       if (requestId === requestRef.current) setChecking(false)
@@ -666,7 +667,7 @@ function resourceSaveError(error: unknown): string {
     return 'ほかの担当者が先にこの設備を変更しました。読み直してからもう一度お試しください。'
   }
   if (error instanceof ApiError && error.status === 403) {
-    return '設備を変更する権限がありません。'
+    return permissionDeniedMessage('store')
   }
   return '設備を保存できませんでした。入力内容を確かめて、もう一度お試しください。'
 }

@@ -14,6 +14,7 @@ import { loadOperators } from '@/lib/operators-cache'
 import type { PanelStatus } from './use-friend-detail'
 import styles from './detail.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 export function useSupportEditor(friendId: string, onSaved: (notice: string) => void, onConflict: (message: string) => void, accountId: string | null = null) {
   const scopeRef = useRef({ friendId, accountId })
@@ -112,7 +113,7 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
           setError('最新の内容を読み直せませんでした。入力は残っています。もう一度お試しください。')
         }
       } else {
-        setError(describeSaveFailure(err))
+        setError(withPermissionFailure(err, describeSaveFailure(err), 'store'))
       }
     } finally {
       if (gen === genRef.current) setBusy(false)
@@ -241,7 +242,7 @@ export function useScenarioPicker(
       }
     } catch (err) {
       if (req !== reqRef.current || scope !== scopeRef.current) return
-      setError(describeSaveFailure(err))
+      setError(withPermissionFailure(err, describeSaveFailure(err), 'store'))
     } finally {
       if (req === reqRef.current && scope === scopeRef.current) setBusy(false)
     }

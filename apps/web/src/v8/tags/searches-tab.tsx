@@ -41,6 +41,7 @@ import type { SavedSearchConditionLabels } from '@/components/friends/saved-sear
 import { filterSavedSearches, savedSearchKpiValues, type SavedSearchUsageFilter } from '@/components/friend-fields/saved-search-kpis'
 import { formatDay, formatNumber } from '@/lib/format'
 import styles from './list.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 const PAGE_SIZES = [10, 20, 50]
 const MAX_SAVED = 50
@@ -313,7 +314,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
     <div className={styles.stateCard}>
       <AlertCircle className={styles.stateIconError} aria-hidden="true" />
       <p className={styles.stateTitle}>保存した検索を見る権限がありません</p>
-      <p className={styles.stateDesc}>オーナーか管理者に確認してください。</p>
+      <p className={styles.stateDesc}>{permissionDeniedMessage('store')}</p>
     </div>
   ) : loadError ? (
     <div className={styles.stateCard}>

@@ -27,6 +27,7 @@ import { RICH_VIDEO_BUTTON_LABELS, richVideoContent, richVideoDraftIssue, videoP
 import styles from './edit.module.css'
 import videoStyles from './rich-video.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 const emptyDraft: RichVideoDraft = {name:'',folderId:'',originalContentUrl:'',previewImageUrl:'',height:1040,buttonEnabled:true,actionLabel:'詳しく見る',actionUrl:'',altText:''}
 
@@ -168,7 +169,7 @@ export default function TemplateRichVideoEditor({ id = null, visual = false, hos
   const side=<><div className={styles.previewToggle}><Button onClick={()=>setPreviewOpen(true)}>LINEでの見え方を見る</Button></div><section className={styles.sideCard}><h2 className={styles.sideTitle}>リッチメッセージとの違い</h2><p className={styles.sideText}>リッチビデオはトークで自動で流れる動画です。画像を面に分けて押した所ごとに動かしたいときは、リッチメッセージを使います。</p></section><h2 className={styles.previewHead}>届き方</h2><div className={styles.phone}>{phone}</div></>
   return <>
     <TemplateEditFrame composerHost={host ? { ...host, busy: busy || loading || Boolean(host.busy), onCancel: () => guarded(host.onCancel) } : undefined} onComposerInsert={(alsoSave)=>void save(alsoSave)} boardId="oIFk7" title={id?'リッチビデオを編集':'リッチビデオを作る'} description="トーク画面で自動で流れる動画。見終わったらボタンで案内" side={side}
-      band={!canMutate && role ? <p className={styles.readonly} role="status">閲覧のみで見ています。変える操作は管理者に頼んでください。</p>:undefined}
+      band={!canMutate && role ? <p className={styles.readonly} role="status">閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>:undefined}
       footerActions={canMutate?<><Button href="/templates">キャンセル</Button><Button variant="primary" onClick={()=>void save()} disabled={busy||loading||loadFailed||mismatch||!selectedAccountId} busy={busy} busyLabel="保存中…">保存する</Button></>:undefined}>
       {error?<p className={styles.error} role="alert">{error}</p>:null}
       {mismatch?<p className={styles.readonly} role="status">このテンプレートのLINEアカウントに切り替えてから保存してください。</p>:null}

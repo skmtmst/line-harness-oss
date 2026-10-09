@@ -86,8 +86,9 @@ import {
 } from './model'
 import styles from './list.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
-const VIEWER_NOTE = '閲覧のみで見ています。変える操作は管理者に頼んでください。'
+const VIEWER_NOTE = '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'
 
 /* 行の「…」を右クリックでも開けるように直す。中身は「…」と同じ。 */
 function toContextMenuItems(menuItems: ActionMenuItem[]): ContextMenuItem[] {

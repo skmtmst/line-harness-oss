@@ -87,7 +87,7 @@ function saveCsv(filename: string, rows: Submission[], fieldKeys: string[], labe
 function retryEffectsFailureText(error: unknown): string {
   if (error instanceof ApiError) {
     return describeApiFailure(error, '後処理の再実行', {
-      forbidden: '後処理を再実行する権限がありません。選んでいるアカウントと権限を確認してください。',
+      scope: 'store',
     })
   }
   if (error instanceof Error && error.message && error.message !== 'retry_failed' && /[ぁ-んァ-ヶ一-龠]/u.test(error.message)) {

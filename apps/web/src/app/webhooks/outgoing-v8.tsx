@@ -552,7 +552,7 @@ function OutgoingV8Inner() {
       }
       if (selectedAccountIdRef.current !== requestAccountId) return
       setError(describeApiFailure(caught, 'シークレットの更新', {
-        forbidden: '合言葉の更新は統括だけができます。必要なときは統括に頼んでください。',
+        scope: 'store',
       }))
     }
   }

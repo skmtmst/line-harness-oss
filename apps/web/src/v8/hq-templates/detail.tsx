@@ -21,6 +21,7 @@ import { ChangeBox, DetailFrame } from '@/v8/template-detail/detail'
 import type { HqAccount, HqTemplateListItem, TemplateDetail } from '@/lib/hq-templates-api'
 import { KIND_TABS, sentLabel } from './store-list'
 import styles from '../template-detail/detail.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /** 「8月21日 18:02」（日本時間）。 */
 function stamp(iso: string): string {
@@ -214,7 +215,7 @@ export default function HqTemplateDetail({
         description={[kindLabel, folderName, current?.creator_name ? `作った人 ${current.creator_name}` : null, `更新 ${stamp(detail.template.updated_at)}`].filter(Boolean).join('・')}
         preview={side}
       >
-        {canEdit ? null : <p className={styles.roBand} role="note">閲覧のみで見ています。編集・配る操作は管理者に頼んでください。</p>}
+        {canEdit ? null : <p className={styles.roBand} role="note">閲覧のみで見ています。編集・配る操作は統括の管理者に頼んでください。</p>}
         {notices}
         {canEdit ? (
           <div className={styles.draftBand} role="status">

@@ -491,7 +491,7 @@ function ProjectInner() {
     [images, filter],
   )
 
-  if (status === 'loading') return <ListState kind="loading" title="プロジェクトを読み込んでいます" />
+  if (status === 'loading') return <ListState permissionScope="hq" kind="loading" title="プロジェクトを読み込んでいます" />
   if (status === 'missing') {
     return <TargetMissing kind="unspecified" title="開くプロジェクトが指定されていません" description="一覧から、開きたいプロジェクトを選び直してください。" backHref="/hq/banners" backLabel="プロジェクト一覧へ戻る" />
   }
@@ -499,7 +499,7 @@ function ProjectInner() {
     return <TargetMissing kind="not-found" title="プロジェクトが見つかりません" description="アーカイブされたか、別の統括のものかもしれません。一覧から選び直してください。" backHref="/hq/banners" backLabel="プロジェクト一覧へ戻る" />
   }
   if (status === 'forbidden') {
-    return <ListState kind="forbidden" description="バナー生成は統括の管理者・オーナーだけが使えます。" action={<Button href="/hq/banners">プロジェクト一覧へ戻る</Button>} />
+    return <ListState permissionScope="hq" kind="forbidden" description="バナー生成は統括の管理者・オーナーだけが使えます。" action={<Button href="/hq/banners">プロジェクト一覧へ戻る</Button>} />
   }
   if (status === 'error' || !project) {
     return <TargetMissing kind="error" title="プロジェクトを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void load()} />
@@ -602,13 +602,13 @@ function ProjectInner() {
             {sizeNotice ? <Notice tone="info" message="大きさの調整は検証環境で確認してください。この画像は生成時の大きさのまま保存されています。" onClose={() => setSizeNotice(false)} /> : null}
 
             {images.length === 0 && pendingCount === 0 ? (
-              <ListState
+              <ListState permissionScope="hq"
                 kind="empty"
                 title="まだ画像がありません"
                 description="右の生成パネルで用途とテキストを決めて「生成する」を押すと、ここに並びます。手持ちの画像は「画像を取り込む」から入れられます。"
               />
             ) : visible.length === 0 && pendingCount === 0 ? (
-              <ListState kind="empty" emptyPreset="filtered" action={<Button onClick={() => setFilter('all')}>条件を外す</Button>} />
+              <ListState permissionScope="hq" kind="empty" emptyPreset="filtered" action={<Button onClick={() => setFilter('all')}>条件を外す</Button>} />
             ) : (
               <div className={styles.grid}>
                 {/* 絵 p03ImY：いま作っている生成でできた画像 → 作っている1枚 → 待っている枚 → それより前の画像。 */}

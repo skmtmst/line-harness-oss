@@ -212,7 +212,7 @@ function InflowCreate() {
         }
       }
       setSaveError(describeApiFailure(error, '発行', {
-        forbidden: '発行するには権限が要ります。オーナーか管理者に依頼してください。',
+        scope: 'store',
       }))
     } finally {
       setSaving(false)
