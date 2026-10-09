@@ -15,7 +15,6 @@ import { Activity, Bookmark, CalendarCheck, CalendarDays, Columns2, FileText, Hi
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -149,12 +148,6 @@ export default function HealthV8({
     printWhenReady(0)
   }, [printPetId, canPrint, summaryPetId])
 
-  /** 数の帯・札からの絞り込み。記録のあるペットのタブへ戻して当てる。 */
-  const applyFilter = (patch: Partial<HealthFilters>) => {
-    setFilters((current) => ({ ...current, ...patch }))
-    if (tab !== 'logs') onChangeTab('logs')
-  }
-
   const tabs = (
     <div className={styles.tabs}>
       <Tabs
@@ -169,13 +162,12 @@ export default function HealthV8({
   )
 
   const pending = kpis === null
-  const kpiMenu = (title: string, items: ActionMenuItem[]) => <KpiMenu title={title} items={items} />
   const stats = accountId ? (
     <KpiBand data-design="KPIs" aria-label="健康日記の数の帯">
-      <KpiCard presentation="band" title="記録のあるペット" icon={<History size={13} aria-hidden="true" />} menu={kpiMenu('記録のあるペット', [{ id: 'all', label: 'すべてのペットを出す', onSelect: () => applyFilter(EMPTY_FILTERS) }])} value={pending ? null : kpis.petsWithRecords} unit="匹" loading={pending} detail={pending ? '読み込んでいます' : `登録 ${kpis.petsTotal} 匹のうち`} />
-      <KpiCard presentation="band" title="気になる変化" icon={<Activity size={13} aria-hidden="true" />} menu={kpiMenu('気になる変化', [{ id: 'concern', label: '気になる変化だけ出す', onSelect: () => applyFilter({ change: 'concern', last: '' }) }])} value={pending ? null : kpis.concerning} unit="匹" loading={pending} detail="体重 ±10%（8週）など" />
-      <KpiCard presentation="band" title="今週の記録" icon={<CalendarCheck size={13} aria-hidden="true" />} menu={kpiMenu('今週の記録', [{ id: 'week', label: '今週 記録のあるペットを出す', onSelect: () => applyFilter({ last: '7' }) }])} value={pending ? null : kpis.recordsThisWeek} unit="件" loading={pending} detail="直近7日に付いた記録" />
-      <KpiCard presentation="band" title="30日 記録なし" icon={<PawPrint size={13} aria-hidden="true" />} menu={kpiMenu('30日 記録なし', [{ id: 'silent', label: '30日 記録なしのペットを出す', onSelect: () => applyFilter({ change: 'silent', last: '' }) }])} value={pending ? null : kpis.silent30} unit="匹" loading={pending} detail="声をかけられます" />
+      <KpiCard presentation="band" title="記録のあるペット" icon={<History size={13} aria-hidden="true" />} value={pending ? null : kpis.petsWithRecords} unit="匹" loading={pending} detail={pending ? '読み込んでいます' : `登録 ${kpis.petsTotal} 匹のうち`} />
+      <KpiCard presentation="band" title="気になる変化" icon={<Activity size={13} aria-hidden="true" />} value={pending ? null : kpis.concerning} unit="匹" loading={pending} detail="体重 ±10%（8週）など" />
+      <KpiCard presentation="band" title="今週の記録" icon={<CalendarCheck size={13} aria-hidden="true" />} value={pending ? null : kpis.recordsThisWeek} unit="件" loading={pending} detail="直近7日に付いた記録" />
+      <KpiCard presentation="band" title="30日 記録なし" icon={<PawPrint size={13} aria-hidden="true" />} value={pending ? null : kpis.silent30} unit="匹" loading={pending} detail="声をかけられます" />
     </KpiBand>
   ) : undefined
 
@@ -214,16 +206,6 @@ export default function HealthV8({
       )}
       {canPrint && activeSummary ? <SummarySheet summary={activeSummary} /> : null}
     </ListPage>
-  )
-}
-
-/** 数の帯の「…」。その数で一覧を絞る。 */
-function KpiMenu({ title, items }: { title: string; items: ActionMenuItem[] }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <span className={styles.kpiMenu}>
-      <SharedRowMenu className={styles.kpiMenuButton} label={`${title}のメニュー`} open={open} onOpenChange={setOpen} items={items.map((item) => ({ ...item, onSelect: () => { setOpen(false); item.onSelect() } }))} />
-    </span>
   )
 }
 

@@ -3,10 +3,6 @@
  * 数字は書かない（globals.css の [data-theme="v8"] の --tpl-sb-*）。
  */
 
-.kpis {
-  gap: var(--tpl-sb-group-gap);
-}
-
 .minor {
   margin: 0;
   color: var(--color-ink-faint);
@@ -161,9 +157,6 @@
  * 運用者へのお知らせ（u8xibp）：数のマスは印つき（内側 16/20・間 8・数 22/26・題 12/18）。
  * 帯は印なし。探す 260・並び 150。表はお知らせ・きっかけ・受け取る人・送る時間・今日・状態・操作。
  */
-.opKpis {
-  gap: var(--tpl-sb-group-gap);
-}
 
 .opSearch {
   width: var(--tpl-rest3-op-search-w);

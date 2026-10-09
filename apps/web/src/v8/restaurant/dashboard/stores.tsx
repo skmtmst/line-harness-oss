@@ -8,14 +8,14 @@
  * 動きは BEHAVIOR.md。
  */
 import { useMemo, useState } from 'react'
+import KpiCard from '@/components/shared/kpi-card'
 import { Send, Store } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { formatYen } from '@/lib/format'
 import type { RestaurantSnapshot } from '@/lib/restaurant-test-api'
 import RestaurantFrame from '../common-a/frame'
-import { HalfGrid, Panel, PanelAside, Stat, StatRow, Status } from '../common-a/parts'
+import { HalfGrid, Panel, PanelAside, StatRow, Status } from '../common-a/parts'
 import styles from './stores.module.css'
-
 
 export function DashboardBoard({ data }: { data: RestaurantSnapshot }) {
   /* 集計は今日以降の有効予約だけを見る（今の画面と同じ R104）。 */
@@ -34,11 +34,11 @@ export function DashboardBoard({ data }: { data: RestaurantSnapshot }) {
   return (
     <>
       <StatRow>
-        <Stat label="予約数" value={`${upcoming.length}件`} note="今日以降の有効予約" help="今日以降に開始する、取消・無断キャンセルでない予約の件数です。" />
-        <Stat label="ご来店予定" value={`${guestCount}名`} note="今日以降の人数合計" help="今日以降の有効予約の人数の合計です。来店済みの過去分は含みません。" />
-        <Stat label="空席率" value={`${Math.max(0, Math.round((1 - guestCount / Math.max(totalCapacity, 1)) * 100))}%`} note="全店舗の概算" help="分母は全店舗の収容数の合計、分子は今日以降の有効予約の人数の合計です。時間帯ごとの空きではありません。" />
-        <Stat label="売上予測" value={priced.length ? formatYen(revenue) : '—'} note={priced.length ? `コース設定 ${priced.length}件分` : 'コース設定がありません'} help="コース単価×人数の合計です。席のみ（コース未設定）の予約は含みません。固定の客単価では計算しません。" />
-        <Stat label="未返信口コミ" value={`${unreplied}件`} note="Google口コミ" warning={unreplied > 0} />
+        <KpiCard title="予約数" valueText={`${upcoming.length}件`} detail="今日以降の有効予約" help="今日以降に開始する、取消・無断キャンセルでない予約の件数です。" icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="ご来店予定" valueText={`${guestCount}名`} detail="今日以降の人数合計" help="今日以降の有効予約の人数の合計です。来店済みの過去分は含みません。" icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="空席率" valueText={`${Math.max(0, Math.round((1 - guestCount / Math.max(totalCapacity, 1)) * 100))}%`} detail="全店舗の概算" help="分母は全店舗の収容数の合計、分子は今日以降の有効予約の人数の合計です。時間帯ごとの空きではありません。" icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="売上予測" valueText={priced.length ? formatYen(revenue) : '—'} detail={priced.length ? `コース設定 ${priced.length}件分` : 'コース設定がありません'} help="コース単価×人数の合計です。席のみ（コース未設定）の予約は含みません。固定の客単価では計算しません。" icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="未返信口コミ" valueText={`${unreplied}件`} detail="Google口コミ" valueTone={unreplied > 0 ? 'warning' : 'default'} icon={null} presentation="band" value={null} unit="" />
       </StatRow>
       <Panel
         title="店舗一覧"

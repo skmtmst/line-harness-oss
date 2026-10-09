@@ -16,11 +16,6 @@
 }
 
 /* 数のカード4枚（間12） */
-.kpis {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--tpl-hb-kpi-gap);
-}
 
 .tabs { margin-bottom: var(--tpl-hb-tabs-pull); }
 
@@ -202,36 +197,3 @@
 .range { color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-hb-small-lh); white-space: nowrap; }
 
 /* 数のカード（余白 16・20、間 8、題の行・数の行・補足の3段） */
-.stat {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-hb-stat-gap);
-  min-width: 0;
-  padding: var(--tpl-hb-stat-pad);
-  border-radius: var(--tpl-hb-card-radius);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -0.5px;
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
-}
-
-.statHead { display: flex; align-items: center; gap: var(--tpl-hb-tool-gap); margin: 0; min-width: 0; }
-.statIcon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: var(--tpl-hb-star);
-  height: var(--tpl-hb-star);
-  border-radius: var(--tpl-hb-stat-icon-radius);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -0.5px;
-  color: var(--color-ink-secondary);
-}
-
-.statIcon svg { width: var(--tpl-hb-stat-glyph); height: var(--tpl-hb-stat-glyph); }
-.statTitle { min-width: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-caption); font-weight: 500; line-height: var(--tpl-hb-stat-lh); text-overflow: ellipsis; white-space: nowrap; }
-.statValue { display: flex; align-items: flex-end; gap: var(--tpl-hb-stat-unit-gap); margin: 0; }
-.statNumber { color: var(--color-ink); font-family: var(--font-inter), Inter, system-ui, sans-serif; font-size: var(--text-metric); font-weight: 600; letter-spacing: var(--tpl-hb-stat-tracking); line-height: var(--tpl-hb-stat-number-lh); font-variant-numeric: tabular-nums; }
-.statUnit { color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-hb-stat-lh); }
-.statDetail { margin: 0; overflow: hidden; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-hb-stat-lh); text-overflow: ellipsis; white-space: nowrap; }

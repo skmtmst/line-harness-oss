@@ -9,6 +9,7 @@
  * 承認待ちのカードは閲覧のみのとき枠を緑にして目立たせる（n4DT7）。動きは BEHAVIOR.md。
  */
 import { useState } from 'react'
+import KpiCard from '@/components/shared/kpi-card'
 import { Check, Eye, Undo2 } from 'lucide-react'
 import { ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -24,7 +25,7 @@ import {
   type RestaurantStore,
 } from '@/lib/restaurant-test-api'
 import RestaurantFrame, { type RestaurantContext } from '../common-a/frame'
-import { formatStamp, Stat, StatRow, Status } from '../common-a/parts'
+import { formatStamp, StatRow, Status } from '../common-a/parts'
 import styles from './approvals.module.css'
 
 const kindLabel: Record<RestaurantApproval['kind'], string> = {
@@ -209,10 +210,10 @@ function ApprovalsBoard({ ctx }: { ctx: RestaurantContext }) {
         <div className={styles.readOnly} role="note"><Eye aria-hidden className={styles.readOnlyIcon} /><span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span></div>
       ) : null}
       <StatRow>
-        <Stat label="承認待ち" value={`${pending.length}`} note="対応が必要" warning={pending.length > 0} />
-        <Stat label="Google投稿" value={`${rows.filter((a) => a.kind === 'gbp_post').length}`} note="投稿下書き" />
-        <Stat label="LINE配信" value={`${rows.filter((a) => a.kind === 'line_message').length}`} note="配信下書き" />
-        <Stat label="メニュー改定" value={`${rows.filter((a) => a.kind === 'menu_change').length}`} note="価格・内容変更" />
+        <KpiCard title="承認待ち" valueText={`${pending.length}`} detail="対応が必要" valueTone={pending.length > 0 ? 'warning' : 'default'} icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="Google投稿" valueText={`${rows.filter((a) => a.kind === 'gbp_post').length}`} detail="投稿下書き" icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="LINE配信" valueText={`${rows.filter((a) => a.kind === 'line_message').length}`} detail="配信下書き" icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="メニュー改定" valueText={`${rows.filter((a) => a.kind === 'menu_change').length}`} detail="価格・内容変更" icon={null} presentation="band" value={null} unit="" />
       </StatRow>
       {rows.length === 0 ? (
         <div className={styles.emptyBox}><ListState kind="empty" title="承認待ちはありません" /></div>

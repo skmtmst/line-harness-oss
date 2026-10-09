@@ -1,6 +1,7 @@
 'use client'
 
 import HelpTip from '@/components/shared/help-tip'
+import KpiCard from '@/components/shared/kpi-card'
 
 /*
  * ★V8 Googleビジネス 口コミ（一覧 `j0Wcg`・返信を作る `x9HIR`・公開の確認 `xSudF`）。
@@ -33,7 +34,7 @@ import {
   type GoogleReviewListData,
   type GoogleReviewOrder,
 } from '@/lib/restaurant-google-api'
-import { Stat, StatRow } from '../common-a/parts'
+import { StatRow } from '../common-a/parts'
 import { errorMessage, formatShortStamp, reviewReceivedAt } from './format'
 import type { GoogleNav } from './google'
 import styles from './google.module.css'
@@ -139,11 +140,11 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
   return (
     <>
       <StatRow>
-        <Stat size="small" label="未返信" value={`${data.summary.unrepliedCount}`} note="返信を待っている口コミ" warning={data.summary.unrepliedCount > 0} />
-        <Stat size="small" label="平均の評価" value={average === null || average === undefined ? '—' : `${Math.round(average * 10) / 10}`} note={`総合・${reviewTotal}件`} />
-        <Stat size="small" label="要確認" value={`${data.summary.attentionCount}`} note="評価2以下" />
+        <KpiCard density="compact" title="未返信" valueText={`${data.summary.unrepliedCount}`} detail="返信を待っている口コミ" valueTone={data.summary.unrepliedCount > 0 ? 'warning' : 'default'} icon={null} presentation="band" value={null} unit="" />
+        <KpiCard density="compact" title="平均の評価" valueText={average === null || average === undefined ? '—' : `${Math.round(average * 10) / 10}`} detail={`総合・${reviewTotal}件`} icon={null} presentation="band" value={null} unit="" />
+        <KpiCard density="compact" title="要確認" valueText={`${data.summary.attentionCount}`} detail="評価2以下" icon={null} presentation="band" value={null} unit="" />
         {/* Google経由の予約：結ぶ口がまだ無いので「—」（数を推測しない）。 */}
-        <Stat size="small" label="Google経由の予約" value="—" note="この30日" help="予約の連携サービスと結ぶと数えます。いまは取れないので「—」です。" />
+        <KpiCard density="compact" title="Google経由の予約" valueText="—" detail="この30日" help="予約の連携サービスと結ぶと数えます。いまは取れないので「—」です。" icon={null} presentation="band" value={null} unit="" />
       </StatRow>
       <div className={styles.toolbar}>
         <HelpTip label="一覧の操作の説明">返信文は手で書くか、AIで下書きを作れます。Googleへ送ると「反映確認中」になり、反映されると「返信済み」になります。</HelpTip>

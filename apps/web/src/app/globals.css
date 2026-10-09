@@ -1262,6 +1262,8 @@
   --tpl-rml-blocker-pad: 9px 0; --tpl-rml-blocker-gap: 8px; --tpl-rml-blocker-lh: 17px; --tpl-rml-dlg-w: 600px; --tpl-rml-dlg-pad: 24px; --tpl-rml-dlg-gap: 14px; --tpl-rml-dlg-top: 240px; --tpl-rml-dlg-title-size: 17px; --tpl-rml-dlg-title-lh: 25px; --tpl-rml-dlg-desc-lh: 22px; --tpl-rml-icon-btn: 28px; --tpl-rml-notice-after: 6px; --tpl-rml-grip-w: 14px; --tpl-rml-row-line: inset 0 -1px 0 var(--color-divider);
   --tpl-rml-ext-max-w: 1584px; --tpl-rml-ext-side-w: 430px; --tpl-rml-ext-thumb-w: 48px; --tpl-rml-ext-col-a: 100px; --tpl-rml-ext-col-b: 110px; --tpl-rml-ext-col-c: 120px; --tpl-rml-ext-area-w: 24px; --tpl-rml-ext-ratio-large: 2500 / 1686; --tpl-rml-ext-ratio-compact: 2500 / 843;
   --tpl-band-gap: 0;
+  --tpl-band-line: rgb(0 0 0 / 0.07);
+  --tpl-band-compact-number-size: 20px; --tpl-band-compact-number-lh: 24px;
   --tpl-viewer-create-space-h: 36px; --tpl-viewer-create-space-col-h: 49px; --tpl-viewer-folder-add-space: 17px; /* 閲覧のみで隠した作るボタンの高さ（場所だけ空ける）。列の上に直接置く画面はボタンの下の間 13 も含める */
   /* 自動応答の一覧（uE9gf・Q5lOCc・WPrd5）。 */
   --tpl-ar-sort-w: 124px; --tpl-ar-saved-w: 151px; --tpl-ar-saved-icon-w: 48px; --tpl-ar-folder-w: 150px; --tpl-ar-row-h: 64px; --tpl-ar-narrow-head-h: 34px;
@@ -1278,7 +1280,7 @@
   --tpl-wh-value-lh: 21px; --tpl-wh-pick-pad: 0 10px 0 12px; --tpl-wh-mini-head-pad: 10px 16px; --tpl-wh-mini-row-pad: 12px 16px; --tpl-wh-mini-row-h: 59.5px;
   --tpl-wh-mini-when: 120px; --tpl-wh-mini-value: 200px; --tpl-wh-mini-candidate: 160px; --tpl-wh-mini-ops: 120px; --tpl-wh-sample-lh: 16px; --tpl-wh-textarea-h: 144px; --tpl-wh-textarea-pad: 8px 12px;
   --tpl-wh-dialog-pull-top: 14px; --tpl-wh-dialog-pull-bottom: 10px; --tpl-wh-sheets-gap: 16px; --tpl-wh-small-select-w: 104px; --tpl-wh-log-row-h: 53.5px; --tpl-wh-log-body-w: 180px; --tpl-wh-log-reply-w: 100px; --tpl-wh-log-time-w: 84px; --tpl-wh-log-ops-w: 130px; --tpl-wh-detail-row-pad: 8px 0; --tpl-wh-pager-margin: 12px 24px; --tpl-wh-pager-lead-pad: 20px; --tpl-wh-new-card-gap: 14px; --tpl-wh-check-gap: 16px; --tpl-wh-event-pad: 12px 14px; --tpl-wh-sample-line-gap: 1px; --tpl-wh-sheets-side-w: 320px; --tpl-wh-care-lh: 19px; --tpl-wh-run-row-h: 45.5px; --tpl-wh-run-when: 140px; --tpl-wh-run-kind: 80px; --tpl-wh-run-what: 220px; --tpl-wh-skel-dot: 32px; --tpl-wh-skel-bar: 10px;
-  --tpl-band-cell-pad-block: 16px; --tpl-band-cell-pad-side: 20px; --tpl-band-cell-gap: 8px;
+  --tpl-band-cell-pad-block: 16px; --tpl-band-cell-pad-side: 24px; --tpl-band-cell-gap: 8px;
   /* シナリオ配信の編集（src/v8/scenario-detail・絵 PMLkX・nMSiE・ARuZ4・kz2B6・Al4Ek） */
   --tpl-sd-head-pad: 20px 24px 16px; --tpl-sd-head-gap: 12px; --tpl-sd-head-text-gap: 6px; --tpl-sd-title-gap: 10px; --tpl-sd-back-size: 13px; --tpl-sd-back-lh: 19px; --tpl-sd-title-size: 22px; --tpl-sd-title-lh: 32px; --tpl-sd-meta-size: 12px; --tpl-sd-meta-lh: 17px; --tpl-sd-icon-btn: 28px; --tpl-sd-icon-btn-radius: 10px; --tpl-sd-icon: 16px;
   --tpl-sd-conflict-wrap-pad: 0 24px 8px; --tpl-sd-conflict-pad: 12px 16px; --tpl-sd-conflict-gap: 12px; --tpl-sd-conflict-icon: 18px; --tpl-sd-conflict-bg: #fdf3e1; --tpl-sd-conflict-text-gap: 2px; --tpl-sd-conflict-title-size: 14px; --tpl-sd-conflict-title-lh: 20px; --tpl-sd-conflict-body-size: 13px; --tpl-sd-conflict-body-lh: 19px;
@@ -2779,4 +2781,4 @@ select:not([multiple]):not(.appearance-none) {
 [data-theme="v8"] { --tpl-hq-attribute-distribute-col: 76px; }
 
 [data-theme='v8'] { --tpl-wh-narrow-column-pad: 9px var(--tpl-af2-wh-narrow-pad); }
-[data-theme='v8'] { --shadow-wh-kpi-top: inset 0 1px 0 var(--color-hairline); }
+[data-theme='v8'] { --shadow-wh-kpi-top: inset 0 1px 0 var(--tpl-band-line); }
