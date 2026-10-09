@@ -485,6 +485,7 @@
   --polish-loading-delay: 300ms;
 }
 :root {
+  --polish-error-ring: inset 0 0 0 1px var(--color-danger), var(--control-shadow);
   --polish-hover: rgb(29 29 31 / 0.04);
   --polish-active: rgb(29 29 31 / 0.08);
   --polish-focus: #2563eb;
