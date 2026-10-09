@@ -310,3 +310,7 @@
 .chip[data-composer] { max-width: var(--tpl-msg-composer-carousel-chip-w); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .colBody[data-composer] { font-size: var(--text-caption); line-height: var(--tpl-msg-composer-tab-lh); }
+
+/* 保存で落ちた欄（B-139）：ボタンの行の真下に理由。札の右に直す欄の数の赤い丸。 */
+.buttonBlock { display: flex; flex-direction: column; gap: var(--tpl-cn-field-gap); min-width: 0; }
+.chip:has([data-design-part='error-count-badge']) { display: inline-flex; align-items: center; gap: var(--tpl-cn-field-gap); }

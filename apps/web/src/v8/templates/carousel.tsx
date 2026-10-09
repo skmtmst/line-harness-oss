@@ -30,9 +30,12 @@ import Dialog from '@/components/shared/dialog'
 import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import { FieldError } from '@/components/shared/form-controls'
+import { ErrorCountBadge } from '@/components/shared/error-count-badge'
+import { useFormErrors } from '@/lib/use-form-errors'
 import TapActionField from '@/components/shared/tap-action-field'
 import { useTapActionSources } from '@/components/shared/use-tap-action-sources'
-import { TAP_ACTION_KINDS, isTapActionKind, type TapActionKind } from '@/lib/tap-actions'
+import { TAP_ACTION_KINDS, isTapActionKind, tapActionDef, type TapActionKind } from '@/lib/tap-actions'
 import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
@@ -47,8 +50,8 @@ import { uploadCarouselImage } from '../template-edit/carousel-image-upload'
 import te from '../template-edit/edit.module.css'
 import {
   MAX_ACTIONS, MAX_COLUMNS, TEXT_MAX_WITH_IMAGE, TEXT_MAX_WITHOUT_IMAGE, TITLE_MAX,
-  MESSAGE_TEXT_MAX, buildCarouselActions, buildCarouselContent, carouselChoiceProblems, carouselSnapshot, choiceFromUri, emptyChoice, emptyPanel,
-  saveCarousel, visualPanels, type ChoiceKind, type Panel,
+  MESSAGE_TEXT_MAX, buildCarouselActions, buildCarouselContent, carouselSnapshot, choiceFromUri, emptyChoice, emptyPanel,
+  needsLiff, saveCarousel, visualPanels, type ChoiceKind, type Panel,
 } from './carousel-core'
 import styles from './question-new.module.css'
 import own from './carousel.module.css'
@@ -130,6 +133,19 @@ export function choiceKindOptions(opts: { host: boolean; current?: ChoiceKind })
 
 /** 統括で保存できない「押したら」。 */
 const HOST_ALLOWED: readonly ChoiceKind[] = HOST_CHOICE_KINDS
+
+/** 1つのボタンの誤り（文字のあるボタンだけ見る）。欄の真下に出すので「カード〇のボタン〇」は付けない（B-139）。 */
+function buttonProblem(a: Panel['actions'][number], liffId: string | null, hqHost: boolean): string | null {
+  if (!a.label.trim()) return null
+  if (hqHost && !HOST_ALLOWED.includes(a.kind)) return '統括のカルーセルのボタンは「URLを開く」か「テキストを送る」にしてください'
+  if (a.kind === 'message') {
+    if (!a.text.trim()) return '送る文を入力してください'
+    if ([...a.text.trim()].length > MESSAGE_TEXT_MAX) return `送る文は${MESSAGE_TEXT_MAX}文字までです`
+  }
+  if (a.kind === 'form' && !a.formId) return '回答フォームを選んでください'
+  if (needsLiff(a.kind) && !liffId) return `このアカウントに LIFF が登録されていないため、「${tapActionDef(a.kind)?.label}」は開けません`
+  return null
+}
 
 function Carousel({ host }: { host?: TemplateEditHost }) {
   const inline = Boolean(host?.composer)
@@ -241,15 +257,32 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   }
   const textMaxFor = (panel: Panel) => (panel.title.trim() || panel.thumbnailImageUrl.trim() ? TEXT_MAX_WITH_IMAGE : TEXT_MAX_WITHOUT_IMAGE)
 
+  /*
+   * 保存で落ちた欄（B-139・オーナーの写真の指摘：「すべてのカードに本文を入力してください」の帯だけだった）。
+   * 欄の真下に理由を出して赤くし、別のカードの欄ならそのカードを選んでから移る。カードの札には直す欄の数の赤い丸。
+   */
+  const fields = useFormErrors()
+  if (!inline) fields.define('name', 'テンプレート名', () => (name.trim() ? null : '名前を入力してください'))
+  const someImage = panels.some((p) => p.thumbnailImageUrl.trim())
+  panels.forEach((p, i) => {
+    const opts = { reveal: () => setSelected(i), group: `card-${i}` }
+    fields.define(`card-${i}-image`, `カード${i + 1}の画像`, () => (someImage && !p.thumbnailImageUrl.trim() ? '画像は全部のカードに入れるか、全部入れないかにしてください' : null), opts)
+    fields.define(`card-${i}-title`, `カード${i + 1}のタイトル`, () => ([...p.title].length > TITLE_MAX ? `タイトルは${TITLE_MAX}文字までです（いま${[...p.title].length}文字）` : null), opts)
+    fields.define(`card-${i}-text`, `カード${i + 1}の本文`, () => (
+      !p.text.trim() ? '本文を入力してください'
+        : [...p.text].length > textMaxFor(p) ? `本文は${textMaxFor(p)}文字までです（いま${[...p.text].length}文字）` : null
+    ), opts)
+    p.actions.forEach((a, ai) => {
+      fields.define(`card-${i}-button-${ai}`, `カード${i + 1}のボタン${ai + 1}`, () => buttonProblem(a, liffId, hqHost), opts)
+    })
+  })
+
   /** 保存する。できたらテンプレートの id（URL の id または作成済み）を返す。 */
   const saveNow = async (): Promise<string | null> => {
     if (savingRef.current || uploadLock.current) return null
     if (loadFailed) { setError('読み込めませんでした。開き直してください。'); return null }
     if (!id && !createdId && !selectedAccountId) { setError('上のバーでLINE公式アカウントを選んでください'); return null }
-    if (!name.trim()) { setError('名前を入力してください'); return null }
-    const problems = carouselChoiceProblems(panels, liffId)
-    if (problems.length > 0) { setError(problems[0]); return null }
-    if (panels.some((p) => p.thumbnailImageUrl.trim()) && panels.some((p) => !p.thumbnailImageUrl.trim())) { setError('画像は全部のカードに入れるか、全部入れないかにしてください'); return null }
+    if (fields.submit().length > 0) { setError(''); return null }
     savingRef.current = true
     setSaving(true)
     setError('')
@@ -302,12 +335,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   /* 統括の入口：中身を組み立てて呼ぶ側へ渡す。選択肢は URL を開く・テキストを送るだけ（ほかは配った先で動かせない）。 */
   const hostSave = async (distribute: boolean) => {
     if (!host || uploadLock.current || host.busy || savingRef.current) return
-    if (!name.trim()) { setError('名前を入力してください'); return }
-    if (hqHost && panels.some((p) => p.actions.some((a) => a.label.trim() && !HOST_ALLOWED.includes(a.kind)))) { setError('統括のカルーセルのボタンは「URLを開く」か「テキストを送る」にしてください'); return }
-    const problems = carouselChoiceProblems(panels, liffId)
-    if (problems.length > 0) { setError(problems[0]); return }
-    if (panels.some((p) => p.thumbnailImageUrl.trim()) && panels.some((p) => !p.thumbnailImageUrl.trim())) { setError('画像は全部のカードに入れるか、全部入れないかにしてください'); return }
-    if (panels.some((p) => !p.text.trim())) { setError('すべてのカードに本文を入力してください'); return }
+    if (fields.submit().length > 0) { setError(''); return }
     setError('')
     let backingId = ''
     if (inline && !distribute && panels.some((p) => p.actions.some((a) => a.kind === 'action'))) { setError('「動きを実行する」を入れるときは、テンプレートとしても保存してください。'); return }
@@ -419,10 +447,11 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
             {inline ? null : <section className={styles.card} aria-labelledby="cr-name">
               <h2 className={styles.cardTitle} id="cr-name">名前とフォルダ</h2>
               <div className={styles.row}>
-                <label className={`${styles.field} ${styles.grow}`}>
-                  <span className={styles.label}>テンプレート名</span>
-                  <input className={styles.input} value={name} placeholder="例：夏の定番5点" onChange={(event) => setName(event.target.value)} />
-                </label>
+                <div className={`${styles.field} ${styles.grow}`}>
+                  <label className={styles.label} htmlFor="cr-name-input">テンプレート名</label>
+                  <input {...fields.bind('name')} id="cr-name-input" className={styles.input} value={name} placeholder="例：夏の定番5点" aria-invalid={fields.invalid('name') || undefined} aria-describedby={fields.invalid('name') ? 'cr-name-input-error' : undefined} onChange={(event) => setName(event.target.value)} />
+                  <FieldError id="cr-name-input-error">{fields.error('name')}</FieldError>
+                </div>
                 <div className={`${styles.field} ${styles.folder}`}>
                   <span className={styles.pickLabel}>フォルダ</span>
                   <FolderSelect
@@ -464,6 +493,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                     onDrop={(event) => onDrop(event, index)}
                   >
                     {`${index + 1} ${chipName(item.title) || `カード ${index + 1}`}`}
+                    <ErrorCountBadge count={fields.countIn(`card-${index}`)} label={`カード${index + 1}`} />
                   </button>
                 ))}
                 <Button type="button" variant="text" disabled={busy || panels.length >= MAX_COLUMNS} onClick={() => { setPanels((prev) => [...prev, emptyPanel()]); setSelected(panels.length) }}>
@@ -477,6 +507,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
               <section className={styles.card} aria-labelledby="cr-panel">
                 <h2 className={styles.cardTitle} id="cr-panel">{`カード ${selectedIndex + 1} の中身`}</h2>
                 <div className={own.panelRow}>
+                  <div className={own.imageCol} {...fields.bind(`card-${selectedIndex}-image`)} aria-describedby={fields.invalid(`card-${selectedIndex}-image`) ? 'cr-image-error' : undefined}>
                   <CarouselImage
                     url={panel.thumbnailImageUrl} disabled={busy || loading || loadFailed || (!host && !folderAccountId)} maxMB={hqHost ? 8 : 10}
                     scope={`${host ? 'hq' : folderAccountId}-${id ?? 'new'}-${selectedIndex}`}
@@ -496,15 +527,19 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                     onMediaPick={hqHost ? undefined : () => setPickerOpen(true)}
                     onUrl={() => setUrlOpen((open) => !open)}
                   />
+                  <FieldError id="cr-image-error">{fields.error(`card-${selectedIndex}-image`)}</FieldError>
+                  </div>
                   <div className={own.textCol}>
-                    <label className={styles.field}>
-                      <span className={styles.label}>{`タイトル（${TITLE_MAX}文字まで）`}</span>
-                      <input className={styles.input} value={panel.title} onChange={(event) => update(selectedIndex, { title: event.target.value })} />
-                    </label>
-                    <label className={styles.field}>
-                      <span className={styles.label}>{panel.title.trim() || panel.thumbnailImageUrl.trim() ? `本文（タイトルか画像があると${TEXT_MAX_WITH_IMAGE}文字まで）` : `本文（${TEXT_MAX_WITHOUT_IMAGE}文字まで）`}</span>
-                      <input className={styles.input} value={panel.text} onChange={(event) => update(selectedIndex, { text: event.target.value })} />
-                    </label>
+                    <div className={styles.field}>
+                      <label className={styles.label} htmlFor="cr-title">{`タイトル（${TITLE_MAX}文字まで）`}</label>
+                      <input {...fields.bind(`card-${selectedIndex}-title`)} id="cr-title" className={styles.input} value={panel.title} aria-invalid={fields.invalid(`card-${selectedIndex}-title`) || undefined} aria-describedby={fields.invalid(`card-${selectedIndex}-title`) ? 'cr-title-error' : undefined} onChange={(event) => update(selectedIndex, { title: event.target.value })} />
+                      <FieldError id="cr-title-error">{fields.error(`card-${selectedIndex}-title`)}</FieldError>
+                    </div>
+                    <div className={styles.field}>
+                      <label className={styles.label} htmlFor="cr-text">{panel.title.trim() || panel.thumbnailImageUrl.trim() ? `本文（タイトルか画像があると${TEXT_MAX_WITH_IMAGE}文字まで）` : `本文（${TEXT_MAX_WITHOUT_IMAGE}文字まで）`}</label>
+                      <input {...fields.bind(`card-${selectedIndex}-text`)} id="cr-text" className={styles.input} value={panel.text} aria-invalid={fields.invalid(`card-${selectedIndex}-text`) || undefined} aria-describedby={fields.invalid(`card-${selectedIndex}-text`) ? 'cr-text-error' : undefined} onChange={(event) => update(selectedIndex, { text: event.target.value })} />
+                      <FieldError id="cr-text-error">{fields.error(`card-${selectedIndex}-text`)}</FieldError>
+                    </div>
                     {[...panel.title].length > TITLE_MAX || [...panel.text].length > textMaxFor(panel) ? (
                       <p className={own.over} role="alert">{`タイトル ${[...panel.title].length} / ${TITLE_MAX}・本文 ${[...panel.text].length} / ${textMaxFor(panel)} 文字。多すぎる分を減らしてください。`}</p>
                     ) : null}
@@ -526,7 +561,8 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                 {panel.actions.map((action, ai) => {
                   const setAction = (patch: Partial<typeof action>) => update(selectedIndex, { actions: panel.actions.map((a, j) => (j === ai ? { ...a, ...patch } : a)) })
                   return (
-                    <div key={ai} className={own.buttonRow}>
+                    <div key={ai} className={own.buttonBlock}>
+                    <div className={own.buttonRow} {...fields.bind(`card-${selectedIndex}-button-${ai}`)} aria-describedby={fields.invalid(`card-${selectedIndex}-button-${ai}`) ? `cr-button-${ai}-error` : undefined}>
                       <input className={`${styles.input} ${own.colLabel}`} value={action.label} placeholder="ボタンの文字" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の文字`} onChange={(event) => setAction({ label: event.target.value })} />
                       <div className={own.colTap}>
                       <TapActionField
@@ -559,6 +595,8 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                           <Trash2 className={own.icon} aria-hidden="true" />
                         </button>
                       ) : null}
+                    </div>
+                    <FieldError id={`cr-button-${ai}-error`}>{fields.error(`card-${selectedIndex}-button-${ai}`)}</FieldError>
                     </div>
                   )
                 })}
