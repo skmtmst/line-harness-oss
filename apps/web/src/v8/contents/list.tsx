@@ -966,18 +966,40 @@ export default function MediaLibraryListV8() {
   // まとめて削除の候補は未使用かつ一覧にいるものだけ。退避済みは選ばない。
   const [selectionItems, setSelectionItems] = useState<MediaItem[]>([])
   const [selectionTotal, setSelectionTotal] = useState<number | undefined>(undefined)
-  const selectAllMedia = async () => {
+  const [selectionLoading, setSelectionLoading] = useState(false)
+  const [selectionError, setSelectionError] = useState('')
+  const selectionScope = JSON.stringify([selectedAccountId, folderFilter, query, [...kinds].sort(), showNearLimitOnly, showArchivedOnly, sort])
+  const selectionScopeRef = useRef(selectionScope)
+  selectionScopeRef.current = selectionScope
+  useEffect(() => { setSelected(new Set()); setSelectionItems([]); setSelectionTotal(undefined); setSelectionLoading(false); setSelectionError('') }, [selectionScope])
+  const readSelectableMedia = useCallback(async () => {
     const account = selectedAccountId
-    const sequence = listSeqRef.current
+    const scope = selectionScope
     if (!account) return
-    const all = await collectListRows(selectionTotal ?? total, async (offset, limit) => {
-      const response = await api.media.list(account, { kind: kinds.size === 1 ? [...kinds][0] : undefined, folderId: folderFilter || undefined, query: query.trim() || undefined, unusedOnly: true, nearLimitOnly: showNearLimitOnly, archived: showArchivedOnly ? 'only' : undefined, sort, limit, offset })
-      if (!response.success) throw new Error('読み込めませんでした')
-      return response.data
-    })
-    if (account !== latestAccountRef.current || sequence !== listSeqRef.current) return
-    const eligible = all.filter(isKnownUnused)
-    setSelectionItems(eligible); setSelectionTotal(eligible.length); setSelected(new Set(eligible.map(item => item.id)))
+    setSelectionLoading(true)
+    setSelectionError('')
+    try {
+      const all = await collectListRows(total, async (offset, limit) => {
+        const response = await api.media.list(account, { kind: kinds.size === 1 ? [...kinds][0] : undefined, folderId: folderFilter || undefined, query: query.trim() || undefined, unusedOnly: true, nearLimitOnly: showNearLimitOnly, archived: showArchivedOnly ? 'only' : undefined, sort, limit, offset })
+        if (!response.success) throw new Error('読み込めませんでした')
+        return response.data
+      })
+      if (scope !== selectionScopeRef.current) return
+      const eligible = all.filter(item => isKnownUnused(item) && !item.archivedAt && kinds.has(item.kind))
+      setSelectionItems(eligible)
+      setSelectionTotal(eligible.length)
+    } catch {
+      if (scope === selectionScopeRef.current) setSelectionError('すべての対象を読み込めませんでした。')
+    } finally {
+      if (scope === selectionScopeRef.current) setSelectionLoading(false)
+    }
+  }, [selectedAccountId, selectionScope, total, kinds, folderFilter, query, showNearLimitOnly, showArchivedOnly, sort])
+  useEffect(() => {
+    if (selected.size > 0 && selectionTotal === undefined && !selectionLoading && !selectionError) void readSelectableMedia()
+  }, [selected.size, selectionTotal, selectionLoading, selectionError, readSelectableMedia])
+  const selectAllMedia = () => {
+    if (selectionTotal === undefined) return
+    setSelected(new Set(selectionItems.map(item => item.id)))
   }
   const removable = items.filter((item) => isKnownUnused(item) && !item.archivedAt)
   const allSelected = removable.length > 0 && removable.every((item) => selected.has(item.id))
@@ -1321,9 +1343,9 @@ export default function MediaLibraryListV8() {
           {canManageMedia ? (
             <BulkBar
               count={selected.size}
-              total={selectionTotal ?? total}
+              total={selectionTotal}
               onSelectAll={selectAllMedia}
-              hint="対象を確認してから操作を選んでください"
+              hint={selectionLoading ? 'すべての対象を確認しています…' : selectionError ? <><span role="alert">{selectionError}</span><Button size="compact" onClick={() => void readSelectableMedia()}>もう一度読み込む</Button></> : '対象を確認してから操作を選んでください'}
             >
               <Button type="button" variant="secondary" onClick={() => setSelected(new Set())}>
                 選択を外す
