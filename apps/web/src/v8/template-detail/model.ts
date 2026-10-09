@@ -210,13 +210,26 @@ export function publishRowState(row: UsageRow): string {
 
 /** 版の差（行ごと）。消えた行は「－」、増えた行は「＋」。同じ行は出さない。 */
 export function lineChanges(before: string, after: string): Array<{ kind: 'removed' | 'added'; text: string }> {
-  const beforeLines = before.split('\n').map((line) => line.trimEnd()).filter((line) => line !== '')
-  const afterLines = after.split('\n').map((line) => line.trimEnd()).filter((line) => line !== '')
-  const afterSet = new Set(afterLines)
-  const beforeSet = new Set(beforeLines)
+  const lines = (text: string) => [...new Set(text.split('\n').map(line => line.trimEnd()).filter(line => line.trim() !== ''))]
+  const left = lines(before), right = lines(after)
+  // 最長の共通順序を残す。同じ文字があっても順番が変わった行は削除＋追加にする。
+  const lengths = Array.from({ length: left.length + 1 }, () => new Uint32Array(right.length + 1))
+  for (let i = left.length - 1; i >= 0; i--) {
+    for (let j = right.length - 1; j >= 0; j--) {
+      lengths[i][j] = left[i] === right[j] ? lengths[i + 1][j + 1] + 1 : Math.max(lengths[i + 1][j], lengths[i][j + 1])
+    }
+  }
+  const removed: string[] = [], added: string[] = []
+  let i = 0, j = 0
+  while (i < left.length && j < right.length) {
+    if (left[i] === right[j]) { i++; j++ }
+    else if (lengths[i + 1][j] >= lengths[i][j + 1]) removed.push(left[i++])
+    else added.push(right[j++])
+  }
+  removed.push(...left.slice(i)); added.push(...right.slice(j))
   return [
-    ...beforeLines.filter((line) => !afterSet.has(line)).map((text) => ({ kind: 'removed' as const, text })),
-    ...afterLines.filter((line) => !beforeSet.has(line)).map((text) => ({ kind: 'added' as const, text })),
+    ...removed.map(text => ({ kind: 'removed' as const, text })),
+    ...added.map(text => ({ kind: 'added' as const, text })),
   ]
 }
 
