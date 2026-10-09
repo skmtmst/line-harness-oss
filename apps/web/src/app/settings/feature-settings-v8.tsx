@@ -30,6 +30,7 @@ import {
   type UsageCategory,
 } from './use-feature-settings'
 import styles from './settings-v8.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 /**
  * 機能設定の V8 画面（★V8-B `ywFJT`）。
@@ -516,11 +517,10 @@ export function FeatureSettingsV8() {
             </div>
           )}
 
-          {dirty && <div className={styles.reasonBand}>
-            <label htmlFor="feature-settings-reason">
-              変更理由（必須）
-            </label>
-            <input
+          {dirty && <div className={styles.reasonBand}><Field label={<>
+
+              変更理由
+            </>} htmlFor="feature-settings-reason" required><input
               id="feature-settings-reason"
               value={reason}
               onChange={(event) => setReason(event.target.value)}

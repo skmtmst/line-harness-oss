@@ -49,6 +49,7 @@ import Select from '@/components/shared/select'
 import { inputClass } from '@/components/shared/form-controls'
 import styles from './conversion-points-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 /** V8 の絞り込み。`all` を含む以外は v7 の `StatusFilter` と同じ。 */
 export type ConversionPointsV8Status = 'all' | ConversionDefinitionFilter
@@ -728,9 +729,7 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
                   />
                 </span>
               ) : null}
-              <label className={styles.reasonField}>
-                <span className={styles.reasonLabel}>理由（必須）</span>
-                <input
+              <Field label="理由" required><input
                   aria-label="止める理由"
                   className={inputClass}
                   value={model.stopReason}

@@ -33,6 +33,7 @@ import {
 import type { OperatorNotificationTeam } from '@line-crm/shared'
 import styles from './operator-new-v8.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { Field } from '@/components/shared/form-controls'
 
 const THRESHOLD_OPTIONS = [
   { value: 'one', label: '1件でも' },
@@ -448,9 +449,7 @@ function NewOperatorNotificationV8Inner() {
         <div className={styles.main}>
           <section className={styles.card} aria-labelledby="operator-when-heading">
             <h2 id="operator-when-heading" className={styles.cardTitle}>どんなときに知らせるか</h2>
-            <div className={styles.fieldFull}>
-              <label htmlFor="operator-name" className={styles.fieldLabel}>お知らせの名前</label>
-              <input
+            <div className={styles.fieldFull}><Field label="お知らせの名前" htmlFor="operator-name"><input
                 id="operator-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
@@ -460,42 +459,31 @@ function NewOperatorNotificationV8Inner() {
               />
             </div>
             <div className={styles.fieldGrid}>
-              <div>
-                <label htmlFor="operator-event" className={styles.fieldLabel}>きっかけ</label>
-                <Select
+              <div><Field label="きっかけ" htmlFor="operator-event"><Select
                   aria-label="きっかけ"
                   id="operator-event"
                   size="full"
                   value={eventType}
                   onChange={(value) => setEventType(value)}
                   options={[...OPERATOR_EVENT_OPTIONS]}
-                />
-              </div>
-              <div>
-                <label htmlFor="operator-importance" className={styles.fieldLabel}>重要度</label>
-                <Select
+                /></Field></div>
+              <div><Field label="重要度" htmlFor="operator-importance"><Select
                   aria-label="重要度"
                   id="operator-importance"
                   size="full"
                   value={importance}
                   onChange={(value) => setImportance(value)}
                   options={IMPORTANCE_OPTIONS}
-                />
-              </div>
-              <div>
-                <label htmlFor="operator-threshold" className={styles.fieldLabel}>どれくらいたまったら</label>
-                <Select
+                /></Field></div>
+              <div><Field label="どれくらいたまったら" htmlFor="operator-threshold"><Select
                   aria-label="どれくらいたまったら"
                   id="operator-threshold"
                   size="full"
                   value={threshold}
                   onChange={(value) => setThreshold(value)}
                   options={THRESHOLD_OPTIONS}
-                />
-              </div>
-              <div>
-                <label htmlFor="operator-dedupe" className={styles.fieldLabel}>同じ知らせを重ねない</label>
-                <Select
+                /></Field></div>
+              <div><Field label="同じ知らせを重ねない" htmlFor="operator-dedupe"><Select
                   aria-label="同じ知らせを重ねない"
                   id="operator-dedupe"
                   size="full"
@@ -511,20 +499,15 @@ function NewOperatorNotificationV8Inner() {
             <h2 id="operator-who-heading" className={styles.cardTitle}>だれが受け取るか</h2>
             <p className={styles.cardNote}>LINEログイン済みの人にだけ届きます。お客様の連絡先は宛先に入りません。</p>
             <div className={styles.fieldGrid}>
-              <div>
-                <label htmlFor="operator-recipient-kind" className={styles.fieldLabel}>送り先</label>
-                <Select
+              <div><Field label="送り先" htmlFor="operator-recipient-kind"><Select
                   aria-label="送り先"
                   id="operator-recipient-kind"
                   size="full"
                   value="staff"
                   onChange={() => undefined}
                   options={[{ value: 'staff', label: 'チーム' }]}
-                />
-              </div>
-              <div>
-                <label htmlFor="operator-recipient-team" className={styles.fieldLabel}>チーム</label>
-                <Select
+                /></Field></div>
+              <div><Field label="チーム" htmlFor="operator-recipient-team"><Select
                   aria-label="チーム"
                   id="operator-recipient-team"
                   size="full"
@@ -536,6 +519,7 @@ function NewOperatorNotificationV8Inner() {
                     else setTeamName('')
                   }}
                   options={[{ value: '', label: 'スタッフを選んでチームを作る' }, ...teams.map(team => ({ value: team.id, label: `${team.name}（${team.staffIds.length}人）` }))]}
+            <div className={styles.fieldGrid}><Field label="チーム名"><Button variant="secondary" disabled={!canWrite || teamBusy} onClick={() => void saveTeam()}>{teamId ? 'チームを更新する' : 'チームを作る'}</Button></Field></div>
                 />
               </div>
             </div>
@@ -609,9 +593,7 @@ function NewOperatorNotificationV8Inner() {
 
           <section className={styles.card} aria-labelledby="operator-when-send-heading">
             <h2 id="operator-when-send-heading" className={styles.cardTitle}>いつ送るか・重ならないか</h2>
-            <div className={styles.fieldFull}>
-              <label htmlFor="operator-schedule" className={styles.fieldLabel}>送る時間</label>
-              <Select
+            <div className={styles.fieldFull}><Field label="送る時間" htmlFor="operator-schedule"><Select
                 aria-label="送る時間"
                 id="operator-schedule"
                 size="full"

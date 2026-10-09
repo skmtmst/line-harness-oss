@@ -27,6 +27,7 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { formatDateTime } from '@/lib/format'
 import styles from './bookings-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 /** 予約・申込の状態の見え方。色だけに頼らず、必ず文字で言う。 */
 const STATUS_TONE: Record<string, StatusBadgeTone> = {
@@ -736,9 +737,7 @@ export default function BookingsV8({ eventId }: { eventId: string }) {
         }}
       >
         {rejectApplicant ? (
-          <label className="grid gap-1 text-xs font-medium text-ink-secondary">
-            断る理由（任意・内部メモ）
-            <textarea
+          <Field label="断る理由（・内部メモ）"><textarea
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               rows={2}
@@ -821,9 +820,7 @@ export default function BookingsV8({ eventId }: { eventId: string }) {
                 </Button>
               </div>
             ) : null}
-            <label className="grid gap-1 text-xs font-medium text-ink-secondary">
-              理由（必須・記録に残ります）
-              <textarea
+            <Field label="理由（・記録に残ります）" required><textarea
                 value={waitlistReason}
                 onChange={(e) => setWaitlistReason(e.target.value)}
                 rows={2}

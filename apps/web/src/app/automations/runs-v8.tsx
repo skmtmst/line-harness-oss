@@ -29,6 +29,7 @@ import type { AutoV8Counts, AutoV8Model } from './automations-v8'
 import styles from './automations-v8.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 type RunStatus = 'queued' | 'claimed' | 'succeeded' | 'skipped' | 'waiting' | 'retry_wait' | 'partial' | 'permanent_failed' | 'cancelled'
 
@@ -455,8 +456,13 @@ export function V8RunsTab({
       <p className={styles.footnote}>オートメーションが動いた記録です。条件に外れて動かなかったものも並びます。</p>
       {retryNotice ? <p role="status" className={styles.footnote}>{retryNotice}</p> : null}
 
-      <div className={styles.toolbar}>
-        <TextField
+      <div className={styles.toolbar}><Field label={<>
+          <Checkbox
+            checked={includeTest}
+            onCheckedChange={(checked) => changeIncludeTest(checked)}
+          />
+          テスト実行も見る
+        </>}><TextField
           aria-label="友だちの名前・オートメーションの名前で探す"
           placeholder="友だちの名前・オートメーションの名前で探す"
           value={query}

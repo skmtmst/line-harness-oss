@@ -50,6 +50,7 @@ import { webinarLoadFailure, type WebinarLoadFailure } from './webinar-load-fail
 import styles from './list-v8.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 type SortKey = 'updated' | 'created' | 'name'
 type SavedFilter = '' | 'active' | 'draft' | 'archived'
@@ -199,10 +200,8 @@ function WebinarFolderPanelForm({
   const [name, setName] = useState(folder?.name ?? '')
 
   return (
-    <div>
-      <p className="text-ink-secondary mt-2 text-sm">ウェビナーを整理する名前を入力してください。</p>
-      <label className="text-ink mt-4 block text-sm font-semibold" htmlFor="webinar-v8-folder-name">フォルダ名</label>
-      <input
+    <div><Field label={<>フォルダ名</>} htmlFor="webinar-v8-folder-name"><p className="text-ink-secondary mt-2 text-sm">ウェビナーを整理する名前を入力してください。</p>
+<input
         id="webinar-v8-folder-name"
         value={name}
         onChange={(event) => setName(event.target.value)}

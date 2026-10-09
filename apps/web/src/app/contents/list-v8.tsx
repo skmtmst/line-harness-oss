@@ -63,6 +63,7 @@ import MediaReplacementDialog from './media-replacement-dialog'
 import MediaUploadDialog from './media-upload-dialog'
 import styles from './list-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 type MediaSort = 'newest' | 'oldest' | 'name' | 'size' | 'usage'
 const UNGROUPED = '__ungrouped__'
@@ -1658,9 +1659,7 @@ export default function MediaLibraryListV8() {
           </div>
         }
       >
-        <label>
-          <span>理由<RequiredBadge /><span>（あとから履歴で確認できます）</span></span>
-          <input
+        <Field label="理由（あとから履歴で確認できます）" required><input
             type="text"
             autoFocus
             value={archiveReason}

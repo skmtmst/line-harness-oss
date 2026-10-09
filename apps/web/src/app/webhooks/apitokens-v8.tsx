@@ -36,6 +36,7 @@ import {
   WebhooksV8Band, WebhooksV8Head, outgoingKpiCells, useV8BandData,
 } from './outgoing-v8'
 import styles from './apitokens-v8.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'disabled'
 
@@ -313,9 +314,7 @@ function ApiTokensV8Inner() {
         {showCreate ? (
           <section className={styles.createBox} aria-label="鍵の発行">
             <h2 className={styles.createTitle}>新しい鍵</h2>
-            <div>
-              <label className={styles.label} htmlFor="webhook-v8-token-name">名前</label>
-              <input
+            <div><Field label={<>名前</>} htmlFor="webhook-v8-token-name"><input
                 id="webhook-v8-token-name"
                 value={name}
                 maxLength={120}

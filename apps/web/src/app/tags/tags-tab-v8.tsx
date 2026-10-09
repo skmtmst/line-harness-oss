@@ -55,6 +55,7 @@ import {
 } from '@/components/friend-fields/tags-page-v4'
 import styles from './list-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -136,8 +137,7 @@ function TagFolderDialog({
         </>
       }
     >
-      <label className="mt-1 block">
-        <span className="text-ink-secondary mb-1 block text-xs font-medium">
+      <Field label={<><span className="text-ink-secondary mb-1 block text-xs font-medium">
           フォルダ名 <span className="text-danger">*</span>
         </span>
         <input

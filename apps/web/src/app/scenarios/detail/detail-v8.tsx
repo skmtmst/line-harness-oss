@@ -120,6 +120,7 @@ import { scenarioReferenceData } from '@/components/scenarios/scenario-reference
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -1588,9 +1589,7 @@ export default function ScenarioDetailV8({
           description="いつ送るか。送ったあと次の通へ進むかどうかも、設計どおりここでそろえて決めます。"
         >
           <div className="space-y-3">
-        <div>
-          <label className="block text-xs font-medium text-ink-secondary mb-1">ステップ順序</label>
-          <NumberInput
+        <div><Field label={<>ステップ順序</>}><NumberInput
             type="number"
             min={1}
             className="w-32 border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
@@ -1611,9 +1610,7 @@ export default function ScenarioDetailV8({
           以前は画面のいちばん下、到達タグと同じ束に置いていたので、
           「いつ送るか」を決めているときに目に入らなかった。
         */}
-        <div>
-          <label className="block text-xs font-medium text-ink-secondary mb-1">送信後</label>
-          <Select
+        <div><Field label={<>送信後</>}><Select
             aria-label="送信後"
             value={stepForm.afterSend}
             onChange={(value) =>
@@ -1694,9 +1691,7 @@ export default function ScenarioDetailV8({
         )}
 
         {!stepForm.question && stepForm.inputMode === 'template' && (
-          <div>
-            <label className="block text-xs font-medium text-ink-secondary mb-1">テンプレート <span className="text-danger">*</span></label>
-            <Select
+          <div><Field label={<>テンプレート <span className="text-danger">*</span></>}><Select
               aria-label="テンプレート"
               value={stepForm.templateId ?? ''}
               onChange={(value) => {
@@ -1729,9 +1724,7 @@ export default function ScenarioDetailV8({
 
         {!stepForm.question && stepForm.inputMode === 'direct' && (
           <>
-            <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">メッセージタイプ</label>
-              <Select
+            <div><Field label={<>メッセージタイプ</>}><Select
                 aria-label="メッセージタイプ"
                 value={stepForm.messageType}
                 onChange={(value) => setStepForm({ ...stepForm, messageType: value as MessageType })}
@@ -1768,11 +1761,7 @@ export default function ScenarioDetailV8({
                 }}
               />
             ) : (
-              <div>
-                <label className="block text-xs font-medium text-ink-secondary mb-1">メッセージ内容 <span className="text-danger">*</span></label>
-                {/* 差し込みは本文のときだけ。Flex は JSON なので、入れる位置を
-                    間違えると本文が壊れる。 */}
-                {stepForm.messageType === 'text' && (
+              <div><Field label={<>メッセージ内容 <span className="text-danger">*</span></>}>{stepForm.messageType === 'text' && (
                   <div className="mb-2">
                     <InsertToolbar
                       targetRef={stepBodyRef}
@@ -1852,9 +1841,7 @@ export default function ScenarioDetailV8({
           }
         >
           <div className="space-y-3">
-            <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">到達したらタグ付与</label>
-              <Select
+            <div><Field label={<>到達したらタグ付与</>}><Select
                 aria-label="到達したらタグ付与"
                 value={stepForm.onReachTagId ?? ''}
                 onChange={(value) => setStepForm({ ...stepForm, onReachTagId: value || null })}
@@ -2833,19 +2820,14 @@ export default function ScenarioDetailV8({
         }
       >
         <div className="flex flex-col gap-4">
-          <label className="block">
-            <span className="text-ink-secondary mb-1 block text-xs font-medium">シナリオ名</span>
-            <TextField
+          <Field label={<><span className="text-ink-secondary mb-1 block text-xs font-medium">シナリオ名</span></>}><TextField
               value={editForm.name}
               onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
               maxLength={80}
               required
               aria-label="シナリオ名"
-            />
-          </label>
-          <label className="block">
-            <span className="text-ink-secondary mb-1 block text-xs font-medium">説明（任意）</span>
-            <TextArea
+            /></Field>
+          <Field label={<><span className="text-ink-secondary mb-1 block text-xs font-medium">説明</span></>}><TextArea
               value={editForm.description}
               onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
               rows={3}
@@ -3039,9 +3021,7 @@ export default function ScenarioDetailV8({
           写らないもの：配った記録と、いま受けている人。複製しただけでは始まりません（止まった状態でできます）。
         </p>
         <div className="mt-3">
-          <label className="block">
-            <span className="text-ink-secondary mb-1 block text-xs font-medium">複製の名前</span>
-            <TextField
+          <Field label={<><span className="text-ink-secondary mb-1 block text-xs font-medium">複製の名前</span></>}><TextField
               value={duplicateName}
               onChange={(e) => setDuplicateName(e.target.value)}
               maxLength={80}

@@ -17,6 +17,7 @@ import { extractEditConflict } from './webinar-edit-conflict-band'
 import type { CompareMine } from './webinar-edit-compare-dialog'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
 
 /* 申込フォームの候補（編集画面の CtaDesignStep と同じ形）。 */
 type FormCandidates = {
@@ -324,22 +325,23 @@ export default function CtaV8({
                 </Button>
               </div>
               {current ? (
-                <div className="bg-canvas-sunken mt-3 space-y-3 rounded-control p-3">
-                  <p className="text-ink text-sm font-semibold">
+                <div className="bg-canvas-sunken mt-3 space-y-3 rounded-control p-3"><Field label={<>
+                    <span className="text-ink-secondary mb-1 block text-xs font-medium">ボタンの言葉</span>
+                    <input
+                      value={current.buttonLabel}
+                      onChange={(e) => update(currentIndex, { buttonLabel: e.target.value })}
+                      className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
+                    />
+                  </>}><p className="text-ink text-sm font-semibold">
                     選んでいるカード：{fmtMinSec(current.atSeconds)}
                   </p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="block">
-                      <span className="text-ink-secondary mb-1 block text-xs font-medium">見出し</span>
-                      <input
+<div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="見出し"><input
                         value={current.title}
                         onChange={(e) => update(currentIndex, { title: e.target.value })}
                         className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="text-ink-secondary mb-1 block text-xs font-medium">出す時刻（分:秒）</span>
-                      <NumberInput numericText
+                      /></Field>
+                    <Field label="出す時刻（分:秒）"><NumberInput numericText
                         value={times[currentIndex] ?? ''}
                         onChange={(e) =>
                           setTimes((prev) => prev.map((t, j) => (j === currentIndex ? e.target.value : t)))
@@ -381,9 +383,7 @@ export default function CtaV8({
                         ]}
                       />
                     ) : (
-                      <label className="block">
-                        <span className="text-ink-secondary mb-1 block text-xs font-medium">開くURL</span>
-                        <input
+                      <Field label="開くURL"><input
                           value={current.url ?? ''}
                           onChange={(e) => update(currentIndex, { url: e.target.value })}
                           inputMode="url"

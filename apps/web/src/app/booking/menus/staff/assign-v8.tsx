@@ -42,6 +42,7 @@ import { menuPriceLabel } from '../../lib/menu-price'
 import shell from '../settings-v8.module.css'
 import styles from './assign-v8.module.css'
 import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
 
 /* 予約設定の5タブ（settings-v8.tsx の V8_TABS と同じ並び）。 */
 const V8_TABS = [
@@ -443,9 +444,7 @@ export default function AssignMatrixV8() {
                       升を押したとき（{staffLabel(selectedStaff)} × {selectedMenu.name}）
                     </h3>
                   <div className={styles.overrideFields}>
-                    <label className={styles.field}>
-                      <span className={styles.label}>このスタッフの所要時間</span>
-                      <span className={styles.unitField}>
+                    <Field label="このスタッフの所要時間"><span className={styles.unitField}>
                         <NumberInput
                           type="number"
                           min={1}
@@ -461,11 +460,8 @@ export default function AssignMatrixV8() {
                           aria-label={`${staffLabel(selectedStaff)} の ${selectedMenu.name} の所要時間`}
                         />
                         <span className={styles.unitSuffix}>分（メニューは {selectedMenu.duration_minutes} 分）</span>
-                      </span>
-                    </label>
-                    <label className={styles.field}>
-                      <span className={styles.label}>このスタッフの料金</span>
-                      <span className={styles.unitField}>
+                      </span></Field>
+                    <Field label="このスタッフの料金"><span className={styles.unitField}>
                         <span className={styles.unitSuffix}>¥</span>
                         <NumberInput
                           type="number"

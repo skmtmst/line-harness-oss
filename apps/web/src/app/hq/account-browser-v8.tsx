@@ -18,6 +18,7 @@ import { TextField } from '@/components/shared/text-field'
 import { formatNumber } from '@/lib/format'
 import { Folder, LayoutGrid, List as ListIcon, LogIn, Plus, Settings } from 'lucide-react'
 import './readonly-v8.css'
+import { Field } from '@/components/shared/form-controls'
 
 type StatusFilter = 'all' | 'ok' | 'warn' | 'archived'
 type TagFilter = string | null
@@ -413,9 +414,7 @@ export default function AccountBrowser({
           </div>
         }
       >
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="hq-account-tag-name" className="text-label font-medium text-ink">タグの名前</label>
-          <TextField
+        <div className="flex flex-col gap-1.5"><Field label="タグの名前" htmlFor="hq-account-tag-name"><TextField
             id="hq-account-tag-name"
             value={tagName}
             maxLength={100}

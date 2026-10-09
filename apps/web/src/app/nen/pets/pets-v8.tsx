@@ -638,15 +638,7 @@ function FeedingV8({ accountId }: { accountId: string }) {
               onAdd={() => add('nen')}
               disabledAdd={drafts.length >= MAX_PRODUCTS}
             />
-            <div className={styles.treatRow}>
-              <label className={styles.fieldLabel}>
-                おやつの上限（%）
-                <span className={styles.treatInput}>
-                  <NumberInput numericText aria-label="おやつの上限（%）" inputMode="numeric" value={treatLimit} onChange={(event) => { setTreatLimit(event.target.value); setDirty(true); setNotice('') }} />
-                </span>
-              </label>
-              <p className={styles.treatNote}>1日の必要カロリーのうち、おやつに回す割合</p>
-            </div>
+            <div className={styles.treatRow}><Field label="おやつの上限（%）"><p className={styles.treatNote}>1日の必要カロリーのうち、おやつに回す割合</p></Field></div>
           </section>
         </div>
 
@@ -887,14 +879,8 @@ function PetEditorV8({ accountId, pet, onClose, onSaved }: {
           {pill('種別', 'other', 'その他', animalType, (next) => setAnimalType(next as typeof animalType))}
         </fieldset>
         <div className={styles.fieldGrid}>
-          <label className={styles.fieldLabel}>
-            ペットの名前
-            <TextField aria-label="ペットの名前" value={name} maxLength={80} onChange={(event) => setName(event.target.value)} />
-          </label>
-          <label className={styles.fieldLabel}>
-            品種
-            <TextField aria-label="品種" value={breed} maxLength={80} onChange={(event) => setBreed(event.target.value)} />
-          </label>
+          <Field label="ペットの名前"><TextField aria-label="ペットの名前" value={name} maxLength={80} onChange={(event) => setName(event.target.value)} /></Field>
+          <Field label="品種"><TextField aria-label="品種" value={breed} maxLength={80} onChange={(event) => setBreed(event.target.value)} /></Field>
         </div>
         <fieldset className={styles.pillGroup}>
           <legend className={styles.fieldLabel}>性別</legend>
@@ -903,14 +889,8 @@ function PetEditorV8({ accountId, pet, onClose, onSaved }: {
           {pill('性別', 'unknown', 'わからない', gender, (next) => setGender(next as typeof gender))}
         </fieldset>
         <div className={styles.fieldGrid}>
-          <label className={styles.fieldLabel}>
-            誕生日
-            <TextField aria-label="誕生日" placeholder="2022-04-03" value={birthday} onChange={(event) => setBirthday(event.target.value)} />
-          </label>
-          <label className={styles.fieldLabel}>
-            体重
-            <TextField aria-label="体重" inputMode="decimal" placeholder="9.2 kg" value={weight} onChange={(event) => setWeight(event.target.value)} />
-          </label>
+          <Field label="誕生日"><TextField aria-label="誕生日" placeholder="2022-04-03" value={birthday} onChange={(event) => setBirthday(event.target.value)} /></Field>
+          <Field label="体重"><TextField aria-label="体重" inputMode="decimal" placeholder="9.2 kg" value={weight} onChange={(event) => setWeight(event.target.value)} /></Field>
         </div>
         <p className={styles.fieldHint}>生まれた年が分からないときは「03-15」のように月日だけを入れます。空欄は未登録です。</p>
         {error ? <p className={styles.errorText} role="alert">{error}</p> : null}

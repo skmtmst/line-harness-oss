@@ -21,6 +21,7 @@ import {
   type WebinarScheduleRule,
 } from '@/lib/api'
 import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
 
@@ -293,8 +294,7 @@ export default function VideoV8({
 
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card" aria-label="公開期間">
           <h2 className="text-ink text-base font-bold">公開期間</h2>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <label className="block">
+          <div className="mt-3 grid gap-3 sm:grid-cols-2"><Field label={<>
               <span className="text-ink-secondary mb-1 block text-xs font-medium">公開の開始</span>
               <input
                 type="datetime-local"
@@ -402,8 +402,15 @@ export default function VideoV8({
             </div>
           ) : null}
           {adding ? (
-            <div className="border-hairline mt-3 space-y-3 rounded-control border p-3">
-              <Select
+            <div className="border-hairline mt-3 space-y-3 rounded-control border p-3"><Field label={<>
+                <span className="text-ink-secondary mb-1 block text-xs font-medium">時刻</span>
+                <input
+                  type="time"
+                  value={newTime}
+                  onChange={(e) => setNewTime(e.target.value)}
+                  className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
+                />
+              </>}><Select
                 label="枠の種類"
                 aria-label="枠の種類"
                 value={newKind}
@@ -436,10 +443,8 @@ export default function VideoV8({
                   </span>
                 </div>
               ) : null}
-              {newKind === 'once' ? (
-                <label className="block">
-                  <span className="text-ink-secondary mb-1 block text-xs font-medium">日付</span>
-                  <input
+{newKind === 'once' ? (
+                <Field label="日付"><input
                     type="date"
                     value={newDate}
                     onChange={(e) => setNewDate(e.target.value)}
@@ -470,27 +475,19 @@ export default function VideoV8({
             <div className="border-hairline mt-3 space-y-3 rounded-control border p-3">
               <p className="text-ink-secondary text-xs">日付の範囲に、単発の枠を1日1つずつ足します（31日まで）。</p>
               <div className="grid gap-3 sm:grid-cols-3">
-                <label className="block">
-                  <span className="text-ink-secondary mb-1 block text-xs font-medium">始まり</span>
-                  <input
+                <Field label={<><span className="text-ink-secondary mb-1 block text-xs font-medium">始まり</span></>}><input
                     type="date"
                     value={bulkFrom}
                     onChange={(e) => setBulkFrom(e.target.value)}
                     className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-ink-secondary mb-1 block text-xs font-medium">終わり</span>
-                  <input
+                  /></Field>
+                <Field label={<><span className="text-ink-secondary mb-1 block text-xs font-medium">終わり</span></>}><input
                     type="date"
                     value={bulkTo}
                     onChange={(e) => setBulkTo(e.target.value)}
                     className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-ink-secondary mb-1 block text-xs font-medium">時刻</span>
-                  <input
+                  /></Field>
+                <Field label={<><span className="text-ink-secondary mb-1 block text-xs font-medium">時刻</span></>}><input
                     type="time"
                     value={bulkTime}
                     onChange={(e) => setBulkTime(e.target.value)}

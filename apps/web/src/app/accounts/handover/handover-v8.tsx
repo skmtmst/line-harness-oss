@@ -39,6 +39,7 @@ import { formatDateTime, formatNumber } from '@/lib/format'
 import styles from './handover-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
 
 type HandoverDecisionView = AccountHandoverDecision & {
   sourceName?: string
@@ -587,22 +588,7 @@ export default function HandoverV8() {
             {MATCH_BUCKETS.map((bucket) => `${bucket.label} ${countsAreComplete ? `${handover.counts?.[bucket.key]}人` : emptyValue('unknown')}`).join('・')}
           </p>
           {canManage && (
-            <div className="mt-3">
-              <label className="block">
-                <span className="text-ink-faint text-xs">
-                  移し元システムが言う友だち数（申告。分からなければ空欄）
-                </span>
-                <NumberInput
-                  type="number"
-                  min={0}
-                  className="mt-1 w-40"
-                  placeholder="例：231"
-                  value={declaredTotalInput}
-                  onChange={(e) => setDeclaredTotalInput(e.target.value)}
-                  disabled={refreshing || !handover.counts}
-                />
-              </label>
-              <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+            <div className="mt-3"><Field label="移し元システムが言う友だち数（申告。分からなければ空欄）"><p className="text-ink-faint mt-1 text-xs leading-relaxed">
                 申告の数と事前確認の合計が違うままでは、本実行しません。
               </p>
             </div>

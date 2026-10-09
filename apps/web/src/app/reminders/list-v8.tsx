@@ -85,6 +85,7 @@ import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
 import { formatTriggerOffset } from './reminder-timing'
 import styles from './list-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -1289,9 +1290,7 @@ export default function RemindersListV8() {
         }}
       >
         <div className={styles.moveBody}>
-          <label className="block">
-            <span className={styles.moveLabel}>移動先のフォルダ</span>
-            <Select
+          <Field label={<><span className={styles.moveLabel}>移動先のフォルダ</span></>}><Select
               aria-label="移動先のフォルダ"
               size="full"
               value={moveDraft}

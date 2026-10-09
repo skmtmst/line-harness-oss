@@ -85,6 +85,7 @@ import VarsExportPanel from './export-panel'
 import styles from './list-v8.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -1538,16 +1539,7 @@ function CommonVarsListV8Inner() {
         }
       >
         {statusTarget ? (
-          <div>
-            {statusAction === 'stop' && statusTarget.nextSchedule ? (
-              <p className={styles.dialogWarn} role="note">
-                <TriangleAlert size={14} aria-hidden="true" />
-                <span>
-                  決めた日時に変わる予約（{formatStamp(statusTarget.nextSchedule.effectiveFrom)}に「{statusTarget.nextSchedule.value || '（空）'}」へ）があります。止める前に予定も見直してください。
-                </span>
-              </p>
-            ) : null}
-            <label className={styles.dialogField}>
+          <div><Field label={<>
               <span className={styles.dialogLabel}>
                 {statusAction === 'stop' ? '止める理由（記録に残ります）' : '再開する理由（記録に残ります）'}
               </span>
@@ -1642,8 +1634,17 @@ function CommonVarsListV8Inner() {
                 使用先を確認できませんでした。読み直してから、もう一度お試しください。
               </p>
             ) : deleteImpact ? (
-              <div>
-                <p className={deleteImpact.total > 0 ? styles.dialogError : styles.dialogLead}>
+              <div><Field label={<>
+                  <span className={styles.dialogLabel}>
+                    {deleteImpact.canDelete ? '消した理由（記録に残ります）' : '消した理由・止める理由（記録に残ります）'}
+                  </span>
+                  <input
+                    value={deleteReason}
+                    onChange={(e) => setDeleteReason(e.target.value)}
+                    placeholder="例：店舗情報の変更のため"
+                    className={styles.dialogInput}
+                  />
+                </>}><p className={deleteImpact.total > 0 ? styles.dialogError : styles.dialogLead}>
                   {usageText(deleteImpact)}
                 </p>
                 {consequenceText(deleteImpact) ? (
@@ -1698,9 +1699,7 @@ function CommonVarsListV8Inner() {
                       <p className={styles.choiceNote}>
                         {formatNumber(deleteImpact.blockingTotal)}か所の差し込みを、選んだ別のキーへ置き換えます。置き換え後は元の共通情報を履歴が残る形で保管します。
                       </p>
-                      <label className={styles.dialogField} onClick={(e) => e.stopPropagation()}>
-                        <span className={styles.dialogLabel}>差し替え先</span>
-                        <Select
+                      <Field label="差し替え先"><Select
                           size="full"
                           value={replacementId}
                           disabled={deleteBusy || replacementCandidates.length === 0}
@@ -1750,25 +1749,8 @@ function CommonVarsListV8Inner() {
                 {unavailableText(deleteImpact) ? (
                   <p className={styles.dialogHint}>{unavailableText(deleteImpact)}</p>
                 ) : null}
-
-                <label className={styles.dialogField}>
-                  <span className={styles.dialogLabel}>
-                    {deleteImpact.canDelete ? '消した理由（記録に残ります）' : '消した理由・止める理由（記録に残ります）'}
-                  </span>
-                  <input
-                    value={deleteReason}
-                    onChange={(e) => setDeleteReason(e.target.value)}
-                    placeholder="例：店舗情報の変更のため"
-                    className={styles.dialogInput}
-                  />
-                </label>
-
-                {deleteImpact.canDelete ? (
-                  <label className={styles.dialogField}>
-                    <span className={styles.dialogLabel}>
-                      削除する場合は、差し込みキーを入力してください
-                    </span>
-                    <input
+{deleteImpact.canDelete ? (
+                  <Field label="削除する場合は、差し込みキーを入力してください"><input
                       value={typedKey}
                       onChange={(e) => setTypedKey(e.target.value)}
                       placeholder={placeholderText(deleteImpact.variable.varKey)}
@@ -1812,11 +1794,7 @@ function CommonVarsListV8Inner() {
           setDeleteTargets([])
         }}
       >
-        <label className="block">
-          <span className="text-ink-secondary text-xs font-semibold">
-            消した理由 <span className="text-danger">必須</span>
-          </span>
-          <input
+        <Field label="消した理由" required><input
             value={batchReason}
             onChange={(e) => setBatchReason(e.target.value)}
             placeholder="例：店舗情報の変更のため"

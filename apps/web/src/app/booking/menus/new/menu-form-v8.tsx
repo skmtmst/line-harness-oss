@@ -53,6 +53,7 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -790,9 +791,7 @@ export default function MenuFormV8() {
               <h2 className={shell.sectionTitle}>メニューの中身</h2>
             </div>
             <div className={styles.fieldGrid}>
-              <label className={styles.field}>
-                <span className={styles.label}>メニュー名</span>
-                <input
+              <Field label="メニュー名"><input
                   className={styles.input}
                   type="text"
                   value={name}
@@ -840,9 +839,7 @@ export default function MenuFormV8() {
                   />
                 )}
               </span>
-              <label className={`${styles.field} ${styles.fieldFull}`}>
-                <span className={styles.label}>説明（お客さまに見えます）<span className={styles.optional}>任意</span></span>
-                <input
+              <Field label="説明（お客さまに見えます）"><input
                   className={styles.input}
                   type="text"
                   value={description}
@@ -852,9 +849,7 @@ export default function MenuFormV8() {
               </label>
             </div>
             <div className={`${styles.fieldGrid} ${styles.fieldGrid3}`}>
-              <label className={styles.field}>
-                <span className={styles.label}>かかる時間</span>
-                <span className={styles.unitField}>
+              <Field label="かかる時間"><span className={styles.unitField}>
                   <NumberInput unit="分"
                     type="number"
                     min={1}
@@ -875,11 +870,8 @@ export default function MenuFormV8() {
                 </span>
                 {fieldErrors.duration !== undefined ? (
                   <span className="text-danger mt-1 text-xs" role="alert">{fieldErrors.duration}</span>
-                ) : null}
-              </label>
-              <label className={styles.field}>
-                <span className={styles.label}>金額（空なら「お問い合わせ」）</span>
-                <span className={styles.unitField}>
+                ) : null}</Field>
+              <Field label="金額（空なら「お問い合わせ」）"><span className={styles.unitField}>
                   <span className={styles.unitSuffix}>¥</span>
                   <NumberInput
                     type="number"
@@ -1036,9 +1028,7 @@ export default function MenuFormV8() {
               <h2 className={shell.sectionTitle}>受け方</h2>
             </div>
             <div className={styles.fieldCol}>
-              <label className={styles.field}>
-                <span className={styles.label}>同時に受けられる件数</span>
-                <span className={styles.unitField}>
+              <Field label="同時に受けられる件数"><span className={styles.unitField}>
                   <NumberInput unit="件"
                     type="number"
                     min={1}
@@ -1047,11 +1037,8 @@ export default function MenuFormV8() {
                     aria-label="同時に受けられる件数"
                   />
 
-                </span>
-              </label>
-              <label className={styles.field}>
-                <span className={styles.label}>後の空き時間（片付け・移動）</span>
-                <span className={styles.unitField}>
+                </span></Field>
+              <Field label="後の空き時間（片付け・移動）"><span className={styles.unitField}>
                   <NumberInput unit="分"
                     type="number"
                     min={0}
@@ -1131,9 +1118,7 @@ export default function MenuFormV8() {
                 />
               </div>
               {askQuestion && (
-                <label className={styles.field}>
-                  <span className={styles.label}>質問文</span>
-                  <input
+                <Field label="質問文"><input
                     className={styles.input}
                     type="text"
                     value={intakeQuestion}

@@ -60,6 +60,7 @@ import {
 import { formatNumber } from '@/lib/format'
 import styles from './first-step-v8.module.css'
 import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
 
 const modeLabel: Record<DeliveryMode, string> = {
   absolute_time: '時刻で指定',
@@ -713,15 +714,7 @@ export default function ScenarioFirstStepV8() {
                       {contentMode === 'compose' ? (
                         <MessageTypeTabs value={kind} onChange={changeKind}>
                           {kind === 'text' && (
-                            <div>
-                              {/*
-                                「本文」の字と入力欄を結び付ける。押したら欄へ移る
-                                （共通方針 UX-01 のラベル→入力の構造）。
-                              */}
-                              <label
-                                htmlFor="first-step-body"
-                                className={styles.fieldLabel}
-                              >
+                            <div><Field label={<>
                                 本文
                               </label>
                               <div className="mb-2">

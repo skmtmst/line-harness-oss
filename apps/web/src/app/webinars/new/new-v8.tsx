@@ -20,6 +20,7 @@ import { webinarApi, describeSaveFailure, type WebinarFolder } from '@/lib/api'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { STEPS } from '@/app/webinars/edit/edit-steps'
 import styles from './new-v8.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 type DeliveryKind = 'on-demand' | 'scheduled'
 
@@ -195,9 +196,7 @@ function NewWebinarV8Inner() {
           <section className={styles.card} aria-labelledby="webinar-v8-basic">
             <h2 className={styles.cardTitle} id="webinar-v8-basic">基本設定</h2>
             <div className={styles.fieldGrid}>
-              <div className={styles.fieldFull}>
-                <label className={styles.label} htmlFor="webinar-v8-title">名前 <RequiredBadge /></label>
-                <input
+              <div className={styles.fieldFull}><Field label={<>名前 </>} htmlFor="webinar-v8-title" required><input
                   id="webinar-v8-title"
                   value={title}
                   onChange={(event) => {
@@ -216,11 +215,8 @@ function NewWebinarV8Inner() {
                 />
                 {fieldErrors.title !== undefined ? (
                   <p className={styles.fieldError} role="alert">{fieldErrors.title}</p>
-                ) : null}
-              </div>
-              <div>
-                <label className={styles.label} htmlFor="webinar-v8-slug">公開ページのURL</label>
-                <input
+                ) : null}</Field></div>
+              <div><Field label={<>公開ページのURL</>} htmlFor="webinar-v8-slug"><input
                   id="webinar-v8-slug"
                   value={slug}
                   onChange={(event) => {
@@ -241,11 +237,8 @@ function NewWebinarV8Inner() {
                 {fieldErrors.slug !== undefined ? (
                   <p className={styles.fieldError} role="alert">{fieldErrors.slug}</p>
                 ) : null}
-                <p className={styles.fieldHelp}>アドレスの最後の部分です。空のままなら自動で付けます。</p>
-              </div>
-              <div>
-                <label className={styles.label} htmlFor="webinar-v8-folder">フォルダ</label>
-                <Select
+<p className={styles.fieldHelp}>アドレスの最後の部分です。空のままなら自動で付けます。</p></Field></div>
+              <div><Field label={<>フォルダ</>} htmlFor="webinar-v8-folder"><Select
                   id="webinar-v8-folder"
                   aria-label="フォルダ"
                   value={folderId}
@@ -263,11 +256,8 @@ function NewWebinarV8Inner() {
                       もう一度読み込む
                     </button>
                   </p>
-                ) : null}
-              </div>
-              <div className={styles.fieldFull}>
-                <label className={styles.label} htmlFor="webinar-v8-description">案内文</label>
-                <input
+                ) : null}</Field></div>
+              <div className={styles.fieldFull}><Field label={<>案内文</>} htmlFor="webinar-v8-description"><input
                   id="webinar-v8-description"
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}

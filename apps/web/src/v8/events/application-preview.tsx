@@ -68,7 +68,7 @@ export default function ApplicationPreview({ accountId, draft, date, startTime, 
             {data.description ? <p className={styles.previewText}>{data.description}</p> : null}
             <p>残り {data.capacity} 席</p>
             {data.questions.map((question) => (
-              <Field label={<>{question.label}{question.required ? '（必須）' : ''}</>}><input className={styles.input} disabled aria-label={question.label} /></Field>
+              <Field label={question.label} required={question.required}><input className={styles.input} disabled aria-label={question.label} /></Field>
             ))}
             <Button disabled>{data.requiresApproval ? '申し込む（承認後に確定）' : '申し込む'}</Button>
             <p className={styles.cardNote}>見本です。申し込みや公開は行いません。</p>

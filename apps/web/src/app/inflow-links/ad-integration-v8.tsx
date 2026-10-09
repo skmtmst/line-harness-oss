@@ -579,19 +579,14 @@ function ManualEntryDialogs({ model }: { model: AdV8Model }) {
         }}
       >
         <div className="space-y-4">
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-label-v8">流入元の名前</label>
-            <TextField
+          <div><Field label="流入元の名前" htmlFor="ad-cost-label-v8"><TextField
               id="ad-cost-label-v8"
               value={model.manualLabel}
               onChange={(event: React.ChangeEvent<HTMLInputElement>) => model.setManualLabel(event.target.value)}
               placeholder="例：チラシ"
               maxLength={100}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-route-v8">計測リンク（分かれば）</label>
-            <Select
+            /></Field></div>
+          <div><Field label="計測リンク（分かれば）" htmlFor="ad-cost-route-v8"><Select
               id="ad-cost-route-v8"
               aria-label="計測リンク"
               value={model.manualRouteId}
@@ -601,15 +596,9 @@ function ManualEntryDialogs({ model }: { model: AdV8Model }) {
                 ...model.entryRoutes.map((route) => ({ value: route.id, label: route.name })),
               ]}
             />
-            <p className="mt-1 text-xs text-ink-faint">結びつけると友だち追加の人数で「1人あたり」が出ます。</p>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-day-v8">費用の日付</label>
-            <DateField id="ad-cost-day-v8" value={model.manualDay} onChange={model.setManualDay} />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-amount-v8">費用（円）</label>
-            <NumberInput numericText
+<p className="mt-1 text-xs text-ink-faint">結びつけると友だち追加の人数で「1人あたり」が出ます。</p></Field></div>
+          <div><Field label="費用の日付" htmlFor="ad-cost-day-v8"><DateField id="ad-cost-day-v8" value={model.manualDay} onChange={model.setManualDay} /></Field></div>
+          <div><Field label="費用（円）" htmlFor="ad-cost-amount-v8"><NumberInput numericText
               id="ad-cost-amount-v8"
               inputMode="numeric"
               value={model.manualAmount}
@@ -641,9 +630,7 @@ function ManualEntryDialogs({ model }: { model: AdV8Model }) {
                 {formatMinor(model.cancelTarget.amountMinor, model.cancelTarget.currency)}
               </strong>
             </p>
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-cancel-reason-v8">取り消す理由（必須）</label>
-              <TextField
+            <div><Field label="取り消す理由" htmlFor="ad-cost-cancel-reason-v8" required><TextField
                 id="ad-cost-cancel-reason-v8"
                 value={model.cancelReason}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) => model.setCancelReason(event.target.value)}

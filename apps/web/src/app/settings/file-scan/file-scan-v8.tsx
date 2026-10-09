@@ -16,6 +16,7 @@ import { FILE_SCAN_PAGE_SIZE, useFileScan } from './use-file-scan'
 import { SettingsShellV8 } from '../settings-nav-v8'
 import styles from '../settings-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 /* 板 `PfA4o` の札。`使えません`・`使えます` の絞り込みは v7 の画面に残す。 */
 const STATUS_CHIPS = [
@@ -93,11 +94,10 @@ export function FileScanV8() {
           onCancel={() => { setReleaseTarget(null); setReleaseReason(''); setReleaseError('') }}
           onConfirm={() => void release()}
         >
-          <div>
-            <label htmlFor="file-scan-release-reason" className={styles.reasonHint}>
-              理由（必須）
-            </label>
-            <TextArea
+          <div><Field label={<>
+
+              理由
+            </>} htmlFor="file-scan-release-reason" required><TextArea
               id="file-scan-release-reason"
               value={releaseReason}
               onChange={(event) => { setReleaseReason(event.target.value); setReleaseError('') }}
@@ -318,27 +318,19 @@ export function FileScanV8() {
           </div>
           {configOpen ? (
             <div className={styles.formNarrow}>
-              <div>
-                <label htmlFor="file-scan-provider" className={styles.reasonHint}>提供元</label>
-                <TextField
+              <div><Field label={<>提供元</>} htmlFor="file-scan-provider"><TextField
                   id="file-scan-provider"
                   value={provider}
                   onChange={(event) => setProvider(event.target.value)}
                   placeholder="例：example-scan"
-                />
-              </div>
-              <div className={styles.fieldGap}>
-                <label htmlFor="file-scan-endpoint" className={styles.reasonHint}>送り先（https）</label>
-                <TextField
+                /></Field></div>
+              <div className={styles.fieldGap}><Field label={<>送り先（https）</>} htmlFor="file-scan-endpoint"><TextField
                   id="file-scan-endpoint"
                   value={endpoint}
                   onChange={(event) => setEndpoint(event.target.value)}
                   placeholder="https://example.com/scan"
-                />
-              </div>
-              <div className={styles.fieldGap}>
-                <label htmlFor="file-scan-secret-ref" className={styles.reasonHint}>鍵の名前</label>
-                <TextField
+                /></Field></div>
+              <div className={styles.fieldGap}><Field label={<>鍵の名前</>} htmlFor="file-scan-secret-ref"><TextField
                   id="file-scan-secret-ref"
                   value={secretRef}
                   onChange={(event) => setSecretRef(event.target.value)}

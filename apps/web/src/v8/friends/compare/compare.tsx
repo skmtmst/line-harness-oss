@@ -197,7 +197,7 @@ function CompareInner() {
 
               {panelOpen ? (
                 <div className={styles.pair}>
-                  <div ref={panelRef} className={styles.panel} role="group" aria-labelledby="compare-decide"><Field label={<>判定の理由（必須）</>} htmlFor="compare-reason"><p id="compare-decide" className={styles.panelTitle}>「この2件を判定する」の小窓</p>
+                  <div ref={panelRef} className={styles.panel} role="group" aria-labelledby="compare-decide"><Field label={<>判定の理由</>} htmlFor="compare-reason" required><p id="compare-decide" className={styles.panelTitle}>「この2件を判定する」の小窓</p>
 <div className={styles.radios} role="radiogroup" aria-label="判定">
                       {DECISIONS.map((item) => (
                         <Radio key={item.value} name="compare-decision" value={item.value} checked={decision === item.value} onChange={() => setDecision(item.value)}>

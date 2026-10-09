@@ -43,6 +43,7 @@ import releaseLog from '@/generated/release-log-summary.json'
 import type { UpdateRelease } from './update-history'
 import styles from './control-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 type StopTarget = 'broadcasts' | 'scenarios' | 'reminders' | 'automations'
 
@@ -611,9 +612,7 @@ const EmergencyControlV8 = (
           ))}
         </div>
         <div className={styles.accountRow}>
-          <div className={styles.accountField}>
-            <label htmlFor="emergency-account-v8" className={styles.fieldLabel}>止めるアカウント</label>
-            <span className={styles.accountSelect}>
+          <div className={styles.accountField}><Field label="止めるアカウント" htmlFor="emergency-account-v8"><span className={styles.accountSelect}>
             <Select
               size="full"
               id="emergency-account-v8"
@@ -852,9 +851,7 @@ const EmergencyControlV8 = (
                 ))}
               </div>
               <p className={styles.dialogHint}>止まらないもの：{targets.automations ? '受信箱からの手の返信と予約の受付は止まりません。' : '自動処理／受信箱からの手の返信／予約の受付は止まりません。'}</p>
-              <div className={styles.confirmReason}>
-                <label htmlFor="emergency-reason-v8" className={styles.dialogLabel}>止める理由（必須）</label>
-                <input
+              <div className={styles.confirmReason}><Field label="止める理由" htmlFor="emergency-reason-v8" required><input
                   id="emergency-reason-v8"
                   aria-label="止める理由"
                   value={reason}
@@ -898,11 +895,7 @@ const EmergencyControlV8 = (
               ) : null}
             </>
           )}
-          <label className={styles.dialogField}>
-            <span className={styles.dialogLabel}>
-              確認のため「{confirmMode === 'stop' ? '停止' : '復旧'}」と入力
-            </span>
-            <input
+          <Field label="確認のため「」と入力"><input
               value={confirmWord}
               onChange={(event) => setConfirmWord(event.target.value)}
               autoFocus

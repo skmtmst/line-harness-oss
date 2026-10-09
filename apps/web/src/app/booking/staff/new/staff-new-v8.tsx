@@ -36,6 +36,7 @@ import { LiffPhoneStaffStep } from '../../menus/liff-phone-v8'
 import shell from '../../menus/settings-v8.module.css'
 import styles from './staff-new-v8.module.css'
 import TextLink from '@/components/shared/text-link'
+import { Field } from '@/components/shared/form-controls'
 
 export default function StaffNewV8() {
   const { selectedAccountId, selectedAccount } = useAccount()
@@ -322,9 +323,7 @@ export default function StaffNewV8() {
               <h2 className={shell.sectionTitle}>お客さまに見える情報</h2>
             </div>
             <div className={styles.fieldGrid}>
-              <label className={styles.field}>
-                <span className={styles.label}>スタッフ名（管理画面での呼び名）</span>
-                <input
+              <Field label="スタッフ名（管理画面での呼び名）"><input
                   id="bs-name"
                   type="text"
                   value={name}
@@ -344,11 +343,8 @@ export default function StaffNewV8() {
                 />
                 {fieldErrors.name !== undefined ? (
                   <span className={styles.formError} role="alert">{fieldErrors.name}</span>
-                ) : null}
-              </label>
-              <label className={styles.field}>
-                <span className={styles.label}>お客さま向けの表示名（空欄なら上の名前）</span>
-                <input
+                ) : null}</Field>
+              <Field label="お客さま向けの表示名（空欄なら上の名前）"><input
                   id="bs-display"
                   type="text"
                   value={displayName}
@@ -356,11 +352,8 @@ export default function StaffNewV8() {
                   maxLength={BOOKING_STAFF_LIMITS.displayName}
                   placeholder="例：みさき"
                   className={styles.input}
-                />
-              </label>
-              <label className={styles.field}>
-                <span className={styles.label}>肩書き</span>
-                <input
+                /></Field>
+              <Field label="肩書き"><input
                   id="bs-role"
                   type="text"
                   value={role}
@@ -368,11 +361,8 @@ export default function StaffNewV8() {
                   maxLength={BOOKING_STAFF_LIMITS.role}
                   placeholder="例：トリミング担当"
                   className={styles.input}
-                />
-              </label>
-              <label className={styles.field}>
-                <span className={styles.label}>顔写真（正方形・1MB まで）</span>
-                <input
+                /></Field>
+              <Field label="顔写真（正方形・1MB まで）"><input
                   id="bs-image"
                   type="url"
                   value={imageUrl}
@@ -380,11 +370,8 @@ export default function StaffNewV8() {
                   maxLength={BOOKING_STAFF_LIMITS.profileImageUrl}
                   placeholder="https://…/misaki.jpg"
                   className={styles.input}
-                />
-              </label>
-              <label className={`${styles.field} ${styles.fieldFull}`}>
-                <span className={styles.label}>紹介文</span>
-                <textarea
+                /></Field>
+              <Field label="紹介文"><textarea
                   id="bs-bio"
                   rows={3}
                   value={bio}
@@ -527,9 +514,7 @@ export default function StaffNewV8() {
                 onRetry={() => setMembersReloadKey((value) => value + 1)}
               />
             ) : (
-              <label className={styles.field}>
-                <span className={styles.label}>ログインユーザー</span>
-                <Select
+              <Field label="ログインユーザー"><Select
                   aria-label="ログインユーザーとの紐づけ"
                   id="bs-member"
                   size="full"

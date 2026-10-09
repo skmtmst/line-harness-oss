@@ -33,6 +33,7 @@ import { PhotoReviewDetail } from './photo-review-detail'
 import PhotoPolicyHistoryV8 from './photo-policy-history-v8'
 import styles from './photo-review-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 type PhotoStatus = 'pending' | 'adopted' | 'rejected'
 type PhotoView = 'list' | 'detail' | 'publications'
@@ -601,10 +602,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
             </button>
           ))}
         </div>
-        <label className={styles.fieldLabel}>
-          投稿者に届く補足（直せます）
-          <textarea value={reasonNote} onChange={(event) => { setReasonNote(event.target.value.slice(0, 500)); setReasonError('') }} rows={3} placeholder={reasonCode === 'other' ? '理由を入力してください' : '必要な場合だけ入力します'} />
-        </label>
+        <Field label="投稿者に届く補足（直せます）"><textarea value={reasonNote} onChange={(event) => { setReasonNote(event.target.value.slice(0, 500)); setReasonError('') }} rows={3} placeholder={reasonCode === 'other' ? '理由を入力してください' : '必要な場合だけ入力します'} /></Field>
       </Dialog>
 
       <Dialog open={Boolean(publicationCandidate)} title="公式サイトに掲載しますか？"
@@ -924,10 +922,7 @@ function RejectDialogV8({
             </button>
           ))}
         </fieldset>
-        <label className={styles.fieldLabel}>
-          お客様に届く補足（直せます）
-          <textarea aria-label="お客様に届く補足" className={styles.reasonTextarea} value={reasonNote} maxLength={500} rows={2} placeholder={reasonCode === 'other' ? 'お客様に送る文章を書いてください' : '必要な場合だけ補足します'} onChange={(event) => onReasonNote(event.target.value)} />
-        </label>
+        <Field label="お客様に届く補足（直せます）"><textarea aria-label="お客様に届く補足" className={styles.reasonTextarea} value={reasonNote} maxLength={500} rows={2} placeholder={reasonCode === 'other' ? 'お客様に送る文章を書いてください' : '必要な場合だけ補足します'} onChange={(event) => onReasonNote(event.target.value)} /></Field>
         <label className={styles.checkRow}>
           <Checkbox checked={resubmitInvite} onCheckedChange={onResubmitInvite}>もう一度 送ってもらえるようお願いする</Checkbox>
         </label>

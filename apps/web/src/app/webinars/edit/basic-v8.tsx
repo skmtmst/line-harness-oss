@@ -12,6 +12,7 @@ import { RequiredBadge } from '@/components/shared/form-controls'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { webinarApi, describeSaveFailure, type Webinar, type WebinarEditor, type WebinarFolder } from '@/lib/api'
 import './basic-v8.css'
+import { Field } from '@/components/shared/form-controls'
 
 /** 基本設定の編集も j7PP04 の並び。動画・公開操作は動画と確認の段に残す。 */
 export default function BasicV8({ webinar, editor, onWebinarSaved, onEditorChange, onDirtyChange, registerSave }: {
@@ -147,29 +148,20 @@ export default function BasicV8({ webinar, editor, onWebinarSaved, onEditorChang
           <section className="wb-basic-card" aria-labelledby="webinar-basic-heading">
             <h2 id="webinar-basic-heading" className="wb-basic-cardTitle">基本設定</h2>
             <div className="wb-basic-fieldGrid">
-              <div className="wb-basic-fieldFull">
-                <label className="wb-basic-label" htmlFor="webinar-basic-title">名前 <RequiredBadge /></label>
-                <input id="webinar-basic-title" aria-label="タイトル" value={title} onChange={(event) => setTitle(event.target.value)} className="wb-basic-input" aria-invalid={Boolean(fieldErrors.title)} />
-                {fieldErrors.title ? <p className="wb-basic-fieldError" role="alert">{fieldErrors.title}</p> : null}
-              </div>
+              <div className="wb-basic-fieldFull"><Field label={<>名前 </>} htmlFor="webinar-basic-title" required><input id="webinar-basic-title" aria-label="タイトル" value={title} onChange={(event) => setTitle(event.target.value)} className="wb-basic-input" aria-invalid={Boolean(fieldErrors.title)} />
+{fieldErrors.title ? <p className="wb-basic-fieldError" role="alert">{fieldErrors.title}</p> : null}</Field></div>
               <div>
                 <div className="flex items-center gap-1"><label className="wb-basic-label" htmlFor="webinar-basic-slug">公開ページのURL</label><HelpTip label="公開ページのURLの説明">アドレスの最後の部分です。半角の英小文字・数字・ハイフンで入力します。</HelpTip></div>
                 <input id="webinar-basic-slug" value={slug} onChange={(event) => setSlug(event.target.value)} className="wb-basic-input" aria-invalid={Boolean(fieldErrors.slug)} />
                 {fieldErrors.slug ? <p className="wb-basic-fieldError" role="alert">{fieldErrors.slug}</p> : null}
               </div>
-              <div>
-                <label className="wb-basic-label" htmlFor="webinar-basic-folder">フォルダ</label>
-                <Select id="webinar-basic-folder" aria-label="フォルダ" value={folderId} disabled={folderState !== 'ready' || !canEdit || saving || testing} onChange={setFolderId} options={[
+              <div><Field label={<>フォルダ</>} htmlFor="webinar-basic-folder"><Select id="webinar-basic-folder" aria-label="フォルダ" value={folderId} disabled={folderState !== 'ready' || !canEdit || saving || testing} onChange={setFolderId} options={[
                   { value: '', label: '未分類' },
                   ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
                   ...(folderId && !folders.some((folder) => folder.id === folderId) ? [{ value: folderId, label: '現在のフォルダ' }] : []),
                 ]} />
-                {folderState === 'error' ? <p className="wb-basic-fieldHelp">フォルダを読み込めませんでした。<Button size="compact" onClick={() => void loadFolders()}>もう一度読み込む</Button></p> : null}
-              </div>
-              <div className="wb-basic-fieldFull">
-                <label className="wb-basic-label" htmlFor="webinar-basic-description">案内文</label>
-                <input id="webinar-basic-description" value={description} onChange={(event) => setDescription(event.target.value)} className="wb-basic-input" />
-              </div>
+{folderState === 'error' ? <p className="wb-basic-fieldHelp">フォルダを読み込めませんでした。<Button size="compact" onClick={() => void loadFolders()}>もう一度読み込む</Button></p> : null}</Field></div>
+              <div className="wb-basic-fieldFull"><Field label={<>案内文</>} htmlFor="webinar-basic-description"><input id="webinar-basic-description" value={description} onChange={(event) => setDescription(event.target.value)} className="wb-basic-input" /></Field></div>
             </div>
           </section>
           <section className="wb-basic-card" aria-labelledby="webinar-kind-heading">

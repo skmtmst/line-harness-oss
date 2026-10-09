@@ -19,6 +19,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import { formatNumber } from '@/lib/format'
 import '../affiliates/create-v8.css'
 import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
 
 const OFFER_LIST_PATH = '/conversions?tab=offers'
 
@@ -223,19 +224,14 @@ export function NewOfferV8() {
           <section className="af-create-card" aria-label="どんな案件か">
             <h2 className="af-create-cardTitle">どんな案件か</h2>
             <p className="af-create-cardNote">アフィリエイターの画面に出ます</p>
-            <label className="af-create-fieldLabel" htmlFor="of-name">
-              案件名
-              <TextField
+            <Field label="案件名" htmlFor="of-name"><TextField
                 id="of-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="例：定期便の初回"
                 maxLength={120}
-              />
-            </label>
-            <label className="af-create-fieldLabel" htmlFor="of-description">
-              説明 任意
-              <TextArea
+              /></Field>
+            <Field label="説明" htmlFor="of-description"><TextArea
                 id="of-description"
                 rows={3}
                 value={description}
@@ -253,9 +249,7 @@ export function NewOfferV8() {
           <section className="af-create-card" aria-label="何を成果として数えるか">
             <h2 className="af-create-cardTitle">何を成果として数えるか</h2>
             <p className="af-create-cardNote">コンバージョンで作った成果地点から選びます</p>
-            <label className="af-create-fieldLabel" htmlFor="v8-offer-point">
-              成果地点
-              <Select
+            <Field label="成果地点" htmlFor="v8-offer-point"><Select
                 id="v8-offer-point"
                 aria-label="成果地点"
                 value=""
@@ -272,9 +266,7 @@ export function NewOfferV8() {
             <h2 className="af-create-cardTitle">いくら払うか</h2>
             <p className="af-create-cardNote">アフィリエイター側の決まりが「定額」のときにこの額を使います</p>
             <div className="af-create-grid2">
-              <label className="af-create-fieldLabel" htmlFor="of-amount">
-                報酬額（円）
-                <NumberInput
+              <Field label="報酬額（円）" htmlFor="of-amount"><NumberInput
                   id="of-amount"
                   type="number"
                   min={0}
@@ -282,11 +274,8 @@ export function NewOfferV8() {
                   value={rewardAmount}
                   onChange={(event) => setRewardAmount(event.target.value)}
                   placeholder="2000"
-                />
-              </label>
-              <label className="af-create-fieldLabel" htmlFor="of-miles">
-                マイル（任意） 任意
-                <NumberInput
+                /></Field>
+              <Field label="マイル" htmlFor="of-miles"><NumberInput
                   id="of-miles"
                   type="number"
                   min={0}

@@ -10,6 +10,7 @@ import LinePreview from '@/components/shared/line-preview'
 import WebinarNotifications from '@/components/webinars/webinar-notifications'
 import { webinarApi, type WebinarAction, type WebinarEditor, type WebinarNotificationOverview, type WebinarNotificationSettings } from '@/lib/api'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
+import { Field } from '@/components/shared/form-controls'
 
 const TRIGGER_LABEL: Record<WebinarAction['trigger'], string> = { completed: '視聴完了', cta_clicked: 'CTAクリック', unviewed: '未視聴' }
 const ACTION_LABEL: Record<WebinarAction['actionType'], string> = { add_tag: 'タグを付ける', remove_tag: 'タグを外す', start_scenario: 'シナリオを始める', stop_scenario: 'シナリオを止める', resume_scenario: 'シナリオを再開する', send_message: 'メッセージを送る', send_webhook: 'Webhookを送る', switch_rich_menu: 'リッチメニューを変える', remove_rich_menu: 'リッチメニューを外す' }
@@ -115,7 +116,7 @@ export default function NotificationsV8({ webinarId, webinarTitle, editor, onEdi
           </ul>}
           <label className="text-ink block text-xs font-semibold" htmlFor="webinar-action-message">視聴完了のメッセージ</label>
           <textarea id="webinar-action-message" aria-label="視聴完了メッセージ本文" value={templateBody} onChange={(event) => setTemplateBody(event.target.value)} rows={2} className="border-hairline bg-canvas text-ink mt-2 w-full rounded-control border px-3 py-2 text-sm" />
-          <div className="mt-3"><label className="text-ink mb-2 block text-xs font-semibold">結果が取れないとき</label><Select aria-label="視聴結果を取得できない場合" value={policy} onChange={(value) => setPolicy(value as typeof policy)} options={[{ value: 'escalate', label: '要対応へ追加' }, { value: 'retry_next_day', label: '翌日に再取得' }]} /></div>
+          <div className="mt-3"><Field label={<>結果が取れないとき</>}><Select aria-label="視聴結果を取得できない場合" value={policy} onChange={(value) => setPolicy(value as typeof policy)} options={[{ value: 'escalate', label: '要対応へ追加' }, { value: 'retry_next_day', label: '翌日に再取得' }]} /></Field></div>
           <div className="mt-3"><Button onClick={onOpenActions}>条件を足す</Button></div>
           {!registerSave ? <Button onClick={() => void save()} disabled={saving}>下書きを保存</Button> : null}
         </fieldset>

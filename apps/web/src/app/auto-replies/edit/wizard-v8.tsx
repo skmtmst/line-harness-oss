@@ -108,6 +108,7 @@ import InsertTextField from '@/components/shared/insert-text-field'
 import { FieldError } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
 
 /*
  * ★V8 自動応答の作成・編集・有効化。
@@ -1594,22 +1595,13 @@ function AutoReplyWizardV8Inner() {
                   <p className={styles.cardNote}>一覧に出る名前です。友だちには見えません。</p>
                 </div>
                 <div className={styles.fieldPair}>
-                  <div className={styles.field}>
-                    <label htmlFor="wiz-name" className={styles.label}>
-                      ルール名
-                    </label>
-                    <TextField
+                  <div className={styles.field}><Field label="ルール名" htmlFor="wiz-name"><TextField
                       id="wiz-name"
                       value={form.ruleName}
                       onChange={(e) => patch({ ruleName: e.target.value })}
                       placeholder="例：予約の日程変更"
-                    />
-                  </div>
-                  <div className={styles.field}>
-                    <label htmlFor="wiz-folder" className={styles.label}>
-                      フォルダ
-                    </label>
-                    <FolderSelect
+                    /></Field></div>
+                  <div className={styles.field}><Field label="フォルダ" htmlFor="wiz-folder"><FolderSelect
                       id="wiz-folder"
                       aria-label="フォルダ"
                       value={form.folderId}
@@ -1623,11 +1615,7 @@ function AutoReplyWizardV8Inner() {
                     />
                   </div>
                 </div>
-                <div className={styles.field}>
-                  <label htmlFor="wiz-memo" className={styles.label}>
-                    社内メモ<span className={styles.labelOptional}>任意</span>
-                  </label>
-                  <TextField
+                <div className={styles.field}><Field label="社内メモ" htmlFor="wiz-memo"><TextField
                     id="wiz-memo"
                     value={form.internalMemo}
                     onChange={(e) => patch({ internalMemo: e.target.value })}
@@ -1948,9 +1936,7 @@ function AutoReplyWizardV8Inner() {
                     </button>
                   </div>
                   {/* 祝日の扱いは機能として残す（絵は説明の1行だけ）。場所を取らないよう時間帯の横に小さく。 */}
-                  <label className={styles.inlineSelect}>
-                    祝日
-                    <Select
+                  <Field label="祝日"><Select
                       aria-label="祝日の扱い"
                       value={form.holidayRule}
                       onChange={(v) => patch({ holidayRule: v as HolidayRuleValue })}
@@ -2089,11 +2075,7 @@ function AutoReplyWizardV8Inner() {
                 )}
 
                 {form.mode === 'inline-flex' && (
-                  <div className={styles.field}>
-                    <label htmlFor="wiz-flex" className={styles.label}>
-                      カードの内容（JSON）
-                    </label>
-                    <TextArea
+                  <div className={styles.field}><Field label="カードの内容（JSON）" htmlFor="wiz-flex"><TextArea
                       id="wiz-flex"
                       invalid={!!fieldError('wiz-flex')}
                       aria-describedby={fieldError('wiz-flex') ? 'wiz-flex-error' : undefined}
@@ -2591,9 +2573,7 @@ function KeywordInput({ onAdd, error }: { onAdd: (word: string) => void; error?:
     }
   }
   return (
-    <label className={styles.kwInput} data-invalid={!!error || undefined}>
-      <Search size={14} aria-hidden="true" />
-      <input
+    <Field label={<><Search size={14} aria-hidden="true" /></>}><input
         id="wiz-keywords"
         aria-invalid={!!error || undefined}
         aria-describedby={error ? 'wiz-keywords-error' : undefined}

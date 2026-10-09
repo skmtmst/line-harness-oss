@@ -50,6 +50,7 @@ import { FriendMultiSelect } from './friend-multi-select'
 import { formatNumber, formatTime } from '@/lib/format'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 /**
  * ルールを作る。Pencil ★V6 `Rv8Jv`（25-1-A つくる）。
@@ -729,11 +730,9 @@ function ResourcePickRow(props: {
 }) {
   const { title, id, selectLabel, value, onPick, options, tagsLoading, tagsFailed, failedNote } = props
   return (
-    <div className="space-y-2">
-      <label className={styles.fieldLabel} htmlFor={id}>
-        {title}<RequiredBadge />
-      </label>
-      <div className="space-y-2">
+    <div className="space-y-2"><Field label={<>
+        {title}
+      </>} htmlFor={id} required><div className="space-y-2">
         <Select
           id={id}
           value={value}
@@ -2228,9 +2227,7 @@ export function NewAutomationV8({
           <section className={styles.formCard} aria-label="名前">
             <h2 className={styles.formTitle}>{stepNo(1)}名前</h2>
             <p className={styles.footnote}>一覧で見分けるための名前。お客さまには見えません</p>
-            <label className={styles.fieldLabel} htmlFor="v8-rule-name">
-              名前
-              <TextField
+            <Field label="名前" htmlFor="v8-rule-name"><TextField
                 id="v8-rule-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
@@ -2319,9 +2316,7 @@ export function NewAutomationV8({
             <h2 className={styles.formTitle}>{stepNo(2)}だれに動かしますか</h2>
             <p className={styles.footnote}>条件を付けないと、きっかけに当てはまった人全員に動きます。</p>
             {usesKeyword ? (
-              <label className={styles.fieldLabel} htmlFor="v8-rule-keyword">
-                含まれる言葉
-                <TextField
+              <Field label="含まれる言葉" htmlFor="v8-rule-keyword"><TextField
                   id="v8-rule-keyword"
                   value={keyword}
                   onChange={(event) => setKeyword(event.target.value)}
@@ -2377,8 +2372,7 @@ export function NewAutomationV8({
               {actions.map((row, index) => (
                 <li key={row.key} className={styles.actionRow}>
                   <span className={styles.actionNum}>{index + 1}</span>
-                  <div className={styles.actionBody}>
-                    <label className={styles.fieldLabel} htmlFor={`v8-action-${row.key}`}>
+                  <div className={styles.actionBody}><Field label={<>
                       {actionRowTitle(row.type)}
                       <Select
                         id={`v8-action-${row.key}`}
@@ -2426,9 +2420,7 @@ export function NewAutomationV8({
                         failedNote="共通アクションを読み込めませんでした。画面を再読み込みしてください。"
                       />
                     ) : (
-                      <label className={styles.fieldLabel} htmlFor={`v8-message-${row.key}`}>
-                        送る文面
-                        <TextArea
+                      <Field label="送る文面" htmlFor={`v8-message-${row.key}`}><TextArea
                           id={`v8-message-${row.key}`}
                           value={row.message}
                           onChange={(event) => updateAction(row.key, { message: event.target.value })}
@@ -2785,8 +2777,7 @@ function V8ResourcePickRow(props: {
 }) {
   const { title, id, selectLabel, value, onPick, options, loading, failed, failedNote } = props
   return (
-    <div className={styles.formGrid}>
-      <label className={styles.fieldLabel} htmlFor={id}>
+    <div className={styles.formGrid}><Field label={<>
         {title}
         <Select
           id={id}

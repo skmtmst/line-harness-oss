@@ -28,6 +28,7 @@ import {
 } from './use-friend-migrations'
 import styles from '@/app/friends/friends-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 export default function FriendMigrationsV8() {
   usePageTitle('CSVで書き出す・取り込む')
@@ -69,21 +70,7 @@ export default function FriendMigrationsV8() {
       <div className={styles.duoCards}>
         <section className={styles.section}>
           <h3 className={styles.sectionTitle}>CSVで書き出す</h3>
-          <div className={styles.fieldStack}>
-            <label className={styles.fieldLabel}>
-              アカウント
-              <Select
-                aria-label="書き出すLINEアカウント"
-                size="full"
-                value={m.accountId}
-                onChange={m.setAccountId}
-                options={[
-                  { value: '', label: 'アカウントを選択' },
-                  ...m.accounts.map((account) => ({ value: account.id, label: account.name })),
-                ]}
-              />
-            </label>
-            <fieldset className={styles.fieldStack} style={{ gap: 8 }}>
+          <div className={styles.fieldStack}><Field label="アカウント" help={<>基本はLINEユーザーID・LINE表示名・本名・システム表示名・登録日の5列です。この5列はそのまま取り込めます。</>}><fieldset className={styles.fieldStack} style={{ gap: 8 }}>
               <legend className={styles.fieldLabel}>
                 書き出す項目
                 <HelpTip label="書き出す項目の説明">基本はLINEユーザーID・LINE表示名・本名・システム表示名・登録日の5列です。この5列はそのまま取り込めます。</HelpTip>

@@ -32,6 +32,7 @@ import { formatNumber } from '@/lib/format'
 import './create-v8.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
 
 const FRIEND_PAGE_SIZE = 20
 const AFFILIATE_LIST_PATH = '/conversions?tab=affiliates'
@@ -354,19 +355,14 @@ export function NewAffiliateV8() {
             <h2 className="af-create-cardTitle">だれを登録するか</h2>
             <p className="af-create-cardNote">会社でも個人でも登録できます</p>
             <div className="af-create-grid2">
-              <label className="af-create-fieldLabel" htmlFor="af-name">
-                名前（表示名）
-                <TextField
+              <Field label="名前（表示名）" htmlFor="af-name"><TextField
                   id="af-name"
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   placeholder="例：ペットライフ編集部"
                   maxLength={120}
-                />
-              </label>
-              <label className="af-create-fieldLabel" htmlFor="af-code">
-                <span className="af-create-toolbar">紹介コード（リンクの最後に付く）<HelpTip label="紹介コードの決まり">登録後は変更できません。英数字4文字以上。空欄なら推測されにくいコードを自動で作ります。</HelpTip></span>
-                <TextField
+                /></Field>
+              <Field label="紹介コード（リンクの最後に付く）" htmlFor="af-code" help={<>登録後は変更できません。英数字4文字以上。空欄なら推測されにくいコードを自動で作ります。</>}><TextField
                   id="af-code"
                   value={code}
                   onChange={(event) => setCode(event.target.value)}
@@ -375,9 +371,7 @@ export function NewAffiliateV8() {
                 />
               </label>
             </div>
-            <label className="af-create-fieldLabel" htmlFor="af-email">
-              連絡先メール
-              <TextField
+            <Field label="連絡先メール" htmlFor="af-email"><TextField
                 id="af-email"
                 type="email"
                 value={email}
@@ -475,9 +469,7 @@ export function NewAffiliateV8() {
               ))}
             </RadioCardGroup>
             {payoutKind === 'rate' ? (
-              <label className="af-create-fieldLabel" htmlFor="af-rate">
-                売上に対する割合
-                <span className="af-create-toolbar">
+              <Field label="売上に対する割合" htmlFor="af-rate"><span className="af-create-toolbar">
                   <NumberInput unit="%"
                     id="af-rate"
                     type="number"
@@ -492,19 +484,14 @@ export function NewAffiliateV8() {
               </label>
             ) : null}
             <div className="af-create-grid2">
-              <label className="af-create-fieldLabel" htmlFor="af-cycle">
-                締めと支払い
-                <TextField
+              <Field label="締めと支払い" htmlFor="af-cycle"><TextField
                   id="af-cycle"
                   value={payoutCycle}
                   onChange={(event) => setPayoutCycle(event.target.value)}
                   placeholder="例：月末締め翌月末払い"
                   maxLength={100}
-                />
-              </label>
-              <label className="af-create-fieldLabel" htmlFor="af-hold">
-                <span className="af-create-toolbar">保留期間<HelpTip label="保留期間の意味">返品・キャンセルを考慮する期間です。</HelpTip></span>
-                <span className="af-create-toolbar">
+                /></Field>
+              <Field label="保留期間" htmlFor="af-hold" help={<>返品・キャンセルを考慮する期間です。</>}><span className="af-create-toolbar">
                   <NumberInput
                     id="af-hold"
                     type="number"

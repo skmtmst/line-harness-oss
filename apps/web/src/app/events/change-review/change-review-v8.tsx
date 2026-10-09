@@ -28,6 +28,7 @@ import {
 import styles from './change-review-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
 
 /** datetime-local の入力値（壁時計）を見やすく出す。 */
 function formatLocalInput(local: string): string {
@@ -237,29 +238,21 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
               <>
                 <p className={styles.cardNote}>{formatJp(activeSlot.starts_at)} の回</p>
                 <div className={`${styles.fieldGrid} mt-3`}>
-                  <label className="grid gap-1 text-xs font-medium text-ink-secondary">
-                    開始日時
-                    <input
+                  <Field label="開始日時"><input
                       type="datetime-local"
                       value={activeEdit?.startsAt ?? ''}
                       onChange={(e) => updateActiveEdit({ startsAt: e.target.value })}
                       aria-label="開始日時"
                       className="border-hairline rounded-control w-full border px-3 py-2 text-sm font-normal"
-                    />
-                  </label>
-                  <label className="grid gap-1 text-xs font-medium text-ink-secondary">
-                    終了日時
-                    <input
+                    /></Field>
+                  <Field label="終了日時"><input
                       type="datetime-local"
                       value={activeEdit?.endsAt ?? ''}
                       onChange={(e) => updateActiveEdit({ endsAt: e.target.value })}
                       aria-label="終了日時"
                       className="border-hairline rounded-control w-full border px-3 py-2 text-sm font-normal"
-                    />
-                  </label>
-                  <label className="grid gap-1 text-xs font-medium text-ink-secondary">
-                    定員
-                    <NumberInput
+                    /></Field>
+                  <Field label="定員"><NumberInput
                       type="number"
                       min={1}
                       value={activeEdit?.capacity ?? ''}
@@ -283,9 +276,7 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
                   </div>
                 </div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <label className="grid gap-1 text-xs font-medium text-ink-secondary">
-                    会場
-                    <input
+                  <Field label="会場"><input
                       value={venueName}
                       onChange={(e) => {
                         setVenueName(e.target.value)
@@ -293,11 +284,8 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
                       }}
                       placeholder={event.venue_name ?? emptyValue('unconfigured')}
                       className="border-hairline rounded-control border px-3 py-2 text-sm font-normal"
-                    />
-                  </label>
-                  <label className="grid gap-1 text-xs font-medium text-ink-secondary">
-                    オンラインのURL（確定した申込にだけ見せます）
-                    <input
+                    /></Field>
+                  <Field label="オンラインのURL（確定した申込にだけ見せます）"><input
                       value={venueUrl}
                       onChange={(e) => {
                         setVenueUrl(e.target.value)
@@ -307,6 +295,7 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
                       inputMode="url"
                       className="border-hairline rounded-control border px-3 py-2 text-sm font-normal"
                     />
+                <div className="mt-3"><Field label="変える理由"><p className="text-ink-faint mt-1 text-xs">理由は変更の記録に残ります。友だちには送りません。</p></Field></div>
                   </label>
                 </div>
                 <div className="mt-3">

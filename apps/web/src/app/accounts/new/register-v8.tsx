@@ -28,6 +28,7 @@ import { isDuplicateChannelError, matchRegisteredAccountId } from './account-rec
 import styles from './register-v8.module.css'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 const V8_STEPS = [
   { number: 1, label: 'LINE準備', designNode: 'xj3zz' },
@@ -638,28 +639,16 @@ export default function RegisterV8() {
                 <h2>チャネル設定</h2>
                 <div className={styles.panelBody}>
                   <div className={styles.twoCol}>
-                    <div>
-                      <label className={styles.fieldLabel} htmlFor="v8-channel-id">Messaging API のチャネルID<RequiredBadge /></label>
-                      <input id="v8-channel-id" className={styles.fieldInput} value={form.channelId} onChange={(event) => update('channelId', event.target.value)} inputMode="numeric" required aria-invalid={fieldErrors.channelId ? true : undefined} />
-                      {fieldErrors.channelId && <p className={styles.fieldError}>{fieldErrors.channelId}</p>}
-                      <p className={styles.fieldHelp}>LINE Developers の Messaging API チャネルで取得　<TextLink external href="/manuals/line-connect/index.html#m1"   className="text-action font-semibold hover:underline">取得方法を見る</TextLink></p>
-                    </div>
-                    <div>
-                      <label className={styles.fieldLabel} htmlFor="v8-channel-secret">Messaging API のチャネルシークレット<RequiredBadge /></label>
-                      <input id="v8-channel-secret" type="password" autoComplete="new-password" className={styles.fieldInput} value={form.channelSecret} onChange={(event) => update('channelSecret', event.target.value)} required aria-invalid={fieldErrors.channelSecret ? true : undefined} />
-                      {fieldErrors.channelSecret && <p className={styles.fieldError}>{fieldErrors.channelSecret}</p>}
-                    </div>
-                    <div>
-                      <label className={styles.fieldLabel} htmlFor="v8-login-channel-id">LINE Login のチャネルID<RequiredBadge /></label>
-                      <input id="v8-login-channel-id" className={styles.fieldInput} value={form.loginChannelId} onChange={(event) => update('loginChannelId', event.target.value)} inputMode="numeric" required aria-invalid={fieldErrors.loginChannelId ? true : undefined} />
-                      {fieldErrors.loginChannelId && <p className={styles.fieldError}>{fieldErrors.loginChannelId}</p>}
-                      <p className={styles.fieldHelp}>LIFF は自動で作ります。Messaging API と同じプロバイダーのチャネル　<TextLink external href="/manuals/line-connect/index.html#m2"   className="text-action font-semibold hover:underline">取得方法を見る</TextLink></p>
-                    </div>
-                    <div>
-                      <label className={styles.fieldLabel} htmlFor="v8-login-channel-secret">LINE Login のチャネルシークレット<RequiredBadge /></label>
-                      <input id="v8-login-channel-secret" type="password" autoComplete="new-password" className={styles.fieldInput} value={form.loginChannelSecret} onChange={(event) => update('loginChannelSecret', event.target.value)} required aria-invalid={fieldErrors.loginChannelSecret ? true : undefined} />
-                      {fieldErrors.loginChannelSecret && <p className={styles.fieldError}>{fieldErrors.loginChannelSecret}</p>}
-                    </div>
+                    <div><Field label="Messaging API のチャネルID" htmlFor="v8-channel-id" required><input id="v8-channel-id" className={styles.fieldInput} value={form.channelId} onChange={(event) => update('channelId', event.target.value)} inputMode="numeric" required aria-invalid={fieldErrors.channelId ? true : undefined} />
+{fieldErrors.channelId && <p className={styles.fieldError}>{fieldErrors.channelId}</p>}
+<p className={styles.fieldHelp}>LINE Developers の Messaging API チャネルで取得　<TextLink external href="/manuals/line-connect/index.html#m1"   className="text-action font-semibold hover:underline">取得方法を見る</TextLink></p></Field></div>
+                    <div><Field label="Messaging API のチャネルシークレット" htmlFor="v8-channel-secret" required><input id="v8-channel-secret" type="password" autoComplete="new-password" className={styles.fieldInput} value={form.channelSecret} onChange={(event) => update('channelSecret', event.target.value)} required aria-invalid={fieldErrors.channelSecret ? true : undefined} />
+{fieldErrors.channelSecret && <p className={styles.fieldError}>{fieldErrors.channelSecret}</p>}</Field></div>
+                    <div><Field label="LINE Login のチャネルID" htmlFor="v8-login-channel-id" required><input id="v8-login-channel-id" className={styles.fieldInput} value={form.loginChannelId} onChange={(event) => update('loginChannelId', event.target.value)} inputMode="numeric" required aria-invalid={fieldErrors.loginChannelId ? true : undefined} />
+{fieldErrors.loginChannelId && <p className={styles.fieldError}>{fieldErrors.loginChannelId}</p>}
+<p className={styles.fieldHelp}>LIFF は自動で作ります。Messaging API と同じプロバイダーのチャネル　<TextLink external href="/manuals/line-connect/index.html#m2"   className="text-action font-semibold hover:underline">取得方法を見る</TextLink></p></Field></div>
+                    <div><Field label="LINE Login のチャネルシークレット" htmlFor="v8-login-channel-secret" required><input id="v8-login-channel-secret" type="password" autoComplete="new-password" className={styles.fieldInput} value={form.loginChannelSecret} onChange={(event) => update('loginChannelSecret', event.target.value)} required aria-invalid={fieldErrors.loginChannelSecret ? true : undefined} />
+{fieldErrors.loginChannelSecret && <p className={styles.fieldError}>{fieldErrors.loginChannelSecret}</p>}</Field></div>
                   </div>
                   <p className={styles.fieldHelp}>検査中は「次へ」を押せません。入力を変えると接続確認はやり直しになります。</p>
                 </div>
@@ -673,14 +662,9 @@ export default function RegisterV8() {
                 <h2>基本情報</h2>
                 <div className={styles.panelBody}>
                   <div className={styles.twoCol}>
-                    <div>
-                      <label className={styles.fieldLabel} htmlFor="v8-display-name">表示名</label>
-                      <input id="v8-display-name" className={styles.fieldInput} value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="未入力なら LINE公式アカウントの名前を使います" aria-invalid={fieldErrors.name ? true : undefined} />
-                      {fieldErrors.name && <p className={styles.fieldError}>{fieldErrors.name}</p>}
-                    </div>
-                    <div>
-                      <label className={styles.fieldLabel} htmlFor="v8-line-id">LINE ID</label>
-                      <div className={styles.endpointRow}>
+                    <div><Field label="表示名" htmlFor="v8-display-name"><input id="v8-display-name" className={styles.fieldInput} value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="未入力なら LINE公式アカウントの名前を使います" aria-invalid={fieldErrors.name ? true : undefined} />
+{fieldErrors.name && <p className={styles.fieldError}>{fieldErrors.name}</p>}</Field></div>
+                    <div><Field label="LINE ID" htmlFor="v8-line-id"><div className={styles.endpointRow}>
                         <input id="v8-line-id" className={styles.fieldInput} value={form.lineId} readOnly placeholder="「LINEから取得」を押すと入ります" aria-readonly />
                         <Button type="button" onClick={() => void fetchLineId()} disabled={busyAction === 'check'} busy={busyAction === 'check'} busyLabel="取得しています…">LINEから取得</Button>
                       </div>
@@ -705,7 +689,7 @@ export default function RegisterV8() {
                   </div>
                   <div className={styles.twoCol}>
                     <div><span className={styles.fieldLabel}>親アカウント</span><Select aria-label="親アカウント" value={form.parentId} onChange={value => update('parentId', value)} options={[{value:'',label:'親なし'}, ...parents.map(a => ({value:a.id,label:a.name}))]} /></div>
-                    <div><label className={styles.fieldLabel} htmlFor="v8-existing-liff">既存のLIFF ID（任意）</label><input id="v8-existing-liff" className={styles.fieldInput} value={form.liffId} onChange={e => update('liffId',e.target.value)} placeholder="未入力なら自動で用意します" /></div>
+                    <div><Field label="既存のLIFF ID" htmlFor="v8-existing-liff"><input id="v8-existing-liff" className={styles.fieldInput} value={form.liffId} onChange={e => update('liffId',e.target.value)} placeholder="未入力なら自動で用意します" /></Field></div>
                   </div>
                   <fieldset><legend className={styles.fieldLabel}>このアカウントを担当範囲に追加する人</legend><div className={styles.tagRow}>{staffOptions.map(member => <Checkbox key={member.id} aria-label={member.name} checked={form.staffIds.includes(member.id)} onCheckedChange={checked => update('staffIds',checked ? [...form.staffIds,member.id] : form.staffIds.filter(id => id !== member.id))}>{member.name}</Checkbox>)}</div><p className={styles.fieldHelp}>全アカウント担当者は追加操作なしで閲覧できます。</p></fieldset>
                   {optionsError ? <p role="alert" className={styles.fieldError}>{optionsError}</p> : null}

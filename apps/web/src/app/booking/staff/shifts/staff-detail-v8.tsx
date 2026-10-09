@@ -51,6 +51,7 @@ import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { DetailLoading } from '@/components/templates/detail-page'
+import { Field } from '@/components/shared/form-controls'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -961,19 +962,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
               </span>
             </p>
           ) : (
-            <div className={styles.switcherRow}>
-              <label className={styles.switcherField}>
-                <span className={styles.switcherLabel}>担当者を切り替える</span>
-                <Select
-                  aria-label="担当者を切り替える"
-                  size="full"
-                  value={staffId}
-                  onChange={(value) => router.push(`/booking/staff/shifts?staff_id=${value}`)}
-                  options={staffList.map((item) => ({ value: item.id, label: item.display_name }))}
-                />
-              </label>
-              <p className={styles.switcherNote}>保存すると、右の予約画面にすぐ出ます。</p>
-            </div>
+            <div className={styles.switcherRow}><Field label="担当者を切り替える"><p className={styles.switcherNote}>保存すると、右の予約画面にすぐ出ます。</p></Field></div>
           )}
 
           {/* N-411: 本人勤務が閲覧のみのときは全編集部品をまとめて無効化する。
@@ -1220,10 +1209,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
                   開始日
                   <DateField aria-label="まとめて作り始める日" value={genFrom} onChange={setGenFrom} className="mt-1" />
                 </span>
-                <label className={styles.fieldLabel}>
-                  週の数（1〜12）
-                  <NumberInput aria-label="まとめて作る週の数" type="number" min={1} max={12} value={genWeeks} onChange={(event) => setGenWeeks(event.target.value)} className={`${styles.input} mt-1`} />
-                </label>
+                <Field label="週の数（1〜12）"><NumberInput aria-label="まとめて作る週の数" type="number" min={1} max={12} value={genWeeks} onChange={(event) => setGenWeeks(event.target.value)} className={`${styles.input} mt-1`} /></Field>
                 <div className={styles.genAction}>
                   <Button variant="primary" onClick={() => void generateFromRules()} disabled={generating} busy={generating} busyLabel="作成中…">作る</Button>
                 </div>
@@ -1241,25 +1227,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
               {!serviceConfigured ? (
                 <p className={shell.warnBand} role="status">Googleの接続設定がまだなのでつなげません。管理者に連絡してください。</p>
               ) : null}
-              <div className={styles.calendarRow}>
-                <label className={styles.calendarField}>
-                  <span className={styles.fieldLabel}>カレンダーの ID</span>
-                  <input
-                    aria-label="カレンダーのID"
-                    value={calendarId ? (calendarInput || calendarId) : calendarInput}
-                    onChange={(event) => {
-                      if (calendarId) {
-                        setCalendarId(null)
-                        setCalendarInput(event.target.value)
-                      } else {
-                        setCalendarInput(event.target.value)
-                      }
-                    }}
-                    placeholder="例：example@example.invalid"
-                    className={styles.input}
-                  />
-                </label>
-                {calendarId ? (
+              <div className={styles.calendarRow}><Field label="カレンダーの ID">{calendarId ? (
                   <span className={styles.connectedBadge}>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="5" /><path d="M3.8 6.2l1.4 1.4 3-3.2" /></svg>
                     つながっている

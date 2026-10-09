@@ -31,6 +31,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import BranchEditors, { newBranchStep, updateBranchStep, type BranchPatch } from './branch-editor'
 import { mergeOrderedActions, stepNumbers } from './action-order'
 import styles from '@/app/automations/automations-v8.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 const EMPTY_RESOURCES: CommonActionResources = {
   tags: [], scenarios: [], templates: [], webhooks: [], richMenus: [], commonActions: [],
@@ -170,19 +171,14 @@ export function CommonActionNewV8() {
           <section className={styles.formCard}>
             <h2 className={styles.formTitle}>どんなアクションか</h2>
             <div className={styles.formGrid}>
-              <label className={styles.fieldLabel} htmlFor="v8-common-action-name">
-                名前
-                <TextField
+              <Field label="名前" htmlFor="v8-common-action-name"><TextField
                   id="v8-common-action-name"
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   maxLength={120}
                   placeholder="例：購入のお礼"
-                />
-              </label>
-              <label className={styles.fieldLabel} htmlFor="v8-common-action-description">
-                説明 <span className={styles.optional}>任意</span>
-                <TextField
+                /></Field>
+              <Field label="説明" htmlFor="v8-common-action-description"><TextField
                   id="v8-common-action-description"
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
@@ -221,10 +217,7 @@ export function CommonActionNewV8() {
               <Button onClick={() => setActions((current) => [...current, newBranchStep()])} variant="secondary" size="compact">条件で分ける</Button>
               <Button onClick={() => setActions((current) => [...current, newCommonActionStep('wait')])} variant="secondary" size="compact">待ち時間を入れる</Button>
               {resources.commonActions.length > 0 ? (
-                <label className={styles.inlineField}>
-                  <span>見本から受け渡す</span>
-                  <Select aria-label="見本から受け渡す" value={exampleId} onChange={(value) => { setExampleId(value); addExample(value) }} options={[{ value: '', label: '選ぶ' }, ...resources.commonActions.map((item) => ({ value: item.id, label: `${item.name} v${item.version}` }))]} />
-                </label>
+                <Field label="見本から受け渡す"><Select aria-label="見本から受け渡す" value={exampleId} onChange={(value) => { setExampleId(value); addExample(value) }} options={[{ value: '', label: '選ぶ' }, ...resources.commonActions.map((item) => ({ value: item.id, label: `${item.name} v${item.version}` }))]} /></Field>
               ) : null}
             </div>
           </section>

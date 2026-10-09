@@ -44,6 +44,7 @@ import { daysUntilIso, eventRowState, isLowApplication, summarizeEventAttention 
 import { formatDateTime, formatDay } from '@/lib/format'
 import styles from './events-list-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 /*
  * R601: 読み込みの失敗は「権限不足」と「通信失敗」を分ける。
@@ -155,11 +156,7 @@ function EventFolderPanelForm({
   return (
     <div>
       <p className="text-ink-faint mt-1 text-xs leading-relaxed">イベントを整理するフォルダです。</p>
-      <label className="mt-4 block">
-        <span className="text-ink-secondary mb-1 block text-xs font-medium">
-          フォルダ名 <span className="text-danger">*</span>
-        </span>
-        <input
+      <Field label="フォルダ名" required><input
           type="text"
           value={name}
           onChange={(event) => setName(event.target.value)}

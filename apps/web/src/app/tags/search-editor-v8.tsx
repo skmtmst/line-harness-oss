@@ -50,6 +50,7 @@ import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/com
 import { formatDateTime } from '@/lib/format'
 import styles from './search-editor-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 /*
  * R185: 友だち画面で作れる条件はここでも編集できるようにする。実行側
@@ -197,8 +198,10 @@ function DateRangeEditor({
   const reversed = Boolean(from && to && from > to)
   return (
     <div className="min-w-0 flex-1">
-      <div className="flex min-w-0 flex-wrap items-end gap-2">
-        <Select
+      <div className="flex min-w-0 flex-wrap items-end gap-2"><Field label={<>
+          {op === 'before' ? '終了日' : '開始日'}
+          <DateField aria-label={op === 'before' ? '終了日' : '開始日'} value={op === 'before' ? to : from} onChange={op === 'before' ? setTo : setFrom} className="mt-1" />
+        </>}><Select
           aria-label="日付の比べ方"
           value={op}
           onChange={setOp}
@@ -216,10 +219,7 @@ function DateRangeEditor({
         {op === 'between' ? (
           <>
             <span className="pb-2 text-ink-faint" aria-hidden="true">〜</span>
-            <label className="min-w-40 flex-1 text-xs font-semibold text-ink-faint">
-              終了日
-              <DateField aria-label="終了日" value={to} onChange={setTo} className="mt-1" />
-            </label>
+            <Field label="終了日"><DateField aria-label="終了日" value={to} onChange={setTo} className="mt-1" /></Field>
           </>
         ) : null}
       </div>
