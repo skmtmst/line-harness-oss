@@ -184,7 +184,7 @@ function NewWebinarV8Inner() {
       <nav data-design="Crumb" className={styles.crumb} aria-label="パンくず">
         <Link href="/webinars" className={styles.crumbLink}>← ウェビナーへ</Link>
       </nav>
-      <PageHeading title="ウェビナーを作る" help={<> 管理名と公開ページの基本、開催形式を決めます。保存しても、まだ誰にも公開されません。</>} />
+      <div data-design="Head"><PageHeading title="ウェビナーを作る" help={<> 管理名と公開ページの基本、開催形式を決めます。保存しても、まだ誰にも公開されません。</>} /></div>
       <StepBand current={0} />
 
 
