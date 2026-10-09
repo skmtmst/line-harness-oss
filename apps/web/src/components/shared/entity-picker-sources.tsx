@@ -20,7 +20,7 @@ import FlexPreview from '@/components/flex-preview'
 import LinePreview, { LinePreviewMessage } from './line-preview'
 import ListState from './list-state'
 import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '@/components/templates/message-template-editor'
-import { EntityPickerField, type EntityPickerCategory, type EntityPickerFolder, type EntityPickerItem } from './entity-picker'
+import { EntityPickerDialog, EntityPickerField, type EntityPickerCategory, type EntityPickerFolder, type EntityPickerItem } from './entity-picker'
 
 const FormPhone = dynamic(() => import('@/v8/form-edit/phone').then((mod) => mod.FormPhone), { ssr: false, loading: () => <ListState kind="loading" /> })
 
@@ -229,4 +229,30 @@ export function EntityKindField(props: KindFieldBase & ({ multiple?: false; valu
     : undefined
   const categories = kind === 'template' ? TEMPLATE_CATEGORIES.filter((c) => items.some((item) => item.category === c.id)) : undefined
   return <EntityPickerField {...common} value={props.value} onChange={props.onChange} clearable={props.clearable} preview={preview} categories={categories && categories.length > 1 ? categories : undefined} />
+}
+
+/** 欄を使わず窓だけを開く（「テンプレートを選択」ボタンから本文へ入れる など）。 */
+export function EntityKindDialog({ kind, options, initialId = '', confirmLabel, accountId: givenAccountId, onConfirm, onCancel }: {
+  kind: EntityKind
+  options: ReadonlyArray<EntityLike>
+  initialId?: string
+  confirmLabel?: string
+  accountId?: string | null
+  onConfirm: (id: string) => void
+  onCancel: () => void
+}) {
+  const account = useMaybeAccount()
+  const accountId = givenAccountId ?? account?.selectedAccountId ?? null
+  const def = ENTITY_KINDS[kind]
+  const items = useMemo(() => toPickerItems(kind, options), [kind, options])
+  const { folders, failed, load } = useEntityFolders(kind, accountId)
+  const hasFolderInfo = items.some((item) => item.folderId !== undefined)
+  useEffect(() => { if (hasFolderInfo) load() }, [hasFolderInfo, load])
+  const preview = kind === 'template' ? (item: EntityPickerItem | null) => <TemplatePreviewPhone templateId={item?.id ?? null} accountName={account?.selectedAccount?.name} />
+    : kind === 'form' ? (item: EntityPickerItem | null) => <FormPreviewPhone formId={item?.id ?? null} accountId={accountId} accountName={account?.selectedAccount?.name} />
+    : undefined
+  const categories = kind === 'template' ? TEMPLATE_CATEGORIES.filter((c) => items.some((item) => item.category === c.id)) : []
+  return <EntityPickerDialog title={`${def.noun}を選ぶ`} items={items} folders={hasFolderInfo ? folders : undefined} foldersFailed={hasFolderInfo && failed}
+    categories={categories.length > 1 ? categories : undefined} initialId={initialId} preview={preview} confirmLabel={confirmLabel}
+    createHref={def.createHref} createLabel={def.createLabel} designNode="dJZ7Q" onConfirm={onConfirm} onCancel={onCancel} />
 }
