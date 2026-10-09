@@ -116,6 +116,8 @@ export interface ManagedFolderPanelProps {
   disabled?: boolean
   /** 「フォルダを追加」を押したとき、窓を開く前にすること（開いている詳細の小窓を閉じるなど）。 */
   onAddStart?: () => void
+  /** 作ったフォルダを選ぶなど、追加できたあとにすること（読み直しは onChanged が行う）。 */
+  onAdded?: (folder: Folder) => void
 }
 
 /**
@@ -172,6 +174,7 @@ export default function ManagedFolderPanel({
   children,
   disabled,
   onAddStart,
+  onAdded,
 }: ManagedFolderPanelProps) {
   const [adding, setAdding] = useState(false)
   const managed = kind !== null
@@ -230,7 +233,7 @@ export default function ManagedFolderPanel({
           note={`${itemLabel}を分けてしまう箱です。消しても、中の${itemLabel}は未分類に残ります。`}
           placeholder={placeholder}
           onClose={() => setAdding(false)}
-          onAdded={() => { setAdding(false); void onChanged() }}
+          onAdded={(created) => { setAdding(false); if (created) onAdded?.(created); void onChanged() }}
         />
       ) : null}
       {actions.dialogs}
