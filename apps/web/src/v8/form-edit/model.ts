@@ -211,8 +211,8 @@ export const ADD_GROUPS: { title: string; cards: AddCard[] }[] = [
     { key: 'text', label: '1行で書く', hint: '名前・会員番号など', make: input('text') },
     { key: 'textarea', label: '自由に書く', hint: '複数行のフリーテキスト', make: input('textarea') },
     // メールと電話は分ける（オーナー 2026-10-08：「メールアドレスと電話番号を分けよう」）。
-    { key: 'contact', label: 'メール', hint: 'メールの形をチェック', make: input('text', { label: 'メールアドレス', limit: { format: 'email' } }) },
-    { key: 'tel', label: '電話', hint: '番号の形をチェック', make: input('text', { label: '電話番号', limit: { format: 'tel' } }) },
+    { key: 'contact', label: 'メール', hint: 'メールの形をチェック', make: input('text', { label: 'メールアドレス', placeholder: '例：sample@example.com', limit: { format: 'email' } }) },
+    { key: 'tel', label: '電話', hint: '番号の形をチェック', make: input('text', { label: '電話番号', placeholder: '例：090-1234-5678', limit: { format: 'tel' } }) },
     { key: 'address', label: '住所', hint: '郵便番号から自動で', make: input('address', { label: '住所' }) },
   ] },
   { title: '日にち・予約', cards: [

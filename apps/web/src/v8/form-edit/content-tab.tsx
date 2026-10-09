@@ -293,6 +293,11 @@ function InputFields({ block, refs, patch }: { block: FormInputBlock; refs: Form
       <Labeled label="質問文" htmlFor={labelId}>
         <TextField id={labelId} value={block.label} placeholder="質問の文" onChange={(e) => set({ label: e.target.value })} />
       </Labeled>
+      {['text', 'textarea', 'address', 'date'].includes(block.type) ? (
+        <Labeled label="参考の文字（入力欄の中に薄く出る）" htmlFor={`${labelId}-placeholder`}>
+          <TextField id={`${labelId}-placeholder`} value={block.placeholder ?? ''} placeholder="例：山田 太郎" onChange={(e) => set({ placeholder: e.target.value })} />
+        </Labeled>
+      ) : null}
       {isChoiceType(block.type) ? <ChoiceFields block={block} set={set} /> : null}
       {block.type === 'booking' ? <BookingFields block={block} refs={refs} set={set} /> : <SaveTo block={block} refs={refs} set={set} />}
     </>

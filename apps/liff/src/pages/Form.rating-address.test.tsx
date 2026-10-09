@@ -125,7 +125,7 @@ describe('住所', () => {
         { postalCode: '1000001', prefecture: '東京都', city: '千代田区', town: '皇居外苑' },
       ],
     } });
-    fireEvent.click(screen.getByRole('button', { name: '住所を自動入力' }));
+    fireEvent.click(screen.getByRole('button', { name: '住所を探す' }));
     await screen.findByRole('button', { name: '東京都千代田区皇居外苑' });
     fireEvent.change(screen.getByLabelText('郵便番号'), { target: { value: '530-0001' } });
     expect(screen.queryByRole('button', { name: '東京都千代田区皇居外苑' })).toBeNull();
@@ -138,9 +138,9 @@ describe('住所', () => {
     type Response = Awaited<ReturnType<typeof postalCodeSearch>>;
     const pending: Array<(value: Response) => void> = [];
     postalCodeSearch.mockImplementation(() => new Promise<Response>((resolve) => pending.push(resolve)));
-    fireEvent.click(screen.getByRole('button', { name: '住所を自動入力' }));
+    fireEvent.click(screen.getByRole('button', { name: '住所を探す' }));
     fireEvent.change(screen.getByLabelText('郵便番号'), { target: { value: '530-0001' } });
-    fireEvent.click(screen.getByRole('button', { name: '住所を自動入力' }));
+    fireEvent.click(screen.getByRole('button', { name: '住所を探す' }));
     fireEvent.change(screen.getByLabelText('番地'), { target: { value: '2-3-4' } });
     fireEvent.change(screen.getByLabelText('建物名'), { target: { value: '新しい建物' } });
     await act(async () => pending[1]({ success: true, data: {
@@ -171,7 +171,7 @@ describe('住所', () => {
         query: '100-0001', normalized: '1000001',
       },
     });
-    fireEvent.click(screen.getByRole('button', { name: '住所を自動入力' }));
+    fireEvent.click(screen.getByRole('button', { name: '住所を探す' }));
     expect(await screen.findByDisplayValue('千代田区')).toBeTruthy();
     fireEvent.click(screen.getByRole('radio', { name: '星5つ' }));
     submitForm.mockResolvedValue({ status: 200, body: { success: true, data: {} } });
@@ -194,7 +194,7 @@ describe('住所', () => {
         candidates: [{ postalCode: '1000001', prefecture: '東京都', city: '千代田区', town: '千代田' }],
       },
     });
-    fireEvent.click(screen.getByRole('button', { name: '住所を自動入力' }));
+    fireEvent.click(screen.getByRole('button', { name: '住所を探す' }));
     expect(await screen.findByDisplayValue('千代田区')).toBeTruthy();
     expect(screen.getByDisplayValue('1-2-3')).toBeTruthy();
     expect(screen.getByDisplayValue('テストビル 101')).toBeTruthy();
@@ -204,7 +204,7 @@ describe('住所', () => {
     setup();
     fireEvent.change(await screen.findByLabelText('郵便番号'), { target: { value: '100-0001' } });
     postalCodeSearch.mockRejectedValue(new Error('offline'));
-    fireEvent.click(screen.getByRole('button', { name: '住所を自動入力' }));
+    fireEvent.click(screen.getByRole('button', { name: '住所を探す' }));
     expect(await screen.findByText('住所を調べられませんでした。下の欄へ直接入力してください')).toBeTruthy();
     fireEvent.change(screen.getByLabelText('市区町村'), { target: { value: '手入力の市区町村' } });
     expect(screen.getByDisplayValue('手入力の市区町村')).toBeTruthy();
@@ -224,7 +224,7 @@ describe('住所', () => {
         query: '100-0001', normalized: '1000001',
       },
     });
-    fireEvent.click(screen.getByRole('button', { name: '住所を自動入力' }));
+    fireEvent.click(screen.getByRole('button', { name: '住所を探す' }));
     fireEvent.click(await screen.findByRole('button', { name: '東京都千代田区皇居外苑' }));
     expect(await screen.findByDisplayValue('皇居外苑')).toBeTruthy();
   });
@@ -234,7 +234,7 @@ describe('住所', () => {
     fireEvent.change(await screen.findByLabelText('郵便番号'), { target: { value: '100-0001' } });
     let answer: (v: Awaited<ReturnType<typeof postalCodeSearch>>) => void = () => {};
     postalCodeSearch.mockImplementation(() => new Promise((r) => { answer = r; }));
-    fireEvent.click(screen.getByRole('button', { name: '住所を自動入力' }));
+    fireEvent.click(screen.getByRole('button', { name: '住所を探す' }));
     fireEvent.change(screen.getByLabelText('番地'), { target: { value: '1-2-3' } });
     fireEvent.change(screen.getByLabelText('建物名'), { target: { value: 'テストビル 101' } });
     await act(async () => {
@@ -256,7 +256,7 @@ describe('住所', () => {
     fireEvent.change(await screen.findByLabelText('郵便番号'), { target: { value: '100-0001' } });
     let answer: (v: Awaited<ReturnType<typeof postalCodeSearch>>) => void = () => {};
     postalCodeSearch.mockImplementation(() => new Promise((r) => { answer = r; }));
-    fireEvent.click(screen.getByRole('button', { name: '住所を自動入力' }));
+    fireEvent.click(screen.getByRole('button', { name: '住所を探す' }));
     fireEvent.change(screen.getByLabelText('郵便番号'), { target: { value: '530-0001' } });
     await act(async () => {
       answer({
@@ -269,6 +269,6 @@ describe('住所', () => {
     });
     expect(screen.queryByDisplayValue('千代田区')).toBeNull();
     expect(screen.getByDisplayValue('530-0001')).toBeTruthy();
-    expect(screen.getByRole('button', { name: '住所を自動入力' }).hasAttribute('disabled')).toBe(false);
+    expect(screen.getByRole('button', { name: '住所を探す' }).hasAttribute('disabled')).toBe(false);
   });
 });

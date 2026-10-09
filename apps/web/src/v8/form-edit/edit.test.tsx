@@ -57,6 +57,9 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 })
 
 import FormEditPage from '@/app/form-submissions/edit/page'
+import FormEditV8 from './edit'
+import { EMPTY_REFS } from '@/components/forms/form-refs'
+import type { FormHostContent } from './host'
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import { ApiError } from '@/lib/api'
 
@@ -238,5 +241,64 @@ describe('回答フォームの下書き自動保存（一斉配信と同じ形�
     for (let i = 0; i < 6; i++) await act(async () => { await Promise.resolve() })
     expect(status()).toContain('自動保存できませんでした')
     expect(host.querySelector('[role="alert"]')).toBeNull()
+  })
+})
+
+
+describe('参考の文字の保存と読み直し', () => {
+  const hintLabel = '参考の文字（入力欄の中に薄く出る）'
+  const sample = () => {
+    const l = emptyLayout()
+    l.sections[0].blocks = [{ id: 'hint-q', kind: 'input', type: 'text', name: 'name', label: 'お名前' }]
+    return l
+  }
+  const restart = () => {
+    act(() => root.unmount())
+    root = createRoot(host)
+  }
+
+  it('店で設定して保存→APIから読み直すと、設定と見本に残る。空にして保存すると消える', async () => {
+    let stored = { ...structuredClone(formData), layout: sample() }
+    formsGet.mockImplementation(async () => ({ success: true, data: structuredClone(stored) }))
+    formsUpdate.mockImplementation(async (_id, _account, content) => {
+      stored = { ...stored, layout: JSON.parse(JSON.stringify(content.layout)) }
+      return { success: true, data: { id: stored.id, contentRevision: 8 } }
+    })
+    await render('id=form-1')
+    fireEvent.change(screen.getByLabelText(hintLabel), { target: { value: '例：山田 太郎' } })
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    await waitFor(() => expect(formsUpdate).toHaveBeenCalled())
+    restart()
+    await render('id=form-1')
+    expect((screen.getByLabelText(hintLabel) as HTMLInputElement).value).toBe('例：山田 太郎')
+    expect(within(screen.getByLabelText('お客さまに見える形')).getByPlaceholderText('例：山田 太郎')).toBeTruthy()
+    expect(formsPublish).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText(hintLabel), { target: { value: '' } })
+    formsUpdate.mockClear()
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    await waitFor(() => expect(formsUpdate).toHaveBeenCalled())
+    restart()
+    await render('id=form-1')
+    expect((screen.getByLabelText(hintLabel) as HTMLInputElement).value).toBe('')
+    expect(within(screen.getByLabelText('お客さまに見える形')).queryByPlaceholderText('例：山田 太郎')).toBeNull()
+  })
+
+  it('統括も同じ欄で設定し、ひな形を保存→読み直すと残る。店の保存APIは呼ばない', async () => {
+    let stored: FormHostContent = { name: '回答のひな形', description: '', layout: sample(), onSubmitTagId: '' }
+    const onSave = vi.fn((content: FormHostContent) => { stored = JSON.parse(JSON.stringify(content)) })
+    const open = async () => {
+      act(() => root.render(<FormEditV8 host={{ initial: stored, refs: EMPTY_REFS, accountName: 'ひな形', backHref: '/hq/form-submissions', statusLine: '下書き', distributedLine: 'まだ配っていません', busy: false, onSave, onCancel: vi.fn() }} />))
+      await screen.findByLabelText(hintLabel)
+    }
+    await open()
+    fireEvent.change(screen.getByLabelText(hintLabel), { target: { value: '例：統括の見本' } })
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalled())
+    restart()
+    await open()
+    expect((screen.getByLabelText(hintLabel) as HTMLInputElement).value).toBe('例：統括の見本')
+    expect(within(screen.getByLabelText('お客さまに見える形')).getByPlaceholderText('例：統括の見本')).toBeTruthy()
+    expect(formsUpdate).not.toHaveBeenCalled()
+    expect(formsGet).not.toHaveBeenCalled()
   })
 })

@@ -216,7 +216,7 @@
 .phoneIcons { flex: 1; display: flex; justify-content: flex-end; align-items: center; gap: var(--tpl-fe-phone-icon-gap); color: var(--tpl-fe-phone-black); }
 .phoneHead { flex: none; height: var(--tpl-fe-phone-bar-h); display: flex; align-items: center; gap: var(--tpl-fe-row-gap); padding: var(--tpl-fe-phone-head-pad); color: var(--color-ink); }
 .phoneName { flex: 1; min-width: 0; font-size: var(--tpl-fe-sub-title-size); font-weight: 700; line-height: var(--tpl-fe-phone-name-lh); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.phoneForm { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: var(--tpl-fe-open-gap); padding: var(--tpl-fe-phone-form-pad); }
+.phoneForm { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: var(--tpl-fe-open-gap); padding: var(--tpl-fe-phone-form-pad); }
 .phoneEmpty { margin: 0; font-size: var(--tpl-fe-small-size); color: var(--color-ink-faint); }
 .phoneImage { flex: none; display: block; width: 100%; height: var(--tpl-fe-phone-image-h); object-fit: cover; border-radius: var(--tpl-fe-phone-r); background: var(--tpl-fe-phone-image-bg); }
 .phoneHeading { margin: 0; font-size: var(--tpl-fe-title-size); font-weight: 700; line-height: var(--tpl-fe-title-lh); color: var(--color-ink); }
@@ -230,26 +230,6 @@
 .phoneQ { flex: none; display: flex; flex-direction: column; gap: var(--tpl-fe-field-gap); }
 .phoneQTitle { display: flex; align-items: center; gap: var(--tpl-fe-phone-progress-gap); font-size: var(--tpl-fe-phone-q-size); font-weight: 700; line-height: var(--tpl-fe-note-lh); color: var(--color-ink); }
 .phoneRequired { font-size: var(--tpl-fe-badge-size); font-weight: 700; color: var(--color-danger); }
-.phoneChoice { display: flex; align-items: center; gap: var(--tpl-fe-field-gap); padding: var(--tpl-fe-phone-choice-pad); border-radius: var(--tpl-fe-phone-choice-r); box-shadow: var(--tpl-fe-ring-phone); font-size: var(--tpl-fe-small-size); line-height: var(--tpl-fe-small-lh); color: var(--color-ink); }
-.phoneChoice[data-on] { box-shadow: none; outline: 1px solid var(--fe-phone-main, var(--color-accent)); outline-offset: -1px; }
-.phoneDot { flex: none; width: var(--tpl-fe-phone-dot); height: var(--tpl-fe-phone-dot); border-radius: var(--radius-pill); box-shadow: var(--tpl-fe-ring-dot); }
-.phoneChoice[data-kind='checkbox'] .phoneDot { border-radius: var(--tpl-fe-phone-check-r); }
-.phoneChoice[data-on] .phoneDot { box-shadow: none; border: var(--tpl-fe-phone-dot-on) solid var(--fe-phone-main, var(--color-accent)); }
-.phoneStars { display: flex; gap: var(--tpl-fe-phone-progress-gap); color: var(--color-star-on-edge); }
-.phoneStars > svg:not([data-on]) { color: var(--tpl-fe-phone-dot-line); }
-.phoneMenuName { font-size: var(--tpl-fe-phone-menu-size); line-height: var(--tpl-fe-phone-menu-lh); color: var(--tpl-fe-phone-sub); }
-.phoneDays { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--tpl-fe-phone-day-gap); }
-.phoneDay { display: flex; flex-direction: column; align-items: center; padding: var(--tpl-fe-phone-day-pad); border-radius: var(--tpl-fe-phone-r); box-shadow: var(--tpl-fe-ring-phone); }
-.phoneDay[data-on] { background: var(--color-accent-soft); box-shadow: none; outline: var(--tpl-fe-open-line) solid var(--fe-phone-main, var(--color-accent)); outline-offset: calc(0px - var(--tpl-fe-open-line)); color: var(--fe-phone-main, var(--color-accent)); }
-.phoneDayWeek { font-size: var(--tpl-fe-badge-size); line-height: var(--tpl-fe-badge-lh); color: var(--tpl-fe-phone-sub); }
-.phoneDayNum { font-size: var(--tpl-fe-body-size); font-weight: 700; line-height: var(--tpl-fe-phone-day-lh); }
-.phoneTimes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--tpl-fe-phone-time-gap); }
-.phoneTime { height: var(--tpl-fe-phone-time-h); display: flex; align-items: center; justify-content: center; border-radius: var(--tpl-fe-phone-choice-r); box-shadow: var(--tpl-fe-ring-phone); font-size: var(--tpl-fe-small-size); font-weight: 500; color: var(--color-ink); }
-.phoneTime[data-off] { color: var(--tpl-fe-phone-dot-line); background: var(--tpl-fe-phone-track); box-shadow: none; }
-.phoneTime[data-on] { background: var(--fe-phone-main, var(--color-accent)); color: var(--color-canvas); font-weight: 700; box-shadow: none; }
-.phonePicked { font-size: var(--tpl-fe-phone-picked-size); font-weight: 600; line-height: var(--tpl-fe-phone-menu-lh); color: var(--fe-phone-main, var(--color-accent)); }
-.phoneInput { min-height: var(--tpl-fe-phone-input-h); border-radius: var(--tpl-fe-phone-choice-r); box-shadow: var(--tpl-fe-ring-phone); }
-.phoneInput[data-tall] { min-height: var(--tpl-fe-phone-textarea-h); }
 .phoneSpacer { flex: 1; }
 .phoneNext { flex: none; height: var(--tpl-fe-phone-next-h); display: flex; align-items: center; justify-content: center; border-radius: var(--tpl-fe-phone-r); background: var(--fe-phone-main, var(--color-accent)); color: var(--color-canvas); font-size: var(--tpl-fe-body-size); font-weight: 700; }
 .phoneMenu { flex: none; height: var(--tpl-fe-phone-menu-h); display: flex; align-items: center; justify-content: center; gap: var(--tpl-fe-phone-progress-gap); font-size: var(--tpl-fe-small-size); font-weight: 600; color: var(--tpl-fe-phone-menu-color); box-shadow: var(--tpl-fe-line-top); }
@@ -264,3 +244,6 @@
 :global([data-theme='v8']) .more :global(button) { min-height: 0; min-width: 0; width: var(--tpl-fe-more-h); height: var(--tpl-fe-more-h); border-radius: var(--radius-control); box-shadow: var(--tpl-fe-ring); background: var(--color-canvas); }
 /* 行の中の押せる文字は行の高さを増やさない（全体の押せる大きさの決まりは行そのものが満たす）。 */
 :global([data-theme='v8']) .actionText, :global([data-theme='v8']) .blockOpen { min-height: 0; }
+
+.phoneChoices { display: flex; flex-direction: column; gap: var(--tpl-fe-field-gap); }
+.phoneChoices[data-inline] { flex-direction: row; flex-wrap: wrap; }

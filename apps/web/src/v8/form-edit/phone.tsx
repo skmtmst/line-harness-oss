@@ -7,8 +7,9 @@
  * 予約を入れる欄の日にち・時刻は形を見せるための見本で、実際の空きではない。
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { BatteryFull, ChevronDown, ChevronLeft, Menu, Phone, Search, Signal, Star, Wifi } from 'lucide-react'
-import { FORM_OPTIONS_DEFAULT, type FormBlock, type FormInputBlock, type FormLayout } from '@line-crm/shared'
+import { BatteryFull, ChevronDown, ChevronLeft, Menu, Phone, Search, Signal, Wifi } from 'lucide-react'
+import { PREFECTURES, normalizeRatingValue, FORM_OPTIONS_DEFAULT, type FormBlock, type FormInputBlock, type FormLayout } from '@line-crm/shared'
+import { DateYmdField, AddressControls, BookingControls, FormChoiceRow, FormFileControl, FormSelectControl, FormTextControl, RatingStars } from '../../../../liff/src/components/forms/controls'
 import styles from './edit.module.css'
 
 const WEEKDAY = '日月火水木金土'
@@ -122,66 +123,41 @@ function PhoneImage({ url }: { url: string }) {
 
 function PhoneQuestion({ block, bookingMenus }: { block: FormInputBlock; bookingMenus: Props['bookingMenus'] }) {
   if (block.hidden) return null
-  const title = (
-    <span className={styles.phoneQTitle}>
-      {block.label || '（質問の文）'}
-      {block.required ? <span className={styles.phoneRequired}>必須</span> : null}
-    </span>
-  )
-  if (block.type === 'radio' || block.type === 'checkbox') {
-    return (
-      <div className={styles.phoneQ}>
-        {title}
-        {(block.choices ?? []).map((choice, i) => (
-          <span key={choice.id} className={styles.phoneChoice} data-on={i === 0 || undefined} data-kind={block.type}>
-            <span className={styles.phoneDot} aria-hidden="true" />
-            {choice.label}
-          </span>
-        ))}
-      </div>
-    )
-  }
-  if (block.type === 'rating') {
-    return (
-      <div className={styles.phoneQ}>
-        {title}
-        <span className={styles.phoneStars} aria-label="5段階">
-          {[0, 1, 2, 3, 4].map((i) => <Star key={i} size={18} aria-hidden="true" data-on={i < 4 || undefined} />)}
-        </span>
-      </div>
-    )
-  }
-  if (block.type === 'booking') {
-    const menu = bookingMenus.find((m) => m.id === block.booking?.menuId)
-    const days = Array.from({ length: 5 }, (_, i) => {
-      const d = new Date()
-      d.setDate(d.getDate() + i + 1)
-      return d
-    })
-    const picked = days[2]
-    return (
-      <div className={styles.phoneQ} data-kind="booking">
-        {title}
-        <span className={styles.phoneMenuName}>{menu ? `${menu.name}・${menu.durationMinutes}分` : 'メニューを選んでください'}</span>
-        <span className={styles.phoneDays}>
-          {days.map((d, i) => (
-            <span key={i} className={styles.phoneDay} data-on={i === 2 || undefined}>
-              <span className={styles.phoneDayWeek}>{WEEKDAY[d.getDay()]}</span>
-              <span className={styles.phoneDayNum}>{d.getDate()}</span>
-            </span>
-          ))}
-        </span>
-        <span className={styles.phoneTimes}>
-          {SAMPLE_TIMES.map((t, i) => <span key={t} className={styles.phoneTime} data-on={i === 2 || undefined} data-off={i === 0 || i === 4 || undefined}>{t}</span>)}
-        </span>
-        <span className={styles.phonePicked}>{`${picked.getMonth() + 1}月${picked.getDate()}日（${WEEKDAY[picked.getDay()]}）13:00〜14:00 を選んでいます`}</span>
-      </div>
-    )
-  }
-  return (
-    <div className={styles.phoneQ}>
-      {title}
-      <span className={styles.phoneInput} data-tall={block.type === 'textarea' || block.type === 'address' || undefined}>{block.placeholder ?? ''}</span>
+  const text = block.defaultValue ?? ''
+  const selectedChoices = (block.choices ?? []).filter((c) => c.defaultSelected).map((c) => c.label)
+  return <div className={styles.phoneQ}>
+    <span className={styles.phoneQTitle}>{block.label || '（質問の文）'}{block.required ? <span className={styles.phoneRequired}>必須</span> : null}</span>
+    {block.description ? <p className={styles.phoneText}>{block.description}</p> : null}
+    {/* inert は見た目を薄くせず、選択・添付・送信とキーボード操作を止める。 */}
+    <div inert>
+      {(block.type === 'text' || block.type === 'textarea' || block.type === 'date') ? (
+        block.type === 'date' && block.dateStyle === 'ymd' ? <DateYmdField value={text} placeholder={block.placeholder} readOnly onChange={() => {}} /> :
+          <FormTextControl block={block} value={text} readOnly onChange={() => {}} />
+      ) : null}
+      {block.type === 'select' || block.type === 'prefecture' ? <FormSelectControl aria-label={block.label} value={text || selectedChoices[0] || (block.type === 'select' ? block.choices?.[0]?.label : '') || ''} onChange={() => {}}>
+        <option value="">{block.type === 'prefecture' ? '都道府県を選択' : '選択してください'}</option>
+        {(block.type === 'prefecture' ? PREFECTURES : (block.choices ?? []).map((c) => c.label)).map((label) => <option key={label} value={label}>{label}</option>)}
+      </FormSelectControl> : null}
+      {block.type === 'radio' || block.type === 'checkbox' ? <div className={styles.phoneChoices} data-inline={block.inline || undefined}>
+        {(block.choices ?? []).map((choice) => {
+          const selected = block.type === 'radio' && text ? text === choice.label : selectedChoices.includes(choice.label)
+          return <FormChoiceRow key={choice.id} selected={selected}><input type={block.type} checked={selected} readOnly tabIndex={-1} />{choice.label}</FormChoiceRow>
+        })}
+      </div> : null}
+      {block.type === 'rating' ? <RatingStars name={block.name} current={normalizeRatingValue(text)} onChange={() => {}} /> : null}
+      {block.type === 'file' ? <FormFileControl label={block.label} /> : null}
+      {block.type === 'address' ? <AddressControls draft={{ postalCode: '', prefecture: '', city: '', addressLine1: '', addressLine2: '' }} placeholder={block.placeholder} onChange={() => {}} /> : null}
+      {block.type === 'booking' ? <BookingPreview block={block} bookingMenus={bookingMenus} /> : null}
     </div>
-  )
+  </div>
+}
+
+function BookingPreview({ block, bookingMenus }: { block: FormInputBlock; bookingMenus: Props['bookingMenus'] }) {
+  const menu = bookingMenus.find((m) => m.id === block.booking?.menuId)
+  const days = Array.from({ length: 5 }, (_, i) => {
+    const d = new Date()
+    d.setDate(d.getDate() + i + 1)
+    return { date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`, weekday: WEEKDAY[d.getDay()], day: d.getDate(), open: true }
+  })
+  return <><p className={styles.phoneText}>空き枠の見本（実際の空きではありません）</p><BookingControls preview menuLabel={menu ? `${menu.name}・${menu.durationMinutes}分` : 'メニューを選んでください'} days={days} selectedDate={days[2].date} onDate={() => {}} times={SAMPLE_TIMES.map((start, i) => ({ start, open: i !== 0 && i !== 4, selected: false }))} onTime={() => {}} /></>
 }
