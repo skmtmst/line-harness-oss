@@ -347,6 +347,7 @@ type FieldBase = {
   searchPlaceholder?: string
   id?: string
   buttonRef?: Ref<HTMLButtonElement>
+  describedBy?: string
 }
 type SingleField = FieldBase & {
   multiple?: false
@@ -372,12 +373,14 @@ type MultiField = FieldBase & {
 }
 
 /** 欄の1行だけ（窓は呼ぶ側が開く）。一括配信の送るアカウントのように窓を自前で持つ画面が使う。 */
-export function EntityPickerSummary({ label, noun, icon: Icon, name, meta, placeholder, disabled = false, readOnly = false, invalid = false, id, buttonRef, onOpen, onClear }: {
+export function EntityPickerSummary({ label, noun, icon: Icon, name, meta, placeholder, disabled = false, readOnly = false, invalid = false, id, buttonRef, describedBy, onOpen, onClear }: {
   label: string; noun: string; icon?: LucideIcon
   /** 選んだものの名前。空なら「（〇〇を選んでください）」。 */
   name?: string; meta?: string; placeholder?: string
   disabled?: boolean; readOnly?: boolean; invalid?: boolean; id?: string
   buttonRef?: Ref<HTMLButtonElement>
+  /** 欄の下の誤り・説明の id。［選ぶ］ボタンの読み上げにつなぐ。 */
+  describedBy?: string
   onOpen: () => void
   /** 渡すと「外す」を出す。 */
   onClear?: () => void
@@ -393,7 +396,7 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, meta, place
       </>}
     </span>
     {onClear && !empty && !readOnly ? <Button size="compact" variant="text" disabled={disabled} aria-label={`${label}を外す`} onClick={onClear}>外す</Button> : null}
-    {readOnly && empty ? null : <Button ref={buttonRef} size="compact" disabled={disabled} aria-label={`${label}：${actionLabel}`} aria-haspopup="dialog" onClick={onOpen}>{actionLabel}</Button>}
+    {readOnly && empty ? null : <Button ref={buttonRef} size="compact" disabled={disabled} aria-label={`${label}：${actionLabel}`} aria-haspopup="dialog" aria-invalid={invalid || undefined} aria-describedby={describedBy} onClick={onOpen}>{actionLabel}</Button>}
   </div>
 }
 
@@ -413,14 +416,14 @@ export function describePicked(items: EntityPickerItem[], folders: EntityPickerF
 
 /** 画面の欄。「選んだもの（印・名前・補足）＋［選ぶ］／［変える］」の1行。押すと窓が開く。 */
 export function EntityPickerField(props: SingleField | MultiField) {
-  const { label, noun, icon, items, folders = [], foldersFailed, onOpen, state, placeholder, disabled = false, readOnly = false, invalid = false, createHref, createLabel, description, id, buttonRef } = props
+  const { label, noun, icon, items, folders = [], foldersFailed, onOpen, state, placeholder, disabled = false, readOnly = false, invalid = false, createHref, createLabel, description, id, buttonRef, describedBy } = props
   const [open, setOpen] = useState(false)
   const title = props.title ?? `${noun}を選ぶ`
   const picked = describePicked(items, folders, props.value, props.multiple ? props.unit : undefined, props.multiple ? props.summarize : undefined)
   const close = () => setOpen(false)
   return <>
     <EntityPickerSummary label={label} noun={noun} icon={icon} name={picked.name} meta={picked.meta} placeholder={placeholder} disabled={disabled} readOnly={readOnly}
-      invalid={invalid || picked.missing} id={id} buttonRef={buttonRef} onOpen={() => { onOpen?.(); setOpen(true) }}
+      invalid={invalid || picked.missing} id={id} buttonRef={buttonRef} describedBy={describedBy} onOpen={() => { onOpen?.(); setOpen(true) }}
       onClear={!props.multiple && props.clearable ? () => props.onChange('') : undefined} />
     {open ? props.multiple
       ? <EntityMultiPickerDialog title={title} description={description} items={items} folders={folders} foldersFailed={foldersFailed} initialIds={props.value} unit={props.unit} state={state} readOnly={readOnly}

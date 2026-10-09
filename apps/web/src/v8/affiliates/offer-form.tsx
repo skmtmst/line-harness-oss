@@ -280,18 +280,19 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
         </div>
 
         <div>
-          <label className="text-ink-secondary mb-1 block text-xs font-medium">タグ</label>
-          <Select
-            aria-label="タグ"
+          <span className="text-ink-secondary mb-1 block text-xs font-medium">タグ</span>
+          <EntityKindField
+            kind="tag"
+            label="タグ"
+            accountId={lineAccountId || null}
             value={tagId}
             onChange={(value) => setTagId(value)}
+            clearable
+            placeholder="（選択しない）"
             options={[
-              { value: '', label: '— 選択しない —' },
-              ...accountTags.map((tag) => ({ value: tag.id, label: tag.name })),
-              ...(tagIdStale ? [{ value: tagId, label: `${staleTagName ?? tagId}（このアカウントでは使えません）` }] : []),
+              ...accountTags,
+              ...(tagIdStale ? [{ id: tagId, name: `${staleTagName ?? tagId}（このアカウントでは使えません）` }] : []),
             ]}
-            className="w-full"
-            size="full"
           />
         </div>
 

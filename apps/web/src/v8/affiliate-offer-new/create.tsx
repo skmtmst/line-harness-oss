@@ -331,13 +331,16 @@ export default function AffiliateOfferCreateV8() {
             <p className={styles.switchNote}>{tagName ?? 'まだ決めていません'}</p>
             {tagEnabled ? (
               <div className={styles.selectBox}>
-                <Select
+                <EntityKindField
                   id="of-tag"
-                  aria-label="付けるタグ"
-                  size="full"
+                  kind="tag"
+                  label="付けるタグ"
                   value={tagId}
                   onChange={(value) => setTagId(value)}
-                  options={[{ value: '', label: '（なし）' }, ...tags.filter((t) => (t.status ?? 'active') === 'active').map((t) => ({ value: t.id, label: t.name }))]}
+                  clearable
+                  placeholder="（なし）"
+                  readOnly={!canEdit}
+                  options={tags.filter((t) => (t.status ?? 'active') === 'active')}
                 />
               </div>
             ) : null}

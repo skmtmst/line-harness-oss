@@ -70,6 +70,7 @@ describe('作ってあるものを選ぶ欄と窓（dJZ7Q）', () => {
   it('消された候補を指していたら、見つからないと出して選び直させる', () => {
     render(<Single initial="gone" />)
     expect(screen.getByText('見つかりません')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '回答フォーム：変える' }).getAttribute('aria-invalid')).toBe('true')
   })
 })
 

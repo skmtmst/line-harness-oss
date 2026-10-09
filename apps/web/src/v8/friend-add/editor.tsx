@@ -1478,13 +1478,7 @@ function ActionsStep({ definition, setDefinition, options, canEdit }: {
             />
           </div>
           <div className={styles.actionSelect}>
-            <Select
-              aria-label="足す操作の対象"
-              size="full"
-              value={target}
-              onChange={setTarget}
-              options={[{ value: '', label: '選んでください' }, ...targets.map((item) => ({ value: item.id, label: item.name }))]}
-            />
+            <EntityKindField kind={source} label="足す操作の対象" options={targets} value={target} onChange={setTarget} />
           </div>
           <Button type="button" disabled={!target} onClick={addAction}>
             <Plus size={15} aria-hidden="true" />足す

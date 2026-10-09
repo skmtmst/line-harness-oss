@@ -8,7 +8,7 @@
  *   見本の無い種類（シナリオ・タグなど）は見本の列を出さない。
  * データは今の画面が読んでいる行をそのまま渡す。窓を開いたときだけフォルダ・見本を読む。
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from 'react'
 import dynamic from 'next/dynamic'
 import {
   Bell, BookOpen, CalendarDays, ClipboardList, FileText, LayoutGrid, Tag as TagIcon, UserRound, Workflow, type LucideIcon,
@@ -200,6 +200,10 @@ type KindFieldBase = {
   id?: string
   /** 中身の見本を出さない（狭い所・中身の無い種類）。 */
   noPreview?: boolean
+  /** 誤りの欄へ移るときに［選ぶ］ボタンをつかむ。 */
+  buttonRef?: Ref<HTMLButtonElement>
+  /** 欄の下の誤り・説明の id。 */
+  describedBy?: string
 }
 
 /**
@@ -207,7 +211,7 @@ type KindFieldBase = {
  * 保存する値（ID）は今と同じ形で返す。
  */
 export function EntityKindField(props: KindFieldBase & ({ multiple?: false; value: string | null | undefined; onChange: (id: string) => void; clearable?: boolean } | { multiple: true; value: string[]; onChange: (ids: string[]) => void; allowEmpty?: boolean })) {
-  const { kind, label, options, meta, placeholder, disabled, readOnly, invalid, description, id, noPreview } = props
+  const { kind, label, options, meta, placeholder, disabled, readOnly, invalid, description, id, noPreview, buttonRef, describedBy } = props
   const account = useMaybeAccount()
   const accountId = props.accountId ?? account?.selectedAccountId ?? null
   const accountName = account?.selectedAccount?.name
@@ -217,7 +221,7 @@ export function EntityKindField(props: KindFieldBase & ({ multiple?: false; valu
   const { folders, failed, load } = useEntityFolders(kind, accountId)
   const common = {
     label, noun: def.noun, icon: def.icon, items, folders: hasFolderInfo ? folders : undefined, foldersFailed: hasFolderInfo && failed,
-    onOpen: hasFolderInfo ? load : undefined, placeholder, disabled, readOnly, invalid, description, id,
+    onOpen: hasFolderInfo ? load : undefined, placeholder, disabled, readOnly, invalid, description, id, buttonRef, describedBy,
     createHref: def.createHref, createLabel: def.createLabel,
   }
   if (props.multiple) {
