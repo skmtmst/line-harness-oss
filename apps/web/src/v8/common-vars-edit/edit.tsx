@@ -79,6 +79,7 @@ import {
 } from './impact'
 import { formatNumber } from '@/lib/format'
 import styles from './edit.module.css'
+import { focusFieldById } from '@/lib/use-form-errors'
 
 /** 予定の日時（`YYYY-MM-DDTHH:mm`・日本時間）を「10/1 0:00」の形にする。 */
 export function scheduleStamp(value: string): string {
@@ -182,6 +183,10 @@ function EditCommonVarV8Inner() {
   const [valueFieldError, setValueFieldError] = useState('')
   const [fallbackFieldError, setFallbackFieldError] = useState('')
   const [scheduleFieldError, setScheduleFieldError] = useState('')
+  /* 欄の誤りは帯ではなく欄の真下に出して移る（B-139）。 */
+  const [nameFieldError, setNameFieldError] = useState('')
+  const [periodFieldError, setPeriodFieldError] = useState('')
+  const [scheduleDateError, setScheduleDateError] = useState('')
 
   const [draft, setDraft] = useState<{ date: string; time: string; value: string } | null>(null)
   const [clearSchedulesOpen, setClearSchedulesOpen] = useState(false)
@@ -394,34 +399,21 @@ function EditCommonVarV8Inner() {
   const save = async () => {
     if (!item || saving || !selectedAccountId) return
     const accountAtRequest = selectedAccountId
-    if (!name.trim()) {
-      setError('共通情報名を入力してください')
+    const nameProblem = name.trim() ? '' : '共通情報名を入力してください'
+    const valueProblem = commonVarValueError(item.type, value) ?? ''
+    const periodProblem = validFrom && validUntil && validFrom >= validUntil ? '有効終了は有効開始より後にしてください' : ''
+    const fallbackProblem = expiryBehavior !== 'fallback' ? ''
+      : !fallbackValue ? '期限切れ時に使う代替値を入力してください'
+        : commonVarValueError(item.type, fallbackValue, '代替値') ?? ''
+    setNameFieldError(nameProblem)
+    setValueFieldError(valueProblem)
+    setPeriodFieldError(periodProblem)
+    setFallbackFieldError(fallbackProblem)
+    const firstProblem = nameProblem ? 'cv-name' : valueProblem ? 'cv-value' : periodProblem ? 'cv-valid-from' : fallbackProblem ? 'cv-fallback-value' : null
+    if (firstProblem) {
+      setError('')
+      focusFieldById(firstProblem)
       return
-    }
-    const valueError = commonVarValueError(item.type, value)
-    if (valueError) {
-      setError(valueError)
-      setValueFieldError(valueError)
-      document.getElementById('cv-value')?.focus()
-      return
-    }
-    if (validFrom && validUntil && validFrom >= validUntil) {
-      setError('有効終了は有効開始より後にしてください')
-      return
-    }
-    if (expiryBehavior === 'fallback') {
-      if (!fallbackValue) {
-        setError('期限切れ時に使う代替値を入力してください')
-        document.getElementById('cv-fallback-value')?.focus()
-        return
-      }
-      const fallbackError = commonVarValueError(item.type, fallbackValue, '代替値')
-      if (fallbackError) {
-        setError(fallbackError)
-        setFallbackFieldError(fallbackError)
-        document.getElementById('cv-fallback-value')?.focus()
-        return
-      }
     }
     if (isSecretLikeVarValue(value)) {
       const message = '鍵やトークンのような秘密の値は共通情報に保存できません'
@@ -603,7 +595,8 @@ function EditCommonVarV8Inner() {
   const addSchedule = async () => {
     if (addingSchedule || !item || !draft || !selectedAccountId) return
     if (!draft.date) {
-      setError('開始日を入れてください')
+      setScheduleDateError('開始日を入れてください')
+      focusFieldById('sc-date')
       return
     }
     const scheduleValueError = commonVarValueError(item.type, draft.value, '更新後の値')
@@ -812,10 +805,13 @@ function EditCommonVarV8Inner() {
               type="text"
               maxLength={200}
               value={name}
-              onChange={(e) => { setSaved(false); setName(e.target.value) }}
+              onChange={(e) => { setSaved(false); setName(e.target.value); setNameFieldError('') }}
               className={styles.fieldInput}
               readOnly={!canWrite}
+              aria-invalid={nameFieldError ? true : undefined}
+              aria-describedby={nameFieldError ? 'cv-name-error' : undefined}
             />
+            {nameFieldError ? <p id="cv-name-error" className={styles.fieldError} role="alert">{nameFieldError}</p> : null}
           </div>
           {canWrite ? (
             <FolderSelect
@@ -857,14 +853,15 @@ function EditCommonVarV8Inner() {
           <div className={styles.field}>
             <label htmlFor="cv-valid-from" className={styles.fieldLabelStrong}>始まり</label>
             {canWrite
-              ? <DateTimeField id="cv-valid-from" value={validFrom} placeholder="指定なし" onChange={(v) => { setSaved(false); setValidFrom(v) }} />
+              ? <DateTimeField id="cv-valid-from" value={validFrom} placeholder="指定なし" invalid={Boolean(periodFieldError)} onChange={(v) => { setSaved(false); setValidFrom(v); setPeriodFieldError('') }} />
               : <ReadOnlyValue id="cv-valid-from" value={readOnlyDate(validFrom)} />}
           </div>
           <div className={styles.field}>
             <label htmlFor="cv-valid-until" className={styles.fieldLabelStrong}>終わり</label>
             {canWrite
-              ? <DateTimeField id="cv-valid-until" value={validUntil} placeholder="指定なし" onChange={(v) => { setSaved(false); setValidUntil(v) }} />
+              ? <DateTimeField id="cv-valid-until" value={validUntil} placeholder="指定なし" invalid={Boolean(periodFieldError)} onChange={(v) => { setSaved(false); setValidUntil(v); setPeriodFieldError('') }} />
               : <ReadOnlyValue id="cv-valid-until" value={readOnlyDate(validUntil)} />}
+            {periodFieldError ? <p className={styles.fieldError} role="alert">{periodFieldError}</p> : null}
           </div>
         </div>
         <div className={styles.sideFields}>
@@ -1169,11 +1166,11 @@ function EditCommonVarV8Inner() {
                 ) : item.type === 'boolean' ? (
                   <Select size="full" aria-label="新しい中身" id="cv-value" value={value} onChange={(next) => { setSaved(false); setValue(next) }} options={[{ value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
                 ) : (item.type as string) === 'long_text' ? (
-                  <textarea id="cv-value" value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} className={styles.fieldArea} rows={2} readOnly={!canWrite} />
+                  <textarea id="cv-value" value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} className={styles.fieldArea} rows={2} readOnly={!canWrite} aria-invalid={valueFieldError ? true : undefined} />
                 ) : (item.type as string) === 'date' ? (
-                  <DateField id="cv-value" value={value} onChange={(v) => { setSaved(false); setValue(v) }} />
+                  <DateField id="cv-value" invalid={Boolean(valueFieldError)} value={value} onChange={(v) => { setSaved(false); setValue(v) }} />
                 ) : (item.type as string) === 'datetime' ? (
-                  <DateTimeField id="cv-value" value={value} onChange={(v) => { setSaved(false); setValue(v) }} />
+                  <DateTimeField id="cv-value" invalid={Boolean(valueFieldError)} value={value} onChange={(v) => { setSaved(false); setValue(v) }} />
                 ) : (
                   <input
                     id="cv-value"
@@ -1181,6 +1178,7 @@ function EditCommonVarV8Inner() {
                     value={value}
                     onChange={(e) => { setSaved(false); setValue(e.target.value) }}
                     className={styles.fieldInput}
+                    aria-invalid={valueFieldError ? true : undefined}
                     aria-label="新しい中身"
                     readOnly={!canWrite}
                   />
@@ -1367,8 +1365,10 @@ function EditCommonVarV8Inner() {
                   id="sc-date"
                   value={draft.date}
                   min={jstNowLocalInput().date}
-                  onChange={(v) => setDraft({ ...draft, date: v })}
+                  invalid={Boolean(scheduleDateError)}
+                  onChange={(v) => { setDraft({ ...draft, date: v }); setScheduleDateError('') }}
                 />
+                {scheduleDateError ? <p className={styles.fieldError} role="alert">{scheduleDateError}</p> : null}
               </div>
               <div className={styles.field}>
                 <label htmlFor="sc-time" className={styles.fieldLabelStrong}>開始時刻</label>

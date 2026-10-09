@@ -6,6 +6,7 @@
  * 役割を変えないときは役割を送らない（担当者が管理者に上がらない）。
  */
 import React, { act } from 'react'
+import { fireEvent } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -102,6 +103,24 @@ describe('V8 統括のメンバーの窓', () => {
     const checks = Array.from(document.querySelectorAll('[role="dialog"] [aria-label="担当するアカウント"] input[type="checkbox"]')).map((l) => l.getAttribute('aria-label'))
     expect(checks).toEqual(['然 -NEN- 本店', '然 -NEN- 渋谷店'])
     expect(document.querySelector('[role="dialog"]')!.textContent).toContain('閲覧のみ（見るだけ）')
+  })
+
+  it('B-139：招待で名前が空・担当するアカウントが0なら送らず、両方の欄に理由を出し、名前の欄へ移る', async () => {
+    await act(async () => { buttonByText('権限者を招待')!.click() })
+    await flush()
+    const dialog = document.querySelector('[role="dialog"]')!
+    const email = dialog.querySelector('input[type="email"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(email, { target: { value: 'staff@example.com' } }) })
+    const first = dialog.querySelector('[aria-label="担当するアカウント"] input[type="checkbox"]') as HTMLInputElement
+    await act(async () => { first.click() })
+    await act(async () => { buttonByText('招待メールを送る')!.click() })
+    await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    expect(create).not.toHaveBeenCalled()
+    expect(dialog.textContent).toContain('名前を入力してください')
+    const scope = dialog.querySelector('[aria-label="担当するアカウント"]')!
+    expect(scope.getAttribute('aria-describedby')).toMatch(/-scope-error$/)
+    expect(dialog.textContent).toContain('担当するアカウントを1つ以上選んでください')
+    expect((document.activeElement as HTMLInputElement | null)?.id).toMatch(/-name$/)
   })
 
   it('確認の間は変更の窓を閉じ、やめたら入れた中身のまま戻り、役割を変えないときは役割を送らない', async () => {

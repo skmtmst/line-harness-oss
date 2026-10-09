@@ -23,6 +23,8 @@ import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import { ApiError, api, type MileageAdjustmentPolicy } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
+import { FieldError } from '@/components/shared/form-controls'
+import { useFormErrors } from '@/lib/use-form-errors'
 import styles from './mileage.module.css'
 
 /** 手でマイルを動かすときの失敗の言葉（app/mileage/friends/detail/mileage-adjustment-dialog.tsx から写した）。 */
@@ -112,6 +114,7 @@ export default function MileageAdjustDialog({
     setExpiresOn('')
     setStep('input')
     setError('')
+    fields.reset()
     setBusy(false)
     setCompletedResult(null)
     setRetrying(false)
@@ -125,29 +128,43 @@ export default function MileageAdjustDialog({
       })
       .catch((caught) => setError(mileageAdjustmentErrorMessage(caught)))
       .finally(() => setPolicyLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 欄の印の片付けは開いたときだけ（fields は描画ごとに新しい）
   }, [accountId, initialDirection, open])
 
+  /* 欄ごとの誤り（B-139）。欄の真下に出し、確定を押したら1つ目の欄へ移る。 */
+  const amountError = zeroing && currentBalance <= 0 ? '残高が0のため、0にすることはできません'
+    : !Number.isInteger(amount) || amount <= 0 ? '1以上の整数でマイル数を入力してください'
+      : amount > 1_000_000_000 ? 'マイル数が大きすぎます'
+        : delta < 0 && amount > currentBalance ? '利用可能な残高を超えて減らすことはできません' : null
+  const expiresError = expiresOn && direction !== 'increase' ? '有効期限はマイルを増やすときだけ指定できます'
+    : expiresOn && new Date(`${expiresOn}T23:59:59+09:00`).getTime() <= Date.now() ? '有効期限は明日以降を選んでください' : null
+  const sourceError = sourceReferenceId.trim().length > 128 ? '調整元IDは128文字以内で入力してください' : null
+  const reasonError = !reason.trim() ? '詳しい理由を入力してください' : reason.trim().length > 500 ? '詳しい理由は500文字以内で入力してください' : null
+  const fields = useFormErrors()
+  fields.define('amount', 'マイル数', () => amountError)
+  fields.define('expires', 'この分の有効期限', () => expiresError)
+  fields.define('source', '調整元ID', () => sourceError)
+  fields.define('reason', '詳しい理由', () => reasonError)
+  const describedBy = (key: string) => (fields.invalid(key) ? `adj-${key}-error` : undefined)
+
   const inputError = useMemo(() => {
-    if (zeroing && currentBalance <= 0) return '残高が0のため、0にすることはできません'
-    if (!Number.isInteger(amount) || amount <= 0) return '1以上の整数でマイル数を入力してください'
-    if (amount > 1_000_000_000) return 'マイル数が大きすぎます'
-    if (delta < 0 && amount > currentBalance) return '利用可能な残高を超えて減らすことはできません'
-    if (!reason.trim()) return '詳しい理由を入力してください'
-    if (reason.trim().length > 500) return '詳しい理由は500文字以内で入力してください'
-    if (sourceReferenceId.trim().length > 128) return '調整元IDは128文字以内で入力してください'
-    if (expiresOn && direction !== 'increase') return '有効期限はマイルを増やすときだけ指定できます'
-    if (expiresOn && new Date(`${expiresOn}T23:59:59+09:00`).getTime() <= Date.now()) return '有効期限は明日以降を選んでください'
+    const fieldError = amountError ?? expiresError ?? sourceError ?? reasonError
+    if (fieldError) return fieldError
     if (!policyLoading && !policy?.configured) {
       return canConfigurePolicy
         ? '高額調整の承認境界が未設定です。下の欄で承認境界を設定してください。'
         : '高額調整の承認境界が未設定です。オーナーへ設定を依頼してください。'
     }
     return null
-  }, [amount, canConfigurePolicy, currentBalance, delta, direction, expiresOn, policy, policyLoading, reason, sourceReferenceId, zeroing])
+  }, [amountError, canConfigurePolicy, expiresError, policy, policyLoading, reasonError, sourceError])
 
   const valid = inputError === null
 
   const submit = async () => {
+    if (fields.submit().length > 0) {
+      setError('')
+      return
+    }
     if (inputError) {
       setError(inputError)
       return
@@ -365,22 +382,31 @@ export default function MileageAdjustDialog({
             <div>
               <p className={styles.dlgFieldLabel}>マイル数</p>
               <input
+                {...fields.bind('amount')}
                 className={styles.dlgInput}
                 inputMode="numeric"
                 value={zeroing ? String(currentBalance) : amountText}
                 disabled={zeroing}
                 onChange={(event) => setAmountText(event.target.value.replace(/[^0-9]/g, ''))}
                 aria-label="マイル数"
+                aria-invalid={fields.invalid('amount') || undefined}
+                aria-describedby={describedBy('amount')}
               />
+              <FieldError id="adj-amount-error">{fields.error('amount')}</FieldError>
             </div>
             <div>
               <p className={styles.dlgFieldLabel}>この分の有効期限</p>
-              <DateField
-                value={expiresOn}
-                disabled={direction !== 'increase'}
-                onChange={setExpiresOn}
-                aria-label="この分の有効期限"
-              />
+              <span {...fields.bind('expires')}>
+                <DateField
+                  value={expiresOn}
+                  disabled={direction !== 'increase'}
+                  onChange={setExpiresOn}
+                  aria-label="この分の有効期限"
+                  invalid={fields.invalid('expires')}
+                  aria-describedby={describedBy('expires')}
+                />
+              </span>
+              <FieldError id="adj-expires-error">{fields.error('expires')}</FieldError>
             </div>
           </div>
 
@@ -398,23 +424,31 @@ export default function MileageAdjustDialog({
             <div>
               <p className={`${styles.dlgFieldLabel} ${styles.labelRow}`}>問い合わせ・注文・調整元ID<span className={styles.dlgPersonSub}>任意</span></p>
               <input
+                {...fields.bind('source')}
                 className={styles.dlgInput}
                 value={sourceReferenceId}
                 onChange={(event) => setSourceReferenceId(event.target.value)}
                 placeholder="例：注文番号など"
                 aria-label="問い合わせ・注文・調整元ID"
+                aria-invalid={fields.invalid('source') || undefined}
+                aria-describedby={describedBy('source')}
               />
+              <FieldError id="adj-source-error">{fields.error('source')}</FieldError>
             </div>
           </div>
 
           <div className={styles.dlgGroup}>
             <p className={styles.dlgCaption}>詳しい理由</p>
             <textarea
+              {...fields.bind('reason')}
               className={styles.dlgTextarea}
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               aria-label="詳しい理由"
+              aria-invalid={fields.invalid('reason') || undefined}
+              aria-describedby={describedBy('reason')}
             />
+            <FieldError id="adj-reason-error">{fields.error('reason')}</FieldError>
           </div>
 
           {/* 絵 M8zhjL：スイッチ＋題と説明の2行。 */}

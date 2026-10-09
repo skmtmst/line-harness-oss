@@ -906,6 +906,9 @@
   --tpl-textarea-compact-h: 72px;
   --tpl-stamp-card-min-h: 1074px;
   --tpl-tab-count-pad: 0 6px;
+  /* 隠れた所の誤りの数の丸（B-139・ErrorCountBadge）。 */
+  --tpl-error-badge-size: 18px;
+  --tpl-error-badge-gap: 6px;
   --tpl-stamp-history-date-w: 15%;
   --tpl-stamp-history-friend-w: 20%;
   --tpl-stamp-history-count-w: 18%;

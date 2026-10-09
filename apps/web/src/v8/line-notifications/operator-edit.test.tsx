@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
+import { fireEvent } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { OPERATOR_EVENT_OPTIONS } from '@/app/line-notifications/operator-event-options'
@@ -119,6 +120,23 @@ test('狭い板の案内は開閉しても入力内容を保つ', async () => {
   await act(async () => { toggle?.click() })
   expect(aside?.hasAttribute('data-expanded')).toBe(false)
   expect(host?.querySelector<HTMLInputElement>('#operator-name')?.value).toBe(rule.name)
+})
+
+describe('B-139 欄で知らせて移る', () => {
+  test('名前を消して下書きを保存すると、口を呼ばず名前の欄が赤くなり理由が出て、そこへ移る', async () => {
+    await render()
+    const name = host!.querySelector('#operator-name') as HTMLInputElement
+    await act(async () => { fireEvent.change(name, { target: { value: '' } }) })
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
+    fetchMock.mockClear()
+    const save = Array.from(host!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '下書きを保存する')!
+    await act(async () => { save.click() })
+    await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    expect(fetchMock.mock.calls.some(([, init]) => ((init as RequestInit | undefined)?.method ?? 'GET') !== 'GET')).toBe(false)
+    expect(name.getAttribute('aria-invalid')).toBe('true')
+    expect(host!.querySelector('#operator-name-error')?.textContent).toBe('お知らせの名前を入力してください。')
+    expect(document.activeElement).toBe(name)
+  })
 })
 
 describe('公開前の確認の窓（sDXNy）', () => {

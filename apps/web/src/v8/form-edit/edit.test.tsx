@@ -145,6 +145,41 @@ describe('回答フォームの編集（V8）', () => {
     expect(screen.getByDisplayValue('来店アンケート')).toBeTruthy()
   })
 
+  it('B-139：2ページ目の質問文が空のまま保存すると、そのページとブロックを開いて質問文の欄へ移り、中身のタブに赤い印を付ける', async () => {
+    const broken = structuredClone(formData)
+    ;(broken.layout.sections[1].blocks[0] as { label: string }).label = ''
+    formsGet.mockImplementation(async () => ({ success: true, data: broken }))
+    await render('id=form-1&tab=appearance')
+    await screen.findByText('受付のきまり（つづき）')
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    for (let i = 0; i < 3; i++) await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    expect(formsUpdate).not.toHaveBeenCalled()
+    expect(await screen.findByText('ページ2 のブロック')).toBeTruthy()
+    const label = document.getElementById('fe-q-q2') as HTMLInputElement
+    expect(label.getAttribute('aria-invalid')).toBe('true')
+    expect(document.getElementById('fe-q-q2-error')?.textContent).toBe('質問文を入れてください')
+    expect(document.activeElement).toBe(label)
+    const tab = screen.getByRole('tab', { name: /中身/ })
+    expect(tab.querySelector('[data-design-part="error-count-badge"]')?.textContent).toBe('1')
+    expect(screen.queryByText('タイトルが空のブロックがあります')).toBeNull()
+  })
+
+  it('B-139：フォーム名が空のまま中身のタブで保存すると、受付と見た目のタブを開いて名前の欄へ移る', async () => {
+    formsGet.mockImplementation(async () => ({ success: true, data: { ...structuredClone(formData), name: '' } }))
+    await render('id=form-1')
+    await screen.findByText('ページ1 のブロック')
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    for (let i = 0; i < 3; i++) await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    expect(formsUpdate).not.toHaveBeenCalled()
+    const name = document.getElementById('fe-name') as HTMLInputElement
+    expect(name).toBeTruthy()
+    expect(name.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(name)
+    const tab = screen.getByRole('tab', { name: /受付と見た目/ })
+    expect(tab.getAttribute('aria-selected')).toBe('true')
+    expect(tab.querySelector('[data-design-part="error-count-badge"]')?.textContent).toBe('1')
+  })
+
   it('ほかの人が先に保存していたら（409）帯を出し、主のボタンは「比べてから保存」になる', async () => {
     formsUpdate.mockImplementation(async () => { throw new ApiError(409, 'conflict', 'VERSION_CONFLICT', { updatedAt: '' }) })
     // 再送の見分けで読み直したとき、中身が違う＝ほかの人の保存。

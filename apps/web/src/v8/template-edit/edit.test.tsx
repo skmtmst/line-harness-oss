@@ -181,7 +181,29 @@ describe('V8 メッセージを作る・編集', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
     await flush()
     expect(templatesApi.create).not.toHaveBeenCalled()
-    expect(screen.getByRole('alert').textContent).toContain('名前を入力してください')
+    // 理由は上の帯ではなく、名前の欄の真下に出る（B-139）。
+    expect(screen.getByRole('alert').textContent).toContain('テンプレート名を入力してください')
+    expect(screen.getByLabelText('テンプレート名').getAttribute('aria-invalid')).toBe('true')
+  })
+
+  it('B-139：名前と本文が空で保存すると、両方の欄が赤くなり真下に理由が出て、1つ目の欄へ移る。直すとその欄の赤は消える', async () => {
+    await mount()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
+    for (let i = 0; i < 3; i += 1) await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    expect(templatesApi.create).not.toHaveBeenCalled()
+    const nameInput = screen.getByLabelText('テンプレート名')
+    expect(nameInput.getAttribute('aria-invalid')).toBe('true')
+    expect(document.getElementById('te-name-error')?.textContent).toBe('テンプレート名を入力してください。')
+    expect(document.getElementById('te-content-error')?.textContent).toBe('本文を入力してください。')
+    expect(document.querySelector('#te-content')?.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(nameInput)
+    expect(document.querySelector('[data-design-part="validation-summary"]')?.textContent).toContain('2か所直してください：テンプレート名・本文')
+    type(nameInput, '予約前日のご案内')
+    await flush()
+    expect(nameInput.getAttribute('aria-invalid')).toBeNull()
+    expect(document.getElementById('te-name-error')).toBeNull()
+    expect(document.getElementById('te-content-error')?.textContent).toBe('本文を入力してください。')
+    expect(document.querySelector('[data-design-part="validation-summary"]')).toBeNull()
   })
 
   it('差し込む「名前」を押すと本文へ {{name}} が入り、数が増える', async () => {

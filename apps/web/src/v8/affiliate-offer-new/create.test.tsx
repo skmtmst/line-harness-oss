@@ -55,4 +55,18 @@ describe('案件を作る（Td4TN）', () => {
     expect(buttons()).not.toContain('保存して公開')
     expect(host.textContent).toContain('閲覧のみで見ています')
   })
+
+  test('B-139：案件名と報酬が足りないまま保存すると、欄が赤くなり真下に理由が出て、案件名の欄へ移る', async () => {
+    await render()
+    const save = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.trim() === '保存して公開')!
+    await act(async () => { save.click() })
+    for (let i = 0; i < 2; i++) await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    const name = host.querySelector('#of-name') as HTMLInputElement
+    expect(name.getAttribute('aria-invalid')).toBe('true')
+    expect(host.querySelector('#of-name-error')?.textContent).toBe('案件名を入力してください')
+    expect(host.querySelector('#of-amount')?.getAttribute('aria-invalid')).toBe('true')
+    expect(host.querySelector('#of-amount-error')?.textContent).toBe('報酬（円かマイル）のどちらかを入れてください')
+    expect(document.activeElement).toBe(name)
+    expect(host.querySelector('[data-design-part="validation-summary"]')?.textContent).toContain('2か所直してください：案件名・報酬額（円）')
+  })
 })

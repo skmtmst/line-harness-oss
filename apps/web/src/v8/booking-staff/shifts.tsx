@@ -373,6 +373,20 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [reloadKey, setReloadKey] = useState(0)
   const [ruleError, setRuleError] = useState<string | null>(null)
+  /*
+   * 保存で落ちた時刻の欄（B-139）。囲みの理由の文に加えて、その行の時刻の欄を赤くし、終わりの欄へ移る。
+   * 欄は aria-label（「月曜の終わり」など）で見分ける。直したら消える。
+   */
+  const [badTimes, setBadTimes] = useState<string[]>([])
+  const markBadTimes = (labels: string[]) => {
+    setBadTimes(labels)
+    const target = labels[labels.length - 1]
+    requestAnimationFrame(() => {
+      const el = Array.from(document.querySelectorAll<HTMLElement>('[aria-label]')).find((node) => node.getAttribute('aria-label') === target)
+      el?.scrollIntoView?.({ block: 'center' })
+      el?.focus({ preventScroll: true })
+    })
+  }
   const [savingRules, setSavingRules] = useState(false)
   const [rulesSavedAt, setRulesSavedAt] = useState<string | null>(null)
   const [breakGroups, setBreakGroups] = useState<BreakGroup[]>([])
@@ -583,6 +597,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       if (!row.active) continue
       if (!validRange(row.start, row.end)) {
         setRuleError(`${day.label}の時間を正しく入れてください（終わりは始まりより後にします）。入力はそのまま残しています。`)
+        markBadTimes([`${day.label}の始まり`, `${day.label}の終わり`])
         return
       }
       payload.push({ weekday: day.weekday, start_time: row.start, end_time: row.end })
@@ -627,6 +642,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       }
       if (!validRange(group.start, group.end)) {
         setBreakError(`${weekdaySetLabel(group.weekdays)}の時間を正しく入れてください（終わりは始まりより後にします）。入力はそのまま残しています。`)
+        markBadTimes(['休憩の始まり', '休憩の終わり'])
         return
       }
     }
@@ -732,6 +748,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
     const row = shiftRows[shift.id] ?? { start: shift.start_time, end: shift.end_time }
     if (!validRange(row.start, row.end)) {
       setShiftError(`${shortDay(shift.work_date)}の時間を正しく入れてください（終わりは始まりより後にします）。入力はそのまま残しています。`)
+      markBadTimes([`${shortDay(shift.work_date)}の始まり`, `${shortDay(shift.work_date)}の終わり`])
       return
     }
     setSavingShift(true)
@@ -762,6 +779,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
     }
     if (dayAddKind !== 'closed' && !validRange(dayAddStart, dayAddEnd)) {
       setShiftError('時間を正しく入れてください（終わりは始まりより後にします）。入力はそのまま残しています。')
+      markBadTimes(['この日の始まり', 'この日の終わり'])
       return
     }
     setDayAddBusy(true)
@@ -998,7 +1016,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
   const staffLabel = (item: BookingStaff) => `${item.name}${item.role ? `（${item.role}）` : ''}`
   // 閲覧のみ：時刻を選ぶ部品は置かず、いまの時刻を文字で見せる（2026-10-06 オーナー決定）。
   const timeBox = (label: string, value: string, onChange: (v: string) => void) => (canEdit
-    ? <TimeField aria-label={label} value={value} onChange={onChange} className={styles.time} />
+    ? <TimeField aria-label={label} value={value} invalid={badTimes.includes(label)} onChange={(v) => { if (badTimes.includes(label)) setBadTimes([]); onChange(v) }} className={styles.time} />
     : <span aria-label={label} className={`${styles.time} ${styles.timeText}`}>{value || '—'}</span>
   )
 

@@ -59,3 +59,18 @@ test('止められなかったら知らせて残り、もう一度押すと止�
   expect(calls.filter((call) => call.startsWith('POST /api/webhooks/outgoing'))).toHaveLength(1)
   expect(puts).toBe(2)
 })
+
+test('B-139：名前とURLが足りないまま保存すると、帯で済ませず欄が赤くなり、1つ目（名前）の欄へ移る', async () => {
+  vi.stubGlobal('fetch', async () => json({ success: true, data: [] }))
+  render(<WebhooksCreateV8 />)
+  fireEvent.change(document.querySelector('#wh-new-url')!, { target: { value: 'http://example.com' } })
+  await act(async () => { screen.getByRole('button', { name: '下書きを保存' }).click() })
+  await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+  const name = document.querySelector('#wh-new-name') as HTMLInputElement
+  expect(name.getAttribute('aria-invalid')).toBe('true')
+  expect(document.querySelector('#wh-new-url')?.getAttribute('aria-invalid')).toBe('true')
+  expect(screen.getByText('名前を入力してください')).toBeTruthy()
+  expect(screen.getByText('URLは https:// で始めてください')).toBeTruthy()
+  expect(screen.queryByText(/直す所があります/)).toBeNull()
+  expect(document.activeElement).toBe(name)
+})
