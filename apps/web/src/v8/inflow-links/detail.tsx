@@ -11,6 +11,7 @@
  * - 受付を止める・別リンクへ送る・削除するは「その後」の段の右上の「…」から（今は段の題の右）
  * - 閲覧のみ（owner・admin 以外）には、リンクを編集・止める・することを変える・「…」を出さず、閲覧のみの帯を出す
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -131,11 +132,11 @@ function InflowDetailContent() {
   const [showOrders, setShowOrders] = useState(false)
   const [afterMenuOpen, setAfterMenuOpen] = useState(false)
   const [openFriendMenuId, setOpenFriendMenuId] = useState<string | null>(null)
-  const [friendSearch, setFriendSearch] = useState('')
-  const [friendChip, setFriendChip] = useState<FriendChip>('all')
-  const [friendPeriod, setFriendPeriod] = useState<FriendPeriod>('all')
-  const [friendPage, setFriendPage] = useState(1)
-  const [friendPageSize, setFriendPageSize] = useState(20)
+  const [friendSearch, setFriendSearch] = useListUrlValue('friendSearch', '')
+  const [friendChip, setFriendChip] = useListUrlValue<FriendChip>('friendChip', 'all')
+  const [friendPeriod, setFriendPeriod] = useListUrlValue<FriendPeriod>('friendPeriod', 'all')
+  const [friendPage, setFriendPage] = useListUrlValue('friendPage', 1)
+  const [friendPageSize, setFriendPageSize] = useListUrlValue('friendPageSize', 20)
   const { accounts = [] } = useAccount()
 
   usePageTitle(route?.name ?? '流入と計測')

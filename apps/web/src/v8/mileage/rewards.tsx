@@ -149,7 +149,7 @@ export default function RewardsTab() {
   const [failed, setFailed] = useState<FailedRedemption[]>([])
   const [redemptionsVisible, setRedemptionsVisible] = useState(false)
   const [redemptionsLoad, setRedemptionsLoad] = useState<LoadStatus>('loading')
-  const [redemptionsPage, setRedemptionsPage] = useState(1)
+  const [redemptionsPage, setRedemptionsPage] = useListUrlValue('redemptionsPage', 1)
   const [redemptionsTotal, setRedemptionsTotal] = useState(0)
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [retryError, setRetryError] = useState('')

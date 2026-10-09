@@ -8,6 +8,7 @@
  * ①② は下書きで、下の帯の［保存する］でまとめて保存する。③・店で手入力・④の取り消しは、その場で口を呼ぶ。
  * 呼ぶ口は visit-stamps-api（Codex の API-7）だけ。動き・権限は BEHAVIOR.md。
  */
+import { flushListUrlState, useListUrlValue } from '@/components/shared/list-url-state'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { notifySaved } from '@/components/shared/toast'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -119,6 +120,7 @@ function VisitStampsScreen() {
   const rawTab = params.get('tab')
   const tab = STAMP_TABS.find(t => t.key === rawTab)?.key ?? (params.get('friend') && !rawTab ? 'history' : 'settings')
   const selectTab = (key: typeof STAMP_TABS[number]['key']) => {
+    flushListUrlState()
     const url = new URL(window.location.href)
     url.searchParams.set('tab', key)
     router.replace(`${url.pathname}${url.search}${url.hash}`, { scroll: false })
@@ -262,8 +264,8 @@ function VisitStampsScreen() {
   /* ④ 店全体の押した・使った記録（期間・友だち・種類で絞れる口。ここは新しい順に全部）。 */
   const [log, setLog] = useState<VisitStampEntryPage | null>(null)
   const [logError, setLogError] = useState<unknown>(null)
-  const [logPage, setLogPage] = useState(1)
-  const [logPageSize, setLogPageSize] = useState(20)
+  const [logPage, setLogPage] = useListUrlValue('logPage', 1)
+  const [logPageSize, setLogPageSize] = useListUrlValue('logPageSize', 20)
   const logRequest = useRef(0)
   const loadLog = useCallback(async () => {
     const request = ++logRequest.current

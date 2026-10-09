@@ -38,6 +38,7 @@ vi.mock('@/lib/api', () => ({
   api: { friends: { list: fx.friendsList, get: fx.friendsGet }, staff: { list: fx.staffList }, uploads: { image: fx.uploadImage } },
   describeSaveFailure: (e: unknown) => (e instanceof Error ? e.message : '保存できませんでした。'),
 }))
+import { flushListUrlState } from '@/components/shared/list-url-state'
 import VisitStampsV8 from './visit-stamps'
 import { notifyToast } from '@/components/shared/toast'
 
@@ -51,6 +52,7 @@ const card = {
 
 beforeEach(() => {
   fx.accountId = 'acc-1'
+  flushListUrlState()
   window.history.replaceState(null, '', '/visit-stamps')
   fx.replace.mockImplementation((href: string) => {
     window.history.replaceState(null, '', href)

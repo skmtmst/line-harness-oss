@@ -268,3 +268,12 @@ it('複数の種類はURLから戻り、関数による連続変更で条件を�
   expect(params.has('page')).toBe(false)
   expect(params.get('id')).toBe('detail')
 })
+
+it('詳細内の一覧も絞り込みで先頭に戻り、明示したページ送りはそのまま残す', () => {
+  expect(nextListUrl({ pathname: '/inflow-links/detail', search: '?id=r1&friendPage=4&friendSearch=old', hash: '' }, { friendSearch: '' }, { friendSearch: 'new' })).toBe('/inflow-links/detail?id=r1&friendSearch=new')
+  expect(nextListUrl({ pathname: '/inflow-links/detail', search: '?id=r1&friendSearch=new', hash: '' }, { friendPage: '1' }, { friendPage: '3' })).toBe('/inflow-links/detail?id=r1&friendSearch=new&friendPage=3')
+})
+
+it('タブで記録と設定を行き来しても、記録の一覧ページは覚えておく', () => {
+  expect(nextListUrl({ pathname: '/visit-stamps', search: '?logPage=2&tab=history', hash: '' }, { tab: '' }, { tab: 'settings' })).toBe('/visit-stamps?logPage=2&tab=settings')
+})

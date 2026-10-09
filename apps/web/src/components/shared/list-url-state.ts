@@ -77,6 +77,9 @@ if (typeof window !== 'undefined') {
   // 別の画面へ移る・戻るときは、書きかけを先に書いてから。
   window.addEventListener('popstate', () => { pending = null })
   window.addEventListener('pagehide', flushListUrlState)
+  document.addEventListener('click', event => {
+    if (event.target instanceof Element && event.target.closest('a[href]')) flushListUrlState()
+  }, true)
 }
 const readServerSearch = () => ''
 
@@ -102,10 +105,14 @@ export function nextListUrl<T extends Record<string, string>>(
     if (value === '' || value === defaults[key]) params.delete(key)
     else params.set(key, value)
   }
-  const changedFilter = Object.entries(patch).some(([key, value]) => !['page', 'cursor', 'offset', 'highlight', 'id'].includes(key) && value !== undefined && value !== (new URLSearchParams(location.search).get(key) ?? defaults[key] ?? ''))
+  const isPagination = (key: string) => /(?:page|cursor|offset)$/i.test(key)
+  const changedFilter = Object.entries(patch).some(([key, value]) => !isPagination(key) && !['highlight', 'id'].includes(key) && value !== undefined && value !== (new URLSearchParams(location.search).get(key) ?? defaults[key] ?? ''))
   if (changedFilter && patch.page === undefined) params.delete('page')
   if (changedFilter && patch.cursor === undefined) params.delete('cursor')
   if (changedFilter && patch.offset === undefined) params.delete('offset')
+  if (changedFilter && !Object.keys(patch).every(key => key === 'tab')) for (const key of Array.from(params.keys())) {
+    if (isPagination(key) && patch[key] === undefined) params.delete(key)
+  }
   const query = params.toString()
   return `${location.pathname}${query ? `?${query}` : ''}${location.hash}`
 }

@@ -767,7 +767,7 @@ function StaffPageHost() {
   // ★V7 `x63W5x`：集計が取れていない間、KPI に 0 を出さない。「—」と出す。
   const [summaryReady, setSummaryReady] = useState(false)
   const [editing, setEditing] = useState<StaffMember | null>(null), [settingTwoFactor, setSettingTwoFactor] = useState<StaffMember | null>(null), [permissionTarget, setPermissionTarget] = useState<AccessUserItem | null>(null)
-  const [userPage, setUserPage] = useState(1)
+  const [userPage, setUserPage] = useListUrlValue('userPage', 1)
   const USER_PAGE_SIZE = 6
   /* ブラウザの `confirm()` をやめて、共通の確認窓へ移した（理由は EditModal と同じ）。 */
   const [disablingTarget, setDisablingTarget] = useState<StaffMember | null>(null), [disablingTwoFactor, setDisablingTwoFactor] = useState(false), [disableError, setDisableError] = useState('')
