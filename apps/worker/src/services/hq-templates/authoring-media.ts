@@ -28,12 +28,12 @@ const dimensionParam = (value: string | null): number | null => {
 export async function uploadHqImage(bucket: R2Bucket, authority: HqTemplateAuthority, request: Request, publicBaseUrl: string) {
   if (requireHqTemplateAuthority(authority).kind !== 'AUTHORIZED' || !/^[A-Za-z0-9_-]{1,128}$/.test(authority.tenantId)) error('FORBIDDEN');
   const url = new URL(request.url), purpose = url.searchParams.get('purpose'), filename = url.searchParams.get('filename') ?? '';
-  if (!['message', 'rich_menu'].includes(purpose ?? '') || !filename.trim() || filename.length > 200 || /[\\/\u0000-\u001f]/.test(filename)) error('INVALID_IMAGE');
+  if (!['message', 'rich_menu', 'rich_video_preview'].includes(purpose ?? '') || !filename.trim() || filename.length > 200 || /[\\/\u0000-\u001f]/.test(filename)) error('INVALID_IMAGE');
   // R568: the editor tells which size it can adopt. A declared size that the
   // image does not match is rejected here, before any R2 write.
   const expectedWidth = dimensionParam(url.searchParams.get('width')), expectedHeight = dimensionParam(url.searchParams.get('height'));
   if ((expectedWidth === null) !== (expectedHeight === null)) error('INVALID_IMAGE');
-  const max = purpose === 'rich_menu' ? 1024 * 1024 : 8 * 1024 * 1024;
+  const max = purpose === 'rich_menu' || purpose === 'rich_video_preview' ? 1024 * 1024 : 8 * 1024 * 1024;
   const declared = request.headers.get('content-length');
   if (declared !== null && (!/^\d+$/.test(declared) || Number(declared) > max || Number(declared) < 1)) error('MEDIA_SIZE_LIMIT');
   if (!request.body) error('INVALID_IMAGE');
@@ -94,7 +94,8 @@ export async function deleteHqImage(bucket: R2Bucket, authority: HqTemplateAutho
 /** LINEイメージマップ用5サイズ。統括の登録画像からだけ作り、配布時は全サイズをコピーする。 */
 export async function uploadHqImagemap(env: import('../../index.js').Env['Bindings'], authority: HqTemplateAuthority, request: Request, origin: string): Promise<import('@line-crm/shared').TemplateImagemapUpload> {
   if (!env.CF_IMAGES) error('IMAGE_TRANSFORM_UNAVAILABLE');
-  const url=new URL(request.url); url.searchParams.set('purpose','message');
+  const url=new URL(request.url); const richVideo = url.searchParams.get('purpose') === 'rich_video_preview';
+  url.searchParams.set('purpose',richVideo ? 'rich_video_preview' : 'message');
   const source=await uploadHqImage(env.IMAGES,authority,new Request(url,request),origin);
   const object=await env.IMAGES.get(source.r2Key);
   if(!object || !('body' in object)) error('INVALID_IMAGE');
@@ -120,5 +121,5 @@ export async function uploadHqImagemap(env: import('../../index.js').Env['Bindin
     for(const m of media) if(isRegisteredHqMedia(await env.IMAGES.head(m.r2Key),m,authority.tenantId)) await env.IMAGES.delete(m.r2Key);
     throw e;
   }
-  return {media,payload:{imageUrl:media.at(-1)!.publicUrl,baseUrl:`${new URL(origin).origin}/images/${baseKey}`,baseSize:{width:1040,height}}};
+  return {media:richVideo ? [source,...media] : media,payload:{imageUrl:richVideo ? source.publicUrl : media.at(-1)!.publicUrl,baseUrl:`${new URL(origin).origin}/images/${baseKey}`,baseSize:{width:1040,height}}};
 }

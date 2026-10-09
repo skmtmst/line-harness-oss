@@ -12,6 +12,7 @@ vi.mock('@/components/shell/page-chrome',()=>({usePageTitle:()=>{},usePageCrumbs
 vi.mock('@/lib/use-unsaved-guard',()=>({useUnsavedGuard:()=>({leaveTarget:null,disarm:mocks.disarm,guarded:mocks.guarded})}))
 vi.mock('@/lib/unsaved-leave-dialog',()=>({UnsavedLeaveDialog:()=>null}))
 vi.mock('@/lib/api',()=>({api:{templates:{get:mocks.get,create:mocks.create,update:mocks.update},folders:{list:async()=>({success:true,data:[]})}}}))
+vi.mock('./rich-video-core', async original => ({...await original<typeof import('./rich-video-core')>(),videoPreviewFile:vi.fn(async()=>({file:new File(['preview'],'preview.jpg',{type:'image/jpeg'}),height:520}))}))
 import Editor from './rich-video'
 import type { TemplateEditHost } from './host'
 const draft:RichVideoDraft={name:'動画',folderId:'',originalContentUrl:'https://worker.example/images/video.mp4',previewImageUrl:'https://worker.example/images/preview.jpg',height:520,buttonEnabled:true,actionLabel:'詳しく見る',actionUrl:'https://example.com/menu',altText:'新しい動画です'}
@@ -19,6 +20,40 @@ function stored(button=true){return {...richVideoContent({...draft,buttonEnabled
 beforeEach(()=>{vi.clearAllMocks();mocks.role='owner';mocks.account='a';mocks.get.mockResolvedValue({success:true,data:{id:'r',accountId:'a',name:'動画',messageType:'imagemap',messageContent:JSON.stringify(stored()),publishedVersion:1,draftRevision:0}});mocks.update.mockResolvedValue({success:true,data:{id:'r'}})})
 afterEach(cleanup)
 describe('リッチビデオ編集',()=>{
+ it('統括は店を選ばず取り込み、ひな形の口へ保存して配る（Ni0V8）',async()=>{
+  mocks.account='';
+  const video={id:'video',kind:'video' as const,filename:'video.mp4',mimeType:'video/mp4',sizeBytes:3,width:null,height:null,durationMs:1000,r2Key:'hq-templates/tenant/uploads/video.mp4',publicUrl:draft.originalContentUrl,versionId:'video-v',versionNo:1,contentHash:'a'.repeat(64)}
+  const image={...video,id:'preview',kind:'image' as const,mimeType:'image/jpeg',r2Key:'hq-templates/tenant/preview',publicUrl:draft.previewImageUrl,width:1040,height:520}
+  const preview={media:[image],payload:{imageUrl:draft.previewImageUrl,baseUrl:'https://worker.example/images/imagemaps/map',baseSize:{width:1040,height:520}}}
+  const upload=vi.fn().mockResolvedValue(video),uploadPreview=vi.fn().mockResolvedValue(preview),save=vi.fn(),folder=vi.fn()
+  const host:TemplateEditHost={description:'統括のひな形',folders:[{value:'hq-folder',label:'統括の動画'}],folder:'hq-folder',onFolderChange:folder,busy:false,onSave:save,onCancel:vi.fn(),uploadRichVideo:upload,uploadRichVideoPreview:uploadPreview}
+  const {container}=render(<Editor host={host}/>);
+  fireEvent.change(screen.getByLabelText('テンプレート名'),{target:{value:'新しい動画'}})
+  fireEvent.change(container.querySelector('input[type=file]')!,{target:{files:[new File(['mp4'],'video.mp4',{type:'video/mp4'})]}})
+  await waitFor(()=>expect(uploadPreview).toHaveBeenCalledOnce())
+  await screen.findByText('プレビュー画像も作りました')
+  fireEvent.click(screen.getByRole('switch',{name:'見終わったあとのボタンを出す'}))
+  fireEvent.change(screen.getByLabelText('通知に出る文'),{target:{value:'動画のお知らせ'}})
+  fireEvent.click(screen.getByRole('button',{name:'保存して配る'}))
+  await waitFor(()=>expect(save).toHaveBeenCalledOnce())
+  const [content,distribute]=save.mock.calls[0]
+  expect(distribute).toBe(true);expect(content.kind).toBe('rich_video');expect(content.media).toEqual([video,image])
+  expect(JSON.parse(content.messageContent)).toMatchObject({baseUrl:preview.payload.baseUrl,baseSize:{height:520},video:{originalContentUrl:video.publicUrl,previewImageUrl:image.publicUrl}})
+  expect(mocks.create).not.toHaveBeenCalled();expect(mocks.update).not.toHaveBeenCalled();expect(mocks.push).not.toHaveBeenCalled()
+ })
+ it('統括の編集は取り込み済みの画像の組を保持し、下書きも保存できる',async()=>{
+  mocks.account='';const save=vi.fn().mockResolvedValue(false)
+  const media=[{id:'v',kind:'video' as const,filename:'video.mp4',mimeType:'video/mp4',sizeBytes:3,width:null,height:null,durationMs:1000,r2Key:'hq-templates/tenant/video',publicUrl:draft.originalContentUrl,versionId:'v',versionNo:1,contentHash:'a'.repeat(64)},{id:'p',kind:'image' as const,filename:'preview.jpg',mimeType:'image/jpeg',sizeBytes:3,width:1040,height:520,durationMs:null,r2Key:'hq-templates/tenant/preview',publicUrl:draft.previewImageUrl,versionId:'p',versionNo:1,contentHash:'b'.repeat(64)}]
+  const host:TemplateEditHost={description:'',folders:[],folder:'',onFolderChange:()=>{},busy:false,onSave:save,onCancel:vi.fn(),initialContent:{kind:'rich_video',name:'動画',messageContent:JSON.stringify(stored()),media}}
+  render(<Editor host={host}/>);await screen.findByDisplayValue('新しい動画です')
+  fireEvent.change(screen.getByLabelText('通知に出る文'),{target:{value:'直した通知'}})
+  fireEvent.click(screen.getByRole('button',{name:'下書きを保存'}))
+  await waitFor(()=>expect(save).toHaveBeenCalledOnce())
+  expect(save.mock.calls[0][1]).toBe(false);expect(save.mock.calls[0][0].media).toEqual(media)
+  expect(JSON.parse(save.mock.calls[0][0].messageContent).baseUrl).toBe(stored().baseUrl)
+  expect(mocks.disarm).not.toHaveBeenCalled();expect(mocks.get).not.toHaveBeenCalled()
+ })
+
  it('引用した動画はテンプレートを更新せず入れ直せる。入れ直しが失敗したときは変更を残す',async()=>{
   const insert=vi.fn().mockResolvedValue(false);const cancel=vi.fn()
   const host:TemplateEditHost={composer:{index:2,accountId:'a'},description:'',folders:[],folder:'',onFolderChange:()=>{},busy:false,onSave:insert,onCancel:cancel,initialContent:{kind:'message',name:'動画',messageType:'imagemap',messageContent:JSON.stringify(stored())}}

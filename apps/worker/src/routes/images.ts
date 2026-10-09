@@ -102,16 +102,19 @@ images.get('/images/*', async (c) => {
     return c.json({ success: false, error: 'Invalid image key' }, 400);
   }
   // 写真審査の原本は公開配信しない。管理画面もreview/public派生画像だけを使う。
-  if (key.startsWith('nen-photo-originals/') || key.startsWith('private/')) {
+  if (key.startsWith('nen-photo-originals/') || key.startsWith('private/') || /^hq-templates\/[^/]+\/pending\//.test(key)) {
     return c.json({ success: false, error: 'Image not found' }, 404);
   }
   // 検査が終わるまで出さない。記録が無い古いファイルは通す。
   const gateKind = key.startsWith('form-uploads/')
     ? 'form_file'
-    : key.startsWith('broadcast-media/')
+    : key.startsWith('broadcast-media/') || /^hq-templates\/[^/]+\/uploads\/[^/]+\.(mp4|m4a)$/.test(key)
       ? 'broadcast_asset'
       : null;
   if (gateKind) {
+    if (key.startsWith('hq-templates/') && !await c.env.DB.prepare("SELECT 1 FROM media_file_scans WHERE subject_kind='broadcast_asset' AND subject_id=?").bind(key).first()) {
+      return c.json({ success: false, error: 'ファイルの安全性を確かめています' }, 409);
+    }
     const gate = await checkKeyGate(c.env.DB, c.env.IMAGES, gateKind, key);
     if (!gate.allowed) {
       return c.json({ success: false, code: gate.code, error: gate.message }, 409);
@@ -142,6 +145,7 @@ images.get('/images/*', async (c) => {
 images.delete('/api/images/:key', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const key = c.req.param('key');
+    if (key.startsWith('hq-templates/')) return c.json({success:false,error:'統括のファイルは統括の削除操作から外してください'},403);
     await c.env.IMAGES.delete(key);
     return c.json({ success: true, data: null });
   } catch (err) {

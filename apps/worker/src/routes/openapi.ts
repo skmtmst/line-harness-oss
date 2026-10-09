@@ -2075,17 +2075,39 @@ const spec = {
       get: { tags: ['HQ Support'], summary: '契約先から見える運営の操作履歴（書き込みを伴ったものだけ）', responses: { '200': { description: 'Visible operator actions for the caller tenant' } } },
     },
     // ── HQ Templates ───────────────────────────────────────────────────────
+    '/api/hq/templates/media/upload-sessions': {
+      post: {
+        tags: ['HQ Templates'], summary: '店を選ばず、統括の動画・音声の直接アップロードを準備する',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['filename', 'mimeType', 'sizeBytes'], properties: { filename: { type: 'string', maxLength: 200 }, mimeType: { enum: ['video/mp4', 'audio/mp4'] }, sizeBytes: { type: 'integer', minimum: 1, maximum: 209715200 } } } } } },
+        responses: { '201': { description: '15分有効の署名付きPUT URL、必須ヘッダー、セッションIDと期限' }, '403': { description: '統括全体の編集権限がない' }, '422': { description: '形式・容量が不正' }, '500': { description: '直接アップロード未設定' } },
+      },
+    },
+    '/api/hq/templates/media/upload-sessions/{id}/complete': {
+      post: {
+        tags: ['HQ Templates'], summary: '統括の動画・音声を容量・形式・ETag・長さで検査し、受取記録を返す',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['etag'], properties: { etag: { type: 'string' } } } } } },
+        responses: { '201': { description: 'メディアの受取記録。再要求も同じ記録を返す。安全性の確認が終わるまで公開・配布しない' }, '403': { description: '統括全体の編集権限がない' }, '404': { description: '利用者・統括に属するセッションがない' }, '409': { description: '期限切れ・内容不一致・取り込み未確定' }, '422': { description: 'ファイル形式・長さが不正' } },
+      },
+    },
+    '/api/hq/templates/media/upload-sessions/{id}': {
+      delete: {
+        tags: ['HQ Templates'], summary: '未完了の統括アップロードを取り消す',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'セッションを失効し、未完了のファイルを削除' }, '403': { description: '統括全体の編集権限がない' }, '404': { description: '利用者・統括に属するセッションがない' }, '409': { description: '完了済みのファイルは取り消せない' } },
+      },
+    },
     '/api/hq/templates/media': {
       post: {
         tags: ['HQ Templates'], summary: '統括ひな形のPNG/JPEG画像を登録',
         parameters: [
-          { name: 'purpose', in: 'query', required: true, schema: { type: 'string', enum: ['message', 'rich_menu', 'rich_message'] } },
+          { name: 'purpose', in: 'query', required: true, schema: { type: 'string', enum: ['message', 'rich_menu', 'rich_message', 'rich_video_preview'] } },
           { name: 'filename', in: 'query', required: true, schema: { type: 'string', minLength: 1, maxLength: 200 } },
           { name: 'width', in: 'query', required: false, schema: { type: 'integer' }, description: '採用できる幅。画像が違う寸法なら登録せず422' },
           { name: 'height', in: 'query', required: false, schema: { type: 'integer' }, description: '採用できる高さ。画像が違う寸法なら登録せず422' },
         ],
         requestBody: { required: true, content: { 'image/png': { schema: { type: 'string', format: 'binary' } }, 'image/jpeg': { schema: { type: 'string', format: 'binary' } } } },
-        responses: { '201': { description: '統括の画像。rich_messageは5サイズのmediaとbaseUrl/baseSizeを返す。message/rich_menuの同一再送は既存画像を再利用する' }, '403': { description: 'Tenant-wide owner/admin write permission required' }, '422': { description: 'Invalid image, dimensions, size or unconfirmed upload' } },
+        responses: { '201': { description: '統括の画像。rich_message・rich_video_previewは原本と5サイズのmediaとbaseUrl/baseSizeを返す。message/rich_menuの同一再送は既存画像を再利用する' }, '403': { description: 'Tenant-wide owner/admin write permission required' }, '422': { description: 'Invalid image, dimensions, size or unconfirmed upload' } },
       },
       delete: {
         tags: ['HQ Templates'], summary: '採用されなかった統括ひな形の画像を回収（所有確認つき）',

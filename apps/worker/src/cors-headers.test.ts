@@ -22,7 +22,8 @@ function tsFiles(dir: string): string[] {
   for (const name of readdirSync(dir)) {
     const full = join(dir, name);
     if (statSync(full).isDirectory()) out.push(...tsFiles(full));
-    else if (name.endsWith('.ts') || name.endsWith('.tsx')) out.push(full);
+    // 実行する画面コードを調べる。試験のR2直接PUT用の見本ヘッダは管理APIへ送られない。
+    else if (/\.(ts|tsx)$/.test(name) && !/\.(test|spec)\.(ts|tsx)$/.test(name)) out.push(full);
   }
   return out;
 }

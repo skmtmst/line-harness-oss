@@ -6,6 +6,7 @@ import { listTemplateFolders, saveTemplateFolder, deleteTemplateFolder, duplicat
 import { listMessageReferences } from '../services/hq-templates/message-card-references.js';
 import { deleteHqImage, uploadHqImage, uploadHqImagemap } from '../services/hq-templates/authoring-media.js';
 import { TemplateHqTemplateError } from '../services/hq-templates/template.js';
+import { createHqMediaSession, completeHqMediaSession, cancelHqMediaSession } from '../services/hq-media.js';
 import { Hono, type Context } from 'hono';
 import { HQ_TEMPLATE_TYPES, getStaffById, getHqTemplate, type HqTemplateType } from '@line-crm/db';
 import { dbFor } from '../services/db-router.js';
@@ -31,6 +32,14 @@ async function authority(c: Context<Env>): Promise<HqTemplateAuthority> {
   return auth.authority;
 }
 const reasons: Record<string, string> = {
+  INVALID_MEDIA: '動画はMP4、音声はM4Aで選んでください。ファイルの長さを読み取れるか確認してください',
+  MEDIA_SIZE_LIMIT: '動画・音声は200MB以内、プレビュー画像は1MB以内で選んでください',
+  DIRECT_UPLOAD_UNAVAILABLE: '直接アップロードが未設定です。統括の管理者に頼んでください',
+  UPLOAD_EXPIRED: 'アップロード期限が切れました。ファイルを選び直してください',
+  UPLOAD_UNCONFIRMED: 'アップロードの完了を確認できません。もう一度確認してください',
+  MEDIA_SCAN_PENDING: 'ファイルの安全性を確かめています。少し待って再確認してください',
+  MEDIA_IN_USE: '保存済みのファイルは削除できません',
+  SOURCE_MEDIA_UNAVAILABLE: 'ファイルを確認できません。選び直してください',
   LIFF_UNAVAILABLE: '配り先のLINEアカウントにLIFFが設定されていません。LIFFを設定してから配り直してください',
   CARD_REFERENCE_UNAVAILABLE: '配り先に同じ名前のフォーム・シナリオ・予約メニュー・スタンプカードが1件だけあるか、LIFFが設定されているか確認してください',
   INVALID_REQUEST_ID: '作成依頼の識別情報を確認してください',
@@ -65,10 +74,19 @@ hqTemplates.use('/api/hq/templates/*', requireRole('owner', 'admin'), async (c, 
     return inputError(c, { success: false, ...(typed && (error.status === 400 || error.status === 422) ? { fields: error.fields } : {}), error: reasons[code] ?? (typed && error.status < 500 ? '入力内容を確認してください' : '処理結果を確認できません。しばらくしてから再確認してください'), code }, typed ? error.status : 500);
   }
 });
+hqTemplates.post('/api/hq/templates/media/upload-sessions', async c => {
+  return c.json({ success: true, data: await createHqMediaSession(c.env, dbFor(c.env), await authority(c), await body(c)) }, 201);
+});
+hqTemplates.post('/api/hq/templates/media/upload-sessions/:id/complete', async c => {
+  return c.json({ success: true, data: await completeHqMediaSession(c.env, dbFor(c.env), await authority(c), c.req.param('id'), (await body(c)).etag, c.env.WORKER_URL || new URL(c.req.url).origin) }, 201);
+});
+hqTemplates.delete('/api/hq/templates/media/upload-sessions/:id', async c => {
+  return c.json({ success: true, data: await cancelHqMediaSession(c.env.IMAGES, dbFor(c.env), await authority(c), c.req.param('id')) });
+});
 hqTemplates.post('/api/hq/templates/media', inputJsonBoundary(), async c => {
   const auth = await authority(c);
   try {
-    const data = c.req.query('purpose')==='rich_message'
+    const data = ['rich_message','rich_video_preview'].includes(c.req.query('purpose') ?? '')
       ? await uploadHqImagemap(c.env, auth, c.req.raw, c.env.WORKER_URL || new URL(c.req.url).origin)
       : await uploadHqImage(c.env.IMAGES, auth, c.req.raw, c.env.WORKER_URL || new URL(c.req.url).origin);
     return c.json({ success: true, data }, 201);
@@ -82,6 +100,15 @@ hqTemplates.post('/api/hq/templates/media', inputJsonBoundary(), async c => {
 hqTemplates.delete('/api/hq/templates/media', async c => {
   const auth = await authority(c);
   try {
+    const key = c.req.query('r2Key');
+    if (key?.startsWith(`hq-templates/${auth.tenantId}/uploads/`)) {
+      // Retain files referenced by any saved HQ version/run, including history.
+      const adopted = await dbFor(c.env).prepare(`SELECT 1 AS used WHERE EXISTS(
+        SELECT 1 FROM hq_template_versions v,json_tree(v.definition_json) j WHERE v.tenant_id=? AND j.type='text' AND (j.value=? OR j.value LIKE ?))
+        OR EXISTS(SELECT 1 FROM hq_broadcast_runs r,json_tree(r.input_json) j WHERE r.tenant_id=? AND j.type='text' AND (j.value=? OR j.value LIKE ?))`)
+        .bind(auth.tenantId,key,`%/images/${key}`,auth.tenantId,key,`%/images/${key}`).first();
+      if (adopted) throw new HqTemplateError('MEDIA_IN_USE', 409);
+    }
     const data = await deleteHqImage(c.env.IMAGES, auth, c.req.query('r2Key'));
     return c.json({ success: true, data });
   } catch (error) {

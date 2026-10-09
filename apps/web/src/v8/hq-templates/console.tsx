@@ -53,6 +53,8 @@ import { useFormErrors } from '@/lib/use-form-errors'
 import TemplateMessageEditor from '@/v8/template-edit/message'
 import TemplateAssetEditor from '@/v8/template-edit/asset'
 import TemplateRichEditor from '@/v8/template-edit/rich'
+import TemplateRichVideoEditor from '@/v8/template-edit/rich-video'
+import { hqMediaApi } from '@/lib/api-hq-media'
 import CarouselV8 from '@/v8/templates/carousel'
 import QuestionNewV8 from '@/v8/templates/question-new'
 import type { TemplateEditHost, TemplateHostContent } from '@/v8/template-edit/host'
@@ -155,7 +157,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const [search, setSearch] = useListUrlValue('q', '')
   const [accountFolder, setAccountFolder] = useState(ALL_ACCOUNTS)
   const accountFolders = useDistributionFolders(stage === 'accounts' || stage === 'duplicates' || stage === 'result' || stage === 'saved' || folderDistribution !== null)
-  /* テンプレートの6種類（店と同じ上のタブ・API-17）。タブを替えたらその種類だけ読む。 */
+  /* テンプレートの7種類（店と同じ上のタブ・API-17）。タブを替えたらその種類だけ読む。 */
   const [kind, setKind] = useState<TemplateKind>('message')
   const [kindRows, setKindRows] = useState<HqTemplate[] | null>(null)
   const [kindCounts, setKindCounts] = useState<Partial<Record<TemplateKind, number>> | null>(null)
@@ -354,7 +356,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const sharedEditorRef = useRef(false)
   const sharedEditorNow = () => sharedEditorRef.current
   const usesMessageForm = () => stage === 'edit' && type === 'template' && 'template' in definition && !sharedEditorNow()
-  const save = (distribute: boolean, sourceDefinition = definition, sourceName = name, sourceDescription = description, andAnother = false, options: { folderId?: string | null; preselect?: string[] } = {}) => (usesMessageForm() && messageFields.submit().length > 0 ? Promise.resolve() : perform(async () => {
+  const save = (distribute: boolean, sourceDefinition = definition, sourceName = name, sourceDescription = description, andAnother = false, options: { folderId?: string | null; preselect?: string[]; onSaved?: () => void } = {}) => (usesMessageForm() && messageFields.submit().length > 0 ? Promise.resolve() : perform(async () => {
     const preparedDefinition = definitionForName(type, sourceDefinition, sourceName.trim(), sourceDescription.trim())
     const validation = !sourceName.trim() ? 'ひな形の名前を入力してください。' : definitionError(type, preparedDefinition, creationScope.current?.tenantId)
     if (validation) throw new Error(validation)
@@ -413,6 +415,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     setCreateUncertain(false)
     setTemplates((current) => [saved.template, ...current.filter((row) => row.id !== saved.template.id)])
     refreshStats()
+    options.onSaved?.()
     notifySaved(continueToAccounts ? '' : 'ひな形を保存しました。')
     if (continueToAccounts) {
       setSelected(options.preselect ?? []); setTextOverrides({}); setSearch('')
@@ -776,7 +779,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const current = ('template' in definition ? definition : freshDefinition('template')) as MessageTemplateDefinition
   /* 編集で中身を店の画面の形に戻せないもの（古い形のカード等）は、空で開いて上書きしないよう今の画面（X4JcOf）で直す。 */
   const editContent = detail && type === 'template' && editKind !== 'message' ? hostContentOf(editKind, name, current) : undefined
-  const sharedEditor = type === 'template' && !createUncertain && ['message', 'coupon', 'research', 'carousel', 'question', 'rich_message'].includes(editKind)
+  const sharedEditor = type === 'template' && !createUncertain && ['message', 'coupon', 'research', 'carousel', 'question', 'rich_message', 'rich_video'].includes(editKind)
     && (!detail || editKind === 'message' || Boolean(editContent))
   sharedEditorRef.current = sharedEditor
   if (stage === 'edit' && sharedEditor) {
@@ -790,10 +793,12 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       createFolder: canEdit ? createFolder : undefined,
       busy,
       notice: notices,
-      onSave: (content, distribute) => {
+      onSave: async (content, distribute) => {
         const next = hostDefinition(current, content)
         setName(content.name); setDefinition(next)
-        void save(distribute, next, content.name, description)
+        let saved = false
+        await save(distribute, next, content.name, description, false, {onSaved: () => {saved = true}})
+        return saved
       },
       onCancel: toList,
       initialMessage: detail && editKind === 'message' ? { name, messageType: current.template.messageType, messageContent: current.template.messageContent } : undefined,
@@ -806,6 +811,26 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           const media = await hqTemplatesApi.uploadImage(file, 'message')
           noteSessionUpload(media)
           return media
+        } finally {
+          if (alive.current) setUploadBusy(false)
+        }
+      },
+      uploadRichVideo: async (file) => {
+        setUploadBusy(true)
+        try {
+          const media = await hqMediaApi.upload(file, 'video')
+          noteSessionUpload(media)
+          return media
+        } finally {
+          if (alive.current) setUploadBusy(false)
+        }
+      },
+      uploadRichVideoPreview: async (file) => {
+        setUploadBusy(true)
+        try {
+          const preview = await hqMediaApi.uploadRichVideoPreview(file)
+          for (const media of preview.media) noteSessionUpload(media)
+          return preview
         } finally {
           if (alive.current) setUploadBusy(false)
         }
@@ -823,6 +848,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       },
     }
     const editorKey = `${editKind}-${detail?.template.id ?? 'new'}-${formKey}`
+    if (editKind === 'rich_video') return <TemplateRichVideoEditor key={editorKey} host={host} />
     if (editKind === 'rich_message') return <TemplateRichEditor key={editorKey} host={host} />
     if (editKind === 'message') return <TemplateMessageEditor key={editorKey} id={null} visual={false} host={host} />
     if (editKind === 'carousel') return <CarouselV8 key={editorKey} host={host} />
@@ -1222,6 +1248,13 @@ function accountName(accounts: HqAccount[], id: string): string {
 
 /** 保存してある統括のひな形を、店の作る画面へ渡す中身（保存と同じ形）に戻す。読めなければ undefined（空から）。 */
 export function hostContentOf(kind: TemplateKind, name: string, definition: MessageTemplateDefinition): TemplateHostContent | undefined {
+  if (kind === 'rich_video' && definition.template.messageType === 'imagemap') {
+    try {
+      const payload = JSON.parse(definition.template.messageContent)
+      if (!payload.video) return undefined
+      return { kind, name, messageContent: definition.template.messageContent, media: [...definition.media] }
+    } catch { return undefined }
+  }
   const asset = definition.asset
   if ((kind === 'coupon' || kind === 'research' || kind === 'rich_message') && asset?.kind === kind) {
     const payload = asset.payload as Record<string, unknown>
@@ -1243,6 +1276,9 @@ export function hostDefinition(current: MessageTemplateDefinition, content: Temp
   const base = { ...current, template: { ...current.template, name: content.name } }
   const { card: _card, asset: _asset, ...rest } = base
   void _card; void _asset
+  if (content.kind === 'rich_video') {
+    return { ...rest, media: content.media, template: { ...rest.template, messageType: 'imagemap', messageContent: content.messageContent, carouselActionsJson: null, carouselTapLimitMode: 'none', carouselTapLimitText: null, questionJson: null } }
+  }
   if (content.kind === 'message') {
     return { ...rest, template: { ...rest.template, messageType: content.messageType as MessageTemplateDefinition['template']['messageType'], messageContent: content.messageContent, questionJson: null } }
   }

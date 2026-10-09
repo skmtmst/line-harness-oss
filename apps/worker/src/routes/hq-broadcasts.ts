@@ -13,6 +13,7 @@ import { StampError } from '../services/visit-stamps.js';
 import { hqBroadcastAuthority, prepareHqBroadcast, getHqBroadcastRun, readHqBroadcastResult, preflightHqBroadcast,
   excludeHqBroadcastTargets, dispatchHqBroadcast, stopHqBroadcast, retryHqBroadcastTarget } from '../services/hq-broadcasts.js';
 export const hqBroadcasts=new Hono<Env>();
+const mediaRuntime = (c: import('hono').Context<Env>) => ({bucket:c.env.IMAGES,publicBaseUrl:c.env.WORKER_URL || new URL(c.req.url).origin});
 hqBroadcasts.onError((e,c)=>inputError(c, {success:false,...(e instanceof StampError && (e.status === 400 || e.status === 422) ? {fields:e.fields} : {}),error:e instanceof StampError?e.message:'統括配信を確認できません'}, e instanceof StampError?e.status:500, []));
 hqBroadcasts.use('/api/hq/broadcasts/*',requireRole('owner','admin'),async(c,next)=>{await hqBroadcastAuthority(dbFor(c.env),c.get('staff'),['GET','HEAD'].includes(c.req.method));await next();});
 hqBroadcasts.get('/api/hq/broadcasts',async c=>{
@@ -67,7 +68,7 @@ hqBroadcasts.get('/api/hq/broadcasts/:id',async c=>{
   const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),['GET','HEAD'].includes(c.req.method));return c.json({success:true,data:await readHqBroadcastResult(db,await getHqBroadcastRun(db,a.tenantId,c.req.param('id')))});
 });
 hqBroadcasts.post('/api/hq/broadcasts/:id/preflight',inputJsonBoundary(), async c=>{
-  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),['GET','HEAD'].includes(c.req.method));return c.json({success:true,data:await preflightHqBroadcast(db,await getHqBroadcastRun(db,a.tenantId,c.req.param('id')))});
+  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),['GET','HEAD'].includes(c.req.method));return c.json({success:true,data:await preflightHqBroadcast(db,await getHqBroadcastRun(db,a.tenantId,c.req.param('id')),true,mediaRuntime(c))});
 });
 hqBroadcasts.put('/api/hq/broadcasts/:id/exclusions',inputJsonBoundary({"accountIds":["array"],"expectedVersion":["number"]}), async c=>{
   const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),['GET','HEAD'].includes(c.req.method)),b=await c.req.json<{accountIds:string[];expectedVersion:number}>();
@@ -77,7 +78,7 @@ hqBroadcasts.put('/api/hq/broadcasts/:id/exclusions',inputJsonBoundary({"account
 hqBroadcasts.post('/api/hq/broadcasts/:id/send',requireIrreversibleConfirmation('broadcast-send'),inputJsonBoundary({"expectedVersion":["number"],"confirmedRecipientCount":["number"]}), async c=>{
   const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),['GET','HEAD'].includes(c.req.method)),b=await c.req.json<{expectedVersion:number;confirmedRecipientCount?:number}>();
   if(!Number.isSafeInteger(b.expectedVersion))throw new StampError('版を確認してください', 400, ["expectedVersion"]);
-  return c.json({success:true,data:await dispatchHqBroadcast(db,await getHqBroadcastRun(db,a.tenantId,c.req.param('id')),a.actorId,b.expectedVersion,b.confirmedRecipientCount)});
+  return c.json({success:true,data:await dispatchHqBroadcast(db,await getHqBroadcastRun(db,a.tenantId,c.req.param('id')),a.actorId,b.expectedVersion,b.confirmedRecipientCount,mediaRuntime(c))});
 });
 hqBroadcasts.post('/api/hq/broadcasts/:id/stop',inputJsonBoundary({"expectedVersion":["number"]}), async c=>{
   const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),['GET','HEAD'].includes(c.req.method)),b=await c.req.json<{expectedVersion:number}>();
@@ -118,7 +119,7 @@ for(const [suffix,action] of [['approval-request','request'],['approve','approve
 });
 hqBroadcasts.post('/api/hq/broadcasts/:id/test-send',inputJsonBoundary({"accountId":["string"]}), async c=>{
  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff')),b=await c.req.json<{accountId:string}>();
- return c.json({success:true,data:await testHqBroadcast(db,await getHqBroadcastRun(db,a.tenantId,c.req.param('id')),a.actorId,b.accountId)});
+ return c.json({success:true,data:await testHqBroadcast(db,await getHqBroadcastRun(db,a.tenantId,c.req.param('id')),a.actorId,b.accountId,mediaRuntime(c))});
 });
 hqBroadcasts.get('/api/hq/broadcasts/:id/targets/:accountId/recipients',async c=>{
  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),true),p=pagination(c);

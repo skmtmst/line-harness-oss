@@ -61,6 +61,18 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 describe('統括のテンプレートを作る（店の作る画面＋保存後に配り先を選ぶ）', () => {
+  it('リッチビデオの種類から店と同じ編集部品を統括で開ける', async () => {
+    render(<HqTemplatesV8 type="template" />)
+    fireEvent.click(await screen.findByRole('tab', { name: /リッチビデオ/ }))
+    await waitFor(() => expect(calls.listByKind).toHaveBeenCalledWith('rich_video'))
+    fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+    expect(await screen.findByRole('heading', { name: 'リッチビデオを作る' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '下書きを保存' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '保存する' })).toBeTruthy()
+    expect(screen.getByLabelText('テンプレート名')).toBeTruthy()
+    expect(calls.create).not.toHaveBeenCalled()
+  })
+
   it('作る画面から一覧へは、上の帯のパンくず「テンプレート」で戻る（同じ URL のまま段を替える）', async () => {
     render(<HqTemplatesV8 type="template" />)
     fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
@@ -337,6 +349,28 @@ describe('統括のテンプレートを直す（質問・クーポン：店の�
     expect(JSON.parse(input.definition.template.questionJson)).toMatchObject({ text: 'どのお肉が好きですか？', choices: [{ label: '鹿肉' }, { label: '馬肉' }] })
   })
 
+  it('リッチビデオは保存済みの動画と画像の組から開き、統括へ保存して配り先を選べる', async () => {
+    const videoUrl='https://worker.test/images/hq-templates/tenant-a/video.mp4'
+    const previewUrl='https://worker.test/images/hq-templates/tenant-a/preview.jpg'
+    const payload={altText:'動画の通知',baseUrl:'https://worker.test/images/hq-templates/tenant-a/map',baseSize:{width:1040,height:520},actions:[],video:{originalContentUrl:videoUrl,previewImageUrl:previewUrl,area:{x:0,y:0,width:1040,height:520}}}
+    const video={id:'v',kind:'video',filename:'video.mp4',mimeType:'video/mp4',sizeBytes:3,width:null,height:null,durationMs:1000,r2Key:'hq-templates/tenant-a/video.mp4',publicUrl:videoUrl,versionId:'v',versionNo:1,contentHash:'a'.repeat(64)}
+    const media=[video,{...video,id:'p',kind:'image',mimeType:'image/jpeg',publicUrl:previewUrl,r2Key:'hq-templates/tenant-a/preview.jpg',width:1040,height:520}]
+    const definition={...message,template:{...message.template,messageType:'imagemap',name:'統括の動画',messageContent:JSON.stringify(payload)},media}
+    await open(definition,'rich_video','統括の動画')
+    expect(await screen.findByRole('heading',{name:'リッチビデオを作る'})).toBeTruthy()
+    calls.update.mockRejectedValueOnce(new Error('保存できませんでした。もう一度お試しください。'))
+    fireEvent.change(screen.getByLabelText('通知に出る文'),{target:{value:'直した通知'}})
+    fireEvent.click(screen.getByRole('button',{name:'保存する'}))
+    await screen.findByText('保存できませんでした。もう一度お試しください。')
+    expect(screen.getByDisplayValue('直した通知')).toBeTruthy()
+    expect(screen.queryByRole('checkbox',{name:/然 -NEN- 本店/})).toBeNull()
+    fireEvent.click(screen.getByRole('button',{name:'保存する'}))
+    await waitFor(()=>expect(calls.update).toHaveBeenCalledTimes(2))
+    const saved=calls.update.mock.calls[0][1].definition
+    expect(saved.media).toEqual(media);expect(saved.asset).toBeUndefined();expect(saved.template.messageType).toBe('imagemap')
+    expect(JSON.parse(saved.template.messageContent)).toEqual({...payload,altText:'直した通知'})
+    expect(await screen.findByRole('checkbox',{name:/然 -NEN- 本店/})).toBeTruthy()
+  })
   it('クーポンは保存してある期間・説明で店のクーポンの画面が開き、そのまま保存しても期間を落とさない', async () => {
     await open(couponDefinition, 'coupon', '冬の10%オフ')
     expect(await screen.findByRole('heading', { name: 'クーポンを作る' })).toBeTruthy()
