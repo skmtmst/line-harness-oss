@@ -1,3 +1,5 @@
+import { copyHqMediaStream } from '../hq-media-stream.js';
+import { hqMediaGate } from '../hq-media.js';
 import { captureDistributionName } from './distribution-display.js';
 import { withTextOverride } from './text-overrides.js';
 import { HQ_AUTHORED_MESSAGE_ID, isRegisteredHqMedia } from './authoring-media.js';
@@ -311,6 +313,7 @@ async function messageAdapter(b:R2RuntimeBinding,context:HqTemplateAdapterContex
     if(!normalizeSha256(media.contentHash)||(!hqAuthored&&(!row||normalizeSha256(row.content_hash)!==normalizeSha256(media.contentHash))))fail('SOURCE_MEDIA_UNAVAILABLE');
     const key=sourceKey(media.r2Key,b.authority.tenantId),object=await b.bucket.head(key);
     if(!object||object.size!==media.sizeBytes||(hqAuthored&&!isRegisteredHqMedia(object,media,b.authority.tenantId)))fail('SOURCE_MEDIA_UNAVAILABLE');
+    if (hqAuthored && ['video','audio'].includes(media.kind)) await hqMediaGate(b.db,b.bucket,key);
     bindings.push({tenantId:b.authority.tenantId,templateVersionId:b.templateVersionId,sourceAccountId,mediaId:media.id,mediaVersionId:media.versionId,versionNo:media.versionNo,r2Key:key,r2KeyPrefix:`hq-templates/${b.authority.tenantId}`,sizeBytes:media.sizeBytes,contentHash:media.contentHash,etag:object!.etag});
     if(!hqAuthored)sourceGuards.push(guard(`EXISTS(SELECT 1 FROM media_versions v JOIN media m ON m.id=v.media_id JOIN line_accounts a ON a.id=m.line_account_id WHERE v.id=? AND v.media_id=? AND v.version_no=? AND v.size_bytes=? AND v.content_hash=? AND m.line_account_id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL)`,[media.versionId,media.id,media.versionNo,media.sizeBytes,row!.content_hash,sourceAccountId,b.authority.tenantId]));
   }
@@ -318,6 +321,11 @@ async function messageAdapter(b:R2RuntimeBinding,context:HqTemplateAdapterContex
   const ids=new Map<string,string>();
   for(const [kind,id] of [['template',`template:${definition.template.id}`],...definition.media.flatMap(m=>[['media',`media:${m.id}`],['media_version',m.versionId]])])ids.set(`${kind}:${id}`,(await digest(JSON.stringify([owner,b.templateVersionId,kind,id]))).slice(0,32));
   const dependencies:MessageTemplateAdapterDependencies={
+    stageSourceObject: async (media, binding) => {
+      if (!hqAuthored || !binding.etag) fail('SOURCE_MEDIA_UNAVAILABLE');
+      await hqMediaGate(b.db, b.bucket, media.r2Key);
+      return { r2Key: binding.r2Key, etag: binding.etag!, sizeBytes: media.sizeBytes, contentHash: normalizeSha256(media.contentHash)! };
+    },
     cardTargets: references.targets,
     referenceTargets: Object.fromEntries(resourcePlan.matches.map(ref=>[ref.sourceId,ref.targetId])),
     resolveSourceVersion:async({authority,templateVersionId})=>{
@@ -332,7 +340,7 @@ async function messageAdapter(b:R2RuntimeBinding,context:HqTemplateAdapterContex
       return {bytes:await readMessageTemplateSourceBytes(object.body,maxBytes),etag:object.etag};
     },
     createId:(kind,id)=>ids.get(`${kind}:${id}`)??fail('INVALID_SOURCE_ID'),
-    createTargetR2Key:(media,id)=> definition.asset?.kind==='rich_message' && /\/(240|300|460|700|1040)$/.test(media.r2Key)
+    createTargetR2Key:(media,id)=> (definition.asset?.kind==='rich_message' || definition.template.messageType === 'imagemap') && /\/(240|300|460|700|1040)$/.test(media.r2Key)
       ? `media/${safeId(context.targetAccountId)}/hq/${owner}/imagemap/${media.r2Key.split('/').at(-1)}`
       : `media/${safeId(context.targetAccountId)}/hq/${owner}/${safeId(id)}`,
     createTargetPublicUrl:key=>{
@@ -501,13 +509,14 @@ export async function executeR2RuntimeStore(options: R2StoreOptions): Promise<R2
       if(object.ownerToken !== expectedOwner || !new RegExp(`^${prefix}/${safeId(context.targetAccountId)}/hq/${expectedOwner}/(?:[a-f0-9]{32}|imagemap/(?:240|300|460|700|1040))$`).test(object.key)) fail('INVALID_OWNERSHIP_PLAN');
       const key = {runId,tenantId:authority.tenantId,targetAccountId:context.targetAccountId,objectKey:object.key,ownerToken:object.ownerToken};
       if(await recordHqTemplateOwnedR2Key(db,key)==='conflict_or_missing')fail('IMAGE_OWNER_CONFLICT');
-      const contentHash=await digest(object.bytes),existing=await options.bucket.head(object.key);
-      if(existing) { if(existing.customMetadata?.ownerToken!==object.ownerToken||existing.customMetadata?.contentHash!==contentHash)fail('IMAGE_OWNER_CONFLICT');continue; }
+      const contentHash=object.streamSource?.contentHash ?? await digest(object.bytes),existing=await options.bucket.head(object.key);
+      if(existing) { if(existing.customMetadata?.ownerToken!==object.ownerToken||existing.customMetadata?.contentHash!==contentHash || (object.streamSource && (existing.size !== object.streamSource.sizeBytes || existing.httpMetadata?.contentType !== object.contentType)))fail('IMAGE_OWNER_CONFLICT');continue; }
       let written = false;
       for (let putAttempt = 1; putAttempt <= MAX_IO_ATTEMPTS; putAttempt++) {
         await renewClaim();
         try {
-          const result=await options.bucket.put(object.key,object.bytes,{onlyIf:{etagDoesNotMatch:'*'},customMetadata:{ownerToken:object.ownerToken,contentHash},httpMetadata:{contentType:object.contentType}});
+          const putOptions: R2PutOptions = {onlyIf:{etagDoesNotMatch:'*'},customMetadata:{ownerToken:object.ownerToken,contentHash},httpMetadata:{contentType:object.contentType}};
+          const result = object.streamSource ? await copyHqMediaStream(options.bucket, object.streamSource, object.key, putOptions) : await options.bucket.put(object.key,object.bytes,putOptions);
           if(result){written=true;break;}
         } catch {
           // A timed-out PUT may still have committed. Verify the deterministic object.

@@ -32,6 +32,7 @@ export function templateContentSummary(type: HqTemplateType, definitionJson: str
       }
       case 'template': {
         const definition = parseMessageTemplateDefinition(JSON.parse(definitionJson));
+        if (definition.template.messageType === 'imagemap') return 'リッチビデオ';
         if(definition.asset) {
           const {kind,payload}=definition.asset;
           if(kind==='card_message') return `カード ${Array.isArray(payload.cards)?payload.cards.length:0}枚`;
