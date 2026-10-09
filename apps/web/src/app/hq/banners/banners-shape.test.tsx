@@ -69,7 +69,8 @@ describe('hq/banners の形違い応答', () => {
     apiMocks.stats.mockResolvedValue({ success: true, data: { projects: { active: 2, archived: 1 }, deliveredImages: 18, deliveredAccounts: 3 } })
     render(<Page />)
     await flush()
-    expect(await screen.findByText('アーカイブ 1')).toBeTruthy()
+    // 数の帯と、上の絞り込みの札（見る：アーカイブ）の両方に出る（B-136）。
+    expect((await screen.findAllByText('アーカイブ 1')).length).toBeGreaterThan(0)
   })
 })
 
