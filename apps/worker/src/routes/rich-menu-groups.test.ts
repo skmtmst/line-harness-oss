@@ -471,7 +471,7 @@ describe('V6 targeting preview and publish schedule', () => {
     });
 
     expect(res.status).toBe(503);
-    expect((await res.json() as { error: string }).error).toContain('対象条件');
+    expect((await res.json() as { error: string; code: string }).error).toContain('対象条件');
   });
 
   test('公開予約は実行キーが無ければ保存しない', async () => {
@@ -485,7 +485,7 @@ describe('V6 targeting preview and publish schedule', () => {
       body: JSON.stringify({ mode: 'scheduled', startsAt: '2026-09-10T01:00:00.000Z' }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json() as { error: string }).error).toContain('Idempotency-Key');
+    expect((await res.json() as { error: string; code: string }).error).toContain('Idempotency-Key');
   });
 
   test('一般スタッフは公開予約を作れない', async () => {
@@ -725,7 +725,7 @@ describe('POST /api/rich-menu-groups', () => {
       }),
     });
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
+    const body = (await res.json()) as { error: string; code: string };
     expect(body.error).toMatch(/richmenuswitch/i);
   });
 
@@ -743,7 +743,7 @@ describe('POST /api/rich-menu-groups', () => {
       }),
     });
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
+    const body = (await res.json()) as { error: string; code: string };
     expect(body.error).toMatch(/duplicat/i);
   });
 
@@ -1375,10 +1375,9 @@ describe('POST /api/rich-menu-groups/:groupId/publish', () => {
       method: 'POST', headers: { 'Idempotency-Key': 'manual-publish-2' },
     });
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({
+    await expect(res.json()).resolves.toMatchObject({
       success: false,
-      error: 'ページ「基本メニュー」の「送信ボタン」: 送信テキストを入力してください',
-    });
+      error: 'ページ「基本メニュー」の「送信ボタン」: 送信テキストを入力してください', fields: expect.any(Object) });
     // 所有者付きで解放する。
     expect(dbMocks.releasePublishLease).toHaveBeenCalledWith(
       expect.anything(),
@@ -1502,7 +1501,7 @@ describe('POST /api/rich-menu-groups/:groupId/apply-to-tag (#502中)', () => {
       body: JSON.stringify({ mode: 'bulk-link', tagId: null }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json() as { error: string }).error).toContain('Idempotency-Key');
+    expect((await res.json() as { error: string; code: string }).error).toContain('Idempotency-Key');
     expect(dbMocks.getFollowingLineUserIdsByTag).not.toHaveBeenCalled();
   });
 
@@ -1590,7 +1589,7 @@ describe('人数プレビューの権限と複雑さ上限 (#502中)', () => {
       }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json() as { error: string }).error).toContain('複雑');
+    expect((await res.json() as { error: string; code: string }).error).toContain('複雑');
   });
 });
 
@@ -1605,7 +1604,7 @@ describe('外部応答の固定文言 (#502中)', () => {
       { method: 'POST' },
     );
     expect(res.status).toBe(404);
-    const body = (await res.json()) as { error: string };
+    const body = (await res.json()) as { error: string; code: string };
     expect(body.error).not.toContain('external detail leak');
     expect(body.error).toContain('見つかりません');
     fetchSpy.mockRestore();

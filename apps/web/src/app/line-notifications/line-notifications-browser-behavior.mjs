@@ -48,6 +48,8 @@ import { createReadStream, existsSync, statSync } from 'node:fs'
 import { extname, join, normalize } from 'node:path'
 import { chromium } from '@playwright/test'
 
+let lastPage
+
 const outDir = join(process.cwd(), 'apps/web/out')
 if (!existsSync(outDir)) {
   throw new Error('apps/web/out がありません。先に pnpm --filter web build を実行してください。')
@@ -177,6 +179,7 @@ async function openHarness(browser) {
     sessionStorage.setItem('lh_auth_selection_cleared', '1')
   })
   const page = await context.newPage()
+  lastPage = page
   page.on('pageerror', (error) => console.error('browser page error:', error.message))
   page.on('console', (message) => {
     if (message.type() === 'error') console.error('browser console:', message.text())
@@ -271,8 +274,16 @@ async function openEditor(page) {
   await page.getByRole('button', { name: '下書きを保存する', exact: true }).waitFor({ timeout: 15_000 })
 }
 
-const introBox = (page) => page.locator('label', { hasText: 'ご案内文' }).locator('textarea')
+const introBox = (page) => page.getByRole('textbox', { name: 'ご案内文', exact: true })
 const draftKey = (accountId) => `line-notifications:draft:v1:${accountId}:${EVENT_TYPE}`
+
+async function switchAccount(page, accountId) {
+  const account = accounts.find((item) => item.id === accountId)
+  assert.ok(account, '切り替えるアカウントを用意している')
+  await page.getByRole('button', { name: 'アカウントを切り替える', exact: true }).click()
+  await page.getByRole('menu', { name: 'LINEアカウントの切り替え', exact: true })
+    .getByRole('menuitemradio', { name: account.name, exact: true }).click()
+}
 
 const browser = await chromium.launch({ headless: true })
 try {
@@ -400,21 +411,20 @@ try {
     await page.waitForFunction(() => document.body.innerText.includes('未保存の変更があります'))
 
     // 編集画面は開いたまま、見ているアカウントだけが替わる。
-    const accountSelect = page.getByLabel('LINEアカウント')
     const introValue = () => page.evaluate(() => {
-      const box = document.querySelector('[data-design-node="Q55bb"] textarea')
+      const box = document.querySelector('#customer-notification-intro')
       return box ? box.value : null
     })
     const waitForIntro = async (expected) => {
       await page.waitForFunction((want) => {
-        const box = document.querySelector('[data-design-node="Q55bb"] textarea')
+        const box = document.querySelector('#customer-notification-intro')
         return Boolean(box) && box.value === want
       }, expected, { timeout: 15_000 })
     }
 
-    await accountSelect.selectOption('account-b')          // A → B
+    await switchAccount(page, 'account-b')          // A → B
     await waitForIntro('B店の本文')
-    await accountSelect.selectOption('account-a')          // B → A
+    await switchAccount(page, 'account-a')          // B → A
     // Aへ戻ると、端末に残した控えが復元される。
     await waitForIntro('Aで保存を押した時点の本文')
     assert.equal(await introValue(), 'Aで保存を押した時点の本文')
@@ -466,7 +476,7 @@ try {
     let releaseB = () => {}
     state.holdAccountLoad['account-b'] = new Promise((resolve) => { releaseB = resolve })
 
-    await page.getByLabel('LINEアカウント').selectOption('account-b')
+    await switchAccount(page, 'account-b')
     // Bへ切り替わった描画（アカウント選択欄）は済んでいるが、
     // 一覧はまだ「読み込み中」——ここが指摘された窓。見つからなければ
     // 窓を通せていないということなので、握り潰さず試験自体を落とす。
@@ -480,7 +490,7 @@ try {
     // Bの読み込みを再開させ、普通に終わらせる（隙間を通したことの裏取り）。
     releaseB()
     await page.waitForFunction(() => {
-      const box = document.querySelector('[data-design-node="Q55bb"] textarea')
+      const box = document.querySelector('#customer-notification-intro')
       return Boolean(box) && box.value === 'B店の本文'
     }, undefined, { timeout: 15_000 })
 
@@ -489,9 +499,9 @@ try {
     assert.equal(JSON.parse(stored).introText, 'Aで保存を押した時点の本文', '控えの中身が変わっている')
 
     // Aへ戻ると、消されていない控えが復元され、未保存の印も戻る。
-    await page.getByLabel('LINEアカウント').selectOption('account-a')
+    await switchAccount(page, 'account-a')
     await page.waitForFunction(() => {
-      const box = document.querySelector('[data-design-node="Q55bb"] textarea')
+      const box = document.querySelector('#customer-notification-intro')
       return Boolean(box) && box.value === 'Aで保存を押した時点の本文'
     }, undefined, { timeout: 15_000 })
     assert.ok(
@@ -532,12 +542,17 @@ try {
     await nameLink.waitFor({ timeout: 15_000 })
     // タブは #708 で role="tab" へ変わった（nav>button ではなく tablist/tab）。
     await page.getByRole('tab', { name: /顧客へのお知らせ/ }).first().click()
-    await page.waitForFunction(() => document.body.innerText.includes('注文受付'), undefined, { timeout: 15_000 })
+    const customerRow = page.getByRole('row').filter({ has: page.getByRole('cell', { name: '注文が確定したとき', exact: true }) })
+    await customerRow.getByRole('button', { name: /の内容を編集$/ }).waitFor({ timeout: 15_000 })
     await context.close()
     console.log('NOTIFY-04（一覧の名前から編集画面へ戻る）: PASS')
   }
 
   console.log('line notifications browser behavior: PASS')
+} catch (error) {
+  console.error('browser current URL:', lastPage.url())
+  console.error('browser body:', (await lastPage.locator('body').innerText()).slice(0, 4000))
+  throw error
 } finally {
   await browser.close()
   await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()))

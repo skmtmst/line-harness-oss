@@ -82,6 +82,7 @@
 /* ★V8「枠線の色」：操作する欄の枠は control-border。誤りの赤は変えない。 */
 [data-theme='v8'] .field {
   border-color: var(--color-control-border);
+  box-shadow: var(--control-shadow);
 }
 
 [data-theme='v8'] .invalid {
@@ -89,7 +90,7 @@
 }
 
 /* V8 正本HTMLの実寸。v7には適用しない。 */
-[data-theme='v8'] .single { height: 36px; border: 0; padding: 0 12px; outline: 1px solid var(--color-toggle-off); outline-offset: -0.5px; box-shadow: var(--shadow-board); line-height: 21px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+[data-theme='v8'] .single { height: 36px; border: 0; padding: 0 12px; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; box-shadow: var(--control-shadow); line-height: 21px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
 [data-theme='v8'] .single[aria-invalid='true'] { outline-color: var(--color-danger); }
 [data-theme='v8'] .single:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
 /* 誤りのある欄へ移したとき、青い枠で赤を消さない（2026-10-08 オーナー：入力が要る欄は周りが赤くなってそこへ移る）。 */
@@ -128,5 +129,5 @@
 [data-theme='v8'] .multiShort { min-height: var(--tpl-nm-textarea-h); height: var(--tpl-nm-textarea-h); padding: var(--tpl-nm-textarea-pad); font-size: var(--tpl-nm-row-size); line-height: var(--tpl-nm-textarea-lh); }
 
 /* コラムの紹介文。改行を保ち、最初は1行分の高さで表示する。 */
-[data-theme='v8'] .multiSingleRow { min-height: 36px; height: 36px; border: 0; padding: 7.5px 12px; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; line-height: 21px; box-shadow: var(--shadow-board); }
+[data-theme='v8'] .multiSingleRow { min-height: 36px; height: 36px; border: 0; padding: 7.5px 12px; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; line-height: 21px; box-shadow: var(--control-shadow); }
 [data-theme='v8'] .multiSingleRow[aria-invalid='true'] { outline-color: var(--color-danger); }

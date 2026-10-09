@@ -29,36 +29,6 @@
   flex: 0 0 var(--tpl-op-dash-tickets-w);
 }
 
-.stats {
-  display: flex;
-  gap: var(--tpl-op-me-gap);
-}
-
-.stat {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: var(--tpl-op-dash-stat-gap);
-  border-radius: var(--tpl-op-caution-radius);
-  background: var(--color-surface-pearl);
-  padding: var(--tpl-op-dash-stat-pad);
-}
-
-.statLabel {
-  color: var(--color-ink-secondary);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-op-mini-head-lh);
-}
-
-.statValue {
-  color: var(--color-ink);
-  font-size: var(--text-lead);
-  font-weight: 700;
-  line-height: var(--tpl-op-dash-stat-lh);
-  white-space: nowrap;
-}
-
 .chart {
   display: flex;
   height: var(--tpl-op-dash-chart-h);

@@ -10,6 +10,8 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '@/components/shared/button'
 import Drawer from '@/components/shared/drawer'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { formatDay } from '@/lib/format'
@@ -78,24 +80,12 @@ export default function SummaryDrawerV8({
         ) : (
           <>
             <p className={styles.summaryNote}>お客さまがマイページで付けた記録をまとめたものです。診断や治療の判断は含みません。</p>
-            <dl className={styles.statGrid}>
-              <div className={styles.statBox}>
-                <dt className={styles.statLabel}>記録</dt>
-                <dd className={styles.statValue}>{`${s.records} 日`}</dd>
-              </div>
-              <div className={styles.statBox}>
-                <dt className={styles.statLabel}>体重</dt>
-                <dd className={styles.statValue}>{s.weight ? `${s.weight.first} → ${s.weight.last} kg` : '—'}</dd>
-              </div>
-              <div className={styles.statBox}>
-                <dt className={styles.statLabel}>呼吸数（平均）</dt>
-                <dd className={styles.statValue}>{s.respiratoryRateAvg == null ? '—' : `${s.respiratoryRateAvg} 回／分`}</dd>
-              </div>
-              <div className={styles.statBox}>
-                <dt className={styles.statLabel}>心拍数（平均）</dt>
-                <dd className={styles.statValue}>{s.heartRateAvg == null ? '—' : `${s.heartRateAvg} 回／分`}</dd>
-              </div>
-            </dl>
+            <KpiBand density="compact">
+              <KpiCard icon={null} title="記録" value={s.records} unit="日" detail={null} />
+              <KpiCard icon={null} title="体重" value={null} valueText={s.weight ? `${s.weight.first} → ${s.weight.last} kg` : '—'} unit="" detail={null} />
+              <KpiCard icon={null} title="呼吸数（平均）" value={s.respiratoryRateAvg} unit="回／分" detail={null} />
+              <KpiCard icon={null} title="心拍数（平均）" value={s.heartRateAvg} unit="回／分" detail={null} />
+            </KpiBand>
             <section className={styles.chart} aria-label="体重の30日の推移">
               <div className={styles.chartHead}>
                 <h3 className={styles.chartTitle}>体重</h3>

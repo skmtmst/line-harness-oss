@@ -110,3 +110,7 @@
   opacity: 0.5;
 }
 }
+
+@layer components {
+[data-theme='v8'] .field { box-shadow: var(--control-shadow); }
+}

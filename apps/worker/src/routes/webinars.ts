@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 // オートウェビナー (疑似ライブ) HTTP routes.
 //
 // LIFF:   /api/liff/webinars/:slug          (id_token verify で friend 特定)
@@ -499,7 +500,7 @@ webinarRoutes.get('/api/liff/webinars/:slug/audience', async (c) => {
   return c.json(data);
 });
 
-webinarRoutes.post('/api/liff/webinars/:slug/heartbeat', async (c) => {
+webinarRoutes.post('/api/liff/webinars/:slug/heartbeat', inputJsonBoundary(), async (c) => {
   try {
     const auth = await resolveWebinarCaller(c, c.req.param('slug'));
     if (auth instanceof Response) return auth;
@@ -527,10 +528,10 @@ webinarRoutes.post('/api/liff/webinars/:slug/heartbeat', async (c) => {
       !Number.isFinite(playbackRate) ||
       (clientAtMs !== null && !Number.isFinite(clientAtMs))
     ) {
-      return c.json({ error: 'invalid_body' }, 422);
+      return inputError(c, { error: 'invalid_body' }, 422, ["sessionStartAt","positionSeconds","playbackRate","clientAtMs"]);
     }
     if (parseWebinarHeartbeatPlayerState(body.playerState) === null) {
-      return c.json({ error: 'invalid_body' }, 422);
+      return inputError(c, { error: 'invalid_body' }, 422, ["playerState"]);
     }
     const heartbeat = await recordWebinarHeartbeat(c.env.DB, {
       webinarId: loaded.webinar.id,
@@ -582,7 +583,7 @@ webinarRoutes.post('/api/liff/webinars/:slug/heartbeat', async (c) => {
   }
 });
 
-webinarRoutes.post('/api/liff/webinars/:slug/comments', async (c) => {
+webinarRoutes.post('/api/liff/webinars/:slug/comments', inputJsonBoundary(), async (c) => {
   try {
     const auth = await resolveWebinarCaller(c, c.req.param('slug'));
     if (auth instanceof Response) return auth;
@@ -598,7 +599,7 @@ webinarRoutes.post('/api/liff/webinars/:slug/comments', async (c) => {
       !Number.isFinite(sessionStartAt) || !Number.isFinite(atSeconds) ||
       atSeconds < COMMENT_MIN_AT_SECONDS || text.length === 0 || text.length > COMMENT_MAX
     ) {
-      return c.json({ error: 'invalid_body' }, 422);
+      return inputError(c, { error: 'invalid_body' }, 422, ["sessionStartAt","atSeconds","body"]);
     }
     // sessionStartAt はクライアント申告値。サーバー側で現在のセッションを再計算し、
     // ライブ外や偽装 sessionStartAt でのコメント投稿（60件上限バイパス含む）を防ぐ。
@@ -648,7 +649,7 @@ webinarRoutes.post('/api/liff/webinars/:slug/comments', async (c) => {
 // セッション選択メニューの予約。sessionStartAt はスケジュール上の実在する
 // 未来セッションに加え、開始後5分以内だけ現在回も受理。
 // 冪等 (同一回の再予約は成功扱い)。
-webinarRoutes.post('/api/liff/webinars/:slug/register', async (c) => {
+webinarRoutes.post('/api/liff/webinars/:slug/register', inputJsonBoundary(), async (c) => {
   try {
     const auth = await resolveWebinarCaller(c, c.req.param('slug'));
     if (auth instanceof Response) return auth;
@@ -666,7 +667,7 @@ webinarRoutes.post('/api/liff/webinars/:slug/register', async (c) => {
     if ((await resolveWebinarDeliveryKind(c.env.DB, webinar)) === 'on_demand') {
       const onDemandStart = onDemandSessionStartAt(webinar, now);
       if (!Number.isFinite(sessionStartAt) || sessionStartAt !== onDemandStart) {
-        return c.json({ error: 'invalid_session' }, 400);
+        return inputError(c, { error: 'invalid_session' }, 400, ["sessionStartAt"]);
       }
       try {
         const registered = await registerWebinarSession(
@@ -696,7 +697,7 @@ webinarRoutes.post('/api/liff/webinars/:slug/register', async (c) => {
       !Number.isFinite(sessionStartAt) ||
       (!currentIsBookable && !upcoming.includes(sessionStartAt))
     ) {
-      return c.json({ error: 'invalid_session' }, 400);
+      return inputError(c, { error: 'invalid_session' }, 400, ["sessionStartAt"]);
     }
     let registered: Awaited<ReturnType<typeof registerWebinarSession>>;
     try {
@@ -750,7 +751,7 @@ webinarRoutes.post('/api/liff/webinars/:slug/register', async (c) => {
   }
 });
 
-webinarRoutes.post('/api/liff/webinars/:slug/cta-click', async (c) => {
+webinarRoutes.post('/api/liff/webinars/:slug/cta-click', inputJsonBoundary(), async (c) => {
   try {
     const auth = await resolveWebinarCaller(c, c.req.param('slug'));
     if (auth instanceof Response) return auth;
@@ -759,12 +760,12 @@ webinarRoutes.post('/api/liff/webinars/:slug/cta-click', async (c) => {
     const body = await c.req.json<{ sessionStartAt?: unknown; ctaId?: unknown }>();
     const sessionStartAt = Number(body.sessionStartAt);
     const ctaId = typeof body.ctaId === 'string' ? body.ctaId.slice(0, 128) : '';
-    if (!Number.isFinite(sessionStartAt)) return c.json({ error: 'invalid_body' }, 422);
+    if (!Number.isFinite(sessionStartAt)) return inputError(c, { error: 'invalid_body' }, 422, ["sessionStartAt"]);
 
     if (ctaId) {
       const ctas = await getWebinarCtas(c.env.DB, loaded.webinar.id);
       if (!ctas.some((cta) => cta.id === ctaId)) {
-        return c.json({ error: 'invalid_cta' }, 422);
+        return inputError(c, { error: 'invalid_cta' }, 422, ["ctaId"]);
       }
     }
 
@@ -807,7 +808,7 @@ webinarRoutes.post('/api/liff/webinars/:slug/cta-click', async (c) => {
 
 // CTA表示→フォーム入力→送信の途中離脱を段階計測する。
 // 同一 friend・同一回・同一段階はDB側の一意制約で1件にまとめる。
-webinarRoutes.post('/api/liff/webinars/:slug/funnel-event', async (c) => {
+webinarRoutes.post('/api/liff/webinars/:slug/funnel-event', inputJsonBoundary(), async (c) => {
   try {
     const auth = await resolveWebinarCaller(c, c.req.param('slug'));
     if (auth instanceof Response) return auth;
@@ -824,10 +825,10 @@ webinarRoutes.post('/api/liff/webinars/:slug/funnel-event', async (c) => {
     const formId = typeof body.formId === 'string' ? body.formId.slice(0, 128) : '';
     const fieldName = typeof body.fieldName === 'string' ? body.fieldName.slice(0, 64) : '';
     if (!Number.isInteger(sessionStartAt) || !FUNNEL_EVENT_TYPES.has(eventType)) {
-      return c.json({ error: 'invalid_body' }, 422);
+      return inputError(c, { error: 'invalid_body' }, 422, ["sessionStartAt","eventType"]);
     }
     if (fieldName && !/^[A-Za-z0-9_]+$/.test(fieldName)) {
-      return c.json({ error: 'invalid_field_name' }, 422);
+      return inputError(c, { error: 'invalid_field_name' }, 422, ["fieldName"]);
     }
     const registration = await getWebinarRegistration(
       c.env.DB, auth.webinar.id, auth.friendId, sessionStartAt,
@@ -839,10 +840,10 @@ webinarRoutes.post('/api/liff/webinars/:slug/funnel-event', async (c) => {
 
     const ctas = await getWebinarCtas(c.env.DB, auth.webinar.id);
     if (ctaId && !ctas.some((cta) => cta.id === ctaId)) {
-      return c.json({ error: 'invalid_cta' }, 422);
+      return inputError(c, { error: 'invalid_cta' }, 422, ["ctaId"]);
     }
     if (formId && !ctas.some((cta) => cta.form_id === formId)) {
-      return c.json({ error: 'invalid_form' }, 422);
+      return inputError(c, { error: 'invalid_form' }, 422, ["formId"]);
     }
 
     await recordWebinarFunnelEvent(c.env.DB, {
@@ -1234,6 +1235,17 @@ function parseWebinarActions(value: unknown): WebinarActionInput[] | null {
 }
 
 // body → createWebinar/updateWebinar input。不正なら string (エラーコード) を返す
+function webinarErrorFields(code: string): string[] {
+  const keys: Record<string, string[]> = {
+    title_required: ['title'], invalid_slug: ['slug'], invalid_status: ['status'],
+    invalid_duration: ['durationSeconds'], invalid_folder: ['folderId'],
+    invalid_publication_period: ['publicationStartsAt', 'publicationEndsAt'],
+    invalid_schedule: ['schedule'], invalid_cta: ['cta'],
+    ambiguous_video_source: ['videoPrefix', 'videoMediaId'],
+  };
+  return keys[code] ?? [];
+}
+
 function validateWebinarBody(
   body: WebinarBody,
   { requireCore }: { requireCore: boolean },
@@ -1368,33 +1380,30 @@ webinarRoutes.get('/api/webinars', async (c) => {
   }
 });
 
-webinarRoutes.post('/api/webinars', requireRole('owner', 'admin'), async (c) => {
+webinarRoutes.post('/api/webinars', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["null","string"],"title":["string"],"slug":["string"],"status":["string"],"videoPrefix":["null","string"],"videoMediaId":["null","string"],"durationSeconds":["number"],"schedule":["array"],"cta":["null","object"],"tagOnAttend":["null","string"],"tagOnCtaClick":["null","string"],"folderId":["null","string"],"publicationStartsAt":["null","string"],"publicationEndsAt":["null","string"],"expectedVersion":["number"],"deliveryKind":["string"],"viewingCondition":["object"],"publicDescription":["string"],"registrationFormId":["null","string"]}), async (c) => {
   try {
     const body = await c.req.json<WebinarBody>();
     if (!body.accountId) {
-      return c.json({ success: false, error: 'account_id_required' }, 400);
+      return inputError(c, { success: false, error: 'account_id_required' }, 400, ["accountId"]);
     }
     // R95: 作った瞬間の公開は受けない。公開前検査と公開版の固定を通す
     // 公開専用口（POST /:id/publish）へ寄せるため、下書きで作る。
     if (body.status === 'active') {
-      return c.json({ success: false, error: 'publish_via_publish_endpoint' }, 422);
+      return inputError(c, { success: false, error: 'publish_via_publish_endpoint' }, 422, ["status"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
     const input = validateWebinarBody(body, { requireCore: true });
     if (typeof input === 'string') {
-      return c.json(
-        { success: false, error: input },
-        input === 'invalid_duration' ? 422 : 400,
-      );
+      return inputError(c, { success: false, error: input }, input === 'invalid_duration' ? 422 : 400, webinarErrorFields(input));
     }
     const videoError = await applyVideoMediaSelection(c.env.DB, input, body.accountId);
-    if (videoError) return c.json({ success: false, error: videoError }, 400);
+    if (videoError) return inputError(c, { success: false, error: videoError }, 400, ["title","slug","status","durationSeconds","folderId","publicationStartsAt","publicationEndsAt","schedule","cta","accountId","videoPrefix","videoMediaId","tagOnAttend","tagOnCtaClick"]);
     if (body.folderId) {
       const folder = await getFolderById(c.env.DB, body.folderId);
       if (!folder || folder.kind !== 'webinar' || folder.account_id !== body.accountId) {
-        return c.json({ success: false, error: 'invalid_folder' }, 400);
+        return inputError(c, { success: false, error: 'invalid_folder' }, 400, ["folderId","accountId"]);
       }
     }
     const existing = await getWebinarBySlug(c.env.DB, body.slug!);
@@ -1437,13 +1446,13 @@ webinarRoutes.get('/api/webinars/:id/editor', async (c) => {
   }
 });
 
-webinarRoutes.put('/api/webinars/:id/editor', requireRole('owner', 'admin'), async (c) => {
+webinarRoutes.put('/api/webinars/:id/editor', requireRole('owner', 'admin'), inputJsonBoundary({"deliveryKind":["string"],"viewingCondition":["object"],"publicDescription":["string"],"registrationFormId":["null","string"],"notificationMessages":["object"],"notificationTest":["null","object"],"actionTemplateBody":["string"],"missingResultPolicy":["string"],"publicPageTest":["null","object"]}), async (c) => {
   try {
     const row = await getWebinarById(c.env.DB, c.req.param('id'));
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
     const body = await c.req.json<WebinarEditorSettingsInput & { expectedVersion?: unknown; expectedUpdatedAt?: unknown }>();
     if (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 0) {
-      return c.json({ success: false, error: 'expected_version_required' }, 400);
+      return inputError(c, { success: false, error: 'expected_version_required' }, 400, ["expectedVersion"]);
     }
     /*
      * 同時編集の見分けは「最後に直した日時で比べる」。
@@ -1464,21 +1473,21 @@ webinarRoutes.put('/api/webinars/:id/editor', requireRole('owner', 'admin'), asy
       }
     }
     if (body.deliveryKind && !['on_demand', 'scheduled', 'external'].includes(body.deliveryKind)) {
-      return c.json({ success: false, error: 'invalid_delivery_kind' }, 400);
+      return inputError(c, { success: false, error: 'invalid_delivery_kind' }, 400, ["deliveryKind"]);
     }
     if (
       body.missingResultPolicy &&
       !['escalate', 'retry_next_day'].includes(body.missingResultPolicy)
     ) {
-      return c.json({ success: false, error: 'invalid_missing_result_policy' }, 400);
+      return inputError(c, { success: false, error: 'invalid_missing_result_policy' }, 400, ["missingResultPolicy"]);
     }
     if (body.registrationFormId) {
       const form = await getFormById(c.env.DB, body.registrationFormId);
       if (!form || !form.is_active) {
-        return c.json({ success: false, error: 'form_inactive_or_missing' }, 400);
+        return inputError(c, { success: false, error: 'form_inactive_or_missing' }, 400, ["registrationFormId"]);
       }
       if (!row.account_id || !await formBelongsToLineAccount(c.env.DB, form.id, row.account_id)) {
-        return c.json({ success: false, error: 'form_account_mismatch' }, 400);
+        return inputError(c, { success: false, error: 'form_account_mismatch' }, 400, ["registrationFormId"]);
       }
     }
     const saved = await saveWebinarEditorSettings(
@@ -1495,7 +1504,7 @@ webinarRoutes.put('/api/webinars/:id/editor', requireRole('owner', 'admin'), asy
   }
 });
 
-webinarRoutes.post('/api/webinars/:id/public-page/test', requireRole('owner', 'admin'), async (c) => {
+webinarRoutes.post('/api/webinars/:id/public-page/test', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const row = await getWebinarById(c.env.DB, c.req.param('id'));
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
@@ -1635,14 +1644,14 @@ webinarRoutes.get('/api/webinars/:id/publish-validation', async (c) => {
   }
 });
 
-webinarRoutes.post('/api/webinars/:id/publish', requireRole('owner', 'admin'), async (c) => {
+webinarRoutes.post('/api/webinars/:id/publish', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const row = await getWebinarById(c.env.DB, id);
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
     const body = await c.req.json<{ expectedVersion?: unknown }>();
     if (!Number.isInteger(body.expectedVersion)) {
-      return c.json({ success: false, error: 'expected_version_required' }, 400);
+      return inputError(c, { success: false, error: 'expected_version_required' }, 400, ["expectedVersion"]);
     }
     const validation = await buildPublishValidation(c, row);
     if (validation.blockers.length > 0) {
@@ -1712,7 +1721,7 @@ const WEBINAR_VIDEO_NEXT_STAGE: Record<string, string[]> = {
   failed: [],
 };
 
-webinarRoutes.post('/api/webinars/:id/video-asset/advance', requireRole('owner', 'admin'), async (c) => {
+webinarRoutes.post('/api/webinars/:id/video-asset/advance', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const row = await getWebinarById(c.env.DB, id);
@@ -1720,7 +1729,7 @@ webinarRoutes.post('/api/webinars/:id/video-asset/advance', requireRole('owner',
     const body = await c.req.json<{ stage?: unknown; errorCode?: unknown; durationSeconds?: unknown }>();
     const stage = typeof body.stage === 'string' ? body.stage : '';
     if (!['uploaded', 'inspecting', 'converting', 'packaging', 'thumbnail', 'ready', 'failed'].includes(stage)) {
-      return c.json({ success: false, error: 'invalid_stage' }, 400);
+      return inputError(c, { success: false, error: 'invalid_stage' }, 400, ["stage"]);
     }
     const current = await getWebinarVideoAsset(c.env.DB, id);
     const allowed = current ? WEBINAR_VIDEO_NEXT_STAGE[current.stage] ?? [] : ['uploaded'];
@@ -1731,7 +1740,7 @@ webinarRoutes.post('/api/webinars/:id/video-asset/advance', requireRole('owner',
       ? null
       : Math.floor(Number(body.durationSeconds));
     if (durationSeconds !== null && (!Number.isFinite(durationSeconds) || durationSeconds < 0)) {
-      return c.json({ success: false, error: 'invalid_body' }, 400);
+      return inputError(c, { success: false, error: 'invalid_body' }, 400, ["durationSeconds"]);
     }
     const advanced = await advanceWebinarVideoAsset(c.env.DB, id, stage as WebinarVideoStage, {
       errorCode: typeof body.errorCode === 'string' ? body.errorCode.slice(0, 64) : null,
@@ -1774,7 +1783,7 @@ webinarRoutes.get('/api/webinars/:id/sessions/:startAt', async (c) => {
   }
 });
 
-webinarRoutes.put('/api/webinars/:id/sessions/:startAt', requireRole('owner', 'admin'), async (c) => {
+webinarRoutes.put('/api/webinars/:id/sessions/:startAt', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const row = await getWebinarById(c.env.DB, id);
@@ -1783,7 +1792,7 @@ webinarRoutes.put('/api/webinars/:id/sessions/:startAt', requireRole('owner', 'a
     const body = await c.req.json<{ capacity?: unknown }>();
     const capacity = body.capacity === undefined || body.capacity === null ? null : Math.floor(Number(body.capacity));
     if (!Number.isFinite(startAt) || (capacity !== null && (!Number.isInteger(capacity) || capacity < 1))) {
-      return c.json({ success: false, error: 'invalid_body' }, 400);
+      return inputError(c, { success: false, error: 'invalid_body' }, 400, ["capacity"]);
     }
     const session = await setWebinarSessionCapacity(c.env.DB, id, startAt, capacity);
     auditLog(c, 'webinar.session_capacity', { kind: 'webinar', id });
@@ -1805,7 +1814,7 @@ webinarRoutes.put('/api/webinars/:id/sessions/:startAt', requireRole('owner', 'a
   }
 });
 
-webinarRoutes.post('/api/webinars/:id/pause', requireRole('owner', 'admin'), async (c) => {
+webinarRoutes.post('/api/webinars/:id/pause', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const row = await getWebinarById(c.env.DB, id);
@@ -1824,7 +1833,7 @@ webinarRoutes.post('/api/webinars/:id/pause', requireRole('owner', 'admin'), asy
   }
 });
 
-webinarRoutes.post('/api/webinars/:id/duplicate', requireRole('owner', 'admin'), async (c) => {
+webinarRoutes.post('/api/webinars/:id/duplicate', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const row = await getWebinarById(c.env.DB, id);
@@ -1884,7 +1893,7 @@ webinarRoutes.get('/api/webinars/:id/notifications', async (c) => {
 webinarRoutes.put(
   '/api/webinars/:id/notifications',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary({"registrationEnabled":["boolean"],"dayBeforeEnabled":["boolean"],"dayBeforeTime":["string"],"hourBeforeEnabled":["boolean"],"hourBeforeMinutes":["number"],"startEnabled":["boolean"],"missedEnabled":["boolean"],"missedTime":["string"],"completedEnabled":["boolean"],"missedWindowDays":["number"]}), async (c) => {
     try {
       const body = await c.req.json<Partial<WebinarNotificationSettingsInput>>();
       const required = [
@@ -1899,7 +1908,7 @@ webinarRoutes.put(
         'completedEnabled',
       ] as const;
       if (required.some((key) => body[key] === undefined)) {
-        return c.json({ success: false, error: 'invalid_settings' }, 400);
+        return inputError(c, { success: false, error: 'invalid_settings' }, 400, required.filter((key) => body[key] === undefined));
       }
       const booleans = [
         body.registrationEnabled,
@@ -1916,7 +1925,7 @@ webinarRoutes.put(
         typeof body.hourBeforeMinutes !== 'number' ||
         (body.missedWindowDays !== undefined && typeof body.missedWindowDays !== 'number')
       ) {
-        return c.json({ success: false, error: 'invalid_settings' }, 400);
+        return inputError(c, { success: false, error: 'invalid_settings' }, 400, ["registrationEnabled","dayBeforeEnabled","hourBeforeEnabled","startEnabled","missedEnabled","completedEnabled","dayBeforeTime","missedTime","hourBeforeMinutes","missedWindowDays"]);
       }
       const result = await saveWebinarNotificationSettings(
         c.env.DB,
@@ -1927,7 +1936,7 @@ webinarRoutes.put(
     } catch (err) {
       const code = err instanceof Error ? err.message : 'invalid_settings';
       if (code === 'invalid_time' || code === 'invalid_hour_before' || code === 'invalid_missed_window') {
-        return c.json({ success: false, error: code }, 400);
+        return inputError(c, { success: false, error: code }, 400, code === 'invalid_time' ? ['dayBeforeTime', 'missedTime'] : code === 'invalid_hour_before' ? ['hourBeforeMinutes'] : ['missedWindowDays']);
       }
       console.error('PUT /api/webinars/:id/notifications error:', err);
       return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -1938,7 +1947,7 @@ webinarRoutes.put(
 webinarRoutes.post(
   '/api/webinars/:id/notifications/test',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const webinar = await getWebinarById(c.env.DB, c.req.param('id'));
       if (!webinar) return c.json({ success: false, error: 'Not found' }, 404);
@@ -1948,7 +1957,7 @@ webinarRoutes.post(
         nowEpoch(),
         1,
       )[0];
-      if (!nextSession) return c.json({ success: false, error: 'no_upcoming_session' }, 400);
+      if (!nextSession) return inputError(c, { success: false, error: 'no_upcoming_session' }, 400, []);
       const liffMatch = /liff\.line\.me\/([^/?]+)/.exec(c.env.LIFF_URL ?? '');
       const result = await sendWebinarNotificationTest(
         c.env.DB,
@@ -1988,7 +1997,7 @@ webinarRoutes.post(
         'missing_liff_id',
         'no_active_test_recipients',
       ].includes(code)) {
-        return c.json({ success: false, error: code }, 400);
+        return inputError(c, { success: false, error: code }, 400, []);
       }
       console.error('POST /api/webinars/:id/notifications/test error:', err);
       return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -1996,7 +2005,7 @@ webinarRoutes.post(
   },
 );
 
-webinarRoutes.put('/api/webinars/:id', requireRole('owner', 'admin'), async (c) => {
+webinarRoutes.put('/api/webinars/:id', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["null","string"],"title":["string"],"slug":["string"],"status":["string"],"videoPrefix":["null","string"],"videoMediaId":["null","string"],"durationSeconds":["number"],"schedule":["array"],"cta":["null","object"],"tagOnAttend":["null","string"],"tagOnCtaClick":["null","string"],"folderId":["null","string"],"publicationStartsAt":["null","string"],"publicationEndsAt":["null","string"],"expectedVersion":["number"],"deliveryKind":["string"],"viewingCondition":["object"],"publicDescription":["string"],"registrationFormId":["null","string"]}), async (c) => {
   try {
     const id = c.req.param('id');
     const row = await getWebinarById(c.env.DB, id);
@@ -2015,20 +2024,17 @@ webinarRoutes.put('/api/webinars/:id', requireRole('owner', 'admin'), async (c) 
     }
     const input = validateWebinarBody(body, { requireCore: false });
     if (typeof input === 'string') {
-      return c.json(
-        { success: false, error: input },
-        input === 'invalid_duration' ? 422 : 400,
-      );
+      return inputError(c, { success: false, error: input }, input === 'invalid_duration' ? 422 : 400, webinarErrorFields(input));
     }
     const videoError = await applyVideoMediaSelection(
       c.env.DB, input, body.accountId ?? row.account_id,
     );
-    if (videoError) return c.json({ success: false, error: videoError }, 400);
+    if (videoError) return inputError(c, { success: false, error: videoError }, 400, ["title","slug","status","durationSeconds","folderId","publicationStartsAt","publicationEndsAt","schedule","cta","accountId","videoPrefix","videoMediaId","tagOnAttend","tagOnCtaClick"]);
     if (body.folderId) {
       const folder = await getFolderById(c.env.DB, body.folderId);
       const targetAccountId = body.accountId ?? row.account_id;
       if (!folder || folder.kind !== 'webinar' || folder.account_id !== targetAccountId) {
-        return c.json({ success: false, error: 'invalid_folder' }, 400);
+        return inputError(c, { success: false, error: 'invalid_folder' }, 400, ["folderId","accountId"]);
       }
     }
     if (body.slug && body.slug !== row.slug) {
@@ -2053,17 +2059,17 @@ webinarRoutes.get('/api/webinars/:id/actions', async (c) => {
   }
 });
 
-webinarRoutes.put('/api/webinars/:id/actions', requireRole('owner', 'admin'), async (c) => {
+webinarRoutes.put('/api/webinars/:id/actions', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ actions?: unknown }>();
     const actions = parseWebinarActions(body.actions);
-    if (!actions) return c.json({ success: false, error: 'invalid_actions' }, 400);
+    if (!actions) return inputError(c, { success: false, error: 'invalid_actions' }, 400, ["actions"]);
     // 参照検証の基準は対象ウェビナーの account_id。可視性は middleware 済みだが、
     // ここで行を取り直して参照先の所属アカウントを確実にこの値へ固定する。
     const webinar = await getWebinarById(c.env.DB, c.req.param('id'));
     if (!webinar) return c.json({ success: false, error: 'Not found' }, 404);
     if (await countInvalidWebinarActionReferences(c.env.DB, webinar.account_id, actions) > 0) {
-      return c.json({ success: false, error: 'invalid_action_reference' }, 422);
+      return inputError(c, { success: false, error: 'invalid_action_reference' }, 422, ["actions"]);
     }
     const saved = await replaceWebinarActions(c.env.DB, c.req.param('id'), actions);
     return c.json({ success: true, data: saved.map(serializeWebinarAction) });
@@ -2090,7 +2096,7 @@ async function archiveVisibleWebinar(c: Context<Env>) {
   }
 }
 
-webinarRoutes.post('/api/webinars/:id/archive', requireRole('owner', 'admin'), archiveVisibleWebinar);
+webinarRoutes.post('/api/webinars/:id/archive', requireRole('owner', 'admin'), inputJsonBoundary(), archiveVisibleWebinar);
 // 旧クライアント互換。物理削除はせず、同じアーカイブ処理を行う。
 webinarRoutes.delete('/api/webinars/:id', requireRole('owner', 'admin'), archiveVisibleWebinar);
 
@@ -2112,17 +2118,17 @@ webinarRoutes.get('/api/webinars/:id/comments', async (c) => {
   }
 });
 
-webinarRoutes.put('/api/webinars/:id/comments', requireRole('owner', 'admin'), async (c) => {
+webinarRoutes.put('/api/webinars/:id/comments', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const row = await getWebinarById(c.env.DB, id);
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
     const body = await c.req.json<{ comments?: unknown }>();
     if (!Array.isArray(body.comments)) {
-      return c.json({ success: false, error: 'comments_required' }, 400);
+      return inputError(c, { success: false, error: 'comments_required' }, 400, ["comments"]);
     }
     if (body.comments.length > SAKURA_COMMENTS_MAX) {
-      return c.json({ success: false, error: 'too_many_comments' }, 400);
+      return inputError(c, { success: false, error: 'too_many_comments' }, 400, ["comments"]);
     }
     const cleaned: Array<{ atSeconds: number; authorName: string; body: string }> = [];
     for (const raw of body.comments as Array<Record<string, unknown>>) {
@@ -2135,7 +2141,7 @@ webinarRoutes.put('/api/webinars/:id/comments', requireRole('owner', 'admin'), a
         !authorName || authorName.length > 50 ||
         !text || text.length > COMMENT_MAX
       ) {
-        return c.json({ success: false, error: 'invalid_comment' }, 400);
+        return inputError(c, { success: false, error: 'invalid_comment' }, 400, ["comments"]);
       }
       cleaned.push({ atSeconds, authorName, body: text });
     }
@@ -2178,22 +2184,22 @@ webinarRoutes.get('/api/webinars/:id/ctas', async (c) => {
 
 // CTA カード一括置換。kind='form' は forms 実在チェック、kind='url' は https? 必須。
 // 全要素検証 → 不正が1件でもあれば何も書かない (comments と同じ all-or-nothing)。
-webinarRoutes.put('/api/webinars/:id/ctas', requireRole('owner', 'admin'), async (c) => {
+webinarRoutes.put('/api/webinars/:id/ctas', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const row = await getWebinarById(c.env.DB, id);
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
     const body = await c.req.json<{ ctas?: unknown; expectedVersion?: unknown }>();
     if (body.expectedVersion !== undefined && (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 0)) {
-      return c.json({ success: false, error: 'invalid_expected_version' }, 400);
+      return inputError(c, { success: false, error: 'invalid_expected_version' }, 400, ["expectedVersion"]);
     }
     const expectedVersion = body.expectedVersion === undefined ? row.cta_version ?? 0 : Number(body.expectedVersion);
     if (expectedVersion !== (row.cta_version ?? 0)) return c.json({ success: false, error: 'version_conflict', currentVersion: row.cta_version ?? 0, updatedBy: row.cta_updated_by ?? null, updatedAt: row.cta_updated_at ?? null }, 409);
     if (!Array.isArray(body.ctas)) {
-      return c.json({ success: false, error: 'ctas_required' }, 400);
+      return inputError(c, { success: false, error: 'ctas_required' }, 400, ["ctas"]);
     }
     if (body.ctas.length > 20) {
-      return c.json({ success: false, error: 'too_many_ctas' }, 400);
+      return inputError(c, { success: false, error: 'too_many_ctas' }, 400, ["ctas"]);
     }
     const cleaned: Array<{
       atSeconds: number; kind: 'form' | 'url'; title: string; body: string | null;
@@ -2215,13 +2221,13 @@ webinarRoutes.put('/api/webinars/:id/ctas', requireRole('owner', 'admin'), async
         bodyText.length > 300 ||
         !buttonLabel || buttonLabel.length > 50
       ) {
-        return c.json({ success: false, error: 'invalid_cta' }, 400);
+        return inputError(c, { success: false, error: 'invalid_cta' }, 400, ["ctas"]);
       }
       if (kind === 'form') {
-        if (!formId) return c.json({ success: false, error: 'form_id_required' }, 400);
+        if (!formId) return inputError(c, { success: false, error: 'form_id_required' }, 400, ["ctas"]);
         formIdsToCheck.add(formId);
       } else if (!url || !/^https:\/\//.test(url)) {
-        return c.json({ success: false, error: 'invalid_url' }, 400);
+        return inputError(c, { success: false, error: 'invalid_url' }, 400, ["ctas"]);
       }
       cleaned.push({
         atSeconds, kind, title, body: bodyText || null, buttonLabel,
@@ -2234,10 +2240,10 @@ webinarRoutes.put('/api/webinars/:id/ctas', requireRole('owner', 'admin'), async
       [...formIdsToCheck].map((fid) => getFormById(c.env.DB, fid)),
     );
     if (forms.some((f) => !f)) {
-      return c.json({ success: false, error: 'form_not_found' }, 400);
+      return inputError(c, { success: false, error: 'form_not_found' }, 400, ["ctas"]);
     }
     if (forms.some((f) => f && !f.is_active)) {
-      return c.json({ success: false, error: 'form_inactive' }, 400);
+      return inputError(c, { success: false, error: 'form_inactive' }, 400, ["ctas"]);
     }
     if (
       formIdsToCheck.size > 0 &&
@@ -2247,7 +2253,7 @@ webinarRoutes.put('/api/webinars/:id/ctas', requireRole('owner', 'admin'), async
         ),
       )).every(Boolean))
     ) {
-      return c.json({ success: false, error: 'form_account_mismatch' }, 400);
+      return inputError(c, { success: false, error: 'form_account_mismatch' }, 400, ["ctas"]);
     }
     const count = await replaceWebinarCtas(c.env.DB, id, cleaned, { expectedVersion, updatedBy: c.get('staff').id });
     if (count === null) return c.json({ success: false, error: 'version_conflict' }, 409);

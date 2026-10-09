@@ -1,8 +1,8 @@
 'use client'
 
+import React from 'react'
 import Link from 'next/link'
 import { ArrowRight, ChartNoAxesColumn } from 'lucide-react'
-import React from 'react'
 import type { ReactNode } from 'react'
 import HelpTip from './help-tip'
 import { isCountableValue } from './not-connected'
@@ -75,12 +75,8 @@ export type KpiCardProps = {
   /** 対象画面にV6がある場合はv6、配信予定を強調するカードはbroadcastを使う。 */
   variant?: 'v5' | 'v6' | 'broadcast'
   /** V8 は画面の絵に合わせてカードか線で区切るマスを選ぶ。 */
-  presentation?: 'card' | 'band' | 'cell' | 'inline' | 'stacked'
-  density?: 'compact' | 'comfortable' | 'record' | 'mini'
-  /** 小さい数値の設定カード（22/26）。 */
-  metricSize?: 'small'
-  /** LINE通知の板の数カード。既定のカードの寸法は保つ。 */
-  appearance?: 'notification-customer' | 'notification-operator'
+  presentation?: 'card' | 'band' | 'cell' | 'inline'
+  density?: 'compact' | 'comfortable'
   className?: string
   hidden?: boolean
   id?: string
@@ -126,9 +122,7 @@ export default function KpiCard({
   variant = 'v6',
   presentation = 'card',
   density = 'comfortable',
-  appearance,
   className,
-  metricSize,
   valueTone = 'default',
   valueText,
   ...cardProps
@@ -158,8 +152,6 @@ export default function KpiCard({
       className={classes}
       data-kpi-presentation={presentation}
       data-kpi-density={density}
-      data-kpi-metric-size={metricSize}
-      data-kpi-appearance={appearance}
       aria-busy={loading || undefined}
       data-design-version={variant}
       {...cardProps}
@@ -200,7 +192,7 @@ export default function KpiCard({
 
       <div className={styles.valueRow} data-unit-spacing={unitSpacing}>
       {loading ? (
-        <div className={styles.skeleton} aria-hidden="true" />
+        <div data-kpi-skeleton className={styles.skeleton} aria-hidden="true" />
       ) : (
         <p
           className={[
@@ -220,7 +212,7 @@ export default function KpiCard({
       {delta ? <span className={`${styles.delta} v8-only`}>{delta}</span> : null}
       </div>
 
-      {presentation !== 'stacked' || detail || onRetry || action ? <p className={[styles.detail, detailVariantClass].filter(Boolean).join(' ')}>
+      <p data-kpi-detail className={[styles.detail, detailVariantClass].filter(Boolean).join(' ')}>
         <span className={styles.detailText} title={typeof detail === 'string' ? detail : undefined}>{detail}</span>
         {onRetry ? (
           <button type="button" className={styles.retry} onClick={onRetry}>
@@ -232,7 +224,7 @@ export default function KpiCard({
             <span>{action.label}</span><ArrowRight size={12} aria-hidden="true" />
           </Link>
         ) : null}
-      </p> : null}
+      </p>
     </div>
   )
 }

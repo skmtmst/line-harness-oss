@@ -90,18 +90,77 @@ describe('用語表（V6 §7 48番の表記ゆれ潰し）', () => {
    * **期間の言い方を1つにする。**
    *
    * 同じ30日を「直近30日」「過去30日」「この30日」の3通りで書いていた。
-   * `/analytics` は1つの画面の中で「直近30日」と「この30日」が混ざっていた。
-   * 設計は60回が「この30日」なので、そちらへ寄せる。
+   * 2026-10-09 オーナー決定（B-158 の 5・B-160 の ⑦）で「過去30日」に1つ
+   * （用語表 `docs/v6-requirements/v6-00-glossary.md` §3-3）。前の「この30日に寄せる」と
+   * Webhook・マイルの「直近30日」（WEB-025・WEB-073）はこの決定で置き換え。
    *
-   * **28日は別の話。** `/conversions` とダッシュボードは本当に28日で
-   * 数えている（`conversions/page.tsx:44`）。言い方をそろえる前に、
-   * どの窓が正しいかを決める必要があるので、ここでは見張らない。
+   * 2026-10-09 時点で古い言い方が残っているファイルは、下の「直す途中」に入れてある。
+   * 直したら一覧から外す。一覧に無いファイルが古い言い方を足すと落ちる。
    */
-  it('30日の窓は「この30日」と書く', () => {
-    /* WEB-025・WEB-073（2026-10-09 オーナー決定）：Webhook とマイルの数の帯は「直近30日」と書く。 */
-    const decided = new Set(['v8/mileage/balances.tsx', 'v8/mileage/earning-rules.tsx', 'v8/mileage/history.tsx', 'v8/webhooks/shell.tsx'])
-    const hits = FILES.filter((f) => !decided.has(f.p) && /直近30日|過去30日/.test(f.s)).map((f) => f.p)
-    expect(hits, '「この30日」に寄せる').toEqual([])
+  it('30日の窓は「過去30日」と書く', () => {
+    /* 直す途中（2026-10-09 時点で「この30日」「直近30日」が画面に残るファイル）。 */
+    const migrating = new Set([
+    'app/automations/list-v8.tsx',
+    'app/automations/page.tsx',
+    'app/automations/runs-v8.tsx',
+    'app/automations/runs/page.tsx',
+    'app/automations/templates-v8.tsx',
+    'app/booking/menus/page.tsx',
+    'app/common-actions/versions/page.tsx',
+    'app/conversions/_components/conversion-dialogs.tsx',
+    'app/conversions/conversion-points-v8.tsx',
+    'app/conversions/new/page.tsx',
+    'app/conversions/page.tsx',
+    'app/ec-commerce/connector-panel.tsx',
+    'app/emergency/page.tsx',
+    'app/inflow-links/ad-integration-v8.tsx',
+    'app/inflow-links/ad-integration.tsx',
+    'app/line-notifications/customer-kpis.ts',
+    'app/line-notifications/page.tsx',
+    'app/mileage/earning-rules/new/v8-earning-rule-new.tsx',
+    'app/mileage/page.tsx',
+    'app/mileage/v8-balances-tab.tsx',
+    'app/mileage/v8-earning-rules-tab.tsx',
+    'app/nen-campaigns/nen-campaigns-v8.tsx',
+    'app/nen-campaigns/nen-overview.tsx',
+    'app/nen-members/photo-review-v8.tsx',
+    'app/restaurant-test/v8/google.tsx',
+    'app/visual-qa/v8-parts/page.tsx',
+    'app/webhooks/outgoing-v8.tsx',
+    'app/webhooks/webhook-interactions.tsx',
+    'app/webhooks/webhook-overviews.tsx',
+    'components/broadcasts/segment-preset-controls.tsx',
+    'components/inflow-links/site-script-v8.tsx',
+    'components/inflow-links/site-script.tsx',
+    'components/staff/login-audit.tsx',
+    'v8/auto-replies/runs.tsx',
+    'v8/automations/list.tsx',
+    'v8/automations/runs.tsx',
+    'v8/automations/templates.tsx',
+    'v8/conversions/create.tsx',
+    'v8/conversions/dialogs.tsx',
+    'v8/conversions/list.tsx',
+    'v8/inflow-links/ad-connections.tsx',
+    'v8/inflow-links/ads.tsx',
+    'v8/inflow-links/site-script.tsx',
+    'v8/mileage/balances.tsx',
+    'v8/mileage/earning-rule-new/create.tsx',
+    'v8/mileage/earning-rules.tsx',
+    'v8/mileage/history.tsx',
+    'v8/nen-health/summary.tsx',
+    'v8/nen-posts/review.tsx',
+    'v8/restaurant/google/reviews.tsx',
+    'v8/settings/ec-commerce/connector.tsx',
+    'v8/settings/emergency/health.tsx',
+    'v8/settings/emergency/history.tsx',
+    'v8/settings/line-notifications/customer-kpis.ts',
+    'v8/settings/line-notifications/screen.tsx',
+    'v8/webhooks/interactions.tsx',
+    'v8/webhooks/outgoing.tsx',
+    'v8/webhooks/shell.tsx',
+    ])
+    const hits = FILES.filter((f) => !migrating.has(f.p) && /この30日|直近30日/.test(f.s)).map((f) => f.p)
+    expect(hits, '「過去30日」に寄せる').toEqual([])
   })
 
   /**

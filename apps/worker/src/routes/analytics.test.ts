@@ -639,7 +639,7 @@ describe('ファネルの結果', () => {
       mocks.getStaffAccountScopeIds.mockResolvedValue([]);
       const res = await req(`/api/funnels/fn-1/result?${ACCOUNT}`);
       expect(res.status).toBe(422);
-      const body = (await res.json()) as { error: string };
+      const body = (await res.json()) as { error: string; code: string };
       expect(body.error).toBe('analytics_funnel_not_active');
       expect(mocks.countFunnelStep).not.toHaveBeenCalled();
     }
@@ -912,7 +912,7 @@ describe('V6ファネルAPI', () => {
       cohortTo: '2026-08-10T23:59:59.999+09:00',
     });
     expect(res.status).toBe(422);
-    expect(await res.json()).toMatchObject({ error: 'analytics_funnel_not_active' });
+    expect(await res.json()).toMatchObject({ code: 'analytics_funnel_not_active' , fields: expect.any(Object), error: expect.any(String) });
 
     mocks.createFunnelVersion.mockRejectedValueOnce(new Error('analytics_funnel_not_active'));
     const version = await req(`/api/analytics/funnels/fn-1/versions?${ACCOUNT}`, 'POST', {

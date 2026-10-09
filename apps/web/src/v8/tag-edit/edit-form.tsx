@@ -1,5 +1,8 @@
 'use client'
 
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+
 /*
  * ★V8 タグ：タグの編集（一から書いた画面・2026-10-07）。
  * Pencil：タグの編集 `Qat9s`、競合 `xn95q`、閲覧のみ `fkGUR`。
@@ -12,16 +15,13 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-
 import { ArrowDown, ArrowLeft, ArrowUp, Check, ChevronDown, ChevronUp, Copy, GitCompare, Plus, Trash2, TriangleAlert } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, type TagDependencies, type TagRetroactivePreview } from '@/lib/api'
-
 import { formatDay } from '@/lib/format'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
-
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import { Field } from '@/components/shared/form-controls'
@@ -30,13 +30,9 @@ import { tagNameProblem } from '@/v8/tags/tag-name'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import FolderSelect, { type FolderSelectCreate } from '@/components/shared/folder-select'
-
 import Toggle from '@/components/shared/toggle'
-
 import { DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
-
 import { ActionDrawer, RetroactiveDialog, type LinkedAction, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4'
-
 import { MULTIPLIERS, PRIORITIES, actionsSummary, buildUsageRows, mileageSummary } from './model'
 import styles from './edit.module.css'
 
@@ -380,11 +376,11 @@ export function TagEditForm({
                   </div>
                   }
                   {applyToExisting ? (
-                    <div className={styles.statGrid}>
-                      <div className={styles.statBox}><span className={styles.statLabel}>現在の対象者</span><span className={styles.statValue}>{tag.friendCount ?? 0}人</span></div>
-                      <div className={styles.statBox}><span className={styles.statLabel}>本人マイル対象</span><span className={styles.statValue}>{retroPreview ? `${retroPreview.selfTargets}人` : retroactiveReference ? `${tag.friendCount ?? 0}人` : '—'}</span></div>
-                      <div className={styles.statBox}><span className={styles.statLabel}>紹介者対象</span><span className={styles.statValue}>{retroPreview ? `${retroPreview.referralTargets}人` : '—'}</span></div>
-                    </div>
+                    <KpiBand density="compact">
+                      <KpiCard icon={null} title="現在の対象者" value={tag.friendCount ?? 0} unit="人" detail={null} />
+                      <KpiCard icon={null} title="本人マイル対象" value={retroPreview ? retroPreview.selfTargets : retroactiveReference ? tag.friendCount ?? 0 : null} unit="人" detail={null} />
+                      <KpiCard icon={null} title="紹介者対象" value={retroPreview?.referralTargets} unit="人" detail={null} />
+                    </KpiBand>
                   ) : null}
                   {retroPreview && (retroPreview.selfExcluded > 0 || retroPreview.referralExcluded > 0) ? (
                     <p className={styles.hint}>{`すでに付与済みの人（本人${retroPreview.selfExcluded}人・紹介者${retroPreview.referralExcluded}人）は対象から外れています。`}</p>

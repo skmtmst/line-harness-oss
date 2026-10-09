@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
@@ -22,7 +23,7 @@ const actionScoreRules = new Hono<Env>();
 
 async function requireAccount(c: Context<Env>, value: unknown): Promise<string | Response> {
   const accountId = typeof value === 'string' ? value.trim() : '';
-  if (!accountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["accountId"]);
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   if (!scope.allowedAccountIds.includes(accountId)) {
     return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
@@ -38,12 +39,12 @@ function validationResponse(c: Context<Env>, error: ActionScoreRuleValidationErr
     'published_version_missing',
     'friend_not_found',
   ]);
-  return c.json({
+  return inputError(c, {
     success: false,
     error: error.message,
     code: error.code,
     ...(error.field ? { field: error.field } : {}),
-  }, conflict ? 409 : notFound.has(error.code) ? 404 : 422);
+  }, conflict ? 409 : notFound.has(error.code) ? 404 : 422, []);
 }
 
 async function endpoint<T>(c: Context<Env>, run: () => Promise<T>, status = 200): Promise<Response> {
@@ -72,7 +73,7 @@ actionScoreRules.get('/api/action-scores/bands', requireRole('owner', 'admin', '
   return endpoint(c, () => getActionScoreBandOverview(c.env.DB, accountId));
 });
 
-actionScoreRules.patch('/api/action-scores/rules/draft', requireRole('owner', 'admin'), async (c) => {
+actionScoreRules.patch('/api/action-scores/rules/draft', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   type Body = {
     accountId?: unknown;
     expectedDraftVersionId?: unknown;
@@ -87,7 +88,7 @@ actionScoreRules.patch('/api/action-scores/rules/draft', requireRole('owner', 'a
    */
   const idempotencyKey = c.req.header('Idempotency-Key')?.trim() || null;
   if (idempotencyKey && !isValidIdempotencyKey(idempotencyKey)) {
-    return c.json({ success: false, error: 'Idempotency-Key はUUIDで送ってください' }, 400);
+    return inputError(c, { success: false, error: 'Idempotency-Key はUUIDで送ってください' }, 400, []);
   }
   try {
     const data = await saveActionScoreRuleDraft(c.env.DB, {
@@ -123,7 +124,7 @@ actionScoreRules.patch('/api/action-scores/rules/draft', requireRole('owner', 'a
   }
 });
 
-actionScoreRules.post('/api/action-scores/rules/test', requireRole('owner', 'admin'), async (c) => {
+actionScoreRules.post('/api/action-scores/rules/test', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   type Body = {
     accountId?: unknown;
     configuration?: unknown;
@@ -155,7 +156,7 @@ actionScoreRules.post(
   '/api/action-scores/rules/publish',
   requireRole('owner', 'admin'),
   requireIrreversibleConfirmation('action-score-rules-publish'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     type Body = { accountId?: unknown; draftVersionId?: unknown };
     const body = await c.req.json<Body>().catch((): Body => ({}));
     const accountId = await requireAccount(c, body.accountId);
@@ -173,7 +174,7 @@ actionScoreRules.post(
   },
 );
 
-actionScoreRules.post('/api/action-scores/rules/stop', requireRole('owner', 'admin'), async (c) => {
+actionScoreRules.post('/api/action-scores/rules/stop', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   type Body = { accountId?: unknown };
   const body = await c.req.json<Body>().catch((): Body => ({}));
   const accountId = await requireAccount(c, body.accountId);
@@ -193,10 +194,10 @@ actionScoreRules.post(
   '/api/action-scores/adjustments',
   requireRole('owner', 'admin'),
   requireIrreversibleConfirmation('action-score-adjustment'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
     if (!isValidIdempotencyKey(idempotencyKey)) {
-      return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+      return inputError(c, { success: false, error: '有効なIdempotency-Keyが必要です' }, 400, []);
     }
     type Body = {
       accountId?: unknown;
@@ -214,10 +215,10 @@ actionScoreRules.post(
     const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
     // 入力が成立しないものは、アカウント・友だちの照合より先に落とす。
     if (!friendId || !direction || !Number.isInteger(amount) || amount <= 0 || amount > 1_000_000) {
-      return c.json({ success: false, error: 'friendId、増減の向き、1以上の整数の点数が必要です' }, 400);
+      return inputError(c, { success: false, error: 'friendId、増減の向き、1以上の整数の点数が必要です' }, 400, ["friendId","direction","amount"]);
     }
     if (!reason || reason.length > 500) {
-      return c.json({ success: false, error: '理由を500字以内で入力してください' }, 400);
+      return inputError(c, { success: false, error: '理由を500字以内で入力してください' }, 400, ["reason"]);
     }
     const accountId = await requireAccount(c, body.accountId);
     if (typeof accountId !== 'string') return accountId;
@@ -252,7 +253,7 @@ actionScoreRules.post(
 actionScoreRules.post(
   '/api/action-scores/bands/preview',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     type Body = { accountId?: unknown; bands?: unknown };
     const body = await c.req.json<Body>().catch((): Body => ({}));
     const accountId = await requireAccount(c, body.accountId);

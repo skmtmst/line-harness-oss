@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { FolderAssignmentError, readFolderAssignment } from '@line-crm/db';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -148,7 +149,7 @@ affiliateOffers.get('/api/affiliate-offers/:id', async (c) => {
 });
 
 // POST /api/affiliate-offers - create
-affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), async (c) => {
+affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), inputJsonBoundary({folderId:['string','null']}), async (c) => {
   auditLog(c, 'affiliate.offer.create', { kind: 'affiliate_offer' });
   try {
     const body = await c.req
@@ -174,37 +175,25 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), asy
 
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) {
-      return c.json({ success: false, error: 'name is required' }, 400);
+      return inputError(c, { success: false, error: 'name is required' }, 400, ["name"]);
     }
     // 安定した操作UUID（#686）。commit後に応答だけ失われて再送されても、
     // packages/db 側が同じIDで既存行を回収するため二重登録にならない。
     const operationId = typeof body.operationId === 'string' ? body.operationId.trim() : '';
     if (operationId && (operationId.length < 8 || operationId.length > 200)) {
-      return c.json({ success: false, error: 'もう一度、最初からやり直してください' }, 400);
+      return inputError(c, { success: false, error: 'もう一度、最初からやり直してください' }, 400, ["operationId"]);
     }
     if (body.rewardAmount !== undefined && !isValidReward(body.rewardAmount)) {
-      return c.json(
-        { success: false, error: 'rewardAmount must be a non-negative integer' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'rewardAmount must be a non-negative integer' }, 400, ["rewardAmount"]);
     }
     if (body.rewardMiles !== undefined && !isValidReward(body.rewardMiles)) {
-      return c.json(
-        { success: false, error: 'rewardMiles must be a non-negative integer' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'rewardMiles must be a non-negative integer' }, 400, ["rewardMiles"]);
     }
     if (body.windowDays !== undefined && !isValidWindowDays(body.windowDays)) {
-      return c.json(
-        { success: false, error: 'windowDays must be an integer between 1 and 365' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'windowDays must be an integer between 1 and 365' }, 400, ["windowDays"]);
     }
     if (!isValidCap(body.capTotal) || !isValidCap(body.capMonthlyPerAffiliate)) {
-      return c.json(
-        { success: false, error: 'cap must be a positive integer or null' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'cap must be a positive integer or null' }, 400, ["capTotal","capMonthlyPerAffiliate"]);
     }
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const lineAccountId = body.lineAccountId
@@ -212,7 +201,7 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), asy
     if (!lineAccountId) {
       // そのまま画面へ出す文言にする。複数アカウントのとき空欄で押すと
       // ここに来る（#505 重大1）。画面側でも押す前に選ばせている。
-      return c.json({ success: false, error: 'LINEアカウントを選んでください' }, 400);
+      return inputError(c, { success: false, error: 'LINEアカウントを選んでください' }, 400, ["lineAccountId"]);
     }
     if (!scope.allowedAccountIds.includes(lineAccountId)) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
@@ -221,7 +210,7 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), asy
       c.env.DB, { tagId: body.tagId, scenarioId: body.scenarioId }, lineAccountId,
     );
     if (refError) {
-      return c.json({ success: false, error: refError }, 400);
+      return inputError(c, { success: false, error: refError }, 400, ["tagId","scenarioId","lineAccountId"]);
     }
 
     const offer = await createAffiliateOffer(c.env.DB, {
@@ -258,14 +247,14 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), asy
     }
     return c.json({ success: true, data: serializeOffer(offer) }, 201);
   } catch (err) {
-    if(err instanceof FolderAssignmentError)return c.json({success:false,error:err.message},422);
+    if(err instanceof FolderAssignmentError)return inputError(c, {success:false,error:err.message},422,['folderId']);
     console.error('POST /api/affiliate-offers error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
 
 // PUT /api/affiliate-offers/:id - update
-affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), async (c) => {
+affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), inputJsonBoundary({folderId:['string','null']}), async (c) => {
   auditLog(c, 'affiliate.offer.update', { kind: 'affiliate_offer', id: c.req.param('id') });
   try {
     const id = c.req.param('id');
@@ -289,34 +278,22 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
       .catch(() => ({}) as Record<string, never>);
 
     if (body.name !== undefined && (typeof body.name !== 'string' || !body.name.trim())) {
-      return c.json({ success: false, error: 'name cannot be empty' }, 400);
+      return inputError(c, { success: false, error: 'name cannot be empty' }, 400, ["name"]);
     }
     if (body.rewardAmount !== undefined && !isValidReward(body.rewardAmount)) {
-      return c.json(
-        { success: false, error: 'rewardAmount must be a non-negative integer' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'rewardAmount must be a non-negative integer' }, 400, ["rewardAmount"]);
     }
     if (body.rewardMiles !== undefined && !isValidReward(body.rewardMiles)) {
-      return c.json(
-        { success: false, error: 'rewardMiles must be a non-negative integer' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'rewardMiles must be a non-negative integer' }, 400, ["rewardMiles"]);
     }
     if (body.windowDays !== undefined && !isValidWindowDays(body.windowDays)) {
-      return c.json(
-        { success: false, error: 'windowDays must be an integer between 1 and 365' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'windowDays must be an integer between 1 and 365' }, 400, ["windowDays"]);
     }
     if (!isValidCap(body.capTotal) || !isValidCap(body.capMonthlyPerAffiliate)) {
-      return c.json(
-        { success: false, error: 'cap must be a positive integer or null' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'cap must be a positive integer or null' }, 400, ["capTotal","capMonthlyPerAffiliate"]);
     }
     if (body.lineAccountId === null) {
-      return c.json({ success: false, error: 'lineAccountId cannot be empty' }, 400);
+      return inputError(c, { success: false, error: 'lineAccountId cannot be empty' }, 400, ["lineAccountId"]);
     }
     if (body.lineAccountId !== undefined
       && (!body.lineAccountId
@@ -330,7 +307,7 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
     }
     const effectiveAccountId = body.lineAccountId ?? existing.line_account_id;
     if ((body.tagId || body.scenarioId) && !effectiveAccountId) {
-      return c.json({ success: false, error: '案件のLINEアカウントを選んでください' }, 400);
+      return inputError(c, { success: false, error: '案件のLINEアカウントを選んでください' }, 400, ["tagId","scenarioId","lineAccountId"]);
     }
     const refError = effectiveAccountId
       ? await offerReferencesError(
@@ -340,7 +317,7 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
       )
       : null;
     if (refError) {
-      return c.json({ success: false, error: refError }, 400);
+      return inputError(c, { success: false, error: refError }, 400, ["lineAccountId","tagId","scenarioId"]);
     }
 
     await readFolderAssignment(c.env.DB,'affiliate_offer',effectiveAccountId,body.folderId===undefined?existing.folder_id:body.folderId);
@@ -382,7 +359,7 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
     }
     return c.json({ success: true, data: serializeOffer(updated) });
   } catch (err) {
-    if(err instanceof FolderAssignmentError)return c.json({success:false,error:err.message},422);
+    if(err instanceof FolderAssignmentError)return inputError(c, {success:false,error:err.message},422,['folderId']);
     console.error('PUT /api/affiliate-offers/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
@@ -454,7 +431,7 @@ affiliateOffers.get('/api/affiliate-offers/:id/cap-status', async (c) => {
 });
 
 // POST /api/affiliate-offers/:id/versions - 決まりの新しい版を保存
-affiliateOffers.post('/api/affiliate-offers/:id/versions', requireRole('owner', 'admin'), async (c) => {
+affiliateOffers.post('/api/affiliate-offers/:id/versions', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   auditLog(c, 'affiliate.offer.version.create', { kind: 'affiliate_offer', id: c.req.param('id') });
   try {
     const body = await c.req
@@ -472,32 +449,20 @@ affiliateOffers.post('/api/affiliate-offers/:id/versions', requireRole('owner', 
       .catch(() => ({}) as Record<string, never>);
 
     if (body.rewardAmount !== undefined && !isValidReward(body.rewardAmount)) {
-      return c.json(
-        { success: false, error: 'rewardAmount must be a non-negative integer' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'rewardAmount must be a non-negative integer' }, 400, ["rewardAmount"]);
     }
     if (body.rewardMiles !== undefined && !isValidReward(body.rewardMiles)) {
-      return c.json(
-        { success: false, error: 'rewardMiles must be a non-negative integer' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'rewardMiles must be a non-negative integer' }, 400, ["rewardMiles"]);
     }
     if (body.windowDays !== undefined && !isValidWindowDays(body.windowDays)) {
-      return c.json(
-        { success: false, error: 'windowDays must be an integer between 1 and 365' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'windowDays must be an integer between 1 and 365' }, 400, ["windowDays"]);
     }
     if (!isValidCap(body.capTotal) || !isValidCap(body.capMonthlyPerAffiliate)) {
-      return c.json(
-        { success: false, error: 'cap must be a positive integer or null' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'cap must be a positive integer or null' }, 400, ["capTotal","capMonthlyPerAffiliate"]);
     }
     const idempotencyKey = typeof body.idempotencyKey === 'string' ? body.idempotencyKey.trim() : '';
     if (idempotencyKey && (idempotencyKey.length < 8 || idempotencyKey.length > 200)) {
-      return c.json({ success: false, error: 'もう一度、最初からやり直してください' }, 400);
+      return inputError(c, { success: false, error: 'もう一度、最初からやり直してください' }, 400, []);
     }
 
     const version = await createOfferVersion(c.env.DB, {
@@ -519,7 +484,7 @@ affiliateOffers.post('/api/affiliate-offers/:id/versions', requireRole('owner', 
       return c.json({ success: false, error: 'Offer not found' }, 404);
     }
     if (err instanceof Error && /windowDays|cap/.test(err.message)) {
-      return c.json({ success: false, error: err.message }, 400);
+      return inputError(c, { success: false, error: err.message }, 400, ["windowDays","cap"]);
     }
     console.error('POST /api/affiliate-offers/:id/versions error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);

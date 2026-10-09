@@ -178,16 +178,16 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
 
   return <>
     {mode === 'failures' ? (
-      <KpiBand data-kpi-presentation="cards" gridClassName={`${styles.kpis} ${styles.opKpis}`} data-design="KPIs">
+      <KpiBand presentation="band" data-design="KPIs">
         {/*
           * WEB201：期間を口へ送っていないので「この7日」と言わない。ブロック・再試行は読み込んだページから
           * 数えているので、全件より少ないときは「このページの n件から」と書く。
           * WEB202：送れなかった一覧にはメールで届いたもの（受付済み）は出ないので、ここでは数えない。
           */}
-        <KpiCard appearance="notification-operator" presentation="card" icon={<CircleX size={14} aria-hidden="true" />} title="送れなかった" value={kpiValue(summary?.failed ?? null)} unit="件" detail={kpiNote('記録の合計')} loading={visibleState === 'loading'} />
-        <KpiCard appearance="notification-operator" presentation="card" icon={<Ban size={14} aria-hidden="true" />} title="ブロック" value={kpiValue(breakdown.blocked)} unit="件" detail={kpiNote(pageScoped ? `このページの${items.length}件から・対応不要` : '対応不要')} loading={visibleState === 'loading'} />
-        <KpiCard appearance="notification-operator" presentation="card" icon={<Mail size={14} aria-hidden="true" />} title="メールで送った" value={null} unit="件" detail={kpiNote('お知らせの記録で見られます')} loading={visibleState === 'loading'} />
-        <KpiCard appearance="notification-operator" presentation="card" icon={<RotateCw size={14} aria-hidden="true" />} title="再試行の予定" value={kpiValue(breakdown.retry)} unit="件" detail={kpiNote(`${pageScoped ? `このページの${items.length}件から・` : ''}${breakdown.nextRetryAt ? shortJst(breakdown.nextRetryAt) : '予定なし'}`)} loading={visibleState === 'loading'} />
+        <KpiCard presentation="band" icon={<CircleX size={14} aria-hidden="true" />} title="送れなかった" value={kpiValue(summary?.failed ?? null)} unit="件" detail={kpiNote('記録の合計')} loading={visibleState === 'loading'} />
+        <KpiCard presentation="band" icon={<Ban size={14} aria-hidden="true" />} title="ブロック" value={kpiValue(breakdown.blocked)} unit="件" detail={kpiNote(pageScoped ? `このページの${items.length}件から・対応不要` : '対応不要')} loading={visibleState === 'loading'} />
+        <KpiCard presentation="band" icon={<Mail size={14} aria-hidden="true" />} title="メールで送った" value={null} unit="件" detail={kpiNote('お知らせの記録で見られます')} loading={visibleState === 'loading'} />
+        <KpiCard presentation="band" icon={<RotateCw size={14} aria-hidden="true" />} title="再試行の予定" value={kpiValue(breakdown.retry)} unit="件" detail={kpiNote(`${pageScoped ? `このページの${items.length}件から・` : ''}${breakdown.nextRetryAt ? shortJst(breakdown.nextRetryAt) : '予定なし'}`)} loading={visibleState === 'loading'} />
       </KpiBand>
     ) : null}
 

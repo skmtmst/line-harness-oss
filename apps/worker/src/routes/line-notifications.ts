@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { LineClient, type Message } from '@line-crm/line-sdk';
 import {
@@ -192,7 +193,7 @@ lineNotifications.get(
 lineNotifications.post(
   '/api/line-notifications/customer-definitions',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const lineAccountId = bodyString(body?.lineAccountId);
     const key = bodyString(body?.key);
@@ -201,10 +202,10 @@ lineNotifications.post(
     const sourceEventType = bodyString(body?.sourceEventType);
     const draft = bodyDraft(body?.draft);
     if (!lineAccountId || !key || !name || !category || !sourceEventType || !draft) {
-      return c.json({ success: false, error: 'LINEアカウント、キー、名前、区分、きっかけ、下書きは必須です' }, 400);
+      return inputError(c, { success: false, error: 'LINEアカウント、キー、名前、区分、きっかけ、下書きは必須です' }, 400, ["lineAccountId","key","name","category","sourceEventType","draft"]);
     }
     const draftError = validateCustomerDraft(draft);
-    if (draftError) return c.json({ success: false, error: draftError }, 400);
+    if (draftError) return inputError(c, { success: false, error: draftError }, 400, ["draft"]);
     const denied = await requireAccount(c, lineAccountId);
     if (denied) return denied;
     try {
@@ -230,7 +231,7 @@ lineNotifications.post(
 lineNotifications.patch(
   '/api/line-notifications/customer-definitions/:id/draft',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const lineAccountId = bodyString(body?.lineAccountId);
     const expectedVersion = bodyVersion(body?.expectedVersion);
@@ -239,10 +240,10 @@ lineNotifications.patch(
     const sourceEventType = bodyString(body?.sourceEventType);
     const draft = bodyDraft(body?.draft);
     if (!lineAccountId || !expectedVersion || !name || !category || !sourceEventType || !draft) {
-      return c.json({ success: false, error: 'LINEアカウント、現在の版、名前、区分、きっかけ、下書きは必須です' }, 400);
+      return inputError(c, { success: false, error: 'LINEアカウント、現在の版、名前、区分、きっかけ、下書きは必須です' }, 400, ["lineAccountId","expectedVersion","name","category","sourceEventType","draft"]);
     }
     const draftError = validateCustomerDraft(draft);
-    if (draftError) return c.json({ success: false, error: draftError }, 400);
+    if (draftError) return inputError(c, { success: false, error: draftError }, 400, ["draft"]);
     const denied = await requireAccount(c, lineAccountId);
     if (denied) return denied;
     try {
@@ -269,12 +270,12 @@ lineNotifications.patch(
 lineNotifications.post(
   '/api/line-notifications/customer-definitions/:id/publish',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const lineAccountId = bodyString(body?.lineAccountId);
     const expectedVersion = bodyVersion(body?.expectedVersion);
     if (!lineAccountId || !expectedVersion) {
-      return c.json({ success: false, error: 'LINEアカウントと現在の版は必須です' }, 400);
+      return inputError(c, { success: false, error: 'LINEアカウントと現在の版は必須です' }, 400, ["lineAccountId","expectedVersion"]);
     }
     const denied = await requireAccount(c, lineAccountId);
     if (denied) return denied;
@@ -282,7 +283,7 @@ lineNotifications.post(
     if (!current) return c.json({ success: false, error: 'お知らせが見つかりません' }, 404);
     const draft = jsonObject(current.definition.draft_config_json) as CustomerDraft;
     const draftError = validateCustomerDraft(draft);
-    if (draftError) return c.json({ success: false, error: draftError }, 400);
+    if (draftError) return inputError(c, { success: false, error: draftError }, 400, ["lineAccountId"]);
     // N-330 (#943): ECイベントがきっかけの定義は、送信文面をイベント内容
     // から組み立てる(ecFlexMessage)ので、静的なLINEテンプレートは要らない。
     // それ以外の定義は、送る中身が無いまま公開できないようテンプレートを必須にする。
@@ -307,12 +308,12 @@ lineNotifications.post(
 lineNotifications.post(
   '/api/line-notifications/customer-definitions/:id/stop',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const lineAccountId = bodyString(body?.lineAccountId);
     const expectedVersion = bodyVersion(body?.expectedVersion);
     if (!lineAccountId || !expectedVersion) {
-      return c.json({ success: false, error: 'LINEアカウントと現在の版は必須です' }, 400);
+      return inputError(c, { success: false, error: 'LINEアカウントと現在の版は必須です' }, 400, ["lineAccountId","expectedVersion"]);
     }
     const denied = await requireAccount(c, lineAccountId);
     if (denied) return denied;
@@ -392,7 +393,7 @@ function serializeDeliveryItem(
 export async function notificationDeliveriesResponse(c: Context<Env>): Promise<Response> {
   const lineAccountId = c.req.query('lineAccountId')?.trim();
   if (!lineAccountId) {
-    return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
   }
   const denied = await requireAccount(c, lineAccountId);
   if (denied) return denied;
@@ -402,7 +403,7 @@ export async function notificationDeliveriesResponse(c: Context<Env>): Promise<R
   const offset = Number.isInteger(rawOffset) ? Math.max(rawOffset, 0) : 0;
   const view = c.req.query('view') ?? 'all';
   if (view !== 'all' && view !== 'failures') {
-    return c.json({ success: false, error: '表示条件が正しくありません' }, 400);
+    return inputError(c, { success: false, error: '表示条件が正しくありません' }, 400, ["view"]);
   }
   const result = await listNotificationDeliveries(c.env.DB, { lineAccountId, view, limit, offset });
   const attempts = await listNotificationDeliveryAttempts(
@@ -632,12 +633,12 @@ function lineErrorStatus(error: unknown): number | null {
 lineNotifications.post(
   '/api/line-notifications/deliveries/:id/retry',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const lineAccountId = bodyString(body?.lineAccountId);
     const expectedVersion = bodyVersion(body?.expectedVersion);
     if (!lineAccountId || !expectedVersion) {
-      return c.json({ success: false, error: 'LINEアカウントと現在の版は必須です' }, 400);
+      return inputError(c, { success: false, error: 'LINEアカウントと現在の版は必須です' }, 400, ["lineAccountId","expectedVersion"]);
     }
     const denied = await requireAccount(c, lineAccountId);
     if (denied) return denied;
@@ -657,7 +658,7 @@ lineNotifications.post(
       return c.json({ success: true, data: { id: c.req.param('id'), resolved, version: expectedVersion + 1 } });
     }
     if (action !== null) {
-      return c.json({ success: false, error: '操作の種類が正しくありません' }, 400);
+      return inputError(c, { success: false, error: '操作の種類が正しくありません' }, 400, ["action"]);
     }
     if (c.get('staff').role !== 'owner') {
       return c.json({ success: false, error: '送信の再試行は店長だけができます' }, 403);
@@ -739,11 +740,11 @@ lineNotifications.post(
           nextRetryAt,
         });
         if (!finished) throw new Error('notification retry result was not recorded');
-        return c.json({
+        return inputError(c, {
           success: false,
           code: transient ? 'retry_scheduled' : 'retry_failed',
           error: transient ? '一時的な失敗のため、再試行待ちに戻しました' : '再試行できませんでした',
-        }, transient ? 503 : 422);
+        }, transient ? 503 : 422, []);
       }
       const finished = await finishNotificationDeliveryRetry(c.env.DB, {
         delivery,
@@ -828,16 +829,16 @@ lineNotifications.get(
 lineNotifications.post(
   '/api/line-notifications/deliveries/:id/resend',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const lineAccountId = bodyString(body?.lineAccountId);
     const expectedVersion = bodyVersion(body?.expectedVersion);
     const reason = bodyReason(body?.reason);
     if (!lineAccountId || !expectedVersion) {
-      return c.json({ success: false, error: 'LINEアカウントと現在の版は必須です' }, 400);
+      return inputError(c, { success: false, error: 'LINEアカウントと現在の版は必須です' }, 400, ["lineAccountId","expectedVersion"]);
     }
     if (!reason) {
-      return c.json({ success: false, error: '再送する理由を1〜200文字で入力してください' }, 400);
+      return inputError(c, { success: false, error: '再送する理由を1〜200文字で入力してください' }, 400, ["reason"]);
     }
     const denied = await requireAccount(c, lineAccountId);
     if (denied) return denied;
@@ -943,12 +944,12 @@ lineNotifications.post(
           nextRetryAt,
         });
         if (!finished) throw new Error('notification resend result was not recorded');
-        return c.json({
+        return inputError(c, {
           success: false,
           code: transient ? 'resend_scheduled' : 'resend_failed',
           error: transient ? '一時的な失敗のため、新しい送信を再試行待ちにしました' : '再送できませんでした',
           data: { id: created.id },
-        }, transient ? 503 : 422);
+        }, transient ? 503 : 422, []);
       }
       const finished = await finishNotificationResendDelivery(c.env.DB, {
         id: created.id,
@@ -981,15 +982,15 @@ const CUSTOMER_TEST_SEND_NOTICE =
 lineNotifications.post(
   '/api/line-notifications/customer-definitions/:id/test',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const lineAccountId = bodyString(body?.lineAccountId);
     const friendIds = bodyFriendIds(body?.friendIds);
     if (!lineAccountId) {
-      return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+      return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     }
     if (!friendIds) {
-      return c.json({ success: false, error: '試し送りする友だちを1〜5人選んでください' }, 400);
+      return inputError(c, { success: false, error: '試し送りする友だちを1〜5人選んでください' }, 400, ["friendIds"]);
     }
     const denied = await requireAccount(c, lineAccountId);
     if (denied) return denied;

@@ -1,7 +1,8 @@
 'use client'
 
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import { PageHeading } from '@/components/templates/page-frame'
-
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -1006,29 +1007,29 @@ export default function BookingsPage() {
         ★V7 `x63W5x`：取れない KPI は「—」。読み込み中は「読み込んでいます」、
         失敗は「読み込めませんでした」と言い分け、0（本当に0件）と混ぜない。
       */}
-      <div data-design="KPIs" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <Kpi
+      <KpiBand data-design="KPIs">
+        <KpiCard icon={null} presentation="band"
           title="今月の予約"
           value={summaryReady ? kpi.total : null}
           unit="件"
           detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : `前月比 ${kpi.diff >= 0 ? '+' : ''}${kpi.diff}`}
         />
-        <Kpi title="確定" value={summaryReady ? kpi.confirmed : null} unit="件" detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : '来店予定'} />
+        <KpiCard icon={null} presentation="band" title="確定" value={summaryReady ? kpi.confirmed : null} unit="件" detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : '来店予定'} />
         {/* 設計は「変更依頼 / 要対応」。bookings の状態に「変更依頼」が無いので
             承認待ちを出す。要対応であることは変わらない。 */}
-        <Kpi
+        <KpiCard icon={null} presentation="band"
           title="変更依頼"
           value={summaryReady ? summary.requested : null}
           unit="件"
           detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : '要対応'}
         />
-        <Kpi
+        <KpiCard icon={null} presentation="band"
           title="キャンセル"
           value={summaryReady ? kpi.cancelled : null}
           unit="件"
           detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : kpi.rate === null ? '率 —' : `率 ${kpi.rate}%`}
         />
-      </div>
+      </KpiBand>
 
       {createRow}
 
@@ -1402,32 +1403,6 @@ export default function BookingsPage() {
       )}
 
       {dialogs}
-    </div>
-  )
-}
-
-function Kpi({
-  title,
-  value,
-  unit,
-  detail,
-}: {
-  title: string
-  // ★V7 `x63W5x`：取れていないときは null で「—」を出す。0 とは別物。
-  value: number | null
-  unit: string
-  detail: string
-}) {
-  return (
-    <div className="bg-canvas rounded-card border-hairline border p-4">
-      <p className="text-ink-faint text-xs">{title}</p>
-      <p className="text-ink mt-1 text-2xl font-semibold tabular-nums">
-        {value === null ? '—' : formatNumber(value)}
-        {value === null ? null : (
-          <span className="text-ink-faint ml-1 text-xs font-normal">{unit}</span>
-        )}
-      </p>
-      <p className="text-ink-faint mt-1 text-xs">{detail}</p>
     </div>
   )
 }

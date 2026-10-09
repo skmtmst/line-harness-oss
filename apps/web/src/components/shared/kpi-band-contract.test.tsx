@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import KpiBand from './kpi-band'
@@ -30,10 +31,10 @@ describe('数の帯（Pp3nS）', () => {
     )
     expect(strip, 'v8 の帯の指定がありません').toBeTruthy()
     expect(strip![0]).toMatch(/gap:\s*var\(--tpl-band-gap\)/)
-    expect(strip![0]).toMatch(/border-block:\s*1px solid var\(--color-hairline\)/)
+    expect(strip![0]).toMatch(/border-block:\s*1px solid var\(--tpl-band-line\)/)
     expect(strip![0]).toMatch(/border-radius:\s*var\(--radius-none\)/)
     expect(css).toMatch(
-      /\[data-theme='v8'\] \.strip\[data-kpi-presentation='band'\] > \* \+ \* \{[^}]*border-left:\s*1px solid var\(--color-hairline\)/s,
+      /\[data-theme='v8'\] \.strip\[data-kpi-presentation='band'\] > \*:not\(:last-child\) \{[^}]*border-right:\s*1px solid var\(--tpl-band-line\)/s,
     )
     expect(css).toMatch(
       /\[data-theme='v8'\] \.strip\[data-kpi-presentation='band'\] \.number \{[^}]*font-size:\s*var\(--tpl-band-number-size\)/s,

@@ -21,6 +21,7 @@ import {
   type IncomingWebhookUnmatchedItem,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { useOnAccountSwitch } from '@/components/shared/list-url-state'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole } from '@/lib/staff-role'
 import { ListPage } from '@/components/templates'
@@ -122,6 +123,8 @@ export default function WebhooksIncomingV8() {
   const { selectedAccountId, accounts } = useAccount()
   const accountRef = useRef(selectedAccountId)
   accountRef.current = selectedAccountId
+  const accountScopeRef = useRef({ accountId: selectedAccountId })
+  if (accountScopeRef.current.accountId !== selectedAccountId) accountScopeRef.current = { accountId: selectedAccountId }
   const staffRole = useStaffRole()
   /* 受け取り口の変更は統括だけ（R32）。届物の結び付けは管理者も使える。 */
   const canManage = staffRole === null || staffRole === 'owner'
@@ -177,6 +180,27 @@ export default function WebhooksIncomingV8() {
   const [rotateError, setRotateError] = useState('')
   const [rotating, setRotating] = useState(false)
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
+
+  // 初回の null → アカウントは見本の選択を保ち、実際に店を替えたときだけ消す。
+  useOnAccountSwitch(selectedAccountId, () => {
+    setShowCreate(false)
+    setCreateName('')
+    setCreateSource(SOURCE_PRESETS[0].value)
+    setCreateSourceFree('')
+    setCreateSecret('')
+    setCreateFieldError({})
+    setCreating(false)
+    setCreatedSecret(null)
+    setDeleteTarget(null)
+    setDeleteError('')
+    setRotateTarget(null)
+    setRotateSecret('')
+    setRotateError('')
+    setStepUp(null)
+    setOptimisticActive({})
+    togglingRef.current.clear()
+    setTogglingIds([])
+  })
 
   useEffect(() => {
     if (staffRole !== null && staffRole !== 'owner') setShowCreate(false)
@@ -272,6 +296,8 @@ export default function WebhooksIncomingV8() {
   /* ===== 動かす・止める（押した瞬間に変え、裏で保存する） ===== */
   const handleToggle = async (item: IncomingWebhook, currentActive: boolean) => {
     const accountId = selectedAccountId
+    const scope = accountScopeRef.current
+    const isCurrent = () => accountScopeRef.current === scope
     if (!accountId || loadedAccountId !== accountId) {
       setError('LINEアカウントの一覧を読み直してください')
       return
@@ -290,32 +316,34 @@ export default function WebhooksIncomingV8() {
     })
     const fail = (message: string) => {
       clear()
-      notifyToast(message, { tone: 'error', actionLabel: 'もう一度', onAction: () => { void handleToggle(item, currentActive) } })
+      notifyToast(message, { tone: 'error', actionLabel: 'もう一度', onAction: () => { if (isCurrent()) void handleToggle(item, currentActive) } })
     }
     try {
       const res = await api.webhooks.incoming.update(item.id, accountId, { isActive: !currentActive })
-      // 返事の前にアカウントを移った：知らせは出さないが、仮の表示は必ず外す。
-      // 外さないと、戻ったときにサーバーの状態と違う「止めています」が残る（監査 WEB-024）。
-      if (accountRef.current !== accountId) { clear(); return }
+      // 仮の表示は切替時に外してある。前の要求で新しい店の表示を触らない。
+      if (!isCurrent()) return
       if (!res.success) {
         fail(`「${item.name}」は切り替えできませんでした。状態は変わっていません。確かめてから、もう一度お試しください。`)
         return
       }
       await reload()
+      if (!isCurrent()) return
       clear()
       notifyToast(`「${item.name}」を${!currentActive ? '動かしました' : '止めました'}。`, {
         actionLabel: '元に戻す',
-        onAction: () => { void handleToggle(item, !currentActive) },
+        onAction: () => { if (isCurrent()) void handleToggle(item, !currentActive) },
       })
     } catch (caught) {
-      if (accountRef.current !== accountId) { clear(); return }
+      if (!isCurrent()) return
       const forbidden = caught instanceof ApiError && caught.status === 403
       fail(forbidden
         ? `「${item.name}」は統括だけが切り替えできます。必要なときは統括に頼んでください。状態は変わっていません。`
         : `「${item.name}」は切り替えに失敗しました。状態は変わっていません。時間をおいて、もう一度お試しください。`)
     } finally {
-      togglingRef.current.delete(item.id)
-      setTogglingIds((current) => current.filter((id) => id !== item.id))
+      if (isCurrent()) {
+        togglingRef.current.delete(item.id)
+        setTogglingIds((current) => current.filter((id) => id !== item.id))
+      }
     }
   }
 

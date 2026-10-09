@@ -9,6 +9,7 @@
  * 箱は予約元の色（LINE・レストランボード＝緑、予約媒体＝赤、電話＝灰）、承認待ちは黄の枠、押さえは灰の枠。
  */
 import { useMemo } from 'react'
+import KpiCard from '@/components/shared/kpi-card'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Card from '@/components/shared/card'
@@ -18,7 +19,7 @@ import IconButton from '@/components/shared/icon-button'
 import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
-import { Stat, StatRow } from '../booking-kit/shell'
+import { StatRow } from '../booking-kit/shell'
 import {
   INACTIVE_STATUSES, SOURCE_LABEL, dayShort, dayTitle, floorOrder, hm, isHold, mdWeek, minutesOf,
   sameDay, shortCourse, slotLabel, sourceKind, sourceName,
@@ -158,10 +159,10 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
   return (
     <>
       <StatRow compact>
-        <Stat label="今日の予約" value={`${bookings.length}件`} note={`${guests}名`} />
-        <Stat label="承認待ち" value={`${pending.length}件`} note={pendingSources || 'ありません'} warning={pending.length > 0} />
-        <Stat label="未配席" value={`${unseated}件`} note={unseated === 0 ? 'すべて卓に入っています' : '卓の割当が必要'} warning={unseated > 0} />
-        <Stat label="押さえ" value={`${holds.length}枠`} note={holds[0]?.note || holds[0]?.allergy_note || '期限付きの仮押さえ'} />
+        <KpiCard title="今日の予約" valueText={`${bookings.length}件`} detail={`${guests}名`} icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="承認待ち" valueText={`${pending.length}件`} detail={pendingSources || 'ありません'} valueTone={pending.length > 0 ? 'warning' : 'default'} icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="未配席" valueText={`${unseated}件`} detail={unseated === 0 ? 'すべて卓に入っています' : '卓の割当が必要'} valueTone={unseated > 0 ? 'warning' : 'default'} icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="押さえ" valueText={`${holds.length}枠`} detail={holds[0]?.note || holds[0]?.allergy_note || '期限付きの仮押さえ'} icon={null} presentation="band" value={null} unit="" />
       </StatRow>
       <div className={styles.dateBar}>
         <IconButton aria-label="前の日" onClick={() => onDay(new Date(day.getFullYear(), day.getMonth(), day.getDate() - 1))}><ChevronLeft size={16} aria-hidden="true" /></IconButton>

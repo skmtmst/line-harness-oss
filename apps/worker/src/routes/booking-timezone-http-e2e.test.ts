@@ -618,7 +618,7 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
     for (const party_size of [0,2,1.5,-1,'1',null]) {
       const response = await create(NY_NOV2_1000,`party-${String(party_size)}`,{party_size});
       expect(response.status).toBe(422);
-      expect(await response.json()).toMatchObject({error:'unsupported_party_size'});
+      expect(await response.json()).toMatchObject({code:'unsupported_party_size', fields: expect.any(Object), error: expect.any(String) });
     }
     expect(bookingRows()).toHaveLength(0);
     expect((await create(NY_NOV2_1000,'party-one',{party_size:1})).status).toBe(201);
@@ -749,7 +749,7 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
 
     const blocked = await liffCreate(NY_NOV2_1400, 'ny-liff-gcal-1');
     expect(blocked.status).toBe(422);
-    await expect(blocked.json()).resolves.toEqual({ error: 'slot_not_available' });
+    await expect(blocked.json()).resolves.toMatchObject({ code: 'slot_not_available' , fields: expect.any(Object), error: expect.any(String) });
     expect(bookingRows()).toEqual([]);
 
     const ok = await liffCreate(NY_NOV2_1000, 'ny-liff-gcal-ok-1');
@@ -769,7 +769,7 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
 
     const fake = await liffCreate(FAKE_JST_NOV2_1000, 'ny-liff-fake-1');
     expect(fake.status).toBe(422);
-    await expect(fake.json()).resolves.toEqual({ error: 'slot_not_available' });
+    await expect(fake.json()).resolves.toMatchObject({ code: 'slot_not_available' , fields: expect.any(Object), error: expect.any(String) });
     expect(bookingRows()).toHaveLength(1);
   });
 });

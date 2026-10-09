@@ -23,7 +23,8 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: accountId, selectedAccount: { id: accountId, name: accountId === 'account-a' ? '本店' : '支店' }, accounts: [{ id: 'account-a', name: '本店' }, { id: 'account-b', name: '支店' }], loading: false }),
 }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
-vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => false }))
+let narrow = false
+vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => narrow }))
 let role = 'owner'
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
@@ -31,6 +32,8 @@ vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('
 })
 
 import WebhooksIncomingV8 from './incoming'
+import WebhooksOutgoingV8 from './outgoing'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import WebhooksSamplesV8 from './samples'
 import WebhooksInteractionsV8 from './interactions'
 import WebhooksCreateV8 from './create'
@@ -50,6 +53,7 @@ let posted: Array<{ url: string; body: unknown }> = []
 beforeEach(() => {
   accountId = 'account-a'
   role = 'owner'
+  narrow = false
   search = ''
   posted = []
   document.documentElement.dataset.theme = 'v8'
@@ -82,6 +86,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => { root.unmount() })
   host.remove()
+  clearToastsForTest()
   vi.unstubAllGlobals()
   document.documentElement.removeAttribute('data-theme')
 })
@@ -112,6 +117,54 @@ describe('外部連携 V8', () => {
     expect(posted.filter((item) => item.url.includes('/api/webhooks/incoming'))).toHaveLength(0)
   })
 
+  it('見本の受信元は初回のアカウント読込で消さず、実際の切替で作る窓と入力を消す', async () => {
+    search = 'source=booking'
+    accountId = ''
+    await render(<WebhooksIncomingV8 />)
+    accountId = 'account-a'
+    await render(<WebhooksIncomingV8 />)
+    const dialog = () => document.querySelector('[role="dialog"]')
+    expect(dialog()?.textContent).toContain('予約サービス')
+    const input = (id: string) => document.querySelector<HTMLInputElement>(`#${id}`)!
+    await act(async () => {
+      for (const [id, value] of [['wh-incoming-name', '前の店の下書き'], ['wh-incoming-secret', 'a'.repeat(32)]]) {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input(id), value)
+        input(id).dispatchEvent(new Event('input', { bubbles: true }))
+      }
+    })
+    expect(input('wh-incoming-name').value).toBe('前の店の下書き')
+
+    accountId = 'account-b'
+    await render(<WebhooksIncomingV8 />)
+    await vi.waitFor(() => expect(dialog()).toBeNull())
+    await act(async () => { buttons().find((element) => element.textContent?.includes('受け取り口を作る'))!.click() })
+    expect(dialog()?.textContent).toContain('LINE公式アカウント')
+    expect(dialog()?.textContent).not.toContain('予約サービス')
+    expect(input('wh-incoming-name').value).toBe('')
+    expect(input('wh-incoming-secret').value).not.toBe('a'.repeat(32))
+    expect(posted).toHaveLength(0)
+  })
+
+  it.each(['admin', 'staff'])('狭い幅でも %s の権限に合わせて試し送信を出す', async (staffRole) => {
+    role = staffRole
+    narrow = true
+    const base = globalThis.fetch
+    vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => String(input).includes('/api/webhooks/outgoing')
+      ? Promise.resolve(json({ success: true, data: [{
+        id: 'out-1', name: '顧客台帳', url: 'https://example.com/hook', eventTypes: ['friend_add'],
+        isActive: true, hasSecret: true, folderId: null,
+        deliverySummary: { total: 0, failed: 0, pending: 0, canRetry: false, lastResult: null },
+      }] }))
+      : base(input, init))
+    await render(<WebhooksOutgoingV8 />)
+    await act(async () => { buttons().find((element) => element.getAttribute('aria-label') === '「顧客台帳」の操作')!.click() })
+    const items = [...document.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent)
+    expect(items).toContain('中身を見る')
+    expect(items.includes('試しに送る')).toBe(staffRole === 'admin')
+    for (const action of ['止める', '動かす', '直す', '鍵を作り直す', '削除する']) expect(items).not.toContain(action)
+    expect(posted).toHaveLength(0)
+  })
+
   it('閲覧のみ：受け取り口を作る・見本で作る・まとめてやり直すを置かず、閲覧のみの帯を出す', async () => {
     role = 'staff'
     await render(<WebhooksIncomingV8 />)
@@ -125,6 +178,44 @@ describe('外部連携 V8', () => {
     root = createRoot(host)
     await render(<WebhooksInteractionsV8 />)
     expect(buttons().some((element) => element.textContent?.includes('まとめてやり直す'))).toBe(false)
+  })
+
+  it('送り先の切替中に別アカウントへ移ったら仮の状態を消し、戻っても古い失敗を出さない', async () => {
+    const base = globalThis.fetch
+    const outgoing = {
+      id: 'out-1', name: '顧客台帳', url: 'https://example.com/hook', eventTypes: ['friend_add'],
+      isActive: true, hasSecret: true, folderId: null,
+      deliverySummary: { total: 0, failed: 0, pending: 0, canRetry: false, lastResult: null },
+    }
+    let respond: (response: Response) => void = () => {}
+    let started = false
+    vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes('/api/webhooks/outgoing')) {
+        if (init?.method === 'PUT') {
+          started = true
+          return new Promise<Response>((resolve) => { respond = resolve })
+        }
+        return Promise.resolve(json({ success: true, data: [outgoing] }))
+      }
+      return base(input, init)
+    })
+    // 新しい要素を渡して、Context の切替と同じように再描画する。
+    const screen = () => <><WebhooksOutgoingV8 /><ToastHost /></>
+    await render(screen())
+    await act(async () => { buttons().find((element) => element.getAttribute('aria-label') === '「顧客台帳」の設定')!.click() })
+    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).not.toBeNull())
+    await act(async () => { buttons().find((element) => element.getAttribute('role') === 'menuitem' && element.textContent === '止める')!.click() })
+    expect(started).toBe(true)
+    expect(host.textContent).toContain('切り替え中')
+
+    accountId = 'account-b'
+    await render(screen())
+    expect(host.textContent).not.toContain('切り替え中')
+    accountId = 'account-a'
+    await render(screen())
+    await act(async () => { respond(json({ success: false, error: '古い失敗' })) })
+    expect(host.textContent).not.toContain('切り替えできませんでした')
+    expect(host.textContent).not.toContain('切り替え中')
   })
 
   it('やり取りの記録：札に件数、中身は「・」の前を1行目・後ろと経緯を2行目に出す', async () => {

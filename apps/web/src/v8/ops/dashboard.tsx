@@ -11,6 +11,7 @@ import { formatYen } from '@/components/ops/ops-charts'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import Dialog from '@/components/shared/dialog'
+import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import kpiStyles from '@/components/shared/kpi-card.module.css'
 import ListState from '@/components/shared/list-state'
@@ -189,11 +190,11 @@ export default function OpsDashboardV8() {
               <h3 className={parts.panelTitle}>お問い合わせ（チケット）</h3>
               {data ? (
                 <>
-                  <div className={styles.stats}>
-                    <MiniStat label="未対応" value={`${data.tickets.newCount} 件`} />
-                    <MiniStat label="対応中" value={`${data.tickets.inProgressCount} 件`} />
-                    <MiniStat label="平均の初回返信" value={hoursLabel(data.tickets.avgFirstReplyMinutes)} />
-                  </div>
+                  <KpiBand density="compact">
+                    <KpiCard title="未対応" valueText={`${data.tickets.newCount} 件`} icon={null} presentation="band" value={null} unit="" detail={null} />
+                    <KpiCard title="対応中" valueText={`${data.tickets.inProgressCount} 件`} icon={null} presentation="band" value={null} unit="" detail={null} />
+                    <KpiCard title="平均の初回返信" valueText={hoursLabel(data.tickets.avgFirstReplyMinutes)} icon={null} presentation="band" value={null} unit="" detail={null} />
+                  </KpiBand>
                   <Link href="/ops/support" className={parts.textLink}>すべて見る →</Link>
                 </>
               ) : <ListState kind="loading" title="読み込んでいます" />}
@@ -258,15 +259,6 @@ function AlertRow({ label, count, href }: { label: string; count: number; href: 
       <span className={`${parts.fixed} ${styles.colOpen}`}>
         <Button href={href} aria-label={`${label}を開く`}>開く</Button>
       </span>
-    </div>
-  )
-}
-
-function MiniStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className={styles.stat}>
-      <span className={styles.statLabel}>{label}</span>
-      <span className={styles.statValue}>{value}</span>
     </div>
   )
 }

@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
@@ -575,7 +576,7 @@ async function ruleTestResponse(
   const row = await getFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId });
   if (!row) return c.json({ success: false, error: '設定が見つかりません' }, 404);
   const at = parseExpectedAt(input?.expectedAt);
-  if (at === 'invalid') return c.json({ success: false, error: '想定日時が読めません' }, 400);
+  if (at === 'invalid') return inputError(c, { success: false, error: '想定日時が読めません' }, 400, ["expectedAt"]);
   const definition = parseSnapshot(row.definition_snapshot);
   const errors = await validateReferences(c.env.DB, accountId, definition, row.friend_kind, {
     isFallback: row.is_unknown_route_fallback === 1,
@@ -1004,9 +1005,9 @@ friendAddRules.get('/api/friend-add-runs/:id', requireRole('owner', 'admin', 'st
   }
 });
 
-friendAddRules.post('/api/friend-add-runs/:id/retry', requireRole('owner', 'admin'), async (c) => {
+friendAddRules.post('/api/friend-add-runs/:id/retry', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const accountId = accountIdFrom(c);
-  if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'account_id が必要です' }, 400, ["accountId"]);
   try {
     if (!await canUseAccount(c, accountId)) {
       return c.json({ success: false, error: '実行結果が見つかりません' }, 404);
@@ -1029,16 +1030,16 @@ friendAddRules.post('/api/friend-add-runs/:id/retry', requireRole('owner', 'admi
   }
 });
 
-friendAddRules.post('/api/friend-add-rules/folders', requireRole('owner', 'admin'), async (c) => {
+friendAddRules.post('/api/friend-add-rules/folders', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"name":["string"],"color":["null","string"]}), async (c) => {
   const body = await c.req.json<{ accountId?: string; name?: string; color?: string | null }>();
   const accountId = accountIdFrom(c, body);
   const name = body.name?.trim() ?? '';
   const idempotencyKey = c.req.header('Idempotency-Key');
-  if (body.color !== undefined && !isFolderSelectColor(body.color)) return c.json({ success: false, error: 'フォルダの色を確認してください' }, 422);
-  if (!accountId) return c.json({ success: false, error: 'accountId が必要です' }, 400);
-  if (!name || name.length > 60) return c.json({ success: false, error: 'フォルダ名は1〜60文字で入力してください' }, 400);
+  if (body.color !== undefined && !isFolderSelectColor(body.color)) return inputError(c, { success: false, error: 'フォルダの色を確認してください' }, 422, ["color"]);
+  if (!accountId) return inputError(c, { success: false, error: 'accountId が必要です' }, 400, ["accountId"]);
+  if (!name || name.length > 60) return inputError(c, { success: false, error: 'フォルダ名は1〜60文字で入力してください' }, 400, ["name"]);
   if (!idempotencyKey || idempotencyKey.length < 16 || idempotencyKey.length > 200) {
-    return c.json({ success: false, error: '保存には有効な冪等キーが必要です' }, 400);
+    return inputError(c, { success: false, error: '保存には有効な冪等キーが必要です' }, 400, []);
   }
   try {
     if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
@@ -1074,12 +1075,12 @@ friendAddRules.post('/api/friend-add-rules/folders', requireRole('owner', 'admin
 });
 
 // フォルダ名は設定側にも保存されるため、同じトランザクションで置き換える。
-friendAddRules.patch('/api/friend-add-rules/folders/:id', requireRole('owner', 'admin'), async (c) => {
+friendAddRules.patch('/api/friend-add-rules/folders/:id', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"name":["string"],"color":["null","string"]}), async (c) => {
   const body = await c.req.json<{ accountId?: string; name?: string; color?: string | null }>();
   const accountId = accountIdFrom(c, body);
-  if (!accountId) return c.json({ success: false, error: 'accountId が必要です' }, 400);
-  if (body.color !== undefined && !isFolderSelectColor(body.color)) return c.json({ success: false, error: 'フォルダの色を確認してください' }, 422);
-  if (body.name !== undefined && (typeof body.name !== 'string' || !body.name.trim() || body.name.trim().length > 60)) return c.json({ success: false, error: 'フォルダ名は1〜60文字で入力してください' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'accountId が必要です' }, 400, ["accountId"]);
+  if (body.color !== undefined && !isFolderSelectColor(body.color)) return inputError(c, { success: false, error: 'フォルダの色を確認してください' }, 422, ["color"]);
+  if (body.name !== undefined && (typeof body.name !== 'string' || !body.name.trim() || body.name.trim().length > 60)) return inputError(c, { success: false, error: 'フォルダ名は1〜60文字で入力してください' }, 400, ["name"]);
   try {
     if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
     const id = c.req.param('id');
@@ -1249,19 +1250,19 @@ async function getFriendAddOrderVersion(
  * 並びだけを受け付ける——絞り込み中の一部だけで上書きされると、
  * 見えていない設定の順が壊れるため、足りなければ 409 で読み直しを促す。
  */
-friendAddRules.patch('/api/friend-add-rules/reorder', requireRole('owner', 'admin'), async (c) => {
+friendAddRules.patch('/api/friend-add-rules/reorder', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"friendKind":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{ accountId?: string; friendKind?: FriendAddRuleKind; ids?: unknown }>();
     const accountId = accountIdFrom(c, body);
-    if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+    if (!accountId) return inputError(c, { success: false, error: 'account_id が必要です' }, 400, ["accountId"]);
     const kind = body.friendKind;
-    if (!kind || !KINDS.has(kind)) return c.json({ success: false, error: 'friendKind が正しくありません' }, 400);
+    if (!kind || !KINDS.has(kind)) return inputError(c, { success: false, error: 'friendKind が正しくありません' }, 400, ["friendKind"]);
     if (!Array.isArray(body.ids) || body.ids.some((v) => typeof v !== 'string')) {
-      return c.json({ success: false, error: 'ids must be an array of rule ids' }, 400);
+      return inputError(c, { success: false, error: 'ids must be an array of rule ids' }, 400, ["ids"]);
     }
     const ids = body.ids as string[];
     if (ids.length > 500 || new Set(ids).size !== ids.length) {
-      return c.json({ success: false, error: 'ids must be unique and at most 500' }, 400);
+      return inputError(c, { success: false, error: 'ids must be unique and at most 500' }, 400, ["ids"]);
     }
     if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
     const current = await listFriendAddRuleOrderIds(c.env.DB, { lineAccountId: accountId, friendKind: kind });
@@ -1286,24 +1287,24 @@ friendAddRules.patch('/api/friend-add-rules/reorder', requireRole('owner', 'admi
  * どれか1つでも合わなければ書かず 409 で読み直しを促す。
  * PATCH /reorder は従来の画面が使うので残し、版は見ないままにする。
  */
-friendAddRules.put('/api/friend-add-rules/order', requireRole('owner', 'admin'), async (c) => {
+friendAddRules.put('/api/friend-add-rules/order', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"friendKind":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       accountId?: string; friendKind?: FriendAddRuleKind; ids?: unknown; expectedVersion?: unknown;
     }>();
     const accountId = accountIdFrom(c, body);
-    if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+    if (!accountId) return inputError(c, { success: false, error: 'account_id が必要です' }, 400, ["accountId"]);
     const kind = body.friendKind;
-    if (!kind || !KINDS.has(kind)) return c.json({ success: false, error: 'friendKind が正しくありません' }, 400);
+    if (!kind || !KINDS.has(kind)) return inputError(c, { success: false, error: 'friendKind が正しくありません' }, 400, ["friendKind"]);
     if (!Array.isArray(body.ids) || body.ids.some((v) => typeof v !== 'string')) {
-      return c.json({ success: false, error: 'ids must be an array of rule ids' }, 400);
+      return inputError(c, { success: false, error: 'ids must be an array of rule ids' }, 400, ["ids"]);
     }
     const ids = body.ids as string[];
     if (ids.length > 500 || new Set(ids).size !== ids.length) {
-      return c.json({ success: false, error: 'ids must be unique and at most 500' }, 400);
+      return inputError(c, { success: false, error: 'ids must be unique and at most 500' }, 400, ["ids"]);
     }
     if (!Number.isInteger(body.expectedVersion) || (body.expectedVersion as number) < 0) {
-      return c.json({ success: false, error: 'expectedVersion は0以上の整数で指定してください' }, 400);
+      return inputError(c, { success: false, error: 'expectedVersion は0以上の整数で指定してください' }, 400, ["expectedVersion"]);
     }
     if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
     const current = await listFriendAddRuleOrderIds(c.env.DB, { lineAccountId: accountId, friendKind: kind });
@@ -1434,10 +1435,10 @@ friendAddRules.get('/api/friend-add-rules/conflicts', requireRole('owner', 'admi
   }
 });
 
-friendAddRules.post('/api/friend-add-rules/test', requireRole('owner', 'admin', 'staff'), async (c) => {
+friendAddRules.post('/api/friend-add-rules/test', requireRole('owner', 'admin', 'staff'), inputJsonBoundary({"accountId":["string"],"ruleId":["string"],"friendKind":["string"],"routeId":["null","string"],"expectedAt":["null","string"],"friendId":["null","string"]}), async (c) => {
   const body = await c.req.json<RuleTestInput>();
   const accountId = accountIdFrom(c, body);
-  if (!accountId || !body.ruleId) return c.json({ success: false, error: 'accountId と ruleId が必要です' }, 400);
+  if (!accountId || !body.ruleId) return inputError(c, { success: false, error: 'accountId と ruleId が必要です' }, 400, ["accountId","ruleId"]);
   if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
   return ruleTestResponse(c, accountId, body.ruleId, {
     routeId: body.routeId ?? null,
@@ -1446,14 +1447,14 @@ friendAddRules.post('/api/friend-add-rules/test', requireRole('owner', 'admin', 
   });
 });
 
-friendAddRules.post('/api/friend-add-rules/drafts', requireRole('owner', 'admin'), async (c) => {
+friendAddRules.post('/api/friend-add-rules/drafts', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"friendKind":["string"],"name":["string"],"folderName":["null","string"],"priority":["number"],"definition":["object"],"version":["number"]}), async (c) => {
   const body = await c.req.json<RuleInput>();
   const accountId = accountIdFrom(c, body);
   const idempotencyKey = c.req.header('Idempotency-Key');
   const problem = validateInput(body);
-  if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
-  if (!idempotencyKey || idempotencyKey.length < 16 || idempotencyKey.length > 200) return c.json({ success: false, error: '保存には有効な冪等キーが必要です' }, 400);
-  if (problem) return c.json({ success: false, error: problem }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'account_id が必要です' }, 400, ["accountId"]);
+  if (!idempotencyKey || idempotencyKey.length < 16 || idempotencyKey.length > 200) return inputError(c, { success: false, error: '保存には有効な冪等キーが必要です' }, 400, []);
+  if (problem) return inputError(c, { success: false, error: problem }, 400, ["name","friendKind","priority","definition"]);
   if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
   await ensureFriendAddFallbackRules(c.env.DB, accountId);
   const definition = normalizeDefinition(body.definition);
@@ -1461,11 +1462,11 @@ friendAddRules.post('/api/friend-add-rules/drafts', requireRole('owner', 'admin'
   // 書いた参照先がこのアカウントの持ち物かの確認はここでも行う。
   const referenceErrors = await validateReferences(c.env.DB, accountId, definition, body.friendKind!, { allowIncomplete: true });
   if (referenceErrors.length > 0) {
-    return c.json({
+    return inputError(c, {
       success: false,
       error: referenceErrors[0].message,
       details: referenceErrors.map((error) => error.message),
-    }, 400);
+    }, 400, ["accountId","definition","friendKind"]);
   }
   const row = await createFriendAddRuleDraft(c.env.DB, {
     lineAccountId: accountId,
@@ -1522,27 +1523,27 @@ friendAddRules.get('/api/friend-add-rules/:id', requireRole('owner', 'admin', 's
   });
 });
 
-friendAddRules.put('/api/friend-add-rules/:id/draft', requireRole('owner', 'admin'), async (c) => {
+friendAddRules.put('/api/friend-add-rules/:id/draft', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"friendKind":["string"],"name":["string"],"folderName":["null","string"],"priority":["number"],"definition":["object"],"version":["number"]}), async (c) => {
   const body = await c.req.json<RuleInput>();
   const accountId = accountIdFrom(c, body);
   const idempotencyKey = c.req.header('Idempotency-Key');
   const problem = validateInput(body);
-  if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
-  if (!idempotencyKey || idempotencyKey.length < 16 || idempotencyKey.length > 200) return c.json({ success: false, error: '保存には有効な冪等キーが必要です' }, 400);
-  if (problem) return c.json({ success: false, error: problem }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'account_id が必要です' }, 400, ["accountId"]);
+  if (!idempotencyKey || idempotencyKey.length < 16 || idempotencyKey.length > 200) return inputError(c, { success: false, error: '保存には有効な冪等キーが必要です' }, 400, []);
+  if (problem) return inputError(c, { success: false, error: problem }, 400, ["name","friendKind","priority","definition"]);
   if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
   const current = await getFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: c.req.param('id') });
   if (!current) return c.json({ success: false, error: '設定が見つかりません' }, 404);
-  if (current.friend_kind !== body.friendKind) return c.json({ success: false, error: '判定する人は途中で変更できません' }, 400);
+  if (current.friend_kind !== body.friendKind) return inputError(c, { success: false, error: '判定する人は途中で変更できません' }, 400, ["accountId","friendKind"]);
   const definition = normalizeDefinition(body.definition);
   // 下書きは未完成のまま保存できる (R30)。全体の必須はテスト・公開前確認で見る。
   const referenceErrors = await validateReferences(c.env.DB, accountId, definition, body.friendKind!, { allowIncomplete: true });
   if (referenceErrors.length > 0) {
-    return c.json({
+    return inputError(c, {
       success: false,
       error: referenceErrors[0].message,
       details: referenceErrors.map((error) => error.message),
-    }, 400);
+    }, 400, ["accountId","definition","friendKind"]);
   }
   try {
     const saved = await saveFriendAddRuleDraft(c.env.DB, {
@@ -1564,9 +1565,9 @@ friendAddRules.put('/api/friend-add-rules/:id/draft', requireRole('owner', 'admi
   }
 });
 
-friendAddRules.post('/api/friend-add-rules/:id/validate', requireRole('owner', 'admin'), async (c) => {
+friendAddRules.post('/api/friend-add-rules/:id/validate', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const accountId = accountIdFrom(c);
-  if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'account_id が必要です' }, 400, ["accountId"]);
   if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
   const row = await getFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: c.req.param('id') });
   if (!row) return c.json({ success: false, error: '設定が見つかりません' }, 404);
@@ -1608,9 +1609,9 @@ friendAddRules.post('/api/friend-add-rules/:id/validate', requireRole('owner', '
   });
 });
 
-friendAddRules.post('/api/friend-add-rules/:id/test', requireRole('owner', 'admin', 'staff'), async (c) => {
+friendAddRules.post('/api/friend-add-rules/:id/test', requireRole('owner', 'admin', 'staff'), inputJsonBoundary({"accountId":["string"],"ruleId":["string"],"friendKind":["string"],"routeId":["null","string"],"expectedAt":["null","string"],"friendId":["null","string"]}), async (c) => {
   const accountId = accountIdFrom(c);
-  if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'account_id が必要です' }, 400, ["accountId"]);
   if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
   let body: Partial<RuleTestInput> = {};
   try { body = await c.req.json<RuleTestInput>(); } catch { /* 本文なしの呼び出しは「いま・経路不問」で確かめる */ }
@@ -1631,9 +1632,9 @@ friendAddRules.post('/api/friend-add-rules/:id/test', requireRole('owner', 'admi
  *   既存の手動契約（手動1:1は緊急停止の対象外・手動として記録）に新しい例外は作らない。
  * - 実顧客へは送らない。短時間の二度押しは 429 で止める。
  */
-friendAddRules.post('/api/friend-add-rules/:id/test-send', requireRole('owner', 'admin', 'staff'), async (c) => {
+friendAddRules.post('/api/friend-add-rules/:id/test-send', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   const accountId = accountIdFrom(c);
-  if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'account_id が必要です' }, 400, ["accountId"]);
   try {
     if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
     const staff = c.get('staff');
@@ -1642,13 +1643,13 @@ friendAddRules.post('/api/friend-add-rules/:id/test-send', requireRole('owner', 
     }
     const idempotencyKey = c.req.header('Idempotency-Key');
     if (!idempotencyKey || idempotencyKey.length < 16 || idempotencyKey.length > 200) {
-      return c.json({ success: false, error: 'テスト送信には有効な冪等キーが必要です' }, 400);
+      return inputError(c, { success: false, error: 'テスト送信には有効な冪等キーが必要です' }, 400, []);
     }
     const row = await getFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: c.req.param('id') });
     if (!row || !row.definition_snapshot) return c.json({ success: false, error: '設定が見つかりません' }, 404);
     const definition = parseSnapshot(row.definition_snapshot);
     if (definition.messageType !== 'text' || !definition.messageText.trim()) {
-      return c.json({ success: false, error: 'テスト送信できるのはテキストの本文がある版だけです' }, 422);
+      return inputError(c, { success: false, error: 'テスト送信できるのはテキストの本文がある版だけです' }, 422, []);
     }
     // 送り先は操作者本人だけ。staff の LINE 連携からこのアカウントの友だちを引く。
     const staffRow = await c.env.DB.prepare(
@@ -1682,13 +1683,10 @@ friendAddRules.post('/api/friend-add-rules/:id/test-send', requireRole('owner', 
       staff.id,
     ).run();
     if ((claim.meta.changes ?? 0) !== 1) {
-      return c.json(
-        { success: false, error: '短時間に繰り返し送信しています。10秒待ってからやり直してください' },
-        { status: 429, headers: { 'Retry-After': '10' } },
-      );
+      return c.json({ success: false, error: '短時間に繰り返し送信しています。10秒待ってからやり直してください' }, { status: 429, headers: { 'Retry-After': '10' } });
     }
     const account = await getLineAccountById(c.env.DB, accountId);
-    if (!account) return c.json({ success: false, error: 'LINEアカウントが見つかりません' }, 400);
+    if (!account) return inputError(c, { success: false, error: 'LINEアカウントが見つかりません' }, 400, []);
     // 共通情報の差し込みは厳格に解く（N-189）。解けなければ送らない。
     let resolvedBody: string;
     try {
@@ -1700,11 +1698,11 @@ friendAddRules.post('/api/friend-add-rules/:id/test-send', requireRole('owner', 
       );
     } catch (error) {
       if (error instanceof CommonVarResolutionFailedError) {
-        return c.json({
+        return inputError(c, {
           success: false,
           code: 'UNRESOLVED_TEMPLATE_VARIABLES',
           error: `共通情報を解決できません: ${error.failures.map((f) => `{{var.${f.varKey}}}`).join(', ')}`,
-        }, 422);
+        }, 422, []);
       }
       throw error;
     }
@@ -1736,12 +1734,12 @@ friendAddRules.post('/api/friend-add-rules/:id/test-send', requireRole('owner', 
   }
 });
 
-friendAddRules.post('/api/friend-add-rules/:id/publish', requireRole('owner', 'admin'), async (c) => {
+friendAddRules.post('/api/friend-add-rules/:id/publish', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const accountId = accountIdFrom(c);
   const idempotencyKey = c.req.header('Idempotency-Key');
-  if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'account_id が必要です' }, 400, ["accountId"]);
   if (!idempotencyKey || idempotencyKey.length < 16 || idempotencyKey.length > 200) {
-    return c.json({ success: false, error: '公開には有効な冪等キーが必要です' }, 400);
+    return inputError(c, { success: false, error: '公開には有効な冪等キーが必要です' }, 400, []);
   }
   if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
   try {
@@ -1775,11 +1773,11 @@ friendAddRules.post('/api/friend-add-rules/:id/publish', requireRole('owner', 'a
   }
 });
 
-friendAddRules.post('/api/friend-add-rules/:id/stop', requireRole('owner', 'admin'), async (c) => {
+friendAddRules.post('/api/friend-add-rules/:id/stop', requireRole('owner', 'admin'), inputJsonBoundary({"version":["number"]}), async (c) => {
   const accountId = accountIdFrom(c);
   const idempotencyKey = c.req.header('Idempotency-Key');
-  if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
-  if (!idempotencyKey || idempotencyKey.length < 16 || idempotencyKey.length > 200) return c.json({ success: false, error: '停止には有効な冪等キーが必要です' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'account_id が必要です' }, 400, ["accountId"]);
+  if (!idempotencyKey || idempotencyKey.length < 16 || idempotencyKey.length > 200) return inputError(c, { success: false, error: '停止には有効な冪等キーが必要です' }, 400, []);
   if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
   let body: { version?: number } = {};
   try { body = await c.req.json<{ version?: number }>(); } catch { /* 従来クライアントは本文なし */ }

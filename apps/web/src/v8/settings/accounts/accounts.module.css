@@ -10,13 +10,6 @@
   gap: var(--tpl-sa-head-actions-gap);
 }
 
-/* 数の4枚：枠1本・角丸 12・余白 14・見出し／数／単位。 */
-.kpis {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--tpl-sa-kpi-gap);
-}
-
 /* 探す欄（幅 260）と絞り込みの札。 */
 .toolbar {
   display: flex;

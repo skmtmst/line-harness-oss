@@ -34,7 +34,7 @@ describe('staging-deploy argument parsing', () => {
     );
   });
 
-  it.each([undefined, 'v7'])('builds staging with V8 even when the caller theme is %s (isolated commands)', (callerTheme) => {
+  it.each([undefined, 'v7'])('builds staging without selecting the retired theme when the caller value is %s (isolated commands)', (callerTheme) => {
     const sandbox = mkdtempSync(resolve(tmpdir(), 'pretheme-deploy-'));
     try {
       for (const dir of ['scripts/deploy', 'apps/worker', 'node_modules/.bin', 'bin', 'parent/.git']) {
@@ -53,7 +53,7 @@ describe('staging-deploy argument parsing', () => {
       if (callerTheme) env.NEXT_PUBLIC_ADMIN_THEME = callerTheme;
       const result = spawnSync('bash', [resolve(sandbox, 'scripts/deploy/staging-deploy.sh'), '--parent-repo', resolve(sandbox, 'parent')], { env, encoding: 'utf8' });
       expect(result.status, result.stderr).toBe(0);
-      expect(result.stdout).toContain('theme=v8 api=https://stg-api.musubo.jp');
+      expect(result.stdout).toContain(`theme=${callerTheme ?? 'unset'} api=https://stg-api.musubo.jp`);
       expect(result.stdout).toContain('dry-run: pages deploy は実行していません');
     } finally {
       rmSync(sandbox, { recursive: true, force: true });

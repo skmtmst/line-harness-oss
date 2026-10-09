@@ -171,10 +171,10 @@
   border-color: var(--color-accent-deep);
 }
 
-/* ★V8「枠線の色」：未選択の ○ の輪郭は control-border。
+/* ★V8「枠線の色」：未選択の ○ の輪郭は choice-border。
    選択中の緑・無効の灰・誤りの赤はそれぞれの色を保つ。 */
 [data-theme='v8'] .radio {
-  border-color: var(--color-control-border);
+  border-color: var(--color-choice-border);
 }
 
 [data-theme='v8'] .radio:checked {

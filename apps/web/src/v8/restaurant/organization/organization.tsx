@@ -10,6 +10,7 @@
  * 閲覧のみ（変える権限が無い人）には、作る・編集・停止・発行のボタンを置かない。動きは BEHAVIOR.md。
  */
 import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from 'react'
+import KpiCard from '@/components/shared/kpi-card'
 import { Copy, Eye, MailPlus, Plus } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -28,7 +29,7 @@ import {
 } from '@/lib/restaurant-test-api'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import RestaurantFrame, { type RestaurantContext } from '../common-a/frame'
-import { formatStamp, Panel, Stat, StatRow, Status } from '../common-a/parts'
+import { formatStamp, Panel, StatRow, Status } from '../common-a/parts'
 import styles from './organization.module.css'
 
 const roleLabel: Record<RestaurantMembership['role'], string> = {
@@ -445,9 +446,9 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
           </Dialog>
           <IntakeAddressPanel accountId={accountId} store={store} readOnly={readOnly} />
           <StatRow>
-            <Stat label="所属ユーザー" value={`${members.length}名`} note="名簿に載っている人数" />
-            <Stat label="店舗管理者" value={`${members.filter((m) => m.role === 'store_manager').length}名`} note="名簿上の役割（操作権限は別）" />
-            <Stat label="連携アカウント" value={`${members.filter((m) => m.line_uid || m.google_email).length}件`} note="LINE UID / Google" />
+            <KpiCard title="所属ユーザー" valueText={`${members.length}名`} detail="名簿に載っている人数" icon={null} presentation="band" value={null} unit="" />
+            <KpiCard title="店舗管理者" valueText={`${members.filter((m) => m.role === 'store_manager').length}名`} detail="名簿上の役割（操作権限は別）" icon={null} presentation="band" value={null} unit="" />
+            <KpiCard title="連携アカウント" valueText={`${members.filter((m) => m.line_uid || m.google_email).length}件`} detail="LINE UID / Google" icon={null} presentation="band" value={null} unit="" />
           </StatRow>
           <Panel
             title="アカウント一覧"

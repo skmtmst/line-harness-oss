@@ -8,9 +8,6 @@
   border-radius: 0; background: var(--color-canvas); box-shadow: none;
   font-family: var(--font-noto-sans-jp), 'Noto Sans JP', sans-serif;
 }
-[data-theme='v8'] .create { width: 100%; margin-bottom: 16px; }
-[data-theme='v8'] .create > * { width: 100%; }
-[data-theme='v8'] .createPlaceholder { height: 36px; }
 [data-theme='v8'] .heading { border: 0; padding: 0; margin-bottom: 8px; }
 [data-theme='v8'] .heading > p { font-size: 12px; font-weight: 600; line-height: normal; color: var(--color-ink-faint); }
 [data-theme='v8'] .rows { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 0; }
@@ -35,7 +32,7 @@
 
 
 [data-theme='v8'] .panel .add { height: auto; padding: 6px 10px; box-shadow: none; }
-[data-theme='v8'] .create button { border: 0; }
+/* B-151：主ボタンの縁と影は Button が持つ。 */
 [data-theme='v8'] .label { min-width: 0; }
 [data-theme='v8'] .row[data-active] .label { font-weight: 600; }
 
@@ -93,3 +90,8 @@
 
 /* ★V8 型のフォルダの列（[data-template-region=folders]）の中では、列が余白と線を持つので部品は二重に持たない（司令塔 2026-10-05） */
 :global([data-theme='v8']) :global([data-template-region='folders']) .panel { padding: 0; border-right: 0; width: auto; }
+
+/* B-151：画面から渡された幅のクラスより、列の作る操作の形を優先する。 */
+[data-theme='v8'] .create { width: fit-content; max-width: 100%; align-self: flex-start; margin-bottom: 16px; }
+[data-theme='v8'] .create > * { width: fit-content; max-width: 100%; height: var(--tpl-folder-create-h); min-height: 0; padding: var(--tpl-folder-create-pad); }
+[data-theme='v8'] .createPlaceholder { height: var(--tpl-folder-create-h); }

@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import type { EventApplicationPreview } from '@line-crm/shared';
 // Event booking feature HTTP routes.
 //
@@ -94,8 +95,15 @@ function optionalExecutionCtx(c: Context<Env>): ExecutionContext | undefined {
 // ----------------------------------------------------------------
 // Helpers
 
-function bad(c: Context<Env>, code: string, status = 422): Response {
-  return c.json({ error: code }, status as 400 | 401 | 403 | 404 | 409 | 410 | 422 | 429);
+function bad(c: Context<Env>, code: string, status = 422, fieldKeys: readonly string[] = []): Response {
+  const simpleFields = new Set(['name', 'description', 'venue_name', 'venue_address', 'venue_url', 'image_url', 'og_image_url',
+    'confirmation_message_extra', 'reminder_message_extra', 'cancel_deadline_hours_before', 'reminder_hours_before',
+    'max_bookings_per_friend', 'entry_cutoff_hours_before', 'sort_order', 'approval_deadline_hours', 'target_type',
+    'account_ids', 'dedup_priority', 'questions', 'starts_at', 'ends_at', 'capacity', 'is_active', 'client_key']);
+  const field = code.replace(/^invalid_/, '').replace(/_required$/, '');
+  const special: Record<string, string[]> = { waitlist_reason_required: ['reason'], expected_version_required: ['expectedVersion'], account_id_required: ['account_id'] };
+  const exact = special[code] ?? (simpleFields.has(field) ? [field] : code === 'invalid_slot_range' ? ['starts_at', 'ends_at'] : fieldKeys);
+  return inputError(c, { error: code }, status as 400 | 401 | 403 | 404 | 409 | 410 | 422 | 429, exact);
 }
 
 // account_id is supplied by the admin client, so validate it once at the
@@ -453,18 +461,18 @@ function validateEventInput(
 // Admin: events CRUD
 // ============================================================
 
-events.post('/api/events/admin/application-preview', requireRole('owner', 'admin', 'staff'), async (c) => {
+events.post('/api/events/admin/application-preview', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-  if (!body) return bad(c, 'invalid_body', 400);
+  if (!body) return bad(c, 'invalid_body', 400, []);
   const validation = validateEventInput(body, true);
-  if (!validation.ok) return bad(c, validation.code, 422);
+  if (!validation.ok) return bad(c, validation.code, 422, ["name","description","venue_name","venue_address","sort_order","approval_deadline_hours","target_type","account_ids","dedup_priority","questions"]);
   const slot = body.slot as { starts_at?: unknown; ends_at?: unknown; capacity?: unknown } | undefined;
   if (!slot || typeof slot.starts_at !== 'string' || typeof slot.ends_at !== 'string'
     || !Number.isFinite(Date.parse(slot.starts_at)) || !Number.isFinite(Date.parse(slot.ends_at))
     || Date.parse(slot.ends_at) <= Date.parse(slot.starts_at)
-    || !Number.isSafeInteger(slot.capacity) || Number(slot.capacity) < 1) return bad(c, 'invalid_slot', 422);
+    || !Number.isSafeInteger(slot.capacity) || Number(slot.capacity) < 1) return bad(c, 'invalid_slot', 422, ["slot"]);
   const questions = body.questions;
-  if (questions != null && (!Array.isArray(questions) || questions.length > 50 || questions.some((q: unknown) => !q || typeof q !== 'object' || typeof (q as Record<string, unknown>).label !== 'string'))) return bad(c, 'invalid_questions', 422);
+  if (questions != null && (!Array.isArray(questions) || questions.length > 50 || questions.some((q: unknown) => !q || typeof q !== 'object' || typeof (q as Record<string, unknown>).label !== 'string'))) return bad(c, 'invalid_questions', 422, ["questions"]);
   const data: EventApplicationPreview = {
     name: String(body.name), description: body.description as string | null ?? null,
     venueName: body.venue_name as string | null ?? null, venueAddress: body.venue_address as string | null ?? null,
@@ -476,12 +484,12 @@ events.post('/api/events/admin/application-preview', requireRole('owner', 'admin
   return c.json(data);
 });
 
-events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c) => {
+events.post('/api/events/admin/events', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const account_id = getAccountId(c);
-  if (!account_id) return bad(c, 'account_id_required', 400);
+  if (!account_id) return bad(c, 'account_id_required', 400, []);
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const v = validateEventInput(body, true);
-  if (!v.ok) return bad(c, v.code, 422);
+  if (!v.ok) return bad(c, v.code, 422, ["name","description","venue_name","venue_address","sort_order","approval_deadline_hours","target_type","account_ids","dedup_priority","questions"]);
 
   if (Array.isArray(body.account_ids)
       && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), body.account_ids as string[])) {
@@ -490,7 +498,7 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
 
   if ('folderId' in body && !await validEventFolder(c, body.folderId,
     body.target_type === 'multi-account-dedup' ? body.account_ids as string[] : [account_id])) {
-    return bad(c, 'invalid_folder', 422);
+    return bad(c, 'invalid_folder', 422, ["folderId","target_type","account_ids"]);
   }
   const id = crypto.randomUUID();
   const targetType = (body.target_type as EventTargetType | undefined) ?? 'single';
@@ -852,9 +860,9 @@ events.get('/api/events/admin/events/:id', async (c) => {
   return c.json(withFolder(row));
 });
 
-events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async (c) => {
+events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const account_id = getAccountId(c);
-  if (!account_id) return bad(c, 'account_id_required', 400);
+  if (!account_id) return bad(c, 'account_id_required', 400, []);
   const id = c.req.param('id');
   const exists = await c.env.DB
     .prepare(
@@ -871,10 +879,10 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async 
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const expectedVersion = body.expected_version ?? body.expectedVersion;
   if (!Number.isInteger(expectedVersion) || (expectedVersion as number) < 1) {
-    return bad(c, 'expected_version_required', 422);
+    return bad(c, 'expected_version_required', 422, ["expected_version","expectedVersion"]);
   }
   const v = validateEventInput(body, false);
-  if (!v.ok) return bad(c, v.code, 422);
+  if (!v.ok) return bad(c, v.code, 422, ["name","description","venue_name","venue_address","sort_order","approval_deadline_hours","target_type","account_ids","dedup_priority","questions"]);
 
   if (Array.isArray(body.account_ids)
       && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), body.account_ids as string[])) {
@@ -920,7 +928,7 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async 
     const accountIds = targetType === 'multi-account-dedup'
       ? (body.account_ids as string[] | undefined) ?? JSON.parse(exists.account_ids as string)
       : [account_id];
-    if (!await validEventFolder(c, body.folderId, accountIds)) return bad(c, 'invalid_folder', 422);
+    if (!await validEventFolder(c, body.folderId, accountIds)) return bad(c, 'invalid_folder', 422, ["folderId","target_type","account_ids"]);
     setClauses.push('folder_id = ?');
     setValues.push(body.folderId);
   }
@@ -1129,7 +1137,7 @@ async function rebuildRemindersForSlot(db: D1Database, slot_id: string): Promise
 
 events.delete('/api/events/admin/events/:id', requireRole('owner', 'admin'), async (c) => {
   const account_id = getAccountId(c);
-  if (!account_id) return bad(c, 'account_id_required', 400);
+  if (!account_id) return bad(c, 'account_id_required', 400, []);
   const id = c.req.param('id');
   // Authorize via multi-account ownership: shared events can be deleted by
   // any account listed in account_ids, not only the sentinel line_account_id.
@@ -1183,16 +1191,16 @@ function waitlistReason(body: Record<string, unknown>): string | null {
 // POST /api/events/admin/events/:id/lifecycle
 // 状態の切替（下書き・公開中・一時停止・終了・中止）。
 // is_published へ両書きするので、旧来の口の公開可否はそのまま動く。
-events.post('/api/events/admin/events/:id/lifecycle', requireRole('owner', 'admin'), async (c) => {
+events.post('/api/events/admin/events/:id/lifecycle', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const account_id = getAccountId(c);
-  if (!account_id) return bad(c, 'account_id_required', 400);
+  if (!account_id) return bad(c, 'account_id_required', 400, []);
   const id = c.req.param('id');
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!isLifecycleStatus(body.to)) return bad(c, 'invalid_lifecycle_status', 422);
+  if (!isLifecycleStatus(body.to)) return bad(c, 'invalid_lifecycle_status', 422, ["to"]);
   const to = body.to;
   const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
   if (lifecycleReasonRequired(to) && reason.length === 0) {
-    return bad(c, 'lifecycle_reason_required', 422);
+    return bad(c, 'lifecycle_reason_required', 422, ["to","reason"]);
   }
   const idemKey = typeof body.idempotency_key === 'string' && body.idempotency_key.length > 0
     ? body.idempotency_key
@@ -1254,9 +1262,9 @@ events.post('/api/events/admin/events/:id/lifecycle', requireRole('owner', 'admi
 
 // POST /api/events/admin/events/:id/change-review
 // 変更の事前表示（読み取り専用）。影響人数と止める理由を返す。
-events.post('/api/events/admin/events/:id/change-review', requireRole('owner', 'admin'), async (c) => {
+events.post('/api/events/admin/events/:id/change-review', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const account_id = getAccountId(c);
-  if (!account_id) return bad(c, 'account_id_required', 400);
+  if (!account_id) return bad(c, 'account_id_required', 400, []);
   const body = (await c.req.json().catch(() => ({}))) as {
     slot_changes?: Array<{
       slot_id?: unknown;
@@ -1267,18 +1275,18 @@ events.post('/api/events/admin/events/:id/change-review', requireRole('owner', '
     }>;
     event_changes?: { venue_name?: string | null; venue_url?: string | null };
   };
-  if (!Array.isArray(body.slot_changes)) return bad(c, 'slot_changes_required', 422);
+  if (!Array.isArray(body.slot_changes)) return bad(c, 'slot_changes_required', 422, ["slot_changes"]);
   for (const change of body.slot_changes) {
     if (typeof change?.slot_id !== 'string' || change.slot_id.length === 0) {
-      return bad(c, 'invalid_slot_id', 422);
+      return bad(c, 'invalid_slot_id', 422, []);
     }
     if (change.capacity !== undefined
       && change.capacity !== null
       && (!Number.isInteger(change.capacity) || (change.capacity as number) < 1)) {
-      return bad(c, 'invalid_capacity', 422);
+      return bad(c, 'invalid_capacity', 422, []);
     }
     if (change.is_active !== undefined && change.is_active !== 0 && change.is_active !== 1) {
-      return bad(c, 'invalid_is_active', 422);
+      return bad(c, 'invalid_is_active', 422, []);
     }
   }
   const result = await previewEventChange(c.env.DB, {
@@ -1303,9 +1311,9 @@ events.post('/api/events/admin/events/:id/change-review', requireRole('owner', '
 events.post(
   '/api/events/admin/events/:id/change-review/apply',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const account_id = getAccountId(c);
-    if (!account_id) return bad(c, 'account_id_required', 400);
+    if (!account_id) return bad(c, 'account_id_required', 400, []);
     const body = (await c.req.json().catch(() => ({}))) as {
       expected_version?: unknown;
       change_reason?: unknown;
@@ -1320,15 +1328,15 @@ events.post(
       event_changes?: { venue_name?: string | null; venue_url?: string | null };
     };
     if (!Number.isInteger(body.expected_version) || (body.expected_version as number) < 1) {
-      return bad(c, 'expected_version_required', 422);
+      return bad(c, 'expected_version_required', 422, ["expected_version"]);
     }
     if (typeof body.idempotency_key !== 'string' || body.idempotency_key.length === 0) {
-      return bad(c, 'idempotency_key_required', 400);
+      return bad(c, 'idempotency_key_required', 400, ["idempotency_key"]);
     }
-    if (!Array.isArray(body.slot_changes)) return bad(c, 'slot_changes_required', 422);
+    if (!Array.isArray(body.slot_changes)) return bad(c, 'slot_changes_required', 422, ["slot_changes"]);
     for (const change of body.slot_changes) {
       if (typeof change?.slot_id !== 'string' || change.slot_id.length === 0) {
-        return bad(c, 'invalid_slot_id', 422);
+        return bad(c, 'invalid_slot_id', 422, []);
       }
     }
     const actor = changeActor(c);
@@ -1351,7 +1359,7 @@ events.post(
     });
     if (result.kind === 'not_found') return bad(c, 'not_found', 404);
     if (result.kind === 'conflict') return bad(c, 'version_conflict', 409);
-    if (result.kind === 'invalid') return bad(c, result.error, 422);
+    if (result.kind === 'invalid') return bad(c, result.error, 422, ["expected_version","change_reason","idempotency_key","slot_changes","event_changes"]);
     if (result.kind === 'duplicate') {
       return c.json({ success: true, deduplicated: true, log_id: result.logId });
     }
@@ -1433,13 +1441,13 @@ events.post(
 events.post(
   '/api/events/admin/occurrences/:id/waitlist/reorder',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const account_id = getAccountId(c);
-    if (!account_id) return bad(c, 'account_id_required', 400);
+    if (!account_id) return bad(c, 'account_id_required', 400, []);
     const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
     const reason = waitlistReason(body);
-    if (!reason) return bad(c, 'waitlist_reason_required', 422);
-    if (!Array.isArray(body.ordered_ids)) return bad(c, 'ordered_ids_required', 422);
+    if (!reason) return bad(c, 'waitlist_reason_required', 422, ["reason"]);
+    if (!Array.isArray(body.ordered_ids)) return bad(c, 'ordered_ids_required', 422, ["ordered_ids"]);
     const expectedVersion = body.expected_version ?? body.expectedVersion;
     const result = await reorderEventWaitlist(c.env.DB, {
       occurrenceId: c.req.param('id'),
@@ -1451,7 +1459,7 @@ events.post(
     if (result.kind === 'conflict') {
       return c.json({ error: 'version_conflict', currentVersion: result.currentVersion }, 409);
     }
-    if (result.kind === 'invalid') return bad(c, result.error, 422);
+    if (result.kind === 'invalid') return bad(c, result.error, 422, ["ordered_ids","expected_version","expectedVersion"]);
     const actor = changeActor(c);
     const occurrence = await c.env.DB
       .prepare(`SELECT event_id FROM event_slots WHERE id = ?`)
@@ -1481,14 +1489,14 @@ events.post(
 events.post(
   '/api/events/admin/occurrences/:id/waitlist/skip',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const account_id = getAccountId(c);
-    if (!account_id) return bad(c, 'account_id_required', 400);
+    if (!account_id) return bad(c, 'account_id_required', 400, []);
     const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
     const reason = waitlistReason(body);
-    if (!reason) return bad(c, 'waitlist_reason_required', 422);
+    if (!reason) return bad(c, 'waitlist_reason_required', 422, ["reason"]);
     if (typeof body.waitlist_id !== 'string' || body.waitlist_id.length === 0) {
-      return bad(c, 'waitlist_id_required', 422);
+      return bad(c, 'waitlist_id_required', 422, ["waitlist_id"]);
     }
     const expectedVersion = body.expected_version ?? body.expectedVersion;
     const result = await skipEventWaitlist(c.env.DB, {
@@ -1501,7 +1509,7 @@ events.post(
     if (result.kind === 'conflict') {
       return c.json({ error: 'version_conflict', currentVersion: result.currentVersion }, 409);
     }
-    if (result.kind === 'invalid') return bad(c, result.error, 422);
+    if (result.kind === 'invalid') return bad(c, result.error, 422, ["waitlist_id","expected_version","expectedVersion"]);
     const actor = changeActor(c);
     const occurrence = await c.env.DB
       .prepare(`SELECT event_id FROM event_slots WHERE id = ?`)
@@ -1725,19 +1733,19 @@ events.get(
 events.post(
   '/api/events/admin/occurrences/:id/applicant-broadcasts/preview',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const accountId = getAccountId(c);
-      if (!accountId) return bad(c, 'account_id_required', 400);
+      if (!accountId) return bad(c, 'account_id_required', 400, []);
       const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
-      if (!idempotencyKey || !UUID_PATTERN.test(idempotencyKey)) return bad(c, 'idempotency_key_required', 400);
+      if (!idempotencyKey || !UUID_PATTERN.test(idempotencyKey)) return bad(c, 'idempotency_key_required', 400, []);
       const body = (await c.req.json<{ title?: unknown; messageContent?: unknown; snapshotId?: unknown }>()
         .catch(() => ({}))) as { title?: unknown; messageContent?: unknown; snapshotId?: unknown };
       const title = typeof body.title === 'string' ? body.title.trim() : '';
       const messageContent = typeof body.messageContent === 'string' ? body.messageContent.trim() : '';
-      if (!title || !messageContent || messageContent.length > 5_000) return bad(c, 'invalid_broadcast_content', 422);
+      if (!title || !messageContent || messageContent.length > 5_000) return bad(c, 'invalid_broadcast_content', 422, ["title","messageContent"]);
       const snapshotId = typeof body.snapshotId === 'string' ? body.snapshotId : '';
-      if (!snapshotId) return bad(c, 'applicant_snapshot_required', 422);
+      if (!snapshotId) return bad(c, 'applicant_snapshot_required', 422, ["snapshotId"]);
 
       const occurrenceId = c.req.param('id');
       const replayExisting = (existing: Broadcast): Response => {
@@ -1766,7 +1774,7 @@ events.post(
       if (loaded.kind === 'expired') return bad(c, 'applicant_snapshot_expired', 410);
       if (loaded.kind === 'invalid') return bad(c, 'applicant_snapshot_invalid', 409);
       const friendIds = [...new Set(loaded.snapshot.data.applicants.map((applicant) => applicant.friendId))];
-      if (friendIds.length === 0) return bad(c, 'no_applicants_to_broadcast', 422);
+      if (friendIds.length === 0) return bad(c, 'no_applicants_to_broadcast', 422, ["snapshotId"]);
       const segmentConditions = JSON.stringify({ operator: 'AND', rules: [{ type: 'friend_id_in', value: friendIds }] });
       let broadcast: Broadcast;
       try {
@@ -1794,16 +1802,16 @@ events.post(
 events.post(
   '/api/events/admin/occurrences/:id/waitlist/promote',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const accountId = getAccountId(c);
-    if (!accountId) return bad(c, 'account_id_required', 400);
+    if (!accountId) return bad(c, 'account_id_required', 400, []);
     const rawBody = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
     // U: 手動の繰り上げは理由が必須（順番の変更・飛ばしと同じ決めごと）。
     const reason = waitlistReason(rawBody);
-    if (!reason) return bad(c, 'waitlist_reason_required', 422);
+    if (!reason) return bad(c, 'waitlist_reason_required', 422, []);
     const expectedVersion = rawBody.expectedVersion ?? rawBody.expected_version;
     if (!Number.isInteger(expectedVersion) || (expectedVersion as number) < 1) {
-      return bad(c, 'expected_version_required', 422);
+      return bad(c, 'expected_version_required', 422, []);
     }
     try {
       const result = await promoteEventWaitlist(c.env.DB, {
@@ -1844,22 +1852,22 @@ events.post(
   },
 );
 
-events.post('/api/events/admin/events/:id/slots', requireRole('owner', 'admin'), async (c) => {
+events.post('/api/events/admin/events/:id/slots', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const account_id = getAccountId(c);
-  if (!account_id) return bad(c, 'account_id_required', 400);
+  if (!account_id) return bad(c, 'account_id_required', 400, []);
   const event_id = c.req.param('id');
   if (!(await ownsEvent(c.env.DB, event_id, account_id))) return bad(c, 'not_found', 404);
 
   const body = (await c.req.json().catch(() => ({}))) as { slots?: SlotInput[] };
-  if (!Array.isArray(body.slots) || body.slots.length === 0) return bad(c, 'slots_required', 422);
+  if (!Array.isArray(body.slots) || body.slots.length === 0) return bad(c, 'slots_required', 422, ["slots"]);
   if (body.slots.length > 400) {
-    return bad(c, '一度に追加できるのは400件までです。400件以下に分けて追加してください', 422);
+    return bad(c, '一度に追加できるのは400件までです。400件以下に分けて追加してください', 422, ["slots"]);
   }
   // 入力は挿入前に全部検証する。途中で 422 を返すと、そこまでの分だけ
   // 残る部分成功になるため。
   for (const s of body.slots) {
     const v = validateSlotInput(s, true);
-    if (!v.ok) return bad(c, v.code, 422);
+    if (!v.ok) return bad(c, v.code, 422, []);
   }
 
   /*
@@ -1967,9 +1975,9 @@ events.post('/api/events/admin/events/:id/slots', requireRole('owner', 'admin'),
   );
 });
 
-events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'admin'), async (c) => {
+events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const account_id = getAccountId(c);
-  if (!account_id) return bad(c, 'account_id_required', 400);
+  if (!account_id) return bad(c, 'account_id_required', 400, []);
   const event_id = c.req.param('id');
   const slot_id = c.req.param('slotId');
   if (!(await ownsEvent(c.env.DB, event_id, account_id))) return bad(c, 'not_found', 404);
@@ -1988,7 +1996,7 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
   // 読み直して差分を見せる。イベント本体 PUT と同じ決め。
   const slotExpectedVersion = body.expected_version ?? body.expectedVersion;
   if (!Number.isInteger(slotExpectedVersion) || (slotExpectedVersion as number) < 1) {
-    return bad(c, 'expected_version_required', 422);
+    return bad(c, 'expected_version_required', 422, ["expected_version","expectedVersion"]);
   }
   if ((slot.version as number) !== slotExpectedVersion) {
     // 古い画面からの操作は、枠時刻の通知作り直しなどの副作用を
@@ -2005,7 +2013,7 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
     sort_order: body.sort_order,
   };
   const v = validateSlotInput(merged, false);
-  if (!v.ok) return bad(c, v.code, 422);
+  if (!v.ok) return bad(c, v.code, 422, ["starts_at","ends_at","capacity","is_active","sort_order"]);
 
   // 申込が入った枠の定員は、使われている席より小さくできない。
   // 削除側は slot_has_bookings で止めている。ここも同じ約束にする。
@@ -2205,7 +2213,7 @@ events.get('/api/liff/events/me', async (c) => {
 
 async function eventWaitlistCaller(c: Context<Env>) {
   const lineAccountId = await resolveAccountIdFromLiff(c);
-  if (!lineAccountId) return bad(c, 'liff_account_resolution_failed', 400);
+  if (!lineAccountId) return bad(c, 'liff_account_resolution_failed', 400, []);
   const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
   if (!callerLineUserId) return bad(c, 'unauthorized', 401);
   return { lineAccountId, callerLineUserId };
@@ -2226,7 +2234,7 @@ events.get('/api/liff/events/me/waitlist/:waitlistId', async (c) => {
   return c.json(items[0]);
 });
 
-events.post('/api/liff/events/me/waitlist/:waitlistId/cancel', async (c) => {
+events.post('/api/liff/events/me/waitlist/:waitlistId/cancel', inputJsonBoundary(), async (c) => {
   const caller = await eventWaitlistCaller(c);
   if (caller instanceof Response) return caller;
   const result = await cancelMyEventWaitlist(c.env.DB, { ...caller, waitlistId: c.req.param('waitlistId') });
@@ -2272,9 +2280,9 @@ events.get('/api/liff/events/me/:bookingId', async (c) => {
   return c.json(row);
 });
 
-events.post('/api/liff/events/me/:bookingId/cancel', async (c) => {
+events.post('/api/liff/events/me/:bookingId/cancel', inputJsonBoundary(), async (c) => {
   const account_id = await resolveAccountIdFromLiff(c);
-  if (!account_id) return bad(c, 'liff_account_resolution_failed', 400);
+  if (!account_id) return bad(c, 'liff_account_resolution_failed', 400, []);
   const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
   if (!callerLineUserId) return bad(c, 'unauthorized', 401);
   const friend = await c.env.DB
@@ -2395,11 +2403,11 @@ events.post('/api/liff/events/me/:bookingId/cancel', async (c) => {
 // v6-29 §7-3。本人の開催回変更は「新しい席を確保できた時だけ元の申込を
 // 取り消す」まとめて1つの操作。確保に失敗したら旧予約を維持する。
 // ----------------------------------------------------------------
-events.post('/api/events/liff/bookings/:id/change', async (c) => {
+events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (c) => {
   const account_id = await resolveAccountIdFromLiff(c);
-  if (!account_id) return bad(c, 'liff_account_resolution_failed', 400);
+  if (!account_id) return bad(c, 'liff_account_resolution_failed', 400, []);
   const idemKey = c.req.header('Idempotency-Key');
-  if (!idemKey) return bad(c, 'idempotency_key_required', 400);
+  if (!idemKey) return bad(c, 'idempotency_key_required', 400, []);
   const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
   if (!callerLineUserId) return bad(c, 'unauthorized', 401);
   const friend = await c.env.DB
@@ -2828,7 +2836,7 @@ events.get('/api/liff/events/waitlist/:token', async (c) => {
   return c.json({ success: true, data });
 });
 
-events.post('/api/liff/events/waitlist/:token/accept', async (c) => {
+events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), async (c) => {
   const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
   if (!callerLineUserId) return bad(c, 'unauthorized', 401);
   const result = await acceptEventWaitlistOffer(c.env.DB, {
@@ -2934,11 +2942,11 @@ events.post('/api/liff/events/waitlist/:token/accept', async (c) => {
   });
 });
 
-events.post('/api/liff/events/:id/bookings', async (c) => {
+events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
   const account_id = await resolveAccountIdFromLiff(c);
-  if (!account_id) return bad(c, 'liff_account_resolution_failed', 400);
+  if (!account_id) return bad(c, 'liff_account_resolution_failed', 400, []);
   const idemKey = c.req.header('Idempotency-Key');
-  if (!idemKey) return bad(c, 'idempotency_key_required', 400);
+  if (!idemKey) return bad(c, 'idempotency_key_required', 400, []);
   const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
   if (!callerLineUserId) return bad(c, 'unauthorized', 401);
 
@@ -3461,7 +3469,7 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
 
 events.delete('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'admin'), async (c) => {
   const account_id = getAccountId(c);
-  if (!account_id) return bad(c, 'account_id_required', 400);
+  if (!account_id) return bad(c, 'account_id_required', 400, []);
   const event_id = c.req.param('id');
   const slot_id = c.req.param('slotId');
   if (!(await ownsEvent(c.env.DB, event_id, account_id))) return bad(c, 'not_found', 404);
@@ -3772,9 +3780,9 @@ async function repairRejectedBookingV6(
   });
 }
 
-events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRole('owner', 'admin', 'staff'), async (c) => {
+events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   const account_id = getAccountId(c);
-  if (!account_id) return bad(c, 'account_id_required', 400);
+  if (!account_id) return bad(c, 'account_id_required', 400, []);
   const event_id = c.req.param('id');
   if (!(await ownsEvent(c.env.DB, event_id, account_id))) return bad(c, 'not_found', 404);
   const booking = await loadBookingForAction(c.env.DB, account_id, event_id, c.req.param('bookingId'));
@@ -3782,7 +3790,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
 
   const body = (await c.req.json().catch(() => ({}))) as { action?: string; reason?: string };
   if (body.action !== 'confirm' && body.action !== 'reject') {
-    return bad(c, 'invalid_action', 422);
+    return bad(c, 'invalid_action', 422, ["action"]);
   }
   const action: EventBookingAction = body.action;
   if (booking.decided_at != null) {
@@ -3971,9 +3979,9 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
   return c.json(updated);
 });
 
-events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRole('owner', 'admin', 'staff'), async (c) => {
+events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   const account_id = getAccountId(c);
-  if (!account_id) return bad(c, 'account_id_required', 400);
+  if (!account_id) return bad(c, 'account_id_required', 400, []);
   const event_id = c.req.param('id');
   if (!(await ownsEvent(c.env.DB, event_id, account_id))) return bad(c, 'not_found', 404);
   const booking = await loadBookingForAction(c.env.DB, account_id, event_id, c.req.param('bookingId'));
@@ -4073,9 +4081,9 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRo
   return c.json({ ok: true });
 });
 
-events.put('/api/events/admin/events/:id/bookings/:bookingId', requireRole('owner', 'admin', 'staff'), async (c) => {
+events.put('/api/events/admin/events/:id/bookings/:bookingId', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   const account_id = getAccountId(c);
-  if (!account_id) return bad(c, 'account_id_required', 400);
+  if (!account_id) return bad(c, 'account_id_required', 400, []);
   const event_id = c.req.param('id');
   if (!(await ownsEvent(c.env.DB, event_id, account_id))) return bad(c, 'not_found', 404);
   const booking = await loadBookingForAction(c.env.DB, account_id, event_id, c.req.param('bookingId'));
@@ -4088,7 +4096,7 @@ events.put('/api/events/admin/events/:id/bookings/:bookingId', requireRole('owne
   if ('internal_note' in body) {
     // 顧客メモと同等の上限(点検#520軽14)。無制限だと一覧が重くなる。
     if (typeof body.internal_note === 'string' && body.internal_note.length > 5000) {
-      return bad(c, 'invalid_internal_note', 422);
+      return bad(c, 'invalid_internal_note', 422, ["internal_note"]);
     }
     setClauses.push('internal_note = ?');
     setValues.push(body.internal_note ?? null);
@@ -4099,7 +4107,7 @@ events.put('/api/events/admin/events/:id/bookings/:bookingId', requireRole('owne
     setClauses.push('status = ?');
     setValues.push(body.status);
   } else if (body.status != null) {
-    return bad(c, 'invalid_status', 422);
+    return bad(c, 'invalid_status', 422, ["status"]);
   }
   if (setClauses.length === 0) {
     const row = await c.env.DB.prepare(`SELECT * FROM event_bookings WHERE id = ?`).bind(booking.id).first();

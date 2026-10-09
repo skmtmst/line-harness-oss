@@ -18,6 +18,8 @@ import { downloadApiFile } from '@/lib/api'
 import { HqApprovalBlock, HqTestSendDialog, approvalGate, useHqApproval } from './approval'
 import type { HqBroadcastRun } from '@line-crm/shared'
 import { PageFrame } from '@/components/templates/page-frame'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -486,16 +488,7 @@ export default function HqBroadcastDetail() {
     : bubbles?.length ? (bubbles[0].type === 'coupon' ? 'クーポン 1通' : bubbles[0].type === 'text' ? 'テキスト 1通' : 'リッチメッセージ 1通') : 'テキスト 1通'
   const exampleStore = sentTo[0]?.accountName ?? '店の名前'
   const tone = badge?.tone === 'success' ? 'success' : badge?.tone === 'danger' ? 'danger' : badge?.tone === 'warning' ? 'warning' : 'neutral'
-  const stat = (label: string, value: number | null, unit: string, detail: string) => (
-    <div className={detailStyles.stat}>
-      <p className={detailStyles.statLabel}>{label}</p>
-      <p className={detailStyles.statValue}>
-        <span className={detailStyles.statNum}>{value == null ? '—' : n(value)}</span>
-        {unit ? <span className={detailStyles.statUnit}>{unit}</span> : null}
-      </p>
-      <p className={detailStyles.statDetail}>{detail}</p>
-    </div>
-  )
+
 
   return (
     <>
@@ -575,12 +568,12 @@ export default function HqBroadcastDetail() {
             {tab === 'overview' && run && run.status !== 'prepared' ? (
               <>
                 <h3 className={detailStyles.secTitle}>配信結果</h3>
-                <div className={detailStyles.stats}>
-                  {stat('届いた', delivered, '人', `送ったアカウント ${n(sentTo.length)}`)}
-                  {stat('開いた', opened, opened == null ? '' : '人', opened == null ? 'まだ数えていません' : `開封 ${rate(opened)}`)}
-                  {stat('押した', clicked, clicked == null ? '' : '人', clicked == null ? 'まだ数えていません' : `クリック ${rate(clicked)}`)}
-                  {stat('反応', reacted, reacted == null ? '' : '人', reacted == null ? 'まだ数えていません' : '送ったあとに返信などがあった人')}
-                </div>
+                <KpiBand density="compact">
+                  <KpiCard icon={null} title="届いた" value={delivered} unit={'人'} detail={`送ったアカウント ${n(sentTo.length)}`} />
+                  <KpiCard icon={null} title="開いた" value={opened} unit={opened == null ? '' : '人'} detail={opened == null ? 'まだ数えていません' : `開封 ${rate(opened)}`} />
+                  <KpiCard icon={null} title="押した" value={clicked} unit={clicked == null ? '' : '人'} detail={clicked == null ? 'まだ数えていません' : `クリック ${rate(clicked)}`} />
+                  <KpiCard icon={null} title="反応" value={reacted} unit={reacted == null ? '' : '人'} detail={reacted == null ? 'まだ数えていません' : '送ったあとに返信などがあった人'} />
+                </KpiBand>
                 <p className={detailStyles.note}>開いた・押したは、各アカウントの配信で数えた人数の合計です。数えていないアカウントがあるときは「—」で出します。反応は、送ったあとにメッセージを受け取った人の数で、送った配信への返信とは限りません。</p>
                 <h3 className={detailStyles.secTitle}>エラー</h3>
                 <p className={detailStyles.note}>{failedPeople > 0 ? `送信に失敗した人が ${n(failedPeople)}人います。下の内訳からやり直せます。` : '送信に失敗した人はいません（0 人）。'}{skipped > 0 ? `送らなかったアカウントが ${n(skipped)}あります。` : ''}</p>

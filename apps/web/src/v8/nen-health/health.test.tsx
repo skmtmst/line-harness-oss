@@ -2,9 +2,10 @@
 /*
  * V8 健康日記（src/v8/nen-health）の動きの試験。BEHAVIOR.md を守る。
  * 一覧を取り直し続けない・「…」→30日のまとめ（引き出し・印刷）・閉じた後の遅い返事を出さない・
- * 数の帯の「…」で絞る・記録の項目の表、を確かめる。
+ * 道具の札で絞る・記録の項目の表、を確かめる。
  */
-import React, { act } from 'react'
+import React from 'react'
+import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -149,10 +150,9 @@ describe('V8 健康日記（src/v8/nen-health）', () => {
     expect(byText('獣医師向け PDF を書き出す')?.disabled).toBe(true)
   })
 
-  it('数の帯の「…」から、気になる変化だけに絞って取り直す', async () => {
+  it('道具の札から、気になる変化だけに絞って取り直す', async () => {
     await render('logs')
-    await click(byLabel('気になる変化のメニュー'))
-    await click(byText('気になる変化だけ出す'))
+    await click(buttons().find((button) => button.hasAttribute('aria-pressed') && /^気になる変化 \d+$/.test(button.textContent?.trim() ?? '')))
     expect(String(listCalls().at(-1)?.[0])).toContain('change=concern')
   })
 
@@ -166,15 +166,15 @@ describe('V8 健康日記（src/v8/nen-health）', () => {
     expect(sheetAtPrint).toBe(true)
   })
 
-  it('WEB223：数の帯の「すべてのペットを出す」で、探す欄の言葉も消える（0.3秒後に前の言葉で絞り直さない）', async () => {
+  it('WEB223：絞り込みを外すと、探す欄の言葉も消える（0.3秒後に前の言葉で絞り直さない）', async () => {
     await render('logs')
     const box = host.querySelector('input[type="search"], input[aria-label*="探す"]') as HTMLInputElement
     expect(box).toBeTruthy()
     await act(async () => { fireEvent.change(box, { target: { value: 'こむぎ' } }) })
     await settle(400)
     expect(String(listCalls().at(-1)?.[0])).toContain('q=')
-    await click(byLabel('記録のあるペットのメニュー'))
-    await click(byText('すべてのペットを出す'))
+    await click(byText('よく使う絞り込み'))
+    await click(byText('絞り込みを外す'))
     await settle(400)
     expect(box.value).toBe('')
     expect(String(listCalls().at(-1)?.[0])).not.toContain('q=%E3')

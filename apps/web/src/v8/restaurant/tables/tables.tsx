@@ -10,6 +10,7 @@
  * データの口・送る形は今の画面（app/restaurant-test/v8/tables.tsx）と同じ。動きは BEHAVIOR.md。
  */
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import KpiCard from '@/components/shared/kpi-card'
 import { useMemo, useRef, useState } from 'react'
 import { Check, Plus } from 'lucide-react'
 import SeatTile from '@/components/shared/seat-tile'
@@ -22,7 +23,7 @@ import { TextField } from '@/components/shared/text-field'
 import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { restaurantTestApi, type RestaurantReservation, type RestaurantTable } from '@/lib/restaurant-test-api'
-import RestaurantShell, { Panel, QuietError, Stat, StatRow, Status, type RestaurantV8Context } from '../booking-kit/shell'
+import RestaurantShell, { Panel, QuietError, StatRow, Status, type RestaurantV8Context } from '../booking-kit/shell'
 import { DialogField, DialogNote, RsDialog } from '../booking-kit/parts'
 import { pickMoveTarget, reservationLine } from './move'
 import styles from './tables.module.css'
@@ -207,10 +208,10 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
   return (
     <>
       <StatRow>
-        <Stat label="卓数" value={`${rows.length}`} note="稼働・停止を含む" />
-        <Stat label="総席数" value={`${rows.reduce((sum, item) => sum + item.max_capacity, 0)}`} note="最大収容人数" />
-        <Stat label="結合可能" value={`${groups.size}`} note="結合グループ" />
-        <Stat label="個室" value={`${rows.filter((item) => item.seat_type === 'private_room').length}`} note="個室卓" />
+        <KpiCard title="卓数" valueText={`${rows.length}`} detail="稼働・停止を含む" icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="総席数" valueText={`${rows.reduce((sum, item) => sum + item.max_capacity, 0)}`} detail="最大収容人数" icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="結合可能" valueText={`${groups.size}`} detail="結合グループ" icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="個室" valueText={`${rows.filter((item) => item.seat_type === 'private_room').length}`} detail="個室卓" icon={null} presentation="band" value={null} unit="" />
       </StatRow>
       {canEdit ? (
         <div className={styles.addRow}>

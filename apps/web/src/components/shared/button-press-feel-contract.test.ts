@@ -18,6 +18,13 @@ const brightnessOf = (token: string) => Number(globals.match(new RegExp(`${token
  * v7 の沈み（0.98・80ms）は変えない。
  */
 describe('押した感じ（V8 のボタン・絵ボタン）', () => {
+  it('B-151：主ボタンは高さ36を保ち、墨色の影・濃緑の縁・角丸8を使う', () => {
+    expect(globals).toContain('--shadow-primary-action: 0 1px 1px rgba(29, 29, 31, 0.16), 0 2px 4px rgba(29, 29, 31, 0.08)')
+    expect(globals).toContain('--color-primary-border: #06612f')
+    expect(globals).toContain('--radius-primary-action: 8px')
+    expect(buttonCss).toMatch(/\[data-theme='v8'\] \.primary \{[^}]*border: 1px solid var\(--color-primary-border\);[^}]*border-radius: var\(--radius-primary-action\);[^}]*box-shadow: var\(--shadow-primary-action\)/s)
+  })
+
   it('押す暗さは乗せる暗さ（0.92）より暗い', () => {
     expect(buttonCss).toMatch(/\.primary:hover:not\(:disabled\) \{\s*filter: brightness\(0\.92\);/)
     expect(brightnessOf('--press-dim')).toBeLessThan(0.92)

@@ -94,7 +94,7 @@ describe('POST /api/integrations/eccube/columns の title 長さ検証（#711司
       slug: 'boundary-121', title: 'あ'.repeat(121), article_url: 'https://example.com/journal/boundary-121',
     });
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ success: false, error: 'title_invalid' });
+    expect(await response.json()).toMatchObject({ success: false, code: 'title_invalid' , fields: expect.any(Object), error: expect.any(String) });
     expect(state.insertBinds).toBeNull();
 
     expect(consoleError).toHaveBeenCalledTimes(1);

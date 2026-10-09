@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
   getFriendByLineUserIdForAccount,
@@ -1297,7 +1298,7 @@ liffRoutes.get('/api/liff/config', async (c) => {
 // ─── Existing LIFF endpoints ────────────────────────────────────
 
 // POST /api/liff/profile - get the authenticated LIFF caller's friend profile
-liffRoutes.post('/api/liff/profile', async (c) => {
+liffRoutes.post('/api/liff/profile', inputJsonBoundary(), async (c) => {
   try {
     const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
     if (!identity) {
@@ -1331,7 +1332,7 @@ liffRoutes.post('/api/liff/profile', async (c) => {
 });
 
 // POST /api/liff/friend-add-intent - 「今回開いたリンク」を追加イベント候補として記録
-liffRoutes.post('/api/liff/friend-add-intent', async (c) => {
+liffRoutes.post('/api/liff/friend-add-intent', inputJsonBoundary({"ref":["string"],"source":["string"]}), async (c) => {
   try {
     const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
     if (!identity) return c.json({ success: false, error: 'Invalid ID token' }, 401);
@@ -1347,11 +1348,11 @@ liffRoutes.post('/api/liff/friend-add-intent', async (c) => {
     }>();
     const refCode = body.ref?.trim() ?? '';
     if (!refCode || refCode.length > 256 || refCode.startsWith('xh:')) {
-      return c.json({ success: false, error: 'ref が正しくありません' }, 400);
+      return inputError(c, { success: false, error: 'ref が正しくありません' }, 400, ["ref"]);
     }
     const source = body.source ?? 'liff';
     if (!['line_login', 'liff', 'short_link'].includes(source)) {
-      return c.json({ success: false, error: 'source が正しくありません' }, 400);
+      return inputError(c, { success: false, error: 'source が正しくありません' }, 400, ["source"]);
     }
 
     const friend = await getFriendByLineUserIdForAccount(
@@ -1404,7 +1405,7 @@ liffRoutes.post('/api/liff/friend-add-intent', async (c) => {
 });
 
 // POST /api/liff/link - link friend to user UUID (public, verified via LINE ID token)
-liffRoutes.post('/api/liff/link', async (c) => {
+liffRoutes.post('/api/liff/link', inputJsonBoundary({"idToken":["string"],"displayName":["null","string"],"ref":["string"],"existingUuid":["string"],"crossAccountToken":["string"],"ig":["string"],"iga":["string"],"igan":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       idToken: string;
@@ -1418,7 +1419,7 @@ liffRoutes.post('/api/liff/link', async (c) => {
     }>();
 
     if (!body.idToken) {
-      return c.json({ success: false, error: 'idToken is required' }, 400);
+      return inputError(c, { success: false, error: 'idToken is required' }, 400, ["idToken"]);
     }
 
     // Try verifying with default Login channel, then DB accounts
@@ -1490,14 +1491,14 @@ liffRoutes.post('/api/liff/link', async (c) => {
         body.crossAccountToken,
       );
       if (!crossAccount || !matchedAccount || crossAccount.targetAccountId !== matchedAccount.id) {
-        return c.json({ success: false, error: 'Invalid cross-account token' }, 400);
+        return inputError(c, { success: false, error: 'Invalid cross-account token' }, 400, ["crossAccountToken"]);
       }
       const targetUser = await db
         .prepare('SELECT id FROM users WHERE id = ?')
         .bind(crossAccount.userId)
         .first<{ id: string }>();
       if (!targetUser) {
-        return c.json({ success: false, error: 'Cross-account user not found' }, 400);
+        return inputError(c, { success: false, error: 'Cross-account user not found' }, 400, ["crossAccountToken"]);
       }
       await linkFriendToUser(db, friend.id, crossAccount.userId);
       linkedUserId = crossAccount.userId;
@@ -2012,11 +2013,11 @@ liffRoutes.get('/api/analytics/ref/:refCode/orders', requireRole('owner', 'admin
 });
 
 // POST /api/links/wrap - wrap a URL with LIFF redirect proxy
-liffRoutes.post('/api/links/wrap', requireRole('owner', 'admin'), async (c) => {
+liffRoutes.post('/api/links/wrap', requireRole('owner', 'admin'), inputJsonBoundary({"url":["string"],"ref":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{ url: string; ref?: string }>();
     if (!body.url) {
-      return c.json({ success: false, error: 'url is required' }, 400);
+      return inputError(c, { success: false, error: 'url is required' }, 400, ["url"]);
     }
 
     const liffUrl = c.env.LIFF_URL;
@@ -2251,7 +2252,7 @@ async function resolveXHarnessToken(
 
 // POST /api/liff/send-form-link — send form URL as push message (public, used by LIFF)
 // Security: requires idToken to verify the caller is the actual LINE user
-liffRoutes.post('/api/liff/send-form-link', async (c) => {
+liffRoutes.post('/api/liff/send-form-link', inputJsonBoundary({"lineUserId":["string"],"formId":["string"],"idToken":["string"],"ref":["string"],"gate":["string"],"xh":["string"],"ig":["string"],"iga":["string"],"igan":["string"]}), async (c) => {
   try {
     const { lineUserId, formId, idToken, ref, gate, xh, ig, iga, igan } = await c.req.json<{
       lineUserId: string;
@@ -2265,7 +2266,7 @@ liffRoutes.post('/api/liff/send-form-link', async (c) => {
       igan?: string;
     }>();
     if (!lineUserId || !formId) {
-      return c.json({ success: false, error: 'lineUserId and formId required' }, 400);
+      return inputError(c, { success: false, error: 'lineUserId and formId required' }, 400, ["lineUserId","formId"]);
     }
     // idToken is required: this endpoint pins friend.first_tracked_link_id and
     // pushes a campaign-specific message, so we must verify the caller IS the

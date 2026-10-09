@@ -320,14 +320,3 @@ button.star:hover { background: var(--color-status-warn-soft); color: var(--colo
 .bulkWrap { display: block; }
 
 /* 数の帯の「…」（絵：題の右端・16px）。 */
-.kpiMenu { display: inline-flex; align-items: center; height: var(--tpl-nph-kpi-menu); }
-:global([data-theme='v8']) .kpiMenu > .kpiMenuButton {
-  width: var(--tpl-nph-kpi-menu);
-  height: var(--tpl-nph-kpi-menu);
-  min-height: 0;
-  flex-basis: var(--tpl-nph-kpi-menu);
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-:global([data-theme='v8']) .kpiMenu > .kpiMenuButton:not(:focus-visible) { outline-color: transparent; }

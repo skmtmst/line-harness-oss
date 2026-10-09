@@ -1,13 +1,11 @@
 // @vitest-environment happy-dom
 /*
- * テーマの初期値（V8 移行で崩れる原因②）。
+ * 見た目は常に V8（2026-10-09 V8 固定）。
  *
- * 以前は React の初期テーマが常に v7 で、検証環境（NEXT_PUBLIC_ADMIN_THEME=v8）でも
- * `<html data-theme="v8">` の下で最初に v7 の旧画面（tags-page-v4 など）を選び、
- * レイアウト効果で V8 に描き直していた（旧画面のちらつき・旧画面の取得）。
- *
- * - 検証環境：サーバの描画もブラウザの最初の描画も v8（旧画面を一度も選ばない）
- * - 本番（変数なし）：今までどおり v7 で始まり、このブラウザの記憶（v8）があれば揃える
+ * - 画面（試験の外＝NODE_ENV が test 以外）：サーバの描画も最初の描画も v8。
+ *   環境変数が無くても、<html> に古い v7 が残っていても、合図が来ても v8 のまま。
+ * - 試験の中だけ：使われないまま残した v7 の画面の試験のために、
+ *   NEXT_PUBLIC_ADMIN_THEME と <html data-theme> での選択が残る（下の「試験の中だけ」）。
  * - サーバとブラウザの最初の描画が同じなので hydration が壊れない
  */
 import { act } from 'react'
@@ -34,7 +32,46 @@ afterEach(() => {
   document.documentElement.dataset.theme = 'v7'
 })
 
-describe('テーマの初期値は環境の既定（layout.tsx と同じ）', () => {
+describe('画面は常に V8（試験の外）', () => {
+  it('NODE_ENV=production：変数なし・<html> が v7 でも、サーバの描画も描き込み後も v8', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('NEXT_PUBLIC_ADMIN_THEME', '')
+    document.documentElement.dataset.theme = 'v7'
+    const seen: string[] = []
+    function Probe() {
+      const theme = useAdminTheme()
+      seen.push(theme)
+      return <span data-theme-probe={theme} />
+    }
+    const html = renderToString(<Probe />)
+    expect(html).toContain('data-theme-probe="v8"')
+    const container = document.createElement('div')
+    container.innerHTML = html
+    document.body.appendChild(container)
+    const errors: unknown[] = []
+    let root!: Root
+    await act(async () => {
+      root = hydrateRoot(container, <Probe />, { onRecoverableError: (error) => errors.push(error) })
+    })
+    await act(async () => {
+      window.dispatchEvent(new Event(ADMIN_THEME_CHANGED_EVENT))
+    })
+    expect(seen.length).toBeGreaterThan(0)
+    expect(seen.every((theme) => theme === 'v8')).toBe(true)
+    expect(errors).toEqual([])
+    await act(async () => { root.unmount() })
+  })
+
+  it('NODE_ENV=development（next dev）も v8', () => {
+    vi.stubEnv('NODE_ENV', 'development')
+    function Probe() {
+      return <span data-theme-probe={useAdminTheme()} />
+    }
+    expect(renderToString(<Probe />)).toContain('data-theme-probe="v8"')
+  })
+})
+
+describe('試験の中だけ：v7 の画面の試験のための選択口', () => {
   it('検証環境（v8）はサーバの描画で最初から V8 の画面を選ぶ（旧画面を選ばない）', () => {
     vi.stubEnv('NEXT_PUBLIC_ADMIN_THEME', 'v8')
     const html = renderToString(<TagsPage />)
@@ -42,9 +79,9 @@ describe('テーマの初期値は環境の既定（layout.tsx と同じ）', ()
     expect(html).not.toContain('data-probe="v7"')
   })
 
-  it('本番（変数なし）でもテーマの値は今までどおり v7 で始まる（タグの入口は V8 だけになった）', () => {
+  it('試験の中で変数なしなら v7 を選べる（タグの入口は V8 だけになった）', () => {
     // タグの入口（app/tags/page.tsx）は 2026-10-09 の V7 削除で V8 だけを出す（mainA）。
-    // テーマの仕組みそのもの（変数なしは v7）は rmv7 が V8 固定にするまで残るので、値だけを見る。
+    // 試験専用の選択口（変数なしは v7）の値だけを見る。
     function Probe() {
       return <span data-theme-probe={useAdminTheme()} />
     }
@@ -99,7 +136,7 @@ describe('テーマの初期値は環境の既定（layout.tsx と同じ）', ()
     await act(async () => { root.unmount() })
   })
 
-  it('本番：このブラウザで v8 を選んでいれば（<html> が v8）、描き込み前に v8 へ揃える', async () => {
+  it('試験の中で <html> を v8 にすれば、描き込み前に v8 へ揃える', async () => {
     document.documentElement.dataset.theme = 'v8'
     let last = ''
     function Probe() {
