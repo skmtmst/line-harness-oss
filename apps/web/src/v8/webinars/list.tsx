@@ -85,6 +85,7 @@ import {
   type WebinarLoadFailure,
 } from './helpers'
 import styles from './list.module.css'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
 
 type SortKey = 'updated' | 'created' | 'name'
 type SavedFilter = '' | 'active' | 'draft' | 'archived'
@@ -289,10 +290,10 @@ function FolderForm({
   onSave: (name: string, color: string | null) => void
 }) {
   const [name, setName] = useState(folder?.name ?? '')
-  const [color, setColor] = useState<string | null>(folder ? folder.color ?? null : FOLDER_SELECT_COLORS[0].value)
+  const [color, setColor] = useState<string | null>(folder ? folderDisplayColor(folder) : FOLDER_SELECT_COLORS[0].value)
   return <FolderEditorDialog open title={folder ? 'フォルダを直す' : 'フォルダを追加'}
     description="ウェビナーを分けてしまう箱です。消しても、中のウェビナーは未分類に残ります。"
-    name={name} onNameChange={setName} color={color} onColorChange={setColor} allowClear
+    name={name} onNameChange={setName} color={color} onColorChange={setColor}
     busy={busy} error={error || undefined} placeholder="例: 商品説明"
     onCancel={onCancel} onConfirm={() => onSave(name.trim(), color)} confirmLabel={folder ? '保存する' : '追加する'} />
 }

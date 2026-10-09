@@ -9,13 +9,13 @@
 .supportTabs > span:last-child > span { gap: 16px; }
 .supportTabs input, .supportTabs select, .supportTabs > span:last-child button { height: 36px; font-size: var(--text-micro); }
 .supportMetrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
-.supportMetric { min-height: 100px; display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid var(--color-hairline); border-radius: var(--radius-card); background: var(--color-canvas); min-width: 0; }
+.supportMetric { min-height: 100px; display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid var(--card-edge); border-radius: var(--radius-card); background: var(--color-canvas); min-width: 0; box-shadow: var(--card-shadow); }
 .supportMetric > svg { flex: 0 0 40px; width: 40px; height: 40px; padding: 11px; border-radius: var(--radius-pill); background: var(--color-shell); }
 .supportMetric > div { border: 0; padding: 0; min-height: 0; gap: 2px; box-shadow: none; min-width: 0; }
 .supportMetric > div > div p, .supportMetric > div > p:last-child { font-size: var(--text-nano); }
 .supportMetric > div > p:not(:last-child) { font-size: var(--text-heading); }
 .supportColumns { display: grid; grid-template-columns: minmax(0, 480px) minmax(0, 1fr); gap: 16px; }
-.supportList, .supportDetail { min-width: 0; border: 1px solid var(--color-hairline); border-radius: var(--radius-card); background: var(--color-canvas); min-height: calc(100svh - 310px); }
+.supportList, .supportDetail { min-width: 0; border: 1px solid var(--card-edge); border-radius: var(--radius-card); background: var(--color-canvas); min-height: calc(100svh - 310px); box-shadow: var(--card-shadow); }
 .supportList > header { background: var(--color-shell); padding: 12px 14px; border-radius: var(--radius-card) var(--radius-card) 0 0; }
 .supportList h2, .supportList li button > span:nth-child(2) { font-size: var(--text-micro); }
 .supportList li button > span:first-child { font-size: var(--text-nano); }

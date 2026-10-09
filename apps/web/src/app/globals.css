@@ -458,6 +458,13 @@
 }
 
 :root {
+  /*
+   * カード（線で囲んだ箱）の線と影（2026-10-09 オーナー採用 B-137「線なし＋影のカード、境目は薄い線とくっきりした影で」）。
+   * 数のカード・アカウント/プロジェクト/プランのカード・設定の段・表の枠など、線で囲んだ箱は全部この2つを読む。
+   * 選ぶカード（ラジオ・チェック）・入力欄・ボタン・浮く面（メニュー・窓）は別の値のまま。
+   */
+  --card-edge: rgba(29, 29, 31, 0.08);
+  --card-shadow: 0 1px 2px rgba(29, 29, 31, 0.12), 0 3px 8px rgba(29, 29, 31, 0.09);
   /* --- 動き（V7）------------------------------------------------------------
    * Pencil ★V7「基礎 動き」（V7 文書 `bi8Au`）の物差し。部品の CSS は ms を
    * 直接書かず、この4段と2本の曲線だけを使う。
@@ -813,6 +820,8 @@
   /* 統括の新しい板（作業役 hq）。他機能の既定値は変更しない。 */
   --tpl-hql-actions-w: 136px;
   --tpl-hql-home-card-h: 234px;
+  /* 統括のカードの帯の段の最低の高さ。警告の無いカードにも帯の分の空きを残し、どの段のカードも同じ高さ（絵 JKjsE の 234）にする。 */
+  --tpl-hq-home-reason-min: 24px;
   --tpl-hql-form-storage-w: 136px; --tpl-hql-form-state-w: 96px; --tpl-hql-form-dest-w: 290px; --tpl-hql-form-actions-w: 148px;
   /* 統括のメンバー・アカウントの残り（作業役 hq） */ --tpl-hq-mem-radio-gap: 20px; --tpl-hq-mem-check-pad: 12px; --tpl-hq-mem-check-gap: 6px; --tpl-hq-mem-confirm-row-h: 35.5px; --tpl-hq-mem-confirm-label-w: 200px; --tpl-hq-home-account-h: 240px; --tpl-hq-home-warn-pad-end: 0px; --tpl-hq-home-warn-pull: -10px;
   --tpl-an-tabs-gap: 24px; --tpl-an-tab-pad-bottom: 8px; --tpl-an-tab-line: 2px; --tpl-an-tab-lh: 19px; --tpl-an-ro-margin: 12px 0 13px; --tpl-an-kpi-menu: 24px; --tpl-an-actions-extra: 4px;

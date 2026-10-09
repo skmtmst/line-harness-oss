@@ -34,6 +34,7 @@ import { definitionsForSave, linkedActionFromDefinition } from '@/components/fri
 import styles from './create.module.css'
 
 import { tagNameProblem } from './tag-name'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
 export { tagNameProblem } from './tag-name'
 
 export default function TagCreateV8() {
@@ -207,7 +208,7 @@ function TagCreate() {
         preview={(
           <div className={styles.aside}>
             <h2 className={styles.asideTitle}>できあがるタグ</h2>
-            <TagPill name={name || 'タグ名'} color={groups.find((group) => group.id === groupId)?.color} />
+            <TagPill name={name || 'タグ名'} color={(() => { const group = groups.find((group) => group.id === groupId); return group ? folderDisplayColor(group) : null })()} />
             <h2 className={styles.asideTitle}>このあと</h2>
             <p className={styles.asideText}>作ると、すぐに友だちへ付けられます。タグ連動（付いたときの動き）は作ったあとの編集で足します。</p>
           </div>

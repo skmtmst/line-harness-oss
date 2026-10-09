@@ -24,9 +24,10 @@
   min-width: 0;
   padding: var(--tpl-cn-panel-pad);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 .card { gap: var(--tpl-cn-panel-inner-gap); }
 .panel { gap: var(--tpl-rsa-ss-panel-gap); }
@@ -114,7 +115,7 @@
 .mockPrimary { outline-color: var(--color-accent-deep); background: var(--color-accent-deep); color: var(--color-on-accent); }
 
 .statusBlock { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-cn-field-gap); }
-.pageTable { display: flex; flex-direction: column; overflow: hidden; border-radius: var(--radius-card); outline: 1px solid var(--color-hairline); outline-offset: -1px; }
+.pageTable { display: flex; flex-direction: column; overflow: hidden; border-radius: var(--radius-card); outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--card-shadow); }
 .pageHead,
 .pageRow { display: flex; align-items: center; gap: var(--tpl-wb-col-gap); }
 .pageHead { padding: var(--tpl-rsa-ss-page-head-pad); background: var(--color-surface-pearl); color: var(--color-ink-secondary); font-size: var(--text-micro); font-weight: 600; line-height: var(--tpl-cn-sub-lh); }

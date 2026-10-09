@@ -238,7 +238,7 @@
 .arp-doneMark svg { width: 28px; height: 28px; }
 .arp-donePanel > h2 { margin-top: 22px; font-size: var(--text-title); }
 .arp-donePanel > p { margin-top: 12px; color: var(--color-ink-secondary); font-size: var(--text-label); font-weight: 650; }
-.arp-doneSummary { width: min(760px, 100%); margin-top: 18px; border: 1px solid var(--color-hairline); border-radius: var(--radius-card); padding: 0 18px; text-align: left; }
+.arp-doneSummary { width: min(760px, 100%); margin-top: 18px; border: 1px solid var(--card-edge); border-radius: var(--radius-card); padding: 0 18px; text-align: left; box-shadow: var(--card-shadow); }
 .arp-doneActions { justify-content: center; margin-top: 18px; }
 
 .arp-nextActions { display: grid; gap: 9px; }

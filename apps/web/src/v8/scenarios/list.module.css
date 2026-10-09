@@ -242,10 +242,11 @@
   gap: var(--tpl-cell-gap-half);
   margin: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side);
   padding: var(--tpl-band-cell-pad-block) var(--tpl-band-cell-pad-side);
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
   text-align: center;
+  box-shadow: var(--card-shadow);
 }
 
 .stateIcon {

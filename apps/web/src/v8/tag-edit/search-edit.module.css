@@ -15,7 +15,7 @@
 .hint { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-eds-hint-lh); }
 
 /* カード：枠1本・角12・余白20・間14。 */
-.card { display: flex; flex-direction: column; gap: var(--tpl-eds-tag-card-gap); padding: var(--tpl-eds-card-pad); border-radius: var(--radius-card); outline: 1px solid var(--color-hairline); outline-offset: -1px; background: var(--color-canvas); }
+.card { display: flex; flex-direction: column; gap: var(--tpl-eds-tag-card-gap); padding: var(--tpl-eds-card-pad); border-radius: var(--radius-card); outline: 1px solid var(--card-edge); outline-offset: -1px; background: var(--color-canvas); box-shadow: var(--card-shadow); }
 .cardTitles { display: flex; flex-direction: column; gap: var(--tpl-eds-title-gap); }
 .cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-eds-card-title-lh); }
 .cardNote { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); }

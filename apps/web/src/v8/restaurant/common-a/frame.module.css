@@ -89,6 +89,7 @@
 .stateBox {
   padding: var(--tpl-rt-state-pad);
   border-radius: var(--tpl-rt-card-radius);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
+  box-shadow: var(--card-shadow);
 }

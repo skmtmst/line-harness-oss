@@ -62,9 +62,10 @@
   min-height: var(--tpl-hq-plan-h);
   padding: var(--tpl-hq-plan-pad);
   border-radius: var(--radius-panel);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 
 .planCurrent {
@@ -209,8 +210,9 @@
   min-width: 0;
   overflow: hidden;
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
+  box-shadow: var(--card-shadow);
 }
 
 .head,

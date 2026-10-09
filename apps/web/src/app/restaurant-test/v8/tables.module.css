@@ -32,13 +32,14 @@
   gap: 2px;
   min-height: 96px;
   padding: 14px 12px;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card, 12px);
   background: var(--color-canvas);
   color: var(--color-ink);
   font-size: 13px;
   cursor: grab;
   width: 100%;
+  box-shadow: var(--card-shadow);
 }
 
 .mapCard[aria-pressed="true"] {

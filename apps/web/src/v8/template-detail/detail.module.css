@@ -25,7 +25,7 @@
 .draftNote { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); }
 
 /* カード：枠1本・角12・余白20・間12。題 15/700・説明 12。 */
-.card { display: flex; flex-direction: column; gap: var(--tpl-eds-card-gap); padding: var(--tpl-eds-card-pad); border-radius: var(--radius-card); outline: 1px solid var(--color-hairline); outline-offset: -1px; background: var(--color-canvas); }
+.card { display: flex; flex-direction: column; gap: var(--tpl-eds-card-gap); padding: var(--tpl-eds-card-pad); border-radius: var(--radius-card); outline: 1px solid var(--card-edge); outline-offset: -1px; background: var(--color-canvas); box-shadow: var(--card-shadow); }
 .cardHead { display: flex; align-items: center; gap: var(--tpl-eds-head-gap); }
 .cardTitles { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-eds-title-gap); min-width: 0; }
 .cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-eds-card-title-lh); }
@@ -71,7 +71,7 @@
 /* 「…」は共通の RowMenu。絵の色（墨）と大きさを共通の印ボタンより強く当てる。 */
 .sideActions > button.moreButton { display: inline-flex; width: var(--tpl-eds-more); flex: 0 0 var(--tpl-eds-more); align-items: center; justify-content: center; height: var(--tpl-eds-more); padding: 0; border: 0; border-radius: var(--radius-control); outline: 1px solid var(--color-hairline); outline-offset: -1px; background: var(--color-canvas); color: var(--color-ink); cursor: pointer; }
 .sideActions > button.moreButton:hover { background: var(--color-surface-pearl); }
-.aboutBox { display: flex; flex-direction: column; gap: var(--tpl-eds-about-gap); padding: var(--tpl-eds-about-pad); border-radius: var(--radius-card); outline: 1px solid var(--color-hairline); outline-offset: -1px; }
+.aboutBox { display: flex; flex-direction: column; gap: var(--tpl-eds-about-gap); padding: var(--tpl-eds-about-pad); border-radius: var(--radius-card); outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--card-shadow); }
 .aboutTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-eds-band-title-lh); }
 .aboutList { display: flex; flex-direction: column; gap: var(--tpl-eds-about-gap); margin: 0; }
 .aboutRow { display: flex; align-items: center; gap: var(--tpl-eds-about-row-gap); padding: var(--tpl-eds-about-row-pad); box-shadow: var(--shadow-row-line); }

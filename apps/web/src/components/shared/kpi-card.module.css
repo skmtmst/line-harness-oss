@@ -187,8 +187,8 @@
 [data-theme='v8'] .card {
   justify-content: flex-start; min-width: 0; min-height: 0;
   gap: var(--tpl-band-cell-gap); padding: var(--tpl-band-cell-pad-block) var(--tpl-band-cell-pad-side); border: 0; border-radius: 12px;
-  outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
-  background: var(--color-canvas); box-shadow: none;
+  outline: 1px solid var(--card-edge); outline-offset: -0.5px;
+  background: var(--color-canvas); box-shadow: var(--card-shadow);
 }
 /* 包みを使わない組み方（画面が strip＋KpiCard を直に並べる所）も、
    数の大きさ・マスの余白は帯と同じ変数で絵どおりにする。 */
@@ -238,7 +238,7 @@
 [data-theme='v8'] .detailText { min-width: 0; flex: 1; }
 [data-theme='v8'] .link { font-size: 12px; font-weight: 500; line-height: 18px; }
 [data-theme='v8'] .card[data-kpi-presentation='band'] {
-  border-radius: 0; outline-color: transparent;
+  border-radius: 0; outline-color: transparent; box-shadow: none;
 }
 [data-theme='v8'] .card[data-kpi-density='compact'] {
   padding: 10px 16px; gap: 4px;

@@ -40,6 +40,8 @@ import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import { AccountArchiveDialogV8, AccountRestoreDialogV8, AccountSettingsDialogV8, accountHandle } from './account-dialogs'
 import { connectionReasonLine } from './connection-reasons'
 import styles from './home.module.css'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
+import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/folder-colors'
 
 type StatusFilter = 'all' | 'ok' | 'warn' | 'archived'
 type View = 'cards' | 'table'
@@ -270,7 +272,7 @@ export default function HqHomeV8() {
 
   const openFolderDialog = (editing: Folder | null) => {
     setFolderName(editing?.name ?? '')
-    setFolderColor(editing?.color ?? null)
+    setFolderColor(editing ? folderDisplayColor(editing) : DEFAULT_TAG_FOLDER_COLOR)
     setFolderError('')
     setFolderDialog({ editing })
   }
@@ -642,7 +644,7 @@ export default function HqHomeV8() {
         title={folderDialog?.editing ? 'フォルダの名前と色を変える' : 'フォルダを追加'}
         description="アカウントは1つのフォルダに入ります。フォルダを消しても、アカウントは消えません。"
         name={folderName} onNameChange={setFolderName} nameId="hq-account-folder-name" nameLabel="フォルダの名前"
-        color={folderColor} onColorChange={setFolderColor} colors={FOLDER_SELECT_COLORS} allowClear
+        color={folderColor} onColorChange={setFolderColor} colors={FOLDER_SELECT_COLORS}
         placeholder="例: 渋谷エリア" maxLength={100}
         onCancel={() => { if (!folderSaving) setFolderDialog(null) }}
         designNode="JKjsE" busy={folderSaving} error={folderError || undefined}

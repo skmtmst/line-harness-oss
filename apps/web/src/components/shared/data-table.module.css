@@ -23,8 +23,9 @@
    * 角丸の切り抜きは overflow-x:auto でも保たれる。 */
   overflow-x: auto; /* clip: true → 390pxでは送って見せる */
   overflow-y: hidden;
-  border: 1px solid var(--color-hairline); /* stroke: $hairline */
-  border-radius: var(--radius-card); /* cornerRadius: $radius-md */
+  border: 1px solid var(--card-edge); /* stroke: $hairline */
+  border-radius: var(--radius-card); /* cornerRadius: $radius-md */;
+  box-shadow: var(--card-shadow);
 }
 
 .row {
@@ -203,8 +204,7 @@
 
 /* 連携画面の行の密度。画面からセルの見た目を上書きさせない。 */
 [data-theme='v8'] .frame[data-density='reviews'] {
-  border-radius: var(--tpl-rt-card-radius); outline: 1px solid var(--color-hairline); outline-offset: -1px;
-}
+  border-radius: var(--tpl-rt-card-radius); outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--card-shadow); }
 [data-theme='v8'] .frame[data-density='reviews'] table { display: block; }
 [data-theme='v8'] .frame[data-density='reviews'] :is(thead, tbody) { display: block; }
 [data-theme='v8'] .frame[data-density='reviews'] tr {
@@ -223,7 +223,7 @@
 [data-theme='v8'] .frame[data-density='media'] td { height: var(--tpl-e49-row-h); padding: var(--tpl-e49-row-pad); }
 [data-theme='v8'] .frame[data-density='media'] :is(th, td):first-child { padding-left: var(--tpl-e49-edge); }
 [data-theme='v8'] .frame[data-density='media'] :is(th, td):last-child { padding-right: var(--tpl-e49-edge); }
-[data-theme='v8'] .frame[data-density='sample'] { overflow: hidden; border: 1px solid var(--color-hairline); border-radius: var(--tpl-e1-radius-l); }
+[data-theme='v8'] .frame[data-density='sample'] { overflow: hidden; border: 1px solid var(--card-edge); border-radius: var(--tpl-e1-radius-l); box-shadow: var(--card-shadow); }
 [data-theme='v8'] .frame[data-density='sample'] thead tr { border-top: 0; }
 [data-theme='v8'] .frame[data-density='sample'] :is(th, td) { height: auto; padding: 0; border: 0; box-shadow: none; }
 [data-theme='v8'] .frame[data-density='sample'] tbody tr { border-bottom: 0; box-shadow: var(--shadow-row-line); }
@@ -290,8 +290,9 @@
 [data-theme='v8'] .frame[data-table-density] {
   overflow: hidden;
   border-radius: var(--tpl-sb-card-radius);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   --table-pad: var(--tpl-st2-id-row-pad);
+  box-shadow: var(--card-shadow);
 }
 [data-theme='v8'] .frame[data-table-density='records'] { --table-pad: var(--tpl-sb-ec-row-pad); }
 [data-theme='v8'] .frame[data-table-density] .table,
@@ -363,8 +364,9 @@
   overflow: hidden;
   border: 0;
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
+  box-shadow: var(--card-shadow);
 }
 [data-theme='v8'] .frame[data-grid-table] .table { display: block; }
 [data-theme='v8'] .frame[data-grid-table] .table :is(thead, tbody) { display: block; }

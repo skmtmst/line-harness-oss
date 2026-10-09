@@ -29,6 +29,7 @@ import AttributeDistribution from './attribute-distribution'
 import { fieldOf, fieldDefinition, markOf } from './attribute-model'
 import listStyles from '@/v8/tags/list.module.css'
 import createStyles from '@/v8/tags/create.module.css'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
 
 type Attempt = { input: HqFriendAttributeInput; requestId: string; distribute: boolean }
 type Entry = { row: HqFriendAttributeTemplate; detail: HqFriendAttributeDetail }
@@ -179,7 +180,7 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
     status, busy, error, reload: () => { void load(); void loadFolders() }, onCreate: () => { if (!busy && canEdit) { setEditor('new'); setRestored(null); setError('') } },
     onEdit: (id) => open(id), onRemove: (id) => setDeleting(entries.find((entry) => entry.row.id === id) ?? null), onDistribute: (id) => open(id, true), onOrder: order, kpis: band,
     folders: folderRows, foldersFailed, onAddFolder: () => { setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setFolderError(''); setFolderDialog('new') },
-    onEditFolder: (id) => { const folder = folders.find((row) => row.id === id); if (folder) { setFolderName(folder.name); setFolderColor(folder.color ?? null); setFolderError(''); setFolderDialog(folder) } },
+    onEditFolder: (id) => { const folder = folders.find((row) => row.id === id); if (folder) { setFolderName(folder.name); setFolderColor(folderDisplayColor(folder)); setFolderError(''); setFolderDialog(folder) } },
     onRemoveFolder: (id) => setDeletingFolder(folders.find((row) => row.id === id) ?? null),
   }
   const notices = <>{role !== null && !canEdit ? <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /> : null}{error ? <Notice tone="danger" message={error} action={editor && editor !== 'new' ? <Button disabled={busy} onClick={() => open(editor.template.id)}>最新の内容を読み込む</Button> : undefined} /> : null}</>
@@ -207,7 +208,7 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
       {distribution?.saved ? <AttributeDistribution key={distribution.detail.template.id} detail={distribution.detail} canEdit={canEdit} saved onClose={() => { setDistribution(null); void load() }} /> : null}
       <ConfirmDialog open={!!deleting} title="ひな形を削除" description={`「${deleting?.row.name ?? ''}」を削除します。配布済みのアカウントの情報と履歴は残ります。`} destructive confirmLabel="削除する" busy={busy} error={error || undefined} onCancel={() => { if (!busy) setDeleting(null) }} onConfirm={() => void perform(async () => { if (!deleting) return; await api.remove(deleting.row.id, deleting.row.revision); setDeleting(null); await load() })} />
       <FolderEditorDialog open={folderDialog !== null} title={folderDialog === 'new' ? 'フォルダを追加' : 'フォルダを直す'}
-        name={folderName} onNameChange={setFolderName} color={folderColor} onColorChange={setFolderColor} allowClear
+        name={folderName} onNameChange={setFolderName} color={folderColor} onColorChange={setFolderColor}
         busy={busy} error={folderError || undefined} confirmLabel={folderDialog === 'new' ? '追加する' : '保存する'}
         onCancel={() => { if (!busy) setFolderDialog(null) }} onConfirm={() => void saveFolder()} />
       <ConfirmDialog open={!!deletingFolder} title="フォルダを削除" description="中のひな形は未分類に残ります。" destructive confirmLabel="削除する" busy={busy} error={error || undefined} onCancel={() => { if (!busy) setDeletingFolder(null) }} onConfirm={() => void perform(async () => { if (!deletingFolder) return; await api.folders.remove(deletingFolder.id, deletingFolder.revision); setDeletingFolder(null); await loadFolders(); await load() })} />

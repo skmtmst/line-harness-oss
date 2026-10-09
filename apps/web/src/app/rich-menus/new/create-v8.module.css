@@ -618,12 +618,13 @@
 /* 読み込み・失敗の板。 */
 .stateCard {
   padding: 32px 20px;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card, 12px);
   background: var(--color-canvas);
   text-align: center;
   color: var(--color-ink-secondary);
   font-size: 13px;
+  box-shadow: var(--card-shadow);
 }
 
 .pageHead { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 20px 24px 16px; border-bottom: 1px solid var(--color-hairline); }
@@ -664,9 +665,10 @@
   gap: var(--tpl-hb2-op-col-gap);
   padding: var(--tpl-hb2-op-box-pad);
   border-radius: var(--tpl-hb2-op-card-radius);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 
 .tabsTitle {
@@ -703,6 +705,6 @@
 .editLoading { margin: 0; padding: var(--tpl-eds-loading-pad); color: var(--color-ink-faint); font-size: var(--text-label); }
 
 /* 作る③④の段（絵：枠1本は内側の線・影なし）。共通のカードは外側の線で2px 高くなるので、この画面の段だけ線を内側へ。 */
-.flatCard { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -1px; box-shadow: none; }
+.flatCard { border: 0; outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--card-shadow); }
 /* 段の題は 15/700・行の高さ 22（共通の見出しは 23）。 */
 .flatCard h3 { line-height: var(--tpl-eds-card-title-lh); }
