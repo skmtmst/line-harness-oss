@@ -61,6 +61,8 @@ export default function Webinar() {
   const [remainSec, setRemainSec] = useState(0);
   const [chat, setChat] = useState<ChatItem[]>([]);
   const [input, setInput] = useState('');
+  const [commentBusy, setCommentBusy] = useState(false);
+  const commentInFlight = useRef(false);
   const [ctaVisible, setCtaVisible] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -258,16 +260,14 @@ export default function Webinar() {
     return () => clearInterval(timer);
   }, [state, slug, expectedPosition, ended]);
 
-  const sendComment = async () => {
-    if (!state?.live || !slug) return;
-    const text = input.trim();
+  const sendComment = async (retry?: { key: string; body: string }) => {
+    if (!state?.live || !slug || commentInFlight.current) return;
+    const text = retry?.body ?? input.trim();
     if (!text) return;
-    const key = `u-${Date.now()}`;
-    setInput('');
-    setChat((prev) => [
-      ...prev,
-      { key, authorName: 'あなた', body: text, mine: true },
-    ]);
+    const key = retry?.key ?? `u-${Date.now()}`;
+    commentInFlight.current = true; setCommentBusy(true);
+    if (!retry || input.trim() === text) setInput('');
+    setChat(prev => retry ? prev.map(item => item.key === key ? { ...item, failed: false } : item) : [...prev, { key, authorName: 'あなた', body: text, mine: true }]);
     try {
       await api.webinarComment(slug, state.sessionStartAt, Math.floor(expectedPosition()), text);
     } catch (err) {
@@ -275,7 +275,7 @@ export default function Webinar() {
       // 送れなかったことを行に出し、書いた文は入力欄へ戻す（新しく書き始めていたら上書きしない）。
       setChat((prev) => prev.map((item) => (item.key === key ? { ...item, failed: true } : item)));
       setInput((current) => (current === '' ? text : current));
-    }
+    } finally { commentInFlight.current = false; setCommentBusy(false); }
   };
 
   const clickCta = () => {
@@ -468,7 +468,7 @@ export default function Webinar() {
               <>
                 <span className="text-night-mine">{item.authorName}</span>
                 {`\u3000${item.body}`}
-                {item.failed && <span className="text-night-dim">（送れませんでした）</span>}
+                {item.failed && <><span className="text-night-dim">（送れませんでした）</span><button type="button" className="liff-hit text-night-mine" disabled={commentBusy} onClick={() => void sendComment(item)}>再送する</button></>}
               </>
             ) : (
               `${item.authorName}\u3000${item.body}`
@@ -509,7 +509,7 @@ export default function Webinar() {
         />
         <button
           type="button"
-          onClick={() => void sendComment()}
+          disabled={commentBusy || !input.trim()} onClick={() => void sendComment()}
           aria-label="送信"
           className="liff-hit flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-liff-primary text-white"
         >
