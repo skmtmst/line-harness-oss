@@ -2922,3 +2922,9 @@ html[data-theme='v8'] :is(button, a, input, textarea, select, [role='button'], [
   --radius-large: var(--polish-radius-dialog);
   --radius-pill: var(--polish-radius-pill);
 }
+
+/* B-152③：型の中の小さい表も、共通の行56・見出し40を読む。 */
+html[data-theme='v8'] [role='table'] [role='row'] { min-height: var(--polish-table-row); font-size: var(--polish-text-body); }
+html[data-theme='v8'] [role='table'] [role='row']:has([role='columnheader']) { min-height: var(--polish-table-head); height: var(--polish-table-head); background: var(--polish-table-head-bg); }
+html[data-theme='v8'] [role='table'] [role='columnheader'] { color: var(--color-ink-secondary); font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); }
+html[data-theme='v8'] [role='table'] [role='row']:not(:has([role='columnheader'])):hover { background: var(--polish-table-hover); }
