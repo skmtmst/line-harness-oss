@@ -344,3 +344,13 @@ export function useListUrlJsonValue<T>(key: string, initial: T, validate?: (valu
   const value = useMemo(() => decode(raw), [decode, raw])
   return [value, setValue]
 }
+
+/** 種類など複数選択の絞り込み。関数による変更もURLの最新の組に重ねる。 */
+export function useListUrlSetValue<T extends string>(key: string, initial: T[]): [Set<T>, (next: Set<T> | ((current: Set<T>) => Set<T>)) => void] {
+  const [values, setValues] = useListUrlJsonValue<T[]>(key, initial)
+  const set = useCallback((next: Set<T> | ((current: Set<T>) => Set<T>)) => {
+    setValues(previous => Array.from(typeof next === 'function' ? next(new Set(previous)) : next))
+  }, [setValues])
+  const value = useMemo(() => new Set(values), [values])
+  return [value, set]
+}

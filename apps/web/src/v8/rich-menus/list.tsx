@@ -10,7 +10,7 @@
  */
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
-import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
+import { useListUrlValue, useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -209,7 +209,7 @@ export default function RichMenusListV8() {
   const role = useStaffRole()
   const canEdit = role === null ? true : canManageRole(role)
 
-  const [showExternal, setShowExternal] = useState(false)
+  const [showExternal, setShowExternal] = useListUrlValue('showExternal', false)
   const activeAccountRef = useRef<string | null>(selectedAccount?.id ?? null)
   const importRequestGenerationRef = useRef(0)
   const externalLoadedRef = useRef(false)

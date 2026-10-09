@@ -5,7 +5,7 @@
  */
 import React from 'react'
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, expect, test, vi } from 'vitest'
+import { beforeEach, afterEach, expect, test, vi } from 'vitest'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: () => {} }),
@@ -39,6 +39,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 
 import HistoryTab from './history'
+import { flushListUrlState } from '@/components/shared/list-url-state'
+beforeEach(() => { flushListUrlState(); window.history.replaceState(null, '', '/mileage?tab=history') })
 afterEach(cleanup)
 
 test('使った・取り消しで、このページに無くても「まだありません」と言わず、ページ送りを残す', async () => {

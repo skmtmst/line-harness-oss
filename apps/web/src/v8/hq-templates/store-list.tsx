@@ -147,7 +147,7 @@ export default function HqStoreList(props: HqStoreListProps) {
   } = props
   const words = WORDS[type]
   const [query, setQuery] = useListUrlValue('q', '')
-  const [undistributedOnly, setUndistributedOnly] = useState(false)
+  const [undistributedOnly, setUndistributedOnly] = useListUrlValue('undistributedOnly', false)
   /* タグ（DzdC3）だけ：上のタブ（タグ・友だち情報欄・対応マーク・保存した検索）と、使用状態・付け方の絞り込み。 */
   const attribute = useAttributeTab('/hq/friend-attributes')
   const [tagUsage, setTagUsage] = useState<TagUsageFilter>('all')

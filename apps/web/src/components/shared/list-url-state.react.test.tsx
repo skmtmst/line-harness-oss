@@ -11,6 +11,7 @@ import {
   useListUrlFlag,
   useListUrlParam,
   useListUrlState,
+  useListUrlSetValue,
   useOnAccountSwitch,
 } from './list-url-state'
 
@@ -246,4 +247,24 @@ it('内部のページ番号が0からでもURLは1から数え、絞り込み�
   expect(new URLSearchParams(window.location.search).get('page')).toBe('3')
   await act(async () => { screen.getByRole('button', { name: '絞る' }).click() })
   expect(screen.getByText('内部0')).toBeTruthy()
+})
+
+it('複数の種類はURLから戻り、関数による連続変更で条件を失わずページだけを先頭に戻す', () => {
+  window.history.replaceState(null, '', '/contents?kinds=%5B%22image%22%5D&page=4&id=detail')
+  function Kinds() {
+    const [kinds, setKinds] = useListUrlSetValue('kinds', ['image', 'video'])
+    return <><output>{Array.from(kinds).join(',')}</output><button onClick={() => {
+      setKinds(previous => new Set([...previous, 'audio']))
+      setKinds(previous => new Set([...previous, 'file']))
+    }}>種類を追加</button></>
+  }
+  render(<Kinds />)
+  expect(screen.getByText('image')).toBeTruthy()
+  act(() => screen.getByText('種類を追加').click())
+  flushListUrlState()
+  expect(screen.getByText('image,audio,file')).toBeTruthy()
+  const params = new URLSearchParams(window.location.search)
+  expect(JSON.parse(params.get('kinds')!)).toEqual(['image', 'audio', 'file'])
+  expect(params.has('page')).toBe(false)
+  expect(params.get('id')).toBe('detail')
 })

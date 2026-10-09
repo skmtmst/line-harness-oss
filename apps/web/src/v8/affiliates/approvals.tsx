@@ -91,7 +91,7 @@ export default function ApprovalsTab() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [actioning, setActioning] = useState<string | null>(null)
   const [query, setQuery] = useListUrlValue('q', '')
-  const [flaggedOnly, setFlaggedOnly] = useState(false)
+  const [flaggedOnly, setFlaggedOnly] = useListUrlValue('flaggedOnly', false)
   const [saved, setSaved] = useState('')
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [page, setPage] = useListUrlValue('page', 1)

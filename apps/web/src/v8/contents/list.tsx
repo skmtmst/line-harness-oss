@@ -9,7 +9,7 @@
  * 札の名前の前にフォルダの色の丸（2026-10-07 オーナー）。札の操作は「…」へ集める。
  */
 import { collectListRows } from '@/components/shared/collect-list-rows'
-import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useListUrlSetValue, useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   Folder,
@@ -186,14 +186,12 @@ export default function MediaLibraryListV8() {
   /* 札の操作は「…」へ集める。行末にボタンは1つも置かない。 */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
 
-  const [kinds, setKinds] = useState<Set<MediaItem['kind']>>(
-    () => new Set(KINDS.map((k) => k.key)),
-  )
+  const [kinds, setKinds] = useListUrlSetValue<MediaItem['kind']>('kinds', KINDS.map((k) => k.key))
   const [query, setQuery] = useListUrlValue('q', '')
-  const [showUnusedOnly, setShowUnusedOnly] = useState(false)
-  const [showNearLimitOnly, setShowNearLimitOnly] = useState(false)
+  const [showUnusedOnly, setShowUnusedOnly] = useListUrlValue('showUnusedOnly', false)
+  const [showNearLimitOnly, setShowNearLimitOnly] = useListUrlValue('showNearLimitOnly', false)
   /** 退避済みだけを見る棚。普段の一覧には出ない。 */
-  const [showArchivedOnly, setShowArchivedOnly] = useState(false)
+  const [showArchivedOnly, setShowArchivedOnly] = useListUrlValue('showArchivedOnly', false)
   /*
     退避・一覧への復帰はどちらも理由が必須（あとから「なぜ」を追えるように）。
     押し口を開いた札と向きを持ち、確定時に同じ窓で理由を聞く。

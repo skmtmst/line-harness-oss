@@ -150,7 +150,7 @@ export default function InflowListV8({
   const [editing, setEditing] = useState<EntryRoute | 'new' | { register: string } | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [copyFailedId, setCopyFailedId] = useState<string | null>(null)
-  const [selectedGenre, setSelectedGenre] = useState('')
+  const [selectedGenre, setSelectedGenre] = useListUrlValue('selectedGenre', '')
   const [search, setSearch] = useListUrlValue('q', '')
   const [editingGenre, setEditingGenre] = useState<EntryRouteGenre | 'new' | null>(null)
   const [qrRoute, setQrRoute] = useState<QrRoute | null>(null)

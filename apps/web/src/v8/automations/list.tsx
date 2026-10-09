@@ -167,8 +167,8 @@ export default function AutomationListV8() {
   const [folderFilter, setFolderFilter] = useListUrlValue('folderFilter', '')
   /* ?search= で開くと、その言葉で探した状態から始める（動いた記録の「ルールを開く」）。 */
   const [search, setSearch] = useState(() => searchParams.get('search') ?? '')
-  const [onlyActive, setOnlyActive] = useState(false)
-  const [onlyStopped, setOnlyStopped] = useState(false)
+  const [onlyActive, setOnlyActive] = useListUrlValue('onlyActive', false)
+  const [onlyStopped, setOnlyStopped] = useListUrlValue('onlyStopped', false)
   const [saved, setSaved] = useState<SavedKey>('')
   const [sort, setSort] = useListUrlValue<'updated' | 'runs' | 'name'>('sort', 'updated')
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
