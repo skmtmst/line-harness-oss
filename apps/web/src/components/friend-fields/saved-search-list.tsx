@@ -360,7 +360,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
           条件に合う保存した検索はありません。条件名か使用先を変えてください。
         </p>
       ) : (
-        <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
+        <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card-surface">
           {/*
             960px以上は表（#1014 ATTR-15）。該当・共有・操作は短い言葉なので
             幅を絞り、はみ出た「条件の要約」と「更新者・日時」に回す。

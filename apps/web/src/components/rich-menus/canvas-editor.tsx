@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { RICH_MENU_DIMENSIONS, type RichMenuAreaIntent } from '@line-crm/shared'
 import {
-  CalendarClock, ClipboardList, Copy, FileText, Link2, MessageCircle, MousePointerClick, Phone, Repeat, Zap,
+  CalendarCheck, CalendarClock, ClipboardList, Copy, History, Stamp, FileText, Link2, MessageCircle, MousePointerClick, Phone, Repeat, Zap,
   type LucideIcon,
 } from 'lucide-react'
 import Notice from '@/components/shared/notice'
@@ -95,6 +95,7 @@ export function areaDisplayName(area: Area, index: number): string {
 const INTENT_ICON: Record<RichMenuAreaIntent, LucideIcon> = {
   url: Link2, tel: Phone, text: MessageCircle, template: FileText, form: ClipboardList,
   switch: Repeat, postback: Zap, datetime: CalendarClock, clipboard: Copy,
+  booking: CalendarCheck, booking_history: History, visit_stamp: Stamp,
 }
 function AreaIcon({ intent }: { intent?: RichMenuAreaIntent | null }) {
   const Icon = intent ? INTENT_ICON[intent] ?? MousePointerClick : MousePointerClick

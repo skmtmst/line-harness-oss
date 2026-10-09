@@ -15,6 +15,15 @@ describe('スタンプAPIの本人・店舗・権限',()=>{
   expect((await call('/api/liff/visit-stamps/cards?accountId=shop','GET',undefined,'invalid')).status).toBe(401);
   expect((await call('/api/liff/visit-stamps/cards?accountId=other')).status).toBe(401);
  });
+ it('カード一覧は別店舗のカードを含まず、URL指定で店舗の範囲を変えない',async()=>{
+  const otherCard=await saveStampCard(f.db,tenant,{name:'別店舗のカード',accountIds:['other'],active:true,expectedVersion:0,settings:{mode:'visit',amountUnit:1000,maxPerVisit:1,firstVisitBonus:0,expiryMonths:null,timezone:'Asia/Tokyo',multipliers:[],rankMultipliers:[],rewards:[{id:'other-reward',name:'別店舗の特典',stamps:1}]}});
+  for(const wanted of [card,otherCard.id,'missing-card']){
+   const res=await call(`/api/liff/visit-stamps/cards?accountId=shop&card=${wanted}`);
+   expect(res.status).toBe(200);
+   const body=await res.json() as {data:Array<{card:{id:string}}>};
+   expect(body.data.map(x=>x.card.id)).toEqual([card]);
+  }
+ });
  it('LIFFの特典選択では使用済みにならず、PINなしの使用を拒否する',async()=>{
   await grantStamps(f.db,{cardId:card,friendId:'friend',accountId:'shop',count:2,reason:'試験',actorId:'staff',requestId:'grant',kind:'manual'});
   const r=await call(`/api/liff/visit-stamps/cards/${card}/rewards?accountId=shop`,'POST',{rewardId:'reward',requestId:'request'});expect(r.status).toBe(201);

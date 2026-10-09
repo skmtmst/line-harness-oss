@@ -1,4 +1,4 @@
-import type { HqMessageCard, HqMessageReference } from '@line-crm/shared';
+import { liffActionUrl, type HqMessageCard, type HqMessageReference } from '@line-crm/shared';
 import { normalizeScopedTagName, type HqTemplateStatement } from '@line-crm/db';
 import type { HqTemplateAuthority } from './contract.js';
 import { HqTemplateError } from './tag.js';
@@ -11,7 +11,9 @@ const ownersSql = `SELECT json_group_array(line_account_id) FROM (SELECT line_ac
 export async function listMessageReferences(db: D1Database, authority: HqTemplateAuthority): Promise<HqMessageReference[]> {
   const scenarios = (await db.prepare(`SELECT s.id,s.name,a.name AS accountName FROM scenarios s JOIN line_accounts a ON a.id=s.line_account_id WHERE a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL ORDER BY s.name,s.id`).bind(authority.tenantId).all<Omit<HqMessageReference, 'kind'>>()).results;
   const forms = (await db.prepare(`SELECT f.id,f.name,group_concat(a.name, ' / ') AS accountName FROM forms f JOIN form_accounts fa ON fa.form_id=f.id JOIN line_accounts a ON a.id=fa.line_account_id WHERE f.status<>'archived' AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL AND NOT EXISTS(SELECT 1 FROM form_accounts x LEFT JOIN line_accounts y ON y.id=x.line_account_id WHERE x.form_id=f.id AND (y.tenant_id IS NULL OR y.tenant_id<>? OR y.is_active<>1 OR y.archived_at IS NOT NULL)) GROUP BY f.id ORDER BY f.name,f.id`).bind(authority.tenantId, authority.tenantId).all<Omit<HqMessageReference, 'kind'>>()).results;
-  return [...forms.map(row => ({ ...row, kind: 'form' as const })), ...scenarios.map(row => ({ ...row, kind: 'scenario' as const }))];
+  const menus = (await db.prepare(`SELECT m.id,m.name,a.name AS accountName FROM menus m JOIN line_accounts a ON a.id=m.line_account_id WHERE m.is_active=1 AND m.deleted_at IS NULL AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL ORDER BY m.name,m.id`).bind(authority.tenantId).all<Omit<HqMessageReference, 'kind'>>()).results;
+  const cards = (await db.prepare(`SELECT c.id,c.name,group_concat(a.name, ' / ') AS accountName FROM visit_stamp_cards c JOIN visit_stamp_card_accounts ca ON ca.card_id=c.id JOIN line_accounts a ON a.id=ca.line_account_id WHERE c.tenant_id=? AND c.active=1 AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL GROUP BY c.id ORDER BY c.name,c.id`).bind(authority.tenantId, authority.tenantId).all<Omit<HqMessageReference, 'kind'>>()).results;
+  return [...forms.map(row => ({ ...row, kind: 'form' as const })), ...scenarios.map(row => ({ ...row, kind: 'scenario' as const })), ...menus.map(row => ({ ...row, kind: 'booking' as const })), ...cards.map(row => ({ ...row, kind: 'visit_stamp' as const }))];
 }
 
 /** Only existing destination resources are reused. Every row and ownership list joins the preflight token and atomic guards. */
@@ -48,7 +50,7 @@ export async function messageCardReferences(db: D1Database, authority: HqTemplat
       const account = await db.prepare(`SELECT liff_id FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL`).bind(accountId, authority.tenantId).first<{ liff_id: string | null }>();
       const liffId = account?.liff_id;
       if (!liffId || !/^[A-Za-z0-9_-]{1,128}$/.test(liffId)) return unavailable();
-      targets[key] = `https://liff.line.me/${liffId}?form=${encodeURIComponent(String(target.id))}`;
+      targets[key] = liffActionUrl({ liffId, kind: 'form', formId: String(target.id) });
       snapshot.push([sourceOwners, targetOwners, liffId]);
       statements.push(guard(`(${ownersSql}) IS ?`, [button.value, sourceOwners]), guard(`(${ownersSql}) IS ?`, [target.id, targetOwners]), guard(`EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND liff_id IS ? AND is_active=1 AND archived_at IS NULL)`, [accountId, authority.tenantId, liffId]));
     } else {

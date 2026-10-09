@@ -2,11 +2,11 @@
 import React, { useState } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-const fx = vi.hoisted(() => ({ account: 'A', id: 'one', definition: vi.fn(), update: vi.fn() }))
+const fx = vi.hoisted(() => ({ role: 'owner', account: 'A', id: 'one', definition: vi.fn(), update: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), useSearchParams: () => new URLSearchParams(`id=${fx.id}`) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fx.account }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => fx.role, canManageRole: (role: string) => role === 'owner' || role === 'admin' }))
 vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
   return { ...actual, api: { ...actual.api, tags: { definition: fx.definition, updateDefinition: fx.update, dependencies: async () => ({ success: true, data: { friendCount: 0 } }) }, tagGroups: { list: async () => ({ success: true, data: [] }) } } }
@@ -18,7 +18,7 @@ vi.mock('./edit-form', () => ({ TagEditForm: ({ tag, saving, onSave }: { tag: { 
 import TagEdit from './edit'
 const detail = (name: string, version = 1) => ({ success: true, data: { tag: { id: fx.id, name, status: 'active', version }, automation: null } })
 const deferred = () => { let resolve!: (v: unknown) => void; let reject!: (v: unknown) => void; const promise = new Promise<unknown>((a,b) => { resolve=a; reject=b }); return { promise, resolve, reject } }
-beforeEach(() => { fx.account='A';fx.id='one';fx.definition.mockReset();fx.update.mockReset() })
+beforeEach(() => { fx.role='owner';fx.account='A';fx.id='one';fx.definition.mockReset();fx.update.mockReset() })
 afterEach(cleanup)
 it('切替先の失敗後も古いタグを編集できない（WEB088）', async () => {
   fx.definition.mockResolvedValueOnce(detail('Aのタグ')).mockRejectedValueOnce(new Error('down'))
@@ -57,4 +57,14 @@ it('A→B→A の古い保存完了で新しい保存中の入力を解放しな
   await act(async()=>oldSave.resolve({success:true,data:{queued:0}}))
   expect((screen.getByLabelText('下書き') as HTMLInputElement).disabled).toBe(true)
   await act(async()=>newSave.resolve({success:true,data:{queued:0}}))
+})
+
+it.each(['staff', 'owner', 'admin'])('保管済みタグの訂正操作も閲覧のみで隠す（%s）', async (role) => {
+  fx.role = role
+  fx.definition.mockResolvedValue({ success: true, data: { tag: { id: 'one', name: '保管したタグ', status: 'archived', version: 1 }, automation: null } })
+  render(<TagEdit />)
+  if (role === 'staff') {
+    await screen.findByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')
+    expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
+  } else expect(await screen.findByRole('button', { name: '保存する' })).toBeTruthy()
 })

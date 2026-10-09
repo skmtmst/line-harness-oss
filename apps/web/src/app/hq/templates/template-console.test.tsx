@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import TemplateConsole, { resolvedItems } from './template-console'
 import type { Preflight, TemplateDefinition, TemplateType } from '@/lib/hq-templates-api'
 
@@ -346,12 +346,15 @@ describe('HQひな形の配布フロー', () => {
       expect(screen.queryByRole('button', { name: '下書きを保存' })).toBeNull()
       expect(screen.queryByText('ひな形を保存しました。')).toBeNull()
       expect(window.sessionStorage.length).toBe(1)
-      fireEvent.click(screen.getByRole('button', { name: '前回の保存を再確認' }))
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: '前回の保存を再確認' })) })
       await waitFor(() => expect(removeCalls).toHaveLength(2))
       expect((screen.getByLabelText('ひな形の名前') as HTMLInputElement).disabled).toBe(true)
       expect(window.sessionStorage.length).toBe(1)
       expect(calls.create).toHaveBeenCalledTimes(1)
-      fireEvent.click(screen.getByRole('button', { name: '前回の保存を再確認' }))
+      // 消去後は固定入力から TagEditor に掛け直される。表示文だけを待つと、
+      // mock の初期化 effect が次の入力を古い名前に戻すことがある。
+      // 非同期の再確認と描画・effect を act で終えてから入力する。
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: '前回の保存を再確認' })) })
       if (outcome === 'success') await screen.findByRole('checkbox', { name: '銀座本店' })
       else await screen.findByText('前回の保存は受け付けられていません。内容を確認して保存し直してください。')
       expect(calls.create).toHaveBeenCalledTimes(1)
@@ -362,6 +365,7 @@ describe('HQひな形の配布フロー', () => {
         const editable = await nameInput()
         expect(editable.disabled).toBe(false)
         fireEvent.change(editable, { target: { value: '修正した新しい内容' } })
+        expect((screen.getByLabelText('ひな形の名前') as HTMLInputElement).value).toBe('修正した新しい内容')
         fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
         await screen.findByText('ひな形を保存しました。')
         expect(calls.create.mock.calls[1][0].name).toBe('修正した新しい内容')
@@ -389,11 +393,7 @@ vi.mock('@/components/shell/page-chrome', () => ({usePageTitle: () => {}, usePag
 
 vi.mock('@/v8/hq-templates/tag-editor', () => ({ default: function TagEditor({ definition, saving, error, conflict, onReloadLatest, onCancel, onSave, onSaveDraft, notice }: { notice?: string; definition: TemplateDefinition & { tag: { name: string } }; saving: boolean; error?: string; conflict?: boolean; onReloadLatest?: () => void; onCancel: () => void; onSave: (v: TemplateDefinition) => void; onSaveDraft: (v: TemplateDefinition) => void }) {
   const [name, setName] = React.useState(definition.tag.name)
-  // 渡された名前が実際に変わったときだけ入れ直す。`definition` の入れ物
-  // そのものを目印にすると、親が同じ中身で作り直しただけの再描画で
-  // 利用者が打った名前を捨ててしまう（本物の tag-editor は key で
-  // 作り直すまで打った内容を保つので、そちらへ合わせる）。
-  React.useEffect(() => { setName(definition.tag.name) }, [definition.tag.name])
+  React.useEffect(() => { setName(definition.tag.name) }, [definition])
   const next = { ...definition, tag: { ...definition.tag, name } }
   return <>{notice ? <p role="status">{notice}</p> : null}<label>ひな形の名前<input value={name} disabled={saving} onChange={e => setName(e.target.value)} /></label><label>説明<textarea disabled={saving} /></label>{error ? <p role="alert">{error}</p> : null}{conflict ? <button onClick={onReloadLatest}>最新の内容を読み込む</button> : null}<button disabled={saving} onClick={onCancel}>キャンセル</button><button disabled={saving || !name.trim()} onClick={() => onSaveDraft(next)}>下書きを保存</button><button disabled={saving || !name.trim()} onClick={() => onSave(next)}>保存する</button></>
 } }))

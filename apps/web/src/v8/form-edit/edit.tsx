@@ -99,6 +99,9 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   hostRef.current = host
   const { selectedAccount, selectedAccountId } = useAccount()
   const narrow = useNarrowViewport()
+  const role = useStaffRole()
+  const canEdit = host ? !host.readOnly : canManageRole(role)
+  const readOnly = host ? Boolean(host.readOnly) : role !== null && !canEdit
 
   /* 友だちに配るURL。LIFF のURLにパスを足すと、LIFFアプリの同じパスへ転送される。 */
   const liffId = selectedAccount?.liffId ?? null
@@ -570,6 +573,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
    * 競合（409）だけは自動でも帯を出す（このまま書くと相手の変更が消えるため）。
    */
   const save = async (publishAfter = false, { silent = false }: { silent?: boolean } = {}): Promise<boolean> => {
+    if (!canEdit) return false
     const problem = saveProblem(publishAfter)
     if (problem) {
       if (silent) return false
@@ -710,11 +714,10 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
    * 入力が止まって2秒で下書きへ静かに保存する（一斉配信と同じ）。保存先は
    * 下書きなので、公開中の内容は変わらない。閲覧のみの人には動かさない。
    */
-  const role = useStaffRole()
   const autosave = useDraftAutosave({
     fingerprint: currentSnapshot,
     dirty,
-    active: !host && (role === null || canManageRole(role)),
+    active: !host && canEdit,
     enabled: formLoaded && !loading && !conflict && saveProblem(false) === null,
     paused: leaveTarget !== null || saving || showPublish,
     save: () => save(false, { silent: true }),
@@ -722,7 +725,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
 
   /* 公開前の試し：試し合言葉を取って試しURLを作る。試しは保存済みの下書きに出る。 */
   const startTest = async () => {
-    if (!selectedAccountId || testBusy) return
+    if (!canEdit || !selectedAccountId || testBusy) return
     setTestBusy(true)
     setTestError('')
     try {
@@ -818,13 +821,15 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
               </Button>
             </div>
             <p className={styles.urlNote}>友だちに配るURLです。LINEの中で開きます。</p>
-            <div className={styles.urlTest}>
-              <Button onClick={() => void startTest()} disabled={testBusy} busy={testBusy} busyLabel="用意しています..." title="保存済みの下書きをお客さま画面で開きます。試しの回答は集計に入りません">
-                <FlaskConical size={15} aria-hidden="true" />
-                <span className={styles.testWide}>公開前に試す（試しのURLを作る）</span>
-                <span className={styles.testNarrow}>公開前に試す</span>
-              </Button>
-            </div>
+            {canEdit ? (
+              <div className={styles.urlTest}>
+                <Button onClick={() => void startTest()} disabled={testBusy} busy={testBusy} busyLabel="用意しています..." title="保存済みの下書きをお客さま画面で開きます。試しの回答は集計に入りません">
+                  <FlaskConical size={15} aria-hidden="true" />
+                  <span className={styles.testWide}>公開前に試す（試しのURLを作る）</span>
+                  <span className={styles.testNarrow}>公開前に試す</span>
+                </Button>
+              </div>
+            ) : null}
             {testError ? <p role="alert" className={styles.urlError}>{testError}</p> : null}
             {testUrl ? (
               <a href={testUrl} target="_blank" rel="noreferrer" className={styles.urlLink}>試しのURLを開く</a>
@@ -857,24 +862,28 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   ) : (
     <>
       <Button href="/form-submissions">キャンセル</Button>
-      <Button onClick={() => void save(false).then((ok) => { if (ok) autosave.markSaved() })} disabled={saving} busy={saving} busyLabel="保存中…" title="フォームを保存（公開中の内容は変わりません）">
-        下書きを保存
-      </Button>
-      {conflict ? (
-        <Button variant="primary" onClick={() => void saveConflict.compare()} disabled={saveConflict.compareBusy || saving}>
-          比べてから保存
-        </Button>
-      ) : (
-        <Button variant="primary" onClick={() => setShowPublish(true)} disabled={saving}>
-          <Upload size={15} aria-hidden="true" />
-          この版を公開
-        </Button>
-      )}
+      {canEdit ? (
+        <>
+          <Button onClick={() => void save(false).then((ok) => { if (ok) autosave.markSaved() })} disabled={saving} busy={saving} busyLabel="保存中…" title="フォームを保存（公開中の内容は変わりません）">
+            下書きを保存
+          </Button>
+          {conflict ? (
+            <Button variant="primary" onClick={() => void saveConflict.compare()} disabled={saveConflict.compareBusy || saving}>
+              比べてから保存
+            </Button>
+          ) : (
+            <Button variant="primary" onClick={() => setShowPublish(true)} disabled={saving}>
+              <Upload size={15} aria-hidden="true" />
+              この版を公開
+            </Button>
+          )}
+        </>
+      ) : null}
     </>
   )
 
   /* 競合の帯（J1pdB）。左右の列の上に横いっぱいで出す。型の「狭い板の切り替え」の置き場を借りる。 */
-  const conflictBand = conflict ? (
+  const conflictBand = canEdit && conflict ? (
     <div className={styles.bandSlot} data-fe-band>
       <SaveConflictBand
         designNode="J1pdB"
@@ -916,6 +925,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
           <Tabs label="編集する内容" items={TAB_ITEMS.map((t) => ({ label: t.label, current: editTab === t.key, errorCount: tabErrors[t.key], onClick: () => changeTab(t.key) }))} />
         </div>
       )}
+      notice={readOnly ? <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /> : undefined}
       preview={preview}
       previewToggle={conflictBand}
       footerActions={footerActions}
@@ -932,6 +942,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
           <p className={styles.loading}>読み込み中...</p>
         ) : editTab === 'content' ? (
           <ContentTab
+            readOnly={!canEdit}
             layout={layout}
             page={page}
             blocks={blocks}
@@ -953,9 +964,10 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             onRemoveBlock={removeBlock}
           />
         ) : editTab === 'after' ? (
-          <AfterTab options={layout.options} refs={refs} onSubmitTagId={onSubmitTagId} onChangeOptions={patchOptions} onChangeSubmitTag={setOnSubmitTagId} />
+          <AfterTab readOnly={!canEdit} options={layout.options} refs={refs} onSubmitTagId={onSubmitTagId} onChangeOptions={patchOptions} onChangeSubmitTag={setOnSubmitTagId} />
         ) : (
           <AppearanceTab
+            readOnly={!canEdit}
             options={layout.options}
             accountId={host ? null : selectedAccountId}
             portable={Boolean(host)}
@@ -982,7 +994,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="フォームへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
 
       <Dialog
-        open={showPublish}
+        open={canEdit && showPublish}
         title="この版を公開する"
         designHeaderPadding="var(--tpl-fm2-dialog-head-pad)"
         busy={saving}
@@ -1040,7 +1052,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       </Dialog>
 
       <SaveConflictCompareDialog
-        open={saveConflict.compareOpen}
+        open={canEdit && saveConflict.compareOpen}
         busy={saveConflict.compareBusy}
         error={saveConflict.compareError}
         {...(saveConflict.latest

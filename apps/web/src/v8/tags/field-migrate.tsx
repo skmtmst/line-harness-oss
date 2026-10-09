@@ -20,6 +20,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import Select from '@/components/shared/select'
@@ -71,6 +72,7 @@ export default function FieldMigrateV8() {
 }
 
 function FieldMigrate() {
+  const staffRole = useStaffRole()
   usePageTitle('種類を変える')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'タグ', href: '/tags' }, { label: '友だち情報欄', href: '/tags?tab=fields' }])
   const params = useSearchParams()
@@ -462,6 +464,8 @@ function FieldMigrate() {
   const usage = typeof source.usageCount === 'number' ? `${formatNumber(source.usageCount)}人に値が入っている` : '値が入っている人数は未集計'
   const back = <Link href="/tags?tab=fields" className={styles.backLink}>← 友だち情報欄へ</Link>
   const rows = sample ? sampleRows(sample) : []
+
+  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
 
   return (
     <CreatePage

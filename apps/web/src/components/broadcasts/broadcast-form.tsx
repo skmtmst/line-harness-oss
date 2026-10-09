@@ -2439,7 +2439,7 @@ export default function BroadcastForm({
           />
         </section>
         {showTemplatePicker && (
-          <section className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-card">
+          <section className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-card-surface">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-bold text-ink">テンプレート選択</h3>

@@ -14,5 +14,6 @@ export function isFolderSelectColor(value: unknown): value is string | null {
   return value === null || FOLDER_SELECT_COLORS.some(color => color.value === value);
 }
 export interface ColoredFolder { id: string; name: string; color?: string | null }
-export interface HqBroadcastFolder extends ColoredFolder { revision: number; item_count?: number }
+export interface HqBroadcastFolder extends ColoredFolder { revision: number; display_order?: number; item_count?: number }
 export interface FriendAddRuleFolder extends ColoredFolder { createdAt?: string | null }
+export interface FriendAddRuleFolderDeleteResult { id: string; deleted: true }

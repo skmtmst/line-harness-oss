@@ -1,3 +1,4 @@
+import { readFolderAssignment } from './folder-assignment.js';
 import { dbTableExists, jstNow } from './utils.js';
 import {
   ensureConversionRewardSnapshot,
@@ -18,6 +19,7 @@ import { ensureDefaultMileageProgram } from './mileage.js';
 // offer may carry a tag + scenario applied to friends who arrive via its links.
 
 export interface AffiliateOffer {
+  folder_id?: string | null;
   id: string;
   name: string;
   description: string | null;
@@ -34,6 +36,7 @@ export interface AffiliateOffer {
 // ── CRUD ─────────────────────────────────────────────────────────────────
 
 export interface CreateAffiliateOfferInput {
+  folderId?: string | null;
   name: string;
   description?: string | null;
   /** Fixed reward per conversion, in yen. Defaults to 0. */
@@ -88,6 +91,7 @@ export async function createAffiliateOffer(
     if (existing) return existing;
   }
 
+  const folderId=await readFolderAssignment(db,'affiliate_offer',lineAccountId,input.folderId);
   const id = crypto.randomUUID();
   const now = jstNow();
   if (!input.mileageProgramId || input.mileageProgramId === 'default') {
@@ -99,8 +103,8 @@ export async function createAffiliateOffer(
       .prepare(
         `INSERT INTO affiliate_offers
            (id, name, description, reward_amount, reward_miles, mileage_program_id,
-            line_account_id, tag_id, scenario_id, is_active, created_at, operation_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            line_account_id, tag_id, scenario_id, is_active, created_at, operation_id, folder_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         id,
@@ -115,6 +119,7 @@ export async function createAffiliateOffer(
         input.isActive === false ? 0 : 1,
         now,
         input.operationId ?? null,
+        folderId ?? null,
       )
       .run();
   } catch (err) {
@@ -179,6 +184,7 @@ export type UpdateAffiliateOfferInput = Partial<
     | 'tag_id'
     | 'scenario_id'
     | 'is_active'
+    | 'folder_id'
   >
 >;
 
@@ -187,6 +193,9 @@ export async function updateAffiliateOffer(
   id: string,
   updates: UpdateAffiliateOfferInput,
 ): Promise<AffiliateOffer | null> {
+  const current=await getAffiliateOfferById(db,id);if(!current)return null;
+  const folderId=await readFolderAssignment(db,'affiliate_offer',updates.line_account_id===undefined?current.line_account_id:updates.line_account_id,updates.folder_id===undefined?current.folder_id:updates.folder_id);
+  if(updates.folder_id!==undefined)updates={...updates,folder_id:folderId};
   const fields: string[] = [];
   const values: unknown[] = [];
 
@@ -196,6 +205,7 @@ export async function updateAffiliateOffer(
       values.push(updates[col]);
     }
   };
+  set('folder_id');
   set('name');
   set('description');
   set('reward_amount');

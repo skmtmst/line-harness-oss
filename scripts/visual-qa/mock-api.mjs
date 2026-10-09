@@ -7332,17 +7332,24 @@ const server = createServer((req, res) => {
     return
   }
 
-  /* 予約設定の右の写し（お客さまの予約画面）は店舗のルールを当てた空きを読む。ほかの画面は下の日付での分け方。 */
-  if (url.pathname === '/api/booking/admin/availability' && url.searchParams.get('apply_store_rules') === '1') {
-    res.writeHead(200).end(JSON.stringify(BOOKING_AVAILABILITY_STORE_VIEW))
-    return
-  }
   /*
-    空いている時間：V8 の画面（右のスマホの見本）は今日から聞く。10/1 以降の範囲なら絵（10/2 金 始まり）の空きを返す。
-    それより前の範囲（v6 の撮影・代理予約の手順は 9/3 を選ぶ）は今までどおり。
+    予約の空き：店舗ルールの写し・10月以降・それ以前の固定データを保つ。
+    Worker と同じく menu_ids の一括取得は by_menu、単件は by_staff。
+    一括取得にも単件の器を返すと、予約台帳が batch.by_menu を読めず
+    「空き枠を読み込めませんでした」になり、速度測定が止まる。
   */
-  if (url.pathname === '/api/booking/admin/availability' && (url.searchParams.get('from') ?? '') >= '2026-10-01') {
-    res.writeHead(200).end(JSON.stringify(BOOKING_AVAILABILITY_OCT))
+  if (url.pathname === '/api/booking/admin/availability') {
+    const availability = url.searchParams.get('apply_store_rules') === '1'
+      ? BOOKING_AVAILABILITY_STORE_VIEW
+      : (url.searchParams.get('from') ?? '') >= '2026-10-01'
+        ? BOOKING_AVAILABILITY_OCT
+        : BOOKING_AVAILABILITY
+    const menuIdsParam = url.searchParams.get('menu_ids')
+    const body = menuIdsParam === null
+      ? availability
+      : { by_menu: [...new Set(menuIdsParam.split(',').map((id) => id.trim()).filter(Boolean))]
+        .map((menu_id) => ({ menu_id, ...availability })) }
+    res.writeHead(200).end(JSON.stringify(body))
     return
   }
   if (url.pathname in RAW) {
