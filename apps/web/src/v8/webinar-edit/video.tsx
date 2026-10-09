@@ -1,5 +1,7 @@
 'use client'
 
+import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
+
 /*
  * ★V8 ウェビナーの ②動画と公開期間（Pencil：オンデマンド VWNaA・日時指定と開催回 LPOe7）。
  * 動画（差し替える・準備の段）→ 公開期間（オンデマンド）／開催回（日時指定）→ 配信枠 → 視聴の数え方。
@@ -54,7 +56,7 @@ function localJst(value: string | null | undefined): string {
   return Number.isNaN(time) ? '' : new Date(time + 9 * 60 * 60 * 1000).toISOString().slice(0, 16)
 }
 function toJstIso(local: string): string {
-  return `${local}:00+09:00`
+  return datetimeLocalJstToUtcIso(local)
 }
 
 function ruleView(rule: WebinarScheduleRule): { kind: string; tone: 'success' | 'neutral' | 'warn'; detail: string } {

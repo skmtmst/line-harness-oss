@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDate, jstDateOffset } from '@/lib/jst-datetime'
+
 /*
  * V8 予約設定（Pencil 板: owaS3 / P6EdLW / yRPxl / KRgTQ / x1OZS6 / VLEaj / xCoDe）。
  *
@@ -68,7 +70,6 @@ const LiffPhoneStaffStep = memo(dynamic(() => import('./liff-phone').then((modul
 }))
 import {
   DAYS,
-  JST_OFFSET_MS,
   V8TabEditContext,
   WEEKDAY_JP,
   AccountIcon,
@@ -133,10 +134,8 @@ const V8_TAB_NODE: Record<V8TabKey, string> = {
 
 // LIFF の日時選択（apps/liff DateTimePicker）と同じく JST の今日から14日分。
 function previewRange(): { from: string; to: string } {
-  const from = new Date(Date.now() + JST_OFFSET_MS).toISOString().slice(0, 10)
-  const end = new Date(`${from}T00:00:00Z`)
-  end.setUTCDate(end.getUTCDate() + 13)
-  return { from, to: end.toISOString().slice(0, 10) }
+  const now = new Date()
+  return { from: jstDate(now), to: jstDateOffset(13, now) }
 }
 
 
@@ -387,7 +386,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
         if (cancelled || requests === null) return
         const count = requests.filter((request) => {
           if (request.status !== 'requested' && request.status !== 'confirmed') return false
-          const jst = new Date(new Date(request.starts_at).getTime() + JST_OFFSET_MS).toISOString().slice(0, 10)
+          const jst = jstDate(new Date(request.starts_at))
           return closedOn(closedRangeList, jst) !== undefined
         }).length
         setClosedBookingCount(count)

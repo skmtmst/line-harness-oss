@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDate, jstDateOffset } from '@/lib/jst-datetime'
+
 /*
  * ★V8 分析の画面で共通に使う処理（app/analytics/page.tsx から写した）。
  * src/v8 からは @/app を読めないので、読み込み・数の出し方・期間・CSV を
@@ -38,11 +40,7 @@ export const RANGES = [7, 30, 90]
 
 /** 今の画面と同じ日本時間の暦日の範囲。 */
 export function rangeFor(days: number, now = new Date()): { from: string; to: string } {
-  const jstNow = new Date(now.getTime() + 9 * 3600_000)
-  return {
-    from: new Date(jstNow.getTime() - days * 24 * 3600_000).toISOString().slice(0, 10),
-    to: jstNow.toISOString().slice(0, 10),
-  }
+  return { from: jstDateOffset(-days, now), to: jstDate(now) }
 }
 
 export type OverviewResult<T> =

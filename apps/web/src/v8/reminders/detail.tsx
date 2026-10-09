@@ -1,5 +1,7 @@
 'use client'
 
+import { scheduledJstIso } from '@/lib/jst-datetime'
+
 /*
  * ★V8 リマインダの詳細（src/v8 に一から書いた版）。
  * 板：rbAig（概要）/ loVfW（登録者）/ RwVo5（一時停止の窓）。
@@ -140,18 +142,8 @@ export function dateTimeLocalJst(value: string): string {
 
 /** datetime-local の JST の壁時計時刻を、曖昧さなく UTC ISO へ変える。 */
 export function dateTimeLocalJstToUtcIso(value: string): string | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value)
-  if (!match) return null
-  const [, yearRaw, monthRaw, dayRaw, hourRaw, minuteRaw] = match
-  const year = Number(yearRaw)
-  const month = Number(monthRaw)
-  const day = Number(dayRaw)
-  const hour = Number(hourRaw)
-  const minute = Number(minuteRaw)
-  if (month < 1 || month > 12 || day < 1 || hour > 23 || minute > 59) return null
-  const utc = new Date(Date.UTC(year, month - 1, day, hour - 9, minute))
-  // 2月30日などを Date が翌月へ丸めても保存しない。
-  return dateTimeLocalJst(utc.toISOString()) === value ? utc.toISOString() : null
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})$/.exec(value)
+  return match ? scheduledJstIso(match[1], match[2]) : null
 }
 
 /** 通知の短い呼び名。日で書いた通は「1日前 18:00」、分で書いた通は「1時間前」。 */

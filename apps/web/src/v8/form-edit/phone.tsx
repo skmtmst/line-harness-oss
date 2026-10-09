@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDateOffset } from '@/lib/jst-datetime'
+
 /*
  * 「お客さまに見える形」のスマホ（m1cWEy・ijxur・XXFT4・tpRRT の右）。
  * 外枠 330×690・黒い島・LINE の上の帯・メニューの帯。中は回答画面の形。
@@ -155,9 +157,9 @@ function PhoneQuestion({ block, bookingMenus }: { block: FormInputBlock; booking
 function BookingPreview({ block, bookingMenus }: { block: FormInputBlock; bookingMenus: Props['bookingMenus'] }) {
   const menu = bookingMenus.find((m) => m.id === block.booking?.menuId)
   const days = Array.from({ length: 5 }, (_, i) => {
-    const d = new Date()
-    d.setDate(d.getDate() + i + 1)
-    return { date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`, weekday: WEEKDAY[d.getDay()], day: d.getDate(), open: true }
+    const date = jstDateOffset(i + 1)
+    const d = new Date(`${date}T00:00:00Z`)
+    return { date, weekday: WEEKDAY[d.getUTCDay()], day: d.getUTCDate(), open: true }
   })
   return <><p className={styles.phoneText}>空き枠の見本（実際の空きではありません）</p><BookingControls preview menuLabel={menu ? `${menu.name}・${menu.durationMinutes}分` : 'メニューを選んでください'} days={days} selectedDate={days[2].date} onDate={() => {}} times={SAMPLE_TIMES.map((start, i) => ({ start, open: i !== 0 && i !== 4, selected: false }))} onTime={() => {}} /></>
 }

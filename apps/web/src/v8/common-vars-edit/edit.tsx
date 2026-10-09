@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDate } from '@/lib/jst-datetime'
+
 /*
  * ★V8 共通情報の編集（板 `AYc6O`、編集（1152）`C67dE`、競合 `piWhz`）。
  *
@@ -112,8 +114,9 @@ export function historyStamp(value: string): string {
 
 /** 「いま」より前は予約できない。入れた瞬間に当たって、予約に見えない。 */
 function jstNowLocalInput(): { date: string; time: string } {
-  const jst = new Date(Date.now() + 9 * 3600_000).toISOString()
-  return { date: jst.slice(0, 10), time: jst.slice(11, 16) }
+  const now = new Date()
+  const jst = new Date(now.getTime() + 9 * 3600_000).toISOString()
+  return { date: jstDate(now), time: jst.slice(11, 16) }
 }
 
 function utcToJstLocalInput(value: string | null): string {

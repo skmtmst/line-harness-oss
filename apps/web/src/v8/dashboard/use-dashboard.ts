@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDate } from '@/lib/jst-datetime'
+
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -49,7 +51,7 @@ export function dashboardStorageKey(accountId: string | null): string {
 export function jstDay(iso: string | number | Date): string {
   const date = iso instanceof Date ? iso : new Date(iso)
   if (Number.isNaN(date.getTime())) return ''
-  return new Date(date.getTime() + 9 * 3600_000).toISOString().slice(0, 10)
+  return jstDate(date)
 }
 
 function monthKey(offset: number): string {

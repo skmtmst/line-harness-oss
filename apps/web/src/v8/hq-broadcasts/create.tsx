@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDateOffset, scheduledJstIso } from '@/lib/jst-datetime'
+
 /*
  * ★V8 統括 一括配信を作る（B-37・絵 V8.pen の BBRDb：① lmWCZ・② AL5vR・③ lLyFR・④ ZU4Ae・⑤ H9eG3n）。
  *
@@ -116,15 +118,9 @@ function runKinds(run: HqBroadcastRun): string {
   return [...new Set(bubblesFromInput(run.input ?? { messageContent: '' }).map((b) => HQ_KIND_LABEL[b.kind]))].join('＋')
 }
 
-function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
 /** 日付（YYYY-MM-DD）と時刻（HH:MM）を日本時間として ISO にする（店の一斉配信と同じ「日本時間」の欄）。 */
 function jstIso(date: string, time: string): string | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return null
-  const d = new Date(`${date}T${time}:00+09:00`)
-  return Number.isNaN(d.getTime()) ? null : d.toISOString()
+  return scheduledJstIso(date, time)
 }
 
 /** 下書きの日時（ISO）を、日本時間の日付と時刻の欄に戻す。 */
@@ -265,7 +261,7 @@ export default function HqBroadcastCreate() {
   const [previewDevice, setPreviewDevice] = useState<'phone' | 'pc'>('phone')
 
   const [when, setWhen] = useState<'now' | 'later'>('later')
-  const [date, setDate] = useState(() => { const d = new Date(); d.setDate(d.getDate() + 1); return ymd(d) })
+  const [date, setDate] = useState(() => jstDateOffset(1))
   const [time, setTime] = useState('11:00')
 
   const [run, setRun] = useState<HqBroadcastRun | null>(null)

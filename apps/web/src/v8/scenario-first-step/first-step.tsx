@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDate } from '@/lib/jst-datetime'
+
 /*
  * ★V8 シナリオを作る②：1通目を設定（Pencil `V6xAo`・1152 `U5rxyH`）。
  *
@@ -483,17 +485,17 @@ export default function ScenarioFirstStepV8() {
    * 「始めた日＋N日後のその時刻。過ぎていたらすぐ」、経過時間は「始めた時刻＋日・時間・分」。
    * 例の始めた時刻は今日の 14:00 に固定する（開いた時刻で文が変わり、行の高さが揺れないように）。
    */
-  const exampleStart = new Date()
-  exampleStart.setHours(14, 0, 0, 0)
-  const dayLabel = (d: Date) => `${d.getMonth() + 1}月${d.getDate()}日（${WEEKDAYS[d.getDay()]}）`
-  const hm = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+  // 日本の暦をUTCの欄で計算し、端末の時間帯による日付のずれを避ける。
+  const exampleStart = new Date(`${jstDate()}T14:00:00Z`)
+  const dayLabel = (d: Date) => `${d.getUTCMonth() + 1}月${d.getUTCDate()}日（${WEEKDAYS[d.getUTCDay()]}）`
+  const hm = (d: Date) => `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}`
   const arrivalText = (() => {
     if (mode === 'absolute_time') {
       if (!TIME_RE.test(deliveryTime)) return null
       const [h, m] = deliveryTime.split(':').map(Number)
       const target = new Date(exampleStart)
-      target.setDate(target.getDate() + offsetDays)
-      target.setHours(h, m, 0, 0)
+      target.setUTCDate(target.getUTCDate() + offsetDays)
+      target.setUTCHours(h, m, 0, 0)
       if (target.getTime() <= exampleStart.getTime()) return `すぐ（${deliveryTime} を過ぎているため）`
       return `${offsetDays === 0 ? '同じ日の' : dayLabel(target)} ${deliveryTime}`
     }

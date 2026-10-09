@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDate, jstDateOffset } from '@/lib/jst-datetime'
+
 /*
  * ★V8 分析「成果地点ごとのレポート」（Pencil `AzrZq`・`/analytics?view=conversion-report`）。
  * 経路と成果の数の帯・道具の段（RoutesFrame）の下に、日ごとの成果の棒と成果地点ごとの表。
@@ -21,10 +23,8 @@ import styles from './analytics.module.css'
 type Point = ConversionDefinitionReport['byDefinition'][number]
 
 function rangeOf(days: number) {
-  const to = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' })
-  const from = new Date(`${to}T00:00:00+09:00`)
-  from.setUTCDate(from.getUTCDate() - days + 1)
-  return { from: from.toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }), to }
+  const now = new Date()
+  return { from: jstDateOffset(1 - days, now), to: jstDate(now) }
 }
 
 function RowMenu({ point, onShowDaily }: { point: Point; onShowDaily: () => void }) {
