@@ -13,6 +13,7 @@ import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { CircleAlert, GitCompare, Link2, RotateCcw, Send } from 'lucide-react'
 import { validateFlexContent, type Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
@@ -493,25 +494,9 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         title={title}
         description={description}
         band={conflict ? (
-          <div className={styles.band} role="alert" data-design-node="NCbYn">
-            <CircleAlert size={18} aria-hidden="true" className={styles.bandIcon} />
-            <div className={styles.bandText}>
-              <p className={styles.bandTitle} title={conflict.name}>
-                {`ほかの人が${conflict.at ? ` ${conflict.at} に` : '先に'}テンプレート「${conflict.name}」を保存しました`}
-              </p>
-              <p className={styles.bandDesc}>あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。</p>
-            </div>
-            <div className={styles.bandActions}>
-              <Button type="button" onClick={() => void openCompare()} disabled={compareBusy} busy={Boolean(compareBusy)} busyLabel="処理中…">
-                <GitCompare size={15} aria-hidden="true" />
-                違いを比べる
-              </Button>
-              <Button type="button" variant="primary" onClick={reloadLatest}>
-                <RotateCcw size={15} aria-hidden="true" />
-                最新を読み込んで続ける
-              </Button>
-            </div>
-          </div>
+          <SaveConflictBand designNode="NCbYn"
+            title={`ほかの人が${conflict.at ? ` ${conflict.at} に` : '先に'}テンプレート「${conflict.name}」を保存しました`}
+            compareBusy={compareBusy} onCompare={openCompare} onReload={reloadLatest} />
         ) : undefined}
         side={(
           <>

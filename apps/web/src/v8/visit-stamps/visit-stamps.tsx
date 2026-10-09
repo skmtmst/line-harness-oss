@@ -8,6 +8,7 @@
  * ①② は下書きで、下の帯の［保存する］でまとめて保存する。③・店で手入力・④の取り消しは、その場で口を呼ぶ。
  * 呼ぶ口は visit-stamps-api（Codex の API-7）だけ。動き・権限は BEHAVIOR.md。
  */
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { notifySaved } from '@/components/shared/toast'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -183,6 +184,21 @@ function VisitStampsScreen() {
     samePage: destination => destination.pathname === '/visit-stamps',
   })
 
+  const saveConflict = useSaveConflict<VisitStampCard>({
+    contextKey: JSON.stringify([selectedAccountId, card?.id]),
+    fetchLatest: async () => {
+      if (!card) return null
+      const response = await visitStampsApi.cards()
+      return response.data.find(next => next.id === card.id) ?? null
+    },
+    reload: async () => {
+      const response = await visitStampsApi.cards()
+      setCards(response.data)
+      resetDraft(response.data.find(next => next.id === card?.id) ?? null)
+      saveConflict.clear()
+    },
+  })
+
   const save = async () => {
     const problem = settingsIssue(name, settings) ?? (settings.completion === 'next_card' && !nextCards.some(c => c.id === settings.nextCardId) ? { field: 'nextCardId' as const, message: '同じ店舗の有効な次のカードを選んでください。' } : null)
     if (problem) { setIssue(problem); return }
@@ -193,11 +209,13 @@ function VisitStampsScreen() {
       const body = { name: name.trim(), accountIds, settings, active: card?.active ?? true, expectedVersion: card?.version ?? 0 }
       if (card) await visitStampsApi.save(card.id, body)
       else await visitStampsApi.create(body)
+      saveConflict.clear()
       notifySaved('来店スタンプの設定を保存しました。')
       await loadCards()
     } catch (caught) {
       const conflict = (caught as { status?: number })?.status === 409
-      notifyToast(conflict ? 'ほかの人が先に保存しました。読み直してから、もう一度変えてください。' : message(caught, '保存できませんでした。'), { tone: 'error' })
+      if (conflict) saveConflict.mark()
+      else notifyToast(message(caught, '保存できませんでした。'), { tone: 'error' })
     } finally { setSaving(false) }
   }
 
@@ -783,6 +801,8 @@ function VisitStampsScreen() {
         onClose={() => setRejecting(null)} onConfirm={(why) => { if (rejecting) void review(rejecting, 'reject', why) }} />
       <ReasonDialog open={!!reversing} title="記録を取り消す" description="スタンプの数を元に戻します。取り消したことも記録に残ります。" confirmLabel="取り消す" busy={!!busy} error={dialogError || undefined}
         onClose={() => setReversing(null)} onConfirm={(why) => { if (reversing) void reverse(reversing, why) }} />
+      {saveConflict.conflict ? <SaveConflictBand title="ほかの人が来店スタンプを先に保存しました" compareBusy={saveConflict.compareBusy} onCompare={saveConflict.compare} onReload={saveConflict.reloadLatest} /> : null}
+      <SaveConflictCompareDialog open={saveConflict.compareOpen} busy={saveConflict.compareBusy} error={saveConflict.compareError} onCancel={saveConflict.closeCompare} onReload={saveConflict.reloadLatest} lines={saveConflict.latest ? [{ text: `名前：入力 ${name} ／ 最新 ${saveConflict.latest.name}` }, { text: `設定：入力 ${JSON.stringify(settings)} ／ 最新 ${JSON.stringify(saveConflict.latest.settings)}` }, { text: `店舗：入力 ${accountIds.join('・')} ／ 最新 ${saveConflict.latest.accountIds.join('・')}` }] : null} />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="保存していないカードの設定" onConfirm={confirmLeave} onCancel={cancelLeave} />
       <PhotoDialog url={photoUrl} name={photo ? friendNames(friendById(photo.friend_id) ?? { displayName: '友だち' }).name : ''} onClose={() => setPhoto(null)} />
     </PageFrame>

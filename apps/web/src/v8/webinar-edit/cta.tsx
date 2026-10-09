@@ -7,6 +7,7 @@
  * 口・保存前の確かめ・同時編集（409）の扱いは app/webinars/edit/cta-v8.tsx と同じ（BEHAVIOR.md）。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { GitCompare, Play, Plus, RefreshCw, TriangleAlert } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
@@ -271,15 +272,9 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
       status={chrome.status}
       /* 競合の帯は左右の列の上に横いっぱい（絵 pvimJ）。 */
       notice={conflict ? (
-        <div className={styles.conflict} role="alert" data-design-node="pvimJ">
-          <TriangleAlert size={16} aria-hidden="true" className={styles.conflictIcon} />
-          <div className={styles.conflictText}>
-            <p className={styles.conflictTitle}>{latest?.editor.updatedAt ? `ほかの人が ${new Date(latest.editor.updatedAt).toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' })} にこのウェビナーを保存しました` : 'ほかの人がこのウェビナーを保存しました'}</p>
-            <p className={styles.conflictNote}>このまま保存すると、ほかの人の変更が消えます</p>
-          </div>
-          <Button disabled={busy} busy={reading} onClick={() => void readLatest()}><GitCompare size={15} aria-hidden="true" />違いを比べる</Button>
-          <Button disabled={busy} onClick={() => setReplaceConfirm(true)}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
-        </div>
+        <SaveConflictBand designNode="pvimJ"
+          title={latest?.editor.updatedAt ? `ほかの人が ${new Date(latest.editor.updatedAt).toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' })} にこのウェビナーを保存しました` : 'ほかの人がこのウェビナーを保存しました'}
+          compareBusy={busy || reading} onCompare={readLatest} onReload={() => setReplaceConfirm(true)} />
       ) : undefined}
       preview={<>
         <h2 className={form.previewTitle}>カードの見え方</h2>

@@ -9,6 +9,7 @@
  * 比べてから保存するか、最新を読み込んで続ける。
  * データの口・送る形は今の画面（app/restaurant-test/v8/inventory.tsx）と同じ。動きは BEHAVIOR.md。
  */
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeftRight, Armchair, BookOpen, Check, TriangleAlert, RefreshCw, Trash2 } from 'lucide-react'
 import type { RestaurantOpeningDay } from '@line-crm/shared'
@@ -328,17 +329,10 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
         <Notice tone="warn" message={loadError} action={<Button onClick={() => setRefresh((n) => n + 1)}>もう一度読み込む</Button>} />
       ) : null}
       {conflict ? (
-        <Notice
-          tone="warn"
-          role="alert"
-          icon={<TriangleAlert size={16} />}
-          heading={`${conflict.who}が${conflict.at ? ` ${conflict.at} に` : ''}予約枠・在庫を保存しました`}
-          message={`このまま保存すると、${conflict.who}の変更（${conflict.scope}）が消えます`}
-          action={<>
-            <Button onClick={() => setDiffOpen(true)}><ArrowLeftRight size={15} aria-hidden="true" />違いを比べる</Button>
-            <Button onClick={reloadLatest}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
-          </>}
-        />
+        <SaveConflictBand
+          title={`${conflict.who}が${conflict.at ? ` ${conflict.at} に` : ''}予約枠・在庫を保存しました`}
+          description={`このまま保存すると、${conflict.who}の変更（${conflict.scope}）が消えます`}
+          onCompare={() => setDiffOpen(true)} onReload={reloadLatest} />
       ) : null}
       <Notice tone="info" icon={<Armchair size={16} />} message="ここは「席（卓）」に対して受ける予約の枠です。担当スタッフなど「人」に対して受ける予約は、予約設定（メニュー・受付枠・担当スタッフ）で決めます。" />
       <DetailColumns variant="restaurant-inventory" asideLabel="この時間帯の卓を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={(

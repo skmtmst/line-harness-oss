@@ -288,7 +288,7 @@ describe('V8 ウェビナーの編集', () => {
     await act(async () => { buttonText('下書きを保存')!.click() })
     for (let i = 0; i < 6; i += 1) await act(async () => {})
     const band = host.querySelector('[data-design-node="pvimJ"][role="alert"]')
-    expect(band?.textContent).toContain('このまま保存すると、ほかの人の変更が消えます')
+    expect(band?.textContent).toContain('このまま保存すると、相手の変更が消えます')
     expect(buttonText('下書きを保存')).toBeUndefined()
     expect(buttonText('比べてから保存')).toBeTruthy()
     expect([...host.querySelectorAll('a')].some((link) => link.textContent?.trim() === 'キャンセル')).toBe(true)

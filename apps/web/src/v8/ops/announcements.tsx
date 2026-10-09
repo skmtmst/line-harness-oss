@@ -1,5 +1,6 @@
 'use client'
 
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { notifySaved } from '@/components/shared/toast'
 import { Send } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -219,6 +220,22 @@ export default function OpsAnnouncementsV8() {
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(baseline), [form, baseline])
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy, onDiscard: () => { setForm(baseline) } })
 
+  const collision = useSaveConflict<OpsAnnouncement>({
+    contextKey: editingId ?? 'new',
+    fetchLatest: async () => {
+      const response = await api.ops.announcements.list()
+      return response.success ? response.data.find(row => row.id === editingId) ?? null : null
+    },
+    reload: async () => {
+      const response = await api.ops.announcements.list()
+      if (!response.success) throw new Error('読み込めませんでした')
+      const latest = response.data.find(row => row.id === editingId)
+      if (!latest) throw new Error('お知らせが見つかりませんでした')
+      edit(latest)
+      collision.clear()
+    },
+  })
+
   const submit = async (mode: OpsAnnouncementInput['mode']) => {
     if (fields.submit().length > 0) { setFormError(''); setConfirmSend(false); return }
     if (validation) { setFormError(validation); setConfirmSend(false); return }
@@ -244,12 +261,9 @@ export default function OpsAnnouncementsV8() {
           setCreateKey(crypto.randomUUID())
           return
         }
-        const latest = (error.data as { latest?: { updatedAt?: string } } | null)?.latest
-        if (latest?.updatedAt) setEditingUpdatedAt(latest.updatedAt)
-        setFormError(error.message && !error.message.startsWith('API error:')
-          ? error.message
-          : 'ほかの人が先に保存しました。一覧を読み直してから、もう一度保存してください。入力した内容はそのまま残っています。')
-        await load()
+        collision.mark()
+        setConfirmSend(false)
+        setFormError('')
         return
       }
       setFormError(error instanceof ApiError ? opsErrorMessage(error) : '保存できませんでした')
@@ -321,6 +335,13 @@ export default function OpsAnnouncementsV8() {
         {readOnly ? null : (
           <section aria-label="作成" className={styles.form}>
             <h2 className={parts.panelTitle}>{editingId ? 'お知らせを直す' : '作成'}</h2>
+            {collision.conflict ? <SaveConflictBand title="ほかの人が先にお知らせを保存しました" compareBusy={collision.compareBusy} onCompare={collision.compare} onReload={collision.reloadLatest} /> : null}
+            <SaveConflictCompareDialog open={collision.compareOpen} busy={collision.compareBusy} error={collision.compareError} onCancel={collision.closeCompare} onReload={collision.reloadLatest}
+              lines={collision.latest ? [
+                { text: `件名：入力 ${form.subject} ／ 最新 ${collision.latest.subject}` },
+                { text: `本文：入力 ${form.body} ／ 最新 ${collision.latest.body}` },
+                { text: `公開時刻：入力 ${form.publishAt || 'すぐに'} ／ 最新 ${toLocalInput(collision.latest.publishAt) || 'すぐに'}` },
+              ] : null} />
             {formError && !confirmSend ? <p role="alert" className={parts.alert}>{formError}</p> : null}
             <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
             <div className={styles.field}>

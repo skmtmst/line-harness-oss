@@ -13,6 +13,7 @@
  * タグ・リッチメニュー・回答フォーム・シナリオのひな形の中身は、入口（app/hq/templates/page.tsx）
  * が今の編集部品を `DefinitionEditor` として渡す（src/v8 から @/app を読まないため）。
  */
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState, type ComponentType } from 'react'
@@ -276,13 +277,34 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     return () => clearInterval(timer)
   }, [stage])
 
+  const tagDraft = useRef<TemplateDefinition | null>(null)
+  const conflictScope = JSON.stringify([type, detail?.template.id, creationScope.current?.tenantId])
+  const conflictScopeRef = useRef(conflictScope)
+  conflictScopeRef.current = conflictScope
+  const collision = useSaveConflict<TemplateDetail>({
+    contextKey: conflictScope,
+    fetchLatest: async () => detail ? hqTemplatesApi.get(detail.template.id) : null,
+    reload: async () => {
+      if (!detail) return
+      const scope = conflictScope
+      const latest = await hqTemplatesApi.get(detail.template.id)
+      if (!alive.current || scope !== conflictScopeRef.current) return
+      loadDetailIntoForm(latest)
+      tagDraft.current = null
+      setFormKey(key => key + 1)
+      setConflict(false); setError(''); collision.clear()
+    },
+  })
+
   const perform = async (action: () => Promise<void>) => {
     if (lock.current || !ready) return
     lock.current = true; setBusy(true); setError(''); setConflict(false); setMessage('')
     try { await action() } catch (e) {
       if (alive.current) {
         setError(errorText(e))
-        setConflict(Boolean(e && typeof e === 'object' && 'status' in e && e.status === 409))
+        const collided = Boolean(e && typeof e === 'object' && 'status' in e && e.status === 409)
+        setConflict(collided)
+        if (collided) collision.mark()
       }
     } finally { lock.current = false; if (alive.current) setBusy(false) }
   }
@@ -597,9 +619,20 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const colorFolder = folders.find((folder) => folder.id === tagFolder?.id) ?? tagFolder ?? templateFolder
   const tagColor = colorFolder ? folderDisplayColor(colorFolder) : null
 
+  const conflictNotice = conflict && detail ? <>
+    <SaveConflictBand title="ほかの人が統括のひな形を先に保存しました" description={error || undefined} compareBusy={collision.compareBusy} onCompare={collision.compare} onReload={collision.reloadLatest} />
+    <SaveConflictCompareDialog open={collision.compareOpen} busy={collision.compareBusy} error={collision.compareError} onCancel={collision.closeCompare} onReload={collision.reloadLatest}
+      lines={collision.latest ? [
+        { text: `名前：入力 ${type === 'tag' && tagDraft.current ? definitionName(type, tagDraft.current) : name} ／ 最新 ${collision.latest.template.name}` },
+        { text: `説明：入力 ${description} ／ 最新 ${collision.latest.template.description ?? ''}` },
+        { text: `内容：入力 ${JSON.stringify(type === 'tag' ? tagDraft.current ?? definition : definition)} ／ 最新 ${JSON.stringify(collision.latest.definition)}` },
+      ] : null} />
+  </> : null
+
   const notices = <>
     {!canEdit && stage === 'list' ? <p className={styles.readonlyBand} role="note">閲覧のみで見ています。変える操作は管理者に頼んでください。</p> : null}
-    {error && stage !== 'saved' ? <Notice tone="danger" message={error} action={conflict && detail ? <Button disabled={busy} onClick={() => open(detail.template.id, 'edit')} busy={Boolean(busy)} busyLabel="処理中…">最新の内容を読み込む</Button> : undefined} /> : null}
+    {conflictNotice}
+    {error && !conflictNotice && stage !== 'saved' ? <Notice tone="danger" message={error} /> : null}
     {message ? <Notice tone="success" message={message} onClose={() => setMessage('')} /> : null}
   </>
 
@@ -897,7 +930,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     const folderOf = (next: TagDefinition) => folders.some((folder) => folder.id === next.tag.folderId) ? next.tag.folderId ?? null : next.tag.folderId ? folderId : null
     return <HqTagEditorV8 key={formKey} definition={definition} folders={folders} onCreateFolder={canEdit ? createFolder : undefined} editing={Boolean(detail)} saving={busy} readOnly={!canEdit}
       onSaveDraft={async (next) => { const nextName = definitionName(type, next); const nextFolder = folderOf(next); setDefinition(next); setName(nextName); setFolderId(nextFolder); await save(false, next, nextName, description, false, { folderId: nextFolder }) }}
-      conflict={conflict} onReloadLatest={detail ? () => { void open(detail.template.id, 'edit') } : undefined}
+      conflictNotice={conflictNotice} onDraftChange={(next) => { tagDraft.current = next }} conflict={conflict} onReloadLatest={detail ? () => { void open(detail.template.id, 'edit') } : undefined}
       error={error} notice={message || undefined} onCancel={toList} onSave={async (next) => { const nextName = definitionName(type, next); const nextFolder = folderOf(next); setDefinition(next); setName(nextName); setFolderId(nextFolder); await save(true, next, nextName, description, false, { folderId: nextFolder }) }} />
   }
 
