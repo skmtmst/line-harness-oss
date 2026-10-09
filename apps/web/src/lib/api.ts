@@ -1971,6 +1971,8 @@ export type BroadcastMessageAsset = {
   payload: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
+  publishedVersion?: number;
+  publishedPayload?: Record<string, unknown>;
 };
 
 export type CommonActionStep = {
@@ -2970,12 +2972,13 @@ export async function refreshCachedList<T>(path: string): Promise<T> {
   return body
 }
 
-export async function fetchApiBlob(path: string, init?: { method?: string; accountId?: string | null }): Promise<Blob> {
+export async function fetchApiBlob(path: string, init?: { method?: string; accountId?: string | null; body?: string }): Promise<Blob> {
   const context = apiAccountContext(path, init)
   const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
     method: init?.method ?? 'GET',
     credentials: 'include',
-    headers: adminSessionHeaders(),
+    headers: { ...adminSessionHeaders(), ...(init?.body ? { 'Content-Type': 'application/json' } : {}) },
+    body: init?.body,
   })
   if (res.status >= 500) reportServerFailure(path, res.status)
   if (!res.ok) {
@@ -13465,8 +13468,10 @@ export const api = {
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/entry-routes/${id}`, { method: 'DELETE' }),
     /** M (止めた経路のQR): 印刷用PDFをサーバーで作る。止めた経路は409。 */
-    qrPdf: (id: string): Promise<Blob> =>
-      fetchApiBlob(`/api/entry-routes/${encodeURIComponent(id)}/qr-pdf`, { method: 'POST' }),
+    qrPdf: (id: string, paper: 'A4' | 'A5' = 'A4'): Promise<Blob> =>
+      fetchApiBlob(`/api/entry-routes/${encodeURIComponent(id)}/qr-pdf`, { method: 'POST', body: JSON.stringify({ paper }) }),
+    qrImage: (id: string, format: 'png' | 'svg', size: 'small' | 'medium' | 'large'): Promise<Blob> =>
+      fetchApiBlob(`/api/entry-routes/${encodeURIComponent(id)}/qr-image`, { method: 'POST', body: JSON.stringify({ format, size }) }),
     funnel: (id: string) =>
       fetchApi<ApiResponse<EntryRouteFunnel>>(`/api/entry-routes/${id}/funnel`),
     /** クリックがどこから来ているか。utm_source > 参照元のホスト > 直接アクセス */

@@ -61,6 +61,7 @@ import { notifyToast } from '@/components/shared/toast'
 import EditRouteDialog from './edit-route-dialog'
 import GenreDialog from './genre-dialog'
 import BulkDialog, { type BulkRouteAction } from './bulk-dialog'
+import StatusBadge from '@/components/shared/status-badge'
 import QrDialog, { referralUrl, type QrRoute } from './qr-dialog'
 import {
   becameLines,
@@ -446,6 +447,7 @@ export default function InflowListV8({
   /* ===== 行の「…」 ===== */
   const qrFor = (row: RouteRow): QrRoute => ({
     refCode: row.refCode,
+    couponEnabled: routes.find((route) => route.id === row.entryRouteId)?.couponEnabled,
     name: row.name,
     genre: row.genre,
     isActive: row.isActive,
@@ -733,6 +735,7 @@ export default function InflowListV8({
                         </div>
                       )}
                       <span className={narrow ? styles.refCode : `${styles.refCode} ${styles.dotIndentPad}`} title={r.refCode}>{r.refCode}</span>
+                      {routes.find((route) => route.id === r.entryRouteId)?.couponEnabled ? <StatusBadge tone="warning" dot={false} size="compact">クーポン付き</StatusBadge> : null}
                       {status ? (
                         <span
                           className={narrow ? styles.pill : `${styles.pill} ${styles.dotIndentMargin}`}
@@ -962,7 +965,7 @@ export default function InflowListV8({
             onSaved={(savedRoute, created) => {
               setEditing(null)
               void load()
-              if (created) setQrRoute({ refCode: savedRoute.refCode, name: savedRoute.name, genre: savedRoute.genre, isActive: savedRoute.isActive, id: savedRoute.id })
+              if (created) setQrRoute({ refCode: savedRoute.refCode, name: savedRoute.name, genre: savedRoute.genre, isActive: savedRoute.isActive, id: savedRoute.id, couponEnabled: savedRoute.couponEnabled })
             }}
           />
         ) : null}

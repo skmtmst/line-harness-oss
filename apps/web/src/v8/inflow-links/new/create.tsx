@@ -15,7 +15,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ArrowLeftRight, Link2, RefreshCw, TriangleAlert } from 'lucide-react'
 import type { ApiResponse, EntryRoute, EntryRouteGenre, Scenario, Tag, TagGroup, TrafficPool, Template } from '@line-crm/shared'
-import { ApiError, api } from '@/lib/api'
+import { ApiError, api, type BroadcastMessageAsset } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAccount } from '@/contexts/account-context'
@@ -36,6 +36,7 @@ import Toggle from '@/components/shared/toggle'
 import { TextField } from '@/components/shared/text-field'
 import { focusField } from '../focus-field'
 import { groupTagsByFolder } from './tag-options'
+import CouponSettings, { type CouponSettingsValue } from '../coupon-settings'
 import styles from './create.module.css'
 
 /* ref は口（entry-routes.ts）と同じ `[A-Za-z0-9_-]{1,64}`。 */
@@ -87,6 +88,8 @@ function InflowCreate() {
   const [tagId, setTagId] = useState('')
   const [scenarioId, setScenarioId] = useState('')
   const [introTemplateId, setIntroTemplateId] = useState('')
+  const [coupon, setCoupon] = useState<CouponSettingsValue>({ couponEnabled: false, couponAssetId: null, couponAudience: 'new_friends' })
+  const [couponOptions, setCouponOptions] = useState<BroadcastMessageAsset[]>([])
   const [poolId, setPoolId] = useState('')
   const [redirectUrl, setRedirectUrl] = useState('')
   const [isActive, setIsActive] = useState(true)
@@ -106,6 +109,8 @@ function InflowCreate() {
 
   useEffect(() => {
     clearConflict()
+    setCoupon({ couponEnabled: false, couponAssetId: null, couponAudience: 'new_friends' })
+    setCouponOptions([])
     let cancelled = false
     /* プールは補助データ。機能がオフでも発行画面は止めない。有効と分からない限り口を呼ばない。 */
     const poolsRequest: Promise<ApiResponse<TrafficPool[]>> = isPoolsFeatureAvailable().then((ok) =>
@@ -154,7 +159,7 @@ function InflowCreate() {
 
   const dirty = Boolean(
     (name && name !== initialName) || genre || newGenre || (refCode && refCode !== initialRef && refCode !== suggestRef(initialName))
-    || tagId || scenarioId || introTemplateId || poolId || redirectUrl || !isActive,
+    || coupon.couponEnabled || coupon.couponAssetId || tagId || scenarioId || introTemplateId || poolId || redirectUrl || !isActive,
   )
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
@@ -172,6 +177,7 @@ function InflowCreate() {
         if (!['http:', 'https:'].includes(url.protocol)) throw new Error()
       } catch { errors['ir-redirect'] = 'http または https で始まる URL を入力してください' }
     }
+    if (coupon.couponEnabled && !coupon.couponAssetId) { setSaveError('渡すクーポンを選んでください'); return }
     setFieldErrors(errors)
     if (Object.keys(errors).length) {
       focusField(Object.keys(errors)[0])
@@ -196,6 +202,7 @@ function InflowCreate() {
         redirectUrl: redirectUrl.trim() || null,
         isActive,
         lineAccountId: selectedAccountId,
+        ...coupon,
       })
       if (!res.success) throw new Error(res.error)
       router.push(`/inflow-links/detail?id=${res.data.id}`)
@@ -262,6 +269,7 @@ function InflowCreate() {
     setPoolId(conflict.poolId && pools.some((pool) => pool.id === conflict.poolId) ? conflict.poolId : '')
     setRedirectUrl(conflict.redirectUrl ?? '')
     setIsActive(conflict.isActive)
+    setCoupon({ couponEnabled: conflict.couponEnabled ?? false, couponAssetId: conflict.couponAssetId ?? null, couponAudience: conflict.couponAudience ?? 'new_friends' })
     setShowCompare(false)
     setSaveError(null)
   }
@@ -284,6 +292,9 @@ function InflowCreate() {
   const afterAdd = (tag: string | null, intro: string | null, scenario: string | null) =>
     [tag ? `タグ「${tag}」` : null, intro ? `テンプレート「${intro}」` : null, scenario ? `シナリオ「${scenario}」` : null]
       .filter(Boolean).join('＋') || '何もしない'
+  const describeCoupon = (enabled?: boolean, assetId?: string | null, audience?: string) => enabled
+    ? `${assetId ? couponOptions.find((item) => item.id === assetId)?.name ?? '現在選べないクーポン' : '（未選択）'} / ${audience === 'all_friends' ? 'すでに友だちの人にも' : '新しく友だちになった人だけ'}`
+    : 'なし'
   const conflictRows = conflict ? [
     { label: '名前', mine: name.trim() || '（未設定）', saved: conflict.name },
     { label: 'フォルダ', mine: genre === '__new' ? newGenre.trim() || '（未設定）' : genre || '（未設定）', saved: conflict.genre ?? '（未設定）' },
@@ -302,8 +313,10 @@ function InflowCreate() {
       mine: poolName,
       saved: conflict.poolId ? poolNames.get(conflict.poolId) ?? '（このアカウントにありません）' : 'メインプールで自動振り分け',
     },
+    { label: 'クーポン', mine: describeCoupon(coupon.couponEnabled, coupon.couponAssetId, coupon.couponAudience), saved: describeCoupon(conflict.couponEnabled, conflict.couponAssetId, conflict.couponAudience),
+      different: coupon.couponEnabled !== Boolean(conflict.couponEnabled) || (coupon.couponEnabled && (coupon.couponAssetId !== conflict.couponAssetId || coupon.couponAudience !== (conflict.couponAudience ?? 'new_friends'))) },
     { label: '公開', mine: isActive ? '公開する' : '公開しない', saved: conflict.isActive ? '公開する' : '公開しない' },
-  ].filter((row) => row.mine !== row.saved) : []
+  ].filter((row) => 'different' in row ? row.different : row.mine !== row.saved) : []
   const conflictSavedAt = conflict ? formatSavedAt(conflict.updatedAt) : ''
 
   const conflictBand = conflict ? (
@@ -318,7 +331,7 @@ function InflowCreate() {
     </div>
   ) : null
 
-  const step4 = introTemplate
+  const step4 = coupon.couponEnabled ? 'トークにクーポンが届く' : introTemplate
     ? `メッセージ「${introTemplate.name}」が届く（右のスマホ）`
     : scenarioName
       ? `シナリオ「${scenarioName}」が始まる`
@@ -377,6 +390,7 @@ function InflowCreate() {
       /* 競合の帯（vWJEm）は板の頭の下・左右の列の上に、板いっぱいで出す（型の頭と本文の間の段）。 */
       notice={conflictBand}
       preview={preview}
+      hidePreviewWhenNarrow
       footerActions={(
         <>
           <Button href="/inflow-links">キャンセル</Button>
@@ -499,6 +513,10 @@ function InflowCreate() {
             ]}
           />
         </div>
+      </section>
+
+      <section className={styles.card} aria-label="クーポン QR">
+        <CouponSettings accountId={selectedAccountId} value={coupon} onChange={setCoupon} onOptionsLoaded={setCouponOptions} disabled={saving} />
       </section>
 
       <section className={styles.card} aria-labelledby="ir-new-after">

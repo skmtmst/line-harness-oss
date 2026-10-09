@@ -16,6 +16,7 @@ const Form = lazy(() => import('./pages/Form.js'));
 const EventWaitlistOffer = lazy(() => import('./pages/EventWaitlistOffer.js'));
 const VisitStamps = lazy(() => import('./pages/VisitStamps.js'));
 const SeatReserve = lazy(() => import('./pages/seat/SeatReserve.js'));
+const EntryRouteCoupon = lazy(() => import('./pages/EntryRouteCoupon.js'));
 const NotFound = lazy(() => import('./pages/NotFound.js'));
 
 function Loading() {
@@ -25,6 +26,7 @@ function Loading() {
 export default function App() {
   const [search] = useSearchParams();
   const location = useLocation();
+  if (search.get('couponRef')) return <Suspense fallback={<Loading />}><EntryRouteCoupon /></Suspense>;
   const waitlistToken = search.get('eventWaitlistToken');
   if (waitlistToken) {
     return (

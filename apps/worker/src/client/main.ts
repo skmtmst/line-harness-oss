@@ -195,7 +195,8 @@ function showFriendAdd(profile: { displayName: string; pictureUrl?: string }) {
         } catch { /* best-effort */ }
       }
       document.removeEventListener('visibilitychange', onVisibilityChange);
-      showCompletion(profile, false);
+      if (new URLSearchParams(window.location.search).get('couponRef')) await initSalonBooking('entry-coupon');
+      else showCompletion(profile, false);
     } catch {
       // ignore
     }
@@ -355,7 +356,7 @@ async function linkAndAddFlow() {
 
 // ─── Salon Booking (React, dynamic-imported) ─────────────
 
-async function initSalonBooking(page: 'salon-book' | 'visit-stamps' = 'salon-book'): Promise<void> {
+async function initSalonBooking(page: 'salon-book' | 'visit-stamps' | 'entry-coupon' = 'salon-book'): Promise<void> {
   // 既存 linkAndAddFlow と同じ初期化シーケンスを踏む:
   //   ① profile + idToken + friendFlag を並列取得
   //   ② /api/liff/link で UUID 確定 (ref/ig 含む) — booking エンドポイントが
@@ -426,6 +427,12 @@ async function initSalonBooking(page: 'salon-book' | 'visit-stamps' = 'salon-boo
   const container = document.getElementById('app');
   if (!container) {
     showError('mount target #app が見つかりません');
+    return;
+  }
+  if (page === 'entry-coupon') {
+    if (!await linked) { showError('クーポンを開けませんでした。時間をおいて、もう一度開いてください。'); return; }
+    const { mountEntryRouteCoupon } = await import('./entry-route-coupon/main.js');
+    mountEntryRouteCoupon(container, { liffId: LIFF_ID, lineUserId: profile.userId, idToken });
     return;
   }
   if (page === 'visit-stamps') {
@@ -723,7 +730,9 @@ async function main() {
     }
 
     const page = getPage();
-    if (page === 'book') {
+    if (new URLSearchParams(window.location.search).get('couponRef')) {
+      await initSalonBooking('entry-coupon');
+    } else if (page === 'book') {
       await initBooking();
     } else if (page === 'salon-book') {
       await initSalonBooking();
