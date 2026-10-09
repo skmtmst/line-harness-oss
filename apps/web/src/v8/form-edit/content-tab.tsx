@@ -25,6 +25,7 @@ import Dialog from '@/components/shared/dialog'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { DragHandle, RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import Toggle from '@/components/shared/toggle'
 import { ADD_GROUPS, blockKindLine, blockTitleLine, inputTypeLabel, isChoiceType } from './model'
 import MediaPickerDialog from './media-picker'
@@ -406,24 +407,28 @@ function BookingFields({ block, refs, set }: { block: FormInputBlock; refs: Form
     <>
       <div className={styles.bookingRow}>
         <Labeled label="メニュー">
-          <Select
-            aria-label="メニュー"
-            size="full"
+          <EntityKindField
+            kind="booking_menu"
+            label="メニュー"
+            options={menus}
             value={booking?.menuId ?? ''}
             onChange={(menuId) => setBooking({ menuId, staffId: null })}
-            options={[
-              { value: '', label: menus.length ? 'メニューを選ぶ' : 'メニューがありません' },
-              ...menus.map((m) => ({ value: m.id, label: `${m.name}・${m.durationMinutes}分` })),
-            ]}
+            placeholder={menus.length ? '（メニューを選ぶ）' : '（メニューがありません）'}
+            meta={(row) => {
+              const menu = menus.find((m) => m.id === row.id)
+              return menu ? `${menu.durationMinutes}分` : undefined
+            }}
           />
         </Labeled>
         <Labeled label="担当">
-          <Select
-            aria-label="担当"
-            size="full"
+          <EntityKindField
+            kind="staff"
+            label="担当"
+            options={staff}
             value={booking?.staffId ?? ''}
             onChange={(staffId) => setBooking({ staffId: staffId || null })}
-            options={[{ value: '', label: 'だれでも' }, ...staff.map((s) => ({ value: s.id, label: s.name }))]}
+            clearable
+            placeholder="（だれでも）"
           />
         </Labeled>
         <Labeled label="選べる期間">
