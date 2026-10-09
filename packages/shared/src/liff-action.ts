@@ -13,7 +13,7 @@ function identifier(id: string): string {
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(id)) throw new Error('INVALID_LIFF_ACTION_ID');
   return id;
 }
-function actionQuery(action: LiffAction): URLSearchParams {
+function actionQuery(action: LiffAction, allowEmptyForm = false): URLSearchParams {
   const params = new URLSearchParams();
   switch (action.kind) {
     case 'booking':
@@ -21,7 +21,7 @@ function actionQuery(action: LiffAction): URLSearchParams {
       if (action.menuId) params.set('menu_id', identifier(action.menuId));
       break;
     case 'booking_history': params.set('page', 'salon-book'); params.set('view', 'history'); break;
-    case 'form': params.set('page', 'form'); params.set('id', identifier(action.formId)); break;
+    case 'form': params.set('page', 'form'); params.set('id', allowEmptyForm && !action.formId ? '' : identifier(action.formId)); break;
     case 'visit_stamp':
       params.set('page', 'visit-stamps');
       if (action.cardId) params.set('card', identifier(action.cardId));
@@ -31,17 +31,19 @@ function actionQuery(action: LiffAction): URLSearchParams {
   return params;
 }
 
-export function liffActionUrl(input: LiffAction & { liffId: string }): string {
-  return `https://liff.line.me/${identifier(input.liffId)}/?${actionQuery(input)}`;
+/** allowEmptyForm は管理画面で選択途中の値を持つためだけに使う。送信時は省略する。 */
+export function liffActionUrl(input: LiffAction & { liffId: string; allowEmptyForm?: boolean }): string {
+  return `https://liff.line.me/${identifier(input.liffId)}/?${actionQuery(input, input.allowEmptyForm)}`;
 }
 
-function fromQuery(params: URLSearchParams): LiffAction | null {
+function fromQuery(params: URLSearchParams, allowEmptyForm = false): LiffAction | null {
   const page = params.get('page');
   const formId = page === 'form' ? params.get('id') : !page ? params.get('form') : null;
   if (formId) return { kind: 'form', formId: identifier(formId) };
+  if (page === 'form' && allowEmptyForm) return { kind: 'form', formId: '' };
   if (page === 'salon-book') {
     if (params.get('view') === 'history') return { kind: 'booking_history' };
-    const menuId = params.get('menu_id') ?? params.get('menuId');
+    const menuId = params.get('menu_id') ?? params.get('menu') ?? params.get('menuId');
     return { kind: 'booking', ...(menuId ? { menuId: identifier(menuId) } : {}) };
   }
   if (page === 'visit-stamps') {
@@ -52,11 +54,11 @@ function fromQuery(params: URLSearchParams): LiffAction | null {
 }
 
 /** LIFF以外・不完全なURLは null。旧 ?form=ID も読む。 */
-export function liffActionFromUrl(value: string): LiffAction | null {
+export function liffActionFromUrl(value: string, options: { allowEmptyForm?: boolean } = {}): LiffAction | null {
   try {
     const url = new URL(value.trim());
     if (url.origin !== 'https://liff.line.me' || url.username || url.password || !/^\/[A-Za-z0-9_-]{1,128}\/?$/.test(url.pathname)) return null;
-    return fromQuery(url.searchParams);
+    return fromQuery(url.searchParams, options.allowEmptyForm);
   } catch { return null; }
 }
 

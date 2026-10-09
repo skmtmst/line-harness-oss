@@ -8,6 +8,15 @@ export const actions: LiffAction[] = [
   { kind: 'form', formId: 'form-1' }, { kind: 'visit_stamp' }, { kind: 'visit_stamp', cardId: 'card-1' },
 ];
 describe('押したらの共通URL', () => {
+  it('管理画面の選択途中のフォームだけ空IDを許し、送信用の既定では拒否する', () => {
+    const draft = liffActionUrl({ liffId: 'store', kind: 'form', formId: '', allowEmptyForm: true });
+    expect(liffActionFromUrl(draft, { allowEmptyForm: true })).toEqual({ kind: 'form', formId: '' });
+    expect(liffActionFromUrl(draft)).toBeNull();
+    expect(() => liffActionUrl({ liffId: 'store', kind: 'form', formId: '' })).toThrow();
+  });
+  it.each(['menu_id=menu-1', 'menu=menu-1', 'menu_id=menu-1&menu=old', 'menuId=menu-1'])('予約メニューの旧URLも読み、menu_idを優先する: %s', query => {
+    expect(liffActionFromUrl(`https://liff.line.me/store/?page=salon-book&${query}`)).toEqual({ kind: 'booking', menuId: 'menu-1' });
+  });
   it.each(actions)('作成・読み戻し・統括の仮URL: %j', action => {
     const url = liffActionUrl({ liffId: '1234-abc', ...action });
     expect(liffActionFromUrl(url)).toEqual(action);
