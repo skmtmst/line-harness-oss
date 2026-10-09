@@ -527,7 +527,7 @@ export default function FriendsListV8() {
     },
     {
       key: 'added', title: '今月の追加', icon: UserPlus, value: stats?.addedThisMonth ?? null,
-      detail: stats ? `前月 ${formatNumber(stats.addedLastMonth)}人` : statsFailed ? '読み込めませんでした' : '—',
+      detail: stats ? `前月 ${formatNumber(stats.addedLastMonth)} 人` : statsFailed ? '読み込めませんでした' : '—',
       delta: stats ? { text: `${addedDiff >= 0 ? '+' : ''}${addedDiff}`, tone: addedDiff < 0 ? 'neutral' : 'up' } : null,
       href: '/chats',
     },
@@ -644,7 +644,7 @@ export default function FriendsListV8() {
             注目のみ
           </FilterChip>
         </div>
-        <span className={styles.count}>{loadStatus === 'ready' && !refreshing ? `${formatNumber(total)}件` : '—'}</span>
+        <span className={styles.count}>{loadStatus === 'ready' && !refreshing ? `${formatNumber(total)} 件` : '—'}</span>
         {broadcastHandoffHref ? (
           <Link href={broadcastHandoffHref} data-broadcast-handoff className={styles.handoff} title="今の絞り込み条件を対象に一斉配信を作ります。人数は送信時に最新の友だちへ計算し直します。">
             <Megaphone size={14} aria-hidden="true" />
@@ -891,7 +891,7 @@ export default function FriendsListV8() {
   const pager = (
     <div className={styles.pager}>
       <span className={styles.pagerCount}>
-        {loadStatus === 'ready' ? `${formatNumber(total)}人中 ${formatNumber(rangeStart)}〜${formatNumber(rangeEnd)}人` : '—'}
+        {loadStatus === 'ready' ? `${formatNumber(total)} 人中 ${formatNumber(rangeStart)}〜${formatNumber(rangeEnd)} 人` : '—'}
       </span>
       <Pagination page={page} pageCount={totalPages} onPageChange={setPage} disabled={loadStatus !== 'ready'} ariaLabel="友だち一覧のページ" />
     </div>

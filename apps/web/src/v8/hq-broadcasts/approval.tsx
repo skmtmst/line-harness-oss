@@ -133,12 +133,12 @@ export function HqApprovalBlock({
   return (
     <>
       {gate === 'single' ? (
-        <Notice tone="info">{`送る人数が ${formatNumber(state.gate.threshold)}通以上です。統括の担当者が1人なので、送るときに人数を入れて確かめます。`}</Notice>
+        <Notice tone="info">{`送る人数が ${formatNumber(state.gate.threshold)} 通以上です。統括の担当者が1人なので、送るときに人数を入れて確かめます。`}</Notice>
       ) : gate === 'needsRequest' ? (
         <Notice tone="warn">
           {state.approval.status === 'rejected'
             ? `差し戻されました（理由：${state.approval.rejectReason || '—'}）。内容を直して、もう一度承認を依頼してください。`
-            : `送る人数が ${formatNumber(state.gate.threshold)}通以上なので、もう1人の承認が要ります。承認されるまで送られません。`}
+            : `送る人数が ${formatNumber(state.gate.threshold)} 通以上なので、もう1人の承認が要ります。承認されるまで送られません。`}
         </Notice>
       ) : gate === 'pending' ? (
         <Notice
@@ -167,7 +167,7 @@ export function HqApprovalBlock({
       <ConfirmDialog
         open={requestOpen}
         title="承認を依頼する"
-        description={`送る相手 ${formatNumber(state.gate.recipientCount)}人。承認されるまで送られません。`}
+        description={`送る相手 ${formatNumber(state.gate.recipientCount)} 人。承認されるまで送られません。`}
         confirmLabel="承認を依頼する"
         busy={busy}
         error={message || undefined}

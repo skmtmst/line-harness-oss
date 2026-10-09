@@ -256,7 +256,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
               )}
               {pageCount > 1 ? (
                 <div className={styles.pagerRow}>
-                  <span className={styles.small}>{`${formatNumber(total)}件中 ${formatNumber(m.page * ITEM_PAGE_SIZE + 1)}〜${formatNumber(Math.min((m.page + 1) * ITEM_PAGE_SIZE, total))}件`}</span>
+                  <span className={styles.small}>{`${formatNumber(total)} 件中 ${formatNumber(m.page * ITEM_PAGE_SIZE + 1)}〜${formatNumber(Math.min((m.page + 1) * ITEM_PAGE_SIZE, total))} 件`}</span>
                   <Pagination page={m.page + 1} pageCount={pageCount} onPageChange={(next) => m.onPageChange(active.id, next - 1)} disabled={m.busy || m.detailBusy} />
                 </div>
               ) : null}
@@ -272,7 +272,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                 <span className={styles.bandTitle}>{active.status === 'completed' ? '本移行と照合が終わりました' : statusView?.badgeLabel}</span>
                 <span className={styles.bandText}>
                   {active.status === 'completed'
-                    ? `${formatNumber(active.counts.applied)}人を引き継ぎました。必要ならこの履歴から切り戻せます。`
+                    ? `${formatNumber(active.counts.applied)} 人を引き継ぎました。必要ならこの履歴から切り戻せます。`
                     : statusView?.description}
                 </span>
               </span>
@@ -280,10 +280,10 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
             <section className={styles.card} aria-labelledby="uid-result">
               <h3 id="uid-result" className={styles.cardTitle}>照合の結果</h3>
               <ul className={styles.lines}>
-                <li className={styles.line}><span>引き継いだ</span><span className={styles.lineGood}>{`${formatNumber(active.counts.applied)}人`}</span></li>
-                <li className={styles.line}><span>一致先なし（CSVで書き出す・取り込むで作る）</span><span className={styles.lineValue}>{`${formatNumber(active.counts.unmatched)}人`}</span></li>
-                <li className={styles.line}><span>除いた</span><span className={styles.lineValue}>{`${formatNumber(active.decisionCounts?.exclude ?? 0)}人`}</span></li>
-                <li className={styles.line}><span>失敗</span><span className={styles.lineValue}>{`${formatNumber(active.counts.failed)}人`}</span></li>
+                <li className={styles.line}><span>引き継いだ</span><span className={styles.lineGood}>{`${formatNumber(active.counts.applied)} 人`}</span></li>
+                <li className={styles.line}><span>一致先なし（CSVで書き出す・取り込むで作る）</span><span className={styles.lineValue}>{`${formatNumber(active.counts.unmatched)} 人`}</span></li>
+                <li className={styles.line}><span>除いた</span><span className={styles.lineValue}>{`${formatNumber(active.decisionCounts?.exclude ?? 0)} 人`}</span></li>
+                <li className={styles.line}><span>失敗</span><span className={styles.lineValue}>{`${formatNumber(active.counts.failed)} 人`}</span></li>
               </ul>
             </section>
           </>
@@ -324,7 +324,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                     <Tr key={run.id} className={`${styles.row} ${styles.rowRun}`} selected={active?.id === run.id || undefined}>
                       <Td className={styles.td}>{slashDateTime(run.createdAt)}</Td>
                       <Td className={styles.td}>
-                        <button type="button" className={styles.runButton} aria-current={active?.id === run.id ? 'true' : undefined} title={`${run.purpose} ・ ${formatNumber(run.counts.total)}件`} onClick={() => m.selectRun(run.id)}>
+                        <button type="button" className={styles.runButton} aria-current={active?.id === run.id ? 'true' : undefined} title={`${run.purpose} ・ ${formatNumber(run.counts.total)} 件`} onClick={() => m.selectRun(run.id)}>
                           {`${accountName(run.fromAccountId)} → ${accountName(run.toAccountId)}`}
                         </button>
                       </Td>

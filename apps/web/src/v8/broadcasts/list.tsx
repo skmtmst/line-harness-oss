@@ -67,6 +67,8 @@ import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import QuickSendV8 from './quick-send'
 import styles from './list.module.css'
+import { formatListDateTime as polishFormatListDateTime } from '@/lib/format'
+
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -640,7 +642,7 @@ export default function BroadcastListV8() {
       icon: Send,
       value: kpiPending ? null : (listKpis?.thisMonth ?? null),
       unit: '件',
-      detail: `${listKpis?.delivered == null ? '—' : `${formatNumber(listKpis.delivered)}人`}に届いた`,
+      detail: `${listKpis?.delivered == null ? '—' : `${formatNumber(listKpis.delivered)} 人`}に届いた`,
     },
     {
       key: 'openRate',
@@ -1090,8 +1092,8 @@ export default function BroadcastListV8() {
               <Td>
                 <span className={styles.cellMain}>
                   {broadcast.status === 'sent'
-                    ? (broadcast.sentAt ? formatDateTime(broadcast.sentAt) : '—')
-                    : (broadcast.scheduledAt ? formatDateTime(broadcast.scheduledAt) : '未設定')}
+                    ? (broadcast.sentAt ? polishFormatListDateTime(broadcast.sentAt) : '—')
+                    : (broadcast.scheduledAt ? polishFormatListDateTime(broadcast.scheduledAt) : '未設定')}
                 </span>
                 {broadcast.status === 'scheduled' && broadcast.scheduledAt ? <span className={styles.cellSub}>予約</span> : null}
               </Td>
@@ -1100,7 +1102,7 @@ export default function BroadcastListV8() {
                   <span className={styles.cellMain}>—</span>
                 ) : (
                   <>
-                    <span className={styles.resultMain}>{formatNumber(insight?.delivered ?? broadcast.successCount)}人に届いた</span>
+                    <span className={styles.resultMain}>{formatNumber(insight?.delivered ?? broadcast.successCount)} 人に届いた</span>
                     {insight && (insight.openRate != null || insight.clickRate != null) ? (
                       <span className={styles.cellSub}>
                         {[
@@ -1150,8 +1152,8 @@ export default function BroadcastListV8() {
     <ListPagePagination>
       <span className={styles.pagerCount}>
         {pageCount > 1
-          ? `${formatNumber(resultTotal ?? visibleBroadcasts.length)}件中 ${rangeFirst}〜${rangeLast}件`
-          : `${formatNumber(resultTotal ?? visibleBroadcasts.length)}件`}
+          ? `${formatNumber(resultTotal ?? visibleBroadcasts.length)} 件中 ${rangeFirst}〜${rangeLast}件`
+          : `${formatNumber(resultTotal ?? visibleBroadcasts.length)} 件`}
       </span>
       {pageCount > 1 ? (
         <Pagination page={page} pageCount={pageCount} onPageChange={goPage} ariaLabel="一斉配信のページ送り" />
@@ -1300,7 +1302,7 @@ export default function BroadcastListV8() {
                 {panelRow.status === 'sent'
                   ? (panelRow.sentAt ? `送信済み：${formatDateTime(panelRow.sentAt)}` : '送信済み')
                   : (panelRow.scheduledAt ? `予約：${formatDateTime(panelRow.scheduledAt)}` : '下書き')}
-                {panelRow.status === 'sent' ? ` ／ ${formatNumber(insight?.delivered ?? panelRow.successCount)}人に届いた` : ''}
+                {panelRow.status === 'sent' ? ` ／ ${formatNumber(insight?.delivered ?? panelRow.successCount)} 人に届いた` : ''}
               </p>
             </DetailPanel>
           )

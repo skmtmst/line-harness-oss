@@ -181,8 +181,8 @@ function Connections() {
         <h2 className={styles.boxTitle} id="rm-state">いまの状態</h2>
         <div className={styles.row}><span>状態</span><strong>{group.status === 'published' ? '公開中' : '下書き'}</strong></div>
         <div className={styles.row}><span>出す相手</span><strong>{audienceText}</strong></div>
-        <div className={styles.row}><span>出る人</span><strong>{reach === null ? '—' : `${formatNumber(reach)}人`}</strong></div>
-        <div className={styles.row}><span>今月押された</span><strong>{taps === null ? '—' : `${formatNumber(taps)}回`}</strong></div>
+        <div className={styles.row}><span>出る人</span><strong>{reach === null ? '—' : `${formatNumber(reach)} 人`}</strong></div>
+        <div className={styles.row}><span>今月押された</span><strong>{taps === null ? '—' : `${formatNumber(taps)} 回`}</strong></div>
       </section>
     </div>
   )

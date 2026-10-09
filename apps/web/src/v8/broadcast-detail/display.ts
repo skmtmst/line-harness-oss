@@ -1,5 +1,7 @@
 import type { ApiBroadcast, BroadcastDisplayStatus } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 /*
  * ★V8 一斉配信の詳細・予約したあとで使う、見せ方の小さな関数。
@@ -54,10 +56,7 @@ export const CREATION_STEPS: ReadonlyArray<{ key: string; order: number; label: 
 
 /** 「8月24日（月）10:00」。無い・読めないときは「—」。 */
 export function formatBroadcastDateTime(value: string | null | undefined): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return formatDateTime(date)
+  return polishFormatDate(value, { style: 'detail', fallback: '—' })
 }
 
 const SHORT = new Intl.DateTimeFormat('ja-JP', {
@@ -72,20 +71,12 @@ const SHORT = new Intl.DateTimeFormat('ja-JP', {
 
 /** スマホの札の短い日時「8/24（月）10:00」（絵 `pNiUk`・`cdZBf`）。 */
 export function formatShortDateTime(value: string | null | undefined): string {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  const part = (type: string) => SHORT.formatToParts(date).find((p) => p.type === type)?.value ?? ''
-  return `${part('month')}/${part('day')}（${part('weekday')}）${part('hour')}:${part('minute')}`
+  return polishFormatDate(value, { style: 'list', fallback: '' })
 }
 
 const MONTH_DAY = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' })
 
 /** 「8月19日」（承認した日など、曜日も時刻も要らない日付）。 */
 export function formatMonthDay(value: string | null | undefined): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const part = (type: string) => MONTH_DAY.formatToParts(date).find((p) => p.type === type)?.value ?? ''
-  return `${part('month')}月${part('day')}日`
+  return polishFormatDate(value, { style: 'list', fallback: '—' })
 }

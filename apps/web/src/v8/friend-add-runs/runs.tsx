@@ -374,8 +374,8 @@ function FriendAddRunsInner() {
       anchor.click()
       URL.revokeObjectURL(url)
       setMessage(exportCursor
-        ? `新しい順に${formatNumber(rows.length)}件まで書き出しました。それより古い記録は含まれていません。`
-        : `${formatNumber(rows.length)}件を書き出しました。`)
+        ? `新しい順に${formatNumber(rows.length)} 件まで書き出しました。それより古い記録は含まれていません。`
+        : `${formatNumber(rows.length)} 件を書き出しました。`)
     } catch {
       setMessage('書き出す記録を読み込めませんでした。通信を確認して、もう一度お試しください。')
     } finally {
@@ -474,7 +474,7 @@ function FriendAddRunsInner() {
         <div className={styles.failBand} role="alert">
           <TriangleAlert size={18} className={styles.failIcon} aria-hidden="true" />
           <div className={styles.failText}>
-            <p className={styles.failTitle}>{`失敗した処理が ${formatNumber(failedCount)}件あります`}</p>
+            <p className={styles.failTitle}>{`失敗した処理が ${formatNumber(failedCount)} 件あります`}</p>
             <p className={styles.failNote}>案内は届きましたが、シナリオを始められませんでした。止まった行の理由を見て、もう一度実行できます。</p>
           </div>
           <Button onClick={() => pickChip('failed')}>失敗だけ見る</Button>
@@ -584,7 +584,7 @@ function FriendAddRunsInner() {
               pageCount={pageCount}
               onPageChange={changePage}
               disabled={loading}
-              summary={`${formatNumber(data.total)}件中 ${(cursorPage - 1) * perPage + 1}〜${(cursorPage - 1) * perPage + items.length}件`}
+              summary={`${formatNumber(data.total)} 件中 ${(cursorPage - 1) * perPage + 1}〜${(cursorPage - 1) * perPage + items.length}件`}
             />
           </div>
         ) : null}
@@ -600,7 +600,7 @@ function FriendAddRunsInner() {
               {routeBreakdown.map(([route, count]) => (
                 <div className={styles.kvRow} key={route}>
                   <dt>{route}</dt>
-                  <dd>{`${formatNumber(count)}人（${Math.round((count / items.length) * 100)}%）`}</dd>
+                  <dd>{`${formatNumber(count)} 人（${Math.round((count / items.length) * 100)}%）`}</dd>
                 </div>
               ))}
             </dl>

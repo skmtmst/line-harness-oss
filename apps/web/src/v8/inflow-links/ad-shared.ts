@@ -9,6 +9,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AdEventMapping } from '@line-crm/shared'
 import { api, type AdConversionLog, type AdPlatform } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 export const AD_PROVIDER_LABEL: Record<string, string> = {
   google: 'Google広告',
@@ -33,14 +35,7 @@ export function adLogStatus(status: string): { label: string; tone: 'info' | 'su
 
 /** 月/日 時:分（日本時間）。 */
 export function adDateTime(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-  }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`
+  return polishFormatDate(iso, { style: 'list', fallback: '—' })
 }
 
 export type AdLogSummary = { sentLast30Days: number; pendingLast30Days: number; failedLast30Days: number }

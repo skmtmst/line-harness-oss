@@ -137,8 +137,8 @@ export default function DashboardV8() {
           action={{ label: '受信箱を開く', href: '/chats?status=unread' }}
         />,
         detail: <>
-          <span>{`LINEの未対応：${d.lineUnread === null ? '未取得' : `${formatNumber(d.lineUnread)}件`}`}</span>
-          <span>{`メールの未対応：${d.mailUnread === null ? '未取得' : `${formatNumber(d.mailUnread)}件`}`}</span>
+          <span>{`LINEの未対応：${d.lineUnread === null ? '未取得' : `${formatNumber(d.lineUnread)} 件`}`}</span>
+          <span>{`メールの未対応：${d.mailUnread === null ? '未取得' : `${formatNumber(d.mailUnread)} 件`}`}</span>
           <span>{`最も古い未対応：${d.pendingOldest === null ? '—' : formatWaitRough(d.pendingOldest)}`}</span>
         </>,
       }
@@ -167,7 +167,7 @@ export default function DashboardV8() {
         detail: <span>{forbidden
           ? '写真を見る権限がありません。権限を確認してください。'
           : state === 'ready' && value !== null && value > 0
-            ? `確認待ちが${formatNumber(value)}件あります。審査するとポイントが付きます。`
+            ? `確認待ちが${formatNumber(value)} 件あります。審査するとポイントが付きます。`
             : '確認待ちの写真はありません。'}</span>,
       }
     }
@@ -213,7 +213,7 @@ export default function DashboardV8() {
         />,
         detail: <span>{state !== 'ready' || !s
           ? (state === 'error' ? STATE_TEXT.error : STATE_TEXT.loading)
-          : `今日の出荷 ${formatNumber(s.today)}件・今日と明日 ${formatNumber(s.soon)}件（${s.scanLimited ? `直近${s.scanLimit}件のEC通知から算出` : 'EC通知から算出'}）`}</span>,
+          : `今日の出荷 ${formatNumber(s.today)} 件・今日と明日 ${formatNumber(s.soon)} 件（${s.scanLimited ? `直近${s.scanLimit}件のEC通知から算出` : 'EC通知から算出'}）`}</span>,
       }
     }
     return null

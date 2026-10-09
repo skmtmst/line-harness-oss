@@ -23,6 +23,8 @@ import { canResendInvite, lastLoginShort, memberKpis, memberStatus, sortMembersB
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import MemberDialogV8, { MemberChangeConfirmV8, type MemberDialogValue } from './member-dialog'
 import styles from './members.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -327,7 +329,7 @@ function StatCard({ label, value, unit, sub }: { label: string; value: number; u
     <div className={styles.card}>
       <span className={styles.cardLabel}>{label}</span>
       <span className={styles.cardValueRow}>
-        <span className={styles.cardValue}>{value.toLocaleString('ja-JP')}</span>
+        <span className={styles.cardValue}>{polishFormatNumber(value)}</span>
         <span className={styles.cardUnit}>{unit}</span>
       </span>
       <span className={styles.cardSub}>{sub}</span>

@@ -28,6 +28,8 @@ import TargetMissing from '@/components/shared/target-missing'
 import { richMenuError, richMenuErrorAll } from '@/v8/rich-menus/errors'
 import { audienceOf, progressStatusText, runAudienceText, runStamp, type ProgressStep, type ReconcileDiff } from './model'
 import styles from './detail.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+
 
 type Group = {
   id: string
@@ -376,8 +378,8 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
               <dl className={styles.aboutList}>
                 <div className={styles.aboutRow}><dt>状態</dt><dd className={styles.stateOk}>公開中</dd></div>
                 <div className={styles.aboutRow}><dt>出す相手</dt><dd>{audience === 'all' ? 'すべての友だち（既定）' : audience === 'targeted' ? '条件に当てはまる友だち' : '登録だけ（出す相手なし）'}</dd></div>
-                <div className={styles.aboutRow}><dt>出る人</dt><dd>{preview?.effective.value == null ? '—' : `${preview.effective.value.toLocaleString('ja-JP')}人`}</dd></div>
-                <div className={styles.aboutRow}><dt>今月押された</dt><dd>{taps === undefined ? '読み込み中…' : taps === null ? '—' : `${taps.toLocaleString('ja-JP')}回`}</dd></div>
+                <div className={styles.aboutRow}><dt>出る人</dt><dd>{preview?.effective.value == null ? '—' : `${polishFormatNumber(preview.effective.value)} 人`}</dd></div>
+                <div className={styles.aboutRow}><dt>今月押された</dt><dd>{taps === undefined ? '読み込み中…' : taps === null ? '—' : `${polishFormatNumber(taps)} 回`}</dd></div>
               </dl>
             </section>
           </aside>

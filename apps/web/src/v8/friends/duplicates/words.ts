@@ -1,5 +1,7 @@
 /* ★V8 重複検出の言葉（hn6Y8・fcg2D）。 */
 import type { IdentityCandidateStatus, IdentityConfidenceLabel } from '@line-crm/shared'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 export const CONFIDENCE_WORD: Record<IdentityConfidenceLabel, string> = { very_high: '最高', high: '高', medium: '中', low: '低' }
 
@@ -34,9 +36,5 @@ export function statusTone(status: IdentityCandidateStatus): PillTone {
 
 /** 8/30 19:00（日本時間）。 */
 export function slashDateTime(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${Number(get('month'))}/${Number(get('day'))} ${get('hour')}:${get('minute')}`
+  return polishFormatDate(iso, { style: 'list', fallback: '—' })
 }

@@ -272,7 +272,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
         pagination={<>
           {state === 'ready' && searched.length > 0 ? (
             <ListPagePagination>
-              <span className={styles.pagerCount}>{`${formatNumber(searched.length)}件中 ${from}〜${to}件`}</span>
+              <span className={styles.pagerCount}>{`${formatNumber(searched.length)} 件中 ${from}〜${to}件`}</span>
               <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="参加者一覧のページ送り" />
             </ListPagePagination>
           ) : null}

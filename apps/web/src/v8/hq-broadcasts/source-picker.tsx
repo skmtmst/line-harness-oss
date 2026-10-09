@@ -10,6 +10,8 @@ import SourcePickerDialog, { type SourcePickerItem, type SourcePickerFolder } fr
 import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api'
 import { hqTemplatesApi, type HqTemplateListItem } from '@/lib/hq-templates-api'
 import { bubbleFromTemplate, previewBubbleOf } from './bubbles'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 const KINDS = [
   { id: 'message', label: 'テキスト' }, { id: 'carousel', label: 'カルーセル' },
@@ -19,9 +21,7 @@ const KINDS = [
 const STATES = [{ id: 'sent', label: '送信済み' }, { id: 'scheduled', label: '予約中' }, { id: 'prepared', label: '下書き' }]
 
 function dateLabel(value?: string | null) {
-  if (!value) return '更新 —'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '更新 —' : `更新 ${new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).format(date)}`
+  return `更新 ${polishFormatDate(value, { style: 'day', fallback: '—' })}`
 }
 
 export function templatePickerItem(item: HqTemplateListItem): SourcePickerItem {

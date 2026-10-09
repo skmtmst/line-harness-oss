@@ -20,6 +20,8 @@ import {
 import { RsDialog } from '../restaurant/booking-kit/parts'
 import { INACTIVE_STATUSES, hm, mdWeek, sourceName } from '../restaurant/reservations/format'
 import styles from './detail-dialog.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+
 
 type History = { state: 'loading' } | { state: 'none' } | { state: 'error' } | { state: 'ready'; count: number; last: string | null }
 
@@ -32,7 +34,7 @@ export function detailWhen(item: RestaurantReservation, table: RestaurantTable |
 /** 「秋の鹿肉コース 8,800円 ・ Hot Pepper から」。コースが無ければ「席のみ」。 */
 export function detailCourse(item: RestaurantReservation, course: RestaurantMenuItem | null): string {
   const name = item.course_name || course?.name || ''
-  const price = course?.price ? ` ${course.price.toLocaleString('ja-JP')}円` : ''
+  const price = course?.price ? ` ${polishFormatNumber(course.price)} 円` : ''
   return `${name ? `${name}${price}` : '席のみ'} ・ ${sourceName(item.source)} から`
 }
 

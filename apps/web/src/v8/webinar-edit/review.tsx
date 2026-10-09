@@ -152,7 +152,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
           {readOnly ? null : <Button disabled={testing !== false || publishing} onClick={() => setNotifyConfirm(true)}><Send size={15} aria-hidden="true" />テストを送る</Button>}
         </div>
         {!ctx.canOpenPublicPage && ctx.publicPageReason ? <p className={form.previewNote}>{ctx.publicPageReason}</p> : null}
-        {ctx.analytics ? <p className={form.previewNote}>{`申込 ${formatNumber(ctx.analytics.summary.reservations)}人`}</p> : null}
+        {ctx.analytics ? <p className={form.previewNote}>{`申込 ${formatNumber(ctx.analytics.summary.reservations)} 人`}</p> : null}
       </>}
     >
       <section className={form.card} data-gap="tight" aria-labelledby="webinar-review-title" data-wc-pane="review">

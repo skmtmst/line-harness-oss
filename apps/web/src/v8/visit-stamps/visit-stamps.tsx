@@ -49,6 +49,8 @@ import {
 } from './display'
 import { BonusDialog, MultiplierDialog, PhotoDialog, PinDialog, RankDialog, ReasonDialog, RewardDialog, StoresDialog } from './dialogs'
 import styles from './visit-stamps.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+
 
 type PaperRow = { id: string; card_id?: string; friend_id: string; photo_url: string; stamps: number; status: string; created_at?: string }
 type FriendLite = { id: string; displayName?: string | null; metadata?: Record<string, unknown> | null }
@@ -527,7 +529,7 @@ function VisitStampsScreen() {
                   <div className={`${styles.row2} ${styles.amount}`}>
                     <label className={styles.field}>
                       <span className={styles.label}>何円ごとに 1個</span>
-                      <TextField {...fieldProps('amountUnit')} value={`${settings.amountUnit.toLocaleString('ja-JP')} 円`} readOnly={ro} inputMode="numeric"
+                      <TextField {...fieldProps('amountUnit')} value={`${polishFormatNumber(settings.amountUnit)} 円`} readOnly={ro} inputMode="numeric"
                         onChange={(e) => { const n = Number(e.target.value.replace(/[^\d]/g, '')); set({ amountUnit: Number.isFinite(n) ? n : 0 }) }} />
                       {fieldError('amountUnit')}
                     </label>
@@ -713,7 +715,7 @@ function VisitStampsScreen() {
                   <div className={styles.historyFooter}>
                     <Select aria-label="記録の表示件数" value={String(logPageSize)} onChange={v => { setLogPageSize(Number(v)); setLogPage(1) }}
                       options={[10, 20, 50].map(n => ({ value: String(n), label: `${n}件ずつ` }))} />
-                    <span className={styles.sub}>{`${logTotal.toLocaleString('ja-JP')}件中 ${logTotal ? (logPage - 1) * logPageSize + 1 : 0}〜${Math.min(logPage * logPageSize, logTotal)}件`}</span>
+                    <span className={styles.sub}>{`${polishFormatNumber(logTotal)} 件中 ${logTotal ? (logPage - 1) * logPageSize + 1 : 0}〜${Math.min(logPage * logPageSize, logTotal)}件`}</span>
                     <Pagination page={logPage} pageCount={logPages} onPageChange={setLogPage} ariaLabel="記録のページ送り" />
                   </div>
                 ) : null}

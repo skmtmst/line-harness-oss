@@ -5,6 +5,8 @@
 import type { HqBroadcastPreflight, HqBroadcastRun } from '@line-crm/shared'
 import type { StatusBadgeTone } from '@/components/shared/status-badge'
 import type { InsertTokenSpec } from '@/components/shared/insert-tokens'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+
 
 /** 画面で見せる差し込み（店ごとに変わる）と、口へ送る書き方。 */
 export const STORE_INSERTS = [
@@ -72,7 +74,7 @@ export function preflightBadge(p: HqBroadcastPreflight, body = ''): { label: str
   if (reasons.some((r) => r.includes('LINEに接続'))) return { label: 'LINE の接続切れ', tone: 'danger' }
   if (reasons.some((r) => r.includes('送信枠が足りません'))) {
     const short = p.audienceCount !== null && p.remaining !== null ? Math.max(0, p.audienceCount - p.remaining) : null
-    return { label: short !== null ? `${short.toLocaleString('ja-JP')}通 足りない` : '送信枠が足りない', tone: 'danger' }
+    return { label: short !== null ? `${polishFormatNumber(short)} 通 足りない` : '送信枠が足りない', tone: 'danger' }
   }
   if (reasons.some((r) => r.includes('送信枠・LINE接続を確認できません'))) return { label: '送信枠を確かめられない', tone: 'warning' }
   if (reasons.some((r) => r.includes('タグ'))) return { label: '同じ名前のタグが無い', tone: 'warning' }
@@ -194,7 +196,7 @@ export function failureLines(run: Pick<HqBroadcastRun, 'targets'>): Array<{ acco
       lines.push({
         accountId: t.accountId,
         store: t.accountName,
-        text: `${f.label}${f.count > 0 ? `（${f.count.toLocaleString('ja-JP')}人）` : ''}${f.retryable ? '・やり直せます' : ''}`,
+        text: `${f.label}${f.count > 0 ? `（${polishFormatNumber(f.count)} 人）` : ''}${f.retryable ? '・やり直せます' : ''}`,
         retryable: f.retryable,
       })
     }

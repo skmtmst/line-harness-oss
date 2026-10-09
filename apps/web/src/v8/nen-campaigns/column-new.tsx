@@ -274,7 +274,7 @@ export default function ColumnNew() {
           <div className={styles.field}>
             <span className={styles.labelRow}>
               <span className={styles.labelSmall}>配信対象</span>
-              <span className={styles.labelNote}>{audienceCount == null ? '' : `${formatNumber(audienceCount)}人に届きます`}</span>
+              <span className={styles.labelNote}>{audienceCount == null ? '' : `${formatNumber(audienceCount)} 人に届きます`}</span>
             </span>
             {/* 1つの欄で選ぶ。空＝友だち全員、タグを選ぶ＝そのタグで絞る（「外す」で全員へ戻す）。 */}
             <EntityKindField

@@ -438,7 +438,7 @@ function ConversionCreate() {
   const previewNote = previewFailed
     ? '保存前の試算を読み込めませんでした。入力内容は保存されていません。'
     : preview
-      ? `入力中の条件だけで試算しています。重複除外 ${formatNumber(preview.duplicateExcludedCount)}件・取消 ${formatNumber(preview.cancellationCount)}件・1日あたり ${formatNumber(preview.dailyAverage)}件。試算では成果を追加しません。`
+      ? `入力中の条件だけで試算しています。重複除外 ${formatNumber(preview.duplicateExcludedCount)} 件・取消 ${formatNumber(preview.cancellationCount)} 件・1日あたり ${formatNumber(preview.dailyAverage)} 件。試算では成果を追加しません。`
       : '入力中の条件を試算しています。'
 
   const previewColumn = (
@@ -452,10 +452,10 @@ function ConversionCreate() {
           </p>
         </div>
         <dl className={styles.previewRows}>
-          <div className={styles.previewRow}><dt>成果</dt><dd>{preview ? `${formatNumber(preview.estimatedCount)}件` : '—'}</dd></div>
+          <div className={styles.previewRow}><dt>成果</dt><dd>{preview ? `${formatNumber(preview.estimatedCount)} 件` : '—'}</dd></div>
           <div className={styles.previewRow}><dt>金額</dt><dd>{preview ? `¥${formatNumber(preview.estimatedValue)}` : '—'}</dd></div>
-          <div className={styles.previewRow}><dt>人数</dt><dd>{preview && typeof preview.uniqueFriendCount === 'number' ? `${formatNumber(preview.uniqueFriendCount)}人` : '—'}</dd></div>
-          <div className={styles.previewRow}><dt>除いた注文</dt><dd>{excluded == null ? '—' : `${formatNumber(excluded)}件`}</dd></div>
+          <div className={styles.previewRow}><dt>人数</dt><dd>{preview && typeof preview.uniqueFriendCount === 'number' ? `${formatNumber(preview.uniqueFriendCount)} 人` : '—'}</dd></div>
+          <div className={styles.previewRow}><dt>除いた注文</dt><dd>{excluded == null ? '—' : `${formatNumber(excluded)} 件`}</dd></div>
         </dl>
         {preview && !previewFailed && preview.excludedReasons.length > 0 ? (
           <ul className={styles.previewReasons}>

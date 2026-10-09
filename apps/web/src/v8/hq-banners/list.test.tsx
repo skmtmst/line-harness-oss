@@ -116,7 +116,7 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
     expect(host.textContent).toContain('今月の残り')
     expect(host.textContent).toContain('上限 150枚')
     expect(host.textContent).toContain('秋のキャンペーン')
-    expect(host.textContent).toContain('3 枚 ・ 9/30 更新')
+    expect(host.textContent).toContain('3 枚 ・ 09/30 更新')
     expect(host.textContent).toContain('— ・ いま作成中')
     expect(host.querySelector('[aria-label="秋のキャンペーン を開く"]')).toBeTruthy()
   })

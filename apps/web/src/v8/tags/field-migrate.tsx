@@ -459,7 +459,7 @@ function FieldMigrate() {
     && (!run || RUN_RUNNING.has(run.status))
   const pollAttention = pollProblem !== '' && (!run || RUN_RUNNING.has(run.status))
   const status = pollAttention ? pollProblem : run ? RUN_STATUS_LABELS[run.status] : executedRunId ? '実行を受け付けました。結果を確認しています' : confirmed ? `事前確認済み：${preview?.summary.total ?? 0}人` : undefined
-  const usage = typeof source.usageCount === 'number' ? `${formatNumber(source.usageCount)}人に値が入っている` : '値が入っている人数は未集計'
+  const usage = typeof source.usageCount === 'number' ? `${formatNumber(source.usageCount)} 人に値が入っている` : '値が入っている人数は未集計'
   const back = <Link href="/tags?tab=fields" className={styles.backLink}>← 友だち情報欄へ</Link>
   const rows = sample ? sampleRows(sample) : []
 
@@ -528,7 +528,7 @@ function FieldMigrate() {
             <div key={`${row.from}:${row.to}`} className={styles.sampleRow} role="row">
               <span role="cell" title={row.from}>{row.from}</span>
               <span role="cell" title={row.to}>{row.to}</span>
-              <span role="cell" className={styles.sampleCount}>{`${formatNumber(row.count)}人`}</span>
+              <span role="cell" className={styles.sampleCount}>{`${formatNumber(row.count)} 人`}</span>
             </div>
           ))}
         </div>

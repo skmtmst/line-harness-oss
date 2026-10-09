@@ -34,7 +34,7 @@ export function md(date: string | null | undefined): string {
 /** 件数の文（「6件中 1〜6件」）。 */
 export function rangeText(total: number, page: number, size: number): string {
   if (total === 0) return '0件'
-  return `${formatNumber(total)}件中 ${(page - 1) * size + 1}〜${Math.min(total, page * size)}件`
+  return `${formatNumber(total)} 件中 ${(page - 1) * size + 1}〜${Math.min(total, page * size)}件`
 }
 
 /**

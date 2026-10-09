@@ -497,11 +497,11 @@ export default function OffersTab() {
                   <span className={styles.cellNum} title={actionText(offer)}>{actionText(offer)}</span>
                 </Td>
                 <Td className={`${styles.colOfferPeople} ${styles.num}`}>
-                  <span className={styles.cellNum}>{approvalState === 'ready' ? `${formatNumber(stat?.people.size ?? 0)}人${approvalsTruncated ? '以上' : ''}` : '—'}</span>
+                  <span className={styles.cellNum}>{approvalState === 'ready' ? `${formatNumber(stat?.people.size ?? 0)} 人${approvalsTruncated ? '以上' : ''}` : '—'}</span>
                 </Td>
                 <Td className={`${styles.colOfferConv} ${styles.num}`}>
                   <span className={styles.stackEnd}>
-                    <span className={styles.cellNum}>{approvalState === 'ready' ? (stat ? `${formatNumber(stat.conversions)}件${approvalsTruncated ? '以上' : ''}` : '—') : '—'}</span>
+                    <span className={styles.cellNum}>{approvalState === 'ready' ? (stat ? `${formatNumber(stat.conversions)} 件${approvalsTruncated ? '以上' : ''}` : '—') : '—'}</span>
                     {stat ? <span className={styles.rowPlan}>{`確定 ${formatYen(stat.reward)}`}</span> : null}
                   </span>
                 </Td>
@@ -555,7 +555,7 @@ export default function OffersTab() {
 
   const pager = ready && shown.length > 0 && pageCount > 1 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>{`${formatNumber(shown.length)}件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, shown.length)}件`}</span>
+      <span className={styles.pagerCount}>{`${formatNumber(shown.length)} 件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, shown.length)}件`}</span>
       <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} />
     </ListPagePagination>
   ) : undefined

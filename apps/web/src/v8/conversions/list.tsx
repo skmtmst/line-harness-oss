@@ -92,6 +92,8 @@ import {
 import { notifyToast } from '@/components/shared/toast'
 import { focusConversionField, type ConversionFieldIssue } from './field-issue'
 import styles from './list.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 type StatusFilter = 'all' | ConversionDefinitionFilter
 /** フォルダの列の「未分類」（`?folder=unfiled`）。 */
@@ -176,7 +178,7 @@ function shortTrigger(point: ConversionDefinitionListItem): string {
 }
 
 function shortDate(iso: string): string {
-  return `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}`
+  return polishFormatDate(iso, { style: 'list-day', fallback: '—' })
 }
 
 /* 「何が起きたら数えるか」の2行目（数え方・金額または止めた日）。 */
@@ -1096,7 +1098,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
                       <span className={styles.cellMain} title={sourceTriggerLabel(point)}>{shortTrigger(point)}</span>
                       <span className={styles.cellSub} title={rowSub(point)}>{rowSub(point)}</span>
                     </Td>
-                    <Td className={styles.colCount}><span className={styles.num}>{`${formatNumber(point.metrics.netCount)}件`}</span></Td>
+                    <Td className={styles.colCount}><span className={styles.num}>{`${formatNumber(point.metrics.netCount)} 件`}</span></Td>
                     <Td className={styles.colValue}>
                       <span className={styles.num}>{point.metrics.netValue > 0 ? `¥${formatNumber(point.metrics.netValue)}` : '—'}</span>
                     </Td>
@@ -1131,7 +1133,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   const pager = !loading && !loadFailed && pageCount > 1 ? (
     <ListPagePagination>
       <span className={styles.pagerCount}>
-        {`${(currentPage - 1) * pageSize + 1}〜${(currentPage - 1) * pageSize + current.length} / ${formatNumber(shown.length)}件`}
+        {`${(currentPage - 1) * pageSize + 1}〜${(currentPage - 1) * pageSize + current.length} / ${formatNumber(shown.length)} 件`}
       </span>
       <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="成果地点の一覧のページ送り" />
     </ListPagePagination>

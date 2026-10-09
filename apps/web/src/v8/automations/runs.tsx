@@ -40,6 +40,8 @@ import {
   type BandCell,
 } from './shell'
 import styles from './runs.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 type RunStatus = AutomationRunDetail['status']
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
@@ -112,13 +114,7 @@ function statusTone(status: RunStatus): 'active' | 'danger' | 'warn' | 'neutral'
 
 /** 「9/30 14:12」（日本時間）。 */
 export function shortDateTime(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '日時不明'
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
-  }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`
+  return polishFormatDate(value, { style: 'list', fallback: '日時不明' })
 }
 
 /** かかった時間（「0.8 秒」）。測れていないものは「—」。 */
@@ -367,7 +363,7 @@ export default function AutomationRunsV8() {
       .then((result) => {
         if (result.truncated && result.totalCount !== null) {
           const rest = result.totalCount - (result.returnedCount ?? 0)
-          setNotice(`5,000件までしか出ませんでした（対象${formatNumber(result.totalCount)}件・残り${formatNumber(rest)}件）。期間や絞り込みで分けて出してください。`)
+          setNotice(`5,000件までしか出ませんでした（対象${formatNumber(result.totalCount)} 件・残り${formatNumber(rest)} 件）。期間や絞り込みで分けて出してください。`)
         }
       })
       .catch(() => setNotice('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。'))
@@ -561,7 +557,7 @@ export default function AutomationRunsV8() {
     <>
       <div className={styles.pagerRow}>
         <span className={styles.pagerCount}>
-          {`${formatNumber(total)}件中 ${data.pagination.offset + 1}〜${data.pagination.offset + data.items.length}件`}
+          {`${formatNumber(total)} 件中 ${data.pagination.offset + 1}〜${data.pagination.offset + data.items.length}件`}
         </span>
         {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="動いた記録のページ送り" /> : null}
       </div>

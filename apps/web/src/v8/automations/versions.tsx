@@ -27,6 +27,8 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { useAutomationManage } from './shell'
 import { describeVersionChanges } from './version-diff'
 import styles from './versions.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 /** 利用先の種類（今の画面と同じ言葉）。 */
 const CONSUMER_LABELS: Record<string, string> = {
@@ -78,11 +80,7 @@ export function consumerBreakdown(bindings: Array<{ consumerType: string }>): st
 
 /** 「9/24」（日本時間）。 */
 function monthDay(iso: string | null): string {
-  if (!iso) return '—'
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).formatToParts(date)
-  return `${parts.find((part) => part.type === 'month')?.value ?? ''}/${parts.find((part) => part.type === 'day')?.value ?? ''}`
+  return polishFormatDate(iso, { style: 'list-day', fallback: '—' })
 }
 
 function VersionsInner() {

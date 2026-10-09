@@ -15,6 +15,8 @@
 import type { BookingAvailabilitySlot, BookingMenu, BookingStaff } from '@/lib/api'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import styles from './settings.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+
 
 const WEEKDAY_JP = '日月火水木金土'
 const STEP_LABELS = ['メニュー', '担当', '日時', '確認']
@@ -44,7 +46,7 @@ function formatJpDay(date: string): string {
 function priceLabel(menu: Pick<BookingMenu, 'price_mode' | 'base_price'>): string {
   if (menu.price_mode === 'free') return '無料'
   if (menu.price_mode === 'inquiry') return 'お問い合わせ'
-  return `¥${menu.base_price.toLocaleString('ja-JP')}`
+  return `¥${polishFormatNumber(menu.base_price)}`
 }
 
 /** 写しの中の読み込み待ちの骨組み（札2枚の形。写し全体が role="img" のため読み上げは付けない）。 */

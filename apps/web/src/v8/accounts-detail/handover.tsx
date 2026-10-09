@@ -266,7 +266,7 @@ export default function AccountHandoverV8() {
       setRollbackOpen(false)
       const detail = await api.accountHandovers.get(handover.id)
       if (detail.success) setHandover(detail.data as HandoverView)
-      notifyToast(`切り戻しました。${formatNumber(res.data.restoredCount)}人を元のアカウントへ戻しました。`)
+      notifyToast(`切り戻しました。${formatNumber(res.data.restoredCount)} 人を元のアカウントへ戻しました。`)
     } catch (caught) {
       setRollbackError(apiMessage(caught, '切り戻せませんでした。期限（7日間）を過ぎていないか確かめてください。'))
     } finally {
@@ -314,7 +314,7 @@ export default function AccountHandoverV8() {
       const detail = await api.accountHandovers.get(handover.id)
       if (detail.success) setHandover(detail.data as HandoverView)
       const moved = result.data.movedCount ?? result.data.plannedCount ?? 0
-      notifyToast(result.data.failureReason ?? `本実行が終わりました。${formatNumber(moved)}人を移しました。`)
+      notifyToast(result.data.failureReason ?? `本実行が終わりました。${formatNumber(moved)} 人を移しました。`)
     } catch {
       setExecuteError('本実行できませんでした。しばらくおいてから、もう一度お試しください。')
     } finally {

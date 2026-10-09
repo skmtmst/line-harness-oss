@@ -270,8 +270,8 @@ export default function MediaUploadDialog({
               <Progress
                 state={uploadErrorCount > 0 ? 'partial' : 'done'}
                 title={uploadErrorCount > 0
-                  ? `${formatNumber(doneCount)}件を登録し、${formatNumber(uploadErrorCount)}件は入りませんでした`
-                  : `${formatNumber(doneCount)}件を登録しました`}
+                  ? `${formatNumber(doneCount)} 件を登録し、${formatNumber(uploadErrorCount)} 件は入りませんでした`
+                  : `${formatNumber(doneCount)} 件を登録しました`}
                 percent={entries.length > 0 ? (doneCount / entries.length) * 100 : 0}
                 className="mb-3"
               />

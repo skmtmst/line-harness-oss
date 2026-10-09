@@ -22,6 +22,8 @@ import { DetailHead } from './chrome'
 import { fmtSec, percent, thisMonthReservations } from './helpers'
 import type { DetailChrome, EditContext } from './types'
 import styles from './analytics.module.css'
+import { formatListDateTime as polishFormatListDateTime } from '@/lib/format'
+
 
 export default function AnalyticsPane({ ctx, chrome }: { ctx: EditContext; chrome: DetailChrome }) {
   const { webinar, analytics, analyticsState } = ctx
@@ -195,9 +197,9 @@ function Retention({ analytics, durationSeconds }: { analytics: WebinarAnalytics
         </div>
       )}
       <p className={styles.cardText}>
-        {`最後まで見た人 ${completedRate}（${formatNumber(completed)}人）・半分まで ${rateOf(half)}・申し込みボタンを出したとき ${rateOf(ctaViewers)}`}
+        {`最後まで見た人 ${completedRate}（${formatNumber(completed)} 人）・半分まで ${rateOf(half)}・申し込みボタンを出したとき ${rateOf(ctaViewers)}`}
       </p>
-      {(analytics.heartbeatRejects ?? 0) > 0 ? <p className={styles.warn}>異常な報告を{formatNumber(analytics.heartbeatRejects ?? 0)}件除いています（視聴時間に数えていません）。</p> : null}
+      {(analytics.heartbeatRejects ?? 0) > 0 ? <p className={styles.warn}>異常な報告を{formatNumber(analytics.heartbeatRejects ?? 0)} 件除いています（視聴時間に数えていません）。</p> : null}
     </section>
   )
 }
@@ -215,10 +217,10 @@ function Details({ analytics }: { analytics: WebinarAnalytics }) {
               <thead><TableHeadRow><Th>開催日時</Th><Th align="right">参加</Th><Th align="right">平均視聴</Th><Th align="right">CTA</Th></TableHeadRow></thead>
               <tbody>{analytics.sessions.map((session) => (
                 <Tr key={session.sessionStartAt}>
-                  <Td>{formatDateTime(session.sessionStartAt * 1000)}</Td>
-                  <Td align="right">{formatNumber(session.viewers)}人</Td>
+                  <Td>{polishFormatListDateTime(session.sessionStartAt * 1000)}</Td>
+                  <Td align="right">{formatNumber(session.viewers)} 人</Td>
                   <Td align="right">{fmtSec(session.avgWatchedSeconds)}</Td>
-                  <Td align="right">{`${formatNumber(session.ctaClicks)}人（${percent(session.ctaClicks, session.viewers)}）`}</Td>
+                  <Td align="right">{`${formatNumber(session.ctaClicks)} 人（${percent(session.ctaClicks, session.viewers)}）`}</Td>
                 </Tr>
               ))}</tbody>
             </table>
@@ -242,7 +244,7 @@ function Details({ analytics }: { analytics: WebinarAnalytics }) {
               {([
                 ['CTA表示', funnel.ctaImpressions], ['CTAを押した', funnel.ctaClicks], ['フォームを開いた', funnel.formOpens],
                 ['入力を始めた', funnel.formStarts], ['送信を試みた', funnel.submitAttempts], ['送信できた', funnel.submitSuccesses], ['送信エラー', funnel.submitErrors],
-              ] as const).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{formatNumber(Number(value))}人</dd></div>)}
+              ] as const).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{formatNumber(Number(value))} 人</dd></div>)}
             </dl>
           ) : <p className={styles.cardText}>フォームの集計を取得できていません。</p>}
         </div>

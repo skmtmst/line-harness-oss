@@ -35,6 +35,8 @@ import ValidationSummary from '@/components/shared/validation-summary'
 import { FieldError } from '@/components/shared/form-controls'
 import parts from './parts.module.css'
 import styles from './announcements.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 /**
  * 運営のお知らせ配信 V8（絵 `tQ2MJ`・送る前の確認 `TJUUl`）。
@@ -106,10 +108,7 @@ function longPublishAt(local: string): string {
 
 /** 一覧の小さい日時（9/18 10:00）。 */
 function shortDateTime(value: string | null): string {
-  if (!value) return '—'
-  const full = formatDateTime(value)
-  const m = full.match(/^(\d+)-(\d+)-(\d+) (\d+:\d+)$/)
-  return m ? `${Number(m[2])}/${Number(m[3])} ${m[4]}` : full
+  return polishFormatDate(value, { style: 'list', fallback: '—' })
 }
 
 function confirmAudience(form: Form, preview: OpsAudiencePreview | null): string {

@@ -28,6 +28,8 @@ import { useAccount } from '@/contexts/account-context'
 import { restaurantGoogleApi, type GoogleConnectionData } from '@/lib/restaurant-google-api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import styles from './sns.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 const GOOGLE_STATE: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' | 'neutral' }> = {
   connected: { label: 'つながっている', tone: 'success' },
@@ -45,11 +47,7 @@ export const INSTAGRAM_CAN = [
 ]
 
 function stamp(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  const day = new Date(iso)
-  const today = new Date()
-  const hm = `${day.getHours()}:${String(day.getMinutes()).padStart(2, '0')}`
-  return day.toDateString() === today.toDateString() ? `今日 ${hm}` : `${day.getMonth() + 1}月${day.getDate()}日 ${hm}`
+  return polishFormatDate(iso, { style: 'detail', fallback: '—' })
 }
 
 function GoogleCard({ data, error, canManage }: { data: GoogleConnectionData | null; error: unknown; canManage: boolean }) {

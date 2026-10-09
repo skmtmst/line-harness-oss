@@ -27,6 +27,8 @@ import {
   validateMediaFile,
 } from './media-direct-upload'
 import { formatDateTime } from '@/lib/format'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 /** 版追加を止めた理由を、互換基準ごとに運用者へ説明する。 */
 function versionBlockerText(blockers: MediaVersionBlocker[]): string {
@@ -48,9 +50,7 @@ function versionBlockerText(blockers: MediaVersionBlocker[]): string {
 }
 
 function formatDate(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—（未取得）'
-  return formatDateTime(date)
+  return polishFormatDate(value, { style: 'detail', fallback: '—（未取得）' })
 }
 
 function mediaKind(item: MediaItem): string {

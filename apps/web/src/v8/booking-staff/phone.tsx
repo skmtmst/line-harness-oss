@@ -11,6 +11,8 @@ import type { ReactNode } from 'react'
 import type { BookingAvailabilitySlot, BookingMenu, BookingStaff } from '@/lib/api'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import styles from './phone.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+
 
 const WEEKDAY_JP = '日月火水木金土'
 const STEP_LABELS = ['メニュー', '担当', '日時', '確認']
@@ -34,7 +36,7 @@ export function phoneTime(time: string): string {
 export function priceLabel(menu: Pick<BookingMenu, 'price_mode' | 'base_price'>): string {
   if (menu.price_mode === 'inquiry') return 'お問い合わせ'
   if (menu.price_mode === 'free' || menu.base_price === 0) return '無料'
-  return `¥${menu.base_price.toLocaleString('ja-JP')}`
+  return `¥${polishFormatNumber(menu.base_price)}`
 }
 
 function PhoneChrome({ step, children, foot }: { step: number; children: ReactNode; foot: ReactNode }) {

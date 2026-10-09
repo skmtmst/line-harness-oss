@@ -89,7 +89,7 @@ const STATUS_CHIPS: Array<{ key: FriendAddRuleStatus; label: string; icon: typeo
 ]
 
 function countText(value: number | null | undefined, unit: string) {
-  return value === null || value === undefined ? '—' : `${formatNumber(value)}${unit}`
+  return value === null || value === undefined ? '—' : `${formatNumber(value)} ${unit}`
 }
 
 function successRate(delivered: number | null, failed: number | null) {
@@ -514,7 +514,7 @@ function FriendAddList() {
   const kpis = [
     {
       key: 'rules', icon: MessageSquareMore, title: '初回案内', value: error ? null : summary?.rules ?? null, unit: '件',
-      detail: summary ? `有効 ${formatNumber(summary.active)}件` : '—',
+      detail: summary ? `有効 ${formatNumber(summary.active)} 件` : '—',
       help: 'いまある初回案内の設定数です。右の3つ（直近7日）とは期間がちがいます。',
     },
     {
@@ -797,7 +797,7 @@ function FriendAddList() {
 
   const pager = data && (canPrev || data.nextCursor) ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>{formatNumber(data.total ?? items.length)}件</span>
+      <span className={styles.pagerCount}>{formatNumber(data.total ?? items.length)} 件</span>
       <span className={styles.pagerButtons} aria-label="ページ送り">
         <Button disabled={!canPrev || loading} onClick={() => goPrev()}>前へ</Button>
         <Button disabled={!data.nextCursor || loading} onClick={() => data.nextCursor && goNext(data.nextCursor)}>次へ</Button>

@@ -388,7 +388,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
                 </Td>
                 <Td className={styles.searchColCount} onClick={(event) => event.stopPropagation()}>
                   <span className={styles.cellText} title={search.matchCountError ?? undefined}>
-                    {search.matchCount !== null && search.matchCount !== undefined ? `${formatNumber(search.matchCount)}人` : '—'}
+                    {search.matchCount !== null && search.matchCount !== undefined ? `${formatNumber(search.matchCount)} 人` : '—'}
                   </span>
                 </Td>
                 <Td className={styles.searchColShare}><span className={styles.cellText}>{search.isShared ? '全員' : '自分だけ'}</span></Td>
@@ -545,7 +545,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
               <dt>該当</dt>
               <dd>
                 {activeSearch.lineAccountId && activeSearch.matchCount !== null && activeSearch.matchCount !== undefined ? (
-                  <Link href={`/friends?savedSearch=${activeSearch.id}`} className={styles.countLink}>{`${formatNumber(activeSearch.matchCount)}人`}</Link>
+                  <Link href={`/friends?savedSearch=${activeSearch.id}`} className={styles.countLink}>{`${formatNumber(activeSearch.matchCount)} 人`}</Link>
                 ) : '—'}
               </dd>
             </div>

@@ -1454,7 +1454,7 @@ export default function AutoRepliesListV8() {
   const listPager = pageCount > 1 ? (
     <ListPagePagination>
       <span className={styles.pagerCount}>
-        {(safePage - 1) * pageSize + 1}〜{Math.min(safePage * pageSize, sortedItems.length)} / {formatNumber(sortedItems.length)}件
+        {(safePage - 1) * pageSize + 1}〜{Math.min(safePage * pageSize, sortedItems.length)} / {formatNumber(sortedItems.length)} 件
       </span>
       <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage} />
     </ListPagePagination>

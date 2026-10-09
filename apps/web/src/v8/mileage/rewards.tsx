@@ -771,7 +771,7 @@ export default function RewardsTab() {
                   )}
                 </Td>
                 <Td className={styles.colGives}><span className={styles.cellMain}>{item.failureMessage || item.failureCode || '理由を確認できませんでした'}</span></Td>
-                <Td className={`${styles.colMonth} ${styles.num}`}><span className={styles.cellMain}>{`${formatNumber(item.attemptCount)}回`}</span></Td>
+                <Td className={`${styles.colMonth} ${styles.num}`}><span className={styles.cellMain}>{`${formatNumber(item.attemptCount)} 回`}</span></Td>
                 <Td className={styles.colGives}><span className={styles.cellMain}>{formatMileageDate(item.updatedAt)}</span></Td>
                 <Td className={styles.colOpsWide}>
                   {!readonly ? (
@@ -793,7 +793,7 @@ export default function RewardsTab() {
       )}
       {Math.ceil(redemptionsTotal / REDEMPTIONS_PAGE_SIZE) > 1 ? (
         <div className={styles.subPager}>
-          <span className={styles.pagerCount}>{`要対応の交換 ${formatNumber(redemptionsTotal)}件`}</span>
+          <span className={styles.pagerCount}>{`要対応の交換 ${formatNumber(redemptionsTotal)} 件`}</span>
           <Pagination
             page={redemptionsPage}
             pageCount={Math.ceil(redemptionsTotal / REDEMPTIONS_PAGE_SIZE)}

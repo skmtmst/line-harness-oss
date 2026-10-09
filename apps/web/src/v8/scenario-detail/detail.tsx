@@ -2304,7 +2304,7 @@ export default function ScenarioDetailV8({
             ? '送信数の上限はありません'
             : runs.quota.remaining === null
               ? (runs.quota.reason ?? '送信枠を読み込めませんでした')
-              : `残り${formatNumber(runs.quota.remaining)}通です`,
+              : `残り${formatNumber(runs.quota.remaining)} 通です`,
       }
     }
     return item
@@ -2588,7 +2588,7 @@ export default function ScenarioDetailV8({
               </p>
               <p className={styles.kpiDetail}>
                 {biggestDrop
-                  ? `${biggestDrop.fromOrder}通目で ${formatNumber(biggestDrop.lost)}人（${Math.round(biggestDrop.rate * 100)}%）が離れています`
+                  ? `${biggestDrop.fromOrder}通目で ${formatNumber(biggestDrop.lost)} 人（${Math.round(biggestDrop.rate * 100)}%）が離れています`
                   : '大きく離れている所はまだありません'}
               </p>
             </div>
@@ -3078,7 +3078,7 @@ export default function ScenarioDetailV8({
             <p className="text-ink text-sm font-semibold">
               きっかけ：{triggerHeadline}
               {simulation
-                ? ` → 対象：${formatNumber(simulation.audience.newStartPlanned)}人`
+                ? ` → 対象：${formatNumber(simulation.audience.newStartPlanned)} 人`
                 : preflightLoading
                   ? ' → 対象：試算中…'
                   : ' → 対象：まだ分かりません'}
@@ -3177,7 +3177,7 @@ export default function ScenarioDetailV8({
             <dd>
               {stats?.activeNow === undefined
                 ? '確認できません'
-                : `${formatNumber(stats.activeNow)}人（止まっているあいだ、新しい人は入りません）`}
+                : `${formatNumber(stats.activeNow)} 人（止まっているあいだ、新しい人は入りません）`}
             </dd>
           </dl>
           <div className={styles.stopFooter}>
@@ -3277,7 +3277,7 @@ export default function ScenarioDetailV8({
             ? '購読中の人数は確認できません。'
             : stats.activeNow === 0
               ? '現在購読中の友だちは0人です。'
-              : `現在${formatNumber(stats.activeNow)}人が購読中です。途中の人は続きを受け取れません。`,
+              : `現在${formatNumber(stats.activeNow)} 人が購読中です。途中の人は続きを受け取れません。`,
           'シナリオの設定と今後の配信が削除されます。',
           'これまでの配信履歴は監査記録として残ります。',
           'この操作は取り消せません。',

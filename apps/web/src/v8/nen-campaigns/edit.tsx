@@ -331,7 +331,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   const kindIsRich = Boolean(merged.imageUrl)
   // 下の帯の左は短く（長いと折り返して帯が高くなる）。くわしい決めごとは見出しの説明に書く。
   const status = merged.isEnabled
-    ? pendingCount !== null && pendingCount > 0 ? `動いています・配信待ち ${formatNumber(pendingCount)}通は前の中身のまま` : '動いています'
+    ? pendingCount !== null && pendingCount > 0 ? `動いています・配信待ち ${formatNumber(pendingCount)} 通は前の中身のまま` : '動いています'
     : '停止中です（保存しても送り始めません）'
 
   const preview = (

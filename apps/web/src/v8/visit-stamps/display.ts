@@ -3,6 +3,8 @@
  * 設定の形は @line-crm/shared の VisitStampSettings（サーバと同じ）。ここで形を変えない。
  */
 import type { VisitStampEntry, VisitStampMultiplier, VisitStampReward, VisitStampSettings } from '@line-crm/shared'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 export const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as const
 const TZ = 'Asia/Tokyo'
@@ -121,10 +123,7 @@ export function trimNumber(n: number): string {
 
 /** 日付と時刻「1/13 18:40」（店の暦＝日本時間）。 */
 export function shortDateTime(iso: string): string {
-  const d = new Date(iso.includes('T') || iso.endsWith('Z') ? iso : `${iso.replace(' ', 'T')}Z`)
-  const f = new Intl.DateTimeFormat('ja-JP', { timeZone: TZ, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(d)
-  const v = (t: string) => f.find((p) => p.type === t)?.value ?? ''
-  return `${v('month')}/${v('day')} ${v('hour')}:${v('minute')}`
+  return polishFormatDate(iso, { style: 'list', fallback: '—' })
 }
 
 export type HistoryRow = { id: string; friendId: string; at: string; count: string; why: string; actor: string; reversible: boolean; reversed: boolean }

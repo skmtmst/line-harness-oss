@@ -690,7 +690,7 @@ export default function HqBroadcastCreate() {
   const byName = (rows: Array<{ name: string; accounts: number }> | null | undefined) => (rows ?? []).map((t) => ({ id: t.name, name: t.name, meta: `${t.accounts}/${chosen.length}アカウント` }))
   const closeAccountPicker = () => { setAccountPickerOpen(false); requestAnimationFrame(() => accountPickerTrigger.current?.focus()) }
   const totals = checks && !stale ? sendTotals(checks) : null
-  const peopleLabel = totals ? `${formatNumber(totals.sendPeople)}人` : audience === 'all' && chosen.length > 0 && friendTotal != null ? `${formatNumber(friendTotal)}人` : '—人'
+  const peopleLabel = totals ? `${formatNumber(totals.sendPeople)} 人` : audience === 'all' && chosen.length > 0 && friendTotal != null ? `${formatNumber(friendTotal)} 人` : '—人'
   const audienceLabel = audience === 'tag' ? (tagName ? `タグ：${tagName}` : 'タグ：未選択')
     : audience === 'scenario' ? (scenarioName ? `シナリオ「${scenarioName}」を購読中` : 'シナリオ購読中の全員')
     : audience === 'advanced' ? (savedName ? `保存した条件「${savedName}」${pruneCondition(condition) ? '＋詳細条件' : ''}` : pruneCondition(condition) ? '詳細条件' : '詳細条件：未設定')
@@ -851,7 +851,7 @@ export default function HqBroadcastCreate() {
                     return (
                       <div key={item.id} className={formStyles.recentRow}>
                         <Send size={14} aria-hidden /><span className={formStyles.recentName} title={item.title}>{item.title}</span>
-                        <span className="text-ink-faint">{jpDateTime(item.scheduledAt)} 送信 ・ {formatNumber(people)}人</span>
+                        <span className="text-ink-faint">{jpDateTime(item.scheduledAt)} 送信 ・ {formatNumber(people)} 人</span>
                         <Button size="compact" onClick={() => duplicate(item)}>複製する</Button>
                       </div>
                     )
@@ -1003,7 +1003,7 @@ export default function HqBroadcastCreate() {
                   </div>
                 ) : null}
                 <div className={formStyles.quota}>
-                  <div className={formStyles.quotaHead}><strong>送信枠</strong><HelpTip label="送信枠の説明">LINE公式アカウントの月間送信枠です。アカウントごとに数えます</HelpTip><span>{totals ? `送る ${formatNumber(totals.sendPeople)}通` : 'アカウントごと'}</span></div>
+                  <div className={formStyles.quotaHead}><strong>送信枠</strong><HelpTip label="送信枠の説明">LINE公式アカウントの月間送信枠です。アカウントごとに数えます</HelpTip><span>{totals ? `送る ${formatNumber(totals.sendPeople)} 通` : 'アカウントごと'}</span></div>
                   <p>今月の残りは最終確認でアカウントごとに確かめます。足りないアカウントは外して送ります</p>
                 </div>
               </section>
@@ -1061,8 +1061,8 @@ export default function HqBroadcastCreate() {
                           return (
                             <Tr key={p.accountId} className={styles.row}>
                               <Td className={styles.colStore}><span className={styles.store} title={p.accountName}>{p.accountName}</span></Td>
-                              <Td className={styles.colPeople}><span className={styles.num}>{p.audienceCount === null ? '—' : `${formatNumber(p.audienceCount)}人`}</span></Td>
-                              <Td className={styles.colQuota}><span className={styles.sub}>{p.remaining === null ? '—' : `${formatNumber(p.remaining)}通`}</span></Td>
+                              <Td className={styles.colPeople}><span className={styles.num}>{p.audienceCount === null ? '—' : `${formatNumber(p.audienceCount)} 人`}</span></Td>
+                              <Td className={styles.colQuota}><span className={styles.sub}>{p.remaining === null ? '—' : `${formatNumber(p.remaining)} 通`}</span></Td>
                               <Td className={styles.colCheck}><StatusBadge tone={badge.tone} title={p.blockedReasons.join('・') || undefined}>{badge.label}</StatusBadge></Td>
                               <Td className={styles.colSend}><StatusBadge tone={go ? 'success' : 'neutral'}>{go ? '送る' : '外す'}</StatusBadge></Td>
                               <Td className={styles.colMenu}>
@@ -1079,7 +1079,7 @@ export default function HqBroadcastCreate() {
                         {rest.length > 0 ? (
                           <Tr className={styles.row}>
                             <Td className={styles.colStore}><span className={styles.store}>{`ほか ${rest.length}アカウント`}</span></Td>
-                            <Td className={styles.colPeople}><span className={styles.num}>{`${formatNumber(rest.reduce((sum, p) => sum + (p.audienceCount ?? 0), 0))}人`}</span></Td>
+                            <Td className={styles.colPeople}><span className={styles.num}>{`${formatNumber(rest.reduce((sum, p) => sum + (p.audienceCount ?? 0), 0))} 人`}</span></Td>
                             <Td className={styles.colQuota}><span className={styles.sub}>—</span></Td>
                             <Td className={styles.colCheck}><StatusBadge tone="success">すべて足りる</StatusBadge></Td>
                             <Td className={styles.colSend}><StatusBadge tone="success">送る</StatusBadge></Td>
@@ -1092,8 +1092,8 @@ export default function HqBroadcastCreate() {
                     </DataTable>
                     {totals ? (
                       <p className={styles.totals}>
-                        <span className={styles.totalSend}>{`送る：${formatNumber(totals.sendStores)}アカウント・${formatNumber(totals.sendPeople)}人`}</span>
-                        <span className={styles.totalSkip}>{`外す：${formatNumber(totals.skipStores)}アカウント・${formatNumber(totals.skipPeople)}人`}</span>
+                        <span className={styles.totalSend}>{`送る：${formatNumber(totals.sendStores)}アカウント・${formatNumber(totals.sendPeople)} 人`}</span>
+                        <span className={styles.totalSkip}>{`外す：${formatNumber(totals.skipStores)}アカウント・${formatNumber(totals.skipPeople)} 人`}</span>
                       </p>
                     ) : null}
                   </>
@@ -1176,7 +1176,7 @@ export default function HqBroadcastCreate() {
       <ConfirmDialog
         open={confirmOpen}
         title={`${formatNumber(totals?.sendStores ?? 0)}アカウントに送ります`}
-        description={`${formatNumber(totals?.sendPeople ?? 0)}人に${when === 'now' ? 'すぐ' : `${sendWhenLabel} に`}送ります。送った LINE は取り消せません。${totals && totals.skipStores ? `外した${formatNumber(totals.skipStores)}アカウントには送りません。` : ''}`}
+        description={`${formatNumber(totals?.sendPeople ?? 0)} 人に${when === 'now' ? 'すぐ' : `${sendWhenLabel} に`}送ります。送った LINE は取り消せません。${totals && totals.skipStores ? `外した${formatNumber(totals.skipStores)}アカウントには送りません。` : ''}`}
         confirmLabel={when === 'now' ? '送る' : '予約する'}
         busy={sending}
         warning

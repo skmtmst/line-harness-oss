@@ -14,7 +14,7 @@ describe('リッチメニューの詳細の計算', () => {
     expect(runAudienceText(run({ isDefaultForAll: null, targetingEnabled: null }))).toBe('—')
   })
   it('時刻は日本時間', () => {
-    expect(runStamp('2026-10-01T01:45:00Z')).toBe('10/1 10:45')
+    expect(runStamp('2026-10-01T01:45:00Z')).toBe('10/01 10:45')
     expect(runStamp('2026-10-01T01:46:00Z', true)).toBe('10:46')
   })
 })

@@ -166,7 +166,7 @@ function downloadCsv(text: string, name: string) {
 /** 件数の文（「7件中 1〜7件」）。 */
 function rangeText(total: number, page: number, size: number): string {
   if (total === 0) return '0件'
-  return `${formatNumber(total)}件中 ${(page - 1) * size + 1}〜${Math.min(total, page * size)}件`
+  return `${formatNumber(total)} 件中 ${(page - 1) * size + 1}〜${Math.min(total, page * size)}件`
 }
 
 /** 状態の札（点＋文字）。tone は 動いている＝ok・予約中＝info・止めている／送っていない＝off。 */
@@ -534,7 +534,7 @@ function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave
         details={[
           { label: 'クーポンを付ける', value: coupon.isEnabled ? '付ける' : '付けない' },
           { label: '特典の名前', value: coupon.benefitLabel || '—' },
-          { label: '割引額', value: `${formatNumber(coupon.discountAmount || 0)}円` },
+          { label: '割引額', value: `${formatNumber(coupon.discountAmount || 0)} 円` },
           { label: '使える日数', value: `${coupon.validityDays || 0}日` },
           { label: 'コードの頭の文字', value: prefix },
           { label: '2月29日生まれの子への平年の扱い', value: leapLabel },
@@ -597,7 +597,7 @@ function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave
         </div>
         <div className={styles.sample}>
           <span className={styles.sampleLabel}>届く見本</span>
-          <strong className={styles.sampleTitle}>{`${coupon.benefitLabel || 'お誕生日クーポン'} ${formatNumber(coupon.discountAmount || 0)}円引き`}</strong>
+          <strong className={styles.sampleTitle}>{`${coupon.benefitLabel || 'お誕生日クーポン'} ${formatNumber(coupon.discountAmount || 0)} 円引き`}</strong>
           <span className={styles.sampleCode}>{`コード ${prefix}-1234・使える日数 ${coupon.validityDays || 0}日`}</span>
         </div>
         <p className={styles.muted}>クーポンが使われた記録は「コンバージョン」で確認できます。</p>

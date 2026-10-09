@@ -1250,7 +1250,7 @@ export default function FormsListV8() {
                   </Td>
                   <Td className={styles.answerCell}>
                     {reviewMode ? (
-                      <span className={styles.answerCount}>{answerCount ? `${formatNumber(answerCount)}件` : '—'}</span>
+                      <span className={styles.answerCount}>{answerCount ? `${formatNumber(answerCount)} 件` : '—'}</span>
                     ) : (
                       <Link
                         href={`/form-submissions/responses?id=${encodeURIComponent(form.id)}`}
@@ -1259,7 +1259,7 @@ export default function FormsListV8() {
                         className={styles.answerCount}
                         data-zero={answerCount === 0 || undefined}
                       >
-                        {`${formatNumber(answerCount)}件`}
+                        {`${formatNumber(answerCount)} 件`}
                       </Link>
                     )}
                     {/*
@@ -1352,7 +1352,7 @@ export default function FormsListV8() {
       )}
     />
   ) : (
-    <p className={styles.pagerSolo}>{`${formatNumber(listTotal)}件`}</p>
+    <p className={styles.pagerSolo}>{`${formatNumber(listTotal)} 件`}</p>
   )
 
   /* 閲覧のみの帯（`JV2oR`）。見出しの下・数の帯の上。 */
@@ -1379,7 +1379,7 @@ export default function FormsListV8() {
         description={`削除しても、中のフォームは未分類に残ります。${
           deletingFolderCount === null
             ? 'いまこのフォルダに入っている件数を確認できませんでした。'
-            : `いまこのフォルダに入っているのは${formatNumber(deletingFolderCount)}件です。`
+            : `いまこのフォルダに入っているのは${formatNumber(deletingFolderCount)} 件です。`
         }`}
         confirmLabel="削除する"
         destructive
@@ -1524,7 +1524,7 @@ export default function FormsListV8() {
             <p className={styles.panelValue}>{destinationText(active)}</p>
             <p className={styles.panelLabel}>回答</p>
             <p className={styles.panelValue}>
-              {`${formatNumber(formAnswerCount(active))}件　${answerSubText(active)}`}
+              {`${formatNumber(formAnswerCount(active))} 件　${answerSubText(active)}`}
             </p>
             <div className={styles.panelButtons}>
               {canEditForms ? <>
@@ -1620,7 +1620,7 @@ export default function FormsListV8() {
             <div className={styles.impactOption} data-tone="recommended">
               <p className={styles.impactOptionTitle}>アーカイブする（おすすめ）</p>
               <p className={styles.impactOptionDesc}>
-                {`一覧から隠します。集まった回答 ${formatNumber(deleteImpact.submissionCount)}件 と友だち情報に保存した答えは残ります。`}
+                {`一覧から隠します。集まった回答 ${formatNumber(deleteImpact.submissionCount)} 件 と友だち情報に保存した答えは残ります。`}
               </p>
             </div>
             <div className={styles.impactOption} data-disabled={deleteImpact.canDelete ? undefined : ''}>

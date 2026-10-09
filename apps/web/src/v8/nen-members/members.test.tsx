@@ -119,7 +119,7 @@ describe('V8 会員（src/v8/nen-members）', () => {
     expect(host.textContent).toContain('¥0〜（固定）')
     expect(host.textContent).toContain('ゴールド以上')
     expect(host.textContent).toContain('今年の購入 ¥50,000 以上')
-    expect(host.textContent).toContain('最後に送った日時 9/30 10:12')
+    expect(host.textContent).toContain('最後に送った日時 09/30 10:12')
   })
 
   it('「…」→ランクを削除する：移す先はひとつ下を先に選び、版つきで消す', async () => {

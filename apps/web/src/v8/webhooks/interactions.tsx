@@ -382,7 +382,7 @@ export default function WebhooksInteractionsV8() {
   const pager = loaded && data.total > 0 ? (
     <div className={styles.pagerRow}>
       <span className={styles.pagerLead}>
-        <span className={styles.pagerCount}>{`${formatNumber(data.total)}件中 ${rangeFirst}〜${rangeLast}件`}</span>
+        <span className={styles.pagerCount}>{`${formatNumber(data.total)} 件中 ${rangeFirst}〜${rangeLast}件`}</span>
         <span className={styles.smallSelect}>
           <Select
             aria-label="1ページに出す件数"

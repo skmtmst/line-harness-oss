@@ -41,6 +41,8 @@ import {
   type DraftState, type StepNumber, type V8CheckRow,
 } from './logic'
 import styles from './register.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+
 
 const V8_STEPS: ReadonlyArray<{ number: StepNumber; label: string; node: string; lead: string }> = [
   { number: 1, label: 'LINE準備', node: 'xj3zz', lead: '5段すべて通ってから登録します。接続確認が通るまで、アカウントは作られません。' },
@@ -612,7 +614,7 @@ export default function AccountRegisterV8() {
                 {connection.followerImport.capability === 'available' && form.importFriends ? <>
                   <div className={styles.progressHead}>
                     <strong>{importingIds ? '既存の友だちを取り込んでいます' : '既存の友だちを取り込みました'}</strong>
-                    <strong>{importingIds ? `${importedCount.toLocaleString('ja-JP')}人 / ${progressTotal !== null ? `${progressTotal.toLocaleString('ja-JP')}人` : '確認中'}` : `${importedCount.toLocaleString('ja-JP')}人`}</strong>
+                    <strong>{importingIds ? `${polishFormatNumber(importedCount)} 人 / ${progressTotal !== null ? `${polishFormatNumber(progressTotal)} 人` : '確認中'}` : `${polishFormatNumber(importedCount)} 人`}</strong>
                   </div>
                   <div className={styles.progressTrack} role="progressbar" aria-valuenow={progressRate} aria-valuemin={0} aria-valuemax={100} aria-label="友だちの取り込み">
                     <span className={styles.progressFill} style={{ width: `${progressRate}%` }} />
@@ -690,7 +692,7 @@ export default function AccountRegisterV8() {
               <ResultRow label="Webhook の利用" value={checkRows[2].state === 'passed' ? 'LINE 側で「オン」でした' : 'まだ確かめていません'} state={checkRows[2].state} />
               <ResultRow
                 label="ボットの情報"
-                value={connection?.displayName ? `表示名「${connection.displayName}」${connection.verification?.followerTotal != null ? `・友だち ${connection.verification.followerTotal.toLocaleString('ja-JP')} 人` : ''}` : 'まだ確かめていません'}
+                value={connection?.displayName ? `表示名「${connection.displayName}」${connection.verification?.followerTotal != null ? `・友だち ${polishFormatNumber(connection.verification.followerTotal)} 人` : ''}` : 'まだ確かめていません'}
                 state={!connection ? 'todo' : connection.displayName ? 'passed' : 'failed'}
               />
               <Tr>

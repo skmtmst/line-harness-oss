@@ -114,7 +114,7 @@ describe('V8 リッチメニュー一覧', () => {
     const view = render(<RichMenusListV8 />)
     const first = (await view.findByText('通常メニュー')).closest('tr') as HTMLElement
     expect(first.textContent).toContain('公開中')
-    expect(first.textContent).toContain('12回')
+    expect(first.textContent).toContain('12 回')
     expect(first.textContent).toContain('（既定）')
     const second = view.getByText('秋のキャンペーン').closest('tr') as HTMLElement
     expect(second.textContent).toContain('10/5 公開')
@@ -162,7 +162,7 @@ describe('V8 リッチメニュー一覧', () => {
     fireEvent.click(await view.findByText('取り下げ・削除する'))
     const dialog = await view.findByRole('alertdialog')
     expect(dialog.textContent).toContain('「通常メニュー」はまだ消せません')
-    expect(dialog.textContent).toContain('消すと、リッチメニューが出なくなる友だちがいます（1,204人）。先に下の順に外してください。')
+    expect(dialog.textContent).toContain('消すと、リッチメニューが出なくなる友だちがいます（1,204 人）。先に下の順に外してください。')
     await waitFor(() => expect(dialog.querySelectorAll('li').length).toBe(3))
     const rows = [...dialog.querySelectorAll('li')].map((li) => li.textContent)
     expect(rows).toEqual([

@@ -192,7 +192,7 @@ describe('V8 NEN配信「コラムを書く」（yRDwW）', () => {
     await act(async () => { picker.querySelector<HTMLInputElement>('input[type="radio"][aria-label="ペット登録あり"]')!.click() })
     await act(async () => { [...picker.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === '選ぶ')!.click() })
     await flush()
-    expect(host.textContent).toContain('1,240人に届きます')
+    expect(host.textContent).toContain('1,240 人に届きます')
     await act(async () => { fireEvent.click(button('下書きを保存')!) })
     await flush()
     expect(calls.createColumn).toHaveBeenCalledWith('account-a', expect.objectContaining({ title: '秋の食事、量はどれくらい？', targetMode: 'tag', targetTagId: 'tag-pet' }))

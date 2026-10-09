@@ -59,6 +59,8 @@ import PageSizeSelect from '@/components/ui/page-size-select'
 import { reminderTriggerLabel, reminderStopSummary, renderReminderBodySample } from '@/components/reminders/reminder-labels'
 import SheetDialog from './sheet-dialog'
 import styles from './detail.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 const PAGE_SIZE = 20
 /** 書き出しの上限。実行結果が多いとき、手元に全部ため込むと固まる。 */
@@ -119,10 +121,7 @@ function formatMonthDay(value: string | null): string {
 }
 
 function formatJst(value: string | null): string {
-  if (!value) return '—'
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return '—'
-  return formatDateTime(parsed)
+  return polishFormatDate(value, { style: 'detail', fallback: '—' })
 }
 
 /** API の UTC ISO を、どの端末でも同じ JST の datetime-local 値へ変える。 */
@@ -347,7 +346,7 @@ function ReminderDetailV8() {
         if (all.length >= EXPORT_LIMIT || offset >= total || response.data.items.length === 0) break
       }
       if (total > EXPORT_LIMIT) {
-        setActionMessage(`件数が多いため、全${formatNumber(total)}件のうち${formatNumber(EXPORT_LIMIT)}件まで書き出しました。`)
+        setActionMessage(`件数が多いため、全${formatNumber(total)} 件のうち${formatNumber(EXPORT_LIMIT)} 件まで書き出しました。`)
       }
       const url = URL.createObjectURL(new Blob([csvFor(all)], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
@@ -564,10 +563,10 @@ function ReminderDetailV8() {
             title="いまの状態"
             rows={[
               { key: 'state', label: '状態', value: <span className={styles.valueState} title={reminderStopSummary(data.reminder.stopConditions)} data-tone={statusLabel === '稼働中' ? 'ok' : undefined}>{statusLabel}</span> },
-              { key: 'registrants', label: '登録者', value: `${formatNumber(data.summary.targetCount)}人` },
-              { key: 'next7', label: 'これから送る（今後7日）', value: `${formatNumber(data.summary.scheduledNext7Days ?? 0)}通` },
-              { key: 'month', label: '今月送った', value: `${formatNumber(data.summary.sentThisMonth ?? 0)}通` },
-              { key: 'errors', label: '失敗', value: <span className={hasErrors ? styles.valueDanger : undefined}>{`${formatNumber(data.summary.errors)}通`}</span> },
+              { key: 'registrants', label: '登録者', value: `${formatNumber(data.summary.targetCount)} 人` },
+              { key: 'next7', label: 'これから送る（今後7日）', value: `${formatNumber(data.summary.scheduledNext7Days ?? 0)} 通` },
+              { key: 'month', label: '今月送った', value: `${formatNumber(data.summary.sentThisMonth ?? 0)} 通` },
+              { key: 'errors', label: '失敗', value: <span className={hasErrors ? styles.valueDanger : undefined}>{`${formatNumber(data.summary.errors)} 通`}</span> },
             ]}
           />
 
@@ -596,8 +595,8 @@ function ReminderDetailV8() {
         title={`「${data.reminder.name}」を一時停止する`}
         description="止めているあいだ、通知は送りません。止めているあいだに送る予定だった通知は、再開しても送りません（過去の日時になるため）。登録者と送った履歴は残ります。"
         band={pauseImpact.truncated
-          ? `送る予定の ${formatNumber(plannedTotal)}通が送られなくなります（今後24時間の分は数え切れませんでした）。`
-          : `今後24時間で送る予定の ${formatNumber(pauseImpact.count)}通 が送られなくなります。`}
+          ? `送る予定の ${formatNumber(plannedTotal)} 通が送られなくなります（今後24時間の分は数え切れませんでした）。`
+          : `今後24時間で送る予定の ${formatNumber(pauseImpact.count)} 通 が送られなくなります。`}
         busy={pausing}
         onClose={() => { if (!pausing) setConfirmPause(false) }}
         actions={(
@@ -652,7 +651,7 @@ function OverviewTab({
         <div className={styles.failBand} role="alert">
           <CircleAlert size={18} className={styles.failIcon} aria-hidden="true" />
           <div className={styles.failText}>
-            <p className={styles.failTitle}>送れなかった通知が {formatNumber(data.summary.errors)}通あります</p>
+            <p className={styles.failTitle}>送れなかった通知が {formatNumber(data.summary.errors)} 通あります</p>
             <p className={styles.failNote}>友だちがブロックしていたか、LINE が受け付けませんでした。理由を見て、送り直せます。</p>
           </div>
           <Button onClick={onShowErrors}>
@@ -678,8 +677,8 @@ function OverviewTab({
             <div key={step.id} role="row" className={styles.row}>
               <span role="cell" className={styles.colNum}>{step.stepNumber}</span>
               <span role="cell" className={styles.colFlex} title={stepLabel(step)}>{stepTiming(step, detailSteps[index], reminder?.deliveryMode)}</span>
-              <span role="cell" className={styles.colSent}>{formatNumber(step.sent)}通</span>
-              <span role="cell" className={styles.colFail} data-danger={step.errors > 0 || undefined}>{formatNumber(step.errors)}通</span>
+              <span role="cell" className={styles.colSent}>{formatNumber(step.sent)} 通</span>
+              <span role="cell" className={styles.colFail} data-danger={step.errors > 0 || undefined}>{formatNumber(step.errors)} 通</span>
               <span role="cell" className={styles.colNext}>{nextByStep ? formatMd(nextByStep[step.stepNumber] ?? null) : '—'}</span>
             </div>
           ))}
@@ -800,7 +799,7 @@ function ScheduleTab({ reminderId, steps }: { reminderId: string; steps: Reminde
             ))}
           </div>
           <div className={styles.pager}>
-            <span className={styles.pagerCount}>{formatNumber(total)}件中 {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)}件</span>
+            <span className={styles.pagerCount}>{formatNumber(total)} 件中 {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)}件</span>
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="配信予定のページ送り" />
           </div>
         </>
@@ -943,7 +942,7 @@ function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string;
             ))}
           </div>
           <div className={styles.pager}>
-            <span className={styles.pagerCount}>{formatNumber(total)}件中 {total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)}件</span>
+            <span className={styles.pagerCount}>{formatNumber(total)} 件中 {total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)}件</span>
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="実行結果のページ送り" />
           </div>
         </>
@@ -1062,7 +1061,7 @@ function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canMana
       <section className={styles.card} aria-labelledby="rm-detail-registrants">
         <div className={styles.cardHead}>
           <h2 id="rm-detail-registrants" className={styles.cardTitle}>登録者</h2>
-          <p className={styles.cardNote}>{formatNumber(items.length)}人</p>
+          <p className={styles.cardNote}>{formatNumber(items.length)} 人</p>
         </div>
         {notice ? <Notice tone="info">{notice}</Notice> : null}
         <div className={styles.toolbar}>
@@ -1146,7 +1145,7 @@ function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canMana
               })}
             </div>
             <div className={styles.pager}>
-              <span className={styles.pagerCount}>{formatNumber(visible.length)}人中 {visible.length === 0 ? 0 : (page - 1) * pageSize + 1}〜{Math.min(page * pageSize, visible.length)}人</span>
+              <span className={styles.pagerCount}>{formatNumber(visible.length)} 人中 {visible.length === 0 ? 0 : (page - 1) * pageSize + 1}〜{Math.min(page * pageSize, visible.length)}人</span>
               <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="登録者のページ送り" />
             </div>
           </>

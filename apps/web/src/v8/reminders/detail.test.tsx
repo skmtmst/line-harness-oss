@@ -146,7 +146,7 @@ describe('V8 リマインダの詳細', () => {
     await act(async () => { buttonByText('一時停止する')!.click() })
     const dialog = document.querySelector('[data-design-node="RwVo5"]')
     expect(dialog?.textContent).toContain('「予約前日のご案内」を一時停止する')
-    expect(dialog?.textContent).toContain('今後24時間で送る予定の 2通 が送られなくなります。')
+    expect(dialog?.textContent).toContain('今後24時間で送る予定の 2 通 が送られなくなります。')
     expect(state.updates).toHaveLength(0)
     const confirm = [...dialog!.querySelectorAll('button')].find((el) => el.textContent?.trim() === '一時停止する') as HTMLButtonElement
     await act(async () => { confirm.click() })

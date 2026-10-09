@@ -35,8 +35,10 @@ import styles from './detail.module.css'
 import detailStyles from '../broadcast-detail/detail.module.css'
 import BroadcastPhone from '../broadcast-detail/phone'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
 
-const n = (value: number) => value.toLocaleString('ja-JP')
+
+const n = (value: number) => polishFormatNumber(value)
 /** 開いた・押した・反応（API-18）。店の計測がまだ取れていない（null）は「—」。 */
 const metric = (value: number | null | undefined) => (value == null ? '—' : n(value))
 /** 送ったアカウントの合計。1つでも取れていなければ「—」（足りない合計を出さない）。 */

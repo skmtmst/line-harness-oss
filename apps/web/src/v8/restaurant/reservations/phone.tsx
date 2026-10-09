@@ -36,6 +36,8 @@ import StoreTabs from '../store-tabs/store-tabs'
 import type { PhonePreset } from './today'
 import { INACTIVE_STATUSES, dayTitle, floorOrder, slotLabel, toYmd } from './format'
 import styles from './reservations.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+
 
 const STAY_MINUTES = 120
 const FALLBACK_START = 17 * 60
@@ -390,7 +392,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
               <Field labelSize="compact" label="コース">
                 <Select aria-label="コース" size="full" value={courseId} onChange={setCourseId} options={[
                   { value: '', label: '席のみ' },
-                  ...courses.map((c) => ({ value: c.id, label: `${c.name} ${c.price.toLocaleString()}円` })),
+                  ...courses.map((c) => ({ value: c.id, label: `${c.name} ${polishFormatNumber(c.price)} 円` })),
                 ]} />
               </Field>
             </div>

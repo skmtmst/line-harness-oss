@@ -53,6 +53,8 @@ import { mileagePaginationTotal } from './display'
 import styles from './mileage.module.css'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError } from '@/components/shared/form-controls'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 const BAND_LABELS: Record<ActionScoreBand, string> = {
   high: '点が高い',
@@ -999,11 +1001,7 @@ export function ScoreAdjustDialog({
 
 /* 明細の日時（絵は「9/02 19:20」。日・時を2桁にそろえ、行の幅をそろえる）。日本時間で出す。 */
 function formatScoreHistoryTime(value: string): string {
-  const time = new Date(value).getTime()
-  if (Number.isNaN(time)) return '—'
-  const jst = new Date(time + 9 * 60 * 60 * 1000)
-  const two = (n: number) => String(n).padStart(2, '0')
-  return `${jst.getUTCMonth() + 1}/${two(jst.getUTCDate())} ${two(jst.getUTCHours())}:${two(jst.getUTCMinutes())}`
+  return polishFormatDate(value, { style: 'detail', fallback: '—' })
 }
 
 /*

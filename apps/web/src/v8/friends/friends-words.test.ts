@@ -80,6 +80,6 @@ describe('重複検出の言葉', () => {
   })
 
   it('見直した時刻は日本時間の M/D HH:mm', () => {
-    expect(slashDateTime('2026-08-30T10:00:00.000Z')).toBe('8/30 19:00')
+    expect(slashDateTime('2026-08-30T10:00:00.000Z')).toBe('08/30 19:00')
   })
 })

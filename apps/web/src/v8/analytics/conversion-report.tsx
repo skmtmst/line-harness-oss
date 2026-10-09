@@ -83,12 +83,12 @@ export default function ConversionReportV8({ accountId }: { accountId: string })
           <section className={styles.reportCard} aria-labelledby="conversion-daily-title">
             <div className={styles.reportHead}>
               <h2 id="conversion-daily-title" className={styles.hoursTitle}>{`日ごとの成果（${point ? point.conversionPointName : '成果地点すべて'}）`}</h2>
-              <span className={styles.reportSub}>{`この${days}日 ${formatNumber(point ? point.netCount : report.kpis.netCount)}件・前の${days}日 ${formatNumber(point ? point.previousNetCount : report.kpis.previousNetCount)}件`}</span>
+              <span className={styles.reportSub}>{`この${days}日 ${formatNumber(point ? point.netCount : report.kpis.netCount)} 件・前の${days}日 ${formatNumber(point ? point.previousNetCount : report.kpis.previousNetCount)} 件`}</span>
               {point ? <><span className={styles.spacer} /><Button variant="secondary" onClick={() => setPointId(null)}>すべてに戻す</Button></> : null}
             </div>
             {daily.length ? <>
               <div className={styles.reportBars}>{daily.map((item) => {
-                const label = `${shortDay(item.date)}（${analyticsWeekday(item.date)}） ${formatNumber(item.count)}件`
+                const label = `${shortDay(item.date)}（${analyticsWeekday(item.date)}） ${formatNumber(item.count)} 件`
                 return <span key={item.date} role="img" aria-label={label} title={label} className={styles.reportBar} style={{ height: `${Math.max(2, item.count / max * 100)}%` }} />
               })}</div>
               <div className={styles.ticks} aria-hidden="true"><span>{shortDay(daily[0].date)}</span><span>{shortDay(daily[daily.length - 1].date)}</span></div>
@@ -107,8 +107,8 @@ export default function ConversionReportV8({ accountId }: { accountId: string })
               ? <div className={styles.emptyRow} role="row"><span role="cell">成果地点がありません</span></div>
               : report.byDefinition.map((item) => <div key={item.conversionPointId} className={styles.reportRow} role="row" data-selected={item.conversionPointId === pointId || undefined}>
                 <span role="cell" className={styles.colMain}><strong className={styles.cellStrong} title={item.conversionPointName}>{item.conversionPointName}</strong></span>
-                <span role="cell" className={styles.rcol} data-w="62">{`${formatNumber(item.netCount)}件`}</span>
-                <span role="cell" className={styles.rcol} data-w="62">{`${formatNumber(item.previousNetCount)}件`}</span>
+                <span role="cell" className={styles.rcol} data-w="62">{`${formatNumber(item.netCount)} 件`}</span>
+                <span role="cell" className={styles.rcol} data-w="62">{`${formatNumber(item.previousNetCount)} 件`}</span>
                 <span role="cell" className={styles.rcol} data-w="48" data-change={item.countChange > 0 ? 'up' : item.countChange < 0 ? 'down' : undefined}>{item.countChange > 0 ? `+${formatNumber(item.countChange)}` : item.countChange < 0 ? `−${formatNumber(-item.countChange)}` : '0'}</span>
                 <span role="cell" className={styles.rcol} data-w="200" title={item.routes[0]?.label}>{item.routes[0]?.label ?? '—'}</span>
                 <span role="cell" className={styles.rcol} data-w="36"><RowMenu point={item} onShowDaily={() => setPointId(item.conversionPointId)} /></span>

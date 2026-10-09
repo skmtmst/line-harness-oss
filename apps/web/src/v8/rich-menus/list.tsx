@@ -150,7 +150,7 @@ function audienceMainText(g: RichMenuGroupListItem, tagNameById: Map<string, str
 function audienceSubText(g: RichMenuGroupListItem): string | null {
   if (g.publishingAt && g.isDefaultForAll) return `${shortDay(g.publishingAt)} から既定`
   if (g.targetingEnabled && g.targetingCondition) {
-    return g.audienceCount != null ? `対象 ${formatNumber(g.audienceCount)}人` : '対象の人数は未取得'
+    return g.audienceCount != null ? `対象 ${formatNumber(g.audienceCount)} 人` : '対象の人数は未取得'
   }
   if (g.isDefaultForAll) return '（既定）'
   return null
@@ -1120,10 +1120,10 @@ export default function RichMenusListV8() {
                   <Td
                       className={styles.countMain}
                       title={g.monthlyStats?.uniqueAudience.value != null
-                        ? `のべ${formatNumber(g.monthlyStats.uniqueAudience.value)}人${g.monthlyStats.uniqueAudience.state === 'partial' ? '（記録開始後）' : ''}`
+                        ? `のべ${formatNumber(g.monthlyStats.uniqueAudience.value)} 人${g.monthlyStats.uniqueAudience.state === 'partial' ? '（記録開始後）' : ''}`
                         : undefined}
                     >
-                      {taps == null ? '—' : `${formatNumber(taps)}回`}
+                      {taps == null ? '—' : `${formatNumber(taps)} 回`}
                     </Td>
                   <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
                     <div className={styles.menuBox}>
@@ -1150,8 +1150,8 @@ export default function RichMenusListV8() {
     <div className={styles.pagerRow}>
       <span className={styles.pagerCount}>
         {pageCount > 1
-          ? `${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, groupTotal)} / ${formatNumber(groupTotal)}件`
-          : `${formatNumber(groupTotal)}件`}
+          ? `${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, groupTotal)} / ${formatNumber(groupTotal)} 件`
+          : `${formatNumber(groupTotal)} 件`}
       </span>
       {pageCount > 1 ? (
         <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="リッチメニューのページ送り" />
@@ -1343,7 +1343,7 @@ export default function RichMenusListV8() {
             unit=""
             valueText={topArea ? topArea.label || '名前のないボタン' : '—'}
             detail={topArea
-              ? `${topAreaGroupName ? `${topAreaGroupName}・` : ''}${formatNumber(topArea.taps)}回`
+              ? `${topAreaGroupName ? `${topAreaGroupName}・` : ''}${formatNumber(topArea.taps)} 回`
               : tapKpiReady
                 ? (tapStats?.total ?? 0) > 0
                   ? '内訳はまだ集まっていません'

@@ -395,7 +395,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
                 const strength = summary && summary.max > 0 ? n / summary.max : 0
                 const active = picked?.rowKey === row.key && picked?.columnKey === col.key
                 return <button key={col.key} type="button" className={styles.gridCell} data-active={active || undefined} data-strong={strength > 0.5 || undefined} data-empty={n === 0 || undefined} disabled={n === 0} aria-pressed={active}
-                  aria-label={`${row.label} × ${col.label} ${formatNumber(n)}${unit}`}
+                  aria-label={`${row.label} × ${col.label} ${formatNumber(n)} ${unit}`}
                   onClick={() => setPickedKey({ rowKey: row.key, columnKey: col.key })}
                   style={n > 0 ? { backgroundColor: `color-mix(in srgb, var(--color-accent) ${Math.round((0.16 + strength * 0.7) * 100)}%, transparent)` } : undefined}>{formatNumber(n)}</button>
               })}
@@ -407,7 +407,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
             </div>
           </section>
           <aside className={styles.funnelSide} data-w="cross" aria-labelledby="cross-picked-title">
-            <h2 id="cross-picked-title" className={styles.hoursTitle}>{picked ? `${picked.rowLabel} × ${picked.columnLabel}（${formatNumber(picked.value)}${unit}${unit === '回' ? `・${formatNumber(picked.uniqueFriends)}人` : ''}）` : 'マスを選んでください'}</h2>
+            <h2 id="cross-picked-title" className={styles.hoursTitle}>{picked ? `${picked.rowLabel} × ${picked.columnLabel}（${formatNumber(picked.value)}${unit}${unit === '回' ? `・${formatNumber(picked.uniqueFriends)} 人` : ''}）` : 'マスを選んでください'}</h2>
             {picked && canManage ? <>
               <span><Button variant="secondary" disabled={audienceBusy} onClick={() => void openAudience('friends')}><Users size={15} aria-hidden="true" />対象者を開く</Button></span>
               <span><Button variant="secondary" disabled={audienceBusy} onClick={() => void openAudience('broadcast')}><Send size={15} aria-hidden="true" />この対象者へ配信を作成</Button></span>

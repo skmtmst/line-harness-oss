@@ -473,7 +473,7 @@ export default function ScenarioResultsV8() {
             <div className={styles.sectionHead}>
               <h2 id="scenario-results-steps" className={styles.sectionTitle}>通ごとの反応</h2>
               {deliveringCount > 0 ? (
-                <span className={styles.sectionNote} role="status">いま送っています（送信中 {formatNumber(deliveringCount)}人）</span>
+                <span className={styles.sectionNote} role="status">いま送っています（送信中 {formatNumber(deliveringCount)} 人）</span>
               ) : null}
             </div>
             <NoteBar tone="info">
@@ -489,19 +489,19 @@ export default function ScenarioResultsV8() {
                   const pct = reached !== null && stats.enrolledTotal > 0
                     ? Math.min(100, (reached / stats.enrolledTotal) * 100)
                     : 0
-                  const opened = run?.opened.state === 'available' && run.opened.value !== null ? `${formatNumber(run.opened.value)}人` : '—'
-                  const clicked = run?.clicked.state === 'available' && run.clicked.value !== null ? `${formatNumber(run.clicked.value)}人` : '—'
+                  const opened = run?.opened.state === 'available' && run.opened.value !== null ? `${formatNumber(run.opened.value)} 人` : '—'
+                  const clicked = run?.clicked.state === 'available' && run.clicked.value !== null ? `${formatNumber(run.clicked.value)} 人` : '—'
                   return (
                     <li key={step.id} className={styles.stepRow}>
                       <div className={styles.stepTop}>
                         <span className={styles.stepNo}>{step.stepOrder}通目</span>
                         <span className={styles.stepWhen}>{scheduleLabel(step)}</span>
-                        <span className={styles.stepReach}>{reached === null ? '—' : `${formatNumber(reached)}人に届いた`}</span>
+                        <span className={styles.stepReach}>{reached === null ? '—' : `${formatNumber(reached)} 人に届いた`}</span>
                         <span className={styles.stepMeta}>
                           {`届いた率 ${reached === null ? '—' : percentLabel(reached, stats.enrolledTotal)}・開いた ${opened}・押した ${clicked}`}
                         </span>
                         {drop && drop.order === step.stepOrder ? (
-                          <span className={styles.stepDrop}>{`ここで ${formatNumber(drop.count)}人（${Math.round((drop.count / drop.base) * 100)}%）離れた`}</span>
+                          <span className={styles.stepDrop}>{`ここで ${formatNumber(drop.count)} 人（${Math.round((drop.count / drop.base) * 100)}%）離れた`}</span>
                         ) : null}
                       </div>
                       <progress className={styles.stepBar} max={100} value={pct} aria-label={`${step.stepOrder}通目の届いた率`} />
@@ -521,7 +521,7 @@ export default function ScenarioResultsV8() {
               <h2 id="scenario-results-friends" className={styles.sectionTitle}>参加中の友だち</h2>
               {failedTotal > 0 ? (
                 <button type="button" className={styles.sectionLink} onClick={() => setSubscriptionStatus('paused')}>
-                  {`送れずに止まった人が ${formatNumber(failedTotal)}人・止まっている人だけを見る`}
+                  {`送れずに止まった人が ${formatNumber(failedTotal)} 人・止まっている人だけを見る`}
                 </button>
               ) : null}
             </div>
@@ -543,7 +543,7 @@ export default function ScenarioResultsV8() {
                 />
               </span>
               {runs ? (
-                <span className={styles.count}>{`${formatNumber(runs.subscriptions.length)} / ${formatNumber(runs.pagination.total)}人`}</span>
+                <span className={styles.count}>{`${formatNumber(runs.subscriptions.length)} / ${formatNumber(runs.pagination.total)} 人`}</span>
               ) : null}
               <span className={styles.toolsSpacer} />
               <Button

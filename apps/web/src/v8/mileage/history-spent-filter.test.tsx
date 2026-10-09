@@ -47,7 +47,7 @@ test('使った・取り消しで、このページに無くても「まだあ�
   await act(async () => { screen.getByRole('button', { name: /使った・取り消し/ }).click() })
   await waitFor(() => expect(screen.getByText('このページには、使った・取り消しの履歴がありません')).toBeTruthy())
   expect(screen.queryByText('条件に合う履歴はありません')).toBeNull()
-  expect(screen.getByText(/使った・取り消し 0件/)).toBeTruthy()
+  expect(screen.getByText(/使った・取り消し 0 件/)).toBeTruthy()
 })
 
  test('WEB-073：履歴の帯は直近30日を別集計し、回数を件で示す', async () => {

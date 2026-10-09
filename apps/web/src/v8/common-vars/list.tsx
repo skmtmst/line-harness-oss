@@ -91,6 +91,8 @@ import {
 } from './model'
 import VarsExportPanel from './export-panel'
 import styles from './list.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -147,9 +149,7 @@ function formatListDate(value: string): string {
 
 /** 「10/7まで」の札の日付。年月は要らず、月日だけ出す。 */
 function formatMonthDay(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return `${date.getMonth() + 1}/${date.getDate()}まで`
+  return polishFormatDate(value, { style: 'list-day', fallback: '—' })
 }
 
 /*
@@ -1367,8 +1367,8 @@ function CommonVarsListInner() {
   const pagerSummary = filtered.length === 0
     ? '0件'
     : pageCount > 1
-      ? `${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)} / ${formatNumber(filtered.length)}件`
-      : `${formatNumber(filtered.length)}件`
+      ? `${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)} / ${formatNumber(filtered.length)} 件`
+      : `${formatNumber(filtered.length)} 件`
   const listPager = listFailed || !selectedAccountId || filtered.length === 0 ? null : pageCount > 1 ? (
     <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={<span className={styles.pagerCount}>{pagerSummary}</span>} />
   ) : (
@@ -1478,7 +1478,7 @@ function CommonVarsListInner() {
                 <TriangleAlert size={14} aria-hidden="true" />
                 <span>
                   予約中の{statusScheduled[0].kindLabel}「{statusScheduled[0].name}」が送られなくなります。
-                  {statusScheduled.length > 1 ? `ほか${formatNumber(statusScheduled.length - 1)}件` : ''}
+                  {statusScheduled.length > 1 ? `ほか${formatNumber(statusScheduled.length - 1)} 件` : ''}
                 </span>
               </p>
             ) : null}

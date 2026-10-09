@@ -154,7 +154,7 @@ export default function ReportTab() {
     const map = aggregate(keyOf, (item) => item.offerName ?? '案件は未設定')
     return [...map.values()].map((row) => {
       const people = new Set(inPeriod.filter((item) => keyOf(item) === row.id).map((item) => item.affiliateId)).size
-      return { ...row, sub: `${formatNumber(people)}人が紹介`, prevReward: prevOf(keyOf, row.id) }
+      return { ...row, sub: `${formatNumber(people)} 人が紹介`, prevReward: prevOf(keyOf, row.id) }
     }).sort((a, b) => b.conversions - a.conversions || b.reward - a.reward)
   }, [aggregate, inPeriod, prevOf])
 
@@ -308,7 +308,7 @@ export default function ReportTab() {
               </Td>
               <Td className={styles.colRepConv}>
                 <span className={styles.stack}>
-                  <span className={styles.cellMain}>{`${formatNumber(row.conversions)}件`}</span>
+                  <span className={styles.cellMain}>{`${formatNumber(row.conversions)} 件`}</span>
                   <span className={styles.rowPlan}>{row.conversions > 0 && row.revenue > 0 ? formatYen(row.revenue) : '—'}</span>
                 </span>
               </Td>

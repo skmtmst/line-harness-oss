@@ -3,6 +3,8 @@
  * 送れる出来事の正本は packages/db/src/webhooks.ts の KNOWN_OUTGOING_EVENT_TYPES。
  */
 import { ecEventLabel } from '@line-crm/shared'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 /** 出来事の種類 → 一覧の「いつ送るか」の言葉（絵：「友だちになった・タグが付いた」）。 */
 const EVENT_WORD: Record<string, string> = {
@@ -104,8 +106,5 @@ const SHORT = new Intl.DateTimeFormat('ja-JP', {
 
 /** 「9/30 10:12」（日本時間）。表の狭い列で使う。読めない値は「—」。 */
 export function shortDateTime(value: string | null | undefined): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return SHORT.format(date)
+  return polishFormatDate(value, { style: 'list', fallback: '—' })
 }

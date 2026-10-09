@@ -172,11 +172,11 @@ describe('来店スタンプ（管理画面）', () => {
     render(<VisitStampsV8 />)
     fireEvent.click(await screen.findByRole('button', { name: '次のページ' }))
     await waitFor(() => expect(fx.entries).toHaveBeenLastCalledWith({ accountId: 'acc-1', page: 2, pageSize: 20 }))
-    expect(await screen.findByText('88件中 21〜40件')).toBeTruthy()
+    expect(await screen.findByText('88 件中 21〜40件')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '記録の表示件数' }))
     fireEvent.click(await screen.findByRole('button', { name: '10件ずつ' }))
     await waitFor(() => expect(fx.entries).toHaveBeenLastCalledWith({ accountId: 'acc-1', page: 1, pageSize: 10 }))
-    expect(await screen.findByText('88件中 1〜10件')).toBeTruthy()
+    expect(await screen.findByText('88 件中 1〜10件')).toBeTruthy()
   })
 
   it('古い記録の返事が遅れても、操作後に読み直した記録を上書きしない', async () => {
@@ -198,7 +198,7 @@ describe('来店スタンプ（管理画面）', () => {
     await waitFor(() => expect(fx.entries).toHaveBeenCalledTimes(3))
     await act(async () => { finishOld({ success: true, data: { items: [], total: 88, page: 2, pageSize: 20 } }) })
     fireEvent.click(screen.getByRole('tab', { name: '押した・使った記録' }))
-    expect(await screen.findByText('120件中 21〜40件')).toBeTruthy()
+    expect(await screen.findByText('120 件中 21〜40件')).toBeTruthy()
     expect(screen.queryByText(/88件中/)).toBeNull()
   })
 
@@ -210,7 +210,7 @@ describe('来店スタンプ（管理画面）', () => {
     fireEvent.click(await screen.findByRole('button', { name: '次のページ' }))
     await waitFor(() => expect(fx.entries).toHaveBeenCalledTimes(3))
     expect(fx.entries).toHaveBeenLastCalledWith({ accountId: 'acc-1', page: 1, pageSize: 20 })
-    expect(await screen.findByText('2件中 1〜2件')).toBeTruthy()
+    expect(await screen.findByText('2 件中 1〜2件')).toBeTruthy()
     expect(screen.queryByRole('navigation', { name: '記録のページ送り' })).toBeNull()
   })
 

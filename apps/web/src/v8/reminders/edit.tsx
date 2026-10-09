@@ -81,6 +81,8 @@ import { BackToReminders, ChoiceCardV8, PhoneV8, ReminderV8Stepper, SummaryCardV
 import styles from './edit.module.css'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import type { InsertTokenSpec } from '@/components/shared/insert-tokens'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 /** リマインダの本文で札にする差し込み（{{date}} はリマインダでは予約日時）。 */
 const REMINDER_TOKENS: readonly InsertTokenSpec[] = [
@@ -120,22 +122,19 @@ export function stageFor(raw: string | null): V8Stage {
 }
 
 function countLabel(value: number | null, unit: string): string {
-  return value == null ? `—${unit}` : `${formatNumber(value)}${unit}`
+  return value == null ? `—${unit}` : `${formatNumber(value)} ${unit}`
 }
 
 const WEEKDAYS_JA = ['日', '月', '火', '水', '木', '金', '土']
 
 /** 「10/1（水）18:00」の形。 */
 function formatMd(value: Date | string | null): string {
-  if (!value) return '—'
-  const date = value instanceof Date ? value : new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return `${date.getMonth() + 1}/${date.getDate()}（${WEEKDAYS_JA[date.getDay()]}）${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  return polishFormatDate(value, { style: 'list', fallback: '—' })
 }
 
 /** 「10/1 18:00」の形（例の文の短い日時）。 */
 function formatShort(value: Date): string {
-  return `${value.getMonth() + 1}/${value.getDate()} ${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`
+  return polishFormatDate(value, { style: 'list', fallback: '—' })
 }
 
 /** 「10月2日(木) 14:00」の形。 */
@@ -943,7 +942,7 @@ function TargetStageV8({
           <SummaryCardV8
             rows={[
               { key: '基準日', value: reminderTriggerLabel(settings.triggerType) },
-              { key: '対象者', value: matched == null ? '—' : `${formatNumber(matched)}人に送る予定` },
+              { key: '対象者', value: matched == null ? '—' : `${formatNumber(matched)} 人に送る予定` },
               { key: '通知', value: settings.steps.length > 0 ? `${settings.steps.length}通` : '手順3で作る' },
               { key: '状態', value: '下書き' },
             ]}
@@ -1575,7 +1574,7 @@ function ScheduleStageV8({
       {preview && preview.summary.duplicateCount > 0 ? (
         <p className={styles.infoBand}>
           <Layers size={16} aria-hidden="true" />
-          同じ時刻に送る通知は、止めずに1通にまとめて送ります（{formatNumber(preview.summary.duplicateCount)}件）。まとめたくないときは時刻をずらしてください。
+          同じ時刻に送る通知は、止めずに1通にまとめて送ります（{formatNumber(preview.summary.duplicateCount)} 件）。まとめたくないときは時刻をずらしてください。
         </p>
       ) : null}
     </CreatePage>
@@ -1667,7 +1666,7 @@ function ConfirmStageV8({
     { key: '基準日', value: reminderTriggerLabel(settings.triggerType), stage: 'basics' },
     {
       key: '対象者',
-      value: `${pruneCondition(settings.targetCondition as SegmentCondition | null) ? '条件に合う人だけ' : '基準日がある人すべて'}${validation?.audience.matched != null ? `（${formatNumber(validation.audience.matched)}人に送る予定）` : ''}`,
+      value: `${pruneCondition(settings.targetCondition as SegmentCondition | null) ? '条件に合う人だけ' : '基準日がある人すべて'}${validation?.audience.matched != null ? `（${formatNumber(validation.audience.matched)} 人に送る予定）` : ''}`,
       stage: 'target',
     },
     { key: '止める条件', value: reminderStopSummary(settings.stopConditions), stage: 'target' },
@@ -1675,7 +1674,7 @@ function ConfirmStageV8({
     {
       key: '配信予定',
       value: preview
-        ? `今後7日 ${countLabel(preview.summary.next7Days, '通')}${preview.summary.duplicateCount > 0 ? `（重なり ${formatNumber(preview.summary.duplicateCount)}件はまとめる）` : ''}`
+        ? `今後7日 ${countLabel(preview.summary.next7Days, '通')}${preview.summary.duplicateCount > 0 ? `（重なり ${formatNumber(preview.summary.duplicateCount)} 件はまとめる）` : ''}`
         : previewFailed ? '読み込めませんでした' : '確認中',
       stage: 'preview',
     },
@@ -1689,7 +1688,7 @@ function ConfirmStageV8({
           <SummaryCardV8
             rows={[
               { key: '基準日', value: reminderTriggerLabel(settings.triggerType) },
-              { key: '対象者', value: validation?.audience.matched != null ? `${formatNumber(validation.audience.matched)}人` : '—' },
+              { key: '対象者', value: validation?.audience.matched != null ? `${formatNumber(validation.audience.matched)} 人` : '—' },
               { key: '通知', value: `${settings.steps.length}通` },
               { key: '状態', value: '下書き → 有効にする' },
             ]}
@@ -1770,7 +1769,7 @@ function ConfirmStageV8({
             <CheckRow
               ok={validation.audience.matched != null}
               title="対象者を数えた"
-              note={validation.audience.matched != null ? `${formatNumber(validation.audience.matched)}人に送る予定` : '対象者を数えられませんでした'}
+              note={validation.audience.matched != null ? `${formatNumber(validation.audience.matched)} 人に送る予定` : '対象者を数えられませんでした'}
               action={<Button variant="text" href={editHref(reminderId, 'target')}>見直す</Button>}
             />
             {validation.checks.filter((check) => check.key !== 'test_send').map((check) => (

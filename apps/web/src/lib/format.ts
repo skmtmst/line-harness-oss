@@ -82,7 +82,9 @@ function zonedParts(date: Date, epoch: number, timeZone: string): JstParts | nul
 
 function toParts(value: DateInput, timeZone = 'Asia/Tokyo'): JstParts | null {
   if (value === null || value === undefined || value === '') return null
-  const date = value instanceof Date ? value : new Date(value)
+  // SQLite の時刻（オフセットなし）は UTC。端末の地域に左右されない。
+  const normalized = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(value) && !/Z$|[+-]\d{2}:?\d{2}$/i.test(value) ? `${value.replace(' ', 'T')}Z` : value
+  const date = normalized instanceof Date ? normalized : new Date(normalized)
   const epoch = date.getTime()
   if (Number.isNaN(epoch)) return null
   if (timeZone === 'Asia/Tokyo') return jstParts(epoch)
@@ -101,24 +103,45 @@ function nowJst(now?: DateInput): JstParts {
 const pad2 = (n: number) => String(n).padStart(2, '0')
 const weekday = (w: number) => `（${WEEKDAYS[w]}）`
 
-/** M月D日（曜）H:mm。年が違うときだけ `YYYY年M月D日 H:mm`（曜日なし）。店舗時間帯で出す画面だけ timeZone を渡す。 */
-export function formatDateTime(
-  value: DateInput, fallback = '—', now?: DateInput, timeZone = 'Asia/Tokyo',
+/** B-152：日付の表示はこの1つの関数で作る。保存値・CSVには使わない。 */
+export function formatDate(
+  value: DateInput,
+  options: { style?: 'detail' | 'list' | 'list-day' | 'list-day-weekday' | 'day' | 'time'; fallback?: string; now?: DateInput; timeZone?: string } = {},
 ): string {
+  const { style = 'detail', fallback = '—', now, timeZone = 'Asia/Tokyo' } = options
   const p = toParts(value, timeZone)
   if (!p) return fallback
-  if (p.y !== (toParts(now ?? new Date(), timeZone) ?? nowJst()).y) {
-    return `${p.y}年${p.m}月${p.d}日 ${p.h}:${pad2(p.min)}`
+  const clock = `${pad2(p.h)}:${pad2(p.min)}`
+  if (style === 'time') return clock
+  const sameYear = p.y === (toParts(now ?? new Date(), timeZone) ?? nowJst()).y
+  if (style === 'list' || style === 'list-day' || style === 'list-day-weekday') {
+    const day = `${pad2(p.m)}/${pad2(p.d)}`
+    if (!sameYear) return `${p.y}/${day}${style === 'list-day-weekday' ? weekday(p.w) : ''}`
+    if (style === 'list-day-weekday') return `${day}${weekday(p.w)}`
+    return style === 'list-day' ? day : `${day} ${clock}`
   }
-  return `${p.m}月${p.d}日${weekday(p.w)}${p.h}:${pad2(p.min)}`
+  const day = `${sameYear ? '' : `${p.y}年`}${p.m}月${p.d}日${weekday(p.w)}`
+  return style === 'day' ? day : `${day}${clock}`
+}
+
+/** 詳細・説明文の日付。 */
+export function formatDateTime(value: DateInput, fallback = '—', now?: DateInput, timeZone = 'Asia/Tokyo'): string {
+  return formatDate(value, { style: 'detail', fallback, now, timeZone })
+}
+
+/** 一覧・表の日付。今年は MM/DD HH:mm、別の年は YYYY/MM/DD。 */
+export function formatListDateTime(value: DateInput, fallback = '—', now?: DateInput, timeZone = 'Asia/Tokyo'): string {
+  return formatDate(value, { style: 'list', fallback, now, timeZone })
+}
+
+/** 時刻を持たない一覧の日付。 */
+export function formatListDay(value: DateInput, fallback = '—', now?: DateInput, timeZone = 'Asia/Tokyo'): string {
+  return formatDate(value, { style: 'list-day', fallback, now, timeZone })
 }
 
 /** M月D日（曜）。予約日・期限など時刻を出さない日付。年が違う記録は `YYYY年M月D日`。店舗時間帯で出す画面だけ timeZone を渡す。 */
 export function formatDay(value: DateInput, fallback = '—', now?: DateInput, timeZone = 'Asia/Tokyo'): string {
-  const p = toParts(value, timeZone)
-  if (!p) return fallback
-  if (p.y !== (toParts(now ?? new Date(), timeZone) ?? nowJst()).y) return `${p.y}年${p.m}月${p.d}日`
-  return `${p.m}月${p.d}日${weekday(p.w)}`
+  return formatDate(value, { style: 'day', fallback, now, timeZone })
 }
 
 /** YYYY-MM-DD（日本時間）。ファイル名・送信値など機械が読む形。表示には使わない。 */
@@ -130,9 +153,7 @@ export function formatYmd(value: DateInput, fallback = ''): string {
 
 /** H:mm だけ（秒なし）。店舗時間帯で出す画面だけ timeZone を渡す。 */
 export function formatTime(value: DateInput, fallback = '—', timeZone = 'Asia/Tokyo'): string {
-  const p = toParts(value, timeZone)
-  if (!p) return fallback
-  return `${p.h}:${pad2(p.min)}`
+  return formatDate(value, { style: 'time', fallback, timeZone })
 }
 
 /**
@@ -186,7 +207,7 @@ export function formatNumber(
 /** 3桁カンマ＋単位（12,480人・3件）。0は「0件」と書く。 */
 export function formatCount(value: number | null | undefined, unit: string, fallback = '—'): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return fallback
-  return `${commaFmt.format(value)}${unit}`
+  return `${commaFmt.format(value)} ${unit}`
 }
 
 /**

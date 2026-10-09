@@ -29,6 +29,8 @@ import MediaSlot from '@/components/shared/media-slot'
 import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
 import { ogImageUrlError } from './model'
 import styles from './edit.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+
 
 type ColorKey = keyof Pick<FormTheme, 'main' | 'sub' | 'accent' | 'error' | 'text'>
 const COLOR_ROLES: { key: ColorKey; label: string }[] = [
@@ -97,7 +99,7 @@ export function AppearanceTab(props: Props) {
           <Toggle checked={options.oncePerFriend?.enabled ?? false} onChange={(enabled) => onChangeOptions({ oncePerFriend: { ...options.oncePerFriend, enabled } })} label="1人1回だけ答えられる" />
         </div>
         <div className={styles.toggleRow}>
-          <span>{`答えの数が ${(options.totalLimit?.max ?? 300).toLocaleString('ja-JP')}件 になったら締め切る`}</span>
+          <span>{`答えの数が ${polishFormatNumber((options.totalLimit?.max ?? 300))} 件 になったら締め切る`}</span>
           <Toggle
             checked={options.totalLimit?.enabled ?? false}
             onChange={(enabled) => onChangeOptions({ totalLimit: { ...options.totalLimit, enabled, max: options.totalLimit?.max ?? 300 } })}

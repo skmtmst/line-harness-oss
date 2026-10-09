@@ -244,9 +244,9 @@ describe('V8 リマインダを作る②〜⑤', () => {
   it('配信予定（T0nis）：重なりの行は「1通にまとめる」と出し、案内の帯で件数を言う', async () => {
     await render('preview')
     expect(host.querySelector('[data-page-template="create"]')?.getAttribute('data-design-node')).toBe('T0nis')
-    expect(host.textContent).toContain('今後7日 124通')
+    expect(host.textContent).toContain('今後7日 124 通')
     expect(host.textContent).toContain('重なり→1通にまとめる')
-    expect(host.textContent).toContain('1通にまとめて送ります（3件）')
+    expect(host.textContent).toContain('1通にまとめて送ります（3 件）')
   })
 
   it('有効にした（hjNpJ）：下の帯は無く、一覧・配信予定・詳細へ行ける', async () => {

@@ -31,6 +31,8 @@ import { ReadValue } from './parts'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './cta.module.css'
+import { formatTime as polishFormatTime } from '@/lib/format'
+
 
 type FormCandidates = { state: 'idle' | 'loading' | 'ready' | 'error' | 'forbidden'; items: Array<{ id: string; name: string; isActive: boolean }> }
 
@@ -274,7 +276,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
         <div className={styles.conflict} role="alert" data-design-node="pvimJ">
           <TriangleAlert size={16} aria-hidden="true" className={styles.conflictIcon} />
           <div className={styles.conflictText}>
-            <p className={styles.conflictTitle}>{latest?.editor.updatedAt ? `ほかの人が ${new Date(latest.editor.updatedAt).toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' })} にこのウェビナーを保存しました` : 'ほかの人がこのウェビナーを保存しました'}</p>
+            <p className={styles.conflictTitle}>{latest?.editor.updatedAt ? `ほかの人が ${polishFormatTime(new Date(latest.editor.updatedAt))} にこのウェビナーを保存しました` : 'ほかの人がこのウェビナーを保存しました'}</p>
             <p className={styles.conflictNote}>このまま保存すると、ほかの人の変更が消えます</p>
           </div>
           <Button disabled={busy} busy={reading} onClick={() => void readLatest()}><GitCompare size={15} aria-hidden="true" />違いを比べる</Button>

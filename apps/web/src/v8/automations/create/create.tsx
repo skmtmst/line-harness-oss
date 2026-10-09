@@ -2876,7 +2876,7 @@ export function NewAutomationV8({
           <div className={styles.kvRow}><dt>きっかけ</dt><dd>{selectedEvent.label}（{triggerConfigSummary}）</dd></div>
           <div className={styles.kvRow}>
             <dt>だれに</dt>
-            <dd>{targetSummary}{previewCount !== null ? ` 見込み ${formatNumber(previewCount)}人` : ''}</dd>
+            <dd>{targetSummary}{previewCount !== null ? ` 見込み ${formatNumber(previewCount)} 人` : ''}</dd>
           </div>
           <div className={styles.kvRow}><dt>すること</dt><dd>{actionSummary || '未設定'}</dd></div>
           <div className={styles.kvRow}>

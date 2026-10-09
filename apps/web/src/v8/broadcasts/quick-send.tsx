@@ -37,8 +37,8 @@ type Estimate = { count: number; blocked: number; remaining: number | null }
 
 /** 見込みの1文。今月の残りが読めたときだけ足す。 */
 export function estimateText(estimate: Estimate): string {
-  const base = `${formatNumber(estimate.count)}人に届く見込み（ブロック中 ${formatNumber(estimate.blocked)}人を除く）`
-  return estimate.remaining === null ? base : `${base}・今月あと ${formatNumber(estimate.remaining)}通 送れます`
+  const base = `${formatNumber(estimate.count)} 人に届く見込み（ブロック中 ${formatNumber(estimate.blocked)} 人を除く）`
+  return estimate.remaining === null ? base : `${base}・今月あと ${formatNumber(estimate.remaining)} 通 送れます`
 }
 
 export default function QuickSendV8({
@@ -325,7 +325,7 @@ export default function QuickSendV8({
           {needsCountConfirmation && estimate ? <SingleOperatorFields recipientCount={estimate.count} value={countInput} onChange={setCountInput} /> : null}
           {needsApproval ? (
             <div className={styles.approval}>
-              <p className={styles.approvalTitle}>{`${formatNumber(approvalConfig?.threshold ?? APPROVAL_THRESHOLD)}人以上に送るときは承認が要ります。承認する人を選んで頼んでください。`}</p>
+              <p className={styles.approvalTitle}>{`${formatNumber(approvalConfig?.threshold ?? APPROVAL_THRESHOLD)} 人以上に送るときは承認が要ります。承認する人を選んで頼んでください。`}</p>
               <Select
                 aria-label="承認する人"
                 size="full"

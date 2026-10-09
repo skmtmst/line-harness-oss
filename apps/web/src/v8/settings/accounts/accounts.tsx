@@ -46,6 +46,8 @@ import {
   webhookLabel,
 } from './view'
 import styles from './accounts.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+
 
 const TITLE = 'LINEアカウント'
 const DESCRIPTION = 'musubo でつないでいる LINE 公式アカウントです。既定のアカウントと、親子（本店と支店など）を決めます。'
@@ -245,7 +247,7 @@ export default function AccountsV8() {
               const webhook = webhookLabel(account)
               const parent = parentName(account, accounts)
               const archived = Boolean(account.archivedAt)
-              const friends = archived || account.stats?.friendCount == null ? '—' : account.stats.friendCount.toLocaleString('ja-JP')
+              const friends = archived || account.stats?.friendCount == null ? '—' : polishFormatNumber(account.stats.friendCount)
               return (
                 <Tr key={account.id} interactive>
                   <Td className={styles.colName}><div className={styles.nameStack}>

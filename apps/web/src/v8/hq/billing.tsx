@@ -40,6 +40,8 @@ import {
 import { billingFailureMessage } from './billing-failure'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import styles from './billing.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -73,11 +75,7 @@ export default function HqBillingV8() {
 
 /** 支払い履歴の日付（絵は「2026/10/01」）。 */
 function invoiceDate(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date)
-  const pick = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${pick('year')}/${pick('month')}/${pick('day')}`
+  return polishFormatDate(iso, { style: 'list-day', fallback: '—' })
 }
 
 function BillingInner() {

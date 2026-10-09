@@ -172,7 +172,7 @@ export default function CsvMigrationsV8() {
             <>
               <Button type="button" variant="secondary" onClick={m.cancelImport} disabled={m.busy}>取り込みをやめる</Button>
               <Button type="button" variant="primary" disabled={blocked || m.busy} busy={m.busy} busyLabel="反映中…" onClick={() => void m.executeImport()}>
-                {`確認した内容を反映（${formatNumber(reflectable)}人）`}
+                {`確認した内容を反映（${formatNumber(reflectable)} 人）`}
               </Button>
             </>
           ) : (

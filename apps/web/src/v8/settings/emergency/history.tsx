@@ -19,6 +19,8 @@ import { MANUAL_UPDATE_GUIDE_URL } from '@/components/update/use-update-status'
 import releaseLog from '@/generated/release-log-summary.json'
 import { api, type OperationHistoryEntry } from '@/lib/api'
 import styles from './history.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 type Release = { version: string; released: string | null; entries: Array<{ text: string }> }
 type Deployment = NonNullable<OperationHistoryEntry['deployment']>
@@ -28,13 +30,7 @@ const DAY = 24 * 60 * 60 * 1000
 
 /** 「10/1 23:58」。release-log の「2026-08-19 15:00」（日本時間・オフセット無し）もそのまま読む。 */
 function shortWhen(value: string | null | undefined): string {
-  if (!value) return '—'
-  const plain = value.match(/^\d{4}-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/)
-  if (plain && !/[zZ]|[+-]\d{2}:\d{2}$/.test(value)) return `${Number(plain[1])}/${Number(plain[2])} ${plain[3]}:${plain[4]}`
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = Object.fromEntries(new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date).map((p) => [p.type, p.value]))
-  return `${parts.month}/${parts.day} ${parts.hour}:${parts.minute}`
+  return polishFormatDate(value, { style: 'list', fallback: '—' })
 }
 
 function toTime(value: string | null | undefined): number {

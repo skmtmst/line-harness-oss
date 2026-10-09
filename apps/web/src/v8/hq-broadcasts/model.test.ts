@@ -31,7 +31,7 @@ describe('一括配信の計算', () => {
 
   it('確かめの札：足りる・足りない通数・接続切れ・止めている', () => {
     expect(preflightBadge(check('a', 10, 20)).label).toBe('足りる')
-    expect(preflightBadge(check('b', 5880, 2100, ['今月の送信枠が足りません'])).label).toBe('3,780通 足りない')
+    expect(preflightBadge(check('b', 5880, 2100, ['今月の送信枠が足りません'])).label).toBe('3,780 通 足りない')
     expect(preflightBadge(check('c', 1, 1, ['LINEに接続されていません'])).label).toBe('LINE の接続切れ')
     expect(preflightBadge(check('d', 1, 1, ['店舗または配信が停止中'])).label).toBe('配信を止めている')
   })
@@ -54,7 +54,7 @@ describe('一括配信の計算', () => {
       target(check('梅田店', 10, 10, [], true), 'excluded', 0, 0, { failureReasons: [{ code: 'x', label: '出さない', count: 1, retryable: false }] }),
       target(check('名古屋店', 10, 10), 'failed', 3, 0, { failureReasons: [{ code: 'line_busy', label: 'LINEが混雑しています', count: 3, retryable: true }] }),
     ] })
-    expect(lines.map((l) => `${l.store}:${l.text}`)).toEqual(['銀座店:友だちが0人です', '名古屋店:LINEが混雑しています（3人）・やり直せます'])
+    expect(lines.map((l) => `${l.store}:${l.text}`)).toEqual(['銀座店:友だちが0人です', '名古屋店:LINEが混雑しています（3 人）・やり直せます'])
   })
 
   it('送る店と外す店の数と人数（外した店・問題のある店は外す側）', () => {

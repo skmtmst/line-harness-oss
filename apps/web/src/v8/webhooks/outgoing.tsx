@@ -639,11 +639,11 @@ export default function WebhooksOutgoingV8() {
                     <Td className={styles.colWhen}><span className={styles.cellText} title={when}>{when}</span></Td>
                     <Td className={styles.colPayload}><span className={styles.cellText} title={payload}>{payload}</span></Td>
                     <Td align="right" className={styles.colCount}>
-                      <span className={styles.num}>{formatNumber(item.deliverySummary.total)}回</span>
+                      <span className={styles.num}>{formatNumber(item.deliverySummary.total)} 回</span>
                       <span className={styles.numSub}>
                         {item.deliverySummary.failed > 0
-                          ? `失敗 ${formatNumber(item.deliverySummary.failed)}回`
-                          : `送信中 ${formatNumber(item.deliverySummary.pending)}回`}
+                          ? `失敗 ${formatNumber(item.deliverySummary.failed)} 回`
+                          : `送信中 ${formatNumber(item.deliverySummary.pending)} 回`}
                       </span>
                     </Td>
                     <Td className={styles.colState}>
@@ -692,7 +692,7 @@ export default function WebhooksOutgoingV8() {
   const pager = ready && pageCount > 1 ? (
     <ListPagePagination>
       <span className={styles.pagerCount}>
-        {(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + visible.length} / {formatNumber(filtered.length)}件
+        {(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + visible.length} / {formatNumber(filtered.length)} 件
       </span>
       <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="送り先一覧のページ送り" />
     </ListPagePagination>

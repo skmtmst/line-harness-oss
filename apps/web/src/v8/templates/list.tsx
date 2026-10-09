@@ -94,6 +94,8 @@ import {
   type UsageDetail,
 } from './words'
 import styles from './list.module.css'
+import { formatDate as polishFormatDate, formatListDateTime as polishFormatListDateTime } from '@/lib/format'
+
 
 /** 一覧のタブ。message/question は同じテンプレートの束を中身で分ける。 */
 type Section = 'message' | 'question' | 'rich_video' | BroadcastAssetKind
@@ -175,9 +177,7 @@ function normalizeTemplateSearchText(value: string): string {
 
 /** M月D日（絵 v19Ivv は曜日を書かない）。時刻は title で見せる。 */
 function formatMonthDay(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return iso
-  return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'long', day: 'numeric' }).format(date)
+  return polishFormatDate(iso, { style: 'list-day', fallback: '—' })
 }
 
 /** 一覧・検索は「いまの最新」を対象にする（下書きがあれば下書き）。 */
@@ -195,7 +195,7 @@ function excerptOf(t: Template): string {
 function sendCountText(t: Template): string {
   if (typeof t.monthlySendCount !== 'number') return '—'
   if (t.publishedAt == null && t.monthlySendCount === 0) return '—'
-  return `${formatNumber(t.monthlySendCount)}通`
+  return `${formatNumber(t.monthlySendCount)} 通`
 }
 
 /** 公開の札（`v19Ivv`：公開中／未公開の変更／下書きだけ）。 */
@@ -1216,13 +1216,13 @@ export default function TemplatesListV8() {
                     {!narrow && (
                       <Td
                         className={styles.cellPlain}
-                        title={typeof t.totalSendCount === 'number' ? `累計 ${formatNumber(t.totalSendCount)}通` : undefined}
+                        title={typeof t.totalSendCount === 'number' ? `累計 ${formatNumber(t.totalSendCount)} 通` : undefined}
                       >
                         {sendCountText(t)}
                       </Td>
                     )}
                     {!narrow && (
-                      <Td className={styles.cellPlain} title={formatDateTime(t.updatedAt)}>
+                      <Td className={styles.cellPlain} title={polishFormatListDateTime(t.updatedAt)}>
                         {formatMonthDay(t.updatedAt)}
                       </Td>
                     )}
@@ -1285,7 +1285,7 @@ export default function TemplatesListV8() {
 
   /* ページ送りは型の pagination 枠へ。件数は部品の summary に入れる（絵：左に「26件中 1〜20件」、右に頁。帯の内側は部品の 10・20）。 */
   const showPager = view === 'ready' && filteredTemplates.length > 0
-  const pagerSummary = `${formatNumber(filteredTemplates.length)}件中 ${(safePage - 1) * pageSize + 1}〜${Math.min(safePage * pageSize, filteredTemplates.length)}件`
+  const pagerSummary = `${formatNumber(filteredTemplates.length)} 件中 ${(safePage - 1) * pageSize + 1}〜${Math.min(safePage * pageSize, filteredTemplates.length)}件`
   const listPager = !showPager ? null : pageCount > 1 ? (
     <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage} summary={<span className={styles.pagerCount}>{pagerSummary}</span>} />
   ) : (

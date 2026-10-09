@@ -35,16 +35,14 @@ import { ReadValue } from './parts'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './video.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
 
 /** JST の「10/8（木）20:00」。 */
 function shortJst(iso: string): string {
-  const time = Date.parse(iso)
-  if (Number.isNaN(time)) return iso
-  const d = new Date(time + 9 * 60 * 60 * 1000)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}（${WEEKDAY[d.getUTCDay()]}）${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`
+  return polishFormatDate(iso, { style: 'list', fallback: '—' })
 }
 /** datetime-local の字面を JST で（`2026-10-01T10:00`）。 */
 function localJst(value: string | null | undefined): string {
@@ -70,7 +68,7 @@ function sessionText(session: WebinarSessionCapacity | null | undefined, failed:
   if (session === null) return '定員なし'
   if (session.state === 'closed') return '受付終了'
   if (session.state === 'full') return '満員'
-  return session.remaining === null ? '受付中' : `残り ${formatNumber(session.remaining)}人`
+  return session.remaining === null ? '受付中' : `残り ${formatNumber(session.remaining)} 人`
 }
 
 /** 開催回1つぶんの定員・申込（口 webinarApi.webinarSession）。 */

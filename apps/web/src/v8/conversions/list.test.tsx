@@ -166,7 +166,7 @@ describe('V8 コンバージョンの一覧', () => {
     expect(screen.getByRole('button', { name: /どこからも使われていない 1/ })).toBeTruthy()
     expect(screen.getByText('注文が確定したとき')).toBeTruthy()
     expect(screen.getByText('1回ごと・取り消しは引く')).toBeTruthy()
-    expect(screen.getByText('1人1回・止めた日 9/20')).toBeTruthy()
+    expect(screen.getByText('1人1回・止めた日 09/20')).toBeTruthy()
     expect(screen.getByText('ファネル 1')).toBeTruthy()
     expect(screen.getByText('アフィリエイト 1')).toBeTruthy()
   })

@@ -30,6 +30,8 @@ import { onlyWhenVisible } from '@/lib/visible-polling'
 // 全文（release-log.json）ではなく要約を読む（V6R-S3-a）。
 import releaseLog from '@/generated/release-log-summary.json'
 import styles from './screen.module.css'
+import { formatTime as polishFormatTime, formatDate as polishFormatDate } from '@/lib/format'
+
 
 type ReleaseSummary = { version: string; released: string | null }
 
@@ -118,19 +120,14 @@ function formatCheckedAt(iso: string | null | undefined, now = Date.now()): stri
   if (!iso) return '—'
   const time = Date.parse(iso)
   if (Number.isNaN(time)) return '—'
-  const clock = new Date(time).toLocaleTimeString('ja-JP', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Tokyo' })
+  const clock = polishFormatTime(new Date(time))
   const minutes = Math.round((now - time) / 60000)
   if (minutes < 10) return clock
   return `${clock}（${minutes >= 60 ? `${Math.round(minutes / 60)}時間前` : `${minutes}分前`}）`
 }
 
 function formatMonthDayTime(iso: string | null | undefined): string {
-  if (!iso) return ''
-  const time = Date.parse(iso)
-  if (Number.isNaN(time)) return ''
-  const date = new Date(time).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' })
-  const clock = new Date(time).toLocaleTimeString('ja-JP', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Tokyo' })
-  return `${date} ${clock}`
+  return polishFormatDate(iso, { style: 'list', fallback: '' })
 }
 
 function formatDetectedSince(iso: string | null | undefined): string {

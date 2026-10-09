@@ -37,6 +37,8 @@ import { Stat, StatRow } from '../common-a/parts'
 import { errorMessage, formatShortStamp, reviewReceivedAt } from './format'
 import type { GoogleNav } from './google'
 import styles from './google.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+
 
 const STATE_OPTIONS: Array<{ value: GoogleReviewFilter; label: string }> = [
   { value: 'all', label: '状態：すべて' },
@@ -389,7 +391,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
                   </>
                 ) : <span className={styles.muted}>この環境ではAI下書きは使えません。</span>}
                 <span className={styles.spacer} aria-hidden="true" />
-                <span className={textLength > 4096 ? styles.countOver : styles.count}>{`${textLength.toLocaleString('ja-JP')} / 4,096`}</span>
+                <span className={textLength > 4096 ? styles.countOver : styles.count}>{`${polishFormatNumber(textLength)} / 4,096`}</span>
               </div>
               {saved ? <p className={styles.saved} role="status">{saved}</p> : null}
               {actionError ? <Notice tone="danger">{actionError}</Notice> : null}

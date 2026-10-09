@@ -130,7 +130,7 @@ function periodSummary(webinar: WebinarListItem): string {
 }
 
 function peopleText(value: number | null | undefined): string {
-  return typeof value === 'number' && Number.isFinite(value) ? `${formatNumber(value)}人` : '—'
+  return typeof value === 'number' && Number.isFinite(value) ? `${formatNumber(value)} 人` : '—'
 }
 
 function metricValue(metric: WebinarOverviewMetric | undefined): number | null {
@@ -150,11 +150,11 @@ function kpiCells(overview: WebinarOverview | null) {
   return [
     {
       key: 'webinars', title: 'ウェビナー', icon: Video, value: metricValue(m?.webinars), unit: '件',
-      detail: active === null ? '—' : `公開中 ${formatNumber(active)}件`, help: '登録済みの件数です。',
+      detail: active === null ? '—' : `公開中 ${formatNumber(active)} 件`, help: '登録済みの件数です。',
     },
     {
       key: 'registrations', title: '申込', icon: Users, value: metricValue(m?.registrations), unit: '人',
-      detail: bookings === null ? '—' : `延べ予約 ${formatNumber(bookings)}件`, help: '全期間の申込人数です。同じ人の複数予約は1人に数えます。',
+      detail: bookings === null ? '—' : `延べ予約 ${formatNumber(bookings)} 件`, help: '全期間の申込人数です。同じ人の複数予約は1人に数えます。',
     },
     {
       key: 'viewers', title: '視聴', icon: CalendarClock, value: metricValue(m?.viewers), unit: '人',
@@ -162,7 +162,7 @@ function kpiCells(overview: WebinarOverview | null) {
     },
     {
       key: 'cta', title: 'CTAクリック', icon: MousePointerClick, value: metricValue(m?.ctaTotalClicks), unit: '回',
-      detail: people === null ? '—' : `押した人 ${formatNumber(people)}人`, help: '全期間にCTAが押された延べ回数です。',
+      detail: people === null ? '—' : `押した人 ${formatNumber(people)} 人`, help: '全期間にCTAが押された延べ回数です。',
     },
   ]
 }
@@ -950,7 +950,7 @@ function WebinarList() {
   const pager = hasListData && pageCount > 1 ? (
     <ListPagePagination>
       <span className={styles.pagerCount}>
-        {(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + visibleItems.length} / {formatNumber(visibleTotal)}件
+        {(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + visibleItems.length} / {formatNumber(visibleTotal)} 件
       </span>
       <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り" />
     </ListPagePagination>

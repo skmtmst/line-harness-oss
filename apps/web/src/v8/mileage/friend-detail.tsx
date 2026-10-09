@@ -385,12 +385,12 @@ function FriendDetailInner() {
             detail={v6Friend ? `今月の増減 ${v6Friend.monthChange > 0 ? '+' : ''}${formatNumber(v6Friend.monthChange)}` : `生涯 ${formatNumber(mileage.summary.lifetimeEarned)}・使用 ${formatNumber(mileage.summary.spent)}`} />
           <KpiCard presentation="band" density="compact" icon={null} title="確定待ち" value={pendingMiles} unit="マイル"
             detail={historyPartial
-              ? `最新${formatNumber(displayedHistory.length)}件のうち ${pendingItems.length}件が確定待ち`
+              ? `最新${formatNumber(displayedHistory.length)} 件のうち ${pendingItems.length}件が確定待ち`
               : pendingItems.length > 0 ? `${pendingItems.length}件が確定待ち` : '確定待ちはありません'} />
           <KpiCard presentation="band" density="compact" icon={null} title="今月たまった" value={monthComplete ? earnedSum : null} unit="マイル"
             detail={monthComplete
-              ? `できごと ${earnedThisMonth.length} 回${rewardedActions === null ? '' : `・付与記録 ${formatNumber(rewardedActions)}回`}`
-              : `最新${formatNumber(displayedHistory.length)}件だけでは数えられません`} />
+              ? `できごと ${earnedThisMonth.length} 回${rewardedActions === null ? '' : `・付与記録 ${formatNumber(rewardedActions)} 回`}`
+              : `最新${formatNumber(displayedHistory.length)} 件だけでは数えられません`} />
           <KpiCard presentation="band" density="compact" icon={null} title="期限が近い" value={expiring ?? null} unit="マイル" detail={expiringSub} />
         </KpiBand>
       </div>
@@ -512,8 +512,8 @@ function FriendDetailInner() {
           <div className={styles.historyPager}>
             <span className={styles.pagerCount}>
               {historyPartial
-                ? `最新${formatNumber(displayedHistory.length)}件（全${formatNumber(historyTotal ?? 0)}件）のうち ${formatNumber(filtered.length)}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)}件`
-                : `${formatNumber(filtered.length)}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)}件`}
+                ? `最新${formatNumber(displayedHistory.length)} 件（全${formatNumber(historyTotal ?? 0)} 件）のうち ${formatNumber(filtered.length)} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)}件`
+                : `${formatNumber(filtered.length)} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)}件`}
             </span>
             {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} /> : null}
           </div>
@@ -523,7 +523,7 @@ function FriendDetailInner() {
       <div className={styles.summaryRow}>
         <section className={styles.summaryBox} aria-label="この人がたまったきっかけ">
           <h2 className={styles.summaryTitle}>この人がたまったきっかけ</h2>
-          {historyPartial ? <p className={styles.cellSub}>{`最新${formatNumber(displayedHistory.length)}件から数えています`}</p> : null}
+          {historyPartial ? <p className={styles.cellSub}>{`最新${formatNumber(displayedHistory.length)} 件から数えています`}</p> : null}
           {earnedReasons.length === 0 ? (
             <p className={styles.cellSub}>付与理由の記録はありません</p>
           ) : earnedReasons.map((reason) => (

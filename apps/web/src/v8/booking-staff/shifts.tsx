@@ -43,6 +43,8 @@ import ListState from '@/components/shared/list-state'
 import { PhoneDatetimeStep } from './phone'
 import layout from './layout.module.css'
 import styles from './shifts.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -104,19 +106,12 @@ function addDays(date: string, days: number): string {
 
 /** `10/12（月）` の形。 */
 export function shortDay(date: string): string {
-  const d = new Date(`${date.slice(0, 10)}T00:00:00Z`)
-  if (Number.isNaN(d.getTime())) return date
-  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}（${WEEKDAY_JP[d.getUTCDay()]}）`
+  return polishFormatDate(date, { style: 'list-day-weekday', fallback: '—' })
 }
 
 /** `10/2 18:40` の形（日本時間）。 */
 function shortStamp(value: string): string {
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return value
-  const jst = new Date(d.getTime() + 9 * 3600_000)
-  const hh = String(jst.getUTCHours()).padStart(2, '0')
-  const mm = String(jst.getUTCMinutes()).padStart(2, '0')
-  return `${jst.getUTCMonth() + 1}/${jst.getUTCDate()} ${hh}:${mm}`
+  return polishFormatDate(value, { style: 'list', fallback: '—' })
 }
 
 /** 休憩の曜日のまとまりを短い言葉にする（月〜金・土・日・毎日・月・水）。 */

@@ -30,7 +30,7 @@ function formatSavedAt(iso: string): string {
 
 function versionSummary(version: OfferVersion): string {
   const parts = [
-    `1件 ${formatNumber(version.rewardAmount)}円`,
+    `1件 ${formatNumber(version.rewardAmount)} 円`,
     version.rewardMiles > 0 ? `＋${formatNumber(version.rewardMiles)}マイル` : null,
     `期間${version.windowDays}日`,
     version.capTotal != null ? `全体${version.capTotal}件` : null,
@@ -209,7 +209,7 @@ export default function OfferTermsDialog({
             <div className="flex gap-2">
               <dt className="text-ink-faint w-24 shrink-0">報酬</dt>
               <dd className="text-ink font-semibold tabular-nums">
-                1件 {formatNumber(rewardAmount)}円
+                1件 {formatNumber(rewardAmount)} 円
                 {rewardMiles > 0 ? `＋${formatNumber(rewardMiles)}マイル` : null}
               </dd>
             </div>
@@ -253,7 +253,7 @@ export default function OfferTermsDialog({
                 ? `上限まであと${status.totalRemaining}件`
                 : '上限に達しました'}
               percent={Math.min(100, Math.round((status.totalUsed / status.capTotal) * 100))}
-              countText={`${formatNumber(status.totalUsed)} / ${formatNumber(status.capTotal)}件`}
+              countText={`${formatNumber(status.totalUsed)} / ${formatNumber(status.capTotal)} 件`}
             />
           ) : status.capMonthlyPerAffiliate != null ? (
             <p className="text-ink-secondary text-sm tabular-nums">

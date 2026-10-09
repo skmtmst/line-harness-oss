@@ -123,7 +123,7 @@ export function SendQuota({ delivery, metric, section, onRetry, overviewFailed }
             <>
               <span className={styles.quotaPre}>LINE公式 残り</span>
               <span className={styles.quotaNum}>{remaining === null ? '—' : formatNumber(remaining)}</span>
-              <span className={styles.quotaPre}>{limit === null ? '' : `/ ${formatNumber(limit)}通`}</span>
+              <span className={styles.quotaPre}>{limit === null ? '' : `/ ${formatNumber(limit)} 通`}</span>
             </>
           )}
         </p>
@@ -199,7 +199,7 @@ export function SupportStatus({ inbox, autoOnInbound }: { inbox: DashboardOvervi
         <KeyValue
           key={row.label}
           label={<StatusPill tone={row.dot === 'faint' ? 'neutral' : row.dot}>{row.label}</StatusPill>}
-          value={row.value === null ? '—' : `${formatNumber(row.value)}件`}
+          value={row.value === null ? '—' : `${formatNumber(row.value)} 件`}
           tone={row.label === '未対応' && (row.value ?? 0) > 0 ? 'danger' : 'default'}
           href={row.href}
           title={`${row.label}で絞った受信箱を開く`}
@@ -279,7 +279,7 @@ export function ConnectionStatus({ account, canCheck, onChecked, risk, activeFri
       {state.label === '要確認' && state.reason && !checking ? <p className={styles.stale} title={state.reason.title}>{state.reason.text}</p> : null}
       {checkError ? <p className={styles.alert} role="alert">{checkError}</p> : null}
       <KeyValue label="自動処理" value={autoLabel} dot={dotOf(autoLabel)} tone={autoLabel === '要確認' ? 'danger' : 'default'} />
-      <KeyValue label="有効友だち" value={activeFriends === null ? '—' : `${formatNumber(activeFriends)}人`} />
+      <KeyValue label="有効友だち" value={activeFriends === null ? '—' : `${formatNumber(activeFriends)} 人`} />
     </div>
   )
 }
@@ -289,13 +289,13 @@ export function FriendStatus({ friends }: { friends: DashboardOverview['friends'
   const blocked = friends.blockedByThem + friends.hiddenByUs + friends.blockedBoth
   const base = friends.active + blocked
   const rate = base > 0 ? (blocked / base) * 100 : 0
-  const breakdown = `相手から ${formatNumber(friends.blockedByThem)}人・自分から ${formatNumber(friends.hiddenByUs)}人・相互に ${formatNumber(friends.blockedBoth)}人`
+  const breakdown = `相手から ${formatNumber(friends.blockedByThem)} 人・自分から ${formatNumber(friends.hiddenByUs)} 人・相互に ${formatNumber(friends.blockedBoth)} 人`
   return (
     <>
       <SectionHeader title="友だちの状態" note="現在" href="/friends" linkLabel="友だちを見る" />
-      <KeyValue label="友だち総数" value={`${formatNumber(friends.total)}人`} />
-      <KeyValue label="有効" value={`${formatNumber(friends.active)}人`} />
-      <KeyValue label="ブロック・非表示" value={`${formatNumber(blocked)}人（${rate.toFixed(1)}%）`} />
+      <KeyValue label="友だち総数" value={`${formatNumber(friends.total)} 人`} />
+      <KeyValue label="有効" value={`${formatNumber(friends.active)} 人`} />
+      <KeyValue label="ブロック・非表示" value={`${formatNumber(blocked)} 人（${rate.toFixed(1)}%）`} />
       <p className={styles.small} title={breakdown}>{breakdown}</p>
     </>
   )

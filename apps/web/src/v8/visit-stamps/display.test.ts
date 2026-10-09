@@ -58,8 +58,8 @@ describe('来店スタンプの見せ方', () => {
   })
 
   it('日時は日本時間（D1 の「YYYY-MM-DD HH:MM:SS」も UTC として読む）', () => {
-    expect(shortDateTime('2026-01-13T09:40:00.000Z')).toBe('1/13 18:40')
-    expect(shortDateTime('2026-01-12 11:14:00')).toBe('1/12 20:14')
+    expect(shortDateTime('2026-01-13T09:40:00.000Z')).toBe('01/13 18:40')
+    expect(shortDateTime('2026-01-12 11:14:00')).toBe('01/12 20:14')
   })
 
   it('手入力の理由とメモ・友だちの名前', () => {

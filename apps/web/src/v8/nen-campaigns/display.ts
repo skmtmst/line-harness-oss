@@ -8,6 +8,8 @@
  */
 import type { NenCampaignSetting } from '@/lib/api'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 export type NenTab = 'auto' | 'columns' | 'history' | 'paused'
 
@@ -111,16 +113,12 @@ function parse(value: string | null | undefined): Date | null {
 
 /** 表の公開日「9/26」「8/08」（日本時間・日は2桁）。読めなければ「—」。 */
 export function jstMonthDay(value: string | null | undefined): string {
-  const date = parse(value)
-  if (!date) return '—'
-  const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000)
-  return `${jst.getUTCMonth() + 1}/${String(jst.getUTCDate()).padStart(2, '0')}`
+  return polishFormatDate(value, { style: 'list-day', fallback: '—' })
 }
 
 /** 「9/20 10:00」。読めなければ「—」。 */
 export function jstDateTime(value: string | null | undefined): string {
-  const date = parse(value)
-  return date ? formatDateTime(date) : '—'
+  return polishFormatDate(value, { style: 'detail', fallback: '—' })
 }
 
 /* 予約日時の決めごとはコラムを書く画面と同じもの（column-form.ts）を使う。 */

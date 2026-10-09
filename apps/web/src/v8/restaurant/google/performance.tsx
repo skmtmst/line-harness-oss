@@ -24,6 +24,8 @@ import {
 } from '@/lib/restaurant-google-api'
 import { errorMessage } from './format'
 import styles from './google.module.css'
+import { formatDate as polishFormatDate, formatNumber as polishFormatNumber } from '@/lib/format'
+
 
 const DAYS: GooglePerformanceDays[] = [7, 28, 90]
 
@@ -60,8 +62,7 @@ export function bucketDaily(daily: Array<{ date: string; impressions: number | n
 const BUCKET_LABELS: Record<GooglePerformanceDays, string> = { 7: '1日ごと', 28: '2日ごと', 90: '7日ごと' }
 
 function shortDate(isoDate: string): string {
-  const [, month, day] = isoDate.split('-')
-  return `${Number.parseInt(month, 10)}/${day}`
+  return polishFormatDate(isoDate, { style: 'list-day', fallback: '—' })
 }
 
 function ImpressionsChart({ data }: { data: GooglePerformanceData }) {
@@ -147,8 +148,8 @@ export default function PerformanceBoard({ accountId }: { accountId: string }) {
           <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
             <SectionHeader size="small" title={<>飲食店向け指標</>} />
             <dl className={styles.facts}>
-              <div className={styles.factRow}><dt className={styles.factKey}>予約ボタンのクリック</dt><dd className={styles.factValue}>{data.food.bookings === null ? '—（連携サービス未対応）' : `${data.food.bookings.toLocaleString('ja-JP')} 回`}</dd></div>
-              <div className={styles.factRow}><dt className={styles.factKey}>メニューの閲覧</dt><dd className={styles.factValue}>{data.food.menuClicks === null ? '—（対象機能を使っている店舗のみ）' : `${data.food.menuClicks.toLocaleString('ja-JP')} 回`}</dd></div>
+              <div className={styles.factRow}><dt className={styles.factKey}>予約ボタンのクリック</dt><dd className={styles.factValue}>{data.food.bookings === null ? '—（連携サービス未対応）' : `${polishFormatNumber(data.food.bookings)} 回`}</dd></div>
+              <div className={styles.factRow}><dt className={styles.factKey}>メニューの閲覧</dt><dd className={styles.factValue}>{data.food.menuClicks === null ? '—（対象機能を使っている店舗のみ）' : `${polishFormatNumber(data.food.menuClicks)} 回`}</dd></div>
               <div className={styles.factRow}><dt className={styles.factKey}>料理の写真の閲覧</dt><dd className={styles.factValue}>—（未取得）</dd></div>
             </dl>
             <p className={styles.grayNote}>数字は Google ビジネス プロフィールの集計です（前日までの分。2〜3日遅れることがあります）。</p>

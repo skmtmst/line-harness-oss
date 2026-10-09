@@ -988,10 +988,10 @@ export default function ScenariosListV8() {
                     />
                     <Td
                       className={styles.countCell}
-                      title={`購読中 ${subscribers}人 ／ 読み終えた ${formatNumber(s.completedCount ?? 0)}人`}
+                      title={`購読中 ${subscribers}人 ／ 読み終えた ${formatNumber(s.completedCount ?? 0)} 人`}
                     >
                       <div className={styles.countMain}>{`${subscribers}人`}</div>
-                      <div className={styles.countSub}>{`読み終えた ${formatNumber(s.completedCount ?? 0)}人`}</div>
+                      <div className={styles.countSub}>{`読み終えた ${formatNumber(s.completedCount ?? 0)} 人`}</div>
                     </Td>
                     <Td>
                       <span className={`${styles.statePill} ${s.isActive ? styles.statePillActive : styles.statePillStopped}`}>
@@ -1063,7 +1063,7 @@ export default function ScenariosListV8() {
   const listPager = scenarioList.pageCount > 1 ? (
     <ListPagePagination>
       <span className={styles.pagerCount}>
-        {(scenarioList.page - 1) * scenarioList.limit + 1}〜{Math.min(scenarioList.page * scenarioList.limit, scenarioList.total)} / {formatNumber(scenarioList.total)}件
+        {(scenarioList.page - 1) * scenarioList.limit + 1}〜{Math.min(scenarioList.page * scenarioList.limit, scenarioList.total)} / {formatNumber(scenarioList.total)} 件
       </span>
       <Pagination page={scenarioList.page} pageCount={scenarioList.pageCount} onPageChange={scenarioList.setPage} />
     </ListPagePagination>
@@ -1141,7 +1141,7 @@ export default function ScenariosListV8() {
 
   const filteredCount =
     scenarioFilterActive && scenarioList.loaded ? (
-      <p className={styles.filteredCount}>条件に一致したシナリオ：{formatNumber(scenarioList.total)}件</p>
+      <p className={styles.filteredCount}>条件に一致したシナリオ：{formatNumber(scenarioList.total)} 件</p>
     ) : null
 
   /*
@@ -1285,7 +1285,7 @@ export default function ScenariosListV8() {
             <p>
               {panelRow.isActive ? '稼働中' : '停止中'} ／ 購読{' '}
               {panelRow.subscriberCount === undefined ? '—' : formatNumber(panelRow.subscriberCount)}人 ／
-              読了 {formatNumber(panelRow.completedCount ?? 0)}人
+              読了 {formatNumber(panelRow.completedCount ?? 0)} 人
             </p>
             {panelRow.description && <p>{panelRow.description}</p>}
             {canEdit && (
@@ -1347,7 +1347,7 @@ export default function ScenariosListV8() {
             <div className={styles.deleteBody}>
               <MoveReferrersNotice scenarioId={deleteTarget.id} />
               <p>
-                購読中 {formatNumber(deleteTarget.subscriberCount ?? 0)}人 ／ 通数{' '}
+                購読中 {formatNumber(deleteTarget.subscriberCount ?? 0)} 人 ／ 通数{' '}
                 {deleteTarget.stepCount === undefined ? '— 読み込めませんでした' : `${deleteTarget.stepCount}通`}
               </p>
               {deleteTarget.lineAccountId === null && (

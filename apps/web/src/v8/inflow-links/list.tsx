@@ -532,7 +532,7 @@ export default function InflowListV8({
         selected={filter === 'has-friends'}
         onChange={() => toggleFilter('has-friends')}
         icon={<UserPlus size={13} aria-hidden="true" />}
-        title={routeCountAvailable ? `友だち追加あり ${formatNumber(hasFriendsCount)}件` : undefined}
+        title={routeCountAvailable ? `友だち追加あり ${formatNumber(hasFriendsCount)} 件` : undefined}
       >
         友だち追加あり
       </FilterChip>
@@ -766,8 +766,8 @@ export default function InflowListV8({
                     <Td className={styles.colFriends}>
                       {summaryAvailable && r.stats ? (
                         <>
-                          <span className={styles.cellMain}>{`${formatNumber(r.stats.friendCount)}人`}</span>
-                          <span className={styles.cellSub}>{`累計 ${formatNumber(r.stats.friendCount)}人`}</span>
+                          <span className={styles.cellMain}>{`${formatNumber(r.stats.friendCount)} 人`}</span>
+                          <span className={styles.cellSub}>{`累計 ${formatNumber(r.stats.friendCount)} 人`}</span>
                         </>
                       ) : (
                         <span className={styles.cellMain}>—</span>
@@ -836,7 +836,7 @@ export default function InflowListV8({
   const pager = !loading && !loadFailed && pageCount > 1 ? (
     <ListPagePagination>
       <span className={styles.pagerCount}>
-        {(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + currentRows.length} / {formatNumber(sortedRows.length)}件
+        {(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + currentRows.length} / {formatNumber(sortedRows.length)} 件
       </span>
       <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="流入経路のページ送り" />
     </ListPagePagination>
@@ -884,7 +884,7 @@ export default function InflowListV8({
             unit={summaryAvailable && summary ? '人' : ''}
             loading={loading}
             detail={summaryAvailable && summary
-              ? `累計。経路が分かる人 ${formatNumber(summary.friendsWithRef)}人`
+              ? `累計。経路が分かる人 ${formatNumber(summary.friendsWithRef)} 人`
               : loading ? '読み込んでいます' : '読み込めませんでした'}
           />
           <KpiCard
