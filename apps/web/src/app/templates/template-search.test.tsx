@@ -118,6 +118,7 @@ async function search(input: HTMLElement, query: string) {
   await act(async () => {
     fireEvent.change(input, { target: { value: query } })
   })
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
 }
 
 describe('テンプレート一覧の検索', () => {

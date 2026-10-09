@@ -702,8 +702,8 @@ function ReviewListV8(props: ReviewListV8Props) {
           <SearchField
             aria-label="写真を探す"
             value={props.searchInput}
-            onChange={props.onSearchInput}
-            onClear={() => props.onSearchInput('')}
+            onChange={(value) => { props.onSearchInput(value); props.onSearchQuery(value.trim().slice(0, 100)) }}
+            onClear={() => { props.onSearchInput(''); props.onSearchQuery('') }}
             placeholder={status === 'pending' ? '飼い主・ペット名で探す' : '名前・ペット名・コメントで探す'}
             maxLength={100}
           />

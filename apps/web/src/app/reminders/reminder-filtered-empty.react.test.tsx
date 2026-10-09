@@ -87,6 +87,7 @@ afterEach(() => {
 })
 
 async function flush() {
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
   await act(async () => { await Promise.resolve() })
   await act(async () => { await Promise.resolve() })
 }

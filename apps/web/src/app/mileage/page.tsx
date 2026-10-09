@@ -18,6 +18,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import KpiCard from '@/components/shared/kpi-card'
@@ -180,8 +181,8 @@ function MileagePageInner() {
   const [overview, setOverview] = useState<MileageFriendsV6Overview | null>(null)
   const [ruleOverview, setRuleOverview] = useState<MileageEarningRulesV6Overview | null>(null)
   const [ruleSummary, setRuleSummary] = useState<EarningRuleSummary | null>(null)
-  const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useListUrlValue('q', '')
+  const [search, setSearch] = useListUrlValue('q', '')
   const [offset, setOffset] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -755,7 +756,7 @@ function MileagePageInner() {
         <SearchField
           aria-label="友だちの名前で検索"
           value={searchInput}
-          onChange={setSearchInput}
+          onChange={(value) => { setSearchInput(value); setSearch(value.trim()); setOffset(0) }}
           onClear={() => { setSearchInput(''); setSearch(''); setOffset(0) }}
           onKeyDown={(event) => {
             if (event.key === 'Enter') {
