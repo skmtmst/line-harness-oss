@@ -6,13 +6,6 @@
  * （`docs/v8` RESPONSIVE の決まり。約 1352px 未満の画面幅に相当）。
  */
 /* 枠・見出し・帯・フォルダ列は型（ListPage）が持つ。画面CSSに置かない。 */
-.folderNote {
-  margin: 0;
-  color: var(--color-ink-faint);
-  font-size: var(--text-micro);
-  line-height: 1.6;
-}
-
 /* 道具の段は型の toolbar 枠（ListToolbar）が持つ。画面CSSに置かない。 */
 /* 操作の失敗の帯。 */
 .errorBand {

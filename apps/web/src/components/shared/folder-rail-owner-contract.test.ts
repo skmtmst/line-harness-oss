@@ -75,10 +75,8 @@ describe('オーナー指示 #582 のフォルダ欄', () => {
 
   it('V8のイベント一覧はイベント専用のフォルダを取得・作成する', () => {
     const events = readFileSync(resolve(APP, 'events/events-list-v8.tsx'), 'utf8')
-    expect(events).toContain('<FolderPanel')
+    // フォルダの列・追加の窓・「…」は共通の ManagedFolderPanel（kind="event"）が持ち、変えたら読み直す（B-136）。
     expect(events).toContain("api.folders.list('event', selectedAccountId)")
-    expect(events).toMatch(/<FolderAddDialog[\s\S]*?kind="event"/)
-    expect(events).toContain('onAdded={() => void loadFolders()}')
-    expect(events).toContain('onAddFolder=')
+    expect(events).toMatch(/<ManagedFolderPanel[\s\S]*?kind="event"[\s\S]*?onChanged=\{loadFolders\}[\s\S]*?canManage=/)
   })
 })

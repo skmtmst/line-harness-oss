@@ -114,6 +114,8 @@ export interface ManagedFolderPanelProps {
   children?: ReactNode
   /** 選ぶ窓の中など、行の選択だけにするとき。 */
   disabled?: boolean
+  /** 「フォルダを追加」を押したとき、窓を開く前にすること（開いている詳細の小窓を閉じるなど）。 */
+  onAddStart?: () => void
 }
 
 /**
@@ -169,6 +171,7 @@ export default function ManagedFolderPanel({
   placeholder,
   children,
   disabled,
+  onAddStart,
 }: ManagedFolderPanelProps) {
   const [adding, setAdding] = useState(false)
   const managed = kind !== null
@@ -212,7 +215,7 @@ export default function ManagedFolderPanel({
         onSelect={onSelect}
         createAction={createAction}
         reserveCreateSpace={reserveCreateSpace}
-        onAddFolder={editable ? () => setAdding(true) : undefined}
+        onAddFolder={editable ? () => { onAddStart?.(); setAdding(true) } : undefined}
         addFolderLabel="フォルダを追加"
         disabled={disabled}
       >
