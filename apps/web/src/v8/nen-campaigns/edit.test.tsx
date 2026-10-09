@@ -133,6 +133,19 @@ describe('V8 NEN配信「配信を直す」（w5pwG）', () => {
     expect(host.textContent).toContain('配信内容を保存しました')
   })
 
+  it('B-139：本文が空のまま保存すると、口を呼ばず本文の欄が赤くなり、真下に理由が出て、本文へ移る', async () => {
+    calls.settings.mockResolvedValue({ success: true, data: [{ ...REVIEW, bodyText: '' }] })
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) })
+    await flush()
+    await act(async () => { fireEvent.click(button('配信内容を保存する')!) })
+    await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    expect(calls.updateSetting).not.toHaveBeenCalled()
+    const body = document.getElementById('nen-edit-body')!
+    expect(body.getAttribute('aria-invalid')).toBe('true')
+    expect(document.getElementById('nen-edit-body-error')?.textContent).toBe('本文を入力してください')
+    expect(body.contains(document.activeElement) || document.activeElement === body).toBe(true)
+  })
+
   it('閲覧のみの人には帯を出し、保存・テスト送信・押せない選ぶ欄を置かない', async () => {
     role.value = 'staff'
     await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) })

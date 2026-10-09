@@ -34,6 +34,8 @@ import { formatNumber } from '@/lib/format'
 import { formatCampaignTiming } from './display'
 import styles from './form.module.css'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import { useFormErrors } from '@/lib/use-form-errors'
+import { FieldError } from '@/components/shared/form-controls'
 
 /** きっかけの短い言い方（配信フローの札・日数の選ぶ欄）。 */
 const TRIGGER_SHORT: Record<string, string> = {
@@ -260,22 +262,22 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   const bodyLimitLabel = formatNumber(NEN_CAMPAIGN_BODY_MAX_LENGTH)
   const bodyRemaining = NEN_CAMPAIGN_BODY_MAX_LENGTH - bodyCheck.length
 
+  /* 保存で落ちた欄は、その欄の真下に理由を出して移る（B-139）。 */
+  const fields = useFormErrors()
+  fields.define('body', '配信本文', () => (
+    !merged.bodyText?.trim() ? '本文を入力してください'
+      : !bodyCheck.fits ? `本文が長すぎます（現在${formatNumber(bodyCheck.length)}字・上限${bodyLimitLabel}字）。短くしてから保存してください。入力内容はそのまま残っています。`
+        : null
+  ))
+  fields.define('form', '回答フォーム', () => (formIssueMessage ? `${formIssueMessage}。フォームを外して選び直してから保存してください` : null))
+  fields.define('mileage', '回答後のマイル', () => (
+    mileageAction && (!Number.isInteger(mileageAction.amount) || mileageAction.amount < 1 || mileageAction.amount > 1_000_000) ? '付けるマイルは1〜1,000,000の整数で入力してください' : null
+  ))
+
   const save = async () => {
     if (!setting || !selectedAccountId) return
-    if (!merged.bodyText?.trim()) {
-      setError('本文を入力してください')
-      return
-    }
-    if (!bodyCheck.fits) {
-      setError(`本文が長すぎます（現在${formatNumber(bodyCheck.length)}字・上限${bodyLimitLabel}字）。短くしてから保存してください。入力内容はそのまま残っています。`)
-      return
-    }
-    if (formIssueMessage) {
-      setError(`${formIssueMessage}。フォームを外して選び直してから保存してください`)
-      return
-    }
-    if (mileageAction && (!Number.isInteger(mileageAction.amount) || mileageAction.amount < 1 || mileageAction.amount > 1_000_000)) {
-      setError('付けるマイルは1〜1,000,000の整数で入力してください')
+    if (fields.submit().length > 0) {
+      setError('')
       return
     }
     setSaving(true)
@@ -497,6 +499,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
             <span className={styles.labelNote}>差し込み：友だち情報欄「ペットの名前」・注文の「商品名」</span>
             {canEdit ? <button type="button" className={styles.labelAside} aria-expanded={insertOpen} onClick={() => setInsertOpen((current) => !current)}>{insertOpen ? '差し込みを閉じる' : '差し込む'}</button> : null}
           </span>
+          <div {...fields.bind('body')}>
           <InsertTextField
             id="nen-edit-body"
             ref={bodyRef}
@@ -506,12 +509,16 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
             onValueChange={(next) => setDraft((previous) => ({ ...previous, bodyText: next }))}
             aria-label="配信本文"
             className={styles.textarea}
+            aria-invalid={fields.invalid('body') || undefined}
+            aria-describedby={fields.invalid('body') ? 'nen-edit-body-error' : undefined}
           />
+          </div>
           {insertOpen && canEdit ? (
             <InsertToolbar targetRef={bodyRef} value={merged.bodyText} onChange={(bodyText) => setDraft((previous) => ({ ...previous, bodyText }))} />
           ) : null}
+          {fields.invalid('body') && bodyCheck.fits ? <FieldError id="nen-edit-body-error">{fields.error('body')}</FieldError> : null}
           {!bodyCheck.fits ? (
-            <p className={styles.error} role="alert">{bodyLimitLabel}字を超えています（現在{formatNumber(bodyCheck.length)}字）。短くしてください。</p>
+            <p id="nen-edit-body-error" className={styles.error} role="alert">{bodyLimitLabel}字を超えています（現在{formatNumber(bodyCheck.length)}字）。短くしてください。</p>
           ) : bodyRemaining <= BODY_NOTICE_REMAINING ? (
             <p className={styles.muted}>あと{formatNumber(bodyRemaining)}字（上限{bodyLimitLabel}字。長すぎるとLINEで送れません）</p>
           ) : null}
@@ -527,7 +534,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
         <div className={styles.row}>
           <div className={styles.field}>
             <span className={styles.labelSmall}>回答フォームを開かせる（任意）</span>
-            {!canEdit ? <StaticBox label="回答フォーム" value={formAction?.formName ?? '開かせない'} /> : <Select
+            {!canEdit ? <StaticBox label="回答フォーム" value={formAction?.formName ?? '開かせない'} /> : <div {...fields.bind('form')}><Select
               aria-label="回答フォームを開かせる（任意）"
               size="full"
               value={formAction?.formId ?? ''}
@@ -538,11 +545,13 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
                 ...(formAction && !selectedForm ? [{ value: formAction.formId, label: `${formAction.formName}（見つかりません）`, disabled: true }] : []),
                 ...forms.map((form) => ({ value: form.id, label: form.isActive ? form.name : `${form.name}（公開されていません）`, disabled: !form.isActive })),
               ]}
-            />}
+            /></div>}
+            <FieldError id="nen-edit-form-error">{fields.error('form')}</FieldError>
           </div>
           <div className={styles.field}>
             <span className={styles.labelSmall}>回答後にマイルを付ける</span>
-            {!canEdit ? <StaticBox label="回答後のマイル" value={mileageAction?.kind === 'award_mileage' ? `${formatNumber(mileageAction.amount)} マイル` : '付けない'} /> : <Select
+            {!canEdit ? <StaticBox label="回答後のマイル" value={mileageAction?.kind === 'award_mileage' ? `${formatNumber(mileageAction.amount)} マイル` : '付けない'} /> : <div {...fields.bind('mileage')}><Select
+              error={fields.error('mileage') ?? undefined}
               aria-label="回答後にマイルを付ける"
               size="full"
               value={mileageAction?.kind === 'award_mileage' ? String(mileageAction.amount) : ''}
@@ -551,7 +560,8 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
                 { value: '', label: '付けない' },
                 ...withCurrent(MILEAGE_CHOICES, mileageAction?.kind === 'award_mileage' ? mileageAction.amount : MILEAGE_CHOICES[0]).map((amount) => ({ value: String(amount), label: `${formatNumber(amount)} マイル` })),
               ]}
-            />}
+            /></div>}
+            <FieldError id="nen-edit-mileage-error">{fields.error('mileage')}</FieldError>
           </div>
         </div>
         <p className={styles.chain}>つながる先：→ 回答フォーム　→ マイル　→ EC連携　→ タグ</p>
