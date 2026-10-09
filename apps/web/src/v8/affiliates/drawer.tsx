@@ -1,5 +1,8 @@
 'use client'
 
+import { Tabs } from '@/components/shared/tabs'
+import { useUrlTab } from '@/lib/use-url-tab'
+
 /*
  * ★V8 アフィリエイターの詳細の引き出し（板 `tnTn9`。右から出る 620px）。
  * 「成果を見る」・名前・`?affiliate=` で開く。上のタブで 概要・内訳・友だち・支払い。
@@ -81,7 +84,7 @@ export default function AffiliateDrawer({
   onStopRequest: (id: string, name: string) => void
 }) {
   const period = useMemo(() => currentSettlementPeriod(), [])
-  const [tab, setTab] = useState<DrawerTab>(startInEdit ? 'payment' : 'summary')
+  const [tab, setTab] = useUrlTab(DRAWER_TABS.map(t => t.key), startInEdit ? 'payment' : 'summary', 'affiliates')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [report, setReport] = useState<ReportV2 | null>(null)
@@ -480,21 +483,7 @@ export default function AffiliateDrawer({
     <>
       <Drawer open title={`${affiliate.name}の詳細`} description={subLine} designWidth={620} layout="inset" busy={paymentOpen} onClose={onClose}
         heading={<span className={styles.titleRow}><span>{affiliate.name}</span><StatusPill tone={affiliate.isActive ? 'active' : 'neutral'}>{affiliate.isActive ? '計測中' : '停止中'}</StatusPill></span>}
-        toolbar={(<div className={styles.tabs} role="tablist" aria-label="詳細の中身">
-          {DRAWER_TABS.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              role="tab"
-              aria-selected={tab === item.key}
-              className={styles.tab}
-              data-current={tab === item.key || undefined}
-              onClick={() => setTab(item.key)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>)}
+        toolbar={<Tabs label="詳細の中身" items={DRAWER_TABS.map(item => ({ label: item.label, current: tab === item.key, onClick: () => setTab(item.key) }))} />}
         footer={(<>{readonly ? <span /> : (
             <button type="button" className={styles.stop} onClick={() => { onClose(); onStopRequest(affiliate.id, affiliate.name) }} disabled={!affiliate.isActive}>
               <PauseCircle size={14} aria-hidden="true" />

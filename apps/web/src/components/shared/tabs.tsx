@@ -179,7 +179,7 @@ function Tab({ id, controls, label, href, count, countTone, errorCount, current,
 
   if (href && !current && !disabled) {
     return (
-      <Link href={href} {...shared}>
+      <Link href={href} replace {...shared}>
         {body}
       </Link>
     )

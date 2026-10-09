@@ -1,5 +1,7 @@
 'use client'
 
+import { useUrlTab } from '@/lib/use-url-tab'
+
 import { Eye, LogIn, Send, Users } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, type OpsMember, type OpsMemberSummary } from '@/lib/api'
@@ -32,7 +34,7 @@ export default function OpsMembersV8() {
   const [members, setMembers] = useState<OpsMember[]>([])
   const [summary, setSummary] = useState<OpsMemberSummary | null>(null)
   const [loaded, setLoaded] = useState(false)
-  const [tab, setTab] = useState<'members' | 'info'>('members')
+  const [tab, setTab] = useUrlTab(['members', 'info'] as const, 'members')
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
   const [listFailed, setListFailed] = useState(false)

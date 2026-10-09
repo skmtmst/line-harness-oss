@@ -1,5 +1,7 @@
 'use client'
 
+import { useUrlTab } from '@/lib/use-url-tab'
+
 import { ChevronLeft, LogIn } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
@@ -64,7 +66,7 @@ function DetailContent() {
   const searchParams = useSearchParams()
   const id = searchParams.get('id') ?? ''
   const [detail, setDetail] = useState<OpsTenantDetail | null>(null)
-  const [tab, setTab] = useState<TabKey>('overview')
+  const [tab, setTab] = useUrlTab(TABS.map(t => t.key), 'overview')
   const [error, setError] = useState('')
   const [statusDialog, setStatusDialog] = useState<StatusTarget | null>(null)
   const [busy, setBusy] = useState(false)

@@ -1,5 +1,7 @@
 'use client'
 
+import { useUrlTab } from '@/lib/use-url-tab'
+
 /*
  * ★V8 他のサイトの枠を閉じる知らせ（提案 E-5 `YMVFD`。ダッシュボードの「すべて見る」から）。
  *
@@ -53,7 +55,7 @@ export default function CloseTasksPage() {
   const [tasks, setTasks] = useState<RestaurantChannelCloseTask[] | null>(null)
   const [media, setMedia] = useState<StoreMedium[]>([])
   const [error, setError] = useState<unknown>(null)
-  const [tab, setTab] = useState<Tab>('open')
+  const [tab, setTab] = useUrlTab(['open', 'done'] as const, 'open')
   const [query, setQuery] = useState('')
   const [medium, setMedium] = useState('all')
   const [busyId, setBusyId] = useState('')
