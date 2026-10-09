@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
 /* 時間×卓の予約・空き枠・卓の選択。既定の Button の見た目に影響しない。 */
 .block {
   position: absolute;
@@ -100,3 +102,4 @@
 }
 
 .block:focus-visible, .slotAdd:focus-visible, .phoneTable:focus-visible { outline: 2px solid var(--color-action); outline-offset: 1px; }
+}

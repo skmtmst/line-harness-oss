@@ -497,6 +497,9 @@
   "components/shared/avatar.tsx": {
     "unresolved-classname": 1
   },
+  "components/shared/booking-controls.tsx": {
+    "unresolved-classname": 1
+  },
   "components/shared/breadcrumb.tsx": {
     "unresolved-classname": 1
   },

@@ -42,10 +42,14 @@ describe('テーマの初期値は環境の既定（layout.tsx と同じ）', ()
     expect(html).not.toContain('data-probe="v7"')
   })
 
-  it('本番（変数なし）は今までどおり v7 の画面で始まる', () => {
-    const html = renderToString(<TagsPage />)
-    expect(html).toContain('data-probe="v7"')
-    expect(html).not.toContain('data-probe="v8"')
+  it('本番（変数なし）でもテーマの値は今までどおり v7 で始まる（タグの入口は V8 だけになった）', () => {
+    // タグの入口（app/tags/page.tsx）は 2026-10-09 の V7 削除で V8 だけを出す（mainA）。
+    // テーマの仕組みそのもの（変数なしは v7）は rmv7 が V8 固定にするまで残るので、値だけを見る。
+    function Probe() {
+      return <span data-theme-probe={useAdminTheme()} />
+    }
+    expect(renderToString(<Probe />)).toContain('data-theme-probe="v7"')
+    expect(renderToString(<TagsPage />)).toContain('data-probe="v8"')
   })
 
   it('検証環境：hydration でサーバと同じ v8 を描き、一度も v7 を経由しない', async () => {

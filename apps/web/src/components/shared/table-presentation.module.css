@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
 /* 予約一覧と時間×卓。既定の表の見た目は変えない。 */
 [data-theme='v8'] .calendar {
   overflow: hidden;
@@ -121,3 +123,4 @@
 
 
 [data-theme='v8'] .calendar :global(td:hover button[data-booking-add]) { opacity: 1; }
+}
