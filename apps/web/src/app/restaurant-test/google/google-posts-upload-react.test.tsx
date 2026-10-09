@@ -53,6 +53,10 @@ vi.mock('@/lib/api', () => ({
         ? Promise.resolve({ success: false, error: '登録できませんでした' })
         : Promise.resolve({ success: true, data: { uploadSessionId: 'upload-1', status: 'verified', mediaId: 'media-new' } }),
     },
+    /* この試験は画像の添付だけを見る。Instagram は未設定にして同時投稿の区画を出さない。 */
+    instagram: {
+      connection: () => Promise.resolve({ success: true, data: { state: 'unconfigured', connection: null } }),
+    },
   },
 }))
 
