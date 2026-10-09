@@ -82,6 +82,11 @@ beforeEach(() => {
               is_valid: true,
               app_id: '100',
               expires_at: Math.floor(Date.now() / 1000) + 60 * 86400,
+              scopes: [
+                'pages_show_list',
+                'instagram_basic',
+                'instagram_content_publish',
+              ],
             },
           }
         : path.endsWith('/oauth/access_token')
@@ -115,24 +120,23 @@ afterEach(() => {
   db.raw.close();
   vi.unstubAllGlobals();
 });
+/**
+ * 接続は一段。Instagram にログインして戻ってきた折り返しだけで保存が終わり、
+ * ページを選ばせる画面は出さずに設定 › SNS連携へ帰る（2026-10-07 利用者承認）。
+ */
 async function connect() {
   const start = await read(await req('/api/instagram/oauth/start', {}));
-  const state = new URL(start.data.url).searchParams.get('state')!;
+  const url = new URL(start.data.url);
+  expect(url.searchParams.get('scope')).toContain('instagram_content_publish');
+  const state = url.searchParams.get('state')!;
   const callback = await req(
     '/api/instagram/oauth/callback?' +
       new URLSearchParams({ state, code: 'mock_code' }),
   );
-  expect(callback.status).toBe(200);
-  const pending = await read(callback);
-  expect(pending.data.pages).toEqual([
-    { pageId: '10', pageName: 'ページ', instagramId: '20' },
-  ]);
-  const result = await req('/api/instagram/oauth/connect', {
-    state,
-    pageId: '10',
-    expectedVersion: 0,
-  });
-  expect(result.status).toBe(200);
+  expect(callback.status).toBe(302);
+  expect(callback.headers.get('location')).toContain(
+    '/settings/sns?instagram=connected',
+  );
   return state;
 }
 it('設定なしは未設定。Metaへ接続せず画面の読取を返す', async () => {
@@ -189,23 +193,66 @@ it('閲覧のみ・別アカウント・偽state・再利用・期限切れを�
   expect(
     (await app().request('/api/instagram/connection?lineAccountId=a2')).status,
   ).toBe(404);
-  expect(
-    (await req('/api/instagram/oauth/callback?state=wrong&code=mock')).status,
-  ).toBe(403);
+  // 折り返しは画面へ戻す口なので、失敗の中身は出さずに instagram=failed だけを伝える。
+  const wrong = await req('/api/instagram/oauth/callback?state=wrong&code=mock');
+  expect(wrong.status).toBe(302);
+  expect(wrong.headers.get('location')).toContain(
+    '/settings/sns?instagram=failed',
+  );
   const state = await connect();
-  expect(
-    (
-      await req(
-        '/api/instagram/oauth/callback?' +
-          new URLSearchParams({ state, code: 'mock' }),
-      )
-    ).status,
-  ).toBe(403);
+  const reused = await req(
+    '/api/instagram/oauth/callback?' +
+      new URLSearchParams({ state, code: 'mock' }),
+  );
+  expect(reused.status).toBe(302);
+  expect(reused.headers.get('location')).toContain(
+    '/settings/sns?instagram=failed',
+  );
   db.raw.exec("UPDATE instagram_connections SET expires_at='2000-01-01'");
   expect((await read(await req('/api/instagram/connection'))).data.state).toBe(
     'expired',
   );
   expect((await req('/api/instagram/sync', {})).status).toBe(409);
+});
+it('同時投稿の許可が無い古い接続は認可切れにして取り直させる', async () => {
+  await connect();
+  db.raw.exec(
+    "UPDATE instagram_connections SET scopes='pages_show_list,instagram_basic'",
+  );
+  expect((await read(await req('/api/instagram/connection'))).data.state).toBe(
+    'expired',
+  );
+  // 期限内でも投稿できないので、更新ではなく接続のやり直しへ回す。
+  expect((await req('/api/instagram/refresh', {})).status).toBe(409);
+});
+it('ビジネスアカウントのつながったページが無ければ保存せず失敗を返す', async () => {
+  const original = vi.mocked(fetch).getMockImplementation()!;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: URL | string, init?: RequestInit) => {
+      // つながっていない普通のページだけを返す＝投稿の口が無い状態。
+      if (new URL(String(url)).pathname.endsWith('/me/accounts'))
+        return Response.json({
+          data: [{ id: '10', name: 'ページ', access_token: 'page_mock' }],
+        });
+      return original(url, init);
+    }),
+  );
+  const start = await read(await req('/api/instagram/oauth/start', {}));
+  const state = new URL(start.data.url).searchParams.get('state')!;
+  const callback = await req(
+    '/api/instagram/oauth/callback?' +
+      new URLSearchParams({ state, code: 'mock_code' }),
+  );
+  expect(callback.status).toBe(302);
+  expect(callback.headers.get('location')).toContain('instagram=failed');
+  expect(
+    db.raw.prepare('SELECT COUNT(*) n FROM instagram_connections').get(),
+  ).toEqual({ n: 0 });
+  // 使い切りの state は捨てて、もう一度ログインからやり直せるようにする。
+  expect(
+    db.raw.prepare('SELECT COUNT(*) n FROM instagram_oauth_states').get(),
+  ).toEqual({ n: 0 });
 });
 async function signed(raw: string) {
   const key = await crypto.subtle.importKey(
@@ -323,33 +370,18 @@ it('壊れた設定・署名済みの壊れた本文・偽のページ候補を�
     });
     expect(r.status).toBe(raw === '{' ? 400 : 200);
   }
+  // 期限切れの state では Meta へ一度も問い合わせず、画面へ失敗だけ返す。
   const start = await read(await req('/api/instagram/oauth/start', {})),
     state = new URL(start.data.url).searchParams.get('state')!;
-  await req(
+  db.raw.exec("UPDATE instagram_oauth_states SET expires_at='2000-01-01'");
+  const calls = vi.mocked(fetch).mock.calls.length;
+  const expired = await req(
     '/api/instagram/oauth/callback?' +
       new URLSearchParams({ state, code: 'mock' }),
   );
-  const calls = vi.mocked(fetch).mock.calls.length;
-  expect(
-    (
-      await req('/api/instagram/oauth/connect', {
-        state,
-        pageId: '999',
-        expectedVersion: 0,
-      })
-    ).status,
-  ).toBe(403);
+  expect(expired.status).toBe(302);
+  expect(expired.headers.get('location')).toContain('instagram=failed');
   expect(vi.mocked(fetch).mock.calls).toHaveLength(calls);
-  db.raw.exec("UPDATE instagram_oauth_states SET expires_at='2000-01-01'");
-  expect(
-    (
-      await req('/api/instagram/oauth/connect', {
-        state,
-        pageId: '10',
-        expectedVersion: 0,
-      })
-    ).status,
-  ).toBe(403);
 });
 
 it('写真DMと受信時刻の順、別アカウントのカーソルを守る', async () => {

@@ -58,7 +58,15 @@ try {
     await messageLayouts.getByRole('radio', { name: '1面（面 A）', exact: true }).click()
     await page.keyboard.press('ArrowRight')
     assert.ok(await messageLayouts.getByRole('radio', { name: '上下2面（面 A・B）', exact: true }).isChecked())
-    assert.equal(await page.getByRole('group', { name: /^面 [AB]$/ }).count(), 2)
+    // TapAreaEditor は選んだ面だけの設定欄を出す。画像上で各面を選んで確かめる。
+    const messageAreas = page.locator('[data-tap-area-canvas]')
+    assert.equal(await messageAreas.getByRole('button', { name: /^面 [AB]「.*」を選ぶ$/ }).count(), 2)
+    assert.equal(await messageAreas.getByRole('button', { name: /^面 C「.*」を選ぶ$/ }).count(), 0)
+    for (const letter of ['A', 'B']) {
+      await messageAreas.getByRole('button', { name: new RegExp(`^面 ${letter}「.*」を選ぶ$`) }).click()
+      await page.getByRole('group', { name: `面 ${letter}`, exact: true }).waitFor()
+      assert.equal(await page.getByRole('group', { name: /^面 [AB]$/ }).count(), 1)
+    }
     assert.equal(await page.getByRole('group', { name: '面 C', exact: true }).count(), 0)
     await noOverflow()
     await page.screenshot({ path: join(output, `message-${width}.png`), fullPage: true })

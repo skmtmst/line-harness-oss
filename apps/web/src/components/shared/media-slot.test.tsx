@@ -143,9 +143,10 @@ it('形式の名前', () => {
 
 it('「URL で入れる」で枠の下に URL の欄を開く', () => {
   const onChange = vi.fn()
-  render(<MediaSlot title="音声を追加" kind="audio" onFile={() => {}} urlEntry={{ value: '', onChange, label: '音声の URL' }} />)
+  render(<MediaSlot title="音声を追加" kind="audio" onFile={() => {}} urlEntry={{ id: 'audio-url', value: '', onChange, label: '音声の URL' }} />)
   expect(screen.queryByRole('textbox', { name: '音声の URL' })).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'URL で入れる' }))
+  expect(screen.getByRole('textbox', { name: '音声の URL' }).id).toBe('audio-url')
   fireEvent.change(screen.getByRole('textbox', { name: '音声の URL' }), { target: { value: 'https://cdn.test/a.m4a' } })
   expect(onChange).toHaveBeenCalledWith('https://cdn.test/a.m4a')
 })
