@@ -114,3 +114,6 @@
 
 /* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
 [data-theme='v8'] .root { -webkit-font-smoothing: auto; }
+
+/* B-152・仕上げ2 */
+[data-theme='v8'] .title { font-size: var(--polish-text-section); font-weight: var(--polish-weight-title); }

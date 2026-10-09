@@ -145,3 +145,7 @@
 
 /* B-152・仕上げ1：ラベルと欄 */
 [data-theme='v8'] .labelRow { margin-bottom: var(--polish-space-row); }
+
+/* B-152・仕上げ2 */
+[data-theme='v8'] .field .label { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); }
+[data-theme='v8'] .field:is([data-field-size], [data-label-size], [data-density]) .label { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); }

@@ -20,9 +20,9 @@ describe('型の見出し（379板の絵）', () => {
     const vars = globals.match(/\[data-theme="v8"\] \{[^}]*--tpl-head-pad-top[^}]*\}/s)
     expect(vars, '変数の一覧がありません').toBeTruthy()
     for (const [name, value] of [
-      ['--tpl-head-pad-top', '20px'], ['--tpl-head-pad-side', '24px'], ['--tpl-head-pad-bottom', '12px'],
-      ['--tpl-title-size', '22px'], ['--tpl-title-weight', '700'], ['--tpl-title-lh', '32px'],
-      ['--tpl-head-gap', '4px'], ['--tpl-desc-size', '13px'], ['--tpl-desc-lh', '19px'],
+      ['--tpl-head-pad-top', 'var(--polish-space-section)'], ['--tpl-head-pad-side', 'var(--polish-space-section)'], ['--tpl-head-pad-bottom', 'var(--polish-space-field)'],
+      ['--tpl-title-size', 'var(--polish-text-page)'], ['--tpl-title-weight', '700'], ['--tpl-title-lh', '32px'],
+      ['--tpl-head-gap', 'var(--polish-space-row)'], ['--tpl-desc-size', 'var(--polish-text-body)'], ['--tpl-desc-lh', '19px'],
       ['--tpl-toolbar-pad-block', '14px'], ['--tpl-toolbar-pad-side', '24px'], ['--tpl-toolbar-gap', '8px'],
       ['--tpl-folder-width', '200px'],
       ['--tpl-page-pad-block', '10px'], ['--tpl-page-pad-side', '24px'],
@@ -32,8 +32,8 @@ describe('型の見出し（379板の絵）', () => {
       ['--tpl-create-head-gap', '8px'],
       ['--tpl-detail-head-pad-top', '20px'], ['--tpl-detail-head-pad-side', '24px'], ['--tpl-detail-head-pad-bottom', '16px'],
       ['--tpl-detail-head-gap', '12px'], ['--tpl-detail-actions-gap', '6px'], ['--tpl-detail-tabs-pad-bottom', '12px'],
-      ['--tpl-create-content-pad-block', '24px'], ['--tpl-create-content-pad-side', '28px'], ['--tpl-create-content-gap', '16px'],
-      ['--tpl-section-pad', '20px'], ['--tpl-section-gap', '14px'],
+      ['--tpl-create-content-pad-block', 'var(--polish-space-section)'], ['--tpl-create-content-pad-side', 'var(--polish-space-section)'], ['--tpl-create-content-gap', 'var(--polish-space-field)'],
+      ['--tpl-section-pad', 'var(--polish-space-section)'], ['--tpl-section-gap', 'var(--polish-space-field)'],
       ['--tpl-preview-pad', '24px'], ['--tpl-preview-narrow-width', '280px'],
       ['--tpl-detail-content-gap', '20px'],
       ['--tpl-footer-pad-block', '12px'], ['--tpl-footer-pad-side', '24px'], ['--tpl-footer-gap', '8px'],
@@ -47,7 +47,7 @@ describe('型の見出し（379板の絵）', () => {
       ['--tpl-composer-pad-top', '12px'], ['--tpl-composer-pad-side', '20px'], ['--tpl-composer-pad-bottom', '16px'],
       ['--tpl-composer-gap', '8px'],
     ] as const) {
-      expect(vars![0]).toMatch(new RegExp(`${name}:\\s*${value}`))
+      expect(vars![0]).toMatch(new RegExp(`${name}:\\s*${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`))
     }
   })
 
