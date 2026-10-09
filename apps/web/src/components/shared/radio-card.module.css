@@ -352,6 +352,7 @@
 [data-theme='v8'] .title { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); line-height: var(--text-lh); }
 [data-theme='v8'] .legend, html[data-theme='v8'] .card:is(.compact, .row) .title { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); line-height: var(--text-lh); }
 [data-theme='v8'] .note { font-size: var(--polish-text-support); font-weight: var(--polish-weight-body); line-height: var(--text-lh); color: var(--color-ink-secondary); }
+html[data-theme='v8'] .card:is(.compact, .row, .form, .small) .note { font-size: var(--polish-text-support); font-weight: var(--polish-weight-body); line-height: var(--text-lh); color: var(--color-ink-secondary); }
 
 /* B-152⑦：箱も120msの地・青い輪・押せない濃さを使う。 */
 [data-theme='v8'] .card, [data-theme='v8'] .card.row {
