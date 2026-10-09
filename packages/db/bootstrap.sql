@@ -2298,7 +2298,7 @@ CREATE TABLE coupon_redemptions (
   used_at TEXT NOT NULL,
   use_number INTEGER NOT NULL,
   payload_snapshot TEXT NOT NULL
-);
+, entry_route_coupon_receipt_id TEXT REFERENCES entry_route_coupon_receipts(id));
 
 CREATE TABLE customer_notification_definitions (
   id                    TEXT PRIMARY KEY,
@@ -2537,6 +2537,20 @@ CREATE TABLE engagement_events (
   UNIQUE (program_id, idempotency_key)
 );
 
+CREATE TABLE entry_route_coupon_receipts (
+  id TEXT PRIMARY KEY,
+  entry_route_id TEXT NOT NULL REFERENCES entry_routes(id),
+  asset_id TEXT NOT NULL,
+  friend_id TEXT NOT NULL REFERENCES friends(id),
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  status TEXT NOT NULL CHECK (status IN ('pending', 'received', 'sent', 'failed', 'unknown')),
+  asset_name TEXT NOT NULL,
+  payload_snapshot TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  received_at TEXT,
+  UNIQUE (entry_route_id, friend_id)
+);
+
 CREATE TABLE entry_route_genres (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
@@ -2566,7 +2580,7 @@ CREATE TABLE entry_routes (
   is_active   INTEGER NOT NULL DEFAULT 1,
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-, pool_id TEXT REFERENCES traffic_pools (id) ON DELETE SET NULL, intro_template_id TEXT REFERENCES message_templates (id) ON DELETE SET NULL, run_account_friend_add_scenarios INTEGER NOT NULL DEFAULT 1, genre TEXT, tenant_id TEXT REFERENCES tenants(id), line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE, stopped_at TEXT, stopped_reason TEXT);
+, pool_id TEXT REFERENCES traffic_pools (id) ON DELETE SET NULL, intro_template_id TEXT REFERENCES message_templates (id) ON DELETE SET NULL, run_account_friend_add_scenarios INTEGER NOT NULL DEFAULT 1, genre TEXT, tenant_id TEXT REFERENCES tenants(id), line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE, stopped_at TEXT, stopped_reason TEXT, coupon_asset_id TEXT REFERENCES broadcast_message_assets(id) ON DELETE SET NULL, coupon_enabled INTEGER NOT NULL DEFAULT 0 CHECK (coupon_enabled IN (0, 1)), coupon_audience TEXT NOT NULL DEFAULT 'new_friends' CHECK (coupon_audience IN ('new_friends', 'all_friends')));
 
 CREATE TABLE error_messages (
   -- エラーコード。code が無い現行 route は error 文字列そのものを鍵にする（§9-1）。
@@ -8745,6 +8759,8 @@ CREATE INDEX idx_conversion_points_tenant ON conversion_points(tenant_id);
 
 CREATE INDEX idx_coupon_redemptions_friend ON coupon_redemptions(asset_id, friend_id);
 
+CREATE INDEX idx_coupon_redemptions_receipt ON coupon_redemptions(entry_route_coupon_receipt_id);
+
 CREATE INDEX idx_customer_notification_definitions_account
   ON customer_notification_definitions(line_account_id, status, category, name, id);
 
@@ -8801,6 +8817,8 @@ CREATE INDEX idx_engagement_events_actor_user
 
 CREATE INDEX idx_engagement_events_source
   ON engagement_events(source, source_event_id);
+
+CREATE INDEX idx_entry_coupon_receipts_asset_friend ON entry_route_coupon_receipts(asset_id, friend_id, received_at);
 
 CREATE INDEX idx_entry_route_genres_created
   ON entry_route_genres (created_at ASC);
