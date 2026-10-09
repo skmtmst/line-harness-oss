@@ -34,7 +34,7 @@ import InlineActionRowsV8, { actionRowTitle } from '@/components/auto-replies/in
 import { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { newActionKey, toActionPayload, type InlineAction } from '@/components/auto-replies/draft-fields'
 import { TemplateEditFrame } from './frame'
-import MediaPickerDialog from './media-picker'
+import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import type { TemplateEditHost } from './host'
 import styles from './edit.module.css'
 import rich from './rich.module.css'

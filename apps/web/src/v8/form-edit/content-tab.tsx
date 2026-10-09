@@ -27,7 +27,7 @@ import { DragHandle, RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import { ADD_GROUPS, blockKindLine, blockTitleLine, inputTypeLabel, isChoiceType } from './model'
-import MediaPickerDialog from './media-picker'
+import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import styles from './edit.module.css'
 
 type Props = {

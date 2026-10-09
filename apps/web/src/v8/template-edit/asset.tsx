@@ -36,7 +36,7 @@ import { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { toActionPayload, type InlineAction } from '@/components/auto-replies/draft-fields'
 import { TemplateEditFrame } from './frame'
 import type { TemplateEditHost } from './host'
-import MediaPickerDialog from './media-picker'
+import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import styles from './edit.module.css'
 
 export type AssetKind = 'coupon' | 'research'

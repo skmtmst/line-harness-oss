@@ -24,7 +24,7 @@ import Dialog from '@/components/shared/dialog'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
-import MediaPickerDialog from './media-picker'
+import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import { ogImageUrlError } from './model'
 import styles from './edit.module.css'
 
