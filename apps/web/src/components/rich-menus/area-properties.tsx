@@ -139,6 +139,10 @@ function defaultActionData(intent: RichMenuAreaIntent): Record<string, unknown> 
       return { mode: 'datetime', initial: '', max: '', min: '' }
     case 'clipboard':
       return { text: '' }
+    case 'booking':
+    case 'booking_history':
+    case 'visit_stamp':
+      return { uri: '' }
   }
 }
 
