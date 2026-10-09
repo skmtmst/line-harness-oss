@@ -31,9 +31,14 @@ beforeEach(() => {
   fx.uploadPaperPhoto.mockResolvedValue({ success: true, data: { id: 'ph-1', photoUrl: 'https://api.example/api/liff/visit-stamps/paper-photos/ph-1', contentType: 'image/jpeg', size: 1000 } });
   fx.requestPaper.mockResolvedValue({ success: true, data: { id: 'p-1', status: 'pending' } });
 });
-afterEach(() => { cleanup(); vi.clearAllMocks(); });
+afterEach(() => { cleanup(); vi.clearAllMocks(); window.history.replaceState(null, '', '/'); });
 
 describe('来店スタンプ（お客さまの LIFF）', () => {
+  it.each([['?page=visit-stamps&card=gold', '選んだカード'], ['?page=visit-stamps', '然 来店スタンプカード']])('URLのカード指定あり・なしで既存画面を開く: %s', async (search, name) => {
+    window.history.replaceState(null, '', `/${search}`);
+    fx.cards.mockResolvedValue({ success: true, data: [{ card, wallet: wallet(6) }, { card: { ...card, id: 'gold', name: '選んだカード' }, wallet: { ...wallet(2), cardId: 'gold' } }] });
+    render(<VisitStamps />); expect(await screen.findByText(name)).toBeTruthy();
+  });
   it('ページを開き直すと、ゴールで受け取った次のカードを表示する', async () => {
     const previous = { ...card, settings: { ...card.settings, completion: 'next_card' as const, nextCardId: 'gold' } };
     const next = { ...card, id: 'gold', name: 'ゴールドカード' };

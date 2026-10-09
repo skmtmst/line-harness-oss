@@ -355,7 +355,7 @@ async function linkAndAddFlow() {
 
 // ─── Salon Booking (React, dynamic-imported) ─────────────
 
-async function initSalonBooking(): Promise<void> {
+async function initSalonBooking(page: 'salon-book' | 'visit-stamps' = 'salon-book'): Promise<void> {
   // 既存 linkAndAddFlow と同じ初期化シーケンスを踏む:
   //   ① profile + idToken + friendFlag を並列取得
   //   ② /api/liff/link で UUID 確定 (ref/ig 含む) — booking エンドポイントが
@@ -383,7 +383,7 @@ async function initSalonBooking(): Promise<void> {
 
   // ② Silent UUID linking (fire-and-forget; booking API は id_token verify で
   //    認証するので待つ必要はない)。
-  apiCall('/api/liff/link', {
+  const linked = apiCall('/api/liff/link', {
     method: 'POST',
     body: JSON.stringify({
       idToken,
@@ -400,10 +400,9 @@ async function initSalonBooking(): Promise<void> {
         const data = (await res.json()) as { success: boolean; data?: { userId?: string } };
         if (data?.data?.userId) saveUuid(data.data.userId);
       }
+      return res.ok;
     })
-    .catch(() => {
-      /* silent */
-    });
+    .catch(() => false);
 
   // ③ Affiliate click 計測 (linkAndAddFlow と同等)。
   if (ref) {
@@ -427,6 +426,15 @@ async function initSalonBooking(): Promise<void> {
   const container = document.getElementById('app');
   if (!container) {
     showError('mount target #app が見つかりません');
+    return;
+  }
+  if (page === 'visit-stamps') {
+    if (!await linked) {
+      showError('来店スタンプを開けませんでした。時間をおいて、もう一度開いてください。');
+      return;
+    }
+    const { mountVisitStamps } = await import('./visit-stamps/main.js');
+    mountVisitStamps(container, { liffId: LIFF_ID, lineUserId: profile.userId, idToken });
     return;
   }
   const { mountSalonBooking } = await import('./salon-booking/main.js');
@@ -719,6 +727,8 @@ async function main() {
       await initBooking();
     } else if (page === 'salon-book') {
       await initSalonBooking();
+    } else if (page === 'visit-stamps') {
+      await initSalonBooking('visit-stamps');
     } else if (page === 'event') {
       await initEventBooking('detail');
     } else if (page === 'event-me') {
