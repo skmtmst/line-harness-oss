@@ -38,6 +38,7 @@ import {
   createFolder,
   updateFolder,
   swapFolderOrder,
+  FolderConflictError,
   deleteFolder,
   isFolderKind,
   getWebinarFolderCounts,
@@ -335,6 +336,7 @@ function serializeFolder(row: Folder, count?: number, itemCount?: number) {
     name: row.name,
     parentId: row.parent_id,
     displayOrder: row.display_order,
+    revision: row.revision,
     color: row.color ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -1589,7 +1591,7 @@ friendAttributes.post('/api/folders', requireRole('owner', 'admin'), async (c) =
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) return c.json({ success: false, error: 'フォルダ名を入力してください' }, 400);
 
-    const integrationKind = ['automation', 'common_action', 'webhook', 'conversion'].includes(body.kind);
+    const integrationKind = ['automation', 'common_action', 'webhook', 'conversion', 'affiliate', 'affiliate_offer', 'mileage_reward', 'friend_add_rule'].includes(body.kind);
     const accountId = integrationKind || body.kind === 'webinar' || body.kind === 'tag' || body.kind === 'template' || body.kind === 'form'
       ? (typeof body.accountId === 'string' ? body.accountId.trim() : '')
       : '';
@@ -1643,6 +1645,7 @@ friendAttributes.post('/api/folders', requireRole('owner', 'admin'), async (c) =
     });
     return c.json({ success: true, data: serializeFolder(folder) }, 201);
   } catch (err) {
+    if (err instanceof FolderConflictError) return c.json({success:false,error:'同じ名前のフォルダがあります'},409);
     console.error('POST /api/folders error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
@@ -1667,6 +1670,10 @@ friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), async 
       }
     }
     const patch: Parameters<typeof updateFolder>[2] = {};
+    if (body.expectedRevision !== undefined) {
+      if (!Number.isSafeInteger(body.expectedRevision) || Number(body.expectedRevision)<1) return c.json({success:false,error:'版を確認してください'},422);
+      patch.expectedRevision = Number(body.expectedRevision);
+    }
     if (body.name !== undefined) {
       const name = String(body.name).trim();
       if (!name) return c.json({ success: false, error: 'フォルダ名を入力してください' }, 400);
@@ -1707,6 +1714,7 @@ friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), async 
     const folder = await updateFolder(c.env.DB, id, patch);
     return c.json({ success: true, data: serializeFolder(folder!) });
   } catch (err) {
+    if (err instanceof FolderConflictError) return c.json({success:false,error:'フォルダが更新されました'},409);
     console.error('PATCH /api/folders/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
@@ -1744,9 +1752,13 @@ friendAttributes.post('/api/folders/:id/swap-order', requireRole('owner', 'admin
     if (a.kind !== b.kind || (a.account_id ?? null) !== (b.account_id ?? null) || (a.parent_id ?? null) !== (b.parent_id ?? null)) {
       return c.json({ success: false, error: '同じ場所のフォルダだけ並べ替えられます' }, 400);
     }
+    for (const [folder, revision] of [[a,body.expectedRevision],[b,body.withExpectedRevision]] as const) {
+      if (revision !== undefined && revision !== folder.revision) return c.json({success:false,error:'フォルダが更新されました'},409);
+    }
     await swapFolderOrder(c.env.DB, a, b);
     return c.json({ success: true, data: { swapped: [id, withId] } });
   } catch (err) {
+    if (err instanceof FolderConflictError) return c.json({success:false,error:'フォルダが更新されました'},409);
     console.error('POST /api/folders/:id/swap-order error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
@@ -1768,11 +1780,14 @@ friendAttributes.delete('/api/folders/:id', requireRole('owner', 'admin'), async
     }
     const denied = await folderBoundary(c, existing, c.req.query('account_id')?.trim());
     if (denied) return denied;
-    if (!(await deleteFolder(c.env.DB, id))) {
+    const revision = c.req.query('expectedRevision');
+    if (revision !== undefined && (!Number.isSafeInteger(Number(revision)) || Number(revision)<1)) return c.json({success:false,error:'版を確認してください'},422);
+    if (!(await deleteFolder(c.env.DB, id, revision === undefined ? undefined : Number(revision)))) {
       return c.json({ success: false, error: 'フォルダの店舗境界を確認してください' }, 409);
     }
     return c.json({ success: true, data: null });
   } catch (err) {
+    if (err instanceof FolderConflictError) return c.json({success:false,error:'フォルダが更新されました'},409);
     console.error('DELETE /api/folders/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }

@@ -557,7 +557,10 @@
     "613_folder_colors.sql",
     "614_tenant_company_contact.sql",
     "615_workflow_steps.sql",
-    "616_affiliate_reward_mode.sql"
+    "616_affiliate_reward_mode.sql",
+    "617_store_common_folders.sql",
+    "618_hq_banner_folders.sql",
+    "619_hq_folder_display_order.sql"
   ],
-  "migrationCount": 558
+  "migrationCount": 561
 }
