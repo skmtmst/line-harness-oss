@@ -224,13 +224,15 @@ type MultiBodyProps = {
   folderHeading?: string
   /** 開いたときに絞っておくフォルダ。 */
   initialFolder?: string
+  /** ほかの窓の中に埋め込むとき。高さを決めて一覧だけを送る。 */
+  embedded?: boolean
 }
 
 /**
  * まとめて選ぶ中身（フォルダの列＋一覧）。窓の中にも、ほかの窓の中にも埋め込める。
  * フォルダの横のチェックは、そのフォルダの選べる候補をまとめて付け外しする。
  */
-export function EntityMultiSelect({ items, folders = [], foldersFailed = false, selected, onChange, query, onlySelected = false, readOnly = false, busy = false, state, rowExtra, searchSlot, listLabel = '候補の一覧', folder: controlledFolder, onFolder, folderHeading, initialFolder }: MultiBodyProps) {
+export function EntityMultiSelect({ items, folders = [], foldersFailed = false, selected, onChange, query, onlySelected = false, readOnly = false, busy = false, state, rowExtra, searchSlot, listLabel = '候補の一覧', folder: controlledFolder, onFolder, folderHeading, initialFolder, embedded = false }: MultiBodyProps) {
   const id = useId()
   const [ownFolder, setOwnFolder] = useState(initialFolder ?? ALL)
   const folder = controlledFolder ?? ownFolder
@@ -246,7 +248,7 @@ export function EntityMultiSelect({ items, folders = [], foldersFailed = false, 
   }
   const folderRows = pickerFolderRows(items, folders, Boolean(state), groupCheck)
   const rows = items.filter((item) => inFolder(item, folder) && matches(item, query) && (!onlySelected || set.has(item.id)))
-  return <div ref={panelRef} className={shell.body}>
+  return <div ref={panelRef} className={embedded ? `${shell.body} ${styles.embedded}` : shell.body}>
     {hasFolders && !narrow ? <div className={shell.folders}>
       <FolderPanel readOnly heading={folderHeading} disabled={busy || Boolean(state)} rows={folderRows} activeId={folder} onSelect={setFolder} />
     </div> : null}

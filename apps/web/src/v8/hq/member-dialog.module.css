@@ -64,8 +64,6 @@
 .checks {
   display: flex;
   flex-direction: column;
-  height: var(--tpl-picker-embed-h);
-  min-height: 0;
   overflow: hidden;
   border-radius: var(--radius-control);
   outline: 1px solid var(--color-hairline);

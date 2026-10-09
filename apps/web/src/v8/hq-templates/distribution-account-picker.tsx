@@ -41,7 +41,7 @@ export default function DistributionAccountPicker({ accounts, folders, selected,
     </>
   }
   return <div className={styles.picker}>
-    <EntityMultiSelect items={items} folders={toPickerFolders(folders.folders)} foldersFailed={folders.failed} selected={selected} onChange={onChange}
+    <EntityMultiSelect embedded items={items} folders={toPickerFolders(folders.folders)} foldersFailed={folders.failed} selected={selected} onChange={onChange}
       query={search} busy={busy} folder={toPicker(filter)} onFolder={(value) => onFilter(fromPicker(value))} folderHeading="フォルダ" listLabel="配るアカウント"
       searchSlot={!headerSearch && onSearch ? <SearchField aria-label="アカウントを探す" placeholder="名前で探す" value={search} disabled={busy} onChange={onSearch} onClear={() => onSearch('')} /> : null}
       rowExtra={(item) => <span className={styles.state}>{accountMeta ? <span className={styles.meta}>{accountMeta(item.id)}</span> : null}{state(item.id)}</span>} />

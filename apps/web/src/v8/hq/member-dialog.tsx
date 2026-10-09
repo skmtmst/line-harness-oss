@@ -236,7 +236,7 @@ export default function MemberDialogV8({
             scopeAccounts.length === 0 ? <p className={styles.note}>アカウントがまだありません。</p> : (
               /* 選ぶ窓（dJZ7Q）のまとめて選ぶ中身を、この窓の中に埋め込む。 */
               <div className={styles.checks}>
-                <EntityMultiSelect items={toHqAccountItems(scopeAccounts, accountFolders)} folders={toPickerFolders(accountFolders.folders)} foldersFailed={accountFolders.failed}
+                <EntityMultiSelect embedded items={toHqAccountItems(scopeAccounts, accountFolders)} folders={toPickerFolders(accountFolders.folders)} foldersFailed={accountFolders.failed}
                   selected={value.scopedLineAccountIds} onChange={(ids) => set('scopedLineAccountIds', ids)} query={scopeQuery} busy={busy} listLabel="担当するアカウント"
                   searchSlot={<SearchField aria-label="担当するアカウントを探す" placeholder="名前で探す" value={scopeQuery} onChange={setScopeQuery} onClear={() => setScopeQuery('')} />} />
               </div>

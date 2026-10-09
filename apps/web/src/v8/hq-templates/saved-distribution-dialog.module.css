@@ -9,4 +9,4 @@
 .meta { flex-shrink: 0; font-size: var(--tpl-htn-text-13); color: var(--color-ink-secondary); white-space: nowrap; }
 
 /* dJZ7Q：共通のまとめて選ぶ中身を窓の中に入れる高さ。 */
-.picker { display: flex; flex-direction: column; min-height: 0; height: var(--tpl-picker-embed-h); }
+.picker { display: flex; flex-direction: column; }

@@ -18,6 +18,7 @@
 .note { margin: 0; font-size: var(--text-caption); color: var(--color-warning); }
 
 /* まとめて選ぶ一覧。 */
+.embedded { flex: none; height: var(--tpl-picker-embed-h); }
 .multiList { gap: var(--tpl-picker-gap); padding: var(--tpl-picker-list-pad); }
 .multiRows { display: flex; flex-direction: column; gap: var(--tpl-picker-row-gap); min-height: 0; overflow-y: auto; }
 .multiRow { display: flex; align-items: center; gap: var(--tpl-picker-gap); min-height: var(--tpl-picker-row-h); padding: var(--tpl-picker-row-pad); border-radius: var(--radius-control); }
