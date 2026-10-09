@@ -55,3 +55,32 @@ test('確かめを開いたまま B に移ったら、A の確かめは閉じる
   await screen.findByRole('switch', { name: 'B の注文のお知らせを出す・止める' })
   expect(screen.queryByText(/「A の注文」のお知らせを止めますか/)).toBeNull()
 })
+
+test('B-139：見出しを空にして保存すると、帯ではなく見出しの欄が赤くなり、真下に理由が出て、そこへ移る', async () => {
+  fx.account = 'account-a'
+  vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => undefined, removeItem: () => undefined })
+  const writes: string[] = []
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input))
+    if ((init?.method ?? 'GET') !== 'GET') writes.push(url.pathname)
+    if (url.pathname === '/api/ec-commerce/settings') return json({ success: true, data: [setting('A の注文')] })
+    if (url.pathname === '/api/ec-commerce/overview') return json({ success: true, data: { total: 0, processed: 0, identityPending: 0, failed: 0, skipped: 0, last24h: 0, lastReceivedAt: null, byType: [], subscriptions: 0 } })
+    if (url.pathname.includes('/operator-rules')) return json({ success: true, data: { items: [], summary: { total: 0, published: 0, stopped: 0, missingRecipients: 0, recipients: 0, acceptedToday: 0, excludedToday: 0 } } })
+    return json({ success: true, data: [] })
+  })
+  render(<Screen />)
+  await screen.findByRole('switch', { name: /のお知らせを出す・止める$/ })
+  await act(async () => { (document.querySelector('button[aria-label$="の内容を編集"]') as HTMLButtonElement).click() })
+  const title = document.getElementById('cn-title') as HTMLInputElement
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(title, '')
+    title.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  const save = screen.getAllByRole('button').find((b) => /を保存する$/.test(b.textContent?.trim() ?? ''))!
+  await act(async () => { save.click() })
+  await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+  expect(writes).toEqual([])
+  expect(title.getAttribute('aria-invalid')).toBe('true')
+  expect(document.getElementById('cn-title-error')?.textContent).toBe('通知の見出しを入力してください。')
+  expect(document.activeElement).toBe(title)
+})

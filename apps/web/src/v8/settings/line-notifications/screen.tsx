@@ -10,6 +10,8 @@
  */
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { FieldError } from '@/components/shared/form-controls'
+import { focusFieldById } from '@/lib/use-form-errors'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import KpiBand from '@/components/shared/kpi-band'
 import Toggle from '@/components/shared/toggle'
@@ -550,6 +552,7 @@ function CustomerNotificationEditor({
   onTestSend,
   notice,
   hasUnsaved,
+  titleError = '',
 }: {
   setting: EcNotificationSetting
   definition: LineNotificationDefinition | null
@@ -561,6 +564,8 @@ function CustomerNotificationEditor({
   onTestSend: () => void
   notice: { tone: 'success' | 'error'; text: string } | null
   hasUnsaved: boolean
+  /** 見出しの誤り（B-139）。欄を赤くして真下に出す。 */
+  titleError?: string
 }) {
   return <div data-design-node="Q55bb" className="min-w-0 space-y-4 pb-48 sm:pb-24">
     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -589,7 +594,7 @@ function CustomerNotificationEditor({
         <section className="rounded-card border border-hairline bg-canvas p-4">
           <h2 className="font-bold text-ink">送るもの</h2>
           <div className="mt-3 space-y-4">
-            <label className="block text-sm font-semibold text-ink-secondary">通知の見出し<input value={setting.title ?? ''} maxLength={80} onChange={(event) => onChange({ title: event.target.value })} className="mt-1.5 w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 font-normal text-ink" /></label>
+            <div><label htmlFor="cn-title" className="block text-sm font-semibold text-ink-secondary">通知の見出し</label><input id="cn-title" value={setting.title ?? ''} maxLength={80} onChange={(event) => onChange({ title: event.target.value })} aria-invalid={titleError ? true : undefined} aria-describedby={titleError ? 'cn-title-error' : undefined} className={`mt-1.5 w-full rounded-control border bg-canvas px-3 py-2.5 font-normal text-ink ${titleError ? 'border-danger' : 'border-hairline'}`} /><FieldError id="cn-title-error">{titleError}</FieldError></div>
             <label className="block text-sm font-semibold text-ink-secondary">ご案内文<textarea value={setting.introText} maxLength={800} rows={5} onChange={(event) => onChange({ introText: event.target.value })} className="mt-1.5 w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 font-normal leading-6 text-ink" /></label>
             <div className="rounded-control border border-nen-border bg-nen-ivory p-4">
               <p className="text-sm font-bold text-nen-green">このお知らせで差し込める項目（EC連携から来ます）</p>
@@ -687,6 +692,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
   const [pendingToggle, setPendingToggle] = useState<EcNotificationSetting | null>(null)
   const [definitionsFailed, setDefinitionsFailed] = useState(false)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
+  const [titleError, setTitleError] = useState('')
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
   /*
    * #988 NEXT-05: 「自分にテスト送信」は実際にはアカウントの test_recipients
@@ -1070,7 +1076,9 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
   }
 
   const save = async (setting: EcNotificationSetting, enabled = setting.isEnabled) => {
-    if (!setting.title?.trim()) { setNotice({ tone: 'error', text: '通知の見出しを入力してください。' }); return }
+    /* 見出しが空なら、帯ではなく見出しの欄で知らせて移る（B-139）。 */
+    if (!setting.title?.trim()) { setTitleError('通知の見出しを入力してください。'); setNotice(null); focusFieldById('cn-title'); return }
+    setTitleError('')
     if (!selectedAccountId) { setNotice({ tone: 'error', text: 'LINEアカウントを選択してください。' }); return }
     if (definitionsFailed && !definitionByEvent.get(setting.eventType)) {
       setNotice({ tone: 'error', text: 'お知らせの設定を読み込めなかったため、保存できません。読み直してから、もう一度お試しください。' })
@@ -1199,13 +1207,14 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
         setting={expandedSetting}
         definition={definitionByEvent.get(expandedSetting.eventType) ?? null}
         busy={busy === expandedSetting.eventType}
-        onChange={(patch) => edit(expandedSetting.eventType, patch)}
+        onChange={(patch) => { if ('title' in patch) setTitleError(''); edit(expandedSetting.eventType, patch) }}
         onClose={() => closeEditor(expandedSetting)}
         onPublish={() => void publish(expandedSetting)}
         onSave={() => void save(expandedSetting)}
         onTestSend={() => openTestSendConfirm(expandedSetting)}
         notice={notice}
         hasUnsaved={dirtyEvents.includes(expandedSetting.eventType)}
+        titleError={titleError}
       />
       <ConfirmDialog
         open={closeConfirmOpen}
