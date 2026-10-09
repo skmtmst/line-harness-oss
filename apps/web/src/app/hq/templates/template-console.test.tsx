@@ -66,6 +66,19 @@ function replaceSessionStorage(overrides: Partial<Pick<Storage, 'getItem' | 'set
   return () => { if (original) Object.defineProperty(window, 'sessionStorage', original) }
 }
 async function list() { render(<TemplateConsole type="tag" />); await screen.findByLabelText('タグ「来店済み」の操作'); fireEvent.click(screen.getByLabelText('タグ「来店済み」の操作')) }
+/*
+ * 「編集する」は読み込みの最中（保存中と同じ止め方）に編集画面を出すので、
+ * 入力欄は一瞬だけ操作できない状態で現れる。混み合った機械ではその瞬間を
+ * 見つけてしまい、操作できない入力欄への打ち込みは何も起きないため、
+ * 打った名前が静かに捨てられていた。操作できるようになるまで待ってから打つ。
+ */
+async function nameInput() {
+  await screen.findByLabelText('ひな形の名前')
+  await waitFor(() => {
+    if ((screen.getByLabelText('ひな形の名前') as HTMLInputElement).disabled) throw new Error('読み込み・保存中は名前を打てません')
+  })
+  return screen.getByLabelText('ひな形の名前') as HTMLInputElement
+}
 async function chooseStores() {
   await list(); fireEvent.click(screen.getByRole('menuitem', { name: '配る' })); await screen.findByRole('checkbox', { name: '銀座本店' })
   expect((screen.getByRole('button', { name: '0アカウントの重複を確認' }) as HTMLButtonElement).disabled).toBe(true)
@@ -110,8 +123,8 @@ describe('HQひな形の配布フロー', () => {
   })
 
   it('作成・編集で期待版と参照先を保ち、保存結果から次へ進む', async () => {
-    await list(); fireEvent.click(screen.getByRole('menuitem', { name: '編集する' })); await screen.findByLabelText('ひな形の名前')
-    fireEvent.change(screen.getByLabelText('ひな形の名前'), { target: { value: '保存名' } }); fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+    await list(); fireEvent.click(screen.getByRole('menuitem', { name: '編集する' }))
+    fireEvent.change(await nameInput(), { target: { value: '保存名' } }); fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await screen.findByRole('checkbox', { name: '銀座本店' })
     expect(calls.update).toHaveBeenCalledWith('t1', expect.objectContaining({ expectedRevision: 3, name: '保存名', definition: expect.objectContaining({ folders: detail.definition.folders }) }))
     expect(calls.distribute).not.toHaveBeenCalled()
@@ -248,8 +261,8 @@ describe('HQひな形の配布フロー', () => {
     expect((screen.getAllByRole('button', { name: 'タグを作る' })[0] as HTMLButtonElement).disabled).toBe(true); expect(calls.create).not.toHaveBeenCalled()
   })
   it('競合した編集は入力を保持し、自動で期待版を更新・再送しない', async () => {
-    calls.update.mockRejectedValueOnce(Object.assign(new Error('別の担当者が更新しました。'), { status: 409, responseReceived: true })); await list(); fireEvent.click(screen.getByRole('menuitem', { name: '編集する' })); await screen.findByLabelText('ひな形の名前')
-    fireEvent.change(screen.getByLabelText('ひな形の名前'), { target: { value: '手元の編集' } }); fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })); await screen.findByRole('alert')
+    calls.update.mockRejectedValueOnce(Object.assign(new Error('別の担当者が更新しました。'), { status: 409, responseReceived: true })); await list(); fireEvent.click(screen.getByRole('menuitem', { name: '編集する' }))
+    fireEvent.change(await nameInput(), { target: { value: '手元の編集' } }); fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })); await screen.findByRole('alert')
     expect((screen.getByLabelText('ひな形の名前') as HTMLInputElement).value).toBe('手元の編集'); expect(calls.update).toHaveBeenCalledOnce()
     fireEvent.click(screen.getByRole('button', { name: '最新の内容を読み込む' }))
     await screen.findByDisplayValue('来店済み'); expect(calls.get).toHaveBeenCalledTimes(2); expect(calls.update).toHaveBeenCalledOnce()
@@ -348,8 +361,10 @@ describe('HQひな形の配布フロー', () => {
       expect(window.sessionStorage.length).toBe(0)
       expect(screen.queryByRole('button', { name: '前回の保存を再確認' })).toBeNull()
       if (outcome === 'definite-rejection') {
-        expect((screen.getByLabelText('ひな形の名前') as HTMLInputElement).disabled).toBe(false)
-        fireEvent.change(screen.getByLabelText('ひな形の名前'), { target: { value: '修正した新しい内容' } })
+        // 「入力を固定」は解かれ、やり直せるようになる。
+        const editable = await nameInput()
+        expect(editable.disabled).toBe(false)
+        fireEvent.change(editable, { target: { value: '修正した新しい内容' } })
         expect((screen.getByLabelText('ひな形の名前') as HTMLInputElement).value).toBe('修正した新しい内容')
         fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
         await screen.findByText('ひな形を保存しました。')
