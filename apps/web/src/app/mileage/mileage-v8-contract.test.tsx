@@ -306,6 +306,19 @@ test('v8 のたまる決めごと：きっかけ（購入・配信の反応・�
   expect(host.querySelector('button[aria-label="きっかけ"], [aria-label="きっかけ"]')).toBeTruthy()
 })
 
+test('v8 の使い道：種類（クーポン・シナリオなど）は上の絞り込み。左のフォルダの列は「すべて」だけ（B-136）', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  query = 'tab=rewards'
+  await act(async () => root.render(<MileagePage />))
+  await settle()
+  await eventually(() => expect(host.textContent).toContain('送料無料クーポン'))
+  const nav = host.querySelector('nav[aria-label="フォルダ"]') as HTMLElement
+  expect([...nav.querySelectorAll('button[title]')].map((b) => b.getAttribute('title'))).toEqual(['すべて'])
+  expect(nav.textContent).not.toContain('クーポン')
+  expect(host.querySelector('[aria-label="種類"]')).toBeTruthy()
+  query = ''
+})
+
 test('v8 のタブごとに板 ID が替わる（S35pO・CJlf4・oRbJi・IRPw8）', async () => {
   document.documentElement.dataset.theme = 'v8'
   for (const [tab, node, word] of [
