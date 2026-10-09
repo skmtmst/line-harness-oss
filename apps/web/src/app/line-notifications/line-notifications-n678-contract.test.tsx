@@ -1257,11 +1257,11 @@ describe('#678 実DOMへマウントした画面全体', () => {
 
     const { unmount } = render(<LineNotificationsPage />)
     await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
-    // M031: 403は「取得失敗」と混ぜない。押しても直らない再試行も出さない。
+    // M031: 403は「取得失敗」と混ぜない。権限が変わった後も読み直せるようにする。
     expect(screen.getByText('運用者へのお知らせ 権限なし')).toBeTruthy()
     expect(screen.queryByText('運用者へのお知らせ 取得失敗')).toBeNull()
     expect(screen.getByText(/見る権限がありません/)).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'もう一度' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
     unmount()
   })
 
