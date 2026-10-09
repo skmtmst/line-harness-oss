@@ -9,6 +9,7 @@
  * 定期便・つなぎ先・注文の状況のパネルは今の部品を入口（page.tsx）から差し込む。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
@@ -305,7 +306,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
         crypto.randomUUID(),
       )
       if (!response.success) throw new Error('retry_failed')
-      setNotice({ tone: 'success', text: '失敗した処理だけを、もう一度行う待ち行列へ戻しました。' })
+      notifySaved('失敗した処理だけを、もう一度行う待ち行列へ戻しました。')
       await loadRecords(false)
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) await loadRecords(false)

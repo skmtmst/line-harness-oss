@@ -1,5 +1,6 @@
 'use client'
 
+import { notifySaved } from '@/components/shared/toast'
 import StatusPill from '@/components/shared/status-pill'
 import { Building2, Check, CircleDot, LogIn, Paperclip, Plus, RefreshCw, Send, Sparkles, Star } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -264,7 +265,7 @@ export default function OpsSupportV8() {
     if (!res.success) { setError(res.error || '下書きを保存できませんでした'); return }
     setReplyFromAi(null)
     setReferences([])
-    setNotice(res.data ? '下書きを保存しました' : '下書きを消しました')
+    notifySaved(res.data ? '下書きを保存しました' : '下書きを消しました')
   }
 
   const generateAi = async (excludeIds = excluded) => {

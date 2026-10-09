@@ -8,6 +8,7 @@
  * アカウント切替の見張り）は同じ。運用者へのお知らせの一覧は今の部品を入口（page.tsx）から差し込む。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import MediaSlot from '@/components/shared/media-slot'
 import { uploadImageFile } from '@/components/shared/media-library-upload'
@@ -902,7 +903,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
       setExpanded((current) => withDrafts.some((setting) => setting.eventType === current) ? current : null)
       if (restoredEvents.length > 0) {
         setDirtyEvents(restoredEvents)
-        setNotice({ tone: 'success', text: `未保存の編集を${restoredEvents.length}件復元しました。確認して保存してください。` })
+        notifySaved(`未保存の編集を${restoredEvents.length}件復元しました。確認して保存してください。`)
       }
       setLoadState('ready')
       setCustomerLoadError(null)

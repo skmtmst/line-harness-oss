@@ -8,6 +8,7 @@
  * （型のフォルダの列。板が狭いときは型が「設定：〇〇」の選ぶ欄に畳む）・統括名のカード。
  * 絵の「運営による操作」は契約先には出さない（2026-10-06 利用者指定。v7 と同じ）。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 import { useEffect, useId, useState, type FormEvent } from 'react'
 import { ListPage } from '@/components/templates'
@@ -91,7 +92,7 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
       if (!response.success) throw new Error(response.error)
       setName(response.data.name ?? trimmed)
       setBaseline(response.data.name ?? trimmed)
-      setSaved(true)
+      setSaved(true); notifySaved()
     } catch (caught) {
       // M026：再試行の言葉がない代替文にしない。共通の状態別案内へ渡す。
       setError(japaneseDetailOf(caught) || describeApiFailure(caught, '統括名の保存', {
@@ -134,7 +135,7 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
       </div>
       <p className={styles.hint}>会社名やブランド名など、メンバーが見てわかる名前にします</p>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
-      {saved ? <p className={styles.saved} role="status">保存しました。</p> : null}
+      {null}
       <div className={styles.actions}>
         <Button variant="primary" type="submit" disabled={loading || saving} busy={saving}>統括名を保存する</Button>
       </div>

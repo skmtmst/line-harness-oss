@@ -11,6 +11,7 @@
  * データの口は今の画面（app/restaurant-test/v8/shell.tsx）と同じ
  * restaurantTestApi.snapshot。取得失敗と未登録を混ぜない（D024）。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError } from '@/lib/api'
@@ -122,7 +123,7 @@ export default function RestaurantFrame({
     try {
       await action()
       await load()
-      setNotice({ tone: 'success', text: success })
+      notifySaved(success)
       return true
     } catch (error) {
       setNotice({ tone: 'error', text: error instanceof ApiError ? error.message : '保存できませんでした。' })

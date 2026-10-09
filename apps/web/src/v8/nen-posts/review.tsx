@@ -1,6 +1,7 @@
 'use client'
 
 /* Pencil の6枚のHTMLをもとにした投稿画面。既存の審査APIを接続する。 */
+import { notifySaved } from '@/components/shared/toast'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, Eye, Globe, HelpCircle, History, MoreHorizontal, Send, Undo2, X } from 'lucide-react'
 import type { ApiResponse } from '@line-crm/shared'
@@ -289,7 +290,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       if (generation !== accountGeneration.current) return
       if (!response.success) throw new Error(response.error)
       setPublicationCandidate(null)
-      notifyToast('公式サイトへの掲載を保存しました。追加報酬の手続き状況は掲載一覧で確認できます。')
+      notifySaved('公式サイトへの掲載を保存しました。追加報酬の手続き状況は掲載一覧で確認できます。')
       await load()
     } catch (error) { if (generation === accountGeneration.current) setNotice(photoNoticeFor(error, '掲載できませんでした。掲載状態と同意を読み直してください。')) }
     finally { if (generation === accountGeneration.current) setReviewing(null) }
@@ -341,7 +342,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
             : response.data.pointSync === 'needs_attention'
               ? 'EC会員とつながっていないため、マイルの手続きはまだ始まっていません。'
               : ''
-      notifyToast(nextStatus === 'adopted'
+      notifySaved(nextStatus === 'adopted'
         ? `写真を採用しました。${adoptedNote}公開は本人の同意がある場合だけ行います。${notification}`
         : `見送り理由を保存しました。${notification}`)
       setRejectingPhotoId(null)
@@ -430,7 +431,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       }).filter((item) => item.photoId)
       setBulkFailed(failedPhotos)
       if (failedPhotos.length === 0) {
-        notifyToast(`${count}枚の審査結果を保存し、投稿者へLINEで通知しました。`)
+        notifySaved(`${count}枚の審査結果を保存し、投稿者へLINEで通知しました。`)
       } else {
         setNotice(`${count}枚の審査結果は保存済みです。${failedPhotos.length}枚のLINE通知は送れませんでした（通知だけ再送できます）。`)
       }
@@ -1160,7 +1161,7 @@ function PublicationsV8({
       if (!response.success) throw new Error(response.error)
       setOrderItems(null)
       setBusyId('')
-      notifyToast('掲載順を保存しました。')
+      notifySaved('掲載順を保存しました。')
       await load()
       onChanged()
     } catch (error) {
@@ -1379,7 +1380,7 @@ function DetailV8({
       }, idempotencyKey)
       if (!response.success) throw new Error(response.error)
       reviewKeys.current.delete(id)
-      notifyToast(nextStatus === 'adopted' ? '写真を採用しました。公開は本人の同意がある場合だけ行います。' : '見送り理由を保存しました。')
+      notifySaved(nextStatus === 'adopted' ? '写真を採用しました。公開は本人の同意がある場合だけ行います。' : '見送り理由を保存しました。')
       onReload()
       onBack()
     } catch (error) {
@@ -1425,7 +1426,7 @@ function DetailV8({
       setDetailPhoto((current) => current && text(current.id) === id
         ? { ...current, display_rotation: rotation, review_version: response.data.reviewVersion }
         : current)
-      setNotice('写真の向きを保存しました。')
+      notifySaved('写真の向きを保存しました。')
     } catch (error) {
       setNotice(error instanceof Error ? error.message : '写真の向きを保存できませんでした。')
     } finally {

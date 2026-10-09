@@ -438,7 +438,7 @@ export default function FeatureSettingsScreen() {
             onClick={() => { if (!validateReason()) return; if (conflicted) setCompareOpen(true); else void save() }}
             disabled={saving || !dirty}
             busy={saving}
-            done={savedTick}
+
             doneLabel="保存しました"
             title={!dirty ? '変更すると保存できます' : undefined}
           >

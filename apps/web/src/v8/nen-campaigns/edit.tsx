@@ -11,6 +11,7 @@
  * ・右に LINE での見え方・気をつけること・この画面でできないこと・自分にテストを送る。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState } from 'react'
 import { CalendarClock, ClipboardList, Coins, Eye, Package, Save, Send } from 'lucide-react'
 import { checkNenCampaignBodyLength, NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared'
@@ -299,7 +300,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
         setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
         return
       }
-      setNotice('配信内容を保存しました')
+      notifySaved('配信内容を保存しました')
       setSetting({ ...merged, updatedAt: response.data?.updatedAt ?? merged.updatedAt })
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 409 && caught.code === 'VERSION_CONFLICT') {

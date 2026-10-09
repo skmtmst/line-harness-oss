@@ -7,6 +7,7 @@
  * 口・保存の順（通知の設定 → 版のある設定）・テスト送信は app/webinars/edit/notifications-v8.tsx と
  * components/webinars/webinar-notifications.tsx と同じ（BEHAVIOR.md）。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Plus, Send } from 'lucide-react'
@@ -173,7 +174,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
           const res = await webinarApi.saveNotifications(webinarId, input)
           setSettings(res.data.settings)
           setBaseline(res.data.settings)
-          notifyToast(`保存しました。${res.data.queued}件を予定に入れ、${res.data.cancelled}件を取り消しました。`)
+          notifySaved(`保存しました。${res.data.queued}件を予定に入れ、${res.data.cancelled}件を取り消しました。`)
         } catch {
           setError('通知の設定を保存できませんでした。入力を残しました。もう一度お試しください。')
           return false

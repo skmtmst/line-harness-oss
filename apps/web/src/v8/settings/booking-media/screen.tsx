@@ -10,6 +10,7 @@
  * 保存した URL は「今日のお店」の右の列と「枠を閉じる知らせ」の［管理画面を開く ↗］に使われる。
  * 動きは BEHAVIOR.md。
  */
+import { notifySaved } from '@/components/shared/toast'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Copy, MessageCircle, Plus } from 'lucide-react'
@@ -351,7 +352,7 @@ export default function BookingMediaPage() {
           setNotice(next); setNoticeSaved(next)
         }
       }
-      notifyToast('予約サイト・グルメ媒体の設定を保存しました')
+      notifySaved('予約サイト・グルメ媒体の設定を保存しました')
       await Promise.all([load(), loadNotice()])
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 409) setConflict(true)

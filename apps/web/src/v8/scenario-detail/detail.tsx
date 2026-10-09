@@ -2904,7 +2904,7 @@ export default function ScenarioDetailV8({
                   }}
                   disabled={saving || !editForm.name.trim()}
                   busy={saving}
-                  done={saveDone}
+
                 >
                   {conflict ? <GitCompareArrows aria-hidden /> : <Check aria-hidden />}
                   {conflict ? '比べてから保存' : '保存する'}

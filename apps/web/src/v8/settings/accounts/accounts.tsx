@@ -9,6 +9,7 @@
  * 一覧（確かめ直しは live）・アーカイブ（理由・本人確認）・アーカイブから戻す。
  * 「並び順と親子を変える」は今ある並び替えの部品（components/accounts/account-ordering）を窓で開く。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -117,7 +118,7 @@ export default function AccountsV8() {
       setArchiveTarget(null)
       setArchiveReason('')
       await load(false)
-      setNotice({ tone: 'success', text: `「${archiveTarget.name}」をアーカイブしました。` })
+      notifySaved(`「${archiveTarget.name}」をアーカイブしました。`)
     } catch (caught) {
       if (!stepUpToken && isStepUpRequired(caught)) {
         setStepUp({ purpose: 'line_account.archive', action: `「${archiveTarget.name}」をアーカイブする`, retry: runArchive })
@@ -139,7 +140,7 @@ export default function AccountsV8() {
       if (!res.success) throw new Error(res.error)
       setRestoreTarget(null)
       await load(false)
-      setNotice({ tone: 'success', text: `「${restoreTarget.name}」をアーカイブから戻しました。` })
+      notifySaved(`「${restoreTarget.name}」をアーカイブから戻しました。`)
     } catch (caught) {
       if (!stepUpToken && isStepUpRequired(caught)) {
         setStepUp({ purpose: 'line_account.credentials', action: `「${restoreTarget.name}」をアーカイブから戻す`, retry: runRestore })

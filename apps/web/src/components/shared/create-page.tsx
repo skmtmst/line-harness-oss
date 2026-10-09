@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Header from '@/components/layout/header'
 import styles from './create-page.module.css'
 import Button from '@/components/shared/button'
+import { notifySaved } from '@/components/shared/toast'
 import HelpTip from '@/components/shared/help-tip'
 import StickyBar from '@/components/shared/sticky-bar'
 import ValidationSummary from '@/components/shared/validation-summary'
@@ -182,9 +183,10 @@ export default function CreatePage({
     setNotice('')
     try {
       const id = await onSave()
+      if (!andAnother) notifySaved()
       if (andAnother) {
         onReset?.()
-        setNotice('保存しました。続けて作れます。')
+        notifySaved('保存しました。続けて作れます。')
         return
       }
       // 作った行を一覧で目立たせる。どこに増えたのか探させない。

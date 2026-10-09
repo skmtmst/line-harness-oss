@@ -1,5 +1,6 @@
 'use client'
 
+import { notifySaved } from '@/components/shared/toast'
 import { Send } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
@@ -229,7 +230,7 @@ export default function OpsAnnouncementsV8() {
         : await api.ops.announcements.create(input(mode), createKey)
       if (!res.success) { setFormError('保存できませんでした'); return }
       setConfirmSend(false)
-      setNotice(mode === 'draft' ? '下書きとして保存しました' : mode === 'schedule' ? `${formatDateTime(res.data.publishAt)} に配信を予約しました` : `送りました（${res.data.recipientsTotal}人。LINE ${res.data.lineSent}・メール ${res.data.mailSent}）`)
+      notifySaved(mode === 'draft' ? '下書きとして保存しました' : mode === 'schedule' ? `${formatDateTime(res.data.publishAt)} に配信を予約しました` : `送りました（${res.data.recipientsTotal}人。LINE ${res.data.lineSent}・メール ${res.data.mailSent}）`)
       setBaseline(EMPTY)
       setForm(EMPTY)
       setEditingId(null)

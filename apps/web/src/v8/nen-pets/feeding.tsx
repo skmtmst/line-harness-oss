@@ -7,6 +7,7 @@
  * 口は今の画面と同じ（GET/PUT /api/nen/feeding-products）。
  * 行は文字で見せ、商品名を押すとその行だけ入力欄になる（足した行は最初から入力欄）。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, Trash2 } from 'lucide-react'
 import Card from '@/components/shared/card'
@@ -150,7 +151,7 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
       setDrafts(fromData(res.data))
       setTreatLimit(String(res.data.treatLimitPercent ?? 10))
       setDirty(false)
-      setNotice(res.data.refreshedPets
+      notifySaved(res.data.refreshedPets
         ? `主食を保存し、登録済みのペット ${formatNumber(res.data.refreshedPets)}頭の目安を計算し直しました。`
         : '主食を保存しました。')
     } catch (caught) {

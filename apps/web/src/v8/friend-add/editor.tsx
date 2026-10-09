@@ -12,6 +12,7 @@
  * （口・版・下書き・冪等の鍵の扱いを変えない）。違うのは見せ方と、先に保存された
  * ときの帯（違いを比べる・最新を読み込んで続ける）。BEHAVIOR.md に書き出した。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -418,7 +419,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       }
       savedSnapshot.current = editorSnapshot(rule, definition)
       setConflict(false)
-      setNotice('下書きを保存しました。')
+      notifySaved('下書きを保存しました。')
       if (!ruleId || nextStep) samePageUrl.replace(`/friend-add-settings?view=edit&id=${encodeURIComponent(savedId)}&step=${nextStep ?? step}`)
       return savedId
     } catch (caught) {

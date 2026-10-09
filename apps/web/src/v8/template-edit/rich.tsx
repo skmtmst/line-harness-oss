@@ -9,6 +9,7 @@
  * 形・面の座標・動きの組み立ては template-asset-editor.tsx から写した（src/v8 は @/app を読めない）。
  * 外枠・名前とフォルダの箱・右の列はクーポン・リサーチ（asset.tsx）と同じ。動きは BEHAVIOR.md。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CircleSlash, Send } from 'lucide-react'
@@ -338,7 +339,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   }
   const onSaveDraft = async () => {
     if (host) { hostSave(false); return }
-    if (await save()) notifyToast('下書きを保存しました')
+    if (await save()) notifySaved('下書きを保存しました')
   }
   const onPublish = async () => {
     if (host) { hostSave(true); return }
@@ -449,7 +450,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
       >
         {host?.notice}
         {error ? <p role="alert" className={styles.error}>{error}</p> : null}
-        {saved ? <p role="status" className={styles.readonly}>保存しました。一覧へ戻ると、リッチメッセージの一覧に出ています。</p> : null}
+        {null}
 
         {host?.composer ? null : <Card padding="none" layout="vertical" className={styles.card}>
           <div className={styles.cardHead}>

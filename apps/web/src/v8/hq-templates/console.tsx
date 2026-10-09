@@ -13,6 +13,7 @@
  * タグ・リッチメニュー・回答フォーム・シナリオのひな形の中身は、入口（app/hq/templates/page.tsx）
  * が今の編集部品を `DefinitionEditor` として渡す（src/v8 から @/app を読まないため）。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState, type ComponentType } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
@@ -384,7 +385,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     setCreateUncertain(false)
     setTemplates((current) => [saved.template, ...current.filter((row) => row.id !== saved.template.id)])
     refreshStats()
-    setMessage(continueToAccounts ? '' : 'ひな形を保存しました。')
+    notifySaved(continueToAccounts ? '' : 'ひな形を保存しました。')
     if (continueToAccounts) {
       setSelected(options.preselect ?? []); setTextOverrides({}); setSearch('')
       setAccountFolder(ALL_ACCOUNTS)

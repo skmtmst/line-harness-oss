@@ -8,6 +8,7 @@
  * ①② は下書きで、下の帯の［保存する］でまとめて保存する。③・店で手入力・④の取り消しは、その場で口を呼ぶ。
  * 呼ぶ口は visit-stamps-api（Codex の API-7）だけ。動き・権限は BEHAVIOR.md。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Gift, ImageIcon, Minus, Plus, Stamp } from 'lucide-react'
@@ -192,7 +193,7 @@ function VisitStampsScreen() {
       const body = { name: name.trim(), accountIds, settings, active: card?.active ?? true, expectedVersion: card?.version ?? 0 }
       if (card) await visitStampsApi.save(card.id, body)
       else await visitStampsApi.create(body)
-      notifyToast('来店スタンプの設定を保存しました。')
+      notifySaved('来店スタンプの設定を保存しました。')
       await loadCards()
     } catch (caught) {
       const conflict = (caught as { status?: number })?.status === 409
@@ -362,7 +363,7 @@ function VisitStampsScreen() {
     setPinBusy(true); setDialogError('')
     try {
       await visitStampsApi.setPin(staffId, selectedAccountId, pin)
-      notifyToast(`${staffName(staffId) ?? '店員'}さんの暗証番号を保存しました。`)
+      notifySaved(`${staffName(staffId) ?? '店員'}さんの暗証番号を保存しました。`)
       setPinOpen(false)
     } catch (caught) { setDialogError(message(caught, '暗証番号を保存できませんでした。')) } finally { setPinBusy(false) }
   }

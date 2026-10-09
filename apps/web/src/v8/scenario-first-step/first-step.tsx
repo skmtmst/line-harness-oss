@@ -11,6 +11,7 @@
  * 1通目は飛ばせる。書かせないと進めない形にすると、あとで考えたい人が
  * 適当な本文を入れて先へ進む。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -429,7 +430,7 @@ export default function ScenarioFirstStepV8() {
       }
       scenarioReferenceData.invalidateScenario(id)
       browserDraft.clear()
-      notifyToast('1通目を保存しました')
+      notifySaved('1通目を保存しました')
       goDetail()
     } catch (submitError) {
       // 例外でも「保存中」のままにしない（SCENARIO-05）。入力は残し、同じ場所からやり直せる。

@@ -9,6 +9,7 @@
  * （断る・認める）と「支払いを確定する」は、成果承認・支払いのタブと同じ口を使う。
  * 世代番号で、別の人へ開き直した途中に届いた古い応答を捨てる。
  */
+import { notifySaved } from '@/components/shared/toast'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Copy, PauseCircle, X } from 'lucide-react'
@@ -579,7 +580,7 @@ function SettlementEditor({
         setError(res.error)
         return
       }
-      notifyToast('支払いの取り決めを保存しました。')
+      notifySaved('支払いの取り決めを保存しました。')
       onSaved()
     } catch (e) {
       setError(e instanceof Error ? e.message : '保存できませんでした。通信を確かめて、もう一度お試しください。')

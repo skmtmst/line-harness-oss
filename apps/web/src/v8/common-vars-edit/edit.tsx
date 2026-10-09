@@ -11,6 +11,7 @@
  * データの口・影響確認・保存・予約・削除・状態切替は `app/contents/vars/edit/edit-v8.tsx` から
  * 写した（import はしない）。動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -471,7 +472,7 @@ function EditCommonVarV8Inner() {
         else if (res.error.includes('値')) setValueFieldError(res.error)
         return
       }
-      setSaved(true)
+      setSaved(true); notifySaved()
       setChangeReason('')
       setConflict(null)
       setCompareOpen(false)
@@ -1233,7 +1234,7 @@ function EditCommonVarV8Inner() {
             )}
           </section>
 
-          {saved && <p className={styles.savedNote} role="status">保存しました。</p>}
+          {null}
         </>
       )}
 

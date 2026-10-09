@@ -2,6 +2,7 @@
 
 /* ② 受付枠（yRPxl）（settings-v8.tsx から分割。見た目・動きは変えない） */
 
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Search } from 'lucide-react'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -121,7 +122,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
         businessHours: draft,
       })
       if (!response.success) throw new Error('booking_business_hours_save_failed')
-      notifyToast('受付時間を保存しました。')
+      notifySaved('受付時間を保存しました。')
       onSaved(response.data)
     } catch (error) {
       setSaveError(businessHoursSaveError(error))

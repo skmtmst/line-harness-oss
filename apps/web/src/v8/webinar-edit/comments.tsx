@@ -5,6 +5,7 @@
  * 左に流すコメントの表（秒数・名前・本文はその場で直せる。行の右端は消す）、右に視聴画面での見え方。
  * 口・件数の上限・JSON の読み込み・保存の決まりは app/webinars/edit/comments-v8.tsx と同じ（BEHAVIOR.md）。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState } from 'react'
 import { Check, Trash2 } from 'lucide-react'
 import { PageFrame } from '@/components/templates/page-frame'
@@ -119,7 +120,7 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
       if (request !== generation.current) return false
       setComments(sorted)
       setBaseline(JSON.stringify(sorted))
-      setMessage({ text: `${response.data.count}件保存しました`, error: false })
+      notifySaved(`${response.data.count}件保存しました`)
       return true
     } catch (cause) {
       if (request === generation.current) setMessage({ text: `保存できませんでした。入力を残しました。${webinarErrorText(cause, '通信を確認して、もう一度保存してください。')}`, error: true })

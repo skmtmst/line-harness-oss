@@ -7,6 +7,7 @@
  * 同じ口（POST /api/broadcast-message-assets）・同じ形の payload。違いは置き場と
  * 見せ方だけ（BEHAVIOR.md）。リッチメッセージは今の画面のまま（入口が渡す）。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { GripVertical, Plus, Send, X } from 'lucide-react'
@@ -312,7 +313,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   }
   const onSaveDraft = async () => {
     if (host) { hostSave(false); return }
-    if (await save()) notifyToast('下書きを保存しました')
+    if (await save()) notifySaved('下書きを保存しました')
   }
   const onPublish = async () => {
     if (host) { hostSave(true); return }
@@ -459,7 +460,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
       >
         {host?.notice}
         {error ? <p role="alert" className={styles.error}>{error}</p> : null}
-        {saved ? <p role="status" className={styles.readonly}>保存しました。一覧へ戻ると、{meta.title}の一覧に出ています。</p> : null}
+        {null}
         {nameCard}
 
         {kind === 'coupon' ? (

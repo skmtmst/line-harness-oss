@@ -1,5 +1,6 @@
 'use client'
 
+import { notifySaved } from '@/components/shared/toast'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
@@ -1849,7 +1850,7 @@ export function NewAutomationV8({
       void refreshAudiencePreview(accountId, draft)
       if (!activate) {
         if (selectedAccountRef.current === accountId) {
-          setNotice('下書きに保存しました。見込み人数を確認して、1人で試せます。')
+          notifySaved('下書きに保存しました。見込み人数を確認して、1人で試せます。')
         }
         return
       }

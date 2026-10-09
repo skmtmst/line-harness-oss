@@ -647,7 +647,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
                     }}
                     disabled={tabEdit.saving}
                     busy={tabEdit.saving}
-                    done={saveDone}
+
                   >
                     <Check size={15} aria-hidden="true" />{tabEdit.saveLabel ?? '保存する'}
                   </Button>

@@ -5,6 +5,7 @@
  * V8 のテーマで出す・選んだ値が保存に乗る・閲覧のみの人には押せない保存を置かない・
  * コラムは配信対象を1つの欄で選び、足りないと保存せずに理由を出す。
  */
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent } from '@testing-library/react'
@@ -77,7 +78,7 @@ const REVIEW = {
 let host: HTMLDivElement
 let root: Root
 
-beforeEach(() => {
+beforeEach(() => { clearToastsForTest();
   document.documentElement.dataset.theme = 'v8'
   role.value = 'owner'
   for (const fn of Object.values(calls)) fn.mockReset()
@@ -131,7 +132,7 @@ describe('狭い板の配信プレビュー', () => {
 
 describe('V8 NEN配信「配信を直す」（w5pwG）', () => {
   it('V8 のテーマで節が並び、選んだ日数・時刻・マイルが保存に乗る', async () => {
-    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) })
+    await act(async () => { root.render(<><CampaignEdit campaignKey="review_request" /><ToastHost /></>) })
     await flush()
     expect(document.documentElement.dataset.theme).toBe('v8')
     expect(host.querySelector('[data-design-node="w5pwG"]')).not.toBeNull()
@@ -154,7 +155,7 @@ describe('V8 NEN配信「配信を直す」（w5pwG）', () => {
 
   it('B-139：本文が空のまま保存すると、口を呼ばず本文の欄が赤くなり、真下に理由が出て、本文へ移る', async () => {
     calls.settings.mockResolvedValue({ success: true, data: [{ ...REVIEW, bodyText: '' }] })
-    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) })
+    await act(async () => { root.render(<><CampaignEdit campaignKey="review_request" /><ToastHost /></>) })
     await flush()
     await act(async () => { fireEvent.click(button('配信内容を保存する')!) })
     await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
@@ -167,7 +168,7 @@ describe('V8 NEN配信「配信を直す」（w5pwG）', () => {
 
   it('閲覧のみの人には帯を出し、保存・テスト送信・押せない選ぶ欄を置かない', async () => {
     role.value = 'staff'
-    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) })
+    await act(async () => { root.render(<><CampaignEdit campaignKey="review_request" /><ToastHost /></>) })
     await flush()
     expect(host.textContent).toContain('閲覧のみで見ています')
     expect(button('配信内容を保存する')).toBeUndefined()

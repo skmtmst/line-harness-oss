@@ -8,6 +8,7 @@
  * 下の帯：キャンセル／下書きを保存／保存して公開。
  * 動き（読み込み・保存・公開・409・利用先の確認）は BEHAVIOR.md。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -372,7 +373,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     const savedId = await saveNow()
     if (savedId) autosave.markSaved()
     if (savedId) {
-      notifyToast('下書きを保存しました')
+      notifySaved('下書きを保存しました')
       leave()
     }
   }

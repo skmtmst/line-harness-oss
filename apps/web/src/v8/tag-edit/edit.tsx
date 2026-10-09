@@ -10,6 +10,7 @@
  * 動き（読み込み・保存・さかのぼり反映の確認・競合・削除・保管済み）は今の画面（app/tags/edit-tag-page-v8）と同じ。
  */
 
+import { notifySaved } from '@/components/shared/toast'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -156,7 +157,7 @@ export default function TagEditV8() {
       if (!stillHere()) return
       if (!update.success) throw new Error(update.error)
       saveKeysRef.current.clear(sig)
-      notifyToast(update.data.replayed ? '保存済みでした。' : update.data.queued > 0 ? `保存しました。${update.data.queued}人へ遡及反映を開始しました。` : '保存しました。')
+      notifySaved(update.data.replayed ? '保存済みでした。' : update.data.queued > 0 ? `保存しました。${update.data.queued}人へ遡及反映を開始しました。` : '保存しました。')
       setConflictValues(null)
       await load(true)
     } catch (reason) {

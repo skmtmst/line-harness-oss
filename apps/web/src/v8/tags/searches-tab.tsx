@@ -10,6 +10,7 @@
  * 並べ替えは行の「…」の「上へ動かす・下へ動かす」（つまみで ↑↓ と同じ口）。
  * 絵の下の段のとおり、行の「…」に「複製して保存」を足した（同じ条件で新しく保存する）。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -190,7 +191,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
         isShared: search.isShared,
       })
       if (!res.success) throw new Error(res.error)
-      notifyToast(`「${search.name}のコピー」を保存しました`)
+      notifySaved(`「${search.name}のコピー」を保存しました`)
       void load()
     } catch (reason) {
       setError(reason instanceof ApiError ? `複製できませんでした（${reason.message}）` : '複製できませんでした')

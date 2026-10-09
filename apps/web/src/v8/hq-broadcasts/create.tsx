@@ -11,6 +11,7 @@
  * 読み書きは統括の一括配信の口（API-7 の hq-broadcasts）。店の口（承認・テスト送信・分散・配信後のアクション・
  * 除くタグ・詳細条件）は統括の口に無いので出さない（BEHAVIOR.md の「今の口で出せないもの」）。
  */
+import { notifySaved } from '@/components/shared/toast'
 import BroadcastAccountPicker, { type BroadcastAccount } from './account-picker'
 import { EntityPickerField, EntityPickerSummary } from '@/components/shared/entity-picker'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
@@ -572,7 +573,7 @@ export default function HqBroadcastCreate() {
 
   const saveDraft = async () => {
     const result = await check()
-    if (result) notifyToast('下書きに保存しました')
+    if (result) notifySaved('下書きに保存しました')
   }
 
   /*
@@ -724,7 +725,7 @@ export default function HqBroadcastCreate() {
       await hqTemplatesApi.create({ type: 'template', name, definition }, crypto.randomUUID())
       setSaveTplOpen(false)
       setCarousels(null)
-      notifyToast(`テンプレート「${name}」に保存しました`)
+      notifySaved(`テンプレート「${name}」に保存しました`)
     } catch (caught) {
       setSaveTplError(errorText(caught, 'テンプレートに保存できませんでした。もう一度お試しください。'))
     } finally {

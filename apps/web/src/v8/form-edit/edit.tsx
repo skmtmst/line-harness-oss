@@ -9,6 +9,7 @@
  * 競合・試しのURLは今までの画面（app/form-submissions/edit/page.tsx）と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -663,13 +664,11 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         setPublishedContentRevision(published.data.contentRevision)
         setIsActive(true)
         const message = published.data.replayed ? 'この版は公開済みです' : 'この版を公開しました'
-        setNotice(message)
-        notifyToast(message)
+        notifySaved(message)
         savedSnapshot.current = JSON.stringify({ ...current, isActive: true })
       } else {
         if (!silent) {
-          setNotice(publishedVersionId ? '下書きを保存しました。公開中の内容は変わっていません' : '下書きを保存しました')
-          notifyToast('下書きを保存しました')
+          notifySaved('下書きを保存しました')
         }
         savedSnapshot.current = reconciledOwnSave
           ? JSON.stringify({

@@ -1,5 +1,6 @@
 'use client'
 
+import { notifySaved } from '@/components/shared/toast'
 import { Th } from '@/components/shared/table'
 
 /*
@@ -228,7 +229,7 @@ export default function AssignMatrixV8() {
       await putGrid(grid)
       setSavedGrid(grid)
       flashDone()
-      notifyToast('保存しました', {
+      notifySaved('保存しました', {
         actionLabel: '元に戻す',
         onAction: () => void undoSave(before, grid),
       })
@@ -580,7 +581,7 @@ export default function AssignMatrixV8() {
                   // WEB061：保存の失敗で保存を押せなくしない（やり直せるように）。止めるのは読み込みの失敗だけ。
                   disabled={saving || !selectedAccountId || loading || loadFailed}
                   busy={saving}
-                  done={saveDone}
+
                 >
                   <Check size={15} aria-hidden="true" />保存
                 </Button>

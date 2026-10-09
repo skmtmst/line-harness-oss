@@ -9,6 +9,7 @@
  * 口・保存の決まり（全部外すときの確認・止めるのは保存してから効く・離れるときの確認・競合の読み直し）は
  * 今の部品（app/ec-commerce/connector-panel.tsx）と同じ。
  */
+import { notifySaved } from '@/components/shared/toast'
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { EC_EVENT_LABELS, type EcEventType } from '@line-crm/shared'
@@ -157,7 +158,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
       if (accountRef.current !== accountAtSave) return
       if (!response.success) throw new Error('save_failed')
       setForm((current) => ({ ...current, inboundSecret: '', expectedVersion: response.data.version }))
-      setNotice({ tone: 'success', text: 'つなぎ先の設定を保存しました。' })
+      notifySaved('つなぎ先の設定を保存しました。')
       await load()
     } catch (error) {
       if (accountRef.current !== accountAtSave) return

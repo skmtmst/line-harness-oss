@@ -1,5 +1,6 @@
 'use client'
 
+import { notifySaved } from '@/components/shared/toast'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Eye, UserPlus, X } from 'lucide-react'
 import Link from 'next/link'
@@ -860,7 +861,7 @@ function StaffPageHost() {
   const openPermissions = (user: AccessUserItem) => { setPermissionTarget(user) }
   const finishPermissionSave = async () => {
     await load()
-    notifyToast('見せる範囲を保存しました。対象者のすべてのログインを終了したため、新しい権限で使うにはもう一度ログインが必要です。')
+    notifySaved('見せる範囲を保存しました。対象者のすべてのログインを終了したため、新しい権限で使うにはもう一度ログインが必要です。')
   }
   // R499: 他者が先に変えていたら上書きせず、一覧の最新へ戻して知らせる。
   const handlePermissionConflict = async () => {

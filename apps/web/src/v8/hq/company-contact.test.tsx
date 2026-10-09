@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -20,9 +21,9 @@ const values = {legalCompanyName:'株式会社テスト',postalCode:'1500001',ad
 const field = (label: string) => screen.getByLabelText(new RegExp(`^${label.replace(/[（ ）]/g,'\\$&')}`)) as HTMLInputElement
 const submit = () => fireEvent.submit(screen.getByRole('form',{name:'会社と連絡先'}))
 const loaded = () => waitFor(()=>expect(field('会社名（正式）').value).toBe(values.legalCompanyName))
-const renderCard = async (canEdit=true) => {render(<CompanyContactCard canEdit={canEdit}/>);await loaded()}
+const renderCard = async (canEdit=true) => {render(<><CompanyContactCard canEdit={canEdit}/><ToastHost /></>);await loaded()}
 
-beforeEach(()=>{
+beforeEach(()=>{clearToastsForTest();
   vi.resetAllMocks();mocks.role='owner'
   mocks.read.mockResolvedValue({success:true,data:{...values,revision:4}})
   mocks.save.mockResolvedValue({success:true,data:{...values,revision:5}})
@@ -125,11 +126,11 @@ describe('会社と連絡先の画面の動き',()=>{
   it('郵便番号データ未登録・検索失敗でも住所を保持して保存できる',async()=>{
     mocks.postal.mockResolvedValueOnce({success:true,data:{candidates:[],readiness:{fullDataset:false}}})
     await renderCard();fireEvent.click(screen.getByRole('button',{name:'住所を探す'}))
-    await waitFor(()=>expect(screen.getByRole('status').textContent).toContain('全データが未登録'))
+    await waitFor(()=>expect(screen.getByText(/全データが未登録/).textContent).toContain('全データが未登録'))
     expect(field('住所').value).toBe(values.address)
     mocks.postal.mockRejectedValueOnce(new Error('検索失敗'))
     fireEvent.click(screen.getByRole('button',{name:'住所を探す'}))
-    await waitFor(()=>expect(screen.getByRole('status').textContent).not.toContain('全データが未登録'))
+    await waitFor(()=>expect(screen.queryByText(/全データが未登録/)).toBeNull())
     expect(field('住所').value).toBe(values.address)
     submit();await waitFor(()=>expect(mocks.save).toHaveBeenCalledTimes(1))
   })
