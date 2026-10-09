@@ -37,6 +37,7 @@ import { Stat, StatRow } from '../common-a/parts'
 import { errorMessage, formatShortStamp, reviewReceivedAt } from './format'
 import type { GoogleNav } from './google'
 import styles from './google.module.css'
+import TextLink from '@/components/shared/text-link'
 
 const STATE_OPTIONS: Array<{ value: GoogleReviewFilter; label: string }> = [
   { value: 'all', label: '状態：すべて' },
@@ -362,7 +363,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
               <span className={styles.reviewMetaName}>{reviewer}</span>
               <Stars rating={review.starRating} small />
               <span className={styles.reviewMetaDate}>{formatShortStamp(reviewReceivedAt(review))}</span>
-              <a href={sourceUrl} target="_blank" rel="noreferrer" className={styles.textLink}>Googleで原文を確認</a>
+              <TextLink external href={sourceUrl}   className={styles.textLink}>Googleで原文を確認</TextLink>
             </p>
             <p className={styles.reviewText}>{review.comment ?? '（本文なし・評価のみ）'}</p>
             {alreadyReplied && (review.replyComment || done) ? (

@@ -56,7 +56,7 @@ function Field({ label, required, help, error, children }: { label: string; requ
 /** マニュアルへの道。URL が決まるまで（空文字）は押せない形で出す（今の画面は出さなかった）。 */
 function ManualButton({ href, children }: { href: string; children: ReactNode }) {
   return href
-    ? <Button href={href} target="_blank" rel="noreferrer" className={styles.helpButton}><BookOpen aria-hidden className={styles.icon15} />{children}</Button>
+    ? <Button external href={href}   className={styles.helpButton}><BookOpen aria-hidden className={styles.icon15} />{children}</Button>
     : <Button disabled title="マニュアルの場所はまだ決まっていません" className={styles.helpButton}><BookOpen aria-hidden className={styles.icon15} />{children}</Button>
 }
 
@@ -267,7 +267,7 @@ export default function StoreNewV8() {
                 <div className={styles.termsRow}>
                   {disabledReason ? <p className={styles.reason}>{disabledReason}</p> : null}
                   <span className={styles.spacer} aria-hidden="true" />
-                  <Button href="/restaurant-test/terms"><ExternalLink aria-hidden className={styles.icon15} />利用規約を別画面で読む</Button>
+                  <Button external href="/restaurant-test/terms">利用規約を別画面で読む</Button>
                 </div>
                 <Checkbox checked={termsChecked} disabled={!readToEnd || agreeing} onCheckedChange={setTermsChecked}>上記の利用規約および個人情報の取扱いに同意します</Checkbox>
                 {agreeError ? <p role="alert" className={styles.error}>{agreeError}</p> : null}

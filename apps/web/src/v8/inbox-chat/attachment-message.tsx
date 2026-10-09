@@ -9,6 +9,7 @@
 import { Download, FileText } from 'lucide-react'
 import { formatExpiry, formatSize, parseSentAttachment } from './attachments'
 import styles from './inbox-chat.module.css'
+import TextLink from '@/components/shared/text-link'
 
 export default function AttachmentMessage({ messageType, content }: { messageType: string; content: string }) {
   const view = parseSentAttachment(messageType, content)
@@ -38,7 +39,7 @@ export default function AttachmentMessage({ messageType, content }: { messageTyp
     </>
   )
   return view.url ? (
-    <a className={styles.sentFile} href={view.url} target="_blank" rel="noreferrer noopener" aria-label={`${view.name} を開く`}>{body}</a>
+    <TextLink external className={styles.sentFile} href={view.url}   aria-label={`${view.name} を開く`}>{body}</TextLink>
   ) : (
     <span className={styles.sentFile}>{body}</span>
   )

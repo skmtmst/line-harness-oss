@@ -278,8 +278,8 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
         </div>
         {ctx.canOpenPublicPage && ctx.publicUrl ? (
           <div className={form.previewActions}>
-            <Button href={ctx.publicUrl} target="_blank" rel="noreferrer"><Monitor size={15} aria-hidden="true" />PC で見る</Button>
-            <Button href={ctx.publicUrl} target="_blank" rel="noreferrer"><Smartphone size={15} aria-hidden="true" />スマホで見る</Button>
+            <Button external href={ctx.publicUrl}  ><Monitor size={15} aria-hidden="true" />PC で見る</Button>
+            <Button external href={ctx.publicUrl}  ><Smartphone size={15} aria-hidden="true" />スマホで見る</Button>
           </div>
         ) : ctx.publicPageReason ? <p className={form.previewNote}>{ctx.publicPageReason}</p> : null}
       </>}

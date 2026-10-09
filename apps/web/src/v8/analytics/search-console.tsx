@@ -120,7 +120,7 @@ export default function SearchConsoleV8() {
   const settingsSiteUrl = data?.siteUrl ?? setup?.siteUrl
   const settingsHref = settingsSiteUrl ? `https://search.google.com/search-console/users?resource_id=${encodeURIComponent(settingsSiteUrl)}` : null
   const periodControl = <PeriodPicker days={days} onChange={(value) => setDays(value as RangeDays)} supportedDays={RANGES} />
-  const settingsButton = settingsHref ? <Button variant="secondary" href={settingsHref} target="_blank" rel="noreferrer"><SlidersHorizontal size={15} aria-hidden="true" />連携を設定</Button> : null
+  const settingsButton = settingsHref ? <Button external variant="secondary" href={settingsHref}  ><SlidersHorizontal size={15} aria-hidden="true" />連携を設定</Button> : null
   const maxDaily = Math.max(1, ...(data?.daily ?? []).map((row) => row.clicks))
   const middle = data ? data.daily[Math.floor(data.daily.length / 2)] : null
 

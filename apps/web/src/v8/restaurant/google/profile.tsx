@@ -21,6 +21,7 @@ import { restaurantGoogleApi, type GoogleHoursProposal, type GoogleProfileAddres
 import { errorMessage, formatPeriods, formatStampFull, formatYmdShort, summarizeWeekly, TIME_OPTIONS } from './format'
 import type { GoogleNav } from './google'
 import styles from './google.module.css'
+import TextLink from '@/components/shared/text-link'
 
 function addressText(a: GoogleProfileAddress | null | undefined): string {
   if (!a) return '—'
@@ -171,7 +172,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
                 return (
                   <div key={f.mask} className={styles.diffItem}>
                     <dt className={styles.fieldLabel}>{f.label}</dt>
-                    <dd className={styles.muted}>この項目はこの画面で比較できません。<a href="https://business.google.com/" target="_blank" rel="noreferrer" className={styles.textLink}>Googleの管理画面で確認する</a></dd>
+                    <dd className={styles.muted}>この項目はこの画面で比較できません。<TextLink external href="https://business.google.com/"   className={styles.textLink}>Googleの管理画面で確認する</TextLink></dd>
                   </div>
                 )
               }

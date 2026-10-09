@@ -45,6 +45,7 @@ import {
 } from './model'
 import styles from './detail.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import TextLink from '@/components/shared/text-link'
 
 /** 表にまず見せる行数。残りは「ほか N か所を見る」で開く。 */
 const USAGE_VISIBLE = 4
@@ -312,7 +313,7 @@ export default function TemplateDetailV8() {
       <span className={row.fixed ? styles.usageVersionFixed : styles.usageVersion} title={row.version}>{row.version}</span>
       <span className={styles.usageState}>{row.status ?? '—'}</span>
       {row.href
-        ? <Link href={row.href} className={styles.ghostButton}><ExternalLink size={14} aria-hidden="true" />開く</Link>
+        ? <TextLink external href={row.href} className={styles.ghostButton}>開く</TextLink>
         : <span className={styles.ghostSpacer} aria-hidden="true" />}
     </div>
   )
@@ -572,7 +573,7 @@ export default function TemplateDetailV8() {
               <span className={styles.usageKind}>{row.kind}</span>
               <span className={styles.dialogName} title={row.name}>{row.name}</span>
               {row.href
-                ? <Link href={row.href} className={styles.ghostButton}><ExternalLink size={14} aria-hidden="true" />開いて差し替える</Link>
+                ? <TextLink external href={row.href} className={styles.ghostButton}>開いて差し替える</TextLink>
                 : <span className={styles.dialogState}>開ける画面がありません</span>}
             </div>
           ))}

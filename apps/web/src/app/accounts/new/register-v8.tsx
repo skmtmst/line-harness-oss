@@ -26,6 +26,7 @@ import { RequiredBadge } from '@/components/shared/form-controls'
 import { canSave, toSteps } from '../connection-check-view'
 import { isDuplicateChannelError, matchRegisteredAccountId } from './account-recovery'
 import styles from './register-v8.module.css'
+import TextLink from '@/components/shared/text-link'
 
 const V8_STEPS = [
   { number: 1, label: 'LINE準備', designNode: 'xj3zz' },
@@ -618,11 +619,11 @@ export default function RegisterV8() {
                       ? 'LINE Developers で Messaging API と LINE Login のチャネルが同じプロバイダーにあることを確かめます。'
                       : 'LINE公式アカウントを作ってから、同じプロバイダー内に Messaging API と LINE Login のチャネルを用意します。'}
                     <br />
-                    <a href="https://developers.line.biz/console/" target="_blank" rel="noreferrer" className="text-action font-semibold hover:underline">LINE Developers を開く</a>
+                    <TextLink external href="https://developers.line.biz/console/"   className="text-action font-semibold hover:underline">LINE Developers を開く</TextLink>
                     {accountMethod === 'new' && (
-                      <>　<a href="https://manager.line.biz/" target="_blank" rel="noreferrer" className="text-action font-semibold hover:underline">LINE公式アカウントを作る（LINE Official Account Manager）</a></>
+                      <>　<TextLink external href="https://manager.line.biz/"   className="text-action font-semibold hover:underline">LINE公式アカウントを作る（LINE Official Account Manager）</TextLink></>
                     )}
-                    　<a href="/manuals/line-connect/index.html#m1" target="_blank" rel="noreferrer" className="text-action font-semibold hover:underline">マニュアルを見る</a>
+                    　<TextLink external href="/manuals/line-connect/index.html#m1"   className="text-action font-semibold hover:underline">マニュアルを見る</TextLink>
                   </div>
                   <p className={styles.fieldHelp}>3番が終わるまでに、チャネルIDとシークレットが要ります。4番では自動で接続を確かめます。</p>
                 </div>
@@ -640,7 +641,7 @@ export default function RegisterV8() {
                       <label className={styles.fieldLabel} htmlFor="v8-channel-id">Messaging API のチャネルID<RequiredBadge /></label>
                       <input id="v8-channel-id" className={styles.fieldInput} value={form.channelId} onChange={(event) => update('channelId', event.target.value)} inputMode="numeric" required aria-invalid={fieldErrors.channelId ? true : undefined} />
                       {fieldErrors.channelId && <p className={styles.fieldError}>{fieldErrors.channelId}</p>}
-                      <p className={styles.fieldHelp}>LINE Developers の Messaging API チャネルで取得　<a href="/manuals/line-connect/index.html#m1" target="_blank" rel="noreferrer" className="text-action font-semibold hover:underline">取得方法を見る</a></p>
+                      <p className={styles.fieldHelp}>LINE Developers の Messaging API チャネルで取得　<TextLink external href="/manuals/line-connect/index.html#m1"   className="text-action font-semibold hover:underline">取得方法を見る</TextLink></p>
                     </div>
                     <div>
                       <label className={styles.fieldLabel} htmlFor="v8-channel-secret">Messaging API のチャネルシークレット<RequiredBadge /></label>
@@ -651,7 +652,7 @@ export default function RegisterV8() {
                       <label className={styles.fieldLabel} htmlFor="v8-login-channel-id">LINE Login のチャネルID<RequiredBadge /></label>
                       <input id="v8-login-channel-id" className={styles.fieldInput} value={form.loginChannelId} onChange={(event) => update('loginChannelId', event.target.value)} inputMode="numeric" required aria-invalid={fieldErrors.loginChannelId ? true : undefined} />
                       {fieldErrors.loginChannelId && <p className={styles.fieldError}>{fieldErrors.loginChannelId}</p>}
-                      <p className={styles.fieldHelp}>LIFF は自動で作ります。Messaging API と同じプロバイダーのチャネル　<a href="/manuals/line-connect/index.html#m2" target="_blank" rel="noreferrer" className="text-action font-semibold hover:underline">取得方法を見る</a></p>
+                      <p className={styles.fieldHelp}>LIFF は自動で作ります。Messaging API と同じプロバイダーのチャネル　<TextLink external href="/manuals/line-connect/index.html#m2"   className="text-action font-semibold hover:underline">取得方法を見る</TextLink></p>
                     </div>
                     <div>
                       <label className={styles.fieldLabel} htmlFor="v8-login-channel-secret">LINE Login のチャネルシークレット<RequiredBadge /></label>
@@ -713,7 +714,7 @@ export default function RegisterV8() {
                       <p className={styles.endpointValue}>{callbackUrl}</p>
                       <CopyButton value={callbackUrl} />
                     </div>
-                    <p className={styles.fieldHelp}>LINE Login → Callback URL <a href="/manuals/line-connect/index.html#m3" target="_blank" rel="noreferrer" className="text-action font-semibold hover:underline">設定方法を見る</a></p>
+                    <p className={styles.fieldHelp}>LINE Login → Callback URL <TextLink external href="/manuals/line-connect/index.html#m3"   className="text-action font-semibold hover:underline">設定方法を見る</TextLink></p>
                   </div>
                 </div>
               </section>

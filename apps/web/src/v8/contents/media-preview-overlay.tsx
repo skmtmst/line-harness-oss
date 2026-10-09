@@ -3,6 +3,7 @@
 /* ★V8 写し：src/app/contents/media-preview-overlay.tsx から写した（src/v8 は src/app を import しない決まり）。中身は同じ。直すときは両方を直す。 */
 
 import Dialog from '@/components/shared/dialog'
+import TextLink from '@/components/shared/text-link'
 
 /*
  * メディアのプレビュー。全面の暗い幕の上に中身だけを出す。
@@ -34,9 +35,9 @@ export default function MediaPreviewOverlay({
       ) : (
         <div className="rounded-card bg-canvas p-6 text-center text-sm">
           <p className="text-ink font-medium">{filename}</p>
-          <a href={src} target="_blank" rel="noreferrer" className="text-info mt-2 inline-block hover:underline">
+          <TextLink external href={src}   className="text-info mt-2 inline-block hover:underline">
             別のタブで開く
-          </a>
+          </TextLink>
         </div>
       )}
   </Dialog>

@@ -354,7 +354,7 @@ function BillingInner() {
                 </span>
                 <span role="cell">
                   {inv.hostedUrl ? (
-                    <Button href={inv.hostedUrl} target="_blank" rel="noreferrer">
+                    <Button external href={inv.hostedUrl}  >
                       <Download aria-hidden="true" className={styles.buttonIcon} />領収書
                     </Button>
                   ) : (

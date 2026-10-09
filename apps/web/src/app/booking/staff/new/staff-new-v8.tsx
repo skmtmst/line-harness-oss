@@ -35,6 +35,7 @@ import { menuPriceLabel } from '../../lib/menu-price'
 import { LiffPhoneStaffStep } from '../../menus/liff-phone-v8'
 import shell from '../../menus/settings-v8.module.css'
 import styles from './staff-new-v8.module.css'
+import TextLink from '@/components/shared/text-link'
 
 export default function StaffNewV8() {
   const { selectedAccountId, selectedAccount } = useAccount()
@@ -580,7 +581,7 @@ export default function StaffNewV8() {
           </div>
           <p className={shell.sideLineLink}>
             {previewUrl
-              ? <a href={previewUrl} target="_blank" rel="noreferrer">実際の画面で確かめる ↗</a>
+              ? <TextLink external href={previewUrl}  >実際の画面で確かめる</TextLink>
               : 'このアカウントには予約画面のURLがまだありません'}
           </p>
         </aside>

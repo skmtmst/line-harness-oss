@@ -137,7 +137,7 @@ export default function ReviewV8({ webinar, editor, registrations, ctaCount, onP
       <p className="text-ink mt-3 truncate text-sm" title={webinar.title}>{webinar.title}</p>
       <p className="text-ink-secondary mt-3 text-xs">{reviewTestSummaryBody(validation, validationState)}</p>
       <p className="text-ink-faint mt-3 text-xs">{reviewMonitoringText(monitoringFailures)}・{registrations === null ? '申込人数—' : `申込人数 ${formatNumber(registrations)}人`}</p>
-      {canOpenPublicPage && publicUrl ? <Button className="mt-3" href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : <p className="text-ink-faint mt-3 text-xs">{publicPageReason || '公開すると、友だちが見るページを確認できます。'}</p>}
+      {canOpenPublicPage && publicUrl ? <Button external className="mt-3" href={publicUrl}  >公開ページを見る</Button> : <p className="text-ink-faint mt-3 text-xs">{publicPageReason || '公開すると、友だちが見るページを確認できます。'}</p>}
     </aside>
     <StickyBar actions={<><Button href="/webinars">キャンセル</Button>{onBack ? <Button onClick={onBack} disabled={publishing || testing}>通知へ戻る</Button> : null}<Button variant="primary" disabled={!canPublish} busy={publishing} busyLabel="公開中…" onClick={() => void publish()}>この版を公開</Button></>} />
   </div>

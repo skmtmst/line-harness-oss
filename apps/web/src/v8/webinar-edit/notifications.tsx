@@ -314,7 +314,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
         </LinePreview>
         <div className={form.previewActions}>
           {readOnly ? null : <Button onClick={() => setTestOpen(true)} disabled={testing || saving || testDone || !settings} busy={testing} busyLabel="送信中…">{testDone ? 'テスト送信済み' : 'テストを送る'}</Button>}
-          {ctx.canOpenPublicPage && ctx.publicUrl ? <Button href={ctx.publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : null}
+          {ctx.canOpenPublicPage && ctx.publicUrl ? <Button external href={ctx.publicUrl}  >公開ページを見る</Button> : null}
         </div>
         {!ctx.canOpenPublicPage && ctx.publicPageReason ? <p className={form.previewNote}>{ctx.publicPageReason}</p> : null}
       </>}

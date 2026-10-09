@@ -31,6 +31,7 @@ import { FieldError } from '@/components/shared/form-controls'
 import parts from './parts.module.css'
 import styles from './support.module.css'
 import { Field } from '@/components/shared/form-controls'
+import TextLink from '@/components/shared/text-link'
 
 /**
  * 運営のお問い合わせ V8（絵 `P0jhqO`・代わりに起票 `Izau1`）。
@@ -612,9 +613,9 @@ function Message({ mine, author, body, attachments }: { mine: boolean; author: s
       {attachments.length > 0 ? (
         <span className={styles.attachments}>
           {attachments.map((a) => (
-            <a key={a.key} href={a.url} target="_blank" rel="noreferrer" className={parts.textLink}>
+            <TextLink external key={a.key} href={a.url}   className={parts.textLink}>
               <Paperclip aria-hidden="true" />{`${a.name}（${mine ? '運営から' : '契約先から'}）`}
-            </a>
+            </TextLink>
           ))}
         </span>
       ) : null}

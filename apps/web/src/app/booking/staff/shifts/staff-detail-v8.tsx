@@ -47,6 +47,7 @@ import { LiffPhoneDatetimeStep } from '../../menus/liff-phone-v8'
 import shell from '../../menus/settings-v8.module.css'
 import styles from './staff-detail-v8.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import TextLink from '@/components/shared/text-link'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -1301,7 +1302,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
           </div>
           <p className={shell.sideLineLink}>
             {previewUrl
-              ? <a href={previewUrl} target="_blank" rel="noreferrer">実際の画面で確かめる ↗</a>
+              ? <TextLink external href={previewUrl}  >実際の画面で確かめる</TextLink>
               : 'このアカウントには予約画面のURLがまだありません'}
           </p>
           {!hasActiveMenu ? (

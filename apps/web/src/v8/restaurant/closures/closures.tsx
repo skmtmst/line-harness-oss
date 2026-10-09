@@ -255,7 +255,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
               </p>
             </div>
             {firstMedium?.loginUrl ? (
-              <Button href={firstMedium.loginUrl} target="_blank" rel="noopener noreferrer">{`${firstMedium.name}の管理画面を開く ↗`}</Button>
+              <Button external href={firstMedium.loginUrl}  >{`${firstMedium.name}の管理画面を開く`}</Button>
             ) : null}
             {canWrite ? (
               <Button onClick={() => void closeOne(firstItem)} disabled={busy === firstItem.id} aria-label={`${nameOf(firstItem.channel)}の枠を閉じた`}>

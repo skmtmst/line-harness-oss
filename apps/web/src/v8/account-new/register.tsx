@@ -466,9 +466,9 @@ export default function AccountRegisterV8() {
                   <p>・Messaging API と LINE Login は同じプロバイダーで作成してください<br />・Webhook の利用は LINE Developers でオンにしてください</p>
                 </Card>
                 <div className={styles.buttonRow}>
-                  <Button href="https://manager.line.biz/" target="_blank" rel="noreferrer"><ExternalLink size={15} aria-hidden="true" />LINE公式アカウントを作る</Button>
-                  <Button href="https://developers.line.biz/console/" target="_blank" rel="noreferrer"><ExternalLink size={15} aria-hidden="true" />LINE Developersを開く</Button>
-                  <Button href={`${MANUAL}#m1`} target="_blank" rel="noreferrer"><BookOpen size={15} aria-hidden="true" />全手順を見る</Button>
+                  <Button external href="https://manager.line.biz/"  >LINE公式アカウントを作る</Button>
+                  <Button external href="https://developers.line.biz/console/"  >LINE Developersを開く</Button>
+                  <Button external href={`${MANUAL}#m1`}  ><BookOpen size={15} aria-hidden="true" />全手順を見る</Button>
                 </div>
               </Card>
               <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" role="complementary" aria-label="この5段でやること">
@@ -506,7 +506,7 @@ export default function AccountRegisterV8() {
                 </div>
                 <div className={styles.secretRow}>
                   <span className={styles.secretNote}><Lock size={14} aria-hidden="true" />秘密値は保存後に画面へ表示されません。</span>
-                  <Button href={`${MANUAL}#m1`} target="_blank" rel="noreferrer"><CircleHelp size={15} aria-hidden="true" />取得方法を見る</Button>
+                  <Button external href={`${MANUAL}#m1`}  ><CircleHelp size={15} aria-hidden="true" />取得方法を見る</Button>
                 </div>
               </Card>
               <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" role="complementary" aria-label="どこにある？">
@@ -631,7 +631,7 @@ export default function AccountRegisterV8() {
               )}
               <p className={styles.groupLabel}>次にすること</p>
               <div className={styles.buttonRow}>
-                <Button href={`/accounts/detail?id=${encodeURIComponent(createdId)}`}><ArrowUpRight size={15} aria-hidden="true" />登録したアカウントを見る</Button>
+                <Button external href={`/accounts/detail?id=${encodeURIComponent(createdId)}`}>登録したアカウントを見る</Button>
                 <Button href="/friends"><Users size={15} aria-hidden="true" />友だち一覧</Button>
                 <Button href="/friend-add-settings"><QrCode size={15} aria-hidden="true" />友だち追加URL・QR</Button>
                 <Button href="/emergency"><Activity size={15} aria-hidden="true" />運用状態の接続監視</Button>

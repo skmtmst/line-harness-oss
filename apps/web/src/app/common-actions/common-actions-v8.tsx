@@ -361,8 +361,8 @@ export function V8CommonActionsTab({
                   </td>
                   <td>
                     <div className={styles.rowActions}>
-                      <Button href={`/common-actions/versions?id=${encodeURIComponent(item.id)}`} variant="secondary" size="compact">
-                        中身を見る <ExternalLink size={14} aria-hidden />
+                      <Button external href={`/common-actions/versions?id=${encodeURIComponent(item.id)}`} variant="secondary" size="compact">
+                        中身を見る 
                       </Button>
                       {canManage ? (
                         <>

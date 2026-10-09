@@ -38,6 +38,7 @@ import {
 import { shortDateTime } from './words'
 import styles from './sheets.module.css'
 import { Field } from '@/components/shared/form-controls'
+import TextLink from '@/components/shared/text-link'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -347,9 +348,9 @@ export default function WebhooksSheetsV8() {
           <span className={styles.statusLabel}>書き出し先</span>
           <span className={styles.spacer} aria-hidden="true" />
           {connection?.spreadsheetUrl ? (
-            <a href={connection.spreadsheetUrl} target="_blank" rel="noopener noreferrer" className={styles.statusValue}>
+            <TextLink external href={connection.spreadsheetUrl}   className={styles.statusValue}>
               {`${connection.spreadsheetTitle ?? connection.spreadsheetUrl}（シート：友だち・フォーム回答）`}
-            </a>
+            </TextLink>
           ) : (
             <span className={styles.statusValue}>まだ決めていません</span>
           )}

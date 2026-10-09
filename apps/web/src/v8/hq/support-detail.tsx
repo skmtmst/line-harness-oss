@@ -36,6 +36,7 @@ import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import { SUPPORT_STATUS_WORDS, supportKindWord, supportTime } from './support-words'
 import styles from './support-detail.module.css'
 import { Field } from '@/components/shared/form-controls'
+import TextLink from '@/components/shared/text-link'
 
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
 
@@ -311,10 +312,10 @@ function Message({ mine, author, at, body, attachments }: { mine: boolean; autho
       {files.length > 0 ? (
         <span className={styles.files}>
           {files.map((a) => (
-            <a key={a.key} href={a.url} target="_blank" rel="noreferrer" className={styles.file}>
+            <TextLink external key={a.key} href={a.url}   className={styles.file}>
               <Paperclip aria-hidden="true" className={styles.smallIcon} />
               {(a.key ?? '').split('/').pop()}
-            </a>
+            </TextLink>
           ))}
         </span>
       ) : null}

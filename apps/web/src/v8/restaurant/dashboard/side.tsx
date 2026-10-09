@@ -55,8 +55,8 @@ export function SidePanel({ media, google, latestReview, canWrite, now }: {
             <li key={m.code} className={styles.medium}>
               <span className={styles.mediumMark} aria-hidden="true">{m.name.slice(0, 1)}</span>
               <span className={styles.mediumName} title={m.name}>{m.name}</span>
-              {m.storePageUrl ? <a className={styles.mediumLink} href={m.storePageUrl} target="_blank" rel="noopener noreferrer">店舗ページ ↗</a> : null}
-              {m.adminUrl ? <a className={styles.mediumLink} href={m.adminUrl} target="_blank" rel="noopener noreferrer">管理画面 ↗</a> : null}
+              {m.storePageUrl ? <TextLink external className={styles.mediumLink} href={m.storePageUrl}  >店舗ページ</TextLink> : null}
+              {m.adminUrl ? <TextLink external className={styles.mediumLink} href={m.adminUrl}  >管理画面</TextLink> : null}
             </li>
           ))}
         </ul>

@@ -125,7 +125,7 @@ export default function NotificationsV8({ webinarId, webinarTitle, editor, onEdi
       <aside aria-label="LINEでの見え方">
         <h2 className="text-ink mb-3 text-base font-semibold">LINEでの見え方</h2>
         <LinePreview><div className="bg-canvas text-ink rounded-control p-3 text-sm">{preview || '通知の本文を入れると、ここに出ます。'}</div></LinePreview>
-        <div className="mt-3 flex flex-wrap justify-center gap-2">{testButton('テストを送る')}{canOpenPublicPage && publicUrl ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : publicPageReason ? <Button disabled title={publicPageReason}>公開ページを見る</Button> : null}</div>
+        <div className="mt-3 flex flex-wrap justify-center gap-2">{testButton('テストを送る')}{canOpenPublicPage && publicUrl ? <Button external href={publicUrl}  >公開ページを見る</Button> : publicPageReason ? <Button disabled title={publicPageReason}>公開ページを見る</Button> : null}</div>
         {publicPageReason && !canOpenPublicPage ? <p className="text-ink-faint mt-2 text-xs">{publicPageReason}</p> : null}
       </aside>
       <ConfirmDialog open={testConfirmOpen} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" busy={testing} onCancel={() => { if (!testing) setTestConfirmOpen(false) }} onConfirm={() => void runTest()}><p className="text-ink-secondary text-xs">{dirty ? '未保存の設定を保存してから送ります。' : ''}対象：「{webinarTitle}」の有効な通知。本文は設定済みのものを送ります。</p></ConfirmDialog>

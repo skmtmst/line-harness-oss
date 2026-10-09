@@ -70,6 +70,7 @@ import { FormEditAttemptContext } from './field-issues'
 import { focusFieldById } from '@/lib/use-form-errors'
 import { FormPhone } from './phone'
 import styles from './edit.module.css'
+import TextLink from '@/components/shared/text-link'
 
 const TAB_ITEMS: { key: EditTab; label: string }[] = [
   { key: 'content', label: '中身' },
@@ -827,7 +828,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             </div>
             {testError ? <p role="alert" className={styles.urlError}>{testError}</p> : null}
             {testUrl ? (
-              <a href={testUrl} target="_blank" rel="noreferrer" className={styles.urlLink}>試しのURLを開く</a>
+              <TextLink external href={testUrl}   className={styles.urlLink}>試しのURLを開く</TextLink>
             ) : null}
           </>
         ) : (

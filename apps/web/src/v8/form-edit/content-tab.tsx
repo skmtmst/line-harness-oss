@@ -36,6 +36,7 @@ import UriTapActionField from '@/components/shared/uri-tap-action-field'
 import { FieldError } from '@/components/shared/form-controls'
 import { useFormEditAttempted } from './field-issues'
 import styles from './edit.module.css'
+import TextLink from '@/components/shared/text-link'
 
 type Props = {
   layout: FormLayout
@@ -457,10 +458,10 @@ function BookingFields({ block, refs, set }: { block: FormInputBlock; refs: Form
       <div className={styles.bookingInfo}>
         <CalendarCheck size={16} aria-hidden="true" className={styles.bookingInfoIcon} />
         <p className={styles.bookingInfoText}>空いている枠は「予約」の営業時間と担当の予定から出します。入った予約は予約の一覧に入り、リマインダも動きます。</p>
-        <Link href="/booking/menus" className={styles.bookingLink}>
-          <ExternalLink size={15} aria-hidden="true" />
+        <TextLink external href="/booking/menus" className={styles.bookingLink}>
+          
           予約の設定を開く
-        </Link>
+        </TextLink>
       </div>
     </>
   )

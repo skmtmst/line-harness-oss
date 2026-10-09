@@ -28,6 +28,7 @@ import {
 } from './media-direct-upload'
 import { formatDateTime } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
+import TextLink from '@/components/shared/text-link'
 
 /** 版追加を止めた理由を、互換基準ごとに運用者へ説明する。 */
 function versionBlockerText(blockers: MediaVersionBlocker[]): string {
@@ -451,7 +452,7 @@ export default function MediaDetailDialog({
             ) : item.kind === 'audio' ? (
               <audio src={displaySrc} controls />
             ) : (
-              <a href={displaySrc} target="_blank" rel="noreferrer" className="text-action text-sm font-semibold">PDFを開く</a>
+              <TextLink external href={displaySrc}   className="text-action text-sm font-semibold">PDFを開く</TextLink>
             )}
           </div>
 

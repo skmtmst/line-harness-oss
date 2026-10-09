@@ -39,6 +39,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './screen.module.css'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
+import TextLink from '@/components/shared/text-link'
 
 export type MediaRow = {
   code: string
@@ -127,9 +128,9 @@ export function withSavedVersion(list: MediaRow[], code: string, version: number
 function UrlCell({ url }: { url: string | null }) {
   if (!url) return <span className={styles.none}>—</span>
   return (
-    <a className={styles.url} href={url} target="_blank" rel="noopener noreferrer" title={url}>
-      {`${shortUrl(url)} ↗`}
-    </a>
+    <TextLink external className={styles.url} href={url}   title={url}>
+      {`${shortUrl(url)}`}
+    </TextLink>
   )
 }
 

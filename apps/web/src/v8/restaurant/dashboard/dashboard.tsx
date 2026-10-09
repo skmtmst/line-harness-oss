@@ -149,7 +149,7 @@ function TodayStore() {
                 </p>
               </div>
               {firstMedium?.adminUrl ? (
-                <Button href={firstMedium.adminUrl} target="_blank" rel="noopener noreferrer">{`${firstMedium.name}の管理画面を開く ↗`}</Button>
+                <Button external href={firstMedium.adminUrl}  >{`${firstMedium.name}の管理画面を開く`}</Button>
               ) : null}
               {canWrite && firstItem ? (
                 <Button onClick={() => void closeOne(firstItem.id, firstItem.name)} disabled={busyId === firstItem.id} aria-label={`${firstItem.name}の枠を閉じた`}>

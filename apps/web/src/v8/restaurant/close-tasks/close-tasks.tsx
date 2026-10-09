@@ -161,7 +161,7 @@ export default function CloseTasksPage() {
                 <Td className={styles.colActions}>
                   <span className={styles.actions}>
                     {targetMedium?.adminUrl ? (
-                      <Button size="compact" href={targetMedium.adminUrl} target="_blank" rel="noopener noreferrer">管理画面を開く ↗</Button>
+                      <Button external size="compact" href={targetMedium.adminUrl}  >管理画面を開く</Button>
                     ) : null}
                     {canWrite && target ? (
                       <Button size="compact" onClick={() => void close(target.id, target.name)} disabled={busyId === target.id} aria-label={`${target.name}の枠を閉じた`} title={`${target.name}の枠を閉じた`}>

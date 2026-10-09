@@ -148,7 +148,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
           <span className={styles.player} aria-hidden="true"><Play size={32} /></span>
         </div>
         <div className={form.previewActions}>
-          {ctx.canOpenPublicPage && ctx.publicUrl ? <Button href={ctx.publicUrl} target="_blank" rel="noreferrer"><ExternalLink size={15} aria-hidden="true" />公開ページを見る</Button> : null}
+          {ctx.canOpenPublicPage && ctx.publicUrl ? <Button external href={ctx.publicUrl}  >公開ページを見る</Button> : null}
           {readOnly ? null : <Button disabled={testing !== false || publishing} onClick={() => setNotifyConfirm(true)}><Send size={15} aria-hidden="true" />テストを送る</Button>}
         </div>
         {!ctx.canOpenPublicPage && ctx.publicPageReason ? <p className={form.previewNote}>{ctx.publicPageReason}</p> : null}

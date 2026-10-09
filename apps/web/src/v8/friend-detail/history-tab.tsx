@@ -23,6 +23,7 @@ import {
   type TimelineFilter,
 } from './timeline'
 import styles from './detail.module.css'
+import TextLink from '@/components/shared/text-link'
 
 const FILTERS: Array<{ value: TimelineFilter; label: string }> = [
   { value: 'all', label: '全件' },
@@ -98,7 +99,7 @@ export default function HistoryTab({ friend, friendId, data }: { friend: FriendD
                     <span role="cell">
                       {source ? (
                         source.external
-                          ? <a className={styles.srcLink} href={source.href} target="_blank" rel="noreferrer">{source.label} ↗</a>
+                          ? <TextLink external className={styles.srcLink} href={source.href}  >{source.label}</TextLink>
                           : <Link className={styles.srcLink} href={source.href}>{source.label} ↗</Link>
                       ) : null}
                     </span>
