@@ -256,10 +256,27 @@ test('v8 の削除の窓（VsSyu）は危ない操作を左端に離し、動い
   await act(async () => { remove.click() })
   await eventually(() => {
     const dialog = document.querySelector('[data-design-node="VsSyu"]')
-    expect(dialog?.textContent).toContain('「契約終了の前に知らせる」を削除する')
+    expect(dialog?.textContent).toContain('「契約終了の前に知らせる」を削除しますか？')
     expect(dialog?.textContent).toContain('削除は元に戻せません。')
     const buttons = [...dialog!.querySelectorAll('button')].map((button) => button.textContent?.trim())
     // 右上の×（文字なし）のあと、左端に削除、真ん中に取消と代わりの操作。
     expect(buttons.filter(Boolean)).toEqual(['削除する', 'キャンセル', '代わりに一時停止'])
   })
+})
+
+test('下書きの削除も確認前には送信せず、元に戻すで延期しない', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  handler = url => url.pathname === '/api/reminders'
+    ? response({ success: true, data: { items: [{ ...reminder, isActive: false, lifecycleStatus: 'draft', plannedDeliveries: 0 }], total: 1, limit: 20 } })
+    : base(url)
+  await act(async () => root.render(<RemindersPage />))
+  await eventually(() => expect(host.querySelector('tbody tr')).toBeTruthy())
+  await act(async () => (host.querySelector('tbody button[aria-label*="操作"]') as HTMLElement).click())
+  await eventually(() => expect(document.querySelector('[role="menuitem"]')).toBeTruthy())
+  await act(async () => ([...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.trim() === '削除') as HTMLElement).click())
+  await eventually(() => expect(document.querySelector('[data-design-node="VsSyu"]')?.textContent).toContain('削除しますか？'))
+  expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false)
+  const confirm = [...document.querySelectorAll('[data-design-node="VsSyu"] button')].find(button => button.textContent === '削除する') as HTMLElement
+  await act(async () => confirm.click())
+  expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(true)
 })
