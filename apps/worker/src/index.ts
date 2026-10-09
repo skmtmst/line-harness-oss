@@ -248,6 +248,9 @@ import {
 export type Env = {
   Bindings: {
     DB: D1Database;
+    BUILD_GIT_COMMIT?: string;
+    BUILD_VERSION?: string;
+    BUILD_RELEASED_AT?: string;
     IMAGES: R2Bucket;
     /** 飲食店向けの受信メール原本。本番 wrangler.toml には束縛が無いので任意 */
     RAW_MAIL?: R2Bucket;

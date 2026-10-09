@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, afterEach } from 'vitest'
 // @ts-expect-error JS tool
-import { stubApi, installStressApi, measureScreen, assertStressResponse, screenReady } from '../../apps/web/scripts/v8-guard/speed-budget.mjs'
+import { stubApi, installStressApi, measureScreen, assertStressResponse, screenReady, waitForScreenReady } from '../../apps/web/scripts/v8-guard/speed-budget.mjs'
 
 type Handler = (route: unknown) => Promise<void>
 function routingPage() {
@@ -18,6 +18,19 @@ function routingPage() {
 const mockFetch = async () => ({ status: 200, body: JSON.stringify({ success: true, data: { items: [{ id: 'f1' }], total: 1 } }) })
 
 describe('WEB236 速度検査の成立条件', () => {
+  it('負荷画面の待ち時間を延ばしても、2,000行の完了印を必須にする', async () => {
+    const calls: unknown[] = []
+    const page = { waitForFunction: async (_fn: unknown, arg: unknown, options: unknown) => {
+      calls.push([arg, options])
+      return { jsonValue: async () => true }
+    } }
+    await waitForScreenReady(page, '/friends', 2000)
+    await waitForScreenReady(page, '/friends')
+    expect(calls).toEqual([
+      [{ route: '/friends', expectedRows: 2000 }, { timeout: 180000 }],
+      [{ route: '/friends', expectedRows: null }, { timeout: 15000 }],
+    ])
+  })
   it('PlaywrightのRequest.url()を呼んでモックに渡す', async () => {
     const page = routingPage()
     let path = ''
@@ -52,7 +65,7 @@ describe('WEB236 速度検査の成立条件', () => {
   it.each(['error', 'timeout'])('mainが出ても読込%sなら速度値にしない', async state => {
     const page = {
       addInitScript: async () => {},
-      goto: async () => {},
+      goto: async (_url: string, options: { waitUntil: string }) => { expect(options.waitUntil).toBe('networkidle') },
       locator: () => ({ first: () => ({ waitFor: async () => {}, count: async () => 0 }) }),
       waitForFunction: async () => { if (state === 'timeout') throw new Error('timeout'); return { jsonValue: async () => 'error' } },
       evaluate: async (fn: () => unknown) => String(fn).includes('jsBytes') ? { jsBytes: 0, longTaskMs: 0 } : null,
@@ -67,13 +80,18 @@ describe('WEB236 速度検査の成立条件', () => {
 afterEach(() => vi.unstubAllGlobals())
 describe('実際の画面の成立条件', () => {
   it.each([
-    ['読み込めませんでした', 'error', false, 'error'],
-    ['読込中', 'loading', false, false],
-    ['全20人中', null, true, false],
-    ['全2,000人中', null, true, true],
-  ])('表示 %s の判定', (text, state, hasRow, expected) => {
+    ['読み込めませんでした', 'error', 2000, 'error'],
+    ['読込中', 'loading', 2000, false],
+    ['全2,000人中', null, 20, false],
+    ['2,000件中 1〜20件を表示', null, 2000, true],
+    ['表示の言葉を変えても完了', null, 2000, true],
+    ['表示済み', null, 1999, false],
+    ['表示済み', null, 0, false],
+  ])('表示 %s / 実際 %s 行の判定', (text, state, rows, expected) => {
     vi.stubGlobal('document', { documentElement: { dataset: { theme: 'v8' } }, querySelector: () => ({
-      textContent: text, querySelector: (selector: string) => selector.includes('error') ? state === 'error' : selector.includes('loading') ? state === 'loading' : hasRow,
+      textContent: text,
+      querySelectorAll: () => ({ length: rows }),
+      querySelector: (selector: string) => selector.includes('error') ? state === 'error' : selector.includes('loading') ? state === 'loading' : rows > 0,
     }) })
     expect(screenReady({ route: '/friends', expectedRows: 2000 })).toBe(expected)
   })
