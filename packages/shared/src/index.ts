@@ -70,3 +70,5 @@ export * from './tenant-company-contact.js';
 
 export * from './liff-action.js';
 export * from './liff-state.js';
+
+export * from './research-form.js';

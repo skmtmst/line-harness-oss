@@ -485,3 +485,28 @@ describe('DB-bound R2 store executor',()=>{
   });
 
 });
+
+test('B-173: リサーチの回答後に使う店舗のマーク・リマインダ・通知先を照合し付け替える', async () => {
+ const f=await fixture('template');
+ for(const [id,account] of [['source-mark','source'],['target-mark','a']]) {
+  f.raw.prepare("INSERT INTO support_marks(id,name) VALUES (?,'確認済み')").run(id);
+  f.raw.prepare("INSERT INTO support_mark_scopes(mark_id,tenant_id,line_account_id,created_at) VALUES (?,'tenant',?,'now')").run(id,account);
+ }
+ for(const [id,account] of [['source-reminder','source'],['target-reminder','a']]) f.raw.prepare("INSERT INTO reminders(id,name,line_account_id,lifecycle_status) VALUES (?,'次の案内',?,'published')").run(id,account);
+ for(const [id,account] of [['source-notice','source'],['target-notice','a']]) f.raw.prepare("INSERT INTO notification_rules(id,name,line_account_id,event_type) VALUES (?,'回答通知',?,'manual')").run(id,account);
+ const answerActions=[{actionType:'support_mark',config:{markId:'source-mark'}},{actionType:'reminder',config:{reminderId:'source-reminder'}},{actionType:'notify_staff',config:{notificationRuleId:'source-notice',notificationRuleVersion:1,message:'回答されました'}}];
+ const definition={...f.message,media:[],asset:{kind:'research',payload:{questions:[{text:'質問',format:'free',required:true}],answerActions}}};
+ const json=JSON.stringify(definition);f.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
+ const ctx=await f.preflight('a','overwrite');expect(ctx.resolutions).toEqual(expect.arrayContaining([expect.objectContaining({itemKind:'mark',targetId:'target-mark'}),expect.objectContaining({itemKind:'reminder',targetId:'target-reminder'}),expect.objectContaining({itemKind:'notification_rule',targetId:'target-notice'})]));
+ expect(await f.execute(ctx)).toMatchObject({status:'succeeded'});
+ const row=f.raw.prepare("SELECT payload_json FROM broadcast_message_assets WHERE line_account_id='a'").get() as {payload_json:string};
+ expect(JSON.parse(row.payload_json).answerActions.map((a:any)=>a.config)).toEqual([{markId:'target-mark'},{reminderId:'target-reminder'},{notificationRuleId:'target-notice',notificationRuleVersion:1,message:'回答されました'}]);
+});
+test('B-173: リサーチの配布先の通知先が別店へ移ったら事前検査を取り直す', async () => {
+ const f=await fixture('template');
+ for(const [id,account] of [['source-notice','source'],['target-notice','a']]) f.raw.prepare("INSERT INTO notification_rules(id,name,line_account_id,event_type) VALUES (?,'回答通知',?,'manual')").run(id,account);
+ const definition={...f.message,media:[],asset:{kind:'research',payload:{questions:[{text:'質問',format:'free',required:true}],answerActions:[{actionType:'notify_staff',config:{notificationRuleId:'source-notice',notificationRuleVersion:1,message:'回答されました'}}]}}};
+ const json=JSON.stringify(definition);f.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
+ const ctx=await f.preflight('a','overwrite');f.raw.exec("UPDATE notification_rules SET line_account_id='foreign' WHERE id='target-notice'");
+ expect(await f.execute(ctx)).toMatchObject({status:'version_conflict'});expect(f.raw.prepare("SELECT id FROM broadcast_message_assets").all()).toEqual([]);
+});

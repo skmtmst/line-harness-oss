@@ -1964,6 +1964,8 @@ export type { BroadcastBubbleType, BroadcastBubble } from '@line-crm/shared';
 import type { BroadcastBubble } from '@line-crm/shared';
 export type BroadcastAssetKind = 'rich_message' | 'card_message' | 'coupon' | 'research';
 export type BroadcastMessageAsset = {
+  publishedPayload?: Record<string, unknown>;
+  publishedVersion?: number;
   id: string;
   lineAccountId: string | null;
   kind: BroadcastAssetKind;

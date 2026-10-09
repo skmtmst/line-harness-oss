@@ -617,7 +617,7 @@ export default function HqBroadcastCreate() {
     try {
       const detail = await hqTemplatesApi.get(id)
       if (detail.template.template_type !== 'template') return 'メッセージのテンプレートを選んでください'
-      const read = bubbleFromTemplate(id, detail.definition as MessageTemplateDefinition)
+      const read = bubbleFromTemplate(id, detail.definition as MessageTemplateDefinition, detail.template.current_version_id)
       if ('error' in read) return read.error
       setBubbles([{ ...read.bubble, body: read.bubble.body.slice(0, BODY_MAX) }]); setOpenBubble(0)
       if (!title.trim()) setTitle((detail.definition as MessageTemplateDefinition).template.name.slice(0, TITLE_MAX))
@@ -634,7 +634,7 @@ export default function HqBroadcastCreate() {
     try {
       const detail = await hqTemplatesApi.get(id)
       if (detail.template.template_type !== 'template') return
-      const read = bubbleFromTemplate(id, detail.definition as MessageTemplateDefinition)
+      const read = bubbleFromTemplate(id, detail.definition as MessageTemplateDefinition, detail.template.current_version_id)
       if ('error' in read || read.bubble.kind !== 'carousel') { setCarouselError('error' in read ? read.error : 'カルーセルのテンプレートを選んでください'); return }
       setContent(read.bubble.content, read.bubble.cardAsset)
     } catch (caught) {
@@ -646,7 +646,7 @@ export default function HqBroadcastCreate() {
     try {
       const detail = await hqTemplatesApi.get(id)
       if (detail.template.template_type !== 'template') return 'メッセージのテンプレートを選んでください'
-      const read = bubbleFromTemplate(id, detail.definition as MessageTemplateDefinition)
+      const read = bubbleFromTemplate(id, detail.definition as MessageTemplateDefinition, detail.template.current_version_id)
       if ('error' in read) return read.error
       replaceActive({ ...read.bubble, body: read.bubble.body.slice(0, BODY_MAX) })
       setCarouselError('')
@@ -969,7 +969,7 @@ export default function HqBroadcastCreate() {
                   busy={composerBusy} onBusyChange={setComposerBusy}
                   extraTokens={STORE_INSERT_CHIPS}
                   inserts={(ref, value, change) => <><span>差し込む：</span>{STORE_INSERTS.map((item) => <InsertButton size="compact" key={item.label} label={item.label.slice(1, -1)} title={item.help} onClick={() => { const field = ref.current; const start = field?.selectionStart ?? value.length; const end = field?.selectionEnd ?? start; change((value.slice(0, start) + item.label + value.slice(end)).slice(0, BODY_MAX)); requestAnimationFrame(() => { field?.focus(); field?.setSelectionRange(start + item.label.length, start + item.label.length) }) }} />)}</>}
-                  unavailable={{ research: notYetText('question'), intro: notYetText('intro'), rich_video: '統括からリッチビデオはまだ送れません。' }}
+                  unavailable={{ intro: notYetText('intro'), rich_video: '統括からリッチビデオはまだ送れません。' }}
                   onChange={(index, next) => { const item = fromApiBubble(next); if (item) setBubbles((items) => items.map((current, i) => i === index ? { ...current, ...item, id: current.id, ...(current.kind === item.kind ? { media: current.media, previewCard: current.previewCard } : {}) } : current)) }}
                   onMove={(index, direction) => { setBubbles((items) => { const next = [...items]; [next[index], next[index + direction]] = [next[index + direction], next[index]]; return next }); setOpenBubble(index + direction) }}
                   onDelete={(index) => { setBubbles((items) => items.filter((_, i) => i !== index)); setOpenBubble(0) }}

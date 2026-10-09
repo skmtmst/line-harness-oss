@@ -18,14 +18,16 @@ export interface VerifiedLineIdentity {
 export async function verifyCallerLineIdentity(
   authHeader: string | undefined,
   env: VerifyEnv,
+  expectedLineAccountId?: string,
 ): Promise<VerifiedLineIdentity | null> {
   if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
   const idToken = authHeader.slice('Bearer '.length).trim();
   if (!idToken) return null;
 
-  const dbAccounts = await getLineAccounts(env.DB);
+  const dbAccounts = (await getLineAccounts(env.DB)).filter(account => !expectedLineAccountId || account.id === expectedLineAccountId);
+  if (expectedLineAccountId && dbAccounts.length === 0) return null;
   const candidates: string[] = [];
-  if (env.LINE_LOGIN_CHANNEL_ID) candidates.push(env.LINE_LOGIN_CHANNEL_ID);
+  if (env.LINE_LOGIN_CHANNEL_ID && (!expectedLineAccountId || !dbAccounts[0]?.login_channel_id)) candidates.push(env.LINE_LOGIN_CHANNEL_ID);
   for (const account of dbAccounts) {
     const channelId = account.login_channel_id;
     if (channelId && !candidates.includes(channelId)) candidates.push(channelId);
@@ -41,7 +43,7 @@ export async function verifyCallerLineIdentity(
       if (verified.sub) {
         return {
           lineUserId: verified.sub,
-          lineAccountId: dbAccounts.find((account) => account.login_channel_id === channelId)?.id ?? null,
+          lineAccountId: dbAccounts.find((account) => account.login_channel_id === channelId)?.id ?? (expectedLineAccountId ?? null),
         };
       }
     }

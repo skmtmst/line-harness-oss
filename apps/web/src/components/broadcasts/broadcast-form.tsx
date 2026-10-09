@@ -177,7 +177,6 @@ const UNSENDABLE_TYPES: Partial<Record<BroadcastBubbleType, string>> = {
   rich_message: 'リッチメッセージには未対応です。いまは写真かFlexで作れます',
   card_message: 'カードタイプには未対応です。いまはカルーセルで作れます',
   coupon: 'クーポンには未対応です',
-  research: 'リサーチには未対応です',
 }
 
 /*
@@ -2429,7 +2428,7 @@ export default function BroadcastForm({
         <div className={shows('message') ? 'contents' : 'hidden'}>
         <section id="broadcast-step-message" className={showTemplatePicker ? 'hidden' : styles.section}>
           <MessageComposer bubbleErrors={bubbles.map((_, index) => fields.error(`bubble-${index}`))} bubbleFieldProps={(index) => fields.bind(`bubble-${index}`)} bubbles={bubbles} accountId={selectedAccountId} busy={composerBusy} onBusyChange={(value) => { if (selectedAccountIdRef.current === selectedAccountId) setComposerBusy(value) }}
-            unavailable={{ intro: '紹介メッセージは現在利用できません。', research: UNSENDABLE_TYPES.research }}
+            unavailable={{ intro: '紹介メッセージは現在利用できません。' }}
             onChange={updateBubble} onMove={moveBubble} onDelete={(index) => setBubbles((items) => items.filter((_, i) => i !== index))}
             onAdd={() => setBubbles((items) => [...items, emptyBubble()])}
             onPickTemplate={(index, kind) => { setComposerTemplateKind(kind); setComposerTemplateIndex(index); setShowTemplatePicker(true) }}

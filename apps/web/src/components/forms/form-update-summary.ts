@@ -109,6 +109,7 @@ export function describeInputUpdates(
  */
 export function describeAction(action: FormAction, refs: FormRefs): string {
   switch (action.kind) {
+    case 'research_action': return 'リサーチで設定した回答後の動作'
     case 'send_text':
       return action.text.trim()
         ? 'テキストを送る'

@@ -1,3 +1,4 @@
+import type { ResearchAnswerAction, ResearchGate } from './research-form.js';
 /**
  * 回答フォームの中身（レイアウト）。
  *
@@ -108,6 +109,7 @@ export interface FormChoice {
  * 仕様を決めてから足す。型に無い動作は保存時に落とす。
  */
 export type FormAction =
+  | ({ kind: "research_action" } & ResearchAnswerAction)
   | { kind: "send_text"; text: string }
   | { kind: "send_template"; templateId: string }
   | { kind: "tag"; op: "add" | "remove"; tagIds: string[] }
@@ -237,6 +239,8 @@ export interface FormOptions {
   totalLimit?: { enabled: boolean; max?: number; message?: string };
   /** 送信できたあとに動かす動作 */
   afterActions?: FormAction[];
+  /** リサーチの公開版から作る回答フォームの受付条件。 */
+  researchGate?: ResearchGate;
   /** 回答者に見せるフォームの色・書体・角丸。任意のCSSは保存しない。 */
   theme?: FormTheme;
 }

@@ -999,6 +999,7 @@ const ALLOWLIST = new Set<string>([
   // 機能「webinars」の管理画面用API（OpenAPI未記載・順次記載）（33件）
   'DELETE /api/webinars/{id}',
   'GET /api/liff/webinars/{slug}',
+  'GET /api/liff/research/{id}/form',
   'GET /api/webinars',
   'GET /api/webinars/overview',
   'GET /api/webinars/{id}',

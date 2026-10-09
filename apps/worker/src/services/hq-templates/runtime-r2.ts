@@ -54,7 +54,7 @@ async function cardReferences(b:R2RuntimeBinding, account:string, definition: im
     throw error;
   }
 }
-type RichReference = ReturnType<typeof richMenuReferences>[number] | Readonly<{kind:'friend_field';sourceId:string}>;
+type RichReference = ReturnType<typeof richMenuReferences>[number] | Readonly<{kind:'friend_field'|'mark'|'reminder'|'notification_rule'|'event'|'folder';sourceId:string}>;
 type DbRow = Record<string,string|number|null>;
 type RichReferenceMatch = RichReference & { name:string;targetId:string;expectedRevision:string;operation:'reuse'|'create';dbCommit:HqTemplateStatement[] };
 const richReferenceKey = (ref:RichReference) => `${ref.kind}:${ref.sourceId}`;
@@ -94,9 +94,30 @@ async function plannedTargetId(b:R2RuntimeBinding,account:string,ref:RichReferen
 
 /** Reuse an exact destination match or plan one private/local clone in the parent atomic batch. */
 async function matchRichReference(b:R2RuntimeBinding,ref:RichReference,account:string,execution=false):Promise<RichReferenceMatch> {
-  if (!['tag','form','scenario','template','friend_field'].includes(ref.kind)) fail('UNSUPPORTED_REFERENCE');
+  if (!['tag','form','scenario','template','friend_field','mark','reminder','notification_rule','event','folder'].includes(ref.kind)) fail('UNSUPPORTED_REFERENCE');
   await targetAccount(b,account);
   const unavailable=()=>fail(execution?'VERSION_CONFLICT':'REFERENCE_UNAVAILABLE');
+  if (['mark','reminder','notification_rule','event','folder'].includes(ref.kind)) {
+    const table = { mark: 'support_marks', reminder: 'reminders', notification_rule: 'notification_rules', event: 'events', folder: 'folders' }[ref.kind as 'mark'|'reminder'|'notification_rule'|'event'|'folder'];
+    const active = { mark: 'r.archived_at IS NULL', reminder: "r.deleted_at IS NULL AND r.lifecycle_status='published'", notification_rule: 'r.is_active=1', event: "r.deleted_at IS NULL AND r.lifecycle_status='published'", folder: '1=1' }[ref.kind as 'mark'|'reminder'|'notification_rule'|'event'|'folder'];
+    const joins = ref.kind === 'mark' ? 'LEFT JOIN support_mark_scopes scope ON scope.mark_id=r.id' : 'JOIN line_accounts a ON a.id=r.line_account_id';
+    const sourceWhere = ref.kind === 'mark' ? "COALESCE(scope.tenant_id,'00000000-0000-4000-8000-000000000001')=?" : 'a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL';
+    const targetWhere = ref.kind === 'mark' ? "COALESCE(scope.tenant_id,'00000000-0000-4000-8000-000000000001')=? AND (scope.line_account_id=? OR scope.line_account_id IS NULL)" : 'a.tenant_id=? AND r.line_account_id=?';
+    const source = await b.db.prepare(`SELECT r.* FROM ${table} r ${joins} WHERE r.id=? AND ${sourceWhere} AND ${active}`).bind(ref.sourceId,b.authority.tenantId).first<DbRow>();
+    if (!source) unavailable();
+    const listSql = `SELECT json_group_array(json_object('id',r.id,'name',r.name)) FROM ${table} r ${joins} WHERE ${targetWhere} AND ${active} ORDER BY r.id`;
+    const list = (await b.db.prepare(`SELECT (${listSql}) AS snapshot`).bind(b.authority.tenantId,account).first<{snapshot:string}>())!.snapshot;
+    const matches = (JSON.parse(list) as {id:string;name:string}[]).filter(row => normalizeScopedTagName(row.name) === normalizeScopedTagName(String(source!.name)));
+    if (matches.length !== 1) unavailable();
+    const target = await b.db.prepare(`SELECT * FROM ${table} WHERE id=?`).bind(matches[0].id).first<DbRow>();
+    if (!target || (ref.kind === 'folder' && target.kind !== source!.kind) || (ref.kind === 'notification_rule' && target.version !== source!.version)) unavailable();
+    const dbCommit = [exactRowGuard(table,source!),exactRowGuard(table,target!),targetListGuard(listSql,[b.authority.tenantId,account],list)];
+    if (ref.kind === 'mark') for (const id of [ref.sourceId, matches[0].id]) {
+      const scope = await b.db.prepare('SELECT tenant_id,line_account_id FROM support_mark_scopes WHERE mark_id=?').bind(id).first<DbRow>();
+      dbCommit.push(guard("COALESCE((SELECT json_array(tenant_id,line_account_id) FROM support_mark_scopes WHERE mark_id=?),'null') IS ?",[id,scope?JSON.stringify([scope.tenant_id,scope.line_account_id]):'null']));
+    }
+    return { ...ref, name: String(source!.name), targetId: matches[0].id, expectedRevision: await digest(JSON.stringify([source,target,list])), operation: 'reuse', dbCommit };
+  }
   if(ref.kind==='friend_field') {
     const source=await b.db.prepare(`SELECT ff.* FROM friend_fields ff LEFT JOIN friend_field_scopes fs ON fs.field_id=ff.id
       WHERE ff.id=? AND ff.status='active' AND COALESCE(fs.tenant_id,'00000000-0000-4000-8000-000000000001')=?
@@ -242,7 +263,7 @@ async function planResourceReferences(b:R2RuntimeBinding,direct:readonly RichRef
 
 function templateResourceReferences(definition: import('@line-crm/shared').MessageTemplateDefinition): RichReference[] {
   const refs=new Map<string,RichReference>();
-  const keys: Record<string,string>={fieldId:'friend_field',field_id:'friend_field',friendFieldId:'friend_field',friendFieldIds:'friend_field',tagId:'tag',tagIds:'tag',addTagIds:'tag',removeTagIds:'tag',targetTagId:'tag',tag_id:'tag',scenarioId:'scenario',scenario_id:'scenario',formId:'form',form_id:'form',templateId:'template',template_id:'template'};
+  const keys: Record<string,string>={fieldId:'friend_field',field_id:'friend_field',friendFieldId:'friend_field',friendFieldIds:'friend_field',tagId:'tag',tagIds:'tag',addTagIds:'tag',removeTagIds:'tag',targetTagId:'tag',tag_id:'tag',scenarioId:'scenario',scenario_id:'scenario',formId:'form',form_id:'form',templateId:'template',template_id:'template',markId:'mark',reminderId:'reminder',notificationRuleId:'notification_rule',eventId:'event',folderId:'folder'};
   const visit=(value:unknown):void=>{
     if(Array.isArray(value)){value.forEach(visit);return;}
     if(!value || typeof value!=='object')return;

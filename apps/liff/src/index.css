@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* Workerの公開入口から共用するときもLIFFの共通部品のクラスを生成する。 */
+@source "./";
 
 /* ─── LIFF ★V7 デザイントークン ─────────────────────────────
  * 値は Pencil「★V7 LIFF 主要画面」の決まり (0-rules.png) から。

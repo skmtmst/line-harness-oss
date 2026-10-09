@@ -19,7 +19,7 @@ import Select from '@/components/shared/select'
 import { ACTION_ADDERS, describeAfterAction, emptyAction } from './model'
 import styles from './edit.module.css'
 
-const ADDER_ICON: Record<FormAction['kind'], typeof Tag> = {
+const ADDER_ICON: Record<Exclude<FormAction['kind'], 'research_action'>, typeof Tag> = {
   send_text: MessageSquare,
   send_template: FileText,
   tag: Tag,

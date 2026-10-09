@@ -234,7 +234,7 @@ export const isChoiceType = (type: FormInputType) => type === 'radio' || type ==
 
 /* ---------------- 答え終わったら行うこと ---------------- */
 
-export function emptyAction(kind: FormAction['kind']): FormAction {
+export function emptyAction(kind: Exclude<FormAction['kind'], 'research_action'>): FormAction {
   switch (kind) {
     case 'send_text': return { kind: 'send_text', text: '' }
     case 'send_template': return { kind: 'send_template', templateId: '' }
@@ -246,7 +246,7 @@ export function emptyAction(kind: FormAction['kind']): FormAction {
 }
 
 /** 足すボタン（XXFT4 の下の列）。 */
-export const ACTION_ADDERS: { kind: FormAction['kind']; label: string }[] = [
+export const ACTION_ADDERS: { kind: Exclude<FormAction['kind'], 'research_action'>; label: string }[] = [
   { kind: 'send_text', label: 'テキスト' },
   { kind: 'send_template', label: 'テンプレート' },
   { kind: 'tag', label: 'タグ' },
@@ -259,6 +259,7 @@ export const ACTION_ADDERS: { kind: FormAction['kind']; label: string }[] = [
 export function describeAfterAction(action: FormAction, refs: FormRefs): string {
   const nameOf = (list: { id: string; name: string }[], id: string, missing: string) => list.find((x) => x.id === id)?.name ?? missing
   switch (action.kind) {
+    case 'research_action': return 'リサーチで設定した回答後の動作'
     case 'send_text': return action.text.trim() ? `テキストを送る「${action.text.trim()}」` : 'テキストを送る（本文が未設定）'
     case 'send_template': return action.templateId ? `テンプレート「${nameOf(refs.templates, action.templateId, '消えたテンプレート')}」を送る` : 'テンプレートを送る（未選択）'
     case 'tag': {

@@ -1,3 +1,5 @@
+import { researchGateProblem, runResearchAnswerAction, validateResearchActionScope } from './research-forms.js';
+import type { Env } from '../index.js';
 /**
  * 回答フォーム（レイアウト版）の、受け付け判定と送信後の処理。
  *
@@ -32,6 +34,7 @@ import {
   enrollFriendInScenario,
   getFriendFieldById,
   getMessageTemplateById,
+  getTemplateById,
   jstNow,
   removeTagFromFriend,
   setFriendFieldValue,
@@ -73,6 +76,10 @@ export async function checkFormGates(input: FormGateInput): Promise<string | nul
   const { db, formId, layout, friendId, submitCount, answers } = input;
   const options = layout.options ?? {};
   const now = input.now ?? new Date();
+  if (input.layout.options.researchGate && !input.resumeSavedAnswer) {
+    const problem = await researchGateProblem(input.db, input.layout.options.researchGate, input.friendId, now);
+    if (problem) return problem;
+  }
   const isTest = input.isTest === true;
 
   // 回答期限
@@ -243,6 +250,7 @@ export interface FormEffectInput {
   answers: FormAnswers;
   /** 解決失敗の台帳に残す出所（フォームID）。無いときは回答IDを使う */
   formId?: string;
+  env?: Env['Bindings'];
   /** タグ付与に伴うシナリオの即時配信で使う */
   push?: { defaultAccessToken: string; workerUrl?: string };
   /** テキスト送信・テンプレート送信で使う。無ければその動作は飛ばす */
@@ -333,6 +341,7 @@ export async function applyFormLayoutEffects(input: FormEffectInput): Promise<Fo
     const action = afterActions[index];
     await runEffectStep(input, failedEffects, destinationWrites, `afterAction:${index}`, () =>
       runFormAction(input, action, destinationWrites, index, `afterAction:${index}`));
+    if (action.kind === 'research_action' && action.onFailure === 'stop' && failedEffects.includes(`afterAction:${index}`)) break;
   }
 
   return { destinationWrites, failedEffects };
@@ -624,6 +633,42 @@ export async function runFormAction(
   const { db, friendId } = input;
 
   switch (action.kind) {
+    case 'research_action': {
+      const friend = await db.prepare('SELECT line_account_id FROM friends WHERE id=?').bind(friendId).first<{ line_account_id: string | null }>();
+      if (!friend?.line_account_id) throw new Error('回答者のアカウントを確認できませんでした');
+      await validateResearchActionScope(db, action, friend.line_account_id);
+      if (action.actionType === 'tag') {
+        const ids = Array.isArray(action.config.tagIds) ? action.config.tagIds.map(String) : [];
+        if (action.config.folderId) {
+          const rows = await db.prepare("SELECT id FROM tags WHERE folder_id=? AND (line_account_id=? OR line_account_id IS NULL) AND status='active'").bind(action.config.folderId,friend.line_account_id).all<{id:string}>();
+          ids.push(...rows.results.map(row => row.id));
+        }
+        await runFormAction(input, {kind:'tag',op:action.config.op==='remove'?'remove':'add',tagIds:[...new Set(ids)]},destinationWrites,actionIndex,pushSuffix);
+        return;
+      }
+      if (action.actionType === 'send_message' || action.actionType === 'send_template' || action.actionType === 'reminder') {
+        if (action.actionType !== 'reminder' && !input.pushText) throw new Error('回答後の送信を利用できません');
+        if (action.actionType === 'send_template') {
+          const template = await getTemplateById(db, String(action.config.templateId));
+          if (!template || !template.published_version) throw new Error('公開済みのテンプレートを選んでください');
+          const { expandSendCommonVars } = await import('./interpolation-context.js');
+          const content = await expandSendCommonVars(db, template.message_content, { kind: 'form_reply', id: input.formId ?? friendId }, { friendId, messageType: template.message_type });
+          if (template.message_type === 'text') await input.pushText!(content, pushSuffix ?? `research-template:${template.id}`);
+          else {
+            if (!input.pushMessage) throw new Error('回答後の送信を利用できません');
+            await input.pushMessage(buildMessage(template.message_type, content, template.name), pushSuffix ?? `research-template:${template.id}`);
+          }
+          return;
+        }
+        const mapped: FormAction = action.actionType === 'send_message' ? { kind: 'send_text', text: String(action.config.content ?? '') }
+
+          : { kind: 'reminder', reminderId: String(action.config.reminderId ?? '') };
+        await runFormAction(input, mapped, destinationWrites, actionIndex, pushSuffix);
+        return;
+      }
+      await runResearchAnswerAction(input.db, action, input.friendId, `${input.idempotencyPrefix ?? input.formId}:${pushSuffix ?? actionIndex}`, input.env);
+      return;
+    }
     case 'send_text':
       if (input.pushText && action.text) {
         const { expandSendCommonVars } = await import('./interpolation-context.js');

@@ -3337,6 +3337,7 @@ async function runFormPostEffects(input: {
       step: 'layout_effects',
       run: () => applyFormLayoutEffects({
         db,
+        env: input.env,
         layout,
         friendId,
         answers: submissionData,

@@ -108,16 +108,19 @@ describe('リッチメッセージの変換', () => {
 });
 
 describe('クーポン・リサーチの変換', () => {
-  it.each(['research'] as const)('%sは内容とリンク先を読める文にする', (kind) => {
-    const result = convertBroadcastAsset(kind, '案内', {
-      description: '500円引き',
-      actionUrl: 'https://example.com/c',
+  it('リサーチは同じLIFFの回答画面を開くボタンにする', () => {
+    const result = convertBroadcastAsset('research', '案内', {
+      assetId: 'research-1', description: '答えてください', questions: [{ text: 'お名前', format: 'free', required: true }],
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.message.messageType).toBe('text');
-    expect(result.message.messageContent).toBe('500円引き\nhttps://example.com/c');
-    expect(result.message.messageContent).not.toContain('assetId');
+    expect(result.message.messageType).toBe('flex');
+    const card = JSON.parse(result.message.messageContent);
+    expect(card.footer.contents[0].action).toEqual({ type: 'uri', label: '回答する', uri: 'https://liff.line.me/{{liff_id}}/?page=research&researchId=research-1' });
+  });
+  it('未保存・質問なしのリサーチは送信できない', () => {
+    expect(convertBroadcastAsset('research', '案内', { description: '旧設定' }).ok).toBe(false);
+    expect(convertBroadcastAsset('research', '案内', { assetId: 'r1', description: '旧設定' }).ok).toBe(false);
   });
 
   it('空のクーポンは作り直し方で止める', () => {
