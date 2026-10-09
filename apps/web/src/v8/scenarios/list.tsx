@@ -39,6 +39,7 @@ import type { Scenario, DeliveryMode, Folder } from '@line-crm/shared'
 import { api, type ListStats } from '@/lib/api'
 import { useOffsetServerList } from '@/lib/use-server-list'
 import { clampSearchQuery } from '@/lib/search-query'
+import { completeReorder } from '@/lib/complete-reorder'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
@@ -390,7 +391,8 @@ export default function ScenariosListV8() {
     runUndoable({
       message: '並び順を変えました',
       commit: async () => {
-        const res = await api.scenarios.reorder(ids)
+        const fullOrder = await completeReorder(ids, loadScenarioPage)
+        const res = await api.scenarios.reorder(fullOrder)
         if (!res.success) throw new Error(res.error)
       },
       undo: () => setOptimisticRows(null),
@@ -632,9 +634,7 @@ export default function ScenariosListV8() {
     ? '閲覧のみのため並び替えできません'
     : serverQuery || activeParam !== undefined || createdThisMonthOnly || folderFilter
       ? '絞り込みを外すと動かせます'
-      : scenarioList.pageCount > 1
-        ? '全件が1ページに収まる表示件数にすると動かせます'
-        : null
+      : null
   const canReorder = reorderDisabledReason === null
 
   /* 動かしている間、置き場所を入れ替えて見せ、ほかの行は滑らかに場所を空ける（フルード ②）。 */
