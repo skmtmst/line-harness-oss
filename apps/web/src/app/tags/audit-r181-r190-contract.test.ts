@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -21,7 +21,7 @@ const TAGS_PAGE = read('components/friend-fields/tags-page-v4.tsx')
 describe('R182 単一選択の既定値はIDのまま比べない', () => {
   it('編集画面は保存済み既定値を選択肢名へ戻して未保存を判定する', () => {
     expect(FIELD_EDIT).toContain('storedDefaultLabels')
-    expect(FIELD_EDIT).toContain('!sameLabels(defaultOptions, storedDefaults.multi)')
+    expect(FIELD_EDIT).toContain('!sameLabels(defaultOptions, stored.multi)')
     // IDのまま比べる旧式は残さない。
     expect(FIELD_EDIT).not.toContain("defaultValue !== (field.defaultValue ?? '')")
   })
@@ -71,8 +71,8 @@ describe('R185 友だち画面で作れる条件は編集画面でも編集で�
 
 describe('R186 複数行テキストの既定値は複数行欄', () => {
   it('新規・編集とも textarea 種は複数行モードで出す', () => {
-    expect(FIELD_NEW).toContain("type === 'textarea' ? 'longtext'")
-    expect(FIELD_EDIT).toContain("field.type === 'textarea' ? 'longtext'")
+    expect(FIELD_NEW).toContain("effectiveType === 'textarea' ? 'longtext'")
+    expect(FIELD_EDIT).toContain("effectiveType === 'textarea' ? 'longtext'")
     expect(DEFAULT_INPUT).toContain("mode === 'longtext'")
     expect(DEFAULT_INPUT).toContain('<TextArea')
   })

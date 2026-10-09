@@ -34,6 +34,7 @@ import { CreatePage } from '@/components/templates'
 import TargetMissing from '@/components/shared/target-missing'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TextField } from '@/components/shared/text-field'
+import { Field } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
 import Button from '@/components/shared/button'
 import HelpTip from '@/components/shared/help-tip'
@@ -447,6 +448,7 @@ function ConditionRow({
   referenceErrors,
   onChange,
   onDelete,
+  errorMessage,
 }: {
   label: '最初' | 'かつ' | 'または'
   condition: SavedSearchCondition
@@ -459,8 +461,10 @@ function ConditionRow({
   referenceErrors: { marks: boolean; scenarios: boolean; fields: boolean; forms: boolean; operators: boolean }
   onChange: (next: SavedSearchCondition) => void
   onDelete: () => void
+  errorMessage?: string
 }) {
   return (
+    <Field error={errorMessage}>
     <div className={styles.conditionRow}>
       <span className={label === '最初' ? styles.opFirst : label === 'かつ' ? styles.opAnd : styles.opOr}>{label}</span>
       <ConditionControls condition={condition} tags={tags} marks={marks} scenarios={scenarios} fields={fields} forms={forms} operators={operators} referenceErrors={referenceErrors} onChange={onChange} />
@@ -468,6 +472,7 @@ function ConditionRow({
         <X size={14} aria-hidden="true" />
       </button>
     </div>
+    </Field>
   )
 }
 
@@ -486,6 +491,16 @@ export default function SavedSearchEditV8() {
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
   const [referenceErrors, setReferenceErrors] = useState({ marks: false, scenarios: false, fields: false, forms: false, operators: false })
   const [name, setName] = useState('')
+  const [nameError, setNameError] = useState('')
+  const [conditionsError, setConditionsError] = useState('')
+  const nameRef = useRef<HTMLInputElement>(null)
+  const conditionsRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (!conditionsError) return
+    const first = conditionsRef.current?.querySelector<HTMLElement>('[aria-invalid="true"], input, [role="combobox"], button')
+    first?.focus()
+    first?.scrollIntoView({ block: 'center' })
+  }, [conditionsError])
   const [conditions, setConditions] = useState<SavedSearchConditions>({ all: [], any: [] })
   const [isShared, setIsShared] = useState(false)
   /** 保存済みの総数。上限50件までの残りを共有範囲の下に出すために持つ。 */
@@ -699,18 +714,21 @@ export default function SavedSearchEditV8() {
     */
     gateRef.current.invalidate()
     setConditions(next)
+    setConditionsError('')
     setPreviewStale(true)
   }
 
   const save = async () => {
     if (!selectedAccountId || !id || saving) return
-    if (!name.trim()) { setError('条件名を入力してください'); return }
+    if (!name.trim()) { setNameError('条件名を入力してください'); setError(''); nameRef.current?.focus(); nameRef.current?.scrollIntoView({ block: 'center' }); return }
+    setNameError('')
     const editableConditions = [...(conditions.all ?? []), ...(conditions.any ?? [])]
     const problem = editableConditions.length === 0
       ? '条件を1つ以上追加してください'
       : editableConditions.map(conditionProblem).find(Boolean)
     if (problem) {
-      setError(problem)
+      setConditionsError(problem)
+      setError('')
       return
     }
     setSaving(true)
@@ -739,7 +757,7 @@ export default function SavedSearchEditV8() {
     const problem = editableConditions.length === 0
       ? '条件を1つ以上追加してください'
       : editableConditions.map(conditionProblem).find(Boolean)
-    if (problem) { setError(problem); return }
+    if (problem) { setConditionsError(problem); setError(''); return }
     setSaving(true)
     setError('')
     try {
@@ -881,7 +899,7 @@ export default function SavedSearchEditV8() {
           <h2 className={styles.cardTitle}>名前と共有</h2>
           <label className={styles.field}>
             <span className={styles.labelStrong}>条件名</span>
-            <TextField value={name} maxLength={80} onChange={(event) => setName(event.target.value)} aria-label="条件名" className={styles.input} />
+            <Field error={nameError}><TextField ref={nameRef} value={name} maxLength={80} onChange={(event) => { setName(event.target.value); setNameError('') }} aria-label="条件名" /></Field>
             {/* IDEA-04：同名の検索がすでにあるとき、保存する前に知らせる。 */}
             <DuplicateNameNote duplicates={nameDuplicates} kindLabel="保存した検索" />
           </label>
@@ -902,17 +920,18 @@ export default function SavedSearchEditV8() {
           </div>
         </section>
 
-        <section className={styles.card} aria-label="条件">
+        <section ref={conditionsRef} className={styles.card} aria-label="条件">
           <div className={styles.cardTitles}>
             <h2 className={styles.cardTitle}>条件</h2>
             <p className={styles.cardNote}>「かつ」はすべて満たす人、「または」はどれかを満たす人に当てはまります。</p>
           </div>
-          {allConditions.length === 0 && anyConditions.length === 0 ? <p className={styles.hint}>条件はまだありません。下のボタンで足します。</p> : null}
+          {allConditions.length === 0 && anyConditions.length === 0 ? <p className={styles.hint} role={conditionsError ? 'alert' : undefined}>{conditionsError || '条件はまだありません。下のボタンで足します。'}</p> : null}
           {allConditions.map((condition, index) => (
             <ConditionRow
               key={`all-${index}`}
               label={index === 0 ? '最初' : 'かつ'}
               condition={condition}
+              errorMessage={conditionsError && condition === [...allConditions, ...anyConditions].find((item) => conditionProblem(item)) ? conditionsError : undefined}
               tags={tags}
               marks={marks}
               scenarios={scenarios}
@@ -929,6 +948,7 @@ export default function SavedSearchEditV8() {
               key={`any-${index}`}
               label={allConditions.length === 0 && index === 0 ? '最初' : 'または'}
               condition={condition}
+              errorMessage={conditionsError && condition === [...allConditions, ...anyConditions].find((item) => conditionProblem(item)) ? conditionsError : undefined}
               tags={tags}
               marks={marks}
               scenarios={scenarios}

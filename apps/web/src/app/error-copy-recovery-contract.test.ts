@@ -16,7 +16,6 @@ const SRC = join(__dirname, '..')
 /** 札・履歴として「失敗しました」で終わってよい所。理由を書く。 */
 const STATUS_LABELS: Record<string, string> = {
   'app/booking/bookings/new/page.tsx': '予約確認の送信結果の札',
-  'app/tags/fields/migrate/page.tsx': '移行の状態の札',
   'app/tags/field-migrate-v8.tsx': '移行の状態の札（v7 と同じ画面の★V8版）',
   'app/automations/runs/page.tsx': '実行履歴の状態の札',
   'app/automations/runs-v8.tsx': '実行履歴の状態の札（v7 と同じ画面の★V8版）',

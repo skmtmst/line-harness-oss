@@ -309,3 +309,5 @@
  */
 [data-theme='v8'] .skeleton { height: 32px; }
 [data-theme='v8'] .card[data-kpi-presentation='band'] .skeleton { height: var(--tpl-band-number-lh); }
+
+[data-theme='v8'] .valueRow[data-unit-spacing='tight'] .value { gap: var(--tpl-kpi-unit-gap-tight); }

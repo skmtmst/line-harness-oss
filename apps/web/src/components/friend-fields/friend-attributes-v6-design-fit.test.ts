@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -18,7 +19,7 @@ import { filterSavedSearches } from './saved-search-kpis'
 const ROOT = path.resolve(__dirname)
 const read = (name: string) => fs.readFileSync(path.join(ROOT, name), 'utf8')
 const readWeb = (relative: string) =>
-  fs.readFileSync(path.resolve(ROOT, '../../..', relative), 'utf8')
+  readUiSource(path.resolve(ROOT, '../../..', relative), 'utf8')
 
 const MARK_LIST = read('mark-list.tsx')
 const SAVED_LIST = read('saved-search-list.tsx')
@@ -148,10 +149,10 @@ describe('sfTEW CSVで一括登録の確認画面', () => {
 
 describe('XBkiQ 保存した検索の編集', () => {
   // m21u: 素の fieldset を共通の RadioCardGroup へ置き換えた。群と案内は保つ。
-  const shareField = between(EDIT_PAGE, '<RadioCardGroup legend="共有範囲"', '</p>\n            {/* IDEA-04')
+  const shareField = between(EDIT_PAGE, '<HelpTip label="共有の説明"', '</HelpTip>')
 
   it('共有範囲のところで、上限と共有すると何が起きるかを先に言う', () => {
-    expect(shareField).toContain('legend="共有範囲"')
+    expect(shareField).toContain('label="共有の説明"')
     expect(shareField).toContain('保存できるのは50件までです（いま${savedCount}件）')
     expect(shareField).toContain('一斉配信・オートメーションの対象条件からも呼び出せます')
   })

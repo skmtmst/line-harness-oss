@@ -1,11 +1,10 @@
 'use client'
 
-import SupportMarkEditor from '@/components/friend-fields/support-mark-editor'
-import MarkEditorV8 from '@/v8/tags/mark-editor'
+import { Suspense } from 'react'
+import Screen from '@/v8/tags/mark-editor'
 import FeatureGate from '@/components/feature-gate'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 
+/** V8 の入口。URL・読み書き・権限は画面側で保つ。 */
 export default function NewSupportMarkPage() {
-  const theme = useAdminTheme()
-  return <FeatureGate feature="support_marks">{theme === 'v8' ? <MarkEditorV8 /> : <SupportMarkEditor />}</FeatureGate>
+  return <FeatureGate feature="support_marks"><Suspense fallback={null}><Screen /></Suspense></FeatureGate>
 }

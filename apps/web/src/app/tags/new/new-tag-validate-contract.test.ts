@@ -1,4 +1,5 @@
-import fs from 'node:fs'
+import { readUiSource } from '../../../../scripts/test-ui-source.mjs'
+const fs = { readFileSync: readUiSource }
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -21,10 +22,10 @@ describe('タグ作成の名前検査の契約', () => {
   })
 
   it('旧作成画面を残さず、一覧と複製から現行V4作成画面へ進む', () => {
-    expect(ROUTE).toContain("import NewTagPageV4 from '@/components/friend-fields/new-tag-page-v4'")
-    expect(ROUTE).toContain('<NewTagPageV4 />')
+    expect(ROUTE).toContain("@/v8/tags/create")
+    expect(ROUTE).toContain('<Screen />')
     expect(ROUTE).not.toContain('LegacyNewTagPage')
-    expect(ROUTE).not.toContain('CreatePage')
+    expect(ROUTE).toContain('<CreatePage')
     expect(LIST).toContain('<Button href="/tags/new" variant="primary">＋ タグを作る</Button>')
     expect(EDITOR).toContain('href={`/tags/new?copy=${tag?.id ?? \'\'}`}')
   })

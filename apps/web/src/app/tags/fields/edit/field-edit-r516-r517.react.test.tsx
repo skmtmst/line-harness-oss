@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react'
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'admin', canManageRole: () => true }))
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -26,10 +27,11 @@ const { TestApiError } = vi.hoisted(() => {
 })
 
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/tags',
   useRouter: () => ({ push: fixture.routerPush }),
   useSearchParams: () => new URLSearchParams('id=f-1'),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-1', selectedAccount: { id: 'account-1', name: '本店' } }),
 }))

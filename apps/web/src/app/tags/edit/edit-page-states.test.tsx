@@ -4,6 +4,7 @@
  * 保存の再送が同じ要求キーになること（応答消失後の再送で保存済みを返す）。
  */
 import React from 'react'
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'admin', canManageRole: () => true }))
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Tag } from '@line-crm/shared'
@@ -43,11 +44,12 @@ const fakes = vi.hoisted(() => {
 })
 
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/tags',
   useRouter: () => ({ push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(state.search),
 }))
 vi.mock('@/components/shell/page-chrome', () => ({
-  usePageTitle: () => {},
+  usePageTitle: () => {}, usePageCrumbs: () => {},
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'a1', selectedAccount: { name: 'A店' } }),
@@ -72,11 +74,11 @@ vi.mock('@/lib/api', async (importOriginal) => {
     },
   }
 })
-vi.mock('@/components/friend-fields/tag-editor-v4', () => ({
+vi.mock('@/v8/tag-edit/edit-form', () => ({
   definitionsForSave: (actions: unknown) => actions,
   linkedActionFromDefinition: (action: unknown) => action,
-  default: (props: { onSave: typeof captured.onSave; notice?: React.ReactNode; error?: string }) => {
-    captured.onSave = props.onSave
+  TagEditForm: (props: { onSave: (values: TagEditorValues, applyRetroactive: boolean, previewToken?: string) => Promise<void>; notice?: React.ReactNode; error?: string }) => {
+    captured.onSave = (values, _andAnother, applyRetroactive, previewToken) => props.onSave(values, applyRetroactive, previewToken)
     return (
       <div data-testid="tag-editor">
         {props.notice ? <p>{props.notice}</p> : null}
@@ -89,6 +91,7 @@ vi.mock('@/components/shared/toast', () => ({
   notifyToast: vi.fn(),
 }))
 
+import { notifyToast } from '@/components/shared/toast'
 import Page from './page'
 
 const tag = {
@@ -201,7 +204,7 @@ describe('M956 保存の再送は同じ要求キー', () => {
     // 応答消失後の再送は同じ要求キー（保存済みとして返る）。
     expect(secondKey).toBe(firstKey)
     // 再送の結果は「保存済みでした」と出す。
-    expect(await screen.findByText('保存済みでした。')).toBeTruthy()
+    expect(notifyToast).toHaveBeenCalledWith('保存済みでした。')
 
     await act(async () => {
       await captured.onSave(values, false, false)
@@ -275,7 +278,7 @@ describe('保存500は日本語の再試行案内を出す（T05/T08）', () => 
     await act(async () => {
       await captured.onSave(values, false, false)
     })
-    expect(await screen.findByText('保存済みでした。')).toBeTruthy()
+    expect(notifyToast).toHaveBeenCalledWith('保存済みでした。')
     // 応答消失後の再送は同じ要求キー（M956 を保つ）。
     const keys = idempotencyKeys(calls)
     expect(keys).toHaveLength(2)
@@ -301,7 +304,7 @@ describe('保存500は日本語の再試行案内を出す（T05/T08）', () => 
     await act(async () => {
       await captured.onSave(valuesRetroOn, false, true, 'preview-1')
     })
-    expect(await screen.findByText('保存済みでした。')).toBeTruthy()
+    expect(notifyToast).toHaveBeenCalledWith('保存済みでした。')
     const patches = tagPatchCalls(calls)
     expect(patches).toHaveLength(2)
     // 実payloadは遡及あり＋引き換え券付き。引き換え券は再送の同一性に入れない。

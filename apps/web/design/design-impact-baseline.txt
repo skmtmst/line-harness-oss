@@ -156,13 +156,9 @@ shared-button-importer app/friend-add-settings/runs/detail/detail-v8.tsx
 shared-button-importer app/friend-add-settings/runs/detail/page.tsx
 shared-button-importer app/friend-add-settings/runs/page.tsx
 shared-button-importer app/friend-add-settings/runs/runs-v8.tsx
-shared-button-importer app/friends/detail/page.tsx
 shared-button-importer app/friends/friends-nav-v8.tsx
 shared-button-importer app/friends/identity-candidates/identity-candidates-v8.tsx
-shared-button-importer app/friends/identity-candidates/page.tsx
 shared-button-importer app/friends/migrations/migrations-v8.tsx
-shared-button-importer app/friends/migrations/page.tsx
-shared-button-importer app/friends/page.tsx
 shared-button-importer app/getting-started/page.tsx
 shared-button-importer app/health/page.tsx
 shared-button-importer app/hq/account-browser-v8.tsx
@@ -241,7 +237,6 @@ shared-button-importer app/ops/support/page.tsx
 shared-button-importer app/ops/tenants/detail/page.tsx
 shared-button-importer app/ops/tenants/page.tsx
 shared-button-importer app/ops/two-factor/page.tsx
-shared-button-importer app/page.tsx
 shared-button-importer app/password/forgot/page.tsx
 shared-button-importer app/password/reset/page.tsx
 shared-button-importer app/pools/page.tsx
@@ -304,16 +299,11 @@ shared-button-importer app/tags/edit-field-page-v8.tsx
 shared-button-importer app/tags/field-editor-v8.tsx
 shared-button-importer app/tags/field-migrate-v8.tsx
 shared-button-importer app/tags/fields-tab-v8.tsx
-shared-button-importer app/tags/fields/edit/page.tsx
-shared-button-importer app/tags/fields/migrate/page.tsx
-shared-button-importer app/tags/fields/new/page.tsx
-shared-button-importer app/tags/folders/new/page.tsx
 shared-button-importer app/tags/list-v8.tsx
 shared-button-importer app/tags/mark-editor-v8.tsx
 shared-button-importer app/tags/marks-v8.tsx
 shared-button-importer app/tags/search-editor-v8.tsx
 shared-button-importer app/tags/searches-v8.tsx
-shared-button-importer app/tags/searches/edit/page.tsx
 shared-button-importer app/tags/tag-editor-v8.tsx
 shared-button-importer app/tags/tags-tab-v8.tsx
 shared-button-importer app/templates/asset-editor-v8.tsx
@@ -760,7 +750,7 @@ shared-button-importer v8/hq-templates/attribute-tabs.tsx
 shared-button-importer v8/hq-templates/tag-editor.tsx
 shared-button-importer v8/hq-templates/message-form.tsx
 shared-button-importer v8/template-detail/detail.tsx
-shared-button-importer v8/tag-edit/edit.tsx
+shared-button-importer v8/tag-edit/edit-form.tsx
 shared-button-importer v8/tag-edit/search-edit.tsx
 shared-button-importer v8/rich-menu-edit/detail.tsx
 shared-button-importer v8/affiliate-offer-new/create.tsx

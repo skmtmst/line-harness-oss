@@ -85,3 +85,16 @@ describe('FlexPreview の描画結果', () => {
     expect(card!.className).toContain('text-ink')
   })
 })
+
+it('親の直接の子にFlex比率を付ける（WEB279）', () => {
+  const bubble = { type: 'bubble', body: { type: 'box', contents: [{ type: 'box', layout: 'horizontal', contents: [{ type: 'text', text: '左', flex: 1 }, { type: 'text', text: '右', flex: 3 }] }] } }
+  const { getByText } = render(<FlexPreview content={JSON.stringify(bubble)} />)
+  expect((getByText('左').parentElement as HTMLElement).style.flexGrow).toBe('1')
+  expect((getByText('右').parentElement as HTMLElement).style.flexGrow).toBe('3')
+})
+it('textのcontentsのspanを順番に描く（WEB280）', () => {
+  const bubble = { type: 'bubble', body: { type: 'box', contents: [{ type: 'text', contents: [{ type: 'span', text: '通常' }, { type: 'span', text: '強調', weight: 'bold' }] }] } }
+  const { getByText, container } = render(<FlexPreview content={JSON.stringify(bubble)} />)
+  expect(container.textContent).toContain('通常強調')
+  expect((getByText('強調') as HTMLElement).style.fontWeight).toBe('700')
+})

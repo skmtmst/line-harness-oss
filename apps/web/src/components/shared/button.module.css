@@ -224,3 +224,6 @@
 [data-theme='v8'] .text { background: transparent; color: var(--color-ink-secondary); box-shadow: none; }
 [data-theme='v8'] .button > svg { width: 15px; height: 15px; flex: none; }
 }
+
+/* 節の見出しと同じ行に置く文字の操作。ほかの高さは変えない。 */
+[data-theme='v8'] .button.inline { min-height: 0; height: auto; padding: 0; font-size: var(--text-caption); line-height: var(--tpl-fdt-small-lh); }

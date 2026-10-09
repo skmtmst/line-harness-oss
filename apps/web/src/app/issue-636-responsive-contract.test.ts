@@ -78,8 +78,14 @@ describe('08-C-狭1 / 10-C-狭1: 狭幅で検索欄を実用幅に保つ', () =>
 describe('03-C-はみ1: 友だち一覧の検索行は収まらない分を折り返す', () => {
   const page = read('friends/page.tsx')
 
-  it('検索フォームに flex-wrap を付ける', () => {
-    expect(page).toContain('flex min-w-0 flex-wrap items-center gap-2.5')
+  it('V8の検索欄と道具の段は縮められる', () => {
+    const page = read('../v8/friends/list/list.tsx')
+    const css = read('../v8/friends/list/list.module.css')
+    expect(page).toContain('<SearchField')
+    expect(page).toContain('className={styles.search}')
+    expect(css).toMatch(/\.toolRow\s*\{[^}]*min-width: 0/s)
+    expect(css).toMatch(/\.search\s*\{[^}]*min-width: 0/s)
+    expect(css).not.toMatch(/min-width:\s*(?:880|1180)px/)
   })
 })
 

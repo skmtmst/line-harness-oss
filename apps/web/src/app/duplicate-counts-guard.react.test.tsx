@@ -303,7 +303,8 @@ describe('m22d 同じ件数は1画面に1か所', () => {
     })
     await renderPage(React.createElement(MigrationsPage))
     expectNoDuplicateCounts()
-    expect(host.textContent).toContain('履歴 3件中 1〜3件を表示')
+    expect(host.querySelectorAll('tbody tr')).toHaveLength(3)
+    expect(host.textContent).toContain('書き出し・取り込みの履歴')
   })
 
   it('/ops/audit は一覧の件数の1か所（見出しの横に出さない）', async () => {

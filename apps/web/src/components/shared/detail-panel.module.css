@@ -8,6 +8,11 @@
  */
 
 .panel {
+  position: fixed;
+  z-index: var(--tpl-detail-panel-z);
+  top: var(--tpl-detail-panel-top);
+  right: var(--tpl-page-pad-side);
+  bottom: var(--tpl-page-pad-block);
   display: flex;
   flex-direction: column;
   width: 360px;

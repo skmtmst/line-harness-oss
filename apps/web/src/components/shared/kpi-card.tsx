@@ -25,6 +25,8 @@ export type KpiCardProps = {
    */
   value: number | null | undefined
   unit: string
+  /** 数字と単位を続けて出す板用。既定の間隔は変えない。 */
+  unitSpacing?: 'normal' | 'tight'
   /** 増減の数（差し引きなど）。true のとき、プラスの数に「+」を付ける（単位はそのまま出す）。 */
   signed?: boolean
   /**
@@ -102,6 +104,7 @@ export default function KpiCard({
   menu,
   value,
   unit,
+  unitSpacing = 'normal',
   signed = false,
   detail,
   description,
@@ -187,7 +190,7 @@ export default function KpiCard({
         ) : null}
       </div>
 
-      <div className={styles.valueRow}>
+      <div className={styles.valueRow} data-unit-spacing={unitSpacing}>
       {loading ? (
         <div className={styles.skeleton} aria-hidden="true" />
       ) : (

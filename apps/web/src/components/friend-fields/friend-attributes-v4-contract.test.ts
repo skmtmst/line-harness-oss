@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -93,18 +93,14 @@ describe('タグ V4 contract', () => {
     }
   })
 
-  it('友だち情報欄はV6の一覧・作成・移行前の確認を縦に通す', () => {
+  it('友だち情報欄はV8でも確認・実行・応答逆転の守りを保つ', () => {
     const list = read('components/friend-fields/field-list.tsx')
     const create = read('app/tags/fields/new/page.tsx')
     const migrate = read('app/tags/fields/migrate/page.tsx')
-    expect(list).toContain('data-design-node="HBTk0"')
-    expect(create).toContain('data-design-node="A1ZYeP"')
-    expect(migrate).toContain('data-design-node="KoT6c"')
     expect(list).toContain('/tags/fields/migrate?id=')
     expect(migrate).toContain('api.friendFields.migrationPreview(')
     expect(migrate).toContain('事前確認する')
     expect(migrate).not.toContain('dry-run')
-    expect(migrate).toContain('事前確認では値を1件も変更しません')
     /*
       ATTR-09: 事前確認で止まらず、確認済みの内容で実行までつなぐ。
       実行には previewToken と冪等キーが要る（ATTR-10）。
@@ -335,12 +331,6 @@ describe('タグ V4 contract', () => {
     expect(source).toContain("refs ? manualRefSummary(refs) : '—'")
     expect(source).toContain("refs ? refSummary(refs, AUTO_REFS) : '—'")
     expect(source).toContain("MANUAL_REFS.filter(([key]) => key !== 'affiliateOffers')")
-  })
-
-  it('タグの作成・編集・一覧ルートはV4を既定表示にする', () => {
-    expect(read('app/tags/page.tsx')).toContain('<TagsPageV4 accountId={selectedAccountId} />')
-    expect(read('app/tags/new/page.tsx')).toContain('<NewTagPageV4 />')
-    expect(read('app/tags/edit/page.tsx')).toContain('<EditTagPageV4 />')
   })
 
   it('タグ編集の削除確認は参照件数の実値を出し、取れなければ押せなくする', () => {

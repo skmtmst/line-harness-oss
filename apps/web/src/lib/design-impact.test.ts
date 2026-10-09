@@ -167,7 +167,7 @@ describe('共通部品の影響範囲', () => {
       'app/webinars/edit/participants-v8.tsx',
       'app/webinars/list-v8.tsx',
       'components/friend-fields/tags-page-v4.tsx',
-      'components/friends/friend-list-table.tsx',
+
       'components/line-notifications/notification-run-list.tsx',
       'components/ops/knowledge-list.tsx',
       'components/staff/login-audit.tsx',

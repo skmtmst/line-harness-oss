@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { describeSavedCondition } from '@/components/friends/saved-search-utils'
@@ -77,16 +77,16 @@ describe('IDEA-04（issue #1022）タグの分類説明・重複候補・変更�
     const source = read('app/tags/searches/edit/page.tsx')
     // 計算時点。APIの calculatedAt をそのまま出し、取れないときは出さない。
     expect(source).toContain('preview?.calculatedAt')
-    expect(source).toContain('に計算')
-    // 条件を変えたあとは「変更前の条件の人数」と「変更後は未計算」を分ける。
-    expect(source).toContain('変更後の条件は未計算')
-    expect(source).toContain('変更前：')
-    expect(source).toContain('変更後：')
+    expect(source).toContain('に数えた数')
+    // 条件を変えたあとは「変更前の条件の人数」と「変えたあとの条件はまだ数えていません」を分ける。
+    expect(source).toContain('変えたあとの条件はまだ数えていません')
+    expect(source).toContain('変える前：')
+    expect(source).toContain('変えたあと：')
     // 変更前後は一覧と同じ言葉（describeSavedCondition 経由）で出す。
     expect(source).toContain('savedSearchSummary(original.conditions')
     expect(source).toContain('savedSearchSummary(conditions')
     // 未計算を推定で埋めない。人数は previewCount が無ければ —（監査6 #674: MetricValue が出す）。
-    expect(source).toContain('<MetricValue value={previewCount}')
+    expect(source).toContain('previewCount === null ? <span className={styles.countNum}>—</span>')
   })
 
   it('条件の言語化は編集画面が作れる演算子をすべて正しく説明する', () => {

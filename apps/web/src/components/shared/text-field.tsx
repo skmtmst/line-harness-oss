@@ -69,13 +69,14 @@ export const TextField = forwardRef<
  */
 export const TextArea = forwardRef<
   HTMLTextAreaElement,
-  ControlOwnProps & { compact?: boolean } & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'className'>
->(function TextArea({ compact, invalid, className, id, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired, ...rest }, ref) {
+  ControlOwnProps & { compact?: boolean; density?: 'regular' | 'compact' } & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'className'>
+>(function TextArea({ compact, density, invalid, className, id, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired, ...rest }, ref) {
   const a11y = useControlA11y({ id, invalid, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired })
   return (
     <textarea
       ref={ref}
       data-design-node="i5BW8b"
+      data-density={density}
       {...rest}
       id={a11y.id}
       required={required}

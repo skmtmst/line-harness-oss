@@ -1,4 +1,5 @@
-import fs from 'node:fs'
+import { readUiSource } from '../../../../../scripts/test-ui-source.mjs'
+const fs = { readFileSync: readUiSource }
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -15,11 +16,11 @@ describe('保存した検索の条件編集', () => {
   })
 
   it('参照先を取得できない状態と0件を同じ言葉にしない', () => {
-    expect(PAGE).toContain("'対応マークを取得できません'")
+    expect(PAGE).toContain("'対応マークを読み込めませんでした'")
     expect(PAGE).toContain("'対応マークがありません'")
-    expect(PAGE).toContain("'シナリオを取得できません'")
+    expect(PAGE).toContain("'シナリオを読み込めませんでした'")
     expect(PAGE).toContain("'シナリオがありません'")
-    expect(PAGE).toContain("'友だち情報を取得できません'")
+    expect(PAGE).toContain("'友だち情報を読み込めませんでした'")
     expect(PAGE).toContain("'友だち情報がありません'")
   })
 

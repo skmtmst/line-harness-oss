@@ -19,11 +19,13 @@ const fixture = vi.hoisted(() => ({
   migrationRun: vi.fn(),
 }))
 
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'admin', canManageRole: () => true }))
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/tags',
   useRouter: () => ({ push: vi.fn() }),
   useSearchParams: () => new URLSearchParams('id=source-1'),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-1' }),
 }))
