@@ -1003,23 +1003,25 @@ function BookingDetailInner() {
                 <h2 className="text-ink mb-3 text-sm font-semibold">予約内容を変更する</h2>
                 <div className="grid gap-3 md:grid-cols-2">
                   <EditField label="予約メニュー">
-                    <Select size="full" aria-label="予約メニュー" value={editMenuId} onChange={(value) => { setEditMenuId(value); setEditTime('') }} options={editMenus.map((item) => ({ value: item.id, label: item.name }))} />
+                    <Select disabled={saving} size="full" aria-label="予約メニュー" value={editMenuId} onChange={(value) => { setEditMenuId(value); setEditTime('') }} options={editMenus.map((item) => ({ value: item.id, label: item.name }))} />
                   </EditField>
                   <EditField label="スタッフ">
-                    <Select size="full" aria-label="スタッフ" value={editStaffId} onChange={(value) => { setEditStaffId(value); setEditTime('') }} options={editStaff.map((item) => ({ value: item.id, label: item.display_name }))} />
+                    <Select disabled={saving} size="full" aria-label="スタッフ" value={editStaffId} onChange={(value) => { setEditStaffId(value); setEditTime('') }} options={editStaff.map((item) => ({ value: item.id, label: item.display_name }))} />
                   </EditField>
                   <EditField label="日付">
                     <DateField
+                      disabled={saving}
                       aria-label="予約の日付"
                       value={editDate}
                       onChange={(v) => { setEditDate(v); setEditTime('') }}
                     />
                   </EditField>
                   <EditField label="時間">
-                    <Select size="full" aria-label="時間" value={editTime} onChange={(value) => setEditTime(value)} disabled={editSlotsLoading} options={[ { value: '', label: editSlotsLoading ? '確認中です' : '選択してください' }, ...editSlots.map((slot) => ({ value: slot.start, label: `${slot.start}〜${slot.end}${ slot.date === jstDate(detail.startsAt) && slot.start === jstHHMM(detail.startsAt) ? '（現在）' : '' }`, })), ]} />
+                    <Select size="full" aria-label="時間" value={editTime} onChange={(value) => setEditTime(value)} disabled={saving || editSlotsLoading} options={[ { value: '', label: editSlotsLoading ? '確認中です' : '選択してください' }, ...editSlots.map((slot) => ({ value: slot.start, label: `${slot.start}〜${slot.end}${ slot.date === jstDate(detail.startsAt) && slot.start === jstHHMM(detail.startsAt) ? '（現在）' : '' }`, })), ]} />
                   </EditField>
                   <EditField label="料金（円・税込）">
                     <input
+                      disabled={saving}
                       type="number"
                       min={0}
                       value={editPrice}
@@ -1029,6 +1031,7 @@ function BookingDetailInner() {
                   </EditField>
                   <EditField label="変更理由（記録に残ります・任意）">
                     <input
+                      disabled={saving}
                       type="text"
                       value={editReason}
                       onChange={(event) => setEditReason(event.target.value)}
@@ -1040,6 +1043,7 @@ function BookingDetailInner() {
                 <div className="mt-3 grid gap-3">
                   <EditField label="お客様からの要望">
                     <textarea
+                      disabled={saving}
                       value={editCustomerNote}
                       onChange={(event) => setEditCustomerNote(event.target.value)}
                       rows={3}
@@ -1048,6 +1052,7 @@ function BookingDetailInner() {
                   </EditField>
                   <EditField label="店内メモ（お客様には見えません）">
                     <textarea
+                      disabled={saving}
                       value={editInternalNote}
                       onChange={(event) => setEditInternalNote(event.target.value)}
                       rows={2}
@@ -1060,9 +1065,9 @@ function BookingDetailInner() {
                     <p className="text-ink mb-2 text-xs font-medium">お知らせの送り方（この予約だけの設定）</p>
                     <div className="space-y-2">
                       {(Object.keys(POLICY_FIELD_LABELS) as Array<keyof BookingNotificationPolicy>).map((key) => (
-                        <Checkbox key={key} checked={editPolicy[key]} onCheckedChange={(checked) => setEditPolicy((prev) => ({ ...prev, [key]: checked }))}>{POLICY_FIELD_LABELS[key]}を送る</Checkbox>
+                        <Checkbox disabled={saving} key={key} checked={editPolicy[key]} onCheckedChange={(checked) => setEditPolicy((prev) => ({ ...prev, [key]: checked }))}>{POLICY_FIELD_LABELS[key]}を送る</Checkbox>
                       ))}
-                      <Checkbox checked={editSendNotice} onCheckedChange={setEditSendNotice}>今回の変更をお客様のLINEに知らせる</Checkbox>
+                      <Checkbox disabled={saving} checked={editSendNotice} onCheckedChange={setEditSendNotice}>今回の変更をお客様のLINEに知らせる</Checkbox>
                     </div>
                   </div>
                 ) : (
