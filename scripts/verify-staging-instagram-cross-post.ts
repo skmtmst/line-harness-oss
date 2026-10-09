@@ -145,9 +145,6 @@ async function main(): Promise<void> {
   let verificationError: unknown = null;
 
   try {
-    // 期限切れの管理セッションは既に使えないので、通常の片付けとして消す。
-    await query('DELETE FROM admin_sessions WHERE expires_at <= ?', [new Date().toISOString()]);
-
     // 担当者は作らずに探す。無ければ確認できないので、その事実を投げる。
     const targets = await query<{ staff_id: string; line_account_id: string }>(
       `SELECT sm.id AS staff_id, la.id AS line_account_id

@@ -88,6 +88,9 @@ describe('staging Instagram cross-post verification safety', () => {
 
     expect(script).toContain('const SESSION_TTL_MINUTES = 15');
     expect(script).toContain('DELETE FROM admin_sessions WHERE token_hash = ?');
+    // 自分が作った一時行だけを消す。期限切れの他行を一括削除する道を作らない。
+    expect(script).not.toContain('expires_at <=');
+    expect(script).not.toMatch(/DELETE FROM admin_sessions WHERE(?! token_hash = \?)/);
     expect(script).toContain("method: 'GET'");
     for (const verb of ['POST', 'PUT', 'PATCH', 'DELETE']) {
       expect(script).not.toContain(`method: '${verb}'`);
