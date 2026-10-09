@@ -490,6 +490,8 @@ export default function InflowListV8({
       kind: 'folder' as const,
       id: genre.name,
       label: genre.name,
+      // entry_route_genres に color 欄がない。追加はオーナーの migration 承認待ち。
+      colorEditable: false,
       count: accountRows.filter((row) => row.genre === genre.name).length,
       // 名前の変更は選んだフォルダの「…」から（選んでいない行に「…」の箱を出すと件数が左へずれる）。
       ...(canManageFolders && !genre.id.startsWith('legacy-') && selectedGenre === genre.name

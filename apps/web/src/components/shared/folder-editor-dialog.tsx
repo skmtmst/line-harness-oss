@@ -1,6 +1,7 @@
 'use client'
 
 import type { ComponentProps, ReactNode } from 'react'
+import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import { useId } from 'react'
 import Dialog from './dialog'
 import Button from './button'
@@ -14,7 +15,7 @@ export interface FolderNameColorFieldsProps {
   onNameChange: (name: string) => void
   color: string | null
   onColorChange: (color: string | null) => void
-  colors: ReadonlyArray<FolderColorOption>
+  colors?: ReadonlyArray<FolderColorOption>
   allowClear?: boolean
   disabled?: boolean
   nameId?: string
@@ -52,7 +53,7 @@ type Props = FolderNameColorFieldsProps & Pick<ComponentProps<typeof Dialog>, 'o
 }
 
 /** IjVpM の低い窓。保存先やエラー処理は画面が持ち、形はここに集約する。 */
-export default function FolderEditorDialog({ name, onNameChange, color, onColorChange, colors, allowClear, disabled, nameId, nameLabel, placeholder, maxLength, children, footer, confirmIcon, confirmTitle, confirmLabel = '追加する', cancelLabel = 'キャンセル', onConfirm, busy, confirmDisabled, ...dialog }: Props) {
+export default function FolderEditorDialog({ name, onNameChange, color, onColorChange, colors = FOLDER_SELECT_COLORS, allowClear, disabled, nameId, nameLabel, placeholder, maxLength, children, footer, confirmIcon, confirmTitle, confirmLabel = '追加する', cancelLabel = 'キャンセル', onConfirm, busy, confirmDisabled, ...dialog }: Props) {
   return <Dialog {...dialog} busy={busy} designWidth={560} designHeaderPadding="24px 24px 0"
     footer={<div className={styles.footer}>{footer ?? <>
       <Button type="button" onClick={dialog.onCancel} disabled={busy}>{cancelLabel}</Button>

@@ -67,6 +67,7 @@ import Select from '@/components/shared/select'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { useFolderRowActions } from '@/components/shared/folder-row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import DetailPanel from '@/components/shared/detail-panel'
@@ -633,9 +634,12 @@ export default function RemindersListV8() {
     const folder = folders.find((f) => f.id === row.folderId)
     return folder ? { name: folder.name, color: folder.color } : null
   }
+  const folderActions = useFolderRowActions({ kind: 'reminder', folders, enabled: canEdit, accountId: undefined, itemLabel: 'リマインダ', onChanged: loadFolders })
+
   const folderRows: FolderPanelRow[] = [
     { kind: 'all' as const, id: '', label: 'すべて', count: reminderList.total ?? null, color: 'var(--color-accent)' },
-    ...folders.map((folder) => ({
+    ...folders.map((folder, index) => ({
+      ...folderActions.rowActions(folder, index),
       kind: 'folder' as const,
       id: folder.id,
       label: folder.name,
@@ -1198,6 +1202,7 @@ export default function RemindersListV8() {
         ))}
       </KpiBand>
 
+      {folderActions.dialogs}
       {folderDialogOpen && (
         <FolderAddDialog
           kind="reminder"

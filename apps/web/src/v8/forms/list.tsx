@@ -46,9 +46,9 @@ import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
+import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
-import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import DetailPanel from '@/components/shared/detail-panel'
@@ -97,97 +97,6 @@ function toContextMenuItems(menuItems: ActionMenuItem[]): ContextMenuItem[] {
     disabled: item.disabled,
     onSelect: () => item.onSelect(),
   }))
-}
-
-/*
- * フォルダの追加・名前の変更（右の詳細パネルの中身）。名前と色を送る。
- * 送り先・文言は今までの V8 一覧と同じ。
- */
-function FolderPanelForm({
-  accountId,
-  folder,
-  onCancel,
-  onAdded,
-}: {
-  accountId: string
-  folder: Folder | null
-  onCancel: () => void
-  onAdded: () => void
-}) {
-  const [name, setName] = useState(folder?.name ?? '')
-  const [color, setColor] = useState(folder?.color ?? FOLDER_COLORS[0])
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-
-  const save = async () => {
-    const trimmed = name.trim()
-    if (!trimmed || saving) return
-    setSaving(true)
-    setError('')
-    try {
-      const folderUpdates = { name: trimmed, color }
-      const res = folder
-        ? await api.folders.update(folder.id, folderUpdates, accountId)
-        : await api.folders.create({ kind: 'form', name: trimmed, color, accountId })
-      if (!res.success) {
-        setError(res.error)
-        return
-      }
-      onAdded()
-      onCancel()
-    } catch {
-      setError(folder ? 'フォルダを直せませんでした' : 'フォルダを追加できませんでした')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div>
-      <p className={styles.panelNote}>
-        フォームを分けてしまう箱です。消しても、入っていたフォームは未分類として残ります。
-      </p>
-      <label className={styles.panelField}>
-        <span className={styles.panelLabel}>
-          フォルダ名 <span className={styles.required}>*</span>
-        </span>
-        <input
-          type="text"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && name.trim()) void save()
-          }}
-          placeholder="例: 01_来店・予約"
-          className={styles.panelInput}
-        />
-      </label>
-      <div className={styles.panelField}>
-        <span className={styles.panelLabel}>色</span>
-        <div className={styles.colorRow}>
-          {FOLDER_COLORS.map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => setColor(c)}
-              aria-label={`色 ${c}`}
-              aria-pressed={color === c}
-              className={styles.colorSwatch}
-              data-selected={color === c || undefined}
-              style={{ backgroundColor: c }}
-            />
-          ))}
-        </div>
-      </div>
-      {error ? <p className={styles.alertText} role="alert">{error}</p> : null}
-      <div className={styles.panelActions}>
-        <Button onClick={onCancel} disabled={saving}>キャンセル</Button>
-        <Button variant="primary" onClick={() => void save()} disabled={!name.trim() || saving} busy={saving}>
-          {folder ? '直す' : '追加する'}
-        </Button>
-      </div>
-    </div>
-  )
 }
 
 export default function FormsListV8() {
@@ -1457,30 +1366,11 @@ export default function FormsListV8() {
   const overlays = (
     <>
       {(folderDialogOpen || editingFolder) && selectedAccountId ? (
-        <DetailPanel
-          open
-          title={editingFolder ? 'フォルダを直す' : 'フォルダを追加'}
-          description={editingFolder ? `「${editingFolder.name}」の名前と色を変えます。` : undefined}
-          onClose={() => {
-            if (folderBusy) return
-            withViewTransition(() => {
-              setFolderDialogOpen(false)
-              setEditingFolder(null)
-            })
-          }}
-        >
-          <FolderPanelForm
-            key={editingFolder?.id ?? 'new'}
-            accountId={selectedAccountId}
-            folder={editingFolder}
-            onCancel={() => {
-              if (folderBusy) return
-              setFolderDialogOpen(false)
-              setEditingFolder(null)
-            }}
-            onAdded={() => { setEditingFolder(null); void loadForms() }}
-          />
-        </DetailPanel>
+        <FolderAddDialog key={editingFolder?.id ?? 'new'} kind="form" accountId={selectedAccountId}
+          folder={editingFolder ?? undefined}
+          note="フォームを分けてしまう箱です。消しても、中のフォームは未分類に残ります。"
+          onClose={() => { setFolderDialogOpen(false); setEditingFolder(null) }}
+          onAdded={() => { setEditingFolder(null); void loadForms() }} />
       ) : null}
 
       <ConfirmDialog

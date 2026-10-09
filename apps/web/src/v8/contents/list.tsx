@@ -179,8 +179,6 @@ export default function MediaLibraryListV8() {
   const [folderReloading, setFolderReloading] = useState(false)
   const [folderFilter, setFolderFilter] = useState('')
   const [addingFolder, setAddingFolder] = useState(false)
-  const [folderName, setFolderName] = useState('')
-  const [savingFolder, setSavingFolder] = useState(false)
   /*
     R37: フォルダの名前変更・削除を FolderPanel の「…」へ接続する。
     追加だけあって直し・消しが無いと、整理し直す手段が無い。
@@ -639,26 +637,6 @@ export default function MediaLibraryListV8() {
     }
   }
 
-  async function addFolder() {
-    const name = folderName.trim()
-    if (!name || savingFolder) return
-    setSavingFolder(true)
-    setError('')
-    try {
-      const response = await api.folders.create({ kind: 'media', name })
-      if (!response.success) throw new Error(response.error)
-      setFolders((current) => [...current, response.data])
-      setFolderFilter(response.data.id)
-      setFolderName('')
-      setAddingFolder(false)
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'フォルダを追加できませんでした')
-    } finally {
-      setSavingFolder(false)
-    }
-  }
-
-  /** R37: フォルダを消す。中身は消えず未分類に戻る。消した先を選んでいたら「すべて」へ戻す。 */
   async function removeFolder() {
     if (!deletingFolder || !selectedAccountId || folderBusy) return
     const accountAtRequest = selectedAccountId
@@ -1200,28 +1178,7 @@ export default function MediaLibraryListV8() {
               </div>
             ) : null}
             {folderError ? <p role="alert">{folderError}</p> : null}
-            {addingFolder ? (
-              <div>
-                <input
-                  type="text"
-                  autoFocus
-                  value={folderName}
-                  onChange={(event) => setFolderName(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') void addFolder()
-                    if (event.key === 'Escape') setAddingFolder(false)
-                  }}
-                  placeholder="フォルダ名を入力"
-                  aria-label="フォルダ名"
-                />
-                <div>
-                  <Button type="button" onClick={() => setAddingFolder(false)}>キャンセル</Button>
-                  <Button type="button" variant="primary" onClick={() => void addFolder()} disabled={!folderName.trim() || savingFolder}>追加する</Button>
-                </div>
-              </div>
-            ) : (
-              <p>フォルダを消しても、中のメディアは未分類に残ります。</p>
-            )}
+            <p>フォルダを消しても、中のメディアは未分類に残ります。</p>
           </FolderPanel>
         </>
       )}
@@ -1383,6 +1340,10 @@ export default function MediaLibraryListV8() {
       )}
       overlays={(
         <>
+          {addingFolder && selectedAccountId ? <FolderAddDialog kind="media" accountId={selectedAccountId}
+            note="メディアを分けてしまう箱です。消しても、中のメディアは未分類に残ります。"
+            onClose={() => setAddingFolder(false)}
+            onAdded={(created) => { if (created) setFolderFilter(created.id); void loadFolders() }} /> : null}
       {/*
         1件ずつの削除確認（設計 `YfTfJ`）。**消せないときは「削除しますか？」と
         聞かない。** 聞いてから断るより、最初から消せないと言うほうが短い。
@@ -1645,7 +1606,7 @@ export default function MediaLibraryListV8() {
           note="メディアを分けてしまう箱です。削除しても、中のメディアは未分類に残ります。"
           placeholder="例: 01_商品写真"
           onClose={() => setEditingFolder(null)}
-          onAdded={() => { setEditingFolder(null); void load() }}
+          onAdded={() => { setEditingFolder(null); void load(); void loadFolders() }}
         />
       )}
 

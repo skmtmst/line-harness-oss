@@ -34,7 +34,7 @@ import { useRowLeaving } from '@/lib/use-row-leaving'
 import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { ListPageBody } from '@/components/templates'
-import { FOLDER_COLORS, FOLDER_COLOR_NAMES } from '@/components/shared/folder-add-dialog'
+import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -138,7 +138,7 @@ function TagFolderDialog({
   onSaved: () => void
 }) {
   const [name, setName] = useState(group?.name ?? '')
-  const [color, setColor] = useState(group?.color ?? FOLDER_COLORS[0])
+  const [color, setColor] = useState<string | null>(group ? group.color ?? null : FOLDER_COLORS[0])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -168,8 +168,8 @@ function TagFolderDialog({
     <FolderEditorDialog open
       title={group ? 'フォルダを直す' : 'フォルダを追加'}
       description="タグを分けてしまう箱です。消しても、入っていたタグは未分類として残ります。"
-      name={name} onNameChange={setName} color={color} onColorChange={(next) => setColor(next ?? FOLDER_COLORS[0])}
-      colors={FOLDER_COLORS.map((value) => ({ value, name: FOLDER_COLOR_NAMES[value] }))}
+      name={name} onNameChange={setName} color={color} onColorChange={setColor}
+      allowClear
       placeholder="例: VIP" busy={saving} error={error || undefined}
       onCancel={onClose} onConfirm={() => void save()} confirmLabel={group ? '保存する' : 'フォルダを作る'}
     />
@@ -572,7 +572,7 @@ export default function TagsTab({
       id: group.id,
       label: group.name,
       count: ready ? items.filter((tag) => tag.groupId === group.id).length : null,
-      color: group.color ?? FOLDER_FALLBACK_COLOR,
+      color: group.color,
       onEdit: canEdit ? () => setFolderDialog(group) : undefined,
       onMoveUp: canEdit && index > 0 ? () => void moveGroupOrder(group, -1) : undefined,
       onMoveDown: canEdit && index < groups.length - 1 ? () => void moveGroupOrder(group, 1) : undefined,

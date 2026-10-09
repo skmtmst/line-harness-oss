@@ -23,10 +23,10 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
+import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { deleteFolderDescription } from '@/components/shared/folder-row-actions'
-import { TextField } from '@/components/shared/text-field'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import type { FolderPanelRow } from '@/components/shared/folder-panel'
 import Pagination from '@/components/shared/pagination'
@@ -96,6 +96,7 @@ export default function HqBroadcastList() {
   const [folderFilter, setFolderFilter] = useState('all')
   const [folderDialog, setFolderDialog] = useState<{ editing: HqFolder | null } | null>(null)
   const [folderName, setFolderName] = useState('')
+  const [folderColor, setFolderColor] = useState<string | null>(FOLDER_SELECT_COLORS[0].value)
   const [deletingFolder, setDeletingFolder] = useState<HqFolder | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
   const [folderError, setFolderError] = useState('')
@@ -172,9 +173,8 @@ export default function HqBroadcastList() {
       label: folder.name,
       color: folder.color,
       count: ready ? countIn(folder.id) : null,
-      colorEditable: false,
       ...(canManage ? {
-        onEdit: () => { setFolderError(''); setFolderName(folder.name); setFolderDialog({ editing: folder }) },
+        onEdit: () => { setFolderError(''); setFolderName(folder.name); setFolderColor(folder.color ?? null); setFolderDialog({ editing: folder }) },
         onDelete: () => { setFolderError(''); setDeletingFolder(folder) },
       } : {}),
     })),
@@ -186,8 +186,8 @@ export default function HqBroadcastList() {
     if (!name || folderBusy || !folderDialog) return
     setFolderBusy(true); setFolderError('')
     try {
-      if (folderDialog.editing) await hqBroadcastsApi.updateFolder(folderDialog.editing.id, name, folderDialog.editing.revision)
-      else await hqBroadcastsApi.createFolder(name)
+      if (folderDialog.editing) await hqBroadcastsApi.updateFolder(folderDialog.editing.id, name, folderDialog.editing.revision, folderColor)
+      else await hqBroadcastsApi.createFolder(name, folderColor)
       await loadFolders()
       setFolderDialog(null)
     } catch (caught) {
@@ -356,7 +356,7 @@ export default function HqBroadcastList() {
           createAction={createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
           activeId={folderFilter}
           onSelect={selectFolder}
-          onAddFolder={canManage ? () => { setFolderError(''); setFolderName(''); setFolderDialog({ editing: null }) } : undefined}
+          onAddFolder={canManage ? () => { setFolderError(''); setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setFolderDialog({ editing: null }) } : undefined}
           addFolderLabel="フォルダを追加"
           rows={folderRows}
         >
@@ -366,9 +366,10 @@ export default function HqBroadcastList() {
       )}
       overlays={(
         <>
-          <Dialog
+          <FolderEditorDialog
+            name={folderName} onNameChange={setFolderName} color={folderColor} onColorChange={setFolderColor} allowClear
             open={folderDialog !== null}
-            title={folderDialog?.editing ? 'フォルダの名前を変える' : 'フォルダを追加'}
+            title={folderDialog?.editing ? 'フォルダを直す' : 'フォルダを追加'}
             description="一括配信を分けてしまう箱です。消しても、中の配信は未分類に残ります。"
             busy={folderBusy}
             error={folderError || undefined}
@@ -376,9 +377,7 @@ export default function HqBroadcastList() {
             cancelLabel="やめる"
             onCancel={() => { if (!folderBusy) setFolderDialog(null) }}
             onConfirm={() => void saveFolder()}
-          >
-            <TextField aria-label="フォルダの名前" value={folderName} maxLength={100} disabled={folderBusy} placeholder="例: キャンペーン" onChange={(event) => setFolderName(event.target.value)} />
-          </Dialog>
+          />
           <ConfirmDialog
             open={deletingFolder !== null}
             title={`フォルダ「${deletingFolder?.name ?? ''}」を消しますか？`}

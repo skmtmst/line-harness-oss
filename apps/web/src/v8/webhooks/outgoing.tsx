@@ -37,6 +37,7 @@ import PageSizeSelect from '@/components/ui/page-size-select'
 import Pagination from '@/components/shared/pagination'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { useFolderRowActions } from '@/components/shared/folder-row-actions'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -380,9 +381,11 @@ export default function WebhooksOutgoingV8() {
   }
 
   /* ===== フォルダの列 ===== */
+  const folderActions = useFolderRowActions({ kind: 'webhook', folders, enabled: canManage, accountId: selectedAccountId, itemLabel: '送り先', onChanged: loadFolders })
+
   const folderRows: FolderPanelRow[] = [
     { kind: 'all' as const, id: '', label: 'すべて', count: ready ? displayed.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
-    ...folders.map((folder) => ({ kind: 'folder' as const, id: folder.id, label: folder.name, count: folder.itemCount ?? null, color: folder.color })),
+    ...folders.map((folder, index) => ({ ...folderActions.rowActions(folder, index), kind: 'folder' as const, id: folder.id, label: folder.name, count: folder.itemCount ?? null, color: folder.color })),
     { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: ready ? displayed.length : null },
   ]
   const folderSelect = (
@@ -750,6 +753,7 @@ export default function WebhooksOutgoingV8() {
       toolbar={narrow ? narrowToolbar : wideToolbar}
       pagination={pager}
       overlays={<>
+        {folderActions.dialogs}
         {folderDialogOpen ? (
           <FolderAddDialog
             kind="webhook"

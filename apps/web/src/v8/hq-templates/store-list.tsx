@@ -20,7 +20,8 @@ import type { HqTemplateFolder, HqTemplateListStats, TemplateKind } from '@line-
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
+import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import EmptyList from '@/components/shared/empty-list'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
@@ -35,7 +36,6 @@ import type { ActionMenuItem } from '@/components/shared/action-menu'
 import Select from '@/components/shared/select'
 import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
-import { TextField } from '@/components/shared/text-field'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { formatNumber } from '@/lib/format'
 import type { HqTemplate, TemplateType } from '@/lib/hq-templates-api'
@@ -117,8 +117,8 @@ export interface HqStoreListProps {
   folderLoadFailed: boolean
   folderFilter: string
   onFolderFilter: (id: string) => void
-  onAddFolder: (name: string) => Promise<void>
-  onRenameFolder: (folder: HqTemplateFolder, name: string) => Promise<void>
+  onAddFolder: (name: string, color: string | null) => Promise<void>
+  onRenameFolder: (folder: HqTemplateFolder, name: string, color: string | null) => Promise<void>
   onDeleteFolder: (folder: HqTemplateFolder) => Promise<void>
   onCreate: () => void
   onEdit: (row: HqTemplate) => void
@@ -152,6 +152,7 @@ export default function HqStoreList(props: HqStoreListProps) {
   /* 分類（フォルダ）の窓：足す・名前を変える（統括のひな形の分類は色を持たない）・消す。 */
   const [folderDialog, setFolderDialog] = useState<{ editing: HqTemplateFolder | null } | null>(null)
   const [folderName, setFolderName] = useState('')
+  const [folderColor, setFolderColor] = useState<string | null>(FOLDER_SELECT_COLORS[0].value)
   const [deletingFolder, setDeletingFolder] = useState<HqTemplateFolder | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
   const [folderError, setFolderError] = useState('')
@@ -242,10 +243,9 @@ export default function HqStoreList(props: HqStoreListProps) {
       label: folder.name,
       color: folder.color,
       count: ready ? countIn(folder.id) : null,
-      colorEditable: false,
       leadingActions: leadingActions(folder.id, folder.name),
       ...(canEdit ? {
-        onEdit: () => { setFolderError(''); setFolderName(folder.name); setFolderDialog({ editing: folder }) },
+        onEdit: () => { setFolderError(''); setFolderName(folder.name); setFolderColor(folder.color ?? null); setFolderDialog({ editing: folder }) },
         onDelete: () => { setFolderError(''); setDeletingFolder(folder) },
       } : {}),
     })),
@@ -258,7 +258,7 @@ export default function HqStoreList(props: HqStoreListProps) {
     <FolderPanel
       activeId={folderFilter}
       onSelect={selectFolder}
-      onAddFolder={canEdit ? () => { setFolderError(''); setFolderName(''); setFolderDialog({ editing: null }) } : undefined}
+      onAddFolder={canEdit ? () => { setFolderError(''); setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setFolderDialog({ editing: null }) } : undefined}
       addFolderLabel="フォルダを追加"
       rows={folderRows}
     >
@@ -274,8 +274,8 @@ export default function HqStoreList(props: HqStoreListProps) {
     setFolderBusy(true)
     setFolderError('')
     try {
-      if (folderDialog.editing) await onRenameFolder(folderDialog.editing, name)
-      else await onAddFolder(name)
+      if (folderDialog.editing) await onRenameFolder(folderDialog.editing, name, folderColor)
+      else await onAddFolder(name, folderColor)
       setFolderDialog(null)
     } catch (caught) {
       setFolderError(japaneseDetailOf(caught) || 'フォルダを保存できませんでした')
@@ -507,9 +507,10 @@ export default function HqStoreList(props: HqStoreListProps) {
       overlays={(
         <>
           {overlays}
-          <Dialog
+          <FolderEditorDialog
+            name={folderName} onNameChange={setFolderName} color={folderColor} onColorChange={setFolderColor} allowClear
             open={folderDialog !== null}
-            title={folderDialog?.editing ? 'フォルダの名前を変える' : 'フォルダを追加'}
+            title={folderDialog?.editing ? 'フォルダを直す' : 'フォルダを追加'}
             description={`${words.item}のひな形を分けてしまう箱です。消しても、中のひな形は未分類に残ります。`}
             busy={folderBusy}
             error={folderError || undefined}
@@ -517,9 +518,7 @@ export default function HqStoreList(props: HqStoreListProps) {
             cancelLabel="やめる"
             onCancel={() => { if (!folderBusy) setFolderDialog(null) }}
             onConfirm={() => void saveFolder()}
-          >
-            <TextField aria-label="フォルダの名前" value={folderName} maxLength={100} disabled={folderBusy} placeholder="例: お問い合わせ" onChange={(event) => setFolderName(event.target.value)} />
-          </Dialog>
+          />
           <ConfirmDialog
             open={deletingFolder !== null}
             title={`フォルダ「${deletingFolder?.name ?? ''}」を消しますか？`}
