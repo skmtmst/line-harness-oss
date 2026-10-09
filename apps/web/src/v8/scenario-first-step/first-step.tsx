@@ -771,7 +771,7 @@ export default function ScenarioFirstStepV8() {
             ) : null}
             {kind === 'image' ? (
               <div className={styles.kindBody}>
-                <ImageUploader mode="line-image" value={image} onChange={editImage} label="送る画像" />
+                <ImageUploader mode="line-image" value={image} onChange={editImage} label="送る画像" title="送る画像を追加" />
               </div>
             ) : null}
             {kind === 'question' ? <QuestionEditor value={question} onChange={editQuestion} /> : null}

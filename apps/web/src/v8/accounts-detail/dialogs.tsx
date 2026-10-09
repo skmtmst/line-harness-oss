@@ -8,6 +8,7 @@
  * 中身（帯・入力欄・下の操作）はここで並べる。保存の口・本人確認の流れは今の画面
  * （app/accounts/detail・components/accounts/account-edit-modal）と同じ。
  */
+import ImageUploader from '@/components/shared/image-uploader'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { Check, ShieldCheck } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
@@ -487,7 +488,7 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
-  const ids = { name: useId(), tz: useId(), login: useId(), liff: useId(), og: useId(), ogDesc: useId(), ogImage: useId(), cap: useId(), warn: useId(), icon: useId() }
+  const ids = { name: useId(), tz: useId(), login: useId(), liff: useId(), og: useId(), ogDesc: useId(), cap: useId(), warn: useId() }
 
   const close = () => {
     if (!busy) onClose()
@@ -597,9 +598,15 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
             <Field label="共有したときの説明" htmlFor={ids.ogDesc}>
               <TextField id={ids.ogDesc} value={ogDescription} onChange={(event) => setOgDescription(event.target.value)} disabled={busy} />
             </Field>
-            <Field label="共有したときの画像のURL" htmlFor={ids.ogImage}>
-              <TextField id={ids.ogImage} type="url" value={ogImageUrl} onChange={(event) => setOgImageUrl(event.target.value)} disabled={busy} />
-            </Field>
+            <ImageUploader
+              mode="url"
+              size="compact"
+              label="共有したときの画像"
+              title="共有したときの画像を追加"
+              disabled={busy}
+              value={ogImageUrl ? { mode: 'url', url: ogImageUrl } : null}
+              onChange={(next) => setOgImageUrl(next?.mode === 'url' ? next.url : '')}
+            />
           </>
         ) : null}
         <div className={styles.pair}>
@@ -610,9 +617,15 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
             <TextField id={ids.warn} inputMode="numeric" placeholder="警告しない" value={warnAt} onChange={(event) => setWarnAt(event.target.value)} disabled={busy} />
           </Field>
         </div>
-        <Field label="アイコンのURL" htmlFor={ids.icon}>
-          <TextField id={ids.icon} type="url" placeholder="https://example.com/icon.png" value={iconUrl} onChange={(event) => setIconUrl(event.target.value)} disabled={busy} />
-        </Field>
+        <ImageUploader
+          mode="url"
+          size="compact"
+          label="アイコン"
+          title="アイコンを追加"
+          disabled={busy}
+          value={iconUrl ? { mode: 'url', url: iconUrl } : null}
+          onChange={(next) => setIconUrl(next?.mode === 'url' ? next.url : '')}
+        />
         <ErrorLine message={error} />
       </Frame>
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}

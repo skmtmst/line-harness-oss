@@ -2109,6 +2109,7 @@ function AutoReplyWizardV8Inner() {
                   <ImageUploader
                     mode="line-image"
                     label="返信する画像"
+                    title="返信する画像を追加"
                     value={
                       imageContent
                         ? { mode: 'line-image', ...imageContent }

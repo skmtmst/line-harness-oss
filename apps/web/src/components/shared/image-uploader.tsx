@@ -24,6 +24,8 @@ export interface ImageUploaderProps {
   readOnly?: boolean
   disabled?: boolean
   size?: 'regular' | 'compact'
+  /** url の形の上限（MB）。既定 10。 */
+  maxMB?: number
 }
 
 /**
@@ -45,6 +47,7 @@ export default function ImageUploader({
   readOnly = false,
   disabled = false,
   size = 'regular',
+  maxMB = 10,
 }: ImageUploaderProps) {
   const [manualUrlMode, setManualUrlMode] = useState(false)
   const lineImage = mode === 'line-image'
@@ -62,10 +65,10 @@ export default function ImageUploader({
       if (!file.type.startsWith('image/')) return '画像ファイルのみアップロードできます'
       if (lineImage && !['image/jpeg', 'image/png'].includes(file.type)) return 'LINE 送信用は JPEG または PNG のみ対応'
       if (lineImage && file.size > 1024 * 1024) return 'LINE 送信用は 1MB 以下にしてください (preview サイズ制限)'
-      if (file.size > 10 * 1024 * 1024) return '10MB 以下にしてください'
+      if (file.size > maxMB * 1024 * 1024) return `${maxMB}MB 以下にしてください`
       return ''
     },
-    [lineImage],
+    [lineImage, maxMB],
   )
 
   const upload = useCallback(async (file: File) => {
@@ -84,7 +87,7 @@ export default function ImageUploader({
         title={title}
         value={previewUrl || null}
         accept={lineImage ? 'image/jpeg,image/png' : 'image/*'}
-        limitText={lineImage ? '1ファイル1メガバイト以内・JPEG・PNG' : '1ファイル10メガバイト以内・画像'}
+        limitText={lineImage ? '1ファイル1メガバイト以内・JPEG・PNG' : `1ファイル${maxMB}メガバイト以内・画像`}
         validate={validate}
         upload={upload}
         onChange={(next) => onChangeRef.current(next ? toValue(next) : null)}
