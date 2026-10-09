@@ -1,6 +1,7 @@
 'use client'
 
 
+import SharedStatusPill from '@/components/shared/status-pill'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar, { ListToolbarOptional } from '@/components/shared/list-toolbar'
@@ -1297,13 +1298,7 @@ export default function AutoRepliesListV8() {
                     </Td>
                   )}
                   <Td>
-                    <span
-                      className={`${styles.statePill} ${r.isActive ? styles.statePillActive : styles.statePillStopped}`}
-                      title={stopNote(r) ?? undefined}
-                    >
-                      <span style={{ width: 6, height: 6, borderRadius: 'var(--radius-pill)', background: 'currentColor' }} aria-hidden="true" />
-                      {r.isActive ? '有効' : '停止中'}
-                    </span>
+                    <SharedStatusPill tone={r.isActive ? 'success' : 'neutral'} title={stopNote(r) ?? undefined}>{r.isActive ? '有効' : '停止中'}</SharedStatusPill>
                     {!r.isActive && r.stopReason && (
                       <p className={styles.stateSub} style={{ maxWidth: 140 }} title={stopNote(r) ?? ''}>
                         {r.stopReason}

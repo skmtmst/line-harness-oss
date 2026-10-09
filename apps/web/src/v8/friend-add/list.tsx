@@ -11,6 +11,7 @@
  * データの口・保存の口・権限・失敗の扱いは app/friend-add-settings/list-v8.tsx と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
+import SharedStatusPill from '@/components/shared/status-pill'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -150,10 +151,7 @@ function statusTone(rule: FriendAddRule) {
 
 function StatusPill({ rule }: { rule: FriendAddRule }) {
   return (
-    <span className={styles.pill} data-tone={statusTone(rule)}>
-      <span className={styles.pillDot} aria-hidden="true" />
-      {statusLabel(rule)}
-    </span>
+    <SharedStatusPill tone={statusTone(rule) === 'active' ? 'success' : statusTone(rule) === 'always' ? 'info' : 'neutral'}>{statusLabel(rule)}</SharedStatusPill>
   )
 }
 

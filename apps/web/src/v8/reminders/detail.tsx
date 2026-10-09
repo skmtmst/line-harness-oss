@@ -6,6 +6,7 @@
  * 枠は型（PageFrame）。頭の中にタブを持つ形（絵の「板の頭」）は型の頭に無いので、ここで組む。
  * 読む口・操作は今の画面（app/reminders/detail/detail-v8.tsx）と同じ。BEHAVIOR.md に一覧がある。
  */
+import SharedStatusPill from '@/components/shared/status-pill'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
@@ -187,10 +188,7 @@ function csvFor(items: ReminderDeliveryRun[]): string {
 
 function StatusPill({ tone, children }: { tone: 'ok' | 'warn' | 'muted'; children: ReactNode }) {
   return (
-    <span className={styles.pill} data-tone={tone}>
-      <span className={styles.pillDot} aria-hidden="true" />
-      {children}
-    </span>
+    <SharedStatusPill tone={tone === 'ok' ? 'success' : tone === 'warn' ? 'warning' : 'neutral'}>{children}</SharedStatusPill>
   )
 }
 

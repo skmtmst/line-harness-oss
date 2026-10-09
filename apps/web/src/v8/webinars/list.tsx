@@ -12,6 +12,7 @@
  * データの口・保存の口・権限・失敗の扱いは app/webinars/list-v8.tsx と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
+import SharedStatusPill from '@/components/shared/status-pill'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import type { ReactNode } from 'react'
@@ -200,10 +201,7 @@ function toContextItems(items: ActionMenuItem[]): ContextMenuItem[] {
 
 function StatusPill({ webinar }: { webinar: WebinarListItem }) {
   return (
-    <span className={styles.pill} data-tone={statusTone(webinar)}>
-      <span className={styles.pillDot} aria-hidden="true" />
-      {statusLabel(webinar)}
-    </span>
+    <SharedStatusPill tone={statusTone(webinar) === 'active' ? 'success' : statusTone(webinar) === 'scheduled' ? 'info' : 'neutral'}>{statusLabel(webinar)}</SharedStatusPill>
   )
 }
 

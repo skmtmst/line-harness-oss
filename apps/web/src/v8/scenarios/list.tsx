@@ -10,6 +10,7 @@
  * 「シナリオを作る」は左のフォルダの列の上、行の右端は「…」（複製・配信結果・削除）、
  * 行の左の □ を選ぶと表の下にまとめての帯（止める・再開・フォルダへ移す）。
  */
+import SharedStatusPill from '@/components/shared/status-pill'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { readListUrlParam, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state'
@@ -995,10 +996,7 @@ export default function ScenariosListV8() {
                       <div className={styles.countSub}>{`読み終えた ${formatNumber(s.completedCount ?? 0)} 人`}</div>
                     </Td>
                     <Td>
-                      <span className={`${styles.statePill} ${s.isActive ? styles.statePillActive : styles.statePillStopped}`}>
-                        <span className={styles.stateDot} aria-hidden="true" />
-                        {s.isActive ? '稼働中' : '停止中'}
-                      </span>
+                      <SharedStatusPill tone={s.isActive ? 'success' : 'neutral'}>{s.isActive ? '稼働中' : '停止中'}</SharedStatusPill>
                     </Td>
                     <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
                       {/* 横並びにして、メニューの位置の目印（空の span）が行を1段増やさないようにする。 */}

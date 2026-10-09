@@ -7,6 +7,7 @@
  * 型（ListPage）と共通部品で一から組み直した。データの口・保存先は今と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import SharedStatusPill from '@/components/shared/status-pill'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
@@ -135,10 +136,7 @@ function StatusBadge({ broadcast }: { broadcast: ApiBroadcast }) {
   const key = broadcast.displayStatus ?? broadcast.status
   const label = broadcast.displayStatusLabel ?? key
   return (
-    <span className={styles.badge} data-tone={BADGE_TONE[key] ?? 'neutral'}>
-      <span className={styles.badgeDot} aria-hidden="true" />
-      {label}
-    </span>
+    <SharedStatusPill tone={BADGE_TONE[key] ?? 'neutral'}>{label}</SharedStatusPill>
   )
 }
 

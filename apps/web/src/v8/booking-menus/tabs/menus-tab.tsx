@@ -1,5 +1,6 @@
 'use client'
 
+import SharedStatusPill from '@/components/shared/status-pill'
 import TagPill from '@/components/shared/tag-pill'
 
 /* ① メニュー（owaS3）（settings-v8.tsx から分割。見た目・動きは変えない） */
@@ -332,10 +333,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
                   <span className={styles.cellNum}>{menu.booking_count_30_days ?? 0} 件</span>
                 </span>
                 <span className={styles.colStatus}>
-                  <span className={`${styles.statePill} ${(visOverride[menu.id] ?? menu.is_active) ? styles.statePillOn : styles.statePillOff}`}>
-                    <span className={styles.stateDot} aria-hidden="true" />
-                    {(visOverride[menu.id] ?? menu.is_active) ? '公開中' : '止めている'}
-                  </span>
+                  <SharedStatusPill tone={(visOverride[menu.id] ?? menu.is_active) ? 'success' : 'neutral'}>{(visOverride[menu.id] ?? menu.is_active) ? '公開中' : '止めている'}</SharedStatusPill>
                 </span>
                 <span className={styles.colMenu}>
                   <RowMenu

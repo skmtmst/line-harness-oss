@@ -12,6 +12,7 @@
  * 空のまま使われているときの黄色の帯は表の列の上、行の右端は「…」
  * （編集・止める／再開する・削除する）。右クリックでも同じものが出る。
  */
+import SharedStatusPill from '@/components/shared/status-pill'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -1314,10 +1315,7 @@ function CommonVarsListInner() {
                       {valueText || <span className={styles.valueEmpty}>（空）</span>}
                     </Td>
                     <Td>
-                      <span className={styles.statePill} data-tone={badge.tone}>
-                        <span className={styles.stateDot} aria-hidden="true" />
-                        {badge.label}
-                      </span>
+                      <SharedStatusPill tone={badge.tone}>{badge.label}</SharedStatusPill>
                     </Td>
                     {!narrow && (
                       <Td onClick={(event) => event.stopPropagation()}>
