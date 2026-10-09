@@ -422,16 +422,16 @@
       "url": "/hq/broadcasts/new",
       "unmeasurable": "幅 2520 の板（手順を横に並べた）。中の1枚ずつは目で照らす"
     },
-    "BERxg": {
-      "doc": "V8-B",
-      "name": "座席・卓管理 V8",
+    "vOtK2": {
+      "doc": "V8",
+      "name": "座席・卓（融合 B-186）",
       "kind": "画面",
       "route": "/restaurant-test/tables",
       "routes": [
         "/restaurant-test/tables"
       ],
       "width": 1440,
-      "shot": "lint/V8-B/shots/BERxg.png",
+      "shot": "lint/V8-B/shots/vOtK2.png",
       "url": "/restaurant-test/tables"
     },
     "BHEl9": {
@@ -3604,16 +3604,16 @@
       "shot": "lint/V8-B/shots/Y4LkX1.png",
       "url": "/emergency?tab=health"
     },
-    "Y8SjT2": {
-      "doc": "V8-B",
-      "name": "予約枠・在庫 V8",
+    "eZPzk": {
+      "doc": "V8",
+      "name": "予約枠・在庫（融合 B-186）",
       "kind": "画面",
       "route": "/restaurant-test/inventory",
       "routes": [
         "/restaurant-test/inventory"
       ],
       "width": 1440,
-      "shot": "lint/V8-B/shots/Y8SjT2.png",
+      "shot": "lint/V8-B/shots/eZPzk.png",
       "url": "/restaurant-test/inventory"
     },
     "Y9ASp": {
@@ -3737,16 +3737,16 @@
       "shot": "lint/V8/shots/Z2LIUx.png",
       "url": "/auto-replies/edit"
     },
-    "Z3FoM": {
-      "doc": "V8-B",
-      "name": "予約台帳 一覧 V8",
+    "xzR4g": {
+      "doc": "V8",
+      "name": "予約台帳 一覧・予約の詳細（融合 B-186）",
       "kind": "画面",
       "route": "/restaurant-test/reservations",
       "routes": [
         "/restaurant-test/reservations"
       ],
       "width": 1440,
-      "shot": "lint/V8-B/shots/Z3FoM.png",
+      "shot": "lint/V8-B/shots/xzR4g.png",
       "url": "/restaurant-test/reservations"
     },
     "Z6Hx5o": {
@@ -4010,16 +4010,16 @@
       "shot": "lint/V8/shots/bR6a1.png",
       "url": "/settings"
     },
-    "bSp4h": {
-      "doc": "V8-B",
-      "name": "組織・権限 V8",
+    "cgESv": {
+      "doc": "V8",
+      "name": "組織・権限（融合 B-186）",
       "kind": "画面",
       "route": "/restaurant-test/organization",
       "routes": [
         "/restaurant-test/organization"
       ],
       "width": 1440,
-      "shot": "lint/V8-B/shots/bSp4h.png",
+      "shot": "lint/V8-B/shots/cgESv.png",
       "url": "/restaurant-test/organization"
     },
     "bglah": {
@@ -4716,9 +4716,9 @@
       "shot": "lint/V8/shots/hEDTK.png",
       "url": "/templates"
     },
-    "hKRRF": {
+    "qwIZr": {
       "doc": "V8",
-      "name": "E-1 今日のお店（店舗ダッシュボード）V8",
+      "name": "今日のお店（融合 B-186）",
       "kind": "画面",
       "route": "/restaurant-test/dashboard",
       "routes": [
@@ -4902,14 +4902,14 @@
       "shot": "lint/V8/shots/hKr8f.png",
       "url": "/rich-menus/edit"
     },
-    "hQQlt": {
-      "doc": "V8-B",
-      "name": "予約枠・在庫 予約経路の連携 V8",
+    "mVUo3": {
+      "doc": "V8",
+      "name": "予約枠・在庫 予約経路の連携（融合 B-186）",
       "kind": null,
       "route": "/restaurant-test/inventory",
       "routes": [],
       "width": 1440,
-      "shot": "lint/V8-B/shots/hQQlt.png",
+      "shot": "lint/V8-B/shots/mVUo3.png",
       "url": "/restaurant-test/inventory"
     },
     "hadfk": {
@@ -5323,16 +5323,16 @@
       "shot": "lint/V8/shots/l87p1J.png",
       "url": "/templates/questions/new"
     },
-    "l9NlC0": {
-      "doc": "V8-B",
-      "name": "予約台帳 今日（時間×卓）V8",
+    "R2w4j": {
+      "doc": "V8",
+      "name": "予約台帳 今日（融合 B-186）",
       "kind": "画面",
       "route": "/restaurant-test/reservations",
       "routes": [
         "/restaurant-test/reservations"
       ],
       "width": 1440,
-      "shot": "lint/V8-B/shots/l9NlC0.png",
+      "shot": "lint/V8-B/shots/R2w4j.png",
       "url": "/restaurant-test/reservations"
     },
     "loVfW": {
@@ -7057,16 +7057,16 @@
       "shot": "lint/V8/shots/xHpkS.png",
       "url": "/friend-add-settings"
     },
-    "xLpnS": {
-      "doc": "V8-B",
-      "name": "LINE来店フォロー V8",
+    "n9vvGx": {
+      "doc": "V8",
+      "name": "LINE来店フォロー（融合 B-186）",
       "kind": "画面",
       "route": "/restaurant-test/line-followup",
       "routes": [
         "/restaurant-test/line-followup"
       ],
       "width": 1440,
-      "shot": "lint/V8-B/shots/xLpnS.png",
+      "shot": "lint/V8-B/shots/n9vvGx.png",
       "url": "/restaurant-test/line-followup"
     },
     "xRPdo": {
