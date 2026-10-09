@@ -107,14 +107,17 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   column-gap: var(--tpl-hq-plans-gap);
   row-gap: var(--tpl-hq-body-gap);
+  /* 1枚のカード＝頭・数・帯・ボタンの4段。行ごとに中身の高さ。 */
+  grid-auto-rows: auto;
 }
 
+/* 横に並ぶカードは4段の高さを共有する（頭が2行のカードがあっても、数・帯・ボタンの段が横でそろう）。 */
 .card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-hq-form-gap);
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 4;
+  row-gap: var(--tpl-hq-form-gap);
   min-width: 0;
-  min-height: var(--tpl-hql-home-card-h);
   padding: var(--tpl-hq-home-account-pad);
   border-radius: var(--radius-card);
   outline: 1px solid var(--color-hairline);
@@ -128,6 +131,7 @@
 .cardHead {
   display: flex;
   align-items: center;
+  align-self: start;
   gap: var(--tpl-hq-attach-gap);
   min-width: 0;
   flex-shrink: 0;
@@ -197,6 +201,7 @@
 .cardButtons {
   display: flex;
   align-items: center;
+  align-self: end;
   gap: var(--tpl-hq-plan-head-gap);
   margin-top: auto;
   flex-shrink: 0;
@@ -209,7 +214,7 @@
 
 .reasonSlot {
   min-width: 0;
-  min-height: 0;
+  min-height: var(--tpl-hq-home-reason-min);
   flex: 1;
 }
 
