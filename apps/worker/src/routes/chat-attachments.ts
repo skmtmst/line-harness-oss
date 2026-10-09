@@ -47,7 +47,7 @@ async function readBounded(body: ReadableStream<Uint8Array>, max: number): Promi
   return bytes;
 }
 
-chatAttachments.post('/api/chats/:id/attachments/upload', ...guards, inputJsonBoundary(), async c => {
+chatAttachments.post('/api/chats/:id/attachments/upload', ...guards, async c => {
   const owner = await target(c);
   if (!owner) return c.notFound();
   try {

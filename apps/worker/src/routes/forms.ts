@@ -1,6 +1,6 @@
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import type { FormSubmissionPostActions } from '@line-crm/shared';
-import { Hono, type Context } from 'hono';
+import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getForms,
   getFormsWithStats,
@@ -226,47 +226,6 @@ function validFormListFilter(value: string | undefined): FormListFilter {
 /** 一覧の並び順。知らない値は「最新の回答順」へ落とす（画面と同じ規則）。 */
 function validFormListSort(value: string | undefined): FormListSort {
   return value === 'answers' || value === 'updated' || value === 'name' ? value : 'latest-answer';
-}
-
-class FormArchiveBodyError extends Error {
-  constructor(readonly status: 400 | 413, message: string) {
-    super(message);
-  }
-}
-
-/** 小さい確認本文でも、宣言値と実際に読んだ量の両方へ上限を置く。 */
-async function readBoundedFormArchiveBody(request: Request): Promise<Record<string, unknown>> {
-  const declared = Number.parseInt(request.headers.get('Content-Length') ?? '', 10);
-  if (Number.isFinite(declared) && declared > FORM_ARCHIVE_BODY_MAX_BYTES) {
-    throw new FormArchiveBodyError(413, '送信内容が大きすぎます');
-  }
-  const reader = request.body?.getReader();
-  if (!reader) return {};
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > FORM_ARCHIVE_BODY_MAX_BYTES) {
-      await reader.cancel();
-      throw new FormArchiveBodyError(413, '送信内容が大きすぎます');
-    }
-    chunks.push(value);
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  try {
-    const parsed = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('object required');
-    return parsed as Record<string, unknown>;
-  } catch {
-    throw new FormArchiveBodyError(400, '送信内容を読み取れませんでした');
-  }
 }
 
 /** フォームの項目定義。forms.fields は JSON の配列で持っている。 */
@@ -1422,14 +1381,32 @@ forms.get('/api/forms/:id/delete-impact', requireRole('owner', 'admin'), async (
   }
 });
 
+/** 本文の解析より前に保管・保管解除の管理権限を確認する。 */
+const requireArchiveManage: MiddlewareHandler<Env> = async (c, next) => {
+  try {
+    if (!c.req.query('account_id')?.trim()) return inputError(c, { success: false, error: 'account_id is required' }, 400, ['account_id']);
+    const accountIds = await getFormAccountIds(c.env.DB, c.req.param('id')!);
+    const gate = await requireFormManage(c, accountIds);
+    if (gate) return gate;
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [c.req.query('account_id')!.trim()])) {
+      return c.json({ success: false, error: 'not found' }, 404);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), accountIds)) {
+      return c.json({ success: false, error: 'すべての利用先を確認する権限がありません' }, 403);
+    }
+    await next();
+  } catch (error) {
+    console.error('form archive permission error:', error);
+    return c.json({ success: false, error: '回答フォームの権限を確認できませんでした' }, 503);
+  }
+};
+
 // POST /api/forms/:id/archive — 公開を止め、回答と利用先を残して保管する。
-forms.post('/api/forms/:id/archive', inputJsonBoundary(), async (c) => {
+forms.post('/api/forms/:id/archive', requireArchiveManage, inputJsonBoundary({}, { maxBytes: FORM_ARCHIVE_BODY_MAX_BYTES }), async (c) => {
   try {
     const accountId = c.req.query('account_id')?.trim();
     if (!accountId) return inputError(c, { success: false, error: 'account_id is required' }, 400, ["account_id"]);
-    const archiveGate = await requireFormManage(c, await getFormAccountIds(c.env.DB, c.req.param('id')));
-    if (archiveGate) return archiveGate;
-    const body = await readBoundedFormArchiveBody(c.req.raw);
+    const body = await c.req.json<Record<string, unknown>>();
     const expectedRevision = typeof body.expectedRevision === 'number'
       ? body.expectedRevision
       : Number.NaN;
@@ -1483,9 +1460,6 @@ forms.post('/api/forms/:id/archive', inputJsonBoundary(), async (c) => {
       },
     });
   } catch (error) {
-    if (error instanceof FormArchiveBodyError) {
-      return inputError(c, { success: false, error: error.message }, error.status, []);
-    }
     console.error('POST /api/forms/:id/archive error:', error);
     return c.json({ success: false, error: '回答フォームを保管できませんでした' }, 503);
   }
@@ -1494,13 +1468,11 @@ forms.post('/api/forms/:id/archive', inputJsonBoundary(), async (c) => {
 // POST /api/forms/:id/unarchive — 保管の取り消し（B 元に戻す）。
 // 保管中の行だけ現行へ戻す。戻した直後は受付停止のまま。版がずれていたら
 // 読み直しを促す（保管口と同じ競合守り）。
-forms.post('/api/forms/:id/unarchive', inputJsonBoundary(), async (c) => {
+forms.post('/api/forms/:id/unarchive', requireArchiveManage, inputJsonBoundary({}, { maxBytes: FORM_ARCHIVE_BODY_MAX_BYTES }), async (c) => {
   try {
     const accountId = c.req.query('account_id')?.trim();
     if (!accountId) return inputError(c, { success: false, error: 'account_id is required' }, 400, ["account_id"]);
-    const unarchiveGate = await requireFormManage(c, await getFormAccountIds(c.env.DB, c.req.param('id')));
-    if (unarchiveGate) return unarchiveGate;
-    const body = await readBoundedFormArchiveBody(c.req.raw);
+    const body = await c.req.json<Record<string, unknown>>();
     const expectedRevision = typeof body.expectedRevision === 'number'
       ? body.expectedRevision
       : Number.NaN;
@@ -1551,9 +1523,6 @@ forms.post('/api/forms/:id/unarchive', inputJsonBoundary(), async (c) => {
       },
     });
   } catch (error) {
-    if (error instanceof FormArchiveBodyError) {
-      return inputError(c, { success: false, error: error.message }, error.status, []);
-    }
     console.error('POST /api/forms/:id/unarchive error:', error);
     return c.json({ success: false, error: '回答フォームを元に戻せませんでした' }, 503);
   }
