@@ -6,8 +6,8 @@ import { describe, expect, it } from 'vitest'
 /*
  * #673 視覚品質基盤の契約。
  *
- * A. カードの影は `--shadow-card` / `--shadow-float` の層状影（Beautiful
- *    shadows）に統一し、画面個別の任意値 shadow を残さない。
+ * A. カードの影は `--card-shadow`（2026-10-09 案A）へ統一する。
+ *    浮く面の影は `--shadow-float` などの既存値を保つ。
  * B. 押した感触・行ホバー・メニューの出入り・指標カードの骨組みを、
  *    共通のベースCSSと主要な指標カードへ入れる。
  *
@@ -23,11 +23,11 @@ const GLOBALS = readFileSync(join(HERE, 'globals.css'), 'utf8')
 const GLOBALS_CODE = GLOBALS.replace(/\/\*[\s\S]*?\*\//g, '')
 
 describe('#673 A. カード・パネルの立体感', () => {
-  it('カードの影は層状影（近距離の薄い影＋下端の光＋1pxリング）', () => {
-    const card = GLOBALS_CODE.match(/--shadow-card:\s*([^;]+);/)?.[1] ?? ''
-    // 3層の影。輪郭の1pxリングが罫線の代わりになる。
-    expect(card.split(',').length).toBeGreaterThanOrEqual(3)
-    expect(card).toContain('0px 0px 0px 1px')
+  it('カードは案Aのくっきりした2層の影と黒8%の線を使う', () => {
+    const card = GLOBALS_CODE.match(/--card-shadow:\s*([^;]+);/)?.[1] ?? ''
+    expect(card).toBe('0 1px 1px rgba(29, 29, 31, 0.16), 0 2px 4px rgba(29, 29, 31, 0.08)')
+    expect(GLOBALS_CODE).toMatch(/--card-edge:\s*rgba\(29, 29, 31, 0\.08\);/)
+    expect(GLOBALS_CODE).toMatch(/--shadow-card-surface:\s*var\(--card-shadow\);/)
   })
 
   it('浮いて見える面の影はカードより一段強い層状影', () => {
@@ -40,7 +40,7 @@ describe('#673 A. カード・パネルの立体感', () => {
     // components/shared/ は変更できないため、globals.css の属性規定で上書きする。
     // ★V7: ダイアログは最前面（段3）の影 `--shadow-overlay`。
     expect(GLOBALS_CODE).toMatch(/\[data-design-part="dialog"\]\[data-design-node\]\s*\{[^}]*var\(--shadow-overlay\)/)
-    expect(GLOBALS_CODE).toMatch(/aside\[aria-label="フォルダ"\]\s*\{[^}]*var\(--shadow-card\)/)
+    expect(GLOBALS_CODE).toMatch(/aside\[aria-label="フォルダ"\]\s*\{[^}]*var\(--card-shadow\)/)
     expect(GLOBALS_CODE).toMatch(/aside\[aria-label="フォルダ"\] \.shadow-lg\s*\{[^}]*var\(--shadow-float\)/)
   })
 
@@ -50,7 +50,7 @@ describe('#673 A. カード・パネルの立体感', () => {
       ['components/dashboard/qr-dialog.tsx', 'shadow-float'],
       ['components/dashboard/dashboard-editor.tsx', 'shadow-card'],
       ['app/chats/page.tsx', 'shadow-card'],
-      ['app/duplicates/page.tsx', 'shadow-card'],
+      ['app/duplicates/page.tsx', 'shadow-card-surface'],
     ] as const
     for (const [file, token] of migrated) {
       const source = readFileSync(join(SRC, file), 'utf8')

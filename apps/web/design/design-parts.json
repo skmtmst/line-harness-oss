@@ -498,11 +498,11 @@
           "resolved": "#ffffff"
         },
         {
-          "pencil": "XywGr effect: #1920261A 1,1,2",
+          "pencil": "XywGr effect → 2026-10-09 オーナー採用 案A",
           "class": "card",
           "prop": "box-shadow",
-          "source": "var(--shadow-card)",
-          "resolved": "0px 2px 3px -1px #1d1d1f14,0px 1px 0px 0px #1d1d1f05,0px 0px 0px 1px #1d1d1f14"
+          "source": "var(--card-shadow)",
+          "resolved": "0 1px 1px #1d1d1f29,0 2px 4px #1d1d1f14"
         },
         {
           "pencil": "ラベル fill: $ink-secondary",
@@ -1695,11 +1695,11 @@
           "resolved": "#ffffff"
         },
         {
-          "pencil": "X34VF effect: #1920261A 1,1,2",
+          "pencil": "X34VF effect → 2026-10-09 オーナー採用 案A",
           "class": "card",
           "prop": "box-shadow",
-          "source": "var(--shadow-card)",
-          "resolved": "0px 2px 3px -1px #1d1d1f14,0px 1px 0px 0px #1d1d1f05,0px 0px 0px 1px #1d1d1f14"
+          "source": "var(--card-shadow)",
+          "resolved": "0 1px 1px #1d1d1f29,0 2px 4px #1d1d1f14"
         },
         {
           "pencil": "dashboard card layout: vertical",
@@ -2870,11 +2870,11 @@
           "resolved": "12px"
         },
         {
-          "pencil": "VJKAT effect: card",
+          "pencil": "VJKAT effect → 2026-10-09 オーナー採用 案A",
           "class": "inline",
           "prop": "box-shadow",
-          "source": "var(--shadow-card)",
-          "resolved": "0px 2px 3px -1px #1d1d1f14,0px 1px 0px 0px #1d1d1f05,0px 0px 0px 1px #1d1d1f14"
+          "source": "var(--card-shadow)",
+          "resolved": "0 1px 1px #1d1d1f29,0 2px 4px #1d1d1f14"
         },
         {
           "pencil": "VJKAT header padding top/right",

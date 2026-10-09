@@ -81,7 +81,7 @@ export function ExternalImportWorkspace({
       {!loading && unmanaged.length > 0 ? (
         <div className={`grid items-start gap-4 ${styles.columns}`}>
           <div className="space-y-4">
-            <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
+            <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h2 className="text-ink text-sm font-bold">LINE側にあって、この管理画面に無いメニュー</h2>
                 <span className="text-ink-faint text-xs">{unmanaged.length}件</span>
@@ -108,7 +108,7 @@ export function ExternalImportWorkspace({
               </div>
             </section>
 
-            <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
+            <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface">
               <h2 className="text-ink mb-3 text-sm font-bold">取り込むと、できるようになること</h2>
               <ul className="space-y-3 text-xs text-ink-secondary">
                 <li>✓ 面ごとのボタンを、この画面から書き換えられます</li>
@@ -121,7 +121,7 @@ export function ExternalImportWorkspace({
 
           {selected ? (
             <aside className="space-y-4">
-              <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
+              <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface">
                 <h2 className="text-ink text-sm font-bold">選んだメニューの中身</h2>
                 <p className="text-ink mt-3 text-sm font-semibold">{selected.name || '名前なし'}</p>
                 <div className={`border-hairline bg-canvas-sunken mt-3 grid grid-cols-3 overflow-hidden rounded-control border ${selected.size.height * 2 > selected.size.width ? styles.previewLarge : styles.previewCompact}`}>

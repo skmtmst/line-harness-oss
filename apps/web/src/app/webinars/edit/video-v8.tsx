@@ -268,7 +268,7 @@ export default function VideoV8({
   return (
     <div className="min-w-0" data-webinar-pane="video" data-design-node={scheduled ? 'LPOe7' : 'VWNaA'}>
       <div className="min-w-0 flex-1 space-y-3">
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card" aria-label="動画">
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface" aria-label="動画">
           <h2 className="text-ink text-base font-bold">動画</h2>
           <div className="bg-canvas-sunken mt-3 flex items-center gap-3 rounded-control p-3">
             <span className="bg-ink flex h-12 w-20 shrink-0 items-center justify-center rounded-control" aria-hidden="true">
@@ -290,7 +290,7 @@ export default function VideoV8({
           <VideoStages webinarId={webinar.id} hasVideo={Boolean(webinar.videoPrefix || webinar.videoMediaId)} canEdit={canEdit} />
         </section>
 
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card" aria-label="公開期間">
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface" aria-label="公開期間">
           <h2 className="text-ink text-base font-bold">公開期間</h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="block">
@@ -329,7 +329,7 @@ export default function VideoV8({
           </div>
         </section>
 
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card" aria-label="配信枠">
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface" aria-label="配信枠">
           <h2 className="text-ink text-base font-bold">{scheduled ? '開催回' : '配信枠'} {webinar.schedule.length}件</h2>
           <p className="text-ink-faint mt-1 text-xs">視聴できる時間の枠です。枠が0だと公開できません。</p>
           {error ? <Notice tone="error" title="配信枠を保存できませんでした">{error}</Notice> : null}
@@ -509,7 +509,7 @@ export default function VideoV8({
           ) : null}
         </section>
 
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card" aria-label="視聴の数え方">
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface" aria-label="視聴の数え方">
           <h2 className="text-ink text-base font-bold">視聴の数え方</h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <div>

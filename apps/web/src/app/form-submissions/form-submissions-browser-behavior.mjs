@@ -238,6 +238,10 @@ async function openHarness(browser, {
     if (path === '/api/auth/session') {
       return json({ success: true, data: { id: 'staff-1', name: `${role}利用者`, role, permissionKeys: [] }, csrfToken: 'test-csrf' })
     }
+    // V8 は保存値でなくこの口で役割を読む。既定の空配列では管理者も閲覧用になる。
+    if (path === '/api/staff/me' && request.method() === 'GET') {
+      return json({ success: true, data: { id: 'staff-1', name: `${role}利用者`, role, permissionKeys: [] } })
+    }
     if (path === '/api/line-accounts') return json({ success: true, data: ACCOUNTS })
     // 左メニューは表示設定を読む。形が違うと画面全体が落ちるので、既定の形で返す。
     if (path === '/api/settings/features') {
@@ -923,6 +927,22 @@ try {
     // 保存済みの MediaSlot は URL の入口でなく画像の見本を出す。
     assert.equal(await linkDialog.getByRole('img', { name: 'カードの画像', exact: true }).getAttribute('src'), sent.ogImageUrl,
       'V8: 再読込で保存した画像URLを見本に使う')
+    await context.close()
+  }
+
+  // 管理者の編集を通すだけでなく、同じ役割の口で staff が閲覧用になることも守る。
+  {
+    const detail = { ...form(1, { id: 'form-1', name: '閲覧するフォーム' }), contentRevision: 4 }
+    const { context, page, state } = await openHarness(browser, {
+      role: 'staff', detail, theme: 'v8', formsByAccount: { 'account-a': [detail] },
+    })
+    await page.goto(`${baseUrl}/form-submissions/edit?id=form-1&tab=appearance`, { waitUntil: 'domcontentloaded' })
+    await page.getByText('閲覧のみで見ています。変える操作は管理者に頼んでください。', { exact: true }).waitFor({ timeout: 15_000 })
+    await page.locator('dd').getByText(detail.name, { exact: true }).waitFor({ timeout: 15_000 })
+    assert.equal(await page.locator('#fe-name').count(), 0, 'V8: 閲覧のみでは名前の入力欄を出さない')
+    assert.equal(await page.getByRole('button', { name: '下書きを保存', exact: true }).count(), 0, 'V8: 閲覧のみでは保存を出さない')
+    assert.equal(await page.getByRole('button', { name: 'この版を公開', exact: true }).count(), 0, 'V8: 閲覧のみでは公開を出さない')
+    assert.equal(state.putBodies.length, 0, 'V8: 閲覧のみでは保存を送らない')
     await context.close()
   }
 

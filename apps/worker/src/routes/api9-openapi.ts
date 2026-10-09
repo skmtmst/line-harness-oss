@@ -61,6 +61,33 @@ function operation(
   };
 }
 export const api9Paths: Record<string, unknown> = {
+  '/api/friend-add-rules/folders/{id}': {
+    delete: {
+      ...operation('友だち追加のフォルダを削除し、設定を未分類へ戻す', ['id'], undefined, { account_id: string }),
+      requestBody: {
+        required: false,
+        content: { 'application/json': { schema: {
+          type: 'object', properties: { accountId: string },
+        } } },
+      },
+      description: 'account_id または本文の accountId が必須。owner/admin のみ。公開版・実行履歴は削除しない。処理中の改名・色変更・削除は409。',
+      responses: {
+        '200': { description: 'フォルダのみ削除', content: { 'application/json': { schema: {
+          type: 'object', required: ['success', 'data'], properties: {
+            success: { const: true }, data: {
+              type: 'object', required: ['id', 'deleted'], properties: { id: string, deleted: { const: true } },
+            },
+          },
+        } } } },
+        '400': { description: 'アカウント未指定・入力不正' },
+        '401': { description: '未認証' },
+        '403': { description: '権限不足・閲覧のみ' },
+        '404': { description: 'フォルダなし・アカウントまたはテナント越境' },
+        '409': { description: '処理中にフォルダが更新された（VERSION_CONFLICT）' },
+        '500': { description: '削除失敗（変更は巻き戻す）' },
+      },
+    },
+  },
   '/api/scenario-drafts/{key}': {
     get: operation('配信に使わないシナリオ下書きを読む', ['key'], undefined, {
       lineAccountId: string,

@@ -250,7 +250,7 @@ export const QUICK_FILTERS: Array<[string, string]> = [
   ['starred', '★のみ表示'],
 ]
 
-const cardShadow = 'shadow-card'
+const cardShadow = 'shadow-card-surface'
 
 export const FRIEND_ATTRIBUTES_QA_GROUPS: TagGroup[] = [
   { id: 'qa-vip', accountId: null, name: 'VIP', sortOrder: 0, color: 'var(--color-status-warn-deep)', createdAt: '', updatedAt: '' },

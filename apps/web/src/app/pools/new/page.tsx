@@ -52,7 +52,7 @@ function NewPoolPageV7() {
       parent={['プール', '/pools']}
       variant="v6"
       aside={(
-        <section className="bg-canvas border-hairline rounded-card border p-5 shadow-card">
+        <section className="bg-canvas border-hairline rounded-card border p-5 shadow-card-surface">
           <h2 className="text-ink text-base font-bold">プレビュー</h2>
           <p className="text-ink-faint mt-1 text-xs">友だちが開く追加先と、現在の受け入れ先です。</p>
           <div className="bg-canvas-sunken rounded-control mt-4 p-4">

@@ -60,7 +60,7 @@ describe('保存値', () => {
     const taps = built.payload.tapAreas as Array<Record<string, unknown>>
     expect(taps.map(({ actionType, uri, text }) => ({ actionType, uri, text }))).toEqual([
       { actionType: 'message', uri: undefined, text: '予約の空き' },
-      { actionType: 'uri', uri: 'https://liff.line.me/L-1/?page=salon-book&menu=m1', text: undefined },
+      { actionType: 'uri', uri: 'https://liff.line.me/L-1/?page=salon-book&menu_id=m1', text: undefined },
       { actionType: 'uri', uri: 'https://liff.line.me/L-1/?page=form&id=f1', text: undefined },
       { actionType: 'uri', uri: 'https://liff.line.me/L-1/?page=visit-stamps', text: undefined },
     ])

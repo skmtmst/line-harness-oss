@@ -19,6 +19,8 @@ export interface AssetCardInput {
   description?: unknown;
   actionLabel?: unknown;
   actionUrl?: unknown;
+  actionType?: unknown;
+  actionText?: unknown;
 }
 
 export interface AssetPayloadInput {
@@ -135,7 +137,7 @@ interface CarouselColumn {
   thumbnailImageUrl?: string;
   title?: string;
   text: string;
-  actions: Array<{ type: 'uri'; label: string; uri: string }>;
+  actions: Array<{ type: 'uri'; label: string; uri: string } | { type: 'message'; label: string; text: string }>;
 }
 
 function convertCardMessage(name: string, payload: AssetPayloadInput): AssetConversion {
@@ -147,6 +149,8 @@ function convertCardMessage(name: string, payload: AssetPayloadInput): AssetConv
     description: text(card.description),
     actionLabel: text(card.actionLabel),
     actionUrl: text(card.actionUrl),
+    actionType: card.actionType ?? 'uri',
+    actionText: text(card.actionText),
   }));
 
   // 画像の有無は全部そろえる決まり。1枚だけ違うと、その枚だけ高さが
@@ -161,8 +165,10 @@ function convertCardMessage(name: string, payload: AssetPayloadInput): AssetConv
     const card = cards[index];
     const body = card.description || card.title;
     if (!body) return { ok: false, error: `パネル${index + 1}の説明を入力してください` };
-    if (!card.actionUrl) return { ok: false, error: `パネル${index + 1}のリンク先を入力してください（配信で開くページ）` };
-    if (!httpsUrl(card.actionUrl)) {
+    if (!['uri', 'message'].includes(String(card.actionType))) return { ok: false, error: `パネル${index + 1}はURLまたはメッセージを選んでください` };
+    if (card.actionType === 'message' && (!card.actionText || [...card.actionText].length > 300)) return { ok: false, error: `パネル${index + 1}の送る文章は1〜300文字で入力してください` };
+    if (card.actionType !== 'message' && !card.actionUrl) return { ok: false, error: `パネル${index + 1}のリンク先を入力してください（配信で開くページ）` };
+    if (card.actionType !== 'message' && !httpsUrl(card.actionUrl)) {
       return { ok: false, error: `パネル${index + 1}のリンク先は https:// から始まるURLにしてください` };
     }
     // タイトルか画像があると本文に使える文字数が半分になる（LINE の決まり）。
@@ -174,7 +180,9 @@ function convertCardMessage(name: string, payload: AssetPayloadInput): AssetConv
       ...(card.imageUrl ? { thumbnailImageUrl: card.imageUrl } : {}),
       ...(card.title ? { title: card.title } : {}),
       text: body,
-      actions: [{ type: 'uri', label: card.actionLabel || '詳しく見る', uri: card.actionUrl }],
+      actions: [card.actionType === 'message'
+        ? { type: 'message', label: card.actionLabel || '送る', text: card.actionText }
+        : { type: 'uri', label: card.actionLabel || '詳しく見る', uri: card.actionUrl }],
     });
   }
 

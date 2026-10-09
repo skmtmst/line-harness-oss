@@ -60,6 +60,20 @@ async function createAsset(body: Record<string, unknown>) {
 }
 
 describe('F4 素材の公開・下書き・版', () => {
+  it('リッチメッセージのpostbackは保存HTTPで400になり、下書きも作らない', async () => {
+    const res = await createAsset({
+      lineAccountId: 'account-1', kind: 'rich_message', name: '押したら',
+      payload: {
+        imageUrl: 'https://example.com/image.jpg', baseUrl: 'https://example.com/map',
+        baseSize: { width: 1040, height: 1040 },
+        tapAreas: [{ x: 0, y: 0, width: 100, height: 100, actionType: 'postback', data: 'action' }],
+      },
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ success: false, error: expect.stringContaining('postback') });
+    expect(store.raw.prepare('SELECT count(*) AS n FROM broadcast_message_assets').get()).toEqual({ n: 0 });
+  });
+
   it('新規は未公開の下書きで始まる', async () => {
     const res = await createAsset({
       lineAccountId: 'account-1', kind: 'coupon', name: '新しい素材', payload: COUPON, folderId: 'folder-1',

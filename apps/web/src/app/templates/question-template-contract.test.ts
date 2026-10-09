@@ -51,10 +51,10 @@ describe('V6 質問テンプレート', () => {
 
 describe('V6 質問テンプレートの寸法', () => {
   it('パネルの角丸と影をV6の値にそろえる', () => {
-    // 角丸と影は1系統になった。card=10px、影は `--shadow-card` だけ。
+    // 角丸と影は1系統になった。card=10px、影は `--card-shadow` を読む。
     const panels = page.match(/rounded-card/g) ?? []
     expect(panels.length).toBeGreaterThanOrEqual(5)
-    expect(page).toContain('shadow-card')
+    expect(page).toContain('shadow-card-surface')
     expect(page).not.toContain('rounded-lg')
     expect(page).not.toContain('rounded-xl')
   })

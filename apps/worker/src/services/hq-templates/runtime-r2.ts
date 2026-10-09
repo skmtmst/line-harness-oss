@@ -1,5 +1,6 @@
 import { copyHqMediaStream } from '../hq-media-stream.js';
 import { hqMediaGate } from '../hq-media.js';
+import { resolveHqLiffActions, messageLiffActions } from './liff-actions.js';
 import { captureDistributionName } from './distribution-display.js';
 import { withTextOverride } from './text-overrides.js';
 import { HQ_AUTHORED_MESSAGE_ID, isRegisteredHqMedia } from './authoring-media.js';
@@ -39,15 +40,19 @@ async function messageSnapshot(b:R2RuntimeBinding,account:string,execution=false
   const table=definition.asset ? 'broadcast_message_assets' : 'templates';
   const templates=(await b.db.prepare(`SELECT id,name,updated_at AS updatedAt FROM ${table} WHERE line_account_id=? ORDER BY id`).bind(account).all<MessageTemplateTargetSnapshot['templates'][number]>()).results;
   const media=(await b.db.prepare(`SELECT m.id,m.filename,m.mime_type AS mimeType,m.size_bytes AS sizeBytes,m.r2_key AS r2Key,m.public_url AS publicUrl,COALESCE(v.content_hash,'') AS contentHash,COALESCE(v.created_at || ':' || COALESCE(v.content_hash,'') || ':' || v.r2_key,'') AS revision,COALESCE(v.version_no,0) AS versionNo FROM media m LEFT JOIN media_versions v ON v.media_id=m.id AND v.version_no=(SELECT MAX(v2.version_no) FROM media_versions v2 WHERE v2.media_id=m.id) WHERE m.line_account_id=? ORDER BY m.id`).bind(account).all<MessageTemplateTargetSnapshot['media'][number]>()).results;
-  const references = await cardReferences(b, account, definition.card, execution);
+  const references = await cardReferences(b, account, definition, execution);
   const resources=await templateReferencePlan(b,definition,account,execution);
   const referenceSnapshot=resources.matches.map(ref=>[richReferenceKey(ref),ref.targetId,ref.expectedRevision,ref.operation]);
   return {tenantId:b.authority.tenantId,targetAccountId:account,templates,media,snapshotToken:`hqts1.${await digest(JSON.stringify([...((references.snapshot.length ? [templates,media,references.snapshot] : [templates,media])),...(referenceSnapshot.length ? [referenceSnapshot] : [])]))}` as HqTemplateSnapshotToken};
 }
-async function cardReferences(b:R2RuntimeBinding, account:string, card?: import('@line-crm/shared').HqMessageCard, execution=false) {
-  try { return await messageCardReferences(b.db, b.authority, account, card); }
+async function cardReferences(b:R2RuntimeBinding, account:string, definition: import('@line-crm/shared').MessageTemplateDefinition, execution=false) {
+  try {
+    const card = await messageCardReferences(b.db, b.authority, account, definition.card && { ...definition.card, buttons: definition.card.buttons.filter(button => button.action === 'scenario') });
+    const liff = await resolveHqLiffActions(b.db, b.authority, account, messageLiffActions(definition));
+    return { targets: { ...card.targets, ...liff.targets }, snapshot: [...card.snapshot, ...liff.snapshot], statements: [...card.statements, ...liff.statements] };
+  }
   catch (error) {
-    if (error instanceof HqTemplateError) return fail(execution ? 'VERSION_CONFLICT' : 'CARD_REFERENCE_UNAVAILABLE');
+    if (error instanceof HqTemplateError) return fail(execution ? 'VERSION_CONFLICT' : error.code === 'LIFF_UNAVAILABLE' ? 'LIFF_UNAVAILABLE' : 'CARD_REFERENCE_UNAVAILABLE');
     throw error;
   }
 }
@@ -293,7 +298,7 @@ function boundedRichBucket(b:R2RuntimeBinding):Bucket {
 }
 async function messageAdapter(b:R2RuntimeBinding,context:HqTemplateAdapterContext,input:HqTemplateAdapterInput,sourceGuards:HqTemplateStatement[]) {
   const definition=parseMessageTemplateDefinition(JSON.parse(input.definitionJson));
-  const references = await cardReferences(b, context.targetAccountId, definition.card, context.preflightId !== 'inspect');
+  const references = await cardReferences(b, context.targetAccountId, definition, context.preflightId !== 'inspect');
   sourceGuards.push(...references.statements);
   const resourcePlan=await templateReferencePlan(b,definition,context.targetAccountId,context.preflightId!=='inspect');
   if(context.preflightId!=='inspect') for(const ref of resourcePlan.matches) {
@@ -328,6 +333,7 @@ async function messageAdapter(b:R2RuntimeBinding,context:HqTemplateAdapterContex
     },
     cardTargets: references.targets,
     referenceTargets: Object.fromEntries(resourcePlan.matches.map(ref=>[ref.sourceId,ref.targetId])),
+    liffTargets: Object.fromEntries(Object.entries(references.targets).filter(([key]) => key.startsWith('https://'))),
     resolveSourceVersion:async({authority,templateVersionId})=>{
       const v=await sourceVersion(b);if(authority.tenantId!==b.authority.tenantId||authority.sourceAccountId!==sourceAccountId||templateVersionId!==b.templateVersionId||v.definition_json!==input.definitionJson)fail('SOURCE_VERSION_UNAVAILABLE');
       return {tenantId:b.authority.tenantId,templateVersionId:b.templateVersionId,sourceAccountId,definitionJson:input.definitionJson,media:bindings};

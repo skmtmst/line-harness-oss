@@ -1,3 +1,4 @@
+import { swapHqFolderOrder,HqFolderError } from '@line-crm/db';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 import { hqBroadcastApprovalState, hqBroadcastApprovalCandidates, updateHqApproval } from '../services/hq-broadcast-approval.js';
 import { hqBroadcastRecipients, hqBroadcastActivity, testHqBroadcast } from '../services/hq-broadcast-details.js';
@@ -28,17 +29,22 @@ hqBroadcasts.get('/api/hq/broadcasts/approvals/candidates',async c=>{
  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),true);
  return c.json({success:true,data:(await hqBroadcastApprovalCandidates(db,a.tenantId)).filter(r=>r.id!==a.actorId).map(r=>({...r,canApprove:true}))});
 });
+hqBroadcasts.post('/api/hq/broadcasts/folders/:id/swap-order',async c=>{
+ const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff')),b=await c.req.json();
+ try {return c.json({success:true,data:await swapHqFolderOrder(db,'hq_broadcast_folders',a.tenantId,c.req.param('id'),{withId:b.withId,expectedRevision:b.expectedVersion,withExpectedRevision:b.withExpectedVersion})});}
+ catch(e){if(e instanceof HqFolderError)return c.json({success:false,error:e.code},e.status);throw e;}
+});
 hqBroadcasts.get('/api/hq/broadcasts/folders',async c=>{
  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),true);
- return c.json({success:true,data:(await db.prepare(`SELECT f.id,f.name,f.revision,f.color,
+ return c.json({success:true,data:(await db.prepare(`SELECT f.id,f.name,f.revision,f.color,f.display_order,
    (SELECT COUNT(*) FROM hq_broadcast_runs r WHERE r.tenant_id=f.tenant_id AND json_extract(r.input_json,'$.folderId')=f.id) AS item_count
-   FROM hq_broadcast_folders f WHERE tenant_id=? AND archived_at IS NULL ORDER BY name,id`).bind(a.tenantId).all()).results});
+   FROM hq_broadcast_folders f WHERE tenant_id=? AND archived_at IS NULL ORDER BY display_order,name,id`).bind(a.tenantId).all()).results});
 });
 hqBroadcasts.post('/api/hq/broadcasts/folders',async c=>{
  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff')),b=await c.req.json<{name:string;color?:string|null}>();
  if(typeof b.name!=='string'||!b.name.trim()||b.name.length>100)throw new StampError('分類名を確認してください');
  if(b.color!==undefined&&!isFolderSelectColor(b.color))return c.json({success:false,error:'フォルダの色を確認してください'},422);
- const id=crypto.randomUUID();await db.prepare('INSERT INTO hq_broadcast_folders(id,tenant_id,name,color) VALUES(?,?,?,?)').bind(id,a.tenantId,b.name.trim(),b.color??null).run();
+ const id=crypto.randomUUID();await db.prepare('INSERT INTO hq_broadcast_folders(id,tenant_id,name,color,display_order) SELECT ?,?,?,?,COALESCE(MAX(display_order),-1)+1 FROM hq_broadcast_folders WHERE tenant_id=? AND archived_at IS NULL').bind(id,a.tenantId,b.name.trim(),b.color??null,a.tenantId).run();
  return c.json({success:true,data:{id,name:b.name.trim(),color:b.color??null,revision:1}},201);
 });
 hqBroadcasts.patch('/api/hq/broadcasts/folders/:id',async c=>{
