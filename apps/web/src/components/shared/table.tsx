@@ -194,6 +194,14 @@ export function Tr({ children, className, selected, interactive, density, leavin
       aria-selected={selected === undefined ? undefined : selected}
       data-leaving={leaving || undefined}
       {...rowProps}
+      onClick={(event) => {
+        if (event.defaultPrevented || (event.target as HTMLElement).closest('a,button,input,select,textarea,[role="button"],[role="checkbox"],[role="menuitem"]')) return
+        if (rowProps.onClick) { rowProps.onClick(event); return }
+        const link = event.currentTarget.querySelector<HTMLAnchorElement>('a[data-row-link],a[href]')
+        if (!link) return
+        if (event.metaKey || event.ctrlKey || event.shiftKey) window.open(link.href, '_blank', 'noopener,noreferrer')
+        else link.click()
+      }}
     >
       {children}
     </tr>

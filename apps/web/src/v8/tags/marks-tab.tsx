@@ -272,7 +272,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
     ] : []
     if (!canEdit) return [{ id: 'open', label: '詳しく見る', onSelect: () => openMarkDetail(mark.id) }]
     return [
-      { id: 'edit', label: '編集', external: true, onSelect: () => router.push(`/tags/marks/edit?id=${encodeURIComponent(mark.id)}`) },
+      { id: 'edit', label: '編集', external: true, href: `/tags/marks/edit?id=${encodeURIComponent(mark.id)}`, onSelect: () => router.push(`/tags/marks/edit?id=${encodeURIComponent(mark.id)}`) },
       {
         id: 'archive',
         label: '保管する',

@@ -228,7 +228,7 @@ export default function BroadcastDetail({
       label: '複製して作る',
       icon: <Copy size={14} aria-hidden="true" />,
       external: true,
-      onSelect: () => router.push(duplicateHref),
+      href: duplicateHref, onSelect: () => router.push(duplicateHref),
     },
   ]
   if (isScheduled) {

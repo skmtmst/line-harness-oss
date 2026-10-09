@@ -110,11 +110,11 @@ function isPageSize(value: number): value is PageSize {
 }
 
 /** 数の帯の「…」。今の「受信箱を開く」はここへ移した。 */
-function KpiMenu({ title, onOpen }: { title: string; onOpen: () => void }) {
+function KpiMenu({ title, href, onOpen }: { title: string; href: string; onOpen: () => void }) {
   const [open, setOpen] = useState(false)
   return (
     <span className={styles.kpiMenu}>
-      <RowMenu className={styles.kpiMenuButton} label={`${title}のメニュー`} open={open} onOpenChange={setOpen} items={[{ id: 'inbox', label: '受信箱を開く', external: true, onSelect: () => { setOpen(false); onOpen() } }]} />
+      <RowMenu className={styles.kpiMenuButton} label={`${title}のメニュー`} open={open} onOpenChange={setOpen} items={[{ id: 'inbox', label: '受信箱を開く', external: true, href, onSelect: () => { setOpen(false); onOpen() } }]} />
     </span>
   )
 }
@@ -554,7 +554,7 @@ export default function FriendsListV8() {
               {kpi.delta.text}
             </span>
           ) : undefined}
-          menu={<KpiMenu title={kpi.title} onOpen={() => router.push(kpi.href)} />}
+          menu={<KpiMenu title={kpi.title} href={kpi.href} onOpen={() => router.push(kpi.href)} />}
         />
       ))}
     </KpiBand>

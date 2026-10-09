@@ -381,7 +381,7 @@ export default function AutoReplyRunsV8() {
         label: 'トークを開く',
         icon: <MessageCircle size={14} aria-hidden="true" />,
         external: true,
-        onSelect: () => { router.push(`/chats?friend=${encodeURIComponent(item.friendId)}`) },
+        href: `/chats?friend=${encodeURIComponent(item.friendId)}`, onSelect: () => { router.push(`/chats?friend=${encodeURIComponent(item.friendId)}`) },
       })
     }
     if (canManage && item.canRetry) {

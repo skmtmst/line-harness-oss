@@ -44,6 +44,7 @@ import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/a
 import { ListPage } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
+import DetailPanel from '@/components/shared/detail-panel'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import Select from '@/components/shared/select'
@@ -211,6 +212,7 @@ export default function RichMenusListV8() {
   const activeAccountRef = useRef<string | null>(selectedAccount?.id ?? null)
   const importRequestGenerationRef = useRef(0)
   const externalLoadedRef = useRef(false)
+  const [detailId, setDetailId] = useState<string | null>(null)
   const [groups, setGroups] = useState<RichMenuGroupListItem[]>([])
   const [external, setExternal] = useState<{ currentDefault: string | null; lineMenus: LineMenu[] } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -996,7 +998,7 @@ export default function RichMenusListV8() {
       loadFailure?.description
         ?? '登録したメニューは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。',
       loadFailure === null || loadFailure.retryable
-        ? <Button type="button" onClick={() => void reload()}>もう一度試す</Button>
+        ? <Button type="button" onClick={() => void reload()}>もう一度読み込む</Button>
         : null,
       'error',
     )
@@ -1042,12 +1044,12 @@ export default function RichMenusListV8() {
                   className={styles.row}
                   leaving={leavingId === g.id}
                   tabIndex={0}
-                  onClick={() => router.push(`/rich-menus/edit?id=${g.id}`)}
+                  onClick={() => setDetailId(g.id)}
                   onKeyDown={(event) => {
                     if (event.target !== event.currentTarget) return
                     if (event.key === 'Enter') {
                       event.preventDefault()
-                      router.push(`/rich-menus/edit?id=${g.id}`)
+                      setDetailId(g.id)
                     }
                   }}
                 >
@@ -1091,7 +1093,7 @@ export default function RichMenusListV8() {
                         href={`/rich-menus/edit?id=${g.id}`}
                         title={g.name}
                         className={styles.name}
-                        onClick={(event) => event.stopPropagation()}
+                        onClick={(event) => { event.stopPropagation(); if (!event.ctrlKey && !event.metaKey && !event.shiftKey) { event.preventDefault(); setDetailId(g.id) } }}
                       >
                         {g.name}
                       </Link>
@@ -1435,7 +1437,10 @@ export default function RichMenusListV8() {
 
         {blockedDialog}
         {deleteConfirm}
-      </>}
+        <DetailPanel open={detailId !== null} title={groups.find(group => group.id === detailId)?.name ?? 'リッチメニュー'} onClose={() => setDetailId(null)} footer={detailId ? <Button href={`/rich-menus/edit?id=${encodeURIComponent(detailId)}`}>{canEdit ? '編集する' : '詳しく見る'}</Button> : undefined}>
+        <p>このリッチメニューの中身や設定は「{canEdit ? '編集する' : '詳しく見る'}」から確認できます。</p>
+      </DetailPanel>
+    </>}
     >
       {actionError ? (
         <p className={styles.errorBand} role="alert">

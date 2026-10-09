@@ -838,7 +838,7 @@ export default function FormsListV8() {
   /* ===== 行の「…」（編集・名前を変更・集まった回答・複製・受付を止める・フォルダへ移す・アーカイブ・削除） ===== */
   const rowMenuItems = (form: Form): ActionMenuItem[] => !canEditForms ? [{
     id: 'responses', label: '集まった回答', external: true,
-    onSelect: () => router.push(`/form-submissions/responses?id=${encodeURIComponent(form.id)}`),
+    href: `/form-submissions/responses?id=${encodeURIComponent(form.id)}`, onSelect: () => router.push(`/form-submissions/responses?id=${encodeURIComponent(form.id)}`),
   }] : [
     {
       id: 'edit',
@@ -850,7 +850,7 @@ export default function FormsListV8() {
       id: 'responses',
       label: '集まった回答',
       external: true,
-      onSelect: () => router.push(`/form-submissions/responses?id=${encodeURIComponent(form.id)}`),
+      href: `/form-submissions/responses?id=${encodeURIComponent(form.id)}`, onSelect: () => router.push(`/form-submissions/responses?id=${encodeURIComponent(form.id)}`),
     },
     { id: 'duplicate', label: '複製', onSelect: () => openDuplicate(form) },
     ...(form.isActive

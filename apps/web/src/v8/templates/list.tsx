@@ -778,7 +778,7 @@ export default function TemplatesListV8() {
         id: 'usage',
         label: '使っている所を見る',
         external: true,
-        onSelect: () => withViewTransition(() => router.push(detailHref(t))),
+        href: detailHref(t), onSelect: () => withViewTransition(() => router.push(detailHref(t))),
       },
       {
         id: 'broadcast',
