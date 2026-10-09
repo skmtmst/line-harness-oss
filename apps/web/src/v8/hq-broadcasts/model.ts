@@ -1,3 +1,4 @@
+import { scheduledJstIso } from '@/lib/jst-datetime'
 /*
  * 統括の一括配信（提案 E-9）の計算だけを集めた所。画面（create.tsx・detail.tsx・list.tsx）と試験が使う。
  * 口の形は `@line-crm/shared` の HqBroadcast*（正本は apps/worker/src/services/hq-broadcasts.ts）。
@@ -173,16 +174,14 @@ const WEEK = ['日', '月', '火', '水', '木', '金', '土']
 /** 「1月15日（木）11:00」。 */
 export function jpDateTime(iso: string | null | undefined): string {
   if (!iso) return '—'
-  const d = new Date(iso)
+  const d = new Date(new Date(iso).getTime() + 9 * 3_600_000)
   if (Number.isNaN(d.getTime())) return '—'
-  return `${d.getMonth() + 1}月${d.getDate()}日（${WEEK[d.getDay()]}）${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
+  return `${d.getUTCMonth() + 1}月${d.getUTCDate()}日（${WEEK[d.getUTCDay()]}）${d.getUTCHours()}:${String(d.getUTCMinutes()).padStart(2, '0')}`
 }
 
-/** 日付（YYYY-MM-DD）と時刻（HH:MM）から、端末の時刻での ISO を作る。 */
+/** 日付（YYYY-MM-DD）と時刻（HH:MM）から、日本時間の ISO を作る。 */
 export function scheduledIso(date: string, time: string): string | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return null
-  const d = new Date(`${date}T${time}:00`)
-  return Number.isNaN(d.getTime()) ? null : d.toISOString()
+  return scheduledJstIso(date, time)
 }
 
 /** 店ごとの失敗の理由（口の failureReasons）。運用者の言葉の label と人数・やり直せるか。 */

@@ -11,6 +11,7 @@
  * 開け閉めの段で残す（絵の表の下の案内どおり、操作を落とさない）。
  * 決めごとの編集の器（試す・保存・公開の手順）は /mileage/score-rules の画面。
  */
+import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Activity, Bookmark, ChevronDown, ChevronUp, CircleMinus, CirclePlus, Download, Minus, Plus, Send, Settings2, Star, TrendingDown, Upload, UserRound } from 'lucide-react'
@@ -220,7 +221,7 @@ export default function ScoreTab() {
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `action-scores-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = `action-scores-${jstDate()}.csv`
     anchor.click()
     URL.revokeObjectURL(url)
   }

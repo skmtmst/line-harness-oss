@@ -1,5 +1,6 @@
 'use client'
 
+import { jstDate } from '@/lib/jst-datetime'
 import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import MenuPortal from './menu-portal'
@@ -272,8 +273,7 @@ export default function DateField({
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
 
 function today(): Date {
-  const now = new Date()
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  return parseDate(jstDate())!
 }
 
 /** `YYYY-MM-DD`（`YYYY-MM-DDTHH:mm` の日付部分も可）を、その日の 0 時の Date にする。 */

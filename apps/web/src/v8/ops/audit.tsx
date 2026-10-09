@@ -1,5 +1,6 @@
 'use client'
 
+import { jstDate } from '@/lib/jst-datetime'
 import { CircleDot, Download, Star } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsAuditRow } from '@/lib/api'
@@ -105,7 +106,7 @@ export default function OpsAuditV8() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `musubo-audit-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `musubo-audit-${jstDate()}.csv`
     a.click()
     URL.revokeObjectURL(url)
     setExportNote(truncated

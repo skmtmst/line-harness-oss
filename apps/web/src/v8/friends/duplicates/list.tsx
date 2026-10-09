@@ -7,6 +7,7 @@
  * 見せ方：頭（← 友だちへ・タブ・表示中をCSVで書き出す）→ 案内の帯 → 数4つ →
  * 探す・状態の札・見直した時刻・もう一度見直す → 重複の候補（比べて決める）→ アカウントごとの重なり。
  */
+import { jstDate } from '@/lib/jst-datetime'
 import Link from 'next/link'
 import { Download, Info, RotateCw } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
@@ -51,7 +52,7 @@ export default function DuplicatesListV8() {
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `duplicates-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = `duplicates-${jstDate()}.csv`
     anchor.click()
     URL.revokeObjectURL(url)
   }

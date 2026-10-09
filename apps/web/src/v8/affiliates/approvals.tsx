@@ -9,6 +9,7 @@
  * 行の右端は「認める」と「…」（認める・認めない・付帯動作をやり直す・詳細を見る）。
  * 左のチェックで選ぶと下から一括バー →「操作を選ぶ」（hadfk）→ 確かめる → 結果。
  */
+import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Ban, Check, CircleCheck, CircleHelp, Download, Hourglass, ListChecks, ShieldAlert, X } from 'lucide-react'
 import { api, type ConversionApprovalItem } from '@/lib/api'
@@ -290,7 +291,7 @@ export default function ApprovalsTab() {
   }
 
   const exportCsv = () => {
-    downloadCsv(`conversion-approvals-${new Date().toISOString().slice(0, 10)}.csv`, [
+    downloadCsv(`conversion-approvals-${jstDate()}.csv`, [
       ['日時', '友だち', 'アフィリエイター', 'アカウント', '案件', '成果地点', '注文番号', '金額', '確認状態'],
       ...shownItems.map((item) => [
         formatMonthDayTime(item.createdAt),

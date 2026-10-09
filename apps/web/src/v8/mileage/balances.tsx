@@ -10,6 +10,7 @@
  * 口に残高あり・確定待ちの絞り込みは無い。札を押したときは全件を読み切ってから
  * 絞る（読んだ頁の中だけで絞ると 21 件目以降が検索に出ない）。
  */
+import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, CircleDot, Clock3, Download, RefreshCw, TrendingDown, TrendingUp, Undo2, Users, Wallet } from 'lucide-react'
@@ -258,7 +259,7 @@ export default function BalancesTab() {
       const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `mileage-balances-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = `mileage-balances-${jstDate()}.csv`
       anchor.click()
       URL.revokeObjectURL(url)
     } catch {

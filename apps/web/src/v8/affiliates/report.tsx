@@ -8,6 +8,7 @@
  * アフィリエイターごと・案件ごとの2つの見方。行（名前）を押すとその人の詳細の引き出し（tnTn9）。
  * 取得の上限を超えたら、合計を出さずに知らせる（今と同じ）。
  */
+import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Banknote, CalendarDays, Download, ListOrdered, ReceiptText, ShoppingBag, Trophy, Users } from 'lucide-react'
@@ -167,7 +168,7 @@ export default function ReportTab() {
   const ready = state === 'ready'
 
   const exportCsv = () => {
-    downloadCsv(`affiliate-report-${new Date().toISOString().slice(0, 10)}.csv`, view === 'affiliate'
+    downloadCsv(`affiliate-report-${jstDate()}.csv`, view === 'affiliate'
       ? [['アフィリエイター', 'いちばん多い案件', '成果', '売上', '報酬', '前の期間の報酬'], ...shown.map((row) => [row.name, row.sub ?? '', row.conversions, row.revenue, row.missingReward ? '' : row.reward, row.prevReward ?? ''])]
       : [['案件', '成果', '売上', '報酬', '前の期間の報酬'], ...shown.map((row) => [row.name, row.conversions, row.revenue, row.missingReward ? '' : row.reward, row.prevReward ?? ''])])
   }

@@ -9,6 +9,7 @@
  * データの口（settings・members・saveRanks・saveMilestones・deleteRank・resync）は今の画面と同じ。
  * 動きの一覧は BEHAVIOR.md。
  */
+import { jstDate } from '@/lib/jst-datetime'
 import { useState, type ReactNode } from 'react'
 import { Download, Eye, History, CircleHelp, Undo2 } from 'lucide-react'
 import { ListPage } from '@/components/templates'
@@ -186,7 +187,7 @@ function useMembersCsv(accountId: string) {
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `nen-members-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = `nen-members-${jstDate()}.csv`
       anchor.click()
       URL.revokeObjectURL(url)
     } catch (caught) {

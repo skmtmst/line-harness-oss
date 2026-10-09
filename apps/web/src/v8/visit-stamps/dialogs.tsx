@@ -5,6 +5,7 @@
  * 特典・倍率・初回ボーナス・ランク倍率は「下書き」を変えるだけ（保存は下の帯の［保存する］）。
  * 理由・暗証番号・写真は、その場で口を呼ぶ（呼び出しは画面側）。
  */
+import DateField from '@/components/shared/date-field'
 import { useEffect, useState } from 'react'
 import type { VisitStampMultiplier, VisitStampReward, VisitStampSettings } from '@line-crm/shared'
 import Checkbox from '@/components/shared/checkbox'
@@ -133,8 +134,8 @@ export function MultiplierDialog({ open, multiplier, onClose, onSave }: {
           <CheckedField id="vs-mul-end" label="時間の終わり" fields={fields} name="end"><div {...fields.bind('end')}><Select id="vs-mul-end" aria-label="時間の終わり" size="full" value={end} error={fields.error('end') ?? undefined} onChange={(v) => { fields.clear('end'); setEnd(v) }} options={endOptions} /></div></CheckedField>
         </div>
         <div className={styles.row2}>
-          <Field label="期間の始まり（任意）"><TextField type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
-          <CheckedField id="vs-mul-to" label="期間の終わり（任意）" fields={fields} name="to"><TextField {...checkedProps(fields, 'to', 'vs-mul-to')} type="date" value={to} onChange={(e) => setTo(e.target.value)} /></CheckedField>
+          <Field label="期間の始まり（任意）"><DateField value={from} onChange={setFrom} /></Field>
+          <CheckedField id="vs-mul-to" label="期間の終わり（任意）" fields={fields} name="to"><DateField {...checkedProps(fields, 'to', 'vs-mul-to')} value={to} onChange={setTo} /></CheckedField>
         </div>
       </div>
     </Dialog>

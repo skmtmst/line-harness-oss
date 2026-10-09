@@ -8,6 +8,7 @@
  * データの口（pets・feeding・saveFeeding・updatePet・CSV）は今の画面と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { jstDate } from '@/lib/jst-datetime'
 import { useEffect, useState } from 'react'
 import { Calculator, Download, Eye, History, PawPrint, Sparkles } from 'lucide-react'
 import { ListPage } from '@/components/templates'
@@ -80,7 +81,7 @@ export default function PetsV8({
     try {
       const res = await nenPetsApi.pets(accountId, { ...query, pageSize: 'all' })
       if (!res.success) throw new Error(res.error)
-      downloadCsv(petsToCsv(res.data.items), `nen-pets-${new Date().toISOString().slice(0, 10)}.csv`)
+      downloadCsv(petsToCsv(res.data.items), `nen-pets-${jstDate()}.csv`)
     } catch {
       setExportError(true)
     } finally {

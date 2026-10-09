@@ -7,6 +7,7 @@
  * 見せ方：頭（← 友だちへ・タブ）→ 案内 → 書き出す／取り込むの2枚 → 確認の結果 → 履歴。
  * 確認の結果は、確認する前も場所と5つの区分を出しておく（数は「—」）。
  */
+import { jstDate } from '@/lib/jst-datetime'
 import { Download, FileSearch, Info } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -52,7 +53,7 @@ export default function CsvMigrationsV8() {
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `friend-migration-history-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = `friend-migration-history-${jstDate()}.csv`
     anchor.click()
     URL.revokeObjectURL(url)
   }

@@ -11,6 +11,7 @@
  * フォルダの列に割り当てる API は無いので、渡すものの種類で分けた
  * 見え方の切り替えとして持つ（保存はしない）。
  */
+import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, ArrowLeftRight, CircleDot, Download, FilePen, Gift, Plus, Star } from 'lucide-react'
@@ -468,7 +469,7 @@ export default function RewardsTab() {
       const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `mileage-rewards-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = `mileage-rewards-${jstDate()}.csv`
       anchor.click()
       URL.revokeObjectURL(url)
     } catch {

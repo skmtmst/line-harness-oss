@@ -11,6 +11,7 @@
  * フォルダの列：アフィリエイターを分けて保存する口は無いので、報酬の決め方で
  * 分けた見え方の切り替えとして持つ（保存しない）。
  */
+import { jstDate } from '@/lib/jst-datetime'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -350,7 +351,7 @@ export default function AffiliatorsTab() {
   }, [bulkTargets, bulkBusy, loadList])
 
   const exportCsv = () => {
-    downloadCsv(`affiliates-${new Date().toISOString().slice(0, 10)}.csv`, [
+    downloadCsv(`affiliates-${jstDate()}.csv`, [
       ['名前', '紹介コード', '紹介リンク数', '友だち追加', '成果', '承認済み報酬'],
       ...shownRows.map((row) => [row.name, row.code, row.linkCount, row.friendAdds, row.totalConversions, Math.round(row.rewardAmount)]),
     ])

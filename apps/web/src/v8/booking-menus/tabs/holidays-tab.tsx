@@ -1,4 +1,5 @@
 'use client'
+import { jstDate } from "@/lib/jst-datetime"
 
 /* ③ 休業日（KRgTQ）（settings-v8.tsx から分割。見た目・動きは変えない） */
 
@@ -59,7 +60,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
   onSaved: (settings: BookingSettings) => void
   onReload: () => void
 }) {
-  const today = useMemo(() => new Date(Date.now() + JST_OFFSET_MS).toISOString().slice(0, 10), [])
+  const today = useMemo(() => jstDate(), [])
   const [month, setMonth] = useState(today.slice(0, 7))
   const [editing, setEditing] = useState<BookingException | 'new' | null>(null)
   const [editFrom, setEditFrom] = useState('')

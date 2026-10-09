@@ -6,6 +6,7 @@
  * 右は公開ページでの見え方。
  * 口・保存の決まりは app/webinars/edit/video-v8.tsx・video-stages.tsx・scheduled-session-row.tsx と同じ（BEHAVIOR.md）。
  */
+import DateField from '@/components/shared/date-field'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { CalendarPlus, Check, Monitor, Play, Plus, Smartphone, Upload } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
@@ -524,11 +525,11 @@ function AddRuleDialog({ mode, busy, error, onCancel, onAdd }: { mode: 'one' | '
             ))}
           </div>
         ) : null}
-        {mode === 'one' && kind === 'once' ? <div className={form.field}><label htmlFor="wd-rule-date" className={form.labelSmall}>日付</label><input id="wd-rule-date" type="date" className={styles.dateInput} value={date} aria-invalid={dateErrors.date ? true : undefined} aria-describedby={dateErrors.date ? 'wd-rule-date-error' : undefined} onChange={(event) => { setDate(event.target.value); setDateErrors({}) }} /><FieldError id="wd-rule-date-error">{dateErrors.date}</FieldError></div> : null}
+        {mode === 'one' && kind === 'once' ? <div className={form.field}><label htmlFor="wd-rule-date" className={form.labelSmall}>日付</label><DateField id="wd-rule-date" value={date} invalid={Boolean(dateErrors.date)} aria-describedby={dateErrors.date ? 'wd-rule-date-error' : undefined} onChange={(value) => { setDate(value); setDateErrors({}) }} /><FieldError id="wd-rule-date-error">{dateErrors.date}</FieldError></div> : null}
         {mode === 'bulk' ? (
           <div className={form.pair}>
-            <div className={form.field}><label htmlFor="wd-rule-from" className={form.labelSmall}>始まり</label><input id="wd-rule-from" type="date" className={styles.dateInput} value={from} aria-invalid={dateErrors.from ? true : undefined} aria-describedby={dateErrors.from ? 'wd-rule-from-error' : undefined} onChange={(event) => { setFrom(event.target.value); setDateErrors({}) }} /><FieldError id="wd-rule-from-error">{dateErrors.from}</FieldError></div>
-            <div className={form.field}><label htmlFor="wd-rule-to" className={form.labelSmall}>終わり</label><input id="wd-rule-to" type="date" className={styles.dateInput} value={to} aria-invalid={dateErrors.to ? true : undefined} aria-describedby={dateErrors.to ? 'wd-rule-to-error' : undefined} onChange={(event) => { setTo(event.target.value); setDateErrors({}) }} /><FieldError id="wd-rule-to-error">{dateErrors.to}</FieldError></div>
+            <div className={form.field}><label htmlFor="wd-rule-from" className={form.labelSmall}>始まり</label><DateField id="wd-rule-from" value={from} invalid={Boolean(dateErrors.from)} aria-describedby={dateErrors.from ? 'wd-rule-from-error' : undefined} onChange={(value) => { setFrom(value); setDateErrors({}) }} /><FieldError id="wd-rule-from-error">{dateErrors.from}</FieldError></div>
+            <div className={form.field}><label htmlFor="wd-rule-to" className={form.labelSmall}>終わり</label><DateField id="wd-rule-to" value={to} invalid={Boolean(dateErrors.to)} aria-describedby={dateErrors.to ? 'wd-rule-to-error' : undefined} onChange={(value) => { setTo(value); setDateErrors({}) }} /><FieldError id="wd-rule-to-error">{dateErrors.to}</FieldError></div>
           </div>
         ) : null}
         <div className={form.field}><span className={form.labelSmall} id="webinar-schedule-time-label">時刻</span><TimeField aria-labelledby="webinar-schedule-time-label" value={time} onChange={setTime} /></div>

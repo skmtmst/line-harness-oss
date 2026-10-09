@@ -7,6 +7,7 @@
  *   ③ 日時を選ぶ … 勤務とシフト（d5fmnM）・自分の勤務（E3YDK）
  * 中身は実データ（作り物の名前は置かない）。今までの app/booking/menus/liff-phone-v8.tsx から写した。
  */
+import { jstDate } from '@/lib/jst-datetime'
 import type { ReactNode } from 'react'
 import type { BookingAvailabilitySlot, BookingMenu, BookingStaff } from '@/lib/api'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
@@ -156,7 +157,7 @@ export function PhoneDatetimeStep({ menu, staffName, slots, closedDates, closedW
   }
   const openDates = [...byDate.keys()].sort()
   const selected = openDates[0] ?? null
-  const anchor = selected ?? new Date().toISOString().slice(0, 10)
+  const anchor = selected ?? jstDate()
   const days = Array.from({ length: 5 }, (_, i) => addDaysStr(anchor, i))
   const closed = new Set(closedDates)
   const closedDow = new Set(closedWeekdays)

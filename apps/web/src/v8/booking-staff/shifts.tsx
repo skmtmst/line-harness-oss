@@ -12,6 +12,7 @@
  * 動き（読み込み・保存・版の競合・権限・失敗時の扱い）は今までの
  * app/booking/staff/shifts/staff-detail-v8.tsx から写した。BEHAVIOR.md を参照。
  */
+import { jstDate } from '@/lib/jst-datetime'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
@@ -92,7 +93,7 @@ function todayKey(timeZone: string): string {
     const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
     return `${get('year')}-${get('month')}-${get('day')}`
   } catch {
-    return new Date().toISOString().slice(0, 10)
+    return jstDate()
   }
 }
 

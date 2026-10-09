@@ -8,6 +8,7 @@
  * 呼ぶ口：媒体の一覧・送信記録のページ（今と同じ）、断られた1件のやり直し `POST /api/ad-platforms/logs/:id/retry`（F-22・owner）。
  * BEHAVIOR.md の「広告への送信履歴」。
  */
+import { jstDate } from '@/lib/jst-datetime'
 import { useMemo, useState } from 'react'
 import { Download, RotateCw } from 'lucide-react'
 import { api, type AdConversionLog } from '@/lib/api'
@@ -76,7 +77,7 @@ export default function AdHistoryV8() {
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `広告への送信履歴_${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = `広告への送信履歴_${jstDate()}.csv`
     anchor.click()
     URL.revokeObjectURL(url)
   }

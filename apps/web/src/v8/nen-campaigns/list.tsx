@@ -9,6 +9,7 @@
  * 表は「見出し 36・行 56」の同じ物差しで並べる（タブを替えても表の頭が動かない）。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { jstDate } from '@/lib/jst-datetime'
 import { useRouter } from 'next/navigation'
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
@@ -219,7 +220,7 @@ export default function NenCampaignsList(props: NenCampaignsListProps) {
   )
   const tabError = props.tabError ?? ''
 
-  const exportCsv = () => downloadCsv(autoSettingsToCsv(autoSettings, sentByKey), `nen-auto-${new Date().toISOString().slice(0, 10)}.csv`)
+  const exportCsv = () => downloadCsv(autoSettingsToCsv(autoSettings, sentByKey), `nen-auto-${jstDate()}.csv`)
 
   const actions = tab === 'columns'
     ? (canEdit ? <Button href="/nen-campaigns/columns/new"><PenLine size={15} aria-hidden="true" />コラムを書く</Button> : null)

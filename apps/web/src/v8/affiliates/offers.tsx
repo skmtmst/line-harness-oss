@@ -10,6 +10,7 @@
  * フォルダの列：案件をフォルダへ入れる口は無いので、成果が出たときの動き
  * （タグ・シナリオ・マイル）で分けた見え方の切り替えとして持つ（保存しない）。
  */
+import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Banknote, CircleDot, Coins, Download, FilePen, Plus, Trophy, Briefcase } from 'lucide-react'
 import type { LineAccount, Scenario, Tag } from '@line-crm/shared'
@@ -324,7 +325,7 @@ export default function OffersTab() {
   }
 
   const exportCsv = () => {
-    downloadCsv(`affiliate-offers-${new Date().toISOString().slice(0, 10)}.csv`, [
+    downloadCsv(`affiliate-offers-${jstDate()}.csv`, [
       ['案件名', '説明', '報酬（円）', 'マイル', '対象アカウント', '成果時のタグ', '開始するシナリオ', '状態', '作成日'],
       ...shown.map((offer) => [
         offer.name,

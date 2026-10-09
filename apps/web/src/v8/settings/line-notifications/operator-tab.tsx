@@ -1,5 +1,6 @@
 'use client'
 
+import { jstDate } from '@/lib/jst-datetime'
 import Notice from '@/components/shared/notice'
 
 /*
@@ -148,7 +149,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `operator-notifications-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = `operator-notifications-${jstDate()}.csv`
       anchor.click()
       URL.revokeObjectURL(url)
       setNotice({ text: '実行記録をCSVで書き出しました。', error: false })

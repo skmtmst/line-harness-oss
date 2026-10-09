@@ -9,6 +9,7 @@
  * ほかは「友だちを見る」）＋「…」。行を押すとその友だちのマイルの詳細。
  * 種類・方法・期間の絞り込みは「よく使う絞り込み」の見方として残す。
  */
+import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CalendarRange, CircleDot, Download, History, Plus, TrendingDown, TrendingUp, Undo2 } from 'lucide-react'
@@ -188,7 +189,7 @@ export default function HistoryTab() {
       const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `mileage-history-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = `mileage-history-${jstDate()}.csv`
       anchor.click()
       URL.revokeObjectURL(url)
     } catch {
