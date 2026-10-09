@@ -2,7 +2,8 @@
 
 
 import { RovingTbody } from '@/components/shared/row-roving'
-import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
+import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
+import { collectListRows } from '@/components/shared/collect-list-rows'
 import { ListPageBody } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
@@ -476,7 +477,20 @@ export default function RemindersListV8() {
   // 選んでいる間は Esc で選択を外す（動きの点検 12・20 番）。
   const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
   useEscapeToClearSelection(selectedCount > 0, clearSelection)
-  const selectedRows = reminders.filter((row) => selectedIds.has(row.id))
+  const [selectionRows, setSelectionRows] = useState<ReminderRow[]>([])
+  const selectionScope = JSON.stringify([selectedAccountId, deferredNameQuery, folderFilter, statusFilter, sort])
+  useEffect(() => { setSelectedIds(new Set()); setSelectionRows([]) }, [selectionScope])
+  const selectAllReminders = async () => {
+    const key = currentListContext.current
+    const all = await collectListRows(reminderList.total, async (offset, limit) => {
+      const response = await loadReminderPage({ page: offset / limit + 1, limit }, new AbortController().signal)
+      return { items: response.items, total: response.total }
+    })
+    if (key !== currentListContext.current) return
+    setSelectionRows(all)
+    setSelectedIds(new Set(all.map(row => row.id)))
+  }
+  const selectedRows = [...new Map([...selectionRows, ...reminders].map(row => [row.id, row])).values()].filter((row) => selectedIds.has(row.id))
   const stoppableIds = selectedRows.filter((row) => statusKeyOf(row) === 'active').map((row) => row.id)
   const resumableIds = selectedRows.filter((row) => statusKeyOf(row) === 'stopped').map((row) => row.id)
 
@@ -1064,8 +1078,7 @@ export default function RemindersListV8() {
 
         {/* まとめての帯（選ぶと表の下に出る）：止める・再開・フォルダへ移す。 */}
         {canEdit && selectedCount > 0 ? (
-          <div className={styles.bulkRow} role="region" aria-label="選択中のまとめ操作">
-            <span className={styles.bulkCount}>{selectedCount}件を選択中</span>
+          <BulkBar count={selectedCount} total={reminderList.total} onSelectAll={selectAllReminders} onClear={clearSelection}>
             <Button
               type="button"
               variant="secondary"
@@ -1094,7 +1107,7 @@ export default function RemindersListV8() {
               <FolderIcon size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
               フォルダへ移す
             </Button>
-          </div>
+          </BulkBar>
         ) : null}
 
         <div className={styles.pagerRow}>

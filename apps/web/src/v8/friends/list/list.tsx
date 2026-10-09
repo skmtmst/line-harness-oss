@@ -174,6 +174,7 @@ export default function FriendsListV8() {
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [refreshing, setRefreshing] = useState(false)
   const [optionsFailed, setOptionsFailed] = useState(false)
+  const [selectionFriends, setSelectionFriends] = useState<FriendListItem[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
   const [bulkOpen, setBulkOpen] = useState(false)
@@ -364,6 +365,7 @@ export default function FriendsListV8() {
       return response.data
     })
     if (request !== loadRequestRef.current) return
+    setSelectionFriends(all)
     setSelectedIds(new Set(all.map(friend => friend.id)))
   }
 
@@ -963,7 +965,7 @@ export default function FriendsListV8() {
           <BulkRunDialog
             open={bulkOpen}
             friendIds={[...selectedIds]}
-            selectedFriends={friends.filter((friend) => selectedIds.has(friend.id))}
+            selectedFriends={[...new Map([...selectionFriends, ...friends].map(friend => [friend.id, friend])).values()].filter(friend => selectedIds.has(friend.id))}
             tags={allTags}
             accountId={selectedAccountId}
             supportMarksEnabled={marksEnabled}

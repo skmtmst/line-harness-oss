@@ -294,3 +294,24 @@ test('停止中のリマインダーの再開は確認も延期もせず送る',
   expect(vi.mocked(fetch).mock.calls.some(([url, init]) => String(url).includes('/api/reminders/r-1') && init?.method === 'PUT')).toBe(true)
   expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull()
 })
+
+test('リマインダーの全件選択はページ外の停止対象も確認する', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  const rows = Array.from({ length: 101 }, (_, i) => ({ ...reminder, id: `r-${i}`, name: `お知らせ${i}` }))
+  handler = url => {
+    if (url.pathname !== '/api/reminders') return base(url)
+    const limit = Number(url.searchParams.get('limit')) || 20
+    const page = Number(url.searchParams.get('page')) || 1
+    return response({ success: true, data: { items: rows.slice((page - 1) * limit, page * limit), total: rows.length, limit } })
+  }
+  await act(async () => root.render(<RemindersPage />))
+  await eventually(() => expect(host.querySelector('tbody tr')).toBeTruthy())
+  await act(async () => (host.querySelector('thead input[type="checkbox"]') as HTMLElement).click())
+  const all = [...host.querySelectorAll('button')].find(button => button.textContent === '101件すべてを選ぶ') as HTMLElement
+  expect(all).toBeTruthy()
+  await act(async () => all.click())
+  expect(host.textContent).toContain('101件を選択中')
+  const stop = [...host.querySelectorAll('button')].find(button => button.textContent?.trim() === '止める') as HTMLElement
+  await act(async () => stop.click())
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('101件のリマインダーを停止しますか？')
+})
