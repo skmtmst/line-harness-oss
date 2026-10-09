@@ -166,7 +166,7 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
               <Button onClick={props.onClose}>キャンセル</Button>
               <Button variant="primary" onClick={props.onConfirm} disabled={props.confirmDisabled}>
                 {packMode
-                  ? <><Send aria-hidden="true" size={15} />{packItems.length}通を続けて送る</>
+                  ? <><Send aria-hidden="true" size={15} />{packItems.length} 通を続けて送る</>
                   : <><CornerDownLeft aria-hidden="true" size={15} />入力欄に入れる</>}
               </Button>
             </div>

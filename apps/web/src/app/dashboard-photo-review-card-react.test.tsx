@@ -129,7 +129,7 @@ describe('ダッシュボードの写真審査カード(#666)', () => {
     await render()
     expect(net.calls).toContain('/api/nen-members/photos/review-metrics?accountId=account-a')
     expect(net.calls.some((path) => path.startsWith('/api/nen-members/overview'))).toBe(false)
-    expect(photoCard().textContent).toContain('確認待ち 7件')
+    expect(photoCard().textContent).toContain('確認待ち 7 件')
   })
 
   it('深掘り先は写真の札と審査待ち絞りを引き継ぐ', async () => {
@@ -162,14 +162,14 @@ describe('ダッシュボードの写真審査カード(#666)', () => {
   it('勘定を切り替えたら前の勘定の件数を残さない', async () => {
     net.photos = () => Promise.resolve({ status: 200, body: METRICS(7) })
     await render()
-    expect(photoCard().textContent).toContain('確認待ち 7件')
+    expect(photoCard().textContent).toContain('確認待ち 7 件')
 
     fixture.accountId = 'account-b'
     net.photos = () => Promise.resolve({ status: 200, body: METRICS(2) })
     await render()
     expect(net.calls).toContain('/api/nen-members/photos/review-metrics?accountId=account-b')
     const text = photoCard().textContent ?? ''
-    expect(text).toContain('確認待ち 2件')
-    expect(text).not.toContain('確認待ち 7件')
+    expect(text).toContain('確認待ち 2 件')
+    expect(text).not.toContain('確認待ち 7 件')
   })
 })
