@@ -335,7 +335,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
           {closures === null ? (
             <ListState kind="loading" />
           ) : list.length === 0 ? (
-            <p className={styles.sideEmpty}>{canWrite ? 'これからの休業・貸切はありません。カレンダーの日か右上のボタンから足せます。' : 'これからの休業・貸切はありません。'}</p>
+            <ListState kind="empty" title="これからの休業・貸切はありません" description={canWrite ? 'カレンダーの日か右上のボタンから足せます。' : '休業日・貸切が登録されると、ここに出ます。'} />
           ) : (
             <ul className={styles.cards}>
               {list.slice(0, UPCOMING_LIMIT).map((closure) => {

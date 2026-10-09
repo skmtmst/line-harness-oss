@@ -34,6 +34,7 @@ type Draft = {
   priority: string
   manualProtectionMinutes: string
   isActive: boolean
+  condition?: SupportMarkAutomationRule['condition']
 }
 
 const EMPTY_DRAFT: Draft = {
@@ -46,6 +47,7 @@ const draftOf = (rule: SupportMarkAutomationRule): Draft => ({
   priority: String(rule.priority),
   manualProtectionMinutes: String(rule.manualProtectionMinutes),
   isActive: rule.isActive,
+  condition: rule.condition,
 })
 
 /**

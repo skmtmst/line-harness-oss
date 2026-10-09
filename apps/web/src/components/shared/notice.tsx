@@ -45,6 +45,9 @@ const ICON_BY_TONE: Record<CanonicalTone, typeof CircleCheck> = {
 
 export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
   tone: NoticeTone
+  density?: 'compact'
+  /** 2行の競合通知。既定の案内帯は変えない。 */
+  heading?: ReactNode
   /** 本文（1〜2文）。`children` があるときはそちらが勝つ。 */
   message?: string
   children?: ReactNode
@@ -77,6 +80,8 @@ export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
  */
 export default function Notice({
   tone,
+  density,
+  heading,
   message,
   children,
   action,
@@ -96,11 +101,12 @@ export default function Notice({
   return (
     <div
       {...props}
-      className={[styles.notice, styles[canonical], className].filter(Boolean).join(' ')}
+      className={[styles.notice, styles[canonical], heading ? styles.twoLine : null, className].filter(Boolean).join(' ')}
       // 呼び出し側が role を指定したらそれを優先する（下書きの競合帯の alert など）。
       // 指定がないときだけ、種類から既定（危険＝alert、ほかは note）を決める。
       role={role ?? (canonical === 'danger' ? 'alert' : 'note')}
       data-design-part="notice"
+      data-density={density}
       data-design-node={node}
     >
       {icon === undefined ? (
@@ -112,7 +118,8 @@ export default function Notice({
         <span className={styles.icon} aria-hidden="true">{icon}</span>
       )}
       <span className={styles.message}>
-        {typeof children === 'string' ? humanizeErrorText(children) : children ?? (message === undefined ? message : humanizeErrorText(message))}
+        {heading ? <><span className={styles.heading}>{heading}</span><span className={styles.description}>{typeof children === 'string' ? humanizeErrorText(children) : children ?? (message === undefined ? message : humanizeErrorText(message))}</span></>
+          : typeof children === 'string' ? humanizeErrorText(children) : children ?? (message === undefined ? message : humanizeErrorText(message))}
         {hasHelp ? (
           <HelpTip label={`${helpLabel ?? 'この案内'}の説明`}>
             {help}

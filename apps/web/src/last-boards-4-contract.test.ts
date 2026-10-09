@@ -28,7 +28,7 @@ const FRIEND_ADD_EDITOR = read('v8/friend-add/editor.tsx')
  */
 describe('最後の細かい板の印', () => {
   it('V8の友だち一覧にywJ5Hを付ける', () => {
-    expect(FRIENDS_PAGE).toContain('data-friends-page="v8" data-design-node="ywJ5H"')
+    expect(FRIENDS_PAGE).toContain('boardId="x6QsVz"')
   })
 
   it('一覧から開く窓にCYJ0Lを付ける', () => {
@@ -46,7 +46,7 @@ describe('最後の細かい板の印', () => {
 
   it('受信箱にM0393・ダッシュボードにd8X09・mcOqKを付ける', () => {
     expect(CHATS).toContain('data-design-node="M0393"')
-    expect(DASHBOARD).toContain('data-design-node="d8X09"')
+    expect(DASHBOARD).toContain('boardId="WQmep"')
     expect(DASHBOARD_EDITOR).toContain('data-design-node="mcOqK"')
   })
 

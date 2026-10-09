@@ -11,6 +11,7 @@
  *  - 「初期状態に戻す」は確認なしに実行されない（A01-02）
  */
 import { act } from 'react'
+import { waitFor } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -237,28 +238,29 @@ async function switchAccount(next: string) {
   await render()
 }
 
-function button(text: string, scope: ParentNode = host): HTMLButtonElement {
+function button(text: string, scope: ParentNode = document.body): HTMLButtonElement {
   const node = Array.from(scope.querySelectorAll('button')).find((item) => item.textContent?.trim() === text)
   if (!node) throw new Error(`Button not found: ${text}`)
   return node
 }
 
 function dialog(): HTMLElement {
-  const node = host.querySelector<HTMLElement>('[role="dialog"]')
+  const node = document.body.querySelector<HTMLElement>('[role="dialog"]')
   if (!node) throw new Error('編集パネルが見つかりません')
   return node
 }
 
 function todayCard(title: string): HTMLElement {
-  const heading = Array.from(host.querySelectorAll('h3')).find((node) => node.textContent?.trim() === title)
+  const heading = Array.from(host.querySelectorAll('[data-kpi-presentation] p[title]')).find((node) => node.textContent?.trim() === title)
   if (!heading) throw new Error(`${title} のカードが見つかりません`)
-  const card = heading.parentElement?.parentElement
+  const card = heading.closest('[data-kpi-presentation]')
   if (!card) throw new Error(`${title} のカード外枠が見つかりません`)
   return card as HTMLElement
 }
 
 async function openEditor() {
   await act(async () => { button('ダッシュボード編集').click() })
+  await waitFor(() => expect(document.body.querySelector('[role="dialog"]')).not.toBeNull())
 }
 
 describe('DASH-02 アカウント切替後の取得失敗で前の数値が残らない', () => {
@@ -267,11 +269,11 @@ describe('DASH-02 アカウント切替後の取得失敗で前の数値が残�
       query.includes('account_id=account-a') ? overviewFor(111) : fail(500),
     )
     await render()
-    expect(host.textContent).toContain('111')
+    expect(document.body.textContent).toContain('111')
 
     await switchAccount('account-b')
     expect(net.calls.some((call) => call.includes('/api/dashboard/overview') && call.includes('account_id=account-b'))).toBe(true)
-    expect(host.textContent).not.toContain('111')
+    expect(document.body.textContent).not.toContain('111')
   })
 
   it('遅れて届いたAの応答でBの画面を上書きしない', async () => {
@@ -281,11 +283,11 @@ describe('DASH-02 アカウント切替後の取得失敗で前の数値が残�
       : Promise.resolve(overviewFor(7))
     await render()
     await switchAccount('account-b')
-    expect(host.textContent).toContain('7')
+    expect(document.body.textContent).toContain('7')
     // 切替後にAの応答が届いても破棄される
     await act(async () => { resolveA?.(overviewFor(222)) })
-    expect(host.textContent).toContain('7')
-    expect(host.textContent).not.toContain('222')
+    expect(document.body.textContent).toContain('7')
+    expect(document.body.textContent).not.toContain('222')
   })
 })
 
@@ -306,8 +308,8 @@ describe('DASH-03 新アカウントの読込中に前の予約・運用状態�
      * ★V7 仕上げ §3 で骨組みは 0.3 秒待ってから出るので、待ってから確かめる。
      */
     await act(async () => { await vi.advanceTimersByTimeAsync(350) })
-    expect(card.querySelector('[data-skeleton]')).not.toBeNull()
-    expect(card.querySelector('[aria-busy="true"]')).not.toBeNull()
+    expect(card.getAttribute('aria-busy')).toBe('true')
+    expect(card.querySelector('[data-kpi-number]')).toBeNull()
     expect(card.textContent).not.toContain('1件')
   })
 })
@@ -363,16 +365,16 @@ describe('DASH-15 配置の遅延GETが編集中の変更を上書きしない',
     await render()
     await openEditor()
 
-    const toggle = dialog().querySelector<HTMLInputElement>('input[aria-label="写真審査を非表示にする"]')
-    expect(toggle?.checked).toBe(true)
+    const toggle = dialog().querySelector<HTMLButtonElement>('button[aria-label="写真審査を表示"]')
+    expect(toggle?.getAttribute('aria-checked')).toBe('true')
     await act(async () => { toggle!.click() })
-    expect(toggle!.checked).toBe(false)
+    expect(toggle!.getAttribute('aria-checked')).toBe('false')
 
     // 遅れて届いたGET（既定配置＝写真審査ON）でdraftを初期化しない
     await act(async () => {
       resolvePreferences?.(ok({ success: true, data: { version: 5, cards: null } }))
     })
-    expect(toggle!.checked).toBe(false)
+    expect(toggle!.getAttribute('aria-checked')).toBe('false')
   })
 })
 
@@ -390,7 +392,7 @@ describe('DASH-04 保存完了が別アカウントの配置・版を上書き�
 
     await switchAccount('account-b')
     // 切替でパネルは閉じ、前アカウントの下書きは持ち越さない
-    expect(host.querySelector('[role="dialog"]')).toBeNull()
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull()
     // Aの保存が完了してもBの表示配置・版は変えない
     await act(async () => {
       net.putSaves[0].resolve(jsonResponse(ok({ success: true, data: { version: 8 } })))
@@ -412,7 +414,7 @@ describe('DASH-05 保存失敗は編集パネルの内側で再試行する', ()
       net.putSaves[0].resolve(jsonResponse(fail(503)))
     })
     const panel = dialog()
-    expect(panel.querySelector('[role="alert"]')?.textContent).toContain('ダッシュボードの配置を保存できませんでした')
+    expect(panel.querySelector('[role="alert"]')?.textContent).toContain('配置を保存できませんでした')
 
     const overviewCallsBefore = net.calls.filter((call) => call.startsWith('GET /api/dashboard/overview')).length
     await act(async () => { button('もう一度保存する', panel).click() })
@@ -421,7 +423,7 @@ describe('DASH-05 保存失敗は編集パネルの内側で再試行する', ()
     await act(async () => {
       net.putSaves[1].resolve(jsonResponse(ok({ success: true, data: { version: 1 } })))
     })
-    expect(host.querySelector('[role="dialog"]')).toBeNull()
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull()
   })
 })
 
@@ -431,10 +433,10 @@ describe('A01-02 初期状態に戻すは確認なしに実行しない', () => 
     await openEditor()
     await act(async () => { button('初期状態に戻す').click() })
     expect(net.deletes).toBe(0)
-    expect(dialog().textContent).toContain('削除して初期状態へ戻します')
+    expect(document.body.textContent).toContain('削除して初期状態へ戻します')
     await act(async () => { button('キャンセル').click() })
     expect(net.deletes).toBe(0)
-    expect(dialog().textContent).not.toContain('削除して初期状態へ戻します')
+    expect(document.body.textContent).not.toContain('削除して初期状態へ戻します')
   })
 
   it('確認するとDELETEを1回だけ実行する', async () => {

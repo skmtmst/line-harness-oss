@@ -5,6 +5,7 @@
  * 改行を残して送ることを、実物の画面で確かめる。
  */
 import React from 'react'
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'admin', canManageRole: () => true }))
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 
@@ -53,14 +54,8 @@ afterEach(() => {
 })
 
 async function chooseType(label: string) {
-  const trigger = screen.getByRole('button', { name: '友だち情報欄の種類' })
-  await act(async () => {
-    fireEvent.click(trigger)
-  })
-  const option = await screen.findByRole('button', { name: label })
-  await act(async () => {
-    fireEvent.click(option)
-  })
+  const word = label === '複数選択' ? 'いくつでも選ぶ' : label === '複数行テキスト' ? '文章' : label
+  fireEvent.click(screen.getByRole('radio', { name: new RegExp(word) }))
 }
 
 describe('R186 複数行テキストの既定値', () => {
@@ -73,11 +68,11 @@ describe('R186 複数行テキストの既定値', () => {
       fireEvent.change(screen.getByLabelText(/項目名/), { target: { value: 'あいさつ文' } })
     })
     await act(async () => {
-      fireEvent.change(screen.getByLabelText(/差し込み名/), { target: { value: 'greeting' } })
+      fireEvent.change(screen.getByLabelText(/差し込みの名前/), { target: { value: 'greeting' } })
     })
     await chooseType('複数行テキスト')
 
-    const defaultField = screen.getByLabelText('既定値') as HTMLTextAreaElement
+    const defaultField = screen.getByLabelText('既定値（任意）') as HTMLTextAreaElement
     expect(defaultField.tagName.toLowerCase()).toBe('textarea')
     await act(async () => {
       fireEvent.change(defaultField, { target: { value: '1行目\n2行目' } })

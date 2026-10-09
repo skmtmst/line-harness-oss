@@ -3,28 +3,45 @@ import styles from './card.module.css'
 
 export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   children: ReactNode
+  frame?: 'raised' | 'inset'
   layout?: 'block' | 'vertical'
   overflow?: 'visible' | 'hidden'
-  padding?: 'none' | 'default' | 'roomy' | 'spacious'
+  padding?: 'none' | 'compact' | 'default' | 'roomy' | 'spacious'
+  corner?: 'card' | 'segment'
   /** V8 の入力の段・右の箱・一覧の小窓。既定のカードは変えない。 */
   variant?: 'default' | 'form' | 'aside' | 'panel'
+  /** 枠と段の間を部品へ任せる連携設定のカード。既定の面は変えない。 */
+  appearance?: 'outlined'
+  gap?: 'tight' | 'normal' | 'loose'
+  /** 内側の線で寸法を保つカード。指定した面だけに適用。 */
+  surface?: 'inset'
 }
 
 /** Pencil V5のダッシュボードカードを正本にした共通の面。 */
 export default function Card({
   children,
   className,
+  frame = 'raised',
   layout = 'block',
   overflow = 'visible',
   padding = 'none',
+  corner = 'card',
   variant = 'default',
+  appearance,
+  gap,
+  surface,
   ...props
 }: CardProps) {
   const classes = [
     styles.card,
+    corner === 'segment' ? styles.segment : null,
+    frame === 'inset' ? styles.inset : null,
     variant !== 'default' ? styles[variant] : null,
+    surface === 'inset' ? styles.inset : null,
+    gap === 'tight' ? styles.gapTight : null,
     layout === 'vertical' ? styles.vertical : null,
     overflow === 'hidden' ? styles.overflowHidden : null,
+    padding === 'compact' ? styles.paddingCompact : null,
     padding === 'default' ? styles.paddingDefault : null,
     padding === 'roomy' ? styles.paddingRoomy : null,
     padding === 'spacious' ? styles.paddingSpacious : null,
@@ -34,7 +51,7 @@ export default function Card({
     .join(' ')
 
   return (
-    <section className={classes} data-design-part="card" {...props}>
+    <section className={classes} data-design-part="card" data-appearance={appearance} data-gap={gap} {...props}>
       {children}
     </section>
   )
@@ -47,22 +64,24 @@ export function CardHeader({
   size = 'standard',
   actionTone = 'accent',
   headingLevel = 2,
+  titleId,
 }: {
   title: ReactNode
   meta?: ReactNode
   action?: ReactNode
-  size?: 'standard' | 'roomy'
+  size?: 'standard' | 'roomy' | 'stacked' | 'panel'
   actionTone?: 'accent' | 'info'
   headingLevel?: 2 | 3
+  titleId?: string
 }) {
   const Heading = headingLevel === 3 ? 'h3' : 'h2'
   return (
     <div
-      className={`${styles.header} ${size === 'roomy' ? styles.headerRoomy : ''}`}
+      className={[styles.header, size === 'roomy' && styles.headerRoomy, size === 'stacked' && styles.headerStacked, size === 'panel' && styles.headerPanel].filter(Boolean).join(' ')}
       data-design-node="t0jk8p"
     >
       <div className={styles.titleGroup}>
-        <Heading className={styles.title}>{title}</Heading>
+        <Heading id={titleId} className={styles.title}>{title}</Heading>
         {meta ? <span className={styles.meta}>{meta}</span> : null}
       </div>
       {action ? (

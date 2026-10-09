@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -12,9 +12,9 @@ const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
  */
 describe('友だち詳細 監査#1011の契約', () => {
   it('FRIEND-21: 情報欄の分類をリンクで切り替えられる', () => {
-    expect(PAGE).toContain('groupChips')
+    expect(PAGE).toContain('chips')
     expect(PAGE).toContain('aria-label="情報欄の分類"')
-    expect(PAGE).toContain("aria-current={active ? 'true' : undefined}")
+    expect(PAGE).toContain("aria-current={group === chip.id ? 'true' : undefined}")
     // 「すべて」と「基本」を分け、消えた分類は「分類が見つからない」と正直に出す。
     expect(PAGE).toContain("const ALL_GROUP = 'all'")
     expect(PAGE).toContain('この分類は削除されたか、見つかりません')
@@ -22,18 +22,18 @@ describe('友だち詳細 監査#1011の契約', () => {
   })
 
   it('FRIEND-22: 項目名ラベルと入力欄が htmlFor/id で結び付く', () => {
-    expect(PAGE).toContain('htmlFor={inputId}')
-    expect(PAGE).toContain('id={inputId}')
-    expect(PAGE).toContain('labelId={`${inputId}-label`}')
+    expect(PAGE).toContain('htmlFor={id}')
+    expect(PAGE).toContain('id={id}')
+    expect(PAGE).toContain('id={`${id}-label`}')
     // 複数選択の表示型は aria-labelledby で項目名へ戻る。
-    expect(PAGE).toContain('aria-labelledby={labelId}')
+    expect(PAGE).toContain('aria-labelledby={`${id}-label`}')
   })
 
   it('FRIEND-23: 権限で隠れた項目と「項目なし」を分ける', () => {
     expect(PAGE).toContain('hiddenPersonalCount > 0')
     expect(PAGE).toContain('個人情報の閲覧権限が要ります')
     // 権限で隠れているだけのときは「項目を作る」を勧めない。
-    expect(PAGE).toContain('canManageFieldDefs && hiddenPersonalCount === 0')
+    expect(PAGE).toContain('perms.manage && hiddenPersonalCount === 0')
   })
 
   it('FRIEND-24: 回答フォームは質問のlabelを見出しにする', () => {
@@ -46,7 +46,7 @@ describe('友だち詳細 監査#1011の契約', () => {
   it('FRIEND-25: 保存待ちの間に書き換えた欄は再取得で上書きしない', () => {
     expect(PAGE).toContain('saveSnapshotRef')
     expect(PAGE).toContain('saveSnapshotRef.current = { ...values }')
-    expect(PAGE).toContain('prev[f.id] !== sentSnapshot[f.id]')
+    expect(PAGE).toContain('prev[f.id] !== sent[f.id]')
   })
 
   it('FRIEND-26: 「さらに読み込む」の失敗は末尾だけに出す', () => {
@@ -58,16 +58,16 @@ describe('友だち詳細 監査#1011の契約', () => {
   })
 
   it('FRIEND-27: 準備中タブには利用者向けの説明と代替操作がある', () => {
-    expect(PAGE).toContain('pendingTabActions')
+    expect(PAGE).toContain('actions={')
     // 開発者向けの「口がまだありません」で行き止まりにしない。
     expect(PAGE).not.toContain('を引く口がまだありません')
-    expect(PAGE).toContain('この友だちをシナリオに登録する')
+    expect(PAGE).toContain('シナリオに登録する')
   })
 
   it('FRIEND-31: 狭い画面では補助プロフィールを畳む', () => {
-    expect(PAGE).toContain('profileExpanded')
-    expect(PAGE).toContain('顧客情報をすべて表示')
-    expect(PAGE).toContain('{profileExpanded &&')
+    const css = readFileSync(join(HERE, '../../../v8/friend-detail/detail.module.css'), 'utf8')
+    expect(css).toContain('@container v8-page (max-width: 900px)')
+    expect(css).toContain('.overview { flex-direction: column; }')
     // PC由来の固定高をスマートフォンへ持ち込まない（lg以上だけ scoped style）。
     expect(PAGE).not.toContain('style={{ minHeight: 1234 }}')
     expect(PAGE).not.toContain('min-height: 1234px')

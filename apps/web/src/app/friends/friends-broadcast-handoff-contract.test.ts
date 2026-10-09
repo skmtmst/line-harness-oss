@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -81,7 +81,7 @@ describe('友だち詳細の履歴', () => {
   })
 
   it('アカウント・友だち切替後の遅い応答を捨てる仕組みを保つ', () => {
-    expect(DETAIL_PAGE).toContain('isStaleResponse')
+    expect(DETAIL_PAGE).toContain('isStale')
     expect(DETAIL_PAGE).toContain('historyReqRef')
   })
 })

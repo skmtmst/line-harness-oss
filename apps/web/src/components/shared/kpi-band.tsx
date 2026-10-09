@@ -16,18 +16,20 @@ export default function KpiBand({
   children,
   gridClassName = gridFourUpClassName,
   className,
+  presentation = 'band',
   ...rest
 }: {
   children: ReactNode
   /** 従来の並べ方（`grid grid-cols-2 gap-3 xl:grid-cols-4` など）。v7 の見た目を保つ。 */
   gridClassName?: string
+  presentation?: 'band' | 'separated'
   className?: string
 } & Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'className'>) {
   return (
     <div
       className={`${kpiStyles.strip} ${gridClassName}${className ? ` ${className}` : ''}`}
       data-kpi-strip
-      data-kpi-presentation="band"
+      data-kpi-presentation={presentation}
       {...rest}
     >
       {children}

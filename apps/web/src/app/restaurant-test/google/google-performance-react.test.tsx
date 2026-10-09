@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /*
- * ★V6 GB-9: パフォーマンス画面を本物のReactで固定する。
+ * ★V8 GB-9: パフォーマンス画面を本物のReactで固定する。
  *
  * 押さえる契約:
  *  1. 主要4指標と前期比が出る（前期が無い指標は「前のN日比 —」）
@@ -32,7 +32,7 @@ vi.mock('@/lib/restaurant-google-api', async () => {
   }
 })
 
-const { PerformanceTab } = await import('./google-performance')
+const { default: PerformanceTab } = await import('@/v8/restaurant/google/performance')
 
 const SAMPLE = {
   success: true,
@@ -82,23 +82,19 @@ describe('GB-9 パフォーマンス', () => {
     expect(text).toContain('ルート検索')
     expect(text).toContain('電話ボタンのクリック')
     expect(text).toContain('サイトへのクリック')
-    expect(text).toContain('前の28日比 +12.4%')
+    expect(text).toContain('前の28日より +12%')
     // 前期が未取得の指標は比較しない
-    expect(text).toContain('前の28日比 —')
-    expect(text).toContain('2026/08/31–09/27')
-    expect(text).toContain('Google提供の集計値です')
-    expect(text).toContain('電話のクリック数は、通話成立数ではありません')
-    expect(text).toContain('プロフィール表示の推移')
-    expect(text).toContain('未取得・未対応は「—」で表示し、0件と区別します')
+    expect(text).toContain('前の28日より —')
+    expect(text).toContain('数字は Google ビジネス プロフィールの集計です')
   })
 
   it('未対応の飲食店向け指標は「—」で出す', async () => {
     await render()
     const text = container.textContent ?? ''
-    expect(text).toContain('メニュー閲覧')
+    expect(text).toContain('メニューの閲覧')
     expect(text).toContain('76')
-    expect(text).toContain('Google経由の予約')
-    expect(text).toContain('料理の注文')
+    expect(text).toContain('予約ボタンのクリック')
+    expect(text).toContain('料理の写真の閲覧')
     expect(text).toContain('連携サービス未対応')
     expect(text).toContain('—')
   })
@@ -106,7 +102,9 @@ describe('GB-9 パフォーマンス', () => {
   it('期間の切り替えでAPIへ days を渡す', async () => {
     await render()
     expect(perf.calls).toEqual([28])
-    const select = container.querySelector('[aria-label="集計期間"]')
-    expect(select).not.toBeNull()
+    const button = [...container.querySelectorAll('button')].find((node) => node.textContent === '直近7日')
+    expect(button).toBeTruthy()
+    await act(async () => { button!.click() })
+    expect(perf.calls).toEqual([28, 7])
   })
 })

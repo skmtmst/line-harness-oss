@@ -199,3 +199,5 @@
   background: var(--color-status-warn-soft);
 }
 }
+
+[data-theme="v8"] .list[data-spacing="compact"] .items { gap: var(--tpl-rt-tab-gap); }

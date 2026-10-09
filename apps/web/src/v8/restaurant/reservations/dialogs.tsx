@@ -5,12 +5,14 @@
  * 送る形は今の画面（app/restaurant-test/v8/reservations.tsx）と同じ。
  */
 import { useEffect, useState } from 'react'
+import { Field } from '@/components/shared/form-controls'
+import { useFormErrors } from '@/lib/use-form-errors'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 import DateTimeField from '@/components/shared/date-time-field'
 import type { RestaurantMenuItem, RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
-import { DialogField, DialogNote, RsDialog } from '../booking-kit/parts'
+import { DialogNote, RsDialog } from '../booking-kit/parts'
 import { INACTIVE_STATUSES, hm, isHold, pad2 } from './format'
 import styles from './reservations.module.css'
 
@@ -60,10 +62,23 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
       courseId: reservation.course_id || '',
     })
   }, [reservation])
+  const fields = useFormErrors()
+  fields.define('name', 'お客様名', () => draft.customerName.trim() ? null : 'お客様名を入れてください。')
+  fields.define('count', '人数', () => Number.isInteger(Number(draft.guestCount)) && Number(draft.guestCount) >= 1 && Number(draft.guestCount) <= 100 ? null : '人数は1〜100で入れてください。')
+  fields.define('start', '開始日時', () => Number.isFinite(Date.parse(draft.startsAt)) ? null : '開始日時を選んでください。')
+  fields.define('end', '終了日時', () => Number.isFinite(Date.parse(draft.endsAt)) && Date.parse(draft.endsAt) > Date.parse(draft.startsAt) ? null : '終了日時は開始日時より後にしてください。')
   if (!reservation) return null
   const hold = isHold(reservation)
   const inactive = INACTIVE_STATUSES.includes(reservation.status)
-  const save = () => onSave({
+  const save = () => {
+    if (fields.submit().length > 0) {
+      requestAnimationFrame(() => {
+        const target = document.querySelector<HTMLElement>('[role="dialog"] [aria-invalid="true"]')
+        target?.focus(); target?.scrollIntoView({ block: 'center' })
+      })
+      return
+    }
+    onSave({
     customerName: draft.customerName,
     customerPhone: draft.customerPhone || null,
     guestCount: Number(draft.guestCount),
@@ -72,7 +87,8 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
     tableId: draft.tableId || null,
     courseId: draft.courseId || null,
     allergyNote: draft.allergyNote || null,
-  })
+    })
+  }
   const tableOptions = [
     { value: '', label: '未配席' },
     ...tables.filter((table) => table.is_active || table.id === reservation.table_id).map((table) => ({ value: table.id, label: `${table.code}・${table.label}（${table.min_capacity}〜${table.max_capacity}名）` })),
@@ -83,6 +99,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
   ]
   return (
     <RsDialog
+      noValidate
       open
       title={hold ? `押さえ（${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}）` : `${reservation.customer_name}さんの予約${canWrite ? 'を変更' : ''}`}
       width={600}
@@ -98,11 +115,11 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
             ) : inactive ? (
               <Button type="button" className={styles.dialogLeft} disabled={busy} onClick={() => onRestore(reservation.id)}>予約を有効に戻す</Button>
             ) : (
-              <Button type="button" className={`${styles.dialogLeft} ${styles.dangerText}`} disabled={busy} onClick={() => onCancelReservation(reservation.id)}>予約を取り消す</Button>
+              <Button type="button" className={styles.dialogLeft} variant="danger-outline" disabled={busy} onClick={() => onCancelReservation(reservation.id)}>予約を取り消す</Button>
             )
           ) : null}
           <Button type="button" onClick={onClose} disabled={busy}>{canWrite && !hold ? 'キャンセル' : '閉じる'}</Button>
-          {canWrite && !hold ? <Button type="submit" variant="primary" disabled={busy || !draft.customerName.trim() || !draft.startsAt || !draft.endsAt}>保存する</Button> : null}
+          {canWrite && !hold ? <Button type="submit" variant="primary" disabled={busy}>保存する</Button> : null}
         </>
       )}
     >
@@ -111,39 +128,39 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
       ) : (
         <>
           <div className={styles.pair}>
-            <DialogField label="お客様名" htmlFor="rs-edit-name">
-              <TextField id="rs-edit-name" required readOnly={!canWrite} value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} />
-            </DialogField>
-            <DialogField label="電話番号" htmlFor="rs-edit-phone">
+            <Field label="お客様名" htmlFor="rs-edit-name" error={fields.error('name')}>
+              <TextField id="rs-edit-name" invalid={fields.invalid('name')} required readOnly={!canWrite} value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} />
+            </Field>
+            <Field label="電話番号" htmlFor="rs-edit-phone">
               <TextField id="rs-edit-phone" readOnly={!canWrite} value={draft.customerPhone} onChange={(event) => setDraft({ ...draft, customerPhone: event.target.value })} />
-            </DialogField>
+            </Field>
           </div>
           <div className={styles.pair}>
-            <DialogField label="人数" htmlFor="rs-edit-guests">
-              <TextField id="rs-edit-guests" type="number" min={1} max={100} required readOnly={!canWrite} value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} />
-            </DialogField>
-            <DialogField label="卓" kind="select">
+            <Field label="人数" htmlFor="rs-edit-guests" error={fields.error('count')}>
+              <TextField id="rs-edit-guests" invalid={fields.invalid('count')} type="number" min={1} max={100} required readOnly={!canWrite} value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} />
+            </Field>
+            <Field labelSize="compact" label="卓">
               {canWrite ? (
                 <Select aria-label="卓" size="full" value={draft.tableId} onChange={(value) => setDraft({ ...draft, tableId: value })} options={tableOptions} />
               ) : <ReadOnlyChoice label="卓" value={draft.tableId} options={tableOptions} />}
-            </DialogField>
+            </Field>
           </div>
           <div className={styles.pair}>
-            <DialogField label="開始日時" htmlFor="rs-edit-start">
-              <DateTimeField id="rs-edit-start" required readOnly={!canWrite} value={draft.startsAt} onChange={(next) => setDraft({ ...draft, startsAt: next })} />
-            </DialogField>
-            <DialogField label="終了日時" htmlFor="rs-edit-end">
-              <DateTimeField id="rs-edit-end" required readOnly={!canWrite} value={draft.endsAt} onChange={(next) => setDraft({ ...draft, endsAt: next })} />
-            </DialogField>
+            <Field label="開始日時" htmlFor="rs-edit-start" error={fields.error('start')}>
+              <DateTimeField id="rs-edit-start" invalid={fields.invalid('start')} required readOnly={!canWrite} value={draft.startsAt} onChange={(next) => setDraft({ ...draft, startsAt: next })} />
+            </Field>
+            <Field label="終了日時" htmlFor="rs-edit-end" error={fields.error('end')}>
+              <DateTimeField id="rs-edit-end" invalid={fields.invalid('end')} required readOnly={!canWrite} value={draft.endsAt} onChange={(next) => setDraft({ ...draft, endsAt: next })} />
+            </Field>
           </div>
-          <DialogField label="コース" kind="select">
+          <Field labelSize="compact" label="コース">
             {canWrite ? (
               <Select aria-label="コース" size="full" value={draft.courseId} onChange={(value) => setDraft({ ...draft, courseId: value })} options={courseOptions} />
             ) : <ReadOnlyChoice label="コース" value={draft.courseId} options={courseOptions} />}
-          </DialogField>
-          <DialogField label="アレルギー・特記事項" htmlFor="rs-edit-allergy">
+          </Field>
+          <Field label="アレルギー・特記事項" htmlFor="rs-edit-allergy">
             <TextField id="rs-edit-allergy" readOnly={!canWrite} value={draft.allergyNote} onChange={(event) => setDraft({ ...draft, allergyNote: event.target.value })} />
-          </DialogField>
+          </Field>
         </>
       )}
     </RsDialog>
@@ -159,10 +176,11 @@ export function CancelReservationDialog({ reservation, busy, onClose, onConfirm 
   const hold = reservation ? isHold(reservation) : false
   return (
     <RsDialog
+      noValidate
       open={Boolean(reservation)}
       title={hold ? 'この押さえを解除しますか？' : 'この予約を取り消しますか？'}
       width={480}
-      top={305}
+      top={300}
       busy={busy}
       onCancel={onClose}
       actions={(
@@ -173,7 +191,7 @@ export function CancelReservationDialog({ reservation, busy, onClose, onConfirm 
       )}
     >
       {reservation ? <p className={styles.dialogStrong}>{hold ? `押さえ ${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}` : `${monthDayWeek(reservation.starts_at)} ${hm(reservation.starts_at)} ${reservation.customer_name}さん ${reservation.guest_count}名`}</p> : null}
-      <DialogNote>{hold ? '押さえを解除すると、その時間の卓は空きに戻ります。台帳には履歴が残ります。' : '台帳には取消として残ります。時間帯の在庫は人数分だけ戻ります。取り消した予約は「復活」で戻せます。'}</DialogNote>
+      <DialogNote>{hold ? '押さえを解除すると、その時間の卓は空きに戻ります。台帳には履歴が残ります。' : '台帳には取消として残ります。その時間帯の卓は空きに戻ります。取り消した予約は「復活」で戻せます。'}</DialogNote>
     </RsDialog>
   )
 }
@@ -185,9 +203,15 @@ export function InboundTrialDialog({ open, busy, onClose, onSubmit }: {
   onSubmit: (body: { provider: string; externalId: string; customerName: string; guestCount: number; startsAt: string }) => void
 }) {
   const [draft, setDraft] = useState({ provider: 'restaurant_board', externalId: '', customerName: '', guestCount: '2', startsAt: '' })
+  const fields = useFormErrors()
+  fields.define('externalId', '外部予約ID', () => draft.externalId.trim() ? null : '外部予約IDを入れてください。')
+  fields.define('name', 'お客様名', () => draft.customerName.trim() ? null : 'お客様名を入れてください。')
+  fields.define('count', '人数', () => Number.isInteger(Number(draft.guestCount)) && Number(draft.guestCount) >= 1 && Number(draft.guestCount) <= 100 ? null : '人数は1〜100で入れてください。')
+  fields.define('start', '開始日時', () => Number.isFinite(Date.parse(draft.startsAt)) ? null : '開始日時を選んでください。')
   useEffect(() => { if (open) setDraft({ provider: 'restaurant_board', externalId: `DEMO-${Date.now()}`, customerName: '', guestCount: '2', startsAt: '' }) }, [open])
   return (
     <RsDialog
+      noValidate
       open={open}
       title="媒体受信シミュレーター（外部への書戻しなし）"
       width={560}
@@ -196,37 +220,43 @@ export function InboundTrialDialog({ open, busy, onClose, onSubmit }: {
       designNode="l4qsT"
       onCancel={onClose}
       onSubmit={() => {
-        if (!draft.customerName.trim() || !draft.startsAt) return
+        if (fields.submit().length > 0) {
+          requestAnimationFrame(() => {
+            const target = document.querySelector<HTMLElement>('[role="dialog"] [aria-invalid="true"]')
+            target?.focus(); target?.scrollIntoView({ block: 'center' })
+          })
+          return
+        }
         onSubmit({ provider: draft.provider, externalId: draft.externalId, customerName: draft.customerName.trim(), guestCount: Number(draft.guestCount), startsAt: new Date(draft.startsAt).toISOString() })
       }}
       actions={(
         <>
           <Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button>
-          <Button type="submit" variant="primary" disabled={busy || !draft.customerName.trim() || !draft.startsAt}>受信として取り込む</Button>
+          <Button type="submit" variant="primary" disabled={busy}>受信として取り込む</Button>
         </>
       )}
     >
-      <DialogField label="受信元" kind="select">
+      <Field labelSize="compact" label="受信元">
         <Select aria-label="受信元" size="full" value={draft.provider} onChange={(value) => setDraft({ ...draft, provider: value })} options={[
           { value: 'restaurant_board', label: 'レストランボード' },
           { value: 'hotpepper', label: 'Hot Pepper' },
           { value: 'tabelog', label: '食べログ' },
         ]} />
-      </DialogField>
-      <DialogField label="外部予約ID" htmlFor="rs-trial-id">
-        <TextField id="rs-trial-id" required value={draft.externalId} onChange={(event) => setDraft({ ...draft, externalId: event.target.value })} />
-      </DialogField>
+      </Field>
+      <Field label="外部予約ID" htmlFor="rs-trial-id" error={fields.error('externalId')}>
+        <TextField id="rs-trial-id" invalid={fields.invalid('externalId')} required value={draft.externalId} onChange={(event) => setDraft({ ...draft, externalId: event.target.value })} />
+      </Field>
       <div className={styles.pair}>
-        <DialogField label="お客様名" htmlFor="rs-trial-name">
-          <TextField id="rs-trial-name" required value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} />
-        </DialogField>
-        <DialogField label="人数" htmlFor="rs-trial-guests">
-          <TextField id="rs-trial-guests" type="number" min={1} max={100} required value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} />
-        </DialogField>
+        <Field label="お客様名" htmlFor="rs-trial-name" error={fields.error('name')}>
+          <TextField id="rs-trial-name" invalid={fields.invalid('name')} required value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} />
+        </Field>
+        <Field label="人数" htmlFor="rs-trial-guests" error={fields.error('count')}>
+          <TextField id="rs-trial-guests" invalid={fields.invalid('count')} type="number" min={1} max={100} required value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} />
+        </Field>
       </div>
-      <DialogField label="開始日時" htmlFor="rs-trial-start">
-        <DateTimeField id="rs-trial-start" required value={draft.startsAt} onChange={(next) => setDraft({ ...draft, startsAt: next })} />
-      </DialogField>
+      <Field label="開始日時" htmlFor="rs-trial-start" error={fields.error('start')}>
+        <DateTimeField id="rs-trial-start" invalid={fields.invalid('start')} required value={draft.startsAt} onChange={(next) => setDraft({ ...draft, startsAt: next })} />
+      </Field>
       <DialogNote>試した予約は台帳に入ります。予約媒体へは何も送りません。</DialogNote>
     </RsDialog>
   )

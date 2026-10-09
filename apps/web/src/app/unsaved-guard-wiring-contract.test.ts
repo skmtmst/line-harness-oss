@@ -472,8 +472,6 @@ const UNTRIAGED: Record<string, string> = {
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/events/bookings/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/friends/detail/page.tsx':
-    's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   /* ★V7: 書き出し項目を共通 Checkbox へ寄せたら入力の印が3未満になり、編集画面の印が無くなったので行を消した。 */
   // 統括の入口はV8の再exportだけ。v8/hq/support.tsx の番兵を上の契約で点検する。
   'app/inflow-links/_components/edit-route-modal.tsx':
@@ -493,8 +491,6 @@ const UNTRIAGED: Record<string, string> = {
   'app/scenarios/detail/scenario-detail-client.tsx':
     's1: シナリオ詳細。手動保存で番兵なし。V6R-S1-d（board#1065）で付ける',
   'app/scenarios/first-step/page.tsx':
-    's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/tags/fields/migrate/page.tsx':
     's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/templates/page.tsx':
     's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',

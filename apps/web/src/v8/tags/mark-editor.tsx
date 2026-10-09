@@ -28,6 +28,8 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import { TextField } from '@/components/shared/text-field'
+import { Field } from '@/components/shared/form-controls'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -105,6 +107,8 @@ function MarkEditorBody({ markId }: { markId?: string }) {
   const [loadMessage, setLoadMessage] = useState('')
   const [reloading, setReloading] = useState(false)
   const [name, setName] = useState('要確認')
+  const [nameError, setNameError] = useState('')
+  const nameRef = useRef<HTMLInputElement>(null)
   const [color, setColor] = useState<string>(COLORS[0].value)
   const [displayOrder, setDisplayOrder] = useState(4)
   const [isDefault, setIsDefault] = useState(false)
@@ -272,7 +276,8 @@ function MarkEditorBody({ markId }: { markId?: string }) {
   }
 
   const save = async () => {
-    if (!name.trim()) return setError('マーク名を入力してください')
+    if (!name.trim()) { setNameError('マーク名を入力してください'); setError(''); nameRef.current?.focus(); nameRef.current?.scrollIntoView({ block: 'center' }); return }
+    setNameError('')
     if (!selectedAccountId) return setError('LINE公式アカウントを選んでください')
     if (loadState !== 'ready' || roleBlocked || saveForbidden) return
     if (loadedAccountRef.current !== selectedAccountId) return
@@ -376,7 +381,6 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         : roleBlocked ? '対応マークを作る権限がありません'
           : saveForbidden ? '対応マークを保存する権限がありません'
             : loadState === 'ready' && loadedAccountRef.current !== selectedAccountId ? 'アカウントを切り替えています。一覧を読み込むまでお待ちください'
-              : !name.trim() ? 'マーク名を入力すると保存できます'
                 : editing && !selected ? '編集中のマークを読み込めませんでした'
                   : null
   const saveDisabled = saving || blockedReason !== null
@@ -458,7 +462,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
 
         {hideForm ? null : (
           <>
-            <MarkBasicFields name={name} color={color} onName={setName} onColor={setColor} nameDuplicates={nameDuplicates} />
+            <MarkBasicFields name={name} color={color} onName={(value) => { setName(value); setNameError('') }} onColor={setColor} nameDuplicates={nameDuplicates} disabled={saving} error={nameError} nameRef={nameRef} />
 
             <section className={styles.card} aria-labelledby="mark-rules">
               <div className={styles.cardHead}>

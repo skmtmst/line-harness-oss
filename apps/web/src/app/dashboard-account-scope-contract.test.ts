@@ -1,4 +1,5 @@
-import fs from 'node:fs'
+import { readUiSource } from '../../scripts/test-ui-source.mjs'
+const fs = { readFileSync: readUiSource }
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'

@@ -1,7 +1,7 @@
 /* 友だち詳細（Q5F2QE の 1〜7・JCDRm）。寸法は globals.css の --tpl-fdt-*。 */
 
 /* ---- 板の頭 ---- */
-.head { display: flex; align-items: center; gap: var(--tpl-fdt-head-gap); padding: var(--tpl-fdt-head-pad); min-width: 0; }
+.head { display: flex; align-items: center; gap: var(--tpl-fdt-head-gap); padding: var(--tpl-fdt-head-pad-compact); min-width: 0; }
 .nameBlock { display: flex; flex-direction: column; gap: var(--tpl-fdt-title-gap); flex: 1 1 0; min-width: 0; }
 .nameRow { display: flex; align-items: center; gap: var(--tpl-fdt-name-gap); min-width: 0; }
 .name { margin: 0; font-size: var(--tpl-title-size); line-height: var(--tpl-title-lh); font-weight: var(--tpl-title-weight); color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -31,12 +31,12 @@
 .kv > dt { flex: 1 1 0; color: var(--color-ink-secondary); white-space: nowrap; }
 .kv > dd { margin: 0; color: var(--color-ink); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .kvList { display: flex; flex-direction: column; gap: var(--tpl-fdt-group-gap); margin: 0; }
-.tags { display: flex; flex-wrap: wrap; gap: var(--tpl-fdt-tag-gap); }
+.tags { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-fdt-overview-tag-gap); }
 .tag { display: inline-flex; align-items: center; padding: var(--tpl-fdt-tag-pad); border-radius: var(--tpl-fdt-tag-radius); outline: 1px solid var(--color-hairline); outline-offset: -0.5px; background: var(--color-canvas); font-size: var(--tpl-fdt-small-size); line-height: var(--tpl-fdt-small-lh); color: var(--color-ink-secondary); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; text-decoration: none; }
-.tagAdd { color: var(--color-ink-faint); }
+.tagAdd { padding: var(--tpl-fdt-tag-add-pad); color: var(--color-ink-faint); }
 .tagAdd:hover { background: var(--color-surface-pearl); }
 .mile { display: flex; align-items: flex-end; gap: var(--tpl-fdt-mile-gap); }
-.mileNum { font-family: var(--font-inter), Inter, sans-serif; font-size: var(--tpl-fdt-mile-size); line-height: var(--tpl-fdt-mile-lh); font-weight: 600; letter-spacing: var(--tpl-fdt-mile-track); color: var(--color-ink); font-variant-numeric: tabular-nums; }
+.mileNum { font-family: inherit; font-size: var(--tpl-fdt-mile-size); line-height: var(--tpl-fdt-mile-lh); font-weight: 600; letter-spacing: var(--tpl-fdt-mile-track); color: var(--color-ink); font-variant-numeric: tabular-nums; }
 .mileUnit { font-size: var(--tpl-fdt-small-size); line-height: var(--tpl-fdt-small-lh); color: var(--color-ink-secondary); white-space: nowrap; }
 .value { margin: 0; font-size: var(--tpl-fdt-text-size); line-height: var(--tpl-fdt-text-lh); color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .memo { margin: 0; font-size: var(--tpl-fdt-text-size); line-height: var(--tpl-fdt-text-lh); color: var(--color-ink-secondary); white-space: pre-wrap; overflow-wrap: anywhere; }

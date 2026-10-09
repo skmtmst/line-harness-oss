@@ -25,6 +25,13 @@ describe('KPIの折りたたみ部品（#975 U060）', () => {
 describe('V8の数の帯とメンバー一覧', () => {
   const read = (path: string) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8')
 
+  it('ダッシュボードは共通の数の帯へ集約する', () => {
+    const source = read('v8/dashboard/dashboard.tsx')
+    expect(source).toContain('<KpiBand')
+    expect(source).toContain('presentation="band"')
+    expect(source).toContain('todayCells.map')
+  })
+
   it('ウェビナーは数の帯を狭い幅で2列にする', () => {
     expect(read('app/webinars/list-v8.tsx')).toContain('aria-label="ウェビナーの数の帯"')
     expect(read('app/webinars/list-v8.module.css')).toMatch(/@media \(max-width: 640px\)[^}]*\.kpiBand[^}]*repeat\(2, minmax\(0, 1fr\)\)/s)
@@ -54,7 +61,6 @@ describe('V8の数の帯とメンバー一覧', () => {
 /** 旧来の折りたたみ部品を引き続き使う画面。 */
 describe('KPI折りたたみの適用（#975 U060）', () => {
   const targets: Array<[string, string]> = [
-    ['app/page.tsx', 'KpiCollapse'],
     ['app/auto-replies/page.tsx', 'KpiCollapse'],
     ['app/conversions/page.tsx', 'KpiCollapse'],
     ['app/automations/page.tsx', 'KpiCollapse'],

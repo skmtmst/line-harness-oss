@@ -23,6 +23,9 @@ import { failureOf, type IdentityFailure } from './identity-view'
 export type IdentityReview = {
   state: IdentityViewState
   items: IdentityCandidateListItem[]
+  detailState: IdentityViewState
+  detailFailure: IdentityFailure | null
+  reloadDetail: () => void
   detail: (IdentityCandidateDetail | IdentityCandidateWithProfiles) | null
   /** 一覧・詳細が出せないときの言い換え。候補の中身は入らない。 */
   failure: IdentityFailure | null
@@ -65,6 +68,9 @@ export function useIdentityReview(
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [detail, setDetail] = useState<IdentityCandidateDetail | IdentityCandidateWithProfiles | null>(null)
+  const [detailState, setDetailState] = useState<IdentityViewState>('loading')
+  const [detailFailure, setDetailFailure] = useState<IdentityFailure | null>(null)
+  const [detailReload, setDetailReload] = useState(0)
   const [decideError, setDecideError] = useState('')
   const [deciding, setDeciding] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -124,6 +130,7 @@ export function useIdentityReview(
       return
     }
     let alive = true
+    setDetail(null); setDetailState('loading'); setDetailFailure(null)
     setDecideError('')
     const request = kind === 'friend_duplicate'
       ? api.identityCandidates.getFriendDuplicate(selectedId)
@@ -132,19 +139,23 @@ export function useIdentityReview(
       .then((res) => {
         if (!alive) return
         if (!res.success) {
+          setDetailFailure(failureOf(null)); setDetailState('error')
           setDecideError(failureOf(null).title)
           return
         }
         setDetail(res.data)
+        setDetailState('ready')
       })
       .catch((error: unknown) => {
         if (!alive) return
-        setDecideError(failureFrom(error).title)
+        const failure = failureFrom(error)
+        setDetailFailure(failure); setDetailState(failure.kind === 'forbidden' ? 'forbidden' : 'error')
+        setDecideError(failure.title)
       })
     return () => {
       alive = false
     }
-  }, [kind, selectedId])
+  }, [kind, selectedId, lineAccountId, detailReload])
 
   const decide = useCallback(
     (input: {
@@ -182,6 +193,7 @@ export function useIdentityReview(
     state,
     items,
     detail,
+    detailState, detailFailure, reloadDetail: () => setDetailReload((key) => key + 1),
     failure,
     decideError,
     deciding,

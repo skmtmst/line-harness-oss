@@ -70,7 +70,7 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
     const forms = readFileSync(join(HERE, '../v8/forms/list.tsx'), 'utf8')
     // 403 は共通の案内（loadFailureCopy）が retryable=false を返し、読み直しを出さない。
     expect(forms).toContain('failure.retryable ? (')
-    const friends = readFileSync(join(HERE, 'friends/page.tsx'), 'utf8')
+    const friends = readFileSync(join(HERE, '../v8/friends/list/list.tsx'), 'utf8')
     expect(friends).toContain('onRetry={() => void loadFriends()}')
   })
 

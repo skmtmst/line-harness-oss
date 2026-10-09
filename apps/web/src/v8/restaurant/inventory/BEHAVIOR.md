@@ -3,7 +3,7 @@
 対象：`app/restaurant-test/v8/inventory.tsx`・`inventory-channels.tsx`（今の V8）から写して一から書いた。板 Y8SjT2・競合 qf3ky・媒体を閉じる知らせ Yyw6i・予約経路の連携 hQQlt。
 
 ## 入口・受け付ける URL
-- `app/restaurant-test/inventory/page.tsx`：`theme === 'v8'` のときだけ V8。v7 は `RestaurantConsole view="inventory"`。
+- `app/restaurant-test/inventory/page.tsx`：V8 だけを描く（2026-10-09 オーナー決定）。
 - `?tab=channels` で「予約経路の連携」、`?tab=closures` で「休業日・貸切」を開く。押したタブも URL に残す（`replaceState`）。「自動で合わせるルール」タブは口（F-24）が無いので出さない。
 
 ## 時間帯ごとの在庫（stock.tsx）

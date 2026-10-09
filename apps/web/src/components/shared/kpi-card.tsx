@@ -25,6 +25,8 @@ export type KpiCardProps = {
    */
   value: number | null | undefined
   unit: string
+  /** 数字と単位を続けて出す板用。既定の間隔は変えない。 */
+  unitSpacing?: 'normal' | 'tight'
   /** 増減の数（差し引きなど）。true のとき、プラスの数に「+」を付ける（単位はそのまま出す）。 */
   signed?: boolean
   /**
@@ -73,14 +75,14 @@ export type KpiCardProps = {
   /** 対象画面にV6がある場合はv6、配信予定を強調するカードはbroadcastを使う。 */
   variant?: 'v5' | 'v6' | 'broadcast'
   /** V8 は画面の絵に合わせてカードか線で区切るマスを選ぶ。 */
-  presentation?: 'card' | 'band' | 'cell'
+  presentation?: 'card' | 'band' | 'cell' | 'inline'
   density?: 'compact' | 'comfortable'
   className?: string
   hidden?: boolean
   id?: string
   'aria-label'?: string
   /** faint は「値を出せない」の見せ方。0 を薄くする用途には使わない。 */
-  valueTone?: 'default' | 'warning' | 'faint'
+  valueTone?: 'default' | 'warning' | 'faint' | 'danger'
 }
 
 /** 旧名。KpiCard に寄せたので、新しくは KpiCardProps を使う。 */
@@ -102,6 +104,7 @@ export default function KpiCard({
   menu,
   value,
   unit,
+  unitSpacing = 'normal',
   signed = false,
   detail,
   description,
@@ -187,7 +190,7 @@ export default function KpiCard({
         ) : null}
       </div>
 
-      <div className={styles.valueRow}>
+      <div className={styles.valueRow} data-unit-spacing={unitSpacing}>
       {loading ? (
         <div className={styles.skeleton} aria-hidden="true" />
       ) : (
@@ -195,6 +198,7 @@ export default function KpiCard({
           className={[
             styles.value,
             valueTone === 'warning' ? styles.valueWarning : null,
+            valueTone === 'danger' ? styles.valueDanger : null,
             valueTone === 'faint' ? styles.valueFaint : null,
           ]
             .filter(Boolean)

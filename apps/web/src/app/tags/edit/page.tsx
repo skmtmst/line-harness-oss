@@ -1,16 +1,9 @@
 'use client'
 
 import { Suspense } from 'react'
-import EditTagPageV4 from '@/components/friend-fields/edit-tag-page-v4'
-import EditTagPageV8 from '@/v8/tag-edit/edit'
-import { useAdminTheme } from '@/lib/use-admin-theme'
+import Screen from '@/v8/tag-edit/edit'
 
-/** v8 テーマのときだけ新しい編集画面（edit-tag-page-v8）。v7 は無変更。 */
+/** V8 の入口。URL・読み書き・権限は画面側で保つ。 */
 export default function EditTagPage() {
-  const theme = useAdminTheme()
-  return (
-    <Suspense fallback={<div className="p-6 text-sm text-ink-faint">読み込み中…</div>}>
-      {theme === 'v8' ? <EditTagPageV8 /> : <EditTagPageV4 />}
-    </Suspense>
-  )
+  return <Suspense fallback={null}><Screen /></Suspense>
 }

@@ -19,6 +19,7 @@ export default function SegmentedControl<T extends string>({
   className,
   size = 'medium',
   disabled = false,
+  appearance = 'track',
   equalWidth = false,
 }: {
   options: { value: T; label: string }[]
@@ -38,6 +39,8 @@ export default function SegmentedControl<T extends string>({
   size?: 'medium' | 'small' | 'compact' | 'panel' | 'timing'
   /** 操作を止める（生成中など）。項目すべてを押せなくする。 */
   disabled?: boolean
+  /** 電話予約の探し方（rm92Y）：各項目が独立した丸い選択肢。 */
+  appearance?: 'track' | 'choices'
   /** 選択肢を器の幅へ均等に並べる（統括の生成枚数）。 */
   equalWidth?: boolean
 }) {
@@ -76,14 +79,15 @@ export default function SegmentedControl<T extends string>({
       aria-label={ariaLabel}
       className={[styles.root, className].filter(Boolean).join(' ')}
       data-size={size}
+      data-appearance={appearance}
       data-equal-width={equalWidth || undefined}
       onKeyDown={onKeyDown}
     >
-      <span
+      {appearance === 'track' ? <span
         className={styles.thumb}
         style={{ transform: `translateX(${thumb.left}px)`, width: thumb.width }}
         aria-hidden="true"
-      />
+      /> : null}
       {options.map((option, index) => (
         <button
           key={option.value}

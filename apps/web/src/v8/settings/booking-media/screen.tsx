@@ -11,9 +11,9 @@
  * 動きは BEHAVIOR.md。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Copy, Info, MessageCircle, Plus } from 'lucide-react'
-import { PageFrame, PageHeading } from '@/components/templates/page-frame'
-import StickyBar from '@/components/shared/sticky-bar'
+import { Check, Copy, MessageCircle, Plus } from 'lucide-react'
+import { PageFrame, PageHeading, PageFooter } from '@/components/templates/page-frame'
+import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
@@ -24,6 +24,7 @@ import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-ba
 import Toggle from '@/components/shared/toggle'
 import Checkbox from '@/components/shared/checkbox'
 import Radio from '@/components/shared/radio'
+import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import { RowActions } from '@/components/shared/row-actions'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -159,10 +160,11 @@ export default function BookingMediaPage() {
   const [editing, setEditing] = useState<MediaRow | null>(null)
   const [editPage, setEditPage] = useState('')
   const [editLogin, setEditLogin] = useState('')
-  const [editError, setEditError] = useState('')
+  const [editErrors, setEditErrors] = useState<{ page?: string; login?: string }>({})
   const [adding, setAdding] = useState(false)
   const [addName, setAddName] = useState('')
   const [addError, setAddError] = useState('')
+  const [addNameError, setAddNameError] = useState('')
   const [addBusy, setAddBusy] = useState(false)
   /* キャンセルで席が空いたときの「もう開けてよい」と、知らせる相手（店ごと）。 */
   const [noticeSaved, setNoticeSaved] = useState<NoticeSettings | null>(null)
@@ -277,21 +279,32 @@ export default function BookingMediaPage() {
   const setAllClose = (on: boolean) => setRows((list) => list.map((row) => (row.acceptsReservations ? { ...row, closeOnBooking: on } : row)))
 
   const openEdit = (row: MediaRow) => {
-    setEditing(row); setEditPage(row.pageUrl ?? ''); setEditLogin(row.loginUrl ?? ''); setEditError('')
+    setEditing(row); setEditPage(row.pageUrl ?? ''); setEditLogin(row.loginUrl ?? ''); setEditErrors({})
   }
   const applyEdit = () => {
     if (!editing) return
     const page = checkHttpsUrl(editPage)
     const login = checkHttpsUrl(editLogin)
-    if (!page.ok) { setEditError(`店舗ページ：${page.message}`); return }
-    if (!login.ok) { setEditError(`管理画面：${login.message}`); return }
+    const errors = { page: !page.ok ? page.message : undefined, login: !login.ok ? login.message : undefined }
+    setEditErrors(errors)
+    if (!page.ok || !login.ok) {
+      const field = document.getElementById(!page.ok ? 'media-page-url' : 'media-login-url')
+      field?.focus(); field?.scrollIntoView({ block: 'center' })
+      return
+    }
     setRow(editing.code, { pageUrl: page.value, loginUrl: login.value })
     setEditing(null)
   }
 
   const addMedium = async () => {
     const name = addName.trim()
-    if (!name) { setAddError('媒体の名前を入れてください'); return }
+    if (!name) {
+      setAddNameError('媒体の名前を入れてください')
+      const field = document.getElementById('media-name')
+      field?.focus(); field?.scrollIntoView({ block: 'center' })
+      return
+    }
+    setAddNameError('')
     if (!selectedAccountId) return
     setAddBusy(true); setAddError('')
     try {
@@ -360,9 +373,9 @@ export default function BookingMediaPage() {
   else if (rows.length === 0) table = <p className={styles.text}>媒体がまだありません。右上の［媒体を足す］から足せます。</p>
   else {
     table = (
-      <DataTable className={styles.table} data-design="booking-media">
+      <DataTable density="media" className={styles.table} data-design="booking-media">
         <thead>
-          <TableHeadRow className={styles.headRow}>
+          <TableHeadRow>
             <Th className={styles.colName}>媒体</Th>
             <Th className={styles.colPage}>店舗ページの URL</Th>
             <Th className={styles.colLogin}>管理画面（ログイン）の URL</Th>
@@ -375,7 +388,7 @@ export default function BookingMediaPage() {
             const badge = importBadge(row, channels.find((c) => c.code === row.code))
             const changed = dirty.some((d) => d.code === row.code)
             return (
-              <Tr key={row.code} className={styles.row} data-dirty={changed || undefined}>
+              <Tr key={row.code} data-dirty={changed || undefined}>
                 <Td className={styles.colName}>
                   <span className={styles.nameCell}>
                     <span className={styles.mark} aria-hidden="true">{row.name.slice(0, 1)}</span>
@@ -429,7 +442,7 @@ export default function BookingMediaPage() {
                   <Select aria-label="店舗" value={storeId} onChange={(value) => { if (value === storeId) return; if (changes > 0) setPendingStoreId(value); else setStoreId(value) }} options={stores.map((s) => ({ value: s.id, label: s.name }))} />
                 </span>
               ) : null}
-              {canManage ? <Button onClick={() => { setAdding(true); setAddName(''); setAddError('') }}><Plus size={15} aria-hidden="true" />媒体を足す</Button> : null}
+              {canManage ? <Button onClick={() => { setAdding(true); setAddName(''); setAddError(''); setAddNameError('') }}><Plus size={15} aria-hidden="true" />媒体を足す</Button> : null}
             </span>
           )}
         />
@@ -457,7 +470,7 @@ export default function BookingMediaPage() {
               helpLabel="LINE 予約を他のサイトに貼るの説明"
             />
             <div className={styles.cards}>
-              <div className={styles.card}>
+              <Card appearance="outlined" layout="vertical" padding="default" gap="tight" className={styles.card}>
                 <p className={styles.cardTitle}>予約ページの URL</p>
                 <p className={styles.cardText}>Instagram のプロフィール・Google ビジネスの予約ボタン・ホームページに貼れます</p>
                 {canManage ? (
@@ -471,8 +484,8 @@ export default function BookingMediaPage() {
                 {linkAsked && link && !link.available ? (
                   <Notice tone="info" role="status">LINE 予約のページは、まだ使えません。使えるようになったら、ここからコピーして貼れます。</Notice>
                 ) : null}
-              </div>
-              <div className={styles.card}>
+              </Card>
+              <Card appearance="outlined" layout="vertical" padding="default" gap="tight" className={styles.card}>
                 <p className={styles.cardTitle}>ボタンの見本と貼り付けるコード</p>
                 <div className={styles.sampleRow}>
                   <span className={styles.lineButton} aria-hidden="true"><MessageCircle size={16} />LINE で予約する</span>
@@ -486,7 +499,7 @@ export default function BookingMediaPage() {
                     </span>
                   </>
                 ) : null}
-              </div>
+              </Card>
             </div>
           </section>
 
@@ -496,10 +509,7 @@ export default function BookingMediaPage() {
               help="知らせを出す媒体は、表の行の「…」から1つずつ選べます。下の切り替えは、予約を受ける媒体をまとめてオン・オフします。"
               helpLabel="他のサイトの枠を閉じる知らせの説明"
             />
-            <div className={styles.band}>
-              <Info size={16} aria-hidden="true" className={styles.bandIcon} />
-              <span className={styles.bandText}>席の数（在庫）の自動調整はしません。LINE や電話で予約が入ったら、他のサイトの同じ時刻の枠を閉じる知らせを出します。</span>
-            </div>
+            <Notice tone="info" density="compact">他の予約サイトの空き枠は自動で変更しません。LINE や電話で予約が入ったら、他のサイトの同じ時刻の枠を閉じる知らせを出します。</Notice>
             <div className={styles.switchRow}>
               {/* 閲覧のみには押せる形のスイッチを置かない。オン・オフは札で見せる。 */}
               {canManage ? (
@@ -523,15 +533,15 @@ export default function BookingMediaPage() {
             <div className={styles.targetRow}>
               <span className={styles.targetLabel}>知らせる相手</span>
               {canManage && notice ? (
-                <button
-                  type="button"
-                  className={`${styles.targetValue} ${styles.targetButton}`}
+                <Button
+                  align="start"
+                  className={styles.targetControl}
                   title={recipientText(notice, members)}
                   aria-haspopup="dialog"
                   onClick={() => { setPicking({ recipientMode: notice.recipientMode, membershipIds: notice.membershipIds }); setPickError('') }}
                 >
                   {recipientText(notice, members)}
-                </button>
+                </Button>
               ) : (
                 <span className={styles.targetValue} title={recipientText(notice ?? { recipientMode: 'responsible', membershipIds: [] }, members)}>
                   {recipientText(notice ?? { recipientMode: 'responsible', membershipIds: [] }, members)}
@@ -542,8 +552,7 @@ export default function BookingMediaPage() {
           </section>
         </div>
         {canManage ? (
-          <div className={styles.footer}>
-            <StickyBar
+          <PageFooter
               actions={(
                 <>
                   <Button onClick={() => { if (saved) setRows(saved); if (noticeSaved) setNotice(noticeSaved); setSaveError('') }} disabled={saving}>キャンセル</Button>
@@ -553,8 +562,7 @@ export default function BookingMediaPage() {
                 </>
               )}
               status={changes > 0 ? <span aria-live="polite">{dirty.length > 0 ? `変えた媒体 ${dirty.length}件${noticeDirty ? '・知らせの設定' : ''}（まだ保存していません）` : '知らせの設定を変えました（まだ保存していません）'}</span> : undefined}
-            />
-          </div>
+          />
         ) : null}
       </PageFrame>
 
@@ -582,17 +590,14 @@ export default function BookingMediaPage() {
         confirmLabel="変える"
         onConfirm={applyEdit}
         onCancel={() => setEditing(null)}
-        error={editError || undefined}
       >
         <div className={styles.dialogFields}>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>店舗ページの URL</span>
-            <TextField value={editPage} onChange={(event) => setEditPage(event.target.value)} placeholder="https://" inputMode="url" />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>管理画面（ログイン）の URL</span>
-            <TextField value={editLogin} onChange={(event) => setEditLogin(event.target.value)} placeholder="https://" inputMode="url" />
-          </label>
+          <Field label="店舗ページの URL" htmlFor="media-page-url" error={editErrors.page}>
+            <TextField id="media-page-url" value={editPage} onChange={(event) => { setEditPage(event.target.value); setEditErrors((errors) => ({ ...errors, page: undefined })) }} placeholder="https://" inputMode="url" />
+          </Field>
+          <Field label="管理画面（ログイン）の URL" htmlFor="media-login-url" error={editErrors.login}>
+            <TextField id="media-login-url" value={editLogin} onChange={(event) => { setEditLogin(event.target.value); setEditErrors((errors) => ({ ...errors, login: undefined })) }} placeholder="https://" inputMode="url" />
+          </Field>
         </div>
       </Dialog>
 
@@ -645,10 +650,9 @@ export default function BookingMediaPage() {
         onCancel={() => setAdding(false)}
         error={addError || undefined}
       >
-        <label className={styles.field}>
-          <span className={styles.fieldLabel}>媒体の名前</span>
-          <TextField value={addName} onChange={(event) => setAddName(event.target.value)} placeholder="例：OZmall" maxLength={100} />
-        </label>
+        <Field label="媒体の名前" htmlFor="media-name" error={addNameError}>
+          <TextField id="media-name" value={addName} onChange={(event) => { setAddName(event.target.value); setAddNameError('') }} placeholder="例：OZmall" maxLength={100} />
+        </Field>
       </Dialog>
     </>
   )

@@ -799,7 +799,7 @@ export default function TagsTab({
                           <span className={styles.gripSpace} aria-hidden="true"><GripVertical className={styles.gripIcon} /></span>
                         )}
                       </span>
-                      <TagPill name={tag.name} color={group?.color} size="sm" href={editHref} />
+                      <TagPill name={tag.name} color={group?.color} size="sm" compactAtNarrow href={editHref} />
                       {tag.status === 'archived' ? <span className={styles.miniBadge}>保管済み</span> : null}
                       {tag.cleanupReasons?.includes('duplicate_name') ? (
                         <span className={`${styles.miniBadge} ${styles.miniBadgeWarn}`} title="正規化した名前がほかのタグと重なっています。整理候補です。">名前が重なっている</span>
@@ -873,6 +873,7 @@ export default function TagsTab({
             title={kpi.title}
             icon={<kpi.icon size={13} aria-hidden="true" />}
             value={kpi.value}
+            unitSpacing="tight"
             unit={kpi.value == null ? '' : kpi.unit}
             detail={kpi.detail}
           />

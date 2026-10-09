@@ -159,4 +159,6 @@ button.item:disabled {
 [data-theme='v8'] .summary { font-family: var(--font-inter), Inter, system-ui, sans-serif; line-height: 20px; }
 
 [data-theme='v8'] .summary { flex: 1; gap: 0; }
+[data-theme='v8'] .pagination[data-spacing='roomy'] { padding: calc(var(--tpl-rs-stat-pad) + var(--tpl-rs-rsv-head-row-gap)) calc(var(--tpl-rs-stat-pad) + var(--tpl-rs-cell-side)); }
+
 }

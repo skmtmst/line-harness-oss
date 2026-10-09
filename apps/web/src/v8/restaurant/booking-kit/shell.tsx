@@ -18,6 +18,9 @@ import {
   type RestaurantStore,
 } from '@/lib/restaurant-test-api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import Card, { CardHeader } from '@/components/shared/card'
+import Notice from '@/components/shared/notice'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
@@ -82,14 +85,14 @@ export function Stat({ label, value, note, warning = false, help }: {
   help?: ReactNode
 }) {
   return (
-    <div className={styles.stat}>
+    <Card layout="vertical" padding="default" surface="inset" className={styles.stat}>
       <p className={styles.statLabel}>
         {label}
         {help ? <HelpTip label={`${label}の説明`}>{help}</HelpTip> : null}
       </p>
       <p className={`${styles.statValue} ${warning ? styles.statValueWarning : ''} ${typeof value === 'string' && /[^\x20-\x7e]/.test(value) ? styles.statValueJp : ''}`}>{value}</p>
       <p className={styles.statNote}>{note}</p>
-    </div>
+    </Card>
   )
 }
 
@@ -108,16 +111,10 @@ export function Panel({ title, description, aside, flush = false, children }: {
   children: ReactNode
 }) {
   return (
-    <section className={styles.panel}>
-      <div className={styles.panelHead}>
-        <div className={styles.panelHeadText}>
-          <h2 className={styles.panelTitle}>{title}</h2>
-          {description ? <p className={styles.panelDescription}>{description}</p> : null}
-        </div>
-        {aside}
-      </div>
+    <Card layout="vertical" surface="inset" overflow="hidden">
+      <CardHeader size="panel" title={title} meta={description} action={aside} />
       {flush ? children : <div className={styles.panelBody}>{children}</div>}
-    </section>
+    </Card>
   )
 }
 
@@ -131,7 +128,7 @@ function EmptySetup() {
   )
 }
 
-export default function RestaurantShell({ boardId, title, description, query, headAfter, bare = false, layout = 'standard', storeTab, boundary = true, headSize, children }: {
+export default function RestaurantShell({ boardId, title, description, query, headAfter, bare = false, layout = 'standard', storeTab, boundary = true, headSize, templateHeading = false, children }: {
   /** Pencil の板 ID。外枠へ付ける。 */
   boardId: string
   title: string
@@ -158,6 +155,7 @@ export default function RestaurantShell({ boardId, title, description, query, he
    */
   boundary?: boolean
   /** 板の頭の大きさ。compact は E 系の板（題 20・説明の行 20）。 */
+  templateHeading?: boolean
   headSize?: 'compact'
   children: (ctx: RestaurantV8Context) => ReactNode
 }) {
@@ -243,9 +241,7 @@ export default function RestaurantShell({ boardId, title, description, query, he
     </span>
   ) : null
   const noticeBand = notice ? (
-    <div role="status" className={`${styles.notice} ${notice.tone === 'success' ? styles.noticeSuccess : styles.noticeError}`}>
-      {notice.text}
-    </div>
+    <Notice role="status" tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />
   ) : null
 
   if (bare) {
@@ -257,8 +253,14 @@ export default function RestaurantShell({ boardId, title, description, query, he
     )
   }
 
-  return (
+  const page = (
     <div data-design-node={boardId} className={styles.page}>
+      {templateHeading ? <PageHeading
+        inset="none"
+        title={title}
+        description={typeof description === 'function' ? description(ctx) : description}
+        actions={headAfter ? headAfter(ctx, storePicker) : storePicker}
+      /> : (
       <div className={`${styles.head} ${layout === 'standard' ? '' : styles.headLedger}`}>
         <div className={styles.headText}>
           <h1 className={`${styles.headTitle} ${headSize === 'compact' ? styles.headTitleCompact : ''}`}>{title}</h1>
@@ -266,6 +268,7 @@ export default function RestaurantShell({ boardId, title, description, query, he
         </div>
         {headAfter ? headAfter(ctx, storePicker) : storePicker}
       </div>
+      )}
       {storeTab ? <div className={styles.storeTabs}><StoreTabs current={storeTab} flush /></div> : null}
       <div className={`${styles.body} ${layout === 'ledgerTight' ? styles.bodyTight : ''} ${storeTab ? styles.bodyAfterTabs : ''} ${boundary ? '' : styles.bodyFlush}`}>
         {boundary ? <BoundaryBanner /> : null}
@@ -274,4 +277,5 @@ export default function RestaurantShell({ boardId, title, description, query, he
       </div>
     </div>
   )
+  return templateHeading ? <PageFrame kind="restaurant" standalone>{page}</PageFrame> : page
 }

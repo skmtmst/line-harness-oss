@@ -7,7 +7,7 @@
  * 絵：幅 520・余白 20・間 12。送るもの（テンプレートから入れる）→ 送る日時の札 → 注意 → 真ん中にキャンセル・予約。
  */
 import { useEffect, useRef, useState } from 'react'
-import { Clock, FileText } from 'lucide-react'
+import { FileText } from 'lucide-react'
 import type { Template } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
@@ -131,8 +131,9 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
       <div className={styles.body}>
         <div className={styles.group}>
           <p className={styles.label}>送るもの</p>
-          <div className={styles.textBox}>
+          <div>
             <TextArea
+              density="compact"
               aria-label="送るもの"
               rows={3}
               value={content}
@@ -184,7 +185,6 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
         <div className={styles.footer}>
           <Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button>
           <Button type="button" variant="primary" onClick={() => void reserve()} disabled={busy} busy={busy}>
-            {!busy ? <Clock size={15} aria-hidden="true" /> : null}
             {scheduledAt ? formatReserveLabel(scheduledAt) : '日時を選んで予約'}
           </Button>
         </div>

@@ -116,7 +116,7 @@ describe('#639 ホバーは hover:hover かつ pointer:fine の中にだけ書�
     expect(readApp('pools/page.tsx')).toContain('bg-action text-on-accent hover:brightness-90')
     // 白地の枠付き口は沈み色へ、淡色ピルは brightness で応答する。
     // V8 移行 ①: 白地の枠付き口は共通 Button secondary へ。沈み色は部品が持つ。
-    expect(readApp('tags/folders/new/page.tsx')).toContain('variant="secondary"')
+    expect(readFileSync(join(HERE, '../../v8/tags/folder-page.tsx'), 'utf8')).toContain('<FolderEditorDialog')
     expect(readApp('booking/bookings/booking-calendar.tsx')).toContain('bg-accent-soft px-3 py-1 text-xs font-semibold text-accent-deep hover:brightness-95')
   })
 })

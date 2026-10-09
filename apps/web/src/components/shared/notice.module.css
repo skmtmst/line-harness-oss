@@ -123,3 +123,12 @@
 
 /* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
 [data-theme='v8'] .notice { -webkit-font-smoothing: auto; }
+
+[data-theme="v8"] .notice[data-density="compact"] { gap: var(--tpl-rt-chip-row-gap); padding: var(--tpl-rt-notice-pad); border-radius: var(--tpl-rt-inner-radius); color: var(--color-ink); font-size: var(--text-label); line-height: normal; }
+/* qf3ky：題と説明を2行にし、右側に競合の操作を並べる。 */
+[data-theme='v8'] .twoLine { gap: 12px; padding: 12px 16px; border: 0; }
+[data-theme='v8'] .twoLine .message { display: flex; flex-direction: column; gap: 2px; }
+[data-theme='v8'] .twoLine .heading { color: var(--color-ink); font-size: 13px; font-weight: 700; line-height: 19px; }
+[data-theme='v8'] .twoLine .description { color: var(--color-ink-secondary); font-size: 12px; line-height: 17px; }
+[data-theme='v8'] .twoLine .action { display: flex; gap: 12px; }
+[data-theme='v8'] .twoLine .icon { color: var(--color-warning); }

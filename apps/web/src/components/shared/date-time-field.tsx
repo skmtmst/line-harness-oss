@@ -7,6 +7,7 @@ import MenuPortal from './menu-portal'
 import Select from './select'
 import TimeFieldV8, { type TimeFieldSize } from './time-field-v8'
 import { useAdminTheme } from '@/lib/use-admin-theme'
+import { joinDescribedBy, useFieldContext } from './field-context'
 import dateStyles from './date-field.module.css'
 import styles from './date-time-field.module.css'
 
@@ -75,6 +76,9 @@ export default function DateTimeField({
   'aria-labelledby'?: string
   'aria-describedby'?: string
 }) {
+  const field = useFieldContext()
+  invalid = invalid || Boolean(field?.invalid)
+  ariaDescribedBy = joinDescribedBy(ariaDescribedBy, field?.describedBy)
   const theme = useAdminTheme()
   const autoId = useId()
   const fieldId = id ?? autoId
@@ -141,6 +145,7 @@ export default function DateTimeField({
           id={fieldId}
           readOnly
           className={[dateStyles.field, size === 'compact' ? styles.compactField : undefined].filter(Boolean).join(' ')}
+          data-size={size}
           data-readonly=""
           value={parsed ? formatDateTimeLabel(parsed) : ''}
           placeholder="—"
@@ -161,8 +166,10 @@ export default function DateTimeField({
         id={fieldId}
         type="button"
         className={[dateStyles.field, size === 'compact' ? styles.compactField : undefined].filter(Boolean).join(' ')}
+        data-size={size}
         disabled={disabled}
         data-invalid={invalid || undefined}
+        aria-invalid={invalid || undefined}
         aria-required={required || undefined}
         // 狭い欄で切れても、重ねれば全文が読める（短い文字列は1行省略＋titleの決まり）。
         title={parsed ? formatDateTimeLabel(parsed) : undefined}

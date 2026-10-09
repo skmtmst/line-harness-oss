@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source.mjs'
 
 const PAGE = [
   'page.tsx',
@@ -23,7 +23,7 @@ describe('M015/M016 UID・顧客データ移行の失敗表示', () => {
     expect(PAGE).toContain('setMessage(')
     // finally で busy を戻し、履歴を読み直す。
     expect(PAGE).toMatch(/finally\s*\{\s*setBusy\(false\)\s*\}/)
-    expect(PAGE).toContain('void executeImport()')
+    expect(PAGE).toContain('void m.executeImport()')
   })
 
   it('書き出し・確認・反映の失敗は原文のまま出さない（M016）', () => {

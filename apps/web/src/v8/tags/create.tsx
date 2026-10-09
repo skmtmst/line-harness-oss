@@ -9,7 +9,7 @@
  * 違うのは見せ方：タグ連動（付いたときの動き）は絵のとおり「作ったあとの編集で足す」。
  * 複製して作る（?copy=）ときは、複製元の連動の中身は画面に出さずにそのまま写して作る。
  */
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Check, ClipboardList, Link2, Plus, Workflow } from 'lucide-react'
@@ -24,6 +24,7 @@ import Notice from '@/components/shared/notice'
 import FolderSelect, { folderCreateResult } from '@/components/shared/folder-select'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import Toggle from '@/components/shared/toggle'
+import { TextField } from '@/components/shared/text-field'
 import ListState from '@/components/shared/list-state'
 import { notifyToast } from '@/components/shared/toast'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -32,14 +33,8 @@ import { DuplicateNameNote, findDuplicateNames } from '@/components/friend-field
 import { definitionsForSave, linkedActionFromDefinition } from '@/components/friend-fields/tag-editor-v4'
 import styles from './create.module.css'
 
-/** 作る前の検査（今の作る画面と同じ）。問題なければ null。 */
-export function tagNameProblem(name: string): string | null {
-  const trimmed = name.trim()
-  if (!trimmed) return 'タグ名を入力してください'
-  if (trimmed.length > 80) return 'タグ名は80文字までで入力してください'
-  if ([...trimmed].some((ch) => { const code = ch.charCodeAt(0); return code < 32 || code === 127 })) return 'タグ名に使えない文字が含まれています'
-  return null
-}
+import { tagNameProblem } from './tag-name'
+export { tagNameProblem } from './tag-name'
 
 export default function TagCreateV8() {
   return (
@@ -72,6 +67,8 @@ function TagCreate() {
   const [siblings, setSiblings] = useState<Array<{ id: string; name: string }>>([])
 
   const [name, setName] = useState('')
+  const [nameError, setNameError] = useState('')
+  const nameRef = useRef<HTMLInputElement>(null)
   const [groupId, setGroupId] = useState('')
   const [isStarred, setIsStarred] = useState(false)
   const dirty = Boolean(name.trim() || groupId || isStarred)
@@ -133,9 +130,13 @@ function TagCreate() {
     if (saving) return
     const problem = tagNameProblem(name)
     if (problem) {
-      setError(problem)
+      setNameError(problem)
+      setError('')
+      nameRef.current?.focus()
+      nameRef.current?.scrollIntoView({ block: 'center' })
       return
     }
+    setNameError('')
     if (!selectedAccountId) {
       setError('LINE公式アカウントを選んでください')
       return
@@ -226,14 +227,18 @@ function TagCreate() {
           </div>
           <label className={styles.field}>
             <span className={styles.label}>タグ名</span>
-            <input
-              className={styles.input}
+            <TextField
+              ref={nameRef}
+              aria-label="タグ名"
+              invalid={Boolean(nameError)}
+              aria-describedby={nameError ? 'tag-name-error' : undefined}
               value={name}
               maxLength={80}
               placeholder="例：定期購入者"
               aria-required="true"
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => { setName(event.target.value); setNameError('') }}
             />
+            {nameError ? <p id="tag-name-error" className={styles.fieldError} role="alert">{nameError}</p> : null}
             <DuplicateNameNote duplicates={duplicates} kindLabel="タグ" />
           </label>
           <div className={styles.field}>

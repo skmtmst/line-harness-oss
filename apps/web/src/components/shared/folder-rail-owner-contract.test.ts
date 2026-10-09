@@ -53,7 +53,7 @@ describe('オーナー指示 #582 のフォルダ欄', () => {
     expect(page).toMatch(/<FolderPanel[\s\S]*?(onAddFolder|addFolderDisabled)/)
     expect(page).toMatch(/<ListPage[\s\S]*?folders=\{/)
     const templateCss = readFileSync(resolve(import.meta.dirname, '../templates/page-templates.module.css'), 'utf8')
-    expect(templateCss).toMatch(/\.folders \{ width: var\(--tpl-folder-width\)/)
+    expect(templateCss).toMatch(/\.folders \{[^}]*width: var\(--tpl-folder-width\)/)
   })
 
   it('テンプレートも同じ幅と欄内追加操作を使う', () => {

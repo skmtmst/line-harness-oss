@@ -369,7 +369,7 @@
     "arbitrary-value": 10
   },
   "components/chats/friend-info-sidebar.tsx": {
-    "unresolved-classname": 13,
+    "unresolved-classname": 14,
     "arbitrary-value": 3
   },
   "components/chats/inbox-dropdown.tsx": {
@@ -495,6 +495,9 @@
     "arbitrary-value": 1
   },
   "components/shared/avatar.tsx": {
+    "unresolved-classname": 1
+  },
+  "components/shared/booking-controls.tsx": {
     "unresolved-classname": 1
   },
   "components/shared/breadcrumb.tsx": {

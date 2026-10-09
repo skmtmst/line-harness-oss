@@ -53,6 +53,12 @@
   line-height: 1.7; /* lineHeight: 1.7 */
   resize: vertical;
 }
+.multi[data-density='compact'] {
+  font-size: var(--text-label);
+  line-height: var(--tpl-compact-textarea-lh);
+  padding: var(--tpl-compact-textarea-pad);
+  min-height: var(--tpl-compact-textarea-h);
+}
 
 /* 入力が正しくないとき。枠を赤くするだけで、文字色は変えない。 */
 .invalid {
@@ -112,3 +118,8 @@
 
 /* 2行の説明用。指定した欄だけを小さくする。 */
 [data-theme='v8'] .multiCompact { min-height: var(--tpl-textarea-compact-h); padding: var(--tpl-e78-pair-gap); line-height: var(--tpl-e78-name-lh); }
+[data-theme="v8"] .multi[data-density="compact"] { padding: var(--tpl-rt-gray-note-pad); border: 0; border-radius: var(--tpl-rt-inner-radius); outline: 1px solid var(--color-control-border); outline-offset: -1px; font-size: var(--text-caption); line-height: var(--tpl-rt-draft-lh); }
+[data-theme="v8"] .multi[data-density="compact"][aria-invalid="true"] { outline-color: var(--color-danger); }
+[data-theme="v8"] .multi[data-density="compact"]:focus-visible { outline-width: 2px; outline-offset: 2px; }
+[data-theme='v8'] .multi[data-height='post'] { min-height: var(--tpl-rt-summary-h); height: var(--tpl-rt-summary-h); }
+[data-theme='v8'] .multi[data-height='reply'] { min-height: var(--tpl-rt-draft-h); height: var(--tpl-rt-draft-h); }

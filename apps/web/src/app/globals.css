@@ -923,6 +923,7 @@
   --tpl-ml-approval-pad: 16px; --tpl-ml-approval-gap: 10px; --tpl-ml-approval-radius: 12px; --tpl-ml-approval-row-pad: 10px 12px; --tpl-ml-approval-row-radius: 8px; --tpl-ml-approval-title-size: 14px; --tpl-ml-flush-pull: -14px; --tpl-ml-foot-after-pager: 23px;
   --tpl-ml-pill-pad: 2px 8px; --tpl-ml-pill-gap: 5px; --tpl-ml-pill-lh: 18px; --tpl-ml-ops-gap: 8px;
   --tpl-ml-notice-after: 6px; --tpl-ml-num-pad-end: 8px; --tpl-ml-tab-pad-bottom: 6px; --tpl-ml-ro-before: 8px; --tpl-ml-ro-after: 12px; --tpl-ml-saved-w: 154px; --tpl-ml-search-w: 240px; --tpl-ml-foot-pad: 12px 24px;
+  --tpl-detail-panel-z: 70; --tpl-detail-panel-top: 74px;
   --tpl-folder-width: 200px; --tpl-folder-pad-block: 16px; --tpl-folder-pad-side: 12px; --tpl-folder-inset-pad-start: 24px;
   /* 統括（/hq）の画面（r4ARpV・JB8V1・b8xBtZ ほか）。 */
   --tpl-hq-nav-gap: 2px; --tpl-hq-nav-label-lh: 16px; --tpl-hq-nav-item-gap: 8px; --tpl-hq-nav-item-pad: 8px 10px; --tpl-hq-nav-item-lh: 19px; --tpl-hq-nav-icon: 14px;
@@ -1275,11 +1276,16 @@
   --tpl-db-act-pad: 18px 24px; --tpl-db-act-gap: 4px; --tpl-db-band-pad: 10px 14px; --tpl-db-band-gap: 12px; --tpl-db-band-radius: 10px; --tpl-db-progress-w: 120px; --tpl-db-progress-h: 4px; --tpl-db-close: 14px; --tpl-db-menu: 16px; --tpl-db-head-h: 23px; --tpl-db-chart-right: 23px; --tpl-db-chart-day-w: 80px; --tpl-db-inbox-gap: 12px; --tpl-db-num-ls: -0.5px; --tpl-db-fig-glyph-lh: 26px; --tpl-db-focus-ring: 2px;
   --tpl-footer-pad-block: 12px; --tpl-footer-pad-side: 24px; --tpl-footer-gap: 8px;
   /* 友だち詳細（Q5F2QE・JCDRm）。src/v8/friend-detail だけが読む。 */
+  /* mainA：Pen の推移の段・要点の小札・1152 のタグ行。 */
+  --tpl-dashboard-trend-min-h: 318px; --tpl-kpi-unit-gap-tight: 0px;
+  --tpl-compact-textarea-lh: 20px; --tpl-compact-textarea-pad: 12px; --tpl-compact-textarea-h: 96px;
+  --tpl-tag-compact-font: 13px; --tpl-tag-compact-dot: 8px; --tpl-tag-compact-pad: 2px 8px; --tpl-tag-compact-gap: 6px;
+  --tpl-fdt-head-pad-compact: 20px 24px 13px; --tpl-tag-narrow-row-h: 61px; --tpl-tag-table-compact-pad: 0 10px; --tpl-fdt-tag-add-pad: 0; --tpl-fdt-overview-tag-gap: 6px;
   --tpl-fdt-head-pad: 20px 24px; --tpl-fdt-head-gap: 14px; --tpl-fdt-name-size: var(--tpl-title-size); --tpl-fdt-name-lh: var(--tpl-title-lh); --tpl-fdt-name-gap: 8px; --tpl-fdt-title-gap: 4px; --tpl-fdt-sub-size: 13px; --tpl-fdt-sub-lh: 20px; --tpl-fdt-square: 36px;
   --tpl-fdt-tabs-gap: 23px; --tpl-fdt-pad-side: 24px;
   --tpl-fdt-summary-w: 320px; --tpl-fdt-summary-pad: 20px 24px; --tpl-fdt-summary-gap: 18px; --tpl-fdt-group-gap: 8px; --tpl-fdt-small-size: 12px; --tpl-fdt-small-lh: 18px; --tpl-fdt-text-size: 13px; --tpl-fdt-text-lh: 20px;
   --tpl-fdt-tag-pad: 2px 8px; --tpl-fdt-tag-radius: 6px; --tpl-fdt-tag-gap: 6px;
-  --tpl-fdt-mile-size: 22px; --tpl-fdt-mile-lh: 33px; --tpl-fdt-mile-gap: 4px; --tpl-fdt-mile-track: -0.4px;
+  --tpl-fdt-mile-size: 22px; --tpl-fdt-mile-lh: 33px; --tpl-fdt-mile-gap: 10px; --tpl-fdt-mile-track: -0.4px;
   --tpl-fdt-content-pad: 20px 28px; --tpl-fdt-content-gap: 22px; --tpl-fdt-sec-size: 15px; --tpl-fdt-sec-lh: 23px; --tpl-fdt-sec-gap: 10px; --tpl-fdt-recent-gap: 4px; --tpl-fdt-link-gap: 4px;
   --tpl-fdt-row-radius: 12px; --tpl-fdt-row-pad: 12px 14px; --tpl-fdt-row-gap: 12px; --tpl-fdt-row-min-h: 56px; --tpl-fdt-icon-box: 32px; --tpl-fdt-icon-radius: 9px; --tpl-fdt-row-text-gap: 6px; --tpl-fdt-bar-h: 4px; --tpl-fdt-bar-radius: 3px;
   --tpl-fdt-recent-h: 50px; --tpl-fdt-dot: 24px; --tpl-fdt-line-h: 26px;
@@ -1376,7 +1382,7 @@
   --tpl-rt-kicker-ink: #9a8a5a; --tpl-rt-kicker-size: 9px; --tpl-rt-kicker-tracking: 2px; --tpl-rt-label-lh: 20px; --tpl-rt-input-lh: 21px; --tpl-rt-body-box-h: 56px; --tpl-rt-body-box-pad: 0 12px;
   --tpl-rt-preview-w: 210px; --tpl-rt-preview-bg: #8fa8cf; --tpl-rt-preview-icon: 22px; --tpl-rt-rich-radius: 14px; --tpl-rt-photo-h: 96px; --tpl-rt-photo-icon: 22px; --tpl-rt-rich-pad: 12px 14px; --tpl-rt-rich-ink: #111111; --tpl-rt-rich-sub: #666666; --tpl-rt-rich-body-lh: 17px; --tpl-rt-rich-action-pad: 10px 0; --tpl-rt-rich-link: #42659a;
   --tpl-rt-photo-a: #c8a27a; --tpl-rt-photo-b: #9fb3c8; --tpl-rt-photo-c: #d9b8a6; --tpl-rt-photo-d: #b9c7a5; --tpl-rt-mini-pad: 18px; --tpl-rt-mini-title-size: 16px;
-  --tpl-inbox-summary-pad: 20px; --tpl-inbox-summary-gap: 16px;
+  --tpl-inbox-tag-bottom: 14px; --tpl-inbox-basic-bottom: 6px; --tpl-inbox-profile-pad: 6px; --tpl-inbox-profile-gap: 8px; --tpl-inbox-profile-lh: 24px; --tpl-inbox-title-inset: 8px; --tpl-inbox-summary-pad: 20px; --tpl-inbox-summary-gap: 16px; --tpl-inbox-summary-top: 21px;
   /* 受信箱の会話の中を探す（M0393 段13・枠 v7GV2）。 */
   --tpl-inbox-search-pad: 8px 20px; --tpl-inbox-search-gap: 8px; --tpl-inbox-search-field-h: 32px; --tpl-inbox-search-field-pad: 0 10px; --tpl-inbox-search-field-gap: 6px; --tpl-inbox-search-field-line: 1.5px solid var(--color-accent-deep); --tpl-inbox-search-field-line-offset: -1.5px;
   --tpl-inbox-search-icon: 14px; --tpl-inbox-search-text: 13px; --tpl-inbox-search-text-lh: 20px; --tpl-inbox-search-count: 12px; --tpl-inbox-search-count-lh: 19px; --tpl-inbox-search-btn: 32px; --tpl-inbox-search-btn-icon: 15px; --tpl-inbox-search-line-bottom: inset 0 -1px 0 var(--color-hairline); --tpl-inbox-search-hit-current: 0 0 0 2px var(--color-warning); --tpl-inbox-search-hit-other: 0 0 0 2px #fdf3e1;

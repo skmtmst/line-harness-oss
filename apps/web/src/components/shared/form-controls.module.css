@@ -122,7 +122,15 @@
 }
 }
 
+[data-theme='v8'] .field[data-label-size='compact'] .label { font-size: var(--text-caption); font-weight: 600; line-height: 17px; }
+
 /* v7 の複数行（TextArea の包み）は元どおり大きさ固定。正本の層の外の resize: vertical より強くするため層の外に置く。 */
 :root:not([data-theme='v8']) .legacyTextarea {
   resize: none;
 }
+
+[data-theme='v8'] .field[data-density] { display: flex; flex-direction: column; gap: var(--tpl-rt-payload-gap); }
+[data-theme='v8'] .field[data-density] .labelRow { margin: 0; }
+[data-theme='v8'] .field[data-density="compact"] .label { color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; line-height: normal; }
+[data-theme='v8'] .field[data-density="input"] .label { color: var(--color-ink); font-size: var(--text-label); font-weight: 500; line-height: var(--tpl-rt-label-lh); }
+[data-theme='v8'] .field[data-grow] { flex: 1 1 0; }

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -23,7 +23,7 @@ describe('友だち詳細のタブ帯は右列を押し広げない', () => {
   })
 
   it('タブは1行に保ち、開いているタブの印を持つ', () => {
-    expect(PAGE).toContain('whitespace-nowrap')
-    expect(PAGE).toContain('aria-current={tab === t.key')
+    expect(PAGE).toContain("from '@/components/shared/tabs'")
+    expect(PAGE).toContain('current: tab === t.key')
   })
 })

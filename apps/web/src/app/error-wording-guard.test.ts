@@ -56,7 +56,6 @@ const KNOWN_FILES: string[] = [
   'app/form-submissions/responses/page.tsx',
   'app/form-submissions/responses/response-summary.ts',
   'app/friend-add-settings/runs/page.tsx',
-  'app/friends/detail/page.tsx',
   'app/getting-started/getting-started-view.ts',
   'app/health/page.tsx',
   'app/inflow-links/ad-integration.tsx',
@@ -78,8 +77,6 @@ const KNOWN_FILES: string[] = [
   // ★V8 版も同じ持ち越し文言を使う（直すときは page.tsx と一緒に直す）
   'app/settings/feature-settings-v8.tsx',
   'app/staff/page.tsx',
-  'app/tags/fields/edit/page.tsx',
-  'app/tags/searches/edit/page.tsx',
   'app/updates/page.tsx',
   'app/webhooks/webhook-overviews.tsx',
   'app/webinars/edit/page.tsx',

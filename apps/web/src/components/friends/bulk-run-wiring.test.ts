@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -115,7 +115,7 @@ describe('V6 友だち一括操作（IAf7j）の配線', () => {
   })
 
   it('一覧の再読込では選択と一括操作の窓を一緒に閉じる', () => {
-    expect(PAGE).toContain('const selectedFriendIds = useMemo(() => [...selectedIds], [selectedIds])')
+    expect(PAGE).toContain('friendIds={[...selectedIds]}')
     const load = PAGE.slice(PAGE.indexOf('const loadFriends'), PAGE.indexOf('const resetPageWith'))
     expect(load).toContain('setBulkOpen(false)')
     expect(load).toContain('setSelectedIds(new Set())')

@@ -132,4 +132,9 @@
   bottom: var(--seg-timing-pad);
   box-shadow: var(--shadow-segment-ring);
 }
+/* rm92Y の探し方。既定の切り替えの寸法・動きは変えない。 */
+[data-theme='v8'] .root[data-appearance='choices'] { padding: 0; gap: 8px; background: transparent; }
+[data-theme='v8'] .root[data-appearance='choices'] .item { min-height: 0; padding: 6px 12px; border-radius: var(--radius-pill); outline: 1px solid var(--color-hairline); outline-offset: -0.5px; font-size: var(--text-caption); font-weight: 400; line-height: 17px; }
+[data-theme='v8'] .root[data-appearance='choices'] .selected { outline-color: transparent; background: var(--color-accent-soft); color: var(--color-accent-deep); font-weight: 600; }
+[data-theme='v8'] .root[data-appearance='choices'] .item:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
 }

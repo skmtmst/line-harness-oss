@@ -105,8 +105,8 @@ const EDIT_PAGES = pages(path.join(SRC, 'app'))
  */
 const NOT_YET: string[] = []
 
-// アカウント登録は保存フォームの帯ではなく、5段のウィザードの進む操作を使う。
-const WIZARD_PAGES = new Set(['accounts/new/page.tsx'])
+// アカウント登録はウィザード、V8のフォルダ作成は共通窓の確定操作を使う。
+const NON_FORM_PAGES = new Set(['accounts/new/page.tsx', 'tags/folders/new/page.tsx'])
 const uses = (s: string) => /StickyBar|CreatePage/.test(s)
 
 describe('下部追従バーの並びを部品で固定する', () => {
@@ -115,7 +115,7 @@ describe('下部追従バーの並びを部品で固定する', () => {
   })
 
   it('帯を使っていない画面を増やさない', () => {
-    const found = EDIT_PAGES.filter((f) => !WIZARD_PAGES.has(f.p) && !uses(f.s)).map((f) => f.p).sort()
+    const found = EDIT_PAGES.filter((f) => !NON_FORM_PAGES.has(f.p) && !uses(f.s)).map((f) => f.p).sort()
     expect(found, '作成・編集画面が自前で帯を書いている').toEqual([...NOT_YET].sort())
   })
 
@@ -125,6 +125,13 @@ describe('下部追従バーの並びを部品で固定する', () => {
     expect(wizard).toContain('type="submit"')
     expect(wizard).toContain('!connectionPassed')
     expect(wizard).toContain('api.lineAccounts.connect(')
+  })
+
+  it('フォルダ作成は共通窓の確定とキャンセルへ接続する', () => {
+    const source = readWithParts(path.join(SRC, 'app/tags/folders/new/page.tsx'))
+    expect(source).toContain('<FolderEditorDialog')
+    expect(source).toContain('onConfirm={() => void save()}')
+    expect(source).toContain('onCancel={close}')
   })
 
   it('削除は左端、ほかは中央、右端は空ける', () => {

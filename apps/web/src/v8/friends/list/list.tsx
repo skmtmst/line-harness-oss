@@ -227,12 +227,13 @@ export default function FriendsListV8() {
   useEffect(() => { void loadStats(selectedAccountId) }, [selectedAccountId, loadStats])
 
   /* ── 一覧の状態の保存・復元（IDEA-03・今と同じ） ── */
-  const restoredRef = useRef(false)
-  const [restored, setRestored] = useState(false)
+  const restoredRef = useRef<string | null>(null)
+  const [restoredAccount, setRestoredAccount] = useState<string | null>(null)
+  const restored = !accountLoading && Boolean(selectedAccountId) && restoredAccount === selectedAccountId
   const hasExplicitUrlFilters = hasScoreRange || audienceId !== '' || Boolean(directSavedSearchId) || directTagId !== '' || directQuery !== ''
   useEffect(() => {
-    if (restoredRef.current || accountLoading) return
-    restoredRef.current = true
+    if (accountLoading || !selectedAccountId || restoredRef.current === selectedAccountId) return
+    restoredRef.current = selectedAccountId
     if (!hasExplicitUrlFilters && selectedAccountId) {
       const snapshot = readFriendsListSnapshot(selectedAccountId)
       if (snapshot) {
@@ -247,9 +248,12 @@ export default function FriendsListV8() {
         if (isPageSize(snapshot.pageSize)) setPageSize(snapshot.pageSize)
         setPage(snapshot.page)
         setAdvanced(snapshot.advanced)
+      } else {
+        setSearchInput(''); setSearchSubmitted(''); setSelectedTagId(''); setResponseFilter('all')
+        setOperatorId(''); setScenarioId(''); setAttentionOnly(false); setSortMode('recent'); setPageSize(20); setPage(1); setAdvanced(null)
       }
     }
-    setRestored(true)
+    setRestoredAccount(selectedAccountId)
   }, [accountLoading, selectedAccountId, hasExplicitUrlFilters])
 
   useEffect(() => {

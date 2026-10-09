@@ -15,13 +15,16 @@ type CommonProps = {
    * `#976` U077/U084: 危険操作は共通ボタンの1役割として持ち、
    * 画面ごとの直書き赤（濃さがバラバラだった）を1本にする。
    */
-  variant?: 'primary' | 'secondary' | 'danger' | 'text'
+  variant?: 'primary' | 'secondary' | 'danger' | 'danger-outline' | 'text'
   /**
    * `compact` は一覧の行内・絞り込み行など、32px級の操作と高さを
    * そろえるときだけ使う（★V7：行内の操作は32）。本文の操作は
    * `standard` のままにする。
    */
-  size?: 'standard' | 'field' | 'compact'
+  size?: 'standard' | 'field' | 'compact' | 'inline' | 'slot' | 'thumbnail'
+  align?: 'start'
+  /** 行内の時刻など、リンク色にしない文字操作。 */
+  textTone?: 'action' | 'ink'
   className?: string
   children: ReactNode
 }
@@ -73,12 +76,12 @@ const DONE_FLASH_MS = 1200
 export default function Button(props: ButtonProps) {
   const variant = props.variant ?? 'secondary'
   const size = props.size ?? 'standard'
-  const classes = [styles.button, styles[variant], styles[size], props.className].filter(Boolean).join(' ')
+  const classes = [styles.button, styles[variant], styles[size], props.textTone === 'ink' ? styles.textInk : null, props.className].filter(Boolean).join(' ')
 
   if ('href' in props && props.href !== undefined) {
-    const { children, className: _className, href, size: _size, variant: _variant, ...linkProps } = props
+    const { children, className: _className, href, size: _size, variant: _variant, align, textTone: _textTone, ...linkProps } = props
     return (
-      <Link href={href} className={classes} {...linkProps}>
+      <Link href={href} className={classes} data-align={align} {...linkProps}>
         {children}
       </Link>
     )
@@ -94,6 +97,8 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     className: _className,
     variant: _variant,
     size: _size,
+    align,
+    textTone: _textTone,
     href: _href,
     type = 'button',
     busy,
@@ -149,6 +154,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     <button
       type={type}
       className={classes}
+      data-align={align}
       ref={setRefs}
       disabled={disabled || busyNow}
       aria-busy={busyNow ? true : undefined}

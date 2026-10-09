@@ -5,6 +5,7 @@ import { loadFailureCopy } from './api-error-message'
 import HelpTip from './help-tip'
 import { FailureTitle, RetryLabel } from './retry-label'
 import styles from './table.module.css'
+import presentationStyles from './table-presentation.module.css'
 
 type TableHeadRowProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'className'> & {
   children: ReactNode
@@ -40,6 +41,8 @@ export type ThProps = Omit<
   scope?: Scope
   /** 短い列では1行で省略し、titleで全文を読める。 */
   truncate?: boolean
+  /** 白い板が狭いときだけ、補助列を畳む。見出しと本文で揃える。 */
+  collapseAt?: 'narrow'
   /**
    * 定義・分母・単位・言葉の意味。見出しのすぐ右の「？」へ入れる
    * （★V7・§2-1b）。表の下の注はここへ移し、2回書かない。
@@ -61,6 +64,7 @@ export function Th({
   helpLabel,
   helpHref,
   truncate,
+  collapseAt,
   ...cellProps
 }: ThProps) {
   const classes = [
@@ -76,7 +80,7 @@ export function Th({
   const heading = helpLabel ?? (typeof children === 'string' ? children : 'この項目')
 
   return (
-    <th className={classes} scope={scope} {...cellProps}>
+    <th className={classes} scope={scope} data-cell-collapse={collapseAt} {...cellProps}>
       {truncate ? <span className={styles.truncated} title={typeof children === 'string' ? children : undefined}>{children}</span> : children}
       {hasHelp ? (
         <HelpTip label={`${heading}の説明`}>
@@ -97,13 +101,19 @@ export function DataTable({
   children,
   className,
   'data-design': dataDesign,
+  presentation,
+  density,
 }: {
   children: ReactNode
   className?: string
   'data-design'?: string
+  /** 時間×卓と予約一覧の寸法、飲食店のカード内の密度。指定した表だけに適用する。 */
+  presentation?: 'ledger' | 'calendar' | 'inventory' | 'channels' | 'columns'
+  /** 連携画面の3種類の行。指定のない表の見た目は変えない。 */
+  density?: 'reviews' | 'media' | 'sample'
 }) {
   return (
-    <div className={[shell.frame, className].filter(Boolean).join(' ')}>
+    <div className={[shell.frame, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={density} data-table-presentation={presentation}>
       <table className={shell.table} data-design={dataDesign}>{children}</table>
     </div>
   )
@@ -154,17 +164,18 @@ export type TdProps = Omit<TdHTMLAttributes<HTMLTableCellElement>, 'align' | 'ch
   children?: ReactNode
   align?: 'left' | 'right' | 'center'
   className?: string
+  collapseAt?: 'narrow'
 }
 
 /** 標準一覧の本文セル。 */
-export function Td({ children, align = 'left', className, ...cellProps }: TdProps) {
+export function Td({ children, align = 'left', className, collapseAt, ...cellProps }: TdProps) {
   const classes = [
     shell.bodyCell,
     align === 'right' && styles.right,
     align === 'center' && styles.center,
     className,
   ].filter(Boolean).join(' ')
-  return <td className={classes} {...cellProps}>{children}</td>
+  return <td className={classes} data-cell-collapse={collapseAt} {...cellProps}>{children}</td>
 }
 
 /** 名前・副題・注記を同じ列にまとめる先頭セル。 */
