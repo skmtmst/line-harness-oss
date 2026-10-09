@@ -133,6 +133,7 @@ const ALLOWLIST_MAX = 772;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'DELETE /api/friend-add-rules/folders/{id}',
   'GET /api/scenarios/{id}/question-answers',
   'POST /api/scenarios/{id}/question-answers/{executionId}/resume',
   'GET /api/automations/counts',

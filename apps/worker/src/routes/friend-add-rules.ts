@@ -3,6 +3,7 @@ import type { Context } from 'hono';
 import {
   archiveFriendAddRule,
   createFriendAddRuleDraft,
+  deleteFriendAddRuleFolder,
   ensureFriendAddFallbackRules,
   getFriendAddRule,
   getFriendByLineUserIdForAccount,
@@ -1094,6 +1095,29 @@ friendAddRules.patch('/api/friend-add-rules/folders/:id', requireRole('owner', '
   } catch (error) {
     if (error instanceof Error && /unique/i.test(error.message)) return c.json({ success: false, error: '同じ名前のフォルダがあります' }, 409);
     return c.json({ success: false, error: 'フォルダを変更できませんでした' }, 500);
+  }
+});
+
+friendAddRules.delete('/api/friend-add-rules/folders/:id', requireRole('owner', 'admin'), async (c) => {
+  const text = await c.req.text();
+  let body: { accountId?: string } | null;
+  try { body = text.trim() ? JSON.parse(text) : null; }
+  catch { return c.json({ success: false, error: '入力を確認してください' }, 400); }
+  if (body !== null && (typeof body !== 'object' || Array.isArray(body) || (body.accountId !== undefined && typeof body.accountId !== 'string'))) {
+    return c.json({ success: false, error: '入力を確認してください' }, 400);
+  }
+  const accountId = accountIdFrom(c, body ?? undefined);
+  if (!accountId) return c.json({ success: false, error: 'accountId が必要です' }, 400);
+  try {
+    if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
+    const id = c.req.param('id');
+    const result = await deleteFriendAddRuleFolder(c.env.DB, { lineAccountId: accountId, folderId: id });
+    if (result === 'not_found') return c.json({ success: false, error: 'フォルダが見つかりません' }, 404);
+    if (result === 'conflict') return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'フォルダが更新されました。読み直してください' }, 409);
+    return c.json({ success: true, data: { id, deleted: true } satisfies import('@line-crm/shared').FriendAddRuleFolderDeleteResult });
+  } catch (error) {
+    console.error('DELETE /api/friend-add-rules/folders/:id error:', error);
+    return c.json({ success: false, error: 'フォルダを削除できませんでした' }, 500);
   }
 });
 

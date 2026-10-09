@@ -11251,6 +11251,10 @@ export const api = {
       fetchApi<ApiResponse<import('@line-crm/shared').FriendAddRuleFolder>>(`/api/friend-add-rules/folders/${encodeURIComponent(id)}`, {
         method: 'PATCH', body: JSON.stringify({ accountId, ...input }),
       }),
+    deleteFolder: (accountId: string, id: string) =>
+      fetchApi<ApiResponse<import('@line-crm/shared').FriendAddRuleFolderDeleteResult>>(`/api/friend-add-rules/folders/${encodeURIComponent(id)}?account_id=${encodeURIComponent(accountId)}`, {
+        method: 'DELETE',
+      }),
     runs: (accountId: string, params?: {
       period?: 'all' | 'last28days' | 'today' | 'this_month' | 'last_month'
       from?: string
