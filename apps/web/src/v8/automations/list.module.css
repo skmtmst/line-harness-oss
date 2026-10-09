@@ -17,19 +17,6 @@
   width: var(--tpl-am-create-w);
   height: var(--tpl-chip-h);
 }
-/* 閲覧のみで「フォルダを追加」を置かないときの場所。 */
-.addSpace {
-  display: block;
-  height: var(--tpl-am-add-space);
-}
-.folderNote {
-  margin: 0;
-  color: var(--color-ink-faint);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-am-note-lh);
-  /* 絵は字の途中で折る（全体の言葉のまとまりで折ると3行になる）。 */
-  word-break: normal;
-}
 
 /* 案内の帯（表の上の主列）。帯の下は道具の段の上の余白と同じだけ空ける。 */
 .noticeRow {

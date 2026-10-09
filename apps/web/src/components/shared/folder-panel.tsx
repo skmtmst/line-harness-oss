@@ -50,6 +50,8 @@ export interface FolderPanelRow {
   icon?: ReactNode
   /** フォルダ全体の選択など、行の右に置く操作。 */
   trailing?: ReactNode
+  /** 選ぶ窓（dJZ7Q）のフォルダごと選ぶチェック。行の左に置き、readOnly でも出す。 */
+  leading?: ReactNode
   /** 行ごとの追加操作。今の操作の前に置き、その後に区切りを入れる。 */
   leadingActions?: ActionMenuItem[]
   /**
@@ -210,6 +212,7 @@ export default function FolderPanel({
               data-menu-open={openMenuId === row.id || undefined}
               data-has-actions={hasActions || undefined}
             >
+              {row.leading ? <span className={styles.leading}>{row.leading}</span> : null}
               <button
                 type="button"
                 onClick={() => {

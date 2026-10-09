@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { act, cleanup, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 const scope = vi.hoisted(() => ({ account: 'a', tags: vi.fn(), fields: vi.fn(), scenarios: vi.fn() }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: scope.account }) }))
@@ -29,6 +29,10 @@ it('WEB261/262: 持ち主の候補を使い、切替前の遅い応答を捨て�
   view.rerender(<QuestionEditor accountId="owner-b" value={question} onChange={() => {}} choiceColumns />)
   await act(async () => {})
   await act(async () => resolveOld({ success: true, data: [{ id: 'old', name: '古いタグ' }] }))
-  expect(view.container.textContent).not.toContain('古いタグ')
-  expect(view.container.textContent).toContain('新しいタグ')
+  // タグの候補は選ぶ窓の中に並ぶ。窓を開いて、切替後の持ち主の候補だけがあることを見る。
+  fireEvent.click(screen.getAllByRole('button', { name: '選択時に追加するタグ：選ぶ' })[0])
+  const dialog = (await screen.findAllByRole('dialog')).at(-1)!
+  const names = within(dialog).getAllByRole('checkbox').map((box) => box.getAttribute('aria-label') ?? box.textContent ?? '')
+  expect(names.some((name) => name.includes('古いタグ'))).toBe(false)
+  expect(names.some((name) => name.includes('新しいタグ'))).toBe(true)
 })

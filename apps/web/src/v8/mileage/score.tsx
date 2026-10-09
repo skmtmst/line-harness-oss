@@ -51,6 +51,8 @@ import { MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import { mileagePaginationTotal } from './display'
 import styles from './mileage.module.css'
+import { useFormErrors } from '@/lib/use-form-errors'
+import { FieldError } from '@/components/shared/form-controls'
 
 const BAND_LABELS: Record<ActionScoreBand, string> = {
   high: '点が高い',
@@ -828,7 +830,7 @@ export default function ScoreTab() {
  * 口と約束（理由必須・追記だけ・再送しても二重反映しない）は今と同じ。見せ方だけ V8。
  * 窓の幅・位置は絵どおり（designWidth 560・designTop 184）。
  */
-function ScoreAdjustDialog({
+export function ScoreAdjustDialog({
   accountId,
   friendId,
   friendName,
@@ -861,18 +863,14 @@ function ScoreAdjustDialog({
   const scoreAfter = validAmount ? currentScore + delta : currentScore
   const bandAfter = bandOf(scoreAfter, highMin, normalMin)
   const bandChanges = validAmount && bandAfter !== band
+  /* 確定で落ちた欄は、その欄の真下に理由を出して移る（B-139）。 */
+  const fields = useFormErrors()
+  fields.define('amount', '点数', () => (validAmount ? null : '1以上1000000以下の整数で点数を入力してください'))
+  fields.define('reason', '理由', () => (!reason.trim() ? '理由を入力してください。' : reason.trim().length > 500 ? '理由は500文字以内で入力してください' : null))
 
   const submit = async () => {
-    if (!validAmount) {
-      setError('1以上1000000以下の整数で点数を入力してください')
-      return
-    }
-    if (!reason.trim()) {
-      setError('理由を入力してください。')
-      return
-    }
-    if (reason.trim().length > 500) {
-      setError('理由は500文字以内で入力してください')
+    if (fields.submit().length > 0) {
+      setError('')
       return
     }
     setBusy(true)
@@ -950,7 +948,11 @@ function ScoreAdjustDialog({
             inputMode="numeric"
             value={amountText}
             onChange={(event) => setAmountText(event.target.value.replace(/[^0-9]/g, ''))}
+            {...fields.bind('amount')}
+            aria-invalid={fields.invalid('amount') || undefined}
+            aria-describedby={fields.invalid('amount') ? 'ml-score-amount-error' : undefined}
           />
+          <FieldError id="ml-score-amount-error">{fields.error('amount')}</FieldError>
         </div>
 
         <div className={styles.dlgGroup}>
@@ -961,7 +963,11 @@ function ScoreAdjustDialog({
             value={reason}
             onChange={(event) => setReason(event.target.value)}
             rows={2}
+            {...fields.bind('reason')}
+            aria-invalid={fields.invalid('reason') || undefined}
+            aria-describedby={fields.invalid('reason') ? 'ml-score-reason-error' : undefined}
           />
+          <FieldError id="ml-score-reason-error">{fields.error('reason')}</FieldError>
         </div>
 
         <p className={styles.dlgCaption}>この変更で起きること</p>

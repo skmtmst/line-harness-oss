@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Play, Video } from 'lucide-react'
+import { Play } from 'lucide-react'
 import { validateImagemapMessage, type Folder } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -13,7 +13,8 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
-import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
+import { AttachmentRow } from '@/components/shared/file-drop'
+import MediaSlot from '@/components/shared/media-slot'
 import FolderSelect, { folderById } from '@/components/shared/folder-select'
 import HelpTip from '@/components/shared/help-tip'
 import LinePreview from '@/components/shared/line-preview'
@@ -173,9 +174,9 @@ export default function TemplateRichVideoEditor({ id = null, visual = false, hos
       {loading?<p role="status">読み込み中…</p>:null}
       <Card padding="none" layout="vertical" className={styles.card}><h2 className={styles.cardTitle}>名前とフォルダ</h2><div className={styles.pair}><div className={`${styles.field} ${styles.grow}`}><label htmlFor="rv-name" className={styles.label}>テンプレート名</label><TextField id="rv-name" invalid={issue?.field==='name'} aria-describedby={issue?.field==='name'?'rv-name-error':undefined} value={draft.name} onChange={e=>patch({name:e.target.value})} disabled={!canMutate||busy||loading||loadFailed}/>{fieldError('name')}</div><div className={`${styles.field} ${styles.folderField}`}><label htmlFor="rv-folder" className={styles.labelSmall}>フォルダ</label>{canMutate?<FolderSelect size="full" id="rv-folder" aria-label="フォルダ" value={draft.folderId} onChange={value=>patch({folderId:value})} folders={folders.map(folderById)} disabled={busy||loading||loadFailed}/>:<span>{folders.find(f=>f.id===draft.folderId)?.name??'未分類'}</span>}</div></div></Card>
       <Card padding="none" layout="vertical" className={styles.card}><div className={styles.cardHead}><h2 className={styles.cardTitle}>動画</h2><p className={styles.cardNote}>縦長・横長・正方形のどれでも。トーク画面では自動で流れます</p></div>
-        <div id="rv-video" tabIndex={-1}>{canMutate && !loadFailed ? <FileDropzone variant="video" invalid={issue?.field==='video'} icon={<Video size={24} aria-hidden="true"/>} title="動画をドラッグ、またはファイルを選ぶ" hint="MP4・200MBまで ・ 縦長 / 横長 / 正方形 に対応" accept="video/mp4" busy={busy} disabled={loading||mismatch} onFiles={files=>void upload(files[0])}/>:null}{fieldError('video')}</div>
+        <div id="rv-video" tabIndex={-1}>{canMutate && !loadFailed ? <MediaSlot kind="video" title="動画を追加" value={draft.originalContentUrl||null} valueName={fileName||undefined} accept="video/mp4" limitText="1ファイル200メガバイト以内・MP4・縦長 / 横長 / 正方形" busy={busy} error={issue?.field==='video'?issue.message:undefined} disabled={loading||mismatch} onFile={file=>void upload(file)} onRemove={()=>{patch({originalContentUrl:'',previewImageUrl:''});setFileName('');setNeedsImage(false)}}/>:null}</div>
         {fileName?<AttachmentRow name={fileName} meta={draft.previewImageUrl?'プレビュー画像も作りました':'プレビュー画像を追加してください'}/>:null}
-        {(needsImage || issue?.field==='preview')?<div id="rv-preview" tabIndex={-1}>{needsImage && canMutate?<FileDropzone invalid={issue?.field==='preview'} title="動画と同じ縦横比のプレビュー画像を選ぶ" hint="動画から画像を作れませんでした。JPEG・PNG、1MBまで" accept="image/png,image/jpeg" disabled={busy||mismatch} onFiles={files=>void upload(files[0],true)}/>:null}{fieldError('preview')}</div>:null}
+        {(needsImage || issue?.field==='preview')?<div id="rv-preview" tabIndex={-1} className={videoStyles.previewSlot}>{needsImage && canMutate?<MediaSlot size="compact" title="プレビュー画像を追加" previewAlt="動画のプレビュー画像" value={draft.previewImageUrl||null} accept="image/png,image/jpeg" limitText="1MB 以内" error={issue?.field==='preview'?issue.message:undefined} disabled={busy||mismatch} onFile={file=>void upload(file,true)}/>:fieldError('preview')}<p className={styles.cardNote}>動画から画像を作れませんでした。動画と同じ縦横比の JPEG・PNG（1MBまで）を入れてください。</p></div>:null}
       </Card>
       <Card padding="none" layout="vertical" className={styles.card}><div className={styles.toggleRow}><h2 className={styles.cardTitle}>見終わったあとのボタン</h2><HelpTip label="見終わったあとのボタンの説明">動画の再生が終わったあとに、リンクを開くボタンを出します。</HelpTip><span className={styles.spacer}/><span className={styles.toggleLabelSmall}>{draft.buttonEnabled?'出す':'出さない'}</span>{canMutate?<Toggle checked={draft.buttonEnabled} label="見終わったあとのボタンを出す" onChange={value=>patch({buttonEnabled:value})} disabled={busy||loading||loadFailed}/>:null}</div>
         {draft.buttonEnabled?<div className={styles.pair}><div className={`${styles.field} ${styles.folderField}`}><label className={styles.label} htmlFor="rv-label">ボタンの文字</label>{canMutate?<Select size="full" id="rv-label" aria-label="ボタンの文字" value={draft.actionLabel} onChange={value=>patch({actionLabel:value})} options={RICH_VIDEO_BUTTON_LABELS.map(label=>({value:label,label}))} disabled={busy||loading||loadFailed}/>:<span>{draft.actionLabel}</span>}</div><div className={`${styles.field} ${styles.grow}`}><label className={styles.label} htmlFor="rv-actionUrl">リンク先URL</label><TextField id="rv-actionUrl" type="url" invalid={issue?.field==='actionUrl'} aria-describedby={issue?.field==='actionUrl'?'rv-actionUrl-error':undefined} value={draft.actionUrl} onChange={e=>patch({actionUrl:e.target.value})} placeholder="https://…" disabled={!canMutate||busy||loading||loadFailed}/>{fieldError('actionUrl')}</div></div>:null}

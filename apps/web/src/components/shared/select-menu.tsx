@@ -159,6 +159,8 @@ export interface SelectMenuOptionProps {
   disabled?: boolean
   /** 行の先頭の印（状態の色の点など）。 */
   leading?: ReactNode
+  /** 名前の下の1行の説明（「押したら」の一覧 YPzmo）。渡すと行が2段になる。多い候補を間引く一覧では使わない。 */
+  description?: string
   onSelect: () => void
   onHover?: () => void
   setSize?: number
@@ -171,25 +173,35 @@ export function SelectMenuOption({
   active = false,
   disabled = false,
   leading,
+  description,
   onSelect,
   onHover,
   setSize,
   posInSet,
 }: SelectMenuOptionProps) {
   return (
-    <li role="option" aria-selected={selected} aria-setsize={setSize} aria-posinset={posInSet} className={styles.row}>
+    // 説明つきの行も、選択肢の名前は名前だけ（説明は見た目と title で出す）。
+    <li role="option" aria-selected={selected} aria-setsize={setSize} aria-posinset={posInSet} aria-label={description ? label : undefined} className={styles.row}>
       <button
         type="button"
         className={styles.item}
         disabled={disabled}
         data-selected={selected || undefined}
         data-active={active || undefined}
+        data-described={description ? '' : undefined}
         onMouseEnter={onHover}
         onClick={onSelect}
-        title={label}
+        title={description ? `${label}：${description}` : label}
       >
         {leading ? <span className={styles.leading} aria-hidden="true">{leading}</span> : null}
-        <span className={styles.label}>{label}</span>
+        {description ? (
+          <span className={styles.texts}>
+            <span className={styles.label}>{label}</span>
+            <span className={styles.description}>{description}</span>
+          </span>
+        ) : (
+          <span className={styles.label}>{label}</span>
+        )}
         {selected ? <Check className={styles.check} aria-hidden="true" /> : null}
       </button>
     </li>

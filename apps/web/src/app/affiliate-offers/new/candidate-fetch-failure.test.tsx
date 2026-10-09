@@ -62,9 +62,15 @@ async function openOptions(buttonId: string) {
   const switchName = buttonId === 'of-tag' ? 'タグを付ける' : 'シナリオ配信を始める'
   const toggle = host.querySelector<HTMLButtonElement>(`[role=switch][aria-label="${switchName}"]`)
   if (toggle?.getAttribute('aria-checked') === 'false') await act(async () => { toggle.click() })
-  const button = host.querySelector<HTMLButtonElement>(`#${buttonId}`)
+  // タグは選ぶ窓（dJZ7Q）。欄の［選ぶ］で開き、窓の候補（radio）の名前を読む。
+  const button = host.querySelector<HTMLButtonElement>(buttonId === 'of-tag' ? '#of-tag button[aria-haspopup="dialog"]' : `#${buttonId}`)
   expect(button).toBeTruthy()
   await act(async () => { button!.click() })
+  if (buttonId === 'of-tag') {
+    const labels = [...document.querySelectorAll('[role="dialog"] input[type="radio"]')].map((el) => el.getAttribute('aria-label') ?? '')
+    await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
+    return labels
+  }
   return [...document.querySelectorAll('[role="option"]')].map((el) => el.textContent ?? '')
 }
 

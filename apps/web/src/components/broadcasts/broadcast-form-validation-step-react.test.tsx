@@ -80,7 +80,7 @@ async function flush() {
   })
 }
 
-async function renderForm(step: BroadcastStepKey) {
+async function renderForm(step: BroadcastStepKey | null) {
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -169,6 +169,36 @@ describe('保存失敗の案内（R580）', () => {
         (item) => (item.textContent ?? '').includes('へ移動'),
       )
       expect(move).toBeFalsy()
+    } finally {
+      unmount()
+    }
+  })
+})
+
+describe('吹き出しの不備は欄で知らせる（B-139）', () => {
+  it('本文が空の吹き出しは帯にせず、その吹き出しの下に理由と頭に赤い丸を出し、そこへ移る', async () => {
+    await renderForm(null)
+    try {
+      const title = container.querySelector<HTMLInputElement>('input[aria-label="配信名"], #broadcast-title, input[name="title"]')
+        ?? [...container.querySelectorAll<HTMLInputElement>('input')].find((input) => input.closest('label')?.textContent?.includes('配信名') || input.getAttribute('aria-label')?.includes('タイトル'))
+      expect(title, '配信名の欄がありません').toBeTruthy()
+      await act(async () => {
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+        setter.call(title!, '秋のお知らせ')
+        title!.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+      await act(async () => {
+        saveDraftButton().dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+      await flush()
+      await act(async () => { await new Promise((resolve) => requestAnimationFrame(resolve)) })
+      expect(createApi).not.toHaveBeenCalled()
+      const bubble = container.querySelector('[aria-label="1通目の吹き出し"]')!
+      const reason = bubble.querySelector('[role="alert"]')
+      expect(reason?.textContent).toBe('テキストを入力してください')
+      expect(bubble.querySelector('[role="img"]')?.getAttribute('aria-label')).toBe('1通目に直す欄が1か所')
+      expect([...container.querySelectorAll('[role="alert"]')].some((item) => item.textContent?.includes('吹き出し1のテキスト'))).toBe(false)
+      expect(bubble.contains(document.activeElement)).toBe(true)
     } finally {
       unmount()
     }

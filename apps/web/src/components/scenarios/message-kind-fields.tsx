@@ -12,7 +12,13 @@
  * 選べないファイルを探させることになる**ので、URL欄にして条件を書く。
  */
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import type { MediaItem } from '@line-crm/shared'
+import MediaSlot from '@/components/shared/media-slot'
+import MediaPickerDialog from '@/components/shared/media-picker-dialog'
+import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
+import { extractMediaMetadata } from '@/v8/contents/media-direct-upload'
+import styles from './message-kind-fields.module.css'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Button from '@/components/shared/button'
 import ComposerStickers from '@/components/shared/composer-stickers'
@@ -285,10 +291,44 @@ export interface MessageKindFieldsProps {
   kind: MessageKind
   value: MessageKindState
   onChange: (next: MessageKindState) => void
+  /**
+   * 動画・音声・プレビュー画像を入れる先（登録メディア）のアカウント。
+   * 省く・null（統括など、どの店にも属さない）はファイルを受け取らず URL だけ。
+   */
+  mediaAccountId?: string | null
 }
 
-export default function MessageKindFields({ kind, value, onChange, composer = false }: MessageKindFieldsProps) {
+/** 音声ファイルの長さ（秒）。読めなければ空。 */
+async function readDurationSeconds(file: File): Promise<string> {
+  const { durationMs } = await extractMediaMetadata(file)
+  return durationMs && durationMs > 0 ? String(durationMs / 1000) : ''
+}
+
+export default function MessageKindFields({ kind, value, onChange, composer = false, mediaAccountId }: MessageKindFieldsProps) {
   const [stickerMode, setStickerMode] = useState<'pick' | 'manual'>('pick')
+  const pickFrom = mediaAccountId ?? null
+  const [picking, setPicking] = useState<{ kind: MediaItem['kind']; apply: (url: string, item?: MediaItem) => void } | null>(null)
+  /** 長さをファイル・登録メディアから読んで入れたか（読めたら手で入れる欄は出さない）。 */
+  const [autoDuration, setAutoDuration] = useState(false)
+  /** 取り込んだ音声から読んだ長さ。返った URL と一緒に入れる。 */
+  const readDuration = useRef('')
+  /** 登録メディアへ入れる送り先。アカウントが無ければ渡さない（URL だけの形）。 */
+  const upload = (mediaKind: MediaItem['kind']) =>
+    pickFrom
+      ? async (file: File, progress: (percent: number) => void) => (await uploadToMediaLibrary(file, pickFrom, mediaKind, progress)).url
+      : undefined
+  const picker = (
+    <MediaPickerDialog
+      open={picking !== null}
+      accountId={pickFrom}
+      kind={picking?.kind}
+      onClose={() => setPicking(null)}
+      onSelect={(item) => {
+        picking?.apply(item.url, item)
+        setPicking(null)
+      }}
+    />
+  )
 
   if (composer && kind === 'sticker') return <ComposerStickers value={value.sticker} onChange={(sticker) => onChange({ ...value, sticker })} />
 
@@ -356,32 +396,35 @@ export default function MessageKindFields({ kind, value, onChange, composer = fa
       onChange({ ...value, video: { ...v, ...patch } })
     return (
       <div className="space-y-3">
-        <label className="block">
-          <span className={labelClass}>
-            動画のURL <span className="text-danger">*</span>
-          </span>
-          <input
-            value={v.originalContentUrl}
-            onChange={(e) => set({ originalContentUrl: e.target.value })}
-            placeholder="https://…/movie.mp4"
-            className={inputClass}
+        <div className={styles.videoRow}>
+          <MediaSlot
+            kind="video"
+            title="動画を追加"
+            value={v.originalContentUrl || null}
+            accept="video/mp4"
+            maxBytes={200 * 1024 * 1024}
+            upload={upload('video')}
+            onChange={(url) => set({ originalContentUrl: url ?? '' })}
+            onMediaPick={pickFrom ? () => setPicking({ kind: 'video', apply: (url) => set({ originalContentUrl: url }) }) : undefined}
+            urlEntry={{ value: v.originalContentUrl, onChange: (url) => set({ originalContentUrl: url }), label: '動画のURL', placeholder: 'https://…/movie.mp4' }}
           />
-          <span className={hintClass}>mp4、200MBまで。https で公開されている必要があります。</span>
-        </label>
-        <label className="block">
-          <span className={labelClass}>
-            サムネイル画像のURL <span className="text-danger">*</span>
-          </span>
-          <input
-            value={v.previewImageUrl}
-            onChange={(e) => set({ previewImageUrl: e.target.value })}
-            placeholder="https://…/thumbnail.jpg"
-            className={inputClass}
+          <MediaSlot
+            size="compact"
+            title="プレビュー画像を追加"
+            previewAlt="動画のプレビュー画像"
+            value={v.previewImageUrl || null}
+            accept="image/jpeg,image/png"
+            maxBytes={1024 * 1024}
+            upload={upload('image')}
+            onChange={(url) => set({ previewImageUrl: url ?? '' })}
+            onMediaPick={pickFrom ? () => setPicking({ kind: 'image', apply: (url) => set({ previewImageUrl: url }) }) : undefined}
+            urlEntry={{ value: v.previewImageUrl, onChange: (url) => set({ previewImageUrl: url }), label: 'サムネイル画像のURL', placeholder: 'https://…/thumbnail.jpg' }}
           />
-          <span className={hintClass}>
-            JPEG / PNG、1MBまで。LINE側で必須なので、無いと送れません。
-          </span>
-        </label>
+        </div>
+        <p className={hintClass}>
+          動画は mp4・200MBまで。プレビュー画像（JPEG / PNG・1MBまで）は LINE 側で必須なので、無いと送れません。
+        </p>
+        {picker}
       </div>
     )
   }
@@ -390,35 +433,61 @@ export default function MessageKindFields({ kind, value, onChange, composer = fa
     const v = value.audio
     const set = (patch: Partial<MessageKindState['audio']>) =>
       onChange({ ...value, audio: { ...v, ...patch } })
+    const uploadAudio = upload('audio')
     return (
       <div className="space-y-3">
-        <label className="block">
-          <span className={labelClass}>
-            音声のURL <span className="text-danger">*</span>
-          </span>
-          <input
-            value={v.originalContentUrl}
-            onChange={(e) => set({ originalContentUrl: e.target.value })}
-            placeholder="https://…/voice.m4a"
-            className={inputClass}
-          />
-          <span className={hintClass}>m4a、200MBまで。https で公開されている必要があります。</span>
-        </label>
-        <label className="block">
-          <span className={labelClass}>
-            長さ（秒） <span className="text-danger">*</span>
-          </span>
-          <input
-            value={v.duration}
-            onChange={(e) => set({ duration: e.target.value })}
-            inputMode="decimal"
-            placeholder="30"
-            className={`${inputClass} max-w-40`}
-          />
-          <span className={hintClass}>
-            実際の長さと合っていないと、再生の途中で切れたり、伸びたまま止まったりします。
-          </span>
-        </label>
+        <MediaSlot
+          kind="audio"
+          title="音声を追加"
+          value={v.originalContentUrl || null}
+          valueName={v.originalContentUrl.split('/').pop() || v.originalContentUrl}
+          accept="audio/mp4,.m4a"
+          maxBytes={200 * 1024 * 1024}
+          limitText="1ファイル200メガバイト以内・M4A"
+          upload={uploadAudio ? async (file, progress) => {
+            // 長さはファイルから読む。読めたら URL と一緒に入れ、手で入れる欄は出さない。
+            const seconds = await readDurationSeconds(file)
+            const url = await uploadAudio(file, progress)
+            readDuration.current = seconds
+            return url
+          } : undefined}
+          onChange={(url) => {
+            const seconds = readDuration.current
+            readDuration.current = ''
+            setAutoDuration(Boolean(url && seconds))
+            set(url && seconds ? { originalContentUrl: url, duration: seconds } : { originalContentUrl: url ?? '' })
+          }}
+          onMediaPick={pickFrom ? () => setPicking({ kind: 'audio', apply: (url: string, item?: MediaItem) => {
+            const ms = item?.durationMs
+            setAutoDuration(Boolean(ms && ms > 0))
+            set(ms && ms > 0 ? { originalContentUrl: url, duration: String(ms / 1000) } : { originalContentUrl: url })
+          } }) : undefined}
+          urlEntry={{ value: v.originalContentUrl, onChange: (url) => { setAutoDuration(false); set({ originalContentUrl: url }) }, label: '音声のURL', placeholder: 'https://…/voice.m4a' }}
+        />
+        <p className={hintClass}>m4a、200MBまで。URL で入れるときは https で公開されている必要があります。</p>
+        {autoDuration && v.duration ? (
+          <p className={hintClass}>
+            {`長さ ${v.duration} 秒（ファイルから読みました）`}{' '}
+            <button type="button" className="text-action font-semibold" onClick={() => setAutoDuration(false)}>直す</button>
+          </p>
+        ) : v.originalContentUrl ? (
+          <label className="block">
+            <span className={labelClass}>
+              長さ（秒） <span className="text-danger">*</span>
+            </span>
+            <input
+              value={v.duration}
+              onChange={(e) => set({ duration: e.target.value })}
+              inputMode="decimal"
+              placeholder="30"
+              className={`${inputClass} max-w-40`}
+            />
+            <span className={hintClass}>
+              ファイルから長さを読めなかったときに入れます。実際の長さと合っていないと、再生の途中で切れたり、伸びたまま止まったりします。
+            </span>
+          </label>
+        ) : null}
+        {picker}
       </div>
     )
   }

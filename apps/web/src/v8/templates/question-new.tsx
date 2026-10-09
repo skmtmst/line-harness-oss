@@ -27,6 +27,9 @@ import Notice from '@/components/shared/notice'
 import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
+import { useFormErrors } from '@/lib/use-form-errors'
+import ValidationSummary from '@/components/shared/validation-summary'
+import { FieldError } from '@/components/shared/form-controls'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -158,22 +161,25 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   }, [id, selectedAccountId])
 
   const dirty = snapshotOf({ name, category, folderId, question }) !== savedSnapshot
+  /* 保存で落ちた欄は、その欄を赤くして真下に理由を出し、1つ目の欄へ移る（B-139）。 */
+  const fields = useFormErrors()
+  fields.define('name', 'テンプレート名', () => (name.trim() ? null : 'テンプレート名を入力してください。'))
+  fields.define('text', '質問文', () => (question.text.trim() ? null : '質問文を入力してください。'))
+  question.choices.forEach((choice, index) => {
+    fields.define(`choice-${index}`, `選択肢 ${index + 1} のボタンの文字`, () => (choice.label.trim() ? null : 'ボタンの文字を入力してください。'))
+  })
   const { leaveTarget, confirmLeave, cancelLeave, guarded, disarm } = useUnsavedGuard({ dirty, busy: saving || publishing })
 
   const save = async (questionStatus: 'draft' | 'published'): Promise<boolean> => {
     if (host) {
-      if (!name.trim()) { setError('テンプレート名を入力してください。'); return false }
-      if (!question.text.trim()) { setError('質問文を入力してください。'); return false }
-      if (question.choices.length === 0 || question.choices.some((choice) => !choice.label.trim())) { setError('すべての選択肢に文字を入力してください。'); return false }
+      if (fields.submit().length > 0) { setError(''); return false }
       setError('')
       disarm()
       host.onSave({ kind: 'question', name: name.trim(), question: question as unknown as Record<string, unknown>, messageContent: question.intro?.trim() || question.text }, questionStatus === 'published')
       return false
     }
     if (!selectedAccountId) { setError('上のバーでLINE公式アカウントを選んでください。'); return false }
-    if (!name.trim()) { setError('テンプレート名を入力してください。'); return false }
-    if (!question.text.trim()) { setError('質問文を入力してください。'); return false }
-    if (question.choices.length === 0 || question.choices.some((choice) => !choice.label.trim())) { setError('すべての選択肢に文字を入力してください。'); return false }
+    if (fields.submit().length > 0) { setError(''); return false }
     setSaving(true)
     setError('')
     const payload = {
@@ -264,14 +270,16 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
       >
         {host?.notice}
         {error ? <Notice tone="danger" message={error} /> : null}
+        <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
 
         <section className={styles.card} aria-labelledby="q-name">
           <h2 className={styles.cardTitle} id="q-name">名前とフォルダ</h2>
           <div className={styles.row}>
             <label className={`${styles.field} ${styles.grow}`}>
               <span className={styles.label}>テンプレート名</span>
-              <input className={styles.input} value={name} maxLength={120} placeholder="例：継続の意思をうかがう" onChange={(event) => setName(event.target.value)} />
+              <input {...fields.bind('name')} className={styles.input} value={name} maxLength={120} placeholder="例：継続の意思をうかがう" aria-invalid={fields.invalid('name') || undefined} aria-describedby={fields.invalid('name') ? 'q-name-error' : undefined} onChange={(event) => setName(event.target.value)} />
             </label>
+            <FieldError id="q-name-error">{fields.error('name')}</FieldError>
             <div className={`${styles.field} ${styles.folder}`}>
               <span className={styles.pickLabel}>フォルダ</span>
               <FolderSelect
@@ -304,8 +312,9 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
           </label>
           <label className={styles.field}>
             <span className={styles.label}>質問文（160文字まで）</span>
-            <input className={styles.input} value={question.text} maxLength={160} placeholder="来月も定期便を続けますか？" onChange={(event) => setQuestion((current) => ({ ...current, text: event.target.value }))} />
+            <input {...fields.bind('text')} className={styles.input} value={question.text} maxLength={160} placeholder="来月も定期便を続けますか？" aria-invalid={fields.invalid('text') || undefined} aria-describedby={fields.invalid('text') ? 'q-text-error' : undefined} onChange={(event) => setQuestion((current) => ({ ...current, text: event.target.value }))} />
           </label>
+          <FieldError id="q-text-error">{fields.error('text')}</FieldError>
           <div className={styles.inline}>
             <span className={styles.pickLabel} id="q-mode">答え方</span>
             <span className={styles.seg} role="radiogroup" aria-labelledby="q-mode">
@@ -330,8 +339,9 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
                 </div>
                 <label className={styles.field}>
                   <span className={styles.label}>ボタンの文字（20文字まで）</span>
-                  <input className={styles.input} value={choice.label} maxLength={20} onChange={(event) => setChoice(index, { label: event.target.value })} />
+                  <input {...fields.bind(`choice-${index}`)} className={styles.input} value={choice.label} maxLength={20} aria-invalid={fields.invalid(`choice-${index}`) || undefined} aria-describedby={fields.invalid(`choice-${index}`) ? `q-choice-${index}-error` : undefined} onChange={(event) => setChoice(index, { label: event.target.value })} />
                 </label>
+                <FieldError id={`q-choice-${index}-error`}>{fields.error(`choice-${index}`)}</FieldError>
                 {host ? null : <div className={styles.inline}>
                   <span className={styles.smallLabel}>押されたら</span>
                   <button type="button" className={styles.pick} title="押したときの動き（タグ・友だち情報・シナリオ・URL など）を決める" onClick={() => setActionsOpen(true)}>

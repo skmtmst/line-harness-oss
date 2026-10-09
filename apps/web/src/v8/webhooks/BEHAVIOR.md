@@ -26,7 +26,7 @@ API 接続のタブ（`ralAc`）も `src/v8/webhooks/api-tokens.tsx`（今まで
 - 受け取り口：`api.webhooks.incoming.list / detail / update（name・isActive・secret）/ delete / create / unmatched / resolveUnmatched / test`
 - やり取り：`api.webhooks.interactions.list（periodDays・direction・status・search・page・limit）/ retry / retryFailed`
 - Google Sheets：`api.webhooks.googleSheets.connection / runs / connectStart / setTarget / sync / disconnect`
-- フォルダの箱：`api.folders.list('webhook', accountId)`・追加は共通の `FolderAddDialog`（kind=`webhook`）
+- フォルダの箱：`api.folders.list('webhook', accountId)`・列は共通の `ManagedFolderPanel`（kind=`webhook`。追加・「…」の名前・色・並べ替え・消す）
 - 帯の数：送り先の一覧・受け取り口の一覧・やり取りの集計（この30日・`limit: 1`）を1回ずつ読む（どのタブも同じ）
 
 ## 権限（今と同じ R32）
@@ -34,7 +34,7 @@ API 接続のタブ（`ralAc`）も `src/v8/webhooks/api-tokens.tsx`（今まで
 - 閲覧のみ（統括でない人）には、押せない作る・設定・フォルダを追加・この見本で作る・まとめてやり直すを**置かず**、場所だけ空ける（2026-10-06 オーナー決定）。タブの下・数の帯の上に「閲覧のみで見ています」の帯。
 
 ## 今の V8 と違うところ
-- 送る一覧：左にフォルダの列（箱は `kind=webhook`）。**送り先をフォルダへ入れる口がまだ無い**（送り先の表に folder_id が無い）ので、全件が未分類。フォルダを選ぶと0件。箱の件数は口が返さないので出さない。
+- 送る一覧：左にフォルダの列（箱は `kind=webhook`）。送り先の一覧は `folderId` を返すので、フォルダ・未分類で絞り、件数は読み込んだ送り先から数える。行の名前の前にフォルダの色の丸（B-136）。
 - 送る一覧：並びの部品は絵に無いので、既定を名前順にし、送った回数順は「よく使う絞り込み」から選ぶ。
 - 送る一覧：行の右は「中身を見る（失敗があれば やり直す）」と「設定」（押すと操作の一覧。右クリックでも同じ一覧）。操作の名前は「鍵を作り直す」。
 - 送る一覧：動いているのに一度も送っていない行は「まだ送っていません」。

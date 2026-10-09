@@ -63,7 +63,7 @@ function point(id: string, name: string, overrides: Record<string, unknown> = {}
 }
 
 const items = [
-  point('cp-1', '商品を買った'),
+  point('cp-1', '商品を買った', { folderId: 'f-ec' }),
   point('cp-6', '資料をダウンロードした', { sourceType: 'url_reach', measureMethod: 'url_reach', targetUrl: 'https://example.com/dl', deduplicationMode: 'once_per_friend', valueMode: 'none', status: 'stopped', state: 'stopped', usageCount: 0, usageNames: [], stoppedAt: '2026-09-20T09:00:00.000Z' }),
 ]
 
@@ -101,6 +101,9 @@ beforeEach(() => {
     }
     if (url.pathname === '/api/conversions/report') {
       return json({ success: true, data: { kpis: { netCount: 52, previousNetCount: 40, netValue: 412000 }, byDefinition: [] } })
+    }
+    if (url.pathname === '/api/folders') {
+      return json({ success: true, data: [{ id: 'f-ec', kind: 'conversion', name: '通販', parentId: null, displayOrder: 0, color: '#16a34a', createdAt: '', updatedAt: '', itemCount: 1 }], unfiledCount: 1 })
     }
     if (url.pathname.endsWith('/delete-impact')) {
       return json({ success: true, data: { definition: { ...items[0], version: 3 }, usages: [], eventCount: 52, canDelete: false, stopImpact: { affectedUsageCount: 2, preservesPastEvents: true, preservesUsages: true }, replacementCandidates: [] } })
@@ -246,5 +249,33 @@ describe('V8 コンバージョンの一覧', () => {
     await flush()
     expect(screen.queryByText('商品を買った')).toBeNull()
     expect(screen.getByText('資料をダウンロードした')).toBeTruthy()
+  })
+
+  it('左のフォルダの列（共通・種類 conversion）：すべて・通販・未分類で絞り、名前の前にフォルダの色の丸。閲覧のみは追加・「…」を出さない', async () => {
+    await mount()
+    expect(calls).toContain('GET /api/folders')
+    const folderNav = screen.getByRole('navigation', { name: 'フォルダ' })
+    expect([...folderNav.querySelectorAll('button[title]')].map((b) => b.getAttribute('title')).filter((t) => !t?.startsWith('フォルダ「'))).toEqual(['すべて', '通販', '未分類'])
+    expect(screen.getByRole('button', { name: /フォルダを追加/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'フォルダ「通販」の操作' })).toBeTruthy()
+    expect(host.querySelector('tr[data-row-id="cp-1"] [aria-label="フォルダ：通販"]')).not.toBeNull()
+    expect(host.querySelector('tr[data-row-id="cp-6"] [aria-label="フォルダ：未分類"]')).not.toBeNull()
+    fireEvent.click(folderNav.querySelector('button[title="通販"]')!)
+    await flush()
+    expect(screen.getByText('商品を買った')).toBeTruthy()
+    expect(screen.queryByText('資料をダウンロードした')).toBeNull()
+    fireEvent.click(folderNav.querySelector('button[title="未分類"]')!)
+    await flush()
+    expect(screen.queryByText('商品を買った')).toBeNull()
+    expect(screen.getByText('資料をダウンロードした')).toBeTruthy()
+    fireEvent.click(folderNav.querySelector('button[title="すべて"]')!)
+    await flush()
+
+    act(() => root.unmount())
+    root = createRoot(host)
+    role.value = 'viewer'
+    await mount()
+    expect(screen.queryByRole('button', { name: /フォルダを追加/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'フォルダ「通販」の操作' })).toBeNull()
   })
 })

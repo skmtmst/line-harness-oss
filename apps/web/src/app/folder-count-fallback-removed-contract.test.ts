@@ -32,7 +32,10 @@ describe('フォルダ件数フォールバックの削除(#631)', () => {
 
   it('reminders: reminders.filter(...).length でフォルダ件数を数えていない', () => {
     expect(REMINDERS).not.toMatch(/reminders\.filter\(.*folderId.*\)\.length/)
-    expect(REMINDERS).toContain('folder.itemCount')
+    // フォルダの件数は共通のフォルダの列（ManagedFolderPanel）が既定でサーバーの itemCount を出す（B-136）。
+    const panel = REMINDERS.match(/<ManagedFolderPanel[\s\S]*?>/)?.[0] ?? ''
+    expect(panel).toContain('kind="reminder"')
+    expect(panel).not.toContain('countOf=')
     // 型に無い itemCount を独自キャストで足していた拡張型を消した(#631)。
     // 型に足せば、来ていない経路は型エラーになる。
     expect(REMINDERS).not.toContain('VisualFolder')
@@ -50,8 +53,12 @@ describe('フォルダ件数フォールバックの削除(#631)', () => {
     expect(AUTO_REPLIES).not.toMatch(/\.itemCount \?\? items\.filter/)
     expect(AUTO_REPLIES).not.toMatch(/items\.filter\(\(r\) => r\.folderId === f\.id\)\.length/)
     expect(AUTO_REPLIES).not.toMatch(/items\.filter\(\(r\) => !r\.folderId\)\.length/)
-    expect(AUTO_REPLIES).toContain('f.itemCount')
-    expect(AUTO_REPLIES).toContain('unfiledCount')
+    // フォルダの件数は共通のフォルダの列（ManagedFolderPanel）が既定でサーバーの itemCount を出す。
+    // 画面で数え直す countOf を渡していないことを見る（B-136）。
+    const panel = AUTO_REPLIES.match(/<ManagedFolderPanel[\s\S]*?\/>/)?.[0] ?? ''
+    expect(panel).toContain('kind="auto_reply"')
+    expect(panel).not.toContain('countOf=')
+    expect(panel).toContain('unfiledCount={unfiledCount}')
   })
 
   it('templates: 現在ページの行数でフォルダ件数を数えていない(#721)', () => {

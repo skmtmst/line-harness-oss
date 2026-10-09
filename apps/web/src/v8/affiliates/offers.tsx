@@ -18,9 +18,8 @@ import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel from '@/components/shared/folder-panel'
+import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
-import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -60,20 +59,18 @@ type FilterKey = 'open' | 'draft'
 type FolderKey = 'all' | 'tag' | 'scenario' | 'miles' | 'none'
 type LoadState = 'loading' | 'ready' | 'error'
 
-/* 色は行の名前の前の丸と左のフォルダの列で同じものを使う（絵 h7dmB）。動きが未設定は色の無い輪。 */
-const FOLDERS: Array<{ key: FolderKey; label: string; color?: string; match: (o: AffiliateOffer) => boolean }> = [
-  { key: 'all', label: 'すべて', match: () => true },
-  { key: 'tag', label: 'タグを付ける', color: FOLDER_COLORS[0], match: (o) => Boolean(o.tagId) },
-  { key: 'scenario', label: 'シナリオを始める', color: FOLDER_COLORS[1], match: (o) => !o.tagId && Boolean(o.scenarioId) },
-  { key: 'miles', label: 'マイルを渡す', color: FOLDER_COLORS[2], match: (o) => !o.tagId && !o.scenarioId && o.rewardMiles > 0 },
+/*
+ * 成果が出たときの動きで分けた見え方（保存しない）。作ったフォルダではないので、左のフォルダの列ではなく
+ * 上の絞り込み（「成果のときの動き」の選ぶ欄）に置く（B-136 2026-10-09）。
+ */
+const FOLDERS: Array<{ key: FolderKey; label: string; match: (o: AffiliateOffer) => boolean }> = [
+  { key: 'all', label: '動き：すべて', match: () => true },
+  { key: 'tag', label: 'タグを付ける', match: (o) => Boolean(o.tagId) },
+  { key: 'scenario', label: 'シナリオを始める', match: (o) => !o.tagId && Boolean(o.scenarioId) },
+  { key: 'miles', label: 'マイルを渡す', match: (o) => !o.tagId && !o.scenarioId && o.rewardMiles > 0 },
   { key: 'none', label: '動きが未設定', match: (o) => !o.tagId && !o.scenarioId && o.rewardMiles === 0 },
 ]
 
-/** 行の名前の前の丸に渡すフォルダ。動きが未設定は null（色の無い輪）。 */
-function folderDotOf(offer: AffiliateOffer): { name: string; color?: string } | null {
-  const item = FOLDERS.find((f) => f.key !== 'all' && f.match(offer))
-  return item && item.color ? { name: item.label, color: item.color } : null
-}
 
 const SAVED_VIEWS: Array<{ value: string; label: string; filters: FilterKey[]; sort: 'newest' | 'name' | 'reward'; folder?: FolderKey }> = [
   { value: '', label: 'よく使う絞り込み', filters: [], sort: 'newest' },
@@ -393,22 +390,26 @@ export default function OffersTab() {
     </CreateButton>
   )
 
+  /* 左の列は共通の ManagedFolderPanel。案件をフォルダへ入れる口（API）がまだ無いので「すべて」だけ。 */
   const folderPanel = (
-    <FolderPanel
-      heading="フォルダ"
-      rows={FOLDERS.map((item) => ({ kind: item.label === 'すべて' ? 'all' as const : item.label === '未分類' ? 'unfiled' as const : 'folder' as const, id: item.key, label: item.label, count: ready ? offers.filter(item.match).length : null, color: item.color }))}
-      activeId={folder}
-      onSelect={(id) => resetPage(() => { setSaved(''); setFolder(id as FolderKey) })}
-      addFolderNote={<p className={styles.stateDesc}>成果が出たときの動きで分けた見え方です</p>}
+    <ManagedFolderPanel
+      kind={null}
+      folders={[]}
+      onChanged={() => undefined}
+      canManage={!readonly}
+      itemLabel="案件"
+      activeId="all"
+      onSelect={() => undefined}
+      allCount={ready ? offers.length : null}
     />
   )
 
   const folderSelect = (
     <div className={styles.narrowFolder}>
       <Select
-        aria-label="フォルダ"
+        aria-label="成果のときの動き"
         value={folder}
-        options={FOLDERS.map((item) => ({ value: item.key, label: `フォルダ：${item.label}` }))}
+        options={FOLDERS.map((item) => ({ value: item.key, label: item.key === 'all' || !ready ? item.label : `${item.label} ${offers.filter(item.match).length}` }))}
         onChange={(value) => resetPage(() => setFolder(value as FolderKey))}
       />
     </div>
@@ -450,7 +451,7 @@ export default function OffersTab() {
       narrow={narrow}
       notices={<ToolbarNotices info="アフィリエイターは「紹介する人」、案件は「何を紹介すると、いくら払うか」の決まりです。1人のアフィリエイターが、いくつもの案件を紹介できます。" />}
       search={{ placeholder: '案件名・説明で探す', value: query, onChange: (value) => resetPage(() => setQuery(value)) }}
-      chips={chips}
+      chips={narrow ? chips : <>{folderSelect}{chips}</>}
       trailing={trailing}
       narrowLead={<>{createButton(false)}{folderSelect}</>}
     />
@@ -476,7 +477,7 @@ export default function OffersTab() {
               <Tr key={offer.id} className={styles.row} data-table-layout="columns">
                 <Td className={styles.colName}>
                   <span className={narrow ? styles.stack : `${styles.stack} ${styles.dotStack}`}>
-                    <FolderDotName folder={folderDotOf(offer)} dot={!narrow}>
+                    <FolderDotName folder={null} dot={!narrow}>
                       {readonly ? (
                         <span className={styles.rowNameText} title={offer.name}>{offer.name}</span>
                       ) : (
@@ -564,7 +565,7 @@ export default function OffersTab() {
       help={readonly ? '行の「…」から 決まり（受付期間・上限・数える期間）を見る。' : '行の「…」から 編集・決まり・公開を止める・複製。'}
       actions={<Button onClick={exportCsv} disabled={shown.length === 0}><Download size={15} aria-hidden="true" /> CSV で書き出す</Button>}
       stats={stats}
-      folderNav={{ rows: FOLDERS.map((item) => ({ id: item.key, label: item.label })), activeId: folder, onSelect: (id) => resetPage(() => { setSaved(''); setFolder(id as FolderKey) }), createAction: readonly ? undefined : createButton(false) }}
+      folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => undefined, createAction: readonly ? undefined : createButton(false) }}
       folders={narrow ? undefined : <>{createButton(true)}{folderPanel}</>}
       toolbar={toolbar}
       pagination={pager}

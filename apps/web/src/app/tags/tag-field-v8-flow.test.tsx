@@ -128,6 +128,7 @@ import NewTagPage from './new/page'
 import NewFieldPage from './fields/new/page'
 import SingleFriendActions from '@/components/friends/single-friend-actions'
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -250,8 +251,7 @@ describe('V8 タグの通し：作る→付ける→外す', () => {
     await flush()
 
     fireEvent.click(screen.getByRole('button', { name: 'タグを付ける・外す' }))
-    const tagSelect = await screen.findByLabelText('タグ')
-    fireEvent.change(tagSelect, { target: { value: 't-1' } })
+    await pickEntity('タグ', '流れのタグ')
 
     // 付ける（成功の知らせは行内に出て、窓は閉じる）。
     fireEvent.click(screen.getByRole('button', { name: '付ける' }))
@@ -261,7 +261,7 @@ describe('V8 タグの通し：作る→付ける→外す', () => {
 
     // 外す（窓を開き直す）。
     fireEvent.click(screen.getByRole('button', { name: 'タグを付ける・外す' }))
-    fireEvent.change(await screen.findByLabelText('タグ'), { target: { value: 't-1' } })
+    await pickEntity('タグ', '流れのタグ')
     fireEvent.click(screen.getByRole('button', { name: '外す' }))
     await waitFor(() => expect(removeTag).toHaveBeenCalledWith('f-1', 't-1'))
     await screen.findByText('タグを外しました')

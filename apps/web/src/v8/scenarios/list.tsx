@@ -64,9 +64,7 @@ import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
-import FolderAddDialog from '@/components/shared/folder-add-dialog'
-import { useFolderRowActions } from '@/components/shared/folder-row-actions'
+import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -156,7 +154,6 @@ export default function ScenariosListV8() {
   /** 「未分類」の件数。`null` は数えていない。 */
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   const [folderFilter, setFolderFilter] = useListUrlParam('folder')
-  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   /** 絞り込みを掛けない「すべて」の件数。`null` は「まだ数えられていない」。 */
   const [overallTotal, setOverallTotal] = useState<number | null>(null)
 
@@ -223,17 +220,6 @@ export default function ScenariosListV8() {
     }
   }, [selectedAccountId])
 
-  /* フォルダの「…」：名前を変える・色を変える・並べ替える・消す（共通部品・B-35）。 */
-  const folderActions = useFolderRowActions({
-    kind: 'scenario',
-    folders,
-    accountId: selectedAccountId ?? null,
-    enabled: canEdit,
-    itemLabel: 'シナリオ',
-    countOf: (id) => folders.find((f) => f.id === id)?.itemCount ?? null,
-    onChanged: () => loadFolders(),
-    onDeleted: (id) => { if (folderFilter === id) setFolderFilter('') },
-  })
 
   useEffect(() => {
     void loadFolders()
@@ -682,17 +668,6 @@ export default function ScenariosListV8() {
       ? Math.max(0, overallTotal - folderedTotal - unfiledCount)
       : 0
 
-  const folderRows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: '', label: 'すべて', count: overallTotal },
-    ...folders.map((f, index) => ({ kind: 'folder' as const, ...folderActions.rowActions(f, index),
-      id: f.id,
-      label: f.name,
-      count: f.itemCount ?? null,
-      color: f.color,
-    })),
-    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
-  ]
-
   const folderSelectOptions = [
     { value: '', label: 'フォルダ：すべて' },
     ...folders.map((f) => ({ value: f.id, label: `フォルダ：${f.name}` })),
@@ -700,20 +675,27 @@ export default function ScenariosListV8() {
   ]
 
   const folderPanel = (
-    <FolderPanel
+    <ManagedFolderPanel
+      kind="scenario"
+      accountId={selectedAccountId ?? null}
+      folders={folders}
+      onChanged={loadFolders}
+      canManage={canEdit}
+      itemLabel="シナリオ"
       activeId={folderFilter}
       onSelect={setFolderFilter}
-      onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}
-      addFolderLabel="フォルダを追加"
-      rows={folderRows}
+      allId=""
+      unfiledId={UNFILED}
+      allCount={overallTotal}
+      unfiledCount={unfiledCount}
+      placeholder="例: 01_新規フォロー"
     >
-      <p className={styles.folderNote}>フォルダを消しても、中のシナリオは未分類に残ります</p>
       {sharedScenarioCount > 0 ? (
         <p className={styles.folderNote}>
           全アカウントに共通で適用されるシナリオが{sharedScenarioCount}件あります。「すべて」の件数には含まれますが、フォルダ別の件数と「未分類」には含まれません。
         </p>
       ) : null}
-    </FolderPanel>
+    </ManagedFolderPanel>
   )
 
   /* ===== 数の帯（4つ） ===== */
@@ -1255,16 +1237,6 @@ export default function ScenariosListV8() {
         </KpiBand>
       </>}
       overlays={<>
-        {folderActions.dialogs}
-        {folderDialogOpen && (
-          <FolderAddDialog
-            kind="scenario"
-            note="シナリオを分けてしまう箱です。消しても、入っていたシナリオは未分類として残ります。"
-            placeholder="例: 01_新規フォロー"
-            onClose={() => setFolderDialogOpen(false)}
-            onAdded={() => void loadFolders()}
-          />
-        )}
 
         {/* 行の詳細パネル。一覧は左に見えたまま。 */}
         {panelRow && (

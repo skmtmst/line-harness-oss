@@ -134,6 +134,7 @@ import NewReminderPage from './new/page'
 import SingleFriendActions from '@/components/friends/single-friend-actions'
 import { ReminderRegistrantsPanel } from './detail/registrants-panel'
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -249,10 +250,7 @@ describe('V8 リマインダの通し：登録者を足す', () => {
     await waitFor(() => expect(listRemindersApi).toHaveBeenCalled())
 
     // リマインダを選ぶ。
-    const selectButton = screen.getByRole('button', { name: 'リマインダ' })
-    fireEvent.click(selectButton)
-    const listbox = await screen.findByRole('listbox')
-    fireEvent.click(within(listbox).getByText('流れのリマインダ'))
+    await pickEntity('リマインダ', '流れのリマインダ')
 
     // ゴール日時を入れる。
     const dateInput = screen.getByLabelText('ゴール日時')

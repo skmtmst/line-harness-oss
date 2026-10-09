@@ -84,6 +84,8 @@
   font-size: var(--text-body);
 }
 .dateInput:disabled { opacity: 0.6; }
+/* 保存で落ちた日付の欄（B-139）。枠を危険の色にする。 */
+.dateInput[aria-invalid='true'] { border-color: var(--color-danger); outline-color: var(--color-danger); }
 
 .side { flex-shrink: 0; color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-wc-tab-lh); white-space: nowrap; }
 

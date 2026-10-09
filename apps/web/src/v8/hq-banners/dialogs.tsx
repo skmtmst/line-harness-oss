@@ -6,9 +6,10 @@
  * - `AnwtH` 画像を取り込む（入れるプロジェクトを選び、PNG・JPEG・WebP、10MB まで）
  * - `I0w2e` アーカイブの確認・`B24oNg` 一覧から外す確認（プロジェクトの中で使う）
  */
-import { Archive, ImagePlus, Plus, Upload } from 'lucide-react'
-import { useEffect, useId, useRef, useState } from 'react'
+import { Archive, Plus, Upload } from 'lucide-react'
+import { useEffect, useId, useState } from 'react'
 import Button from '@/components/shared/button'
+import MediaSlot from '@/components/shared/media-slot'
 import Select from '@/components/shared/select'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { api } from '@/lib/api'
@@ -130,8 +131,14 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
   // 選んだファイル。選んでから「取り込む」を押すまで送らない。
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [dragging, setDragging] = useState(false)
-  const fileRef = useRef<HTMLInputElement | null>(null)
+  // 選んだ画像の見本（取り込む前に枠いっぱいに見せる）。閉じる・選び直すと手放す。
+  const [filePreview, setFilePreview] = useState<string | null>(null)
+  useEffect(() => {
+    if (!file || typeof URL.createObjectURL !== 'function') { setFilePreview(null); return }
+    const url = URL.createObjectURL(file)
+    setFilePreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [file])
 
   useEffect(() => {
     if (!open) return
@@ -214,41 +221,18 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
                 />
               </div>
             </div>
-            <div
-              role="button"
-              tabIndex={0}
-              aria-label="取り込むファイルを選ぶ"
-              onClick={() => fileRef.current?.click()}
-              onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') fileRef.current?.click() }}
-              onDragOver={(event) => { event.preventDefault(); setDragging(true) }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={(event) => { event.preventDefault(); setDragging(false); pickFile(event.dataTransfer.files?.[0]) }}
-              className={dragging ? `${styles.drop} ${styles.dropOn}` : styles.drop}
-            >
-              <ImagePlus aria-hidden="true" className={styles.dropIcon} />
-              {file ? (
-                <>
-                  <p className={styles.dropText} title={file.name}>{file.name}</p>
-                  <span className={styles.dropAgain}>選び直す</span>
-                </>
-              ) : (
-                <>
-                  <p className={styles.dropText}>ここへドラッグ、または</p>
-                  <Button onClick={(event) => { event.stopPropagation(); fileRef.current?.click() }}>
-                    <Upload aria-hidden="true" className={styles.icon} />ファイルを選ぶ
-                  </Button>
-                </>
-              )}
-              <input
-                ref={fileRef}
-                type="file"
-                accept={BANNER_UPLOAD_ACCEPT.join(',')}
-                className={styles.hiddenInput}
-                tabIndex={-1}
-                aria-hidden="true"
-                onChange={(event) => { pickFile(event.target.files?.[0]); event.target.value = '' }}
-              />
-            </div>
+            <MediaSlot
+              title="画像を追加"
+              previewAlt={file?.name}
+              value={filePreview}
+              fit="contain"
+              accept={BANNER_UPLOAD_ACCEPT.join(',')}
+              limitText={`1ファイル${BANNER_UPLOAD_MAX_BYTES / 1024 / 1024}メガバイト以内・PNG・JPEG・WebP`}
+              busy={uploading}
+              onFile={(next) => pickFile(next)}
+              onRemove={() => setFile(null)}
+            />
+            {file ? <p className={styles.dropText} title={file.name}>{file.name}</p> : null}
           </>
         )}
     </BannerDialogFrame>

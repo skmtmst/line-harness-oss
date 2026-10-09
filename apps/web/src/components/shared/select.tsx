@@ -4,6 +4,7 @@ import { ArrowUpDown, Check, ChevronDown, ChevronUp } from 'lucide-react'
 import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { isImeComposing } from './ime'
+import { joinDescribedBy, useFieldContext } from './field-context'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import MenuPortal from './menu-portal'
 import { SELECT_MENU_ROW_STRIDE, SelectMenu, SelectMenuAction, SelectMenuOption, SelectMenuSpacer, splitOptionHeads } from './select-menu'
@@ -17,6 +18,8 @@ export interface SelectOption {
   disabled?: boolean
   /** ★V8 の開いた中身で行の先頭に出す印（対応状況の色の点など）。v7 では出さない。 */
   leading?: ReactNode
+  /** ★V8 の開いた中身で名前の下に出す1行の説明（「押したら」YPzmo）。候補が多く間引く一覧では出さない。 */
+  description?: string
   /** 対応状況の札の地・文字・点に使う色。treatment='pill' のときだけ適用する。 */
   tone?: StatusBadgeTone
 }
@@ -93,7 +96,7 @@ export default function Select({
   defaultOpen = false,
   disabled = false,
   error,
-  invalid = false,
+  invalid: invalidProp = false,
   id,
   label,
   name,
@@ -107,8 +110,11 @@ export default function Select({
   createAction,
   menuHeading,
 }: SelectProps) {
+  // Field の中に置くと、欄の誤り（赤）と説明の読み上げを受け取る（B-139）。
+  const field = useFieldContext()
+  const invalid = Boolean(error) || invalidProp || Boolean(field?.invalid)
   const generatedId = useId()
-  const buttonId = id ?? `${generatedId}-button`
+  const buttonId = id ?? field?.controlId ?? `${generatedId}-button`
   const listboxId = `${generatedId}-listbox`
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -300,6 +306,7 @@ export default function Select({
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-invalid={Boolean(error) || invalid || undefined}
+        aria-describedby={joinDescribedBy(field?.describedBy)}
         disabled={disabled}
         onClick={() => setOpen((current) => !current)}
         onKeyDown={onButtonKeyDown}
@@ -356,6 +363,7 @@ export default function Select({
                 key={option.value}
                 label={heads.labelOf(option)}
                 leading={option.leading}
+                description={windowed ? undefined : option.description}
                 selected={option.value === value}
                 active={optionIndex >= 0 && optionIndex === activeIndex}
                 disabled={option.disabled}

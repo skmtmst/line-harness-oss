@@ -25,7 +25,7 @@ describe('一斉配信の最終確認', () => {
   })
 
   it('入り口で止める。窓の中で初めて弾かない', () => {
-    expect(FORM).toContain('const validationError = validate()\n    if (validationError) { setError(validationError); return }')
+    expect(FORM).toContain('const validationError = validate()\n    if (validationError) { rejectValidation(validationError); return }')
   })
 
   /**

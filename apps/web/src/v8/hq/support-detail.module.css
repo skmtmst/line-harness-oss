@@ -29,7 +29,6 @@
 .faint { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
 .buttonIcon { width: var(--tpl-hq-button-icon); height: var(--tpl-hq-button-icon); }
 .smallIcon { width: var(--tpl-hq-check); height: var(--tpl-hq-check); }
-.hiddenInput { display: none; }
 .notice { margin: 0; color: var(--color-accent-deep); font-size: var(--text-label); }
 .error { margin: 0; color: var(--color-danger); font-size: var(--text-label); }
 .warn { color: var(--color-status-warn-deep); }
@@ -242,3 +241,6 @@
 }
 
 .historyRowCurrent .historyName { font-weight: 600; }
+
+/* 画像を添える所（MediaSlot・Z7vd2 の小さい形）。 */
+.attachSlot { width: var(--tpl-slot-w-compact); }

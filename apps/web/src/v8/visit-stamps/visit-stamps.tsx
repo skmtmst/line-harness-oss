@@ -17,6 +17,7 @@ import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import tpl from '@/components/templates/page-templates.module.css'
 import Button from '@/components/shared/button'
+import MediaSlot from '@/components/shared/media-slot'
 import ColorWell from '@/components/shared/color-well'
 import Combobox from '@/components/shared/combobox'
 import HelpTip from '@/components/shared/help-tip'
@@ -145,7 +146,6 @@ function VisitStampsScreen() {
     input?.focus()
     input?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
   }, [issue])
-  const imageInput = useRef<HTMLInputElement>(null)
   const uploadImage = async (file: File) => {
     if (!['image/jpeg', 'image/png'].includes(file.type) || file.size > 3 * 1024 * 1024 || !file.size) { notifyToast('背景画像はJPG・PNG、3MBまでです。', { tone: 'error' }); return }
     setImageBusy(true)
@@ -425,13 +425,19 @@ function VisitStampsScreen() {
                 <div className={styles.field}>
                   <span className={styles.label}>カードの見た目 <HelpTip label="カードの見た目の説明">画像があるときは画像を使います。色は文字の下地です。</HelpTip></span>
                   <div className={styles.appearance}>
-                    <span className={styles.imageThumb}>{settings.backgroundImageUrl ? <img src={settings.backgroundImageUrl} alt="背景画像" /> : <ImageIcon size={18} aria-hidden="true" />}</span>
-                    <div className={styles.field}>
-                      <span className={styles.label}>背景画像<span className={styles.optional}>任意</span></span>
-                      {ro ? <span className={styles.sub}>{settings.backgroundImageUrl ? '画像あり' : '画像なし'}</span> : <Button disabled={imageBusy} onClick={() => imageInput.current?.click()}>{imageBusy ? '預けています…' : 'ファイルを選ぶ'}</Button>}
-                      {ro ? null : <input ref={imageInput} type="file" accept="image/jpeg,image/png" aria-label="背景画像を選ぶ" className="sr-only" onChange={e => { const file = e.target.files?.[0]; if(file) void uploadImage(file); e.target.value = '' }} />}
-                      <span className={styles.sub}>JPG・PNG　3MBまで</span>
-                      {!ro && settings.backgroundImageUrl ? <Button variant="text" size="compact" onClick={() => set({ backgroundImageUrl: null })}>画像を外す</Button> : null}
+                    <div className={styles.imageSlot}>
+                      <MediaSlot
+                        size="compact"
+                        title="背景画像を追加"
+                        previewAlt="背景画像"
+                        value={settings.backgroundImageUrl || null}
+                        accept="image/jpeg,image/png"
+                        limitText="JPG・PNG　3MBまで・任意"
+                        busy={imageBusy}
+                        readOnly={ro}
+                        onFile={(file) => void uploadImage(file)}
+                        onRemove={() => set({ backgroundImageUrl: null })}
+                      />
                     </div>
                     <div className={styles.colorField}>
                       <span className={styles.label}>色</span>

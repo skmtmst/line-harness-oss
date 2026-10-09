@@ -18,9 +18,11 @@ const PAGE = readFileSync(new URL('../../v8/scenarios/list.tsx', import.meta.url
 describe('シナリオ一覧の件数定義（#981 A05-02）', () => {
   it('「すべて」と見出し総数は、絞り込み無しの全体件数を別口で数える', () => {
     expect(PAGE).toContain('const [overallTotal, setOverallTotal]')
-    expect(PAGE).toContain("id: '', label: 'すべて', count: overallTotal")
+    // フォルダの列は共通の ManagedFolderPanel。「すべて」の件数に全体件数を渡す。
+    expect(PAGE).toMatch(/<ManagedFolderPanel[\s\S]*?allId=""[\s\S]*?allCount=\{overallTotal\}/)
     // 絞り込み後の scenarioList.total を「すべて」に使ってはいけない。
     expect(PAGE).not.toContain("label: 'すべて', count: scenarioList.total")
+    expect(PAGE).not.toContain('allCount={scenarioList.total}')
   })
 
   it('フォルダAPI・KPIは一覧と同じアカウント範囲で数える', () => {

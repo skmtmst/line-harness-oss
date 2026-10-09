@@ -309,3 +309,9 @@
   padding: var(--tpl-wa-op-foot-pad);
   border-top: 1px solid var(--color-hairline);
 }
+
+/* 保存で落ちた欄（B-139）。枠を危険の色にする。 */
+.input[aria-invalid='true'] {
+  border-color: var(--color-danger);
+  outline-color: var(--color-danger);
+}

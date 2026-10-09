@@ -38,6 +38,9 @@ import AccountHandoverV8 from './handover'
 import { credentialLine, summaryLine, type AccountDetailView } from './view'
 import { countsLine, handoverPill, totalsMatch } from './handover-view'
 
+/** 欄の読み上げにつながる誤りの文（共通の Field が欄の下に出す）。 */
+const errorTextOf = (el: Element) => (el.getAttribute('aria-describedby') ?? '').split(' ').map((id) => document.getElementById(id)).find((node) => node?.getAttribute('role') === 'alert' || /-error$/.test(node?.id ?? ''))?.textContent
+
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
@@ -243,6 +246,28 @@ describe('LINEアカウントの詳細（V8 ihjfd）', () => {
     const put = sent.find((s) => s.url.endsWith('/api/line-accounts/acc-1'))
     expect(put?.method).toBe('PUT')
     expect(put?.body).toEqual({ timezone: 'Europe/Paris' })
+  })
+
+  it('B-139：名前を消し、警告を上限より大きくして保存すると、送らず2つの欄に理由を出し、名前の欄へ移る', async () => {
+    await act(async () => root.render(<AccountDetailV8 />))
+    await settle()
+    await click(buttons('編集する')[0])
+    const dialog = document.querySelector('[role="dialog"]')!
+    const name = dialog.querySelector('input[required]') as HTMLInputElement
+    await type(name, '')
+    const cap = dialog.querySelector('input[placeholder="管理しない"]') as HTMLInputElement
+    const warn = dialog.querySelector('input[placeholder="警告しない"]') as HTMLInputElement
+    await type(cap, '100')
+    await type(warn, '200')
+    sent.length = 0
+    await click(buttons('保存する')[0])
+    await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    expect(sent.some((s) => s.method === 'PUT')).toBe(false)
+    expect(name.getAttribute('aria-invalid')).toBe('true')
+    expect(errorTextOf(name)).toBe('アカウント名を入れてください。')
+    expect(warn.getAttribute('aria-invalid')).toBe('true')
+    expect(errorTextOf(warn)).toContain('上限以下にしてください')
+    expect(document.activeElement).toBe(name)
   })
 
   it('管理者（オーナーでない）にはタイムゾーンの欄を出さない', async () => {

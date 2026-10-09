@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import TriggerEditor from './trigger-editor'
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -124,7 +125,7 @@ describe('U004: 開始条件のキャンセル', () => {
   it('タグを足してもキャンセルで元に戻る', async () => {
     const { onClose } = await renderEditor()
 
-    fireEvent.change(screen.getByLabelText('きっかけにするタグ'), { target: { value: 'tag-2' } })
+    await pickEntity('きっかけにするタグ', '購入済')
     fireEvent.click(screen.getByText('＋ このタグが付いたとき'))
     expect(addTrigger).not.toHaveBeenCalled()
     expect(screen.getByText('タグ「購入済」が付いたとき')).toBeTruthy()
@@ -141,7 +142,7 @@ describe('U004: 開始条件のキャンセル', () => {
 
     // 既存の友だち追加を外し、タグを1つ足す。
     fireEvent.click(screen.getAllByText('外す')[0])
-    fireEvent.change(screen.getByLabelText('きっかけにするタグ'), { target: { value: 'tag-2' } })
+    await pickEntity('きっかけにするタグ', '購入済')
     fireEvent.click(screen.getByText('＋ このタグが付いたとき'))
     expect(removeTrigger).not.toHaveBeenCalled()
     expect(addTrigger).not.toHaveBeenCalled()

@@ -6,6 +6,7 @@ import type { KeyboardEvent } from 'react'
 import MenuPortal from './menu-portal'
 import styles from './combobox.module.css'
 import { isImeComposing } from './ime'
+import { joinDescribedBy, useFieldContext } from './field-context'
 
 export type ComboboxDot = 'green' | 'blue' | 'amber' | 'gray'
 
@@ -74,8 +75,11 @@ export default function Combobox({
   placeholder,
   value,
 }: ComboboxProps) {
+  // Field の中に置くと、欄の誤り（赤）と説明の読み上げを受け取る（B-139）。
+  const field = useFieldContext()
+  const invalid = Boolean(error) || Boolean(field?.invalid)
   const generatedId = useId()
-  const inputId = id ?? `${generatedId}-input`
+  const inputId = id ?? field?.controlId ?? `${generatedId}-input`
   const listboxId = `${generatedId}-listbox`
   const errorId = `${generatedId}-error`
   const statusId = `${generatedId}-status`
@@ -177,7 +181,7 @@ export default function Combobox({
       {name ? <input type="hidden" name={name} value={value} disabled={disabled} /> : null}
       <div
         ref={fieldRef}
-        className={[styles.field, open ? styles.open : null, error ? styles.invalid : null, disabled ? styles.disabled : null].filter(Boolean).join(' ')}
+        className={[styles.field, open ? styles.open : null, invalid ? styles.invalid : null, disabled ? styles.disabled : null].filter(Boolean).join(' ')}
       >
         <input
           ref={inputRef}
@@ -189,8 +193,8 @@ export default function Combobox({
           aria-controls={listboxId}
           aria-activedescendant={open && active ? `${listboxId}-${activeMatchIndex}` : undefined}
           aria-autocomplete="list"
-          aria-invalid={Boolean(error) || undefined}
-          aria-describedby={error ? errorId : undefined}
+          aria-invalid={invalid || undefined}
+          aria-describedby={joinDescribedBy(error ? errorId : undefined, field?.describedBy)}
           aria-busy={loading || undefined}
           autoComplete="off"
           disabled={disabled}
