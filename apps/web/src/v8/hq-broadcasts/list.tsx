@@ -178,7 +178,8 @@ export default function HqBroadcastList() {
         onDelete: () => { setFolderError(''); setDeletingFolder(folder) },
       } : {}),
     })),
-    ...(folders && folders.length > 0 ? [{ kind: 'unfiled' as const, id: 'none', label: '未分類', count: ready ? countIn('none') : null }] : []),
+    // 未分類はほかの一覧と同じく、フォルダが1つも無くても出す（B-136）。読めなかったときは出さない。
+    ...(folders ? [{ kind: 'unfiled' as const, id: 'none', label: '未分類', count: ready ? countIn('none') : null }] : []),
   ]
   const selectFolder = (id: string) => { setFolderFilter(id); setPage(1) }
   const saveFolder = async () => {
