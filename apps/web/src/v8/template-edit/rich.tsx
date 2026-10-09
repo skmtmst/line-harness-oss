@@ -25,6 +25,7 @@ import LayoutPicker from '@/components/shared/layout-picker'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import LinePreview from '@/components/shared/line-preview'
+import TapAreaEditor from '@/components/shared/tap-area-editor'
 import Select from '@/components/shared/select'
 import FolderSelect, { folderByName, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
@@ -175,6 +176,8 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   const [pendingShape, setPendingShape] = useState<string | null>(null)
   const [areas, setAreas] = useState<Record<string, AreaDraft>>(() => (hostInitial ? hostInitial.areas : visual ? visualAreas() : {}))
   const [actionsFor, setActionsFor] = useState<string | null>(null)
+  /* 採用案 Wmch0：画像の上か右の一覧で選んだ面（記号）。下にその面の動きだけを出す。 */
+  const [selectedLabel, setSelectedLabel] = useState('A')
   const [previewOpen, setPreviewOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
@@ -325,6 +328,13 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
     return draft.actions.length > 1 ? `${first} ほか${draft.actions.length - 1}件` : first
   }
   const editingArea = actionsFor ? (areas[actionsFor] ?? emptyAreaDraft()) : null
+  /* 形を変えて選んでいた面が無くなったら、最初の面を選ぶ。 */
+  const selectedShapeArea = shapeDef.areas.find((area) => area.label === selectedLabel) ?? shapeDef.areas[0]
+  const areaSummary = (draft: AreaDraft | undefined): string | null => {
+    if (!draft || draft.kind === 'none') return null
+    if (draft.kind === 'uri') return draft.uri.trim() || 'URLを開く'
+    return draft.actions.length > 0 ? actionsSummary(draft) : '動きを実行する'
+  }
 
   const sideCard = (
     <section className={styles.sideCard}>
@@ -493,48 +503,67 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
         </Card>
 
         <Card padding="none" layout="vertical" className={styles.card}>
-          <div className={styles.cardHead}>
-            <h2 className={styles.cardTitle}>押した面ごとの動き</h2>
-          </div>
-          <div className={rich.areaHead} aria-hidden="true">
-            <span className={rich.areaColChip}>面</span>
-            <span className={rich.areaColKind}>押したら</span>
-            <span className={rich.areaColBody}>中身</span>
-          </div>
-          {shapeDef.areas.map((area) => {
-            const draft = areas[area.label] ?? emptyAreaDraft()
-            return (
-              <div key={area.label} className={rich.areaRow} role="group" aria-label={`面 ${area.label}`}>
-                <span className={rich.areaChip} data-unset={draft.kind === 'none' || undefined}>{`${area.label} ${areaPlace(area, shapeDef.areas)}`}</span>
-                <div className={rich.areaKind}>
-                  <Select
-                    aria-label={`面 ${area.label} を押したら`}
-                    value={draft.kind}
-                    onChange={(value) => updateArea(area.label, { kind: value as AreaActionKind })}
-                    options={host ? HOST_AREA_KIND_OPTIONS : AREA_KIND_OPTIONS}
-                  />
+          {/* 採用案 Wmch0（リッチメニューと同じ部品）：画像の上で面を押して選ぶ＋右に一覧＋下に選んだ面の動き。 */}
+          <TapAreaEditor
+            framed={false}
+            title="押した面ごとの動き"
+            description="画像の上の面か右の一覧を押すと、下でその面の動きを決められます"
+            imageUrl={imageSet ? imageUrl.trim() : null}
+            aspectRatio={1}
+            items={shapeDef.areas.map((area) => ({
+              id: area.label,
+              name: areaPlace(area, shapeDef.areas),
+              summary: areaSummary(areas[area.label]),
+              x: area.x,
+              y: area.y,
+              width: area.width,
+              height: area.height,
+            }))}
+            selectedId={selectedShapeArea.label}
+            onSelect={setSelectedLabel}
+            detail={(() => {
+              const area = selectedShapeArea
+              const draft = areas[area.label] ?? emptyAreaDraft()
+              return (
+                <div className={rich.areaDetail}>
+                  <div className={rich.areaHead} aria-hidden="true">
+                    <span className={rich.areaColChip}>面</span>
+                    <span className={rich.areaColKind}>押したら</span>
+                    <span className={rich.areaColBody}>中身</span>
+                  </div>
+                  <div className={rich.areaRow} role="group" aria-label={`面 ${area.label}`}>
+                    <span className={rich.areaChip} data-unset={draft.kind === 'none' || undefined}>{`${area.label} ${areaPlace(area, shapeDef.areas)}`}</span>
+                    <div className={rich.areaKind}>
+                      <Select
+                        aria-label={`面 ${area.label} を押したら`}
+                        value={draft.kind}
+                        onChange={(value) => updateArea(area.label, { kind: value as AreaActionKind })}
+                        options={host ? HOST_AREA_KIND_OPTIONS : AREA_KIND_OPTIONS}
+                      />
+                    </div>
+                    <div className={rich.areaBody}>
+                      {draft.kind === 'uri' ? (
+                        <TextField
+                          type="url"
+                          value={draft.uri}
+                          onChange={(event) => updateArea(area.label, { uri: event.target.value })}
+                          placeholder="https://example.com"
+                          aria-label={`面 ${area.label} のURL`}
+                        />
+                      ) : draft.kind === 'actions' ? (
+                        <button type="button" className={rich.actionPick} onClick={() => setActionsFor(area.label)} aria-haspopup="dialog">
+                          <span className={rich.actionPickText}>{actionsSummary(draft)}</span>
+                          <ChevronDown size={14} aria-hidden="true" />
+                        </button>
+                      ) : (
+                        <p className={rich.areaNone}>押しても何も起きません</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div className={rich.areaBody}>
-                  {draft.kind === 'uri' ? (
-                    <TextField
-                      type="url"
-                      value={draft.uri}
-                      onChange={(event) => updateArea(area.label, { uri: event.target.value })}
-                      placeholder="https://example.com"
-                      aria-label={`面 ${area.label} のURL`}
-                    />
-                  ) : draft.kind === 'actions' ? (
-                    <button type="button" className={rich.actionPick} onClick={() => setActionsFor(area.label)} aria-haspopup="dialog">
-                      <span className={rich.actionPickText}>{actionsSummary(draft)}</span>
-                      <ChevronDown size={14} aria-hidden="true" />
-                    </button>
-                  ) : (
-                    <p className={rich.areaNone}>押しても何も起きません</p>
-                  )}
-                </div>
-              </div>
-            )
-          })}
+              )
+            })()}
+          />
           {unsetAreas.length > 0 ? (
             <p className={rich.warn}>
               {unsetAreas.map((area) => `面 ${area.label}`).join('・')}の動きが未設定です。そのまま送ると、押しても何も起きません。

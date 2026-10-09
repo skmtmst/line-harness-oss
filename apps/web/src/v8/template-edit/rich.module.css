@@ -62,3 +62,6 @@
   color: var(--color-ink); font-size: var(--text-caption); font-weight: 600;
 }
 .phoneRow:nth-child(even) .phoneArea:not([data-image]) { background: var(--color-canvas-sunken); }
+
+/* 採用案 Wmch0：選んだ面の動き（一覧の下に1行）。 */
+.areaDetail { display: flex; flex-direction: column; gap: var(--tpl-wa-rich-col-gap); width: 100%; min-width: 0; }
