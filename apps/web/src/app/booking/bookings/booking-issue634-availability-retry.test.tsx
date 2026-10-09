@@ -105,7 +105,9 @@ describe('#634 予約管理の空き枠・一覧の再読み込み', () => {
     await waitFor(() => expect(fixture.requestsSummary).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(fixture.listMenus).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.queryByText(/予約の記録だけを表示しています/)).toBeNull())
-    await waitFor(() => expect(screen.getAllByText('実際に受け付けられる枠を数えています').length).toBeGreaterThan(0))
+    await waitFor(() => expect(screen.getByText('今日の残り')).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'まだ空いている枠の説明' }))
+    expect(screen.getByText('実際に受け付けられる枠を数えています')).toBeTruthy()
   })
 
   it('一覧自体の失敗表示にも読み直す口を出す', async () => {

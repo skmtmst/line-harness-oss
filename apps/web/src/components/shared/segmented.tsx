@@ -22,7 +22,7 @@ export default function SegmentedControl<T extends string>({
   appearance = 'track',
   equalWidth = false,
 }: {
-  options: { value: T; label: string }[]
+  options: { value: T; label: string; count?: number }[]
   value: T
   onChange: (value: T) => void
   'aria-label': string
@@ -36,7 +36,7 @@ export default function SegmentedControl<T extends string>({
    * 'panel' は脇のパネル内（★BG-B `SLgY5` つくる枚数：器 余白3・r8・
    * 横いっぱい・項目 5/12・文 12/17・選択中 700・つまみ r6）。v8 だけで効く。
    */
-  size?: 'medium' | 'small' | 'compact' | 'panel' | 'timing' | 'sticker'
+  size?: 'medium' | 'small' | 'compact' | 'panel' | 'timing' | 'sticker' | 'booking'
   /** 操作を止める（生成中など）。項目すべてを押せなくする。 */
   disabled?: boolean
   /** 電話予約の探し方（rm92Y）：各項目が独立した丸い選択肢。 */
@@ -102,7 +102,7 @@ export default function SegmentedControl<T extends string>({
           aria-pressed={option.value === value}
           onClick={() => onChange(option.value)}
         >
-          {option.label}
+          {option.label}{option.count !== undefined ? <span className={styles.count}>{option.count}</span> : null}
         </button>
       ))}
     </div>

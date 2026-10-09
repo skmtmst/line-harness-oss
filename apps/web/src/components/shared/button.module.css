@@ -266,3 +266,6 @@
 [data-theme='v8'] .button.composer { height: var(--tpl-btn-compact-h, 32px); min-height: var(--tpl-btn-compact-h, 32px); padding: 0 14px; font-size: var(--text-caption); line-height: var(--tpl-msg-composer-tab-lh); }
 
 [data-theme='v8'] .button.composer-small { min-height: var(--tpl-msg-composer-small-button-h); height: var(--tpl-msg-composer-small-button-h); padding: 0 8px; font-size: var(--text-caption); line-height: var(--tpl-msg-composer-tab-lh); }
+
+/* O2Z8u・GcyTr の電話予約。標準の高さを保ち、印と文字の間を絵へ合わせる。 */
+[data-theme='v8'] .button.booking { height: var(--tpl-chip-h); padding-inline: var(--tpl-booking-button-pad); gap: var(--tpl-body-gap); }
