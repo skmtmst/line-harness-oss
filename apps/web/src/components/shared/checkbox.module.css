@@ -192,7 +192,7 @@
 [data-theme='v8'] .input:checked + .box, [data-theme='v8'] .input:indeterminate + .box { outline-color: var(--color-accent-deep); }
 [data-theme='v8'] .input[aria-invalid='true']:not(:checked) + .box { outline-color: var(--color-status-danger); }
 [data-theme='v8'] .input:focus-visible + .box { outline: 2px solid var(--color-action); outline-offset: 2px; }
-[data-theme='v8'] .mark { width: 12px; height: 12px; stroke-width: 2; }
+[data-theme='v8'] .mark { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); }
 
 [data-theme='v8'] .root { gap: 8px; }
 [data-theme='v8'] .box { gap: 0; }
