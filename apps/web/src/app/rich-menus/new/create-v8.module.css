@@ -265,88 +265,6 @@
   flex-wrap: wrap;
 }
 
-/* 面の一覧（画像の下）。 */
-.areaList {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.areaRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 9px 10px;
-  border: 0;
-  border-radius: var(--radius-control, 8px);
-  background: transparent;
-  text-align: left;
-  font: inherit;
-  cursor: pointer;
-}
-
-.areaRow:hover {
-  background: var(--color-canvas-sunken);
-}
-
-.areaRowOn {
-  background: var(--color-accent-soft);
-}
-
-.areaRowOn:hover {
-  background: var(--color-accent-soft);
-}
-
-/* 板 `Z0uO6`「面の一覧」：記号は 22px・角丸 6・未選択は薄い地＋灰色の字。 */
-.areaLetter {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: var(--radius-mini);
-  background: var(--color-surface-pearl);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--color-ink-secondary);
-}
-
-.areaRowOn .areaLetter {
-  background: var(--color-accent-deep);
-  color: #ffffff;
-}
-
-.areaName {
-  flex: 1 1 0;
-  color: var(--color-ink);
-  font-size: 13px;
-  font-weight: 600;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* 板 `Z0uO6`：動きの要約と未設定は 11px。未設定は太字にしない。 */
-.areaAction {
-  margin-left: auto;
-  flex: none;
-  font-size: 11px;
-  color: var(--color-ink-secondary);
-}
-
-.areaUnset {
-  margin-left: auto;
-  flex: none;
-  font-size: 11px;
-  color: var(--color-warning);
-}
-
 /* 切替タブの中で面を描くときの帯（見本表示用）。 */
 .previewMenuTabs {
   display: flex;
@@ -630,8 +548,6 @@
 .pageHead { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 20px 24px 16px; border-bottom: 1px solid var(--color-hairline); }
 .previewColumn { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 24px; border-left: 1px solid var(--color-hairline); background: var(--color-surface-pearl); }
 
-/* ページ名は正本の280px。狭い欄では欄の幅を超えない。 */
-.pageName { width: 280px; min-width: 0; max-width: 100%; }
 
 @container (max-width: 560px) { .fieldGrid { grid-template-columns: minmax(0, 1fr); } }
 
@@ -647,51 +563,24 @@
   .railPhone { display: none; }
 }
 
-/* 手順②（板 Z0uO6・kmTab）：外の箱に札の箱・題・画像・面の一覧を入れる。 */
-.buttonsSection {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-hb2-rm-section-gap);
-  min-width: 0;
-  padding: var(--tpl-hb2-rm-section-pad);
-  border-radius: var(--tpl-hb2-op-card-radius);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-}
+/* 採用案 K6Ot7O：①のタブの名前（タブの数だけ横に並べる）。 */
+.tabNameGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: var(--tpl-hb2-op-col-gap); }
 
-.tabsCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-hb2-op-col-gap);
-  padding: var(--tpl-hb2-op-box-pad);
-  border-radius: var(--tpl-hb2-op-card-radius);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
-}
+/* 採用案 K6Ot7O：①の画像（タブごとに1枚）。枠を横に並べ、上にタブ〇「名前」。
+ * ImageSlot（共通部品）ができたら枠はそちらへ移す。 */
+.tabImageGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: var(--tpl-hb2-op-col-gap); }
+.tabImageSlot { display: flex; flex-direction: column; gap: var(--tpl-hb2-op-field-gap); min-width: 0; }
+.tabImageHead { overflow: hidden; color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.tabImageBox { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; padding: 0; overflow: hidden; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas-sunken); color: var(--color-ink-secondary); font: inherit; cursor: pointer; }
+.tabImageBox[data-filled] { background: var(--color-success-bg); }
+.tabImageBox:disabled { cursor: default; opacity: 0.6; }
+.tabImageBox:focus-visible { outline: 2px solid var(--color-action); outline-offset: 1px; }
+.tabImageBox img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.tabImageEmpty { display: flex; flex-direction: column; align-items: center; gap: var(--tpl-hb2-op-field-gap); font-size: var(--text-caption); font-weight: 600; }
 
-.tabsTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--text-body);
-  font-weight: 700;
-  line-height: normal;
-}
-
-.buttonsHead {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-hb2-op-head-gap);
-}
-
-.buttonsTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--tpl-hb2-rm-title);
-  font-weight: 700;
-  line-height: normal;
-}
+/* 採用案 K6Ot7O：②の頭は「直すタブ」の切り替えと、①へ戻る文字リンクの1段だけ。 */
+.tabSwitchRow { display: flex; align-items: center; gap: var(--tpl-hb2-op-col-gap); flex-wrap: wrap; min-width: 0; }
+.tabSwitchLink { margin-left: auto; }
 
 /* 押された回数の注意（絵：11px・行 18）。2行に収める。 */
 .tapNote {
