@@ -7,6 +7,7 @@ import Icon from './ui/Icon.js';
 import Button from './ui/Button.js';
 import BottomBar from './ui/BottomBar.js';
 import PrivacyNote from './ui/PrivacyNote.js';
+import { FormTextControl } from './forms/controls.js';
 import type { SlotPick } from './DateTimePicker.js';
 
 /**
@@ -19,6 +20,7 @@ export default function Confirm({
   staff,
   slot,
   autoConfirm,
+  cancelDeadlineMinutesBefore = null,
   onBack,
   onSubmitted,
 }: {
@@ -27,6 +29,7 @@ export default function Confirm({
   slot: SlotPick;
   /** 予約のルールが承認なし確定のとき真。未承認の案内を出さない。 */
   autoConfirm: boolean;
+  cancelDeadlineMinutesBefore?: number | null;
   /** 「← 日時を選び直す」。日時の段へ戻る。 */
   onBack: () => void;
   /** 予約ができたら予約ID・状態・支払い(お支払いありのときだけ付く)を渡す。前払いのみの案内も付く。 */
@@ -39,6 +42,7 @@ export default function Confirm({
 }) {
   // 414 幅の板（`uZqMA`）は板 ID だけを替える。中身は同じ。
   const wide = useWideViewport();
+  const deadline = menu.cancel_deadline_hours_before == null ? cancelDeadlineMinutesBefore : menu.cancel_deadline_hours_before * 60;
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,14 +98,12 @@ export default function Confirm({
       </dl>
       <label className="block">
         <span className="flex items-baseline gap-1.5 text-[13px] font-bold text-ink">
-          ご要望<span className="text-[11px] font-normal text-liff-sub">任意</span>
+          {menu.intake_question?.trim() || 'ご要望'}<span className="text-[11px] font-normal text-liff-sub">任意</span>
         </span>
-        <textarea
+        <FormTextControl
+          block={{ id: 'booking-intake', kind: 'input', type: 'textarea', name: 'customer_note', label: menu.intake_question?.trim() || 'ご要望', placeholder: menu.intake_question?.trim() ? undefined : '例：前髪は短めにしたい' }}
           value={note}
-          onChange={(e) => setNote(e.target.value)}
-          className="mt-1.5 h-18 w-full resize-none rounded-(--liff-radius) bg-canvas p-3 text-[13px] text-ink outline outline-1 -outline-offset-1 outline-liff-line-strong placeholder:text-liff-idle focus-visible:outline-2 focus-visible:outline-ink"
-          rows={3}
-          placeholder="例：前髪は短めにしたい"
+          onChange={setNote}
         />
       </label>
       {error && (
@@ -115,8 +117,7 @@ export default function Confirm({
           {autoConfirm
             ? '送るとその場で確定します。確定のお知らせをLINEで送ります。'
             : 'まだ確定ではありません。お店が確かめたら、LINEでお知らせします。'}
-          {menu.cancel_deadline_hours_before != null &&
-            `キャンセルは${menu.cancel_deadline_hours_before}時間前まで。`}
+          {deadline != null ? `キャンセルは開始の${deadline % 60 === 0 ? `${deadline / 60}時間` : `${deadline}分`}前まで。` : 'キャンセル期限は予約の履歴で確認してください。'}
         </p>
       </div>
       <PrivacyNote />

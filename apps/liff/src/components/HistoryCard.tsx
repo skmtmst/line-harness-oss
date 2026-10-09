@@ -39,6 +39,7 @@ export default function HistoryCard({
             <Badge tone={meta.tone}>{meta.label}</Badge>
           </div>
         </div>
+        {booking.cancel_deadline_at && <p className="text-xs text-ink-secondary">キャンセル期限：{new Date(booking.cancel_deadline_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</p>}
         {hasActions && (
           <div className="flex gap-2">
             {onChange && (

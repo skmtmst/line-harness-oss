@@ -21,8 +21,9 @@ export interface MenuItem {
   buffer_after_minutes: number;
   base_price: number;
   sort_order: number;
-  /** キャンセル期限 (開始の何時間前まで)。null は期限なし。 */
+  /** キャンセル期限 (開始の何時間前まで)。null は店の既定を使う。 */
   cancel_deadline_hours_before?: number | null;
+  intake_question?: string | null;
 }
 
 export interface StaffItem {
@@ -70,6 +71,7 @@ export interface LiffBookingSettings extends LiffLookApiSettings {
   booking_window_days: number;
   /** 予約のルール「お店が承認してから確定する」。無いときは承認あり扱い。 */
   approval_mode?: 'automatic' | 'manual';
+  cancel_deadline_minutes_before?: number;
 }
 
 /** 予約作成の応答。お支払いありの店・メニューだけ payment が付く。 */

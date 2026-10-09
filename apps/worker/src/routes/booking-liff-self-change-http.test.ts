@@ -366,6 +366,22 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     return sqlite.prepare('SELECT * FROM bookings WHERE id = ?').get(id) as Record<string, unknown>;
   }
 
+  test('店の既定期限を公開設定と履歴に返し、メニュー個別期限を優先する', async () => {
+    sqlite.prepare("UPDATE booking_settings SET cancel_deadline_minutes_before = 90 WHERE line_account_id = 'account-ny'").run();
+    const settings = await selfApp.request('/api/liff/booking/settings?liffId=liff-ny-1', {}, env);
+    expect((await settings.json() as { cancel_deadline_minutes_before: number }).cancel_deadline_minutes_before).toBe(90);
+    mockSlots([D11]);
+    await adminCreate('menu-ok', T1, 'deadline-test');
+    const read = () => selfApp.request('/api/liff/booking/me?liffId=liff-ny-1', { headers: { Authorization: 'Bearer idToken-self' } }, env);
+    const before = await read();
+    expect(before.status).toBe(200);
+    const mine = await before.json() as { upcoming: Array<{ cancel_deadline_minutes_before: number; cancel_deadline_at: string }> };
+    expect(mine.upcoming[0]).toMatchObject({ cancel_deadline_minutes_before: 60, cancel_deadline_at: new Date(Date.parse(T1) - 60 * 60_000).toISOString() });
+    sqlite.prepare("UPDATE menus SET cancel_deadline_hours_before = NULL WHERE id = 'menu-ok'").run();
+    const inherited = await read();
+    expect((await inherited.json() as typeof mine).upcoming[0]).toMatchObject({ cancel_deadline_minutes_before: 90, cancel_deadline_at: new Date(Date.parse(T1) - 90 * 60_000).toISOString() });
+  });
+
   test('予約履歴の版とメニュー・担当を使って日時変更と取消ができる', async () => {
     mockSlots([D11, D12]);
     const id = await adminCreate('menu-ok', T1, 'history-actions');
