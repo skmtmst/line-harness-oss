@@ -352,3 +352,18 @@
 [data-theme='v8'] .title { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); line-height: var(--text-lh); }
 [data-theme='v8'] .legend, html[data-theme='v8'] .card:is(.compact, .row) .title { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); line-height: var(--text-lh); }
 [data-theme='v8'] .note { font-size: var(--polish-text-support); font-weight: var(--polish-weight-body); line-height: var(--text-lh); color: var(--color-ink-secondary); }
+
+/* B-152⑦：箱も120msの地・青い輪・押せない濃さを使う。 */
+[data-theme='v8'] .card, [data-theme='v8'] .card.row {
+  --polish-overlay-strength: var(--polish-overlay-idle);
+  background-image: linear-gradient(rgb(var(--polish-overlay-rgb) / var(--polish-overlay-strength)), rgb(var(--polish-overlay-rgb) / var(--polish-overlay-strength)));
+  transition-property: background-color, border-color, outline-color, opacity, --polish-overlay-strength;
+  transition-duration: var(--polish-interaction-duration);
+}
+[data-theme='v8'] .card:not(.disabled):hover { --polish-overlay-strength: var(--polish-hover-opacity); }
+[data-theme='v8'] .card:not(.row):not(.checked):not(.disabled):hover { background-color: var(--color-canvas); }
+[data-theme='v8'] .card:not(.disabled):active { --polish-overlay-strength: var(--polish-active-opacity); }
+[data-theme='v8'] .card:active { filter: none; }
+[data-theme='v8'] .card:not(.row):has(.radio:focus-visible) { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
+[data-theme='v8'] .disabled { opacity: var(--polish-disabled-opacity); }
+html[data-theme='v8'] .disabled .radio:disabled { opacity: var(--polish-enabled-opacity); }

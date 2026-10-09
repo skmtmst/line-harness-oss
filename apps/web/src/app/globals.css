@@ -502,6 +502,11 @@
 }
 :root {
   --polish-status-weight: 600;
+  --polish-overlay-rgb: 0 0 0;
+  --polish-overlay-idle: 0;
+  --polish-enabled-opacity: 1;
+  --polish-hover-opacity: 0.04;
+  --polish-active-opacity: 0.08;
   --polish-status-dot-size: 6px;
   --polish-status-gap: 8px;
   --polish-status-pad: 2px 8px;
@@ -2886,16 +2891,21 @@ html[data-theme='v8'] :is(button, a, input, textarea, select, [tabindex], [role=
   outline: var(--polish-focus-width) solid var(--polish-focus);
   outline-offset: var(--polish-focus-offset);
 }
-html[data-theme='v8'] :is(button, input, textarea, select, [role='button'], [role='tab'], [role='menuitem'], [role='option']) {
+/* 数値として登録し、地の濃さを120msで連続して変える（文字には重ねない）。 */
+@property --polish-overlay-strength { syntax: '<number>'; inherits: false; initial-value: 0; }
+html[data-theme='v8'] :is(button, a, input, textarea, select, [role='button'], [role='tab'], [role='menuitem'], [role='option']) {
+  --polish-overlay-strength: var(--polish-overlay-idle);
+  background-image: linear-gradient(rgb(var(--polish-overlay-rgb) / var(--polish-overlay-strength)), rgb(var(--polish-overlay-rgb) / var(--polish-overlay-strength)));
+  transition-property: background-color, color, border-color, outline-color, box-shadow, transform, filter, opacity, --polish-overlay-strength;
   transition-duration: var(--polish-interaction-duration);
 }
-html[data-theme='v8'] :is(button, [role='button'], [role='tab'], [role='menuitem'], [role='option']):hover:not(:disabled):not([aria-disabled='true']) {
-  background-image: linear-gradient(var(--polish-hover), var(--polish-hover));
+html[data-theme='v8'] :is(button, a, input, textarea, select, [role='button'], [role='tab'], [role='menuitem'], [role='option']):hover:not(:disabled):not([aria-disabled='true']) {
+  --polish-overlay-strength: var(--polish-hover-opacity);
 }
-html[data-theme='v8'] :is(button, [role='button'], [role='tab'], [role='menuitem'], [role='option']):active:not(:disabled):not([aria-disabled='true']) {
-  background-image: linear-gradient(var(--polish-active), var(--polish-active));
+html[data-theme='v8'] :is(button, a, input, textarea, select, [role='button'], [role='tab'], [role='menuitem'], [role='option']):active:not(:disabled):not([aria-disabled='true']) {
+  --polish-overlay-strength: var(--polish-active-opacity);
 }
-html[data-theme='v8'] :is(button, input, textarea, select, [role='button'], [role='tab'], [role='menuitem'], [role='option']):is(:disabled, [aria-disabled='true']) { opacity: var(--polish-disabled-opacity); }
+html[data-theme='v8'] :is(button, a, input, textarea, select, [role='button'], [role='tab'], [role='menuitem'], [role='option']):is(:disabled, [aria-disabled='true']) { opacity: var(--polish-disabled-opacity); }
 
 [data-theme='v8'] [data-skeleton] { background: var(--polish-skeleton-bg); border-radius: var(--polish-skeleton-radius); background-image: none; animation: none; }
 
