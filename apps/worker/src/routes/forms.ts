@@ -1,4 +1,5 @@
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { formAvailability } from '../services/form-availability.js';
 import type { FormSubmissionPostActions } from '@line-crm/shared';
 import { Hono, type Context } from 'hono';
 import {
@@ -959,7 +960,7 @@ forms.get('/api/forms/:id', async (c) => {
       if (!draft) {
         return c.json({ success: false, error: 'Form not found' }, 404);
       }
-      return c.json({ success: true, data: { ...serializePublicForm(draft), isTest: true } });
+      return c.json({ success: true, data: { ...serializePublicForm(draft), isTest: true, availability: await formAvailability({ db: c.env.DB, formId: id, layout: parseLayout(draft.layout, draft.fields), active: !!draft.is_active, submitCount: draft.submit_count ?? 0, friendId: null, isTest: true }) } });
     }
     // ログイン中の運用者が公開URLを開いても、account_id を明示した管理画面取得で
     // ない限り下書きを漏らさない。
@@ -971,9 +972,22 @@ forms.get('/api/forms/:id', async (c) => {
     if (adminView && !await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
       return c.json({ success: false, error: 'Form not found' }, 404);
     }
+    let friendId: string | null = null;
+    const layout = parseLayout(form.layout, form.fields);
+    if (!adminView && layout.options.oncePerFriend?.enabled && c.req.header('Authorization')) {
+      const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
+      if (!identity) return c.json({ success: false, error: 'Unauthorized' }, 401);
+      if (!identity.lineAccountId || !await formBelongsToLineAccount(c.env.DB, id, identity.lineAccountId)) {
+        return c.json({ success: false, error: 'Form not found' }, 404);
+      }
+      friendId = (await getFriendByLineUserIdForAccount(c.env.DB, identity.lineUserId, identity.lineAccountId))?.id ?? null;
+    }
     const data = adminView
       ? serializeForm(form, undefined, { redactSecrets: staff.role === 'staff' })
-      : serializePublicForm(form);
+      : { ...serializePublicForm(form), availability: await formAvailability({
+        db: c.env.DB, formId: id, layout, active: !!form.is_active,
+        submitCount: form.submit_count ?? 0, friendId,
+      }) };
     return c.json({ success: true, data });
   } catch (err) {
     console.error('GET /api/forms/:id error:', err);

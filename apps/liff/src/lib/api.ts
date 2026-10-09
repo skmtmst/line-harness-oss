@@ -345,6 +345,7 @@ export interface PublicForm {
   isActive: boolean;
   /** P（試し回答）：true は下書きの試し。集計に入らず、後処理も動かない。 */
   isTest?: boolean;
+  availability?: import('@line-crm/shared').FormAvailability;
 }
 
 /** F-11：郵便番号検索の結果。status が matched/multiple のとき候補から選ぶ。 */

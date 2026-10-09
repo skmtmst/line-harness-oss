@@ -72,3 +72,4 @@ export type { ApiFieldErrors, ApiInputErrorResponse } from './api-field-errors.j
 export * from './liff-action.js';
 export * from './liff-state.js';
 export * from './affiliate-bank.js';
+export * from './form-availability.js';
