@@ -57,15 +57,19 @@ it.each([
   "UPDATE friend_add_rule_folders SET updated_at='later' WHERE id='folder'",
   "DELETE FROM friend_add_rule_folders WHERE id='folder'",
 ])('独立した接続が読み取り後に変更したとき、競合を返して設定を触らない: %s', async (sql) => {
-  const before = rules();
+  let competingRules: ReturnType<typeof rules> | undefined;
+  const versions = raw.prepare('SELECT * FROM friend_add_rule_versions').all();
   const other = new Database(join(directory, 'test.sqlite'));
   try {
     const competing = { prepare: db.prepare, batch: (statements: D1PreparedStatement[]) => {
       other.exec(sql);
+      // 617では他の更新も設定へ同期する。その成功結果を自分の失敗で戻さない。
+      competingRules = rules();
       return db.batch(statements);
     } } as D1Database;
     expect(await deleteFriendAddRuleFolder(competing, input)).toBe('conflict');
-    expect(rules()).toEqual(before);
+    expect(rules()).toEqual(competingRules);
+    expect(raw.prepare('SELECT * FROM friend_add_rule_versions').all()).toEqual(versions);
   } finally { other.close(); }
 });
 
