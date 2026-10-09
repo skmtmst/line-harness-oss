@@ -7,6 +7,8 @@ import LoadingView from '../components/LoadingView.js';
 import StatusView from '../components/ui/StatusView.js';
 import Icon from '../components/ui/Icon.js';
 import { liffDocumentTitle } from '../components/ui/LiffHeader.js';
+import Button from '../components/ui/Button.js'
+import { LiffInput } from '../components/forms/controls.js'
 
 // 疑似ライブプレーヤー。時刻の権威はサーバー:
 //   期待位置 = state.offsetSeconds + (performance.now() - t0) / 1000
@@ -433,9 +435,9 @@ export default function Webinar() {
             ● ライブ
           </span>
           {needsTap && (
-            <button
+            <Button variant="sound"
               type="button"
-              className="liff-hit pointer-events-auto inline-flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-white"
+
               onClick={() => {
                 const v = videoRef.current;
                 if (v) {
@@ -447,7 +449,7 @@ export default function Webinar() {
             >
               <Icon name="volume-x" className="h-3.5 w-3.5" />
               タップで音声ON
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -468,7 +470,7 @@ export default function Webinar() {
               <>
                 <span className="text-night-mine">{item.authorName}</span>
                 {`\u3000${item.body}`}
-                {item.failed && <><span className="text-night-dim">（送れませんでした）</span><button type="button" className="liff-hit text-night-mine" disabled={commentBusy} onClick={() => void sendComment(item)}>再送する</button></>}
+                {item.failed && <><span className="text-night-dim">（送れませんでした）</span><Button variant="night-text" type="button"  disabled={commentBusy} onClick={() => void sendComment(item)}>再送する</Button></>}
               </>
             ) : (
               `${item.authorName}\u3000${item.body}`
@@ -479,13 +481,13 @@ export default function Webinar() {
 
       {ctaVisible && state.cta && (
         <div className="px-4 pb-2">
-          <button
+          <Button variant="night-cta"
             type="button"
             onClick={clickCta}
-            className="flex h-12 w-full items-center justify-center rounded-xl bg-night-cta text-[15px] font-bold text-white"
+
           >
             {state.cta.label}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -494,7 +496,7 @@ export default function Webinar() {
         // 板 (RpW2h) どおり下に 30 空ける (端末の下の帯の分を含む)。
         style={{ paddingBottom: 'max(1.875rem, env(safe-area-inset-bottom))' }}
       >
-        <input
+        <LiffInput
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
@@ -502,19 +504,19 @@ export default function Webinar() {
             if (e.key !== 'Enter' || e.nativeEvent.isComposing || e.keyCode === 229) return;
             void sendComment();
           }}
-          placeholder="コメントを書く"
+          appearance="night" placeholder="コメントを書く"
           maxLength={500}
           aria-label="コメントを書く"
-          className="h-[42px] min-w-0 flex-1 rounded-full bg-night-panel px-4 text-[13px] text-white placeholder:text-night-dim"
+          className="flex-1"
         />
-        <button
+        <Button variant="send"
           type="button"
           disabled={commentBusy || !input.trim()} onClick={() => void sendComment()}
           aria-label="送信"
-          className="liff-hit flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-liff-primary text-white"
+          className="shrink-0"
         >
           <Icon name="send" className="h-[18px] w-[18px]" />
-        </button>
+        </Button>
       </div>
     </div>
   );

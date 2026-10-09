@@ -4,6 +4,7 @@ import { logFailure } from '../lib/user-message.js';
 import LoadErrorView from './LoadErrorView.js';
 import LoadingView from './LoadingView.js';
 import Icon from './ui/Icon.js';
+import Button from './ui/Button.js'
 
 /**
  * 1-b 担当を選ぶ (★V8・biNP5)。札を押すと選ばれるだけで、進むのは下の操作の帯。
@@ -71,15 +72,11 @@ export default function StaffList({
                 .join('・');
           return (
             <li key={s.id}>
-              <button
+              <Button variant="row"
                 type="button"
                 onClick={() => onSelect(s)}
                 aria-pressed={selected}
-                className={`liff-press flex w-full items-center gap-3 rounded-(--liff-radius-lg) p-3.5 text-left outline focus-visible:outline-2 focus-visible:outline-ink ${
-                  selected
-                    ? 'bg-liff-soft outline-2 -outline-offset-1 outline-liff-primary'
-                    : 'bg-canvas outline-1 -outline-offset-1 outline-liff-line'
-                }`}
+
               >
                 {s.profile_image_url ? (
                   <img
@@ -115,7 +112,7 @@ export default function StaffList({
                 ) : (
                   <Icon name="chevron-right" className="h-[18px] w-[18px] shrink-0 text-liff-idle" />
                 )}
-              </button>
+              </Button>
             </li>
           );
         })}

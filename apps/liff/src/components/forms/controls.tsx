@@ -1,5 +1,5 @@
 /** LIFF と管理画面の見本で共有する入力の形。通信・送信は呼ぶ側が持つ。 */
-import { useEffect, useState, useRef, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
+import { useEffect, useState, useRef, forwardRef, type InputHTMLAttributes, type ReactNode, type LabelHTMLAttributes, type TextareaHTMLAttributes, type SelectHTMLAttributes } from 'react'
 import { PREFECTURES, type FormInputBlock } from '@line-crm/shared'
 import styles from './controls.module.css'
 
@@ -180,4 +180,18 @@ export function DateYmdField({
       ))}
     </div>
   );
+}
+
+/** LIFF の全画面が使う素の欄。識別子・電話・選択・添付の意味は変えない。 */
+export const LiffInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & {appearance?:'night'}>(function LiffInput({className, appearance, type='text',...props},ref) {
+ const choice=type==='radio'||type==='checkbox'
+ return <input {...props} ref={ref} type={type} className={[choice?styles.choiceInput:appearance==='night'?styles.nightInput:styles.input,className].filter(Boolean).join(' ')} />
+})
+export const LiffTextArea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function LiffTextArea({className,rows=3,...props},ref){return <textarea {...props} ref={ref} rows={rows} className={[styles.input,styles.textarea,className].filter(Boolean).join(' ')} />})
+export function RequiredMark() { return <span aria-hidden="true" className={styles.required}>必須</span> }
+export function OptionalMark() { return <span aria-hidden="true" className={styles.optional}>任意</span> }
+export function LiffFieldLabel({label,children,required=false,optional=!required,as:Tag='label',className,...props}: LabelHTMLAttributes<HTMLLabelElement> & {label?:string;required?:boolean;optional?:boolean;as?:'label'|'span'}) {
+ const text=label ?? children
+ const shown=typeof text==='string'?text.replace(/\s*[（(](任意|必須)[）)]/g,'').replace(/\s*[*＊]$/,''):text
+ return <span className={styles.labelRow}><Tag {...props} className={[styles.label,className].filter(Boolean).join(' ')}>{shown}</Tag>{required?<RequiredMark/>:optional?<OptionalMark/>:null}</span>
 }

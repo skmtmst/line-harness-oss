@@ -1,4 +1,5 @@
 import Icon from './Icon.js';
+import Button from './Button.js'
 
 /**
  * ★V7 の見出し行。題＋(あれば)戻る。押せる所は高さ44以上。
@@ -8,14 +9,14 @@ export default function PageHeader({ title, onBack }: { title: string; onBack?: 
   return (
     <div className="flex min-h-11 items-center gap-1">
       {onBack && (
-        <button
+        <Button variant="icon"
           type="button"
           onClick={onBack}
           aria-label="戻る"
-          className="flex h-11 w-11 items-center justify-center text-ink focus-visible:outline-2 focus-visible:outline-ink"
+
         >
           <Icon name="chevron-left" className="h-6 w-6" />
-        </button>
+        </Button>
       )}
       <h1 className="text-base font-bold text-ink">{title}</h1>
     </div>

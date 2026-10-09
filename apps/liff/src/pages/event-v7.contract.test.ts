@@ -54,7 +54,7 @@ describe('素の Tailwind 色・16進数・絵文字が無い', () => {
 describe('進む操作は下の操作の帯に1つだけ', () => {
   it('詳細は選んでから進む (枠タップで直接進まない)', () => {
     expect(event).toContain('<BottomBar>');
-    expect(event.match(/<Button/g)?.length ?? 0).toBe(1);
+    expect(event.match(/<Button\s+variant="primary"/g)?.length ?? 0).toBe(1);
     expect(event).toContain('variant="primary"');
     expect(event).toContain('selectedSlot');
     expect(event).toContain('時間を選んでください');
@@ -78,7 +78,7 @@ describe('進む操作は下の操作の帯に1つだけ', () => {
   it('確認は申し込む1つ (戻るボタンは見出しの ← だけ)', () => {
     expect(confirm).toContain('<BottomBar>');
     expect(confirm).toMatch(/<Button[\s\S]*variant="primary"/);
-    expect(confirm.match(/<Button/g)?.length ?? 0).toBe(2);
+    expect(confirm.slice(confirm.indexOf("<BottomBar>")).match(/<Button\s+variant="primary"/g)?.length ?? 0).toBe(1);
     expect(confirm).toContain('申し込む');
     expect(confirm).not.toContain('予約をリクエスト');
     expect(confirm).not.toContain('>戻る<');

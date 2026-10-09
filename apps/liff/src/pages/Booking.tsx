@@ -183,13 +183,13 @@ export default function Booking() {
           <Button variant="primary" disabled={!staff} onClick={() => setStep('datetime')}>
             日時を選ぶ
           </Button>
-          <button
+          <Button variant="text"
             type="button"
             onClick={() => setStep('menu')}
-            className="liff-hit self-center text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
+            className="self-center"
           >
             ← メニューを選び直す
-          </button>
+          </Button>
         </BottomBar>
       )}
     </LiffLookScope>

@@ -36,12 +36,14 @@ import { useWideViewport } from '../lib/use-wide-viewport.js';
 import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
 import Button from '../components/ui/Button.js';
+import { LiffFieldLabel } from '../components/forms/controls.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
 import BottomBar from '../components/ui/BottomBar.js';
 import PrivacyNote from '../components/ui/PrivacyNote.js';
 import StatusView from '../components/ui/StatusView.js';
 import Icon from '../components/ui/Icon.js';
 import { DateYmdField, AddressControls, BookingControls, FormChoiceRow, FormFileControl, FormSelectControl, FormTextControl, RatingStars } from '../components/forms/controls';
+import { LiffInput } from '../components/forms/controls.js'
 
 /**
  * 回答フォーム（友だちが実際に入力する画面）。
@@ -79,13 +81,7 @@ function initialAnswers(layout: FormLayout): Answers {
  * 必須の印。★V8 (B8rCt・g9osGN) は欄名の横の小さな赤い札。
  * 入力の失敗 (お店のテーマの error) とは分け、必須は常にこの札にする。
  */
-function RequiredMark() {
-  return (
-    <span className="rounded bg-liff-required-bg px-1.5 py-px text-[10px] font-bold whitespace-nowrap text-liff-sun">
-      必須
-    </span>
-  );
-}
+
 
 /**
  * 送信ボタンの文字。管理画面で決めた名前があればそれを使い、
@@ -112,12 +108,12 @@ function OtherTextInput({
   inputClass: string;
 }) {
   return (
-    <input
+    <LiffInput
       type="text"
       value={value}
       placeholder="具体的に入力してください"
       onChange={(e) => onChange(e.target.value)}
-      className={`${inputClass} mt-1.5`}
+      className="mt-1.5"
     />
   );
 }
@@ -517,25 +513,25 @@ export default function Form() {
             <div className="mx-6 mb-6 rounded-[10px] border border-liff-line-strong bg-canvas p-4">
               <p className="text-sm font-bold text-ink">{bookingError}</p>
               <div className="mt-3 flex gap-2">
-                <button
+                <Button variant="primary"
                   type="button"
                   onClick={() => void retryBookings()}
                   disabled={bookingRetrying}
-                  className="min-h-11 flex-1 rounded-[10px] bg-liff-primary px-3 text-sm font-bold text-white disabled:opacity-50"
+                  className="flex-1"
                 >
                   {bookingRetrying ? '確保中...' : '予約を取り直す'}
-                </button>
-                <button
+                </Button>
+                <Button variant="secondary"
                   type="button"
                   onClick={() => {
                     setBookingError(null);
                     setDone(false);
                     window.scrollTo({ top: 0 });
                   }}
-                  className="min-h-11 flex-1 rounded-[10px] border border-liff-line-strong bg-canvas px-3 text-sm font-bold text-ink"
+                  className="flex-1"
                 >
                   日時を選び直す
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -651,23 +647,23 @@ export default function Form() {
       </div>
 
       <BottomBar>
-        <button
+        <Button variant="primary"
           type="button"
           onClick={() => (isLast ? submit() : goNext())}
           disabled={sending}
-          className="w-full py-3 text-[15px] font-bold disabled:opacity-50"
+
           style={{ backgroundColor: theme.main, color: submitButtonText(theme, hasCustomTheme), borderRadius: radius }}
         >
           {sending ? '送信中...' : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
-        </button>
+        </Button>
         {trail.length > 0 && (
-          <button
+          <Button variant="text"
             type="button"
             onClick={goBack}
-            className="liff-hit self-center px-4 py-1 text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
+            className="self-center"
           >
             ← {options.prevLabel || '前のページへ'}
-          </button>
+          </Button>
         )}
       </BottomBar>
 
@@ -678,21 +674,21 @@ export default function Form() {
               {options.confirmDialog?.text || '送信してよろしいですか？'}
             </p>
             <div className="mt-4 flex gap-2">
-              <button
+              <Button variant="secondary"
                 type="button"
                 onClick={() => setConfirming(false)}
-                className="flex-1 rounded-lg border border-hairline bg-canvas py-2 text-sm text-ink"
+                className="flex-1"
               >
                 {options.confirmDialog?.cancelLabel || 'キャンセル'}
-              </button>
-              <button
+              </Button>
+              <Button variant="primary"
                 type="button"
                 onClick={() => submit()}
-                className="flex-1 py-2 text-sm font-bold"
+                className="flex-1"
                 style={{ backgroundColor: theme.main, color: submitButtonText(theme, hasCustomTheme), borderRadius: radius }}
               >
                 {submitLabelText(options.confirmDialog?.okLabel)}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -819,16 +815,16 @@ function AddressFields({
         <div className="space-y-1">
           <p className="text-xs text-ink-faint">候補が複数あります。選んでください</p>
           {candidates.map((c) => (
-            <button
+            <Button variant="secondary"
               key={`${c.postalCode}-${c.town}`}
               type="button"
               onClick={() => applyCandidate(c)}
-              className="block w-full rounded-[10px] border border-liff-line-strong bg-canvas px-3 py-2 text-left text-sm text-ink"
+
             >
               {c.prefecture}
               {c.city}
               {c.town}
-            </button>
+            </Button>
           ))}
         </div>
       )}
@@ -974,7 +970,7 @@ export function BookingSlotPicker({
       {!fixedStaffId && staffList.length > 1 && (
         <div className="flex flex-wrap gap-2">
           {staffList.map((s) => (
-            <button
+            <Button variant="choice"
               key={s.id}
               type="button"
               onClick={() => {
@@ -983,14 +979,10 @@ export function BookingSlotPicker({
                 setStaffId(s.id);
               }}
               aria-pressed={staffId === s.id}
-              className={`min-h-11 rounded-[10px] border px-3 text-sm ${
-                staffId === s.id
-                  ? 'border-liff-primary bg-liff-soft font-bold text-ink'
-                  : 'border-liff-line-strong bg-canvas text-ink'
-              }`}
+
             >
               {s.display_name}
-            </button>
+            </Button>
           ))}
         </div>
       )}
@@ -1120,14 +1112,7 @@ function BlockView({
   return (
     <div className="flex flex-col gap-2">
       {/* ★V8 (B8rCt)：欄名と必須の札を1行に並べ、選択肢まで 8 空ける。 */}
-      <label
-        id={labelId}
-        htmlFor={singleControl ? fieldId : undefined}
-        className="flex items-center gap-1.5 text-sm font-bold text-ink"
-      >
-        {block.label}
-        {block.required && <RequiredMark />}
-      </label>
+      <LiffFieldLabel id={labelId} htmlFor={singleControl ? fieldId : undefined} label={block.label} required={block.required} />
       {block.description && (
         <p id={descId} className="-mt-1 text-xs text-ink-faint">{block.description}</p>
       )}
@@ -1209,12 +1194,12 @@ function BlockView({
               return (
                 <div key={choice.id}>
                   <FormChoiceRow selected={checkedRadio}>
-                    <input
+                    <LiffInput
                       type="radio"
                       name={block.name}
                       checked={checkedRadio}
                       onChange={() => onChange(block.name, choice.label)}
-                      className="h-[18px] w-[18px] shrink-0 accent-liff-primary"
+                      className="shrink-0"
                     />
                     {choice.label}
                   </FormChoiceRow>
@@ -1241,10 +1226,10 @@ function BlockView({
               return (
                 <div key={choice.id}>
                   <FormChoiceRow selected={isChecked}>
-                    <input
+                    <LiffInput
                       type="checkbox"
                       checked={isChecked}
-                      className="h-[18px] w-[18px] shrink-0 accent-liff-primary"
+                      className="shrink-0"
                       onChange={() => {
                         if (!choice.isOther) {
                           onToggle(block.name, choice.label);
@@ -1321,13 +1306,13 @@ function BlockView({
             {text && (
               <div className="mt-2">
                 <img src={text} alt="送った画像" className="max-h-40 rounded-lg" />
-                <button
+                <Button variant="text"
                   type="button"
                   onClick={() => onChange(block.name, '')}
-                  className="mt-1 min-h-11 text-xs text-ink-faint underline"
+                  className="mt-1"
                 >
                   選び直す
-                </button>
+                </Button>
               </div>
             )}
           </div>

@@ -1,3 +1,4 @@
+import { LiffFieldLabel } from '../components/forms/controls.js'
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api, type EventDetail, type EventSlot } from '../lib/api.js';
@@ -11,6 +12,7 @@ import BottomBar from '../components/ui/BottomBar.js';
 import PrivacyNote from '../components/ui/PrivacyNote.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
 import LiffLookScope from '../components/LiffLookScope.js';
+import { LiffInput, LiffTextArea } from '../components/forms/controls.js'
 
 function nanoid(): string {
   return crypto.randomUUID();
@@ -202,42 +204,35 @@ export default function EventConfirm() {
               const value = answers[q.id];
               return (
                 <div key={q.id}>
-                  <span className="mb-1 block text-sm text-ink" id={`eq-label-${q.id}`}>
-                    {q.label}
-                    {q.required ? (
-                      <span className="ml-1 text-danger" aria-label="必須">*</span>
-                    ) : (
-                      <span className="ml-1 text-xs text-ink-faint">任意</span>
-                    )}
-                  </span>
+                  <LiffFieldLabel as="span" id={`eq-label-${q.id}`} label={q.label} required={q.required} />
                   {q.type === 'text' && (
-                    <input
+                    <LiffInput
                       type="text"
                       aria-labelledby={`eq-label-${q.id}`}
                       value={typeof value === 'string' ? value : ''}
                       onChange={(e) => setAnswers((cur) => ({ ...cur, [q.id]: e.target.value }))}
-                      className="w-full rounded-lg border border-hairline bg-canvas p-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-ink"
+
                     />
                   )}
                   {q.type === 'textarea' && (
-                    <textarea
+                    <LiffTextArea
                       aria-labelledby={`eq-label-${q.id}`}
                       value={typeof value === 'string' ? value : ''}
                       onChange={(e) => setAnswers((cur) => ({ ...cur, [q.id]: e.target.value }))}
                       rows={3}
-                      className="w-full rounded-lg border border-hairline bg-canvas p-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-ink"
+
                     />
                   )}
                   {q.type === 'radio' && (
                     <div className="space-y-1" role="radiogroup" aria-labelledby={`eq-label-${q.id}`}>
                       {(q.options ?? []).map((opt) => (
                         <label key={opt} className="flex min-h-11 items-center gap-2 text-sm text-ink">
-                          <input
+                          <LiffInput
                             type="radio"
                             name={`eq-${q.id}`}
                             checked={value === opt}
                             onChange={() => setAnswers((cur) => ({ ...cur, [q.id]: opt }))}
-                            className="h-4 w-4 accent-liff-primary"
+
                           />
                           {opt}
                         </label>
@@ -251,7 +246,7 @@ export default function EventConfirm() {
                         const checked = chosen.includes(opt);
                         return (
                           <label key={opt} className="flex min-h-11 items-center gap-2 text-sm text-ink">
-                            <input
+                            <LiffInput
                               type="checkbox"
                               checked={checked}
                               onChange={() =>
@@ -260,7 +255,7 @@ export default function EventConfirm() {
                                   [q.id]: checked ? chosen.filter((x) => x !== opt) : [...chosen, opt],
                                 }))
                               }
-                              className="h-4 w-4 accent-liff-primary"
+
                             />
                             {opt}
                           </label>
@@ -276,13 +271,13 @@ export default function EventConfirm() {
 
         <label className="block">
           <span className="block text-sm font-bold text-ink">備考</span>
-          <textarea
+          <LiffTextArea
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={3}
             maxLength={5000}
             placeholder="質問や伝えたいことがあれば"
-            className="mt-2 block h-20 w-full resize-none rounded-(--liff-radius) bg-canvas px-3.5 py-3 text-sm text-ink outline outline-1 -outline-offset-1 outline-liff-line-strong placeholder:text-liff-idle focus-visible:outline-2 focus-visible:outline-ink"
+            className="mt-2"
           />
         </label>
 
@@ -301,13 +296,13 @@ export default function EventConfirm() {
         <Button variant="primary" onClick={submit} disabled={submitting}>
           {submitting ? '送信中...' : '申し込む'}
         </Button>
-        <button
+        <Button variant="text"
           type="button"
           onClick={back}
-          className="liff-hit self-center px-4 py-1 text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
+          className="self-center"
         >
           ← 戻る
-        </button>
+        </Button>
       </BottomBar>
     </LiffLookScope>
   );
