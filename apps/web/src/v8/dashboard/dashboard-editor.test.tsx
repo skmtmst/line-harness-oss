@@ -117,3 +117,11 @@ describe('V8 ダッシュボード編集', () => {
     expect(screen.getByText(/「集計を見る」で開きます/)).toBeTruthy()
   })
 })
+
+// WEB246：保存する配置の送信後は、入力と移動を止める。
+it('保存中は全カードの表示・上下移動・つまみを操作できない', () => {
+  renderEditor({ saving: true })
+  for (const control of screen.getAllByRole('switch')) expect((control as HTMLButtonElement).disabled).toBe(true)
+  for (const control of screen.getAllByRole('button', { name: /1つ上へ移動|1つ下へ移動/ })) expect((control as HTMLButtonElement).disabled).toBe(true)
+  expect(document.querySelector('button[data-reorder-handle]')).toBeNull()
+})

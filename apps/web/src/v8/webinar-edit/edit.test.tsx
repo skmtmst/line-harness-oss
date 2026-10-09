@@ -92,6 +92,7 @@ beforeEach(() => {
     const url = new URL(String(input))
     const path = url.pathname
     const method = init?.method ?? 'GET'
+    if (method === 'POST' && path.endsWith('/pause')) { puts.push({ path, body: JSON.parse(String(init?.body)) }); return json({ data: { ...webinar, status: 'paused' } }) }
     if (method === 'PUT') {
       puts.push({ path, body: init?.body ? JSON.parse(String(init.body)) : null })
       if (conflictState.ctas && path.endsWith('/ctas')) return json({ success: false, error: 'ほかの人が保存しました', code: 'version_conflict' }, 409)
@@ -246,4 +247,18 @@ describe('V8 ウェビナーの編集', () => {
     expect(buttonText('比べてから保存')).toBeTruthy()
     expect([...host.querySelectorAll('a')].some((link) => link.textContent?.trim() === 'キャンセル')).toBe(true)
   })
+})
+
+it('WEB-166：公開中は編集の…から版を確認して停止する', async () => {
+  await render(<WebinarEditV8 />)
+  const menu = buttons().find(b => b.getAttribute('aria-label') === 'ウェビナーの操作')!
+  expect(menu).toBeTruthy()
+  await act(async () => { menu.click() })
+  const pause = document.querySelector('[role="menuitem"]') as HTMLElement
+  expect(pause.textContent).toContain('停止')
+  await act(async () => { pause.click() })
+  const confirm = buttons().find(b => b.textContent?.trim() === '停止する')!
+  expect(confirm).toBeTruthy()
+  await act(async () => { confirm.click() })
+  expect(puts.some(p => p.path.endsWith('/pause') && (p.body as { expectedVersion: number }).expectedVersion === 3)).toBe(true)
 })

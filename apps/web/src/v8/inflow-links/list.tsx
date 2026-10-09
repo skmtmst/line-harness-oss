@@ -453,7 +453,7 @@ export default function InflowListV8({
   })
   const rowMenuItems = (row: RouteRow): ActionMenuItem[] => {
     const items: ActionMenuItem[] = []
-    if (row.isActive !== false) {
+    {
       items.push({ id: 'qr', label: 'QRコードを見る', onSelect: () => { setOpenMenuRefCode(null); setQrRoute(qrFor(row)) } })
       items.push({ id: 'copy', label: 'URLをコピー', onSelect: () => { setOpenMenuRefCode(null); void onCopy(row.refCode) } })
     }
@@ -780,14 +780,9 @@ export default function InflowListV8({
                     </Td>
                     <Td className={styles.colUrl}>
                       <div className={styles.opsBox}>
-                        {r.isActive === false ? (
-                          // 停止中の経路の URL と QR は出さない（開いても友だち追加できない URL を配らない）。
-                          <Button disabled title="停止中のためURLとQRコードは表示できません">停止中</Button>
-                        ) : (
-                          <Button onClick={() => void onCopy(r.refCode)} aria-label={`${r.name}のURLをコピー`}>
-                            {copyFailedId === r.refCode ? 'コピー失敗' : copiedId === r.refCode ? '済み' : 'コピー'}
-                          </Button>
-                        )}
+                        <Button onClick={() => void onCopy(r.refCode)} aria-label={`${r.name}のURLをコピー`}>
+                          {copyFailedId === r.refCode ? 'コピー失敗' : copiedId === r.refCode ? '済み' : 'コピー'}
+                        </Button>
                         {menuItems.length > 0 ? (
                           <RowMenu
                             label={menuLabel}

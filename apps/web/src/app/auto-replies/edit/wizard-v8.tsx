@@ -13,7 +13,6 @@ import {
   Check,
   ChevronRight,
   CircleAlert,
-  GripVertical,
   Play,
   Power,
   X,
@@ -221,7 +220,7 @@ const EMPTY_FORM: WizardForm = {
   keywordMatchMode: 'any',
   matchType: 'exact',
   messageKinds: [],
-  weekdays: [],
+  weekdays: [0, 1, 2, 3, 4, 5, 6],
   holidayRule: 'ignore',
   timeMode: 'always',
   activeFrom: '',
@@ -258,7 +257,7 @@ function formFromSettings(s: AutoReplyDraftInput): WizardForm {
     keywordMatchMode: s.keywordMatchMode ?? 'any',
     matchType: initialMatchType({ keyword: s.keyword, matchType: s.matchType, keywords: s.keywords }),
     messageKinds: s.messageKinds ?? [],
-    weekdays: s.responseWeekdays ?? [],
+    weekdays: s.responseWeekdays?.length ? s.responseWeekdays : [0, 1, 2, 3, 4, 5, 6],
     holidayRule: (s.responseHolidayRule as HolidayRuleValue) ?? 'ignore',
     timeMode: s.activeFrom || s.activeUntil ? 'custom' : 'always',
     activeFrom: s.activeFrom ?? '',
@@ -815,6 +814,7 @@ function AutoReplyWizardV8Inner() {
    * 返り値は保存したルールの id。失敗したら理由を出して null。
    */
   const saveDraftNow = useCallback(async (): Promise<{ id: string; accountId: string | null } | null> => {
+    if (form.weekdays.length === 0) { setWeekdayNotice('反応する曜日を1つ以上選んでください。'); return null }
     const body = buildInput()
     if ('error' in body) {
       showInputIssue(body)
@@ -1838,7 +1838,7 @@ function AutoReplyWizardV8Inner() {
                 <div className={styles.field}>
                   <span className={styles.label}>曜日</span>
                   <div className={styles.weekdayRow}>
-                  <div className={styles.weekdays} role="group" aria-label="反応する曜日">
+                  <div className={styles.weekdays} role="group" aria-label="反応する曜日" aria-describedby={weekdayNotice ? 'wiz-weekday-error' : undefined} aria-invalid={Boolean(weekdayNotice)}>
                     {/* 絵 A0pDt は月曜はじまり。保存する値（0=日〜6=土）は変えない。 */}
                     {[1, 2, 3, 4, 5, 6, 0].map((index) => {
                       const label = WEEKDAY_LABELS[index]
@@ -1854,7 +1854,8 @@ function AutoReplyWizardV8Inner() {
                               ? form.weekdays.filter((d) => d !== index)
                               : [...form.weekdays, index].sort()
                             if (next.length === 0) {
-                              setWeekdayNotice('全部の曜日を外すと、このルールはどの曜日にも反応しなくなります。')
+                              setWeekdayNotice('反応する曜日を1つ以上選んでください。')
+                              return
                             } else {
                               setWeekdayNotice('')
                             }
@@ -1886,7 +1887,7 @@ function AutoReplyWizardV8Inner() {
                     </span>
                   </div>
                   </div>
-                  {weekdayNotice ? <p className={styles.hint}>{weekdayNotice}</p> : null}
+                  {weekdayNotice ? <FieldError id="wiz-weekday-error">{weekdayNotice}</FieldError> : null}
                 </div>
                 <div className={styles.field}>
                   <span className={styles.label}>時間帯</span>
@@ -2254,7 +2255,7 @@ function AutoReplyWizardV8Inner() {
                             certain && aboveSelf ? styles.orderRowConflict : '',
                           ].join(' ')}
                         >
-                          <GripVertical size={14} aria-hidden="true" className={styles.orderGrip} />
+                          <span aria-hidden="true" className={styles.orderGrip} />
                           <span className={styles.orderNum}>{index + 1}</span>
                           <div className={styles.orderBody}>
                             <p className={styles.orderName}>

@@ -136,4 +136,22 @@ describe('作りかけの下書きを ?id= で開き直す', () => {
     await settle()
     expect(host.textContent).toContain('作りかけの下書きを開けませんでした')
   })
+  it('WEB287：保存待ち中は名前と文言を編集できない', async () => {
+    window.history.replaceState(null, '', '/rich-menus/new?id=rmg-x&step=shape')
+    const original = vi.mocked(fetch).getMockImplementation()!
+    let release!: (v: unknown) => void
+    vi.mocked(fetch).mockImplementation((input, init) => init?.method === 'PATCH' ? new Promise(resolve => { release = resolve as never }) : original(input, init))
+    await act(async () => root.render(<RichMenuCreateV8 />)); await settle()
+    const name = host.querySelector('#rm-name') as HTMLInputElement
+    expect(name).toBeTruthy()
+    await act(async () => fireEvent.change(name, { target: { value: '直した名前' } }))
+    const save = [...host.querySelectorAll('button')].find(button => button.textContent?.trim() === '下書きを保存')!
+    await act(async () => fireEvent.click(save)); await settle()
+    expect(typeof release).toBe('function')
+    expect(name.closest('fieldset[disabled]')).not.toBeNull()
+    await act(async () => release({ ok: false, status: 500, json: async () => ({ success: false, error: 'down' }) }))
+    await settle(); expect(name.closest('fieldset[disabled]')).toBeNull()
+    expect(name.value).toBe('直した名前')
+  })
+
 })

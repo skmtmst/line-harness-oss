@@ -42,3 +42,19 @@ describe('返したあとに行うこと（V8 の行）', () => {
     expect(screen.getByRole('button', { name: /処理を足す/ })).toBeTruthy()
   })
 })
+
+it('WEB-019：つまみはマウスと上下キーで同じ順へ動かせる', () => {
+  const onChange = vi.fn()
+  const actions = [a({}), a({ key: 'k2' })]
+  const { container } = render(<InlineActionRowsV8 actions={actions} onChange={onChange} {...opts} />)
+  const handle = screen.getAllByRole('button', { name: '対応マークを付ける「予約変更」を並べ替える' })[0]
+  fireEvent.keyDown(handle, { key: 'ArrowDown' })
+  expect(onChange).toHaveBeenLastCalledWith([actions[1], actions[0]])
+  onChange.mockClear()
+  fireEvent.dragStart(handle)
+  const target = container.querySelector('[data-reorder-id="k2"]')!
+  fireEvent.dragEnter(target)
+  fireEvent.dragOver(target)
+  fireEvent.drop(target)
+  expect(onChange).toHaveBeenLastCalledWith([actions[1], actions[0]])
+})

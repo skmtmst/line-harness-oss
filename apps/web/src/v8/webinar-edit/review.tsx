@@ -135,6 +135,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
     <CreatePage
       boardId="XCUNf"
       title={chrome.title}
+      actions={chrome.actions}
       identity={chrome.identity}
       steps={chrome.steps}
       description="すべての段がそろうと公開できます。公開すると、申込ページと LINE の案内が使えるようになります。"

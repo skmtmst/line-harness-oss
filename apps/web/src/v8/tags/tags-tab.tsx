@@ -34,7 +34,7 @@ import { useRowLeaving } from '@/lib/use-row-leaving'
 import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { ListPageBody } from '@/components/templates'
-import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
+import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from './folder-colors'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -138,7 +138,7 @@ function TagFolderDialog({
   onSaved: () => void
 }) {
   const [name, setName] = useState(group?.name ?? '')
-  const [color, setColor] = useState<string | null>(group ? group.color ?? null : FOLDER_COLORS[0])
+  const [color, setColor] = useState<string | null>(group ? group.color ?? null : DEFAULT_TAG_FOLDER_COLOR)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -169,7 +169,8 @@ function TagFolderDialog({
       title={group ? 'フォルダを直す' : 'フォルダを追加'}
       description="タグを分けてしまう箱です。消しても、入っていたタグは未分類として残ります。"
       name={name} onNameChange={setName} color={color} onColorChange={setColor}
-      allowClear
+      colors={TAG_FOLDER_COLORS}
+      allowClear={Boolean(group)}
       placeholder="例: VIP" busy={saving} error={error || undefined}
       onCancel={onClose} onConfirm={() => void save()} confirmLabel={group ? '保存する' : 'フォルダを作る'}
     />
@@ -796,7 +797,7 @@ export default function TagsTab({
                             <GripVertical className={styles.gripIcon} aria-hidden="true" />
                           </ReorderHandle>
                         ) : (
-                          <span className={styles.gripSpace} aria-hidden="true"><GripVertical className={styles.gripIcon} /></span>
+                          <span className={styles.gripSpace} aria-hidden="true" />
                         )}
                       </span>
                       <TagPill name={tag.name} color={group?.color} size="sm" compactAtNarrow href={editHref} />

@@ -255,7 +255,7 @@ export default function ApprovalsTab() {
       .filter((item) => !needle || [item.friendName, item.affiliateName, item.offerName, item.conversionPointName, item.orderNumber]
         .filter(Boolean).join(' ').toLocaleLowerCase('ja-JP').includes(needle))
       .toSorted((a, b) => (status === 'pending'
-        ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        ? new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
         : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()))
   }, [scoped, flaggedOnly, query, status])
 

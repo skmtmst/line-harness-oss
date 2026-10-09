@@ -614,7 +614,7 @@ export default function DateTimePicker({
     setListDay(day);
     // switchView('list') だと calDay 経由でこの関数へ戻るので、直接切り替える。
     setView('list');
-    rememberView('list');
+    if (settings?.calendarMode !== 'month-only') rememberView('list');
   }
 
   /** 週を送る。見ている日も次へ進める（前の週で選んだ日を持ち越さない）。
@@ -701,6 +701,9 @@ export default function DateTimePicker({
           この日の時間を選ぶ
         </Button>
       )}
+      {view === 'list' && settings?.calendarMode === 'month-only' ? (
+        <button type="button" className="liff-hit self-center text-xs text-liff-sub" onClick={() => switchView('calendar')}>日を選び直す</button>
+      ) : null}
       <button
         type="button"
         onClick={onBackToStaff}

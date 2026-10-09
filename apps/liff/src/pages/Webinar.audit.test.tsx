@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { WebinarState } from '../lib/api.js';
 
@@ -89,6 +89,12 @@ describe('監査 L9：送れなかったコメント', () => {
     fireEvent.click(screen.getByRole('button', { name: '送信' }));
     expect(await screen.findByText('（送れませんでした）')).toBeTruthy();
     expect(input.value).toBe('質問です');
+    webinarComment.mockResolvedValue({ ok: true });
+    fireEvent.click(screen.getByRole('button', { name: '再送する' }));
+    await waitFor(() => expect(webinarComment).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByText('（送れませんでした）')).toBeNull());
+    expect(webinarComment.mock.calls[1]![3]).toBe('質問です');
+    expect(input.value).toBe('');
   });
 });
 

@@ -98,7 +98,7 @@ test('210：複製は数える期間・上限・受付の期間も写す', async
   await act(async () => { menu.click() })
   const item = [...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent?.includes('複製')) as HTMLElement
   await act(async () => { item.click() })
-  await waitFor(() => expect(net.create).toHaveBeenCalledWith(expect.objectContaining({ windowDays: 14, capTotal: 5, capMonthlyPerAffiliate: 2, receptionFrom: '2026-10-01', receptionTo: '2026-10-31', isActive: false })))
+  await waitFor(() => expect(net.create).toHaveBeenCalledWith(expect.objectContaining({ name: '紹介A（コピー）', rewardAmount: 1000, rewardMiles: 0, windowDays: 14, capTotal: 5, capMonthlyPerAffiliate: 2, receptionFrom: '2026-10-01', receptionTo: '2026-10-31', isActive: false })))
 })
 
 test('209：承認を読み切れなかったときは、平均報酬を言い切らない', async () => {

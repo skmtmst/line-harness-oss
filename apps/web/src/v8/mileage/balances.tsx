@@ -311,7 +311,7 @@ export default function BalancesTab() {
       />
       <KpiCard
         presentation="band"
-        title="今月 増えた"
+        title="直近30日 増えた"
         icon={<TrendingUp size={14} aria-hidden="true" />}
         value={!loading && !loadError ? grantedMiles ?? 0 : null}
         unit=""
@@ -319,7 +319,7 @@ export default function BalancesTab() {
       />
       <KpiCard
         presentation="band"
-        title="今月 減った"
+        title="直近30日 減った"
         icon={<TrendingDown size={14} aria-hidden="true" />}
         value={!loading && !loadError ? decreasedMiles ?? 0 : null}
         unit=""

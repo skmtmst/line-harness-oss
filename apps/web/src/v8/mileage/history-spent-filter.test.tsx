@@ -16,6 +16,7 @@ vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; chil
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc', loading: false }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
 
+const requests = vi.hoisted(() => [] as Array<Record<string, unknown>>)
 const grant = (id: string) => ({
   id, friendId: 'f', displayName: '田中', entryType: 'grant', mode: 'automatic', amount: 10, reason: '来店',
   balanceAfter: 10, occurredAt: '2026-10-01T00:00:00.000Z', status: 'available', executedByStaffName: null,
@@ -28,10 +29,10 @@ vi.mock('@/lib/api', async (importOriginal) => {
       ...actual.api,
       mileage: {
         ...actual.api.mileage,
-        history: async () => ({
+        history: async (params: Record<string, unknown>) => { requests.push(params); return ({
           success: true,
           data: { items: Array.from({ length: 20 }, (_, i) => grant(`g${i}`)), summary: { byType: [] }, pagination: { total: 60, limit: 20, offset: 0 } },
-        }),
+        }) },
       },
     },
   }
@@ -48,3 +49,12 @@ test('使った・取り消しで、このページに無くても「まだあ�
   expect(screen.queryByText('条件に合う履歴はありません')).toBeNull()
   expect(screen.getByText(/使った・取り消し 0件/)).toBeTruthy()
 })
+
+ test('WEB-073：履歴の帯は直近30日を別集計し、回数を件で示す', async () => {
+  requests.length = 0
+  render(<HistoryTab />)
+  await screen.findAllByText('田中')
+  expect(screen.getByText('直近30日の動き')).toBeTruthy()
+  expect(requests.some(params => typeof params.from === 'string' && typeof params.to === 'string' && params.limit === 1)).toBe(true)
+  expect(screen.queryByText('今月の動き')).toBeNull()
+ })

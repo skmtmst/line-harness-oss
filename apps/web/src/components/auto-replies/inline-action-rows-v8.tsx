@@ -1,12 +1,12 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { GripVertical, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { ActionConfigEditor, ACTION_KINDS } from '@/components/scenarios/action-editor'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
-import { MoreAction } from '@/components/shared/row-actions'
+import { DragHandle, MoreAction, useReorder } from '@/components/shared/row-actions'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { actionIncompleteReason } from './action-completeness'
@@ -59,14 +59,7 @@ export default function InlineActionRowsV8({ actions, onChange, ...options }: Pr
   const addRef = useRef<HTMLButtonElement>(null)
 
   const update = (key: string, patch: Partial<InlineAction>) => onChange(actions.map((a) => (a.key === key ? { ...a, ...patch } : a)))
-  const move = (index: number, delta: number) => {
-    const t = index + delta
-    if (t < 0 || t >= actions.length) return
-    const next = [...actions]
-    const [m] = next.splice(index, 1)
-    next.splice(t, 0, m)
-    onChange(next)
-  }
+  const reorder = useReorder({ items: actions, idOf: action => action.key, onReorder: ({ ids }) => onChange(ids.map(id => actions.find(action => action.key === id)!)) })
   const add = (actionType: InlineAction['actionType']) => {
     const kind = ACTION_KINDS.find((k) => k.type === actionType)
     const key = newActionKey()
@@ -81,18 +74,17 @@ export default function InlineActionRowsV8({ actions, onChange, ...options }: Pr
   return (
     <div className={styles.list}>
       {actions.length === 0 && <p className={styles.empty}>まだ何もありません。「処理を足す」から選んでください。</p>}
-      {actions.map((action, index) => {
+      {reorder.shown.map((action, index) => {
         const incomplete = actionIncompleteReason(action.actionType, action.config)
         const items: ActionMenuItem[] = [
           { id: 'edit', label: editing === action.key ? '設定を閉じる' : '設定を変える', onSelect: () => setEditing(editing === action.key ? null : action.key) },
-          { id: 'up', label: '上へ', disabled: index === 0, onSelect: () => move(index, -1) },
-          { id: 'down', label: '下へ', disabled: index === actions.length - 1, onSelect: () => move(index, 1) },
+          ...reorder.menuItems(action.key),
           { id: 'delete', label: '削除する', tone: 'danger', dividerBefore: true, onSelect: () => onChange(actions.filter((a) => a.key !== action.key)) },
         ]
         return (
-          <div key={action.key} className={styles.item}>
+          <div key={action.key} className={styles.item} {...reorder.rowProps(action.key)}>
             <div className={styles.row}>
-              <GripVertical size={14} aria-hidden="true" className={styles.grip} />
+              <DragHandle label={`${actionRowTitle(action, options)}を並べ替える`} {...reorder.handleProps(action.key)} {...reorder.handle(action.key)} />
               <span className={styles.num}>{index + 1}</span>
               <span className={styles.title}>{actionRowTitle(action, options)}</span>
               {incomplete ? <span className={styles.incomplete}>未完成</span> : null}

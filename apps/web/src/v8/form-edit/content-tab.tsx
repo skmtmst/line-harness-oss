@@ -76,7 +76,7 @@ export function ContentTab(props: Props) {
             destructiveItem={layout.sections.length > 1 ? {
               id: 'remove',
               label: 'このページを消す',
-              onSelect: () => ((section?.blocks.length ?? 0) === 0 ? props.onRemovePage(page) : setRemoving(true)),
+              onSelect: () => setRemoving(true),
             } : undefined}
           />
         </div>
@@ -129,7 +129,7 @@ export function ContentTab(props: Props) {
       <Dialog
         open={removing}
         title="このページを消す"
-        description={`「${section?.name ?? ''}」と、その中のブロック${section?.blocks.length ?? 0}個を消します。保存するまでは元に戻せます。`}
+        description={`「${section?.name ?? ''}」と、その中のブロック${section?.blocks.length ?? 0}個を消します。この操作は元に戻せません。`}
         confirmLabel="消す"
         onConfirm={() => {
           setRemoving(false)
@@ -384,7 +384,7 @@ function SaveTo({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; s
           value={current}
           onChange={(value) => {
             const rest = (block.destinations?.friendFieldIds ?? []).slice(1)
-            set({ destinations: { ...block.destinations, friendFieldIds: value ? [value, ...rest.filter((id) => id !== value)] : rest } })
+            set({ destinations: value ? { ...block.destinations, friendFieldIds: [value, ...rest.filter((id) => id !== value)] } : { friendFieldIds: [] } })
           }}
           options={options}
         />

@@ -16,6 +16,8 @@ import type { ReactNode } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { ArrowRight } from 'lucide-react'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { RowMenu } from '@/components/shared/row-actions'
 import TargetMissing from '@/components/shared/target-missing'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -93,6 +95,9 @@ function EditInner() {
   const [loadFailure, setLoadFailure] = useState<{ id: string; failure: WebinarLoadFailure } | null>(null)
   const [loadMissing, setLoadMissing] = useState<{ id: string } | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  const [pauseVersion, setPauseVersion] = useState<number | null>(null)
+  const [pausing, setPausing] = useState(false)
+  const [pauseError, setPauseError] = useState('')
   const loadRequestId = useRef(0)
   const [analytics, setAnalytics] = useState<WebinarAnalytics | null>(null)
   const [analyticsState, setAnalyticsState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
@@ -341,6 +346,18 @@ function EditInner() {
     goStep(next)
   }
 
+  const pause = async () => {
+    if (!id || pauseVersion === null || pausing || readOnly) return
+    setPausing(true); setPauseError('')
+    try {
+      const response = await webinarApi.pause(id, pauseVersion)
+      setLoaded(current => current?.id === id ? { ...current, webinar: response.data } : current)
+      setPauseVersion(null); setReloadKey(value => value + 1)
+    } catch (error) { setPauseError(error instanceof Error ? error.message : '停止できませんでした') }
+    finally { setPausing(false) }
+  }
+  const menuActions = !readOnly && webinar.status === 'active' ? <RowMenu label="ウェビナーの操作" triggerProps={{ disabled: pausing || savingForNav !== false }} items={[{ id: 'pause', label: '停止', onSelect: () => { setPauseError(''); setPauseVersion(editor.version) } }]} /> : null
+
   const wizardChrome = (key: StepKey, primary?: ReactNode): WizardChrome => {
     const nextLabel = NEXT_LABEL[key]
     const label = nextLabel && unsaved.has(key) && savable.has(key) ? `保存して${nextLabel}` : nextLabel
@@ -355,6 +372,7 @@ function EditInner() {
     </>
     return {
       title: STEP_TITLE[key],
+      actions: menuActions,
       identity: <BackLink />,
       steps: <WizardSteps current={key} stateOf={stateOf} onSelect={goStep} />,
       status: unsaved.size > 0 ? '保存していない変更があります' : undefined,
@@ -374,6 +392,7 @@ function EditInner() {
 
   const detailChrome: DetailChrome = {
     title: webinar.title,
+    menuActions,
     subtitle: `${editor.deliveryKind === 'on_demand' ? 'オンデマンド・いつでも視聴' : '日時指定'}・${webinarStatusLabel(webinar.status)}（版 ${editor.version}）`,
     participantsCount: analytics ? analytics.summary.reservations : null,
     onSelect: goStep,
@@ -392,6 +411,7 @@ function EditInner() {
       {pane === 'analytics' ? <AnalyticsPane ctx={ctx} chrome={detailChrome} /> : null}
       {keep('comments', <CommentsPane ctx={ctx} chrome={detailChrome} onDirtyChange={dirtyReporterFor('comments')} registerSave={saveRegistrarFor('comments')} />)}
       {leaveDialog}
+      <ConfirmDialog open={pauseVersion !== null} title="ウェビナーを停止しますか？" description="新しい視聴を受け付けなくなります。" confirmLabel="停止する" busy={pausing} error={pauseError || undefined} onConfirm={() => void pause()} onCancel={() => { if (!pausing) setPauseVersion(null) }} />
     </div>
   )
 }

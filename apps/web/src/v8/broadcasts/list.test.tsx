@@ -353,3 +353,10 @@ it('検索の通信失敗は内部の英語を出さず、読み直す案内を�
   expect(host.textContent).toContain('再読み込みしても直らない場合はエラー報告へ')
   expect(buttonByText('もう一度試す')).toBeTruthy()
 })
+
+it('WEB-014：一斉配信には手動順・つまみ・上下移動を置かない', async () => {
+    await act(async () => root.render(<BroadcastListV8 />)); await flush()
+    expect(host.querySelector('[data-reorder-handle]')).toBeNull()
+    expect(host.textContent).not.toContain('手動順')
+    expect(host.querySelector('[draggable="true"]')).toBeNull()
+  })

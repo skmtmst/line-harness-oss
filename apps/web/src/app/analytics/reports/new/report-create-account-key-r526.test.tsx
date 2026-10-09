@@ -19,9 +19,11 @@ vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
 const pushed = vi.hoisted(() => [] as string[])
+const queryState = vi.hoisted(() => ({ value: '' }))
+const editSchedules = vi.hoisted(() => ({ items: [] as Array<Record<string, unknown>> }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: (href: string) => { pushed.push(href) } }),
-  useSearchParams: () => new URLSearchParams(''),
+  useSearchParams: () => new URLSearchParams(queryState.value),
   usePathname: () => '/analytics/reports/new',
 }))
 /** 画面上部のアカウント切替と同じcontext。試験の途中で選択を変える。 */
@@ -59,7 +61,7 @@ function installFetch() {
       return new Response(JSON.stringify({ success: true, data: { role: 'owner' } }), { status: 200 })
     }
     if (url.pathname === '/api/analytics/report-schedules' && (init?.method ?? 'GET') === 'GET') {
-      return new Response(JSON.stringify({ success: true, data: { items: [], options: OPTIONS } }), { status: 200 })
+      return new Response(JSON.stringify({ success: true, data: { items: editSchedules.items, options: OPTIONS } }), { status: 200 })
     }
     if (url.pathname === '/api/analytics/report-schedules' && init?.method === 'POST') {
       const entry = {
@@ -149,6 +151,7 @@ beforeEach(() => {
   pendingPosts.length = 0
   postMode.current = 'fail'
   account.id = 'account-a'
+  queryState.value = ''; editSchedules.items = []
   installFetch()
 })
 
@@ -179,6 +182,7 @@ describe('定期レポート作成の要求キー（R526）', () => {
     account.id = 'account-b'
     await rerender()
     await settle()
+    await checkRecipient('山田')
     expect(hasText('山田')).toBe(true)
     await click(buttonByText('つくって動かす'))
     await settle()
@@ -204,6 +208,7 @@ describe('定期レポート作成の要求キー（R526）', () => {
     account.id = 'account-b'
     await rerender()
     await settle()
+    await checkRecipient('山田')
     await click(buttonByText('つくって動かす'))
     await settle()
     const keyB = posted[1].key
@@ -214,6 +219,7 @@ describe('定期レポート作成の要求キー（R526）', () => {
     account.id = 'account-a'
     await rerender()
     await settle()
+    await checkRecipient('山田')
     await click(buttonByText('つくって動かす'))
     await settle()
 
@@ -239,6 +245,7 @@ describe('定期レポート作成の要求キー（R526）', () => {
     account.id = 'account-b'
     await rerender()
     await settle()
+    await checkRecipient('山田')
     expect(buttonByText('つくって動かす').disabled).toBe(false)
 
     // 遅れてAの成功が戻っても、Bの画面はそのまま（結果へ飛ばない・文も変わらない）。
@@ -294,9 +301,11 @@ describe('定期レポート作成の要求キー（R526）', () => {
     account.id = 'account-b'
     await rerender()
     await settle()
+    await checkRecipient('山田')
     account.id = 'account-a'
     await rerender()
     await settle()
+    await checkRecipient('山田')
 
     // 内容を変えてAで作り直す（新しい保存の試行。独立proofと同値）。
     const nameField = container.querySelector('input[type="text"]')
@@ -342,9 +351,11 @@ describe('定期レポート作成の要求キー（R526）', () => {
     account.id = 'account-b'
     await rerender()
     await settle()
+    await checkRecipient('山田')
     account.id = 'account-a'
     await rerender()
     await settle()
+    await checkRecipient('山田')
 
     const nameField = container.querySelector('input[type="text"]')
     if (!nameField) throw new Error('レポート名の入力が見つかりません')
@@ -386,9 +397,11 @@ describe('定期レポート作成の要求キー（R526）', () => {
     account.id = 'account-b'
     await rerender()
     await settle()
+    await checkRecipient('山田')
     account.id = 'account-a'
     await rerender()
     await settle()
+    await checkRecipient('山田')
 
     // 内容を変えずに作り直す。正当な再送で、同じキー・同じ内容になる。
     await click(buttonByText('つくって動かす'))
@@ -431,9 +444,11 @@ describe('定期レポート作成の要求キー（R526）', () => {
     account.id = 'account-b'
     await rerender()
     await settle()
+    await checkRecipient('山田')
     account.id = 'account-a'
     await rerender()
     await settle()
+    await checkRecipient('山田')
 
     // 新しい保存はまだ押さない。名前だけ変えた未送信の編集がある。
     const nameField = container.querySelector('input[type="text"]') as HTMLInputElement | null
@@ -453,4 +468,27 @@ describe('定期レポート作成の要求キー（R526）', () => {
     expect(hasText('定期レポートを作れませんでした')).toBe(false)
     expect(saveButton().disabled).toBe(false)
   })
+})
+
+it('WEB309：新規のアカウントを切り替えたら名前・宛先・通知を初期値に戻す', async () => {
+  await mount()
+  await settle()
+  fireEvent.change(container.querySelector('#report-name')!, { target: { value: '前の店のレポート' } })
+  await checkRecipient('山田')
+  account.id = 'account-b'
+  await rerender()
+  await settle()
+  expect((container.querySelector('#report-name') as HTMLInputElement).value).toBe('週次まとめ')
+  const selected = [...container.querySelectorAll('li')].filter(li => li.textContent?.includes('山田')).flatMap(li => [...li.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]).filter(input => input.checked)
+  expect(selected).toHaveLength(0)
+})
+
+it('WEB309：編集から新規へ移ったら本文・配信周期・通知を初期値に戻す', async () => {
+  queryState.value = 'id=sched-edit'
+  editSchedules.items = [{ id: 'sched-edit', name: '編集元', sections: [], savedAnalysisIds: [], cadence: 'monthly', weekday: null, monthDay: 20, sendTime: '12:00', periodDays: 30, recipients: [], channels: ['email'], alertRules: [], isOneTime: false }]
+  await mount(); await settle()
+  expect((container.querySelector('#report-name') as HTMLInputElement).value).toBe('編集元')
+  queryState.value = ''; await rerender(); await settle()
+  expect((container.querySelector('#report-name') as HTMLInputElement).value).toBe('週次まとめ')
+  expect(container.textContent).toContain('毎週')
 })
