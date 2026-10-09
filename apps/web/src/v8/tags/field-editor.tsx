@@ -354,7 +354,7 @@ export default function FieldEditor({
         <>
           <h2 className={styles.asideTitle}>いまの使用状況</h2>
           <dl className={styles.placeList}>
-            <div className={styles.placeRow}><dt>値が入っている友だち</dt><dd>{typeof field?.usageCount === 'number' ? `${field.usageCount}人` : '未集計'}</dd></div>
+            <div className={styles.placeRow}><dt>値が入っている友だち</dt><dd>{typeof field?.usageCount === 'number' ? `${field.usageCount} 人` : '未集計'}</dd></div>
             {field?.displayTargets?.length ? <div className={styles.placeRow}><dt>使用先</dt><dd>{field.displayTargets.join('・')}</dd></div> : null}
           </dl>
           <p className={styles.asideText}>{field?.isPersonal ? '個人情報として保護されています。見られる・変えられるのは権限のある担当者だけです。' : '個人情報の保護は未設定です。'}</p>

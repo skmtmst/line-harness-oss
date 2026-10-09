@@ -92,7 +92,7 @@ describe('運用者へのお知らせを なおす（hiBO8）', () => {
     const rows = Array.from(host?.querySelectorAll('ul[class*=staffList] > li') ?? []).map((li) => li.textContent ?? '')
     expect(rows.length).toBe(3)
     expect(rows[1]).toContain('LINE 未ログイン')
-    expect(host?.textContent).toContain('選択 2人／LINEで受け取れる 1人／管理画面で受け取れる 2人')
+    expect(host?.textContent).toContain('選択 2 人／LINEで受け取れる 1 人／管理画面で受け取れる 2 人')
     // 保存ずみの「メールでも送る」を戻す。
     const mail = Array.from(host?.querySelectorAll('label') ?? []).find((label) => label.textContent?.includes('メールでも送る'))
     expect(mail?.querySelector('input')?.checked).toBe(true)
@@ -104,7 +104,7 @@ describe('運用者へのお知らせを なおす（hiBO8）', () => {
     await render()
     expect(host?.querySelector('[data-design-node="gjUz3"]')).not.toBeNull()
     expect(host?.querySelector('[data-template-region="heading"] h2')?.textContent).toBe('運用者へのお知らせを作る')
-    expect(host?.textContent).toContain('選択 3人／LINEで受け取れる 2人')
+    expect(host?.textContent).toContain('選択 3 人／LINEで受け取れる 2 人')
   })
 })
 

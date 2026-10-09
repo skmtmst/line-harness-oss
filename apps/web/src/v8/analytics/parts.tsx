@@ -10,6 +10,7 @@ import type { AnalyticsMetric, AnalyticsMetricState } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 import { formatDate as polishFormatDate } from '@/lib/format'
+import { formatYen as polishFormatYen } from '@/lib/format'
 
 
 export function downloadCsv(filename: string, rows: Array<Array<string | number | null | undefined>>) {
@@ -87,7 +88,7 @@ export function metricText(
   if (value.value === null) return '—'
   if (typeof value.value === 'string') return value.value
   if (options?.percent) return `${Math.round(value.value * 1000) / 10}%`
-  if (options?.currency) return `${formatNumber(value.value)} 円`
+  if (options?.currency) return `${polishFormatYen(value.value)}`
   return formatNumber(value.value)
 }
 

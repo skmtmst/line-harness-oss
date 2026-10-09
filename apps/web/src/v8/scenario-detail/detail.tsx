@@ -571,7 +571,7 @@ export default function ScenarioDetailV8({
   const [insertAfter, setInsertAfter] = useState<number | null>(null)
   const [editingStepId, setEditingStepId] = useState<string | null>(null)
   const [stepForm, setStepForm] = useState<StepFormState>(() => emptyStepForm(1))
-  usePageTitle(editingStepId ? `${stepForm.stepOrder}通目を編集` : 'シナリオ配信')
+  usePageTitle(editingStepId ? `${stepForm.stepOrder} 通目を編集` : 'シナリオ配信')
   const [stepSaving, setStepSaving] = useState(false)
   const [stepError, setStepError] = useState('')
   /* 通の保存で落ちた欄は、その欄の真下に理由を出して移る（B-139）。検査は保存の直前に1つずつ見る形なので fail で結び付ける。 */
@@ -934,7 +934,7 @@ export default function ScenarioDetailV8({
           isDraft: step.isDraft === true,
         }).catch((cause) => ({ success: false as const, error: cause instanceof Error && cause.message ? cause.message : '通をコピーできませんでした' }))
         // 途中で止める。続けると通が欠けた別物の流れが残る。
-        if (!copied.success) throw new DuplicateAborted(copy, `${step.stepOrder}通目のコピー`, new Error(copied.error))
+        if (!copied.success) throw new DuplicateAborted(copy, `${step.stepOrder} 通目のコピー`, new Error(copied.error))
         stepIdMap.set(step.id, copied.data.id)
       }
 
@@ -2013,7 +2013,7 @@ export default function ScenarioDetailV8({
                     hook: 'step_sent',
                     stepId: editingStepId,
                     choiceIndex: null,
-                    title: `${stepForm.stepOrder}通目を送ったあと`,
+                    title: `${stepForm.stepOrder} 通目を送ったあと`,
                   })
                 }
                 className="text-action shrink-0 text-xs hover:underline"
@@ -2277,7 +2277,7 @@ export default function ScenarioDetailV8({
         ...item,
         state: complete ? ('ok' as const) : ('warn' as const),
         detail: complete
-          ? `${simulation.steps.length}通すべての配信日時を試算しました`
+          ? `${simulation.steps.length} 通すべての配信日時を試算しました`
           : '配信日時を試算できない通があります',
       }
     }
@@ -2287,7 +2287,7 @@ export default function ScenarioDetailV8({
         state: runs.testSends.length > 0 ? ('ok' as const) : ('warn' as const),
         detail:
           runs.testSends.length > 0
-            ? `最新のテスト送信は${runs.testSends[0].messageCount}通です`
+            ? `最新のテスト送信は${runs.testSends[0].messageCount} 通です`
             : 'テスト送信の記録がありません',
       }
     }
@@ -2583,12 +2583,12 @@ export default function ScenarioDetailV8({
               <p className={styles.kpiLabel}>離脱が多い所</p>
               <p className={styles.kpiValue}>
                 <span className={styles.kpiNumWide}>
-                  {biggestDrop ? `${biggestDrop.fromOrder}→${biggestDrop.toOrder}通目` : '—'}
+                  {biggestDrop ? `${biggestDrop.fromOrder}→${biggestDrop.toOrder} 通目` : '—'}
                 </span>
               </p>
               <p className={styles.kpiDetail}>
                 {biggestDrop
-                  ? `${biggestDrop.fromOrder}通目で ${formatNumber(biggestDrop.lost)} 人（${Math.round(biggestDrop.rate * 100)}%）が離れています`
+                  ? `${biggestDrop.fromOrder} 通目で ${formatNumber(biggestDrop.lost)} 人（${Math.round(biggestDrop.rate * 100)}%）が離れています`
                   : '大きく離れている所はまだありません'}
               </p>
             </div>
@@ -2610,7 +2610,7 @@ export default function ScenarioDetailV8({
           </div>
 
           {/* メッセージの行。選んだ通が右の欄に出る。 */}
-          <h2 className={styles.sectionTitle}>{`メッセージ（${sortedSteps.length}通）`}</h2>
+          <h2 className={styles.sectionTitle}>{`メッセージ（${sortedSteps.length} 通）`}</h2>
           {sortedSteps.length === 0 ? (
             <p className={styles.emptyNote}>
               まだ配るものがありません。下の「メッセージを追加する」から1通目を作ってください。
@@ -2632,7 +2632,7 @@ export default function ScenarioDetailV8({
                           <button
                             type="button"
                             onClick={() => openInsertStep(sortedSteps[index - 1].stepOrder)}
-                            title={`${sortedSteps[index - 1].stepOrder}通目と${step.stepOrder}通目のあいだに足します`}
+                            title={`${sortedSteps[index - 1].stepOrder} 通目と${step.stepOrder} 通目のあいだに足します`}
                           >
                             ＋ ここに挿入
                           </button>
@@ -2645,7 +2645,7 @@ export default function ScenarioDetailV8({
                       className={isShown ? styles.stepRowSelected : styles.stepRow}
                       onClick={() => setSelectedStepId(step.id)}
                     >
-                      <span className={styles.stepNo}>{`${step.stepOrder}通目`}</span>
+                      <span className={styles.stepNo}>{`${step.stepOrder} 通目`}</span>
                       <span className={styles.stepWhen}>
                         <span className={styles.stepWhenMain}>{stepWhenLabel(deliveryMode, step, index)}</span>
                         {previewLabels[step.stepOrder] ? (
@@ -2678,7 +2678,7 @@ export default function ScenarioDetailV8({
                           <button
                             type="button"
                             className={styles.iconButton}
-                            aria-label={`${step.stepOrder}通目を上へ`}
+                            aria-label={`${step.stepOrder} 通目を上へ`}
                             disabled={index === 0}
                             onClick={(e) => {
                               e.stopPropagation()
@@ -2690,7 +2690,7 @@ export default function ScenarioDetailV8({
                           <button
                             type="button"
                             className={styles.iconButton}
-                            aria-label={`${step.stepOrder}通目を下へ`}
+                            aria-label={`${step.stepOrder} 通目を下へ`}
                             disabled={index === sortedSteps.length - 1}
                             onClick={(e) => {
                               e.stopPropagation()
@@ -2702,8 +2702,8 @@ export default function ScenarioDetailV8({
                           <span className={styles.menuBox} onClick={(e) => e.stopPropagation()}>
                             <RowMenu
                               appearance="plain"
-                              label={`${step.stepOrder}通目のその他操作`}
-                              menuLabel={`${step.stepOrder}通目の操作`}
+                              label={`${step.stepOrder} 通目のその他操作`}
+                              menuLabel={`${step.stepOrder} 通目の操作`}
                               open={stepMenuId === step.id}
                               onOpenChange={(next) => setStepMenuId(next ? step.id : null)}
                               items={[
@@ -2712,7 +2712,7 @@ export default function ScenarioDetailV8({
                                 {
                                   id: 'test',
                                   label: 'テスト',
-                                  onSelect: () => setTestSend({ stepId: step.id, label: `${step.stepOrder}通目` }),
+                                  onSelect: () => setTestSend({ stepId: step.id, label: `${step.stepOrder} 通目` }),
                                 },
                                 /* この通を送ったあとに動かすアクション。件数を出すのは、設定済みを忘れて二重に足すのを防ぐため。 */
                                 {
@@ -2723,7 +2723,7 @@ export default function ScenarioDetailV8({
                                       hook: 'step_sent',
                                       stepId: step.id,
                                       choiceIndex: null,
-                                      title: `${step.stepOrder}通目を送ったあと`,
+                                      title: `${step.stepOrder} 通目を送ったあと`,
                                     }),
                                 },
                                 {
@@ -2776,7 +2776,7 @@ export default function ScenarioDetailV8({
                   const audience = describeStepAudience(step.targetCondition, tags)
                   return (
                     <li key={step.id} className={styles.statRow}>
-                      <span className={styles.statNo}>{`${step.stepOrder}通目`}</span>
+                      <span className={styles.statNo}>{`${step.stepOrder} 通目`}</span>
                       <span className={styles.statAudience} title={audience}>
                         {audience}
                       </span>
@@ -2831,7 +2831,7 @@ export default function ScenarioDetailV8({
         {/* 右の欄：選んだ通のスマホ。 */}
         <aside className={styles.right}>
           <h2 className={styles.rightTitle}>
-            {`選んだ通（${shownStep ? `${shownStep.stepOrder}通目` : '—'}）の見え方`}
+            {`選んだ通（${shownStep ? `${shownStep.stepOrder} 通目` : '—'}）の見え方`}
           </h2>
           <div className={styles.phoneSlot}>
             <LinePreview
@@ -3087,7 +3087,7 @@ export default function ScenarioDetailV8({
           <div>
             <p className="text-ink-faint text-xs">通数・終了後</p>
             <p className="text-ink text-sm font-semibold">
-              {sortedSteps.length}通・最後の1通のあと「{startCompleteSummary}」
+              {sortedSteps.length} 通・最後の1通のあと「{startCompleteSummary}」
             </p>
           </div>
         </div>
@@ -3215,7 +3215,7 @@ export default function ScenarioDetailV8({
           <div className={styles.dupBox}>
             <p className={styles.dupBoxTitle}>引き継ぐもの</p>
             <p className={styles.dupBoxBody}>
-              {`・メッセージ ${sortedSteps.length}通${sortedSteps.some((s) => s.question) ? '（質問を含む）' : ''}・開始のきっかけ・アクション・配信対象の条件・最後の1通の後・配信方式（${modeLabel}）・フォルダ`}
+              {`・メッセージ ${sortedSteps.length} 通${sortedSteps.some((s) => s.question) ? '（質問を含む）' : ''}・開始のきっかけ・アクション・配信対象の条件・最後の1通の後・配信方式（${modeLabel}）・フォルダ`}
             </p>
           </div>
           <div className={styles.dupBox}>
@@ -3253,9 +3253,9 @@ export default function ScenarioDetailV8({
 
       <ConfirmDialog
         open={deleteStepTarget !== null}
-        title={deleteStepTarget ? `${deleteStepTarget.stepOrder}通目を削除しますか？` : 'この通を削除しますか？'}
+        title={deleteStepTarget ? `${deleteStepTarget.stepOrder} 通目を削除しますか？` : 'この通を削除しますか？'}
         description={deleteStepTarget
-          ? `${deleteStepTarget.stepOrder}通目と、その配信対象・送信後アクションが削除されます。到達済みの履歴は監査記録として残ります。この操作は取り消せません。`
+          ? `${deleteStepTarget.stepOrder} 通目と、その配信対象・送信後アクションが削除されます。到達済みの履歴は監査記録として残ります。この操作は取り消せません。`
           : ''}
         confirmLabel="この通を削除する"
         destructive

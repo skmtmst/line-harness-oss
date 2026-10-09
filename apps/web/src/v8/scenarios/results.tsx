@@ -267,7 +267,7 @@ export default function ScenarioResultsV8() {
       ...sortedSteps.map((step) => {
         const result = statsByOrder.get(step.stepOrder)
         return [
-          `${step.stepOrder}通目`, scheduleLabel(step), result?.reachedCount ?? '—',
+          `${step.stepOrder} 通目`, scheduleLabel(step), result?.reachedCount ?? '—',
           result ? percentLabel(result.reachedCount, stats.enrolledTotal) : '—', '—', '—',
         ]
       }),
@@ -464,7 +464,7 @@ export default function ScenarioResultsV8() {
               title="離れた"
               value={leftCount}
               unit="人"
-              detail={drop ? `${drop.order}通目で多い` : '終わらずに抜けた人'}
+              detail={drop ? `${drop.order} 通目で多い` : '終わらずに抜けた人'}
             />
           </KpiBand>
           </div>
@@ -494,7 +494,7 @@ export default function ScenarioResultsV8() {
                   return (
                     <li key={step.id} className={styles.stepRow}>
                       <div className={styles.stepTop}>
-                        <span className={styles.stepNo}>{step.stepOrder}通目</span>
+                        <span className={styles.stepNo}>{step.stepOrder} 通目</span>
                         <span className={styles.stepWhen}>{scheduleLabel(step)}</span>
                         <span className={styles.stepReach}>{reached === null ? '—' : `${formatNumber(reached)} 人に届いた`}</span>
                         <span className={styles.stepMeta}>
@@ -504,7 +504,7 @@ export default function ScenarioResultsV8() {
                           <span className={styles.stepDrop}>{`ここで ${formatNumber(drop.count)} 人（${Math.round((drop.count / drop.base) * 100)}%）離れた`}</span>
                         ) : null}
                       </div>
-                      <progress className={styles.stepBar} max={100} value={pct} aria-label={`${step.stepOrder}通目の届いた率`} />
+                      <progress className={styles.stepBar} max={100} value={pct} aria-label={`${step.stepOrder} 通目の届いた率`} />
                     </li>
                   )
                 })}
@@ -625,7 +625,7 @@ export default function ScenarioResultsV8() {
                         <span className={styles.colState} role="cell">
                           <StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge>
                         </span>
-                        <span className={styles.colNow} role="cell">{`${sub.currentStepOrder}通目まで`}</span>
+                        <span className={styles.colNow} role="cell">{`${sub.currentStepOrder} 通目まで`}</span>
                         <span className={styles.colNext} role="cell">{nextLabel(sub)}</span>
                         <span className={styles.colPlan} role="cell">
                           <Button

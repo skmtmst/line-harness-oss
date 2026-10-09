@@ -29,7 +29,7 @@ describe('ダッシュボードの言葉を設計にそろえる', () => {
     expect(CODE, '数字だけで向きが分からない').not.toMatch(/\$\{remaining\.toLocaleString\('ja-JP'\)\} \/ \$\{limit/)
     expect(CODE).toContain('LINE公式 残り')
     expect(CODE).toContain("remaining === null ? '—' : formatNumber(remaining)")
-    expect(CODE).toContain('/ ${formatNumber(limit)}通')
+    expect(CODE).toContain('/ ${formatNumber(limit)} 通')
   })
 
   it('残りは limit - used から出す（向きを取り違えない）', () => {

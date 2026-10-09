@@ -124,7 +124,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
   return (
     <div className={styles.tabStack} data-design="Table">
       <div className={styles.staffHeadRow}>
-        <h2 className={styles.staffHeadTitle}>{`担当スタッフ ${staff.length}人`}</h2>
+        <h2 className={styles.staffHeadTitle}>{`担当スタッフ ${staff.length} 人`}</h2>
         <div className={styles.staffHeadActions}>
           <Button href="/booking/menus/staff"><ListChecks size={15} aria-hidden="true" />担当メニューをまとめて決める</Button>
           {canEdit ? <Button variant="primary" onClick={() => setEditing(EMPTY_STAFF)}><Plus size={15} aria-hidden="true" />スタッフを登録</Button> : null}

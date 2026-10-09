@@ -63,8 +63,8 @@ export default function ListView({ view, rows, total, tables, page, period, stat
   return (
     <>
       <StatRow>
-        <Stat label="予約" value={`${total}件`} note={`表示中 ${rows.length}件`} />
-        <Stat label="ご来店人数" value={`${guests}名`} note={`表示中の${rows.length}件${cancelledGuests > 0 ? `・取消 ${cancelledGuests} 名を除く` : ''}`} />
+        <Stat label="予約" value={`${total} 件`} note={`表示中 ${rows.length} 件`} />
+        <Stat label="ご来店人数" value={`${guests}名`} note={`表示中の${rows.length} 件${cancelledGuests > 0 ? `・取消 ${cancelledGuests} 名を除く` : ''}`} />
         <Stat label="LINE予約" value={`${lineCount}`} note="自社導線" />
         <Stat label="媒体予約" value={`${mediaCount}`} note="受信した予約" />
         <Stat label="未配席" value={`${unseated}`} note="卓の割当が必要" warning={unseated > 0} />
@@ -152,7 +152,7 @@ export default function ListView({ view, rows, total, tables, page, period, stat
           </DataTable>
         )}
         {view === 'list' && pageCount > 1 ? (
-          <Pagination spacing="roomy" page={page} pageCount={pageCount} onPageChange={onPage} ariaLabel="予約台帳のページ送り" disabled={busy} summary={`${total}件中 ${(page - 1) * PAGE_SIZE + 1}〜${Math.min((page - 1) * PAGE_SIZE + rows.length, total)}件`} />
+          <Pagination spacing="roomy" page={page} pageCount={pageCount} onPageChange={onPage} ariaLabel="予約台帳のページ送り" disabled={busy} summary={`${total} 件中 ${(page - 1) * PAGE_SIZE + 1}〜${Math.min((page - 1) * PAGE_SIZE + rows.length, total)} 件`} />
         ) : null}
       </Panel>
       <Panel title="顧客カルテ" description="電話番号または LINE UID で名寄せする設計です。">

@@ -559,8 +559,8 @@ export default function AutoRepliesListV8() {
           ? '自動応答を再開しました'
           : '自動応答を停止しました'
         : targetKind === 'resume'
-          ? `${ids.length}件の自動応答を再開しました`
-          : `${ids.length}件の自動応答を停止しました`
+          ? `${ids.length} 件の自動応答を再開しました`
+          : `${ids.length} 件の自動応答を停止しました`
     const failedMessage = (targetKind: 'stop' | 'resume', forbidden: boolean) =>
       forbidden
         ? `${NO_WRITE_PERMISSION.label}。自動応答を止めたり動かしたりするには権限が要ります。`
@@ -693,7 +693,7 @@ export default function AutoRepliesListV8() {
             failed += 1
           }
         }
-        if (failed > 0) throw new Error(`${failed}件のフォルダ移動に失敗しました`)
+        if (failed > 0) throw new Error(`${failed} 件のフォルダ移動に失敗しました`)
       },
       undo: () => setOptimisticRows(null),
       failureMessage: 'フォルダへ移せませんでした。状態を読み直してからお試しください。',
@@ -1013,7 +1013,7 @@ export default function AutoRepliesListV8() {
       value: ready ? rules.filter((r) => r.isActive).length : null,
       unit: '件',
       detail: ready
-        ? `動いていない ${rules.filter((r) => !r.isActive).length}件`
+        ? `動いていない ${rules.filter((r) => !r.isActive).length} 件`
         : LOAD_STATE_WORDS[visibleLoadState].label,
     },
     {
@@ -1025,7 +1025,7 @@ export default function AutoRepliesListV8() {
       detail: ready
         ? monthlyHits === null
           ? '実行結果を読み込めませんでした'
-          : `累計 ${totalHits === null ? '—' : formatNumber(totalHits)}回`
+          : `累計 ${totalHits === null ? '—' : formatNumber(totalHits)} 回`
         : LOAD_STATE_WORDS[visibleLoadState].label,
     },
     {
@@ -1289,11 +1289,11 @@ export default function AutoRepliesListV8() {
                   {!narrow && (
                     <Td
                       className={styles.countCell}
-                      title={`今月 ${r.hits?.period ?? '—'}回 ／ 累計 ${r.hits?.total ?? '—'}回`}
+                      title={`今月 ${r.hits?.period ?? '—'} 回 ／ 累計 ${r.hits?.total ?? '—'} 回`}
                     >
                       {/* 数えられていないものを 0 と書かない。0 は「当たらなかった」の意味。 */}
                       <div className={styles.countMain}>{r.hits?.period ?? '—'}<span className={styles.kpiUnit}>回</span></div>
-                      <div className={styles.countSub}>累計 {r.hits?.total == null ? '—' : formatNumber(r.hits.total)}回</div>
+                      <div className={styles.countSub}>累計 {r.hits?.total == null ? '—' : formatNumber(r.hits.total)} 回</div>
                     </Td>
                   )}
                   <Td>
@@ -1397,8 +1397,8 @@ export default function AutoRepliesListV8() {
               }
             >
               <p>
-                {panelRow.isActive ? '有効' : '停止中'} ／ 今月 {panelRow.hits?.period ?? '—'}回 ／
-                累計 {panelRow.hits?.total ?? '—'}回
+                {panelRow.isActive ? '有効' : '停止中'} ／ 今月 {panelRow.hits?.period ?? '—'} 回 ／
+                累計 {panelRow.hits?.total ?? '—'} 回
               </p>
             </DetailPanel>
           )
@@ -1407,7 +1407,7 @@ export default function AutoRepliesListV8() {
       {/* まとめての帯（選ぶと表の下に出る）：止める・再開・フォルダへ移す。 */}
       {canEdit && selectedCount > 0 ? (
         <div className={styles.bulkRow} style={{ padding: '10px 14px' }} role="region" aria-label="選択中のまとめ操作">
-          <span className={styles.bulkCount} aria-live="polite" aria-atomic="true">{selectedCount}件を選択中</span>
+          <span className={styles.bulkCount} aria-live="polite" aria-atomic="true">{selectedCount} 件を選択中</span>
           <Button
             type="button"
             variant="secondary"
@@ -1648,10 +1648,10 @@ export default function AutoRepliesListV8() {
             : pendingToggle.kind === 'resume'
               ? pendingToggle.ids.length === 1
                 ? `自動応答「${pendingToggle.names[0]}」を再開しますか？`
-                : `${pendingToggle.ids.length}件の自動応答を再開しますか？`
+                : `${pendingToggle.ids.length} 件の自動応答を再開しますか？`
               : pendingToggle.ids.length === 1
                 ? `「${pendingToggle.names[0]}」を止める`
-                : `${pendingToggle.ids.length}件の自動応答を止めますか？`
+                : `${pendingToggle.ids.length} 件の自動応答を止めますか？`
         }
         description={
           pendingToggle?.kind === 'resume'
@@ -1770,7 +1770,7 @@ export default function AutoRepliesListV8() {
         title={
           moveIds && moveIds.length === 1
             ? `「${displayName(rules.find((r) => r.id === moveIds[0]) ?? ({} as AutoReply))}」のフォルダを移す`
-            : `${moveIds?.length ?? 0}件の自動応答をフォルダへ移す`
+            : `${moveIds?.length ?? 0} 件の自動応答をフォルダへ移す`
         }
         description="移動先のフォルダを選んでください。「未分類」を選ぶとフォルダから外れます。"
         confirmLabel="移動する"

@@ -143,7 +143,7 @@ function InflowCreate() {
     if (tagId && !tagIds.has(tagId)) { setTagId(''); removed += 1 }
     if (scenarioId && !scenarioIds.has(scenarioId)) { setScenarioId(''); removed += 1 }
     if (introTemplateId && !templateIds.has(introTemplateId)) { setIntroTemplateId(''); removed += 1 }
-    if (removed > 0) setPruneNotice(`選んでいた候補のうち${removed}件は、今のアカウントにないため外しました。選び直してください。`)
+    if (removed > 0) setPruneNotice(`選んでいた候補のうち${removed} 件は、今のアカウントにないため外しました。選び直してください。`)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tags, scenarios, templates])
 

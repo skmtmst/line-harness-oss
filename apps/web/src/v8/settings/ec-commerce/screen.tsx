@@ -107,7 +107,7 @@ function actionStatusLabel(action: { status: EcActionExecutionStatus; eventType:
 
 function actionDone(action: EcActionExecution): string {
   if (action.status === 'retryable_failed' || action.status === 'permanent_failed') {
-    return action.errorMessage ?? `${action.attemptCount}回やり直しました`
+    return action.errorMessage ?? `${action.attemptCount} 回やり直しました`
   }
   if (action.status === 'skipped') {
     return action.eventType === 'ec.order.shipped' && action.errorCode === 'notification_disabled'
@@ -491,7 +491,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
         <div className={styles.pager}>
           <span className={styles.minorText}>
             <ListRange label="取り込みの記録" total={actionTotal} first={(page - 1) * ACTION_PAGE_SIZE + 1} last={(page - 1) * ACTION_PAGE_SIZE + actions.length} />
-            {` 最後に届いた ${longDateTime(overview?.lastReceivedAt ?? null)}・今日 ${overview ? formatNumber(overview.last24h) : '—'}件。注文の本文や接続用の秘密値は表示しません。`}
+            {` 最後に届いた ${longDateTime(overview?.lastReceivedAt ?? null)}・今日 ${overview ? formatNumber(overview.last24h) : '—'} 件。注文の本文や接続用の秘密値は表示しません。`}
           </span>
           {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} /> : null}
         </div>

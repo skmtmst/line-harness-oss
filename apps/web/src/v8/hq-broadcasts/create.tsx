@@ -478,7 +478,7 @@ export default function HqBroadcastCreate() {
    */
   const fields = useFormErrors()
   bubbles.forEach((item, index) => {
-    fields.define(`bubble-${index}`, `${index + 1}通目`, () => hqBubbleProblem(item) || null, {
+    fields.define(`bubble-${index}`, `${index + 1} 通目`, () => hqBubbleProblem(item) || null, {
       reveal: () => { if (step !== 'message') changeStep('message'); setOpenBubble(index) },
       group: `bubble-${index}`,
     })
@@ -494,7 +494,7 @@ export default function HqBroadcastCreate() {
     for (const [index, item] of bubbles.entries()) {
       /* 質問・紹介（統括の口がまだ受けない）もここで止め、口を呼ばない。 */
       const why = hqBubbleProblem(item)
-      if (why) return { message: `${bubbles.length > 1 ? `${index + 1}通目の` : ''}${why}`, step: 'message' }
+      if (why) return { message: `${bubbles.length > 1 ? `${index + 1} 通目の` : ''}${why}`, step: 'message' }
     }
     if (when === 'later' && !scheduledAt) return { message: '送る日時を選んでください', step: 'schedule' }
     if (scheduledAt && Date.parse(scheduledAt) <= Date.now()) return { message: '予約日時は今より後にしてください', step: 'schedule' }
@@ -1017,7 +1017,7 @@ export default function HqBroadcastCreate() {
                   {([
                     { key: 'basic', label: '配信名', value: title.trim() || '配信名を入力してください', done: steps[0].state === 'done' || Boolean(title.trim()), move: '基本設定へ戻る' },
                     { key: 'audience', label: '送るアカウント・配信対象', value: `${accountsLabel} ・ ${audienceFull} ・ ${peopleLabel}（ブロック中の人を除く）`, done: steps[1].state === 'done' || (chosen.length > 0 && (audience === 'all' || audience === 'scenario' || (audience === 'tag' && Boolean(tagName)) || (audience === 'advanced' && (Boolean(pruneCondition(condition)) || Boolean(savedName))))), move: '対象者へ戻る' },
-                    { key: 'message', label: 'メッセージ', value: `${bubbles.length > 1 ? `${bubbles.length}件` : KIND_LABEL[kind]} ・ ${previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}`, done: bubblesDone && previewConfirmed, move: 'メッセージへ戻る' },
+                    { key: 'message', label: 'メッセージ', value: `${bubbles.length > 1 ? `${bubbles.length} 件` : KIND_LABEL[kind]} ・ ${previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}`, done: bubblesDone && previewConfirmed, move: 'メッセージへ戻る' },
                     { key: 'schedule', label: '送信設定', value: sendWhenLabel, done: when === 'now' || Boolean(scheduledAt), move: '送信設定へ戻る' },
                   ] as const).map((row) => (
                     <div className={formStyles.checkRow} key={row.key}>
@@ -1031,7 +1031,7 @@ export default function HqBroadcastCreate() {
                   const left = [title.trim(), steps[1].state === 'done', bubblesDone && previewConfirmed, when === 'now' || scheduledAt].filter((ok) => !ok).length
                   return (
                     <Notice tone={left ? 'warn' : 'info'}>
-                      {left ? `${left}件の確認が残っています` : '配信する内容を確認してください'}
+                      {left ? `${left} 件の確認が残っています` : '配信する内容を確認してください'}
                     </Notice>
                   )
                 })()}
@@ -1106,7 +1106,7 @@ export default function HqBroadcastCreate() {
                     onRequestClose={() => setApprovalRequestOpen(false)}
                     onChanged={() => { void hqBroadcastsApi.get(run.id).then((res) => { setRun(res.data); setRunKey(key) }).catch(() => undefined) }}
                     scheduledLabel={scheduledAt ? jpDateTime(scheduledAt) : null}
-                    messageSummary={`${bubbles.length}通`}
+                    messageSummary={`${bubbles.length} 通`}
                   />
                 ) : null}
                 <p className="text-xs text-ink-faint">{when === 'later' ? '予約後も送る前までは、一括配信の詳細から止められます。' : '「今すぐ送る」で確認の小窓を開き、そこで送ると友だちに届きます。送信は取り消せません。'}</p>
@@ -1208,7 +1208,7 @@ export default function HqBroadcastCreate() {
       <Dialog
         open={saveTplOpen}
         title="テンプレートとして保存する"
-        description={`${openBubble + 1}通目の吹き出しを保存します。ほかの吹き出しは含みません。保存したテンプレートはアカウントへ配れます。`}
+        description={`${openBubble + 1} 通目の吹き出しを保存します。ほかの吹き出しは含みません。保存したテンプレートはアカウントへ配れます。`}
         confirmLabel="保存する"
         cancelLabel="やめる"
         busy={saveTplBusy}

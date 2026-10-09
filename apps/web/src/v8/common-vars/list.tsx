@@ -804,7 +804,7 @@ function CommonVarsListInner() {
   const prepareRemoveSelected = async () => {
     if (selected.size === 0 || !selectedAccountId) return
     if (selected.size > MAX_BATCH_DELETE_COUNT) {
-      setError(`一度に削除できるのは${MAX_BATCH_DELETE_COUNT}件までです。フォルダや検索で絞り込んで分けて削除してください。`)
+      setError(`一度に削除できるのは${MAX_BATCH_DELETE_COUNT} 件までです。フォルダや検索で絞り込んで分けて削除してください。`)
       return
     }
     const request = {
@@ -829,7 +829,7 @@ function CommonVarsListInner() {
       const blocked = impacts.filter(({ impact }) => !impact.canDelete)
       if (blocked.length > 0) {
         const references = blocked.reduce((sum, { impact }) => sum + impact.total, 0)
-        setError(`${blocked.length}件は、合計${references}か所で使用中のため削除できません。`)
+        setError(`${blocked.length} 件は、合計${references}か所で使用中のため削除できません。`)
         return
       }
     } catch {
@@ -884,7 +884,7 @@ function CommonVarsListInner() {
         setDeleteBatchError(
           failed.length === targets.length
             ? '選択した共通情報を削除できませんでした。状態を読み直してから、もう一度お試しください。'
-            : `${failed.length}件の共通情報を削除できませんでした。削除できなかったものだけを残しています。`,
+            : `${failed.length} 件の共通情報を削除できませんでした。削除できなかったものだけを残しています。`,
         )
         await load()
         return
@@ -1258,7 +1258,7 @@ function CommonVarsListInner() {
                 const badge = stateBadge(item)
                 const valueText = formatVarValue(item.type, item.value)
                 const pending = item.nextSchedule ?? null
-                const updateTitle = `最終更新 ${formatListDate(item.updatedAt)}${!pending ? ' ／ 予定なし' : ` ／ ${formatStamp(pending.effectiveFrom)} に ${formatVarValue(item.type, pending.value) || '（空）'}へ${(item.pendingScheduleCount ?? 0) > 1 ? ` ほか${(item.pendingScheduleCount ?? 1) - 1}件` : ''}`}`
+                const updateTitle = `最終更新 ${formatListDate(item.updatedAt)}${!pending ? ' ／ 予定なし' : ` ／ ${formatStamp(pending.effectiveFrom)} に ${formatVarValue(item.type, pending.value) || '（空）'}へ${(item.pendingScheduleCount ?? 0) > 1 ? ` ほか${(item.pendingScheduleCount ?? 1) - 1} 件` : ''}`}`
                 return (
                   <Tr
                     interactive
@@ -1745,8 +1745,8 @@ function CommonVarsListInner() {
         open={deleteTargets.length > 0}
         title={deleteTargets.length === 1
           ? `「${deleteTargets[0]?.name ?? ''}」を削除しますか？`
-          : `「${deleteTargets[0]?.name ?? ''}」ほか${deleteTargets.length - 1}件を削除しますか？`}
-        description={`選択した${deleteTargets.length}件の共通情報と、登録値・次回予約を削除します。テンプレート、配信、フォルダ、友だちは削除しません。この操作は元に戻せません。`}
+          : `「${deleteTargets[0]?.name ?? ''}」ほか${deleteTargets.length - 1} 件を削除しますか？`}
+        description={`選択した${deleteTargets.length} 件の共通情報と、登録値・次回予約を削除します。テンプレート、配信、フォルダ、友だちは削除しません。この操作は元に戻せません。`}
         confirmLabel="削除する"
         destructive
         busy={deleting}

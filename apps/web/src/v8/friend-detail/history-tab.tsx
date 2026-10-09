@@ -57,7 +57,7 @@ export default function HistoryTab({ friend, friendId, data }: { friend: FriendD
           ))}
         </div>
         {historyStatus === 'ready' ? (
-          <span className={styles.count}>{complete ? `${rows.length}件` : `${rows.length}件を表示中`}</span>
+          <span className={styles.count}>{complete ? `${rows.length} 件` : `${rows.length} 件を表示中`}</span>
         ) : null}
       </div>
 

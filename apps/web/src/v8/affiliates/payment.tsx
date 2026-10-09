@@ -173,8 +173,8 @@ export default function PaymentTab() {
       } else {
         if (succeeded > 0) notifyToast(`${formatNumber(succeeded)} 人分の支払明細を発行しました。`)
         const names = failedNames.slice(0, 5).join('、')
-        const rest = failedNames.length > 5 ? `ほか${failedNames.length - 5}人` : ''
-        setOperationError(`${failedNames.length}人分を発行できませんでした（${names}${rest}）。もう一度押すと失敗分を試し直せます。`)
+        const rest = failedNames.length > 5 ? `ほか${failedNames.length - 5} 人` : ''
+        setOperationError(`${failedNames.length} 人分を発行できませんでした（${names}${rest}）。もう一度押すと失敗分を試し直せます。`)
       }
       if (resumed && succeeded > 0) void load()
     } catch (cause) {
@@ -431,7 +431,7 @@ export default function PaymentTab() {
 
   const pager = ready && shown.length > 0 && pageCount > 1 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>{`${formatNumber(shown.length)} 人中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, shown.length)}人`}</span>
+      <span className={styles.pagerCount}>{`${formatNumber(shown.length)} 人中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, shown.length)} 人`}</span>
       <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} />
     </ListPagePagination>
   ) : undefined

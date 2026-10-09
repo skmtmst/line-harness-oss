@@ -61,7 +61,7 @@ export type ParticipantRow = WebinarParticipantPage['items'][number]
 export function joinNote(participant: ParticipantRow): string {
   const sessions = participant.sessions ?? 0
   if (sessions <= 0) return '申込のみ'
-  return `${sessions}回参加・${participant.registered ? '予約から参加' : '直接参加'}`
+  return `${sessions} 回参加・${participant.registered ? '予約から参加' : '直接参加'}`
 }
 
 /** 入場がライブ時間内か終了後（録画）かを回数つきで短く示す。 */

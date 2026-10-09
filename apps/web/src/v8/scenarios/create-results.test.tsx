@@ -283,7 +283,7 @@ describe('配信結果（X4STXS）', () => {
     expect(screen.getByText('送れずに止まった')).toBeTruthy()
     expect(screen.getByText('止まっている')).toBeTruthy()
     expect(screen.getAllByText('読み終えた').length).toBeGreaterThan(0)
-    expect(screen.getByText('3通目まで')).toBeTruthy()
+    expect(screen.getByText('3 通目まで')).toBeTruthy()
     expect(screen.getAllByText('—（止めている）').length).toBe(2)
     expect(screen.getByText('届いた率 100.0%・開いた —・押した 4 人')).toBeTruthy()
   })

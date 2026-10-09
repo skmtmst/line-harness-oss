@@ -131,7 +131,7 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
               )}
               {props.remaining > 0 ? (
                 <Button variant="secondary" size="compact" onClick={props.onLoadMore} disabled={props.loadingMore}>
-                  {props.loadingMore ? '読み込み中...' : `さらに表示（残り${props.remaining}件）`}
+                  {props.loadingMore ? '読み込み中...' : `さらに表示（残り${props.remaining} 件）`}
                 </Button>
               ) : null}
             </div>
@@ -147,7 +147,7 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
               <span className={styles.tpBandOrder} title={packItems.map((item) => item.name).join(' → ')}>
                 {packItems.map((item, index) => `${'①②③④⑤'[index] ?? `${index + 1}.`} ${item.name}`).join(' → ')}
               </span>
-              <span className={styles.tpBandCount}>{packItems.length} / {PACK_MAX}通</span>
+              <span className={styles.tpBandCount}>{packItems.length} / {PACK_MAX} 通</span>
             </div>
           ) : null}
           <div className={styles.tpFoot}>

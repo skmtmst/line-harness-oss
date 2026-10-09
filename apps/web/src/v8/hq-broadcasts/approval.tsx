@@ -220,7 +220,7 @@ export function HqTestSendDialog({
       const id = await prepare()
       if (!id) { setError('先に入れていない所を直してください。'); return }
       const result = (await hqBroadcastsApi.testSend(id, chosen)).data
-      notifyToast(result.failed ? `テストを ${result.sent}人に送りました（${result.failed}人は送れませんでした）` : `テストを ${result.sent}人に送りました`)
+      notifyToast(result.failed ? `テストを ${result.sent} 人に送りました（${result.failed} 人は送れませんでした）` : `テストを ${result.sent} 人に送りました`)
       onClose()
     } catch (caught) {
       setError(errorText(caught, 'テストを送れませんでした。アカウントのテスト送信の宛先を確かめてください。'))

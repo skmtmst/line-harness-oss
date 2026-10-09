@@ -98,3 +98,8 @@ describe('B-152 一覧と詳細の書式', () => {
     expect(formatListDateTime('invalid')).toBe('—')
   })
 })
+
+
+it('来年以降の予約も、一覧で開始時刻を確認できる', () => {
+  expect(formatListDateTime('2027-01-02T01:12:00Z', '—', NOW)).toBe('2027/01/02 10:12')
+})

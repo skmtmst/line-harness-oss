@@ -75,8 +75,8 @@ function GoogleCard({ data, error, canManage }: { data: GoogleConnectionData | n
         <dl className={styles.facts}>
           <div className={styles.fact}><dt>店舗</dt><dd>{connection.locationTitle ?? data.store.name}</dd></div>
           <div className={styles.fact}><dt>最終同期</dt><dd>{stamp(connection.lastSyncedAt)}</dd></div>
-          <div className={styles.fact}><dt>口コミ</dt><dd>{`★${connection.averageRating ?? '—'}（${connection.totalReviewCount ?? '—'}件）・未返信 ${summary.unrepliedCount}件`}</dd></div>
-          <div className={styles.fact}><dt>投稿</dt><dd>{summary.postsAttentionCount ? `確かめる投稿 ${summary.postsAttentionCount}件` : '確かめる投稿はありません'}</dd></div>
+          <div className={styles.fact}><dt>口コミ</dt><dd>{`★${connection.averageRating ?? '—'}（${connection.totalReviewCount ?? '—'} 件）・未返信 ${summary.unrepliedCount} 件`}</dd></div>
+          <div className={styles.fact}><dt>投稿</dt><dd>{summary.postsAttentionCount ? `確かめる投稿 ${summary.postsAttentionCount} 件` : '確かめる投稿はありません'}</dd></div>
         </dl>
       ) : (
         <p className={styles.text}>{connection.status === 'pending_location' ? 'Google アカウントの認可は済んでいます。つなぐ店舗を選んでください。' : 'Google ビジネスとつなぐと、口コミ・投稿・プロフィールをこの管理画面で扱えます。'}</p>

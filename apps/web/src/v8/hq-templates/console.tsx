@@ -962,7 +962,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                 />
               ) : <p role="alert">この種類のひな形は、ここでは編集できません。</p>}
               {!canonicalEditorOwnsSave ? uncertainNotice : null}
-              {!canonicalEditorOwnsSave ? <p className={styles.note}>{`参照先 ${referenceCount(type, definition)}件を含めて配布します。`}</p> : null}
+              {!canonicalEditorOwnsSave ? <p className={styles.note}>{`参照先 ${referenceCount(type, definition)} 件を含めて配布します。`}</p> : null}
             </section>
           )}
           {footer ? <div className={styles.footer}>{footer}</div> : null}

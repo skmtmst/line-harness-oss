@@ -35,7 +35,7 @@ function sourceOf(item: Link): { kind: string; name: string; all: string } {
   const first = item.usageLocations[0]
   if (!first) return { kind: '—', name: '', all }
   const match = /^(.+?)「(.+)」$/.exec(first)
-  const more = item.usageLocations.length > 1 ? ` ほか${item.usageLocations.length - 1}件` : ''
+  const more = item.usageLocations.length > 1 ? ` ほか${item.usageLocations.length - 1} 件` : ''
   return match ? { kind: match[1], name: `${match[2]}${more}`, all } : { kind: first, name: more.trim(), all }
 }
 
@@ -126,9 +126,9 @@ export default function UrlClicksV8({ accountId }: { accountId: string }) {
           })}
       </div>
       {links.length > 10 ? <div className={styles.pager}>
-        <span>{`${links.length}件中 ${links.length ? currentPage * pageSize + 1 : 0}〜${Math.min((currentPage + 1) * pageSize, links.length)}件（取得した範囲）`}</span>
+        <span>{`${links.length} 件中 ${links.length ? currentPage * pageSize + 1 : 0}〜${Math.min((currentPage + 1) * pageSize, links.length)} 件（取得した範囲）`}</span>
         <span className={styles.spacer} />
-        <Select aria-label="表示件数" value={String(pageSize)} options={[10, 20, 50].map((value) => ({ value: String(value), label: `${value}件` }))} onChange={(value) => { setPageSize(Number(value)); setPage(0) }} />
+        <Select aria-label="表示件数" value={String(pageSize)} options={[10, 20, 50].map((value) => ({ value: String(value), label: `${value} 件` }))} onChange={(value) => { setPageSize(Number(value)); setPage(0) }} />
         <Button variant="secondary" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>前へ</Button>
         <Button variant="secondary" disabled={currentPage === lastPage} onClick={() => setPage(currentPage + 1)}>次へ</Button>
       </div> : null}

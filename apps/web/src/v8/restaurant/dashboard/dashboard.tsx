@@ -143,7 +143,7 @@ function TodayStore() {
             <div className={styles.closeBand} role="status" data-close-band="">
               <Bell size={18} aria-hidden="true" className={styles.closeIcon} />
               <div className={styles.closeText}>
-                <p className={styles.closeTitle}>{`他の予約サイトの枠を閉じてください（未対応 ${pending.length}件）`}</p>
+                <p className={styles.closeTitle}>{`他の予約サイトの枠を閉じてください（未対応 ${pending.length} 件）`}</p>
                 <p className={styles.closeDetail}>
                   {`${slotTitle(first.startsAt)} の枠が${reasonText(first)} → ${openItems(first).map((item) => item.name).join('・')} の枠を閉じてください`}
                 </p>
@@ -179,7 +179,7 @@ function TodayStore() {
               value={summary?.guests ?? null}
               unit="人"
               loading={!summary}
-              detail={summary ? (summary.peak ? `いちばん多いのは ${summary.peak.label}（${summary.peak.guests}人）` : '今日の予約はまだありません') : '読み込んでいます'}
+              detail={summary ? (summary.peak ? `いちばん多いのは ${summary.peak.label}（${summary.peak.guests} 人）` : '今日の予約はまだありません') : '読み込んでいます'}
               action={{ label: '時間ごとに見る', href: '/restaurant-test/reservations' }}
             />
             <KpiCard
@@ -201,7 +201,7 @@ function TodayStore() {
               unit="件"
               delta={googleConnected && d.oldestReview ? <Chip tone="warn">{`最長 ${daysAgo(d.oldestReview.createTime, now)}`}</Chip> : null}
               detail={googleConnected
-                ? `Google ★${google.connection.averageRating ?? '—'}（${google.connection.totalReviewCount ?? 0}件）`
+                ? `Google ★${google.connection.averageRating ?? '—'}（${google.connection.totalReviewCount ?? 0} 件）`
                 : google ? 'Google ビジネスとつないでいません' : '読み込めませんでした'}
               action={googleConnected ? { label: '返信する', href: '/restaurant-test/google' } : { label: 'つなぐ', href: '/settings/sns' }}
             />

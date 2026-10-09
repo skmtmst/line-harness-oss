@@ -17,7 +17,7 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import styles from './affiliates.module.css'
 
-export const PAGE_SIZE_OPTIONS = [10, 20, 50].map((size) => ({ value: String(size), label: `${size}件表示` }))
+export const PAGE_SIZE_OPTIONS = [10, 20, 50].map((size) => ({ value: String(size), label: `${size} 件表示` }))
 
 /** 道具の段の右：「よく使う絞り込み」（左に印）。 */
 export function SavedSelect({

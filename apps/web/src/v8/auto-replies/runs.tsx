@@ -70,8 +70,8 @@ export function actionLabel(run: AutoReplyRun): string {
   const summary = run.actionSummary
   const parts: string[] = []
   if (run.replyStatus === 'accepted') parts.push('返信')
-  if ((summary.executed ?? 0) > 0) parts.push(`後続処理${summary.executed}件`)
-  if ((summary.failed ?? 0) > 0) parts.push(`失敗${summary.failed}件`)
+  if ((summary.executed ?? 0) > 0) parts.push(`後続処理${summary.executed} 件`)
+  if ((summary.failed ?? 0) > 0) parts.push(`失敗${summary.failed} 件`)
   return parts.length > 0 ? parts.join('＋') : run.detail ?? '—'
 }
 
@@ -136,7 +136,7 @@ export function periodFrom(period: PeriodKey, now: Date): string | null {
   return null
 }
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50].map((n) => ({ value: String(n), label: `${n}件表示` }))
+const PAGE_SIZE_OPTIONS = [10, 20, 50].map((n) => ({ value: String(n), label: `${n} 件表示` }))
 
 /** 届いた言葉は「」で囲んで1行。 */
 function quoted(text: string | null): string {
@@ -297,7 +297,7 @@ export default function AutoReplyRunsV8() {
     }
     setActionMessage(
       retried > 0
-        ? `失敗した処理を${retried}件もう一度実行しました。`
+        ? `失敗した処理を${retried} 件もう一度実行しました。`
         : 'もう一度実行できる処理はありませんでした。',
     )
     await load()
@@ -431,9 +431,9 @@ export default function AutoReplyRunsV8() {
       <div className={styles.kpis}>
       <KpiBand data-design="KPIs">
         <KpiCard presentation="band" icon={null} title="今月当たった" value={data ? data.summary.monthHits : null} unit="回"
-          detail={`累計 ${data ? formatNumber(data.summary.totalHits) : '—'}回`} />
+          detail={`累計 ${data ? formatNumber(data.summary.totalHits) : '—'} 回`} />
         <KpiCard presentation="band" icon={null} title="担当者へ引き継ぎ" value={data ? data.summary.handovers : null} unit="件"
-          detail={`確認待ち ${data ? formatNumber(data.handovers.waiting) : '—'}件`} />
+          detail={`確認待ち ${data ? formatNumber(data.handovers.waiting) : '—'} 件`} />
         <KpiCard presentation="band" icon={null} title="失敗した処理" value={data ? failedCount : null} unit="件"
           detail={failedCount > 0 ? '理由を見て、もう一度実行できます' : '記録を開始してからの合計です'} />
         <KpiCard presentation="band" icon={null} title="平均で返すまで"
@@ -591,7 +591,7 @@ export default function AutoReplyRunsV8() {
               pageCount={pageCount}
               onPageChange={setPage}
               disabled={loading}
-              summary={total > 0 ? `${formatNumber(total)} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, total)}件` : undefined}
+              summary={total > 0 ? `${formatNumber(total)} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, total)} 件` : undefined}
             />
           </div>
         ) : null}

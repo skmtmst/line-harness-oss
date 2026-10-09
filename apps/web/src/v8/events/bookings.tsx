@@ -463,9 +463,9 @@ function Bookings({ eventId }: { eventId: string }) {
             <p className={styles.cardNote}>承認待ちは期限までに承認か断るを選びます。断る・キャンセルにすると LINE でお知らせが届き、枠が空きます</p>
           </div>
           <div className={styles.attendance} aria-label="当日の受付">
-            <span className={styles.attendanceStrong}>{`参加済 ${attendance?.attendedSeats ?? 0}人`}</span>
-            <span className={styles.attendanceDanger}>{`無断欠席 ${attendance?.noShowSeats ?? 0}人`}</span>
-            <span>{`受付前 ${Math.max(0, confirmedSeats - (attendance?.attendedSeats ?? 0) - (attendance?.noShowSeats ?? 0))}人`}</span>
+            <span className={styles.attendanceStrong}>{`参加済 ${attendance?.attendedSeats ?? 0} 人`}</span>
+            <span className={styles.attendanceDanger}>{`無断欠席 ${attendance?.noShowSeats ?? 0} 人`}</span>
+            <span>{`受付前 ${Math.max(0, confirmedSeats - (attendance?.attendedSeats ?? 0) - (attendance?.noShowSeats ?? 0))} 人`}</span>
             <span className={styles.attendanceNote}>当日、来た人に「参加済」、来なかった人に「無断」を付けます</span>
           </div>
         </div>
@@ -785,7 +785,7 @@ function Bookings({ eventId }: { eventId: string }) {
 
       <ConfirmDialog
         open={broadcastConfirmOpen && broadcastPreview !== null}
-        title={`${broadcastPreview?.recipientCount ?? 0}人に送りますか？`}
+        title={`${broadcastPreview?.recipientCount ?? 0} 人に送りますか？`}
         description="この回の申込者へLINEでまとめて送ります。送ったお知らせは取り消せません。"
         confirmLabel="送る"
         busy={broadcastBusy}

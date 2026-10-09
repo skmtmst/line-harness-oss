@@ -56,7 +56,7 @@ const RUN_STATUSES_PARAM = new Set<FriendAddEventRoutingStatus>([
 /** CSV 書き出しの安全弁（今までと同じ：100件×50頁＝5,000件で止める）。 */
 const CSV_EXPORT_MAX_PAGES = 50
 const CSV_EXPORT_PAGE_SIZE = 100
-const PAGE_SIZE_OPTIONS = [10, 20, 50].map((n) => ({ value: String(n), label: `${n}件表示` }))
+const PAGE_SIZE_OPTIONS = [10, 20, 50].map((n) => ({ value: String(n), label: `${n} 件表示` }))
 const NO_MANAGE_NOTE = '閲覧のみで見ています。一時停止・もう一度実行はオーナーと管理者だけができます。実行結果の確認と書き出しはこのまま使えます。'
 
 function routeNameOf(item: RunItem): string {
@@ -92,7 +92,7 @@ export function actionText(item: RunItem): string {
   }
   if (item.scenario?.started) return `案内＋シナリオ「${item.scenario.name ?? '名前は未取得'}」を開始`
   if (item.status === 'pending' && item.actions.total > 0) return `案内＋${item.actions.total}つの処理（テスト待ち）`
-  if (item.deliveryCount > 0) return `案内を${item.deliveryCount}通送信`
+  if (item.deliveryCount > 0) return `案内を${item.deliveryCount} 通送信`
   if (item.actions.total > 0) return `案内＋${item.actions.total}つの処理`
   return routingAction(item.status, item.errorCode)
 }
@@ -313,7 +313,7 @@ function FriendAddRunsInner() {
       if (await retryOne(item)) retried += 1
     }
     setRetrying(null)
-    setMessage(retried > 0 ? `失敗した処理を${retried}件もう一度実行しました。` : 'もう一度実行できる処理はありませんでした。')
+    setMessage(retried > 0 ? `失敗した処理を${retried} 件もう一度実行しました。` : 'もう一度実行できる処理はありませんでした。')
     await load()
   }
 
@@ -462,7 +462,7 @@ function FriendAddRunsInner() {
       <div className={styles.kpis}>
         <KpiBand data-design="KPIs">
           <KpiCard presentation="band" icon={null} title="直近28日の友だち追加" value={summary ? summary.recentFriends ?? null : null} unit="人"
-            detail={`追加の記録 ${summary?.recentEvents == null ? '—' : formatNumber(summary.recentEvents)}件`} />
+            detail={`追加の記録 ${summary?.recentEvents == null ? '—' : formatNumber(summary.recentEvents)} 件`} />
           <KpiCard presentation="band" icon={null} title="送った案内" value={summary ? summary.cumulativeDeliveries : null} unit="通" detail={successRate} />
           <KpiCard presentation="band" icon={null} title="失敗した処理" value={summary ? summary.failed : null} unit="通"
             detail={failedCount > 0 ? '理由を見て、もう一度実行できます' : '記録を始めてからの合計です'} />
@@ -584,7 +584,7 @@ function FriendAddRunsInner() {
               pageCount={pageCount}
               onPageChange={changePage}
               disabled={loading}
-              summary={`${formatNumber(data.total)} 件中 ${(cursorPage - 1) * perPage + 1}〜${(cursorPage - 1) * perPage + items.length}件`}
+              summary={`${formatNumber(data.total)} 件中 ${(cursorPage - 1) * perPage + 1}〜${(cursorPage - 1) * perPage + items.length} 件`}
             />
           </div>
         ) : null}

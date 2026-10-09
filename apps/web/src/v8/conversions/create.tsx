@@ -482,7 +482,7 @@ function ConversionCreate() {
                   ? '読み込めません'
                   : all === 0
                     ? 'まだ無い'
-                    : chosen === 0 ? '使わない' : chosen === all ? '使う' : `${chosen}/${all}件`
+                    : chosen === 0 ? '使わない' : chosen === all ? '使う' : `${chosen}/${all} 件`
             return (
               <div key={group.kind} className={styles.usageRow}>
                 <Checkbox

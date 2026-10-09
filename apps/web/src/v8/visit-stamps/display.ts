@@ -57,7 +57,7 @@ export function sortedRewards(rewards: VisitStampReward[]): VisitStampReward[] {
 export function rewardNote(reward: VisitStampReward, settings: VisitStampSettings): string {
   return reward.stamps >= Math.max(...settings.rewards.map(r => r.stamps))
     ? settings.completion === 'next_card' ? '使ったら次のカードへ' : '使ったら新しいカードへ'
-    : `使うとスタンプが ${reward.stamps}個へる`
+    : `使うとスタンプが ${reward.stamps} 個へる`
 }
 
 export function expiryLabel(months: number | null, basis: VisitStampSettings['expiryBasis'] = 'last_visit'): string {

@@ -167,12 +167,12 @@ export function OperationalAlerts({ risk, healthIssues, oldestWaitMinutes, twoFa
       <SectionHeader title="運用アラート" href="/emergency" linkLabel="運用状態を見る" />
       <p className={styles.alertHead}>
         <span className={failed || count === null ? styles.faintStrong : styles.strong}>
-          {failed ? '未取得' : count === null ? '—' : `接続・自動処理 ${count}件`}
+          {failed ? '未取得' : count === null ? '—' : `接続・自動処理 ${count} 件`}
         </span>
         {!failed && count !== null ? <Tag tone={count > 0 ? 'warning' : 'success'}>{count > 0 ? '要確認' : '正常'}</Tag> : null}
       </p>
       <p className={styles.item}>{`・最も古い未対応：${oldestWaitMinutes === null ? '—' : formatWaitRough(oldestWaitMinutes)}`}</p>
-      <p className={styles.item}>{`・組織全体の二段階認証：${twoFactor === null ? '—' : `${twoFactor.enabled} / ${twoFactor.total}人`}`}</p>
+      <p className={styles.item}>{`・組織全体の二段階認証：${twoFactor === null ? '—' : `${twoFactor.enabled} / ${twoFactor.total} 人`}`}</p>
       <Updated>{dashboardLocalUpdatedAt(updatedAt)}</Updated>
     </div>
   )

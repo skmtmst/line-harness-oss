@@ -284,7 +284,7 @@ export default function HqSupportV8() {
                 size="compact"
                 title="画像を添える"
                 accept="image/png,image/jpeg"
-                limitText={`PNG・JPEG、1枚 5MB まで（${SUPPORT_ATTACHMENT_MAX}枚まで）`}
+                limitText={`PNG・JPEG、1枚 5MB まで（${SUPPORT_ATTACHMENT_MAX} 枚まで）`}
                 disabled={sending}
                 onFile={(file) => void addFile(file)}
               />
@@ -339,7 +339,7 @@ export default function HqSupportV8() {
                   <span role="cell" className={styles.subjectCell}>
                     <Link href={`/hq/support/detail?id=${encodeURIComponent(item.id)}`} className={styles.subject} title={item.subject}>{item.subject}</Link>
                     {!tenantUnavailable && item.replies && item.replies.length > 0 ? (
-                      <span className={styles.replyNote}>運営からの返信 {item.replies.length}件・開いて続きを送れます</span>
+                      <span className={styles.replyNote}>運営からの返信 {item.replies.length} 件・開いて続きを送れます</span>
                     ) : null}
                   </span>
                   <span role="cell" className={styles.cell} title={item.kindLabel}>{supportKindWord(item.kind, item.kindLabel)}</span>

@@ -200,7 +200,7 @@ describe('V8 リマインダを作る②〜⑤', () => {
     // happy-dom の窓は幅 1024 なので 1152 の板（r1l0bT）：右の列は「LINEでの見え方を見る」と例だけ。
     expect(host.querySelector('[data-page-template="create"]')?.getAttribute('data-design-node')).toBe('r1l0bT')
     expect(buttonByText('LINEでの見え方を見る')).toBeTruthy()
-    expect(host.querySelector('[aria-label="届く日時の例"]')?.textContent).toContain('2通目')
+    expect(host.querySelector('[aria-label="届く日時の例"]')?.textContent).toContain('2 通目')
     const cards = host.querySelectorAll('[data-open]')
     expect(cards).toHaveLength(1)
     expect(host.textContent).toContain('1日前 18:00')
@@ -209,7 +209,7 @@ describe('V8 リマインダを作る②〜⑤', () => {
     expect((host.querySelector('input[aria-label="送る時刻"]') as HTMLInputElement | null)?.value).toBe('18 : 00')
     const add = buttonByText('通知を足す')
     await act(async () => { add!.click() })
-    expect(host.textContent).toContain('3通目')
+    expect(host.textContent).toContain('3 通目')
   })
 
   it('通知の並べ替え：つまみのドラッグ・上下キー・「後ろへ」は同じ結果になる', async () => {

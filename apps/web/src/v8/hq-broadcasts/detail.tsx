@@ -81,7 +81,7 @@ export function ResultCard({ run, canManage, onRetry, onRetryAll }: {
       <div className={styles.cardHead}>
         <div className={styles.cardText}>
           <h2 id="hq-bc-result" className={styles.cardTitle}>アカウントごとの送った結果</h2>
-          <p className={styles.cardSub}>{`${jpDateTime(run.scheduledAt)} ・ ${n(sentTo.length)}店に送信 ・ 成功 ${n(success)}人 ・ 失敗 ${n(failed)}人`}</p>
+          <p className={styles.cardSub}>{`${jpDateTime(run.scheduledAt)} ・ ${n(sentTo.length)}店に送信 ・ 成功 ${n(success)} 人 ・ 失敗 ${n(failed)} 人`}</p>
         </div>
         {canManage && retryable.length > 0 ? (
           <Button onClick={onRetryAll}><RotateCcw size={15} aria-hidden="true" />失敗した店にやり直す</Button>
@@ -108,7 +108,7 @@ export function ResultCard({ run, canManage, onRetry, onRetryAll }: {
             return (
               <Tr key={t.accountId} className={styles.row}>
                 <Td className={styles.colStore}><span className={styles.store} title={t.accountName}>{t.accountName}</span></Td>
-                <Td className={styles.colNum}><span className={styles.num} title={off ? undefined : `送った ${n(t.totalCount ?? 0)}人`}>{off ? '—' : n(t.successCount ?? 0)}</span></Td>
+                <Td className={styles.colNum}><span className={styles.num} title={off ? undefined : `送った ${n(t.totalCount ?? 0)} 人`}>{off ? '—' : n(t.successCount ?? 0)}</span></Td>
                 <Td className={styles.colFail}><span className={off ? styles.faint : fail > 0 ? styles.numStrong : styles.faint}>{off ? '—' : n(fail)}</span></Td>
                 <Td className={styles.colMetric}><span className={styles.num}>{off ? '—' : metric(t.openedCount)}</span></Td>
                 <Td className={styles.colMetric}><span className={styles.num}>{off ? '—' : metric(t.clickedCount)}</span></Td>
@@ -156,7 +156,7 @@ function PreparedCard({ run }: { run: HqBroadcastRun }) {
       <div className={styles.cardHead}>
         <div className={styles.cardText}>
           <h2 id="hq-bc-prepared" className={styles.cardTitle}>送る前の確かめ</h2>
-          <p className={styles.cardSub}>{`送る：${n(totals.sendStores)}店・${n(totals.sendPeople)}人 ・ 外す：${n(totals.skipStores)}店・${n(totals.skipPeople)}人`}</p>
+          <p className={styles.cardSub}>{`送る：${n(totals.sendStores)}店・${n(totals.sendPeople)} 人 ・ 外す：${n(totals.skipStores)}店・${n(totals.skipPeople)} 人`}</p>
         </div>
       </div>
       <DataTable className={styles.table} data-design="hq-broadcast-prepared">
@@ -176,8 +176,8 @@ function PreparedCard({ run }: { run: HqBroadcastRun }) {
             return (
               <Tr key={t.accountId} className={styles.row}>
                 <Td className={styles.colStore}><span className={styles.store} title={t.accountName}>{t.accountName}</span></Td>
-                <Td className={styles.colNum}><span className={styles.num}>{t.audienceCount === null ? '—' : `${n(t.audienceCount)}人`}</span></Td>
-                <Td className={styles.colNum}><span className={styles.faint}>{t.remaining === null ? '—' : `${n(t.remaining)}通`}</span></Td>
+                <Td className={styles.colNum}><span className={styles.num}>{t.audienceCount === null ? '—' : `${n(t.audienceCount)} 人`}</span></Td>
+                <Td className={styles.colNum}><span className={styles.faint}>{t.remaining === null ? '—' : `${n(t.remaining)} 通`}</span></Td>
                 <Td className={styles.colState}><StatusBadge tone={badge.tone} title={t.blockedReasons.join('・') || undefined}>{badge.label}</StatusBadge></Td>
                 <Td className={styles.colFail}><StatusBadge tone={go ? 'success' : 'neutral'}>{go ? '送る' : '外す'}</StatusBadge></Td>
               </Tr>
@@ -215,7 +215,7 @@ function RecipientsTab({ run }: { run: HqBroadcastRun }) {
       <div className={styles.cardHead}>
         <div className={styles.cardText}>
           <h3 className={detailStyles.secTitle}>宛先</h3>
-          <p className={styles.cardSub}>{total == null ? 'アカウントを選ぶと、その店の宛先が出ます' : `${n(total)}人`}</p>
+          <p className={styles.cardSub}>{total == null ? 'アカウントを選ぶと、その店の宛先が出ます' : `${n(total)} 人`}</p>
         </div>
         <span className={styles.accountPick}>
           <Select aria-label="宛先を見るアカウント" size="full" value={accountId} onChange={setAccountId} options={sentTo.map((t) => ({ value: t.accountId, label: t.accountName }))} />
@@ -464,7 +464,7 @@ export default function HqBroadcastDetail() {
   const totals = run ? sendTotals(run.targets) : null
 
   const confirmText: Record<Ask['kind'], { title: string; description: string; label: string }> = {
-    send: { title: `${n(totals?.sendStores ?? 0)}店に送ります`, description: `${n(totals?.sendPeople ?? 0)}人に送ります。送った LINE は取り消せません。`, label: '送る' },
+    send: { title: `${n(totals?.sendStores ?? 0)}店に送ります`, description: `${n(totals?.sendPeople ?? 0)} 人に送ります。送った LINE は取り消せません。`, label: '送る' },
     stop: { title: '一括配信を止めます', description: 'まだ送っていない店・人には送りません。送った LINE は取り消せません。止めたあと、店ごとにやり直せます。', label: '止める' },
     cancel: { title: '一括配信を取り消します', description: '取り消すと、どの店にも送らず、やり直しもできません。送った LINE は取り消せません。', label: '取り消す' },
     retry: { title: 'この店にやり直します', description: '一時的に失敗した人と、止める前に送れなかった人にだけ送ります。届いた人には二重に送りません。', label: 'やり直す' },
@@ -484,7 +484,7 @@ export default function HqBroadcastDetail() {
   const people = run ? (run.status === 'prepared' ? (totals?.sendPeople ?? 0) : sentTo.reduce((sum, t) => sum + (t.totalCount ?? 0), 0)) : 0
   const bubbles = (() => { try { return run?.input?.messageBubblesJson ? JSON.parse(run.input.messageBubblesJson) : null } catch { return null } })()
   const messageText = Array.isArray(bubbles) && bubbles.length > 1
-    ? `吹き出し ${bubbles.length}通`
+    ? `吹き出し ${bubbles.length} 通`
     : bubbles?.length ? (bubbles[0].type === 'coupon' ? 'クーポン 1通' : bubbles[0].type === 'text' ? 'テキスト 1通' : 'リッチメッセージ 1通') : 'テキスト 1通'
   const exampleStore = sentTo[0]?.accountName ?? '店の名前'
   const tone = badge?.tone === 'success' ? 'success' : badge?.tone === 'danger' ? 'danger' : badge?.tone === 'warning' ? 'warning' : 'neutral'
@@ -585,7 +585,7 @@ export default function HqBroadcastDetail() {
                 </div>
                 <p className={detailStyles.note}>開いた・押したは、各アカウントの配信で数えた人数の合計です。数えていないアカウントがあるときは「—」で出します。反応は、送ったあとにメッセージを受け取った人の数で、送った配信への返信とは限りません。</p>
                 <h3 className={detailStyles.secTitle}>エラー</h3>
-                <p className={detailStyles.note}>{failedPeople > 0 ? `送信に失敗した人が ${n(failedPeople)}人います。下の内訳からやり直せます。` : '送信に失敗した人はいません（0 人）。'}{skipped > 0 ? `送らなかったアカウントが ${n(skipped)}あります。` : ''}</p>
+                <p className={detailStyles.note}>{failedPeople > 0 ? `送信に失敗した人が ${n(failedPeople)} 人います。下の内訳からやり直せます。` : '送信に失敗した人はいません（0 人）。'}{skipped > 0 ? `送らなかったアカウントが ${n(skipped)}あります。` : ''}</p>
               </>
             ) : null}
             {tab === 'overview' || !run ? (
@@ -600,7 +600,7 @@ export default function HqBroadcastDetail() {
             <dl className={detailStyles.rows}>
               {[
                 ['送るアカウント', `${n(sentTo.length)}アカウント${skipped ? `（外した ${n(skipped)}）` : ''}`],
-                ['対象', `${audience} ${n(people)}人`],
+                ['対象', `${audience} ${n(people)} 人`],
                 [run?.status === 'prepared' ? '送る日時' : '送った日時', run?.scheduledAt ? jpDateTime(run.scheduledAt) : 'すぐ送る'],
                 ['送り方', deliveryWayText(run?.input, run?.status !== 'prepared')],
                 ['メッセージ', messageText],

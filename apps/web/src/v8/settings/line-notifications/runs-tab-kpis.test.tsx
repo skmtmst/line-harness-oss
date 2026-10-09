@@ -41,7 +41,7 @@ afterEach(cleanup)
 
 test('ページだけから数えたと書き、メールで送ったは数えない', async () => {
   render(<RunsTab lineAccountId="acc" mode="failures" />)
-  await waitFor(() => expect(screen.getByText(/このページの2件から・対応不要/)).toBeTruthy())
+  await waitFor(() => expect(screen.getByText(/このページの2 件から・対応不要/)).toBeTruthy())
   expect(screen.queryByText('この7日')).toBeNull()
   expect(screen.getByText('お知らせの記録で見られます')).toBeTruthy()
 })

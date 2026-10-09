@@ -180,9 +180,9 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
           * WEB202：送れなかった一覧にはメールで届いたもの（受付済み）は出ないので、ここでは数えない。
           */}
         <KpiCard appearance="notification-operator" presentation="card" icon={<CircleX size={14} aria-hidden="true" />} title="送れなかった" value={kpiValue(summary?.failed ?? null)} unit="件" detail={kpiNote('記録の合計')} loading={visibleState === 'loading'} />
-        <KpiCard appearance="notification-operator" presentation="card" icon={<Ban size={14} aria-hidden="true" />} title="ブロック" value={kpiValue(breakdown.blocked)} unit="件" detail={kpiNote(pageScoped ? `このページの${items.length}件から・対応不要` : '対応不要')} loading={visibleState === 'loading'} />
+        <KpiCard appearance="notification-operator" presentation="card" icon={<Ban size={14} aria-hidden="true" />} title="ブロック" value={kpiValue(breakdown.blocked)} unit="件" detail={kpiNote(pageScoped ? `このページの${items.length} 件から・対応不要` : '対応不要')} loading={visibleState === 'loading'} />
         <KpiCard appearance="notification-operator" presentation="card" icon={<Mail size={14} aria-hidden="true" />} title="メールで送った" value={null} unit="件" detail={kpiNote('お知らせの記録で見られます')} loading={visibleState === 'loading'} />
-        <KpiCard appearance="notification-operator" presentation="card" icon={<RotateCw size={14} aria-hidden="true" />} title="再試行の予定" value={kpiValue(breakdown.retry)} unit="件" detail={kpiNote(`${pageScoped ? `このページの${items.length}件から・` : ''}${breakdown.nextRetryAt ? shortJst(breakdown.nextRetryAt) : '予定なし'}`)} loading={visibleState === 'loading'} />
+        <KpiCard appearance="notification-operator" presentation="card" icon={<RotateCw size={14} aria-hidden="true" />} title="再試行の予定" value={kpiValue(breakdown.retry)} unit="件" detail={kpiNote(`${pageScoped ? `このページの${items.length} 件から・` : ''}${breakdown.nextRetryAt ? shortJst(breakdown.nextRetryAt) : '予定なし'}`)} loading={visibleState === 'loading'} />
       </KpiBand>
     ) : null}
 
@@ -241,7 +241,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
                 </Td>
                 <Td><StatusBadge tone={status.tone === 'good' ? 'success' : status.tone === 'muted' ? 'neutral' : status.tone}>{status.label}</StatusBadge></Td>
                 <Td className={styles.cell} title={reason}>{item.resolved ? `対応済み・${reason}` : reason}</Td>
-                <Td className={styles.cell}>{`${item.attemptCount == null ? '—' : `${item.attemptCount}回`}・${item.clickedAt ? 'クリックあり' : '—'}`}</Td>
+                <Td className={styles.cell}>{`${item.attemptCount == null ? '—' : `${item.attemptCount} 回`}・${item.clickedAt ? 'クリックあり' : '—'}`}</Td>
               </Tr>
             })}
           </tbody>
@@ -252,7 +252,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
       <div className={styles.runFoot}>
         {mode === 'failures'
           ? <Notice tone="info" icon={null}>個人の既読は見られません。試行回数と次の再試行予定は送信台帳の記録を表示します。検索と絞り込みは表示中のページの中だけに効きます。</Notice>
-          : <p className={styles.minor}>{`表示中の20件を絞り込み・${formatNumber(total)} 件中 ${(page - 1) * PAGE_SIZE + 1}〜${Math.min(page * PAGE_SIZE, total)}件`}</p>}
+          : <p className={styles.minor}>{`表示中の20件を絞り込み・${formatNumber(total)} 件中 ${(page - 1) * PAGE_SIZE + 1}〜${Math.min(page * PAGE_SIZE, total)} 件`}</p>}
         {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} /> : null}
       </div>
     ) : null}
@@ -271,7 +271,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
           {(detail.attemptHistory?.length ?? 0) > 0 ? (
             <ul className={styles.runAttempts} aria-label="試行の履歴">
               {detail.attemptHistory!.map((attempt) => (
-                <li key={`${detail.id}-${attempt.number}`}>{`${attempt.number}回目 ${shortJst(attempt.attemptedAt)}／${attempt.outcome === 'provider_accepted' ? 'LINE API受付済み' : attempt.error || '送信失敗'}`}</li>
+                <li key={`${detail.id}-${attempt.number}`}>{`${attempt.number} 回目 ${shortJst(attempt.attemptedAt)}／${attempt.outcome === 'provider_accepted' ? 'LINE API受付済み' : attempt.error || '送信失敗'}`}</li>
               ))}
             </ul>
           ) : <p className={styles.minor}>試行の履歴はまだありません。</p>}

@@ -144,7 +144,7 @@ export function hqBubbleSummary(item: HqBubble): string {
   if (HQ_NOT_YET.has(item.kind)) return `${label} ・ 統括からは送れません`
   if (item.kind === 'carousel') {
     const name = String(item.content.templateName ?? item.content.assetName ?? '')
-    return name ? `${label} ・ ${name}（カード${carouselColumns(item).length}枚）` : `${label} ・ まだ選んでいません`
+    return name ? `${label} ・ ${name}（カード${carouselColumns(item).length} 枚）` : `${label} ・ まだ選んでいません`
   }
   if (item.kind === 'rich' || item.kind === 'coupon' || item.kind === 'flex') return `${label} ・ ${String(item.content.assetName ?? item.content.templateName ?? '') || 'まだ選んでいません'}`
   return hqBubbleProblem(item) ? `${label} ・ まだ入れていません` : `${label} ・ 入力済み`
@@ -155,7 +155,7 @@ export function hqBubblePreview(item: HqBubble): string {
   if (item.kind === 'carousel' || item.kind === 'rich' || item.kind === 'coupon') {
     const name = String(item.content.templateName ?? item.content.assetName ?? '')
     if (!name) return ''
-    return item.kind === 'carousel' ? `［カルーセル］${name}（カード${carouselColumns(item).length}枚）` : `［${HQ_KIND_LABEL[item.kind]}］${name}`
+    return item.kind === 'carousel' ? `［カルーセル］${name}（カード${carouselColumns(item).length} 枚）` : `［${HQ_KIND_LABEL[item.kind]}］${name}`
   }
   if (item.kind === 'location') {
     const state = item.content.state as MessageKindState | undefined

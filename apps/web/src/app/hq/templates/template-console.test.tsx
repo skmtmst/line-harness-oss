@@ -72,7 +72,7 @@ async function chooseStores() {
   fireEvent.click(screen.getByRole('checkbox', { name: '表示中のアカウントをすべて選ぶ' })); fireEvent.click(screen.getByRole('button', { name: '2アカウントの重複を確認' })); await screen.findByRole('button', { name: 'この内容で2アカウントへ配る' })
 }
 function chooseMode(label: string, option: string) { fireEvent.click(screen.getByRole('button', { name: label, exact: true })); fireEvent.click(within(screen.getByRole('listbox')).getByRole('button', { name: new RegExp(`${option.split('：').pop()}$`) })) }
-async function distribute() { await chooseStores(); chooseMode('一括の配布方法', '一括の配布方法：別名で作る'); fireEvent.click(screen.getByRole('button', { name: 'この内容で2アカウントへ配る' })); await screen.findByText(/新規 \d+件・上書き \d+件・別名 \d+件/); const dialog = await screen.findByRole('dialog', { name: '配った結果：来店済み' }); fireEvent.click(within(dialog).getAllByRole('button', { name: '閉じる', exact: true })[0]) }
+async function distribute() { await chooseStores(); chooseMode('一括の配布方法', '一括の配布方法：別名で作る'); fireEvent.click(screen.getByRole('button', { name: 'この内容で2アカウントへ配る' })); await screen.findByText(/新規 \d+ 件・上書き \d+ 件・別名 \d+ 件/); const dialog = await screen.findByRole('dialog', { name: '配った結果：来店済み' }); fireEvent.click(within(dialog).getAllByRole('button', { name: '閉じる', exact: true })[0]) }
 
 describe('HQひな形の配布フロー', () => {
   it('参照再利用は上書きと区別し、既存を使用する選択と結果内訳を表示する', async () => {
@@ -87,7 +87,7 @@ describe('HQひな形の配布フロー', () => {
     expect((screen.getByRole('button', { name: 'この内容で2アカウントへ配る' }) as HTMLButtonElement).disabled).toBe(true)
     chooseMode('一括の配布方法', '一括の配布方法：上書き')
     fireEvent.click(screen.getByRole('button', { name: 'この内容で2アカウントへ配る' }))
-    await screen.findByText(/新規 \d+件・上書き \d+件・別名 \d+件/)
+    await screen.findByText(/新規 \d+ 件・上書き \d+ 件・別名 \d+ 件/)
     expect(calls.distribute.mock.calls[0][2].every((item: { mode: string }) => item.mode === 'overwrite')).toBe(true)
     expect(calls.distribute).toHaveBeenCalledWith('t1', 'p1', accounts.map(a => ({ accountId: a.id, sourceId: 'tag1', mode: 'overwrite' })))
   })
@@ -188,7 +188,7 @@ describe('HQひな形の配布フロー', () => {
     fireEvent.click(screen.getByRole('button', { name: '横浜店の配布方法' }));
     expect(within(screen.getByRole('listbox')).queryByRole('button', { name: '上書き' })).toBeNull();
     fireEvent.click(within(screen.getByRole('listbox')).getByRole('button', { name: '別名で作る' })); expect(execute.disabled).toBe(false)
-    fireEvent.click(execute); fireEvent.click(execute); await screen.findByText(/新規 \d+件・上書き \d+件・別名 \d+件/)
+    fireEvent.click(execute); fireEvent.click(execute); await screen.findByText(/新規 \d+ 件・上書き \d+ 件・別名 \d+ 件/)
     expect(calls.distribute).toHaveBeenCalledExactlyOnceWith('t1', 'p1', [{ accountId: 'a', sourceId: 'tag1', mode: 'overwrite' }, { accountId: 'b', sourceId: 'tag1', mode: 'alias' }])
   })
   it('有効期限切れの確認では実行できない', async () => {
@@ -214,12 +214,12 @@ describe('HQひな形の配布フロー', () => {
   it('復元も不達なら成功・失敗を断定せず、GET再確認だけを提供する', async () => {
     calls.distribute.mockRejectedValue(new Error('network')); calls.result.mockRejectedValue(new Error('network')); await chooseStores()
     chooseMode('一括の配布方法', '一括の配布方法：別名で作る'); fireEvent.click(screen.getByRole('button', { name: 'この内容で2アカウントへ配る' })); await screen.findByRole('alert')
-    expect(screen.queryByText(/新規 \d+件・上書き \d+件・別名 \d+件/)).toBeNull(); expect(screen.queryByText('失敗1アカウントを再確認')).toBeNull()
-    calls.result.mockResolvedValue(completed); fireEvent.click(screen.getByRole('button', { name: '結果を再確認' })); await screen.findByText(/新規 \d+件・上書き \d+件・別名 \d+件/); expect(calls.distribute).toHaveBeenCalledOnce()
+    expect(screen.queryByText(/新規 \d+ 件・上書き \d+ 件・別名 \d+ 件/)).toBeNull(); expect(screen.queryByText('失敗1アカウントを再確認')).toBeNull()
+    calls.result.mockResolvedValue(completed); fireEvent.click(screen.getByRole('button', { name: '結果を再確認' })); await screen.findByText(/新規 \d+ 件・上書き \d+ 件・別名 \d+ 件/); expect(calls.distribute).toHaveBeenCalledOnce()
   })
   it('再読み込みはURLの既存配布番号をGETで復元する', async () => {
     window.history.replaceState(null, '', '/hq/templates?type=tag#template=t1&run=p1'); render(<TemplateConsole type="tag" />)
-    await screen.findByText(/新規 \d+件・上書き \d+件・別名 \d+件/); expect(calls.result).toHaveBeenCalledWith('t1', 'p1'); expect(calls.distribute).not.toHaveBeenCalled()
+    await screen.findByText(/新規 \d+ 件・上書き \d+ 件・別名 \d+ 件/); expect(calls.result).toHaveBeenCalledWith('t1', 'p1'); expect(calls.distribute).not.toHaveBeenCalled()
   })
   it.each([
     ['template', { schemaVersion: 1, template: { id: 'hq-authored-message', name: '来店お礼', category: 'general', messageType: 'text', messageContent: 'ありがとうございます', carouselActionsJson: null, carouselTapLimitMode: 'none', carouselTapLimitText: null, questionJson: null, questionStatus: 'draft' }, media: [] }, '配信する本文', 'ありがとうございます'],

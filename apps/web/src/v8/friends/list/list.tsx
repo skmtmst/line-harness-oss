@@ -652,7 +652,7 @@ export default function FriendsListV8() {
           </Link>
         ) : null}
         <span className={styles.spacer} />
-        {selectedCount > 0 ? <span className={styles.selectedCount}>{selectedCount}件選択中</span> : null}
+        {selectedCount > 0 ? <span className={styles.selectedCount}>{selectedCount} 件選択中</span> : null}
         <span className={styles.columnsBox}>
           <button ref={columnsButtonRef} type="button" aria-expanded={columnsOpen} onClick={() => setColumnsOpen((current) => !current)} className={styles.textButton}>
             <Columns3 size={16} aria-hidden="true" />
@@ -683,7 +683,7 @@ export default function FriendsListV8() {
           width={98}
           value={String(pageSize)}
           onChange={(value) => resetPageWith(() => setPageSize(Number(value) as PageSize))}
-          options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size}件表示` }))}
+          options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size} 件表示` }))}
         />
         <Select
           aria-label="並び順"
@@ -704,9 +704,9 @@ export default function FriendsListV8() {
       {hasScoreRange ? (
         <div className={styles.applied}>
           <span>
-            行動スコア：{scoreMin !== undefined ? `${scoreMin}点以上` : ''}
+            行動スコア：{scoreMin !== undefined ? `${scoreMin} 点以上` : ''}
             {scoreMin !== undefined && scoreMax !== undefined ? '〜' : ''}
-            {scoreMax !== undefined ? `${scoreMax}点以下` : ''}
+            {scoreMax !== undefined ? `${scoreMax} 点以下` : ''}
             {scoredOnly ? '（点数がついている人のみ）' : ''}
           </span>
           <Link href="/friends" className={styles.linkButton}>この条件を外す</Link>

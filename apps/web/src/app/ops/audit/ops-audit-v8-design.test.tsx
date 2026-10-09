@@ -70,7 +70,7 @@ describe('e7ljE 監査ログの絵合わせ', () => {
     }
     expect(body).toContain('開始日')
     expect(body).toContain('終了日')
-    expect(body).toContain('10/1 15:20')
+    expect(body).toContain('10/01 15:20')
     expect(body).toContain('代理ログイン（閲覧）')
     expect(body).toContain('契約先の停止')
     expect(body).toContain('個人情報の表示')

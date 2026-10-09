@@ -161,7 +161,7 @@ export default function DashboardV8() {
           unit="件"
           loading={state === 'loading'}
           delta={state === 'ready' ? <Tag>ポイント付与あり</Tag> : forbidden ? <Tag tone="danger">権限なし</Tag> : null}
-          detail={forbidden ? '写真を見る権限がありません' : state === 'error' ? STATE_TEXT.error : value === null ? STATE_TEXT.loading : `確認待ち ${value}件`}
+          detail={forbidden ? '写真を見る権限がありません' : state === 'error' ? STATE_TEXT.error : value === null ? STATE_TEXT.loading : `確認待ち ${value} 件`}
           action={{ label: action, href }}
         />,
         detail: <span>{forbidden
@@ -208,12 +208,12 @@ export default function DashboardV8() {
           value={state === 'ready' ? (s?.soon ?? null) : null}
           unit="件"
           loading={state === 'loading'}
-          detail={state === 'error' ? STATE_TEXT.error : state === 'ready' ? ((s?.soon ?? 0) > 0 ? `今日 ${s?.today ?? 0}件・明日 ${(s?.soon ?? 0) - (s?.today ?? 0)}件` : '未処理はありません') : STATE_TEXT.loading}
+          detail={state === 'error' ? STATE_TEXT.error : state === 'ready' ? ((s?.soon ?? 0) > 0 ? `今日 ${s?.today ?? 0} 件・明日 ${(s?.soon ?? 0) - (s?.today ?? 0)} 件` : '未処理はありません') : STATE_TEXT.loading}
           action={{ label: 'ECを見る', href: '/ec-commerce' }}
         />,
         detail: <span>{state !== 'ready' || !s
           ? (state === 'error' ? STATE_TEXT.error : STATE_TEXT.loading)
-          : `今日の出荷 ${formatNumber(s.today)} 件・今日と明日 ${formatNumber(s.soon)} 件（${s.scanLimited ? `直近${s.scanLimit}件のEC通知から算出` : 'EC通知から算出'}）`}</span>,
+          : `今日の出荷 ${formatNumber(s.today)} 件・今日と明日 ${formatNumber(s.soon)} 件（${s.scanLimited ? `直近${s.scanLimit} 件のEC通知から算出` : 'EC通知から算出'}）`}</span>,
       }
     }
     return null
@@ -243,12 +243,12 @@ export default function DashboardV8() {
       : data ? <RecentResults conversions={data.conversions} period={dashboardPeriodLabel(d.period) ?? 'この期間'} section={data.sections?.conversions} /> : <><SectionHeader title="最近の成果" /><Loading label="最近の成果" /></>
     const ops = d.sectionAvailable('operations') ? data?.operations : undefined
     const opsDetail = (text: string | null) => text ?? (data ? STATE_TEXT.error : STATE_TEXT.loading)
-    if (id === 'booking-status') return <Metric title="予約状況" period="現在" href="/booking/bookings?view=list&status=requested" linkLabel="予約を見る" value={ops?.bookings?.pending ?? null} detail={opsDetail(ops?.bookings ? `今後の予約 ${ops.bookings.upcoming}件` : null)} section={data?.sections?.operations} loading={d.loading} />
+    if (id === 'booking-status') return <Metric title="予約状況" period="現在" href="/booking/bookings?view=list&status=requested" linkLabel="予約を見る" value={ops?.bookings?.pending ?? null} detail={opsDetail(ops?.bookings ? `今後の予約 ${ops.bookings.upcoming} 件` : null)} section={data?.sections?.operations} loading={d.loading} />
     if (id === 'inflow-top') return <Metric title="流入経路TOP3" period={dashboardPeriodLabel(d.period) ?? undefined} href="/analytics?tab=routes" linkLabel="経路別の内訳を見る" value={ops?.inflowTop?.[0]?.count ?? (ops?.inflowTop ? 0 : null)} detail={opsDetail(ops?.inflowTop ? ops.inflowTop.map((item) => `${item.name ?? '—'} ${item.count}`).join('、') || '期間内の追加なし' : null)} section={data?.sections?.operations} loading={d.loading} />
     if (id === 'funnel-alert') return <Metric title="ファネル要注意" period={dashboardPeriodLabel(d.period) ?? undefined} href="/analytics?tab=funnel" linkLabel="ファネルを見る" value={ops?.funnelAlerts ?? null} detail="" help="3人以上追加され、成果が0件の経路です" section={data?.sections?.operations} loading={d.loading} />
     if (id === 'automation-failures') return <Metric title="オートメーション失敗" period={dashboardPeriodLabel(d.period) ?? undefined} href="/automations/runs?status=problems" linkLabel="実行状況を見る" value={ops?.automationFailures ?? null} detail="" help="期間内の失敗と一部失敗の合計です" section={data?.sections?.operations} loading={d.loading} />
-    if (id === 'scenario-status') return <Metric title="シナリオ配信状況" period="現在" href="/scenarios" linkLabel="シナリオを見る" value={ops?.scenarios?.active ?? null} detail={opsDetail(ops?.scenarios ? `一時停止 ${ops.scenarios.paused}件` : null)} section={data?.sections?.operations} loading={d.loading} />
-    if (id === 'uid-migration') return <Metric title="UID移行状況" period="現在" href="/accounts?tab=migration" linkLabel="移行状況を見る" value={ops?.migrations?.active ?? null} detail={opsDetail(ops?.migrations ? `完了 ${ops.migrations.completed}件` : null)} section={data?.sections?.operations} loading={d.loading} />
+    if (id === 'scenario-status') return <Metric title="シナリオ配信状況" period="現在" href="/scenarios" linkLabel="シナリオを見る" value={ops?.scenarios?.active ?? null} detail={opsDetail(ops?.scenarios ? `一時停止 ${ops.scenarios.paused} 件` : null)} section={data?.sections?.operations} loading={d.loading} />
+    if (id === 'uid-migration') return <Metric title="UID移行状況" period="現在" href="/accounts?tab=migration" linkLabel="移行状況を見る" value={ops?.migrations?.active ?? null} detail={opsDetail(ops?.migrations ? `完了 ${ops.migrations.completed} 件` : null)} section={data?.sections?.operations} loading={d.loading} />
     return null
   }
 

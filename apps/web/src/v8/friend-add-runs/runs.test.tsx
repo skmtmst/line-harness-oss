@@ -167,7 +167,7 @@ describe('実行結果の画面（REIxB）', () => {
       await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
     }
     expect(retried).toEqual(['run-f1', 'run-f2'])
-    expect(host.textContent).toContain('失敗した処理を2件もう一度実行しました。')
+    expect(host.textContent).toContain('失敗した処理を2 件もう一度実行しました。')
   })
 
   it('閲覧のみには一時停止・もう一度実行を出さず、帯を出す', async () => {

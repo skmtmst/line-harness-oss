@@ -199,7 +199,7 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
               width={96}
               value={String(u.pageSize)}
               onChange={(value) => u.setPageSize(Number(value))}
-              options={USERS_PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))}
+              options={USERS_PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))}
             />
           </div>
 

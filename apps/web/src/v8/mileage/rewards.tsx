@@ -460,7 +460,7 @@ export default function RewardsTab() {
         String(reward.currentVersion?.requiredMiles ?? ''),
         reward.benefitName ? `${KIND_LABEL[reward.rewardKind]}「${reward.benefitName}」` : KIND_LABEL[reward.rewardKind],
         benefitSub(reward) ?? '',
-        `${reward.exchangedThisMonth}件`,
+        `${reward.exchangedThisMonth} 件`,
         statusPill(reward.status).text,
       ])
       const csv = [['使い道', '必要なマイル', '交換すると渡るもの', '残り・期限', '今月交換された', '状態'], ...rows]
@@ -505,7 +505,7 @@ export default function RewardsTab() {
         value={ready && popularName ? 0 : null}
         valueText={ready && popularName ? popularName : undefined}
         unit=""
-        detail={ready ? (popularName ? `今月 ${formatMileageNumber(popularCount ?? 0)}件` : 'まだ交換されていません') : '—'}
+        detail={ready ? (popularName ? `今月 ${formatMileageNumber(popularCount ?? 0)} 件` : 'まだ交換されていません') : '—'}
       />
       <KpiCard
         presentation="band"
@@ -707,7 +707,7 @@ export default function RewardsTab() {
                   {sub ? <span className={styles.cellSub}>{sub}</span> : null}
                 </Td>
                 <Td className={`${styles.colMonth} ${styles.num}`}>
-                  <span className={styles.cellMain}>{`${formatMileageNumber(reward.exchangedThisMonth)}件`}</span>
+                  <span className={styles.cellMain}>{`${formatMileageNumber(reward.exchangedThisMonth)} 件`}</span>
                 </Td>
                 <Td className={styles.colStateWide}>
                   <span className={styles.pill} data-tone={pill.tone}>
@@ -832,7 +832,7 @@ export default function RewardsTab() {
 
   const pager = ready && visible.length > 0 && pageCount > 1 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>{`${shown.length}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, shown.length)}件`}</span>
+      <span className={styles.pagerCount}>{`${shown.length} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, shown.length)} 件`}</span>
       <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
     </ListPagePagination>
   ) : undefined

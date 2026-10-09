@@ -207,10 +207,10 @@ export default function HqHomeV8() {
     try {
       await Promise.all([load(), refreshAccounts()])
       setConnectionResult(failed === 0
-        ? `${succeeded}件のLINE IDと接続状態を更新しました。`
-        : `${succeeded}件を更新し、${failed}件は更新できませんでした。`)
+        ? `${succeeded} 件のLINE IDと接続状態を更新しました。`
+        : `${succeeded} 件を更新し、${failed} 件は更新できませんでした。`)
     } catch {
-      setConnectionResult(`${succeeded}件を確認しましたが、一覧を再読み込みできませんでした。`)
+      setConnectionResult(`${succeeded} 件を確認しましたが、一覧を再読み込みできませんでした。`)
     } finally {
       setConnectionProgress('')
       setCheckingConnections(false)
@@ -477,7 +477,7 @@ export default function HqHomeV8() {
             value={String(size)}
             width={110}
             onChange={(value) => { setSize(Number(value)); resetPage() }}
-            options={PAGE_SIZES.map((value) => ({ value: String(value), label: `${value}件表示` }))}
+            options={PAGE_SIZES.map((value) => ({ value: String(value), label: `${value} 件表示` }))}
           />
         </div>
       </div>

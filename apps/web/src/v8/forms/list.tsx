@@ -864,7 +864,7 @@ export default function FormsListV8() {
       icon: CircleCheck,
       value: statsFailed ? null : formStats?.published ?? null,
       unit: '件',
-      detail: `下書き ${statsFailed || !formStats ? '—' : formatNumber(formStats.draft)}件`,
+      detail: `下書き ${statsFailed || !formStats ? '—' : formatNumber(formStats.draft)} 件`,
     },
     {
       key: 'monthly-submits',
@@ -872,7 +872,7 @@ export default function FormsListV8() {
       icon: Inbox,
       value: statsFailed ? null : formStats?.monthlySubmits ?? null,
       unit: '件',
-      detail: `先月 ${statsFailed || !formStats ? '—' : formatNumber(formStats.prevMonthSubmits)}件`,
+      detail: `先月 ${statsFailed || !formStats ? '—' : formatNumber(formStats.prevMonthSubmits)} 件`,
     },
     {
       key: 'completion-rate',
@@ -1033,7 +1033,7 @@ export default function FormsListV8() {
         aria-label="表示件数"
         size="page-size"
         value={String(pageSize)}
-        options={FORM_PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))}
+        options={FORM_PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))}
         onChange={(value) => updateListState({ pageSize: Number(value), page: 1 })}
       />
     </div>

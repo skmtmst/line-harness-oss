@@ -304,7 +304,7 @@ describe('LINEアカウントの乗り換え（V8 x2dSNv）', () => {
     expect(document.body.textContent).not.toContain('書き換えをまだ保存していません')
     await click(document.querySelector('[aria-label="高橋 直人の判断"]') as HTMLElement)
     await click(buttons('新しく作る')[0])
-    expect(document.body.textContent).toContain('1件の書き換えをまだ保存していません')
+    expect(document.body.textContent).toContain('1 件の書き換えをまだ保存していません')
     const run = buttons('本実行する（あと 1 人）')[0] as HTMLButtonElement
     expect(run.disabled).toBe(true)
     await click(buttons('判断を保存する')[0])
@@ -325,8 +325,8 @@ describe('LINEアカウントの乗り換え（V8 x2dSNv）', () => {
 describe('言葉', () => {
   it('資格情報の1行は、値を出さず登録・末尾・確認・更新だけ', () => {
     expect(credentialLine({ configured: false })).toBe('未登録')
-    expect(credentialLine({ configured: true, last4: 'x9Qa', updatedAt: '2026-09-28T01:10:00.000Z' })).toBe('登録済み・末尾 …x9Qa・更新 9/28')
-    expect(credentialLine({ configured: true, checkedAt: '2026-10-01T21:00:00.000Z' })).toBe('登録済み・最後の確認 10/2 06:00')
+    expect(credentialLine({ configured: true, last4: 'x9Qa', updatedAt: '2026-09-28T01:10:00.000Z' })).toBe('登録済み・末尾 …x9Qa・更新 09/28')
+    expect(credentialLine({ configured: true, checkedAt: '2026-10-01T21:00:00.000Z' })).toBe('登録済み・最後の確認 10/02 06:00')
   })
   it('題の下の1行は、確認が通っていれば「正常」', () => {
     const ok = { ...ACCOUNT, connection: { lastTestStatus: 'succeeded' } }

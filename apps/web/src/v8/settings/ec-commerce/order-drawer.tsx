@@ -98,8 +98,8 @@ function EventRow({ event, retryingId, onRetry, canEdit }: { event: EcOrderDetai
                       : action.status === 'pending' || action.status === 'processing' ? '処理中です'
                         : '失敗しました。通信を確かめて、もう一度お試しください。')}
                   {kind ? `（${kind.label}）` : ''}
-                  {action.attemptCount > 0 ? `・${action.attemptCount}/${action.maxAttempts}回` : '・まだ試していません'}
-                  {action.attempts.length > 1 ? `・手動で戻した ${action.attempts.filter((attempt) => attempt.triggerKind === 'manual').length}回` : ''}
+                  {action.attemptCount > 0 ? `・${action.attemptCount}/${action.maxAttempts} 回` : '・まだ試していません'}
+                  {action.attempts.length > 1 ? `・手動で戻した ${action.attempts.filter((attempt) => attempt.triggerKind === 'manual').length} 回` : ''}
                 </span>
                 {kind && (action.status === 'retryable_failed' || action.status === 'permanent_failed' || action.status === 'skipped') ? <span className={styles.hint}>{kind.hint}</span> : null}
                 {canEdit && action.retryAvailable ? (

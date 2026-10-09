@@ -181,7 +181,7 @@ function Retention({ analytics, durationSeconds }: { analytics: WebinarAnalytics
       {empty ? <p className={styles.cardText}>まだ視聴データがありません</p> : (
         <div className={styles.chart}>
           <div className={styles.plot}>
-            <svg className={styles.line} viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={`見ていた人の割合の線。始まりに見ていた${started}人。`}>
+            <svg className={styles.line} viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={`見ていた人の割合の線。始まりに見ていた${started} 人。`}>
               <path d={path} fill="none" className={styles.linePath} vectorEffect="non-scaling-stroke" />
             </svg>
             <svg className={styles.marks} aria-hidden="true">
@@ -271,7 +271,7 @@ function ViewerComments({ webinarId }: { webinarId: string }) {
     return () => { active = false }
   }, [webinarId, attempt])
   return (
-    <Disclosure size="compact" title="視聴者コメント" hint={comments ? `${comments.length}件` : '—'}>
+    <Disclosure size="compact" title="視聴者コメント" hint={comments ? `${comments.length} 件` : '—'}>
       {error ? <div role="alert" className={styles.cardText}>{error}<Button size="compact" onClick={() => setAttempt((count) => count + 1)}>もう一度読み込む</Button></div>
         : comments === null ? <p role="status" className={styles.cardText}>コメントを読み込んでいます…</p>
           : comments.length === 0 ? <p className={styles.cardText}>まだコメントはありません。</p>

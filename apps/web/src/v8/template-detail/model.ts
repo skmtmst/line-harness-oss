@@ -141,7 +141,7 @@ export function buildUsageRows(usage: TemplateUsage | null | undefined): UsageRo
     ...usage.scenarioSteps.map((u) => ({
       key: `scenario-step-${u.stepId}`,
       kind: 'シナリオ配信',
-      name: `${u.scenarioName}・${u.stepOrder}通目`,
+      name: `${u.scenarioName}・${u.stepOrder} 通目`,
       version: versionText(u.templateVersion ?? null),
       versionNumber: u.templateVersion ?? null,
       fixed: u.templateVersion !== null && u.templateVersion !== undefined,

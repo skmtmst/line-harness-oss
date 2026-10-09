@@ -224,10 +224,10 @@ function MembersInner() {
         ) : (
           <>
             <div className={styles.cards} aria-label="権限者の数">
-              <StatCard label="権限者" value={kpis.total} unit="人" sub={`有効 ${kpis.active}人`} />
+              <StatCard label="権限者" value={kpis.total} unit="人" sub={`有効 ${kpis.active} 人`} />
               <StatCard label="招待中" value={kpis.invited} unit="人" sub="まだ承諾していない招待" />
               <StatCard label="閲覧のみ" value={kpis.viewers} unit="人" sub="編集できない権限者" />
-              <StatCard label="担当アカウント" value={kpis.scopedAccounts} unit="アカウント" sub={`全アカウントを担当 ${kpis.allScope}人`} />
+              <StatCard label="担当アカウント" value={kpis.scopedAccounts} unit="アカウント" sub={`全アカウントを担当 ${kpis.allScope} 人`} />
             </div>
 
             <div className={styles.table} role="table" aria-label="権限者の一覧" data-design="Table">

@@ -121,7 +121,7 @@ describe('来店スタンプ（管理画面）', () => {
     ] }).mockResolvedValue({ success: true, data: [] })
     render(<VisitStampsV8 />)
     fireEvent.click(await screen.findByRole('tab', { name: /紙のカードの移行.*1/ }))
-    fireEvent.click(await screen.findByRole('button', { name: '鈴木 美咲さんの 7個を承認' }))
+    fireEvent.click(await screen.findByRole('button', { name: '鈴木 美咲さんの 7 個を承認' }))
     expect(await screen.findByRole('tab', { name: /紙のカードの移行.*0/ })).toBeTruthy()
   })
 
@@ -134,9 +134,9 @@ describe('来店スタンプ（管理画面）', () => {
     await screen.findByRole('tab', { name: '紙のカードの移行' })
     fx.accountId = 'acc-2'
     rerender(<VisitStampsV8 />)
-    expect(await screen.findByRole('button', { name: '鈴木 美咲さんの 2個を承認' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: '鈴木 美咲さんの 2 個を承認' })).toBeTruthy()
     await act(async () => { finishOld({ success: true, data: [{ id: 'old-paper', friend_id: 'f1', photo_url: '', stamps: 9, status: 'pending' }] }) })
-    expect(screen.queryByRole('button', { name: '鈴木 美咲さんの 9個を承認' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '鈴木 美咲さんの 9 個を承認' })).toBeNull()
     expect(screen.getByRole('tab', { name: /紙のカードの移行.*1/ })).toBeTruthy()
   })
 
@@ -172,11 +172,11 @@ describe('来店スタンプ（管理画面）', () => {
     render(<VisitStampsV8 />)
     fireEvent.click(await screen.findByRole('button', { name: '次のページ' }))
     await waitFor(() => expect(fx.entries).toHaveBeenLastCalledWith({ accountId: 'acc-1', page: 2, pageSize: 20 }))
-    expect(await screen.findByText('88 件中 21〜40件')).toBeTruthy()
+    expect(await screen.findByText('88 件中 21〜40 件')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '記録の表示件数' }))
-    fireEvent.click(await screen.findByRole('button', { name: '10件ずつ' }))
+    fireEvent.click(await screen.findByRole('button', { name: '10 件ずつ' }))
     await waitFor(() => expect(fx.entries).toHaveBeenLastCalledWith({ accountId: 'acc-1', page: 1, pageSize: 10 }))
-    expect(await screen.findByText('88 件中 1〜10件')).toBeTruthy()
+    expect(await screen.findByText('88 件中 1〜10 件')).toBeTruthy()
   })
 
   it('古い記録の返事が遅れても、操作後に読み直した記録を上書きしない', async () => {
@@ -194,12 +194,12 @@ describe('来店スタンプ（管理画面）', () => {
     expect(screen.queryByRole('button', { name: '記録の表示件数' })).toBeNull()
     // 承認後の再読込が古いリクエストを追い越す場面を再現する。
     fireEvent.click(screen.getByRole('tab', { name: /紙のカードの移行/ }))
-    fireEvent.click(await screen.findByRole('button', { name: '鈴木 美咲さんの 7個を承認' }))
+    fireEvent.click(await screen.findByRole('button', { name: '鈴木 美咲さんの 7 個を承認' }))
     await waitFor(() => expect(fx.entries).toHaveBeenCalledTimes(3))
     await act(async () => { finishOld({ success: true, data: { items: [], total: 88, page: 2, pageSize: 20 } }) })
     fireEvent.click(screen.getByRole('tab', { name: '押した・使った記録' }))
-    expect(await screen.findByText('120 件中 21〜40件')).toBeTruthy()
-    expect(screen.queryByText(/88件中/)).toBeNull()
+    expect(await screen.findByText('120 件中 21〜40 件')).toBeTruthy()
+    expect(screen.queryByText(/88 件中/)).toBeNull()
   })
 
   it('記録の総数が減って今のページがなくなったら、最後のページを読み直す', async () => {
@@ -210,7 +210,7 @@ describe('来店スタンプ（管理画面）', () => {
     fireEvent.click(await screen.findByRole('button', { name: '次のページ' }))
     await waitFor(() => expect(fx.entries).toHaveBeenCalledTimes(3))
     expect(fx.entries).toHaveBeenLastCalledWith({ accountId: 'acc-1', page: 1, pageSize: 20 })
-    expect(await screen.findByText('2 件中 1〜2件')).toBeTruthy()
+    expect(await screen.findByText('2 件中 1〜2 件')).toBeTruthy()
     expect(screen.queryByRole('navigation', { name: '記録のページ送り' })).toBeNull()
   })
 
@@ -246,14 +246,14 @@ describe('来店スタンプ（管理画面）', () => {
   it('説明・受け取りボーナス・間隔を見本と保存に反映する', async () => {
     render(<VisitStampsV8 />)
     await screen.findByDisplayValue('然 来店スタンプカード')
-    fireEvent.change(screen.getByRole('textbox', { name: '使い方の説明' }), { target: { value: 'お店で1個\n特典があります' } })
+    fireEvent.change(screen.getByRole('textbox', { name: '使い方の説明' }), { target: { value: 'お店で1 個\n特典があります' } })
     fireEvent.change(screen.getByRole('spinbutton', { name: 'カードを受け取った時のボーナス' }), { target: { value: '2' } })
     fireEvent.click(screen.getByRole('radio', { name: /同じ日は1回/ }))
-    expect(screen.getByLabelText('お客さまの見え方').textContent).toContain('お店で1個')
+    expect(screen.getByLabelText('お客さまの見え方').textContent).toContain('お店で1 個')
     expect(screen.getByLabelText('お客さまの見え方').textContent).toContain('3 / 10')
     expect(screen.getByLabelText('お客さまの見え方').textContent).toContain('有効期限')
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
-    await waitFor(() => expect(fx.save).toHaveBeenCalledWith('card-1', expect.objectContaining({ settings: expect.objectContaining({ instructions: 'お店で1個\n特典があります', receiptBonus: 2, stampInterval: { mode: 'same_day' } }) })))
+    await waitFor(() => expect(fx.save).toHaveBeenCalledWith('card-1', expect.objectContaining({ settings: expect.objectContaining({ instructions: 'お店で1 個\n特典があります', receiptBonus: 2, stampInterval: { mode: 'same_day' } }) })))
   })
   it('画像は既存のアップロードを使い、3MBを越える画像は預けない', async () => {
     render(<VisitStampsV8 />)
@@ -279,7 +279,7 @@ describe('来店スタンプ（管理画面）', () => {
     render(<VisitStampsV8 />)
     await screen.findByRole('tab', { name: /紙のカードの移行/ })
     fireEvent.click(screen.getByRole('tab', { name: /紙のカードの移行/ }))
-    fireEvent.click(await screen.findByRole('button', { name: '鈴木 美咲さんの 7個を承認' }))
+    fireEvent.click(await screen.findByRole('button', { name: '鈴木 美咲さんの 7 個を承認' }))
     await waitFor(() => expect(fx.reviewPaper).toHaveBeenCalledWith('p1', 'approve', expect.any(String)))
   })
 
@@ -298,7 +298,7 @@ describe('来店スタンプ（管理画面）', () => {
     render(<VisitStampsV8 />)
     await screen.findByRole('tab', { name: /紙のカードの移行/ })
     fireEvent.click(screen.getByRole('tab', { name: /紙のカードの移行/ }))
-    expect(await screen.findByRole('button', { name: '鈴木 美咲さんの 7個を承認' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: '鈴木 美咲さんの 7 個を承認' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
     expect(screen.queryByRole('button', { name: /店員の暗証番号/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /特典を足す/ })).toBeNull()
@@ -339,7 +339,7 @@ describe('来店スタンプ（管理画面）', () => {
     fireEvent.click(screen.getByRole('button', { name: '重ねたときの順番' }))
     fireEvent.click(await screen.findByRole('button', { name: '倍率のあとで初回ボーナス' }))
     fireEvent.click(screen.getByRole('button', { name: '重ねたときの上限' }))
-    fireEvent.click(await screen.findByRole('button', { name: '1回 8個まで' }))
+    fireEvent.click(await screen.findByRole('button', { name: '1回 8 個まで' }))
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fx.save).toHaveBeenCalled())
     const body = fx.save.mock.calls[0][1]

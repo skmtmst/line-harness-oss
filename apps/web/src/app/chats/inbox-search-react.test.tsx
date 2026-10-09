@@ -157,7 +157,7 @@ describe('会話の中を探す（V8 M0393 段13・枠 v7GV2）', () => {
       input.dispatchEvent(new Event('input', { bubbles: true }))
     })
     // いちばん新しい当たり（読み込み済み）。古い当たりは薄い枠にならない（まだ無い）
-    await eventually(() => expect(host.querySelector('[role="status"]')?.textContent).toBe('2件中 2件目'))
+    await eventually(() => expect(host.querySelector('[role="status"]')?.textContent).toBe('2 件中 2 件目'))
     await eventually(() => expect(host.querySelector('[data-search-hit="current"]')?.textContent).toContain('定期便を追加したい'))
 
     // Enter で古い方へ：old-1 は読み込んでいないので、最古の1件から 1,000 件ずつ読み足す
@@ -167,7 +167,7 @@ describe('会話の中を探す（V8 M0393 段13・枠 v7GV2）', () => {
     expect(fill.searchParams.get('beforeId')).toBe('new-1')
     expect(fill.searchParams.get('limit')).toBe('1000')
     expect(host.querySelector('[data-search-hit="other"]')?.textContent).toContain('定期便を追加したい')
-    expect(host.querySelector('[role="status"]')?.textContent).toBe('2件中 1件目')
+    expect(host.querySelector('[role="status"]')?.textContent).toBe('2 件中 1 件目')
     // 読み足した分は新しい方とつながったまま（4件・前はもう無い）
     expect(host.querySelector('[role="feed"]')?.getAttribute('data-loaded')).toBe('4')
 

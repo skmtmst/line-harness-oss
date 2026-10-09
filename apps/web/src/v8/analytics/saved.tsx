@@ -50,7 +50,7 @@ function summarizeSnapshotResult(result: unknown, limit = 12): Array<{ path: str
     if (Array.isArray(node)) {
       if (node.length === 0) rows.push({ path, text: '0件' })
       node.slice(0, 4).forEach((item, index) => visit(item, `${path}[${index + 1}]`, depth + 1))
-      if (node.length > 4) rows.push({ path, text: `ほか${node.length - 4}件` })
+      if (node.length > 4) rows.push({ path, text: `ほか${node.length - 4} 件` })
       return
     }
     if (typeof node === 'object') {
@@ -253,7 +253,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
                 : visibleItems.map((item) => {
                   const active = selectedId === item.id
                   return <div key={item.id} className={styles.trow} role="row" data-h="pill" data-selected={active || undefined}>
-                    <span role="cell" className={styles.colMain}><button type="button" className={styles.rowButton} onClick={() => setSelectedId(item.id)} title={`${item.name}（第${item.currentVersionNumber}版・保存結果 ${item.snapshotCount}件）`} aria-pressed={active}>{item.name}</button></span>
+                    <span role="cell" className={styles.colMain}><button type="button" className={styles.rowButton} onClick={() => setSelectedId(item.id)} title={`${item.name}（第${item.currentVersionNumber}版・保存結果 ${item.snapshotCount} 件）`} aria-pressed={active}>{item.name}</button></span>
                     <span role="cell" className={styles.colType} data-w="90"><span>{kindLabel(item.kind)}</span></span>
                     <span role="cell" className={styles.colType} data-w="80"><span className={styles.cellText} title={item.createdByName}>{item.createdByName}</span></span>
                     <span role="cell" className={styles.colType} data-w="100"><span>{shortDateTime(item.updatedAt)}</span></span>
@@ -263,7 +263,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
             </div>
           </div>
           <section className={styles.historyCard} aria-labelledby="saved-history-title">
-            <h2 id="saved-history-title" className={styles.hoursTitle} title={selected ? `定期レポート ${schedulesLoading ? '確認中' : schedulesError ? '—' : `${schedules.filter((schedule) => schedule.savedAnalysisIds.includes(selected.id)).length}件`}` : undefined}>{selected ? `選んだ分析の履歴：${selected.name}` : '選んだ分析の履歴'}</h2>
+            <h2 id="saved-history-title" className={styles.hoursTitle} title={selected ? `定期レポート ${schedulesLoading ? '確認中' : schedulesError ? '—' : `${schedules.filter((schedule) => schedule.savedAnalysisIds.includes(selected.id)).length} 件`}` : undefined}>{selected ? `選んだ分析の履歴：${selected.name}` : '選んだ分析の履歴'}</h2>
             {/* 履歴だけ取れないときは、その場所に小さく1行。一覧の失敗とは分ける。 */}
             {snapshotError ? <p className={styles.caption} role="alert">結果の履歴を読み込めませんでした。<button type="button" className={styles.linkButton} onClick={() => setSnapshotReload((n) => n + 1)}>もう一度</button></p> : null}
             {snapshotLoading ? <p className={styles.caption}>結果を読み込んでいます</p>
@@ -326,7 +326,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
 
       {/* 1回だけ送った直近の結果。一覧からは消えるため、ここから失敗理由・宛先別結果へ進める。 */}
       {recentOneTime.length > 0 ? <section className={styles.table} aria-label="1回だけ送った結果">
-        <div className={styles.thead}><span className={styles.colMain}>{`1回だけ送った結果（${recentOneTime.length}件）`}</span></div>
+        <div className={styles.thead}><span className={styles.colMain}>{`1回だけ送った結果（${recentOneTime.length} 件）`}</span></div>
         {recentOneTime.map((item) => <div key={item.schedule.id} className={styles.trow} data-h="button">
           <span className={styles.colMain}><strong className={styles.cellStrong} ><TruncatedText value={String(item.schedule.name ?? '')} /></strong><span className={styles.cellSub}>{item.lastRun ? `${RUN_STATE_LABELS[item.lastRun.state] ?? item.lastRun.state}${runErrorLabel(item.lastRun.errorCode, item.lastRun.state) ? `：${runErrorLabel(item.lastRun.errorCode, item.lastRun.state)}` : ''}` : 'まだ送信されていません'}</span></span>
           <span className={styles.colOps}><Button href={`/analytics/reports/new?id=${item.schedule.id}`} variant="secondary">結果を見る</Button></span>

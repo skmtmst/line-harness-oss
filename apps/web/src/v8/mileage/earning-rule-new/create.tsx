@@ -275,7 +275,7 @@ export default function EarningRuleCreateV8() {
         <dl className={styles.trialRows}>
           <div className={styles.trialRow}>
             <dt>当てはまる人</dt>
-            <dd>{trialValue(`${miles(trial?.matchedFriends)}人`)}</dd>
+            <dd>{trialValue(`${miles(trial?.matchedFriends)} 人`)}</dd>
           </div>
           <div className={styles.trialRow}>
             <dt>付くマイル</dt>
@@ -289,7 +289,7 @@ export default function EarningRuleCreateV8() {
                 <HelpTip label="倍率の説明">倍率はタグ側の設定で決まります。優先度がいちばん高いタグ1枚だけが効きます。</HelpTip>
               ) : null}
             </dt>
-            <dd>{`${validAmount ? miles(value) : '—'}${dailyCap ? `（1日${dailyCap}回まで）` : ''}`}</dd>
+            <dd>{`${validAmount ? miles(value) : '—'}${dailyCap ? `（1日${dailyCap} 回まで）` : ''}`}</dd>
           </div>
         </dl>
       </section>

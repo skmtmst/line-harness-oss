@@ -197,7 +197,7 @@ export default function BroadcastDetail({
     try {
       const res = await api.broadcasts.testSend(broadcast.id)
       if (!res.success) throw new Error(res.error)
-      notifyToast(`テスト送信が完了しました（成功 ${res.sent ?? 0}件・失敗 ${res.failed ?? 0}件）。`)
+      notifyToast(`テスト送信が完了しました（成功 ${res.sent ?? 0} 件・失敗 ${res.failed ?? 0} 件）。`)
     } catch {
       notifyToast('テスト送信できませんでした。テスト送信先の設定と配信内容を確認してください。', { tone: 'error' })
     } finally {
@@ -250,7 +250,7 @@ export default function BroadcastDetail({
 
   const total = broadcast.totalCount
   const bubbleCount = broadcast.messageBubbles?.length ?? (broadcast.messageContent ? 1 : 0)
-  const messageText = `${messageTypeLabel(broadcast.messageType)} ${bubbleCount}通`
+  const messageText = `${messageTypeLabel(broadcast.messageType)} ${bubbleCount} 通`
   const scheduledLabel = broadcast.scheduledAt ? formatBroadcastDateTime(broadcast.scheduledAt) : null
   const approvalStatus = approval.state?.approval.status ?? null
 

@@ -86,7 +86,7 @@ export function FriendMultiSelect({
   return (
     <div>
       <p id="au-friends-label" className="text-xs font-medium text-ink">
-        対象の友だち（{ids.length}人）<RequiredBadge />
+        対象の友だち（{ids.length} 人）<RequiredBadge />
       </p>
       {ids.length > 0 ? (
         <ul aria-labelledby="au-friends-label" className="mt-2 flex flex-wrap gap-2">

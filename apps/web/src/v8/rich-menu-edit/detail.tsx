@@ -327,7 +327,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
                       : diffs.length === 0 ? <span>{`管理画面の記録とLINE上の状態にずれはありませんでした${checkedAt ? `（${runStamp(checkedAt.toISOString(), true)}）` : ''}`}</span>
                         : (
                           <>
-                            <span className={styles.diffTitle}>{`${diffs.length}件のずれがあります`}</span>
+                            <span className={styles.diffTitle}>{`${diffs.length} 件のずれがあります`}</span>
                             <ul className={styles.diffList}>
                               {diffs.map((diff, index) => <li key={`${diff.kind}-${index}`}>{diff.detail}{diff.fix ? `（${diff.fix.label}）` : ''}</li>)}
                             </ul>

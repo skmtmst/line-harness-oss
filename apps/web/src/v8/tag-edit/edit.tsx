@@ -156,7 +156,7 @@ export default function TagEditV8() {
       if (!stillHere()) return
       if (!update.success) throw new Error(update.error)
       saveKeysRef.current.clear(sig)
-      notifyToast(update.data.replayed ? '保存済みでした。' : update.data.queued > 0 ? `保存しました。${update.data.queued}人へ遡及反映を開始しました。` : '保存しました。')
+      notifyToast(update.data.replayed ? '保存済みでした。' : update.data.queued > 0 ? `保存しました。${update.data.queued} 人へ遡及反映を開始しました。` : '保存しました。')
       setConflictValues(null)
       await load(true)
     } catch (reason) {

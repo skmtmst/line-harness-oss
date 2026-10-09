@@ -472,10 +472,10 @@ function Responses() {
                 <div className={styles.alert} role="status">
                   <AlertCircle size={18} aria-hidden="true" className={styles.alertIcon} />
                   <div className={styles.alertText}>
-                    <p className={styles.alertTitle}>{`後処理が終わっていない回答が ${incompleteItems.length}件あります`}</p>
+                    <p className={styles.alertTitle}>{`後処理が終わっていない回答が ${incompleteItems.length} 件あります`}</p>
                     <p className={styles.alertNote}>{`答えは保存されています。${failedSteps.join('・') || '後処理'}が終わっていません${(total ?? 0) > items.length ? '（表示中のページから数えています）' : ''}。`}</p>
                   </div>
-                  <Button onClick={() => { selectAnswer(incompleteItems[0]?.id ?? null); setView('rows') }}>{`その${incompleteItems.length}件を見る`}</Button>
+                  <Button onClick={() => { selectAnswer(incompleteItems[0]?.id ?? null); setView('rows') }}>{`その${incompleteItems.length} 件を見る`}</Button>
                 </div>
               ) : null}
               {summaries.map((fieldSummary) => {

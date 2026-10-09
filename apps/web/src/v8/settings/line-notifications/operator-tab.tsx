@@ -206,7 +206,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
           <tbody>
             {visible.map((rule) => {
               const published = rule.status === 'published'
-              const recipients = conditionsOf(rule).recipientLabel ?? (rule.recipientCount > 0 ? `${rule.recipientCount}人` : '受け取れる人なし')
+              const recipients = conditionsOf(rule).recipientLabel ?? (rule.recipientCount > 0 ? `${rule.recipientCount} 人` : '受け取れる人なし')
               const schedule = conditionsOf(rule).scheduleLabel ?? 'いつでも'
               return <Tr key={rule.id}>
                 <Td className={styles.opName}>

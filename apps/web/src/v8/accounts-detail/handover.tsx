@@ -461,12 +461,12 @@ export default function AccountHandoverV8() {
             </div>
           ) : null}
           {declaredMismatch ? (
-            <p className={styles.boxWarn}>申告の数（{handover.declaredFriendTotal}人）と事前確認の合計（{handover.counts?.sourceTotal ?? '—'}人）が違います。差の理由を確かめてから、数を直すか事前確認をやり直してください。</p>
+            <p className={styles.boxWarn}>申告の数（{handover.declaredFriendTotal} 人）と事前確認の合計（{handover.counts?.sourceTotal ?? '—'} 人）が違います。差の理由を確かめてから、数を直すか事前確認をやり直してください。</p>
           ) : null}
         </Card>
       </div>
 
-      <DataTable presentation="account-handover" label={`要確認 ${handover.counts?.review ?? '—'}人の判断`}>
+      <DataTable presentation="account-handover" label={`要確認 ${handover.counts?.review ?? '—'} 人の判断`}>
         <thead>
         <TableHeadRow>
           <Th className={styles.colName}>元の友だち</Th>
@@ -519,7 +519,7 @@ export default function AccountHandoverV8() {
         <div className={styles.pendingBand}>
           {decisionError
             ? <p role="alert" className={styles.pendingText}>{decisionError}</p>
-            : <p className={styles.pendingText}>{editCount}件の書き換えをまだ保存していません。保存するまで本実行へ進めません。</p>}
+            : <p className={styles.pendingText}>{editCount} 件の書き換えをまだ保存していません。保存するまで本実行へ進めません。</p>}
           <Button type="button" disabled={refreshing || !countsAreComplete} busy={refreshing} busyLabel="確認中…" onClick={() => void rerunPreview()}>
             <RotateCcw size={14} aria-hidden="true" />事前確認をやり直す
           </Button>

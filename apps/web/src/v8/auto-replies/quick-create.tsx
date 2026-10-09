@@ -33,7 +33,7 @@ function validateReply(reply: string): string | null {
 function overlapNames(conflicts: AutoReplyConflict[]): string {
   const names = conflicts.map((conflict) => conflict.name).filter(Boolean)
   if (names.length <= 3) return names.join('・')
-  return `${names.slice(0, 3).join('・')}ほか${names.length - 3}件`
+  return `${names.slice(0, 3).join('・')}ほか${names.length - 3} 件`
 }
 
 type Phase = 'editing' | 'confirming' | 'saving'

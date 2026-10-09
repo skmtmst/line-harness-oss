@@ -243,7 +243,7 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
 
       {jobs.length > 1 ? (
         <details className="text-ink-secondary w-full text-xs">
-          <summary className="cursor-pointer">最近の書き出し（{jobs.length}件）</summary>
+          <summary className="cursor-pointer">最近の書き出し（{jobs.length} 件）</summary>
           <ul className="border-hairline divide-hairline mt-1 divide-y rounded-control border">
             {jobs.slice(0, RECENT_LIMIT).map((job) => (
               <li key={job.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">

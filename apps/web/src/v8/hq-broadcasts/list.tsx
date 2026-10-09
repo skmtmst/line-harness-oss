@@ -356,7 +356,7 @@ export default function HqBroadcastList() {
 
   const pager = runs && filtered.length > 0 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>{pageCount > 1 ? `${formatNumber(filtered.length)} 件中 ${(current - 1) * pageSize + 1}〜${Math.min(current * pageSize, filtered.length)}件` : `${formatNumber(filtered.length)} 件`}</span>
+      <span className={styles.pagerCount}>{pageCount > 1 ? `${formatNumber(filtered.length)} 件中 ${(current - 1) * pageSize + 1}〜${Math.min(current * pageSize, filtered.length)} 件` : `${formatNumber(filtered.length)} 件`}</span>
       {pageCount > 1 ? <Pagination page={current} pageCount={pageCount} onPageChange={setPage} ariaLabel="一括配信のページ送り" /> : null}
     </ListPagePagination>
   ) : null

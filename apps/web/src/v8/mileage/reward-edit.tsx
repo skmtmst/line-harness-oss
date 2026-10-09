@@ -345,7 +345,7 @@ function RewardEditorInner() {
   }
   const kindNote = KINDS.find((kind) => kind.value === form.rewardKind)?.note ?? ''
   const requiredMiles = Number(form.requiredMiles)
-  const perFriend = form.perFriendLimit.trim() === '' ? '何回でも' : `${form.perFriendLimit}回まで`
+  const perFriend = form.perFriendLimit.trim() === '' ? '何回でも' : `${form.perFriendLimit} 回まで`
   const errorOf = (message: string) => (touched && errors.includes(message) ? message : undefined)
 
   const preview = (

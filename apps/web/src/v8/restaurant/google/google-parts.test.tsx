@@ -114,6 +114,6 @@ it('WEB176：平均と件数は期間集計ではなく総合と表示する', a
   data.connection.averageRating = 4.5;
   data.connection.totalReviewCount = 42;
   render(<ReviewsBoard accountId="a" data={data} go={vi.fn()} onSynced={vi.fn()} />);
-  expect(screen.getByText('総合・42件')).toBeTruthy();
-  expect(screen.queryByText('この30日・42件')).toBeNull();
+  expect(screen.getByText('総合・42 件')).toBeTruthy();
+  expect(screen.queryByText('この30日・42 件')).toBeNull();
 });

@@ -297,7 +297,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
     >
 
       <section className={form.card} data-gap="tight" aria-labelledby="webinar-cta-title" data-wc-pane="cta">
-        <div className={form.cardHeadRow}><h2 id="webinar-cta-title" className={form.cardTitle}>{ctas === null ? 'CTA カード' : `CTA カード ${ctas.length}枚`}</h2></div>
+        <div className={form.cardHeadRow}><h2 id="webinar-cta-title" className={form.cardTitle}>{ctas === null ? 'CTA カード' : `CTA カード ${ctas.length} 枚`}</h2></div>
         <p className={styles.desc}>動画の途中で出す申し込みボタンです。出す時刻は 分:秒 で入れます。</p>
         {message ? <Notice tone="danger">{message}</Notice> : null}
         <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />

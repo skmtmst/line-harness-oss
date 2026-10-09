@@ -233,9 +233,9 @@ function Connections() {
         </div>
         <div className={styles.addRow}>
           {pages.length < MAX_PAGES ? (
-            <Button variant="text" href={buttonsHref}><Plus size={15} aria-hidden="true" />{`切替先のメニューを足す（最大${MAX_PAGES}枚）`}</Button>
-          ) : <span className={styles.cardNote}>{`切替先は最大${MAX_PAGES}枚です`}</span>}
-          <span className={styles.count}>{`${pages.length}枚`}</span>
+            <Button variant="text" href={buttonsHref}><Plus size={15} aria-hidden="true" />{`切替先のメニューを足す（最大${MAX_PAGES} 枚）`}</Button>
+          ) : <span className={styles.cardNote}>{`切替先は最大${MAX_PAGES} 枚です`}</span>}
+          <span className={styles.count}>{`${pages.length} 枚`}</span>
         </div>
       </section>
 
@@ -249,12 +249,12 @@ function Connections() {
           </div>
         ))}
         {analysis.missingTargetEdges.length > 0 ? (
-          <div className={styles.check}><span>切替先が見つからないタブ</span><strong className={styles.bad}>{`${analysis.missingTargetEdges.length}件`}</strong></div>
+          <div className={styles.check}><span>切替先が見つからないタブ</span><strong className={styles.bad}>{`${analysis.missingTargetEdges.length} 件`}</strong></div>
         ) : null}
         {analysis.unreachablePageIds.size > 0 ? (
-          <div className={styles.check}><span>どこからも来られないメニュー</span><strong className={styles.bad}>{`${analysis.unreachablePageIds.size}件`}</strong></div>
+          <div className={styles.check}><span>どこからも来られないメニュー</span><strong className={styles.bad}>{`${analysis.unreachablePageIds.size} 件`}</strong></div>
         ) : null}
-        <div className={styles.check}><span>切替先が下書きのまま</span><strong className={draftTargets.length ? styles.bad : undefined}>{draftTargets.length ? `${draftTargets.length}件` : 'なし'}</strong></div>
+        <div className={styles.check}><span>切替先が下書きのまま</span><strong className={draftTargets.length ? styles.bad : undefined}>{draftTargets.length ? `${draftTargets.length} 件` : 'なし'}</strong></div>
         {/* 「誰に出すか」はメニューの束ごとに決めるので、切替先だけ違うことは起きない。 */}
         <div className={styles.check}><span>切替先だけ「誰に出すか」が違う</span><strong>なし</strong></div>
       </section>

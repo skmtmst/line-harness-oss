@@ -158,9 +158,9 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
   return (
     <>
       <StatRow compact>
-        <Stat label="今日の予約" value={`${bookings.length}件`} note={`${guests}名`} />
-        <Stat label="承認待ち" value={`${pending.length}件`} note={pendingSources || 'ありません'} warning={pending.length > 0} />
-        <Stat label="未配席" value={`${unseated}件`} note={unseated === 0 ? 'すべて卓に入っています' : '卓の割当が必要'} warning={unseated > 0} />
+        <Stat label="今日の予約" value={`${bookings.length} 件`} note={`${guests}名`} />
+        <Stat label="承認待ち" value={`${pending.length} 件`} note={pendingSources || 'ありません'} warning={pending.length > 0} />
+        <Stat label="未配席" value={`${unseated} 件`} note={unseated === 0 ? 'すべて卓に入っています' : '卓の割当が必要'} warning={unseated > 0} />
         <Stat label="押さえ" value={`${holds.length}枠`} note={holds[0]?.note || holds[0]?.allergy_note || '期限付きの仮押さえ'} />
       </StatRow>
       <div className={styles.dateBar}>

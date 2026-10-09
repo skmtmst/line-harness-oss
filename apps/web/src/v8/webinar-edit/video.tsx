@@ -357,7 +357,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
         </section>
       ) : (
         <section className={form.card} data-gap="tight" aria-labelledby="webinar-rules-title">
-          <div className={form.cardHeadRow}><h2 id="webinar-rules-title" className={form.cardTitle}>{`配信枠 ${webinar.schedule.length}件`}</h2></div>
+          <div className={form.cardHeadRow}><h2 id="webinar-rules-title" className={form.cardTitle}>{`配信枠 ${webinar.schedule.length} 件`}</h2></div>
           <p className={styles.desc}>視聴できる時間の枠です。枠が0件だと公開できません。</p>
           {webinar.schedule.map((rule, index) => <RuleRow key={index} rule={rule} webinarId={webinar.id} menu={ruleMenu(index, `枠${index + 1}`)} />)}
           {webinar.schedule.length === 0 ? <p className={form.cardNote}>まだ枠がありません。下の「枠を足す」から足してください。</p> : null}

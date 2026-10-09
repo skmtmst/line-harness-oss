@@ -203,7 +203,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
   const paused = form.status === 'paused'
   const showSecretInput = canEdit && (!connector?.secretConfigured || replacingSecret)
   const impact = data?.impact
-  const impactWords = (value: number | null | undefined) => (typeof value === 'number' ? `${value}件` : '未取得')
+  const impactWords = (value: number | null | undefined) => (typeof value === 'number' ? `${value} 件` : '未取得')
 
   return (
     <div className={styles.board} data-design-node="iLJmw">

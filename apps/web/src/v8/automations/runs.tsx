@@ -557,7 +557,7 @@ export default function AutomationRunsV8() {
     <>
       <div className={styles.pagerRow}>
         <span className={styles.pagerCount}>
-          {`${formatNumber(total)} 件中 ${data.pagination.offset + 1}〜${data.pagination.offset + data.items.length}件`}
+          {`${formatNumber(total)} 件中 ${data.pagination.offset + 1}〜${data.pagination.offset + data.items.length} 件`}
         </span>
         {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="動いた記録のページ送り" /> : null}
       </div>
@@ -645,7 +645,7 @@ export default function AutomationRunsV8() {
                   {runDetail.steps.map((step) => (
                     <li key={step.stepKey} className={styles.step}>
                       <span>{step.actionLabel}{step.commonActionVersionId ? '（共通アクション）' : ''}</span>
-                      <span className={styles.stepMeta}>{`${step.attemptNumber}回目・${STEP_STATUS_LABEL[step.status]}`}</span>
+                      <span className={styles.stepMeta}>{`${step.attemptNumber} 回目・${STEP_STATUS_LABEL[step.status]}`}</span>
                       {step.errorMessage ? <span className={styles.stepError}>{step.errorMessage}</span> : null}
                     </li>
                   ))}

@@ -447,7 +447,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
           <StatRow>
             <Stat label="所属ユーザー" value={`${members.length}名`} note="名簿に載っている人数" />
             <Stat label="店舗管理者" value={`${members.filter((m) => m.role === 'store_manager').length}名`} note="名簿上の役割（操作権限は別）" />
-            <Stat label="連携アカウント" value={`${members.filter((m) => m.line_uid || m.google_email).length}件`} note="LINE UID / Google" />
+            <Stat label="連携アカウント" value={`${members.filter((m) => m.line_uid || m.google_email).length} 件`} note="LINE UID / Google" />
           </StatRow>
           <Panel
             title="アカウント一覧"

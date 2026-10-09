@@ -481,13 +481,13 @@ export default function ScenariosListV8() {
       rows: scenarios.map((s) => (ids.includes(s.id) ? { ...s, isActive: next } : s)),
     })
     runUndoable({
-      message: next ? `${ids.length}件の配信を始めました` : `${ids.length}件を停止しました`,
+      message: next ? `${ids.length} 件の配信を始めました` : `${ids.length} 件を停止しました`,
       commit: async () => {
         const results = await Promise.all(
           ids.map((id) => api.scenarios.update(id, { isActive: next }).catch(() => null)),
         )
         const failed = results.filter((res) => !res || !res.success).length
-        if (failed > 0) throw new Error(`${failed}件の保存に失敗しました`)
+        if (failed > 0) throw new Error(`${failed} 件の保存に失敗しました`)
       },
       undo: () => setOptimisticRows(null),
       failureMessage: next ? '配信を始められませんでした。' : '停止できませんでした。',
@@ -529,7 +529,7 @@ export default function ScenariosListV8() {
           ids.map((id) => api.scenarios.update(id, { folderId }).catch(() => null)),
         )
         const failed = results.filter((res) => !res || !res.success).length
-        if (failed > 0) throw new Error(`${failed}件のフォルダ移動に失敗しました`)
+        if (failed > 0) throw new Error(`${failed} 件のフォルダ移動に失敗しました`)
       },
       undo: () => setOptimisticRows(null),
       failureMessage: 'フォルダを移動できませんでした。',
@@ -601,7 +601,7 @@ export default function ScenariosListV8() {
   /** 複製の窓の「引き継ぐもの」：通の数と配信方式は対象のシナリオから書く。 */
   const duplicateCarries = duplicateTarget
     ? [
-        `メッセージ ${duplicateTarget.stepCount === undefined ? '' : `${duplicateTarget.stepCount}通`}（質問を含む）`,
+        `メッセージ ${duplicateTarget.stepCount === undefined ? '' : `${duplicateTarget.stepCount} 通`}（質問を含む）`,
         '開始のきっかけ',
         'アクション',
         '配信対象の条件',
@@ -693,7 +693,7 @@ export default function ScenariosListV8() {
     >
       {sharedScenarioCount > 0 ? (
         <p className={styles.folderNote}>
-          全アカウントに共通で適用されるシナリオが{sharedScenarioCount}件あります。「すべて」の件数には含まれますが、フォルダ別の件数と「未分類」には含まれません。
+          全アカウントに共通で適用されるシナリオが{sharedScenarioCount} 件あります。「すべて」の件数には含まれますが、フォルダ別の件数と「未分類」には含まれません。
         </p>
       ) : null}
     </ManagedFolderPanel>
@@ -911,7 +911,7 @@ export default function ScenariosListV8() {
                 const showFolder = folders.length > 0 || s.folderId
                 const meta = [
                   deliveryModeLabels[s.deliveryMode ?? 'relative'],
-                  s.stepCount === undefined ? '—通' : `${s.stepCount}通`,
+                  s.stepCount === undefined ? '—通' : `${s.stepCount} 通`,
                   ...(showFolder ? [folderName] : []),
                 ].join('・')
                 /* 絵：送り方・通数・フォルダのあとに全角の間を空けて説明。1つの文字列で書く。 */
@@ -989,9 +989,9 @@ export default function ScenariosListV8() {
                     />
                     <Td
                       className={styles.countCell}
-                      title={`購読中 ${subscribers}人 ／ 読み終えた ${formatNumber(s.completedCount ?? 0)} 人`}
+                      title={`購読中 ${subscribers} 人 ／ 読み終えた ${formatNumber(s.completedCount ?? 0)} 人`}
                     >
-                      <div className={styles.countMain}>{`${subscribers}人`}</div>
+                      <div className={styles.countMain}>{`${subscribers} 人`}</div>
                       <div className={styles.countSub}>{`読み終えた ${formatNumber(s.completedCount ?? 0)} 人`}</div>
                     </Td>
                     <Td>
@@ -1023,7 +1023,7 @@ export default function ScenariosListV8() {
         {/* まとめての帯（選ぶと表の下に出る）：止める・再開・フォルダへ移す。 */}
         {canEdit && selectedCount > 0 ? (
           <div className={styles.bulkRow} role="region" aria-label="選択中のまとめ操作">
-            <span className={styles.bulkCount} aria-live="polite" aria-atomic="true">{selectedCount}件を選択中</span>
+            <span className={styles.bulkCount} aria-live="polite" aria-atomic="true">{selectedCount} 件を選択中</span>
             <Button
               type="button"
               variant="secondary"
@@ -1246,7 +1246,7 @@ export default function ScenariosListV8() {
             title={panelRow.name}
             description={[
               deliveryModeLabels[panelRow.deliveryMode ?? 'relative'],
-              panelRow.stepCount === undefined ? '—通' : `${panelRow.stepCount}通`,
+              panelRow.stepCount === undefined ? '—通' : `${panelRow.stepCount} 通`,
             ].join('・')}
             onClose={() => setPanelId(null)}
             onPrev={panelIndex > 0 ? () => setPanelId(scenarios[panelIndex - 1].id) : undefined}
@@ -1285,7 +1285,7 @@ export default function ScenariosListV8() {
           >
             <p>
               {panelRow.isActive ? '稼働中' : '停止中'} ／ 購読{' '}
-              {panelRow.subscriberCount === undefined ? '—' : formatNumber(panelRow.subscriberCount)}人 ／
+              {panelRow.subscriberCount === undefined ? '—' : formatNumber(panelRow.subscriberCount)} 人 ／
               読了 {formatNumber(panelRow.completedCount ?? 0)} 人
             </p>
             {panelRow.description && <p>{panelRow.description}</p>}
@@ -1306,7 +1306,7 @@ export default function ScenariosListV8() {
           title={
             moveIds && moveIds.length === 1
               ? `「${scenarios.find((s) => s.id === moveIds[0])?.name ?? 'シナリオ'}」のフォルダを移動`
-              : `${moveIds?.length ?? 0}件のシナリオのフォルダを移動`
+              : `${moveIds?.length ?? 0} 件のシナリオのフォルダを移動`
           }
           description="移動先のフォルダを選んでください。「未分類」を選ぶとフォルダから外れます。"
           confirmLabel="移動する"
@@ -1349,7 +1349,7 @@ export default function ScenariosListV8() {
               <MoveReferrersNotice scenarioId={deleteTarget.id} />
               <p>
                 購読中 {formatNumber(deleteTarget.subscriberCount ?? 0)} 人 ／ 通数{' '}
-                {deleteTarget.stepCount === undefined ? '— 読み込めませんでした' : `${deleteTarget.stepCount}通`}
+                {deleteTarget.stepCount === undefined ? '— 読み込めませんでした' : `${deleteTarget.stepCount} 通`}
               </p>
               {deleteTarget.lineAccountId === null && (
                 <p className={styles.deleteWarn}>全アカウント共通のシナリオです。すべてのアカウントから消えます。</p>

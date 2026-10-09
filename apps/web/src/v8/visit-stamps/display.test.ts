@@ -22,7 +22,7 @@ describe('来店スタンプの見せ方', () => {
   })
 
   it('特典の下の1行は、サーバの減らし方どおり（途中の特典は減る数・最後は新しいカード）', () => {
-    expect(rewardNote(settings.rewards[0], settings)).toBe('使うとスタンプが 5個へる')
+    expect(rewardNote(settings.rewards[0], settings)).toBe('使うとスタンプが 5 個へる')
     expect(rewardNote(settings.rewards[1], settings)).toBe('使ったら新しいカードへ')
   })
 

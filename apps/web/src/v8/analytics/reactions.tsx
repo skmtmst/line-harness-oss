@@ -37,8 +37,8 @@ export default function ReactionsV8({ accountId }: { accountId: string }) {
   const scenarioShown = overview ? overview.campaigns.length - broadcastShown : 0
   // 打切りに達した系統だけ、一覧に実際に出ている件数で「先頭○件まで」を告げる。
   const truncationNote = overview ? [
-    overview.campaignsTruncation?.broadcast ? `一斉配信は新しい方から先頭${broadcastShown}件` : null,
-    overview.campaignsTruncation?.scenario ? `シナリオは新しい方から先頭${scenarioShown}件` : null,
+    overview.campaignsTruncation?.broadcast ? `一斉配信は新しい方から先頭${broadcastShown} 件` : null,
+    overview.campaignsTruncation?.scenario ? `シナリオは新しい方から先頭${scenarioShown} 件` : null,
   ].filter(Boolean).join('・') : ''
   const exportCampaigns = () => {
     if (!overview) return
@@ -101,7 +101,7 @@ export default function ReactionsV8({ accountId }: { accountId: string }) {
           : overview.campaigns.map((item) => <div key={`${item.kind}:${item.id}`} className={styles.trow} role="row" data-h="two">
             <span role="cell" className={styles.colMain}><span className={styles.cellText} ><TruncatedText value={String(item.name ?? '')} /></span></span>
             <span role="cell" className={styles.colType}><strong className={styles.cellStrong}>{item.kind === 'broadcast' ? '一斉配信' : 'シナリオ'}</strong><span className={styles.cellSub}>{shortDateTime(item.sentAt)}</span></span>
-            <span role="cell" className={styles.num} data-w="80"><MetricText metric={item.targetPeople} />{item.kind === 'scenario' ? <span className={styles.cellSub}>送信 {metricText(item.sentMessages)}通</span> : null}</span>
+            <span role="cell" className={styles.num} data-w="80"><MetricText metric={item.targetPeople} />{item.kind === 'scenario' ? <span className={styles.cellSub}>送信 {metricText(item.sentMessages)} 通</span> : null}</span>
             <span role="cell" className={styles.num} data-w="80"><MetricText metric={item.delivered} /></span>
             <span role="cell" className={styles.num} data-w="80"><MetricText metric={item.opened} /></span>
             <span role="cell" className={styles.num} data-w="100"><MetricText metric={item.lineClicked} /></span>
@@ -115,7 +115,7 @@ export default function ReactionsV8({ accountId }: { accountId: string }) {
         <div className={styles.hourBars}>
           {Array.from({ length: 24 }, (_, hour) => {
             const clicks = overview.trackedClickHours.find((item) => item.hour === hour)?.clicks ?? 0
-            return <span key={hour} role="img" aria-label={`${hour}時台 ${clicks}回`} title={`${hour}時台 ${clicks}回`} className={styles.hourBar} data-top={topHours.includes(hour) || undefined} style={{ height: `${Math.max(2, clicks / maxHourly * 100)}%` }} />
+            return <span key={hour} role="img" aria-label={`${hour}時台 ${clicks} 回`} title={`${hour}時台 ${clicks} 回`} className={styles.hourBar} data-top={topHours.includes(hour) || undefined} style={{ height: `${Math.max(2, clicks / maxHourly * 100)}%` }} />
           })}
         </div>
         <div className={styles.hourTicks} aria-hidden="true">{Array.from({ length: 24 }, (_, hour) => <span key={hour}>{hour % 3 === 0 ? hour : ''}</span>)}</div>

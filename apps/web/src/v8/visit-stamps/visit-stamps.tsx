@@ -62,7 +62,7 @@ const REMINDER_OPTIONS = [
   { value: 'day_before', label: '前日' }, { value: 'three_days_before', label: '3日前' }, { value: 'week_before', label: '1週間前' },
   { value: 'two_weeks_before', label: '2週間前' }, { value: 'month_before', label: '1か月前' }, { value: 'none', label: '知らせない' },
 ]
-const CAP_OPTIONS = [1, 2, 3, 4, 5, 6, 8, 10, 20].map((n) => ({ value: String(n), label: `1回 ${n}個まで` }))
+const CAP_OPTIONS = [1, 2, 3, 4, 5, 6, 8, 10, 20].map((n) => ({ value: String(n), label: `1回 ${n} 個まで` }))
 const STAMP_TABS = [
   { key: 'settings', label: 'カードの設定', board: 'fpPlW' },
   { key: 'paper', label: '紙のカードの移行', board: 'byCFU' },
@@ -289,7 +289,7 @@ function VisitStampsScreen() {
     setBusy(row.id); setDialogError('')
     try {
       await visitStampsApi.reviewPaper(row.id, action, reason)
-      notifyToast(action === 'approve' ? `${row.stamps}個をカードに足しました。お客さまに LINE でお知らせします。` : '申請を却下しました。')
+      notifyToast(action === 'approve' ? `${row.stamps} 個をカードに足しました。お客さまに LINE でお知らせします。` : '申請を却下しました。')
       setRejecting(null)
       await loadPaper()
       await loadLog()
@@ -329,7 +329,7 @@ function VisitStampsScreen() {
         requestId: grantRequest.current, source: reason === 'paper' ? 'paper' : 'manual',
       })
       grantRequest.current = newRequestId()
-      notifyToast(`${count}個 押しました。`)
+      notifyToast(`${count} 個 押しました。`)
       setCount(1); setMemo('')
       await loadLog()
     } catch (caught) {
@@ -508,7 +508,7 @@ function VisitStampsScreen() {
                         <span ><TruncatedText value={String(name ?? '')} /></span><span>{`${filled} / ${slotCount(settings)}`}</span>
                       </div>
                       <div className={styles.slots}>
-                        {previewSlots(settings, filled).map(slot => <span key={slot.n} className={`${styles.slot} ${slot.state === 'done' ? styles.slotDone : ''}`} aria-label={slot.state === 'done' ? `${slot.n}個目 済み` : slot.state === 'reward' ? `${slot.n}個目 特典` : `${slot.n}個目`}>
+                        {previewSlots(settings, filled).map(slot => <span key={slot.n} className={`${styles.slot} ${slot.state === 'done' ? styles.slotDone : ''}`} aria-label={slot.state === 'done' ? `${slot.n} 個目 済み` : slot.state === 'reward' ? `${slot.n} 個目 特典` : `${slot.n} 個目`}>
                           {slot.state === 'done' ? <Check size={16} aria-hidden="true" /> : slot.state === 'reward' ? <Gift size={16} aria-hidden="true" /> : slot.n}
                         </span>)}
                       </div>
@@ -572,7 +572,7 @@ function VisitStampsScreen() {
                   <Toggle checked={settings.firstVisitBonus > 0} label="初回来店ボーナスを使う" locked={ro && settings.firstVisitBonus > 0} onChange={ro ? undefined : (on) => set({ firstVisitBonus: on ? 1 : 0 })} />
                   <span className={styles.texts}>
                     <span className={styles.name}>初回来店ボーナス</span>
-                    <span className={styles.sub}>{settings.firstVisitBonus > 0 ? `はじめての来店で +${settings.firstVisitBonus}個` : 'はじめての来店で多めに押します'}</span>
+                    <span className={styles.sub}>{settings.firstVisitBonus > 0 ? `はじめての来店で +${settings.firstVisitBonus} 個` : 'はじめての来店で多めに押します'}</span>
                   </span>
                   {ro ? null : <RowActions subjectName="初回来店ボーナス" menuItems={[{ id: 'edit', label: '個数を変える', onSelect: () => setBonusOpen(true) }]} />}
                 </div>
@@ -599,7 +599,7 @@ function VisitStampsScreen() {
                   <div className={styles.field}>
                     <span className={styles.label}>重ねたときの上限</span>
                     <Select aria-label="重ねたときの上限" size="full" disabled={ro} value={String(stackedCap(settings))} onChange={(v) => set({ maxStackedStamps: Number(v) })}
-                      options={CAP_OPTIONS.some((o) => o.value === String(stackedCap(settings))) ? CAP_OPTIONS : [...CAP_OPTIONS, { value: String(stackedCap(settings)), label: `1回 ${stackedCap(settings)}個まで` }]} />
+                      options={CAP_OPTIONS.some((o) => o.value === String(stackedCap(settings))) ? CAP_OPTIONS : [...CAP_OPTIONS, { value: String(stackedCap(settings)), label: `1回 ${stackedCap(settings)} 個まで` }]} />
                   </div>
                 </div>
                 {ro || settings.multipliers.length >= 20 ? null : (
@@ -654,7 +654,7 @@ function VisitStampsScreen() {
                                     {row.status === 'pending' && canStamp ? (
                                       <>
                                         <Button size="compact" disabled={!!busy} onClick={() => { setDialogError(''); setRejecting(row) }}>却下</Button>
-                                        <Button size="compact" disabled={!!busy} onClick={() => void review(row, 'approve', '紙のカードの写真を確認しました')} aria-label={`${names.name}さんの ${row.stamps}個を承認`}><Check size={15} aria-hidden="true" />承認</Button>
+                                        <Button size="compact" disabled={!!busy} onClick={() => void review(row, 'approve', '紙のカードの写真を確認しました')} aria-label={`${names.name}さんの ${row.stamps} 個を承認`}><Check size={15} aria-hidden="true" />承認</Button>
                                       </>
                                     ) : null}
                                     <RowActions subjectName={`${names.name}さんの申請`} menuItems={[
@@ -715,8 +715,8 @@ function VisitStampsScreen() {
                 {log ? (
                   <div className={styles.historyFooter}>
                     <Select aria-label="記録の表示件数" value={String(logPageSize)} onChange={v => { setLogPageSize(Number(v)); setLogPage(1) }}
-                      options={[10, 20, 50].map(n => ({ value: String(n), label: `${n}件ずつ` }))} />
-                    <span className={styles.sub}>{`${polishFormatNumber(logTotal)} 件中 ${logTotal ? (logPage - 1) * logPageSize + 1 : 0}〜${Math.min(logPage * logPageSize, logTotal)}件`}</span>
+                      options={[10, 20, 50].map(n => ({ value: String(n), label: `${n} 件ずつ` }))} />
+                    <span className={styles.sub}>{`${polishFormatNumber(logTotal)} 件中 ${logTotal ? (logPage - 1) * logPageSize + 1 : 0}〜${Math.min(logPage * logPageSize, logTotal)} 件`}</span>
                     <Pagination page={logPage} pageCount={logPages} onPageChange={setLogPage} ariaLabel="記録のページ送り" />
                   </div>
                 ) : null}

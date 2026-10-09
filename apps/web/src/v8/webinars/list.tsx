@@ -1084,7 +1084,7 @@ function WebinarList() {
         <ConfirmDialog
           open={deletingFolder !== null}
           title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
-          description={`削除しても、中のウェビナーは未分類に残ります。いまこのフォルダに入っているのは${deletingFolder?.count ?? 0}件です。`}
+          description={`削除しても、中のウェビナーは未分類に残ります。いまこのフォルダに入っているのは${deletingFolder?.count ?? 0} 件です。`}
           confirmLabel="削除する"
           destructive
           busy={folderBusy}

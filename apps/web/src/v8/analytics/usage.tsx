@@ -35,8 +35,8 @@ function summarizeMenuFeatures(settings: { features: Record<string, boolean>; sp
   return { enabled: items.filter((item) => itemIsEnabled(item, features)).length, total: items.length }
 }
 function usageObservation(item: Category): { text: string; tone: 'normal' | 'warning' | 'unknown' } {
-  if (item.brokenReferences.value !== null && item.brokenReferences.value > 0) return { text: `参照切れが${item.brokenReferences.value}件あります`, tone: 'warning' }
-  if (item.unused.value !== null && item.unused.value > 0) return { text: `${item.unused.value}個は使われていません`, tone: 'warning' }
+  if (item.brokenReferences.value !== null && item.brokenReferences.value > 0) return { text: `参照切れが${item.brokenReferences.value} 件あります`, tone: 'warning' }
+  if (item.unused.value !== null && item.unused.value > 0) return { text: `${item.unused.value} 個は使われていません`, tone: 'warning' }
   if (item.unused.value === 0) return { text: 'すべて利用中です', tone: 'normal' }
   return { text: item.unused.reason ?? '利用状況を確認できません', tone: 'unknown' }
 }

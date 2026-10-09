@@ -173,7 +173,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
           const res = await webinarApi.saveNotifications(webinarId, input)
           setSettings(res.data.settings)
           setBaseline(res.data.settings)
-          notifyToast(`保存しました。${res.data.queued}件を予定に入れ、${res.data.cancelled}件を取り消しました。`)
+          notifyToast(`保存しました。${res.data.queued} 件を予定に入れ、${res.data.cancelled} 件を取り消しました。`)
         } catch {
           setError('通知の設定を保存できませんでした。入力を残しました。もう一度お試しください。')
           return false
@@ -219,7 +219,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
       if (dirty && !(await saveRef.current())) return
       setTestOpen(false)
       const res = await webinarApi.testNotifications(webinarId)
-      setTestResult(`テスト送信しました。成功 ${res.data.sent}件・失敗 ${res.data.failed}件`)
+      setTestResult(`テスト送信しました。成功 ${res.data.sent} 件・失敗 ${res.data.failed} 件`)
       const refreshed = await webinarApi.editor(webinarId)
       ctx.onEditorChange(refreshed.data)
     } catch (cause) {
@@ -321,7 +321,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
       <section className={form.card} data-gap="tight" aria-labelledby="webinar-notify-title" data-wc-pane="notifications">
         <div className={form.cardHeadRow}>
           <h2 id="webinar-notify-title" className={form.cardTitle}>通知とリマインド</h2>
-          <HelpTip label="送った数と通知の対象">{`予定 ${count(overview?.pending)}件・取消 ${count(overview?.cancelled)}件・合計 ${count(overview?.total)}件。通知の対象：${overview?.audience ? `${formatNumber(overview.audience.people)} 人（取消を除いた有効な申込。延べ予約は${formatNumber(overview.audience.bookings)} 件）` : '—'}`}</HelpTip>
+          <HelpTip label="送った数と通知の対象">{`予定 ${count(overview?.pending)} 件・取消 ${count(overview?.cancelled)} 件・合計 ${count(overview?.total)} 件。通知の対象：${overview?.audience ? `${formatNumber(overview.audience.people)} 人（取消を除いた有効な申込。延べ予約は${formatNumber(overview.audience.bookings)} 件）` : '—'}`}</HelpTip>
         </div>
         <p className={styles.desc}>LINE で送るお知らせです。テストは全部をまとめて自分に送ります。</p>
         {notificationBody}

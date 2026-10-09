@@ -242,7 +242,7 @@ export function TagEditForm({
         identity={host ? undefined : <Link href="/tags" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />タグへ</Link>}
         description={host ? <>{host.description}{readOnly ? <p className={styles.roBand} role="note">閲覧のみで見ています。変える操作は管理者に頼んでください。</p> : null}</> : (
           <>
-            {`${groupName}フォルダ・${tag.friendCount ?? 0}人に付いている・${formatDay(tag.createdAt)}作成`}
+            {`${groupName}フォルダ・${tag.friendCount ?? 0} 人に付いている・${formatDay(tag.createdAt)}作成`}
             {readOnly ? <p className={styles.roBand} role="note" data-design-node="fkGUR">閲覧のみで見ています。変える操作は管理者に頼んでください。</p> : null}
             {conflictBand}
           </>
@@ -381,13 +381,13 @@ export function TagEditForm({
                   }
                   {applyToExisting ? (
                     <div className={styles.statGrid}>
-                      <div className={styles.statBox}><span className={styles.statLabel}>現在の対象者</span><span className={styles.statValue}>{tag.friendCount ?? 0}人</span></div>
-                      <div className={styles.statBox}><span className={styles.statLabel}>本人マイル対象</span><span className={styles.statValue}>{retroPreview ? `${retroPreview.selfTargets}人` : retroactiveReference ? `${tag.friendCount ?? 0}人` : '—'}</span></div>
-                      <div className={styles.statBox}><span className={styles.statLabel}>紹介者対象</span><span className={styles.statValue}>{retroPreview ? `${retroPreview.referralTargets}人` : '—'}</span></div>
+                      <div className={styles.statBox}><span className={styles.statLabel}>現在の対象者</span><span className={styles.statValue}>{tag.friendCount ?? 0} 人</span></div>
+                      <div className={styles.statBox}><span className={styles.statLabel}>本人マイル対象</span><span className={styles.statValue}>{retroPreview ? `${retroPreview.selfTargets} 人` : retroactiveReference ? `${tag.friendCount ?? 0} 人` : '—'}</span></div>
+                      <div className={styles.statBox}><span className={styles.statLabel}>紹介者対象</span><span className={styles.statValue}>{retroPreview ? `${retroPreview.referralTargets} 人` : '—'}</span></div>
                     </div>
                   ) : null}
                   {retroPreview && (retroPreview.selfExcluded > 0 || retroPreview.referralExcluded > 0) ? (
-                    <p className={styles.hint}>{`すでに付与済みの人（本人${retroPreview.selfExcluded}人・紹介者${retroPreview.referralExcluded}人）は対象から外れています。`}</p>
+                    <p className={styles.hint}>{`すでに付与済みの人（本人${retroPreview.selfExcluded} 人・紹介者${retroPreview.referralExcluded} 人）は対象から外れています。`}</p>
                   ) : null}
                   <div className={styles.subHead}>
                     <h3 className={styles.subTitle}>タグが付いたときに積むマイル</h3>

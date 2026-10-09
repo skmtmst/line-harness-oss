@@ -164,7 +164,7 @@ function stepTiming(step: ReminderDeliveryRunsResponse['steps'][number], detail:
 /** 通知の本文を、番号だけでなく人が見分けられる短い名前にする。 */
 function stepLabel(step: ReminderDeliveryRunsResponse['steps'][number]): string {
   const firstLine = step.messageContent.trim().split(/\r?\n/, 1)[0]?.trim()
-  return firstLine ? firstLine.slice(0, 40) : `${step.stepNumber}通目`
+  return firstLine ? firstLine.slice(0, 40) : `${step.stepNumber} 通目`
 }
 
 function csvFor(items: ReminderDeliveryRun[]): string {
@@ -172,7 +172,7 @@ function csvFor(items: ReminderDeliveryRun[]): string {
     ['友だち', '通知', '結果', '配信予定', '実行時刻', '試行回数', '次の再試行', 'LINE要求ID', '理由'],
     ...items.map((item) => [
       item.friendName ?? '削除済みの友だち',
-      `${item.stepNumber}通目`,
+      `${item.stepNumber} 通目`,
       STATUS_VIEW[item.domainStatus].label,
       formatJst(item.scheduledAt),
       formatJst(item.completedAt ?? item.startedAt),
@@ -478,7 +478,7 @@ function ReminderDetailV8() {
   const accountName = selectedAccount?.name ?? 'LINE公式アカウント'
   const meta = [
     reminder?.triggerType ? `基準日：${reminderTriggerLabel(reminder.triggerType)}` : null,
-    `通知 ${data.steps.length}通`,
+    `通知 ${data.steps.length} 通`,
     reminder?.updatedAt ? `更新 ${formatMonthDay(reminder.updatedAt)}` : null,
   ].filter(Boolean).join('・')
 
@@ -791,7 +791,7 @@ function ScheduleTab({ reminderId, steps }: { reminderId: string; steps: Reminde
                 <span role="cell" className={styles.colFlex}>
                   <Link href={`/friends/${encodeURIComponent(item.friendId)}`} className={styles.friendName}>{item.friendName ?? '削除済みの友だち'}</Link>
                 </span>
-                <span role="cell" className={styles.colWide} title={stepNameByNumber[item.stepNumber] ?? ''}>{item.stepNumber}通目</span>
+                <span role="cell" className={styles.colWide} title={stepNameByNumber[item.stepNumber] ?? ''}>{item.stepNumber} 通目</span>
                 <span role="cell" className={styles.colResult}>
                   <StatusPill tone={STATUS_VIEW[item.domainStatus].tone}>{STATUS_VIEW[item.domainStatus].label}</StatusPill>
                 </span>
@@ -799,7 +799,7 @@ function ScheduleTab({ reminderId, steps }: { reminderId: string; steps: Reminde
             ))}
           </div>
           <div className={styles.pager}>
-            <span className={styles.pagerCount}>{formatNumber(total)} 件中 {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)}件</span>
+            <span className={styles.pagerCount}>{formatNumber(total)} 件中 {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)} 件</span>
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="配信予定のページ送り" />
           </div>
         </>
@@ -926,11 +926,11 @@ function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string;
                 <span role="cell" className={styles.colFlex}>
                   <Link href={`/friends/${encodeURIComponent(item.friendId)}`} className={styles.friendName}>{item.friendName ?? '削除済みの友だち'}</Link>
                 </span>
-                <span role="cell" className={styles.colStep}>{item.stepNumber}通目</span>
+                <span role="cell" className={styles.colStep}>{item.stepNumber} 通目</span>
                 <span role="cell" className={styles.colResult}>
                   <StatusPill tone={STATUS_VIEW[item.domainStatus].tone}>{STATUS_VIEW[item.domainStatus].label}</StatusPill>
                 </span>
-                <span role="cell" className={styles.colReason} title={item.lastErrorMessage ?? undefined}>{item.lastErrorMessage ?? `${item.attemptCount}回試行`}</span>
+                <span role="cell" className={styles.colReason} title={item.lastErrorMessage ?? undefined}>{item.lastErrorMessage ?? `${item.attemptCount} 回試行`}</span>
                 <span role="cell" className={styles.colOps}>
                   {item.canRetry && canManage ? (
                     <Button variant="text" disabled={retryingId === item.id} busy={retryingId === item.id} busyLabel="受け付けています" onClick={() => void retry(item.id)}>
@@ -942,7 +942,7 @@ function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string;
             ))}
           </div>
           <div className={styles.pager}>
-            <span className={styles.pagerCount}>{formatNumber(total)} 件中 {total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)}件</span>
+            <span className={styles.pagerCount}>{formatNumber(total)} 件中 {total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)} 件</span>
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="実行結果のページ送り" />
           </div>
         </>
@@ -1145,7 +1145,7 @@ function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canMana
               })}
             </div>
             <div className={styles.pager}>
-              <span className={styles.pagerCount}>{formatNumber(visible.length)} 人中 {visible.length === 0 ? 0 : (page - 1) * pageSize + 1}〜{Math.min(page * pageSize, visible.length)}人</span>
+              <span className={styles.pagerCount}>{formatNumber(visible.length)} 人中 {visible.length === 0 ? 0 : (page - 1) * pageSize + 1}〜{Math.min(page * pageSize, visible.length)} 人</span>
               <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="登録者のページ送り" />
             </div>
           </>

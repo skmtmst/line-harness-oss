@@ -126,7 +126,7 @@ export default function EcSubscriptions({ accountId, canEdit = true }: { account
         <Td><span className={shared.stack}><span className={shared.main} title={item.ownerName ?? undefined}>{item.ownerName ?? 'お客様名 —'}{item.petName ? `（${item.petName}）` : ''}</span><span className={shared.sub} title={item.items ?? undefined}>{[item.items ?? '中身 未取得', item.cycle].filter(Boolean).join('・')}</span></span></Td>
         <Td align="right">{item.amount == null ? '—' : `¥${formatNumber(item.amount)}`}</Td>
         <Td>{shortDate(item.nextShippingAt)}</Td>
-        <Td align="right">{item.continuedCount == null ? '—' : `${item.continuedCount}回`}</Td>
+        <Td align="right">{item.continuedCount == null ? '—' : `${item.continuedCount} 回`}</Td>
         <Td><span className={shared.stack}><StatusBadge tone={STATUS_TONE[item.status]} size="compact">{FILTERS.find((f) => f.key === item.status)?.label ?? item.statusLabel}</StatusBadge>{item.riskReason || item.cancellationReason ? <span className={shared.sub} title={item.riskReason ?? item.cancellationReason ?? undefined}>{item.riskReason ?? `理由「${item.cancellationReason}」`}</span> : null}</span></Td>
         <Td><span className={styles.ops}><Button href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`} variant="secondary">中身を見る</Button>{item.manageUrl ? <RowMenu label={`${item.ownerName ?? 'お客様'}のその他操作`} menuLabel="定期便の操作" open={openMenuId === item.id} onOpenChange={(open) => setOpenMenuId(open ? item.id : null)} items={[{ id: 'manage', label: 'ECで変更', onSelect: () => window.open(item.manageUrl!, '_blank', 'noopener,noreferrer') }]} /> : null}</span></Td>
       </Tr>)}</tbody>

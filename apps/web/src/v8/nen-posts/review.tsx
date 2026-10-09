@@ -433,9 +433,9 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       }).filter((item) => item.photoId)
       setBulkFailed(failedPhotos)
       if (failedPhotos.length === 0) {
-        notifyToast(`${count}枚の審査結果を保存し、投稿者へLINEで通知しました。`)
+        notifyToast(`${count} 枚の審査結果を保存し、投稿者へLINEで通知しました。`)
       } else {
-        setNotice(`${count}枚の審査結果は保存済みです。${failedPhotos.length}枚のLINE通知は送れませんでした（通知だけ再送できます）。`)
+        setNotice(`${count} 枚の審査結果は保存済みです。${failedPhotos.length} 枚のLINE通知は送れませんでした（通知だけ再送できます）。`)
       }
       setSelectedPhotoIds([])
       setBulkApproveOpen(false)
@@ -525,7 +525,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
           <div className={styles.stats}>
             <KpiBand data-design="KPIs" aria-label="投稿の数の帯">
               <KpiCard presentation="band" title="審査待ち" icon={<History size={13} aria-hidden="true" />}
-                menu={kpiHelp('審査待ち', `まだ決めていない写真の枚数です。注意候補 ${reviewMetrics?.attentionCount ?? '—'}件・投稿から審査までの日数：${reviewMetrics?.averageReviewMinutes == null ? '—' : formatMinutesRough(reviewMetrics.averageReviewMinutes)}`)}
+                menu={kpiHelp('審査待ち', `まだ決めていない写真の枚数です。注意候補 ${reviewMetrics?.attentionCount ?? '—'} 件・投稿から審査までの日数：${reviewMetrics?.averageReviewMinutes == null ? '—' : formatMinutesRough(reviewMetrics.averageReviewMinutes)}`)}
                 value={countsReady ? reviewMetrics?.pendingCount ?? counts.pending : null} unit="枚"
                 detail={reviewMetrics?.oldestPendingAt ? `いちばん古いもの ${formatWaitRough((Date.now() - Date.parse(reviewMetrics.oldestPendingAt)) / 60000)}` : 'いちばん古いもの —'} />
               <KpiCard presentation="band" title="今月 採用" icon={<HelpCircle size={13} aria-hidden="true" />}
@@ -567,15 +567,15 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
             />
           ) : null}
 
-          <Dialog open={bulkApproveOpen} title={`${selectedPendingPhotos.length}枚をまとめて採用`} description="選択した写真の件数、マイル、公開範囲を確認してください。" busy={bulkReviewing} confirmLabel="まとめて採用" cancelLabel="審査へ戻る" onCancel={() => setBulkApproveOpen(false)} onConfirm={() => void bulkReview('approve')}>
+          <Dialog open={bulkApproveOpen} title={`${selectedPendingPhotos.length} 枚をまとめて採用`} description="選択した写真の件数、マイル、公開範囲を確認してください。" busy={bulkReviewing} confirmLabel="まとめて採用" cancelLabel="審査へ戻る" onCancel={() => setBulkApproveOpen(false)} onConfirm={() => void bulkReview('approve')}>
             <dl className={styles.bulkSummary}>
-              <div><dt>写真</dt><dd>{selectedPendingPhotos.length}枚</dd></div>
+              <div><dt>写真</dt><dd>{selectedPendingPhotos.length} 枚</dd></div>
               <div><dt>付与するマイル</dt><dd>合計 {policyPoints == null ? '—' : `${formatNumber(selectedPendingPhotos.length * policyPoints)} マイル`}</dd></div>
               <div><dt>公開範囲</dt><dd>公開しない</dd></div>
             </dl>
             <p className={styles.railNote}>写真を採用しても自動公開しません。本人の公開同意を確認したあと、公式サイト掲載画面で公開先を選びます。</p>
           </Dialog>
-          <Dialog open={bulkReturnOpen} title={`${selectedPendingPhotos.length}枚をまとめて見送り`} description="選んだ理由と補足は、選択した写真すべてに記録され、投稿者へLINEで届きます。" tone="destructive" busy={bulkReviewing} error={reasonError} confirmLabel="この理由でまとめて見送り" cancelLabel="審査へ戻る" onCancel={() => { setBulkReturnOpen(false); setReasonError(''); setReasonFieldError('') }} onConfirm={() => {
+          <Dialog open={bulkReturnOpen} title={`${selectedPendingPhotos.length} 枚をまとめて見送り`} description="選んだ理由と補足は、選択した写真すべてに記録され、投稿者へLINEで届きます。" tone="destructive" busy={bulkReviewing} error={reasonError} confirmLabel="この理由でまとめて見送り" cancelLabel="審査へ戻る" onCancel={() => { setBulkReturnOpen(false); setReasonError(''); setReasonFieldError('') }} onConfirm={() => {
             if (reasonCode === 'other' && !reasonNote.trim()) { setReasonFieldError('そのほかの理由を入力してください'); focusFormField('photo-reject-note'); return }
             void bulkReview('return', { reasonCode, reasonNote: reasonNote.trim() })
           }}>
@@ -603,7 +603,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
         </>
       }
     >
-      {bulkFailed.length > 0 ? <section className={styles.deliveryFailures} aria-label="LINE通知を送れなかった写真"><p>LINE通知を送れなかった写真（{bulkFailed.length}枚）・通知だけ再送できます</p>{bulkFailed.map((item) => <div key={item.photoId}><span>{item.petName}</span>{canEdit ? <Button variant="secondary" disabled={reviewing !== null} onClick={() => void retryNotification(item.photoId)}>LINE通知を再送</Button> : null}</div>)}</section> : null}
+      {bulkFailed.length > 0 ? <section className={styles.deliveryFailures} aria-label="LINE通知を送れなかった写真"><p>LINE通知を送れなかった写真（{bulkFailed.length} 枚）・通知だけ再送できます</p>{bulkFailed.map((item) => <div key={item.photoId}><span>{item.petName}</span>{canEdit ? <Button variant="secondary" disabled={reviewing !== null} onClick={() => void retryNotification(item.photoId)}>LINE通知を再送</Button> : null}</div>)}</section> : null}
       {!accountId ? (
         <div className={styles.stateBox}>
           <ListState
@@ -775,7 +775,7 @@ function ReviewListV8(props: ReviewListV8Props) {
   const more = !loading && !loadError && props.hasMorePhotos ? (
     <div>
       <Button variant="secondary" disabled={props.loadingMore} onClick={props.onLoadMore} busy={props.loadingMore} busyLabel="読み込み中...">
-        {`さらに読み込む（いま${photos.length}枚）`}
+        {`さらに読み込む（いま${photos.length} 枚）`}
       </Button>
     </div>
   ) : null
@@ -1250,8 +1250,8 @@ function PublicationsV8({
                 </tbody>
               </DataTable>
             </div>
-            <p className={styles.listHint}>{`公式サイト掲載中 ${publishedCount ?? '—'}枚のうち ${items.length}枚を表示（使っている場所で絞る：サイト・NENコラム・リッチメニュー・回答フォーム・登録メディア）`}</p>
-            <details className={styles.publicationHistory}><summary>掲載の整理と外した履歴（{pendingWithdrawals.length + withdrawnItems.length}件）</summary>
+            <p className={styles.listHint}>{`公式サイト掲載中 ${publishedCount ?? '—'} 枚のうち ${items.length} 枚を表示（使っている場所で絞る：サイト・NENコラム・リッチメニュー・回答フォーム・登録メディア）`}</p>
+            <details className={styles.publicationHistory}><summary>掲載の整理と外した履歴（{pendingWithdrawals.length + withdrawnItems.length} 件）</summary>
               {pendingWithdrawals.map((item) => <div key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>{text(item.publication_withdrawn_at) ? 'ご本人が公開の同意を撤回しました' : '公開の同意と採用状態を確認してください'}</p><p>まだ残っている掲載先：{placementLabels(item)}</p>{canEdit ? <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => void withdraw(item)}>掲載先から外す</Button> : null}</div>)}
               {withdrawnItems.map((item) => <div key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>外した日時：{formatPhotoReceivedAt(item.withdrawn_at)}・{text(item.withdrawn_by_name) || '—'}</p>{(item.placements ?? []).map((placement) => <p key={text(placement.id)}>{text(placement.placement_label)}・{text(placement.removed_at) ? `${formatPhotoReceivedAt(placement.removed_at)}に外しました` : '記録あり'}</p>)}</div>)}
             </details>

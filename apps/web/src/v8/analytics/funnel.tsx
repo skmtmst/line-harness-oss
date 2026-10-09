@@ -333,7 +333,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
               {result.map((step, i) => {
                 const previous = i > 0 ? result[i - 1] : null
                 const dropRate = previous && previous.reached > 0 ? previous.droppedAfter / previous.reached * 100 : null
-                return <button key={step.stepOrder} type="button" className={styles.funnelStep} data-selected={shownPick === i || undefined} disabled={!measurable} onClick={() => setPicked(i)} aria-pressed={shownPick === i} title={previous ? `止まった ${previous.droppedAfter}人・進行中 ${previous.inProgressAfter}人` : undefined}>
+                return <button key={step.stepOrder} type="button" className={styles.funnelStep} data-selected={shownPick === i || undefined} disabled={!measurable} onClick={() => setPicked(i)} aria-pressed={shownPick === i} title={previous ? `止まった ${previous.droppedAfter} 人・進行中 ${previous.inProgressAfter} 人` : undefined}>
                   <span className={styles.funnelNumber}>{i + 1}</span>
                   <span className={styles.funnelLabel} title={step.label}>{step.label}</span>
                   <span className={styles.funnelMeasure}>

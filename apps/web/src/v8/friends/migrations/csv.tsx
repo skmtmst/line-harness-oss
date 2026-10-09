@@ -99,7 +99,7 @@ export default function CsvMigrationsV8() {
           <div className={styles.cardFoot}>
             {m.exportResult ? (
               <a className={styles.link} href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}${m.exportResult.downloadUrl}`}>
-                {`CSVをダウンロード（${m.exportResult.rowCount ?? '—'}件）`}
+                {`CSVをダウンロード（${m.exportResult.rowCount ?? '—'} 件）`}
               </a>
             ) : null}
             {/* 変えられない人には押せないボタンを置かない（理由は上の1行）。 */}
@@ -122,7 +122,7 @@ export default function CsvMigrationsV8() {
             onFiles={(files) => void m.onPickFile(files[0] ?? null)}
           />
           {m.file ? (
-            <AttachmentRow name={m.file.name} meta={`${formatNumber(m.rows.length)}行・${formatImportBytes(m.file.size)}`} onRemove={() => void m.onPickFile(null)} />
+            <AttachmentRow name={m.file.name} meta={`${formatNumber(m.rows.length)} 行・${formatImportBytes(m.file.size)}`} onRemove={() => void m.onPickFile(null)} />
           ) : null}
           <p className={styles.small}>同じファイルをもう一度入れても、二重には反映しません。</p>
           {m.manageLocked ? <p className={styles.small}>{MANAGE_FORBIDDEN}</p> : null}

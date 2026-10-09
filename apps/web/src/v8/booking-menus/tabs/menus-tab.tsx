@@ -259,7 +259,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
           <div className={styles.sectionHead}>
             <h2 className={styles.sectionTitle}>メニュー</h2>
             <span className={styles.sectionDesc}>
-              {menuCount ?? menus.length}件・出しているもの {activeCount}
+              {menuCount ?? menus.length} 件・出しているもの {activeCount}
             </span>
           </div>
           <div className={styles.tableHead} role="row" aria-hidden="true">
@@ -329,7 +329,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
                   )}
                 </span>
                 <span className={styles.colCount}>
-                  <span className={styles.cellNum}>{menu.booking_count_30_days ?? 0}件</span>
+                  <span className={styles.cellNum}>{menu.booking_count_30_days ?? 0} 件</span>
                 </span>
                 <span className={styles.colStatus}>
                   <span className={`${styles.statePill} ${(visOverride[menu.id] ?? menu.is_active) ? styles.statePillOn : styles.statePillOff}`}>

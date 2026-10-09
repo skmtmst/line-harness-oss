@@ -120,7 +120,7 @@ export default function Reserved({
                 value={`${audienceLabel}${audienceCount === null ? '' : ` ${formatNumber(audienceCount)} 人`}${estimate && estimate.hiddenExcluded > 0 ? `（除く見込み ${formatNumber(estimate.hiddenExcluded)} 人）` : ''}`}
               />
               <Row label="送る日時" value={scheduledLabel} />
-              <Row label="メッセージ" value={`${messageTypeLabel(broadcast.messageType)} ${bubbleCount}通`} />
+              <Row label="メッセージ" value={`${messageTypeLabel(broadcast.messageType)} ${bubbleCount} 通`} />
               <Row label="状態" value={`予約中${approverLabel}`} />
             </dl>
             <p className={styles.slack}>

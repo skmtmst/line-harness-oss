@@ -1426,7 +1426,7 @@ export default function MediaLibraryListV8() {
       <Dialog
         open={bulkConfirm !== null}
         tone="destructive"
-        title={bulkConfirm ? `${bulkConfirm.length}件のメディアを削除しますか？` : ''}
+        title={bulkConfirm ? `${bulkConfirm.length} 件のメディアを削除しますか？` : ''}
         description="どこにも使われていないと確かめたものだけを消します。元に戻せません。"
         busy={bulkBusy}
         onCancel={() => {
@@ -1452,7 +1452,7 @@ export default function MediaLibraryListV8() {
         </p>
         {bulkBusy && bulkProgress ? (
           <p aria-live="polite">
-            処理中…（{bulkProgress.done}/{bulkProgress.total}件）
+            処理中…（{bulkProgress.done}/{bulkProgress.total} 件）
           </p>
         ) : null}
       </Dialog>

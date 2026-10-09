@@ -84,7 +84,7 @@ export function ExternalImportWorkspace({
             <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h2 className="text-ink text-sm font-bold">LINE側にあって、この管理画面に無いメニュー</h2>
-                <span className="text-ink-faint text-xs">{unmanaged.length}件</span>
+                <span className="text-ink-faint text-xs">{unmanaged.length} 件</span>
               </div>
               <div className="space-y-2">
                 {unmanaged.map((menu) => {

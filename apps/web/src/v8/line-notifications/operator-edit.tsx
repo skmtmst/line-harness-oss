@@ -336,7 +336,7 @@ function OperatorEditInner() {
           recipientType: teamId ? 'team' : 'staff',
           ...(teamId ? { teamId } : {}),
           recipientIds,
-          recipientLabel: `${recipientIds.length}人`,
+          recipientLabel: `${recipientIds.length} 人`,
           message: null,
           schedule,
           scheduleLabel,
@@ -437,7 +437,7 @@ function OperatorEditInner() {
   const description = editId
     ? '宛先はお店のスタッフ（運用者）です。どんなときに知らせるか・だれが受け取るか・いつ送るかを決めます。閉じるときに保存していなければ確認が出ます。'
     : '宛先はお店の人です。あとから顧客向けへは変えられません。顧客へ送るものは「顧客へのお知らせ」で作ります。'
-  const teamOptions = [{ value: '', label: 'スタッフを選ぶ' }, ...teams.map(team => ({ value: team.id, label: `${team.name}（${team.staffIds.length}人）` }))]
+  const teamOptions = [{ value: '', label: 'スタッフを選ぶ' }, ...teams.map(team => ({ value: team.id, label: `${team.name}（${team.staffIds.length} 人）` }))]
 
   return (
     <PageFrame kind="settings" boardId={editId ? 'hiBO8' : 'gjUz3'}>
@@ -608,7 +608,7 @@ function OperatorEditInner() {
                   {items.length > 0 ? (
                     <>
                       <p className={styles.staffSummary}>
-                        {`選択 ${recipientIds.length}人／LINEで受け取れる ${lineReachable.length}人／管理画面で受け取れる ${recipientIds.length}人`}
+                        {`選択 ${recipientIds.length} 人／LINEで受け取れる ${lineReachable.length} 人／管理画面で受け取れる ${recipientIds.length} 人`}
                       </p>
                       <p className={styles.staffNote}>0人のときは「受け取る人を1人以上選んでください」と出て、公開できません。</p>
                     </>

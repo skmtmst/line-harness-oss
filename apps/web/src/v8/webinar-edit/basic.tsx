@@ -137,7 +137,7 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
     try {
       if (dirty && !(await save())) return
       const response = await webinarApi.testNotifications(webinar.id)
-      setTestResult(`通知テスト：成功 ${response.data.sent}件・失敗 ${response.data.failed}件`)
+      setTestResult(`通知テスト：成功 ${response.data.sent} 件・失敗 ${response.data.failed} 件`)
       setTestConfirm(false)
     } catch (cause) {
       setError(describeSaveFailure(cause))

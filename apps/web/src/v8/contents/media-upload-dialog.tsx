@@ -251,7 +251,7 @@ export default function MediaUploadDialog({
             <div className="mb-2 flex items-center justify-between">
               <p className="text-ink text-sm font-bold">入れているもの</p>
               {busy || attempted ? null : (
-                <p className="text-ink-faint text-xs">{entries.length}件中 {doneCount}件 完了</p>
+                <p className="text-ink-faint text-xs">{entries.length} 件中 {doneCount} 件 完了</p>
               )}
             </div>
             {/*
@@ -359,11 +359,11 @@ export default function MediaUploadDialog({
         {error ? <Notice tone="danger" message={error} className="mx-6 mb-4" /> : null}
         <div className="border-hairline flex flex-wrap items-center justify-between gap-3 border-t px-6 py-4">
           <p className={errorCount > 0 ? 'text-danger text-xs font-semibold' : 'text-ink-faint text-xs'}>
-            {errorCount > 0 ? `${errorCount}件は登録できません` : `${entries.length}件を選択中`}
+            {errorCount > 0 ? `${errorCount} 件は登録できません` : `${entries.length} 件を選択中`}
           </p>
           <div className="flex items-center gap-2">
             <Button type="button" variant="primary" onClick={() => void uploadReady()} disabled={busy || readyCount === 0 || !accountId} busy={busy} busyLabel="登録しています…">
-              {`${readyCount}件を登録する`}
+              {`${readyCount} 件を登録する`}
             </Button>
           </div>
         </div>

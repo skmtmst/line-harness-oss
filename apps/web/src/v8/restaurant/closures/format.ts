@@ -201,9 +201,9 @@ export function tasksFor(closure: Pick<RestaurantClosure, 'id'>, tasks: Restaura
 /** 右の列の3行目「予約 2件 ・ 他サイト 未対応 2」。件数が分からないとき（null）は予約を書かない。 */
 export function statusLine(reservations: number | null, tasks: ClosureTasks, contacted: number | null = null): string {
   const parts: string[] = []
-  if (reservations !== null) parts.push(`予約 ${reservations}件`)
+  if (reservations !== null) parts.push(`予約 ${reservations} 件`)
   /* 連絡済み：休業を作った後に担当者が LINE で連絡した予約の数（重なる予約があるときだけ）。 */
-  if (reservations !== null && reservations > 0 && contacted !== null) parts.push(`連絡済み ${contacted}件`)
+  if (reservations !== null && reservations > 0 && contacted !== null) parts.push(`連絡済み ${contacted} 件`)
   if (tasks.total > 0) parts.push(tasks.open.length > 0 ? `他サイト 未対応 ${tasks.open.length}` : `他サイト 閉じた ${tasks.done}/${tasks.total}`)
   return parts.join(' ・ ')
 }
@@ -270,7 +270,7 @@ export function overlapMessage(conflicts: ReadonlyArray<Pick<RestaurantClosure, 
   const first = conflicts[0]
   const when = first.allDay || !first.startTime || !first.endTime ? rangeTitle(first) : `${rangeTitle(first)} ${first.startTime}〜${first.endTime}`
   const name = first.name && first.name !== KIND_LABEL[first.kind] ? `${KIND_LABEL[first.kind]}「${first.name}」` : KIND_LABEL[first.kind]
-  const more = conflicts.length > 1 ? `ほか ${conflicts.length - 1}件` : ''
+  const more = conflicts.length > 1 ? `ほか ${conflicts.length - 1} 件` : ''
   return `${when}の${name}${more ? `（${more}）` : ''}と重なっています。${tail}`
 }
 

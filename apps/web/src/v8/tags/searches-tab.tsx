@@ -273,7 +273,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
         : search.usedIn === undefined
           ? '使用先を確認できないため削除できません'
           : (search.usedIn?.length ?? 0) > 0
-            ? `使用中のため削除できません（${search.usedIn?.length ?? 0}件）`
+            ? `使用中のため削除できません（${search.usedIn?.length ?? 0} 件）`
             : '削除できるか確認できません'
       list.push({
         id: 'delete',
@@ -422,7 +422,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
       {pages > 1 ? (
         <div className={styles.pager}>
           <span className={styles.pagerCount}>
-            {`${filteredList.length}件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, filteredList.length)}件`}
+            {`${filteredList.length} 件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, filteredList.length)} 件`}
           </span>
           <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="保存した検索のページ送り" />
         </div>

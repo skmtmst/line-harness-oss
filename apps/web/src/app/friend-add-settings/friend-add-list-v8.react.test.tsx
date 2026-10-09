@@ -258,7 +258,7 @@ test('v8 の受け皿を止める選択は「止められない」確かめの�
     // 板 cFo2p：止められない確かめ
     const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')
     expect(dialog?.textContent).toContain('止められません')
-    expect(dialog?.textContent).toContain('12人')
+    expect(dialog?.textContent).toContain('12 人')
   })
 })
 

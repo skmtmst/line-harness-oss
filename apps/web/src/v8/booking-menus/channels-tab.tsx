@@ -99,7 +99,7 @@ function CalendarDetailDialog({
       <dl className={ch.detail}>
         <div className={ch.detailRow}><dt className={ch.detailKey}>カレンダー</dt><dd className={ch.detailValue}>{calendarId || '—'}</dd></div>
         <div className={ch.detailRow}><dt className={ch.detailKey}>状態</dt><dd className={ch.detailValue}><StaffStatusChip status={staff.status} /></dd></div>
-        <div className={ch.detailRow}><dt className={ch.detailKey}>外の予定（今週）</dt><dd className={ch.detailValue}>{staff.externalEventsThisWeek == null ? '—' : `${staff.externalEventsThisWeek}件`}</dd></div>
+        <div className={ch.detailRow}><dt className={ch.detailKey}>外の予定（今週）</dt><dd className={ch.detailValue}>{staff.externalEventsThisWeek == null ? '—' : `${staff.externalEventsThisWeek} 件`}</dd></div>
         <div className={ch.detailRow}><dt className={ch.detailKey}>最後に読んだ</dt><dd className={ch.detailValue}>{formatReadAt(staff.lastReadAt)}</dd></div>
         {staff.readError ? <div className={ch.detailRow}><dt className={ch.detailKey}>読めなかった理由</dt><dd className={ch.detailValue}>{staff.readError}</dd></div> : null}
       </dl>
@@ -380,7 +380,7 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
                 </span>
                 <span className={ch.cell} role="cell"><OneLine text={calendarId || '—'} /></span>
                 <span className={ch.cell} role="cell"><StaffStatusChip status={person.status} /></span>
-                <span className={`${ch.cell} ${ch.right}`} role="cell">{person.externalEventsThisWeek == null ? '—' : `${person.externalEventsThisWeek}件`}</span>
+                <span className={`${ch.cell} ${ch.right}`} role="cell">{person.externalEventsThisWeek == null ? '—' : `${person.externalEventsThisWeek} 件`}</span>
                 <span className={ch.cell} role="cell">{formatReadAt(person.lastReadAt)}</span>
                 <span className={ch.cell} role="cell">
                   {person.status === 'connected' ? (
@@ -419,7 +419,7 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
                 </span>
                 <span className={`${ch.cell} ${ch.wrap}`} role="cell">{label.how || '—'}</span>
                 <span className={ch.cell} role="cell"><ChannelStatusChip channel={channel} /></span>
-                <span className={`${ch.cell} ${ch.right}`} role="cell">{channel.todayCount == null ? '—' : `${channel.todayCount}件`}</span>
+                <span className={`${ch.cell} ${ch.right}`} role="cell">{channel.todayCount == null ? '—' : `${channel.todayCount} 件`}</span>
                 <span className={ch.cell} role="cell">—</span>
                 <span className={ch.cell} role="cell">
                   {channel.status === 'active' && (channel.key === 'line' || channel.key === 'manual') ? (

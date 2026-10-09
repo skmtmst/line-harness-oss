@@ -120,7 +120,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
       </div>
       <FileDropzone title="対応表のCSVをここに置く" hint="old_uid・new_uid 列のCSVを選びます" accept=".csv,text/csv" chooseLabel="CSVをアップロード" onFiles={(files) => void m.onUidFile(files)} />
       {m.file ? (
-        <AttachmentRow name={m.file.name} meta={`${formatNumber(m.mappings.length)}行・${formatMappingBytes(m.file.size)}`} onRemove={() => { m.setFile(null); m.setMappings([]); m.setMessage(null) }} />
+        <AttachmentRow name={m.file.name} meta={`${formatNumber(m.mappings.length)} 行・${formatMappingBytes(m.file.size)}`} onRemove={() => { m.setFile(null); m.setMappings([]); m.setMessage(null) }} />
       ) : <p className={styles.small}>ファイルは未選択です</p>}
       <div className={styles.cardFoot}>
         {canDecideItems ? (

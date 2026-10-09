@@ -386,7 +386,7 @@ export default function EventsListV8() {
                 aria-label="表示件数"
                 size="page-size"
                 value={String(perPage)}
-                options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))}
+                options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))}
                 onChange={(value) => setPerPage(Number(value))}
               />
             </div>

@@ -57,7 +57,7 @@ export function eventLabel(types: readonly string[]): string {
   if (types.length === 0) return 'まだ決めていません'
   const words = types.map(eventWord)
   if (words.length <= 2) return words.join('・')
-  return `${words.slice(0, 2).join('・')} ほか${words.length - 2}件`
+  return `${words.slice(0, 2).join('・')} ほか${words.length - 2} 件`
 }
 
 export function payloadLabel(types: readonly string[]): string {

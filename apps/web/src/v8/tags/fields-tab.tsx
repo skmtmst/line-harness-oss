@@ -323,7 +323,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
         : null
   const detailOf = (whenAvailable: string): string => kpiReason ?? whenAvailable
   const kpis = [
-    { title: '項目', icon: ClipboardList, value: summary?.total ?? null, unit: '件', detail: detailOf(typeof summary?.inUse === 'number' ? `使っている ${summary.inUse}件` : '使っている数は未集計') },
+    { title: '項目', icon: ClipboardList, value: summary?.total ?? null, unit: '件', detail: detailOf(typeof summary?.inUse === 'number' ? `使っている ${summary.inUse} 件` : '使っている数は未集計') },
     { title: '入力済みの友だち', icon: Users, value: summary?.registeredFriends ?? null, unit: '人', detail: detailOf('1つ以上入っている') },
     // 口そのものが無いときは、読込・失敗とは別の言葉にする（v7 と同じ）。
     { title: '回答フォームで集める', icon: FileText, value: summary?.formLinks ?? null, unit: '件', detail: kpiReason ?? (summary?.formLinks === null ? notConnectedText('回答フォームの登録先') : '回答で自動で入る') },
@@ -442,7 +442,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
                   </ContextMenu>
                 </Td>
                 <Td className={styles.fieldColType}><span className={styles.cellText}>{fieldTypeWord(field.type)}</span></Td>
-                <Td className={styles.fieldColType}><span className={styles.cellText}>{usage === null ? '—' : `${usage}人`}</span></Td>
+                <Td className={styles.fieldColType}><span className={styles.cellText}>{usage === null ? '—' : `${usage} 人`}</span></Td>
                 <Td className={styles.fieldColType}>
                   <span className={styles.cellText} title={field.formUsageCount === undefined ? '回答フォームの使用数は未集計' : undefined}>
                     {field.formUsageCount === undefined || field.formUsageCount === 0 ? '—' : `${field.formUsageCount}つ`}
@@ -470,7 +470,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
       {pages > 1 ? (
         <div className={styles.pager}>
           <span className={styles.pagerCount}>
-            {`${visible.length}件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, visible.length)}件`}
+            {`${visible.length} 件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, visible.length)} 件`}
           </span>
           <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="友だち情報欄のページ送り" />
         </div>
@@ -600,7 +600,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
             </div>
             <div><dt>差し込み名</dt><dd>{`{{field.${activeField.fieldKey}}}`}</dd></div>
             <div><dt>種類</dt><dd>{fieldTypeWord(activeField.type)}</dd></div>
-            <div><dt>入っている人</dt><dd>{knownUsageCount(activeField) === null ? '—' : `${knownUsageCount(activeField)}人`}</dd></div>
+            <div><dt>入っている人</dt><dd>{knownUsageCount(activeField) === null ? '—' : `${knownUsageCount(activeField)} 人`}</dd></div>
             <div><dt>回答フォーム</dt><dd>{activeField.formUsageCount === undefined ? '—' : `${activeField.formUsageCount}つ`}</dd></div>
             <div><dt>出す場所</dt><dd>{destinationLabel(activeField)}</dd></div>
           </dl>

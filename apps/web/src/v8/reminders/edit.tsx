@@ -783,7 +783,7 @@ function BasicsStageV8({
             rows={[
               { key: '基準日', value: basicsBaseSummary(value, dateFields, events) },
               { key: '対象者', value: '手順2で決める' },
-              { key: '通知', value: stepCount > 0 ? `${stepCount}通` : '手順3で作る' },
+              { key: '通知', value: stepCount > 0 ? `${stepCount} 通` : '手順3で作る' },
               { key: '状態', value: '下書き' },
             ]}
           />
@@ -943,7 +943,7 @@ function TargetStageV8({
             rows={[
               { key: '基準日', value: reminderTriggerLabel(settings.triggerType) },
               { key: '対象者', value: matched == null ? '—' : `${formatNumber(matched)} 人に送る予定` },
-              { key: '通知', value: settings.steps.length > 0 ? `${settings.steps.length}通` : '手順3で作る' },
+              { key: '通知', value: settings.steps.length > 0 ? `${settings.steps.length} 通` : '手順3で作る' },
               { key: '状態', value: '下書き' },
             ]}
           />
@@ -1059,7 +1059,7 @@ function TargetStageV8({
       <Dialog
         open={facesOpen}
         title="対象者を確認"
-        description={faces?.matched != null ? `送る予定 ${countLabel(faces.matched, '人')}の先頭${faces.sample.length}人です。` : undefined}
+        description={faces?.matched != null ? `送る予定 ${countLabel(faces.matched, '人')}の先頭${faces.sample.length} 人です。` : undefined}
         onCancel={() => setFacesOpen(false)}
       >
         {!faces || faces.loading
@@ -1190,11 +1190,11 @@ function MessagesStageV8({
   const examples = (
     <section className={styles.sideBox} aria-label="届く日時の例">
       <h2 className={styles.sideBoxTitle}>届く日時の例</h2>
-      <p className={styles.sideBoxNote}>{formatJpDay(sampleBase.current)} に{settings.triggerType === 'friend_field' ? '基準日がある' : '予約した'}人</p>
+      <p className={styles.sideBoxNote}>{formatJpDay(sampleBase.current)} に{settings.triggerType === 'friend_field' ? '基準日がある' : '予約した'} 人</p>
       <dl className={styles.sideRows}>
         {settings.steps.map((step, index) => (
           <div key={step.stableStepId} className={styles.sideRow}>
-            <dt>{index + 1}通目</dt>
+            <dt>{index + 1} 通目</dt>
             <dd>{formatMd(exampleSendAt(step, settings.deliveryMode, sampleBase.current))}</dd>
           </div>
         ))}
@@ -1250,7 +1250,7 @@ function MessagesStageV8({
                   <ReorderHandle
                     look="bare"
                     className={styles.grip}
-                    label={`${index + 1}通目の通知`}
+                    label={`${index + 1} 通目の通知`}
                     {...stepOrder.handle(step.stableStepId)}
                     {...stepOrder.handleProps(step.stableStepId)}
                   >
@@ -1290,7 +1290,7 @@ function MessagesStageV8({
                         className={styles.bodyArea}
                         value={step.messageContent}
                         maxLength={BODY_LIMIT}
-                        aria-label={`${index + 1}通目の本文`}
+                        aria-label={`${index + 1} 通目の本文`}
                         placeholder="友だちに届く本文を書きます"
                         onValueChange={(next) => updateStep(step.stableStepId, { messageContent: next })}
                         extraTokens={REMINDER_TOKENS}
@@ -1493,7 +1493,7 @@ function ScheduleStageV8({
             rows={[
               { key: '基準日', value: reminderTriggerLabel(settings.triggerType) },
               { key: '対象者', value: preview ? countLabel(preview.summary.audience, '人') : '—' },
-              { key: '通知', value: `${settings.steps.length}通` },
+              { key: '通知', value: `${settings.steps.length} 通` },
               { key: '状態', value: '下書き' },
             ]}
           />
@@ -1562,7 +1562,7 @@ function ScheduleStageV8({
                 <span role="cell" className={`${styles.colWho} ${styles.planWho}`} title={`対象になる人 全員（${countLabel(preview.summary.audience, '人')}）`}>
                   {`対象になる人 全員（${countLabel(preview.summary.audience, '人')}）`}
                 </span>
-                <span role="cell" className={styles.colStep}>{item.stepNumber}通目</span>
+                <span role="cell" className={styles.colStep}>{item.stepNumber} 通目</span>
                 <span role="cell" className={styles.colState} data-tone={item.state === 'duplicate' ? 'warn' : undefined}>
                   {item.state === 'duplicate' ? '重なり→1通にまとめる' : item.state === 'past' ? '基準日が過去' : '送る予定'}
                 </span>
@@ -1689,7 +1689,7 @@ function ConfirmStageV8({
             rows={[
               { key: '基準日', value: reminderTriggerLabel(settings.triggerType) },
               { key: '対象者', value: validation?.audience.matched != null ? `${formatNumber(validation.audience.matched)} 人` : '—' },
-              { key: '通知', value: `${settings.steps.length}通` },
+              { key: '通知', value: `${settings.steps.length} 通` },
               { key: '状態', value: '下書き → 有効にする' },
             ]}
           />

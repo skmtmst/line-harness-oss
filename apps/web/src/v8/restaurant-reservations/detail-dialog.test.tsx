@@ -44,10 +44,10 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
   it('予約の箱で開き、日時と卓・コースと予約元・アレルギー・これまでの来店が出る', async () => {
     const dialog = await openDetail()
     const text = () => dialog.textContent ?? ''
-    expect(text()).toMatch(/19:00〜21:00 ・ T4（4人卓）/)
-    expect(text()).toContain('秋の鹿肉コース 8,800 円 ・ Hot Pepper から')
+    expect(text()).toMatch(/19:00〜21:00 ・ T4（4 人卓）/)
+    expect(text()).toContain('秋の鹿肉コース ¥8,800 ・ Hot Pepper から')
     expect(text()).toContain('アレルギー：なし')
-    await waitFor(() => expect(text()).toContain('これまでの来店 3回・前回 8/14'))
+    await waitFor(() => expect(text()).toContain('これまでの来店 3 回・前回 8/14'))
     expect(fixture.customerHistory).toHaveBeenCalledWith('account-1', 'store-1', { phone: '090-1234-5678', lineUid: undefined })
     for (const name of ['取り消す', '変更する']) expect(within(dialog).getByRole('button', { name })).not.toBeNull()
   })

@@ -75,7 +75,7 @@ export function FriendTrend({ trend, loading }: { trend: DashboardFriendTrendPoi
             {trend.map((day, index) => {
               const label = trendDay(day.date)
               const latest = index === trend.length - 1
-              const name = `${label.jp}（${label.week}） 登録${day.added}人・ブロック${day.blocked}人`
+              const name = `${label.jp}（${label.week}） 登録${day.added} 人・ブロック${day.blocked} 人`
               return (
                 <div key={day.date} className={styles.column} title={name} aria-label={name} role="img">
                   <div className={styles.bars}>

@@ -1324,7 +1324,7 @@ export default function RichMenusListV8() {
             unit={groupKpiReady && groupFacets?.published != null ? '件' : ''}
             detail={groupKpiReady
               ? groupFacets?.published != null
-                ? `下書き ${(groupFacets?.total ?? groupTotal) - groupFacets.published}件`
+                ? `下書き ${(groupFacets?.total ?? groupTotal) - groupFacets.published} 件`
                 : '下書き —'
               : groupKpiUnavailableText}
           />

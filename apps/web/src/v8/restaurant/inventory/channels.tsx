@@ -226,7 +226,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
                 </Td>
                 <Td>{preparing && channel.receiveMethod === 'email_forward' ? 'メール転送（未設定）' : METHOD_LABEL[channel.receiveMethod]}</Td>
                 <Td><Status value={state.value} label={state.label} /></Td>
-                <Td align="right">{preparing || channel.todayCount === null ? '—' : `${channel.todayCount}件`}</Td>
+                <Td align="right">{preparing || channel.todayCount === null ? '—' : `${channel.todayCount} 件`}</Td>
                 <Td>{preparing ? '—' : formatAt(channel.lastReceivedAt, timezone)}</Td>
                 <Td align="right">{preparing || channel.receiveMethod === 'manual' ? '—' : channel.unreadableCount ?? '—'}</Td>
                 <Td>

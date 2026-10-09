@@ -71,7 +71,7 @@ const PERIOD_OPTIONS: Array<{ value: FriendPeriod; label: string }> = [
   { value: 'this', label: '今月' },
   { value: 'last', label: '先月' },
 ]
-const PAGE_SIZE_OPTIONS = [10, 20, 50].map((n) => ({ value: String(n), label: `${n}件表示` }))
+const PAGE_SIZE_OPTIONS = [10, 20, 50].map((n) => ({ value: String(n), label: `${n} 件表示` }))
 
 const DELETE_CHOICES: ReadonlyArray<readonly [DeleteChoice, string, string]> = [
   ['stop', '新しい人を受けるのをやめる（おすすめ）', 'URLは残し、「受付を終了しました」と表示します。'],
@@ -352,7 +352,7 @@ function InflowDetailContent() {
   })
   const friendPageCount = Math.max(1, Math.ceil(friendRows.length / friendPageSize))
   const friendPageRows = friendRows.slice((friendPage - 1) * friendPageSize, friendPage * friendPageSize)
-  const friendSummary = `${formatNumber(friendRows.length)} 人中 ${(friendPage - 1) * friendPageSize + 1}〜${Math.min(friendPage * friendPageSize, friendRows.length)}人`
+  const friendSummary = `${formatNumber(friendRows.length)} 人中 ${(friendPage - 1) * friendPageSize + 1}〜${Math.min(friendPage * friendPageSize, friendRows.length)} 人`
 
   // 削除の窓を開く。「…」と帯の「止める」から、選ぶ内容だけ変える。
   const openDelete = (choice: DeleteChoice) => {
@@ -468,7 +468,7 @@ function InflowDetailContent() {
             <KpiCard presentation="band" icon={null} title="今月 友だちになった" value={monthTotal} unit="人"
               detail={`先月より ${monthDelta == null ? '—' : `${monthDelta >= 0 ? '+' : ''}${formatNumber(monthDelta)}`}`} />
             <KpiCard presentation="band" icon={null} title="累計" value={funnel ? funnel.friend_add_count : null} unit="人"
-              detail={`${createdDate}から・いま残っている ${funnel?.remainingCount == null ? '—' : formatNumber(funnel.remainingCount)}人`} />
+              detail={`${createdDate}から・いま残っている ${funnel?.remainingCount == null ? '—' : formatNumber(funnel.remainingCount)} 人`} />
             <KpiCard presentation="band" icon={null} title="ブロック" value={funnel?.blockedCount ?? null} unit="人"
               detail={blockRate == null ? '割合は集計できません' : `友だちになった人の ${blockRate}%`} />
             <KpiCard presentation="band" icon={null} title="成果（コンバージョン）" value={funnel ? funnel.cv_count : null} unit="件"
@@ -555,7 +555,7 @@ function InflowDetailContent() {
               </section>
             ) : null}
             <div className={styles.ordersRow}>
-              <h3 className={styles.ordersTitle}>{`注文の明細 ${ordersSummary ? formatNumber(ordersSummary.total) : '—'}件`}</h3>
+              <h3 className={styles.ordersTitle}>{`注文の明細 ${ordersSummary ? formatNumber(ordersSummary.total) : '—'} 件`}</h3>
               <Button onClick={() => setShowOrders((current) => !current)} aria-expanded={showOrders}>注文を見る</Button>
             </div>
             {showOrders ? <RefOrdersPanel refCode={route.refCode} onSummaryChange={setOrdersSummary} /> : null}

@@ -398,7 +398,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
 
   const back = <Link href="/tags?tab=marks" className={styles.backLink}>← 対応マークへ</Link>
   const description = editing && selected
-    ? `${selected.friendCount}人に付いている・${shownTargets.map((target) => PLACE_LABELS[target]).filter(Boolean).join('・')}に出る`
+    ? `${selected.friendCount} 人に付いている・${shownTargets.map((target) => PLACE_LABELS[target]).filter(Boolean).join('・')}に出る`
     : '対応の状態を、色つきの印で管理します。'
 
   const aside = hideForm ? null : (

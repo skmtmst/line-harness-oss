@@ -171,7 +171,7 @@ export function templateUsageEntries(usedBy: TemplateUsedBy): Array<{ key: strin
     ...usedBy.scenarioSteps.map((usage) => ({
       key: `scenario-${usage.stepId}`,
       href: `/scenarios/detail?id=${usage.scenarioId}`,
-      label: `シナリオ「${usage.scenarioName}」${usage.stepOrder}通目`,
+      label: `シナリオ「${usage.scenarioName}」${usage.stepOrder} 通目`,
     })),
     ...usedBy.autoReplies.map((usage) => ({
       key: `auto-reply-${usage.id}`,

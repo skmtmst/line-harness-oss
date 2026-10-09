@@ -1152,7 +1152,7 @@ export default function BroadcastListV8() {
     <ListPagePagination>
       <span className={styles.pagerCount}>
         {pageCount > 1
-          ? `${formatNumber(resultTotal ?? visibleBroadcasts.length)} 件中 ${rangeFirst}〜${rangeLast}件`
+          ? `${formatNumber(resultTotal ?? visibleBroadcasts.length)} 件中 ${rangeFirst}〜${rangeLast} 件`
           : `${formatNumber(resultTotal ?? visibleBroadcasts.length)} 件`}
       </span>
       {pageCount > 1 ? (
@@ -1312,7 +1312,7 @@ export default function BroadcastListV8() {
           title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
           description={`削除しても、中の配信は未分類に残ります。いまこのフォルダに入っているのは${
             deletingFolder ? broadcasts.filter((b) => b.folderId === deletingFolder.id).length : 0
-          }件です。`}
+          } 件です。`}
           confirmLabel="削除する"
           destructive
           busy={folderBusy}

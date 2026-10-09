@@ -901,7 +901,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
       setExpanded((current) => withDrafts.some((setting) => setting.eventType === current) ? current : null)
       if (restoredEvents.length > 0) {
         setDirtyEvents(restoredEvents)
-        setNotice({ tone: 'success', text: `未保存の編集を${restoredEvents.length}件復元しました。確認して保存してください。` })
+        setNotice({ tone: 'success', text: `未保存の編集を${restoredEvents.length} 件復元しました。確認して保存してください。` })
       }
       setLoadState('ready')
       setCustomerLoadError(null)

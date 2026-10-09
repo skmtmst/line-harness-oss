@@ -168,7 +168,7 @@ function Preview({ draft }: { draft: DashboardPreferences }) {
         ) : (
           <div className={styles.previewStack}>
             {mobileToday.map((item) => <span key={item.id} className={styles.previewCard} data-small="">{labelOf(item.id)}</span>)}
-            {folded > 0 ? <span className={styles.previewCard} data-muted="">ほか {folded}件（「集計を見る」で開きます）</span> : null}
+            {folded > 0 ? <span className={styles.previewCard} data-muted="">ほか {folded} 件（「集計を見る」で開きます）</span> : null}
             {visible('main').map((item) => <span key={item.id} className={styles.previewCard}>{labelOf(item.id)}</span>)}
             {visible('right').map((item) => <span key={item.id} className={styles.previewCard} data-aside="">{labelOf(item.id)}</span>)}
           </div>

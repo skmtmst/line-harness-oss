@@ -212,7 +212,7 @@ export default function OpsDashboardV8() {
                   <p className={parts.line}>{lineUnregisteredLine(data.lineRegistration.unregisteredCount, unregistered)}</p>
                   {data.lineRegistration.unregisteredCount > 0 ? (
                     <button type="button" className={parts.textLink} onClick={() => void openUnregistered()}>
-                      {`未登録の${data.lineRegistration.unregisteredCount}人を見る`}
+                      {`未登録の${data.lineRegistration.unregisteredCount} 人を見る`}
                     </button>
                   ) : null}
                 </div>
