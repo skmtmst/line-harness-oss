@@ -415,7 +415,7 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
             )}
             {mileageAction?.kind === 'award_mileage' ? (
               <div className={styles.actionRow}>
-                <div><Field label="回答後に付けるマイル"><p className={styles.note}>回答フォームへの送信をきっかけにしています</p></Field></div>
+                <div><Field label="回答後に付けるマイル"><NumberInput unit="マイル" aria-label="回答後に付けるマイル" type="number" min={1} max={1_000_000} step={1} value={mileageAction.amount || ''} onChange={(event) => setActions(actions.map((action) => action === mileageAction ? { ...action, amount: Number(event.target.value) } : action))} /><p className={styles.note}>回答フォームへの送信をきっかけにしています</p></Field></div>
                 <Button type="button" variant="secondary" aria-label="マイル付与を外す" onClick={() => setActions(actions.filter((action) => action !== mileageAction))}>外す</Button>
               </div>
             ) : (

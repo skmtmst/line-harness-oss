@@ -20,3 +20,10 @@ it('外の Field が持つ識別子を継ぎ、誤りの欄へ移れる',()=>{
  const input=screen.getByRole('spinbutton',{name:'帰属期間'}) as HTMLInputElement
  expect(input.id).toBe('days');expect(input.getAttribute('aria-invalid')).toBe('true');input.focus();expect(document.activeElement).toBe(input)
 })
+
+it('識別子を省略した数値欄も Field のラベルとつながる',()=>{
+ const {container}=render(<Field label="人数"><NumberField value="2" unit="人" readOnly/></Field>)
+ const input=screen.getByRole('spinbutton',{name:'人数'}) as HTMLInputElement
+ const label=Array.from(container.querySelectorAll('label')).find(node=>node.textContent?.startsWith('人数'))
+ expect(input.id).not.toBe('');expect(label?.htmlFor).toBe(input.id)
+})

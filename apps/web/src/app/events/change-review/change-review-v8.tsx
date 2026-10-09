@@ -295,7 +295,14 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
                       className="border-hairline rounded-control border px-3 py-2 text-sm font-normal"
                     /></Field>
                 </div>
-                <div className="mt-3"><Field label="変える理由"><p className="text-ink-faint mt-1 text-xs">理由は変更の記録に残ります。友だちには送りません。</p></Field></div>
+                <div className="mt-3"><Field label="変える理由" required={isPublished}><textarea
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      rows={2}
+                      placeholder="例：会場の都合で時間を30分遅らせます"
+                      aria-label="変える理由"
+                      className="border-hairline rounded-control border px-3 py-2 text-sm font-normal"
+                    /><p className="text-ink-faint mt-1 text-xs">理由は変更の記録に残ります。友だちには送りません。</p></Field></div>
                 <div className="mt-3">
                   <Button variant="secondary" onClick={() => void runPreview()} disabled={previewBusy} busy={previewBusy} busyLabel="確かめています…">
                     影響を確かめる

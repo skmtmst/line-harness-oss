@@ -157,7 +157,7 @@ export function Field({
   const over = actualCount ? actualCount.value > actualCount.max : false
   const describedBy = [shownError ? errorId : null, showNote ? noteId : null, actualCount ? countId : null].filter(Boolean).join(' ') || undefined
   return (
-    <FieldContext.Provider value={{ label: typeof shownLabel === 'string' ? shownLabel : undefined, controlId: htmlFor, describedBy, invalid: Boolean(shownError), required: Boolean(actualRequired) }}>
+    <FieldContext.Provider value={{ label: typeof shownLabel === 'string' ? shownLabel : undefined, controlId, describedBy, invalid: Boolean(shownError), required: Boolean(actualRequired) }}>
     <div
       ref={fieldRef}
       className={styles.field}

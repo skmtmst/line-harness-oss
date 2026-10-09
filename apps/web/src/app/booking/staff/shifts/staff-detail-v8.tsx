@@ -963,7 +963,13 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
               </span>
             </p>
           ) : (
-            <div className={styles.switcherRow}><Field label="担当者を切り替える"><p className={styles.switcherNote}>保存すると、右の予約画面にすぐ出ます。</p></Field></div>
+            <div className={styles.switcherRow}><Field label="担当者を切り替える"><Select
+                  aria-label="担当者を切り替える"
+                  size="full"
+                  value={staffId}
+                  onChange={(value) => router.push(`/booking/staff/shifts?staff_id=${value}`)}
+                  options={staffList.map((item) => ({ value: item.id, label: item.display_name }))}
+                /><p className={styles.switcherNote}>保存すると、右の予約画面にすぐ出ます。</p></Field></div>
           )}
 
           {/* N-411: 本人勤務が閲覧のみのときは全編集部品をまとめて無効化する。
@@ -1228,7 +1234,20 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
               {!serviceConfigured ? (
                 <p className={shell.warnBand} role="status">Googleの接続設定がまだなのでつなげません。管理者に連絡してください。</p>
               ) : null}
-              <div className={styles.calendarRow}><Field label="カレンダーの ID">{calendarId ? (
+              <div className={styles.calendarRow}><Field label="カレンダーの ID"><input
+                    aria-label="カレンダーのID"
+                    value={calendarId ? (calendarInput || calendarId) : calendarInput}
+                    onChange={(event) => {
+                      if (calendarId) {
+                        setCalendarId(null)
+                        setCalendarInput(event.target.value)
+                      } else {
+                        setCalendarInput(event.target.value)
+                      }
+                    }}
+                    placeholder="例：example@example.invalid"
+                    className={styles.input}
+                  />{calendarId ? (
                   <span className={styles.connectedBadge}>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="5" /><path d="M3.8 6.2l1.4 1.4 3-3.2" /></svg>
                     つながっている

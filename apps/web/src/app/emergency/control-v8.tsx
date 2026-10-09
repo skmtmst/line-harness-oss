@@ -893,7 +893,7 @@ const EmergencyControlV8 = (
               ) : null}
             </>
           )}
-          <Field label="確認のため「」と入力"><input
+          <Field label={`確認のため「${confirmMode === 'stop' ? '停止' : '復旧'}」と入力`} required><input
               value={confirmWord}
               onChange={(event) => setConfirmWord(event.target.value)}
               autoFocus

@@ -149,7 +149,7 @@ export default function ColumnNewV8() {
             <h2 className={styles.cardTitle}>題名と分類</h2>
             <Field label="題名"><TextField aria-label="題名" value={draft.title} maxLength={120} onChange={(event) => set({ title: event.target.value })} /></Field>
             {touched && errorFor('title') ? <p className={styles.fieldError}>{errorFor('title')}</p> : <p className={styles.note}>{titleNotice(draft.title) ?? `題名はLINEの通知に${TITLE_NOTICE_LENGTH}文字まで出ます。`}</p>}
-            <div className={styles.row2}><Field label="分類"><div className={styles.fieldLabel}>
+            <div className={styles.row2}><Field label="分類"><TextField aria-label="分類" value={draft.category} maxLength={CATEGORY_MAX} placeholder="例：季節のこと" onChange={(event) => set({ category: event.target.value })} /><div className={styles.fieldLabel}>
                 前のコラムを下敷きにする
                 <Link href="/nen-campaigns?tab=columns" className={styles.linkAction}>一覧で元のコラムを選びます →</Link>
               </div></Field></div>
