@@ -39,6 +39,14 @@ describe('来店スタンプ（お客さまの LIFF）', () => {
     fx.cards.mockResolvedValue({ success: true, data: [{ card, wallet: wallet(6) }, { card: { ...card, id: 'gold', name: '選んだカード' }, wallet: { ...wallet(2), cardId: 'gold' } }] });
     render(<VisitStamps />); expect(await screen.findByText(name)).toBeTruthy();
   });
+  it.each(['other-shop-card', 'missing-card'])('別店舗・存在しないカード指定は通常の表示に戻る: %s', async (id) => {
+    window.history.replaceState(null, '', `/?page=visit-stamps&card=${id}`);
+    render(<VisitStamps />);
+    expect(await screen.findByText('然 来店スタンプカード')).toBeTruthy();
+    expect(fx.cards).toHaveBeenCalledWith('acc-1');
+    expect(fx.card).not.toHaveBeenCalled();
+    expect(fx.paperRequests).toHaveBeenCalledWith('acc-1', 'c1');
+  });
   it('ページを開き直すと、ゴールで受け取った次のカードを表示する', async () => {
     const previous = { ...card, settings: { ...card.settings, completion: 'next_card' as const, nextCardId: 'gold' } };
     const next = { ...card, id: 'gold', name: 'ゴールドカード' };
