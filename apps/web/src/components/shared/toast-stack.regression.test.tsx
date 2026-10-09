@@ -13,8 +13,16 @@ it('F-3: 通知が消えたら残る通知の位置を200msで詰める', async 
   })
   render(<ToastHost />)
   await act(async () => { notifyToast('最初', { duration: 0 }); notifyToast('次', { duration: 0 }) })
-  fireEvent.click(screen.getAllByRole('button', { name: '知らせを閉じる' })[0])
-  await act(async () => new Promise(resolve => setTimeout(resolve, 180)))
-  expect(animate).toHaveBeenCalledWith(expect.any(Array), expect.objectContaining({ duration: 200 }))
-  expect(screen.getByText('次')).toBeTruthy()
+  // 閉じた通知は 150ms のあいだ場所を取ってから消え、その後の再描画で
+  // 残った通知の位置を詰める。本物の時計で 180ms 待つと、混み合った機械では
+  // 消える処理が終わる前に確かめてしまうので、時計を止めて進める。
+  vi.useFakeTimers()
+  try {
+    fireEvent.click(screen.getAllByRole('button', { name: '知らせを閉じる' })[0])
+    await act(async () => { vi.advanceTimersByTime(180) })
+    expect(animate).toHaveBeenCalledWith(expect.any(Array), expect.objectContaining({ duration: 200 }))
+    expect(screen.getByText('次')).toBeTruthy()
+  } finally {
+    vi.useRealTimers()
+  }
 })
