@@ -324,3 +324,6 @@
 
 /* WEB-006: 枠なしでも焦点の輪を残す。 */
 [data-theme='v8'] .textTrigger:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
+
+/* B-152・仕上げ7 */
+[data-theme='v8'] .trigger:disabled { opacity: var(--polish-disabled-opacity); }

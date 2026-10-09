@@ -166,3 +166,9 @@
 }
 /* B-152・仕上げ5 */
 [data-theme='v8'] .searchIcon { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); color: var(--color-ink-secondary); }
+
+/* B-152・仕上げ7：輪は検索欄の外側だけに出す。 */
+html[data-theme='v8'] .search:has(.input:focus-visible) { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
+html[data-theme='v8'] .search .input:focus-visible { outline: none; }
+html[data-theme='v8'] .disabled { opacity: var(--polish-disabled-opacity); }
+html[data-theme='v8'] .disabled .input:disabled { opacity: 1; }

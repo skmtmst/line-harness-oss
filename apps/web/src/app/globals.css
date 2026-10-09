@@ -466,6 +466,16 @@
 /* B-152・仕上げ3：表 */
 /* B-152・仕上げ4：状態の札（5色） */
 /* B-152・仕上げ5：印 */
+/* B-152・仕上げ7：操作の反応 */
+:root {
+  --polish-hover: rgb(29 29 31 / 0.04);
+  --polish-active: rgb(29 29 31 / 0.08);
+  --polish-focus: #2563eb;
+  --polish-focus-width: 2px;
+  --polish-focus-offset: 2px;
+  --polish-disabled-opacity: 0.5;
+  --polish-interaction-duration: 120ms;
+}
 :root {
   --polish-icon-control: 16px;
   --polish-icon-heading: 20px;
@@ -2851,3 +2861,19 @@ select:not([multiple]):not(.appearance-none) {
 [data-theme='v8'] :is(h1, h2, h3) > svg.lucide {
   width: var(--polish-icon-heading); height: var(--polish-icon-heading); stroke-width: var(--polish-icon-stroke); color: inherit;
 }
+
+/* キーボードの輪は、画面から渡されたクラスにも共通で効く。 */
+html[data-theme='v8'] :is(button, a, input, textarea, select, [tabindex], [role='button'], [role='tab'], [role='menuitem'], [role='option']):focus-visible {
+  outline: var(--polish-focus-width) solid var(--polish-focus);
+  outline-offset: var(--polish-focus-offset);
+}
+html[data-theme='v8'] :is(button, input, textarea, select, [role='button'], [role='tab'], [role='menuitem'], [role='option']) {
+  transition-duration: var(--polish-interaction-duration);
+}
+html[data-theme='v8'] :is(button, [role='button'], [role='tab'], [role='menuitem'], [role='option']):hover:not(:disabled):not([aria-disabled='true']) {
+  background-image: linear-gradient(var(--polish-hover), var(--polish-hover));
+}
+html[data-theme='v8'] :is(button, [role='button'], [role='tab'], [role='menuitem'], [role='option']):active:not(:disabled):not([aria-disabled='true']) {
+  background-image: linear-gradient(var(--polish-active), var(--polish-active));
+}
+html[data-theme='v8'] :is(button, input, textarea, select, [role='button'], [role='tab'], [role='menuitem'], [role='option']):is(:disabled, [aria-disabled='true']) { opacity: var(--polish-disabled-opacity); }

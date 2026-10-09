@@ -138,3 +138,7 @@
 }
 [data-theme='v8'] .button[data-variant='plain']:not(:focus-visible) { outline-color: transparent; background: transparent; }
 }
+
+/* B-152・仕上げ7 */
+[data-theme='v8'] .button:disabled { opacity: var(--polish-disabled-opacity); }
+[data-theme='v8'] .button:is(:hover, :active):not(:disabled) { filter: none; }
