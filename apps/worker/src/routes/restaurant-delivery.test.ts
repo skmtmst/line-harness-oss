@@ -764,3 +764,168 @@ describe('取り消せない操作（受入条件4）', () => {
     expect(response.status).toBe(403);
   });
 });
+
+describe('書き込みは店舗管理者以上だけ（受入条件1）', () => {
+  it('担当者（staff）は注文を受け付けられない', async () => {
+    seedOrder();
+    useStaffRole('staff');
+    const response = await call('/api/restaurant-test/delivery/orders/order-1/accept', {
+      body: {},
+      token: 'staff-session',
+    });
+    expect(response.status).toBe(403);
+    expect(orderRow()?.status).toBe('new');
+    expect(deliveryCalls).toHaveLength(0);
+    expect(dispatchRows()).toHaveLength(0);
+  });
+
+  it('担当者（staff）は準備完了にできない', async () => {
+    seedOrder({ status: 'cooking' });
+    useStaffRole('staff');
+    const response = await call('/api/restaurant-test/delivery/orders/order-1/ready', {
+      body: {},
+      token: 'staff-session',
+    });
+    expect(response.status).toBe(403);
+    expect(orderRow()?.status).toBe('cooking');
+    expect(deliveryCalls).toHaveLength(0);
+  });
+
+  it('担当者（staff）は受け渡し済みにできない', async () => {
+    seedOrder({ status: 'cooking' });
+    useStaffRole('staff');
+    const response = await call('/api/restaurant-test/delivery/orders/order-1/handed-over', {
+      body: {},
+      token: 'staff-session',
+    });
+    expect(response.status).toBe(403);
+    expect(orderRow()?.status).toBe('cooking');
+    expect(deliveryCalls).toHaveLength(0);
+  });
+
+  it('担当者（staff）は注文を拒否できない', async () => {
+    seedOrder();
+    useStaffRole('staff');
+    const response = await call('/api/restaurant-test/delivery/orders/order-1/reject', {
+      body: { reason_code: 'out_of_stock' },
+      token: 'staff-session',
+    });
+    expect(response.status).toBe(403);
+    expect(orderRow()?.status).toBe('new');
+  });
+
+  it('担当者（staff）は品切れをまとめて切り替えられない', async () => {
+    useStaffRole('staff');
+    const response = await call('/api/restaurant-test/delivery/menu-items/bulk-sold-out', {
+      body: { item_ids: ['item-1'], sold_out: true },
+      token: 'staff-session',
+    });
+    expect(response.status).toBe(403);
+    expect(deliveryCalls).toHaveLength(0);
+    expect(dispatchRows()).toHaveLength(0);
+  });
+
+  it('見るだけの一覧・履歴・CSV・商品一覧は担当者（staff）でも使える', async () => {
+    seedOrder();
+    useStaffRole('staff');
+    for (const path of [
+      '/api/restaurant-test/delivery/orders',
+      '/api/restaurant-test/delivery/orders/order-1',
+      '/api/restaurant-test/delivery/history',
+      '/api/restaurant-test/delivery/history.csv',
+      '/api/restaurant-test/delivery/menu-items',
+    ]) {
+      const response = await call(path, { token: 'staff-session' });
+      expect(response.status, path).toBe(200);
+    }
+  });
+});
+
+describe('期限が過ぎた受付停止の自動再開（受入条件2）', () => {
+  /** 30分の停止をかける。D-6の窓から送られる形と同じ。 */
+  async function stopFor30m() {
+    const response = await call('/api/restaurant-test/delivery/intake/stop', {
+      body: { preset: '30m', services: ['ubereats'] },
+      confirm: INTAKE_STOP_CONFIRM_TOKEN,
+    });
+    expect(response.status).toBe(200);
+    deliveryCalls = [];
+    return response;
+  }
+
+  function stateRow(service = 'ubereats'): Record<string, unknown> | undefined {
+    return testDb.raw
+      .prepare('SELECT * FROM rt_delivery_service_states WHERE store_id = ? AND service = ?')
+      .get('store-shibuya', service) as Record<string, unknown> | undefined;
+  }
+
+  async function servicesFromOrders(): Promise<
+    Array<{ service: string; intakeStatus: string; stopUntil: string | null }>
+  > {
+    const response = await call('/api/restaurant-test/delivery/orders');
+    expect(response.status).toBe(200);
+    const data = (await response.json()) as {
+      services: Array<{ service: string; intakeStatus: string; stopUntil: string | null }>;
+    };
+    return data.services;
+  }
+
+  it('期限が過ぎたら一覧を読んだ時点で受付中へ戻り、再開も送られる', async () => {
+    await stopFor30m();
+    vi.setSystemTime(new Date(NOW.getTime() + 31 * 60 * 1000));
+
+    const services = await servicesFromOrders();
+    expect(services.find((state) => state.service === 'ubereats')).toMatchObject({
+      intakeStatus: 'open',
+      stopUntil: null,
+    });
+    expect(deliveryCalls.some((request) => request.url.endsWith('/intake/resume'))).toBe(true);
+    expect(stateRow()).toMatchObject({ intake_status: 'open', stop_until: null });
+    expect(dispatchRows().at(-1)).toMatchObject({
+      action: 'intake_resume',
+      target_kind: 'service',
+      target_id: 'ubereats',
+      status: 'succeeded',
+    });
+  });
+
+  it('期限内はそのまま停止で残り、再開は送らない', async () => {
+    await stopFor30m();
+    vi.setSystemTime(new Date(NOW.getTime() + 29 * 60 * 1000));
+
+    const services = await servicesFromOrders();
+    expect(services.find((state) => state.service === 'ubereats')?.intakeStatus).toBe('stopped');
+    expect(deliveryCalls).toHaveLength(0);
+    expect(stateRow()).toMatchObject({ intake_status: 'stopped' });
+  });
+
+  it('再開を送れなかったサービスは停止のまま残り、次に読んだ時にもう一度試す', async () => {
+    await stopFor30m();
+    vi.setSystemTime(new Date(NOW.getTime() + 31 * 60 * 1000));
+
+    sendFailStatus = 429;
+    const failed = await servicesFromOrders();
+    expect(failed.find((state) => state.service === 'ubereats')?.intakeStatus).toBe('stopped');
+    expect(stateRow()).toMatchObject({ intake_status: 'stopped' });
+    expect(dispatchRows().at(-1)).toMatchObject({ action: 'intake_resume', status: 'retryable_failed' });
+
+    sendFailStatus = null;
+    const retried = await servicesFromOrders();
+    expect(retried.find((state) => state.service === 'ubereats')?.intakeStatus).toBe('open');
+    expect(stateRow()).toMatchObject({ intake_status: 'open', stop_until: null });
+  });
+
+  it('手で再開した後は自動再開を重ねて送らない', async () => {
+    await stopFor30m();
+    const resumed = await call('/api/restaurant-test/delivery/intake/resume', {
+      body: { services: ['ubereats'] },
+    });
+    expect(resumed.status).toBe(200);
+    deliveryCalls = [];
+
+    vi.setSystemTime(new Date(NOW.getTime() + 31 * 60 * 1000));
+    const services = await servicesFromOrders();
+    expect(services.find((state) => state.service === 'ubereats')?.intakeStatus).toBe('open');
+    expect(deliveryCalls).toHaveLength(0);
+  });
+});

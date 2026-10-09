@@ -391,7 +391,7 @@ export default function OrdersBoard({
         ))}
       </div>
 
-      <KpiBand presentation="separated" gridClassName="">
+      <KpiBand gridClassName="">
         <KpiCard
           presentation="cell"
           title="本日の注文"

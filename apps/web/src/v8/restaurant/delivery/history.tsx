@@ -222,7 +222,7 @@ export default function HistoryBoard({
 
       {data ? (
         <>
-          <KpiBand presentation="separated" gridClassName="">
+          <KpiBand gridClassName="">
             <KpiCard
               presentation="cell"
               title={isToday ? '本日の合計' : '合計'}

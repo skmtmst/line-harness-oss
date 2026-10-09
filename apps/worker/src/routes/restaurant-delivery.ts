@@ -216,6 +216,59 @@ async function serviceStates(
   );
 }
 
+/**
+ * 期限の過ぎた受付停止を自動で戻す（D-6 `XCVGd` の「過ぎると自動で再開します」）。
+ *
+ * 時刻起動（cron）は検証環境で使えないため、注文一覧を読むたびに確かめる形にする。
+ * 各サービスへ再開を送り、**通ったサービスだけ** D1 を受付中へ戻す。
+ * 送れなかったサービスは停止のまま残し、次に読み直した時にもう一度試す。
+ */
+async function resumeExpiredIntake(
+  c: Context<Env>,
+  store: StoreContext,
+  states: DeliveryServiceStateRow[],
+  now: number,
+): Promise<DeliveryServiceStateRow[]> {
+  const expired = states.filter(
+    (state) =>
+      state.intake_status === 'stopped' && state.stop_until !== null && state.stop_until <= now,
+  );
+  if (expired.length === 0) return states;
+
+  const resumed = new Set<DeliveryService>();
+  for (const state of expired) {
+    const result = await sendWithLedger(c, store, {
+      service: state.service,
+      action: 'intake_resume',
+      targetKind: 'service',
+      targetId: state.service,
+      now,
+    });
+    if (!result.ok) continue;
+    await upsertIntake(c, store, state.service, { intake: 'open', now });
+    resumed.add(state.service);
+  }
+  if (resumed.size === 0) return states;
+
+  auditLog(
+    c,
+    'restaurant.delivery.intake.resume',
+    { id: store.id, kind: 'rt_store' },
+    { result: 'success', lineAccountId: store.lineAccountId },
+  );
+  return states.map((state) =>
+    resumed.has(state.service)
+      ? {
+          ...state,
+          intake_status: 'open' as const,
+          stop_until: null,
+          resumed_at: now,
+          version: state.version + 1,
+        }
+      : state,
+  );
+}
+
 /** 同じ店舗で調理中の件数。急ぎ度の判定に渡す。 */
 async function cookingCountFor(c: Context<Env>, store: StoreContext): Promise<number> {
   const row = await dbFor(c.env, store.id)
@@ -478,7 +531,7 @@ restaurantDelivery.get(
     const yesterday = tokyoDayRange(tokyoDateText(now - 24 * 60 * 60), now);
 
     const [
-      states,
+      loadedStates,
       cookingCount,
       openCountRows,
       todayRows,
@@ -522,6 +575,9 @@ restaurantDelivery.get(
           Pick<DeliveryOrderRow, 'id' | 'status' | 'received_at' | 'wanted_at' | 'item_count'>
         >(),
     ]);
+
+    // 停止の期限が過ぎていたら、一覧を読んだこの時点で受付中へ戻す（D-6の約束）。
+    const states = await resumeExpiredIntake(c, store, loadedStates, now);
 
     const todaySummary = summarizeDay(todayRows.results);
     const yesterdaySummary = summarizeDay(yesterdayRows.results);
@@ -822,7 +878,8 @@ async function runOrderMutation(
 
 restaurantDelivery.post(
   '/api/restaurant-test/delivery/orders/:id/accept',
-  requireRole('owner', 'admin', 'staff'),
+  // 書き込みは店舗管理者以上だけ。担当者には画面にも出さない（BEHAVIOR.mdの「閲覧のみ」）。
+  requireRole('owner', 'admin'),
   async (c) =>
     runOrderMutation(c, {
       to: 'cooking',
@@ -834,7 +891,7 @@ restaurantDelivery.post(
 
 restaurantDelivery.post(
   '/api/restaurant-test/delivery/orders/:id/ready',
-  requireRole('owner', 'admin', 'staff'),
+  requireRole('owner', 'admin'),
   async (c) =>
     runOrderMutation(c, {
       to: 'ready',
@@ -846,7 +903,7 @@ restaurantDelivery.post(
 
 restaurantDelivery.post(
   '/api/restaurant-test/delivery/orders/:id/handed-over',
-  requireRole('owner', 'admin', 'staff'),
+  requireRole('owner', 'admin'),
   async (c) =>
     runOrderMutation(c, {
       to: 'handed_over',
@@ -1190,7 +1247,7 @@ restaurantDelivery.get(
  */
 restaurantDelivery.post(
   '/api/restaurant-test/delivery/menu-items/bulk-sold-out',
-  requireRole('owner', 'admin', 'staff'),
+  requireRole('owner', 'admin'),
   async (c) => {
     const store = await deliveryStore(c);
     if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
