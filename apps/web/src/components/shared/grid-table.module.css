@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
 .table {
   display: flex;
   flex-direction: column;
@@ -37,3 +39,4 @@
 .row[data-broken] { background: var(--color-status-danger-soft); }
 .row:last-child:not([data-head]) { box-shadow: none; }
 .cell { min-width: 0; }
+}

@@ -43,7 +43,7 @@
 .card[data-card-surface='inset'], .card[data-card-surface='muted'] {
   border: 0; box-shadow: none;
 }
-.card[data-card-surface='inset'] { box-shadow: inset 0 0 0 1px var(--color-hairline); }
+.card[data-card-surface='inset'] { box-shadow: var(--tpl-sa-ring); }
 .card[data-card-surface='muted'] { background: var(--color-surface-pearl); }
 .card[data-card-corner='control'] { border-radius: var(--radius-control); }
 .card[data-card-spacing] {

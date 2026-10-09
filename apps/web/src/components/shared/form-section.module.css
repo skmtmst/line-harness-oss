@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
 .section {
   display: flex;
   flex-direction: column;
@@ -13,3 +15,4 @@
 .heading { display: flex; flex-direction: column; gap: var(--tpl-hb2-op-head-gap); min-width: 0; }
 .title { margin: 0; color: var(--color-ink); font-size: var(--text-body); font-weight: 700; line-height: normal; }
 .description { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: normal; }
+}

@@ -136,5 +136,5 @@
   position: absolute;
   inset: calc((var(--tpl-icon-btn-row) - var(--tpl-icon-btn-row-hit)) / 2);
 }
-[data-theme='v8'] .button[data-variant='plain'] { outline: none; background: transparent; }
+[data-theme='v8'] .button[data-variant='plain']:not(:focus-visible) { outline-color: transparent; background: transparent; }
 }

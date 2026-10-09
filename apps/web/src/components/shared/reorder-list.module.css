@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
 .list {
   display: flex;
   flex-direction: column;
@@ -31,4 +33,5 @@
   line-height: var(--tpl-sa-staff-name-lh);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
 }

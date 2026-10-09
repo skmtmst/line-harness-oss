@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { BroadcastBubble } from '@line-crm/shared'
 const mocks = vi.hoisted(() => ({ upload: vi.fn(), play: vi.fn(), pause: vi.fn(), picker: vi.fn() }))
-vi.mock('@/lib/api', () => ({ api: { broadcastMessageAssets: { upload: mocks.upload } } }))
+vi.mock('@/lib/api', () => ({ ApiError: class ApiError extends Error {}, api: { broadcastMessageAssets: { upload: mocks.upload } } }))
 vi.mock('@/v8/template-edit/media-picker', () => ({ default: (props: unknown) => { mocks.picker(props); return null } }))
 vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 import Media from './message-composer-media'

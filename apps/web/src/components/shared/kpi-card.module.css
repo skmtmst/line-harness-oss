@@ -301,7 +301,7 @@
 /* 印なしの帯の横並びは kpi-band-v8.css（層なしCSS）に置く。 */
 [data-theme='v8'] .card[data-kpi-presentation='stacked'] {
   gap: var(--tpl-sa-kpi-inner-gap); padding: var(--tpl-sa-kpi-pad);
-  border-radius: var(--radius-card); outline: none; box-shadow: var(--tpl-sa-ring);
+  border-radius: var(--radius-card); outline-color: transparent; box-shadow: var(--tpl-sa-ring);
 }
 [data-theme='v8'] .card[data-kpi-presentation='stacked'] .head { min-height: 0; }
 [data-theme='v8'] .card[data-kpi-presentation='stacked'] .label {
@@ -364,7 +364,7 @@
 
 [data-theme='v8'] .card[data-kpi-density='mini'] {
   padding: var(--tpl-rest3-ec-mini-pad); gap: var(--tpl-rest3-ec-mini-inner-gap);
-  border-radius: var(--tpl-rest3-ec-mini-radius); outline: 0; background: var(--color-surface-pearl);
+  border-radius: var(--tpl-rest3-ec-mini-radius); outline-color: transparent; background: var(--color-surface-pearl);
 }
 [data-theme='v8'] .card[data-kpi-density='mini'] .head { min-height: 0; }
 [data-theme='v8'] .card[data-kpi-density='mini'] .label { color: var(--color-ink-secondary); font-size: var(--tpl-rest3-ec-xs); line-height: var(--tpl-rest3-ec-note-lh); }

@@ -23,6 +23,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import LinePreview from '@/components/shared/line-preview'
 import BroadcastTextBubble from './broadcast-text-bubble'
 import {
+  MAX_BUBBLES,
   messageLengthNotice,
 } from './message-limits'
 import {
@@ -510,7 +511,8 @@ export default function BroadcastForm({
   const [recentBroadcasts, setRecentBroadcasts] = useState<ApiBroadcast[]>([])
   const [inlineComposer, setInlineComposer] = useState<{ index: number; kind: 'carousel' | 'rich_message' | 'rich_video' } | null>(null)
   const [composerBusy, setComposerBusy] = useState(false)
-  const [composerTemplateIndex, setComposerTemplateIndex] = useState(0)
+  /** 吹き出しの［テンプレートから選ぶ］で開いたときだけ何通目か。作り方の「テンプレート」から開いたときは null（末尾へ足す・WEB256）。 */
+  const [composerTemplateIndex, setComposerTemplateIndex] = useState<number | null>(null)
   const [composerTemplateKind, setComposerTemplateKind] = useState<string | undefined>()
   const [templateSaveIndex, setTemplateSaveIndex] = useState<number | null>(null)
   const [templateSaveName, setTemplateSaveName] = useState('')
@@ -980,7 +982,7 @@ export default function BroadcastForm({
             ? contentTemplateToBubble(contentTemplate)
             : null
         if (bubble) {
-          updateBubble(composerTemplateIndex, { ...bubble, id: bubbles[composerTemplateIndex]?.id ?? bubble.id }, false)
+          placeTemplateBubble(bubble)
           setTitle(template?.name ?? contentTemplate?.name ?? '')
           setShowTemplatePicker(false)
         }
@@ -1107,6 +1109,22 @@ export default function BroadcastForm({
     return { ...bubble, id: item.id }
   }))
   }
+  /*
+   * 選んだテンプレートを置く。吹き出しの口から開いたときはその吹き出しを置き換え、
+   * 作り方の「テンプレート」から開いたときは今の入力を捨てずに末尾へ足す（WEB256・5通まで）。
+   */
+  const placeTemplateBubble = (bubble: BroadcastBubble) => {
+    if (composerTemplateIndex !== null && bubbles[composerTemplateIndex]) {
+      updateBubble(composerTemplateIndex, { ...bubble, id: bubbles[composerTemplateIndex].id }, false)
+      return
+    }
+    const empty = bubbles.length === 1 && bubbles[0]?.type === 'text' && !String(bubbles[0].content.text ?? '').trim()
+    if (!empty && bubbles.length >= MAX_BUBBLES) {
+      setError(`メッセージは${MAX_BUBBLES}通までです。追加する前に、不要なメッセージを削除してください。`)
+      return
+    }
+    setBubbles((items) => empty ? [bubble] : [...items, bubble])
+  }
   const moveBubble = (index: number, direction: -1 | 1) => setBubbles((items) => { const next = [...items]; const [item] = next.splice(index, 1); next.splice(index + direction, 0, item); return next })
 
   /*
@@ -1147,7 +1165,7 @@ export default function BroadcastForm({
       setTemplateApplyError('このテンプレートの内容を読み込めませんでした')
       return
     }
-    updateBubble(composerTemplateIndex, { ...bubble, id: bubbles[composerTemplateIndex]?.id ?? bubble.id }, false)
+    placeTemplateBubble(bubble)
     setSelectedTemplate(null)
     setShowTemplatePicker(false)
   }
@@ -2136,6 +2154,7 @@ export default function BroadcastForm({
                     onChange={(next) => {
                       setDeliveryMethod(next as typeof deliveryMethod)
                       if (next === 'template') {
+                        setComposerTemplateIndex(null); setComposerTemplateKind(undefined)
                         setShowTemplatePicker(true)
                         goToStep('message')
                       }
@@ -2143,7 +2162,7 @@ export default function BroadcastForm({
                     /* 選択済みの「テンプレートを選択」をもう一度押すと、
                        一覧を開き直せる（radio の change は発火しないため）。 */
                     onClick={value === 'template' && deliveryMethod === 'template'
-                      ? () => { setShowTemplatePicker(true); goToStep('message') }
+                      ? () => { setComposerTemplateIndex(null); setComposerTemplateKind(undefined); setShowTemplatePicker(true); goToStep('message') }
                       : undefined}
                   />
                 ))}
@@ -2352,7 +2371,7 @@ export default function BroadcastForm({
               </label>
             </div>
             <div className="mt-4 space-y-3">
-              {assets.filter((asset) => (!composerTemplateKind || asset.kind === composerTemplateKind) && (!asset.lineAccountId || asset.lineAccountId === selectedAccountId) && (!templatePickerQuery.trim() || asset.name.toLowerCase().includes(templatePickerQuery.trim().toLowerCase())) && (!templatePickerFolderId || templatePickerFolderId === '__none__')).map((asset) => <button key={asset.id} type="button" className="broadcast-template-row" onClick={() => { updateBubble(composerTemplateIndex, contentTemplateToBubble(asset), false); setSelectedTemplate(null); setShowTemplatePicker(false) }}><span className="min-w-0 flex-1"><strong>{asset.name}</strong><small>{typeLabel(asset.kind)}</small></span><span aria-hidden>›</span></button>)}
+              {assets.filter((asset) => (!composerTemplateKind || asset.kind === composerTemplateKind) && (!asset.lineAccountId || asset.lineAccountId === selectedAccountId) && (!templatePickerQuery.trim() || asset.name.toLowerCase().includes(templatePickerQuery.trim().toLowerCase())) && (!templatePickerFolderId || templatePickerFolderId === '__none__')).map((asset) => <button key={asset.id} type="button" className="broadcast-template-row" onClick={() => { placeTemplateBubble(contentTemplateToBubble(asset)); setSelectedTemplate(null); setShowTemplatePicker(false) }}><span className="min-w-0 flex-1"><strong>{asset.name}</strong><small>{typeLabel(asset.kind)}</small></span><span aria-hidden>›</span></button>)}
               {pickerTemplates.map((template) => (
                 <button key={template.id} type="button" onClick={() => setSelectedTemplate(template)} className="broadcast-template-row">
                   <span className="min-w-0 flex-1">

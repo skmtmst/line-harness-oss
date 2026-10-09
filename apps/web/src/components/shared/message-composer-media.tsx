@@ -8,6 +8,7 @@ import MediaPickerDialog from '@/v8/template-edit/media-picker'
 import { extractMediaMetadata, putMediaFile, validateMediaFile } from '@/v8/contents/media-direct-upload'
 import { emptyMessageKindState, type MessageKindState } from '@/components/scenarios/message-kind-fields'
 import Button from './button'
+import { japaneseDetailOf } from './api-error-message'
 import FileDropzone from './file-drop'
 import { TextField } from './text-field'
 import styles from './message-composer.module.css'
@@ -80,7 +81,7 @@ export default function ComposerMedia({ bubble, accountId, onChange, disabled, o
         if (!result.success) throw new Error(result.error || 'アップロードできませんでした。')
         if (live.current) onChange({ ...bubble.content, fileName: file.name, originalContentUrl: result.data.url, previewImageUrl: video ? String(bubble.content.previewImageUrl ?? '') : result.data.url })
       }
-    } catch (cause) { if (live.current) setError(cause instanceof Error ? cause.message : 'アップロードできませんでした。もう一度お試しください。') }
+    } catch (cause) { if (live.current) setError(japaneseDetailOf(cause) || (cause instanceof Error && cause.message && !/^API error: /.test(cause.message) && /[ぁ-んァ-ヶ一-龠]/u.test(cause.message) ? cause.message : 'アップロードできませんでした。もう一度お試しください。')) }
     finally { lock.current = false; if (live.current) setBusy(false); onBusyChange?.(false) }
   }
   return <>
