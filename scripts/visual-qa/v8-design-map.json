@@ -7,9 +7,202 @@
     "specs/pages/*.md"
   ],
   "designDir": "/Users/kentakenta/lh-work/design/v8",
-  "boardCount": 564,
+  "boardCount": 579,
   "retired": [],
   "boards": {
+    "jQRsr": {
+      "doc": "V8",
+      "name": "LIFF ① スタンプカード",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/jQRsr.png",
+      "url": "/visit-stamps",
+      "app": "liff"
+    },
+    "V2HU7": {
+      "doc": "V8",
+      "name": "LIFF ② 特典を店員に見せる",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/V2HU7.png",
+      "url": "/visit-stamps",
+      "app": "liff",
+      "state": {
+        "manual": "特典を押したあと（店員に見せる画面）。AC 10-09 に地図へ足した"
+      }
+    },
+    "xe8ga": {
+      "doc": "V8",
+      "name": "LIFF ② 使用済み",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/xe8ga.png",
+      "url": "/visit-stamps",
+      "app": "liff",
+      "state": {
+        "manual": "店員が押したあとの使用済み。AC 10-09 に地図へ足した"
+      }
+    },
+    "h2HKh": {
+      "doc": "V8",
+      "name": "LIFF ③ 紙のカードを移す",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/h2HKh.png",
+      "url": "/visit-stamps",
+      "app": "liff",
+      "state": {
+        "manual": "［紙のカードを移す］を押したあと。AC 10-09 に地図へ足した"
+      }
+    },
+    "etLd8": {
+      "doc": "V8",
+      "name": "LIFF ③ お店の確認待ち",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/etLd8.png",
+      "url": "/visit-stamps",
+      "app": "liff",
+      "state": {
+        "manual": "紙のカードを送ったあとの確認待ち。AC 10-09 に地図へ足した"
+      }
+    },
+    "glL3g": {
+      "doc": "V8",
+      "name": "LIFF 席の予約 ① 人数と日時",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/glL3g.png",
+      "url": "/restaurant/reserve/qa-token",
+      "app": "liff"
+    },
+    "km8EG": {
+      "doc": "V8",
+      "name": "LIFF 席の予約 ② 確認",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/km8EG.png",
+      "url": "/restaurant/reserve/qa-token",
+      "app": "liff",
+      "state": {
+        "manual": "① で人数と日時を選んで進んだあと。AC 10-09 に地図へ足した"
+      }
+    },
+    "sAnyy": {
+      "doc": "V8",
+      "name": "LIFF 席の予約 ③ 受け付けました",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/sAnyy.png",
+      "url": "/restaurant/reserve/qa-token",
+      "app": "liff",
+      "state": {
+        "manual": "② で予約したあと。AC 10-09 に地図へ足した"
+      }
+    },
+    "aLU3r": {
+      "doc": "V8",
+      "name": "404 LIFF ページが見つかりません V8",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/aLU3r.png",
+      "url": "/no-such-page",
+      "app": "liff"
+    },
+    "Nx5dz": {
+      "doc": "V8",
+      "name": "404 管理画面 ページが見つかりません V8",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": 1440,
+      "shot": "lint/V8/shots/Nx5dz.png",
+      "url": "/no-such-page"
+    },
+    "GcyTr": {
+      "doc": "V8",
+      "name": "予約 今日",
+      "kind": "画面",
+      "route": "/booking/bookings",
+      "routes": [
+        "/booking/bookings"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/GcyTr.png",
+      "url": "/booking/bookings"
+    },
+    "R8tlbw": {
+      "doc": "V8",
+      "name": "予約 今月",
+      "kind": "画面",
+      "route": "/booking/bookings",
+      "routes": [
+        "/booking/bookings"
+      ],
+      "width": "今月・一覧の見え方。range の値は実装に合わせて確かめる（AC 10-09）",
+      "shot": "lint/V8/shots/R8tlbw.png",
+      "url": "/booking/bookings?range=all"
+    },
+    "O2Z8u": {
+      "doc": "V8",
+      "name": "予約管理 今日（1152）V8",
+      "kind": "画面",
+      "route": "/booking/bookings",
+      "routes": [
+        "/booking/bookings"
+      ],
+      "width": 1152,
+      "shot": "lint/V8/shots/O2Z8u.png",
+      "url": "/booking/bookings"
+    },
+    "SDrMu": {
+      "doc": "V8",
+      "name": "状態 接続状態と送信枠（ふだん以外の形・2026-10-08）",
+      "kind": "状態",
+      "route": "/",
+      "routes": [
+        "/"
+      ],
+      "width": 1100,
+      "shot": "lint/V8/shots/SDrMu.png",
+      "url": "/",
+      "state": {
+        "manual": "ダッシュボードの接続状態と送信枠の帯の、ふだん以外の形（部分の板）"
+      }
+    },
+    "Ptr2u": {
+      "doc": "V8-B",
+      "name": "ウェビナー 公開中の編集：頭の「…」に［停止］V8（B-106 WEB-166・2026-10-09）",
+      "kind": "画面",
+      "route": "/webinars/edit",
+      "routes": [
+        "/webinars/edit"
+      ],
+      "width": 880,
+      "shot": "lint/V8-B/shots/Ptr2u.png",
+      "url": "/webinars/edit?id=webinar-1&pane=video",
+      "state": {
+        "manual": "頭の右の「…」を開いて［停止］の確かめの窓を出した形"
+      }
+    },
     "A0pDt": {
       "doc": "V8",
       "name": "自動応答 作る② どんなときに動くか V8",
