@@ -1,7 +1,6 @@
 // main.tsx — Auto-webinar (疑似ライブ) LIFF entry. Loaded via dynamic import
 // from apps/worker/src/client/main.ts (?page=webinar&slug=<slug>).
-// apps/liff/src/pages/Webinar.tsx と同一ロジックの legacy-client 移植版
-// (本番 LIFF は worker 内蔵クライアントのため。apps/liff は未デプロイ)。
+// Worker の入口と apps/liff の入口が共用する、申込・視聴・回答の本体。
 //
 // 時刻の権威はサーバー:
 //   期待位置 = offsetSeconds + (performance.now() - t0) / 1000
@@ -31,6 +30,7 @@ export interface WebinarContext {
   liffId: string;
   lineUserId: string;
   idToken: string;
+  apiBase?: string;
 }
 
 const DRIFT_TOLERANCE = 5;
@@ -131,6 +131,7 @@ interface ChatItem {
   authorName: string;
   body: string;
   mine?: boolean;
+  failed?: boolean;
   ctaCard?: WebinarCtaCard;
 }
 
@@ -139,7 +140,7 @@ function buildAuthHeaders(ctx: WebinarContext, extra: Record<string, string> = {
 }
 
 async function apiGet<T>(path: string, ctx: WebinarContext): Promise<T> {
-  const url = new URL(path, window.location.origin);
+  const url = new URL(path, ctx.apiBase || window.location.origin);
   url.searchParams.set('liffId', ctx.liffId);
   const r = await fetch(url.toString(), { headers: buildAuthHeaders(ctx) });
   if (!r.ok) {
@@ -151,7 +152,7 @@ async function apiGet<T>(path: string, ctx: WebinarContext): Promise<T> {
 }
 
 async function apiPost<T>(path: string, body: unknown, ctx: WebinarContext): Promise<T> {
-  const url = new URL(path, window.location.origin);
+  const url = new URL(path, ctx.apiBase || window.location.origin);
   url.searchParams.set('liffId', ctx.liffId);
   const r = await fetch(url.toString(), {
     method: 'POST',
@@ -172,8 +173,11 @@ function formatJp(epoch: number): string {
   });
 }
 
-function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
+export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
   const [state, setState] = useState<WebinarState | null>(null);
+  const loadingRef = useRef(false);
+  const commentInFlight = useRef(false);
+  const [commentBusy, setCommentBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ended, setEnded] = useState(false);
   const [needsTap, setNeedsTap] = useState(false);
@@ -232,12 +236,16 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
   );
 
   const load = useCallback(async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    setError(null);
     try {
       const admissionSession = new URLSearchParams(window.location.search).get('sessionStartAt');
       const path = `/api/liff/webinars/${encodeURIComponent(slug)}` +
         (admissionSession ? `?sessionStartAt=${encodeURIComponent(admissionSession)}` : '');
       const s = await apiGet<WebinarState>(path, ctx);
       if (s.live) {
+        s.playlistUrl = new URL(s.playlistUrl, ctx.apiBase || window.location.origin).toString();
         t0Ref.current = performance.now();
         baseOffsetRef.current = s.offsetSeconds;
         commentIdxRef.current = 0;
@@ -263,6 +271,8 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
       else if (status === 404) setError('この配信は見つかりませんでした。');
       else setError('読み込みに失敗しました。開き直してください。');
       console.error(err);
+    } finally {
+      loadingRef.current = false;
     }
   }, [slug, ctx]);
 
@@ -280,7 +290,7 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
 
   // 待機画面: カウントダウン + 開始時刻到達で自動リロード
   useEffect(() => {
-    if (!state || state.live) return;
+    if (!state || state.live || error) return;
     if (state.nextSessionAt === null) return;
     const timer = setInterval(() => {
       const remain = state.nextSessionAt! - Math.floor(Date.now() / 1000);
@@ -297,7 +307,7 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
       );
     }, 1000);
     return () => clearInterval(timer);
-  }, [state, load]);
+  }, [state, load, error]);
 
   // ライブ画面: プレーヤー初期化
   useEffect(() => {
@@ -523,8 +533,8 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
     return () => clearInterval(timer);
   }, [state, joined, slug, ctx, expectedPosition, ended]);
 
-  const sendComment = async () => {
-    if (!state) return;
+  const sendComment = async (retry?: ChatItem) => {
+    if (!state || commentInFlight.current) return;
     // ライブ中は現在位置、待機ルーム中は次回セッション帰属の負の位置で投稿する
     let sessionStartAt: number;
     let atSeconds: number;
@@ -537,13 +547,14 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
     } else {
       return;
     }
-    const text = input.trim();
+    const text = retry?.body ?? input.trim();
     if (!text) return;
-    setInput('');
-    setChat((prev) => [
-      ...prev,
-      { key: `u-${Date.now()}`, authorName: 'あなた', body: text, mine: true },
-    ]);
+    const key = retry?.key ?? `u-${crypto.randomUUID()}`;
+    commentInFlight.current = true;
+    setCommentBusy(true);
+    if (!retry || input.trim() === text) setInput('');
+    setChat(prev => retry ? prev.map(item => item.key === key ? { ...item, failed: false } : item)
+      : [...prev, { key, authorName: 'あなた', body: text, mine: true }]);
     try {
       await apiPost(`/api/liff/webinars/${encodeURIComponent(slug)}/comments`, {
         sessionStartAt,
@@ -552,6 +563,11 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
       }, ctx);
     } catch (err) {
       console.warn('comment post failed:', err);
+      setChat(prev => prev.map(item => item.key === key ? { ...item, failed: true } : item));
+      setInput(current => current === '' ? text : current);
+    } finally {
+      commentInFlight.current = false;
+      setCommentBusy(false);
     }
   };
 
@@ -578,13 +594,13 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
       // 開封記録 (フォーム機能側のファネル計測に乗せる)
       if (!IS_PREVIEW) {
         // 帰属は Authorization の LINE ID トークンで判定される (body の ID は無視)
-        void fetch(`/api/forms/${encodeURIComponent(card.formId)}/opened`, {
+        void fetch(new URL(`/api/forms/${encodeURIComponent(card.formId)}/opened`, ctx.apiBase || window.location.origin).toString(), {
           method: 'POST',
           headers: buildAuthHeaders(ctx, { 'Content-Type': 'application/json' }),
           body: JSON.stringify({}),
         }).catch(() => undefined);
       }
-      void fetch(`/api/forms/${encodeURIComponent(card.formId)}`)
+      void fetch(new URL(`/api/forms/${encodeURIComponent(card.formId)}`, ctx.apiBase || window.location.origin).toString())
         .then(async (r) => {
           const json = (await r.json()) as { success: boolean; data?: FormDef };
           if (!r.ok || !json.success || !json.data) throw new Error('form fetch failed');
@@ -651,7 +667,7 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
   };
 
   if (error) {
-    return <div className="p-8 text-center text-gray-300">{error}</div>;
+    return <div className="p-8 text-center text-gray-300">{error}<button type="button" onClick={() => void load()}>もう一度読み込む</button></div>;
   }
   if (!state) {
     return <div className="p-8 text-center text-gray-500">読み込み中...</div>;
@@ -677,7 +693,7 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
                 <span className={item.mine ? 'font-medium text-[#06C755]' : 'font-medium text-gray-400'}>
                   {item.authorName}
                 </span>{' '}
-                <span className="text-gray-100">{item.body}</span>
+                <span className="text-gray-100">{item.body}</span>{item.failed && <><span>（送れませんでした）</span><button type="button" disabled={commentBusy} onClick={() => void sendComment(item)}>再送する</button></>}
               </div>
             ))}
           </div>
@@ -687,14 +703,16 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') void sendComment();
+                if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.keyCode !== 229) void sendComment();
               }}
-              placeholder="コメントを入力..."
+              aria-label="コメントを書く"
+            placeholder="コメントを入力..."
               maxLength={500}
               className="flex-1 rounded-full bg-gray-800 px-4 py-2 text-base text-white placeholder-gray-500"
             />
             <button
-              onClick={() => void sendComment()}
+              disabled={commentBusy || !input.trim()}
+            onClick={() => void sendComment()}
               className="rounded-full bg-[#06C755] px-4 py-2 text-sm font-bold active:opacity-80"
             >
               送信
@@ -929,7 +947,7 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
               <span className={item.mine ? 'font-medium text-[#06C755]' : 'font-medium text-gray-400'}>
                 {item.authorName}
               </span>{' '}
-              <span className="text-gray-100">{item.body}</span>
+              <span className="text-gray-100">{item.body}</span>{item.failed && <><span>（送れませんでした）</span><button type="button" disabled={commentBusy} onClick={() => void sendComment(item)}>再送する</button></>}
             </div>
           ),
         )}
@@ -957,13 +975,15 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') void sendComment();
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.keyCode !== 229) void sendComment();
             }}
+            aria-label="コメントを書く"
             placeholder="コメントを入力..."
             maxLength={500}
             className="flex-1 rounded-full bg-gray-800 px-4 py-2 text-base text-white placeholder-gray-500"
           />
           <button
+            disabled={commentBusy || !input.trim()}
             onClick={() => void sendComment()}
             className="rounded-full bg-[#06C755] px-4 py-2 text-sm font-bold active:opacity-80"
           >
@@ -1076,7 +1096,7 @@ export function FormSheet({
     const idemKey = idemKeyRef.current.key;
     // #729: ヘッダ組立は共有部品へ寄せる。認証の取得(ctx)・URL・再送はここに残す。
     const postOnce = async (key: FormIdempotencyKey) => {
-      const r = await fetch(`/api/forms/${encodeURIComponent(def.id)}/submit`, {
+      const r = await fetch(new URL(`/api/forms/${encodeURIComponent(def.id)}/submit`, ctx.apiBase || window.location.origin).toString(), {
         method: 'POST',
         headers: buildAuthHeaders(ctx, buildFormSubmitHeaders(key)),
         body: JSON.stringify({ data: values }),

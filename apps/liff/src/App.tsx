@@ -34,6 +34,10 @@ export default function App() {
     );
   }
 
+  if (location.pathname === '/' && search.get('page') === 'webinar' && search.get('slug')) {
+    return <Navigate to={{ pathname: `/webinar/${encodeURIComponent(search.get('slug')!)}`, search: location.search }} replace />;
+  }
+
   const action = liffActionFromUrl(`https://liff.line.me/entry/${location.search}`);
   if (location.pathname === '/' && action) {
     const pathname = action.kind === 'visit_stamp' ? '/visit-stamps'
