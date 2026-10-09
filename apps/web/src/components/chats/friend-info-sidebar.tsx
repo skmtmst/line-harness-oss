@@ -997,7 +997,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                       aria-label="対応状況を変える"
                       treatment="pill"
                       icon={<StatusDot tone={SUPPORT_STATUS_TONES[effectiveStatus ?? 'unread']} />}
-                      options={STATUS_OPTIONS.map((option) => ({ ...option, leading: <StatusDot tone={SUPPORT_STATUS_TONES[option.value]} /> }))}
+                      options={STATUS_OPTIONS.map((option) => ({ ...option, tone: SUPPORT_STATUS_TONES[option.value], leading: <StatusDot tone={SUPPORT_STATUS_TONES[option.value]} /> }))}
                       value={effectiveStatus ?? 'unread'}
                       onChange={(next) => saveChatStatus(next as NonNullable<ChatStatusInfo['status']>)}
                     />

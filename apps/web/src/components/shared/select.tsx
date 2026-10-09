@@ -9,6 +9,7 @@ import MenuPortal from './menu-portal'
 import { SELECT_MENU_ROW_STRIDE, SelectMenu, SelectMenuAction, SelectMenuOption, SelectMenuSpacer, splitOptionHeads } from './select-menu'
 import styles from './select.module.css'
 import pillStyles from './status-pill.module.css'
+import type { StatusBadgeTone } from './status-badge'
 
 export interface SelectOption {
   value: string
@@ -16,6 +17,8 @@ export interface SelectOption {
   disabled?: boolean
   /** ★V8 の開いた中身で行の先頭に出す印（対応状況の色の点など）。v7 では出さない。 */
   leading?: ReactNode
+  /** 対応状況の札の地・文字・点に使う色。treatment='pill' のときだけ適用する。 */
+  tone?: StatusBadgeTone
 }
 
 /** 「＋ 〇〇」を押した後の板に渡すもの。 */
@@ -288,6 +291,7 @@ export default function Select({
         id={buttonId}
         type="button"
         className={`${styles.trigger} ${open ? styles.openTrigger : styles.closedTrigger} ${treatment === 'text' ? styles.textTrigger : treatment === 'pill' && v8 ? `${pillStyles.pill} ${pillStyles.control}` : ''}`}
+        data-tone={treatment === 'pill' && v8 ? selected?.tone ?? 'neutral' : undefined}
         aria-label={ariaLabel}
         aria-controls={listboxId}
         aria-expanded={open}
