@@ -1,3 +1,4 @@
+import { hydrateDocumentAnswers } from '../services/form-documents.js';
 import { getFriendSummary } from '@line-crm/db';
 import { getFriendUpcomingItems } from '../services/friend-upcoming-items.js';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
@@ -1291,7 +1292,7 @@ friends.get('/api/friends/:id/form-submissions', requireVisibleFriend, async (c)
     return c.json({
       success: true,
       data: {
-        items: page.items.map(serializeFriendFormSubmission),
+        items: await Promise.all(page.items.map(async row => { const item = serializeFriendFormSubmission(row); return { ...item, data: await hydrateDocumentAnswers(c.env.DB, item.data, c.get('staff')?.role, row.id) }; })),
         total,
         nextCursor: page.nextCursor,
       },

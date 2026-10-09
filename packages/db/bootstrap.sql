@@ -2881,6 +2881,27 @@ CREATE TABLE form_opens (
 , is_test INTEGER NOT NULL DEFAULT 0
   CHECK (is_test IN (0, 1)));
 
+CREATE TABLE form_submission_files (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  form_id TEXT NOT NULL REFERENCES forms(id),
+  form_version_id TEXT,
+  block_id TEXT NOT NULL,
+  friend_id TEXT NOT NULL REFERENCES friends(id),
+  submission_id TEXT REFERENCES form_submissions(id),
+  file_kind TEXT NOT NULL CHECK (file_kind IN ('image', 'pdf', 'identity')),
+  side TEXT NOT NULL CHECK (side IN ('single', 'front', 'back')),
+  r2_key TEXT NOT NULL UNIQUE,
+  filename TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  size_bytes INTEGER NOT NULL CHECK (size_bytes > 0 AND size_bytes <= 10485760),
+  scan_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  expires_at TEXT,
+  deleted_at TEXT,
+  deletion_reason TEXT
+);
+
 CREATE TABLE form_submissions (
   id TEXT PRIMARY KEY,
   form_id TEXT NOT NULL REFERENCES forms (id) ON DELETE CASCADE,
@@ -8912,6 +8933,12 @@ CREATE INDEX idx_form_opens_form ON form_opens (form_id, opened_at);
 
 CREATE INDEX idx_form_opens_test_month
   ON form_opens(form_id, is_test, opened_at);
+
+CREATE INDEX idx_form_submission_files_expiry ON form_submission_files(expires_at) WHERE deleted_at IS NULL;
+
+CREATE INDEX idx_form_submission_files_owner ON form_submission_files(line_account_id, form_id, friend_id, block_id);
+
+CREATE INDEX idx_form_submission_files_submission ON form_submission_files(submission_id);
 
 CREATE INDEX idx_form_submissions_form ON form_submissions (form_id);
 

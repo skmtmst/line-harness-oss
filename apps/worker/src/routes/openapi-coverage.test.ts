@@ -122,7 +122,7 @@ function formatKeys(keys: string[]): string {
  * 後続票で記載済みにした分はここから消す（残っているとテストが落とす）。
  */
 /** 未記載負債はこの件数より増やせない。 */
-const ALLOWLIST_MAX = 772;
+const ALLOWLIST_MAX = 771;
 
 /**
  * 記載済み operation の完全な基準一覧。
@@ -133,6 +133,10 @@ const ALLOWLIST_MAX = 772;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'GET /api/form-files/{id}/content',
+  'GET /api/forms/document-settings/{accountId}',
+  'PUT /api/forms/document-settings/{accountId}',
+  'POST /api/forms/{id}/files',
   "GET /api/hq/banners/folders",
   "POST /api/hq/banners/folders",
   "PATCH /api/hq/banners/folders/{id}",
@@ -1472,7 +1476,6 @@ const ALLOWLIST = new Set<string>([
   'POST /api/forms',
   'POST /api/forms/drafts',
   'POST /api/forms/{id}/archive',
-  'POST /api/forms/{id}/files',
   'PUT /api/forms/{id}',
 
   // 機能「scenarios」の管理画面用API（OpenAPI未記載・順次記載）（10件）

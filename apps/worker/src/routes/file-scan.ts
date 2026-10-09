@@ -116,7 +116,7 @@ export async function processDueFileScans(
       );
       if (external) {
         // 外の検査は設定があれば使う。鍵は設定の secret_ref が指す環境値から。
-        const head = await env.IMAGES.get(target.key, { range: { offset: 0, length: 256 * 1024 } });
+        const head = await env.IMAGES.get(target.key, target.key.startsWith('private/form-documents/') ? undefined : { range: { offset: 0, length: 256 * 1024 } });
         const bytes = head ? new Uint8Array(await head.arrayBuffer()) : new Uint8Array();
         try {
           const verdict = await external.scan(bytes, {

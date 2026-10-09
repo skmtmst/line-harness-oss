@@ -1,3 +1,5 @@
+import { formDocuments } from './routes/form-documents.js';
+import { purgeExpiredFormDocuments } from './services/form-documents.js';
 import { autoReplyUnmatched } from './routes/auto-reply-unmatched.js';
 import { instagram } from './routes/instagram.js';
 import { purgeInstagramTransientData } from './services/instagram.js';
@@ -571,6 +573,7 @@ app.route('/', commonActions);
 app.route('/', richMenus);
 app.route('/', trackedLinks);
 app.route('/', entryRoutes);
+app.route('/', formDocuments);
 app.route('/', forms);
 app.route('/', postalCode);
 app.route('/', adPlatforms);
@@ -1434,6 +1437,10 @@ async function runFrequentHeavyJobs(
   const jobs: ScheduledJob[] = [
     {name:'durable tracked click continuation',run:async()=>{const {processDueTrackedClicks}=await import('./services/tracked-click-steps.js');await processDueTrackedClicks(env);}},
     {name:'durable banner generation',run:async()=>{const {processDueBannerGenerations}=await import('./services/banner-jobs.js');await processDueBannerGenerations(env);}},
+    {
+      name: 'form document retention',
+      run: async () => { await purgeExpiredFormDocuments(env.DB, env.IMAGES, new Date(event.scheduledTime)); },
+    },
     {name:'API draft and integration retention',run:async()=>{const now=new Date(event.scheduledTime);await purgeExpiredScenarioDrafts(env.DB,now);await purgeInstagramTransientData(env.DB,now);}},
     {name:'booking waitlist expiry and promotion',run:async()=>{const {processBookingWaitlists}=await import('./services/waitlist-tick.js');await processBookingWaitlists(env);}},
     {
