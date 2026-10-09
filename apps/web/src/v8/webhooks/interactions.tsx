@@ -19,6 +19,7 @@ import { formatNumber } from '@/lib/format'
 import { ListPage } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import Button from '@/components/shared/button'
+import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
@@ -333,14 +334,14 @@ export default function WebhooksInteractionsV8() {
   } else {
     listBody = (
       <div className={styles.tableWrap}>
-        <DataTable className={styles.table}>
+        <DataTable columnLayout={{ headHeight: 'var(--tpl-wh-head-h)', rowHeight: 'var(--tpl-wh-log-row-h)', gap: 'var(--tpl-wh-col-gap)', padding: 'var(--tpl-wh-row-pad)', numberInset: 'var(--tpl-wh-num-pad-end)' }}>
           <thead>
-            <TableHeadRow className={styles.headRow} data-table-layout="columns">
+            <TableHeadRow data-table-layout="columns">
               <Th className={styles.colWhen}>いつ・どちら向き</Th>
-              <Th className={styles.colName}>つなぎ先</Th>
+              <Th grow className={styles.colName}>つなぎ先</Th>
               <Th className={styles.colBody}>送った・届いた中身</Th>
               <Th className={styles.colReply}>返事</Th>
-              <Th className={styles.colTime}>かかった時間</Th>
+              <Th align="right" className={styles.colTime}>かかった時間</Th>
               <Th className={styles.colOps}>操作</Th>
             </TableHeadRow>
           </thead>
@@ -349,12 +350,12 @@ export default function WebhooksInteractionsV8() {
               const reply = replyLabel(item)
               const lines = bodyLines(item)
               return (
-                <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
+                <Tr key={item.id} data-table-layout="columns" data-row-id={item.id}>
                   <Td className={styles.colWhen}>
                     <span className={styles.main}>{shortDateTime(item.startedAt)}</span>
                     <span className={styles.sub}>{item.direction === 'outgoing' ? '送る' : '受け取る'}</span>
                   </Td>
-                  <Td className={styles.colName}>
+                  <Td grow className={styles.colName}>
                     <span className={styles.main} title={`${item.webhookName}（${triggerWord(item)}）`}>{item.webhookName}</span>
                   </Td>
                   <Td className={styles.colBody}>
@@ -362,12 +363,9 @@ export default function WebhooksInteractionsV8() {
                     {lines.sub ? <span className={styles.sub} title={lines.sub}>{lines.sub}</span> : null}
                   </Td>
                   <Td className={styles.colReply}>
-                    <span className={styles.pill} data-tone={reply.failed ? 'danger' : 'active'}>
-                      <span className={styles.pillDot} aria-hidden="true" />
-                      {reply.text}
-                    </span>
+                    <StatusBadge tone={reply.failed ? 'danger' : 'success'}>{reply.text}</StatusBadge>
                   </Td>
-                  <Td className={styles.colTime}><span className={styles.main}>{seconds(item.durationMs)}</span></Td>
+                  <Td align="right" className={styles.colTime}><span className={styles.main}>{seconds(item.durationMs)}</span></Td>
                   <Td className={styles.colOps}>
                     <Button onClick={() => openDetail(item)} aria-label={`「${item.webhookName}」の中身を見る`}>中身を見る</Button>
                   </Td>
@@ -400,6 +398,7 @@ export default function WebhooksInteractionsV8() {
 
   return (
     <ListPage
+      help="行の「中身を見る」から 送った中身と返事・もう一度送る（失敗のとき）。"
       boardId="Uv9AA"
       headingSize="regular"
       title="外部連携"
@@ -451,7 +450,7 @@ export default function WebhooksInteractionsV8() {
     >
       {listBody}
       {pager}
-      <p className={styles.footNote}>行の「中身を見る」から 送った中身と返事・もう一度送る（失敗のとき）。</p>
+
     </ListPage>
   )
 }
@@ -563,10 +562,7 @@ function InteractionDialog({ item, accountId, techOpen, setTechOpen, canRetry, r
           <div className={`${styles.dialogRow} ${styles.dialogRowPill}`}>
             <dt>やり直せるか</dt>
             <dd>
-              <span className={styles.pill} data-tone={retryable ? 'active' : 'neutral'} title={why}>
-                <span className={styles.pillDot} aria-hidden="true" />
-                {retryable ? 'やり直せる' : 'やり直せない'}
-              </span>
+              <StatusBadge tone={retryable ? 'success' : 'neutral'} title={why}>{retryable ? 'やり直せる' : 'やり直せない'}</StatusBadge>
               {showWhy ? <span className={styles.dialogWhy}>{why}</span> : null}
             </dd>
           </div>

@@ -475,11 +475,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
         </div>
       ) : null}
 
-      <p className={styles.footNote}>
-        {canEdit
-          ? `${visible.length}件。行の「…」に：編集・${host ? '配る' : '移行（種類を変える）'}・削除。並べ替えはつまんで上下（キーボードは上下キー）`
-          : `${visible.length}件。`}
-      </p>
+
     </DelayedSkeleton>
   )
 
@@ -500,6 +496,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
       </KpiBand>}
 
       <ListPageBody
+        listHelp={canEdit ? `行の「…」に：編集・${host ? '配る' : '移行（種類を変える）'}・削除。並べ替えはつまんで上下（キーボードは上下キー）` : '行から中身を見られます。'}
         folders={<>
           {createButton(true)}
           <FolderPanel

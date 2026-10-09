@@ -42,6 +42,8 @@ export interface SelectProps {
   defaultOpen?: boolean
   disabled?: boolean
   error?: string
+  /** 理由を Field が描くとき、欄の赤枠だけを出す。 */
+  invalid?: boolean
   id?: string
   label?: string
   name?: string
@@ -91,6 +93,7 @@ export default function Select({
   defaultOpen = false,
   disabled = false,
   error,
+  invalid = false,
   id,
   label,
   name,
@@ -268,7 +271,7 @@ export default function Select({
         styles[size === 'page-size' ? 'pageSize' : size],
         open ? styles.open : null,
         disabled ? styles.disabled : null,
-        error ? styles.invalid : null,
+        error || invalid ? styles.invalid : null,
         className,
       ]
         .filter(Boolean)
@@ -296,7 +299,7 @@ export default function Select({
         aria-controls={listboxId}
         aria-expanded={open}
         aria-haspopup="listbox"
-        aria-invalid={Boolean(error) || undefined}
+        aria-invalid={Boolean(error) || invalid || undefined}
         disabled={disabled}
         onClick={() => setOpen((current) => !current)}
         onKeyDown={onButtonKeyDown}

@@ -572,6 +572,64 @@
   --color-support-hold: #4b5563;
   --color-support-hold-bg: #f1f2f4;
   --color-support-hold-dot: #6b7280;
+  /* G-9 共通メッセージ作成 */
+  --tpl-msg-composer-fill: 100%;
+  --tpl-msg-composer-image-max-h: none;
+  --tpl-msg-composer-drawer-w: 1160px;
+  --tpl-msg-composer-drawer-head-pad: 18px 24px;
+  --tpl-msg-composer-drawer-title: 20px;
+  --tpl-msg-composer-drawer-title-lh: 30px;
+  --tpl-msg-composer-drawer-footer-pad: 14px 24px;
+  --tpl-msg-composer-drawer-content-pad: 20px 24px;
+  --tpl-msg-composer-drawer-side-w: 380px;
+  --tpl-msg-composer-sticker-h: 72px;
+  --tpl-msg-composer-image-opacity: .2;
+  --tpl-msg-composer-carousel-chip-w: 94px;
+  --tpl-msg-composer-gap: 16px;
+  --tpl-msg-composer-gap-s: 6px;
+  --tpl-msg-composer-title: 15px;
+  --tpl-msg-composer-title-lh: 23px;
+  --tpl-msg-composer-head-pad: 10px 16px;
+  --tpl-msg-composer-head-h: 48px;
+  --tpl-msg-composer-heading-gap: 11px;
+  --tpl-msg-composer-head-gap: 10px;
+  --tpl-msg-composer-step-gap: 7px;
+  --tpl-msg-composer-step-line-w: 10px;
+  --tpl-msg-composer-sticker-switch-pad: 0 16px;
+  --tpl-msg-composer-sticker-chip-h: 26px;
+  --tpl-msg-composer-sticker-chip-pad: 0 12px;
+  --tpl-msg-composer-number: 22px;
+  --tpl-msg-composer-number-inset: 2px;
+  --tpl-msg-composer-kind-pad: 3px 10px;
+  --tpl-msg-composer-tab-gap: 15px;
+  --tpl-msg-composer-tab-pad: 0 20px;
+  --tpl-msg-composer-tab-button-pad: 12px 0 10px;
+  --tpl-msg-composer-insert-h: 24px;
+  --tpl-msg-composer-insert-pad: 2px 8px;
+  --tpl-msg-composer-tab-lh: 18px;
+  --tpl-msg-composer-content-pad: 20px;
+  --tpl-msg-composer-content-gap: 12px;
+  --tpl-msg-composer-text-h: 96px;
+  --tpl-msg-composer-text-pad: 12px;
+  --tpl-msg-composer-text-lh: 20px;
+  --tpl-msg-composer-choice-pad: 16px;
+  --tpl-msg-composer-choice-action-gap: 6px;
+  --tpl-msg-composer-choice-lh: 18px;
+  --tpl-msg-composer-made-gap: 20px;
+  --tpl-msg-composer-made-pad: 7px 16px 16px;
+  --tpl-msg-composer-thumbnail-w: 220px;
+  --tpl-msg-composer-thumbnail-h: 44px;
+  --tpl-msg-composer-add-pad: 5px 20px;
+  --tpl-msg-composer-media-h: 96px;
+  --tpl-msg-composer-audio-h: 36px;
+  --tpl-msg-composer-audio-icon-w: 32px;
+  --tpl-msg-composer-small-button-h: 28px;
+  --tpl-msg-composer-drawer-actions-gap: 28px;
+  --tpl-msg-composer-preview-card-w: 128px;
+  --tpl-msg-composer-preview-image-h: 62px;
+  --tpl-msg-composer-preview-action-h: 28px;
+  --tpl-msg-composer-media-preview: 160px;
+
   /* 面の分け方（案A・JeINq／EFV8l）。タイルと見本の選択色。 */
   --color-layout-picker-sample: #f1f2f4;
   --color-layout-picker-sample-selected: #cfe9d8;
@@ -750,6 +808,11 @@
   --tpl-an-nav-gap: 8px; --tpl-an-group-gap: 2px; --tpl-an-group-pad: 2px; --tpl-an-group-item-pad: 5px 12px; --tpl-an-seg-radius: 8px; --tpl-an-seg-item-radius: 6px; --tpl-an-seg-lh: 17px; --tpl-an-seg-thumb-shadow: 0 1px 2px #1d1d1f14;
   /* 設定・ログインユーザー・EC連携・プール・運営・分析の残り（作業役 st2） */ --tpl-st2-setnav-child-pad: 5px 10px; --tpl-st2-ticket-subject-lh: 17px; --tpl-st2-ticket-meta-lh: 16px; --tpl-st2-stop-gap: 14px; --tpl-st2-stop-note-pad: 10px 12px; --tpl-st2-stop-note-lh: 17px; --tpl-st2-member-row-gap: 14px; --tpl-st2-stop-side: 24px;
   --tpl-st2-od-z: 80; --tpl-st2-od-scrim: #1d1d1f59; --tpl-st2-od-w: 560px; --tpl-st2-od-pad: 24px; --tpl-st2-od-gap: 16px; --tpl-st2-od-shadow: -8px 0 24px #1d1d1f29; --tpl-st2-od-head-gap: 8px; --tpl-st2-od-head-text-gap: 4px; --tpl-st2-od-title: 18px; --tpl-st2-od-close: 36px; --tpl-st2-od-title-gap: 6px; --tpl-st2-od-fact-gap: 12px; --tpl-st2-od-fact-label-w: 90px; --tpl-st2-od-row-pad: 6px 0; --tpl-st2-od-time-gap: 10px; --tpl-st2-od-time-w: 80px; --tpl-st2-od-detail-gap: 4px; --tpl-st2-od-title-lh: 26px; --tpl-st2-od-text-lh: 17px; --tpl-st2-od-small-lh: 16px; --tpl-st2-od-section-lh: 19px;
+  /* ecc：設定内の列幅。狭い板でも右端を越えない。 */
+  --tpl-ecc-record-columns: minmax(0, 170fr) minmax(0, 150fr) minmax(0, 222fr) minmax(0, 170fr) minmax(82px, 90fr) 36px;
+  --tpl-ecc-sub-columns: minmax(0, 282fr) minmax(0, 100fr) minmax(0, 100fr) minmax(0, 90fr) minmax(100px, 110fr) 160px;
+  --tpl-ecc-identity-columns: minmax(0, 196fr) minmax(0, 180fr) minmax(0, 200fr) minmax(70px, 90fr) 190px;
+  --tpl-ecc-sub-search: 340px;
   --tpl-st2-id-band-lh: 18px; --tpl-st2-id-band-pad: 10px 12px; --tpl-st2-id-col-friend: 180px; --tpl-st2-id-col-evidence: 200px; --tpl-st2-id-col-confidence: 90px; --tpl-st2-id-col-ops: 190px; --tpl-st2-id-row-pad: 9px 14px; --tpl-st2-id-ops-gap: 6px;
   --tpl-st2-pc-side-w: 340px; --tpl-st2-pc-card-pad: 18px; --tpl-st2-pc-title-lh: 20px; --tpl-st2-pc-label-lh: 20px; --tpl-st2-pc-account-gap: 8px; --tpl-st2-pc-account-pad: 10px 12px; --tpl-st2-pc-fact-pad: 7px 0;
   --tpl-st2-imp-h: 48px; --tpl-st2-imp-pad: 0 20px; --tpl-st2-imp-gap: 12px; --tpl-st2-imp-icon: 16px; --tpl-st2-imp-btn-pad: 6px 12px; --tpl-st2-imp-bg: #fff4e0; --tpl-st2-imp-line: #f0b45a; --tpl-st2-imp-ink: #8a3c00; --tpl-st2-imp-strong: #b45309; --tpl-st2-imp-btn-line: #d9822b;
@@ -1201,6 +1264,12 @@
   --tpl-chip-h: 36px; --tpl-chip-pad: 0 10px; --tpl-chip-gap: 5px; --tpl-body-pad: 14px; --tpl-body-gap: 8px; --tpl-body-lh: 22px; --tpl-insert-pad: 0 14px; --tpl-body-spacer: 24px; --tpl-chip-row-gap: 4px; --tpl-rule-row-gap: 12px; --tpl-chip-label-lh: 20px; --tpl-kw-chip-pad: 4px 6px 4px 10px; --tpl-kw-input-w: 200px; --tpl-kw-input-pad: 0 12px; --tpl-seg-btn-h: 32px; --tpl-seg-btn-pad: 0 12px; --tpl-weekday-w: 48px; --tpl-field-gap-basic: 6px; --tpl-count-num-size: 24px; --tpl-count-num-lh: 29px; --tpl-summary-key-w: 140px; --tpl-summary-val-lh: 21px; --tpl-summary-gap: 13px; --tpl-conflict-desc-lh: 18px; --tpl-rule-note-lh: 16px;
   --tpl-action-row-pad: 10px 12px; --tpl-action-row-gap: 10px; --tpl-action-select-w: 140px;
   /* LINEアカウントの詳細（ihjfd）・送受信を止める（CFAyf）・資格情報（Msb1j）・アーカイブ（WOfBN）・登録の編集（n9Z2P）・乗り換え（x2dSNv）。 */
+  /* acct：登録の手順の下と、乗り換えの本文の寸法（既定の設定フォームは保つ）。 */
+  --tpl-acct-hierarchy-row-pad: 8px 12px;
+  --tpl-acct-hierarchy-footer-pad: 14px 24px 22px;
+  --tpl-acct-register-body-pad: 12px 24px 24px;
+  --tpl-acct-basic-pad: 20px 20px 44px;
+  --tpl-acct-handover-content-pad: 24px 24px 24px 0;
   --tpl-acd-pad: 16px 24px 24px 0; --tpl-acd-gap: 14px; --tpl-acd-stack-gap: 12px; --tpl-acd-side-w: 320px;
   --tpl-acd-card-pad: 18px; --tpl-acd-card-gap: 12px; --tpl-acd-card-radius: 12px; --tpl-acd-inner-pad: 16px;
   --tpl-acd-title-size: 14px; --tpl-acd-title-lh: 20px; --tpl-acd-head-gap: 2px; --tpl-acd-sub-lh: 16px;
@@ -1364,6 +1433,10 @@
   --tpl-sb-pill-pad: 3px 8px; --tpl-sb-pill-gap: 4px; --tpl-sb-pill-pad-sm: 2px 8px; --tpl-sb-chip-pad: 0 10px; --tpl-sb-chip-gap: 5px; --tpl-sb-chip-text: 12px; --tpl-sb-chip-lh: 18px;
   --tpl-sb-field-gap: 6px; --tpl-sb-field-value: 14px; --tpl-sb-field-value-lh: 21px; --tpl-sb-seg-pad: 2px; --tpl-sb-seg-item-pad: 6px 12px; --tpl-sb-seg-radius: 8px;
   --tpl-sb-conflict-pad: 12px 16px; --tpl-sb-conflict-gap: 12px; --tpl-sb-conflict-icon: 18px; --tpl-sb-conflict-title: 14px; --tpl-sb-conflict-title-lh: 20px; --tpl-sb-conflict-lh: 19px; --tpl-sb-conflict-band-top: 16px; --tpl-sb-conflict-band-bottom: -8px;
+  /* 設定の並び替え窓（ztgRD）の行。ほかの窓の寸法は変えない。 */
+  --tpl-reorder-row-h: 54px; --tpl-reorder-row-pad: 9px 12px; --tpl-reorder-gap: 12px; --tpl-reorder-handle-w: 14px;
+  --tpl-sett-manual-cols-narrow: 40px 106px minmax(0, 1fr) 76px 76px 52px;
+  --tpl-sett-sns-cols-narrow: minmax(0, 1fr) 120px minmax(0, 1fr) 96px 72px; --tpl-sett-sns-row-pad: 9px 20px; --tpl-sett-sns-head-pad: 13px 20px; --tpl-sett-sns-row-h: 60px;
   --tpl-sb-dlg-w: 520px; --tpl-sb-dlg-max-h: 720px; --tpl-sb-dlg-head-pad: 14px 18px 10px; --tpl-sb-dlg-title: 15px; --tpl-sb-dlg-desc: 12px; --tpl-sb-dlg-gap: 4px; --tpl-sb-dlg-body-pad: 8px 0; --tpl-sb-dlg-group-pad: 10px 18px 4px; --tpl-sb-dlg-row-pad: 6px 18px; --tpl-sb-dlg-move: 26px; --tpl-sb-dlg-foot-pad: 12px 18px; --tpl-sb-overlay-pad: 24px; --tpl-sb-dlg-link-pad: 6px 4px;
   --tpl-sb-usage-text: 10px; --tpl-sb-usage-pad: 1px 7px; --tpl-sb-state-pad: 24px; --tpl-sb-skeleton-gap: 12px;
   --tpl-sb-note-pad: 12px 16px; --tpl-sb-note-text: 12px; --tpl-sb-tbl-pad: 4px 12px; --tpl-sb-tbl-row-pad: 11px 8px; --tpl-sb-tbl-gap: 12px; --tpl-sb-tbl-head: 12px;
@@ -1377,10 +1450,10 @@
   /* 作業役 rest3（LINE通知 運用者へのお知らせ u8xibp）。 */ --tpl-rest3-op-kpi-pad: 16px 20px; --tpl-rest3-op-kpi-gap: 8px; --tpl-rest3-op-kpi-title: 12px; --tpl-rest3-op-kpi-title-lh: 18px; --tpl-rest3-op-kpi-num: 22px; --tpl-rest3-op-kpi-num-lh: 26px; --tpl-rest3-op-band-pad: 10px 12px; --tpl-rest3-op-search-w: 260px; --tpl-rest3-op-sort-w: 150px; --tpl-rest3-op-row-pad: 10px 14px; --tpl-rest3-op-head-pad: 9px 14px; --tpl-rest3-op-num-pad: 12px; --tpl-rest3-op-cols: minmax(0, 118px) minmax(0, 150px) minmax(0, 110px) minmax(0, 120px) 60px 80px minmax(max-content, 1fr); --tpl-rest3-run-search-w: 300px; --tpl-rest3-run-period-w: 136px; --tpl-rest3-run-row-pad: 9px 14px; --tpl-rest3-run-list-indent: 16px; --tpl-rest3-run-cols: minmax(0, 120px) minmax(0, 170px) minmax(0, 82px) minmax(max-content, 130px) minmax(0, 240px) minmax(88px, 1fr);
   /* 作業役 rest3（運用状態 緊急コントロール OHwbU）。 */ --tpl-rest3-em-gap: 14px; --tpl-rest3-em-kpi-gap: 12px; --tpl-rest3-em-kpi-inner-gap: 8px; --tpl-rest3-em-kpi-pad: 16px 20px; --tpl-rest3-em-radius: 12px; --tpl-rest3-em-tile: 24px; --tpl-rest3-em-tile-radius: 9px; --tpl-rest3-em-small: 12px; --tpl-rest3-em-small-lh: 18px; --tpl-rest3-em-num: 22px; --tpl-rest3-em-num-lh: 26px; --tpl-rest3-em-unit-gap: 3px; --tpl-rest3-em-card-pad: 16px; --tpl-rest3-em-title: 14px; --tpl-rest3-em-title-lh: 20px; --tpl-rest3-em-row-gap: 12px; --tpl-rest3-em-target-gap: 20px; --tpl-rest3-em-body: 13px; --tpl-rest3-em-body-lh: 19px; --tpl-rest3-em-band-pad: 12px 14px; --tpl-rest3-em-band-radius: 10px; --tpl-rest3-em-line-gap: 8px; --tpl-rest3-em-ctl-h: 36px; --tpl-rest3-em-note-lh: 17px; --tpl-rest3-em-list-top: 10px; --tpl-rest3-em-list-lh: 22px; --tpl-rest3-em-th-pad: 11px 0 9px 14px; --tpl-rest3-em-th: 11px; --tpl-rest3-em-th-lh: 16px; --tpl-rest3-em-td-pad: 9px 0 9px 14px; --tpl-rest3-em-col-when: 144px; --tpl-rest3-em-col-who: 114px; --tpl-rest3-em-col-what: 214px; --tpl-rest3-em-col-why: 216px; --tpl-rest3-em-col-minutes: 104px; --tpl-rest3-em-num-pad: 12px; --tpl-rest3-em-last-pad: 26px; --tpl-rest3-em-note-pad: 12px; --tpl-rest3-em-select-w: 320px; --tpl-rest3-em-table-min: 760px; --tpl-rest3-em-td-lh: 17px;
   /* 作業役 rest3（成果地点を作る 試算の行の間 j8p3yj・cXqlS：行の間隔 36）。 */ --tpl-rest3-cv-row-gap: 5px;
-  /* 作業役 rest3（EC連携 つなぎ先 iLJmw）。 */ --tpl-rest3-ec-gap: 14px; --tpl-rest3-ec-side-w: 380px; --tpl-rest3-ec-col-gap: 12px; --tpl-rest3-ec-card-gap: 10px; --tpl-rest3-ec-card-pad: 16px; --tpl-rest3-ec-radius: 12px; --tpl-rest3-ec-title: 14px; --tpl-rest3-ec-title-lh: 20px; --tpl-rest3-ec-field-gap: 6px; --tpl-rest3-ec-key-gap: 11px; --tpl-rest3-ec-key-top: 3px; --tpl-rest3-ec-key-h: 46px; --tpl-rest3-ec-key-pad: 5px 12px; --tpl-rest3-ec-small: 12px; --tpl-rest3-ec-label-lh: 17px; --tpl-rest3-ec-row-gap: 12px; --tpl-rest3-ec-xs: 11px; --tpl-rest3-ec-note-lh: 16px; --tpl-rest3-ec-desc-lh: 18px; --tpl-rest3-ec-mini-gap: 8px; --tpl-rest3-ec-mini-inner-gap: 2px; --tpl-rest3-ec-mini-pad: 12px; --tpl-rest3-ec-mini-radius: 10px; --tpl-rest3-ec-mini-num: 16px; --tpl-rest3-ec-mini-num-lh: 23px; --tpl-rest3-ec-wide-extra: 2px; --tpl-rest3-ec-body: 13px; --tpl-rest3-ec-body-lh: 19px; --tpl-rest3-ec-dot-gap: 5px; --tpl-rest3-ec-pill-pad: 2px 8px; --tpl-rest3-ec-dot: 6px; --tpl-rest3-ec-band-gap: 8px; --tpl-rest3-ec-band-h: 56px; --tpl-rest3-ec-band-pad: 10px 14px; --tpl-rest3-ec-band-radius: 10px; --tpl-rest3-ec-check-gap: 21px; --tpl-rest3-ec-check-gap-y: 8px; --tpl-rest3-ec-rule-h: 22px; --tpl-rest3-ec-link-gap: 8px;
+  /* 作業役 rest3（EC連携 つなぎ先 iLJmw）。 */ --tpl-rest3-ec-gap: 14px; --tpl-rest3-ec-side-w: 380px; --tpl-rest3-ec-col-gap: 12px; --tpl-rest3-ec-card-gap: 10px; --tpl-rest3-ec-card-pad: 16px; --tpl-rest3-ec-radius: 12px; --tpl-rest3-ec-title: 14px; --tpl-rest3-ec-title-lh: 20px; --tpl-rest3-ec-field-gap: 6px; --tpl-rest3-ec-key-gap: 11px; --tpl-rest3-ec-key-top: 3px; --tpl-rest3-ec-key-h: 56px; --tpl-rest3-ec-key-pad: 10px 12px; --tpl-rest3-ec-small: 12px; --tpl-rest3-ec-label-lh: 17px; --tpl-rest3-ec-row-gap: 12px; --tpl-rest3-ec-xs: 11px; --tpl-rest3-ec-note-lh: 16px; --tpl-rest3-ec-desc-lh: 18px; --tpl-rest3-ec-mini-gap: 8px; --tpl-rest3-ec-mini-inner-gap: 2px; --tpl-rest3-ec-mini-pad: 10px 12px; --tpl-rest3-ec-mini-radius: 8px; --tpl-rest3-ec-mini-num: 16px; --tpl-rest3-ec-mini-num-lh: 23px; --tpl-rest3-ec-wide-extra: 2px; --tpl-rest3-ec-body: 13px; --tpl-rest3-ec-body-lh: 19px; --tpl-rest3-ec-dot-gap: 5px; --tpl-rest3-ec-pill-pad: 2px 8px; --tpl-rest3-ec-dot: 6px; --tpl-rest3-ec-band-gap: 8px; --tpl-rest3-ec-band-h: 56px; --tpl-rest3-ec-band-pad: 10px 14px; --tpl-rest3-ec-band-radius: 10px; --tpl-rest3-ec-check-gap: 21px; --tpl-rest3-ec-check-gap-y: 8px; --tpl-rest3-ec-rule-h: 22px; --tpl-rest3-ec-link-gap: 8px;
   /* 作業役 rest3（E-2 電話予約の引き出し svUTk：時刻の札1行の高さ）。 */ --tpl-rest3-e2-times-h: 36px;
   /* 作業役 rest3（会員一覧 AOWoJ）。 */ --tpl-rest3-mb-gap: 16px;
-  /* 作業役 rest3（運用状態 更新履歴 I2V65v）。 */ --tpl-rest3-uh-gap: 14px; --tpl-rest3-uh-row-h: 40px; --tpl-rest3-uh-head-h: 36px; --tpl-rest3-uh-row-pad: 0 14px; --tpl-rest3-uh-cols: minmax(0, 130px) minmax(0, 426px) minmax(0, 100px) 100px minmax(0, 1fr); --tpl-rest3-uh-cols-narrow: minmax(0, 80px) minmax(0, 1fr) 48px 72px 80px; --tpl-rest3-mb-dot: 6px; --tpl-rest3-mb-dot-gap: 5px; --tpl-rest3-mb-row-h: 56px; --tpl-rest3-mb-head-h: 36px; --tpl-rest3-mb-row-pad: 10px 24px; --tpl-rest3-mb-cols: minmax(0, 338px) 96px 84px 96px 84px minmax(0, 130px) 72px 60px minmax(36px, 1fr); --tpl-rest3-mb-cols-narrow: minmax(0, 1fr) 96px 84px 96px 84px minmax(0, 130px) 36px;
+  /* 作業役 rest3（運用状態 更新履歴 I2V65v）。 */ --tpl-rest3-uh-gap: 14px; --tpl-rest3-uh-row-h: 40px; --tpl-rest3-uh-head-h: 36px; --tpl-rest3-uh-row-pad: 0 14px; --tpl-rest3-uh-cols: minmax(0, 130px) minmax(0, 426px) minmax(0, 100px) 100px minmax(0, 1fr); --tpl-rest3-uh-cols-narrow: minmax(0, 80px) minmax(0, 1fr) 64px 72px 80px; --tpl-rest3-mb-dot: 6px; --tpl-rest3-mb-dot-gap: 5px; --tpl-rest3-mb-row-h: 56px; --tpl-rest3-mb-head-h: 36px; --tpl-rest3-mb-row-pad: 10px 24px; --tpl-rest3-mb-cols: minmax(0, 338px) 96px 84px 96px 84px minmax(0, 130px) 72px 60px minmax(36px, 1fr); --tpl-rest3-mb-cols-narrow: minmax(0, 1fr) 96px 84px 96px 84px minmax(0, 130px) 36px;
   --tpl-sb-hc-banner-pad: 14px 18px; --tpl-sb-hc-banner-icon: 20px; --tpl-sb-hc-banner-title: 15px; --tpl-sb-hc-banner-title-lh: 22px; --tpl-sb-hc-body-lh: 17px; --tpl-sb-hc-alert-pad: 8px 0; --tpl-sb-hc-row-pad: 12px 16px; --tpl-sb-hc-col-judge: 90px; --tpl-sb-hc-col-time: 110px; --tpl-sb-hc-col-how: 220px;
   --tpl-sb-ln-preview-w: 390px; --tpl-sb-ln-brand-track: 0.22em; --tpl-sb-focus-ring: 2px solid var(--color-accent); --tpl-sb-dot-radius: 50%;
   --tpl-sb-line-top: inset 0 1px 0 var(--color-hairline); --tpl-sb-line-top-soft: inset 0 1px 0 var(--color-divider); --tpl-sb-line-bottom: inset 0 -1px 0 var(--color-hairline); --tpl-sb-line-bottom-soft: inset 0 -1px 0 var(--color-divider);
@@ -2623,3 +2696,6 @@ select:not([multiple]):not(.appearance-none) {
   --tpl-bcpick-mobile-preview: 30dvh;
 }
 [data-theme="v8"] { --tpl-hq-attribute-distribute-col: 76px; }
+
+[data-theme='v8'] { --tpl-wh-narrow-column-pad: 9px var(--tpl-af2-wh-narrow-pad); }
+[data-theme='v8'] { --shadow-wh-kpi-top: inset 0 1px 0 var(--color-hairline); }

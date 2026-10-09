@@ -105,6 +105,10 @@ describe('外部連携 V8', () => {
     const create = [...dialog!.querySelectorAll('button')].find((element) => element.textContent?.includes('作る') && !element.textContent.includes('受け取り口'))!
     await act(async () => { create.click() })
     expect(dialog?.textContent).toContain('名前を入力してください')
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    expect(document.activeElement?.id).toBe('wh-incoming-name')
+    expect(dialog?.querySelector('#wh-incoming-name')?.getAttribute('aria-invalid')).toBe('true')
+    expect(dialog?.querySelectorAll('[data-design-part=notice][role=alert]')).toHaveLength(0)
     expect(posted.filter((item) => item.url.includes('/api/webhooks/incoming'))).toHaveLength(0)
   })
 
@@ -148,6 +152,17 @@ describe('外部連携 V8', () => {
     search = 'event=form_submitted'
     await render(<WebhooksCreateV8 />)
     expect(host.textContent).toContain('フォームが送られた')
+  })
+
+  it('送り先を作る：未入力では送信せず、最初の誤りに移動し欄で知らせる', async () => {
+    await render(<WebhooksCreateV8 />)
+    await act(async () => { buttons().find((button) => button.textContent?.includes('つくって動かす'))!.click() })
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    expect(document.activeElement?.id).toBe('wh-new-name')
+    expect(host.querySelector('#wh-new-name')?.getAttribute('aria-invalid')).toBe('true')
+    expect(host.querySelector('#wh-new-url')?.getAttribute('aria-invalid')).toBe('true')
+    expect(host.querySelectorAll('[data-design-part=notice][role=alert]')).toHaveLength(0)
+    expect(posted).toHaveLength(0)
   })
 
   it('同期の記録：同じ時刻の行を束ね、失敗で0件の行は書き出したものに数えない', () => {

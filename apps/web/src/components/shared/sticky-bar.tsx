@@ -27,6 +27,7 @@ export default function StickyBar({
   actions,
   outlined,
   split,
+  presentation,
   className,
 }: {
   /**
@@ -66,8 +67,16 @@ export default function StickyBar({
   outlined?: boolean
   /** 左の一覧と右の作る欄を分ける板だけで使う。 */
   split?: { lead?: ReactNode; trailingWidth: string }
+  /** 本文につながるアカウントの操作行。指定した画面だけ浮かせない。 */
+  presentation?: 'account-registration' | 'account-handover'
   className?: string
 }) {
+  if (presentation) return (
+    <div className={[styles.inlineBar, className].filter(Boolean).join(' ')} data-presentation={presentation}>
+      {status}
+      {actions}
+    </div>
+  )
   if (split) return (
     <div className={[styles.bar, styles.splitBar, outlined ? styles.outlined : null, className].filter(Boolean).join(' ')}
       style={{ '--sticky-trailing-width': split.trailingWidth } as CSSProperties}>

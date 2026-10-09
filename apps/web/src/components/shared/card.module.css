@@ -17,6 +17,7 @@
   display: flex;
   flex-direction: column;
 }
+.horizontal { display: flex; align-items: center; justify-content: space-between; }
 
 .overflowHidden {
   overflow: hidden;
@@ -37,6 +38,18 @@
  */
 .paddingSpacious {
   padding: 20px;
+}
+
+.card[data-card-surface='inset'], .card[data-card-surface='muted'] {
+  border: 0; box-shadow: none;
+}
+.card[data-card-surface='inset'] { box-shadow: var(--tpl-sa-ring); }
+.card[data-card-surface='muted'] { background: var(--color-surface-pearl); }
+.card[data-card-corner='control'] { border-radius: var(--radius-control); }
+.card[data-card-spacing] {
+  padding: var(--card-content-padding, 0);
+  gap: var(--card-content-gap, 0);
+  min-width: 0;
 }
 
 .header {
@@ -140,3 +153,27 @@
 .headerStacked .title, .headerPanel .title { margin: 0; font-size: var(--text-body); font-weight: 700; line-height: var(--tpl-rs-lh-14); }
 .headerStacked .meta, .headerPanel .meta { color: var(--color-ink-faint); font-size: var(--text-micro); font-weight: 400; line-height: var(--tpl-rs-lh-11); }
 .headerPanel { padding: var(--tpl-rs-panel-head-pad); box-shadow: var(--tpl-rs-line-bottom); }
+
+[data-theme='v8'] .card[data-spacing='settings'] {
+  display: flex; flex-direction: column; min-width: 0;
+  gap: var(--tpl-rest3-ec-card-gap); padding: var(--tpl-rest3-ec-card-pad);
+  border: 0; border-radius: var(--tpl-rest3-ec-radius);
+  outline: 1px solid var(--color-hairline); outline-offset: -1px; box-shadow: none;
+}
+/* 外部連携の設定・見本カードだけ（spacing='integration' | 'preview'）。既定のカードは変えない。 */
+[data-theme='v8'] .spacedInset {
+  display: flex; flex-direction: column; border: 0; box-shadow: none;
+  outline: 1px solid var(--color-hairline); outline-offset: -1px;
+}
+[data-theme='v8'] .integration { gap: var(--tpl-rule-row-gap); padding: var(--tpl-cn-card-pad); }
+[data-theme='v8'] .preview { gap: var(--tpl-toolbar-gap); padding: var(--tpl-side-card-pad); }
+
+/* NEN の設定フォーム。既定の面と余白は保つ。 */
+[data-theme='v8'] .inset { min-width: 0; border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; box-shadow: none; }
+[data-theme='v8'] .bordered { min-width: 0; box-shadow: none; }
+[data-theme='v8'] .spacingNormal { gap: var(--tpl-nm-card-gap); }
+[data-theme='v8'] .spacingRoomy { gap: var(--tpl-nc-card-gap-wide); }
+
+[data-theme='v8'] .paddingCompact { padding: var(--tpl-nc-side-pad); }
+[data-theme='v8'] .spacingTight { gap: var(--tpl-nc-field-gap); }
+[data-theme='v8'] .spacingControls { gap: var(--tpl-toolbar-gap); }

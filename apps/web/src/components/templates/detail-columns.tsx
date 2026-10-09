@@ -13,7 +13,7 @@ export function DetailColumns({ children, aside, asideLabel, expanded, onExpande
   expanded: boolean
   onExpandedChange: (expanded: boolean) => void
   /** 補助欄自体がカードの枠を持つ板。既定の仕切り線は付けない。 */
-  presentation?: 'card'
+  presentation?: 'card' | 'notification'
 }) {
   const asideId = useId()
   return <div className={styles.detailColumns} data-detail-columns={variant} data-presentation={presentation}>

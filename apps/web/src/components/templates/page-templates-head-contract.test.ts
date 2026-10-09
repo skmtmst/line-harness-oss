@@ -76,8 +76,8 @@ describe('型の見出し（379板の絵）', () => {
 
   it('一覧の頭は下余白12・帯は頭の直下（頭の高さ87）', () => {
     expect(css).toMatch(/\.heading \{[^}]*padding:\s*var\(--tpl-head-pad-top\) var\(--tpl-head-pad-side\) var\(--tpl-head-pad-bottom\)/s)
-    expect(css).toMatch(/\[data-page-template='list'\] \.stats \{[^}]*border-top:\s*0/s)
-    const stats = css.match(/\[data-page-template='list'\] \.stats \{[^}]*\}/)
+    expect(css).toMatch(/\.stats \{[^}]*border:\s*0/s)
+    const stats = css.match(/\.stats \{[^}]*\}/)
     expect(stats, '一覧の帯の枠がありません').toBeTruthy()
     expect(stats![0]).not.toMatch(/margin|padding-top/)
   })

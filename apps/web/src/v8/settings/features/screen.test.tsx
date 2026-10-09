@@ -7,6 +7,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearFeatureSettingsCache } from '@/lib/feature-settings-cache'
+import { fireEvent } from '@testing-library/react'
 
 const fixture = vi.hoisted(() => ({ role: 'owner' }))
 
@@ -69,6 +70,29 @@ async function flush() {
 const buttonNames = () => [...host.querySelectorAll('button')].map((button) => button.textContent?.trim() ?? '')
 
 describe('★V8 機能設定の閲覧のみ', () => {
+  it('変更理由が空なら送信せず、その欄へ移動して誤りを一度だけ知らせる', async () => {
+    fixture.role = 'owner'
+    const scroll = vi.fn()
+    const originalScroll = HTMLElement.prototype.scrollIntoView
+    HTMLElement.prototype.scrollIntoView = scroll
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    try {
+      await act(async () => { root.render(<FeatureSettingsScreen />) })
+      await flush()
+      await act(async () => { fireEvent.click(host.querySelector('[role="switch"]')!) })
+      const save = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('機能設定を保存'))!
+      await act(async () => { fireEvent.click(save) })
+      const reason = host.querySelector<HTMLInputElement>('#feature-settings-reason')!
+      expect(reason.getAttribute('aria-invalid')).toBe('true')
+      expect(document.activeElement).toBe(reason)
+      expect(scroll).toHaveBeenCalledWith({ block: 'center' })
+      expect(host.textContent?.match(/変更理由を入力してください/g)).toHaveLength(1)
+      expect(fetchSpy.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(false)
+    } finally {
+      HTMLElement.prototype.scrollIntoView = originalScroll
+      fetchSpy.mockRestore()
+    }
+  })
   it('オーナーにはスイッチ・まとめて・並びを変える・保存の帯がある', async () => {
     fixture.role = 'owner'
     await act(async () => { root.render(<FeatureSettingsScreen />) })

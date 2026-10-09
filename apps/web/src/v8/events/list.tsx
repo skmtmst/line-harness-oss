@@ -573,7 +573,7 @@ export default function EventsListV8() {
 
   const pager = !dataReady || items.length === 0 ? null : (
     <div className={styles.pagerBlock}>
-      <p className={styles.footNote}>行の「…」から 中身を見る・申込者を見る・日時と定員を変える・プレビュー・削除。申込中・キャンセル待ちがいるイベントは削除できません。</p>
+
       {pageCount > 1 ? (
         <Pagination
           page={current}
@@ -654,6 +654,7 @@ export default function EventsListV8() {
 
   return (
     <ListPage
+      help="行の「…」から 中身を見る・申込者を見る・日時と定員を変える・プレビュー・削除。申込中・キャンセル待ちがいるイベントは削除できません。"
       boardId="e2ekFu"
       headingSize="regular"
       title="イベント予約"
@@ -665,7 +666,7 @@ export default function EventsListV8() {
         </div>
       ) : undefined}
       stats={(
-        <KpiBand data-design="KPIs" className={styles.kpiStrip}>
+        <KpiBand data-design="KPIs">
           {kpis.map((item) => (
             <KpiCard
               key={item.key}

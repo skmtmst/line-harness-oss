@@ -791,7 +791,6 @@ function FriendAddList() {
             </tbody>
           </DataTable>
         </div>
-        <p className={styles.footNote}>{ORDER_NOTE}</p>
       </>
     )
   }
@@ -808,6 +807,7 @@ function FriendAddList() {
 
   return (
     <ListPage
+      help={ORDER_NOTE}
       boardId={canEdit ? 'MRhef' : 'LEwkJ'}
       headingSize="regular"
       title="友だち追加時の配信"

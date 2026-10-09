@@ -138,3 +138,6 @@
 [data-theme='v8'] .root[data-appearance='choices'] .selected { outline-color: transparent; background: var(--color-accent-soft); color: var(--color-accent-deep); font-weight: 600; }
 [data-theme='v8'] .root[data-appearance='choices'] .item:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
 }
+
+[data-theme='v8'] .root[data-size='sticker'] { height: var(--seg-timing-h); max-width: 100%; gap: 0; }
+[data-theme='v8'] .root[data-size='sticker'] .item { padding: var(--tpl-msg-composer-sticker-switch-pad); font-size: var(--text-label); line-height: var(--tpl-msg-composer-text-lh); white-space: nowrap; }

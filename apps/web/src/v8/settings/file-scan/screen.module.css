@@ -75,36 +75,6 @@
 }
 
 /* 表：枠 1・角丸 12・余白 4/12。列はファイル・上げた人 120・見つかったもの・操作 200（間 12）。 */
-.table {
-  padding: var(--tpl-sb-tbl-pad);
-  border-radius: var(--tpl-sb-card-radius);
-  outline: 1px solid var(--card-edge);
-  box-shadow: var(--card-shadow);
-}
-
-.row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--tpl-sb-fs-col-uploader) minmax(0, 1fr) var(--tpl-sb-fs-col-action);
-  align-items: center;
-  column-gap: var(--tpl-sb-tbl-gap);
-  padding: var(--tpl-sb-tbl-row-pad);
-  box-shadow: var(--shadow-row-line);
-  color: var(--color-ink);
-  font-size: var(--tpl-sb-tbl-head);
-}
-
-.row:last-child {
-  box-shadow: none;
-}
-
-.headRow {
-  color: var(--color-ink-secondary);
-  font-weight: 600;
-}
-
-.headRow:last-child {
-  box-shadow: var(--shadow-row-line);
-}
 
 .cell {
   min-width: 0;

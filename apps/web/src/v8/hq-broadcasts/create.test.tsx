@@ -35,11 +35,11 @@ vi.mock('@/lib/hq-templates-api', async (original) => ({ ...await original<typeo
  */
 vi.mock('@/v8/templates/carousel', () => ({
   default: ({ host }: { host: { onSave: (content: unknown, distribute: boolean) => void; onCancel: () => void; primaryLabel?: string } }) => React.createElement('div', null,
-    React.createElement('button', { type: 'button', onClick: () => host.onSave({ kind: 'carousel', name: 'その場のカルーセル', messageContent: JSON.stringify([{ title: 'A', text: 'a', actions: [{ type: 'uri', label: '見る', uri: 'https://shop.example/a' }] }, { title: 'B', text: 'b', actions: [{ type: 'uri', label: '見る', uri: 'https://shop.example/b' }] }]), tapLimitMode: 'none', tapLimitText: null }, true) }, host.primaryLabel),
+    React.createElement('button', { type: 'button', onClick: () => host.onSave({ kind: 'carousel', name: 'その場のカルーセル', messageContent: JSON.stringify([{ title: 'A', text: 'a', actions: [{ type: 'uri', label: '見る', uri: 'https://shop.example/a' }] }, { title: 'B', text: 'b', actions: [{ type: 'uri', label: '見る', uri: 'https://shop.example/b' }] }]), tapLimitMode: 'none', tapLimitText: null }, false) }, host.primaryLabel),
     React.createElement('button', { type: 'button', onClick: host.onCancel }, 'キャンセル')),
 }))
 vi.mock('@/v8/template-edit/rich', () => ({
-  default: ({ host }: { host: { onSave: (content: unknown, distribute: boolean) => void; primaryLabel?: string } }) => React.createElement('button', { type: 'button', onClick: () => host.onSave({ kind: 'rich_message', name: 'その場のリッチ', payload: { imageUrl: 'https://cdn.example/rich.png', baseUrl: 'https://cdn.example/rich', baseSize: { width: 1040, height: 1040 }, tapAreas: [{ x: 0, y: 0, width: 100, height: 100, actionType: 'uri', uri: 'https://shop.example/' }] }, media: [{ id: 'm1' }] }, true) }, host.primaryLabel),
+  default: ({ host }: { host: { onSave: (content: unknown, distribute: boolean) => void; primaryLabel?: string } }) => React.createElement('button', { type: 'button', onClick: () => host.onSave({ kind: 'rich_message', name: 'その場のリッチ', payload: { imageUrl: 'https://cdn.example/rich.png', baseUrl: 'https://cdn.example/rich', baseSize: { width: 1040, height: 1040 }, tapAreas: [{ x: 0, y: 0, width: 100, height: 100, actionType: 'uri', uri: 'https://shop.example/' }] }, media: [{ id: 'm1' }] }, false) }, host.primaryLabel),
 }))
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -189,7 +189,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     fireEvent.click(screen.getByRole('button', { name: 'メッセージ設定へ' }))
     fireEvent.change(screen.getByLabelText('本文'), { target: { value: '1通目' } })
     fireEvent.click(screen.getByRole('button', { name: /メッセージを追加する/ }))
-    fireEvent.change(screen.getByLabelText('本文'), { target: { value: '2通目' } })
+    fireEvent.change(screen.getByLabelText('2通目の本文'), { target: { value: '2通目' } })
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     await waitFor(() => expect(hq.create).toHaveBeenCalled())
     const input = hq.create.mock.calls[0][0]
@@ -329,11 +329,11 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     definition: { schemaVersion: 1, media: [], template: { id, name: '秋の新商品 3種', category: '', messageType: 'carousel', messageContent: JSON.stringify(columns), carouselActionsJson: null, carouselTapLimitMode: 'none', carouselTapLimitText: null, questionJson: null, questionStatus: 'draft' } },
   })
 
-  it('③ の種類のタブは絵 lLyFR の並び（テキスト〜紹介・その他）で、見出しの右に［テンプレートから選ぶ］', async () => {
+  it('③ の種類のタブはG-9 の12種類（テキスト〜紹介・その他）で、見出しの右に［テンプレートから選ぶ］', async () => {
     render(<HqBroadcastCreate />)
     await toMessage()
-    const tabs = within(screen.getByRole('tablist', { name: 'メッセージの形式' })).getAllByRole('tab').map((tab) => tab.textContent)
-    expect(tabs).toEqual(['テキスト', '画像', '動画', '音声', 'スタンプ', 'カルーセル', 'リッチメッセージ', '位置情報', '質問', '紹介', 'その他'])
+    const tabs = within(screen.getByRole('tablist', { name: '1通目のメッセージ形式' })).getAllByRole('tab').map((tab) => tab.textContent)
+    expect(tabs).toEqual(['テキスト', '画像', '動画', '音声', 'スタンプ', 'カルーセル', 'リッチメッセージ', 'リッチビデオ', '位置情報', '質問', '紹介', 'その他'])
     expect(screen.getByRole('button', { name: 'テンプレートから選ぶ' })).toBeTruthy()
   })
 
@@ -345,38 +345,38 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     const file = new File(['x'], 'a.png', { type: 'image/png' })
     fireEvent.change(document.querySelector('input[type="file"]') as HTMLInputElement, { target: { files: [file] } })
     await waitFor(() => expect(upload).toHaveBeenCalledWith(file, null))
-    await screen.findByText(/アップロード済み/)
+    await screen.findByAltText('画像のプレビュー')
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     await waitFor(() => expect(hq.create).toHaveBeenCalled())
     const input = hq.create.mock.calls[0][0]
     expect(input.messageType).toBe('image')
-    expect(JSON.parse(input.messageBubblesJson)).toEqual([expect.objectContaining({ type: 'image', content: { originalContentUrl: 'https://cdn.example/a.png', previewImageUrl: 'https://cdn.example/a.png' } })])
+    expect(JSON.parse(input.messageBubblesJson)).toEqual([expect.objectContaining({ type: 'image', content: expect.objectContaining({ originalContentUrl: 'https://cdn.example/a.png', previewImageUrl: 'https://cdn.example/a.png' }) })])
   })
 
   it('スタンプは店と同じ一覧から選び、sticker の吹き出しで送る', async () => {
     render(<HqBroadcastCreate />)
     await toMessage()
     fireEvent.click(screen.getByRole('tab', { name: 'スタンプ' }))
-    fireEvent.click(screen.getByTitle('ありがとう'))
+    fireEvent.click(screen.getByRole('button', { name: 'スタンプ 52002734' }))
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     await waitFor(() => expect(hq.create).toHaveBeenCalled())
     const input = hq.create.mock.calls[0][0]
     expect(input.messageType).toBe('sticker')
-    expect(JSON.parse(input.messageContent)).toEqual({ packageId: '446', stickerId: '1990' })
+    expect(JSON.parse(input.messageContent)).toEqual({ packageId: '11537', stickerId: '52002734' })
     expect(JSON.parse(input.messageBubblesJson)[0].type).toBe('sticker')
   })
 
   it('カルーセルは統括のカルーセルのひな形から選び、カードの中身を控えて carousel の吹き出しで送る', async () => {
     const columns = [{ title: '秋の新商品 3種', text: '定期便なら10%オフ', actions: [{ type: 'uri', label: '商品を見る', uri: 'https://shop.example/a' }] }]
-    tpl.listByKind.mockImplementation(async (kind?: string) => (kind === 'carousel' ? [{ id: 'ct-1', name: '秋の新商品 3種', kind: 'carousel' }] : []))
+    tpl.listByKind.mockImplementation(async (kind?: string) => (!kind || kind === 'carousel' ? [{ id: 'ct-1', name: '秋の新商品 3種', kind: 'carousel' }] : []))
     tpl.get.mockResolvedValue(carouselDetail('ct-1', columns))
     render(<HqBroadcastCreate />)
     await toMessage()
     fireEvent.click(screen.getByRole('tab', { name: 'カルーセル' }))
     await waitFor(() => expect(tpl.listByKind).toHaveBeenCalledWith('carousel'))
-    fireEvent.click(await screen.findByRole('button', { name: 'カルーセルを選ぶ' }))
-    fireEvent.click(within(await screen.findByRole('option', { name: '秋の新商品 3種' })).getByRole('button'))
-    await screen.findByText('カード1枚')
+    fireEvent.click(within(screen.getByLabelText('1通目の吹き出し')).getByRole('button', { name: 'テンプレートから選ぶ' }))
+    fireEvent.click(await screen.findByRole('button', { name: /秋の新商品 3種/ }))
+    await screen.findByRole('button', { name: '開いて直す' })
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     await waitFor(() => expect(hq.create).toHaveBeenCalled())
     const input = hq.create.mock.calls[0][0]
@@ -386,27 +386,30 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
   })
 
   it('ボタンで動きを実行する（postback）カルーセルは、店で押しても動かないので保存しない', async () => {
-    tpl.listByKind.mockImplementation(async (kind?: string) => (kind === 'carousel' ? [{ id: 'ct-2', name: '秋の新商品 3種', kind: 'carousel' }] : []))
+    tpl.listByKind.mockImplementation(async (kind?: string) => (!kind || kind === 'carousel' ? [{ id: 'ct-2', name: '秋の新商品 3種', kind: 'carousel' }] : []))
     tpl.get.mockResolvedValue(carouselDetail('ct-2', [{ text: 'a', actions: [{ type: 'postback', label: '申し込む', data: 'ctpl=hq&c=0&a=0' }] }]))
     render(<HqBroadcastCreate />)
     await toMessage()
     fireEvent.click(screen.getByRole('tab', { name: 'カルーセル' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'カルーセルを選ぶ' }))
-    fireEvent.click(within(await screen.findByRole('option', { name: '秋の新商品 3種' })).getByRole('button'))
-    await screen.findByText('カード1枚')
+    fireEvent.click(within(screen.getByLabelText('1通目の吹き出し')).getByRole('button', { name: 'テンプレートから選ぶ' }))
+    fireEvent.click(await screen.findByRole('button', { name: /秋の新商品 3種/ }))
+    await screen.findByRole('button', { name: '開いて直す' })
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     expect((await screen.findAllByRole('alert')).map((el) => el.textContent).join('')).toContain('ボタンで動きを実行するカルーセルは、まだ統括からは送れません')
     expect(hq.create).not.toHaveBeenCalled()
   })
 
-  it('質問・紹介はタブを出すが「まだ統括からは送れません」の1行だけで、保存しない', async () => {
+  it('まだ送れない質問・紹介は理由を示し、書いた本文を残す', async () => {
     render(<HqBroadcastCreate />)
     await toMessage()
-    fireEvent.click(screen.getByRole('tab', { name: '質問' }))
-    expect(screen.getByRole('note').textContent).toBe('質問は、まだ統括からは送れません。送るときは店の一斉配信で作ってください')
-    expect(screen.queryByLabelText('本文')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
-    expect((await screen.findByRole('alert')).textContent).toContain('質問は、まだ統括からは送れません。送るときは店の一斉配信で作ってください')
+    fireEvent.change(screen.getByLabelText('本文'), {target:{value:'残す本文'}})
+    for (const name of ['質問','紹介','リッチビデオ']) {
+      const tab = screen.getByRole('tab', {name})
+      expect(tab.getAttribute('aria-disabled')).toBe('true')
+      expect(tab.getAttribute('title')).toBeTruthy()
+      fireEvent.click(tab)
+      expect((screen.getByLabelText('本文') as HTMLTextAreaElement).value).toBe('残す本文')
+    }
     expect(hq.create).not.toHaveBeenCalled()
   })
 
@@ -476,9 +479,9 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     render(<HqBroadcastCreate />)
     await toMessage()
     fireEvent.click(screen.getByRole('tab', { name: 'カルーセル' }))
-    fireEvent.click(screen.getByRole('button', { name: /カルーセルをその場で作る/ }))
-    fireEvent.click(await screen.findByRole('button', { name: 'メッセージに入れる' }))
-    expect(await screen.findByText('カード2枚')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'ここで作る' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'この吹き出しに入れる' }))
+    expect(await screen.findByRole('button', { name: '開いて直す' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     await waitFor(() => expect(hq.create).toHaveBeenCalled())
     const input = hq.create.mock.calls[0][0]
@@ -490,9 +493,9 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     render(<HqBroadcastCreate />)
     await toMessage()
     fireEvent.click(screen.getByRole('tab', { name: 'リッチメッセージ' }))
-    fireEvent.click(screen.getByRole('button', { name: /リッチメッセージをその場で作る/ }))
-    fireEvent.click(await screen.findByRole('button', { name: 'メッセージに入れる' }))
-    await screen.findByText(/その場で作ったリッチメッセージ：その場のリッチ/)
+    fireEvent.click(screen.getByRole('button', { name: 'ここで作る' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'この吹き出しに入れる' }))
+    await screen.findByRole('button', { name: '開いて直す' })
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     await waitFor(() => expect(hq.create).toHaveBeenCalled())
     const bubble = JSON.parse(hq.create.mock.calls[0][0].messageBubblesJson)[0]
@@ -501,19 +504,19 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     expect(bubble.content.media).toBeUndefined()
   })
 
-  it('［保存してテンプレート化する］：テキストは統括のひな形に保存し、まだ保存できない種類は口を呼ばず理由を出す', async () => {
+  it('［保存してテンプレートにする］：テキストは統括のひな形に保存し、まだ保存できない種類は口を呼ばず理由を出す', async () => {
     tpl.create.mockResolvedValue({ template: { id: 'new' }, definition: {} })
     render(<HqBroadcastCreate />)
     await toMessage('定休日')
     fireEvent.change(screen.getByLabelText('本文'), { target: { value: '{店名}は明日お休みです' } })
-    fireEvent.click(screen.getByRole('button', { name: /保存してテンプレート化する/ }))
+    fireEvent.click(screen.getByRole('button', { name: /保存してテンプレートにする/ }))
     fireEvent.click(await screen.findByRole('button', { name: '保存する' }))
     await waitFor(() => expect(tpl.create).toHaveBeenCalledTimes(1))
     const [body] = tpl.create.mock.calls[0]
     expect(body).toMatchObject({ type: 'template', name: '定休日', definition: { template: { messageType: 'text', messageContent: '{{account.name}}は明日お休みです' } } })
     fireEvent.click(screen.getByRole('tab', { name: 'スタンプ' }))
-    fireEvent.click(screen.getByTitle('ありがとう'))
-    fireEvent.click(screen.getByRole('button', { name: /保存してテンプレート化する/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'スタンプ 52002734' }))
+    fireEvent.click(screen.getByRole('button', { name: /保存してテンプレートにする/ }))
     fireEvent.click(await screen.findByRole('button', { name: '保存する' }))
     expect(await screen.findByText('スタンプは、まだ統括のテンプレートとして保存できません')).toBeTruthy()
     expect(tpl.create).toHaveBeenCalledTimes(1)

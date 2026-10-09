@@ -12,7 +12,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ExternalLink, GitBranch, RefreshCw, TriangleAlert } from 'lucide-react'
 import Button from '@/components/shared/button'
+import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
 import ListState from '@/components/shared/list-state'
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { MANUAL_UPDATE_GUIDE_URL } from '@/components/update/use-update-status'
 import releaseLog from '@/generated/release-log-summary.json'
 import { api, type OperationHistoryEntry } from '@/lib/api'
@@ -70,6 +72,21 @@ export function latestDeploymentPhases(deployments: Deployment[]): Deployment[] 
   return latest
 }
 
+/** 配備の口を正にし、版の文書に無い配備も落とさない。文書だけの版も残す。 */
+export function historyRows(releases: Release[], deployments: Deployment[]) {
+  const latest = latestDeploymentPhases(deployments)
+  const used = new Set<string>()
+  const rows = latest.map((deployment) => {
+    const version = deployment.version?.replace(/^v/, '') ?? '—'
+    used.add(version)
+    const release = releases.find((item) => item.version.replace(/^v/, '') === version)
+      ?? { version, released: deployment.occurredAt, entries: [] }
+    return { release, deployment: deployment as Deployment | null }
+  })
+  rows.push(...releases.filter((item) => !used.has(item.version.replace(/^v/, ''))).map((release) => ({ release, deployment: null })))
+  return rows.sort((a, b) => (toTime(b.deployment?.occurredAt ?? b.release.released) || 0) - (toTime(a.deployment?.occurredAt ?? a.release.released) || 0)).slice(0, 10)
+}
+
 /** WEB194：表の「結果」。配備の記録が無い・読めないときに「反映済み（成功）」と言わない。 */
 export function releaseResult(deployment: Deployment | null, historyState: 'loading' | 'ready' | 'error'): { label: string; tone: 'good' | 'warn' | 'danger' | 'muted' } {
   if (deployment) return RESULT[deployment.phase]
@@ -95,11 +112,6 @@ export default function UpdateHistoryV8() {
 
   const releases = useMemo(() => ((releaseLog as { releases?: Release[] }).releases ?? []).filter((item) => item.released), [])
   const deployments = useMemo(() => latestDeploymentPhases(history.flatMap((item) => (item.historyKind === 'deployment' && item.deployment ? [item.deployment] : []))), [history])
-  const byVersion = useMemo(() => {
-    const map = new Map<string, Deployment>()
-    for (const d of deployments) if (d.version && !map.has(d.version.replace(/^v/, ''))) map.set(d.version.replace(/^v/, ''), d)
-    return map
-  }, [deployments])
 
   const now = Date.now()
   const recent = deployments.filter((d) => now - toTime(d.occurredAt) <= 30 * DAY)
@@ -110,10 +122,7 @@ export default function UpdateHistoryV8() {
   const failed = recent.filter((d) => d.phase === 'failed' || d.phase === 'rolled_back').length
   const ready = state === 'ready'
 
-  const rows = releases.slice(0, 10).map((release) => {
-    const deployment = byVersion.get(release.version) ?? null
-    return { release, deployment }
-  })
+  const rows = historyRows(releases, deployments)
 
   return (
     <div className={styles.board}>
@@ -142,32 +151,32 @@ export default function UpdateHistoryV8() {
       {rows.length === 0 ? (
         <ListState kind="empty" title="更新の記録はまだありません" />
       ) : (
-        <div className={styles.table} role="table" aria-label="管理画面の更新">
+        <GridTable label="管理画面の更新" design={{ columns: 'var(--sett-history-columns)', gap: 'var(--tpl-rest3-uh-gap)', rowPadding: 'var(--tpl-rest3-uh-row-pad)', rowHeight: 'var(--tpl-rest3-uh-row-h)', headHeight: 'var(--tpl-rest3-uh-head-h)', fontSize: 'var(--tpl-rest3-em-body)', lineHeight: 'var(--tpl-rest3-em-td-lh)', headFontSize: 'var(--tpl-rest3-em-th)', headLineHeight: 'var(--tpl-rest3-em-th-lh)', headColor: 'var(--color-ink-faint)', headBackground: 'var(--color-surface-pearl)' }} className={styles.table}>
           <div role="rowgroup">
-            <div role="row" className={`${styles.row} ${styles.head}`}>
-              <span role="columnheader">開始</span>
-              <span role="columnheader">版</span>
-              <span role="columnheader">どうやって</span>
-              <span role="columnheader" className={styles.num}>かかった時間</span>
-              <span role="columnheader">結果</span>
-            </div>
+            <GridHeadRow>
+              <GridCell role="columnheader">開始</GridCell>
+              <GridCell role="columnheader">版</GridCell>
+              <GridCell role="columnheader">どうやって</GridCell>
+              <GridCell role="columnheader" className={styles.num}>かかった時間</GridCell>
+              <GridCell role="columnheader">結果</GridCell>
+            </GridHeadRow>
           </div>
           <div role="rowgroup">
             {rows.map(({ release, deployment }) => {
               const result = releaseResult(deployment, state)
               const title = `v${release.version} ${release.entries[0]?.text ?? ''}`.trim()
               return (
-                <div role="row" key={release.version} className={styles.row}>
-                  <span role="cell" className={styles.cell}>{shortWhen(deployment?.occurredAt ?? release.released)}</span>
-                  <span role="cell" className={`${styles.cell} ${styles.strong}`} title={title}>{title}</span>
-                  <span role="cell" className={styles.cell}>{deployment ? (isAutomatic(deployment) ? '自動' : '手動') : '—'}</span>
-                  <span role="cell" className={`${styles.cell} ${styles.num}`}>—</span>
-                  <span role="cell"><span className={styles.status} data-tone={result.tone}><span className={styles.dot} aria-hidden="true" />{result.label}</span></span>
-                </div>
+                <GridRow key={deployment?.deploymentId || `${release.version}|${deployment?.occurredAt ?? release.released}`}>
+                  <GridCell role="cell" className={styles.cell}>{shortWhen(deployment?.occurredAt ?? release.released)}</GridCell>
+                  <GridCell role="cell" className={`${styles.cell} ${styles.strong}`} title={title}>{title}</GridCell>
+                  <GridCell role="cell" className={styles.cell}>{deployment ? (isAutomatic(deployment) ? '自動' : '手動') : '—'}</GridCell>
+                  <GridCell role="cell" className={`${styles.cell} ${styles.num}`}>—</GridCell>
+                  <GridCell role="cell" className={styles.judge}><StatusBadge tone={({ good: 'success', warn: 'warning', danger: 'danger', muted: 'neutral' } as Record<string, StatusBadgeTone>)[result.tone]}>{result.label}</StatusBadge></GridCell>
+                </GridRow>
               )
             })}
           </div>
-        </div>
+        </GridTable>
       )}
 
       <div className={styles.foot}>

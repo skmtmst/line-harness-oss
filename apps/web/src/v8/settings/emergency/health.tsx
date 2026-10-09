@@ -12,8 +12,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { TriangleAlert, CircleCheck, Info, OctagonAlert } from 'lucide-react'
 import Button from '@/components/shared/button'
+import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import {
   api,
   ApiError,
@@ -98,7 +100,8 @@ const SEVERITY: Record<OperationSeverity, { label: string; tone: 'good' | 'warn'
 /** 札（点＋文字）。古い確認は灰。 */
 export function StatusPill({ severity, stale = false }: { severity: OperationSeverity; stale?: boolean }) {
   const style = stale ? { label: '古い確認', tone: 'muted' as const } : SEVERITY[severity]
-  return <span className={styles.status} data-tone={style.tone}><span className={styles.dot} aria-hidden="true" />{style.label}</span>
+  const tones: Record<string, StatusBadgeTone> = { good: 'success', warn: 'warning', danger: 'danger', muted: 'neutral' }
+  return <StatusBadge tone={tones[style.tone]}>{style.label}</StatusBadge>
 }
 
 const STALE_ITEM_AFTER_MS = 10 * 60 * 1000
@@ -494,32 +497,32 @@ export function HealthPanelV8({
           onAcknowledge={acknowledgeAlert}
           onRetry={retryAlertNotifications}
         />
-        <div role="table" aria-label="確かめていること">
+        <GridTable label="確かめていること" framed={false} design={{ columns: 'minmax(0, 1fr) var(--tpl-sb-hc-col-judge) var(--tpl-sb-hc-col-time) var(--tpl-sb-hc-col-how)', gap: 'var(--tpl-sb-ec-gap)', rowPadding: 'var(--tpl-sb-hc-row-pad)', headPadding: 'var(--tpl-sb-ec-head-pad)', fontSize: 'var(--tpl-sb-band-text)', headFontSize: 'var(--tpl-sb-row-sub)', headLineHeight: 'var(--tpl-sb-row-sub-lh)', headBackground: 'var(--color-surface-pearl)' }}>
           <div role="rowgroup">
-            <div role="row" className={`${styles.row} ${styles.headRow}`}>
-              <span role="columnheader">確かめていること</span>
-              <span role="columnheader">判定</span>
-              <span role="columnheader">最後の確認</span>
-              <span role="columnheader">判定の見方</span>
-            </div>
+            <GridHeadRow>
+              <GridCell role="columnheader">確かめていること</GridCell>
+              <GridCell role="columnheader">判定</GridCell>
+              <GridCell role="columnheader">最後の確認</GridCell>
+              <GridCell role="columnheader">判定の見方</GridCell>
+            </GridHeadRow>
           </div>
           <div role="rowgroup">
             {checks.map((check) => {
               const abnormal = !check.stale && (check.severity === 'warning' || check.severity === 'danger') && check.summary
               return (
-                <div role="row" key={check.id} className={styles.row}>
-                  <span role="cell" className={styles.stack}>
-                    <span className={styles.main}>{check.title}</span>
+                <GridRow key={check.id}>
+                  <GridCell role="cell" className={styles.stack}>
+                    <span className={styles.main} title={check.title}>{check.title}</span>
                     <span className={styles.sub}>{check.sub}</span>
-                  </span>
-                  <span role="cell"><StatusPill severity={check.severity} stale={check.stale} /></span>
-                  <span role="cell" className={styles.time}>{formatCheckedAt(check.observedAt)}</span>
-                  <span role="cell" className={styles.how} title={abnormal ? check.threshold : undefined}>{abnormal ? check.summary : check.threshold}</span>
-                </div>
+                  </GridCell>
+                  <GridCell role="cell" className={styles.judge}><StatusPill severity={check.severity} stale={check.stale} /></GridCell>
+                  <GridCell role="cell" className={styles.time}>{formatCheckedAt(check.observedAt)}</GridCell>
+                  <GridCell role="cell" className={styles.how} title={abnormal ? check.threshold : undefined}>{abnormal ? check.summary : check.threshold}</GridCell>
+                </GridRow>
               )
             })}
           </div>
-        </div>
+        </GridTable>
       </section>
       <KpiBand data-kpi-presentation="cards" gridClassName={styles.kpis}>
         <KpiCard presentation="card" icon={null} title="止めた回数" value={stats ? stats.stops : null} unit="" detail={statsNote} />

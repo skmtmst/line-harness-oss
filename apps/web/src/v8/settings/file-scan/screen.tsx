@@ -7,12 +7,16 @@
  * 今までの V8（app/settings/file-scan/file-scan-v8.tsx）と同じ。処理は同じ場所の use-file-scan.ts（写し）。
  * 行の右端は「使えるように戻す」＋「…」（中の「削除する」）。
  */
-import { useState } from 'react'
-import { Info, Pencil, RotateCcw, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Pencil, RotateCcw, Trash2 } from 'lucide-react'
 import Button from '@/components/shared/button'
+import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
 import SearchField from '@/components/shared/search-field'
+import FilterChip from '@/components/shared/filter-chip'
+import Notice from '@/components/shared/notice'
+import { Field } from '@/components/shared/form-controls'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
@@ -20,13 +24,12 @@ import { TextField, TextArea } from '@/components/shared/text-field'
 import ListRange from '@/components/ui/list-range'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import type { FileScanItem } from '@/lib/api'
-import { SbBackLink, SbSettingsScreen } from '../sb-frame/settings-screen'
+import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import { FILE_SCAN_PAGE_SIZE, useFileScan } from './use-file-scan'
 import styles from './screen.module.css'
 
 const TITLE = 'ファイルの検査'
 const DESCRIPTION = '上げたファイルに危ないものがないかを確かめます'
-const BACK = <SbBackLink href="/settings" label="機能設定へ" />
 
 /* 板の札。`使えません`・`使えます` の絞り込みは v7 の画面に残す。 */
 const STATUS_CHIPS = [
@@ -53,6 +56,7 @@ export default function FileScanScreen() {
     page,
     setPage,
     actionError,
+    setActionError,
     actionDone,
     releaseTarget,
     setReleaseTarget,
@@ -92,6 +96,41 @@ export default function FileScanScreen() {
     changeStatusFilter,
   } = useFileScan()
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const providerRef = useRef<HTMLInputElement>(null)
+  const endpointRef = useRef<HTMLInputElement>(null)
+  const [configErrors, setConfigErrors] = useState<{ provider?: string; endpoint?: string }>({})
+  const configServerError = actionError === '宛先は https にし、提供元と宛先の両方を入れてください。' ? actionError : ''
+  const saveExternalConfig = () => {
+    const errors: { provider?: string; endpoint?: string } = {}
+    if (endpoint.trim() && !provider.trim()) errors.provider = '提供元を入力してください'
+    if (provider.trim() && !endpoint.trim()) errors.endpoint = '送り先を入力してください'
+    if (endpoint.trim()) {
+      try { if (new URL(endpoint.trim()).protocol !== 'https:') errors.endpoint = 'https:// で始まる送り先を入力してください' }
+      catch { errors.endpoint = '送り先の URL を確かめてください（https:// から）' }
+    }
+    setConfigErrors(errors)
+    setActionError('')
+    if (errors.provider || errors.endpoint) {
+      const field = errors.provider ? providerRef.current : endpointRef.current
+      field?.focus()
+      field?.scrollIntoView({ block: 'center' })
+      return
+    }
+    void saveConfig()
+  }
+  useEffect(() => {
+    if (!configServerError) return
+    endpointRef.current?.focus()
+    endpointRef.current?.scrollIntoView({ block: 'center' })
+  }, [configServerError])
+  const releaseReasonRef = useRef<HTMLTextAreaElement>(null)
+  const releaseReasonError = releaseError === '理由を入力してください' ? releaseError : ''
+  useEffect(() => {
+    if (!releaseReasonError) return
+    releaseReasonRef.current?.focus()
+    releaseReasonRef.current?.scrollIntoView({ block: 'center' })
+  }, [releaseReasonError])
+
 
   const openRelease = (item: FileScanItem) => { setReleaseTarget(item); setReleaseReason(''); setReleaseError('') }
   const openDelete = (item: FileScanItem) => { setDeleteTarget(item); setDeleteError('') }
@@ -106,19 +145,28 @@ export default function FileScanScreen() {
           confirmLabel="使えるように戻す"
           cancelLabel="キャンセル"
           busy={releaseBusy}
-          error={releaseError || undefined}
+          error={releaseReasonError ? undefined : releaseError || undefined}
           onCancel={() => { setReleaseTarget(null); setReleaseReason(''); setReleaseError('') }}
-          onConfirm={() => void release()}
+          onConfirm={() => {
+            if (!releaseReason.trim()) {
+              setReleaseError('理由を入力してください')
+              releaseReasonRef.current?.focus()
+              releaseReasonRef.current?.scrollIntoView({ block: 'center' })
+              return
+            }
+            void release()
+          }}
         >
-          <div className={styles.field}>
-            <label htmlFor="file-scan-release-reason" className={styles.fieldLabel}>理由（必須）</label>
+          <Field label="理由（必須）" htmlFor="file-scan-release-reason" error={releaseReasonError || undefined}>
             <TextArea
+              ref={releaseReasonRef}
               id="file-scan-release-reason"
+              aria-required="true"
               value={releaseReason}
               onChange={(event) => { setReleaseReason(event.target.value); setReleaseError('') }}
               placeholder="例：社内の画像と確認できたため"
             />
-          </div>
+          </Field>
         </ConfirmDialog>
       ) : null}
 
@@ -163,7 +211,7 @@ export default function FileScanScreen() {
 
   if (phase === 'loading' || phase === 'error' || phase === 'forbidden' || !selectedAccountId) {
     return (
-      <SbSettingsScreen boardId="PfA4o" title={TITLE} description={DESCRIPTION} identity={BACK}>
+      <SbSettingsScreen boardId="PfA4o" title={TITLE} description={DESCRIPTION}>
         {phase === 'loading' ? (
           <ListState kind="loading" />
         ) : phase === 'error' ? (
@@ -193,13 +241,10 @@ export default function FileScanScreen() {
   const externalOn = Boolean(config?.externalProvider && config?.externalEndpointUrl)
 
   return (
-    <SbSettingsScreen boardId="PfA4o" title={TITLE} description={DESCRIPTION} identity={BACK}>
-      <p className={styles.infoBand}>
-        <Info className={styles.bandIcon} aria-hidden="true" />
-        <span>確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。</span>
-      </p>
+    <SbSettingsScreen boardId="PfA4o" title={TITLE} description={DESCRIPTION}>
+      <Notice tone="info">確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。</Notice>
 
-      {actionError ? <p role="alert" className={styles.dangerBand}>{actionError}</p> : null}
+      {actionError && !configServerError ? <Notice tone="danger" message={actionError} /> : null}
       {actionDone ? <p role="status" className={styles.doneBand}>{actionDone}</p> : null}
 
       <div className={styles.toolbar}>
@@ -211,15 +256,14 @@ export default function FileScanScreen() {
           className={styles.search}
         />
         {STATUS_CHIPS.map((chip) => (
-          <button
+          <FilterChip
             key={chip.value}
-            type="button"
-            className={styles.chip}
-            aria-pressed={statusFilter === chip.value}
-            onClick={() => changeStatusFilter(chip.value)}
+            selectedIcon={false}
+            selected={statusFilter === chip.value}
+            onChange={() => changeStatusFilter(chip.value)}
           >
             {chip.value === 'released' ? chip.label : `${chip.label} ${counts[chip.value]}`}
-          </button>
+          </FilterChip>
         ))}
       </div>
 
@@ -236,27 +280,27 @@ export default function FileScanScreen() {
           />
         )
       ) : (
-        <div className={styles.table} role="table" aria-label="しまったファイル">
+        <GridTable label="しまったファイルの一覧" design={{ columns: 'minmax(0, 1fr) var(--tpl-sb-fs-col-uploader) minmax(0, 1fr) var(--tpl-sb-fs-col-action)', gap: 'var(--tpl-sb-tbl-gap)', padding: 'var(--tpl-sb-tbl-pad)', rowPadding: 'var(--tpl-sb-tbl-row-pad)', fontSize: 'var(--tpl-sb-tbl-head)', color: 'var(--color-ink)' }}>
           <div role="rowgroup">
-            <div role="row" className={`${styles.row} ${styles.headRow}`}>
-              <span role="columnheader">ファイル</span>
-              <span role="columnheader">上げた人</span>
-              <span role="columnheader">見つかったもの</span>
-              <span role="columnheader"><span className={styles.srOnly}>操作</span></span>
-            </div>
+            <GridHeadRow>
+              <GridCell role="columnheader">ファイル</GridCell>
+              <GridCell role="columnheader">上げた人</GridCell>
+              <GridCell role="columnheader">見つかったもの</GridCell>
+              <GridCell role="columnheader"><span className={styles.srOnly}>操作</span></GridCell>
+            </GridHeadRow>
           </div>
           <div role="rowgroup">
             {items.map((item) => (
-              <div role="row" key={item.id} className={styles.row}>
-                <span role="cell" className={`${styles.cell} ${styles.name}`} title={item.filename}>
+              <GridRow key={item.id}>
+                <GridCell role="cell" className={`${styles.cell} ${styles.name}`} title={item.filename}>
                   {item.filename}
                   {item.releasedAt ? <span className={styles.released}>戻した</span> : null}
-                </span>
-                <span role="cell" className={styles.cell} title={item.uploaderLabel ?? '—'}>{item.uploaderLabel ?? '—'}</span>
-                <span role="cell" className={styles.cell} data-tone={reasonTone(item)} title={item.reasonLabel ?? '確認が必要です'}>
+                </GridCell>
+                <GridCell role="cell" className={styles.cell} title={item.uploaderLabel ?? '—'}>{item.uploaderLabel ?? '—'}</GridCell>
+                <GridCell role="cell" className={styles.cell} data-tone={reasonTone(item)} title={item.reasonLabel ?? '確認が必要です'}>
                   {item.reasonLabel ?? '確認が必要です'}
-                </span>
-                <span role="cell" className={styles.actions}>
+                </GridCell>
+                <GridCell role="cell" className={styles.actions}>
                   {item.status === 'quarantined' ? (
                     <Button variant="text" onClick={() => openRelease(item)}>
                       <RotateCcw className={styles.btnIcon} aria-hidden="true" />
@@ -276,11 +320,11 @@ export default function FileScanScreen() {
                   ) : (
                     <span className={styles.muted}>—</span>
                   )}
-                </span>
-              </div>
+                </GridCell>
+              </GridRow>
             ))}
           </div>
-        </div>
+        </GridTable>
       )}
 
       {total > FILE_SCAN_PAGE_SIZE ? (
@@ -316,20 +360,17 @@ export default function FileScanScreen() {
         </div>
         {configOpen ? (
           <div className={styles.form}>
-            <div className={styles.field}>
-              <label htmlFor="file-scan-provider" className={styles.fieldLabel}>提供元</label>
-              <TextField id="file-scan-provider" value={provider} onChange={(event) => setProvider(event.target.value)} placeholder="例：example-scan" />
-            </div>
-            <div className={styles.field}>
-              <label htmlFor="file-scan-endpoint" className={styles.fieldLabel}>送り先（https）</label>
-              <TextField id="file-scan-endpoint" value={endpoint} onChange={(event) => setEndpoint(event.target.value)} placeholder="https://example.com/scan" />
-            </div>
-            <div className={styles.field}>
-              <label htmlFor="file-scan-secret-ref" className={styles.fieldLabel}>鍵の名前</label>
+            <Field label="提供元" htmlFor="file-scan-provider" error={configErrors.provider}>
+              <TextField ref={providerRef} id="file-scan-provider" value={provider} onChange={(event) => { setProvider(event.target.value); setConfigErrors((current) => ({ ...current, provider: undefined })); if (configServerError) setActionError('') }} placeholder="例：example-scan" />
+            </Field>
+            <Field label="送り先（https）" htmlFor="file-scan-endpoint" error={configErrors.endpoint || configServerError || undefined}>
+              <TextField ref={endpointRef} id="file-scan-endpoint" value={endpoint} onChange={(event) => { setEndpoint(event.target.value); setConfigErrors((current) => ({ ...current, endpoint: undefined })); if (configServerError) setActionError('') }} placeholder="https://example.com/scan" />
+            </Field>
+            <Field label="鍵の名前" htmlFor="file-scan-secret-ref">
               <TextField id="file-scan-secret-ref" value={secretRef} onChange={(event) => setSecretRef(event.target.value)} placeholder="例：FILE_SCAN_API_KEY" />
-            </div>
+            </Field>
             <div>
-              <Button type="button" variant="primary" disabled={configBusy} onClick={() => void saveConfig()} busy={configBusy} busyLabel="保存しています…">
+              <Button type="button" variant="primary" disabled={configBusy} onClick={saveExternalConfig} busy={configBusy} busyLabel="保存しています…">
                 外の検査の設定を保存する
               </Button>
             </div>

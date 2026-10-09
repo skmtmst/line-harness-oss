@@ -426,7 +426,6 @@ export default function PaymentTab() {
   ) : (
     <>
       {table}
-      <p className={styles.footNote}>口座番号は本人だけに表示します。銀行用 CSV（口座情報を含む）は、6桁コードかパスワードで本人確認したときだけ書き出せます（15分で期限切れ）。</p>
     </>
   )
 
@@ -460,6 +459,7 @@ export default function PaymentTab() {
 
   return (
     <AffiliateFrame
+      help="口座番号は本人だけに表示します。銀行用 CSV（口座情報を含む）は、6桁コードかパスワードで本人確認したときだけ書き出せます（15分で期限切れ）。"
       actions={actions}
       stats={stats}
       toolbar={toolbar}

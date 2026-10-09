@@ -267,6 +267,8 @@
   white-space: nowrap;
 }
 
+.judge { display: flex; align-items: center; }
+
 .how {
   font-size: var(--tpl-sb-row-sub);
   line-height: var(--tpl-sb-row-sub-lh);

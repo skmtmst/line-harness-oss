@@ -7,6 +7,8 @@ import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
+import { Field } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
 import { FeatureLinkCard } from '@/components/shared/side-cards'
 import StickyBar from '@/components/shared/sticky-bar'
 import type { PhotoAssetStatus, PhotoDerivatives } from '@/lib/api'
@@ -345,13 +347,13 @@ export function PhotoReviewDetail({
       }}
     >
       {stepUpMethod === 'none' ? null : stepUpMethod === 'password' ? (
-        <label className="block text-sm font-semibold text-ink">パスワード
-          <input type="password" value={downloadCode} onChange={(event) => { setDownloadCode(event.target.value); setDownloadError('') }} autoComplete="current-password" className="mt-2 w-full rounded-control border border-shell-gray bg-canvas px-3 py-2 text-sm font-normal text-ink outline-none focus:border-action" />
-        </label>
+        <Field label="パスワード" htmlFor="photo-download-password">
+          <TextField id="photo-download-password" type="password" value={downloadCode} onChange={(event) => { setDownloadCode(event.target.value); setDownloadError('') }} autoComplete="current-password" />
+        </Field>
       ) : (
-        <label className="block text-sm font-semibold text-ink">再認証コード
-          <input value={downloadCode} onChange={(event) => { setDownloadCode(event.target.value.replace(/\D/g, '').slice(0, 6)); setDownloadError('') }} inputMode="numeric" autoComplete="one-time-code" placeholder="6桁のコード" className="mt-2 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" />
-        </label>
+        <Field label="再認証コード" htmlFor="photo-download-code">
+          <TextField id="photo-download-code" value={downloadCode} onChange={(event) => { setDownloadCode(event.target.value.replace(/\D/g, '').slice(0, 6)); setDownloadError('') }} inputMode="numeric" autoComplete="one-time-code" placeholder="6桁のコード" />
+        </Field>
       )}
     </Dialog>
   </div>

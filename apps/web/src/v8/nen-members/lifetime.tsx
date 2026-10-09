@@ -9,12 +9,15 @@
  */
 import { useEffect, useState } from 'react'
 import { Check } from 'lucide-react'
+import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Toggle from '@/components/shared/toggle'
 import { RowActions } from '@/components/shared/row-actions'
 import { TextField } from '@/components/shared/text-field'
+import { FieldError } from '@/components/shared/form-controls'
+import { useFieldValidation } from '@/lib/use-field-validation'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -52,7 +55,11 @@ export default function LifetimeV8({
   const [notice, setNotice] = useState('')
   /** 編集の窓。index は直す行（新しい行は drafts.length）。 */
   const [editing, setEditing] = useState<{ index: number; threshold: string; title: string; notify: boolean } | null>(null)
-  const [editError, setEditError] = useState('')
+  const fields = useFieldValidation(editing ? [
+    ...(!Number.isFinite(parseYen(editing.threshold)) || parseYen(editing.threshold) <= 0
+      ? [{ id: 'milestone-threshold', message: '節目の金額は1円以上で入れてください。' }] : []),
+    ...(!editing.title.trim() ? [{ id: 'milestone-title', message: '称号を入れてください。' }] : []),
+  ] : [])
 
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy })
 
@@ -63,7 +70,7 @@ export default function LifetimeV8({
 
   const openEdit = (index: number) => {
     const row = drafts[index]
-    setEditError('')
+    fields.reset()
     setEditing(row
       ? { index, threshold: String(row.threshold), title: row.title, notify: row.notify }
       : { index, threshold: '', title: '', notify: true })
@@ -72,8 +79,7 @@ export default function LifetimeV8({
   const applyEdit = () => {
     if (!editing) return
     const threshold = parseYen(editing.threshold)
-    if (!Number.isFinite(threshold) || threshold <= 0) { setEditError('節目の金額は 1 円以上で入れてください。'); return }
-    if (!editing.title.trim()) { setEditError('称号を入れてください。'); return }
+    if (!fields.submit()) return
     setDrafts((current) => {
       const next = [...current]
       const before = next[editing.index]
@@ -131,7 +137,7 @@ export default function LifetimeV8({
         </div>
       ) : null}
 
-      <section className={styles.card} aria-labelledby="nen-lifetime-title">
+      <Card layout="vertical" padding="spacious" surface="inset" spacing="normal" aria-labelledby="nen-lifetime-title">
         <div className={styles.lifetimeHead}>
           <div className={styles.cardHead}>
             <h2 id="nen-lifetime-title" className={styles.cardTitle}>節目（ライフタイム）</h2>
@@ -186,7 +192,7 @@ export default function LifetimeV8({
             </button>
           </div>
         )}
-      </section>
+      </Card>
 
       {readonly ? null : (
         <div className={styles.saveRow}>
@@ -204,7 +210,6 @@ export default function LifetimeV8({
         description="金額は、これまでの購入額の累計です。保存は下の「保存して EC へ同期する」でまとめて行います。"
         confirmLabel="決める"
         cancelLabel="キャンセル"
-        error={editError}
         onConfirm={applyEdit}
         onCancel={() => setEditing(null)}
       >
@@ -212,11 +217,13 @@ export default function LifetimeV8({
           <div className={styles.editBody}>
             <label className={styles.removeField}>
               <span className={styles.removeLabel}>節目（累計の金額）</span>
-              <TextField inputMode="numeric" placeholder="¥50,000" value={editing.threshold} onChange={(event) => setEditing({ ...editing, threshold: event.target.value })} />
+              <TextField {...fields.bind('milestone-threshold')} inputMode="numeric" placeholder="¥50,000" value={editing.threshold} onChange={(event) => setEditing({ ...editing, threshold: event.target.value })} />
+              <FieldError id="milestone-threshold-error">{fields.error('milestone-threshold')}</FieldError>
             </label>
             <label className={styles.removeField}>
               <span className={styles.removeLabel}>称号</span>
-              <TextField maxLength={30} placeholder="なかよし" value={editing.title} onChange={(event) => setEditing({ ...editing, title: event.target.value })} />
+              <TextField {...fields.bind('milestone-title')} maxLength={30} placeholder="なかよし" value={editing.title} onChange={(event) => setEditing({ ...editing, title: event.target.value })} />
+              <FieldError id="milestone-title-error">{fields.error('milestone-title')}</FieldError>
             </label>
             <div className={styles.editToggle}>
               <Toggle checked={editing.notify} onChange={(checked) => setEditing({ ...editing, notify: checked })} label={editing.notify ? '到達したら LINE で通知する' : '到達しても通知しない'} />

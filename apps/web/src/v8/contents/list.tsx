@@ -1137,7 +1137,7 @@ export default function MediaLibraryListV8() {
         </p>
       ) : undefined}
       stats={(
-        <KpiBand className={styles.kpiStrip} aria-label="登録メディアの集計">
+        <KpiBand aria-label="登録メディアの集計">
           {kpiCards.map((card) => (
             <KpiCard
               key={card.key}

@@ -11,6 +11,7 @@ import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions'
 import { csvCell } from '@/lib/presentation'
 import { formatNumber } from '@/lib/format'
 import { petAnimalTypeLabel, type NenPetRow, type NenPetSort, type NenPetWeightFilter } from '@/lib/nen-pets-api'
+import StatusBadge from '@/components/shared/status-badge'
 import styles from './pets.module.css'
 
 export type PetTab = 'pets' | 'feeding'
@@ -83,10 +84,7 @@ export function feedingLines(pet: NenPetRow): { main: string; sub: string } {
 /** 状態の札（点＋文字）。 */
 export function Pill({ tone, children, title }: { tone: 'ok' | 'warn' | 'off'; children: ReactNode; title?: string }) {
   return (
-    <span className={styles.pill} data-tone={tone} title={title}>
-      <span className={styles.pillDot} aria-hidden="true" />
-      {children}
-    </span>
+    <StatusBadge tone={tone === 'ok' ? 'success' : tone === 'off' ? 'neutral' : tone === 'warn' ? 'warning' : 'neutral'} title={title}>{children}</StatusBadge>
   )
 }
 

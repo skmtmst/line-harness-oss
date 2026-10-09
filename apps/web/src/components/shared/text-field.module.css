@@ -123,3 +123,10 @@
 [data-theme="v8"] .multi[data-density="compact"]:focus-visible { outline-width: 2px; outline-offset: 2px; }
 [data-theme='v8'] .multi[data-height='post'] { min-height: var(--tpl-rt-summary-h); height: var(--tpl-rt-summary-h); }
 [data-theme='v8'] .multi[data-height='reply'] { min-height: var(--tpl-rt-draft-h); height: var(--tpl-rt-draft-h); }
+
+/* 見送りの補足2行（ujcar）。指定した欄だけを56pxにする。 */
+[data-theme='v8'] .multiShort { min-height: var(--tpl-nm-textarea-h); height: var(--tpl-nm-textarea-h); padding: var(--tpl-nm-textarea-pad); font-size: var(--tpl-nm-row-size); line-height: var(--tpl-nm-textarea-lh); }
+
+/* コラムの紹介文。改行を保ち、最初は1行分の高さで表示する。 */
+[data-theme='v8'] .multiSingleRow { min-height: 36px; height: 36px; border: 0; padding: 7.5px 12px; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; line-height: 21px; box-shadow: var(--shadow-board); }
+[data-theme='v8'] .multiSingleRow[aria-invalid='true'] { outline-color: var(--color-danger); }

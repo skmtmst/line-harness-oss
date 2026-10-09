@@ -4,50 +4,8 @@
  * 数字は app/globals.css の [data-theme="v8"] の --tpl-nc-* に置く。
  */
 
-.backLink {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-nc-back-gap);
-  color: var(--color-action);
-  font-size: var(--text-label);
-  font-weight: 600;
-  line-height: var(--tpl-nc-back-lh);
-}
-.backLink:hover {
-  text-decoration: underline;
-}
-
-.viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ro-band-gap);
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-ro-band-lh);
-}
-.viewerBand > svg {
-  flex-shrink: 0;
-  color: var(--color-action);
-}
 
 /* カード（白・枠1・角12・余白20）。間は板によって 12（w5pwG）か 14（yRDwW）。 */
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-nc-card-gap);
-  padding: var(--tpl-nc-card-pad);
-  border-radius: var(--radius-card);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -0.5px;
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
-}
-.cardWide {
-  gap: var(--tpl-nc-card-gap-wide);
-}
 .cardHead {
   display: flex;
   flex-direction: column;
@@ -213,27 +171,6 @@
   gap: var(--tpl-nc-form-gap);
 }
 
-/* 配信本文（枠1・角8・余白 10/12・文字 12/19・高さ 72）。 */
-.textarea {
-  box-sizing: border-box;
-  width: 100%;
-  height: var(--tpl-nc-body-h);
-  min-height: var(--tpl-nc-body-h);
-  padding: var(--tpl-nc-body-pad);
-  border: 0;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-control-border);
-  outline-offset: -0.5px;
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font: inherit;
-  font-size: var(--text-caption);
-  line-height: var(--tpl-nc-body-lh);
-  resize: vertical;
-}
-.textarea:focus-visible {
-  outline: var(--tpl-nc-focus-ring) solid var(--color-action);
-}
 .caution {
   margin: 0;
   padding: var(--tpl-nc-body-pad);
@@ -267,19 +204,6 @@
   flex-direction: column;
   gap: var(--tpl-nc-side-gap);
   width: 100%;
-}
-.sideCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-nc-field-gap);
-  padding: var(--tpl-nc-side-pad);
-  border-radius: var(--radius-card);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -0.5px;
-  box-shadow: var(--card-shadow);
-}
-.sideCardTest {
-  gap: var(--tpl-toolbar-gap);
 }
 .sideTitle {
   margin: 0;

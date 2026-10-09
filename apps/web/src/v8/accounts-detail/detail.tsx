@@ -21,7 +21,9 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { SettingsPage } from '@/components/templates'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import TargetMissing from '@/components/shared/target-missing'
 import {
@@ -260,14 +262,11 @@ export default function AccountDetailV8() {
         navigation={<SettingsInnerNav inline />}
       >
         {viewer ? (
-          <p className={styles.viewerBand} role="status">
-            <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-          </p>
+          <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />}>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</Notice>
         ) : null}
         <div className={styles.columns}>
           <div className={styles.main}>
-            <section className={styles.card} aria-labelledby="acd-basic">
+            <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-basic">
               <div className={styles.cardHead}><h3 id="acd-basic" className={styles.cardTitle}>登録の内容</h3></div>
               <Row label="表示名">{account.name}</Row>
               <Row label="チャネルID">{account.channelId}</Row>
@@ -275,7 +274,7 @@ export default function AccountDetailV8() {
                 {parentValue ?? (
                   <span className={styles.inline}>
                     読み込めませんでした
-                    <button type="button" className={styles.textButton} onClick={() => void loadAll()}>もう一度読み込む</button>
+                    <Button type="button" variant="text" presentation="account-inline" onClick={() => void loadAll()}>もう一度読み込む</Button>
                   </span>
                 )}
               </Row>
@@ -284,20 +283,20 @@ export default function AccountDetailV8() {
                 <span className={styles.inline}>
                   <span className={styles.truncate} title={recipientValue}>{recipientValue}</span>
                   {canManage ? (
-                    <button type="button" className={styles.textButton} onClick={() => setRecipientsOpen(true)}>変える</button>
+                    <Button type="button" variant="text" presentation="account-inline" onClick={() => setRecipientsOpen(true)}>変える</Button>
                   ) : null}
                 </span>
               </Row>
-            </section>
+            </Card>
 
-            <section className={styles.card} aria-labelledby="acd-credentials">
-              <div className={styles.inner}>
+            <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-credentials">
+              <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-inner-pad)" gap="var(--tpl-acd-card-gap)" className={styles.inner}>
                 <h3 className={styles.cardTitle}>登録の内容（つづき）</h3>
                 <Pair label="友だち数">{friendsLine(account)}</Pair>
                 <Pair label="状態"><span className={styles.end}><StatusBadge tone={state.tone}>{state.label}</StatusBadge></span></Pair>
                 <Pair label="国・地域">{account.country ?? '未設定'}</Pair>
                 <Pair label="役割メモ">{account.role ?? '未設定'}</Pair>
-              </div>
+              </Card>
               <div className={styles.cardHead} id="acd-credentials-head">
                 <h3 id="acd-credentials" className={styles.cardTitle}>資格情報</h3>
                 <p className={styles.cardSub}>秘密値そのものは表示しません。差し替えるときは、新しい値を入れて保存し直します。</p>
@@ -336,10 +335,10 @@ export default function AccountDetailV8() {
                   <StatusBadge tone={match.tone}>{match.badge}</StatusBadge>
                 </span>
               </Row>
-            </section>
+            </Card>
 
             {!account.isActive && !account.archivedAt ? (
-              <section className={styles.card} aria-labelledby="acd-skipped">
+              <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-skipped">
                 <div className={styles.cardHead}>
                   <h3 id="acd-skipped" className={styles.cardTitle}>止まっている間に送らなかったもの</h3>
                   {account.inactivatedAt ? (
@@ -349,7 +348,7 @@ export default function AccountDetailV8() {
                   ) : null}
                 </div>
                 {skipped === null ? (
-                  <p className={styles.muted}>読み込んでいます…</p>
+                  <ListState kind="loading" />
                 ) : skipped === 'error' ? (
                   <p className={styles.muted}>送らなかった配信の一覧を読み込めませんでした。詳細のほかの欄はそのまま使えます。</p>
                 ) : skipped.length === 0 ? (
@@ -365,28 +364,28 @@ export default function AccountDetailV8() {
                   </ul>
                 )}
                 <p className={styles.faint}>再開しても、ここに並んだ配信は自動では送り直しません。</p>
-              </section>
+              </Card>
             ) : null}
           </div>
 
           <aside className={styles.side}>
-            <section className={styles.card} aria-labelledby="acd-cando">
+            <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-cando">
               <div className={styles.cardHead}><h3 id="acd-cando" className={styles.cardTitle}>このアカウントでできること</h3></div>
               <p className={styles.bullets}>{CAN_DO}</p>
               <Button href="/?qr=base" className={styles.fit}><QrCode size={14} aria-hidden="true" />友だち追加URLとQRを見る</Button>
-            </section>
-            <section className={styles.card} aria-labelledby="acd-careful">
+            </Card>
+            <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-careful">
               <div className={styles.cardHead}><h3 id="acd-careful" className={styles.cardTitle}>気をつけること</h3></div>
               <p className={styles.bullets}>{CAREFUL}</p>
-            </section>
-            <section className={styles.card} aria-labelledby="acd-links">
+            </Card>
+            <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-links">
               <div className={styles.cardHead}><h3 id="acd-links" className={styles.cardTitle}>つながる先</h3></div>
               <p className={styles.links}>
                 {LINKS.map((link, index) => (
                   <span key={link.href}>{index > 0 ? '　' : ''}<Link href={link.href}>→ {link.label}</Link></span>
                 ))}
               </p>
-            </section>
+            </Card>
             {canManage ? (
               <div className={styles.actions}>
                 {account.archivedAt ? (

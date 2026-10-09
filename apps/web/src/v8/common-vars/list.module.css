@@ -50,15 +50,8 @@
   color: var(--color-action);
 }
 
-/*
- * 数の帯（FM94M）：上下の線はマスの外枠と重なる（絵は -0.5 の重ね）。帯の下の線は
- * 型の数の帯の段が持つので、帯自身の下の線は消し、上の線は頭の余白へ1つ重ねる。
- * 数字は詰めた字幅（「1」が「7」と同じ幅にならない）。
- */
-:global([data-theme='v8']) .kpiStrip.kpiStrip[data-kpi-presentation='band'] {
-  margin-top: -1px;
-  border-bottom: 0;
-}
+/* 数の帯の境目は共通の型と帯に任せる。数字の字幅だけを絵に合わせる。 */
+
 
 :global([data-theme='v8']) .kpiStrip :global([data-kpi-number]) {
   font-variant-numeric: normal;
