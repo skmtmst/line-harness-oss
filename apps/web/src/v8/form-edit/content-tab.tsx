@@ -28,6 +28,9 @@ import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import { ADD_GROUPS, blockKindLine, blockTitleLine, inputTypeLabel, isChoiceType } from './model'
 import MediaPickerDialog from './media-picker'
+import TapActionField from '@/components/shared/tap-action-field'
+import { tapLiffIdOf, useTapActionAccount, useTapActionSources } from '@/components/shared/use-tap-action-sources'
+import { tapActionFromSavedUri, tapActionLiffUrl, tapActionNeedsLiff, type TapActionKind } from '@/lib/tap-actions'
 import styles from './edit.module.css'
 
 type Props = {
@@ -457,6 +460,36 @@ function BookingFields({ block, refs, set }: { block: FormInputBlock; refs: Form
   )
 }
 
+/*
+ * リンクのボタンの押したら（共通の欄 TapActionField・YPzmo・B-129）。保存は今のまま開く URL の文字だけ。
+ * 予約・回答フォーム・予約履歴・来店スタンプはアカウントの LIFF の URL にする。テキストを送るは、
+ * 回答フォームの画面のボタンでは送れないので出さない。
+ */
+const FORM_LINK_KINDS: readonly TapActionKind[] = ['uri', 'booking', 'form', 'booking_history', 'visit_stamp']
+function ButtonTapField({ id, url, accountId, onChange }: { id: string; url: string; accountId: string | null; onChange: (url: string) => void }) {
+  const liffId = tapLiffIdOf(useTapActionAccount(), accountId)
+  const sources = useTapActionSources(accountId)
+  const value = tapActionFromSavedUri(url)
+  return (
+    <div className={`${styles.field} ${styles.decoTap}`} id={`${id}-url`}>
+      <span className={styles.fieldLabel}>押したら</span>
+      <TapActionField
+        name="このボタン"
+        value={value}
+        onChange={(patch) => {
+          const kind = patch.kind ?? value.kind
+          if (kind === 'uri') { onChange(patch.uri ?? (patch.kind !== undefined ? '' : url)); return }
+          if (tapActionNeedsLiff(kind)) onChange(tapActionLiffUrl(liffId || '{{liff_id}}', kind, patch.refId ?? (patch.kind !== undefined ? '' : value.refId)))
+        }}
+        kinds={FORM_LINK_KINDS}
+        hasLiff={Boolean(liffId)}
+        liffSettingsHref={accountId ? `/accounts/detail?id=${encodeURIComponent(accountId)}` : '/accounts'}
+        sources={sources}
+      />
+    </div>
+  )
+}
+
 function DecoFields({ block, patch, accountId }: { block: FormBlock; patch: (next: Partial<FormBlock>) => void; accountId: string | null }) {
   const [picking, setPicking] = useState(false)
   const id = `fe-deco-${block.id}`
@@ -484,9 +517,7 @@ function DecoFields({ block, patch, accountId }: { block: FormBlock; patch: (nex
           <Labeled label="ボタンの文字" htmlFor={id}>
             <TextField id={id} value={block.label} onChange={(e) => patch({ label: e.target.value } as Partial<FormBlock>)} />
           </Labeled>
-          <Labeled label="開くURL" htmlFor={`${id}-url`}>
-            <TextField id={`${id}-url`} type="url" placeholder="https://..." value={block.url} onChange={(e) => patch({ url: e.target.value } as Partial<FormBlock>)} />
-          </Labeled>
+          <ButtonTapField id={id} url={block.url} accountId={accountId} onChange={(url) => patch({ url } as Partial<FormBlock>)} />
         </div>
       )
     case 'image':

@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react'
 import { api, bookingApi } from '@/lib/api'
 import { visitStampsApi } from '@/lib/visit-stamps-api'
+import * as accountContext from '@/contexts/account-context'
 import type { TapActionSources } from './tap-action-field'
 
 export function useTapActionSources(accountId: string | null | undefined, want: { form?: boolean; booking?: boolean; visit_stamp?: boolean } = { form: true, booking: true, visit_stamp: true }): TapActionSources {
@@ -35,4 +36,25 @@ export function useTapActionSources(accountId: string | null | undefined, want: 
     return () => { cancelled = true }
   }, [accountId, form, booking, stamp])
   return sources
+}
+
+type TapAccount = NonNullable<ReturnType<typeof accountContext.useOptionalAccount>>
+
+/*
+ * 上のバーのアカウント（LIFF の有無を読む）。AccountProvider の外（部品だけの試験）では null。
+ * 試験のモックが useOptionalAccount を持たないと読んだ時点で投げるので、そのときも null（呼ぶ hook の数は毎回同じ）。
+ */
+export function useTapActionAccount(): TapAccount | null {
+  let hook: typeof accountContext.useOptionalAccount | undefined
+  try { hook = accountContext.useOptionalAccount } catch { hook = undefined }
+  return hook ? hook() : null
+}
+
+/** アカウントの LIFF ID（無ければ null）。accountId を省くと上のバーで選んでいるアカウント。 */
+export function tapLiffIdOf(account: TapAccount | null, accountId?: string | null): string | null {
+  if (!account) return null
+  const id = accountId === undefined ? account.selectedAccountId : accountId
+  const found = (account.accounts ?? []).find((item) => item.id === id)
+  if (found) return found.liffId || null
+  return id && id === account.selectedAccountId ? account.selectedAccount?.liffId || null : null
 }

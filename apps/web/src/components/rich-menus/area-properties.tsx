@@ -5,8 +5,7 @@ import { ArrowLeftRight, CalendarClock, Copy, Phone, Send, Zap } from 'lucide-re
 import MultiSelect from '@/components/shared/multi-select'
 import Select from '@/components/shared/select'
 import TapActionField, { type TapActionExtraKind } from '@/components/shared/tap-action-field'
-import { useTapActionSources } from '@/components/shared/use-tap-action-sources'
-import * as accountContext from '@/contexts/account-context'
+import { tapLiffIdOf, useTapActionAccount, useTapActionSources } from '@/components/shared/use-tap-action-sources'
 import { HQ_RICH_MENU_INTENTS } from '@/lib/hq-rich-menu-create'
 import {
   tapActionDef, tapActionFromUri, tapActionLiffUrl, tapActionNeedsLiff,
@@ -110,16 +109,6 @@ function tapValueOf(area: Area): TapActionValue {
   const kind = tapKindOf(area)
   if (URL_LIFF_KINDS.includes(kind as TapActionKind)) return { kind, uri: '', text: '', refId: tapActionFromUri(String(data.uri ?? '')).refId }
   return { kind, uri: String(data.uri ?? ''), text: String(data.text ?? ''), refId: kind === 'form' ? area.formId ?? '' : '' }
-}
-
-/*
- * 上のバーのアカウント（LIFF の有無・予約メニュー・スタンプカードを読む）。AccountProvider の外（部品だけの試験）では null。
- * 試験のモックが useOptionalAccount を持たないと、読んだ時点で投げるので、そのときも null（呼ぶ hook の数は毎回同じ）。
- */
-function useTapAccount() {
-  let hook: typeof accountContext.useOptionalAccount | undefined
-  try { hook = accountContext.useOptionalAccount } catch { hook = undefined }
-  return hook ? hook() : null
 }
 
 /** LIFF ID がまだ無いときの仮の URL（公開の前に isAreaActionConfigured が止める）。 */
@@ -240,8 +229,8 @@ export function AreaProperties({
   const isHq = scope
     ? scope === 'hq'
     : Boolean(allowedIntents) && allowedIntents!.length === HQ_RICH_MENU_INTENTS.length && HQ_RICH_MENU_INTENTS.every((value) => allowedIntents!.includes(value))
-  const account = useTapAccount()
-  const liffId = isHq ? null : liffIdProp !== undefined ? liffIdProp : (account?.selectedAccount?.liffId ?? null) || null
+  const account = useTapActionAccount()
+  const liffId = isHq ? null : liffIdProp !== undefined ? liffIdProp : tapLiffIdOf(account)
   const shopSources = useTapActionSources(isHq ? null : account?.selectedAccountId, { booking: true, visit_stamp: true })
   /* 6つのうち使えるもの（並びは絵の順）。予約・予約履歴・来店スタンプは url の intent で保存するので url が要る。 */
   const tapKinds: TapActionKind[] = [

@@ -97,6 +97,8 @@
 .bookingInfoText { flex: 1; min-width: 0; margin: 0; font-size: var(--tpl-fe-note-size); line-height: var(--tpl-fe-info-lh); color: var(--color-ink-secondary); }
 .bookingLink { flex: none; display: inline-flex; align-items: center; gap: var(--tpl-fe-icon-gap); padding: var(--tpl-fe-button-pad); height: var(--tpl-fe-control-h); font-size: var(--tpl-fe-body-size); font-weight: 600; color: var(--color-ink-secondary); white-space: nowrap; }
 .decoRow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--tpl-fe-save-gap); }
+/* リンクのボタンの押したら（共通の欄）は2列をまたいで1行に置く。 */
+.decoTap { grid-column: 1 / -1; }
 
 /* ---------- ブロックを足す ---------- */
 
