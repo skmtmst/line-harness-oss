@@ -14,8 +14,8 @@
  *       - 画面の .module.css が部品の中身を子孫・属性・:global で塗り直している
  *   (c) 直書き：画面の CSS に色・大きさ・角丸・影を変数なしで書いている所（型は selector の手がかりで割り当て、
  *       当たらない分は「（型なし）」）
- *   (d) Pen：板で持ち主の部品を切り離した・見た目を上書きした所（部品の板の html と同じ名前の節を比べる。
- *       文字・件数・データの違いは数えない）、と手描きの目印（板 ID）
+ *   (d) Pen：板で持ち主の部品を切り離した・見た目を上書きした所（部品と同じ名前の写しどうしを比べ、一番多い値と違う所。
+ *       部品の板の html は古いことがあるため。文字・件数・データの違いは数えない）、と手描きの目印（板 ID）
  * 効く範囲：持ち主の部品を読んでいる画面側のファイル数・機能の数、Pen は部品を置いている板の数。
  *
  * 出力：<out>/pattern-audit.json と <out>/pattern-audit.md。数は「候補」なので、直す前に目で確かめる。
@@ -214,27 +214,89 @@ export function scanCodeFile(pattern, rel, content, glob = { excludeFiles: [] })
   return hits.map((hit) => ({ ...hit, file: rel, scope: scopeOf(rel), usesCanonical }))
 }
 
-/** (b) JSX：持ち主の部品に className / style を渡している所。 */
-export function scanPropOverrides(pattern, rel, content) {
+const LOOK_PROP = /^(color|background(-color|-image)?|border(-(top|right|bottom|left))?(-(color|style|width))?|border-radius|outline(-[a-z]+)?|box-shadow|font-(size|weight|family)|line-height|letter-spacing|opacity|fill|stroke|text-decoration)$/
+const LOOK_TW = /^(?:[a-z0-9-]+:)*(bg-|text-(?!left\b|right\b|center\b|ellipsis\b|nowrap\b|wrap\b|balance\b|pretty\b)|border(?!-collapse)|rounded|shadow|font-|ring|outline|opacity-|leading-|tracking-|fill-|stroke-)/
+
+/** CSS Modules の import を解く（./ と @/ だけ）。 */
+function cssModuleOf(rel, content, codeRoot, read) {
+  const m = content.match(/import\s+(\w+)\s+from\s+['"]([^'"]+\.module\.css)['"]/)
+  if (!m || !codeRoot) return null
+  const spec = m[2]
+  const base = spec.startsWith('@/') ? join(codeRoot, 'apps/web/src', spec.slice(2)) : resolve(join(codeRoot, dirname(rel)), spec)
+  const css = read(base)
+  return css == null ? null : { name: m[1], css }
+}
+
+/** そのクラスの規則に見た目（色・枠・角丸・影・文字）を書いているか。幅・余白・並びだけなら見た目ではない（§5）。 */
+export function classHasLook(css, className) {
+  const re = new RegExp(`\\.${escapeRe(className)}(?![\\w-])`)
+  return cssRules(css).some((rule) => re.test(rule.selector) && declarations(rule.body).some((d) => LOOK_PROP.test(d.prop)))
+}
+
+/** className / style の中身が見た目を足しているか。 */
+export function overrideLooks(kind, expr, module) {
+  if (kind === 'style') return /\b(color|background|border|borderRadius|boxShadow|outline|fontSize|fontWeight|opacity)\s*:/.test(expr)
+  const tokens = [...expr.matchAll(/['"`]([^'"`]*)['"`]/g)].flatMap((m) => m[1].split(/\s+/)).filter(Boolean)
+  if (tokens.some((t) => LOOK_TW.test(t))) return true
+  if (module) {
+    for (const m of expr.matchAll(new RegExp(`\\b${module.name}(?:\\.(\\w+)|\\[['"]([\\w-]+)['"]\\])`, 'g'))) {
+      if (classHasLook(module.css, m[1] ?? m[2])) return true
+    }
+  }
+  return false
+}
+
+function propExpression(content, start) {
+  const ch = content[start]
+  if (ch === '"' || ch === "'") return content.slice(start, content.indexOf(ch, start + 1) + 1)
+  if (ch !== '{') return content.slice(start, start + 80)
+  let depth = 0
+  for (let i = start; i < content.length && i < start + 1200; i += 1) {
+    if (content[i] === '{') depth += 1
+    else if (content[i] === '}') { depth -= 1; if (depth === 0) return content.slice(start, i + 1) }
+  }
+  return content.slice(start, start + 400)
+}
+
+/** (b) JSX：持ち主の部品に見た目の className / style を渡している所（幅・余白・並びだけのものは数えない）。 */
+export function scanPropOverrides(pattern, rel, content, codeRoot = null, read = safeRead) {
   const p = pattern._code
   if (!p.propOverride || !/\.tsx$/.test(rel) || isOwnerSide(scopeOf(rel))) return []
   const lines = content.split('\n')
+  const module = cssModuleOf(rel, content, codeRoot, read)
   const hits = []
   p.propOverride.lastIndex = 0
   let m
   while ((m = p.propOverride.exec(content))) {
     const at = m.index + m[0].length - m[2].length - 1
-    const line = lineAt(content, at)
+    const expr = propExpression(content, m.index + m[0].length)
+    if (!overrideLooks(m[2], expr, module)) continue
+    const line = lineAt(content, at + 1)
     hits.push({ file: rel, line, kind: `prop:${m[2]}`, component: m[1], text: (lines[line - 1] ?? '').trim().slice(0, 180), scope: scopeOf(rel) })
   }
   return hits
 }
 
-const VISUAL_PROP = /^(color|background(-color)?|border(-[a-z]+)*|outline(-[a-z]+)*|box-shadow|font-(size|weight)|line-height|height|min-height|max-height|width|min-width|max-width|padding(-[a-z]+)*|gap|opacity|fill|stroke)$/
-const OVERRIDE_SELECTOR = /:global\((?!\s*\[data-theme)|\s(button|input|select|textarea|table|thead|tbody|tr|th|td|label|svg|a)\b|\[(data-[a-z-]+|role|aria-[a-z-]+)|>\s*\*|\s\*/
+const cache = new Map()
+function safeRead(path) {
+  if (cache.has(path)) return cache.get(path)
+  let out = null
+  try { out = readFileSync(path, 'utf8') } catch { out = null }
+  cache.set(path, out)
+  return out
+}
 
-function stripThemeScope(selector) {
-  return selector.replace(/:global\(\s*\[data-theme[^)]*\)\s*\)/g, '').replace(/:global\(\s*\[data-theme[^)]*\]\s*\)/g, '').trim()
+// 部品の中身へ手を伸ばす書き方：:global(.x)・:global(*)・子の * ・子孫の要素・部品が付ける data-* と型の印
+const OVERRIDE_SELECTOR = /:global\(\s*[.*]|>\s*\*|\s\*(?![\w-])|[\s>](button|input|select|textarea|table|thead|tbody|tr|th|td|label|svg|a|li|ul)(?![\w-])|\[data-(variant|tone|size|kind|surface|corner|state|selected|open|active|card-[a-z-]+|template-region|page-template|design-[a-z-]+)|\[(role|aria-[a-z-]+)=/
+
+/** 先頭の範囲指定（見た目の切り替え・型の印・:has）は外して読む。 */
+export function stripThemeScope(selector) {
+  let s = selector
+  for (;;) {
+    const next = s.replace(/^\s*:global\(\s*\[data-(theme|page-template)[^\]]*\]\s*\)(:has\([^)]*\))?\s*/, '')
+    if (next === s) return s.trim()
+    s = next
+  }
 }
 
 function declarations(body) {
@@ -250,8 +312,8 @@ export function scanCssOverrides(patterns, rel, content) {
   const hits = []
   for (const rule of cssRules(content)) {
     const selector = stripThemeScope(rule.selector)
-    if (!OVERRIDE_SELECTOR.test(` ${selector}`)) continue
-    const visual = declarations(rule.body).filter((d) => VISUAL_PROP.test(d.prop))
+    if (!selector.split(',').some((part) => OVERRIDE_SELECTOR.test(` ${part.trim()}`))) continue
+    const visual = declarations(rule.body).filter((d) => LOOK_PROP.test(d.prop))
     if (!visual.length) continue
     const owner = patterns.find((p) => p._code.overrideSelectors.some((re) => re.test(selector)))
     hits.push({ file: rel, line: lineAt(content, rule.index), kind: 'css', pattern: owner?.id ?? NO_TYPE, text: selector.replace(/\s+/g, ' ').slice(0, 160), scope: scopeOf(rel) })
@@ -328,7 +390,7 @@ export function scanCode(catalog, codeRoot, patterns = catalog.patterns) {
     const scope = scopeOf(rel)
     for (const pattern of patterns) {
       a[pattern.id].push(...scanCodeFile(pattern, rel, content, glob))
-      for (const hit of scanPropOverrides(pattern, rel, content)) b[pattern.id].push({ ...hit, pattern: pattern.id })
+      for (const hit of scanPropOverrides(pattern, rel, content, codeRoot)) b[pattern.id].push({ ...hit, pattern: pattern.id })
       if (!isOwnerSide(scope) && /\.tsx?$/.test(rel) && pattern._code.canonicalUse?.test(content)) {
         usage[pattern.id].files.add(rel)
         usage[pattern.id].features.add(featureOf(rel))
@@ -412,24 +474,50 @@ export function loadPenComponents(penDir) {
   return defs
 }
 
-/** (d) 板の中の部品の写し（同じ名前の節）を部品と比べる。見た目の値・中の作りの違いだけを数える。 */
-export function comparePenInstances(pattern, board, nodes, defs, glob) {
-  const out = { uses: 0, hits: [] }
-  const owners = (pattern.owner?.pen ?? []).map((o) => defs[o.id]).filter(Boolean)
-  if (!owners.length) return out
-  const byName = new Map(owners.map((d) => [d.name, d]))
+/** 板の中の、持ち主の部品と同じ名前の節（部品の写し）を集める。 */
+export function collectPenInstances(pattern, board, nodes, defs) {
+  const names = new Set((pattern.owner?.pen ?? []).map((o) => defs[o.id]?.name ?? o.instanceName).filter(Boolean))
+  const out = []
+  if (!names.size) return out
   nodes.forEach((node, index) => {
-    const def = byName.get(node.name)
-    if (!def) return
+    if (!names.has(node.name)) return
     if (pattern._pen.ancestorNot.some((re) => node.ancestors.some((name) => re.test(name)))) return
-    out.uses += 1
-    const props = styleProps(node.style)
-    const changed = glob.penCompare.filter((prop) => (props[prop] ?? '') !== (def.props[prop] ?? ''))
-    const extra = [...descendantNames(nodes, index)].filter((name) => !def.names.has(name))
-    if (changed.length) out.hits.push({ board, kind: 'pen:look', component: def.id, name: node.name, detail: changed.map((p) => `${p}: ${props[p] ?? '—'} ≠ ${def.props[p] ?? '—'}`).join(' / ').slice(0, 200) })
-    if (extra.length) out.hits.push({ board, kind: 'pen:detached', component: def.id, name: node.name, detail: `部品に無い中身：${extra.slice(0, 6).join('・')}`.slice(0, 200) })
+    out.push({ board, name: node.name, props: styleProps(node.style), inner: [...descendantNames(nodes, index)] })
   })
   return out
+}
+
+function mode(values) {
+  const count = new Map()
+  for (const v of values) count.set(v, (count.get(v) ?? 0) + 1)
+  return [...count.entries()].sort((x, y) => y[1] - x[1])[0]?.[0]
+}
+
+/**
+ * (d) 写しを比べる。部品の板の html は古いことがあるので、同じ名前の写しで一番多い値を「部品の値」とみなし、
+ * それと違う見た目（compareProps）を「上書き」、写しの 5% 以下にしか無い中身を「切り離し・手で足した中身」とする。
+ * 文字・件数・データ（直下の文字・行の数）は比べない。空き・数字を含む名前（「タブ 会員一覧」「列 名前」など中身の差し込み口）も比べない。
+ */
+export function judgePenInstances(instances, compareProps, rare = 0.05) {
+  const hits = []
+  const byName = new Map()
+  for (const inst of instances) {
+    if (!byName.has(inst.name)) byName.set(inst.name, [])
+    byName.get(inst.name).push(inst)
+  }
+  for (const [name, list] of byName) {
+    const base = Object.fromEntries(compareProps.map((prop) => [prop, mode(list.map((i) => i.props[prop] ?? ''))]))
+    const freq = new Map()
+    for (const inst of list) for (const n of inst.inner) freq.set(n, (freq.get(n) ?? 0) + 1)
+    const limit = Math.max(1, Math.floor(list.length * rare))
+    for (const inst of list) {
+      const changed = compareProps.filter((prop) => (inst.props[prop] ?? '') !== base[prop])
+      if (changed.length) hits.push({ board: inst.board, kind: 'pen:look', name, detail: changed.map((prop) => `${prop}: ${inst.props[prop] || '—'}（多くは ${base[prop] || '—'}）`).join(' / ').slice(0, 220) })
+      const odd = list.length >= 5 ? inst.inner.filter((n) => !/[\s\d]/.test(n) && (freq.get(n) ?? 0) <= limit) : []
+      if (odd.length) hits.push({ board: inst.board, kind: 'pen:detached', name, detail: `ほかの写しに無い中身：${odd.slice(0, 6).join('・')}`.slice(0, 220) })
+    }
+  }
+  return hits
 }
 
 export function scanPenBoard(pattern, board, nodes) {
@@ -461,6 +549,7 @@ export function scanPen(catalog, penDir, patterns = catalog.patterns) {
   const titles = {}
   if (!penDir || !existsSync(penDir)) return { boards: 0, hand, inst, reach, titles, defs: {} }
   const defs = loadPenComponents(penDir)
+  const collected = Object.fromEntries(patterns.map((p) => [p.id, []]))
   const files = readdirSync(penDir).filter((f) => f.endsWith('.html')).sort()
   let boards = 0
   for (const file of files) {
@@ -471,11 +560,12 @@ export function scanPen(catalog, penDir, patterns = catalog.patterns) {
     boards += 1
     for (const pattern of patterns) {
       hand[pattern.id].push(...scanPenBoard(pattern, board, nodes))
-      const compared = comparePenInstances(pattern, board, nodes, defs, glob)
-      inst[pattern.id].push(...compared.hits)
-      if (compared.uses) { reach[pattern.id].boards += 1; reach[pattern.id].uses += compared.uses }
+      const found = collectPenInstances(pattern, board, nodes, defs)
+      collected[pattern.id].push(...found)
+      if (found.length) { reach[pattern.id].boards += 1; reach[pattern.id].uses += found.length }
     }
   }
+  for (const pattern of patterns) inst[pattern.id] = judgePenInstances(collected[pattern.id], glob.penCompare)
   return { boards, hand, inst, reach, titles, defs }
 }
 
