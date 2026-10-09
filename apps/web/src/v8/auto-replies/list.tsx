@@ -1,6 +1,7 @@
 'use client'
 
 
+import BulkBar from '@/components/shared/bulk-bar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { ListPage, ListPagePagination } from '@/components/templates'
@@ -1370,9 +1371,7 @@ export default function AutoRepliesListV8() {
 
       {/* まとめての帯（選ぶと表の下に出る）：止める・再開・フォルダへ移す。 */}
       {canEdit && selectedCount > 0 ? (
-        <div className={styles.bulkRow} style={{ padding: '10px 14px' }} role="region" aria-label="選択中のまとめ操作">
-          <span className={styles.bulkCount} aria-live="polite" aria-atomic="true">{selectedCount}件を選択中</span>
-          <Button
+        <BulkBar count={selectedCount} total={sortedItems.length} onSelectAll={() => setSelectedIds(new Set(sortedItems.map(item => item.id)))} onClear={clearSelection}><Button
             type="button"
             variant="secondary"
             disabled={stoppableIds.length === 0}
@@ -1385,8 +1384,7 @@ export default function AutoRepliesListV8() {
           >
             <Square size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
             まとめて止める
-          </Button>
-          <Button
+          </Button><Button
             type="button"
             variant="secondary"
             disabled={resumableIds.length === 0}
@@ -1398,19 +1396,16 @@ export default function AutoRepliesListV8() {
           >
             <Play size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
             まとめて再開
-          </Button>
-          <Button
+          </Button><Button
             type="button"
             variant="secondary"
             onClick={() => openMove([...selectedIds])}
           >
             <FolderIcon size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
             フォルダへ移す
-          </Button>
-          <Button type="button" variant="secondary" onClick={() => setSelectedIds(new Set())}>
+          </Button><Button type="button" variant="secondary" onClick={() => setSelectedIds(new Set())}>
             選択を外す
-          </Button>
-        </div>
+          </Button></BulkBar>
       ) : null}
     </>
   )

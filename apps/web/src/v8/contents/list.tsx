@@ -8,6 +8,7 @@
  * 選んだときの一括バーをはめる。データの口・確かめの窓は今の V8（src/app/contents/list-v8.tsx）から写した。
  * 札の名前の前にフォルダの色の丸（2026-10-07 オーナー）。札の操作は「…」へ集める。
  */
+import { collectListRows } from '@/components/shared/collect-list-rows'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
@@ -635,7 +636,7 @@ export default function MediaLibraryListV8() {
   const removeSelected = async () => {
     if (selected.size === 0 || !selectedAccountId) return
     const removableSelected = [...selected].filter((id) =>
-      items.some((item) => item.id === id && isKnownUnused(item)),
+      [...items, ...selectionItems].some((item) => item.id === id && isKnownUnused(item)),
     )
     if (removableSelected.length !== selected.size) {
       setSelected(new Set(removableSelected))
@@ -659,7 +660,7 @@ export default function MediaLibraryListV8() {
     let deleted = 0
     const failedNames: string[] = []
     for (const id of ids) {
-      const name = items.find((m) => m.id === id)?.filename ?? id
+      const name = [...items, ...selectionItems].find((m) => m.id === id)?.filename ?? id
       try {
         await api.media.delete(id, accountAtRequest)
       } catch {
@@ -963,6 +964,21 @@ export default function MediaLibraryListV8() {
   }, [page, pageCount])
 
   // まとめて削除の候補は未使用かつ一覧にいるものだけ。退避済みは選ばない。
+  const [selectionItems, setSelectionItems] = useState<MediaItem[]>([])
+  const [selectionTotal, setSelectionTotal] = useState<number | undefined>(undefined)
+  const selectAllMedia = async () => {
+    const account = selectedAccountId
+    const sequence = listSeqRef.current
+    if (!account) return
+    const all = await collectListRows(selectionTotal ?? total, async (offset, limit) => {
+      const response = await api.media.list(account, { kind: kinds.size === 1 ? [...kinds][0] : undefined, folderId: folderFilter || undefined, query: query.trim() || undefined, unusedOnly: true, nearLimitOnly: showNearLimitOnly, archived: showArchivedOnly ? 'only' : undefined, sort, limit, offset })
+      if (!response.success) throw new Error('読み込めませんでした')
+      return response.data
+    })
+    if (account !== latestAccountRef.current || sequence !== listSeqRef.current) return
+    const eligible = all.filter(isKnownUnused)
+    setSelectionItems(eligible); setSelectionTotal(eligible.length); setSelected(new Set(eligible.map(item => item.id)))
+  }
   const removable = items.filter((item) => isKnownUnused(item) && !item.archivedAt)
   const allSelected = removable.length > 0 && removable.every((item) => selected.has(item.id))
   /** R587: フォルダ欄の失敗は403（権限）とそれ以外（通信）で案内を分ける。 */
@@ -1305,6 +1321,8 @@ export default function MediaLibraryListV8() {
           {canManageMedia ? (
             <BulkBar
               count={selected.size}
+              total={selectionTotal ?? total}
+              onSelectAll={selectAllMedia}
               hint="対象を確認してから操作を選んでください"
             >
               <Button type="button" variant="secondary" onClick={() => setSelected(new Set())}>

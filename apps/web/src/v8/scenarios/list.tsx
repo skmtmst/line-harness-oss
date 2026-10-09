@@ -10,6 +10,8 @@
  * 「シナリオを作る」は左のフォルダの列の上、行の右端は「…」（複製・配信結果・削除）、
  * 行の左の □ を選ぶと表の下にまとめての帯（止める・再開・フォルダへ移す）。
  */
+import { collectListRows } from '@/components/shared/collect-list-rows'
+import BulkBar from '@/components/shared/bulk-bar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
@@ -415,7 +417,14 @@ export default function ScenariosListV8() {
   /* 選んでいる間は Esc で選択を外す（動きの点検 12 番）。 */
   const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
   useEscapeToClearSelection(selectedCount > 0, clearSelection)
-  const selectedRows = scenarios.filter((s) => selectedIds.has(s.id))
+  const [selectionRows, setSelectionRows] = useState<ScenarioRow[]>([])
+  const selectedRows = [...new Map([...scenarios, ...selectionRows].map(row => [row.id, row])).values()].filter(row => selectedIds.has(row.id))
+  const selectAllScenarios = async () => {
+    const account = selectedAccountId
+    const rows = await collectListRows(scenarioList.total, (offset, limit) => loadScenarioPage({ page: Math.floor(offset / limit) + 1, limit }, new AbortController().signal))
+    if (activeAccountRef.current !== account) return
+    setSelectionRows(rows); setSelectedIds(new Set(rows.map(row => row.id)))
+  }
   const stoppableIds = selectedRows.filter((s) => s.isActive).map((s) => s.id)
   const resumableIds = selectedRows.filter((s) => !s.isActive).map((s) => s.id)
 
@@ -993,9 +1002,7 @@ export default function ScenariosListV8() {
 
         {/* まとめての帯（選ぶと表の下に出る）：止める・再開・フォルダへ移す。 */}
         {canEdit && selectedCount > 0 ? (
-          <div className={styles.bulkRow} role="region" aria-label="選択中のまとめ操作">
-            <span className={styles.bulkCount} aria-live="polite" aria-atomic="true">{selectedCount}件を選択中</span>
-            <Button
+          <BulkBar count={selectedCount} total={scenarioList.total} onSelectAll={selectAllScenarios} onClear={clearSelection}><Button
               type="button"
               variant="secondary"
               disabled={stoppableIds.length === 0}
@@ -1004,8 +1011,7 @@ export default function ScenariosListV8() {
             >
               <Square size={13} aria-hidden="true" />
               止める
-            </Button>
-            <Button
+            </Button><Button
               type="button"
               variant="secondary"
               disabled={resumableIds.length === 0}
@@ -1014,19 +1020,16 @@ export default function ScenariosListV8() {
             >
               <Play size={13} aria-hidden="true" />
               再開
-            </Button>
-            <Button
+            </Button><Button
               type="button"
               variant="secondary"
               onClick={() => openMove([...selectedIds])}
             >
               <FolderIcon size={13} aria-hidden="true" />
               フォルダへ移す
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => setSelectedIds(new Set())}>
+            </Button><Button type="button" variant="secondary" onClick={() => setSelectedIds(new Set())}>
               選択を外す
-            </Button>
-          </div>
+            </Button></BulkBar>
         ) : null}
       </>
     )

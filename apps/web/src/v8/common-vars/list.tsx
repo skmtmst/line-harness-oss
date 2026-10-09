@@ -1301,7 +1301,7 @@ function CommonVarsListInner() {
       </ContextMenu>
 
       {/* まとめての帯（選ぶと表の下に出る）。 */}
-      {canWrite ? <BulkBar count={selected.size} hint="対象を確認してから操作を選んでください" onClear={() => setSelected(new Set())}>
+      {canWrite ? <BulkBar count={selected.size} total={filtered.length} onSelectAll={() => setSelected(new Set(filtered.map(item => item.id)))} hint="対象を確認してから操作を選んでください" onClear={() => setSelected(new Set())}>
         <Button type="button" variant="secondary" onClick={() => setSelected(new Set())}>選択を外す</Button>
         <Button type="button" variant="danger" onClick={() => void prepareRemoveSelected()}>選択した共通情報を削除</Button>
       </BulkBar> : null}

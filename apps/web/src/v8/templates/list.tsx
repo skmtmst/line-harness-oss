@@ -9,6 +9,7 @@
  * （app/templates/list-v8.tsx）と同じ。見た目だけを型（ListPage）と部品で組み直した。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import BulkBar from '@/components/shared/bulk-bar'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import { runOptimistic } from '@/lib/undoable'
@@ -1224,9 +1225,7 @@ export default function TemplatesListV8() {
 
       {/* まとめての帯（選ぶと表の下に出る）：フォルダへ移す・まとめて削除。 */}
       {canMutateTemplates && selectedCount > 0 ? (
-        <div className={styles.bulkRow} role="region" aria-label="選択中のまとめ操作">
-          <span className={styles.bulkCount}>{selectedCount}件を選択中</span>
-          <Button
+        <BulkBar count={selectedCount} total={filteredTemplates.length} onSelectAll={() => setSelectedIds(new Set(filteredTemplates.map(item => item.id)))} onClear={clearSelection}><Button
             type="button"
             variant="secondary"
             disabled={moving}
@@ -1234,8 +1233,7 @@ export default function TemplatesListV8() {
           >
             <FolderIcon size={13} aria-hidden="true" />
             フォルダへ移す
-          </Button>
-          <Button
+          </Button><Button
             type="button"
             variant="secondary"
             disabled={bulkDeleting || removableSelected.length === 0}
@@ -1251,11 +1249,9 @@ export default function TemplatesListV8() {
           >
             <Trash2 size={13} aria-hidden="true" />
             まとめて削除
-          </Button>
-          <Button type="button" variant="secondary" onClick={() => setSelectedIds(new Set())}>
+          </Button><Button type="button" variant="secondary" onClick={() => setSelectedIds(new Set())}>
             選択を外す
-          </Button>
-        </div>
+          </Button></BulkBar>
       ) : null}
     </>
   )

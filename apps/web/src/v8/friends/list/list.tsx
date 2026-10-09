@@ -9,6 +9,7 @@
  * 道具2段（探す・絞り込み4つ・詳細条件・保存した検索／未対応・注目のみ・件数・
  * 表示項目・件数・並び）→ 表（□・☆・友だち・対応/担当・シナリオ・最新・タグ・流入元・最終接触・…）→ ページ送り。
  */
+import { collectListRows } from '@/components/shared/collect-list-rows'
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
@@ -337,6 +338,34 @@ export default function FriendsListV8() {
       setOptionsFailed(true)
     }
   }, [selectedAccountId, marksEnabled])
+
+  const selectAllFriends = async () => {
+    const request = loadRequestRef.current
+    const all = await collectListRows(total, async (offset, limit) => {
+      const response = await api.friends.list({
+        ...(advanced?.params ?? {}),
+        offset: String(offset),
+        limit,
+        tagId: selectedTagId || undefined,
+        accountId: selectedAccountId || undefined,
+        audienceId: audienceId || undefined,
+        search: searchSubmitted || undefined,
+        includeChatStatus: true,
+        sort: sortMode,
+        handled: responseFilter === 'unhandled' ? 'unhandled' : undefined,
+        operatorId: operatorId || undefined,
+        scenarioId: scenarioId || undefined,
+        metadata: attentionOnly ? { __attention: '1' } : undefined,
+        scoreMin,
+        scoreMax,
+        scoredOnly: scoredOnly || undefined,
+      })
+      if (!response.success) throw new Error('読み込めませんでした')
+      return response.data
+    })
+    if (request !== loadRequestRef.current) return
+    setSelectedIds(new Set(all.map(friend => friend.id)))
+  }
 
   const loadFriends = useCallback(async () => {
     const requestId = ++loadRequestRef.current
@@ -922,7 +951,7 @@ export default function FriendsListV8() {
       overlays={(
         <>
           <span className={styles.bulkWrap} data-design="V8BulkBar">
-            <BulkBar count={selectedIds.size} unit="人" hint="対象を確認してから操作を選んでください" onClear={clearSelection}>
+            <BulkBar total={total} onSelectAll={selectAllFriends} count={selectedIds.size} unit="人" hint="対象を確認してから操作を選んでください" onClear={clearSelection}>
               {selectedIds.size > 1 && canRunBulk(staffRole) ? (
                 <Button variant="secondary" data-qa-open="IAf7j" onClick={() => setBulkOpen(true)}>操作を選ぶ</Button>
               ) : null}
