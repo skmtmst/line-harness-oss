@@ -5,6 +5,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, Eye, Globe, HelpCircle, History, MoreHorizontal, Send, Undo2, X } from 'lucide-react'
 import type { ApiResponse } from '@line-crm/shared'
 import { ApiError, api, fetchApi, type PhotoBulkReviewResult, type PhotoReviewMetrics } from '@/lib/api'
+import { TextArea } from '@/components/shared/text-field'
+import { FieldError } from '@/components/shared/form-controls'
+import Radio from '@/components/shared/radio'
+import { focusFormField } from '@/lib/use-field-validation'
 import Button from '@/components/shared/button'
 import { RowMenu } from '@/components/shared/row-actions'
 import BulkBar from '@/components/shared/bulk-bar'
@@ -364,6 +368,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
   const [reasonCode, setReasonCode] = useState<ReviewReasonCode>('quality')
   const [reasonNote, setReasonNote] = useState('')
   const [reasonError, setReasonError] = useState('')
+  const [reasonFieldError, setReasonFieldError] = useState('')
   const [resubmitInvite, setResubmitInvite] = useState(true)
   const [watchSubmitter, setWatchSubmitter] = useState(false)
 
@@ -378,7 +383,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
     }
     setReasonCode('quality')
     setReasonNote('')
-    setReasonError('')
+    setReasonError(''); setReasonFieldError('')
     setResubmitInvite(true)
     setWatchSubmitter(false)
   }
@@ -434,7 +439,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       setBulkReturnOpen(false)
       setReasonCode('quality')
       setReasonNote('')
-      setReasonError('')
+      setReasonError(''); setReasonFieldError('')
       await load()
     } catch (error) {
       if (generation === accountGeneration.current) {
@@ -511,10 +516,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
         <>
           {!canEdit ? (
             <div className={styles.viewerRow}>
-              <div className={styles.viewerBand} role="status" data-design-node="photo-viewer-band">
-                <Eye size={16} aria-hidden="true" />
-                <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
-              </div>
+              <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />} data-design-node="photo-viewer-band" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
             </div>
           ) : null}
           <div className={styles.stats}>
@@ -546,16 +548,17 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
               reasonCode={reasonCode}
               reasonNote={reasonNote}
               reasonError={reasonError}
+              reasonFieldError={reasonFieldError}
               resubmitInvite={resubmitInvite}
               watchSubmitter={watchSubmitter}
               busy={reviewing !== null}
-              onReasonCode={setReasonCode}
-              onReasonNote={setReasonNote}
+              onReasonCode={(next) => { setReasonCode(next); setReasonFieldError('') }}
+              onReasonNote={(next) => { setReasonNote(next); setReasonFieldError('') }}
               onResubmitInvite={setResubmitInvite}
               onWatchSubmitter={setWatchSubmitter}
-              onClose={() => { setRejectingPhotoId(null); setReasonError('') }}
+              onClose={() => { setRejectingPhotoId(null); setReasonError(''); setReasonFieldError('') }}
               onConfirm={() => {
-                if (reasonCode === 'other' && !reasonNote.trim()) { setReasonError('そのほかの理由を入力してください'); return }
+                if (reasonCode === 'other' && !reasonNote.trim()) { setReasonFieldError('そのほかの理由を入力してください'); focusFormField('photo-reject-note'); return }
                 void review(rejectingPhotoId, 'rejected', { reasonCode, reasonNote: reasonNote.trim(), resubmitInvite, watchSubmitter })
               }}
             />
@@ -569,21 +572,19 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
             </dl>
             <p className={styles.railNote}>写真を採用しても自動公開しません。本人の公開同意を確認したあと、公式サイト掲載画面で公開先を選びます。</p>
           </Dialog>
-          <Dialog open={bulkReturnOpen} title={`${selectedPendingPhotos.length}枚をまとめて見送り`} description="選んだ理由と補足は、選択した写真すべてに記録され、投稿者へLINEで届きます。" tone="destructive" busy={bulkReviewing} error={reasonError} confirmLabel="この理由でまとめて見送り" cancelLabel="審査へ戻る" onCancel={() => { setBulkReturnOpen(false); setReasonError('') }} onConfirm={() => {
-            if (reasonCode === 'other' && !reasonNote.trim()) { setReasonError('そのほかの理由を入力してください'); return }
+          <Dialog open={bulkReturnOpen} title={`${selectedPendingPhotos.length}枚をまとめて見送り`} description="選んだ理由と補足は、選択した写真すべてに記録され、投稿者へLINEで届きます。" tone="destructive" busy={bulkReviewing} error={reasonError} confirmLabel="この理由でまとめて見送り" cancelLabel="審査へ戻る" onCancel={() => { setBulkReturnOpen(false); setReasonError(''); setReasonFieldError('') }} onConfirm={() => {
+            if (reasonCode === 'other' && !reasonNote.trim()) { setReasonFieldError('そのほかの理由を入力してください'); focusFormField('photo-reject-note'); return }
             void bulkReview('return', { reasonCode, reasonNote: reasonNote.trim() })
           }}>
             <div role="radiogroup" aria-label="見送り理由" className={styles.pillGroup}>
               {REVIEW_REASONS.map((reason) => (
-                <button key={reason.value} type="button" role="radio" aria-checked={reasonCode === reason.value} className={styles.pill} onClick={() => { setReasonCode(reason.value); setReasonError('') }}>
-                  <span aria-hidden="true" className={styles.pillDot} />
-                  {reason.label}
-                </button>
+                <Radio key={reason.value} name="photo-reject-reason" checked={reasonCode === reason.value} onChange={() => { setReasonCode(reason.value); setReasonError(''); setReasonFieldError('') }}>{reason.label}</Radio>
               ))}
             </div>
             <label className={styles.fieldLabel}>
               投稿者に届く補足（直せます）
-              <textarea className={styles.reasonTextarea} value={reasonNote} onChange={(event) => { setReasonNote(event.target.value.slice(0, 500)); setReasonError('') }} rows={3} placeholder={reasonCode === 'other' ? '理由を入力してください' : '必要な場合だけ入力します'} />
+              <TextArea id="photo-reject-note" size="short" invalid={Boolean(reasonFieldError)} aria-describedby={reasonFieldError ? 'photo-reject-note-error' : undefined} value={reasonNote} onChange={(event) => { setReasonNote(event.target.value.slice(0, 500)); setReasonError(''); setReasonFieldError('') }} rows={3} placeholder={reasonCode === 'other' ? '理由を入力してください' : '必要な場合だけ入力します'} />
+          <FieldError id="photo-reject-note-error">{reasonFieldError}</FieldError>
             </label>
           </Dialog>
 
@@ -938,6 +939,7 @@ function RejectDialogV8({
   reasonCode,
   reasonNote,
   reasonError,
+  reasonFieldError,
   resubmitInvite,
   watchSubmitter,
   busy,
@@ -952,6 +954,7 @@ function RejectDialogV8({
   reasonCode: ReviewReasonCode
   reasonNote: string
   reasonError: string
+  reasonFieldError: string
   resubmitInvite: boolean
   watchSubmitter: boolean
   busy: boolean
@@ -995,15 +998,13 @@ function RejectDialogV8({
         <div className={styles.pillGroup} role="radiogroup" aria-labelledby="nen-posts-reject-reason">
           <p id="nen-posts-reject-reason" className={styles.fieldTitle}>見送った理由</p>
           {REVIEW_REASONS.map((reason) => (
-            <button key={reason.value} type="button" role="radio" aria-checked={reasonCode === reason.value} className={styles.pill} onClick={() => { onReasonCode(reason.value); onReasonNote(reason.value === 'other' ? '' : reason.message) }}>
-              <span aria-hidden="true" className={styles.pillDot} />
-              {reason.label}
-            </button>
+            <Radio key={reason.value} name="photo-reject-reason" checked={reasonCode === reason.value} onChange={() => { onReasonCode(reason.value); onReasonNote(reason.value === 'other' ? '' : reason.message) }}>{reason.label}</Radio>
           ))}
         </div>
         <label className={styles.fieldLabel}>
           お客様に届く補足（直せます）
-          <textarea aria-label="お客様に届く補足" className={styles.reasonTextarea} value={reasonNote} maxLength={500} rows={2} placeholder={reasonCode === 'other' ? 'お客様に送る文章を書いてください' : '必要な場合だけ補足します'} onChange={(event) => onReasonNote(event.target.value)} />
+          <TextArea id="photo-reject-note" size="short" invalid={Boolean(reasonFieldError)} aria-describedby={reasonFieldError ? 'photo-reject-note-error' : undefined} aria-label="お客様に届く補足" value={reasonNote} maxLength={500} rows={2} placeholder={reasonCode === 'other' ? 'お客様に送る文章を書いてください' : '必要な場合だけ補足します'} onChange={(event) => onReasonNote(event.target.value)} />
+          <FieldError id="photo-reject-note-error">{reasonFieldError}</FieldError>
         </label>
         {/* 絵に無い「次の投稿は人が見る」は、同じ行の右に小さく置く（行を増やさない）。 */}
         <div className={styles.checkLine}>

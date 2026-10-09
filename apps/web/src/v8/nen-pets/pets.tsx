@@ -106,10 +106,7 @@ export default function PetsV8({
   const stats = accountId ? (
     <>
       {readonly ? (
-        <div className={styles.viewerBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。ペットの情報や主食を変える操作は管理者に頼んでください。</span>
-        </div>
+        <div className={styles.viewerBand}><Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />} message="閲覧のみで見ています。ペットの情報や主食を変える操作は管理者に頼んでください。" /></div>
       ) : null}
       <KpiBand data-design="KPIs" aria-label="ペットの数の帯">
         <KpiCard presentation="band" title="登録ペット" icon={<History size={13} aria-hidden="true" />} menu={menu('登録ペット')} value={pending ? null : kpis.total} unit="匹" loading={pending && !kpisFailed} detail={pending ? missing : `犬 ${kpis.dogs}・猫 ${kpis.cats}・その他 ${Math.max(0, kpis.total - kpis.dogs - kpis.cats)}`} />

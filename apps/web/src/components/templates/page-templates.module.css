@@ -181,6 +181,7 @@
   /* 画面が詰めた右の列を頼んだとき（CreatePage の previewCompactWhenNarrow・絵 kmTab）。 */
   :global([data-theme='v8']) .preview[data-preview-narrow='compact'] { padding: var(--tpl-r2-rail-compact-pad); }
   :global([data-theme='v8']) .preview[data-preview-narrow='compact'] .previewContent { width: var(--tpl-r2-rail-compact-content-width); }
+  :global([data-theme='v8']) .preview[data-preview-narrow='hidden'] { display: none; }
   :global([data-theme='v8']) .inboxSummary, :global([data-theme='v8']) .analyticsAside, :global([data-theme='v8']) .dashboardAside:not([data-aside-size='column']) { display: none; }
   :global([data-theme='v8']) .dashboardRow[data-row='link'] .dashboardAside:not([data-aside-size='column']) { display: none; }
   :global([data-theme='v8']) .asideToggle { display: block; }

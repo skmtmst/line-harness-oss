@@ -7,9 +7,10 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'>
   layout?: 'block' | 'vertical' | 'horizontal'
   /**
    * 設定の箱。'settings' は16の余白・10の間（EC設定）。
-   * 'integration'（外部連携の設定）・'preview'（見本）は枠と内側の間を持つ。指定したカードだけ。
+   * 'integration'（外部連携の設定）・'preview'（見本）は枠と内側の間を持つ。
+   * 'normal' | 'roomy' | 'tight' | 'controls' は NEN の設定の中の間。指定したカードだけ。
    */
-  spacing?: 'settings' | 'integration' | 'preview'
+  spacing?: 'settings' | 'integration' | 'preview' | 'normal' | 'roomy' | 'tight' | 'controls'
   overflow?: 'visible' | 'hidden'
   padding?: 'none' | 'compact' | 'default' | 'roomy' | 'spacious'
   corner?: 'card' | 'segment' | 'control'
@@ -21,8 +22,8 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'>
   appearance?: 'outlined'
   /** 'tight' | 'normal' | 'loose' は決まった段。それ以外はトークン（例 'var(--tpl-...)'）を中の間として渡す。 */
   gap?: 'tight' | 'normal' | 'loose' | (string & {})
-  /** 内側の線で寸法を保つカード（inset）・薄い面（muted）。指定した面だけに適用。 */
-  surface?: 'inset' | 'muted'
+  /** 内側の線で寸法を保つカード（inset）・薄い面（muted）・NEN の設定の枠（bordered）。指定した面だけに適用。 */
+  surface?: 'standard' | 'inset' | 'muted' | 'bordered'
 }
 
 /** Pencil V5のダッシュボードカードを正本にした共通の面。 */
@@ -39,7 +40,7 @@ export default function Card({
   variant = 'default',
   appearance,
   gap,
-  surface,
+  surface = 'standard',
   spacing,
   ...props
 }: CardProps) {
@@ -52,6 +53,11 @@ export default function Card({
     variant !== 'default' ? styles[variant] : null,
     surface === 'inset' ? styles.inset : null,
     gap === 'tight' ? styles.gapTight : null,
+    surface === 'bordered' ? styles.bordered : null,
+    spacing === 'normal' ? styles.spacingNormal : null,
+    spacing === 'roomy' ? styles.spacingRoomy : null,
+    spacing === 'tight' ? styles.spacingTight : null,
+    spacing === 'controls' ? styles.spacingControls : null,
     layout === 'vertical' ? styles.vertical : layout === 'horizontal' ? styles.horizontal : null,
     overflow === 'hidden' ? styles.overflowHidden : null,
     padding === 'compact' ? styles.paddingCompact : null,
@@ -67,7 +73,7 @@ export default function Card({
 
   return (
     <section className={classes} data-design-part="card" data-appearance={appearance} data-gap={gapToken} data-spacing={spacing}
-      data-card-surface={surface} data-card-corner={corner === 'control' ? corner : undefined}
+      data-card-surface={surface === 'standard' ? undefined : surface} data-card-corner={corner === 'control' ? corner : undefined}
       data-card-spacing={contentPadding || gapValue ? '' : undefined}
       style={contentPadding || gapValue ? { ...style, '--card-content-padding': contentPadding, '--card-content-gap': gapValue } as CSSProperties : style} {...props}>
       {children}

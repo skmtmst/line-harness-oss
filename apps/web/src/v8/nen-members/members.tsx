@@ -27,6 +27,7 @@ import MembersListV8 from './list'
 import RankSettingsV8 from './ranks'
 import LifetimeV8 from './lifetime'
 import { csvLine, yen, type LoadStatus, type MemberTab, type SavedHandler } from './parts'
+import Notice from '@/components/shared/notice'
 import styles from './members.module.css'
 
 export type { LoadStatus, MemberTab } from './parts'
@@ -77,10 +78,7 @@ export default function MembersV8({
       ]}
     />
     {readonly ? (
-      <div className={styles.viewerBand} role="status">
-        <Eye size={16} aria-hidden="true" />
-        <span>閲覧のみで見ています。ランクや節目を変える操作は管理者に頼んでください。</span>
-      </div>
+      <div className={styles.viewerBand}><Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />} message="閲覧のみで見ています。ランクや節目を変える操作は管理者に頼んでください。" /></div>
     ) : null}
     {tab === 'ranks' ? topBand : null}
   </>
