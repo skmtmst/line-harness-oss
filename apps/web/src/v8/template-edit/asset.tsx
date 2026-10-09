@@ -38,6 +38,8 @@ import { TemplateEditFrame } from './frame'
 import type { TemplateEditHost } from './host'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import MediaSlot from '@/components/shared/media-slot'
+import { FieldError } from '@/components/shared/form-controls'
+import { useFormErrors } from '@/lib/use-form-errors'
 import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
 import styles from './edit.module.css'
 
@@ -194,6 +196,27 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
     }),
   })
 
+  /*
+   * 保存で落ちた欄（B-139）：帯ではなく欄を赤くし、真下に理由を出して1つ目へ移る。
+   * 組み立て（buildPayload）の決まりと同じ中身を欄ごとに持つ。
+   */
+  const fields = useFormErrors()
+  fields.define('name', 'テンプレート名', () => (name.trim() ? null : `${meta.title}名を入力してください`))
+  if (kind === 'coupon') {
+    fields.define('start', '使える期間の開始', () => (couponStartsAt ? null : '開始を入力してください'))
+    fields.define('end', '使える期間の終了', () => (!couponEndsAt ? '終了を入力してください' : couponStartsAt && couponEndsAt <= couponStartsAt ? '終了は開始よりあとにしてください' : null))
+    if (lottery) {
+      fields.define('rate', '当たる確率', () => { const rate = Number(lotteryRate); return Number.isInteger(rate) && rate >= 1 && rate <= 100 ? null : '1〜100の整数で入力してください' })
+      fields.define('limit', '当選人数の上限', () => { const limit = Number(winnerLimit); return Number.isInteger(limit) && limit >= 1 ? null : '1以上の整数で入力してください' })
+    }
+  } else {
+    questions.forEach((question, index) => {
+      fields.define(`q-${question.key}`, `質問 ${index + 1} の本文`, () => (question.text.trim() ? null : '質問文を入力してください'))
+      if (question.format !== 'free') fields.define(`qc-${question.key}`, `質問 ${index + 1} の選択肢`, () => (question.choices.some((choice) => choice.trim()) ? null : '選択肢を1つ以上入力してください'))
+    })
+  }
+  const fieldProps = (key: string, id: string) => ({ ...fields.bind(key), invalid: fields.invalid(key), 'aria-describedby': fields.invalid(key) ? `${id}-error` : undefined })
+
   /** 保存値を組み立てる。足りないときは理由を返す（今の画面と同じ決まり）。 */
   const buildPayload = (): { payload: Record<string, unknown> } | { error: string } => {
     if (kind === 'coupon') {
@@ -250,7 +273,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   const save = async (): Promise<boolean> => {
     if (host) return false
     if (!selectedAccountId) { setError('上のバーでLINE公式アカウントを選んでください。'); return false }
-    if (!name.trim()) { setError(`${meta.title}名を入力してください。`); return false }
+    if (fields.submit().length > 0) { setError(''); return false }
     const built = buildPayload()
     if ('error' in built) { setError(built.error); return false }
     setSaving(true)
@@ -280,7 +303,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   /* 統括の入口：中身を組み立てて呼ぶ側へ渡す（保存・配る・失敗の知らせは呼ぶ側）。 */
   const hostSave = (distribute: boolean) => {
     if (!host) return
-    if (!name.trim()) { setError(`${meta.title}名を入力してください。`); return }
+    if (fields.submit().length > 0) { setError(''); return }
     const built = buildPayload()
     if ('error' in built) { setError(built.error); return }
     setError('')
@@ -382,7 +405,8 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
       <div className={styles.pair}>
         <div className={`${styles.field} ${styles.grow}`}>
           <label htmlFor={`te-${kind}-name`} className={styles.label}>テンプレート名</label>
-          <TextField id={`te-${kind}-name`} value={name} onChange={(event) => setName(event.target.value)} placeholder={kind === 'coupon' ? '例：夏の20%オフ' : '例：定期便のご満足度'} aria-required="true" />
+          <TextField {...fieldProps('name', `te-${kind}-name`)} id={`te-${kind}-name`} value={name} onChange={(event) => setName(event.target.value)} placeholder={kind === 'coupon' ? '例：夏の20%オフ' : '例：定期便のご満足度'} aria-required="true" />
+          <FieldError id={`te-${kind}-name-error`}>{fields.error('name')}</FieldError>
         </div>
         <div className={`${styles.field} ${styles.folderField}`}>
           <label htmlFor={`te-${kind}-folder`} className={styles.labelSmall}>フォルダ</label>
@@ -485,12 +509,14 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               <div className={styles.pair}>
                 <div className={`${styles.field} ${styles.grow}`}>
                   <label htmlFor="te-coupon-start" className={styles.label}>開始</label>
-                  <DateTimeField className={styles.dateBox} id="te-coupon-start" value={couponStartsAt} onChange={setCouponStartsAt} aria-label="使える期間の開始" required />
+                  <span {...fields.bind('start')}><DateTimeField className={styles.dateBox} id="te-coupon-start" value={couponStartsAt} onChange={setCouponStartsAt} aria-label="使える期間の開始" required invalid={fields.invalid('start')} aria-describedby={fields.invalid('start') ? 'te-coupon-start-error' : undefined} /></span>
+                  <FieldError id="te-coupon-start-error">{fields.error('start')}</FieldError>
                 </div>
                 <span className={styles.tilde} aria-hidden="true">〜</span>
                 <div className={`${styles.field} ${styles.grow}`}>
                   <label htmlFor="te-coupon-end" className={styles.label}>終了</label>
-                  <DateTimeField className={styles.dateBox} id="te-coupon-end" value={couponEndsAt} onChange={setCouponEndsAt} aria-label="使える期間の終了" required />
+                  <span {...fields.bind('end')}><DateTimeField className={styles.dateBox} id="te-coupon-end" value={couponEndsAt} onChange={setCouponEndsAt} aria-label="使える期間の終了" required invalid={fields.invalid('end')} aria-describedby={fields.invalid('end') ? 'te-coupon-end-error' : undefined} /></span>
+                  <FieldError id="te-coupon-end-error">{fields.error('end')}</FieldError>
                 </div>
               </div>
               <div className={styles.typeRow}>
@@ -526,11 +552,13 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                 <div className={styles.pair}>
                   <div className={`${styles.field} ${styles.grow}`}>
                     <label htmlFor="te-lottery-rate" className={styles.label}>当たる確率（%）</label>
-                    <TextField id="te-lottery-rate" type="number" min={1} max={100} value={lotteryRate} onChange={(event) => setLotteryRate(event.target.value)} />
+                    <TextField {...fieldProps('rate', 'te-lottery-rate')} id="te-lottery-rate" type="number" min={1} max={100} value={lotteryRate} onChange={(event) => setLotteryRate(event.target.value)} />
+                    <FieldError id="te-lottery-rate-error">{fields.error('rate')}</FieldError>
                   </div>
                   <div className={`${styles.field} ${styles.grow}`}>
                     <label htmlFor="te-winner-limit" className={styles.label}>当選人数の上限（人）</label>
-                    <TextField id="te-winner-limit" type="number" min={1} value={winnerLimit} onChange={(event) => setWinnerLimit(event.target.value)} />
+                    <TextField {...fieldProps('limit', 'te-winner-limit')} id="te-winner-limit" type="number" min={1} value={winnerLimit} onChange={(event) => setWinnerLimit(event.target.value)} />
+                    <FieldError id="te-winner-limit-error">{fields.error('limit')}</FieldError>
                   </div>
                 </div>
               ) : (
@@ -608,7 +636,8 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                   <div className={styles.pair}>
                     <div className={`${styles.field} ${styles.grow}`}>
                       <label htmlFor={`te-q-${question.key}`} className={styles.label}>質問文</label>
-                      <TextField id={`te-q-${question.key}`} value={question.text} onChange={(event) => updateQuestion(index, { text: event.target.value })} placeholder="例：来月も続けたいと思いますか？" aria-required="true" />
+                      <TextField {...fieldProps(`q-${question.key}`, `te-q-${question.key}`)} id={`te-q-${question.key}`} value={question.text} onChange={(event) => updateQuestion(index, { text: event.target.value })} placeholder="例：来月も続けたいと思いますか？" aria-required="true" />
+                      <FieldError id={`te-q-${question.key}-error`}>{fields.error(`q-${question.key}`)}</FieldError>
                     </div>
                     <div className={`${styles.field} ${styles.formatField}`}>
                       <label htmlFor={`te-qf-${question.key}`} className={styles.labelSmall}>答え方</label>
@@ -616,7 +645,8 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                     </div>
                   </div>
                   {question.format !== 'free' ? (
-                    <div className={styles.choiceRow} role="group" aria-label={`問 ${index + 1} の選択肢`}>
+                    <>
+                    <div className={styles.choiceRow} role="group" aria-label={`問 ${index + 1} の選択肢`} {...fields.bind(`qc-${question.key}`)} aria-describedby={fields.invalid(`qc-${question.key}`) ? `te-qc-${question.key}-error` : undefined}>
                       {question.choices.map((choice, choiceIndex) => (
                         <span key={choiceIndex} className={styles.choice}>
                           <input
@@ -647,6 +677,8 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                         <span className={styles.hint}>選択肢は{MAX_CHOICES}つまでです（LINEの決まり）。</span>
                       )}
                     </div>
+                    <FieldError id={`te-qc-${question.key}-error`}>{fields.error(`qc-${question.key}`)}</FieldError>
+                    </>
                   ) : null}
                 </section>
               ))}

@@ -318,7 +318,11 @@ describe('V8 クーポン・リサーチを作る', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
     await flush()
     expect(assetsCreate).not.toHaveBeenCalled()
-    expect(screen.getByRole('alert').textContent).toContain('使える期間の開始と終了')
+    /* B-139：帯ではなく、開始・終了の欄の真下に理由を出し、開始の欄へ移る。 */
+    expect(document.getElementById('te-coupon-start-error')?.textContent).toBe('開始を入力してください')
+    expect(document.getElementById('te-coupon-end-error')?.textContent).toBe('終了を入力してください')
+    await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    expect(document.getElementById('te-coupon-start')?.contains(document.activeElement) || document.activeElement?.id === 'te-coupon-start').toBe(true)
   })
 
   it('クーポン：見本の中身で保存すると、資産の口へクーポン名・期間・フォルダ名を送る', async () => {
@@ -349,7 +353,11 @@ describe('V8 クーポン・リサーチを作る', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
     await flush()
     expect(assetsCreate).not.toHaveBeenCalled()
-    expect(screen.getByRole('alert').textContent).toContain('質問 1 の選択肢を1つ以上入力してください')
+    /* B-139：選択肢の欄の真下に理由を出し、選択肢の1つ目へ移る。 */
+    const choices = screen.getByRole('group', { name: '問 1 の選択肢' })
+    expect(choices.nextElementSibling?.textContent).toBe('選択肢を1つ以上入力してください')
+    await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    expect(document.activeElement).toBe(screen.getByLabelText('問 1 の選択肢 1'))
   })
 
   it('リサーチ：質問の並べ替えは、つまみのドラッグ・上下キー・押して出る「上へ／下へ」で同じ結果になる', async () => {

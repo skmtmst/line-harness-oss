@@ -127,7 +127,7 @@ describe('統括のテンプレートを作る（店の作る画面＋保存後�
     fireEvent.change(screen.getByLabelText('テンプレート名'), { target: { value: '冬の10%オフ' } })
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
     /* 期間が無いと口を呼ばない。 */
-    expect((await screen.findByRole('alert')).textContent).toContain('使える期間')
+    await waitFor(() => expect(document.getElementById('te-coupon-start-error')?.textContent).toBe('開始を入力してください'))
     expect(calls.create).not.toHaveBeenCalled()
   })
 })
