@@ -1,5 +1,6 @@
 'use client'
 
+import { createPageReturnHref } from '@/components/shared/create-page'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { BadgeCheck, CircleDot, CreditCard, Hourglass, Pause, Plus, Star } from 'lucide-react'
@@ -132,7 +133,7 @@ export default function OpsTenantsV8() {
     setNewName('')
     setNewRestaurant(false)
     setCreating(false)
-    router.push(tenantDetailHref(res.data.id))
+    router.push(createPageReturnHref('/ops/tenants', res.data.id))
   }
 
   const first = (fn: (row: OpsTenantRow) => boolean) => rows.find(fn)

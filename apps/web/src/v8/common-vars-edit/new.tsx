@@ -9,6 +9,7 @@
  * データの口・入力検査・秘密値の守り・下書き保存は `app/contents/vars/new/new-v8.tsx`
  * から写した（import はしない）。動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -359,7 +360,7 @@ export default function NewCommonVarV8() {
         }
         return
       }
-      router.push('/contents/vars')
+      router.push(createPageReturnHref('/contents/vars', res.data.id))
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) {
         setError('その差し込み名は既に使われています')

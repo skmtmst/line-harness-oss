@@ -107,7 +107,7 @@ export default function AttributeDistribution({ detail, saved = false, canEdit =
       collapsedFolders={<Select aria-label="アカウントのフォルダ" value={filter} onChange={setFilter} options={folderRows.map((row) => ({ value: row.id, label: row.label }))} />}
       toolbar={<><input aria-label="アカウント名で探す" className={styles.input} value={search} onChange={(event) => setSearch(event.target.value)} /><span>{`選んだ ${selected.length} アカウント`}</span></>}>
       <DataTable><thead><TableHeadRow><Th>選択</Th><Th>アカウント</Th><Th>配布方法・結果</Th></TableHeadRow></thead><tbody>
-        {visible.map((account) => <Tr key={account.id}>
+        {visible.map((account) => <Tr key={account.id} data-row-id={account.id}>
           <Td><Checkbox aria-label={account.name} disabled={busy || stage !== 'accounts'} checked={selected.includes(account.id)} onCheckedChange={(on) => setSelected((current) => on ? [...new Set([...current, account.id])] : current.filter((id) => id !== account.id))} /></Td>
           <Td><FolderDotName folder={folders.membership?.get(account.id)?.folder}>{account.name}</FolderDotName></Td>
           <Td>{stage === 'confirm' ? preflight?.stores.find((store) => store.accountId === account.id)?.items.map((item) => <div key={item.sourceId}>

@@ -629,7 +629,7 @@ function VisitStampsScreen() {
                             const f = friendById(row.friend_id)
                             const names = f ? friendNames(f) : { name: '友だち', line: null }
                             return (
-                              <Tr key={row.id} className={`${styles.row} ${styles.paperLine}`}>
+                              <Tr key={row.id} className={`${styles.row} ${styles.paperLine}`} data-row-id={row.id}>
                                 <Td className={styles.colPhoto}>
                                   <button type="button" className={styles.thumb} onClick={() => setPhoto(row)} aria-label={`${names.name}さんの写真を大きく見る`}>
                                     <PaperThumb accountId={selectedAccountId} url={row.photo_url} />
@@ -694,7 +694,7 @@ function VisitStampsScreen() {
                             </thead>
                             <tbody>
                               {rows.map((row) => (
-                                <Tr key={row.id} className={styles.row}>
+                                <Tr key={row.id} className={styles.row} data-row-id={row.id}>
                                   <Td className={styles.colWhen}><span className={styles.plain}>{shortDateTime(row.at)}</span></Td>
                                   <Td><span className={styles.name} title={friendById(row.friendId) ? friendNames(friendById(row.friendId)!).name : undefined}>{friendById(row.friendId) ? friendNames(friendById(row.friendId)!).name : '友だち'}</span></Td>
                                   <Td className={styles.colCount}><span className={`${styles.countText} ${row.reversed ? styles.countReversed : ''}`} title={row.count}>{row.count}</span></Td>

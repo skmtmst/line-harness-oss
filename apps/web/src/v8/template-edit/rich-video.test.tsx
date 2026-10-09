@@ -39,7 +39,7 @@ describe('リッチビデオ編集',()=>{
   await waitFor(()=>expect(mocks.update).toHaveBeenCalled());
   const content=JSON.parse(mocks.update.mock.calls[0][1].messageContent);
   expect(content.altText).toBe('新しい通知');expect(content.video.externalLink).toBeUndefined();expect(content.video.originalContentUrl).toBe(draft.originalContentUrl);
-  await waitFor(()=>expect(mocks.push).toHaveBeenCalledWith('/templates'));
+  await waitFor(()=>expect(mocks.push).toHaveBeenCalledWith('/templates?highlight=r'));
  });
  it('閲覧のみには保存・アップロード・スイッチを出さない',async()=>{
   mocks.role='staff';render(<Editor id="r"/>);await screen.findByDisplayValue('新しい動画です');

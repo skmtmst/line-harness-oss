@@ -212,7 +212,7 @@ export default function DuplicatesListV8() {
                 const accounts = [candidate.left.lineAccountName, candidate.right.lineAccountName].filter(Boolean).join(' ／ ') || '—'
                 const evidence = candidate.evidenceSummary.length ? candidate.evidenceSummary.join('・') : '根拠を確認'
                 return (
-                  <Tr key={candidate.id} className={styles.row}>
+                  <Tr key={candidate.id} className={styles.row} data-row-id={candidate.id}>
                     <Td className={styles.td}>
                       <Link href={href} className={styles.pair} title={`${candidate.left.label} ↔ ${candidate.right.label}`}>
                         {`${candidate.left.label} ↔ ${candidate.right.label}`}

@@ -230,7 +230,7 @@ function RecipientsTab({ run }: { run: HqBroadcastRun }) {
           </thead>
           <tbody>
             {rows.map((row) => (
-              <Tr key={row.friendId} className={styles.row}>
+              <Tr key={row.friendId} className={styles.row} data-row-id={row.friendId}>
                 <Td className={styles.colStore}><span className={styles.store} title={row.displayName ?? undefined}>{row.displayName ?? '名前未登録'}</span></Td>
                 <Td className={styles.colState}><StatusBadge tone={row.state === 'sent' ? 'success' : row.state === 'failed' ? 'danger' : 'neutral'} title={row.errorCode ?? undefined}>{stateLabel(row.state)}</StatusBadge></Td>
                 <Td className={styles.colState}><span className={styles.faint}>{row.sentAt ? jpDateTime(row.sentAt) : '—'}</span></Td>
@@ -278,7 +278,7 @@ function ActivityTab({ run, names }: { run: HqBroadcastRun; names: Map<string, s
           </thead>
           <tbody>
             {rows.map((row) => (
-              <Tr key={row.id} className={styles.row}>
+              <Tr key={row.id} className={styles.row} data-row-id={row.id}>
                 <Td className={styles.colState}><span className={styles.faint}>{jpDateTime(row.createdAt)}</span></Td>
                 <Td className={styles.colStore}><span className={styles.store}>{ACTIVITY_LABEL[row.action] ?? '操作'}</span></Td>
                 <Td className={styles.colState}><span className={styles.faint} title={account(row.accountId)}>{account(row.accountId)}</span></Td>

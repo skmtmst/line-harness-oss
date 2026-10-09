@@ -532,7 +532,7 @@ export default function WebhooksApiTokensV8() {
                 {tokens.map((token) => {
                   const scopeText = token.scopes.map(scopeLabel).join('・')
                   return (
-                    <Tr key={token.id} data-table-layout="columns" data-ctx-row={token.id}>
+                    <Tr key={token.id} data-table-layout="columns" data-ctx-row={token.id} data-row-id={token.id}>
                       <Td className={styles.colName} title={token.name}>{token.name}</Td>
                       <Td className={styles.colScopes} title={scopeText}>{scopeText}</Td>
                       <Td className={styles.colCreated}>{tokenDate(token.createdAt)}</Td>

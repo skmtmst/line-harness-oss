@@ -523,7 +523,7 @@ export default function AffiliatorsTab() {
         </thead>
         <tbody>
           {pagedRows.map((row) => (
-            <Tr key={row.id} className={styles.row} data-table-layout="columns">
+            <Tr key={row.id} className={styles.row} data-table-layout="columns" data-row-id={row.id}>
               <Td className={styles.colCheck}>
                 {readonly ? null : (
                   <Checkbox

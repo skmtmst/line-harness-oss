@@ -8,6 +8,7 @@
  * 下の帯：キャンセル／下書きを保存／保存して公開。
  * 動き（読み込み・保存・公開・409・利用先の確認）は BEHAVIOR.md。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
 import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -330,9 +331,9 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     save: async () => (await saveNow({ silent: true })) !== null,
   })
 
-  const leave = () => {
+  const leave = (savedId: string) => {
     disarm()
-    router.push('/templates')
+    router.push(createPageReturnHref('/templates', savedId))
   }
 
   const publishNow = async (templateId: string): Promise<boolean> => {
@@ -374,7 +375,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     if (savedId) autosave.markSaved()
     if (savedId) {
       notifySaved('下書きを保存しました')
-      leave()
+      leave(savedId)
     }
   }
 
@@ -397,7 +398,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
       }
       if (await publishNow(savedId)) {
         notifyToast('公開しました')
-        leave()
+        leave(savedId)
       }
     } finally {
       setPublishing(false)
@@ -698,7 +699,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
             if (await publishNow(publishCheck.id)) {
               setPublishCheck(null)
               notifyToast('公開しました')
-              leave()
+              leave(publishCheck.id)
             }
           } finally {
             setPublishing(false)

@@ -14,6 +14,7 @@
  * 統括（host）は URLを開く・テキストを送るだけ（配った先で LIFF ID・回答フォームの ID を付け替える口がまだ無いため）。
  * 受け付ける URL：`/templates/carousel`・`?id=<テンプレート>`・`?visual=1`（見本の3枚で開く。撮影用）。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
 import { Suspense, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -327,7 +328,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
       const usedBy = detail.data.usedBy
       const usageCount = usedBy ? Object.values(usedBy).reduce((total, items) => total + (Array.isArray(items) ? items.length : 0), 0) : 0
       if (usageCount > 0) { setPublishCheck({ id: templateId, usageCount }); return }
-      if (await publishNow(templateId, detail.data)) { disarm(); router.push('/templates') }
+      if (await publishNow(templateId, detail.data)) { disarm(); router.push(createPageReturnHref('/templates', templateId)) }
     } finally {
       setPublishing(false)
     }
@@ -352,7 +353,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
     if (inserted !== false) disarm()
     } finally { savingRef.current = false; setSaving(false) }
   }
-  const onSaveDraft = async () => { if (host) { hostSave(false); return } if (await saveNow()) { disarm(); router.push('/templates') } }
+  const onSaveDraft = async () => { if (host) { hostSave(false); return } const savedId = await saveNow(); if (savedId) { disarm(); router.push(createPageReturnHref('/templates', savedId)) } }
   const onPublish = async () => { if (host) { hostSave(true); return } const savedId = await saveNow(); if (savedId) await publishSaved(savedId) }
 
   const panel = panels[selected] ?? panels[0]
@@ -657,7 +658,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
           setPublishing(true)
           setPublishError('')
           try {
-            if (await publishNow(publishCheck.id)) { setPublishCheck(null); disarm(); router.push('/templates') }
+            if (await publishNow(publishCheck.id)) { setPublishCheck(null); disarm(); router.push(createPageReturnHref('/templates', publishCheck.id)) }
           } finally {
             setPublishing(false)
           }

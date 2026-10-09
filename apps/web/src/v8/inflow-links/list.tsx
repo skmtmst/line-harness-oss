@@ -696,7 +696,7 @@ export default function InflowListV8({
                   <span className={styles.nameText} title={r.name}>{r.name}</span>
                 )
                 return (
-                  <Tr key={r.refCode} interactive className={styles.row} data-table-layout="columns" data-row-id={r.refCode}>
+                  <Tr key={r.refCode} interactive className={styles.row} data-table-layout="columns" data-row-id={r.entryRouteId ?? r.refCode}>
                     <Td className={styles.colCheck}>
                       {r.entryRouteId && !readonly ? (
                         <Checkbox

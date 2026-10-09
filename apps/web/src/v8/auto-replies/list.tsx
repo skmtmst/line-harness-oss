@@ -1162,7 +1162,7 @@ export default function AutoRepliesListV8() {
                       event.preventDefault()
                       setPanelId(r.id)
                     }
-                  }}
+                  }} data-row-id={r.id}
                 >
                     <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
                       {canEdit && <Checkbox

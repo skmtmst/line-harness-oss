@@ -353,7 +353,7 @@ export default function HistoryTab() {
                 onClick={(event) => {
                   if ((event.target as HTMLElement).closest('a, button, [role="menu"]')) return
                   router.push(friendHref)
-                }}
+                }} data-row-id={item.id}
               >
                 <Td className={styles.colName}>
                   <span className={styles.rowName} title={viewName(item)}>{viewName(item)}</span>

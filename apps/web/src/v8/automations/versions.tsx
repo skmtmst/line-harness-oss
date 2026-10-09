@@ -322,7 +322,7 @@ function VersionsInner() {
               </thead>
               <tbody>
                 {detail.bindings.map((binding) => (
-                  <Tr key={binding.id} className={styles.row} data-table-layout="columns">
+                  <Tr key={binding.id} className={styles.row} data-table-layout="columns" data-row-id={binding.id}>
                     <Td className={styles.colWhere}>
                       <span className={styles.where} title={binding.consumerPath || '全体'}>{binding.consumerPath || '全体'}</span>
                       <span className={styles.whereSub}>{CONSUMER_LABELS[binding.consumerType] ?? binding.consumerType}</span>

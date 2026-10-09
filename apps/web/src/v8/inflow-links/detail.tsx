@@ -650,7 +650,7 @@ function InflowDetailContent() {
                 {friendPageRows.map((friend) => {
                   const blocked = isBlockedFriend(friend)
                   return (
-                    <Tr key={friend.id} className={styles.row} data-table-layout="columns">
+                    <Tr key={friend.id} className={styles.row} data-table-layout="columns" data-row-id={friend.id}>
                       <Td className={styles.colWhen}>
                         <span className={styles.when}>
                           {friend.trackedAt ? friend.trackedAt.slice(5, 16).replace('T', ' ').replaceAll('-', '/').replace(/^0/, '') : '日時不明'}

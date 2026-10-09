@@ -694,7 +694,7 @@ export default function TagsTab({
                     event.preventDefault()
                     openTagDetail(tag.id)
                   }
-                }}
+                }} data-row-id={tag.id}
               >
                 <Td className={styles.colName}>
                   <ContextMenu label={`タグ「${tag.name}」の操作`} items={tagContextItems(tag)}>

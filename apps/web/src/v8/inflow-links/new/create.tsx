@@ -11,6 +11,7 @@
  * - 競合（vWJEm）：発行が 409（見分けるための文字が使用中）で返ったら、板の頭の下に帯を出す
  * - 違いを比べる（E14GFm）：違う項目だけを並べた窓。「最新を取り込んで直す」で保存されている値を入力へ写す
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
@@ -199,7 +200,7 @@ function InflowCreate() {
         lineAccountId: selectedAccountId,
       })
       if (!res.success) throw new Error(res.error)
-      router.push(`/inflow-links/detail?id=${res.data.id}`)
+      router.push(createPageReturnHref('/inflow-links', res.data.id))
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
         /* 見分けるための文字が使用中。同じ文字の発行済みリンクを探して比べられるようにする。 */

@@ -464,7 +464,7 @@ export default function BalancesTab() {
                   /* 行の中のボタン・リンクを押したときは、そちらに任せる。 */
                   if ((event.target as HTMLElement).closest('a, button')) return
                   router.push(href)
-                }}
+                }} data-row-id={member.friendId}
               >
                 <Td className={styles.colName}>
                   <span className={styles.rowName} title={member.displayName}>{member.displayName}</span>

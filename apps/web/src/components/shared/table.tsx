@@ -1,4 +1,7 @@
+'use client'
+
 import React from 'react'
+import { useListUrlState } from './list-url-state'
 import type { ReactNode, ThHTMLAttributes, TdHTMLAttributes, HTMLAttributes, CSSProperties } from 'react'
 import shell from './data-table.module.css'
 import { loadFailureCopy } from './api-error-message'
@@ -178,12 +181,14 @@ export type TrProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'cl
 
 /** 標準一覧の高さ58pxの行。 */
 export function Tr({ children, className, selected, interactive, density, leaving, ...rowProps }: TrProps) {
+  const [listState] = useListUrlState({ highlight: '' })
+  const createdHighlight = Boolean(listState.highlight && listState.highlight === (rowProps as Record<string, unknown>)['data-row-id'])
   const classes = [
     shell.row,
     density === 'comfortable' && shell.rowComfortable,
     density === 'template' && shell.rowTemplate,
     interactive && shell.rowInteractive,
-    selected && shell.rowSelected,
+    (selected || createdHighlight) && shell.rowSelected,
     className,
   ]
     .filter(Boolean)
@@ -192,6 +197,7 @@ export function Tr({ children, className, selected, interactive, density, leavin
     <tr
       className={classes}
       aria-selected={selected === undefined ? undefined : selected}
+      data-created-highlight={createdHighlight || undefined}
       data-leaving={leaving || undefined}
       {...rowProps}
       onClick={(event) => {

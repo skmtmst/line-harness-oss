@@ -688,7 +688,7 @@ export default function RewardsTab() {
             const reach = reachMetrics.find((metric) => metric.rewardId === reward.id)
             const sub = benefitSub(reward)
             return (
-              <Tr key={reward.id} className={styles.row} data-table-layout="columns">
+              <Tr key={reward.id} className={styles.row} data-table-layout="columns" data-row-id={reward.id}>
                 <Td className={styles.colName}>
                   {/* 名前の前にフォルダの丸（左のフォルダの列と同じ分け方。未分類は輪）。補足は名前の頭にそろえる。 */}
                   <FolderDotName folder={null}>
@@ -758,7 +758,7 @@ export default function RewardsTab() {
           </thead>
           <tbody>
             {failed.map((item) => (
-              <Tr key={item.id} className={styles.row} data-table-layout="columns">
+              <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
                 <Td className={styles.colName}><span className={styles.cellMain} title={item.rewardName}>{item.rewardName}</span></Td>
                 <Td className={styles.colStateWide}>
                   {item.status === 'delivering' ? (

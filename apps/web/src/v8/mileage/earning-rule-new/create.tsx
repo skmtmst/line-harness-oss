@@ -9,6 +9,7 @@
  * 聞く項目・保存の口・送る形・失敗の扱いは今の作る画面（app/mileage/earning-rules/new/v8-earning-rule-new.tsx）と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -215,7 +216,7 @@ export default function EarningRuleCreateV8() {
         }
         throw new Error(draftResponse.error)
       }
-      router.push(continueAfter ? '/mileage/earning-rules/new' : LIST_HREF)
+      router.push(continueAfter ? '/mileage/earning-rules/new' : createPageReturnHref(LIST_HREF, res.data.id))
     } catch (caught) {
       /* BnrQp：同時に作られた・版がずれたときは競合の帯で知らせる。 */
       if (caught instanceof ApiError && caught.status === 409) {

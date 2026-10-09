@@ -914,7 +914,7 @@ export default function ScenariosListV8() {
                         event.preventDefault()
                         setPanelId(s.id)
                       }
-                    }}
+                    }} data-row-id={s.id}
                   >
                     <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
                       {canEdit && <Checkbox

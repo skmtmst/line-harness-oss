@@ -828,7 +828,7 @@ export default function FriendsListV8() {
             const attention = String(friend.metadata?.__attention ?? '') === '1'
             const tags = splitTags(friend.tags)
             return (
-              <Tr key={friend.id} interactive selected={selectedIds.has(friend.id) || undefined} className={styles.row} data-friend-row>
+              <Tr key={friend.id} interactive selected={selectedIds.has(friend.id) || undefined} className={styles.row} data-friend-row data-row-id={friend.id}>
                 <Td className={styles.tdCheck} onClick={(event) => event.stopPropagation()}>
                   <Checkbox checked={selectedIds.has(friend.id)} onCheckedChange={() => toggleSelect(friend.id)} aria-label={`${friend.displayName}を選ぶ`} />
                 </Td>

@@ -9,6 +9,7 @@
  * 見せ方を絵に合わせた：処理は番号つきの1行（何を・どれを）で並べ、行を押すとその処理の設定を開く。
  * 並べ替え・削除は閉じた行の右端から行う。「失敗したとき」は全部の処理の「失敗したとき」をまとめて決める（行ごとに変えることもできる）。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowDown, ArrowUp, Save, Trash2 } from 'lucide-react'
@@ -167,7 +168,7 @@ export function CommonActionNew() {
         clientRequestKey: requestKey,
       })
       if (!response.success) throw new Error(response.error)
-      router.push(`/common-actions/versions?id=${encodeURIComponent(response.data.id)}`)
+      router.push(createPageReturnHref('/common-actions', response.data.id))
     } catch (caught) {
       setError(describeSaveFailure(caught))
     } finally {

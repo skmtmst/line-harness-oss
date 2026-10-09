@@ -7,6 +7,7 @@
  * 同じ口（POST /api/broadcast-message-assets）・同じ形の payload。違いは置き場と
  * 見せ方だけ（BEHAVIOR.md）。リッチメッセージは今の画面のまま（入口が渡す）。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
 import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -271,7 +272,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
     }
   }
 
-  const save = async (): Promise<boolean> => {
+  const save = async (): Promise<string | false> => {
     if (host) return false
     if (!selectedAccountId) { setError('上のバーでLINE公式アカウントを選んでください。'); return false }
     if (fields.submit().length > 0) { setError(''); return false }
@@ -292,7 +293,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
       }
       setSaved(true)
       setClean(snapshot)
-      return true
+      return result.data.id
     } catch {
       setError('保存できませんでした。通信状態を確認して、もう一度お試しください。')
       return false
@@ -313,15 +314,17 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   }
   const onSaveDraft = async () => {
     if (host) { hostSave(false); return }
-    if (await save()) notifySaved('下書きを保存しました')
+    const savedId = await save()
+    if (savedId) { notifySaved('下書きを保存しました'); disarm(); router.push(createPageReturnHref('/templates', savedId)) }
   }
   const onPublish = async () => {
     if (host) { hostSave(true); return }
     setPublishing(true)
     try {
-      if (await save()) {
+      const savedId = await save()
+      if (savedId) {
         disarm()
-        router.push('/templates')
+        router.push(createPageReturnHref('/templates', savedId))
       }
     } finally {
       setPublishing(false)

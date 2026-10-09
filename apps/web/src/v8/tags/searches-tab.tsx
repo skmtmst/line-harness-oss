@@ -369,7 +369,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
                     event.preventDefault()
                     openSearchDetail(search.id)
                   }
-                }}
+                }} data-row-id={search.id}
               >
                 <Td className={styles.searchColName}>
                   <ContextMenu label={`保存した検索「${search.name}」の操作`} items={searchContextItems(search)}>

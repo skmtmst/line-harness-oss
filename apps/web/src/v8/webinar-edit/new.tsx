@@ -5,6 +5,7 @@
  * 下書きとして作り、「動画の設定へ」で編集の ②動画へ進む。
  * 口・確かめ・離れる前の確かめは app/webinars/new/new-v8.tsx と同じ（BEHAVIOR.md）。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight } from 'lucide-react'
@@ -114,7 +115,7 @@ function NewInner() {
         viewingCondition: { kind: 'registered', label: '申込者向け' },
         publicDescription: values.description.trim() || undefined,
       })
-      router.push(next === 'video' ? `/webinars/edit?id=${created.data.id}&pane=video` : '/webinars')
+      router.push(next === 'video' ? `/webinars/edit?id=${created.data.id}&pane=video` : createPageReturnHref('/webinars', created.data.id))
     } catch (cause) {
       setError(describeSaveFailure(cause))
       savingRef.current = false

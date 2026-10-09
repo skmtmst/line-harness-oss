@@ -74,7 +74,7 @@ export function TodayTable({ rows, canWrite, busyId, onVisited, onUndo }: {
                 ...(canWrite && seated ? [{ id: 'undo', label: '来店の印を取り消す', onSelect: () => onUndo(r.id) }] : []),
               ]
               return (
-                <Tr key={r.id} className={styles.row} data-table-layout="columns">
+                <Tr key={r.id} className={styles.row} data-table-layout="columns" data-row-id={r.id}>
                   <Td className={styles.colTime}><span className={styles.time}>{hm(r.starts_at)}</span></Td>
                   <Td className={styles.colName}><span className={styles.name} title={r.customer_name}>{r.customer_name}</span></Td>
                   <Td className={styles.colGuests}>{`${r.guest_count}名`}</Td>

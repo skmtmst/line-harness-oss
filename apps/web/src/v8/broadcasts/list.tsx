@@ -1050,7 +1050,7 @@ export default function BroadcastListV8() {
                   event.preventDefault()
                   setPanelId(broadcast.id)
                 }
-              }}
+              }} data-row-id={broadcast.id}
             >
               <Td>
                 {/* 左にフォルダの列がある広い板は、名前の前にフォルダの色の丸（絵 l5V9a・NtCE3）。1152（jjFNi）は列が無いので出さない。 */}

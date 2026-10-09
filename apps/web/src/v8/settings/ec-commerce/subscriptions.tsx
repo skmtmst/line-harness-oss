@@ -123,7 +123,7 @@ export default function EcSubscriptions({ accountId, canEdit = true }: { account
     </div>
     {shown.length === 0 ? <ListState kind="empty" title="条件に合う定期便はありません" description="検索する言葉か表示条件を変えてください。" action={filter !== 'all' || search ? <Button onClick={() => { setFilter('all'); setSearch('') }}>条件を外す</Button> : undefined} /> : <DataTable label="定期便" density="compact" columns="var(--tpl-ecc-sub-columns)">
       <thead><TableHeadRow><Th>お客様と中身</Th><Th align="right">1回の金額</Th><Th>次の発送</Th><Th align="right">続いた回数</Th><Th>ようす</Th><Th>操作</Th></TableHeadRow></thead>
-      <tbody>{shown.map((item) => <Tr key={item.id}>
+      <tbody>{shown.map((item) => <Tr key={item.id} data-row-id={item.id}>
         <Td><span className={shared.stack}><span className={shared.main} title={item.ownerName ?? undefined}>{item.ownerName ?? 'お客様名 —'}{item.petName ? `（${item.petName}）` : ''}</span><span className={shared.sub} title={item.items ?? undefined}>{[item.items ?? '中身 未取得', item.cycle].filter(Boolean).join('・')}</span></span></Td>
         <Td align="right">{item.amount == null ? '—' : `¥${formatNumber(item.amount)}`}</Td>
         <Td>{shortDate(item.nextShippingAt)}</Td>

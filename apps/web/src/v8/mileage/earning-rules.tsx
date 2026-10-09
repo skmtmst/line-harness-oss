@@ -808,7 +808,7 @@ export default function EarningRulesTab() {
             const active = rule.published.status === 'published'
             const orderIndex = ruleOrder.indexOf(rule.id)
             return (
-              <Tr key={rule.id} className={styles.row} data-table-layout="columns">
+              <Tr key={rule.id} className={styles.row} data-table-layout="columns" data-row-id={rule.id}>
                 <Td className={styles.colName}>
                   <div className={styles.rowNameLine}>
                     <FolderDotName folder={null}>

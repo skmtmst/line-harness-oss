@@ -211,7 +211,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
             const state = channelStatus(channel)
             const preparing = channel.status === 'preparing'
             return (
-              <Tr key={channel.id}>
+              <Tr key={channel.id} data-row-id={channel.id}>
                 <Td>
                   <p className={styles.channelName} title={channel.name}>{channel.name}</p>
                   <p className={styles.channelSub}>{METHOD_SUB[channel.receiveMethod]}</p>

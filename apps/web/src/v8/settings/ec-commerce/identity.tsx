@@ -215,7 +215,7 @@ export default function EcIdentityCandidatesScreen() {
             const hasCandidate = Boolean(item.right.label)
             const selected = review.selectedId === item.id
             return (
-              <Tr key={item.id} selected={selected}>
+              <Tr key={item.id} selected={selected} data-row-id={item.id}>
                 <Td><span className={shared.stack}>
                   <span className={styles.name} title={item.left.label}>{item.left.label}</span>
                   <span className={shared.sub} title={leftSub}>{leftSub}</span>

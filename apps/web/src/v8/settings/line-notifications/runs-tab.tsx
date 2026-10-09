@@ -236,7 +236,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
               const status = STATUS[item.status]
               const who = item.recipientType === 'customer' ? `顧客${item.orderNumber ? `・${item.orderNumber}` : ''}` : '運用者'
               const reason = reasonWords(item)
-              return <Tr key={item.id}>
+              return <Tr key={item.id} data-row-id={item.id}>
                 <Td className={`${styles.cell} ${styles.runWhen}`}><span className={styles.runWhen}>{shortJst(item.receivedAt)}</span></Td>
                 <Td className={styles.cell}>
                   <button type="button" className={styles.runOpen} onClick={() => setDetailId(item.id)} title={`${item.notificationName}の記録の詳細を開く`}>{item.notificationName}</button>

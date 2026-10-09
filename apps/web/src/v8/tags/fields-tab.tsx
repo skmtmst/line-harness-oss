@@ -408,7 +408,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
                     event.preventDefault()
                     openFieldDetail(field.id)
                   }
-                }}
+                }} data-row-id={field.id}
               >
                 <Td className={styles.markColGrip} onClick={(event) => event.stopPropagation()}>
                   {canEdit ? (

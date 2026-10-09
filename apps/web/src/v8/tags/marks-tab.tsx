@@ -389,7 +389,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
                     event.preventDefault()
                     openMarkDetail(mark.id)
                   }
-                }}
+                }} data-row-id={mark.id}
               >
                 <Td className={styles.markColGrip} onClick={(event) => event.stopPropagation()}>
                   {canEdit ? (

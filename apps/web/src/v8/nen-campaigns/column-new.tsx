@@ -12,6 +12,7 @@
  *   開いたとき・知らせが要るときだけ場所を取る。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -140,7 +141,7 @@ export default function ColumnNew() {
     try {
       const res = await api.nenCampaigns.createColumn(selectedAccountId, toCreateInput(draft))
       if (!res.success) throw new Error('failed')
-      router.push('/nen-campaigns?tab=columns')
+      router.push(createPageReturnHref('/nen-campaigns?tab=columns', res.data.id))
     } catch (e) {
       const status = e instanceof ApiError ? e.status : undefined
       const code = e instanceof ApiError ? e.code : undefined

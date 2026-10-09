@@ -430,7 +430,7 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
                 const timing = formatCampaignTiming(setting)
                 const audience = formatCampaignAudience(setting)
                 return (
-                  <Tr key={setting.campaignKey} className={styles.row} data-table-layout="columns">
+                  <Tr key={setting.campaignKey} className={styles.row} data-table-layout="columns" data-row-id={setting.campaignKey}>
                     <Td className={styles.colName}>
                       {canEdit ? (
                         <Link href={`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`} className={styles.name} title={setting.label}>{setting.label}</Link>
@@ -737,7 +737,7 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
                 const views = metric?.articleOpened.value
                 const draft = column.publishedAt == null
                 return (
-                  <Tr key={column.id} className={styles.row} data-table-layout="columns" selected={props.selectedColumnId === column.id}>
+                  <Tr key={column.id} className={styles.row} data-table-layout="columns" selected={props.selectedColumnId === column.id} data-row-id={column.id}>
                     <Td className={styles.colName}>
                       <span className={styles.nameStack}>
                         <button type="button" className={styles.name} title={column.title} onClick={() => props.onSelectColumn(column.id)}>{column.title}</button>

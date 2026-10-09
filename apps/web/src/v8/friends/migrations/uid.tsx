@@ -217,7 +217,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                   </thead>
                   <tbody>
                     {active.items?.map((item) => (
-                      <Tr key={item.id} className={`${styles.row} ${styles.rowTall}`}>
+                      <Tr key={item.id} className={`${styles.row} ${styles.rowTall}`} data-row-id={item.id}>
                         <Td className={styles.td}>
                           <button type="button" className={`${styles.mono} ${styles.uidButton}`} title={`${item.oldUid}（詳細を見る）`} onClick={() => { m.setDetailError(null); m.setDetailItem(item) }}>
                             {shortUid(item.oldUid)}
@@ -321,7 +321,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                 {m.runs.map((run) => {
                   const badge = historyBadge(run)
                   return (
-                    <Tr key={run.id} className={`${styles.row} ${styles.rowRun}`} selected={active?.id === run.id || undefined}>
+                    <Tr key={run.id} className={`${styles.row} ${styles.rowRun}`} selected={active?.id === run.id || undefined} data-row-id={run.id}>
                       <Td className={styles.td}>{slashDateTime(run.createdAt)}</Td>
                       <Td className={styles.td}>
                         <button type="button" className={styles.runButton} aria-current={active?.id === run.id ? 'true' : undefined} title={`${run.purpose} ・ ${formatNumber(run.counts.total)}件`} onClick={() => m.selectRun(run.id)}>

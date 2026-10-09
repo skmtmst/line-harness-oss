@@ -449,7 +449,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
               const linked = Boolean(action.friendId ?? order?.friendId)
               const label = action.eventLabel || ecEventLabel(action.eventType, action.eventType)
               return (
-                <Tr key={action.id}>
+                <Tr key={action.id} data-row-id={action.id}>
                   <Td><span className={styles.stack}>
                     <span className={styles.main}>{dateTime(action.receivedAt)}</span>
                     <span className={styles.sub} title={action.orderNumber ? `注文 ${action.orderNumber}` : undefined}>{label}</span>

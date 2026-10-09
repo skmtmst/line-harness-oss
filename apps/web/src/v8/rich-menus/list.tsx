@@ -1052,7 +1052,7 @@ export default function RichMenusListV8() {
                       event.preventDefault()
                       setDetailId(g.id)
                     }
-                  }}
+                  }} data-row-id={g.id}
                 >
                   <Td
                     className={styles.orderCell}

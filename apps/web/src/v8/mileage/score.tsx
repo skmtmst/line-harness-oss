@@ -511,7 +511,7 @@ export default function ScoreTab() {
             const day = formatMileageMonthDay(item.lastChangedAt)
             const reason = actionScoreReasonLabel(item.lastReason)
             return (
-              <Tr key={item.friendId} className={styles.row} data-table-layout="columns">
+              <Tr key={item.friendId} className={styles.row} data-table-layout="columns" data-row-id={item.friendId}>
                 <Td className={styles.colName}><span className={styles.rowName} title={item.displayName}>{item.displayName}</span></Td>
                 <Td className={styles.colScore}><span className={styles.scoreNum}>{formatMileageNumber(item.currentScore)}</span></Td>
                 <Td className={styles.colBand}>
@@ -650,7 +650,7 @@ export default function ScoreTab() {
                 const changed = ruleChanged(rule, publishedRules.get(rule.id))
                 const stopped = !rule.enabled
                 return (
-                  <Tr key={rule.id} className={styles.row} data-table-layout="columns">
+                  <Tr key={rule.id} className={styles.row} data-table-layout="columns" data-row-id={rule.id}>
                     <Td className={styles.colName}>
                       <span className={styles.rowNameInk} title={rule.name}>{rule.name}</span>
                       <span className={styles.rowSub}>{frequencyText(rule)}</span>

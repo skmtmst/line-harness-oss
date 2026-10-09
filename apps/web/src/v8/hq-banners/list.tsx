@@ -9,6 +9,7 @@
  * 頭（型 ListPage）・左の「見る」の列（型のフォルダの列＋共通 FolderPanel）・数のカード4枚・
  * 案内の帯・タブ・道具の段・カード（プロジェクト）／画像のます（ライブラリ）・件数と次へ。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { CircleDot, Folder, Gauge, Plus, Send, Sparkles, Star, Upload } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -232,7 +233,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
       if (!res.success) throw new Error(res.error)
       setFormOpen(false)
       onChanged()
-      router.push(`/hq/banners/project?id=${encodeURIComponent(res.data.id)}`)
+      router.push(createPageReturnHref('/hq/banners', res.data.id))
     } catch (caught) {
       // M022：原文のまま出さず、共通の状態別案内へ渡す。窓は開いたまま送り直せる。
       setFormError(bannerFailureMessage(caught, 'プロジェクトの作成'))

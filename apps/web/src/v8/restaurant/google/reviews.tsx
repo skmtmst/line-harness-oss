@@ -192,7 +192,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
             const badge = replyBadge(review)
             const actionable = review.replyStatus === 'unreplied' || review.replyStatus === 'draft' || review.replyStatus === 'pending_confirm'
             return (
-              <Tr key={review.id}>
+              <Tr key={review.id} data-row-id={review.id}>
                 <Td className={`${styles.colReviewer}`}>
                   <span className={styles.reviewer}>{review.reviewerDisplayName ?? '匿名'}</span>
                   <Stars rating={review.starRating} />

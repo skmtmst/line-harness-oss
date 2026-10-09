@@ -297,7 +297,7 @@ export default function ReportTab() {
         </thead>
         <tbody>
           {shown.map((row) => (
-            <Tr key={row.id} className={styles.row} data-table-layout="columns">
+            <Tr key={row.id} className={styles.row} data-table-layout="columns" data-row-id={row.id}>
               <Td className={styles.colName}>
                 <span className={styles.stack}>
                   {view === 'affiliate' ? (
