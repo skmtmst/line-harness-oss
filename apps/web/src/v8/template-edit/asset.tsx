@@ -18,6 +18,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import Card from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
 import ActionMenu from '@/components/shared/action-menu'
@@ -702,6 +703,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>答え終わったときに行うこと</h2>
               </div>
+              <Notice tone="warn">回答後の処理はまだ動きません。設定は保存できますが、回答を受け取る仕組みができるまで実行されません。</Notice>
               <InlineActionRowsV8 actions={answerActions} onChange={setAnswerActions} {...actionOptions} />
             </Card>
 
