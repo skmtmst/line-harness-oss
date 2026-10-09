@@ -672,7 +672,7 @@ function SelectedColumnV8(props: NenOverviewProps) {
     <section className={styles.selectPanel} aria-label={`選んだコラム：${selected.title}`} data-design-node="nen-column-plan-v8">
       <h2 className={styles.selectTitle}>選んだコラム：{selected.title}</h2>
       <p className={styles.selectDesc}>LINEに届くカードと、送る相手・日時を決めます。</p>
-      <div className={styles.selectGrid}><Field label="LINEに出る紹介文"><div className={styles.fieldLabel}>
+      <div className={styles.selectGrid}><Field label="LINEに出る紹介文"><TextArea aria-label="LINEに出る紹介文" value={introDraft} onChange={(event) => props.onIntroChange(event.target.value)} rows={3} maxLength={1500} /><div className={styles.fieldLabel}>
           だれに
           <p className={styles.selectDesc}>{selected.targetMode === 'tag' ? `タグで絞り込み（${audienceCount == null ? emptyValue('unknown') : num(audienceCount)}人）` : `友だち 全員（${audienceCount == null ? emptyValue('unknown') : num(audienceCount)}人）`}</p>
           <p className={styles.selectDesc}>送る相手はコラムを作るときに決めます。友だち解除・ブロックの人には送られません。</p>
