@@ -9,6 +9,7 @@
  * 競合・試しのURLは今までの画面（app/form-submissions/edit/page.tsx）と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { notifySaved } from '@/components/shared/toast'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -736,13 +737,6 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   }
   const testUrl = answerUrl && testToken ? `${answerUrl}${answerUrl.includes('?') ? '&' : '?'}test_token=${encodeURIComponent(testToken)}` : null
 
-  const copyAnswerUrl = () => {
-    if (!answerUrl) return
-    void navigator.clipboard
-      .writeText(answerUrl)
-      .then(() => notifyToast('URLをコピーしました'))
-      .catch(() => setNotice(`コピーできませんでした。URL：${answerUrl}`))
-  }
 
   /* ---------------- 対象が無いとき ---------------- */
 
@@ -811,10 +805,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             <div className={styles.urlRow}>
               {/* 見せるのは短い形（絵どおり）。全文は title とコピーで渡す。 */}
               <span className={styles.urlValue} title={answerUrl}>{`https://liff.line.me/…/forms/${id}`}</span>
-              <Button onClick={copyAnswerUrl}>
-                <Copy size={15} aria-hidden="true" />
-                コピー
-              </Button>
+              <CopyTextButton value={answerUrl} label="コピー" aria-label="回答用URLをコピー" />
             </div>
             <p className={styles.urlNote}>友だちに配るURLです。LINEの中で開きます。</p>
             <div className={styles.urlTest}>
