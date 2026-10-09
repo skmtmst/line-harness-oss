@@ -1,5 +1,7 @@
 'use client'
 
+import { drawerWidth } from './panel-sizes'
+
 import React, { useContext, useEffect, useId, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
@@ -23,12 +25,12 @@ export type DrawerProps = {
   /** falseは参照画像と同じ面だけをページ内に描画する。 */
   modal?: boolean
   /**
-   * 幅。省くと既定（660）。'narrow' は 480（E-2 電話予約 svUTk）。
+   * 幅。省くと480。'narrow' は 480（E-2 電話予約 svUTk）。
    * 'editor' は 540 の編集の引き出し（ダッシュボード編集 mcOqK：頭 16/20・閉じるは枠つき 30・
    * 中 12/20・下 14/20・開くのは 200ms）。v8 だけで効く。
    */
   width?: 'narrow' | 'editor' | 'order' | 'composer'
-  /** V8 の板ごとの幅。省くと既定の幅。 */
+  /** V8は480・540の2段。旧指定は共通部品で段へそろえる。 */
   designWidth?: number
   /** 620幅の紹介者の板など、全体に同じ余白がある型。 */
   layout?: 'inset'
@@ -92,8 +94,8 @@ export default function Drawer({
       data-dirty={dirty || undefined}
       data-width={width}
       data-layout={layout}
-      data-design-width={designWidth ? '' : undefined}
-      style={designWidth ? { '--drawer-design-width': `${designWidth}px` } as CSSProperties : undefined}
+      data-design-width=""
+      style={{ '--drawer-design-width': `${drawerWidth(designWidth ?? (width === 'editor' || width === 'order' || width === 'composer' ? 540 : 480))}px` } as CSSProperties}
       tabIndex={-1}
       data-closing={leaving || undefined}
       data-design-part="drawer"

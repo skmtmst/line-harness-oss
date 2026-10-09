@@ -335,3 +335,6 @@
 [data-theme='v8'] .panel[data-width='composer'] .footer { padding: var(--tpl-msg-composer-drawer-footer-pad); }
 
 .titleRow { display: flex; align-items: center; gap: var(--tpl-msg-composer-content-gap); flex-wrap: wrap; }
+
+/* B-158：幅の段は共通部品の指定を最後に適用する。 */
+[data-theme='v8'] .panel[data-design-width] { width: min(var(--drawer-design-width), 100%); }

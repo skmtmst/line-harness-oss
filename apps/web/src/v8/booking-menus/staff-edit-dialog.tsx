@@ -13,7 +13,7 @@ import ImageUploader from '@/components/shared/image-uploader'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Dialog from '@/components/shared/dialog'
 import { api, type BookingStaff } from '@/lib/api'
 
 export function StaffEditModal({
@@ -31,7 +31,6 @@ export function StaffEditModal({
   const busySave = saving
   const [err, setErr] = useState<string | null>(null)
   // 保存の途中で窓だけ消えないよう、送信中はEscapeを止める。
-  const panelRef = useOverlayFocus(true, onClose, saving)
   // N-411 本人勤務: 予約スタッフをログインユーザーへ紐づけるための一覧。
   const [members, setMembers] = useState<StaffMember[]>([])
 
@@ -67,14 +66,7 @@ export function StaffEditModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-scrim flex items-center justify-center z-50 p-4">
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="booking-staff-modal-title" className="bg-canvas rounded-card shadow-float w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between gap-3 border-b border-hairline px-6 py-4">
-          <h2 id="booking-staff-modal-title" className="text-base font-semibold">{form.id ? 'スタッフ編集' : '新規スタッフ'}</h2>
-          <button type="button" onClick={onClose} disabled={saving} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
-            <X aria-hidden="true" className="h-5 w-5" />
-          </button>
-        </div>
+    <Dialog open title={form.id ? 'スタッフ編集' : '新規スタッフ'} onCancel={onClose} onConfirm={() => void submit()} confirmLabel="保存する" busy={saving} designWidth={560}>
         <div className="px-6 py-4 space-y-4">
           <Field label="内部名（管理用）" required>
             <input
@@ -161,20 +153,7 @@ export function StaffEditModal({
           </Field>
           {err && <p className="text-xs text-danger">{err}</p>}
         </div>
-        <div className="px-6 py-4 border-t border-hairline flex gap-2 justify-end">
-          <button
-            onClick={onClose}
-            disabled={saving}
-            className="px-4 py-2 text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-shell-gray rounded-control"
-          >
-            キャンセル
-          </button>
-          <Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={submit} disabled={saving} busy={busySave}>
-            {busySave === undefined && saving ? '保存中…' : '保存する'}
-          </Button>
-        </div>
-      </div>
-    </div>
+    </Dialog>
   )
 }
 

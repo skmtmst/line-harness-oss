@@ -12,7 +12,6 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Dialog from '@/components/shared/dialog'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -205,7 +204,6 @@ export function AffiliatePaymentConfirmDialog({
   const [statementKey, setStatementKey] = useState('')
   // 確定の実行中は×と同じくEscapeでも閉じない。共通の約束（初期フォーカス・
   // Tabの循環・起点へのフォーカス復帰・背面スクロール停止）もそろえる。
-  const panelRef = useOverlayFocus(!!target, onClose, busy)
   /*
     NEXT-23: 振込先の登録・修正は本人が自分のLINEから行うので、運用者に
     できるのは本人への依頼だけ。依頼の手段（LINEの友だち・連絡先）は
@@ -295,20 +293,19 @@ export function AffiliatePaymentConfirmDialog({
   if (!target) return null
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center overflow-y-auto bg-ink/40 p-4" style={{ zIndex: 90 }} data-design-node="GqFTV">
-      <section ref={panelRef} className="flex w-full flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-overlay" style={{ maxWidth: 800 }} role="dialog" aria-modal="true" aria-labelledby="affiliate-payment-title">
-        <header className="flex items-center justify-between border-b border-hairline px-6 py-4.5">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-pill bg-warning-bg text-warning" aria-hidden="true"><Landmark size={20} /></span>
-            <div>
-              <h2 id="affiliate-payment-title" className="text-lead font-bold text-ink">{title}</h2>
-              <p className="mt-0.5 text-xs text-ink-faint">確定すると金額が固定され、振込用のデータに入ります。</p>
-            </div>
+    <Dialog open title={title} description="確定すると金額が固定され、振込用のデータに入ります。" onCancel={onClose} busy={busy} error={error || undefined} designNode="GqFTV" designWidth={960} footer={(
+        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-6 py-4">
+          <p className="min-w-0 flex-1 text-xs text-ink-faint">振込そのものはここでは行いません。振込用CSVを書き出して銀行で処理してください。</p>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button type="button" onClick={onClose} disabled={busy} className="gap-1.5"><X size={15} />キャンセル</Button>
+            {phase === 'ready' && preview ? (
+              <Button type="button" variant="primary" disabled={busy} onClick={() => { void confirmPayment() }} className="gap-1.5" busy={busy} busyLabel="処理中…">
+                <Check size={15} />{`${yen(preview.amount)} で確定する`}
+              </Button>
+            ) : null}
           </div>
-          <button type="button" aria-label="閉じる" className="flex h-8 w-8 items-center justify-center rounded-control text-ink-faint hover:bg-canvas-sunken" onClick={onClose} disabled={busy}>
-            <X size={20} aria-hidden="true" />
-          </button>
-        </header>
+        </footer>
+    )}>
         <div className="space-y-3 px-6 py-5">
       {phase === 'loading' ? (
         <ListState kind="loading" title="確定する内容を読み込んでいます" />
@@ -402,19 +399,6 @@ export function AffiliatePaymentConfirmDialog({
         </div>
       ) : null}
         </div>
-        {error ? <Notice tone="danger" message={error} className="mx-6 mb-3" /> : null}
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-6 py-4">
-          <p className="min-w-0 flex-1 text-xs text-ink-faint">振込そのものはここでは行いません。振込用CSVを書き出して銀行で処理してください。</p>
-          <div className="flex shrink-0 items-center gap-2">
-            <Button type="button" onClick={onClose} disabled={busy} className="gap-1.5"><X size={15} />キャンセル</Button>
-            {phase === 'ready' && preview ? (
-              <Button type="button" variant="primary" disabled={busy} onClick={() => { void confirmPayment() }} className="gap-1.5" busy={busy} busyLabel="処理中…">
-                <Check size={15} />{`${yen(preview.amount)} で確定する`}
-              </Button>
-            ) : null}
-          </div>
-        </footer>
-      </section>
-    </div>
+    </Dialog>
   )
 }
