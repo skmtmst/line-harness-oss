@@ -20,12 +20,12 @@
  */
 import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { CalendarCheck, ClipboardList, ExternalLink, History, Info, MessageSquare, Stamp, type LucideIcon } from 'lucide-react'
+import { CalendarCheck, ChevronRight, ClipboardList, ExternalLink, History, Info, MessageSquare, Stamp, type LucideIcon } from 'lucide-react'
 import {
   TAP_ACTION_DEFS, TAP_ACTION_KINDS, tapActionDef,
   type TapActionKind, type TapActionValue,
 } from '@/lib/tap-actions'
-import Button from './button'
+import TapExtrasField from './tap-extras-field'
 import { EntityPickerDialog, type EntityPickerItem } from './entity-picker'
 import { ENTITY_KINDS, EntityKindDialog, type EntityKind } from './entity-picker-sources'
 import Select from './select'
@@ -93,6 +93,10 @@ export interface TapActionFieldProps {
   uriPlaceholder?: string
   /** 押したらのプルダウンの読み上げ名（既定「〇〇を押したら」）。幅は持たない（呼び出し側の箱で決める）。 */
   kindLabel?: string
+  allowExtras?: boolean
+  accountId?: string | null
+  extrasUnavailable?: string
+  extrasError?: string | null
 }
 
 function kindOptionsOf(kinds: readonly TapActionKind[], extras: readonly TapActionExtraKind[], current: string) {
@@ -108,13 +112,14 @@ function kindOptionsOf(kinds: readonly TapActionKind[], extras: readonly TapActi
 export default function TapActionField({
   name, value, onChange, kinds = TAP_ACTION_KINDS, extraKinds = [], renderBody,
   scope = 'shop', hasLiff, liffSettingsHref = '/accounts', readOnly = false, sources,
-  layout = 'row', textMax, kindLabel, uriPlaceholder = 'https://example.com',
+  layout = 'row', textMax, kindLabel, allowExtras = false, accountId, extrasUnavailable, extrasError, uriPlaceholder = 'https://example.com',
 }: TapActionFieldProps) {
   const options = useMemo(() => kindOptionsOf(kinds, extraKinds, value.kind), [kinds, extraKinds, value.kind])
   const current = options.find((option) => option.value === value.kind)
   const CurrentIcon = current?.icon
   const def = tapActionDef(value.kind)
   const [picking, setPicking] = useState(false)
+  const PickRow = readOnly ? 'div' : 'button'
 
   const kindControl = readOnly ? (
     <span className={styles.readKind} aria-label={`${kindLabel ?? `${name}を押したら`}：${current?.label ?? ''}`}>
@@ -172,7 +177,7 @@ export default function TapActionField({
       ? `（${target.noun}を選んでください）`
       : def.kind === 'booking' ? 'メニューを決めずに開く（予約ページの最初）' : 'ふつうのスタンプカードを開く'
     body = (
-      <div className={styles.pickRow} data-empty={!value.refId || undefined}>
+      <div className={styles.pickWrap}><PickRow type={readOnly ? undefined : "button"} className={styles.pickRow} data-empty={!value.refId || undefined} aria-label={`${name}の${target.noun}を${value.refId ? '変える' : '選ぶ'}`} aria-haspopup="dialog" onClick={readOnly ? undefined : () => setPicking(true)}>
         <Icon className={styles.icon} aria-hidden="true" />
         <span className={styles.pickText} title={picked?.name}>
           {value.refId ? (
@@ -182,11 +187,8 @@ export default function TapActionField({
             </>
           ) : <span className={styles.pickEmpty}>{emptyText}</span>}
         </span>
-        {readOnly ? null : (
-          <Button type="button" size="compact" aria-label={`${name}の${target.noun}を${value.refId ? '変える' : '選ぶ'}`} onClick={() => setPicking(true)}>
-            {value.refId ? '変える' : '選ぶ'}
-          </Button>
-        )}
+        {readOnly ? null : <><span className={styles.pickChange}>{value.refId ? '変える' : '選ぶ'}</span><ChevronRight className={styles.icon} aria-hidden="true" /></>}
+        </PickRow>
         {picking ? (
           <TapTargetPicker
             tapKind={def.kind}
@@ -204,9 +206,11 @@ export default function TapActionField({
   }
 
   return (
-    <div className={layout === 'stack' ? `${styles.root} ${styles.stack}` : `${styles.root} ${styles.row}`} data-tap-kind={value.kind}>
+    <div className={styles.withExtras}><div className={layout === 'stack' ? `${styles.root} ${styles.stack}` : `${styles.root} ${styles.row}`} data-tap-kind={value.kind}>
       <div className={styles.kind}>{kindControl}</div>
       <div className={styles.body}>{body}</div>
+    </div>
+    {allowExtras ? <TapExtrasField name={name} value={value.tapExtras} onChange={tapExtras => onChange({ tapExtras })} accountId={accountId} readOnly={readOnly} unavailable={extrasUnavailable} error={extrasError} /> : null}
     </div>
   )
 }

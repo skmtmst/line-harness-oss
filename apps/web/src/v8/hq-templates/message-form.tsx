@@ -9,6 +9,7 @@
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { PlayCircle, Plus } from 'lucide-react'
+import { tapExtrasError } from '@line-crm/shared'
 import type { HqMessageCard, HqMessageReference, HqTemplateFolder } from '@line-crm/shared'
 import { hqTemplatesApi, type MessageTemplateDefinition } from '@/lib/hq-templates-api'
 import { withMessageCard, withUploadedImage } from '@/lib/hq-template-authoring'
@@ -42,6 +43,7 @@ const TAP_OF: Record<CardAction, string> = {
 const ACTION_OF: Record<string, CardAction> = { uri: 'url', message: 'message', form: 'form', scenario: 'scenario' }
 function cardTapValue(button: HqMessageCard['buttons'][number]): TapActionValue {
   return {
+    tapExtras: button.tapExtras,
     kind: TAP_OF[button.action],
     uri: button.action === 'url' ? button.value : '',
     text: button.action === 'message' ? button.value : '',
@@ -73,6 +75,8 @@ export interface MessageFormProps {
 
 /** カードのボタン1つの誤り（packages/shared の parseHqMessageCard と同じ決まり）。欄の真下に出す。 */
 function cardButtonProblem(button: HqMessageCard['buttons'][number]): string | null {
+  const extrasError = tapExtrasError(button.tapExtras)
+  if (extrasError) return extrasError
   if (!button.label.trim()) return 'ボタンの文字を入力してください'
   if (!button.value.trim()) return button.action === 'form' ? '回答フォームを選んでください' : button.action === 'scenario' ? 'シナリオを選んでください' : button.action === 'message' ? '送る文を入力してください' : 'URLを入力してください'
   if (button.action === 'url') {
@@ -180,12 +184,13 @@ export default function MessageForm({
                   </label>
                   <div className={styles.field}>
                     <span className={styles.smallLabel}>押したとき</span>
-                    <TapActionField
+                    <TapActionField allowExtras accountId={null} extrasError={fields?.error(`button-${button.id}`)}
                       name={`ボタン${index + 1}`}
                       kindLabel={`ボタン${index + 1}を押したとき`}
                       value={cardTapValue(button)}
                       onChange={(patch) => {
                         if (patch.kind !== undefined) { updateButton(button.id, { action: ACTION_OF[patch.kind] ?? 'url', value: '' }); return }
+                        if (patch.tapExtras !== undefined) updateButton(button.id, { tapExtras: patch.tapExtras })
                         const next = patch.uri ?? patch.text ?? patch.refId
                         if (next !== undefined) updateButton(button.id, { value: next })
                       }}

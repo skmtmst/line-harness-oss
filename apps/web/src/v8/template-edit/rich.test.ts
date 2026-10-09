@@ -20,6 +20,15 @@ describe('面の呼び名', () => {
 })
 
 describe('保存値', () => {
+  test('URLの追加処理は保存し、テキストへの変更後に残った追加処理は送らない', () => {
+    const input = { imageUrl: 'https://x.example/a.png', pickedMedia: null, shape: shape('1') }
+    const tapExtras = { tagIds: ['tag'], scoreChange: 10 }
+    const built = buildRichPayload({ ...input, areas: { A: { ...emptyAreaDraft(), kind: 'uri', uri: 'https://x.example', tapExtras } } })
+    if (!('payload' in built)) throw new Error(built.error)
+    expect(built.payload.tapAreas).toMatchObject([{ tapExtras }])
+    expect(buildRichPayload({ ...input, areas: { A: { ...emptyAreaDraft(), kind: 'message', text: '返信', tapExtras } } })).toMatchObject({ error: expect.stringContaining('追加処理を外すか、URLを開く動きへ変更してください') })
+  })
+
   test('画像が無ければ送らない・URL を選んで空なら送らない', () => {
     expect(buildRichPayload({ imageUrl: ' ', pickedMedia: null, shape: shape('2v'), areas: {} })).toEqual({ error: '画像を設定してください。' })
     expect(buildRichPayload({ imageUrl: 'https://x.example/a.png', pickedMedia: null, shape: shape('2v'), areas: { B: { ...emptyAreaDraft(), kind: 'uri' } } }))

@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CircleSlash, Send } from 'lucide-react'
-import type { Folder, MediaItem, TemplateImagemapUpload } from '@line-crm/shared'
+import { hasTapExtras, type TapExtras, type Folder, type MediaItem, type TemplateImagemapUpload } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -34,7 +34,7 @@ import TapActionField from '@/components/shared/tap-action-field'
 import { FieldError } from '@/components/shared/form-controls'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { useTapActionSources } from '@/components/shared/use-tap-action-sources'
-import { TAP_ACTION_KINDS, tapActionDef, tapActionFromSavedUri, tapActionLiffUrl, tapActionNeedsLiff, tapActionProblem, type TapActionKind } from '@/lib/tap-actions'
+import { TAP_ACTION_KINDS, tapActionDef, tapActionFromSavedUri, tapActionLiffUrl, tapActionNeedsLiff, tapActionProblem, tapExtraSaveError, type TapActionKind } from '@/lib/tap-actions'
 import { TemplateEditFrame } from './frame'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import MediaSlot from '@/components/shared/media-slot'
@@ -88,7 +88,7 @@ export function areaPlace(area: RichArea, all: RichArea[]): string {
  * 予約・回答フォーム・予約履歴・来店スタンプはアカウントの LIFF の URL（uri）で保存する。
  */
 export type AreaActionKind = 'none' | TapActionKind
-export interface AreaDraft { kind: AreaActionKind; uri: string; text: string; refId: string }
+export interface AreaDraft { tapExtras?: TapExtras; kind: AreaActionKind; uri: string; text: string; refId: string }
 export const emptyAreaDraft = (): AreaDraft => ({ kind: 'none', uri: '', text: '', refId: '' })
 export const areaDraftConfigured = (draft: AreaDraft | undefined): boolean => Boolean(draft && draft.kind !== 'none')
 
@@ -107,6 +107,11 @@ function visualAreas(): Record<string, AreaDraft> {
 }
 
 /** 保存値（payload）を組み立てる。足りないときは理由を返す（今の画面と同じ決まり）。 */
+function richAreaProblem(draft: AreaDraft, where: string, hasLiff: boolean): string | null {
+  if (draft.kind === 'message' && hasTapExtras(draft.tapExtras)) return `${where}のテキストを送る動きではタグ・加点を使えません。追加処理を外すか、URLを開く動きへ変更してください`
+  return tapActionProblem(draft, { where, hasLiff, textMax: RICH_MESSAGE_TEXT_MAX })
+}
+
 export function buildRichPayload(input: {
   imageUrl: string
   pickedMedia: MediaItem | null
@@ -120,7 +125,7 @@ export function buildRichPayload(input: {
     const draft = input.areas[area.label]
     if (!draft || draft.kind === 'none') continue
     if (draft.kind === 'uri' && !draft.uri.trim()) return { error: `面 ${area.label} のURLを入力してください。` }
-    const problem = tapActionProblem(draft, { where: `面 ${area.label} `, hasLiff: Boolean(input.liffId), textMax: RICH_MESSAGE_TEXT_MAX })
+    const problem = richAreaProblem(draft, `面 ${area.label} `, Boolean(input.liffId))
     if (problem) return { error: `${problem}。` }
   }
   return {
@@ -132,6 +137,7 @@ export function buildRichPayload(input: {
       tapAreas: input.shape.areas.map((area) => {
         const draft = input.areas[area.label] ?? emptyAreaDraft()
         return {
+          ...(draft.tapExtras ? { tapExtras: draft.tapExtras } : {}),
           label: area.label,
           x: area.x,
           y: area.y,
@@ -161,9 +167,9 @@ function richInitial(host: TemplateEditHost | undefined) {
     const tap = taps.find((item) => item.label === area.label) ?? taps[index]
     if (tap?.actionType === 'uri' && typeof tap.uri === 'string') {
       const back = tapActionFromSavedUri(tap.uri)
-      areas[area.label] = { kind: back.kind as AreaActionKind, uri: back.uri, text: '', refId: back.refId }
+      areas[area.label] = { kind: back.kind as AreaActionKind, uri: back.uri, text: '', refId: back.refId, tapExtras: tap.tapExtras as TapExtras | undefined }
     }
-    if (tap?.actionType === 'message' && typeof tap.text === 'string') areas[area.label] = { kind: 'message', uri: '', text: tap.text, refId: '' }
+    if (tap?.actionType === 'message' && typeof tap.text === 'string') areas[area.label] = { kind: 'message', uri: '', text: tap.text, refId: '', tapExtras: tap.tapExtras as TapExtras | undefined }
   })
   const imageUrl = typeof payload.imageUrl === 'string' ? payload.imageUrl : typeof payload.baseUrl === 'string' ? `${payload.baseUrl}/1040` : ''
   return { name: content.name, shape: shape.value, areas, imageUrl, uploaded: { media: content.media, payload } as TemplateImagemapUpload }
@@ -277,7 +283,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
     fields.define(`area-${area.label}`, `面 ${area.label} の押したら`, () => {
       const draft = areas[area.label]
       if (!draft || draft.kind === 'none') return null
-      return tapActionProblem(draft, { where: 'この面', hasLiff: Boolean(liffId), textMax: RICH_MESSAGE_TEXT_MAX })
+      return richAreaProblem(draft, 'この面', Boolean(liffId))
     }, { reveal: () => setSelectedLabel(area.label), group: `area-${area.label}` })
   })
 
@@ -302,7 +308,12 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
       setSaved(true)
       setClean(snapshot)
       return true
-    } catch {
+    } catch (caught) {
+      const extraError = tapExtraSaveError(caught)
+      if (extraError) {
+        fields.setServerErrors(Object.fromEntries(shapeDef.areas.filter(area => areas[area.label]?.tapExtras).map(area => [`area-${area.label}`, extraError])))
+        return false
+      }
       setError('保存できませんでした。通信状態を確認して、もう一度お試しください。')
       return false
     } finally {
@@ -572,6 +583,8 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                     <span className={rich.areaChip} data-unset={draft.kind === 'none' || undefined}>{`${area.label} ${areaPlace(area, shapeDef.areas)}`}</span>
                     <div className={rich.areaTap} {...fields.bind(`area-${area.label}`)} aria-describedby={fields.invalid(`area-${area.label}`) ? 'te-rich-area-error' : undefined}>
                       <TapActionField
+                        allowExtras={draft.kind !== "none"} accountId={tapAccountId} extrasError={fields.error(`area-${area.label}`)}
+                        extrasUnavailable={draft.kind === 'message' ? 'この動きではタグ・加点を使えません。URLを開く動きへ変更してください。' : undefined}
                         name={`面 ${area.label} `}
                         kindLabel={`面 ${area.label} を押したら`}
                         value={draft}

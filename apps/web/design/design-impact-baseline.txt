@@ -422,7 +422,8 @@ shared-button-importer components/shared/row-actions.tsx
 shared-button-importer components/shared/save-conflict.tsx
 shared-button-importer components/shared/entity-picker.tsx
 shared-button-importer components/shared/source-picker-dialog.tsx
-shared-button-importer components/shared/tap-action-field.tsx
+shared-button-importer components/shared/tag-picker-field.tsx
+shared-button-importer components/shared/tap-extras-field.tsx
 shared-button-importer components/shared/target-missing.tsx
 shared-button-importer components/shared/version-history.tsx
 shared-button-importer components/staff/login-audit.tsx

@@ -10,13 +10,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { GripVertical, Plus, Send, X } from 'lucide-react'
-import type { Folder, MediaItem } from '@line-crm/shared'
+import { tapExtrasError, type TapExtras, type Folder, type MediaItem } from '@line-crm/shared'
+import { tapExtraSaveError } from '@/lib/tap-actions'
 import { api } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import TapExtrasField from '@/components/shared/tap-extras-field'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
@@ -59,7 +61,7 @@ const FORMAT_OPTIONS: Array<{ value: ResearchFormat; label: string }> = [
   { value: 'multiple', label: 'いくつでも選ぶ' },
   { value: 'free', label: '自由に書く' },
 ]
-export interface ResearchQuestion { key: string; text: string; format: ResearchFormat; required: boolean; choices: string[] }
+export interface ResearchQuestion { key: string; text: string; format: ResearchFormat; required: boolean; choices: string[]; choiceTapExtras?: TapExtras[] }
 const newQuestion = (): ResearchQuestion => ({ key: crypto.randomUUID(), text: '', format: 'single', required: true, choices: ['', ''] })
 const visualQuestions = (): ResearchQuestion[] => [
   { key: 'vq-1', text: '来月も定期便を続けたいと思いますか？', format: 'single', required: true, choices: ['続けたい', 'どちらともいえない', '止めたい'] },
@@ -76,10 +78,11 @@ export function assetInitial(payload: Record<string, unknown>) {
       if (!item || typeof item !== 'object') return []
       const q = item as Record<string, unknown>
       const format: ResearchFormat = q.format === 'multiple' || q.format === 'free' ? q.format : 'single'
-      return [{ key: crypto.randomUUID(), text: str(q.text), format, required: q.required !== false, choices: Array.isArray(q.choices) ? q.choices.map(str) : [] }]
+      return [{ key: crypto.randomUUID(), text: str(q.text), format, choiceTapExtras: Array.isArray(q.choiceTapExtras) ? q.choiceTapExtras as TapExtras[] : [], required: q.required !== false, choices: Array.isArray(q.choices) ? q.choices.map(str) : [] }]
     })
     : []
   return {
+    tapExtras: payload.tapExtras as TapExtras | undefined,
     description: str(payload.description),
     couponTitle: str(payload.title),
     imageUrl: str(payload.imageUrl),
@@ -127,6 +130,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   // クーポン
   const [couponTitle, setCouponTitle] = useState(init ? init.couponTitle : visual && kind === 'coupon' ? '夏の20%オフ' : '')
   const [imageUrl, setImageUrl] = useState(init ? init.imageUrl : '')
+  const [tapExtras, setTapExtras] = useState<TapExtras | undefined>(init?.tapExtras)
   const [pickedMedia, setPickedMedia] = useState<MediaItem | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -172,9 +176,9 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   }, [selectedAccountId])
 
   const snapshot = useMemo(() => JSON.stringify({
-    name, folder, description, couponTitle, imageUrl, pickedMedia, couponOnce, couponVisibility, lottery, lotteryRate, winnerLimit,
+    tapExtras, name, folder, description, couponTitle, imageUrl, pickedMedia, couponOnce, couponVisibility, lottery, lotteryRate, winnerLimit,
     couponStartsAt, couponEndsAt, couponUseActions, researchStartsAt, researchEndsAt, targetTagId, questions, answerActions,
-  }), [name, folder, description, couponTitle, imageUrl, pickedMedia, couponOnce, couponVisibility, lottery, lotteryRate, winnerLimit, couponStartsAt, couponEndsAt, couponUseActions, researchStartsAt, researchEndsAt, targetTagId, questions, answerActions])
+  }), [tapExtras, name, folder, description, couponTitle, imageUrl, pickedMedia, couponOnce, couponVisibility, lottery, lotteryRate, winnerLimit, couponStartsAt, couponEndsAt, couponUseActions, researchStartsAt, researchEndsAt, targetTagId, questions, answerActions])
   const [clean, setClean] = useState(() => snapshot)
   const dirty = snapshot !== clean && !saved
   const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({ dirty, busy: saving || publishing })
@@ -203,6 +207,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   const fields = useFormErrors()
   fields.define('name', 'テンプレート名', () => (name.trim() ? null : `${meta.title}名を入力してください`))
   if (kind === 'coupon') {
+    fields.define('tapExtras', 'ボタンの追加処理', () => tapExtrasError(tapExtras))
     fields.define('start', '使える期間の開始', () => (couponStartsAt ? null : '開始を入力してください'))
     fields.define('end', '使える期間の終了', () => (!couponEndsAt ? '終了を入力してください' : couponStartsAt && couponEndsAt <= couponStartsAt ? '終了は開始よりあとにしてください' : null))
     if (lottery) {
@@ -213,6 +218,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
     questions.forEach((question, index) => {
       fields.define(`q-${question.key}`, `質問 ${index + 1} の本文`, () => (question.text.trim() ? null : '質問文を入力してください'))
       if (question.format !== 'free') fields.define(`qc-${question.key}`, `質問 ${index + 1} の選択肢`, () => (question.choices.some((choice) => choice.trim()) ? null : '選択肢を1つ以上入力してください'))
+      if (question.format !== 'free') question.choices.forEach((_, ci) => fields.define(`extra-${question.key}-${ci}`, `質問 ${index + 1} の選択肢 ${ci + 1} の追加処理`, () => tapExtrasError(question.choiceTapExtras?.[ci])))
     })
   }
   const fieldProps = (key: string, id: string) => ({ ...fields.bind(key), invalid: fields.invalid(key), 'aria-describedby': fields.invalid(key) ? `${id}-error` : undefined })
@@ -241,6 +247,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
           visibility: couponVisibility,
           lottery,
           ...(lottery ? { lotteryRate: Number(lotteryRate), winnerLimit: Number(winnerLimit) } : {}),
+          tapExtras,
           useActions: couponUseActions.map(toActionPayload),
         },
       }
@@ -259,6 +266,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
         endsAt: researchEndsAt || null,
         targetTagId: targetTagId || null,
         questions: questions.map((question) => ({
+          choiceTapExtras: question.format === 'free' ? [] : question.choices.flatMap((choice, ci) => choice.trim() ? [question.choiceTapExtras?.[ci] ?? {}] : []),
           text: question.text.trim(),
           format: question.format,
           required: question.required,
@@ -292,7 +300,13 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
       setSaved(true)
       setClean(snapshot)
       return true
-    } catch {
+    } catch (caught) {
+      const extraError = tapExtraSaveError(caught)
+      if (extraError) {
+        if (kind === 'coupon') fields.fail('tapExtras', extraError)
+        else fields.setServerErrors(Object.fromEntries(questions.flatMap(q => q.choices.map((_, ci) => [`extra-${q.key}-${ci}`, extraError]))))
+        return false
+      }
       setError('保存できませんでした。通信状態を確認して、もう一度お試しください。')
       return false
     } finally {
@@ -566,6 +580,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               )}
             </Card>
 
+            <div {...fields.bind("tapExtras")}><TapExtrasField error={fields.error("tapExtras")} name="クーポンのボタン" value={tapExtras} onChange={extra => { fields.clear("tapExtras"); setTapExtras(extra) }} accountId={host ? null : selectedAccountId} /></div>
             {host ? null : (
               <Card padding="none" layout="vertical" className={styles.card}>
                 <div className={styles.cardHead}>
@@ -648,7 +663,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                     <>
                     <div className={styles.choiceRow} role="group" aria-label={`問 ${index + 1} の選択肢`} {...fields.bind(`qc-${question.key}`)} aria-describedby={fields.invalid(`qc-${question.key}`) ? `te-qc-${question.key}-error` : undefined}>
                       {question.choices.map((choice, choiceIndex) => (
-                        <span key={choiceIndex} className={styles.choice}>
+                        <div key={choiceIndex} className={styles.field}><div className={styles.choice}>
                           <input
                             className={styles.choiceInput}
                             value={choice}
@@ -661,12 +676,14 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                               type="button"
                               className={styles.choiceRemove}
                               aria-label={`問 ${index + 1} の選択肢 ${choiceIndex + 1} を消す`}
-                              onClick={() => updateQuestion(index, { choices: question.choices.filter((_, i) => i !== choiceIndex) })}
+                              onClick={() => updateQuestion(index, { choices: question.choices.filter((_, i) => i !== choiceIndex), choiceTapExtras: question.choiceTapExtras?.filter((_, i) => i !== choiceIndex) })}
                             >
                               <X size={12} aria-hidden="true" />
                             </button>
                           ) : null}
-                        </span>
+                          </div>
+                          <div {...fields.bind(`extra-${question.key}-${choiceIndex}`)}><TapExtrasField error={fields.error(`extra-${question.key}-${choiceIndex}`)} name={`問${index + 1}の選択肢${choiceIndex + 1}`} value={question.choiceTapExtras?.[choiceIndex]} accountId={host ? null : selectedAccountId} onChange={extra => updateQuestion(index, { choiceTapExtras: question.choices.map((_, ci) => ci === choiceIndex ? extra : question.choiceTapExtras?.[ci] ?? {}) })} /></div>
+                        </div>
                       ))}
                       {question.choices.length < MAX_CHOICES ? (
                         <button type="button" className={styles.insertChip} onClick={() => updateQuestion(index, { choices: [...question.choices, ''] })}>
