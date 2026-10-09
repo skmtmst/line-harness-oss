@@ -25,6 +25,7 @@ import adsStyles from './ads.module.css'
 import styles from './ad-pages.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const STEPS = [
   { title: 'クリックの目印を持ち帰る', text: '広告から中継リンクを通った人の目印を残します。中継リンクを通らないと広告と結びつきません。' },
@@ -127,7 +128,7 @@ export default function AdConnectionsV8() {
         />
       )
     }
-    return <span className={styles.cellFaint}>—</span>
+    return <span className={styles.cellFaint}>{emptyValue('unknown')}</span>
   }
 
   if (!accountId) {

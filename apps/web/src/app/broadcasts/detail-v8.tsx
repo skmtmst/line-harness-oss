@@ -46,6 +46,7 @@ import {
   rateText,
 } from './broadcast-display'
 import styles from './detail-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 送るまでの6段階。承認が絡まない・予約しない配信はその段を省く。 */
 const DELIVERY_STEPS: ReadonlyArray<{ key: string; label: string }> = [
@@ -389,7 +390,7 @@ export default function BroadcastDetailV8({
                 label="承認"
                 value={
                   approval.state == null
-                    ? (approval.requesterName ? '—' : '要らない')
+                    ? (approval.requesterName ? emptyValue('unknown') : '要らない')
                     : approval.state.approval.status === 'pending'
                       ? `${approval.approverName ?? 'スタッフ'}さんの承認待ち`
                       : approval.state.approval.status === 'approved'
@@ -700,13 +701,13 @@ function Overview({
                 label="開いた"
                 value={null}
                 unit=""
-                detail={insightState === 'error' ? '読み込めませんでした' : '—'}
+                detail={insightState === 'error' ? '読み込めませんでした' : emptyValue('unknown')}
               />
               <StatCell
                 label="押した"
                 value={null}
                 unit=""
-                detail={insightState === 'error' ? '読み込めませんでした' : '—'}
+                detail={insightState === 'error' ? '読み込めませんでした' : emptyValue('unknown')}
               />
             </>
           )}
@@ -822,7 +823,7 @@ function StatCell({ label, value, unit, detail }: { label: string; value: number
     <div className={styles.statCell}>
       <p className={styles.statLabel}>{label}</p>
       <p className={styles.statValue}>
-        {value == null ? '—' : formatNumber(value)}
+        {value == null ? emptyValue('unknown') : formatNumber(value)}
         {unit ? <span className={styles.statUnit}>{unit}</span> : null}
       </p>
       <p className={styles.statDetail}>{detail}</p>

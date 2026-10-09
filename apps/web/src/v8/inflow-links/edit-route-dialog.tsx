@@ -25,6 +25,7 @@ import type {
   Tag,
 } from '@line-crm/shared'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 interface MessageTemplate {
   id: string
@@ -90,7 +91,7 @@ export default function EditRouteModal({
       if (!cancelled && result.success) {
         setPoolMembers(Object.fromEntries(result.data.map(({ poolId, accounts }) => [
           poolId,
-          accounts.filter((account) => account.isActive).map((account) => account.accountName ?? '—'),
+          accounts.filter((account) => account.isActive).map((account) => account.accountName ?? emptyValue('unknown')),
         ])))
       }
     })()

@@ -30,6 +30,7 @@ import { csvLine, yen, type LoadStatus, type MemberTab, type SavedHandler } from
 import Notice from '@/components/shared/notice'
 import styles from './members.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export type { LoadStatus, MemberTab } from './parts'
 
@@ -133,10 +134,10 @@ function MembersKpiBand({
   const menu = (title: string) => <KpiMenu title={title} accountId={accountId} />
   return (
     <KpiBand className={styles.band} aria-label="会員の数の帯">
-      <KpiCard presentation="band" title="会員" icon={<History size={13} aria-hidden="true" />} menu={menu('会員')} value={pending ? null : kpis.members} unit="人" loading={loading} detail={pending ? '—' : `LINE 連携済み ${formatNumber(kpis.linkedMembers ?? 0)}`} />
-      <KpiCard presentation="band" title={topTwoLabel} icon={<CircleHelp size={13} aria-hidden="true" />} menu={menu(topTwoLabel)} value={pending || topTwo.length === 0 ? null : topTwoCount} unit="人" loading={loading} detail={topTwo[1] ? `今年の購入 ${yen(topTwo[1].annualThresholdYen)} 以上` : '—'} />
-      <KpiCard presentation="band" title="ペット登録あり" icon={<CircleHelp size={13} aria-hidden="true" />} menu={menu('ペット登録あり')} value={pending ? null : kpis.petMembers ?? 0} unit="人" loading={loading} detail={pending || petPercent === null ? '—' : `会員の ${petPercent}%`} />
-      <KpiCard presentation="band" title="今月の購入" icon={<Undo2 size={13} aria-hidden="true" />} menu={menu('今月の購入')} value={null} valueText={pending ? '—' : yen(kpis.monthPurchaseYen ?? 0)} unit="" loading={loading} detail={pending ? '—' : `会員 ${formatNumber(kpis.monthBuyers ?? 0)} 人`} />
+      <KpiCard presentation="band" title="会員" icon={<History size={13} aria-hidden="true" />} menu={menu('会員')} value={pending ? null : kpis.members} unit="人" loading={loading} detail={pending ? emptyValue('unknown') : `LINE 連携済み ${formatNumber(kpis.linkedMembers ?? 0)}`} />
+      <KpiCard presentation="band" title={topTwoLabel} icon={<CircleHelp size={13} aria-hidden="true" />} menu={menu(topTwoLabel)} value={pending || topTwo.length === 0 ? null : topTwoCount} unit="人" loading={loading} detail={topTwo[1] ? `今年の購入 ${yen(topTwo[1].annualThresholdYen)} 以上` : emptyValue('unknown')} />
+      <KpiCard presentation="band" title="ペット登録あり" icon={<CircleHelp size={13} aria-hidden="true" />} menu={menu('ペット登録あり')} value={pending ? null : kpis.petMembers ?? 0} unit="人" loading={loading} detail={pending || petPercent === null ? emptyValue('unknown') : `会員の ${petPercent}%`} />
+      <KpiCard presentation="band" title="今月の購入" icon={<Undo2 size={13} aria-hidden="true" />} menu={menu('今月の購入')} value={null} valueText={pending ? emptyValue('unknown') : yen(kpis.monthPurchaseYen ?? 0)} unit="" loading={loading} detail={pending ? emptyValue('unknown') : `会員 ${formatNumber(kpis.monthBuyers ?? 0)} 人`} />
     </KpiBand>
   )
 }

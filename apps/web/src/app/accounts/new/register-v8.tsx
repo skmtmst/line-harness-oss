@@ -27,6 +27,7 @@ import { canSave, toSteps } from '../connection-check-view'
 import { isDuplicateChannelError, matchRegisteredAccountId } from './account-recovery'
 import styles from './register-v8.module.css'
 import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const V8_STEPS = [
   { number: 1, label: 'LINE準備', designNode: 'xj3zz' },
@@ -228,7 +229,7 @@ export default function RegisterV8() {
   const rowsPassed = allV8RowsPassed(checkRows)
   const createdId = connection?.id ?? ''
   const workerBase = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
-  const callbackUrl = workerBase ? `${workerBase}/auth/callback` : '—'
+  const callbackUrl = workerBase ? `${workerBase}/auth/callback` : emptyValue('unknown')
   const importingIds = (importState?.phase ?? connection?.followerImport.phase) === 'importing_ids'
   const selectedTags = tags?.filter((tag) => form.tagIds.includes(tag.id)) ?? []
 
@@ -747,7 +748,7 @@ export default function RegisterV8() {
                       <dl>
                         <div><dt>表示名</dt><dd>{form.name.trim() || (connection?.displayName ? `${connection.displayName}（LINEから取得）` : 'LINEから取得')}</dd></div>
                         <div><dt>LINE ID</dt><dd>{form.lineId || '接続確認で取得します'}</dd></div>
-                        <div><dt>タグ</dt><dd>{selectedTags.length > 0 ? selectedTags.map((tag) => tag.name).join('・') : 'なし'}</dd></div>
+                        <div><dt>タグ</dt><dd>{selectedTags.length > 0 ? selectedTags.map((tag) => tag.name).join('・') : emptyValue('none')}</dd></div>
                       </dl>
                       <p className={styles.fieldHelp}>タグ・親アカウント・担当者は、登録と一緒に保存します。</p>
                     </aside>

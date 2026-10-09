@@ -87,6 +87,7 @@ import {
 import styles from './list.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const VIEWER_NOTE = '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'
 
@@ -865,7 +866,7 @@ export default function FormsListV8() {
       icon: CircleCheck,
       value: statsFailed ? null : formStats?.published ?? null,
       unit: '件',
-      detail: `下書き ${statsFailed || !formStats ? '—' : formatNumber(formStats.draft)}件`,
+      detail: `下書き ${statsFailed || !formStats ? emptyValue('unknown') : formatNumber(formStats.draft)}件`,
     },
     {
       key: 'monthly-submits',
@@ -873,7 +874,7 @@ export default function FormsListV8() {
       icon: Inbox,
       value: statsFailed ? null : formStats?.monthlySubmits ?? null,
       unit: '件',
-      detail: `先月 ${statsFailed || !formStats ? '—' : formatNumber(formStats.prevMonthSubmits)}件`,
+      detail: `先月 ${statsFailed || !formStats ? emptyValue('unknown') : formatNumber(formStats.prevMonthSubmits)}件`,
     },
     {
       key: 'completion-rate',
@@ -1252,7 +1253,7 @@ export default function FormsListV8() {
                   </Td>
                   <Td className={styles.answerCell}>
                     {reviewMode ? (
-                      <span className={styles.answerCount}>{answerCount ? `${formatNumber(answerCount)}件` : '—'}</span>
+                      <span className={styles.answerCount}>{answerCount ? `${formatNumber(answerCount)}件` : emptyValue('unknown')}</span>
                     ) : (
                       <Link
                         href={`/form-submissions/responses?id=${encodeURIComponent(form.id)}`}

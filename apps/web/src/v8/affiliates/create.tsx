@@ -33,6 +33,7 @@ import { TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
 import { distributionUrl } from './display'
 import styles from './create.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const FRIEND_PAGE_SIZE = 20
 const LIST_PATH = '/affiliates'
@@ -314,9 +315,9 @@ export default function CreateAffiliateV8() {
         variant="link"
         description={issuedUrl ? '発行しました' : '登録すると発行されます'}
         rows={[
-          { label: 'リンク', value: <span title={previewUrl ?? undefined}>{previewUrl ?? '—'}</span> },
+          { label: 'リンク', value: <span title={previewUrl ?? undefined}>{previewUrl ?? emptyValue('unknown')}</span> },
           { label: '報酬', value: payoutKind === 'none' ? '計測のみ' : payoutKind === 'rate' ? `売上の ${commissionRate.trim() || '◯'}%` : '1件ごと（案件の額）' },
-          { label: '締め', value: payoutCycle.trim() || '—' },
+          { label: '締め', value: payoutCycle.trim() || emptyValue('unknown') },
         ]}
       >
         {issuedUrl ? <div><Button type="button" onClick={() => { void navigator.clipboard?.writeText(issuedUrl).then(() => setCopied(true), () => setCopied(false)) }}>{copied ? 'コピーしました' : 'リンクをコピー'}</Button></div> : null}

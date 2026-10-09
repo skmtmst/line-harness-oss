@@ -11,6 +11,7 @@ import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
 import { webinarApi, type Webinar, type WebinarEditor, type WebinarPublishValidation } from '@/lib/api'
 import { reviewActionSummaryText, reviewMonitoringText, reviewTestSummaryBody } from './review-text'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const NOTIFICATION_FLAGS = ['registrationEnabled', 'dayBeforeEnabled', 'hourBeforeEnabled', 'startEnabled', 'missedEnabled', 'completedEnabled'] as const
 
@@ -111,8 +112,8 @@ export default function ReviewV8({ webinar, editor, registrations, ctaCount, onP
   const rows = [
     ['開催形式', webinar.schedule.length > 0 ? '日時指定・開催回あり' : 'オンデマンド・いつでも視聴'],
     ['公開期間', publicationStateLabel(webinar.publicationState, webinar.publicationStartsAt, webinar.publicationEndsAt) ?? '—（公開期間は未設定）'],
-    ['CTA', ctaCount > 0 ? `${ctaCount}件` : webinar.cta ? '動画＋CTA＋フォーム' : '未設定'],
-    ['通知', notificationCount === null ? '—' : `${notificationCount}つ`],
+    ['CTA', ctaCount > 0 ? `${ctaCount}件` : webinar.cta ? '動画＋CTA＋フォーム' : emptyValue('unconfigured')],
+    ['通知', notificationCount === null ? emptyValue('unknown') : `${notificationCount}つ`],
     ['視聴後の動き', reviewActionSummaryText(validation)],
   ]
 

@@ -93,6 +93,7 @@ import VarsExportPanel from './export-panel'
 import styles from './list.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -1325,7 +1326,7 @@ function CommonVarsListInner() {
                         {item.usageCount === undefined ? (
                           <span className={styles.usageNone} title="使われている場所（未取得）">—（未取得）</span>
                         ) : item.usageCount === 0 ? (
-                          <span className={styles.usageNone}>なし</span>
+                          <span className={styles.usageNone}>{emptyValue('none')}</span>
                         ) : (
                           <Link
                             href={`/contents/vars/edit?id=${item.id}`}
@@ -1385,7 +1386,7 @@ function CommonVarsListInner() {
       icon: Braces,
       value: listFailed ? null : stats.total,
       unit: '件',
-      detail: `下書き ${listFailed ? '—' : stats.draftCount}・止めた ${listFailed ? '—' : stats.stoppedCount}`,
+      detail: `下書き ${listFailed ? emptyValue('unknown') : stats.draftCount}・止めた ${listFailed ? emptyValue('unknown') : stats.stoppedCount}`,
     },
     {
       key: 'usage',
@@ -1830,7 +1831,7 @@ function CommonVarsListInner() {
               {activeItem.usageCount === undefined
                 ? '—（未取得）'
                 : activeItem.usageCount === 0
-                  ? 'なし'
+                  ? emptyValue('none')
                   : `${formatNumber(activeItem.usageCount)}か所`}
             </p>
             <p className={styles.panelLabel}>更新・次回</p>

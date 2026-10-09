@@ -32,6 +32,7 @@ import { TextField } from '@/components/shared/text-field'
 import { RowActions } from '@/components/shared/row-actions'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import styles from './ad-integration-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const LOG_PAGE_SIZE = 20
 
@@ -757,7 +758,7 @@ export function AdMetricsV8() {
               <BadgeDollarSign size={13} aria-hidden="true" />
               成果1件あたり
             </span>
-            <p className={styles.kpiValue}>—</p>
+            <p className={styles.kpiValue}>{emptyValue('unknown')}</p>
             <p className={styles.kpiDetail}>認めた成果の件数は未接続のため表示できません</p>
           </li>
         </ul>
@@ -786,7 +787,7 @@ export function AdMetricsV8() {
                   </div>
                   <p className={styles.providerSub}>
                     {active
-                      ? `最後の取り込み ${synced ?? '—'}・毎日自動`
+                      ? `最後の取り込み ${synced ?? emptyValue('unknown')}・毎日自動`
                       : 'つなぐと費用とクリックを毎日取り込みます'}
                   </p>
                   {active && platform ? (
@@ -873,12 +874,12 @@ export function AdMetricsV8() {
                         </td>
                         <td>
                           <span className={styles.cellEllipsis}>
-                            {platform ? platformLabel(platform) : row.source === 'manual' ? '手入力' : '—'}
+                            {platform ? platformLabel(platform) : row.source === 'manual' ? '手入力' : emptyValue('unknown')}
                           </span>
                         </td>
                         <td>
                           <span className={styles.cellEllipsis} title={refCode ?? undefined}>
-                            {refCode ?? '—'}
+                            {refCode ?? emptyValue('unknown')}
                           </span>
                         </td>
                         <td className={styles.numeric}>
@@ -886,13 +887,13 @@ export function AdMetricsV8() {
                         </td>
                         <td className={styles.numeric}>
                           <span className={styles.cellValue}>
-                            {row.friendAdds == null ? '—' : `${formatNumber(row.friendAdds)}人`}
+                            {row.friendAdds == null ? emptyValue('unknown') : `${formatNumber(row.friendAdds)}人`}
                           </span>
                         </td>
                         <td className={styles.numeric}>
                           <span className={styles.cellValue}>
                             {row.costPerFriendMinor == null
-                              ? '—'
+                              ? emptyValue('unknown')
                               : formatMinor(row.costPerFriendMinor, row.totals[0]?.currency ?? 'JPY')}
                           </span>
                         </td>
@@ -1117,7 +1118,7 @@ export function AdConnectionsV8() {
           </li>
           <li className={styles.kpi}>
             <span className={styles.kpiLabel}>やり直して成功</span>
-            <p className={styles.kpiValue}>—</p>
+            <p className={styles.kpiValue}>{emptyValue('unknown')}</p>
             <p className={styles.kpiDetail}>二重にはなっていません</p>
           </li>
         </ul>
@@ -1242,7 +1243,7 @@ export function AdHistoryV8() {
                           </td>
                           <td>
                             <span className={styles.cellEllipsis}>
-                              {platform ? platformLabel(platform) : '—'}
+                              {platform ? platformLabel(platform) : emptyValue('unknown')}
                             </span>
                           </td>
                           <td>
@@ -1262,7 +1263,7 @@ export function AdHistoryV8() {
                                 {expanded ? '理由を閉じる' : 'やり直す'}
                               </Button>
                             ) : (
-                              <span className={styles.cellMuted}>—</span>
+                              <span className={styles.cellMuted}>{emptyValue('unknown')}</span>
                             )}
                           </td>
                         </tr>

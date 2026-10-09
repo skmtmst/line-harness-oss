@@ -61,6 +61,7 @@ import { BANNER_UPLOAD_ACCEPT, BannerConfirmDialogV8, CreateProjectDialogV8, upl
 import { bannerLimitKind } from './limit-notice'
 import { bannerFailureMessage, tileLabel } from './words'
 import styles from './project.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'notfound' | 'missing'
 type Filter = 'all' | 'favorite' | 'delivered'
@@ -666,7 +667,7 @@ function ProjectInner() {
               <Button variant="primary" disabled={busy || archived} onClick={openDistribution}><Send aria-hidden="true" className={styles.icon} />{`${selectedImages.length} 枚をアカウントへ配る`}</Button>
             </> : undefined }}
             info={<span className={styles.generationInfo}>
-              <span>{`今日の残り ${usage?.today.remaining ?? '—'}枚`}</span>
+              <span>{`今日の残り ${usage?.today.remaining ?? emptyValue('unknown')}枚`}</span>
               {exportSizeText(presets, input.presetKey) ? <ExportSizeChip text={exportSizeText(presets, input.presetKey)} /> : <span>寸法 —</span>}
             </span>}
             actions={
@@ -703,7 +704,7 @@ function ProjectInner() {
         accountState={(id) => {
           const selected = images.filter((image) => selectedImages.includes(image.id))
           const count = selected.filter((image) => image.deliveredAccountIds.includes(id)).length
-          return <span className={styles.hint}>{selected.length > 0 ? `${selected.length}枚中 ${count}枚を配布済み` : '—'}</span>
+          return <span className={styles.hint}>{selected.length > 0 ? `${selected.length}枚中 ${count}枚を配布済み` : emptyValue('unknown')}</span>
         }}
         notice={distributionProgress ? <p className={styles.distributionProgress} role="status" aria-live="polite">{distributionProgress}</p> : null}
         canDistribute={selectedImages.length > 0}

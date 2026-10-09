@@ -12,6 +12,7 @@ import { TextField } from '@/components/shared/text-field'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { formatPhotoReceivedAt } from './photo-review-time'
 import styles from './photo-review-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const policyContent = (version: PhotoRewardPolicyVersion) => `採用 ${version.points} マイル・公式サイト掲載 さらに ${version.publicationPoints ?? 0} マイル`
 
@@ -77,14 +78,14 @@ export default function PhotoPolicyHistoryV8({ open, canEdit, onClose, onChanged
       {loading ? <ListState kind="loading" title="版を読み込んでいます" /> : error ? <ListState kind="error" title={error} onRetry={() => void load()} /> : <>
         <div className={styles.historyTable}><DataTable><thead><TableHeadRow><Th>版</Th><Th>保存日時</Th><Th>保存した人</Th><Th>内容</Th><Th>操作</Th></TableHeadRow></thead><tbody>
           {versions.filter((version) => version.status !== 'reserved').map((version) => <Tr key={version.versionNumber}>
-            <Td>v{version.versionNumber}</Td><Td>{formatPhotoReceivedAt(version.createdAt)}</Td><Td>{version.createdBy || '—'}</Td><Td>{policyContent(version)}</Td>
+            <Td>v{version.versionNumber}</Td><Td>{formatPhotoReceivedAt(version.createdAt)}</Td><Td>{version.createdBy || emptyValue('unknown')}</Td><Td>{policyContent(version)}</Td>
             <Td>{version.status === 'in_use' ? <Chip tone="ok">いま使っている版</Chip> : <Button variant="secondary" onClick={() => setSelected(version)}>比べる</Button>}</Td>
           </Tr>)}
         </tbody></DataTable></div>
         {selected && current ? <section className={styles.historyCompare}><h3>いま使っている版とv{selected.versionNumber}を比べる</h3><VersionCompare before={`${policyContent(current)}\n${current.summary}`} after={`${policyContent(selected)}\n${selected.summary}`} />{canEdit ? <Button variant="secondary" onClick={() => setRevertOpen(true)}>この版に戻す</Button> : null}</section> : null}
         <p className={styles.historyHint}>過去の版は変わりません。その中身で新しい版を作ります。採用済みの付与は、そのときの版のまま変わりません。</p>
         <div className={styles.historyColumns}>
-          <section className={styles.railCard}><h3 className={styles.railTitle}>予約中の版</h3>{reserved.length ? reserved.map((version) => <div key={version.versionNumber}><p>v{version.versionNumber} <Chip tone="info">予約</Chip></p><p className={styles.railNote}>{version.effectiveFrom ? `${formatPhotoReceivedAt(version.effectiveFrom)}から` : '—'}</p><p className={styles.railNote}>{policyContent(version)}</p></div>) : <p className={styles.railNote}>予約中の版はありません</p>}</section>
+          <section className={styles.railCard}><h3 className={styles.railTitle}>予約中の版</h3>{reserved.length ? reserved.map((version) => <div key={version.versionNumber}><p>v{version.versionNumber} <Chip tone="info">予約</Chip></p><p className={styles.railNote}>{version.effectiveFrom ? `${formatPhotoReceivedAt(version.effectiveFrom)}から` : emptyValue('unknown')}</p><p className={styles.railNote}>{policyContent(version)}</p></div>) : <p className={styles.railNote}>予約中の版はありません</p>}</section>
           {canEdit ? <form className={styles.railCard} onSubmit={(event) => { event.preventDefault(); void save() }}>
             <h3 className={styles.railTitle}>引き出し：新しい版を作る</h3><p className={styles.railRow}>保存しても、使い始めの日時までは今の版のままです。</p>
             <div className={styles.historyFields}><label className={styles.fieldLabel}>採用したら（マイル）<TextField aria-label="採用したら（マイル）" inputMode="numeric" value={points} onChange={(event) => setPoints(event.target.value.replace(/[^0-9]/g, '').slice(0, 6))} disabled={saving} /></label>

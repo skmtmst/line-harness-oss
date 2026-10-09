@@ -20,6 +20,7 @@ import { formatNumber } from '@/lib/format'
 import type { EditContext, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './review.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const FLAGS = ['registrationEnabled', 'dayBeforeEnabled', 'hourBeforeEnabled', 'startEnabled', 'missedEnabled', 'completedEnabled'] as const
 
@@ -123,9 +124,9 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
   const summary: Array<[string, string]> = [
     ['開催形式', editor.deliveryKind === 'scheduled' ? '日時指定・開催回あり' : editor.deliveryKind === 'external' ? '外部の動画' : 'オンデマンド・いつでも視聴'],
     ['公開期間', publicationStateLabel(webinar.publicationState, webinar.publicationStartsAt, webinar.publicationEndsAt) ?? '—（公開期間は未設定）'],
-    ['CTA', ctx.ctaCount > 0 ? `${ctx.ctaCount}件` : '未設定'],
-    ['通知', notifyCount === null ? '—' : `${notifyCount.on} つ${notifyCount.missedOff ? '（見逃し案内は止めている）' : ''}`],
-    ['視聴後の動き', (() => { const check = checks.find((item) => item.key === 'action_dependencies'); return check ? check.detail || check.label : '—' })()],
+    ['CTA', ctx.ctaCount > 0 ? `${ctx.ctaCount}件` : emptyValue('unconfigured')],
+    ['通知', notifyCount === null ? emptyValue('unknown') : `${notifyCount.on} つ${notifyCount.missedOff ? '（見逃し案内は止めている）' : ''}`],
+    ['視聴後の動き', (() => { const check = checks.find((item) => item.key === 'action_dependencies'); return check ? check.detail || check.label : emptyValue('unknown') })()],
   ]
   const chrome = chromeFor(readOnly ? null : (
     <Button variant="primary" disabled={!canPublish} title={canPublish ? undefined : '公開前の確認が全部通ると公開できます'} busy={publishing} busyLabel="公開しています…" onClick={() => void publish()}><Check size={15} aria-hidden="true" />この版を公開</Button>

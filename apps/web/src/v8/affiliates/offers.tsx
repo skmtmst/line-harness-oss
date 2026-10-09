@@ -55,6 +55,7 @@ import {
 } from './parts'
 import styles from './affiliates.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type FilterKey = 'open' | 'draft'
 type FolderKey = 'all' | 'tag' | 'scenario' | 'miles' | 'none'
@@ -368,7 +369,7 @@ export default function OffersTab() {
         title="平均報酬"
         icon={<Banknote size={14} aria-hidden="true" />}
         value={null}
-        valueText={approvalState === 'ready' && !approvalsTruncated && averageReward != null ? formatYen(averageReward) : '—'}
+        valueText={approvalState === 'ready' && !approvalsTruncated && averageReward != null ? formatYen(averageReward) : emptyValue('unknown')}
         unit=""
         detail={approvalState === 'ready'
           ? (approvalsTruncated ? '件数が多く、全部は数えられませんでした' : averageReward == null ? '今月はまだ認めた成果がありません' : '1件あたり')
@@ -498,11 +499,11 @@ export default function OffersTab() {
                   <span className={styles.cellNum} title={actionText(offer)}>{actionText(offer)}</span>
                 </Td>
                 <Td className={`${styles.colOfferPeople} ${styles.num}`}>
-                  <span className={styles.cellNum}>{approvalState === 'ready' ? `${formatNumber(stat?.people.size ?? 0)}人${approvalsTruncated ? '以上' : ''}` : '—'}</span>
+                  <span className={styles.cellNum}>{approvalState === 'ready' ? `${formatNumber(stat?.people.size ?? 0)}人${approvalsTruncated ? '以上' : ''}` : emptyValue('unknown')}</span>
                 </Td>
                 <Td className={`${styles.colOfferConv} ${styles.num}`}>
                   <span className={styles.stackEnd}>
-                    <span className={styles.cellNum}>{approvalState === 'ready' ? (stat ? `${formatNumber(stat.conversions)}件${approvalsTruncated ? '以上' : ''}` : '—') : '—'}</span>
+                    <span className={styles.cellNum}>{approvalState === 'ready' ? (stat ? `${formatNumber(stat.conversions)}件${approvalsTruncated ? '以上' : ''}` : emptyValue('unknown')) : emptyValue('unknown')}</span>
                     {stat ? <span className={styles.rowPlan}>{`確定 ${formatYen(stat.reward)}`}</span> : null}
                   </span>
                 </Td>

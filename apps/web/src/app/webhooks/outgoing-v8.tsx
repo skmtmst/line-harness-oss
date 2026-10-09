@@ -51,6 +51,7 @@ import { formatDateTime, formatNumber } from '@/lib/format'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import styles from './outgoing-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 type OutgoingFilter = 'all' | 'active' | 'paused' | 'failed'
@@ -140,11 +141,11 @@ export function outgoingKpiCells(args: {
   const sentSuccess = summary ? Math.max(0, summary.outgoing - summary.failed) : null
   const failed = summary?.failed ?? null
   const received = summary?.incoming ?? null
-  const num = (value: number | null) => (value === null ? '—' : formatNumber(value))
+  const num = (value: number | null) => (value === null ? emptyValue('unknown') : formatNumber(value))
   return [
     {
       key: 'destinations', icon: <Send size={14} />, label: '送り先',
-      value: items === null ? '—' : num(items.length), unit: '件',
+      value: items === null ? emptyValue('unknown') : num(items.length), unit: '件',
       sub: active === null || paused === null ? ' ' : `動いている ${active}・止めている ${paused}`,
     },
     {
@@ -159,7 +160,7 @@ export function outgoingKpiCells(args: {
     },
     {
       key: 'incoming', icon: <Link2 size={14} />, label: '受け取り',
-      value: incomingCount === null ? '—' : num(incomingCount), unit: '件',
+      value: incomingCount === null ? emptyValue('unknown') : num(incomingCount), unit: '件',
       sub: received === null ? ' ' : `今月 ${num(received)}回`,
     },
   ]
@@ -952,7 +953,7 @@ function OutgoingV8Table({ items, canManage, canTest, manageReason, menuId, setM
                       </span>
                     </div>
                     <div title={completedAt ? `最終 ${formatDateTime(completedAt)}` : undefined}>
-                      {completedAt ? `最終 ${formatDateTime(completedAt)}` : '—'}
+                      {completedAt ? `最終 ${formatDateTime(completedAt)}` : emptyValue('unknown')}
                     </div>
                   </div>
                 </td>

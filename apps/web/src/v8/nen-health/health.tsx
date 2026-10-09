@@ -41,6 +41,7 @@ import HealthItemsV8 from './items'
 import SummaryDrawerV8, { SummarySheet } from './summary'
 import { EMPTY_FILTERS, Pill, RowMenu, WeightBars, changeBadges, md, rangeText, type HealthFilters, type HealthTabKey } from './parts'
 import styles from './health.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export type { HealthTabKey } from './parts'
 
@@ -435,10 +436,10 @@ function HealthRow({ row, onOpenSummary, onOpenPdf }: { row: NenHealthRow; onOpe
         </span>
       </Td>
       <Td className={styles.colOwner}><span className={styles.cell} title={row.owner.name}>{row.owner.name || '（名前なし）'}</span></Td>
-      <Td className={styles.colLast}><span className={styles.cell} title={row.lastLoggedLabel}>{row.lastLoggedOn ? md(row.lastLoggedOn) : '—'}</span></Td>
+      <Td className={styles.colLast}><span className={styles.cell} title={row.lastLoggedLabel}>{row.lastLoggedOn ? md(row.lastLoggedOn) : emptyValue('unknown')}</span></Td>
       <Td className={styles.colCount}><span className={styles.num}>{`${row.count30d} 日`}</span></Td>
       <Td className={styles.colWeight}><WeightBars series={row.weightSeries} warn={weightWarn} /></Td>
-      <Td className={styles.colStool}><span className={styles.cell}>{row.latestStool && row.latestAppetite ? `${row.latestStool}・${row.latestAppetite}` : '—'}</span></Td>
+      <Td className={styles.colStool}><span className={styles.cell}>{row.latestStool && row.latestAppetite ? `${row.latestStool}・${row.latestAppetite}` : emptyValue('unknown')}</span></Td>
       <Td className={styles.colChange}>
         <span className={styles.badges}>
           {changeBadges(row).map((badge) => <Pill key={badge.key} tone={badge.tone} title={badge.detail}>{badge.label}</Pill>)}

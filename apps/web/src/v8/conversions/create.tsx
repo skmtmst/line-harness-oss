@@ -52,6 +52,7 @@ import { originInfoOf } from './origin-labels'
 import { createLatestPreviewRequestGate, type LatestPreviewRequest } from './latest-preview-request'
 import styles from './create.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /* 数えるきっかけ6種（今の作る画面と同じ中身）。 */
 type TriggerKind = 'order' | 'form' | 'booking' | 'page' | 'video' | 'tag'
@@ -453,10 +454,10 @@ function ConversionCreate() {
           </p>
         </div>
         <dl className={styles.previewRows}>
-          <div className={styles.previewRow}><dt>成果</dt><dd>{preview ? `${formatNumber(preview.estimatedCount)}件` : '—'}</dd></div>
-          <div className={styles.previewRow}><dt>金額</dt><dd>{preview ? `¥${formatNumber(preview.estimatedValue)}` : '—'}</dd></div>
-          <div className={styles.previewRow}><dt>人数</dt><dd>{preview && typeof preview.uniqueFriendCount === 'number' ? `${formatNumber(preview.uniqueFriendCount)}人` : '—'}</dd></div>
-          <div className={styles.previewRow}><dt>除いた注文</dt><dd>{excluded == null ? '—' : `${formatNumber(excluded)}件`}</dd></div>
+          <div className={styles.previewRow}><dt>成果</dt><dd>{preview ? `${formatNumber(preview.estimatedCount)}件` : emptyValue('unknown')}</dd></div>
+          <div className={styles.previewRow}><dt>金額</dt><dd>{preview ? `¥${formatNumber(preview.estimatedValue)}` : emptyValue('unknown')}</dd></div>
+          <div className={styles.previewRow}><dt>人数</dt><dd>{preview && typeof preview.uniqueFriendCount === 'number' ? `${formatNumber(preview.uniqueFriendCount)}人` : emptyValue('unknown')}</dd></div>
+          <div className={styles.previewRow}><dt>除いた注文</dt><dd>{excluded == null ? emptyValue('unknown') : `${formatNumber(excluded)}件`}</dd></div>
         </dl>
         {preview && !previewFailed && preview.excludedReasons.length > 0 ? (
           <ul className={styles.previewReasons}>

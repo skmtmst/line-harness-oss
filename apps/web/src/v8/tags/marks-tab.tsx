@@ -41,6 +41,7 @@ import styles from './list.module.css'
 
 import type { AttributeListHost } from './attribute-host'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type MarkRow = SupportMarkListItem
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -427,10 +428,10 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
                     </Link>}
                   </ContextMenu>
                 </Td>
-                <Td className={styles.markColCount}><span className={styles.cellText}>{mark.friendCount == null ? '—' : `${mark.friendCount}人`}</span></Td>
-                <Td className={styles.markColDefault}><span className={styles.cellText}>{mark.isDefault ? '新規の初期値' : '—'}</span></Td>
-                <Td className={styles.markColAuto}><span className={styles.cellText} title={host ? (mark.autoOnInbound ? '受信時' : '—') : autoRuleLabel(mark)}>{host ? (mark.autoOnInbound ? '受信時' : '—') : autoRuleLabel(mark)}</span></Td>
-                <Td className={styles.markColPlace}><span className={styles.cellText} title={host ? undefined : usageLabel(mark)}>{host ? '—' : usageLabel(mark)}</span></Td>
+                <Td className={styles.markColCount}><span className={styles.cellText}>{mark.friendCount == null ? emptyValue('unknown') : `${mark.friendCount}人`}</span></Td>
+                <Td className={styles.markColDefault}><span className={styles.cellText}>{mark.isDefault ? '新規の初期値' : emptyValue('unknown')}</span></Td>
+                <Td className={styles.markColAuto}><span className={styles.cellText} title={host ? (mark.autoOnInbound ? '受信時' : emptyValue('unknown')) : autoRuleLabel(mark)}>{host ? (mark.autoOnInbound ? '受信時' : emptyValue('unknown')) : autoRuleLabel(mark)}</span></Td>
+                <Td className={styles.markColPlace}><span className={styles.cellText} title={host ? undefined : usageLabel(mark)}>{host ? emptyValue('unknown') : usageLabel(mark)}</span></Td>
                 {host && canEdit ? <Td className={styles.colDistribute} onClick={(event) => event.stopPropagation()}><RowQuickAction label="配る" ariaLabel={`${mark.name}を配る`} icon={<Send />} disabled={host.busy} onClick={() => host.onDistribute(mark.id)} /></Td> : null}
                 <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
                   <span className={styles.menuAnchor}>
@@ -570,7 +571,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
               </dd>
             </div>
             <div><dt>付いている人</dt><dd>{`${activeMark.friendCount}人`}</dd></div>
-            <div><dt>はじめの値</dt><dd>{activeMark.isDefault ? '新規の初期値' : '—'}</dd></div>
+            <div><dt>はじめの値</dt><dd>{activeMark.isDefault ? '新規の初期値' : emptyValue('unknown')}</dd></div>
             <div><dt>自動で変わる</dt><dd>{autoRuleLabel(activeMark)}</dd></div>
             <div><dt>出す場所</dt><dd>{usageLabel(activeMark)}</dd></div>
           </dl>

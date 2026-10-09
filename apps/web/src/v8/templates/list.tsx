@@ -95,6 +95,7 @@ import {
 } from './words'
 import styles from './list.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 一覧のタブ。message/question は同じテンプレートの束を中身で分ける。 */
 type Section = 'message' | 'question' | 'rich_video' | BroadcastAssetKind
@@ -525,7 +526,7 @@ export default function TemplatesListV8() {
       icon: FileText,
       value: ready ? tabItems.length : null,
       unit: '件',
-      detail: ready ? `未公開の変更 ${draftChanges}件` : '—',
+      detail: ready ? `未公開の変更 ${draftChanges}件` : emptyValue('unknown'),
     },
     {
       key: 'usage',
@@ -533,7 +534,7 @@ export default function TemplatesListV8() {
       icon: Link2,
       value: ready ? usageTotal : null,
       unit: 'か所',
-      detail: ready ? (usageTotal === null ? '使っている所を確認できません' : '一斉配信・自動応答・シナリオなど') : '—',
+      detail: ready ? (usageTotal === null ? '使っている所を確認できません' : '一斉配信・自動応答・シナリオなど') : emptyValue('unknown'),
     },
     {
       key: 'monthly',
@@ -541,7 +542,7 @@ export default function TemplatesListV8() {
       icon: Send,
       value: ready ? monthlyTotal : null,
       unit: '通',
-      detail: ready ? (monthlyTotal === null ? '送信数を確認できません' : 'このタブのテンプレートから') : '—',
+      detail: ready ? (monthlyTotal === null ? '送信数を確認できません' : 'このタブのテンプレートから') : emptyValue('unknown'),
     },
     {
       key: 'unused',
@@ -549,7 +550,7 @@ export default function TemplatesListV8() {
       icon: Mail,
       value: ready ? unusedCount : null,
       unit: '件',
-      detail: ready ? (unusedCount === null ? '使っている所を確認できません' : '整理の候補') : '—',
+      detail: ready ? (unusedCount === null ? '使っている所を確認できません' : '整理の候補') : emptyValue('unknown'),
     },
   ]
 
@@ -1206,7 +1207,7 @@ export default function TemplatesListV8() {
                         {typeof t.usageCount !== 'number' ? (
                           <span className={styles.cellFaint}>使っている所を確認できません</span>
                         ) : t.usageCount === 0 ? (
-                          <span className={styles.cellFaint}>なし</span>
+                          <span className={styles.cellFaint}>{emptyValue('none')}</span>
                         ) : (
                           <Link href={detailHref(t)} className={styles.usageLink} onClick={(event) => event.stopPropagation()}>
                             {`${formatNumber(t.usageCount)}か所`}
@@ -1711,7 +1712,7 @@ export default function TemplatesListV8() {
               {typeof activeTemplate.usageCount !== 'number'
                 ? '使っている所を確認できません'
                 : activeTemplate.usageCount === 0
-                  ? 'なし'
+                  ? emptyValue('none')
                   : `${activeTemplate.usageCount}か所`}
             </p>
             {panelMove ? (

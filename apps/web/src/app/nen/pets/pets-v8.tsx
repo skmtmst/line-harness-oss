@@ -51,6 +51,7 @@ import { nenRanksApi, type NenFeedingData, type NenFeedingKind } from '@/lib/nen
 import { birthdayDraft, normalizeBirthdayInput } from './pet-editor'
 import type { PetTab } from './page'
 import styles from './pets-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -169,7 +170,7 @@ function PetsKpiBand({
         <span className={styles.kpiLabel}>{label}</span>
         <button type="button" className={styles.kpiHelp} title={help} aria-label={`${label}：${help}`}>…</button>
       </div>
-      <p className={styles.kpiValue}>{value === null ? '—' : <>{formatNumber(value)}<span className={styles.kpiUnit}>匹</span></>}</p>
+      <p className={styles.kpiValue}>{value === null ? emptyValue('unknown') : <>{formatNumber(value)}<span className={styles.kpiUnit}>匹</span></>}</p>
       <p className={styles.kpiSub}>{sub}</p>
     </li>
   )
@@ -305,7 +306,7 @@ function PetsListV8({
           ]}
         />
         <span className={styles.toolsTail}>
-          <span className={styles.rangeLabel}>{data ? headCountLabel(data.total, data.page, data.pageSize) : '—'}</span>
+          <span className={styles.rangeLabel}>{data ? headCountLabel(data.total, data.page, data.pageSize) : emptyValue('unknown')}</span>
           <PageSizeSelect
             value={pageSize}
             options={[10, 20, 50]}
@@ -422,7 +423,7 @@ function PetRowV8({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; 
         <span className={styles.petSub}>{pet.owner.customerId ? `EC会員 ${pet.owner.customerId}` : 'EC未連携'}</span>
       </Td>
       <Td className={styles.colAge}><span className="text-label text-ink-secondary">{pet.ageLabel}</span></Td>
-      <Td align="right"><span className="text-label tabular-nums text-ink">{pet.weightKg == null ? '—' : `${pet.weightKg}kg`}</span></Td>
+      <Td align="right"><span className="text-label tabular-nums text-ink">{pet.weightKg == null ? emptyValue('unknown') : `${pet.weightKg}kg`}</span></Td>
       <Td>
         {pet.feeding?.dailyGrams != null ? (
           <>
@@ -431,12 +432,12 @@ function PetRowV8({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; 
           </>
         ) : pet.feeding ? (
           <>
-            <span className="block text-label text-ink-secondary">—</span>
+            <span className="block text-label text-ink-secondary">{emptyValue('unknown')}</span>
             <span className="block text-micro text-ink-faint">{`約${pet.feeding.dailyKcal}kcal・主食が未設定`}</span>
           </>
         ) : (
           <>
-            <span className="block text-label text-ink-secondary">—</span>
+            <span className="block text-label text-ink-secondary">{emptyValue('unknown')}</span>
             {/* #999 DEEP-24: 犬・猫以外はNRC/FEDIAFの計算対象外。犬の式で出した数値を見せない。 */}
             <span className="block text-micro text-ink-faint">{pet.animalType === 'other' ? '犬・猫以外は目安の計算対象外' : pet.weightKg == null ? '体重が未登録' : '誕生日が未登録'}</span>
           </>

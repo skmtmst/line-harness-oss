@@ -31,6 +31,7 @@ import { ExecuteConfirmDialog, MigrationItemDialog, RollbackConfirmDialog, runSt
 import { classLabel, decisionLabel, formatMappingBytes, ITEM_PAGE_SIZE, MIGRATION_STEPS, useUidMigration, type ItemClassification } from './use-uid-migration'
 import styles from './migrations.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const PRE_EXECUTE = ['dry_run', 'review', 'ready']
 
@@ -187,7 +188,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                     </button>
                   ))}
                   <button type="button" aria-pressed={m.pendingOnly} className={m.pendingOnly ? `${styles.chip} ${styles.chipOn}` : styles.chip} onClick={() => m.onFilterChange(active.id, m.classification, !m.pendingOnly)}>
-                    {`未判断 ${m.unresolved == null ? '—' : formatNumber(m.unresolved)}`}
+                    {`未判断 ${m.unresolved == null ? emptyValue('unknown') : formatNumber(m.unresolved)}`}
                   </button>
                 </div>
                 <span className={styles.spacer} />
@@ -225,7 +226,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                           </button>
                         </Td>
                         <Td className={styles.td}>
-                          <span className={styles.mono} title={[item.newUid, item.candidateName, item.conflictReason].filter(Boolean).join(' ／ ') || undefined}>{item.newUid ? shortUid(item.newUid) : '—'}</span>
+                          <span className={styles.mono} title={[item.newUid, item.candidateName, item.conflictReason].filter(Boolean).join(' ／ ') || undefined}>{item.newUid ? shortUid(item.newUid) : emptyValue('unknown')}</span>
                         </Td>
                         <Td className={styles.td}>
                           <span className={`${styles.pill} ${item.classification === 'auto' ? styles.pillOk : item.classification === 'conflict' ? styles.pillDanger : item.classification === 'unmatched' ? styles.pillMuted : styles.pillWarn}`}>
@@ -338,7 +339,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                           </button>
                         ) : run.rollbackable === true ? (
                           <span className={styles.small} title={rollbackBlockedReason ?? undefined}>ownerのみ</span>
-                        ) : <span className={styles.faint}>—</span>}
+                        ) : <span className={styles.faint}>{emptyValue('unknown')}</span>}
                       </Td>
                     </Tr>
                   )

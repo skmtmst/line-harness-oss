@@ -42,6 +42,7 @@ import {
 import { AffiliatePaymentConfirmDialog } from './dialogs'
 import { StatusPill } from './parts'
 import styles from './affiliate-drawer.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const JOURNEY_PAGE_SIZE = 30
 
@@ -268,17 +269,17 @@ export default function AffiliateDrawer({
       <div className={styles.kpis}>
         <div className={styles.kpi}>
           <span className={styles.kpiLabel}>今月の成果</span>
-          <span className={styles.kpiValue}>{report ? `${formatNumber(report.conversions)} 件` : '—'}</span>
+          <span className={styles.kpiValue}>{report ? `${formatNumber(report.conversions)} 件` : emptyValue('unknown')}</span>
           <span className={styles.kpiSub}>{report ? `認めた ${formatNumber(report.conversionsApproved)}・待っている ${formatNumber(report.conversionsPending)}` : '読み込めませんでした'}</span>
         </div>
         <div className={styles.kpi}>
           <span className={styles.kpiLabel}>今月の報酬</span>
-          <span className={styles.kpiValue}>{monthReward == null ? '—' : formatYen(monthReward)}</span>
+          <span className={styles.kpiValue}>{monthReward == null ? emptyValue('unknown') : formatYen(monthReward)}</span>
           <span className={styles.kpiSub}>{rewardDetail}</span>
         </div>
         <div className={styles.kpi}>
           <span className={styles.kpiLabel}>支払いを確定していない報酬</span>
-          <span className={styles.kpiValue}>{settlementState === 'ready' ? formatYen(settlement?.amount ?? 0) : '—'}</span>
+          <span className={styles.kpiValue}>{settlementState === 'ready' ? formatYen(settlement?.amount ?? 0) : emptyValue('unknown')}</span>
           <span className={styles.kpiSub}>
             {settlementState === 'ready' ? `認めた ${formatNumber(settlement?.conversionCount ?? 0)} 件分` : settlementState === 'loading' ? '読み込んでいます' : '読み込めませんでした'}
           </span>
@@ -426,7 +427,7 @@ export default function AffiliateDrawer({
             <div key={journey.friendId} className={styles.listRow}>
               <span className={styles.listText}>
                 <span className={styles.listName}>{personName(journey.displayName)}</span>
-                <span className={styles.listSub}>{`${formatDate(journey.addedAt)} に追加・リンク ${journey.refCode ?? '—'}`}</span>
+                <span className={styles.listSub}>{`${formatDate(journey.addedAt)} に追加・リンク ${journey.refCode ?? emptyValue('unknown')}`}</span>
               </span>
               {duplicate ? <StatusPill tone="warn">重複の疑い</StatusPill> : null}
               <span className={styles.listValue}>{`${formatNumber(journey.conversionCount)} 件`}</span>
@@ -454,7 +455,7 @@ export default function AffiliateDrawer({
           <div className={styles.kpis}>
             <div className={styles.kpi}><span className={styles.kpiLabel}>今回の金額</span><span className={styles.kpiValue}>{formatYen(settlement.amount)}</span></div>
             <div className={styles.kpi}><span className={styles.kpiLabel}>成果</span><span className={styles.kpiValue}>{`${formatNumber(settlement.conversionCount)} 件`}</span></div>
-            <div className={styles.kpi}><span className={styles.kpiLabel}>振込先</span><span className={styles.kpiValue}>{settlement.bankProfileRegistered ? '登録済み' : '未登録'}</span></div>
+            <div className={styles.kpi}><span className={styles.kpiLabel}>振込先</span><span className={styles.kpiValue}>{settlement.bankProfileRegistered ? '登録済み' : emptyValue('unconfigured')}</span></div>
           </div>
         ) : (
           <p className={styles.empty}>この人には、今回締められる報酬がありません。</p>
@@ -472,7 +473,7 @@ export default function AffiliateDrawer({
         <section className={styles.card} aria-label="支払いの取り決め">
           <h3 className={styles.cardTitle}>支払いの取り決め</h3>
           <p className={styles.cardText}>
-            {`連絡先 ${affiliate.email ?? 'なし'}・確定までの保留 ${affiliate.holdDays == null ? 'なし' : `${affiliate.holdDays}日`}・支払いサイクル ${affiliate.payoutCycle ?? 'なし'}・成果が出たら本人へ${affiliate.notifyOnConversion ? '知らせる' : '知らせない'}`}
+            {`連絡先 ${affiliate.email ?? emptyValue('none')}・確定までの保留 ${affiliate.holdDays == null ? emptyValue('none') : `${affiliate.holdDays}日`}・支払いサイクル ${affiliate.payoutCycle ?? emptyValue('none')}・成果が出たら本人へ${affiliate.notifyOnConversion ? '知らせる' : '知らせない'}`}
           </p>
         </section>
       )}

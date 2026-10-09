@@ -42,6 +42,7 @@ import { filterSavedSearches, savedSearchKpiValues, type SavedSearchUsageFilter 
 import { formatDay, formatNumber } from '@/lib/format'
 import styles from './list.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const PAGE_SIZES = [10, 20, 50]
 const MAX_SAVED = 50
@@ -58,7 +59,7 @@ const USAGE_WORDS: Record<string, string> = {
 export function conditionSummary(split: { all: string[]; any: string[]; note: string | null }): string {
   const all = split.all.join(' かつ ')
   const any = split.any.join(' または ')
-  const main = all && any ? `${all} かつ （${any}）` : all || any || '指定なし'
+  const main = all && any ? `${all} かつ （${any}）` : all || any || emptyValue('unconfigured')
   return split.note ? `${main}・${split.note}` : main
 }
 
@@ -77,7 +78,7 @@ export function usageSummary(usedIn: SavedSearch['usedIn']): string {
 
 /** 更新（「Kenta・8月20日」）。 */
 function updatedText(search: SavedSearch): string {
-  const who = search.updatedBy ?? search.createdBy ?? '—'
+  const who = search.updatedBy ?? search.createdBy ?? emptyValue('unknown')
   const day = formatDay(search.updatedAt ?? search.createdAt).replace(/（.）$/, '')
   return `${who}・${day}`
 }
@@ -298,7 +299,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
 
   const sharedCount = items.filter((item) => item.isShared).length
   const kpiCards = [
-    { title: '保存した条件', icon: Bookmark, value: kpis.total, unit: '件', detail: ready ? `自分 ${items.length - sharedCount}・共有 ${sharedCount}` : '—' },
+    { title: '保存した条件', icon: Bookmark, value: kpis.total, unit: '件', detail: ready ? `自分 ${items.length - sharedCount}・共有 ${sharedCount}` : emptyValue('unknown') },
     { title: '配信で使っている', icon: Send, value: kpis.usedInBroadcasts, unit: '件', detail: '一斉配信・自動処理' },
     { title: '該当なし', icon: CircleDashed, value: kpis.zeroMatches, unit: '件', detail: '条件が古いかも' },
     { title: '今月の利用', icon: MousePointerClick, value: kpis.callsThisMonth, unit: '回', detail: kpis.callsThisMonth === null ? '利用の記録は未接続' : '友だち一覧で開いた回数' },
@@ -389,7 +390,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
                 </Td>
                 <Td className={styles.searchColCount} onClick={(event) => event.stopPropagation()}>
                   <span className={styles.cellText} title={search.matchCountError ?? undefined}>
-                    {search.matchCount !== null && search.matchCount !== undefined ? `${formatNumber(search.matchCount)}人` : '—'}
+                    {search.matchCount !== null && search.matchCount !== undefined ? `${formatNumber(search.matchCount)}人` : emptyValue('unknown')}
                   </span>
                 </Td>
                 <Td className={styles.searchColShare}><span className={styles.cellText}>{search.isShared ? '全員' : '自分だけ'}</span></Td>
@@ -547,7 +548,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
               <dd>
                 {activeSearch.lineAccountId && activeSearch.matchCount !== null && activeSearch.matchCount !== undefined ? (
                   <Link href={`/friends?savedSearch=${activeSearch.id}`} className={styles.countLink}>{`${formatNumber(activeSearch.matchCount)}人`}</Link>
-                ) : '—'}
+                ) : emptyValue('unknown')}
               </dd>
             </div>
             <div><dt>使っている所</dt><dd>{usageSummary(activeSearch.usedIn)}</dd></div>

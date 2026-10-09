@@ -49,6 +49,7 @@ import {
 } from './view'
 import styles from './detail.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Skipped = Array<{ id: string; kind: string; title: string | null; skippedAt: string }>
 
@@ -227,9 +228,9 @@ export default function AccountDetailV8() {
   const lastReceived = account.connection?.lastReceivedAt ?? account.lastWebhookReceivedAt ?? null
 
   const parentValue = !account.parentLineAccountId
-    ? 'なし'
+    ? emptyValue('none')
     : allState === 'ready'
-      ? parent?.name ?? '—'
+      ? parent?.name ?? emptyValue('unknown')
       : allState === 'loading'
         ? '読み込んでいます'
         : null
@@ -238,7 +239,7 @@ export default function AccountDetailV8() {
     ? '読み込んでいます'
     : recipients === 'error'
       ? '読み込めませんでした'
-      : recipients.length === 0 ? '未設定' : recipients.join('、')
+      : recipients.length === 0 ? emptyValue('unconfigured') : recipients.join('、')
 
   const headActions = (
     <div className={styles.headActions}>
@@ -295,8 +296,8 @@ export default function AccountDetailV8() {
                 <h3 className={styles.cardTitle}>登録の内容（つづき）</h3>
                 <Pair label="友だち数">{friendsLine(account)}</Pair>
                 <Pair label="状態"><span className={styles.end}><StatusBadge tone={state.tone}>{state.label}</StatusBadge></span></Pair>
-                <Pair label="国・地域">{account.country ?? '未設定'}</Pair>
-                <Pair label="役割メモ">{account.role ?? '未設定'}</Pair>
+                <Pair label="国・地域">{account.country ?? emptyValue('unconfigured')}</Pair>
+                <Pair label="役割メモ">{account.role ?? emptyValue('unconfigured')}</Pair>
               </Card>
               <div className={styles.cardHead} id="acd-credentials-head">
                 <h3 id="acd-credentials" className={styles.cardTitle}>資格情報</h3>
@@ -328,7 +329,7 @@ export default function AccountDetailV8() {
                 </span>
               </Row>
               <Row label="このシステムが待っているURL">
-                <span className={styles.truncate} title={account.webhook?.expectedUrl ?? undefined}>{account.webhook?.expectedUrl ?? '—'}</span>
+                <span className={styles.truncate} title={account.webhook?.expectedUrl ?? undefined}>{account.webhook?.expectedUrl ?? emptyValue('unknown')}</span>
               </Row>
               <Row label="LINE側に登録したURL">
                 <span className={styles.inline}>

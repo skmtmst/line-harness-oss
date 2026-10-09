@@ -35,6 +35,7 @@ import { focusField } from './focus-field'
 import styles from './site-script.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type PageRow = { host: string | null; path: string; views: number; visitors: number }
 type TrackingSummary = {
@@ -322,7 +323,7 @@ export default function SiteScriptV8() {
         return (
           <div key={site.id} className={styles.siteRow} role="row" data-selected={selectedSiteId === site.id || undefined}>
             <span className={styles.colSite} role="cell"><span className={styles.siteName} title={site.label}>{site.label}</span></span>
-            <span className={styles.colDomain} role="cell"><span className={styles.cellText} title={site.domains.join('\n')}>{site.domains.join('、') || '—'}</span></span>
+            <span className={styles.colDomain} role="cell"><span className={styles.cellText} title={site.domains.join('\n')}>{site.domains.join('、') || emptyValue('unknown')}</span></span>
             <span className={styles.colState} role="cell">
               {stopped ? (
                 <StatusBadge tone="neutral" size="compact">停止中</StatusBadge>
@@ -330,7 +331,7 @@ export default function SiteScriptV8() {
                 <StatusBadge tone="success" size="compact">{site.lastReceivedAt ? '届いている' : '受信待ち'}</StatusBadge>
               )}
             </span>
-            <span className={styles.colLast} role="cell"><span className={styles.cellText}>{last ?? '—'}</span></span>
+            <span className={styles.colLast} role="cell"><span className={styles.cellText}>{last ?? emptyValue('unknown')}</span></span>
             <span className={styles.colMenu} role="cell">
               {manage ? (
                 <IconButton
@@ -454,7 +455,7 @@ export default function SiteScriptV8() {
                   {receiving ? (
                     <>
                       <span><StatusBadge tone="success" size="compact">届いている</StatusBadge></span>
-                      <p className={styles.faint}>{`最後に届いたのは ${lastSeen ?? '—'}`}</p>
+                      <p className={styles.faint}>{`最後に届いたのは ${lastSeen ?? emptyValue('unknown')}`}</p>
                     </>
                   ) : (
                     <>
@@ -480,8 +481,8 @@ export default function SiteScriptV8() {
                   {pages.length === 0 ? (
                     <div className={styles.pageRow} role="row">
                       <span className={styles.pageCol} role="cell">同意なし</span>
-                      <span className={styles.numCol} role="cell">—</span>
-                      <span className={styles.numColNarrow} role="cell">—</span>
+                      <span className={styles.numCol} role="cell">{emptyValue('unknown')}</span>
+                      <span className={styles.numColNarrow} role="cell">{emptyValue('unknown')}</span>
                     </div>
                   ) : null}
                 </div>

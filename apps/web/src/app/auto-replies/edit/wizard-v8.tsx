@@ -106,6 +106,7 @@ import AutoReplyInsertChips, { insertedLabels } from './insert-chips'
 import styles from './wizard-v8.module.css'
 import InsertTextField from '@/components/shared/insert-text-field'
 import { FieldError } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /*
  * ★V8 自動応答の作成・編集・有効化。
@@ -1235,7 +1236,7 @@ function AutoReplyWizardV8Inner() {
     const doneSteps: StepperStep[] = STEP_ORDER.map((key) => ({ key, label: STEP_LABELS_V8[key], state: 'done' }))
     const doneKeywords = form.respondToAll
       ? 'すべてのメッセージ'
-      : effectiveKeywords.map((r) => r.keyword.trim()).filter(Boolean).join('・') || '—'
+      : effectiveKeywords.map((r) => r.keyword.trim()).filter(Boolean).join('・') || emptyValue('unknown')
     return (
       <PageFrame kind="create" boardId={DONE_DESIGN_NODE}>
         <PageHeading
@@ -1319,7 +1320,7 @@ function AutoReplyWizardV8Inner() {
                 <h2 className={styles.sideTitle}>保存したあとに、過去28日で当たった数が出ます</h2>
                 {/* 絵 A0pDt：数（— 件）→ 説明 → 試しの文2つ（いまの言葉で当たるか）。 */}
                 <p className={styles.countRow} aria-label="当たった受信（過去28日）">
-                  <span className={styles.countNum}>{matchedLast28Days == null ? '—' : formatNumber(matchedLast28Days)}</span>
+                  <span className={styles.countNum}>{matchedLast28Days == null ? emptyValue('unknown') : formatNumber(matchedLast28Days)}</span>
                   <span className={styles.countUnit}>件</span>
                 </p>
                 <p className={styles.sideHint}>
@@ -1365,7 +1366,7 @@ function AutoReplyWizardV8Inner() {
                   </div>
                   <div className={styles.kvRow}>
                     <dt className="text-ink-faint text-xs">後の処理</dt>
-                    <dd className={styles.kvVal}>{form.actions.length > 0 ? `${form.actions.length}つ` : 'なし'}</dd>
+                    <dd className={styles.kvVal}>{form.actions.length > 0 ? `${form.actions.length}つ` : emptyValue('none')}</dd>
                   </div>
                   {(() => {
                     const used = insertedLabels(form.responseContent)
@@ -1441,8 +1442,8 @@ function AutoReplyWizardV8Inner() {
               <CreateSummaryCard
                 title="重なりの確認"
                 rows={[
-                  { label: '同時に当たるルール', value: conflicts.length > 0 ? `${conflicts.length}つ` : 'なし' },
-                  { label: '当たる受信（過去28日）', value: matchedLast28Days == null ? '—' : `${formatNumber(matchedLast28Days)}件` },
+                  { label: '同時に当たるルール', value: conflicts.length > 0 ? `${conflicts.length}つ` : emptyValue('none') },
+                  { label: '当たる受信（過去28日）', value: matchedLast28Days == null ? emptyValue('unknown') : `${formatNumber(matchedLast28Days)}件` },
                   { label: '試した結果', value: dryRun ? (dryRun.draftWon ? 'このルールが返す' : '見送り') : 'まだ試していません' },
                 ]}
               />
@@ -1480,7 +1481,7 @@ function AutoReplyWizardV8Inner() {
                   <div className={styles.kvRow}>
                     <dt className="text-ink-faint text-xs">同時に当たるルール</dt>
                     <dd className={styles.kvVal}>
-                      {conflicts.length > 0 ? `${conflicts.length}つ` : 'なし'}
+                      {conflicts.length > 0 ? `${conflicts.length}つ` : emptyValue('none')}
                     </dd>
                   </div>
                 </dl>
@@ -2434,7 +2435,7 @@ function AutoReplyWizardV8Inner() {
                       ? 'すべてのメッセージ'
                       : effectiveKeywords.length > 0
                         ? `${effectiveKeywords.map((r) => `「${r.keyword.trim()}」`).join('')}（${matchTypeWord(form.matchType)}）`
-                        : '未入力'}
+                        : emptyValue('unconfigured')}
                   </SummaryRow>
                   <SummaryRow label="いつ" onEdit={() => goToStep('trigger')}>
                     {[
@@ -2464,7 +2465,7 @@ function AutoReplyWizardV8Inner() {
                   <SummaryRow label="返したあと" onEdit={() => goToStep('response')}>
                     {form.actions.length > 0
                       ? form.actions.map((a, i) => `${i + 1} ${actionRowTitle(a, actionOptions)}`).join(' → ')
-                      : 'なし'}
+                      : emptyValue('none')}
                   </SummaryRow>
                   <SummaryRow label="細かい決まり" onEdit={() => goToStep('response')}>
                     {[
@@ -2507,7 +2508,7 @@ function AutoReplyWizardV8Inner() {
                           className={`${styles.checkIcon} ${gate.state === 'ok' ? styles.checkIconOk : gate.state === 'blocked' ? styles.checkIconWarn : ''}`}
                           aria-hidden="true"
                         >
-                          {gate.state === 'ok' ? <Check size={14} /> : gate.state === 'blocked' ? <CircleAlert size={14} /> : '—'}
+                          {gate.state === 'ok' ? <Check size={14} /> : gate.state === 'blocked' ? <CircleAlert size={14} /> : emptyValue('unknown')}
                         </span>
                         <div className={styles.checkBody}>
                           <p className={styles.checkTitle}>{gate.label}</p>

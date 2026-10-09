@@ -32,6 +32,7 @@ import RestaurantFrame, { type RestaurantContext } from '../common-a/frame'
 import { formatStamp, Panel, Stat, StatRow, Status } from '../common-a/parts'
 import styles from './organization.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const roleLabel: Record<RestaurantMembership['role'], string> = {
   super_admin: 'SuperAdmin',
@@ -56,7 +57,7 @@ function loginSummary(member: RestaurantMembership): string {
   if (!member.staff_id) return 'ログイン未連携'
   const role = member.loginRole === 'owner' ? 'オーナー' : member.loginRole === 'admin' ? '管理者' : 'スタッフ'
   const scope = member.loginAccountScope === 'all' ? '全アカウント' : '担当アカウントのみ'
-  return `${member.loginName || 'ログインメンバー'}・${role}${member.loginAccessLevel === 'read_only' ? '（閲覧のみ）' : ''}・${scope}・版 ${member.loginPolicyVersion ?? '—'}`
+  return `${member.loginName || 'ログインメンバー'}・${role}${member.loginAccessLevel === 'read_only' ? '（閲覧のみ）' : ''}・${scope}・版 ${member.loginPolicyVersion ?? emptyValue('unknown')}`
 }
 
 function Field({ label, name, type = 'text', defaultValue, required = false }: { label: string; name: string; type?: string; defaultValue?: string; required?: boolean }) {
@@ -375,7 +376,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
         {prompt}
         <Panel title="組織階層" narrow flush>
           <div className={styles.treeBody}>
-          <p className={styles.treeTenant}>{`統括：${data.organization?.tenant_name || '未設定'}`}</p>
+          <p className={styles.treeTenant}>{`統括：${data.organization?.tenant_name || emptyValue('unconfigured')}`}</p>
           <p className={styles.treeRoot}>{data.organization?.name}</p>
           <div className={styles.treeChildren}>
             {data.stores.map((s) => (
@@ -400,7 +401,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
                 <div className={styles.storeText}>
                   <p className={styles.storeName}><span>{s.name}</span><Status value={s.status} /></p>
                   <p className={styles.storeSub}>{`${s.code} · ${s.area || 'エリア未設定'} · ${s.capacity}席`}</p>
-                  <p className={styles.storeLine}>{`LINE: ${s.line_account_name ? `${s.line_account_name} 公式` : '未設定'}`}</p>
+                  <p className={styles.storeLine}>{`LINE: ${s.line_account_name ? `${s.line_account_name} 公式` : emptyValue('unconfigured')}`}</p>
                 </div>
                 {readOnly ? null : <Button onClick={() => { setEditingStoreId(s.id); setShowStoreForm(false) }}>編集</Button>}
               </div>
@@ -452,7 +453,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
                   <span role="cell" className={`${styles.cell} ${styles.colRole}`}>{roleLabel[m.role]}</span>
                   <span role="cell" className={`${styles.cell} ${styles.colRole}`}>{data.stores.find((s) => s.id === m.store_id)?.name || '全店舗'}</span>
                   <span role="cell" className={`${styles.cell} ${styles.colLink}`}>
-                    <span className={styles.linkMain}>{`LINE ${m.line_uid ? '設定済' : '未設定'}`}</span>
+                    <span className={styles.linkMain}>{`LINE ${m.line_uid ? '設定済' : emptyValue('unconfigured')}`}</span>
                     <span className={styles.sub}>{m.google_email || 'Google 未設定'}</span>
                   </span>
                   <span role="cell" className={`${styles.cell} ${styles.colState}`}><Status value={m.status} /></span>
@@ -534,7 +535,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
                   <span role="cell" className={`${styles.cell} ${styles.colName}`}>{label}</span>
                   {values.map((v, i) => (
                     <span key={i} role="cell" className={`${styles.cell} ${styles.colMatrix}`}>
-                      {v ? <span className={styles.matrixYes} aria-label="できる">✓</span> : <span className={styles.matrixNo} aria-label="できない">—</span>}
+                      {v ? <span className={styles.matrixYes} aria-label="できる">✓</span> : <span className={styles.matrixNo} aria-label="できない">{emptyValue('unknown')}</span>}
                     </span>
                   ))}
                 </div>

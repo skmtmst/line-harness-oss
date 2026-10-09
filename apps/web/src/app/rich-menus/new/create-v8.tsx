@@ -114,6 +114,7 @@ import {
 import styles from './create-v8.module.css'
 import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
 import { HQ_RICH_MENU_INTENTS, type HqRichMenuSeed } from '@/lib/hq-rich-menu-create'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /* ---------- 手順 ---------- */
 
@@ -257,8 +258,8 @@ function describeMenuSummary(input: {
 }): string {
   const areaCount = input.pages.reduce((total, page) => total + page.areas.length, 0)
   return [
-    `名前：${input.name || '（未入力）'}`,
-    `言葉：${input.chatBarText || '（未入力）'}`,
+    `名前：${input.name || emptyValue('unconfigured')}`,
+    `言葉：${input.chatBarText || emptyValue('unconfigured')}`,
     `出す相手：${input.audienceAll ? 'みんな' : '条件あり'}`,
     `面の数：${input.pages.length}`,
     `ボタンの数：${areaCount}`,
@@ -1662,7 +1663,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const headNote =
     step === 'shape'
       ? host ? 'いまは下書きとして作ります。最後の「配る」で選んだアカウントへ届けます。' : 'いまは下書きとして作ります。最後の「公開」で LINE に出します。'
-      : `名前：${name || '（未入力）'}・いまは下書きです`
+      : `名前：${name || emptyValue('unconfigured')}・いまは下書きです`
 
   /* ---------- 描画 ---------- */
 
@@ -1864,7 +1865,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         return (
           <ConfirmDialog
             open={next !== null}
-            title={blockers.length > 0 ? 'タブの数をいま減らせません' : `タブの数を${next === 0 ? 'なし' : `${(next ?? 0) + 1}つ`}にしますか？`}
+            title={blockers.length > 0 ? 'タブの数をいま減らせません' : `タブの数を${next === 0 ? emptyValue('none') : `${(next ?? 0) + 1}つ`}にしますか？`}
             description={
               blockers.length > 0
                 ? '消えるタブを行き先にしている切替ボタンがあります。理由を直してから、もう一度お試しください。'
@@ -2649,7 +2650,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               {
                 key: 'tabs',
                 label: '切替タブ',
-                value: (group ? pages.length : tabCount + 1) > 1 ? `${group ? pages.length : tabCount + 1}ページ` : 'なし',
+                value: (group ? pages.length : tabCount + 1) > 1 ? `${group ? pages.length : tabCount + 1}ページ` : emptyValue('none'),
               },
             ]}
           />

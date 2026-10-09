@@ -64,6 +64,7 @@ import {
 import styles from './detail.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 送るまでの6段階。承認が絡まない・予約しない配信はその段を省く。 */
 const DELIVERY_STEPS: ReadonlyArray<{ key: string; label: string }> = [
@@ -477,7 +478,7 @@ function metaLine(broadcast: ApiBroadcast, audienceLabel: string): string {
 
 function timeOf(value: string | null | undefined): string {
   const short = formatShortDateTime(value)
-  return short ? short.slice(short.indexOf('）') + 1) : '—'
+  return short ? short.slice(short.indexOf('）') + 1) : emptyValue('unknown')
 }
 
 /** 承認が絡む配信か（承認の段を進みの帯に出すか）。 */
@@ -682,8 +683,8 @@ function Overview({
               detail={scheduledLabel ? `${scheduledLabel} に送り始めます` : 'まだ送っていません'}
             />
             <Stat label="届いた" value={broadcast.successCount} unit="人" detail="送る前のため、まだありません" />
-            <Stat label="開いた" value={null} unit="" detail={insightState === 'error' ? '読み込めませんでした' : '—'} />
-            <Stat label="押した" value={null} unit="" detail={insightState === 'error' ? '読み込めませんでした' : '—'} />
+            <Stat label="開いた" value={null} unit="" detail={insightState === 'error' ? '読み込めませんでした' : emptyValue('unknown')} />
+            <Stat label="押した" value={null} unit="" detail={insightState === 'error' ? '読み込めませんでした' : emptyValue('unknown')} />
           </>
         )}
       </div>
@@ -807,7 +808,7 @@ function ApprovalBox({
           <p className={styles.boxTitle}>{status === 'rejected' ? '差し戻されました' : '期限切れです'}</p>
           <p className={styles.desc}>
             {status === 'rejected'
-              ? `理由：${rejectReason || '—'}。内容を直して、もう一度承認を依頼してください。`
+              ? `理由：${rejectReason || emptyValue('unknown')}。内容を直して、もう一度承認を依頼してください。`
               : '承認されないまま予約の時刻を過ぎたため、送っていません。送るには作り直してください。'}
           </p>
         </div>
@@ -817,7 +818,7 @@ function ApprovalBox({
   if (status !== 'pending') return null
   const mine = state.viewer.isApprover
   const request = [
-    `依頼：${approval.requesterName ?? '—'}・${formatBroadcastDateTime(requestedAt)}`,
+    `依頼：${approval.requesterName ?? emptyValue('unknown')}・${formatBroadcastDateTime(requestedAt)}`,
     note ? `ひとこと「${note}」` : '',
   ].filter(Boolean).join('　')
   return (
@@ -875,7 +876,7 @@ function Stat({ label, value, unit, detail }: { label: string; value: number | n
     <div className={styles.stat}>
       <p className={styles.statLabel}>{label}</p>
       <p className={styles.statValue}>
-        <span className={styles.statNum}>{value == null ? '—' : formatNumber(value)}</span>
+        <span className={styles.statNum}>{value == null ? emptyValue('unknown') : formatNumber(value)}</span>
         {unit ? <span className={styles.statUnit}>{unit}</span> : null}
       </p>
       {/* 数字だけの補足は絵どおり欧文の書体（Inter）。 */}

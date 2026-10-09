@@ -28,6 +28,7 @@ import { formatNumber } from '@/lib/format'
 import { nenRanksApi, type NenRankSettingsData } from '@/lib/nen-ranks-api'
 import { RULE_LABELS, parsePercent, parseYen, shortDateTime, shortTime, yen, type LoadStatus, type SavedHandler } from './parts'
 import styles from './members.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type RankDraft = { id: string | null; name: string; threshold: string; rate: string; tagId: string | null; tagName: string | null; memberCount: number }
 
@@ -457,7 +458,7 @@ export default function RankSettingsV8({
         {conflict ? (
           <div className={styles.diffGrid}>
             <div>
-              <p className={styles.diffHead}>最新（{conflict.latest.rules ? shortDateTime(conflict.latest.rules.updatedAt) : '—'}）</p>
+              <p className={styles.diffHead}>最新（{conflict.latest.rules ? shortDateTime(conflict.latest.rules.updatedAt) : emptyValue('unknown')}）</p>
               <ul className={styles.diffList}>
                 {conflict.latest.ranks.map((rank) => (
                   <li key={rank.id}>{rank.name} — {thresholdText(rank.annualThresholdYen)} / {rateText(rank.mileRatePercent)}</li>
@@ -468,7 +469,7 @@ export default function RankSettingsV8({
               <p className={styles.diffHead}>いまの下書き</p>
               <ul className={styles.diffList}>
                 {drafts.map((row, index) => (
-                  <li key={row.id ?? `draft-${index}`}>{row.name || '（名前なし）'} — {row.threshold || '—'} / {row.rate || '—'}</li>
+                  <li key={row.id ?? `draft-${index}`}>{row.name || '（名前なし）'} — {row.threshold || emptyValue('unknown')} / {row.rate || emptyValue('unknown')}</li>
                 ))}
               </ul>
             </div>

@@ -61,6 +61,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import styles from './list.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type MediaSort = 'newest' | 'oldest' | 'name' | 'size' | 'usage'
 const UNGROUPED = '__ungrouped__'
@@ -970,13 +971,13 @@ export default function MediaLibraryListV8() {
   const folderForbidden = folderFailure != null && classifyApiFailure(folderFailure) === 'forbidden'
 
   /* 数の帯の文言。失敗・未取得は「—」で出し、偽ゼロを置かない。 */
-  const kpiTotalText = !listKnown || loadFailed ? '—' : formatNumber(overallTotal ?? total)
+  const kpiTotalText = !listKnown || loadFailed ? emptyValue('unknown') : formatNumber(overallTotal ?? total)
   const kindBreakdown = KINDS
     .map((kind) => (kpis.kindTotals[kind.key] == null ? null : `${kind.label}${formatNumber(kpis.kindTotals[kind.key] as number)}`))
     .filter((text): text is string => text !== null)
     .join('・')
-  const unusedText = kpis.unusedTotal == null ? '—' : formatNumber(kpis.unusedTotal)
-  const archivedText = kpis.archivedTotal == null ? '—' : formatNumber(kpis.archivedTotal)
+  const unusedText = kpis.unusedTotal == null ? emptyValue('unknown') : formatNumber(kpis.unusedTotal)
+  const archivedText = kpis.archivedTotal == null ? emptyValue('unknown') : formatNumber(kpis.archivedTotal)
   const quotaPercent = quota && quota.limitBytes > 0
     ? Math.round((quota.usageBytes / quota.limitBytes) * 100)
     : null

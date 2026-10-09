@@ -35,6 +35,7 @@ import { FriendPlanDialog } from '@/components/scenarios/scenario-dialogs'
 import { shortDateTime } from '@/lib/hq-banners'
 import { formatNumber } from '@/lib/format'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -275,8 +276,8 @@ export default function ScenarioResultsV8() {
       ...sortedSteps.map((step) => {
         const result = statsByOrder.get(step.stepOrder)
         return [
-          `${step.stepOrder}通目`, scheduleLabel(step), result?.reachedCount ?? '—',
-          result ? percentLabel(result.reachedCount, stats.enrolledTotal) : '—', '—', '—',
+          `${step.stepOrder}通目`, scheduleLabel(step), result?.reachedCount ?? emptyValue('unknown'),
+          result ? percentLabel(result.reachedCount, stats.enrolledTotal) : emptyValue('unknown'), '—', '—',
         ]
       }),
     ]
@@ -482,7 +483,7 @@ export default function ScenarioResultsV8() {
               <p className={styles.kpiValue}>
                 {(runs?.steps ?? []).some((s) => s.failed.state === 'available')
                   ? formatNumber(failedTotal)
-                  : '—'}
+                  : emptyValue('unknown')}
                 <span className={styles.kpiUnit}>人</span>
               </p>
               <p className={styles.kpiDetail}>
@@ -494,7 +495,7 @@ export default function ScenarioResultsV8() {
             <div className={styles.kpi}>
               <p className={styles.kpiLabel}>進んでいる途中</p>
               <p className={styles.kpiValue}>
-                {inProgress === null ? '—' : formatNumber(inProgress)}
+                {inProgress === null ? emptyValue('unknown') : formatNumber(inProgress)}
                 <span className={styles.kpiUnit}>人</span>
               </p>
               <p className={styles.kpiDetail}>
@@ -504,7 +505,7 @@ export default function ScenarioResultsV8() {
             <div className={styles.kpi}>
               <p className={styles.kpiLabel}>全部終わった</p>
               <p className={styles.kpiValue}>
-                {completedCount === null ? '—' : formatNumber(completedCount)}
+                {completedCount === null ? emptyValue('unknown') : formatNumber(completedCount)}
                 <span className={styles.kpiUnit}>人</span>
               </p>
               <p className={styles.kpiDetail}>
@@ -547,17 +548,17 @@ export default function ScenarioResultsV8() {
                           />
                         </span>
                         <span className={styles.stepReachText}>
-                          {reached === undefined || reached === null ? '—' : `${formatNumber(reached)}人到達`}
+                          {reached === undefined || reached === null ? emptyValue('unknown') : `${formatNumber(reached)}人到達`}
                           {reachPct !== null ? `（${percentLabel(reached ?? 0, stats.enrolledTotal)}）` : ''}
                         </span>
                       </span>
                       <span className={styles.stepMeta}>
-                        開封 {run?.opened.value ?? '—'}
-                        {'　クリック '}{run?.clicked.value ?? '—'}
+                        開封 {run?.opened.value ?? emptyValue('unknown')}
+                        {'　クリック '}{run?.clicked.value ?? emptyValue('unknown')}
                         {'　失敗 '}
                         {run?.failed.state === 'available' && run.failed.value !== null
                           ? formatNumber(run.failed.value)
-                          : '—'}
+                          : emptyValue('unknown')}
                       </span>
                     </li>
                   )
@@ -673,8 +674,8 @@ export default function ScenarioResultsV8() {
                           </Td>
                           <Td className="whitespace-nowrap">
                             {sub.status === 'completed'
-                              ? '—'
-                              : sub.nextDeliveryAt ? shortDateTime(sub.nextDeliveryAt) : '—'}
+                              ? emptyValue('unknown')
+                              : sub.nextDeliveryAt ? shortDateTime(sub.nextDeliveryAt) : emptyValue('unknown')}
                           </Td>
                           <ActionCell>
                             {/* #641: 主操作は枠つき「予定を見る」、購読操作は「その他（…）」へ集約。 */}

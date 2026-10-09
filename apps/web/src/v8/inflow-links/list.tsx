@@ -80,6 +80,7 @@ import {
 } from './rows'
 import styles from './list.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 interface MessageTemplate {
   id: string
@@ -326,7 +327,7 @@ export default function InflowListV8({
           ])))
           setPoolMemberNames(Object.fromEntries(batch.data.map(({ poolId, accounts }) => [
             poolId,
-            accounts.filter((account) => account.isActive).map((account) => account.accountName ?? '—'),
+            accounts.filter((account) => account.isActive).map((account) => account.accountName ?? emptyValue('unknown')),
           ])))
         }
       }
@@ -747,7 +748,7 @@ export default function InflowListV8({
                               : '受付を止めています。このURLを開いても友だち追加できません。'}
                         >
                           <span className={styles.pillDot} aria-hidden="true" />
-                          {status === 'measured' ? '計測済' : status === 'unregistered' ? '未登録' : '停止中'}
+                          {status === 'measured' ? '計測済' : status === 'unregistered' ? emptyValue('unconfigured') : '停止中'}
                         </span>
                       ) : null}
                     </Td>
@@ -755,9 +756,9 @@ export default function InflowListV8({
                       {pool ? (
                         <span className={styles.cellMain} title={pool.name}>{pool.name}</span>
                       ) : r.source === 'tracked_link' ? (
-                        <span className={styles.cellMain} title="追加先の振り分けは全体設定に従います。">—</span>
+                        <span className={styles.cellMain} title="追加先の振り分けは全体設定に従います。">{emptyValue('unknown')}</span>
                       ) : (
-                        <span className={styles.cellMain} title="追加先が設定されていません。">未設定</span>
+                        <span className={styles.cellMain} title="追加先が設定されていません。">{emptyValue('unconfigured')}</span>
                       )}
                     </Td>
                     <Td className={styles.colBecame}>
@@ -771,14 +772,14 @@ export default function InflowListV8({
                           <span className={styles.cellSub}>{`累計 ${formatNumber(r.stats.friendCount)}人`}</span>
                         </>
                       ) : (
-                        <span className={styles.cellMain}>—</span>
+                        <span className={styles.cellMain}>{emptyValue('unknown')}</span>
                       )}
                     </Td>
                     <Td className={styles.colClicks}>
-                      <span className={styles.cellMain}>{summaryAvailable && r.stats ? formatNumber(r.stats.clickCount) : '—'}</span>
+                      <span className={styles.cellMain}>{summaryAvailable && r.stats ? formatNumber(r.stats.clickCount) : emptyValue('unknown')}</span>
                     </Td>
                     <Td className={styles.colLatest}>
-                      <span className={styles.cellMain}>{summaryAvailable ? formatLatest(r.stats?.latestAt) : '—'}</span>
+                      <span className={styles.cellMain}>{summaryAvailable ? formatLatest(r.stats?.latestAt) : emptyValue('unknown')}</span>
                     </Td>
                     <Td className={styles.colUrl}>
                       <div className={styles.opsBox}>
@@ -807,7 +808,7 @@ export default function InflowListV8({
                           </Button>
                         ) : r.source === 'tracked_link' ? (
                           // tracked_links は別管理（画面に編集の口が無い）。昇格登録は上書きになるので出さない。
-                          <span className={styles.cellMain} title="この経路は別の仕組み（クリック計測）で管理しています">—</span>
+                          <span className={styles.cellMain} title="この経路は別の仕組み（クリック計測）で管理しています">{emptyValue('unknown')}</span>
                         ) : (
                           <Button
                             onClick={() => setEditing({ register: r.refCode })}

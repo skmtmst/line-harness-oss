@@ -37,6 +37,7 @@ import { dayLabel, formatTime, joinTableCodes, sanName, slotTimeLabel, tableOrde
 import type { RestaurantChannel } from './channels'
 import styles from './inventory.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Alloc = { ota: number; line: number; walkin: number }
 type Hours = RestaurantOpeningDay[]
@@ -460,7 +461,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
                         </svg>
                       </Td>
                       <Td className={`${styles.colSeats} ${styles.strong}`} align="right">{`${slot.seats}席`}</Td>
-                      <Td className={styles.tablesCell}><span title={joinTableCodes(slot.tables)}>{joinTableCodes(slot.tables) || '—'}</span></Td>
+                      <Td className={styles.tablesCell}><span title={joinTableCodes(slot.tables)}>{joinTableCodes(slot.tables) || emptyValue('unknown')}</span></Td>
                       <Td className={`${styles.colFree} ${styles.bold}`} align="right"><span className={lowSlot(slot) ? styles.freeLow : undefined}>{`${slot.free}席`}</span></Td>
                     </Tr>
                   ))}

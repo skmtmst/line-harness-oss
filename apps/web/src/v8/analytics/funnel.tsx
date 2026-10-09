@@ -29,6 +29,7 @@ import styles from './analytics.module.css'
 import { useReportPeriod } from '@/components/shared/period-picker'
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type FunnelStatus = 'active' | 'stopped' | 'archived'
 type FunnelSummary = { id: string; name: string; windowDays: number; createdAt: string; status: FunnelStatus; currentVersion: { id: string; versionNumber: number; createdAt: string } | null; migrationState: 'ready' | 'needs_migration' }
@@ -286,9 +287,9 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
 
   return <>
     {funnels.length > 0 ? <KpiBand className={styles.band}>
-      <KpiCard presentation="band" title="入口" icon={<LogIn size={13} aria-hidden="true" />} menu={menu('入口')} value={overall?.entry ?? null} unit="人" detail={measurable ? (overall?.entryLabel ?? '—') : run ? '判定不能' : '—'} />
-      <KpiCard presentation="band" title="最後まで" icon={<Flag size={13} aria-hidden="true" />} menu={menu('最後まで')} value={overall?.last ?? null} unit="人" detail={measurable ? (overall?.rate != null ? `入口の ${overall.rate}%` : '—') : run ? '判定不能' : '—'} />
-      <KpiCard presentation="band" title="いちばん落ちる段" icon={<ArrowDownRight size={13} aria-hidden="true" />} menu={menu('いちばん落ちる段')} value={worst ? -Math.round(worst.rate * 100) : null} unit="%" detail={worst && result ? `${result[worst.index - 1].label} → ${result[worst.index].label}` : run && !measurable ? '判定不能' : '—'} />
+      <KpiCard presentation="band" title="入口" icon={<LogIn size={13} aria-hidden="true" />} menu={menu('入口')} value={overall?.entry ?? null} unit="人" detail={measurable ? (overall?.entryLabel ?? emptyValue('unknown')) : run ? '判定不能' : emptyValue('unknown')} />
+      <KpiCard presentation="band" title="最後まで" icon={<Flag size={13} aria-hidden="true" />} menu={menu('最後まで')} value={overall?.last ?? null} unit="人" detail={measurable ? (overall?.rate != null ? `入口の ${overall.rate}%` : emptyValue('unknown')) : run ? '判定不能' : emptyValue('unknown')} />
+      <KpiCard presentation="band" title="いちばん落ちる段" icon={<ArrowDownRight size={13} aria-hidden="true" />} menu={menu('いちばん落ちる段')} value={worst ? -Math.round(worst.rate * 100) : null} unit="%" detail={worst && result ? `${result[worst.index - 1].label} → ${result[worst.index].label}` : run && !measurable ? '判定不能' : emptyValue('unknown')} />
       {/* 段ごとの到達日時を持っていない（集計は「通ったか」だけを見る）。 */}
       <KpiCard presentation="band" title="平均の到達日数" icon={<CalendarClock size={13} aria-hidden="true" />} menu={menu('平均の到達日数')} value={null} unit="日" detail="到達日時が無く未取得" />
     </KpiBand> : null}
@@ -332,7 +333,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
               <FunnelChart label="全体の流れ" disabled={!measurable} selectedKey={String(shownPick)} onSelect={key=>setPicked(Number(key))} items={result.map((step,i)=>{
                 const previous=i>0?result[i-1]:null
                 const dropRate=previous && previous.reached>0?previous.droppedAfter/previous.reached*100:null
-                return {key:String(i),label:step.label,value:measurable?step.reached:null,note:previous?`止まった ${previous.droppedAfter}人・進行中 ${previous.inProgressAfter}人`:undefined,detail:<span>{measurable && dropRate!==null?`−${dropRate.toFixed(0)}%`:'—'}</span>}
+                return {key:String(i),label:step.label,value:measurable?step.reached:null,note:previous?`止まった ${previous.droppedAfter}人・進行中 ${previous.inProgressAfter}人`:undefined,detail:<span>{measurable && dropRate!==null?`−${dropRate.toFixed(0)}%`:emptyValue('unknown')}</span>}
               })} />
             </section>
             <aside className={styles.funnelSide} aria-labelledby="funnel-picked-title">
@@ -352,9 +353,9 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
                 {run.groups.map((group) => {
                   const rate = measurable && group.entrants > 0 ? group.completed / group.entrants * 100 : null
                   const lowest = measurable && run.groups.every((other) => other.entrants === 0 || other.completed / other.entrants * 100 >= (rate ?? 0))
-                  return <div key={group.key} className={styles.compareRow}><span className={styles.flowLabel} data-size="row">{group.label}</span><span className={styles.spacer} /><strong data-tone={lowest && run.groups.length > 1 ? 'warn' : undefined}>{`通過率 ${rate === null ? '—' : `${Math.round(rate)}%`}`}</strong></div>
+                  return <div key={group.key} className={styles.compareRow}><span className={styles.flowLabel} data-size="row">{group.label}</span><span className={styles.spacer} /><strong data-tone={lowest && run.groups.length > 1 ? 'warn' : undefined}>{`通過率 ${rate === null ? emptyValue('unknown') : `${Math.round(rate)}%`}`}</strong></div>
                 })}
-                <p className={styles.caption}>{`比較で差が大きい段 ${comparisonGap === null ? '—' : `${comparisonGap}pt`}`}</p>
+                <p className={styles.caption}>{`比較で差が大きい段 ${comparisonGap === null ? emptyValue('unknown') : `${comparisonGap}pt`}`}</p>
               </> : null}
             </aside>
           </div> : null}

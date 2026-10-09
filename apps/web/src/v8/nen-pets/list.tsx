@@ -28,6 +28,7 @@ import {
 import PetEditorV8 from './editor'
 import { NEUTERED_LABEL, Pill, RowMenu, feedingLines, monthDay, rangeText, type PetsQuery } from './parts'
 import styles from './pets.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 const PAGE_SIZES = [10, 20, 50]
@@ -204,7 +205,7 @@ function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; on
     /* マイページの更新を頼む送信の口は無いので、受信箱でこの飼い主とのトークを開いて頼む。 */
     { id: 'nudge', label: 'マイページで更新を促す', external: true, onSelect: () => { router.push(`/chats?friend=${encodeURIComponent(pet.owner.friendId)}`) } },
   ]
-  const updated = pet.weightKg == null ? '—' : monthDay(pet.weightUpdatedAt)
+  const updated = pet.weightKg == null ? emptyValue('unknown') : monthDay(pet.weightUpdatedAt)
   return (
     <Tr className={styles.row} data-table-layout="columns">
       <Td className={styles.colPet}>
@@ -231,7 +232,7 @@ function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; on
         </span>
       </Td>
       <Td className={styles.colAge}><span className={styles.cell}>{pet.ageLabel}</span></Td>
-      <Td className={styles.colWeight}><span className={styles.num}>{pet.weightKg == null ? '—' : `${pet.weightKg}kg`}</span></Td>
+      <Td className={styles.colWeight}><span className={styles.num}>{pet.weightKg == null ? emptyValue('unknown') : `${pet.weightKg}kg`}</span></Td>
       <Td className={styles.colFeed}>
         <span className={styles.stack}>
           <span className={feed.main === '—' ? styles.cell : styles.cellStrong}>{feed.main}</span>

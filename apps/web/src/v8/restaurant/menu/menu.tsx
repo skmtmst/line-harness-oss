@@ -23,6 +23,7 @@ import { restaurantTestApi, type RestaurantMenuItem } from '@/lib/restaurant-tes
 import RestaurantShell, { Panel, Stat, StatRow, Status, type RestaurantV8Context } from '../booking-kit/shell'
 import { DialogField, DialogNote, RowMore, RsDialog } from '../booking-kit/parts'
 import styles from './menu.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export function safeArray(value: string): string[] {
   try {
@@ -34,7 +35,7 @@ export function safeArray(value: string): string[] {
 }
 
 function periodLabel(periods: string[]): string {
-  return periods.map((period) => (period === 'lunch' ? 'ランチ' : 'ディナー')).join('・') || '—'
+  return periods.map((period) => (period === 'lunch' ? 'ランチ' : 'ディナー')).join('・') || emptyValue('unknown')
 }
 
 type Period = 'lunch' | 'dinner' | 'both'
@@ -168,8 +169,8 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
                   <Td className={styles.td}>{item.kind === 'course' ? 'コース' : '単品'}</Td>
                   <Td className={`${styles.td} ${styles.colPrice}`} align="right">{formatYen(item.price)}</Td>
                   <Td className={styles.td}>{periodLabel(safeArray(item.service_periods_json))}</Td>
-                  <Td className={styles.td}>{item.duration_minutes ? `${item.duration_minutes}分` : '—'}</Td>
-                  <Td className={styles.td}><span className={styles.clip} title={allergens.join('・') || 'なし'}>{allergens.join('・') || 'なし'}</span></Td>
+                  <Td className={styles.td}>{item.duration_minutes ? `${item.duration_minutes}分` : emptyValue('unknown')}</Td>
+                  <Td className={styles.td}><span className={styles.clip} title={allergens.join('・') || emptyValue('none')}>{allergens.join('・') || emptyValue('none')}</span></Td>
                   <Td className={styles.td}>
                     {pending ? (
                       <span title={`新価格 ${formatYen(item.pendingPrice ?? 0)}${item.pendingEffectiveAt ? `・${new Date(item.pendingEffectiveAt).toLocaleString('ja-JP')}から` : ''}`}>

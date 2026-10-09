@@ -24,6 +24,7 @@ import { restaurantGoogleApi, type GoogleConnectionData } from '@/lib/restaurant
 import { api } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import styles from './sns.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const GOOGLE_STATE: Record<string, string> = {
   connected: '接続しています',
@@ -176,8 +177,8 @@ export default function SnsSettingsPage() {
             <ListState kind="loading" />
           ) : (
             <>
-              <Row label="いまの状態" value={GOOGLE_STATE[google.connection.status] ?? '—'} />
-              <Row label="接続しているビジネス" value={google.connection.locationTitle ?? '—'} />
+              <Row label="いまの状態" value={GOOGLE_STATE[google.connection.status] ?? emptyValue('unknown')} />
+              <Row label="接続しているビジネス" value={google.connection.locationTitle ?? emptyValue('unknown')} />
               <div className={styles.actions}>
                 <Button variant="secondary" href="/restaurant-test/google?tab=settings">
                   <Settings size={15} />
@@ -212,7 +213,7 @@ export default function SnsSettingsPage() {
                 <>
                   <Row
                     label="接続しているアカウント"
-                    value={igConnection.username ? `@${igConnection.username}（ビジネス）` : igConnection.pageName || '—'}
+                    value={igConnection.username ? `@${igConnection.username}（ビジネス）` : igConnection.pageName || emptyValue('unknown')}
                   />
                   <Row label="できること" value="写真つき投稿の同時公開" />
                 </>

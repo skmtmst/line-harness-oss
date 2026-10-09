@@ -51,6 +51,7 @@ import { BonusDialog, MultiplierDialog, PhotoDialog, PinDialog, RankDialog, Reas
 import styles from './visit-stamps.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type PaperRow = { id: string; card_id?: string; friend_id: string; photo_url: string; stamps: number; status: string; created_at?: string }
 type FriendLite = { id: string; displayName?: string | null; metadata?: Record<string, unknown> | null }
@@ -629,7 +630,7 @@ function VisitStampsScreen() {
                                   </span>
                                 </Td>
                                 <Td className={styles.colStamps}><span className={styles.strong}>{row.stamps} 個</span></Td>
-                                <Td className={styles.colDate}><span className={styles.muted}>{row.created_at ? shortDateTime(row.created_at) : '—'}</span></Td>
+                                <Td className={styles.colDate}><span className={styles.muted}>{row.created_at ? shortDateTime(row.created_at) : emptyValue('unknown')}</span></Td>
                                 <Td className={styles.colState}>
                                   <span className={styles.actions}>
                                     <StatusBadge tone={row.status === 'approved' ? 'success' : row.status === 'rejected' ? 'neutral' : 'warning'}>

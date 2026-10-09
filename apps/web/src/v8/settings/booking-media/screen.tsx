@@ -40,6 +40,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './screen.module.css'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export type MediaRow = {
   code: string
@@ -126,7 +127,7 @@ export function withSavedVersion(list: MediaRow[], code: string, version: number
 }
 
 function UrlCell({ url }: { url: string | null }) {
-  if (!url) return <span className={styles.none}>—</span>
+  if (!url) return <span className={styles.none}>{emptyValue('unknown')}</span>
   return (
     <TextLink external className={styles.url} href={url}   title={url}>
       {`${shortUrl(url)}`}

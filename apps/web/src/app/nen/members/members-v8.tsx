@@ -55,6 +55,7 @@ import {
 import type { LoadStatus, MemberTab } from './page'
 import { RankChip, yen } from './rank-view'
 import styles from './members-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -200,10 +201,10 @@ export function MembersKpiBand({
   const pending = loading || !kpis
   return (
     <section className={styles.kpiBand} aria-label="会員の数の帯">
-      {cell(<Users size={14} />, '会員', pending ? '—' : formatNumber(kpis!.members), pending ? null : '人', pending ? ' ' : `LINE 連携済み ${formatNumber(kpis!.linkedMembers ?? 0)}`)}
-      {cell(<ShoppingBag size={14} />, topTwoLabel, pending || topTwo.length === 0 ? '—' : formatNumber(topTwoCount ?? 0), pending || topTwo.length === 0 ? null : '人', topTwo[1] ? `今年の購入 ${yen(topTwo[1].annualThresholdYen)} 以上` : ' ')}
-      {cell(<PawPrint size={14} />, 'ペット登録あり', pending ? '—' : formatNumber(kpis!.petMembers ?? 0), pending ? null : '人', pending || petPercent === null ? ' ' : `会員の ${petPercent}%`)}
-      {cell(<Link2 size={14} />, '今月の購入', pending ? '—' : yen(kpis!.monthPurchaseYen ?? 0), null, pending ? ' ' : `会員 ${formatNumber(kpis!.monthBuyers ?? 0)} 人`)}
+      {cell(<Users size={14} />, '会員', pending ? emptyValue('unknown') : formatNumber(kpis!.members), pending ? null : '人', pending ? ' ' : `LINE 連携済み ${formatNumber(kpis!.linkedMembers ?? 0)}`)}
+      {cell(<ShoppingBag size={14} />, topTwoLabel, pending || topTwo.length === 0 ? emptyValue('unknown') : formatNumber(topTwoCount ?? 0), pending || topTwo.length === 0 ? null : '人', topTwo[1] ? `今年の購入 ${yen(topTwo[1].annualThresholdYen)} 以上` : ' ')}
+      {cell(<PawPrint size={14} />, 'ペット登録あり', pending ? emptyValue('unknown') : formatNumber(kpis!.petMembers ?? 0), pending ? null : '人', pending || petPercent === null ? ' ' : `会員の ${petPercent}%`)}
+      {cell(<Link2 size={14} />, '今月の購入', pending ? emptyValue('unknown') : yen(kpis!.monthPurchaseYen ?? 0), null, pending ? ' ' : `会員 ${formatNumber(kpis!.monthBuyers ?? 0)} 人`)}
     </section>
   )
 }
@@ -520,11 +521,11 @@ function MemberRowV8({
       <Td align="right" className="w-24"><span className="text-label tabular-nums text-ink">{formatNumber(member.mileBalance)}</span></Td>
       <Td>
         <span className="block truncate text-label text-ink-secondary" title={member.petNames ?? ''}>
-          {member.petNames ? `${member.petNames}${member.petCount > 2 ? ` ほか${member.petCount - 2}頭` : ''}` : '—'}
+          {member.petNames ? `${member.petNames}${member.petCount > 2 ? ` ほか${member.petCount - 2}頭` : ''}` : emptyValue('unknown')}
         </span>
       </Td>
-      <Td className="cq-hide-below-1010 w-20"><span className="text-label text-ink-secondary">{member.lastPurchasedAt ? member.lastPurchasedAt.slice(5, 10).replace('-', '/') : '—'}</span></Td>
-      <Td className="cq-hide-below-1010 w-20" align="right"><span className="text-label font-semibold tabular-nums text-ink">{member.mileRatePercent == null ? '—' : `${member.mileRatePercent}%`}</span></Td>
+      <Td className="cq-hide-below-1010 w-20"><span className="text-label text-ink-secondary">{member.lastPurchasedAt ? member.lastPurchasedAt.slice(5, 10).replace('-', '/') : emptyValue('unknown')}</span></Td>
+      <Td className="cq-hide-below-1010 w-20" align="right"><span className="text-label font-semibold tabular-nums text-ink">{member.mileRatePercent == null ? emptyValue('unknown') : `${member.mileRatePercent}%`}</span></Td>
       <Td align="right" className="w-14">
         {/*
           板の行の「…」：会員の詳細（＝友だち詳細の会員の区画）・友だちを開く・ECで開く。
@@ -817,7 +818,7 @@ export function RankSettingsTabV8({
                         </Td>
                         <Td>
                           <span className="block truncate text-label text-ink-secondary" title={row.tagName ?? ''}>
-                            {row.tagName ?? (row.name.trim() ? `[会員] ランク：${row.name.trim()}（保存すると作られます）` : '—')}
+                            {row.tagName ?? (row.name.trim() ? `[会員] ランク：${row.name.trim()}（保存すると作られます）` : emptyValue('unknown'))}
                           </span>
                         </Td>
                         <Td align="right" className="cq-hide-below-1010 w-20"><span className="text-label font-semibold tabular-nums text-ink">{formatNumber(row.memberCount)}人</span></Td>
@@ -918,7 +919,7 @@ export function RankSettingsTabV8({
         {conflict ? (
           <div className={styles.diffGrid}>
             <div>
-              <p className={styles.diffHead}>最新（{conflict.latest.rules ? formatJstShortDateTime(conflict.latest.rules.updatedAt) : '—'}）</p>
+              <p className={styles.diffHead}>最新（{conflict.latest.rules ? formatJstShortDateTime(conflict.latest.rules.updatedAt) : emptyValue('unknown')}）</p>
               <ul className={styles.diffList}>
                 {conflict.latest.ranks.map((rank) => (
                   <li key={rank.id}>{rank.name} — {yen(rank.annualThresholdYen)}〜 / {rank.mileRatePercent}%</li>
@@ -929,7 +930,7 @@ export function RankSettingsTabV8({
               <p className={styles.diffHead}>いまの下書き</p>
               <ul className={styles.diffList}>
                 {drafts.map((row, index) => (
-                  <li key={row.id ?? `draft-${index}`}>{row.name || '（名前なし）'} — {yen(Number(row.threshold.replace(/[,，]/g, '')) || 0)}〜 / {row.rate || '—'}%</li>
+                  <li key={row.id ?? `draft-${index}`}>{row.name || '（名前なし）'} — {yen(Number(row.threshold.replace(/[,，]/g, '')) || 0)}〜 / {row.rate || emptyValue('unknown')}%</li>
                 ))}
               </ul>
             </div>

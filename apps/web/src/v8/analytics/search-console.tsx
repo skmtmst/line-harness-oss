@@ -27,6 +27,7 @@ import { KpiMenu, StatePill, shortDay } from './common'
 import styles from './analytics.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const RANGES = [7, 28, 90] as const
 type RangeDays = typeof RANGES[number]
@@ -60,8 +61,8 @@ function SetupCard({ setup, denied }: { setup: SearchConsoleSetup | null; denied
   return <section className={styles.flowCard} data-w="full" aria-labelledby="sc-setup-title">
     <h2 id="sc-setup-title" className={styles.hoursTitle}>{denied ? '閲覧権限の確認が必要です' : 'Search Consoleとつなぐ設定'}</h2>
     <p className={styles.observation}>Search Consoleで対象プロパティを開き、サービスアカウントを「制限付きユーザー」として追加すると、検索データを読み取り専用で表示できます。</p>
-    <div className={styles.compareRow}><span className={styles.flowLabel} data-size="row">対象プロパティ</span><span className={styles.spacer} /><strong title={setup?.siteUrl ?? ''}>{setup?.siteUrl ?? '未設定'}</strong></div>
-    <div className={styles.compareRow}><span className={styles.flowLabel} data-size="row">追加するアカウント</span><span className={styles.spacer} /><strong title={setup?.serviceAccountEmail ?? ''}>{setup?.serviceAccountEmail ?? '未設定'}</strong></div>
+    <div className={styles.compareRow}><span className={styles.flowLabel} data-size="row">対象プロパティ</span><span className={styles.spacer} /><strong title={setup?.siteUrl ?? ''}>{setup?.siteUrl ?? emptyValue('unconfigured')}</strong></div>
+    <div className={styles.compareRow}><span className={styles.flowLabel} data-size="row">追加するアカウント</span><span className={styles.spacer} /><strong title={setup?.serviceAccountEmail ?? ''}>{setup?.serviceAccountEmail ?? emptyValue('unconfigured')}</strong></div>
   </section>
 }
 

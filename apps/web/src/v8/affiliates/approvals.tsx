@@ -54,6 +54,7 @@ import {
 } from './parts'
 import styles from './affiliates.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 type BulkOutcome = 'approved' | 'rejected'
@@ -298,8 +299,8 @@ export default function ApprovalsTab() {
         personName(item.friendName),
         item.affiliateName ?? '名前を読み込めませんでした',
         item.lineAccountName ?? 'アカウント未設定',
-        item.offerName ?? '未設定',
-        item.conversionPointName ?? '未設定',
+        item.offerName ?? emptyValue('unconfigured'),
+        item.conversionPointName ?? emptyValue('unconfigured'),
         item.orderNumber ?? '',
         item.value ?? '',
         approvalReviewReasons(item).join('・') || '問題なし',

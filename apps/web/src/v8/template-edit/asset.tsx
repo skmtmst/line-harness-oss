@@ -43,6 +43,7 @@ import { useFormErrors } from '@/lib/use-form-errors'
 import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
 import styles from './edit.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export type AssetKind = 'coupon' | 'research'
 
@@ -102,7 +103,7 @@ function shortDate(value: string): string {
 }
 
 export function couponPeriodLine(startsAt: string, endsAt: string, once: boolean): string {
-  const period = startsAt || endsAt ? `${shortDate(startsAt) || '未設定'}〜${shortDate(endsAt) || '未設定'}` : '期間 未設定'
+  const period = startsAt || endsAt ? `${shortDate(startsAt) || emptyValue('unconfigured')}〜${shortDate(endsAt) || emptyValue('unconfigured')}` : '期間 未設定'
   return `${period}・${once ? '1人1回' : '何回でも'}`
 }
 
@@ -337,9 +338,9 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
     <section className={styles.sideCard}>
       <h2 className={styles.sideTitle}>公開したあとに見られる数</h2>
       <dl className={styles.statList}>
-        <div className={styles.statRow}><dt>配った数</dt><dd>—</dd></div>
-        <div className={styles.statRow}><dt>使われた数</dt><dd>—</dd></div>
-        <div className={styles.statRow}><dt>当選した数</dt><dd>{lottery ? '—' : '抽選なし'}</dd></div>
+        <div className={styles.statRow}><dt>配った数</dt><dd>{emptyValue('unknown')}</dd></div>
+        <div className={styles.statRow}><dt>使われた数</dt><dd>{emptyValue('unknown')}</dd></div>
+        <div className={styles.statRow}><dt>当選した数</dt><dd>{lottery ? emptyValue('unknown') : '抽選なし'}</dd></div>
       </dl>
     </section>
   ) : (

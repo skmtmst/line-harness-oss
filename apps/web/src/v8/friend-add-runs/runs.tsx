@@ -43,6 +43,7 @@ import { useCursorStack } from '@/v8/friend-add/use-cursor-stack'
 import { csvCell, elapsedText, formatJstDateTime, jstTime, routingAction, routingLabel } from './status'
 import styles from './runs.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type KindFilter = 'all' | FriendAddEventKind
 type AttributionFilter = 'all' | FriendAddEventAttributionStatus
@@ -463,7 +464,7 @@ function FriendAddRunsInner() {
       <div className={styles.kpis}>
         <KpiBand data-design="KPIs">
           <KpiCard presentation="band" icon={null} title="直近28日の友だち追加" value={summary ? summary.recentFriends ?? null : null} unit="人"
-            detail={`追加の記録 ${summary?.recentEvents == null ? '—' : formatNumber(summary.recentEvents)}件`} />
+            detail={`追加の記録 ${summary?.recentEvents == null ? emptyValue('unknown') : formatNumber(summary.recentEvents)}件`} />
           <KpiCard presentation="band" icon={null} title="送った案内" value={summary ? summary.cumulativeDeliveries : null} unit="通" detail={successRate} />
           <KpiCard presentation="band" icon={null} title="失敗した処理" value={summary ? summary.failed : null} unit="通"
             detail={failedCount > 0 ? '理由を見て、もう一度実行できます' : '記録を始めてからの合計です'} />
@@ -613,15 +614,15 @@ function FriendAddRunsInner() {
           <dl className={styles.kv}>
             <div className={styles.kvRow}>
               <dt>二重送信を防ぐ</dt>
-              <dd>{!ruleState || ruleState.resendSuppressionHours === null ? '—' : ruleState.resendSuppressionHours > 0 ? '有効' : '無効'}</dd>
+              <dd>{!ruleState || ruleState.resendSuppressionHours === null ? emptyValue('unknown') : ruleState.resendSuppressionHours > 0 ? '有効' : '無効'}</dd>
             </div>
             <div className={styles.kvRow}>
               <dt>失敗の知らせ</dt>
-              <dd>—</dd>
+              <dd>{emptyValue('unknown')}</dd>
             </div>
             <div className={styles.kvRow}>
               <dt>最後に送った</dt>
-              <dd title={summary?.lastDeliveryAt ? formatJstDateTime(summary.lastDeliveryAt) : undefined}>{summary?.lastDeliveryAt ? jstTime(summary.lastDeliveryAt) : '—'}</dd>
+              <dd title={summary?.lastDeliveryAt ? formatJstDateTime(summary.lastDeliveryAt) : undefined}>{summary?.lastDeliveryAt ? jstTime(summary.lastDeliveryAt) : emptyValue('unknown')}</dd>
             </div>
           </dl>
           <div className={styles.boxFoot}>

@@ -61,6 +61,7 @@ import SheetDialog from './sheet-dialog'
 import styles from './detail.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const PAGE_SIZE = 20
 /** 書き出しの上限。実行結果が多いとき、手元に全部ため込むと固まる。 */
@@ -105,13 +106,13 @@ function jstParts(value: string | null) {
 /** 「10/1（水）18:00」（日本時間）。 */
 function formatMd(value: string | null): string {
   const p = jstParts(value)
-  return p ? `${p.month}/${p.day}（${p.weekday}）${p.time}` : '—'
+  return p ? `${p.month}/${p.day}（${p.weekday}）${p.time}` : emptyValue('unknown')
 }
 
 /** 「9/30 18:00」（日本時間）。 */
 function formatShort(value: string | null): string {
   const p = jstParts(value)
-  return p ? `${p.month}/${p.day} ${p.time}` : '—'
+  return p ? `${p.month}/${p.day} ${p.time}` : emptyValue('unknown')
 }
 
 /** 「9月28日」（日本時間）。 */
@@ -181,7 +182,7 @@ function csvFor(items: ReminderDeliveryRun[]): string {
       formatJst(item.completedAt ?? item.startedAt),
       item.attemptCount,
       formatJst(item.nextRetryAt),
-      item.lineRequestId ?? '—',
+      item.lineRequestId ?? emptyValue('unknown'),
       item.lastErrorMessage ?? '',
     ]),
   ]
@@ -680,7 +681,7 @@ function OverviewTab({
               <span role="cell" className={styles.colFlex} title={stepLabel(step)}>{stepTiming(step, detailSteps[index], reminder?.deliveryMode)}</span>
               <span role="cell" className={styles.colSent}>{formatNumber(step.sent)}通</span>
               <span role="cell" className={styles.colFail} data-danger={step.errors > 0 || undefined}>{formatNumber(step.errors)}通</span>
-              <span role="cell" className={styles.colNext}>{nextByStep ? formatMd(nextByStep[step.stepNumber] ?? null) : '—'}</span>
+              <span role="cell" className={styles.colNext}>{nextByStep ? formatMd(nextByStep[step.stepNumber] ?? null) : emptyValue('unknown')}</span>
             </div>
           ))}
         </div>

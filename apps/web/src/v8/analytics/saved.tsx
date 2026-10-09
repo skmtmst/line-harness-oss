@@ -23,6 +23,7 @@ import { KpiMenu, StatePill, shortDateTime, shortDay } from './common'
 import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const SAVED_STATE_LABELS: Record<SavedAnalyticsSnapshot['state'], string> = { available: '利用可能', partial: '一部集計', unavailable: '未取得', failed: '失敗' }
 const REPORT_STATUS_LABELS: Record<AnalyticsReportSchedule['status'], string> = { active: '有効', paused: '停止中', archived: 'アーカイブ' }
@@ -65,7 +66,7 @@ function summarizeSnapshotResult(result: unknown, limit = 12): Array<{ path: str
 
 function latestPill(item: SavedAnalyticsSummary) {
   const latest = item.latestSnapshot
-  if (!latest) return <span className={styles.faint}>—</span>
+  if (!latest) return <span className={styles.faint}>{emptyValue('unknown')}</span>
   // 版ずれ（定義が古い）は集計状態とは別の軸。版ずれを先に出す。
   if (latest.definitionStale) return <StatePill tone="info">更新後未集計</StatePill>
   if (latest.state === 'available') return <StatePill tone="ok">最新の期間</StatePill>
@@ -263,7 +264,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
             </div>
           </div>
           <section className={styles.historyCard} aria-labelledby="saved-history-title">
-            <h2 id="saved-history-title" className={styles.hoursTitle} title={selected ? `定期レポート ${schedulesLoading ? '確認中' : schedulesError ? '—' : `${schedules.filter((schedule) => schedule.savedAnalysisIds.includes(selected.id)).length}件`}` : undefined}>{selected ? `選んだ分析の履歴：${selected.name}` : '選んだ分析の履歴'}</h2>
+            <h2 id="saved-history-title" className={styles.hoursTitle} title={selected ? `定期レポート ${schedulesLoading ? '確認中' : schedulesError ? emptyValue('unknown') : `${schedules.filter((schedule) => schedule.savedAnalysisIds.includes(selected.id)).length}件`}` : undefined}>{selected ? `選んだ分析の履歴：${selected.name}` : '選んだ分析の履歴'}</h2>
             {/* 履歴だけ取れないときは、その場所に小さく1行。一覧の失敗とは分ける。 */}
             {snapshotError ? <p className={styles.caption} role="alert">結果の履歴を読み込めませんでした。<button type="button" className={styles.linkButton} onClick={() => setSnapshotReload((n) => n + 1)}>もう一度</button></p> : null}
             {snapshotLoading ? <p className={styles.caption}>結果を読み込んでいます</p>
@@ -313,7 +314,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
           {schedules.map((schedule) => <div key={schedule.id} className={styles.trow} role="row" data-h="button">
             <span role="cell" className={styles.colMain}><span className={styles.cellText} title={schedule.name}>{schedule.name}</span></span>
             <span role="cell" className={styles.colType} data-w="90"><span>{schedule.isOneTime ? '1回だけ' : cadenceLabel(schedule)}</span></span>
-            <span role="cell" className={styles.colType} data-w="130"><span>{schedule.status === 'paused' ? '—' : shortDateTime(schedule.nextRunAt).replace(/ 0(\d):/, ' $1:')}</span></span>
+            <span role="cell" className={styles.colType} data-w="130"><span>{schedule.status === 'paused' ? emptyValue('unknown') : shortDateTime(schedule.nextRunAt).replace(/ 0(\d):/, ' $1:')}</span></span>
             <span role="cell" className={styles.colType} data-w="90"><span><StatePill tone={schedule.status === 'active' ? 'ok' : 'neutral'}>{REPORT_STATUS_LABELS[schedule.status]}</StatePill></span></span>
             <span role="cell" className={styles.colOps}>{canManage ? <span className={styles.rowActions}>
               {schedule.status === 'active' && !schedule.isOneTime ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => void changeScheduleStatus(schedule, 'paused')}>止める</Button> : null}

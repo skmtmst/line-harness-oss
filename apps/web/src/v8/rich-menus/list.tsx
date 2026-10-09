@@ -80,6 +80,7 @@ import { richMenuError, richMenuErrorAll } from './errors'
 import BlockedDeleteDialog, { type BlockedRow } from './blocked-dialog'
 import styles from './list.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** フォルダに入れていないものを選ぶための、内部だけの値。 */
 const UNFILED = '__unfiled__'
@@ -1124,7 +1125,7 @@ export default function RichMenusListV8() {
                         ? `のべ${formatNumber(g.monthlyStats.uniqueAudience.value)}人${g.monthlyStats.uniqueAudience.state === 'partial' ? '（記録開始後）' : ''}`
                         : undefined}
                     >
-                      {taps == null ? '—' : `${formatNumber(taps)}回`}
+                      {taps == null ? emptyValue('unknown') : `${formatNumber(taps)}回`}
                     </Td>
                   <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
                     <div className={styles.menuBox}>
@@ -1342,7 +1343,7 @@ export default function RichMenusListV8() {
             icon={<Trophy size={13} aria-hidden="true" />}
             value={null}
             unit=""
-            valueText={topArea ? topArea.label || '名前のないボタン' : '—'}
+            valueText={topArea ? topArea.label || '名前のないボタン' : emptyValue('unknown')}
             detail={topArea
               ? `${topAreaGroupName ? `${topAreaGroupName}・` : ''}${formatNumber(topArea.taps)}回`
               : tapKpiReady

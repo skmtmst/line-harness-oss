@@ -62,6 +62,7 @@ import { MediaQuotaGuidance } from './media-quota-guidance'
 import MediaReplacementDialog from './media-replacement-dialog'
 import MediaUploadDialog from './media-upload-dialog'
 import styles from './list-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type MediaSort = 'newest' | 'oldest' | 'name' | 'size' | 'usage'
 const UNGROUPED = '__ungrouped__'
@@ -984,13 +985,13 @@ export default function MediaLibraryListV8() {
   const folderForbidden = folderFailure != null && classifyApiFailure(folderFailure) === 'forbidden'
 
   /* 数の帯の文言。失敗・未取得は「—」で出し、偽ゼロを置かない。 */
-  const kpiTotalText = !listKnown || loadFailed ? '—' : formatNumber(overallTotal ?? total)
+  const kpiTotalText = !listKnown || loadFailed ? emptyValue('unknown') : formatNumber(overallTotal ?? total)
   const kindBreakdown = KINDS
     .map((kind) => (kpis.kindTotals[kind.key] == null ? null : `${kind.label}${formatNumber(kpis.kindTotals[kind.key] as number)}`))
     .filter((text): text is string => text !== null)
     .join('・')
-  const unusedText = kpis.unusedTotal == null ? '—' : formatNumber(kpis.unusedTotal)
-  const archivedText = kpis.archivedTotal == null ? '—' : formatNumber(kpis.archivedTotal)
+  const unusedText = kpis.unusedTotal == null ? emptyValue('unknown') : formatNumber(kpis.unusedTotal)
+  const archivedText = kpis.archivedTotal == null ? emptyValue('unknown') : formatNumber(kpis.archivedTotal)
   const quotaPercent = quota && quota.limitBytes > 0
     ? Math.round((quota.usageBytes / quota.limitBytes) * 100)
     : null
@@ -1097,7 +1098,7 @@ export default function MediaLibraryListV8() {
             <span className={styles.kpiLabel}>使っている容量</span>
           </span>
           <span className={styles.kpiValue}>
-            {quota ? formatMediaSize(quota.usageBytes) : '—'}
+            {quota ? formatMediaSize(quota.usageBytes) : emptyValue('unknown')}
           </span>
           <span className={styles.kpiDetail}>
             {quota && quotaPercent != null ? `上限 ${formatMediaSize(quota.limitBytes)} の${quotaPercent}%` : '—（未取得）'}

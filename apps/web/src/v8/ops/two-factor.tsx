@@ -14,6 +14,7 @@ import { logoutAndGoToLogin } from '@/lib/logout'
 import { qrToDataURL } from '@/lib/qr-image'
 import { opsCall } from '@/components/ops/ops-ui'
 import styles from './auth.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Session = { id: string; name: string; platformAdmin?: boolean; platformAdminState?: string | null }
 
@@ -150,7 +151,7 @@ export default function OpsTwoFactorV8() {
               </div>
               <div className={styles.qrSide}>
                 <p className={styles.qrHint}>読み取れないときは、このキーを手で入力</p>
-                <p className={styles.secret}>{manualKey || '—'}</p>
+                <p className={styles.secret}>{manualKey || emptyValue('unknown')}</p>
                 <Button onClick={() => setQrAttempt((n) => n + 1)} disabled={!uri}>
                   <RefreshCw aria-hidden="true" />QRをもう一度表示する
                 </Button>

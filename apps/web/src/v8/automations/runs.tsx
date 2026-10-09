@@ -42,6 +42,7 @@ import {
 import styles from './runs.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type RunStatus = AutomationRunDetail['status']
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
@@ -442,7 +443,7 @@ export default function AutomationRunsV8() {
   ]
 
   /* ===== 道具の段 ===== */
-  const chipCount = (value: number | undefined) => (value === undefined ? '—' : formatNumber(value))
+  const chipCount = (value: number | undefined) => (value === undefined ? emptyValue('unknown') : formatNumber(value))
   const filterChips = (
     <div role="group" aria-label="結果で絞り込む" className={styles.chipGroup}>
       <FilterChip selected={resultFilter === 'executed'} onChange={(next) => toggleResult('executed', next)} icon={<Activity size={13} aria-hidden="true" />}>{`動いた ${chipCount(summary?.executed)}`}</FilterChip>
@@ -532,7 +533,7 @@ export default function AutomationRunsV8() {
                       {reason ? <span className={styles.sub} title={reason}>{reason}</span> : null}
                     </Td>
                     <Td className={styles.colDone}>
-                      <span className={styles.main} title={done.join('・') || run.detail || ''}>{done.length > 0 ? done.join('・') : '—'}</span>
+                      <span className={styles.main} title={done.join('・') || run.detail || ''}>{done.length > 0 ? done.join('・') : emptyValue('unknown')}</span>
                       {done.length > 0 ? <span className={styles.sub}>{`${done.length} つ`}</span> : null}
                     </Td>
                     <Td className={styles.colTime}><span className={styles.main}>{durationText(run.durationMs)}</span></Td>

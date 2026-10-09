@@ -81,6 +81,7 @@ import { BackToReminders, ChoiceCardV8, PhoneV8, ReminderV8Stepper, SummaryCardV
 import styles from './edit.module.css'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import type { InsertTokenSpec } from '@/components/shared/insert-tokens'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** リマインダの本文で札にする差し込み（{{date}} はリマインダでは予約日時）。 */
 const REMINDER_TOKENS: readonly InsertTokenSpec[] = [
@@ -943,7 +944,7 @@ function TargetStageV8({
           <SummaryCardV8
             rows={[
               { key: '基準日', value: reminderTriggerLabel(settings.triggerType) },
-              { key: '対象者', value: matched == null ? '—' : `${formatNumber(matched)}人に送る予定` },
+              { key: '対象者', value: matched == null ? emptyValue('unknown') : `${formatNumber(matched)}人に送る予定` },
               { key: '通知', value: settings.steps.length > 0 ? `${settings.steps.length}通` : '手順3で作る' },
               { key: '状態', value: '下書き' },
             ]}
@@ -1001,11 +1002,11 @@ function TargetStageV8({
         <div className={styles.countBand}>
           <div className={styles.countItem}>
             <span className={styles.countLabel}>当てはまる人</span>
-            <strong className={styles.countValue}>{`${counting ? '…' : total == null ? '—' : formatNumber(total)} 人`}</strong>
+            <strong className={styles.countValue}>{`${counting ? '…' : total == null ? emptyValue('unknown') : formatNumber(total)} 人`}</strong>
           </div>
           <div className={styles.countItem}>
             <span className={styles.countLabel}>送る予定（ブロックを除く）</span>
-            <strong className={styles.countValue}>{`${counting ? '…' : matched == null ? '—' : formatNumber(matched)} 人`}</strong>
+            <strong className={styles.countValue}>{`${counting ? '…' : matched == null ? emptyValue('unknown') : formatNumber(matched)} 人`}</strong>
           </div>
           <span className={styles.spacer} aria-hidden="true" />
           <Button type="button" variant="text" onClick={openFaces} disabled={counting}>
@@ -1493,7 +1494,7 @@ function ScheduleStageV8({
           <SummaryCardV8
             rows={[
               { key: '基準日', value: reminderTriggerLabel(settings.triggerType) },
-              { key: '対象者', value: preview ? countLabel(preview.summary.audience, '人') : '—' },
+              { key: '対象者', value: preview ? countLabel(preview.summary.audience, '人') : emptyValue('unknown') },
               { key: '通知', value: `${settings.steps.length}通` },
               { key: '状態', value: '下書き' },
             ]}
@@ -1689,7 +1690,7 @@ function ConfirmStageV8({
           <SummaryCardV8
             rows={[
               { key: '基準日', value: reminderTriggerLabel(settings.triggerType) },
-              { key: '対象者', value: validation?.audience.matched != null ? `${formatNumber(validation.audience.matched)}人` : '—' },
+              { key: '対象者', value: validation?.audience.matched != null ? `${formatNumber(validation.audience.matched)}人` : emptyValue('unknown') },
               { key: '通知', value: `${settings.steps.length}通` },
               { key: '状態', value: '下書き → 有効にする' },
             ]}

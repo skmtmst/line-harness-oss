@@ -48,6 +48,7 @@ import shell from '../../menus/settings-v8.module.css'
 import styles from './staff-detail-v8.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -1265,7 +1266,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
               </div>
               {calendarId ? (
                 <p className={styles.calendarMeta}>
-                  最後に読んだ {calendarVerifiedAt ? formatDay(calendarVerifiedAt) : '—'}
+                  最後に読んだ {calendarVerifiedAt ? formatDay(calendarVerifiedAt) : emptyValue('unknown')}
                   {calendarError ? <span className={styles.fieldError}>　最新の確認で失敗しています：{calendarError}</span> : null}
                 </p>
               ) : null}

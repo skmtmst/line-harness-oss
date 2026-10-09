@@ -37,6 +37,7 @@ import {
 } from './handover-view'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import styles from './handover-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type HandoverDecisionView = AccountHandoverDecision & {
   sourceName?: string
@@ -581,8 +582,8 @@ export default function HandoverV8() {
         <div className={styles.card}>
           <p className={styles.cardTitle}>事前確認の結果</p>
           <p className={styles.cardNote}>
-            元の友だち {countsAreComplete && handover.counts ? `${handover.counts.sourceTotal}人` : '—'}：
-            {MATCH_BUCKETS.map((bucket) => `${bucket.label} ${countsAreComplete ? `${handover.counts?.[bucket.key]}人` : '—'}`).join('・')}
+            元の友だち {countsAreComplete && handover.counts ? `${handover.counts.sourceTotal}人` : emptyValue('unknown')}：
+            {MATCH_BUCKETS.map((bucket) => `${bucket.label} ${countsAreComplete ? `${handover.counts?.[bucket.key]}人` : emptyValue('unknown')}`).join('・')}
           </p>
           {canManage && (
             <div className="mt-3">
@@ -607,7 +608,7 @@ export default function HandoverV8() {
           )}
           {declaredMismatch && (
             <Notice tone="warn" className="mt-3">
-              <p className="font-bold">申告の数（{handover.declaredFriendTotal}人）と事前確認の合計（{handover.counts?.sourceTotal ?? '—'}人）が違います</p>
+              <p className="font-bold">申告の数（{handover.declaredFriendTotal}人）と事前確認の合計（{handover.counts?.sourceTotal ?? emptyValue('unknown')}人）が違います</p>
               <p className="mt-1">差の理由を確かめてから、件数を直すか事前確認をやり直してください。</p>
             </Notice>
           )}
@@ -615,7 +616,7 @@ export default function HandoverV8() {
       </div>
 
       <div className={styles.card}>
-        <p className={styles.cardTitle}>要確認 {handover.counts?.review ?? '—'}人の判断</p>
+        <p className={styles.cardTitle}>要確認 {handover.counts?.review ?? emptyValue('unknown')}人の判断</p>
         <p className={styles.cardNote}>「要確認」を全部決めるまで本実行できません。決めた内容はあとから見返せます。</p>
         <div className={styles.tableScroll}>
           <table className="w-full min-w-full text-left">
@@ -674,7 +675,7 @@ export default function HandoverV8() {
           </table>
         </div>
         <p className="text-ink-secondary border-hairline border-t px-5 py-3 text-xs">
-          残り {handover.unresolvedReviews ?? '—'}人。名前と画像だけの一致では、自動で同じ人にしません。
+          残り {handover.unresolvedReviews ?? emptyValue('unknown')}人。名前と画像だけの一致では、自動で同じ人にしません。
         </p>
       </div>
 

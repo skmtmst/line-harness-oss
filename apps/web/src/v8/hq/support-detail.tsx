@@ -37,6 +37,7 @@ import { SUPPORT_STATUS_WORDS, supportKindWord, supportTime } from './support-wo
 import styles from './support-detail.module.css'
 import { Field } from '@/components/shared/form-controls'
 import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
 
@@ -265,9 +266,9 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
           <section className={styles.sender} aria-label="送信者">
             <h2 className={styles.senderTitle}>送信者</h2>
             <p className={styles.senderLines} title={hasSenderEmail ? 'この内容が続きに添えられます。返信はこのメールアドレスに届きます。' : 'この内容が続きに添えられます。返信はこの画面のやり取りに届きます。'}>
-              {`名前：${me?.name ?? '—'}`}<br />
-              {`メール：${me?.email ?? '—'}`}<br />
-              {`統括：${tenantName || '—'}`}
+              {`名前：${me?.name ?? emptyValue('unknown')}`}<br />
+              {`メール：${me?.email ?? emptyValue('unknown')}`}<br />
+              {`統括：${tenantName || emptyValue('unknown')}`}
             </p>
           </section>
 

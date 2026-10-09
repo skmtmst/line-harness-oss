@@ -21,6 +21,7 @@ import { downloadCsv, formatAnalyticsDateTime, periodCaption, rangeFor, shownVal
 import styles from './analytics.module.css'
 import { useReportPeriod } from '@/components/shared/period-picker'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Link = AnalyticsUrlClicksOverview['data']['links'][number]
 
@@ -114,13 +115,13 @@ export default function UrlClicksV8({ accountId }: { accountId: string }) {
           : visibleLinks.map((item) => {
             const source = sourceOf(item)
             const actions = [item.actions?.tagName, item.actions?.scenarioName].filter(Boolean).join('・')
-            const when = `最初 ${item.firstClickedAt ? formatAnalyticsDateTime(item.firstClickedAt.value) : '—'} ／ 最後 ${item.lastClickedAt ? formatAnalyticsDateTime(item.lastClickedAt.value) : '—'}`
+            const when = `最初 ${item.firstClickedAt ? formatAnalyticsDateTime(item.firstClickedAt.value) : emptyValue('unknown')} ／ 最後 ${item.lastClickedAt ? formatAnalyticsDateTime(item.lastClickedAt.value) : emptyValue('unknown')}`
             return <div key={item.trackedLinkId} className={styles.trow} role="row" data-h="two">
               <span role="cell" className={styles.colMain} title={when}><strong className={styles.cellStrong}>{item.name}</strong><span className={styles.cellSub} title={item.originalUrl}>{shortUrl(item.originalUrl)}</span></span>
               <span role="cell" className={styles.colType} data-w="170" title={source.all || undefined}><strong className={styles.cellStrong}>{source.kind}</strong>{source.name ? <span className={styles.cellSub}>{source.name}</span> : null}</span>
               <span role="cell" className={styles.num} data-w="100"><MetricText metric={item.clicks} /></span>
-              <span role="cell" className={styles.num} data-w="90" title={`届いた人数 ${shownValue(item.deliveredPeople) ?? '—'}`}><MetricText metric={item.knownClickPeople} /></span>
-              <span role="cell" className={styles.num} data-w="80">{shownValue(item.clickRate) === null ? <span className={styles.faint} title={item.clickRate.reason ?? undefined}>—</span> : <span>{shownValue(item.clickRate)}%</span>}</span>
+              <span role="cell" className={styles.num} data-w="90" title={`届いた人数 ${shownValue(item.deliveredPeople) ?? emptyValue('unknown')}`}><MetricText metric={item.knownClickPeople} /></span>
+              <span role="cell" className={styles.num} data-w="80">{shownValue(item.clickRate) === null ? <span className={styles.faint} title={item.clickRate.reason ?? undefined}>{emptyValue('unknown')}</span> : <span>{shownValue(item.clickRate)}%</span>}</span>
               <span role="cell" className={styles.colState} title={actions ? `押した人へ：${actions}` : undefined}><StatePill tone={item.isActive ? 'ok' : 'neutral'}>{item.isActive ? '計測中' : '停止中'}</StatePill></span>
             </div>
           })}

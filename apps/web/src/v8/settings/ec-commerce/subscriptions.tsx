@@ -21,11 +21,12 @@ import { ApiError, api, type EcSubscription, type EcSubscriptionList } from '@/l
 import { formatNumber } from '@/lib/format'
 import shared from './screen.module.css'
 import styles from './subscriptions.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 function shortDate(value: string | null): string {
   if (!value) return '—'
   const date = new Date(value)
-  return Number.isNaN(date.valueOf()) ? '—' : new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).format(date)
+  return Number.isNaN(date.valueOf()) ? emptyValue('unknown') : new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).format(date)
 }
 
 const FILTERS = [
@@ -124,9 +125,9 @@ export default function EcSubscriptions({ accountId, canEdit = true }: { account
       <thead><TableHeadRow><Th>お客様と中身</Th><Th align="right">1回の金額</Th><Th>次の発送</Th><Th align="right">続いた回数</Th><Th>ようす</Th><Th>操作</Th></TableHeadRow></thead>
       <tbody>{shown.map((item) => <Tr key={item.id}>
         <Td><span className={shared.stack}><span className={shared.main} title={item.ownerName ?? undefined}>{item.ownerName ?? 'お客様名 —'}{item.petName ? `（${item.petName}）` : ''}</span><span className={shared.sub} title={item.items ?? undefined}>{[item.items ?? '中身 未取得', item.cycle].filter(Boolean).join('・')}</span></span></Td>
-        <Td align="right">{item.amount == null ? '—' : `¥${formatNumber(item.amount)}`}</Td>
+        <Td align="right">{item.amount == null ? emptyValue('unknown') : `¥${formatNumber(item.amount)}`}</Td>
         <Td>{shortDate(item.nextShippingAt)}</Td>
-        <Td align="right">{item.continuedCount == null ? '—' : `${item.continuedCount}回`}</Td>
+        <Td align="right">{item.continuedCount == null ? emptyValue('unknown') : `${item.continuedCount}回`}</Td>
         <Td><span className={shared.stack}><StatusBadge tone={STATUS_TONE[item.status]} size="compact">{FILTERS.find((f) => f.key === item.status)?.label ?? item.statusLabel}</StatusBadge>{item.riskReason || item.cancellationReason ? <span className={shared.sub} title={item.riskReason ?? item.cancellationReason ?? undefined}>{item.riskReason ?? `理由「${item.cancellationReason}」`}</span> : null}</span></Td>
         <Td><span className={styles.ops}><Button href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`} variant="secondary">中身を見る</Button>{item.manageUrl ? <RowMenu label={`${item.ownerName ?? 'お客様'}のその他操作`} menuLabel="定期便の操作" open={openMenuId === item.id} onOpenChange={(open) => setOpenMenuId(open ? item.id : null)} items={[{ id: 'manage', label: 'ECで変更', onSelect: () => window.open(item.manageUrl!, '_blank', 'noopener,noreferrer') }]} /> : null}</span></Td>
       </Tr>)}</tbody>

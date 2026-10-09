@@ -36,6 +36,7 @@ import { focusField } from './focus-field'
 import styles from './ads.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const PROVIDERS = [
   { key: 'google', label: 'Google広告', icon: Search },
@@ -355,16 +356,16 @@ export default function AdsV8() {
           <KpiBand aria-label="広告連携の概要">
               <KpiCard icon={<Wallet size={13} aria-hidden="true" />} title="この30日の広告費"
                 value={null} unit=""
-                valueText={jpyTotal != null ? `¥${formatNumber(jpyTotal)}` : otherTotal ? formatMinor(otherTotal[1], otherTotal[0]) : '—'}
+                valueText={jpyTotal != null ? `¥${formatNumber(jpyTotal)}` : otherTotal ? formatMinor(otherTotal[1], otherTotal[0]) : emptyValue('unknown')}
                 detail="選んだ LINE アカウントの分だけ" />
               <KpiCard icon={<Plug size={13} aria-hidden="true" />} title="つないだ広告" value={connected.length} unit="件"
                 detail={connected.length > 0 ? connected.map(platformLabel).join('・') : 'まだ接続がありません'} />
               <KpiCard icon={<UserPlus size={13} aria-hidden="true" />} title="友だち1人あたり"
-                value={null} unit="" valueText={avgCostPerFriend != null ? `¥${formatNumber(avgCostPerFriend)}` : '—'}
+                value={null} unit="" valueText={avgCostPerFriend != null ? `¥${formatNumber(avgCostPerFriend)}` : emptyValue('unknown')}
                 detail={`友だち追加 ${formatNumber(linkedFriendAdds)} 人`} />
               <KpiCard icon={<Target size={13} aria-hidden="true" />} title="成果1件あたり"
                 value={null} unit=""
-                valueText={conversionCost?.costPerConversionMinor != null && conversionCost.currency ? formatMinor(conversionCost.costPerConversionMinor, conversionCost.currency) : '—'}
+                valueText={conversionCost?.costPerConversionMinor != null && conversionCost.currency ? formatMinor(conversionCost.costPerConversionMinor, conversionCost.currency) : emptyValue('unknown')}
                 detail={conversionCost ? `成果 ${formatNumber(conversionCost.confirmedConversionCount)} 件` : '成果の件数を読み込めませんでした'} />
           </KpiBand>
 
@@ -385,7 +386,7 @@ export default function AdsV8() {
                       : <StatusBadge tone="neutral" size="compact">未接続</StatusBadge>}
                   </div>
                   <p className={styles.providerSub} title={status?.lastRunStatus === 'failed' && status.lastError ? `直近は取り込めませんでした（${status.lastError}）` : undefined}>
-                    {active ? `最後の取り込み ${synced ?? '—'}・毎日自動` : 'つなぐと費用とクリックを毎日取り込みます'}
+                    {active ? `最後の取り込み ${synced ?? emptyValue('unknown')}・毎日自動` : 'つなぐと費用とクリックを毎日取り込みます'}
                   </p>
                   {manage ? (
                     <span>
@@ -440,17 +441,17 @@ export default function AdsV8() {
                 const platform = platforms.find((item) => item.id === row.adPlatformId)
                 const route = row.entryRouteId ? routeById.get(row.entryRouteId) : undefined
                 const link = route ? `${workerHost}/r/${route.refCode}` : null
-                const cost = row.totals.length === 0 ? '—' : row.totals.map((total) => formatMinor(total.amountMinor, total.currency)).join(' ')
+                const cost = row.totals.length === 0 ? emptyValue('unknown') : row.totals.map((total) => formatMinor(total.amountMinor, total.currency)).join(' ')
                 return (
                   <div key={`${row.sourceLabel}|${row.adPlatformId ?? ''}|${row.entryRouteId ?? ''}`} className={styles.tableRow} role="row">
                     <span className={styles.colSource} role="cell"><span className={styles.cell} title={route ? `${route.name}（${row.sourceLabel}）` : row.sourceLabel}>{route?.name ?? row.sourceLabel}</span></span>
-                    <span className={styles.colMedia} role="cell"><span className={styles.cell}>{platform ? platformLabel(platform) : row.source === 'manual' ? '手入力' : '—'}</span></span>
-                    <span className={styles.colLink} role="cell"><span className={styles.cell} title={link ?? undefined}>{link ?? '—'}</span></span>
+                    <span className={styles.colMedia} role="cell"><span className={styles.cell}>{platform ? platformLabel(platform) : row.source === 'manual' ? '手入力' : emptyValue('unknown')}</span></span>
+                    <span className={styles.colLink} role="cell"><span className={styles.cell} title={link ?? undefined}>{link ?? emptyValue('unknown')}</span></span>
                     <span className={styles.colCost} role="cell"><span className={row.totals.length === 0 ? styles.faint : undefined}>{cost}</span></span>
-                    <span className={styles.colNum} role="cell">{row.friendAdds == null ? '—' : formatNumber(row.friendAdds)}</span>
+                    <span className={styles.colNum} role="cell">{row.friendAdds == null ? emptyValue('unknown') : formatNumber(row.friendAdds)}</span>
                     <span className={styles.colNum} role="cell">
                       <span className={row.costPerFriendMinor == null ? styles.faint : undefined}>
-                        {row.costPerFriendMinor == null ? '—' : formatMinor(row.costPerFriendMinor, row.totals[0]?.currency ?? 'JPY')}
+                        {row.costPerFriendMinor == null ? emptyValue('unknown') : formatMinor(row.costPerFriendMinor, row.totals[0]?.currency ?? 'JPY')}
                       </span>
                     </span>
                     <span className={styles.colImport} role="cell">
@@ -480,7 +481,7 @@ export default function AdsV8() {
                     </span>
                     <span className={styles.entrySource} title={entry.sourceLabel}>{route?.name ?? entry.sourceLabel}</span>
                     <span className={styles.entryAmount}>{formatMinor(entry.amountMinor, entry.currency)}</span>
-                    <span className={styles.entryWho} title={`記録した日時 ${shortJst(entry.createdAt) ?? '—'}`}>{`記録 ${shortJst(entry.createdAt)?.split(' ')[0] ?? '—'}`}</span>
+                    <span className={styles.entryWho} title={`記録した日時 ${shortJst(entry.createdAt) ?? emptyValue('unknown')}`}>{`記録 ${shortJst(entry.createdAt)?.split(' ')[0] ?? emptyValue('unknown')}`}</span>
                     <span className={styles.entryMenu}>
                       {manage && !cancelled ? (
                         <IconButton

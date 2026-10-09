@@ -20,6 +20,7 @@ import {
   type BookingChannelsData,
   type BookingConflict,
 } from '../lib/booking-channels'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -283,9 +284,9 @@ export default function ChannelsTabV8({ accountId, canEdit }: { accountId: strin
             {data.staff.map((person) => (
               <Tr key={person.staffId}>
                 <Td>{person.displayName}</Td>
-                <Td>{calendars[person.staffId] ?? '—'}</Td>
+                <Td>{calendars[person.staffId] ?? emptyValue('unknown')}</Td>
                 <Td><StaffStatusChip status={person.status} /></Td>
-                <Td align="right">{person.externalEventsThisWeek == null ? '—' : `${person.externalEventsThisWeek}件`}</Td>
+                <Td align="right">{person.externalEventsThisWeek == null ? emptyValue('unknown') : `${person.externalEventsThisWeek}件`}</Td>
                 <Td>{formatReadAt(person.lastReadAt)}</Td>
                 <Td>
                   {canEdit ? (
@@ -323,10 +324,10 @@ export default function ChannelsTabV8({ accountId, canEdit }: { accountId: strin
                     <span className="block font-semibold text-ink">{label.name}</span>
                     {label.sub ? <span className="block text-xs text-ink-secondary">{label.sub}</span> : null}
                   </Td>
-                  <Td>{label.how || '—'}</Td>
+                  <Td>{label.how || emptyValue('unknown')}</Td>
                   <Td><ChannelStatusChip channel={channel} /></Td>
-                  <Td align="right">{channel.todayCount == null ? '—' : `${channel.todayCount}件`}</Td>
-                  <Td>—</Td>
+                  <Td align="right">{channel.todayCount == null ? emptyValue('unknown') : `${channel.todayCount}件`}</Td>
+                  <Td>{emptyValue('unknown')}</Td>
                   <Td>
                     {channel.status === 'active' && (channel.key === 'line' || channel.key === 'manual') ? (
                       <Button href="/booking/bookings" size="compact">予約管理へ</Button>

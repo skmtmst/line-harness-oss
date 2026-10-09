@@ -21,6 +21,7 @@ import { analyticsWeekday } from './parts'
 import { shortDay } from './common'
 import styles from './analytics.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Point = ConversionDefinitionReport['byDefinition'][number]
 
@@ -109,7 +110,7 @@ export default function ConversionReportV8({ accountId }: { accountId: string })
                 <span role="cell" className={styles.rcol} data-w="62">{`${formatNumber(item.netCount)}件`}</span>
                 <span role="cell" className={styles.rcol} data-w="62">{`${formatNumber(item.previousNetCount)}件`}</span>
                 <span role="cell" className={styles.rcol} data-w="48" data-change={item.countChange > 0 ? 'up' : item.countChange < 0 ? 'down' : undefined}>{item.countChange > 0 ? `+${formatNumber(item.countChange)}` : item.countChange < 0 ? `−${formatNumber(-item.countChange)}` : '0'}</span>
-                <span role="cell" className={styles.rcol} data-w="200" title={item.routes[0]?.label}>{item.routes[0]?.label ?? '—'}</span>
+                <span role="cell" className={styles.rcol} data-w="200" title={item.routes[0]?.label}>{item.routes[0]?.label ?? emptyValue('unknown')}</span>
                 <span role="cell" className={styles.rcol} data-w="36"><RowMenu point={item} onShowDaily={() => setPointId(item.conversionPointId)} /></span>
               </div>)}
           </div>

@@ -15,6 +15,7 @@ import { ApiError, fetchApi, webinarApi, type WebinarCtaCard, type WebinarEditor
 import { ctaCardProblems } from './cta-card-validation'
 import { extractEditConflict } from './webinar-edit-conflict-band'
 import type { CompareMine } from './webinar-edit-compare-dialog'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /* 申込フォームの候補（編集画面の CtaDesignStep と同じ形）。 */
 type FormCandidates = {
@@ -279,7 +280,7 @@ export default function CtaV8({
   return (
     <>
       {conflict ? <div data-design-node="pvimJ"><Notice tone="warn" action={<Button disabled={readingLatest} busy={readingLatest} onClick={() => void compareLatest()}>違いを比べる</Button>}>別の画面でこのウェビナーが更新されました。申込フォームの入力は残しています。最新版を確認してから保存してください。</Notice>
-        {latestEditor ? <div className="border-hairline mt-3 rounded-control border p-3 text-sm"><p>保存されている申込フォーム：{latestEditor.publicPage.form?.name ?? (latestEditor.registrationFormId ? publishedForms.find((form) => form.id === latestEditor.registrationFormId)?.name ?? '選択済みのフォーム' : '未設定')}</p><p className="mt-2">この画面の入力：{publishedForms.find((form) => form.id === selectedRegistrationFormId)?.name ?? (selectedRegistrationFormId ? '選択済みのフォーム' : '未設定')}</p><Button className="mt-3" onClick={() => setReplaceConfirm(true)}>最新を読み込んで続ける</Button></div> : null}
+        {latestEditor ? <div className="border-hairline mt-3 rounded-control border p-3 text-sm"><p>保存されている申込フォーム：{latestEditor.publicPage.form?.name ?? (latestEditor.registrationFormId ? publishedForms.find((form) => form.id === latestEditor.registrationFormId)?.name ?? '選択済みのフォーム' : emptyValue('unconfigured'))}</p><p className="mt-2">この画面の入力：{publishedForms.find((form) => form.id === selectedRegistrationFormId)?.name ?? (selectedRegistrationFormId ? '選択済みのフォーム' : emptyValue('unconfigured'))}</p><Button className="mt-3" onClick={() => setReplaceConfirm(true)}>最新を読み込んで続ける</Button></div> : null}
       </div> : null}
 
     <div className="min-w-0" data-webinar-pane="cta" data-design-node="Q0Jrk">
@@ -411,7 +412,7 @@ export default function CtaV8({
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card" aria-label="申込に使う回答フォーム">
           <h2 className="text-ink text-base font-bold">申込に使う回答フォーム</h2>
           <p className="text-ink-faint mt-1 text-xs">申し込みのときに答えてもらうフォームです。公開中のフォームから1つ選びます。</p>
-          <p className="text-ink-faint mt-2 text-xs">CTAボタンで使うフォームとは別です。保存済み：{editor.publicPage?.form?.name ?? '未設定'}</p>
+          <p className="text-ink-faint mt-2 text-xs">CTAボタンで使うフォームとは別です。保存済み：{editor.publicPage?.form?.name ?? emptyValue('unconfigured')}</p>
           {formCandidates.state === 'loading' ? <p className="text-ink-faint mt-3 text-sm">回答フォームを読み込んでいます。</p> : null}
           {formCandidates.state === 'error' ? <p className="text-ink-secondary mt-3 text-sm" role="alert">回答フォームを読み込めませんでした。候補が取れない間は種類をURLに切り替えて保存できます。 <Button onClick={loadForms}>もう一度読み込む</Button></p> : null}
           {formCandidates.state === 'forbidden' ? <p className="text-ink-secondary mt-3 text-sm">回答フォームを見る権限がありません。管理者に権限の確認を依頼してください。</p> : null}

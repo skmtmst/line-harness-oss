@@ -75,6 +75,7 @@ import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Store = BroadcastAccount
 /** 配信対象（店の一斉配信と同じ4つ。名前は店の口と同じ：詳細条件は advanced）。 */
@@ -703,7 +704,7 @@ export default function HqBroadcastCreate() {
   const bubblesDone = bubbles.every((item) => !hqBubbleProblem(item))
   const bubbleSummary = hqBubbleSummary
   const accountsLabel = chosen.length === 0 ? '未選択' : chosen.length <= 2 ? chosen.map((s) => s.name).join('・') : `${chosen[0].name} ほか ${chosen.length - 1}アカウント`
-  const sendWhenLabel = when === 'now' ? '今すぐ' : scheduledAt ? jpDateTime(scheduledAt) : '未設定'
+  const sendWhenLabel = when === 'now' ? '今すぐ' : scheduledAt ? jpDateTime(scheduledAt) : emptyValue('unconfigured')
   const { shown, rest } = splitPreflightRows(checks ?? [], showAll ? Infinity : ROWS_SHOWN)
   const exampleStore = (checks ?? []).find((p) => !p.excluded && !p.blockedReasons.length)?.accountName ?? chosen[0]?.name ?? '店の名前'
   const previewBubbles = bubbles.map((item) => step === 'message' && item.kind === 'carousel' && !item.cardAsset ? toApiBubble(item, item.id) : previewBubbleOf(item, previewText(item.body, exampleStore)) ?? toApiBubble(item, item.id))
@@ -1047,8 +1048,8 @@ export default function HqBroadcastCreate() {
                           return (
                             <Tr key={p.accountId} className={styles.row}>
                               <Td className={styles.colStore}><span className={styles.store} title={p.accountName}>{p.accountName}</span></Td>
-                              <Td className={styles.colPeople}><span className={styles.num}>{p.audienceCount === null ? '—' : `${formatNumber(p.audienceCount)}人`}</span></Td>
-                              <Td className={styles.colQuota}><span className={styles.sub}>{p.remaining === null ? '—' : `${formatNumber(p.remaining)}通`}</span></Td>
+                              <Td className={styles.colPeople}><span className={styles.num}>{p.audienceCount === null ? emptyValue('unknown') : `${formatNumber(p.audienceCount)}人`}</span></Td>
+                              <Td className={styles.colQuota}><span className={styles.sub}>{p.remaining === null ? emptyValue('unknown') : `${formatNumber(p.remaining)}通`}</span></Td>
                               <Td className={styles.colCheck}><StatusBadge tone={badge.tone} title={p.blockedReasons.join('・') || undefined}>{badge.label}</StatusBadge></Td>
                               <Td className={styles.colSend}><StatusBadge tone={go ? 'success' : 'neutral'}>{go ? '送る' : '外す'}</StatusBadge></Td>
                               <Td className={styles.colMenu}>
@@ -1066,7 +1067,7 @@ export default function HqBroadcastCreate() {
                           <Tr className={styles.row}>
                             <Td className={styles.colStore}><span className={styles.store}>{`ほか ${rest.length}アカウント`}</span></Td>
                             <Td className={styles.colPeople}><span className={styles.num}>{`${formatNumber(rest.reduce((sum, p) => sum + (p.audienceCount ?? 0), 0))}人`}</span></Td>
-                            <Td className={styles.colQuota}><span className={styles.sub}>—</span></Td>
+                            <Td className={styles.colQuota}><span className={styles.sub}>{emptyValue('unknown')}</span></Td>
                             <Td className={styles.colCheck}><StatusBadge tone="success">すべて足りる</StatusBadge></Td>
                             <Td className={styles.colSend}><StatusBadge tone="success">送る</StatusBadge></Td>
                             <Td className={styles.colMenu}>

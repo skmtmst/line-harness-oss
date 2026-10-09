@@ -20,6 +20,7 @@ import {
   type WebinarEditor,
   type WebinarScheduleRule,
 } from '@/lib/api'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
 
@@ -514,7 +515,7 @@ export default function VideoV8({
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <div>
               <span className="text-ink-secondary mb-1 block text-xs font-medium">視聴完了とみなす</span>
-              <p className="text-ink text-sm">{completionLabel ?? '—'}</p>
+              <p className="text-ink text-sm">{completionLabel ?? emptyValue('unknown')}</p>
             </div>
             <div>
               <Select

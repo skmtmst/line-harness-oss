@@ -21,6 +21,7 @@ import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import CompanyContactCard from './company-contact'
 import styles from './settings.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const TITLE = '統括の情報'
 const DESCRIPTION = '統括の名前です。各アカウントの画面の上と、メンバーへの招待メールに出ます。'
@@ -105,7 +106,7 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
       <section className={styles.card} aria-label="統括名">
         <dl className={styles.field}>
           <dt className={styles.label}>統括名</dt>
-          <dd className={styles.value}>{loading ? '読み込んでいます…' : error ? '読み込めませんでした' : name || '—'}</dd>
+          <dd className={styles.value}>{loading ? '読み込んでいます…' : error ? '読み込めませんでした' : name || emptyValue('unknown')}</dd>
         </dl>
         {error ? <p role="alert" className={styles.error}>{error}</p> : null}
         <p className={styles.hint}>統括名の変更は管理者だけができます。</p>

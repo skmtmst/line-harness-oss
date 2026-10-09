@@ -26,6 +26,7 @@ import adsStyles from './ads.module.css'
 import styles from './ad-pages.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'すべての状態' },
@@ -143,19 +144,19 @@ export default function AdHistoryV8() {
               </span>
               <span className={styles.colMedia} role="cell"><span className={styles.cellText}>{adPlatformLabel(platform)}</span></span>
               {/* 流入元は送信記録の口が返さないので「—」。 */}
-              <span className={styles.colSource} role="cell"><span className={styles.cellFaint}>—</span></span>
+              <span className={styles.colSource} role="cell"><span className={styles.cellFaint}>{emptyValue('unknown')}</span></span>
               <span className={styles.colStatus} role="cell">
                 <StatusBadge tone={state.tone} size="compact" title={log.status === 'failed' && log.errorMessage ? `断られた理由：${log.errorMessage}` : undefined}>{state.label}</StatusBadge>
               </span>
               <span className={styles.colNext} role="cell">
-                <span className={styles.cellFaint}>{log.status === 'pending' ? '送信待ち' : '—'}</span>
+                <span className={styles.cellFaint}>{log.status === 'pending' ? '送信待ち' : emptyValue('unknown')}</span>
               </span>
               <span className={styles.colOps} role="cell">
                 {log.status === 'failed' && canRetry ? (
                   <Button onClick={() => void retry(log)} busy={retryingId === log.id} busyLabel="やり直しています…" disabled={retryingId !== null}>
                     <RotateCw size={15} aria-hidden="true" />やり直す
                   </Button>
-                ) : <span className={styles.cellFaint}>—</span>}
+                ) : <span className={styles.cellFaint}>{emptyValue('unknown')}</span>}
               </span>
             </div>
           )

@@ -23,6 +23,7 @@ import {
 } from '@/lib/api'
 import { formatDay, formatNumber } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadPhase = 'loading' | 'ready' | 'empty' | 'error'
 
@@ -336,7 +337,7 @@ export function AffiliatePaymentConfirmDialog({
               <thead><TableHeadRow><Th>案件</Th><Th align="right">認めた</Th><Th align="right">1件の報酬</Th><Th align="right">小計</Th></TableHeadRow></thead>
               <tbody className="divide-hairline divide-y">
                 {preview.breakdown.map((line) => (
-                  <tr key={line.offerName}><td className="text-ink px-3 py-2 font-medium">{line.offerName}</td><td className="text-ink-secondary px-3 py-2 text-right">{formatNumber(line.conversions)}件</td><td className="text-ink-secondary px-3 py-2 text-right">{line.unitReward == null ? '—' : yen(line.unitReward)}</td><td className="text-ink px-3 py-2 text-right font-semibold">{yen(line.subtotal)}</td></tr>
+                  <tr key={line.offerName}><td className="text-ink px-3 py-2 font-medium">{line.offerName}</td><td className="text-ink-secondary px-3 py-2 text-right">{formatNumber(line.conversions)}件</td><td className="text-ink-secondary px-3 py-2 text-right">{line.unitReward == null ? emptyValue('unknown') : yen(line.unitReward)}</td><td className="text-ink px-3 py-2 text-right font-semibold">{yen(line.subtotal)}</td></tr>
                 ))}
               </tbody>
             </table>

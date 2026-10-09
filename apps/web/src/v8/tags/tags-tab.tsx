@@ -74,6 +74,7 @@ import {
 } from '@/components/friend-fields/tags-page-v4'
 import styles from './list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 付け方の呼び名（絵 I1E7Bt の「EC 連携・LINE ログイン・EC 購入・誕生日のきまり」）。v7 の呼び名（tags-page-v4）は触らない。 */
 const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
@@ -84,7 +85,7 @@ const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
   manual: '手動',
   birthday: '誕生日のきまり',
 }
-const sourceLabel = (tag: Tag): string => (tag.assignSource ? SOURCE_LABELS[tag.assignSource] : '—')
+const sourceLabel = (tag: Tag): string => (tag.assignSource ? SOURCE_LABELS[tag.assignSource] : emptyValue('unknown'))
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -119,7 +120,7 @@ export function tagLinkText(tag: Tag): string {
   if (tag.mileageMultiplierBps) main.push(`${tag.mileageMultiplierBps / 10000}倍`)
   const parts = main.length ? [main.join('・')] : []
   if (tag.otherActionCount) parts.push(`他${tag.otherActionCount}`)
-  return parts.length ? parts.join(' ') : '—'
+  return parts.length ? parts.join(' ') : emptyValue('unknown')
 }
 
 /**

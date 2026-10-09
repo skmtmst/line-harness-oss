@@ -26,6 +26,7 @@ import { formatImportBytes, JOB_STATUS_LABELS, MANAGE_FORBIDDEN, useFriendMigrat
 import styles from './migrations.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const COLUMN_CHOICES = [
   ['basic', '基本（LINEユーザーID・表示名・本名・登録日）', false],
@@ -101,7 +102,7 @@ export default function CsvMigrationsV8() {
           <div className={styles.cardFoot}>
             {m.exportResult ? (
               <a className={styles.link} href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}${m.exportResult.downloadUrl}`}>
-                {`CSVで書き出す（${m.exportResult.rowCount ?? '—'}件）`}
+                {`CSVで書き出す（${m.exportResult.rowCount ?? emptyValue('unknown')}件）`}
               </a>
             ) : null}
             {/* 変えられない人には押せないボタンを置かない（理由は上の1行）。 */}
@@ -217,7 +218,7 @@ export default function CsvMigrationsV8() {
                   <Tr key={`${job.kind}-${job.id}`} className={styles.row}>
                     <Td className={styles.td}>{slashDateTime(job.created_at)}</Td>
                     <Td className={styles.td}><span title={account ? `対象：${account}` : undefined}>{job.kind === 'export' ? '書き出し' : '取り込み'}</span></Td>
-                    <Td className={styles.td}>{count == null ? '—' : formatNumber(count)}</Td>
+                    <Td className={styles.td}>{count == null ? emptyValue('unknown') : formatNumber(count)}</Td>
                     <Td className={styles.td}>{job.created_by_name}</Td>
                     <Td className={styles.td}>
                       <span className={styles.stateCell}>

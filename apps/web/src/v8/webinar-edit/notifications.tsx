@@ -40,6 +40,7 @@ import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './notifications.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const SETTINGS_KEYS = [
   'registrationEnabled', 'dayBeforeEnabled', 'dayBeforeTime',
@@ -240,7 +241,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
   const [previewKey, setPreviewKey] = useState<RowKey>('dayBefore')
 
   const available = overview !== null
-  const count = (value: number | undefined) => (available && typeof value === 'number' ? formatNumber(value) : '—')
+  const count = (value: number | undefined) => (available && typeof value === 'number' ? formatNumber(value) : emptyValue('unknown'))
 
   const timeBox = (value: string, label: string, onChange: (next: string) => void) => (readOnly
     ? <ReadValue compact label={label}>{value}</ReadValue>
@@ -322,7 +323,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
       <section className={form.card} data-gap="tight" aria-labelledby="webinar-notify-title" data-wc-pane="notifications">
         <div className={form.cardHeadRow}>
           <h2 id="webinar-notify-title" className={form.cardTitle}>通知とリマインド</h2>
-          <HelpTip label="送った数と通知の対象">{`予定 ${count(overview?.pending)}件・取消 ${count(overview?.cancelled)}件・合計 ${count(overview?.total)}件。通知の対象：${overview?.audience ? `${formatNumber(overview.audience.people)}人（取消を除いた有効な申込。延べ予約は${formatNumber(overview.audience.bookings)}件）` : '—'}`}</HelpTip>
+          <HelpTip label="送った数と通知の対象">{`予定 ${count(overview?.pending)}件・取消 ${count(overview?.cancelled)}件・合計 ${count(overview?.total)}件。通知の対象：${overview?.audience ? `${formatNumber(overview.audience.people)}人（取消を除いた有効な申込。延べ予約は${formatNumber(overview.audience.bookings)}件）` : emptyValue('unknown')}`}</HelpTip>
         </div>
         <p className={styles.desc}>LINE で送るお知らせです。テストは全部をまとめて自分に送ります。</p>
         {notificationBody}

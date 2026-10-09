@@ -44,6 +44,7 @@ import { CreateProjectDialogV8, UploadDialogV8 } from './dialogs'
 import BannerLimitNotice from './limit-notice'
 import { bannerFailureMessage, monthDay, shortPresetLabel } from './words'
 import styles from './list.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Tab = 'projects' | 'library'
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -114,10 +115,10 @@ function BannersInner() {
 
   const kpis = (
     <div className={styles.kpis} data-design="KPIs">
-      <StatCard title="プロジェクト" icon={<Folder aria-hidden="true" />} value={stats ? stats.projects.active : null} unit="件" detail={stats ? `アーカイブ ${stats.projects.archived}` : '—'} loading={summaryLoading} />
-      <StatCard title="今月の生成" icon={<Sparkles aria-hidden="true" />} value={usage ? usage.month.used : null} unit="枚" detail={usage ? `今日 ${usage.today.used}枚・1日の上限 ${usage.today.limit}枚` : '—'} loading={summaryLoading} />
-      <StatCard title="今月の残り" icon={<Gauge aria-hidden="true" />} value={usage ? usage.month.remaining : null} unit="枚" detail={usage ? `上限 ${usage.month.limit}枚・${nextMonthResetLabel()} に戻る` : '—'} loading={summaryLoading} />
-      <StatCard title="アカウントへ配った画像" icon={<Send aria-hidden="true" />} value={stats ? stats.deliveredImages : null} unit="枚" detail={stats ? `${stats.deliveredAccounts}アカウント` : '—'} loading={summaryLoading} />
+      <StatCard title="プロジェクト" icon={<Folder aria-hidden="true" />} value={stats ? stats.projects.active : null} unit="件" detail={stats ? `アーカイブ ${stats.projects.archived}` : emptyValue('unknown')} loading={summaryLoading} />
+      <StatCard title="今月の生成" icon={<Sparkles aria-hidden="true" />} value={usage ? usage.month.used : null} unit="枚" detail={usage ? `今日 ${usage.today.used}枚・1日の上限 ${usage.today.limit}枚` : emptyValue('unknown')} loading={summaryLoading} />
+      <StatCard title="今月の残り" icon={<Gauge aria-hidden="true" />} value={usage ? usage.month.remaining : null} unit="枚" detail={usage ? `上限 ${usage.month.limit}枚・${nextMonthResetLabel()} に戻る` : emptyValue('unknown')} loading={summaryLoading} />
+      <StatCard title="アカウントへ配った画像" icon={<Send aria-hidden="true" />} value={stats ? stats.deliveredImages : null} unit="枚" detail={stats ? `${stats.deliveredAccounts}アカウント` : emptyValue('unknown')} loading={summaryLoading} />
     </div>
   )
 
@@ -160,7 +161,7 @@ function StatCard({ title, icon, value, unit, detail, loading }: {
     <div className={styles.stat} aria-busy={loading || undefined}>
       <p className={styles.statHead}><span className={styles.statIcon}>{icon}</span><span className={styles.statTitle} title={title}>{title}</span></p>
       <p className={styles.statValue}>
-        <span className={styles.statNumber}>{loading ? '…' : value === null ? '—' : formatNumber(value)}</span>
+        <span className={styles.statNumber}>{loading ? '…' : value === null ? emptyValue('unknown') : formatNumber(value)}</span>
         {!loading && value !== null ? <span className={styles.statUnit}>{unit}</span> : null}
       </p>
       <p className={styles.statDetail}>{loading ? '読み込んでいます' : detail}</p>
@@ -662,7 +663,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
                   </button>
                 ) : null}
               </div>
-              <p className={styles.tileProject}>{projects[image.projectId]?.name ?? '—'}</p>
+              <p className={styles.tileProject}>{projects[image.projectId]?.name ?? emptyValue('unknown')}</p>
             </article>
           )
         })}

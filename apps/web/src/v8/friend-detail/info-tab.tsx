@@ -17,6 +17,7 @@ import { TextArea, TextField } from '@/components/shared/text-field'
 import type { FriendDetailState } from './use-friend-detail'
 import type { FriendDetailPermissions } from './permissions'
 import styles from './detail.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 種類の名前は絵では出さない。ラベルの title で読めるようにする。 */
 export const BASIC_GROUP = 'basic'
@@ -39,13 +40,13 @@ function FieldInput({ field, value, onChange, disabled, id }: {
     const parts = value ? value.split(/[,、]\s*/).filter(Boolean) : []
     return (
       <div className={styles.multi} aria-labelledby={`${id}-label`}>
-        {parts.length ? parts.map((p) => <span key={p} className={styles.tag}>{p}</span>) : <span className={styles.faint}>未入力</span>}
+        {parts.length ? parts.map((p) => <span key={p} className={styles.tag}>{p}</span>) : <span className={styles.faint}>{emptyValue('unconfigured')}</span>}
       </div>
     )
   }
   if (readOnly && (field.type === 'select' || field.type === 'checkbox' || field.type === 'date')) {
     // 選ぶ部品は置かず、選んでいる値を文字で見せる。
-    const shown = field.type === 'checkbox' ? (value === '1' ? 'はい' : 'いいえ') : (value || '未入力')
+    const shown = field.type === 'checkbox' ? (value === '1' ? 'はい' : 'いいえ') : (value || emptyValue('unconfigured'))
     return <TextField id={id} value={shown} readOnly aria-readonly="true" aria-label={`${field.name}の値`} title={shown} />
   }
   if (field.type === 'select') {
@@ -66,10 +67,10 @@ function FieldInput({ field, value, onChange, disabled, id }: {
     )
   }
   if (field.type === 'date') {
-    return <DateField id={id} value={value} onChange={onChange} aria-labelledby={`${id}-label`} placeholder="未入力" />
+    return <DateField id={id} value={value} onChange={onChange} aria-labelledby={`${id}-label`} placeholder="未設定" />
   }
   const inputType = field.type === 'number' ? 'number' : field.type === 'url' ? 'url' : field.type === 'tel' ? 'tel' : field.type === 'email' ? 'email' : 'text'
-  return <TextField id={id} type={inputType} value={value} readOnly={readOnly} aria-readonly={readOnly || undefined} placeholder="未入力" onChange={(e) => onChange(e.target.value)} />
+  return <TextField id={id} type={inputType} value={value} readOnly={readOnly} aria-readonly={readOnly || undefined} placeholder="未設定" onChange={(e) => onChange(e.target.value)} />
 }
 
 export default function InfoTab({ friendId, group, data, perms }: {

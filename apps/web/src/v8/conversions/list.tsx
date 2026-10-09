@@ -95,6 +95,7 @@ import styles from './list.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type StatusFilter = 'all' | ConversionDefinitionFilter
 /** フォルダの列の「未分類」（`?folder=unfiled`）。 */
@@ -1101,7 +1102,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
                     </Td>
                     <Td className={styles.colCount}><span className={styles.num}>{`${formatNumber(point.metrics.netCount)}件`}</span></Td>
                     <Td className={styles.colValue}>
-                      <span className={styles.num}>{point.metrics.netValue > 0 ? `¥${formatNumber(point.metrics.netValue)}` : '—'}</span>
+                      <span className={styles.num}>{point.metrics.netValue > 0 ? `¥${formatNumber(point.metrics.netValue)}` : emptyValue('unknown')}</span>
                     </Td>
                     <Td className={styles.colUsage}>
                       <span className={styles.usageMain} title={usageLabel(point)}>{usage.main}</span>
@@ -1182,7 +1183,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
             help="登録している成果地点の数です。"
             value={listUnavailable ? null : total}
             unit="件"
-            detail={stateCounts ? `動いている ${formatNumber(stateCounts.active)}・止めている ${formatNumber(stateCounts.stopped)}` : '—'}
+            detail={stateCounts ? `動いている ${formatNumber(stateCounts.active)}・止めている ${formatNumber(stateCounts.stopped)}` : emptyValue('unknown')}
           />
           <KpiCard
             presentation="band"
@@ -1191,7 +1192,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
             help="この30日に数えた成果の件数です（取り消しを引いた数）。"
             value={reportUnavailable ? null : kpi.currentCount}
             unit="件"
-            detail={delta === null || reportUnavailable ? '—' : `その前の30日より ${delta >= 0 ? '+' : ''}${formatNumber(delta)}`}
+            detail={delta === null || reportUnavailable ? emptyValue('unknown') : `その前の30日より ${delta >= 0 ? '+' : ''}${formatNumber(delta)}`}
           />
           <KpiCard
             presentation="band"

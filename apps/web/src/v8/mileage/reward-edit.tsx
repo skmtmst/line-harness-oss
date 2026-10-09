@@ -43,6 +43,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { LIMIT_FIELD_ERRORS, normalizeDigits, optionalInteger, validateReward, type FormState } from './reward-form'
 import { focusMileageField } from './form-validation'
 import styles from './reward-edit.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type CommonActionOption = { id: string; label: string }
 
@@ -347,7 +348,7 @@ function RewardEditorInner() {
         <p className={styles.sideNote}>LINE のマイルの画面</p>
         <div className={styles.phoneRow}>
           <span className={styles.phoneName}>{form.name.trim() || '（名前を入力）'}</span>
-          <span className={styles.phoneMiles}>{Number.isInteger(requiredMiles) && requiredMiles > 0 ? `${formatNumber(requiredMiles)} マイルで交換` : '—'}</span>
+          <span className={styles.phoneMiles}>{Number.isInteger(requiredMiles) && requiredMiles > 0 ? `${formatNumber(requiredMiles)} マイルで交換` : emptyValue('unknown')}</span>
           <span className={styles.phoneSub}>{`${form.benefitExpiresDays.trim() ? `交換後${form.benefitExpiresDays}日間` : '期限なし'}・お一人さま${perFriend}`}</span>
         </div>
       </section>

@@ -45,6 +45,7 @@ import {
 import type { DetailChrome, EditContext } from './types'
 import styles from './participants.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadState = 'loading' | 'ready' | 'error' | 'denied'
 
@@ -157,8 +158,8 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   const to = Math.min(searched.length, currentPage * pageSize)
 
   const kpis = [
-    { key: 'reservations', title: '申込', icon: History, value: summary?.reservations ?? null, unit: '人', detail: summary ? `今月 +${formatNumber(thisMonthReservations(analytics?.daily ?? []))}` : '—', help: '申し込んだ人の数です。今月の数はサーバーの集計日（UTC）を基準にしています。' },
-    { key: 'completed', title: '視聴完了', icon: CircleCheck, value: summary?.completed ?? null, unit: '人', detail: summary ? `申込の ${percent(summary.completed, summary.reservations)}` : '—', help: '動画の9割以上を見た人です。' },
+    { key: 'reservations', title: '申込', icon: History, value: summary?.reservations ?? null, unit: '人', detail: summary ? `今月 +${formatNumber(thisMonthReservations(analytics?.daily ?? []))}` : emptyValue('unknown'), help: '申し込んだ人の数です。今月の数はサーバーの集計日（UTC）を基準にしています。' },
+    { key: 'completed', title: '視聴完了', icon: CircleCheck, value: summary?.completed ?? null, unit: '人', detail: summary ? `申込の ${percent(summary.completed, summary.reservations)}` : emptyValue('unknown'), help: '動画の9割以上を見た人です。' },
     { key: 'dropped', title: '途中で離れた', icon: LogOut, value: dropped, unit: '人', detail: '平均離脱時間 —', help: '入場した人から、視聴完了の人を引いた数です。途中で離れた人だけの平均離脱時間は、まだ数えていません。' },
     { key: 'unviewed', title: '見ていない', icon: Undo2, value: unviewed, unit: '人', detail: '見逃し案内の対象', help: '申し込んだが入場の記録がない人です。' },
   ]
@@ -203,7 +204,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
                 </Td>
                 <Td className={styles.colWhen}><span className={styles.main}>{shortDateTime(participant.latestJoinedAt)}</span></Td>
                 <Td className={styles.colWatch}>
-                  <span className={styles.main}>{participant.maxWatchedSeconds > 0 ? `${fmtJaDuration(participant.maxWatchedSeconds)}（${rate}%）` : '—'}</span>
+                  <span className={styles.main}>{participant.maxWatchedSeconds > 0 ? `${fmtJaDuration(participant.maxWatchedSeconds)}（${rate}%）` : emptyValue('unknown')}</span>
                   <span className={styles.sub}>{participantStateLabel(participant, webinar.durationSeconds)}</span>
                 </Td>
                 <Td className={styles.colAction}>

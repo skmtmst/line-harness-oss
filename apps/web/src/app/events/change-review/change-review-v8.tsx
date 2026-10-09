@@ -26,6 +26,7 @@ import {
   useChangeReview,
 } from './change-review-model'
 import styles from './change-review-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** datetime-local の入力値（壁時計）を見やすく出す。 */
 function formatLocalInput(local: string): string {
@@ -131,7 +132,7 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
       bits.push(`${formatLocalInput(isoToLocalInput(slot.starts_at))}〜${formatLocalInput(isoToLocalInput(slot.ends_at)).split(' ')[1] ?? ''} → ${formatLocalInput(edit.startsAt)}〜${formatLocalInput(edit.endsAt).split(' ')[1] ?? ''}`)
     }
     if (edit.capacity.trim() !== (slot.capacity == null ? '' : String(slot.capacity))) {
-      bits.push(`定員 ${slot.capacity == null ? 'なし' : `${slot.capacity}人`} → ${edit.capacity.trim() === '' ? 'なし' : `${edit.capacity.trim()}人`}`)
+      bits.push(`定員 ${slot.capacity == null ? emptyValue('none') : `${slot.capacity}人`} → ${edit.capacity.trim() === '' ? emptyValue('none') : `${edit.capacity.trim()}人`}`)
     }
     if ((edit.isActive ? 1 : 0) !== slot.is_active) {
       bits.push(`受付 ${slot.is_active === 1 ? 'する' : '止める'} → ${edit.isActive ? 'する' : '止める'}`)
@@ -212,9 +213,9 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
                             />
                           </Td>
                           <Td className="whitespace-nowrap text-sm tabular-nums">{formatJp(slot.starts_at)}</Td>
-                          <Td align="right" className="tabular-nums">{slot.capacity ?? '—'}</Td>
-                          <Td align="right" className="tabular-nums">{impact ? impact.confirmed_seats : '—'}</Td>
-                          <Td align="right" className="tabular-nums">{impact ? impact.waiting_seats : '—'}</Td>
+                          <Td align="right" className="tabular-nums">{slot.capacity ?? emptyValue('unknown')}</Td>
+                          <Td align="right" className="tabular-nums">{impact ? impact.confirmed_seats : emptyValue('unknown')}</Td>
+                          <Td align="right" className="tabular-nums">{impact ? impact.waiting_seats : emptyValue('unknown')}</Td>
                           <Td align="right">
                             <span className={receiving ? 'bg-success-bg text-success rounded-pill px-2 py-0.5 text-xs' : 'bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-xs'}>
                               {receiving ? '● 受付する' : '● 終了'}
@@ -261,7 +262,7 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
                       type="number"
                       min={1}
                       value={activeEdit?.capacity ?? ''}
-                      placeholder={activeSlot.capacity == null ? 'なし' : String(activeSlot.capacity)}
+                      placeholder={activeSlot.capacity == null ? emptyValue('none') : String(activeSlot.capacity)}
                       onChange={(e) => updateActiveEdit({ capacity: e.target.value })}
                       aria-label="定員"
                       className="border-hairline rounded-control w-full border px-3 py-2 text-sm font-normal"
@@ -289,7 +290,7 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
                         setVenueName(e.target.value)
                         touchEdits()
                       }}
-                      placeholder={event.venue_name ?? '未設定'}
+                      placeholder={event.venue_name ?? emptyValue('unconfigured')}
                       className="border-hairline rounded-control border px-3 py-2 text-sm font-normal"
                     />
                   </label>
@@ -301,7 +302,7 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
                         setVenueUrl(e.target.value)
                         touchEdits()
                       }}
-                      placeholder={event.venue_url ?? '未設定'}
+                      placeholder={event.venue_url ?? emptyValue('unconfigured')}
                       inputMode="url"
                       className="border-hairline rounded-control border px-3 py-2 text-sm font-normal"
                     />

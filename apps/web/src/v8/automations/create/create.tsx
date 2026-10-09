@@ -61,6 +61,7 @@ import { formatNumber, formatTime } from '@/lib/format'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /**
  * ルールを作る。Pencil ★V6 `Rv8Jv`（25-1-A つくる）。
@@ -2341,11 +2342,11 @@ export function NewAutomationV8({
         <dl className={styles.kvList}>
           <div className={styles.kvRow}>
             <dt>友だち全体</dt>
-            <dd>{totalForDraft === null ? '—' : `${formatNumber(totalForDraft)} 人`}</dd>
+            <dd>{totalForDraft === null ? emptyValue('unknown') : `${formatNumber(totalForDraft)} 人`}</dd>
           </div>
           <div className={styles.kvRow}>
             <dt>人数</dt>
-            <dd>{previewCount === null ? '—' : `${formatNumber(previewCount)} 人`}</dd>
+            <dd>{previewCount === null ? emptyValue('unknown') : `${formatNumber(previewCount)} 人`}</dd>
           </div>
         </dl>
         {previewFailed && savedDraft && selectedAccountId ? (
@@ -2453,15 +2454,15 @@ export function NewAutomationV8({
         <dl className={styles.kvList}>
           <div className={styles.kvRow}>
             <dt>シナリオ</dt>
-            <dd className={styles.kvLight}>{usedScenarioNames.length > 0 ? usedScenarioNames.join('、') : 'なし'}</dd>
+            <dd className={styles.kvLight}>{usedScenarioNames.length > 0 ? usedScenarioNames.join('、') : emptyValue('none')}</dd>
           </div>
           <div className={styles.kvRow}>
             <dt>タグ</dt>
-            <dd className={styles.kvLight}>{usedTagNames.length > 0 ? usedTagNames.join('、') : 'なし'}</dd>
+            <dd className={styles.kvLight}>{usedTagNames.length > 0 ? usedTagNames.join('、') : emptyValue('none')}</dd>
           </div>
           <div className={styles.kvRow}>
             <dt>共通アクション</dt>
-            <dd className={styles.kvLight}>{usedCommonActionNames.length > 0 ? usedCommonActionNames.join('、') : 'なし'}</dd>
+            <dd className={styles.kvLight}>{usedCommonActionNames.length > 0 ? usedCommonActionNames.join('、') : emptyValue('none')}</dd>
           </div>
         </dl>
       </section>
@@ -2867,7 +2868,7 @@ export function NewAutomationV8({
             <dt>だれに</dt>
             <dd>{targetSummary}{previewCount !== null ? ` 見込み ${formatNumber(previewCount)}人` : ''}</dd>
           </div>
-          <div className={styles.kvRow}><dt>すること</dt><dd>{actionSummary || '未設定'}</dd></div>
+          <div className={styles.kvRow}><dt>すること</dt><dd>{actionSummary || emptyValue('unconfigured')}</dd></div>
           <div className={styles.kvRow}>
             <dt>最初に動くのは</dt>
             <dd>{['datetime', 'daily', 'weekly'].includes(eventType) ? `次の決めた時刻（${triggerConfigSummary}）` : '次にきっかけが起きたとき'}</dd>

@@ -42,6 +42,7 @@ import { SendPathCoveragePanel } from './send-path-coverage-panel'
 import releaseLog from '@/generated/release-log-summary.json'
 import type { UpdateRelease } from './update-history'
 import styles from './control-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type StopTarget = 'broadcasts' | 'scenarios' | 'reminders' | 'automations'
 
@@ -552,7 +553,7 @@ const EmergencyControlV8 = (
           </div>
           <p className={`${styles.kpiValue} ${isStopped ? styles.kpiValueDanger : ''}`}>
             {/* WEB312：状態が読めていないときは「動いている」と言わない。 */}
-            {previewSettled && control ? (isStopped ? '停止中' : '有効') : '—'}
+            {previewSettled && control ? (isStopped ? '停止中' : '有効') : emptyValue('unknown')}
           </p>
           <p className={styles.kpiDetail}>
             {impactFailed && !control ? '確認できませんでした' : calculatedAt ? `${formatOperationDate(calculatedAt)}に確認` : '確認中'}
@@ -564,7 +565,7 @@ const EmergencyControlV8 = (
             <span className={styles.kpiLabel}>止めた回数</span>
           </div>
           <p className={styles.kpiValue}>
-            {historyState === 'ready' ? formatNumber(recent90.length) : '—'}<span className={styles.kpiUnit}>回</span>
+            {historyState === 'ready' ? formatNumber(recent90.length) : emptyValue('unknown')}<span className={styles.kpiUnit}>回</span>
           </p>
           <p className={styles.kpiDetail}>この90日</p>
         </div>
@@ -574,7 +575,7 @@ const EmergencyControlV8 = (
             <span className={styles.kpiLabel}>いちばん長かった停止</span>
           </div>
           <p className={styles.kpiValue}>
-            {historyState === 'ready' ? (longest.entry ? formatMinutesRough(longest.minutes) : '—') : '—'}
+            {historyState === 'ready' ? (longest.entry ? formatMinutesRough(longest.minutes) : emptyValue('unknown')) : emptyValue('unknown')}
           </p>
           <p className={styles.kpiDetail}>
             {longest.entry ? `${formatMonthDay(longest.entry.stoppedAt)} ${longest.entry.reason.slice(0, 8)}` : '記録なし'}
@@ -585,7 +586,7 @@ const EmergencyControlV8 = (
             <span className={styles.kpiTile} aria-hidden="true"><Tag size={14} /></span>
             <span className={styles.kpiLabel}>いまの版</span>
           </div>
-          <p className={styles.kpiValue}>{historyState === 'ready' ? (currentVersion ?? '—') : '—'}</p>
+          <p className={styles.kpiValue}>{historyState === 'ready' ? (currentVersion ?? emptyValue('unknown')) : emptyValue('unknown')}</p>
           <p className={styles.kpiDetail}>
             {latestReleaseAt ? `管理画面の更新 ${formatMonthDay(latestReleaseAt)}` : '管理画面の更新 —'}
           </p>
@@ -781,8 +782,8 @@ const EmergencyControlV8 = (
                       <td title={entry.detail ? `${entry.reason}（${entry.detail}）` : entry.reason} className={styles.cellTruncate}>
                         {entry.reason}
                       </td>
-                      <td>{minutes === null ? '—' : formatMinutesRough(minutes)}</td>
-                      <td>—</td>
+                      <td>{minutes === null ? emptyValue('unknown') : formatMinutesRough(minutes)}</td>
+                      <td>{emptyValue('unknown')}</td>
                     </tr>
                   )
                 })}

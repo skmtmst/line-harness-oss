@@ -69,6 +69,7 @@ import { useCursorStack } from './use-cursor-stack'
 import styles from './list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const KIND_LABELS: Record<FriendAddRuleKind, string> = {
   first_time: 'はじめて友だち追加した人',
@@ -90,7 +91,7 @@ const STATUS_CHIPS: Array<{ key: FriendAddRuleStatus; label: string; icon: typeo
 ]
 
 function countText(value: number | null | undefined, unit: string) {
-  return value === null || value === undefined ? '—' : `${formatNumber(value)}${unit}`
+  return value === null || value === undefined ? emptyValue('unknown') : `${formatNumber(value)}${unit}`
 }
 
 function successRate(delivered: number | null, failed: number | null) {
@@ -515,7 +516,7 @@ function FriendAddList() {
   const kpis = [
     {
       key: 'rules', icon: MessageSquareMore, title: '初回案内', value: error ? null : summary?.rules ?? null, unit: '件',
-      detail: summary ? `有効 ${formatNumber(summary.active)}件` : '—',
+      detail: summary ? `有効 ${formatNumber(summary.active)}件` : emptyValue('unknown'),
       help: 'いまある初回案内の設定数です。右の3つ（直近7日）とは期間がちがいます。',
     },
     {
@@ -762,7 +763,7 @@ function FriendAddList() {
                   {sendCell(rule)}
                   <Td className={styles.colStatus}><StatusPill rule={rule} /></Td>
                   <Td className={styles.colRecent}>
-                    <span className={styles.num}>{rule.status === 'draft' ? '—' : countText(rule.matchedLast7Days, '人')}</span>
+                    <span className={styles.num}>{rule.status === 'draft' ? emptyValue('unknown') : countText(rule.matchedLast7Days, '人')}</span>
                   </Td>
                   {menuCell(rule)}
                 </Tr>

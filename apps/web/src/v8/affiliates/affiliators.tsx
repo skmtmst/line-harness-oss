@@ -64,6 +64,7 @@ import {
 } from './parts'
 import styles from './affiliates.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type FilterKey = 'active' | 'reward'
 type SortKey = 'conversions' | 'reward' | 'name' | 'newest'
@@ -388,7 +389,7 @@ export default function AffiliatorsTab() {
         title="今月の報酬"
         icon={<Banknote size={14} aria-hidden="true" />}
         value={null}
-        valueText={paymentState === 'ready' && paymentTotal != null ? formatYen(paymentTotal) : '—'}
+        valueText={paymentState === 'ready' && paymentTotal != null ? formatYen(paymentTotal) : emptyValue('unknown')}
         unit=""
         detail={paymentState === 'ready' ? `承認待ち ${formatNumber(pendingCount)} 件は入っていない` : paymentState === 'loading' ? loadingWord : errorWord}
       />

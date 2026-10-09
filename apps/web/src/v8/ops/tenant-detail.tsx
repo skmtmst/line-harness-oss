@@ -23,6 +23,7 @@ import { useOpsReadOnly } from './use-ops-read-only'
 import parts from './parts.module.css'
 import styles from './tenant-detail.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /**
  * 運営の契約先の詳細 V8（絵 `Oub6x`・停止の窓 `okXoi`）。
@@ -171,7 +172,7 @@ function DetailContent() {
               <h3 className={parts.panelTitle}>契約先の情報</h3>
               <dl className={styles.kvs}>
                 <Kv k="統括名" v={tenant.name} />
-                <Kv k="メール" v={owner ? `${owner.email}（${ROLE_LABEL[owner.role] ?? owner.role}）` : '—'} />
+                <Kv k="メール" v={owner ? `${owner.email}（${ROLE_LABEL[owner.role] ?? owner.role}）` : emptyValue('unknown')} />
                 <Kv k="登録日" v={formatDate(tenant.created_at)} />
                 <Kv k="最終ログイン" v={formatDateTime(tenant.last_login_at)} />
               </dl>
@@ -213,7 +214,7 @@ function DetailContent() {
                   <div key={a.id} className={`${parts.miniRow} ${styles.accountRow}`} role="row">
                     <span className={parts.grow} role="cell" title={a.name}>{a.name}</span>
                     <span className={`${parts.fixed} ${styles.col90}`} role="cell">{a.archived_at || !a.is_active ? <StatusBadge tone="neutral">停止中</StatusBadge> : <StatusBadge tone="success">接続中</StatusBadge>}</span>
-                    <span className={`${parts.num} ${styles.col80}`} role="cell">{a.archived_at ? '—' : formatNumber(a.friend_count)}</span>
+                    <span className={`${parts.num} ${styles.col80}`} role="cell">{a.archived_at ? emptyValue('unknown') : formatNumber(a.friend_count)}</span>
                     <span className={`${parts.fixed} ${styles.col80}`} role="cell">{a.archived_at ? <StatusBadge tone="neutral">アーカイブ</StatusBadge> : a.is_active ? <StatusBadge tone="success">有効</StatusBadge> : <StatusBadge tone="neutral">停止</StatusBadge>}</span>
                   </div>
                 ))}
@@ -239,7 +240,7 @@ function DetailContent() {
                 {members.map((m) => (
                   <div key={m.id} className={parts.miniRow} role="row">
                     <span className={parts.grow} role="cell" title={m.name}>{m.name}</span>
-                    <span className={`${parts.fixed} ${styles.colMail}`} role="cell" title={m.email ?? ''}>{m.email ?? '—'}</span>
+                    <span className={`${parts.fixed} ${styles.colMail}`} role="cell" title={m.email ?? ''}>{m.email ?? emptyValue('unknown')}</span>
                     <span className={`${parts.fixed} ${styles.col90}`} role="cell">{ROLE_LABEL[m.role] ?? m.role}{m.access_level === 'read_only' ? '（閲覧）' : ''}</span>
                     <span className={`${parts.fixed} ${styles.col80}`} role="cell">{m.is_active ? <StatusBadge tone="success">有効</StatusBadge> : <StatusBadge tone="neutral">停止</StatusBadge>}</span>
                     <span className={`${parts.fixed} ${styles.colAt}`} role="cell">{shortDateTime(m.last_login_at)}</span>
@@ -268,7 +269,7 @@ function DetailContent() {
                     <span className={`${parts.fixed} ${styles.colAt}`} role="cell" title={formatDateTime(row.created_at)}>{shortDateTime(row.created_at)}</span>
                     <span className={`${parts.fixed} ${styles.col80}`} role="cell" title={row.staff_name}>{row.staff_name}</span>
                     <span className={`${parts.fixed} ${styles.colWhat}`} role="cell">{AUDIT_WORD[row.action] ?? AUDIT_ACTION_LABEL[row.action]?.label ?? row.action}</span>
-                    <span className={parts.grow} role="cell" title={row.reason ?? ''}>{row.reason ?? '—'}</span>
+                    <span className={parts.grow} role="cell" title={row.reason ?? ''}>{row.reason ?? emptyValue('unknown')}</span>
                   </div>
                 ))}
               </div>

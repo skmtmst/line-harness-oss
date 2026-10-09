@@ -32,6 +32,7 @@ import {
   type Automation as SharedAutomation,
 } from '@line-crm/shared'
 import styles from './automation-api-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /*
  * ★V8 オートメーション一覧（板 `LWQXd`）。
@@ -279,10 +280,10 @@ export default function AutomationListV8() {
   }
 
   const tabs = [
-    { key: 'rules', label: `ルール ${loadStatus === 'ready' ? items.length : '—'}` },
-    { key: 'common-actions', label: `共通アクション ${commonActionCount ?? '—'}`, href: '/common-actions' },
+    { key: 'rules', label: `ルール ${loadStatus === 'ready' ? items.length : emptyValue('unknown')}` },
+    { key: 'common-actions', label: `共通アクション ${commonActionCount ?? emptyValue('unknown')}`, href: '/common-actions' },
     { key: 'runs', label: '動いた記録', href: '/automations/runs' },
-    { key: 'templates', label: `見本 ${templateCount ?? '—'}`, href: '/automations?tab=templates' },
+    { key: 'templates', label: `見本 ${templateCount ?? emptyValue('unknown')}`, href: '/automations?tab=templates' },
   ]
 
   return (

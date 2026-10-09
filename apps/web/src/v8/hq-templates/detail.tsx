@@ -22,6 +22,7 @@ import type { HqAccount, HqTemplateListItem, TemplateDetail } from '@/lib/hq-tem
 import { KIND_TABS, sentLabel } from './store-list'
 import styles from '../template-detail/detail.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 「8月21日 18:02」（日本時間）。 */
 function stamp(iso: string): string {
@@ -159,7 +160,7 @@ export default function HqTemplateDetail({
           <div className={styles.aboutRow}><dt>種類</dt><dd>{kindLabel}</dd></div>
           <div className={styles.aboutRow}><dt>フォルダ</dt><dd>{folderName}</dd></div>
           <div className={styles.aboutRow}><dt>今月送った数</dt><dd title={row?.this_month_sent_count == null ? '今月送った数は、この種類では数えていません' : '配った先の合計'}>{sentLabel(row?.this_month_sent_count)}</dd></div>
-          <div className={styles.aboutRow}><dt>差し込み</dt><dd title={words.join('・')}>{words.length > 0 ? words.join('・') : 'なし'}</dd></div>
+          <div className={styles.aboutRow}><dt>差し込み</dt><dd title={words.join('・')}>{words.length > 0 ? words.join('・') : emptyValue('none')}</dd></div>
         </dl>
       </section>
       <LinePreview accountName="公式アカウント" note="受け取る人のLINEでの見え方です。{ } の差し込みは、配った先のアカウントで送るときに、受け取る人ごとの値に変わります。">
@@ -189,7 +190,7 @@ export default function HqTemplateDetail({
   const enterButton = (accountId: string | null) => accountId
     ? <button type="button" className={styles.ghostButton} onClick={() => onEnterAccount(accountId)} aria-label="このアカウントへ入る"><LogIn size={14} aria-hidden="true" />入る</button>
     : <span className={styles.ghostSpacer} aria-hidden="true" />
-  const creator = (version: HqTemplateVersionDisplay) => `${version.creator_name ?? '—'}・${stamp(version.created_at)}`
+  const creator = (version: HqTemplateVersionDisplay) => `${version.creator_name ?? emptyValue('unknown')}・${stamp(version.created_at)}`
   const sortedVersions = [...(versions ?? [])].sort((a, b) => b.version - a.version)
 
   const restore = async () => {
@@ -284,7 +285,7 @@ export default function HqTemplateDetail({
                 <div key={name} className={styles.usageRow}>
                   <span className={styles.usageKind} title={name}>{shortName(name)}</span>
                   <span className={styles.usageNameQuiet} title={name}>{name}</span>
-                  <span className={styles.usageVersion}>—</span>
+                  <span className={styles.usageVersion}>{emptyValue('unknown')}</span>
                   <span className={styles.usageState}>受け取り済み</span>
                   {enterButton(accountIdOf(name))}
                 </div>

@@ -49,6 +49,7 @@ import { formatDateTime } from '@/lib/format'
 import { webinarLoadFailure, type WebinarLoadFailure } from './webinar-load-failure'
 import styles from './list-v8.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type SortKey = 'updated' | 'created' | 'name'
 type SavedFilter = '' | 'active' | 'draft' | 'archived'
@@ -128,7 +129,7 @@ function isUnpublished(webinar: WebinarListItem): boolean {
 }
 
 function peopleText(value: number | null | undefined): string {
-  return typeof value === 'number' && Number.isFinite(value) ? `${formatNumber(value)}人` : '—'
+  return typeof value === 'number' && Number.isFinite(value) ? `${formatNumber(value)}人` : emptyValue('unknown')
 }
 
 function metricText(metric: WebinarOverviewMetric | undefined, unit: string): string {
@@ -165,7 +166,7 @@ function webinarKpiCells(overview: WebinarOverview | null): KpiCell[] {
     : ' '
   const ctaClicks = metrics?.ctaTotalClicks?.state === 'available' && metrics.ctaTotalClicks.value !== null
     ? metricText(metrics?.ctaTotalClicks, '')
-    : '—'
+    : emptyValue('unknown')
   const ctaPeople = metrics?.ctaUniquePeople?.state === 'available' && metrics.ctaUniquePeople.value !== null
     ? `押した人 ${formatNumber(metrics.ctaUniquePeople.value)}人`
     : ' '
@@ -385,7 +386,7 @@ export function WebinarListTableV8({
         <tbody>
           {items.map((w) => {
             const unpublished = w.status !== 'archived' && isUnpublished(w)
-            const viewStarted = unpublished ? '—' : peopleText(w.viewerCount)
+            const viewStarted = unpublished ? emptyValue('unknown') : peopleText(w.viewerCount)
             const period = publicationSummary(w)
             const menuItems = webinarRowMenuItems(w, canEdit, readonlyReason, router, onArchive)
             return (
@@ -406,7 +407,7 @@ export function WebinarListTableV8({
                   <span className={styles.slug} title={`/${w.slug}`}>/{w.slug}</span>
                 </td>
                 <td><span className={statusPillClass(w)}>● {statusLabelV8(w)}</span></td>
-                <td className={styles.countCell}>{unpublished ? '—' : peopleText(w.registrationCount)}</td>
+                <td className={styles.countCell}>{unpublished ? emptyValue('unknown') : peopleText(w.registrationCount)}</td>
                 <td>
                   <div className={styles.viewCell} title={unpublished ? '公開していないので視聴数はありません' : undefined}>
                     <div>視聴完了 —</div>
@@ -1060,8 +1061,8 @@ function WebinarListV8Inner() {
             <p className={styles.archiveTargetSub}><span className={statusPillClass(active)}>● {statusLabelV8(active)}</span></p>
             <p className={styles.archiveTarget}>申込・視聴</p>
             <p className={styles.archiveTargetSub}>
-              申込 {isUnpublished(active) ? '—' : peopleText(active.registrationCount)}
-              　視聴開始 {isUnpublished(active) ? '—' : peopleText(active.viewerCount)}
+              申込 {isUnpublished(active) ? emptyValue('unknown') : peopleText(active.registrationCount)}
+              　視聴開始 {isUnpublished(active) ? emptyValue('unknown') : peopleText(active.viewerCount)}
             </p>
             <p className={styles.archiveTarget}>公開ページの目印</p>
             <p className={styles.archiveTargetSub}>/{active.slug}</p>

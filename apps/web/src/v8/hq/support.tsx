@@ -42,6 +42,7 @@ import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import NoticeLineDialogV8 from './notice-line-dialog'
 import { SUPPORT_STATUS_WORDS, supportKindWord, supportTime } from './support-words'
 import styles from './support.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
 
@@ -91,7 +92,7 @@ export default function HqSupportV8() {
           tenantName: data.sender.tenantName ?? '',
           name: data.sender.name ?? '',
           email: data.sender.email ?? null,
-          planLabel: data.sender.planLabel ?? '—',
+          planLabel: data.sender.planLabel ?? emptyValue('unknown'),
         })
       }
     }).catch(() => {
@@ -294,7 +295,7 @@ export default function HqSupportV8() {
 
           <div className={styles.sender}>
             <span className={styles.senderText} title="この内容が問い合わせに添えられます。返信はこのメールアドレスに届きます。">
-              {`送信者：${sender.name || '—'}${sender.email ? `（${sender.email}）` : ''}・統括：${sender.tenantName || '—'}・プラン：${sender.planLabel}`}
+              {`送信者：${sender.name || emptyValue('unknown')}${sender.email ? `（${sender.email}）` : ''}・統括：${sender.tenantName || emptyValue('unknown')}・プラン：${sender.planLabel}`}
             </span>
             {!tenantUnavailable ? (
               <button type="button" onClick={() => setLineGuide(true)} className={styles.linkButton}>
@@ -336,7 +337,7 @@ export default function HqSupportV8() {
               </div>
               {history.slice(0, 10).map((item) => (
                 <div key={item.id} className={styles.row} role="row">
-                  <span role="cell">{item.ticketLabel ?? '—'}</span>
+                  <span role="cell">{item.ticketLabel ?? emptyValue('unknown')}</span>
                   <span role="cell" className={styles.subjectCell}>
                     <Link href={`/hq/support/detail?id=${encodeURIComponent(item.id)}`} className={styles.subject} title={item.subject}>{item.subject}</Link>
                     {!tenantUnavailable && item.replies && item.replies.length > 0 ? (

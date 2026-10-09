@@ -32,6 +32,7 @@ import { TodayTable } from './today-table'
 import { canWriteRole, groupCloseTasks, openItems, reasonText, slotTitle, summarizeToday } from './summarize'
 import { useStoreToday } from './use-store-today'
 import styles from './dashboard.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 function daysAgo(iso: string, now: number): string {
   const days = Math.max(0, Math.floor((now - Date.parse(iso)) / 86_400_000))
@@ -201,7 +202,7 @@ function TodayStore() {
               unit="件"
               delta={googleConnected && d.oldestReview ? <Chip tone="warn">{`最長 ${daysAgo(d.oldestReview.createTime, now)}`}</Chip> : null}
               detail={googleConnected
-                ? `Google ★${google.connection.averageRating ?? '—'}（${google.connection.totalReviewCount ?? 0}件）`
+                ? `Google ★${google.connection.averageRating ?? emptyValue('unknown')}（${google.connection.totalReviewCount ?? 0}件）`
                 : google ? 'Google ビジネスとつないでいません' : '読み込めませんでした'}
               action={googleConnected ? { label: '返信する', href: '/restaurant-test/google' } : { label: 'つなぐ', href: '/settings/sns' }}
             />

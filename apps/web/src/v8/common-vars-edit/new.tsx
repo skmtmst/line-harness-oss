@@ -47,6 +47,7 @@ import { focusFieldById } from '@/lib/use-form-errors'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /*
  * 種別8つ。板 `p82v9` のカードの並び（標準・長文・数値・URL／
@@ -415,7 +416,7 @@ export default function NewCommonVarV8() {
             <span className={styles.talkName}>然 - NEN -</span>
             <div className={styles.talkBubbleRow}>
               <p className={styles.talkBubble}>
-                {`いつもありがとうございます。\n${previewName}は ${value || '（未入力）'} です。`}
+                {`いつもありがとうございます。\n${previewName}は ${value || emptyValue('unconfigured')} です。`}
               </p>
               <span className={styles.talkTime}>10:00</span>
             </div>

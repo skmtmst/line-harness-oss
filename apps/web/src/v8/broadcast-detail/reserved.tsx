@@ -20,6 +20,7 @@ import { CancelReservationDialog } from './detail'
 import { formatBroadcastDateTime, formatShortDateTime } from './display'
 import styles from './reserved.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type AudienceEstimate = {
   audienceCount: number
@@ -176,7 +177,7 @@ export default function Reserved({
             broadcast={broadcast}
             accountName={accountName}
             chip={shortTime ? `${shortTime} に届きます` : undefined}
-            time={shortTime ? shortTime.slice(shortTime.indexOf('）') + 1) : '—'}
+            time={shortTime ? shortTime.slice(shortTime.indexOf('）') + 1) : emptyValue('unknown')}
           />
         </aside>
       </div>

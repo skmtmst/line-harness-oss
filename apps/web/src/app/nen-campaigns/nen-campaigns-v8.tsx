@@ -57,6 +57,7 @@ import {
 } from './nen-overview'
 import styles from './nen-campaigns-v8.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 板ごとの data-design-node（札で切り替える外枠の印）。 */
 const BOARD_NODE: Record<NenTab, string> = {
@@ -214,7 +215,7 @@ function NenKpiBandV8({
         <span className={styles.kpiLabel}>{label}</span>
         <button type="button" className={styles.kpiHelp} title={help} aria-label={`${label}：${help}`}>…</button>
       </div>
-      <p className={styles.kpiValue}>{value === null ? '—' : <>{formatNumber(value)}<span className={styles.kpiUnit}>{unit}</span></>}</p>
+      <p className={styles.kpiValue}>{value === null ? emptyValue('unknown') : <>{formatNumber(value)}<span className={styles.kpiUnit}>{unit}</span></>}</p>
       <p className={styles.kpiSub}>{sub}</p>
     </li>
   )
@@ -347,7 +348,7 @@ function AutoV8(props: NenOverviewProps & { pausedOnly: boolean }) {
               { value: 'name', label: '並び：配信名順' },
             ]}
           />
-          <span className={styles.rangeLabel}>{visible.length === 0 ? '—' : `${visible.length}件中 ${(safePage - 1) * pageSize + 1}〜${Math.min(visible.length, safePage * pageSize)}件`}</span>
+          <span className={styles.rangeLabel}>{visible.length === 0 ? emptyValue('unknown') : `${visible.length}件中 ${(safePage - 1) * pageSize + 1}〜${Math.min(visible.length, safePage * pageSize)}件`}</span>
           <PageSizeSelect
             value={pageSize}
             options={[10, 20, 50]}
@@ -448,8 +449,8 @@ function AutoRowV8({ setting, monthSent, onTestSend, onToggleSetting, onTabChang
       </Td>
       <Td><span className="text-label text-ink-secondary">{formatCampaignTiming(setting)}</span></Td>
       <Td><span className="text-label text-ink-secondary">{formatCampaignAudience(setting)}</span></Td>
-      <Td align="right"><span className="text-label tabular-nums text-ink">{monthSent == null ? '—' : formatNumber(monthSent)}</span></Td>
-      <Td align="right"><span className="text-label tabular-nums text-ink-secondary">—</span></Td>
+      <Td align="right"><span className="text-label tabular-nums text-ink">{monthSent == null ? emptyValue('unknown') : formatNumber(monthSent)}</span></Td>
+      <Td align="right"><span className="text-label tabular-nums text-ink-secondary">{emptyValue('unknown')}</span></Td>
       <Td>
         {setting.isEnabled ? <StatusBadge tone="success">有効</StatusBadge> : <StatusBadge tone="neutral">停止中</StatusBadge>}
       </Td>
@@ -546,7 +547,7 @@ function ColumnsV8(props: NenOverviewProps) {
               ...categories.map(([name, count]) => ({ value: name, label: `${name} ${count}` })),
             ]}
           />
-          <span className={styles.rangeLabel}>{visible.length === 0 ? '—' : `${visible.length}件中 ${(safePage - 1) * pageSize + 1}〜${Math.min(visible.length, safePage * pageSize)}件`}</span>
+          <span className={styles.rangeLabel}>{visible.length === 0 ? emptyValue('unknown') : `${visible.length}件中 ${(safePage - 1) * pageSize + 1}〜${Math.min(visible.length, safePage * pageSize)}件`}</span>
           <PageSizeSelect
             value={pageSize}
             options={[10, 20, 50]}
@@ -619,7 +620,7 @@ function ColumnsV8(props: NenOverviewProps) {
 function columnViewsV8(column: NenColumn, columnMetrics: NenOverviewProps['columnMetrics']): string {
   const metric = columnMetrics?.columns.find((row) => row.id === column.id)
   const value = metric?.articleOpened.value
-  return value == null ? '—' : formatNumber(value)
+  return value == null ? emptyValue('unknown') : formatNumber(value)
 }
 
 function ColumnRowV8({ column, ...props }: { column: NenColumn } & NenOverviewProps) {
@@ -639,7 +640,7 @@ function ColumnRowV8({ column, ...props }: { column: NenColumn } & NenOverviewPr
         <span className="block truncate text-micro text-ink-faint" title={column.excerpt}>{column.publishedAt == null ? '下書き' : column.excerpt}</span>
       </Td>
       <Td><span className="text-label text-ink-secondary">{column.category?.trim() || '分類なし'}</span></Td>
-      <Td><span className="text-label tabular-nums text-ink-secondary">{column.publishedAt ? jstShortDate(column.publishedAt) : '—'}</span></Td>
+      <Td><span className="text-label tabular-nums text-ink-secondary">{column.publishedAt ? jstShortDate(column.publishedAt) : emptyValue('unknown')}</span></Td>
       <Td>{columnDeliveryBadge(column)}</Td>
       <Td align="right"><span className="text-label tabular-nums text-ink">{columnViewsV8(column, props.columnMetrics)}</span></Td>
       <Td align="right">
@@ -682,7 +683,7 @@ function SelectedColumnV8(props: NenOverviewProps) {
         </label>
         <div className={styles.fieldLabel}>
           だれに
-          <p className={styles.selectDesc}>{selected.targetMode === 'tag' ? `タグで絞り込み（${audienceCount == null ? '—' : num(audienceCount)}人）` : `友だち 全員（${audienceCount == null ? '—' : num(audienceCount)}人）`}</p>
+          <p className={styles.selectDesc}>{selected.targetMode === 'tag' ? `タグで絞り込み（${audienceCount == null ? emptyValue('unknown') : num(audienceCount)}人）` : `友だち 全員（${audienceCount == null ? emptyValue('unknown') : num(audienceCount)}人）`}</p>
           <p className={styles.selectDesc}>送る相手はコラムを作るときに決めます。友だち解除・ブロックの人には送られません。</p>
         </div>
       </div>
@@ -798,11 +799,11 @@ function HistoryV8(props: NenOverviewProps) {
       </div>
       <div className={styles.tools}>
         {([
-          ['all', `すべて ${deliveryList?.pagination.total ?? '—'}`],
-          ['sent', `送りました ${summary?.sent ?? '—'}`],
-          ['pending', `これから ${summary ? summary.pending + summary.processing : '—'}`],
-          ['failed', `届きませんでした ${summary?.failed ?? '—'}`],
-          ['skipped', `送りませんでした ${summary?.skipped ?? '—'}`],
+          ['all', `すべて ${deliveryList?.pagination.total ?? emptyValue('unknown')}`],
+          ['sent', `送りました ${summary?.sent ?? emptyValue('unknown')}`],
+          ['pending', `これから ${summary ? summary.pending + summary.processing : emptyValue('unknown')}`],
+          ['failed', `届きませんでした ${summary?.failed ?? emptyValue('unknown')}`],
+          ['skipped', `送りませんでした ${summary?.skipped ?? emptyValue('unknown')}`],
         ] as Array<[HistoryFilterV8, string]>).map(([value, label]) => (
           <FilterChip key={value} selected={filter === value} onChange={(selected) => { const next = selected ? value : 'all'; setFilter(next); props.onChangeDeliveryView(historyViewStatus(next), undefined, appliedQuery) }}>{label}</FilterChip>
         ))}

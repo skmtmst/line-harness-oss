@@ -36,6 +36,7 @@ import {
   type TagEditorValues,
 } from '@/components/friend-fields/tag-editor-v4'
 import styles from './tag-editor-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 連動 OFF のときに出す「ON にすると何ができるか」（v7 と同じ内容）。 */
 const LINKED_PREVIEW = [
@@ -454,8 +455,8 @@ export default function TagEditorV8({
                 {mode === 'edit' && applyToExisting && (
                   <div className={styles.statGrid}>
                     <div className={styles.statBox}><p className={styles.statLabel}>現在の対象者</p><p className={styles.statValue}>{tag?.friendCount ?? 0}<span className={styles.statUnit}>人</span></p></div>
-                    <div className={styles.statBox}><p className={styles.statLabel}>本人マイル対象</p><p className={styles.statValue}>{retroPreview ? retroPreview.selfTargets : referenceRetroactiveState ? (tag?.friendCount ?? 0) : '—'}<span className={styles.statUnit}>人</span></p></div>
-                    <div className={styles.statBox}><p className={styles.statLabel}>紹介者対象</p><p className={styles.statValue}>{retroPreview ? retroPreview.referralTargets : referenceRetroactiveState ? Math.min(tag?.friendCount ?? 0, 34) : '—'}<span className={styles.statUnit}>人</span></p></div>
+                    <div className={styles.statBox}><p className={styles.statLabel}>本人マイル対象</p><p className={styles.statValue}>{retroPreview ? retroPreview.selfTargets : referenceRetroactiveState ? (tag?.friendCount ?? 0) : emptyValue('unknown')}<span className={styles.statUnit}>人</span></p></div>
+                    <div className={styles.statBox}><p className={styles.statLabel}>紹介者対象</p><p className={styles.statValue}>{retroPreview ? retroPreview.referralTargets : referenceRetroactiveState ? Math.min(tag?.friendCount ?? 0, 34) : emptyValue('unknown')}<span className={styles.statUnit}>人</span></p></div>
                     <div className={styles.statBox}><p className={styles.statLabel}>倍率</p><p className={styles.statValue} style={{ fontSize: 14 }}>次回付与から</p></div>
                   </div>
                 )}
@@ -491,7 +492,7 @@ export default function TagEditorV8({
                   {usageRows.map((row) => (
                     <div key={row.name} className={styles.useRow}>
                       <dt className={styles.useName}>{row.name}</dt>
-                      <dd className={styles.useCount}>{row.count === undefined || row.count === null ? '—' : `${row.count}件`}</dd>
+                      <dd className={styles.useCount}>{row.count === undefined || row.count === null ? emptyValue('unknown') : `${row.count}件`}</dd>
                     </div>
                   ))}
                 </dl>

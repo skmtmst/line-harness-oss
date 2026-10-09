@@ -28,6 +28,7 @@ import { formatStamp, Stat, StatRow, Status } from '../common-a/parts'
 import styles from './approvals.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const kindLabel: Record<RestaurantApproval['kind'], string> = {
   gbp_post: 'Google投稿',
@@ -47,7 +48,7 @@ function approvalSummary(item: RestaurantApproval): string {
   const payload = approvalPayload(item)
   const before = typeof payload.before === 'string' ? payload.before : null
   const after = typeof payload.after === 'string' ? payload.after : null
-  if (before || after) return `${before || '—'} → ${after || '—'}`
+  if (before || after) return `${before || emptyValue('unknown')} → ${after || emptyValue('unknown')}`
   return item.title
 }
 
@@ -89,9 +90,9 @@ function ApprovalContent({ item, data }: { item: RestaurantApproval; data: Resta
     return (
       <p className={styles.payloadDiff}>
         <span className={styles.diffKey}>変更前：</span>
-        <span className={styles.diffBefore}>{before || '—'}</span>
+        <span className={styles.diffBefore}>{before || emptyValue('unknown')}</span>
         <span className={styles.diffKey}>→</span>
-        <span className={styles.diffAfter}>{after || '—'}</span>
+        <span className={styles.diffAfter}>{after || emptyValue('unknown')}</span>
       </p>
     )
   }
@@ -126,7 +127,7 @@ function ApprovalCard({ item, data, store, busy, readOnly, onApprove, onReturn }
         ) : null}
       </div>
       <h3 className={styles.cardTitle}>{item.title}</h3>
-      <p className={styles.requested}>{`申請：${item.requested_by || '—'} ・ ${formatStamp(item.created_at)}`}</p>
+      <p className={styles.requested}>{`申請：${item.requested_by || emptyValue('unknown')} ・ ${formatStamp(item.created_at)}`}</p>
       <div className={styles.payload}>
         <p className={styles.payloadLabel}>変更内容</p>
         <ApprovalContent item={item} data={data} />
@@ -162,7 +163,7 @@ function ReturnDialog({ item, store, busy, onCancel, onSubmit }: {
         <div className={styles.dialogBody}>
           <div className={styles.dialogSummary}>
             <p className={styles.dialogSummaryMeta}>
-              {`${kindLabel[item.kind]}・${store?.name || '全店舗'}・申請 ${item.requested_by || '—'}（${formatStamp(item.created_at)}）`}
+              {`${kindLabel[item.kind]}・${store?.name || '全店舗'}・申請 ${item.requested_by || emptyValue('unknown')}（${formatStamp(item.created_at)}）`}
             </p>
             <p className={styles.dialogSummaryMain}>{approvalSummary(item)}</p>
           </div>

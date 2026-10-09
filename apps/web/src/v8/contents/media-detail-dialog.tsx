@@ -29,6 +29,7 @@ import {
 import { formatDateTime } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
 import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 版追加を止めた理由を、互換基準ごとに運用者へ説明する。 */
 function versionBlockerText(blockers: MediaVersionBlocker[]): string {
@@ -588,7 +589,7 @@ export default function MediaDetailDialog({
               <span className="text-action text-xs font-medium">
                 {impact && (impact.verified !== false || impact.references.length > 0)
                   ? `${impact.usageCount}か所`
-                  : '—'}
+                  : emptyValue('unknown')}
               </span>
             </div>
             {phase === 'loading' ? (

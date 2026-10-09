@@ -32,6 +32,7 @@ import { CONFIDENCE_WORD, STATUS_WORD, slashDateTime } from '../duplicates/words
 import styles from './compare.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const STRENGTH_WORD = { strong: '決め手', medium: '手がかり', weak: '参考' } as const
 const ATTRIBUTE_WORD: Record<string, string> = { メールアドレス: 'メール', 電話番号: '電話' }
@@ -114,7 +115,7 @@ function CompareInner() {
   const firstSelection = profileCandidates[0]
   const firstChosen = firstSelection?.options.find((option) => option.sourceFriendId === selections[firstSelection.fieldKey])
   const selectionSummary = firstChosen
-    ? `採用する値：表で選んだ値（${sideLetter(firstChosen.sourceFriendId)}：${firstChosen.valuePreview ?? '未登録'}${profileCandidates.length > 1 ? ' ほか' : ''}）`
+    ? `採用する値：表で選んだ値（${sideLetter(firstChosen.sourceFriendId)}：${firstChosen.valuePreview ?? emptyValue('unconfigured')}${profileCandidates.length > 1 ? ' ほか' : ''}）`
     : '採用する値：表で選んだ値'
 
   return (
@@ -149,7 +150,7 @@ function CompareInner() {
                 <section key={side} className={styles.subject} aria-label={side}>
                   <p className={styles.side}>{side}</p>
                   <p className={styles.subjectName}>{subject.label}</p>
-                  <p className={styles.subjectSub}>{[subject.detail, subject.lineAccountName].filter(Boolean).join('・') || '—'}</p>
+                  <p className={styles.subjectSub}>{[subject.detail, subject.lineAccountName].filter(Boolean).join('・') || emptyValue('unknown')}</p>
                   <dl className={styles.attrs}>
                     {subject.attributes.map((attribute) => (
                       <div key={attribute.label} className={styles.attr}>
@@ -276,8 +277,8 @@ function CompareInner() {
                     return (
                       <Tr key={field.fieldKey} className={styles.row}>
                         <Td className={styles.td}><span className={styles.itemName}>{field.fieldLabel === 'メールアドレス' ? 'メール' : field.fieldLabel}</span></Td>
-                        <Td className={styles.td}>{left?.valuePreview ?? '—'}</Td>
-                        <Td className={styles.td}>{right?.valuePreview ?? '—'}</Td>
+                        <Td className={styles.td}>{left?.valuePreview ?? emptyValue('unknown')}</Td>
+                        <Td className={styles.td}>{right?.valuePreview ?? emptyValue('unknown')}</Td>
                         <Td className={styles.td}>
                           <Select
                             aria-label={`${field.fieldLabel}に使う値`}
@@ -287,7 +288,7 @@ function CompareInner() {
                             onChange={(value) => setSelections((current) => ({ ...current, [field.fieldKey]: value }))}
                             options={field.options.map((option, index) => ({
                               value: option.sourceFriendId,
-                              label: same && index === 0 ? '同じ' : `${sideLetter(option.sourceFriendId) || option.sourceLabel}：${option.valuePreview ?? '未登録'}`,
+                              label: same && index === 0 ? '同じ' : `${sideLetter(option.sourceFriendId) || option.sourceLabel}：${option.valuePreview ?? emptyValue('unconfigured')}`,
                             }))}
                           />
                         </Td>
@@ -297,8 +298,8 @@ function CompareInner() {
                   {tagCandidates.length > 0 ? (
                     <Tr className={styles.rowPlain}>
                       <Td className={styles.td}><span className={styles.itemName}>タグ</span></Td>
-                      <Td className={styles.td}>{tagCandidates.filter((tag) => tag.sourceFriendIds.includes(detail.left.id)).map((tag) => tag.name).join('・') || '—'}</Td>
-                      <Td className={styles.td}>{tagCandidates.filter((tag) => tag.sourceFriendIds.includes(detail.right.id) && !tag.sourceFriendIds.includes(detail.left.id)).map((tag) => tag.name).join('・') || '—'}</Td>
+                      <Td className={styles.td}>{tagCandidates.filter((tag) => tag.sourceFriendIds.includes(detail.left.id)).map((tag) => tag.name).join('・') || emptyValue('unknown')}</Td>
+                      <Td className={styles.td}>{tagCandidates.filter((tag) => tag.sourceFriendIds.includes(detail.right.id) && !tag.sourceFriendIds.includes(detail.left.id)).map((tag) => tag.name).join('・') || emptyValue('unknown')}</Td>
                       <Td className={styles.td}><span className={styles.faint}>元の友だちに残す</span></Td>
                     </Tr>
                   ) : null}

@@ -48,6 +48,7 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import OrderDrawer from './order-drawer'
 import styles from './screen.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export type EcTabKey = 'events' | 'identity' | 'subscriptions' | 'connector'
 
@@ -126,14 +127,14 @@ const SHORT_DATE_TIME = new Intl.DateTimeFormat('ja-JP', {
 function dateTime(value: string | null): string {
   if (!value) return '—'
   const date = new Date(value)
-  return Number.isNaN(date.valueOf()) ? '—' : SHORT_DATE_TIME.format(date)
+  return Number.isNaN(date.valueOf()) ? emptyValue('unknown') : SHORT_DATE_TIME.format(date)
 }
 
 /** 補足の日時（年なし・曜日つき）。 */
 function longDateTime(value: string | null): string {
   if (!value) return '—'
   const date = new Date(value)
-  return Number.isNaN(date.valueOf()) ? '—' : formatDateTime(date)
+  return Number.isNaN(date.valueOf()) ? emptyValue('unknown') : formatDateTime(date)
 }
 
 const ACTION_PAGE_SIZE = 20
@@ -492,7 +493,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
         <div className={styles.pager}>
           <span className={styles.minorText}>
             <ListRange label="取り込みの記録" total={actionTotal} first={(page - 1) * ACTION_PAGE_SIZE + 1} last={(page - 1) * ACTION_PAGE_SIZE + actions.length} />
-            {` 最後に届いた ${longDateTime(overview?.lastReceivedAt ?? null)}・今日 ${overview ? formatNumber(overview.last24h) : '—'}件。注文の本文や接続用の秘密値は表示しません。`}
+            {` 最後に届いた ${longDateTime(overview?.lastReceivedAt ?? null)}・今日 ${overview ? formatNumber(overview.last24h) : emptyValue('unknown')}件。注文の本文や接続用の秘密値は表示しません。`}
           </span>
           {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} /> : null}
         </div>

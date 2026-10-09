@@ -26,6 +26,7 @@ import {
 } from './shared'
 import styles from '../settings.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /* 候補は v7（/booking/menus の BookingRulesEditor）と同じ。 */
 const TIME_ZONE_CHOICES = [
@@ -367,7 +368,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
                     value={draft.reminderDayBeforeTime ?? ''}
                     onChange={(value) => set('reminderDayBeforeTime', value || null)}
                   />
-                ) : <ReadOnlyText label="前日のお知らせを送る時刻" value={draft.reminderDayBeforeTime || '未設定'} />}
+                ) : <ReadOnlyText label="前日のお知らせを送る時刻" value={draft.reminderDayBeforeTime || emptyValue('unconfigured')} />}
                 <span className="text-ink-faint whitespace-nowrap text-xs">空欄は24時間前</span>
               </span></Field>
             <RuleNumberFieldV8 readOnly={!canEdit} label="当日のお知らせ" unit="時間前" min={1} max={72} value={draft.reminderHoursBefore} onChange={(value) => set('reminderHoursBefore', value)} humanize={(value) => formatHoursBeforeHint(value) || null} />

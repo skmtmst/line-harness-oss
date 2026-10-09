@@ -20,6 +20,7 @@ import { OpsHead } from './shell'
 import KnowledgeArticleV8 from './knowledge-article'
 import parts from './parts.module.css'
 import styles from './ops-knowledge-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /**
  * 運営のナレッジ V8（絵 `h114s`・記事 `R5ckwJ`）。
@@ -42,7 +43,7 @@ function loadDescription(err: unknown): string | undefined {
 
 /** 表の「種類」は短い名前で出す（使い方について → 使い方）。 */
 function shortKind(kind: string): string {
-  const label = KNOWLEDGE_KINDS.find((v) => v.value === kind)?.label ?? '—'
+  const label = KNOWLEDGE_KINDS.find((v) => v.value === kind)?.label ?? emptyValue('unknown')
   return label.replace(/について$/, '').replace('料金・契約', '料金・請求')
 }
 
@@ -110,7 +111,7 @@ export default function OpsKnowledgeV8() {
           <KpiCard presentation="cell" icon={<BadgeCheck size={13} aria-hidden="true" />} title="承認済み" value={count((row) => knowledgeState(row).label === '承認済み')} unit="件" detail="AI の返信に使う" help={pageHelp} loading={!loaded} />
           <KpiCard presentation="cell" icon={<Clock size={13} aria-hidden="true" />} title="承認待ち" value={count((row) => row.reviewState === 'pending')} unit="件" detail="根拠が揃った下書き" help={pageHelp} loading={!loaded} />
           <KpiCard presentation="cell" icon={<CircleHelp size={13} aria-hidden="true" />} title="要確認" value={count((row) => row.reviewState === 'needs_review')} unit="件" detail="運営の回答がない" help={pageHelp} loading={!loaded} />
-          <KpiCard presentation="cell" icon={<MessageSquareText size={13} aria-hidden="true" />} title="使われた回数" value={ready ? rows.reduce((sum, row) => sum + row.usedCount, 0) : null} unit="回" detail={ready ? `役に立った ${rows.reduce((sum, row) => sum + row.helpfulCount, 0)}` : '—'} help="このページの記事の累計です。" loading={!loaded} />
+          <KpiCard presentation="cell" icon={<MessageSquareText size={13} aria-hidden="true" />} title="使われた回数" value={ready ? rows.reduce((sum, row) => sum + row.usedCount, 0) : null} unit="回" detail={ready ? `役に立った ${rows.reduce((sum, row) => sum + row.helpfulCount, 0)}` : emptyValue('unknown')} help="このページの記事の累計です。" loading={!loaded} />
         </div>
 
         <div className={styles.tools}>
@@ -127,7 +128,7 @@ export default function OpsKnowledgeV8() {
             <Select aria-label="記事の種類" value={articleKind} onChange={(value) => { setArticleKind(value); setOffset(0) }} options={[{ value: '', label: '記事：すべて' }, ...KNOWLEDGE_ARTICLE_KINDS]} />
           </div>
           <span className={styles.spacer} />
-          <span className={styles.count}>{ready && total > 0 ? <ListRange total={total} first={offset + 1} last={Math.min(offset + rows.length, total)} /> : ready ? '0件' : '—'}</span>
+          <span className={styles.count}>{ready && total > 0 ? <ListRange total={total} first={offset + 1} last={Math.min(offset + rows.length, total)} /> : ready ? '0件' : emptyValue('unknown')}</span>
         </div>
 
         {actionError ? <p role="alert" className={parts.alert}>{actionError}</p> : null}
@@ -160,8 +161,8 @@ export default function OpsKnowledgeV8() {
                   <span className={parts.grow} role="cell" title={article.title}>{article.title}</span>
                   <span className={`${parts.fixed} ${styles.colKind}`} role="cell">{shortKind(article.kind)}</span>
                   <span className={`${parts.fixed} ${styles.colKind}`} role="cell"><StatusBadge tone={STATE_TONE[label] ?? 'neutral'}>{label}</StatusBadge></span>
-                  <span className={`${parts.num} ${styles.colKind}`} role="cell">{article.usedCount ? article.usedCount : '—'}</span>
-                  <span className={`${parts.num} ${styles.colShort}`} role="cell">{article.helpfulCount ? article.helpfulCount : '—'}</span>
+                  <span className={`${parts.num} ${styles.colKind}`} role="cell">{article.usedCount ? article.usedCount : emptyValue('unknown')}</span>
+                  <span className={`${parts.num} ${styles.colShort}`} role="cell">{article.helpfulCount ? article.helpfulCount : emptyValue('unknown')}</span>
                   <span className={`${parts.fixed} ${styles.colShort}`} role="cell">{shortDate(article.updatedAt)}</span>
                   <span className={`${parts.fixed} ${styles.colShort}`} role="cell">
                     <Button disabled={busy} onClick={() => void open(article)} aria-label={`「${article.title}」を開く`}>開く</Button>

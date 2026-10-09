@@ -27,6 +27,7 @@ import type { FormErrors } from '@/lib/use-form-errors'
 import { decodeImageSize, type TemplateMedia } from './definition'
 import styles from './console.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /*
  * ボタンの押したら（共通の欄 TapActionField・YPzmo・B-129）。保存の形（HqMessageCard の action・value）は今のまま。
@@ -145,7 +146,7 @@ export default function MessageForm({
                 onRemove={card.imageMediaId ? () => { const { imageMediaId: _removed, ...next } = card; updateCard(next) } : undefined}
                 onUploaded={(media) => { const next = withUploadedImage(value, media); onChange(withMessageCard(next, { ...card, imageMediaId: media.id })) }}
               />
-              {image ? <span className={styles.imageName}>{`${image.filename} ・ ${image.width ?? '—'}×${image.height ?? '—'}`}</span> : null}
+              {image ? <span className={styles.imageName}>{`${image.filename} ・ ${image.width ?? emptyValue('unknown')}×${image.height ?? emptyValue('unknown')}`}</span> : null}
             </div>
           )}
           <Field label="タイトル"><input className={styles.input} aria-label="ひな形のタイトル" maxLength={200} value={card.title} disabled={disabled} onChange={(event) => updateCard({ ...card, title: event.target.value })} /></Field>

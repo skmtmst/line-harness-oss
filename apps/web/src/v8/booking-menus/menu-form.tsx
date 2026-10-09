@@ -53,6 +53,7 @@ import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -909,7 +910,7 @@ export default function MenuFormV8() {
                   value={
                     mileageStatus === 'loading' ? '…'
                       : mileageStatus === 'error' ? '未取得'
-                      : bookingMileage === null ? '未設定'
+                      : bookingMileage === null ? emptyValue('unconfigured')
                       : formatNumber(bookingMileage)
                   }
                   disabled

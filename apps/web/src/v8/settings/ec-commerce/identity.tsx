@@ -33,6 +33,7 @@ import shared from './screen.module.css'
 import styles from './identity.module.css'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type View = 'all' | 'candidate' | 'none' | 'conflict'
 type Sort = 'newest' | 'confidence'
@@ -228,7 +229,7 @@ export default function EcIdentityCandidatesScreen() {
                 <Td>
                   {hasCandidate ? (
                     <StatusBadge tone={confidenceTone(item.confidence.label)} size="compact">{confidenceText(item.confidence.label)}</StatusBadge>
-                  ) : '—'}
+                  ) : emptyValue('unknown')}
                 </Td>
                 <Td><span className={styles.ops}>
                   {hasCandidate ? (

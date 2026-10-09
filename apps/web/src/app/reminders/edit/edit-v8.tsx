@@ -62,6 +62,7 @@ import { ChoiceCardV8, PhoneAsideV8, SummaryCardV8, WizardFooterV8, WizardHeadV8
 import { describeReminderDiff } from './reminder-conflict-diff'
 import styles from '../wizard-v8.module.css'
 import { formatNumber } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /*
  * ★V8 リマインダを作る・手順2〜5と完了。
@@ -820,14 +821,14 @@ function TargetStageV8({
               <div className={styles.countItem}>
                 <span className={styles.countLabel}>当てはまる人</span>
                 <strong className={styles.countValue}>
-                  {counting ? '…' : total == null ? '—' : formatNumber(total)}
+                  {counting ? '…' : total == null ? emptyValue('unknown') : formatNumber(total)}
                   <span className={styles.countValueUnit}>人</span>
                 </strong>
               </div>
               <div className={styles.countItem}>
                 <span className={styles.countLabel}>送る予定（ブロックを除く）</span>
                 <strong className={styles.countValue}>
-                  {counting ? '…' : matched == null ? '—' : formatNumber(matched)}
+                  {counting ? '…' : matched == null ? emptyValue('unknown') : formatNumber(matched)}
                   <span className={styles.countValueUnit}>人</span>
                 </strong>
               </div>
@@ -915,7 +916,7 @@ function TargetStageV8({
           <SummaryCardV8
             rows={[
               { key: '基準日', value: reminderTriggerLabel(settings.triggerType) },
-              { key: '対象者', value: matched == null ? '—' : `${formatNumber(matched)}人に送る予定` },
+              { key: '対象者', value: matched == null ? emptyValue('unknown') : `${formatNumber(matched)}人に送る予定` },
               { key: '通知', value: settings.steps.length > 0 ? `${settings.steps.length}通` : '手順3で作る' },
               { key: '状態', value: '下書き' },
             ]}
@@ -1391,7 +1392,7 @@ function ScheduleStageV8({
           <SummaryCardV8
             rows={[
               { key: '基準日', value: reminderTriggerLabel(settings.triggerType) },
-              { key: '対象者', value: preview ? countLabel(preview.summary.audience, '人') : '—' },
+              { key: '対象者', value: preview ? countLabel(preview.summary.audience, '人') : emptyValue('unknown') },
               { key: '通知', value: `${settings.steps.length}通` },
               { key: '状態', value: '下書き' },
             ]}
@@ -1621,7 +1622,7 @@ function ConfirmStageV8({
           <SummaryCardV8
             rows={[
               { key: '基準日', value: reminderTriggerLabel(settings.triggerType) },
-              { key: '対象者', value: validation?.audience.matched != null ? `${formatNumber(validation.audience.matched)}人` : '—' },
+              { key: '対象者', value: validation?.audience.matched != null ? `${formatNumber(validation.audience.matched)}人` : emptyValue('unknown') },
               { key: '通知', value: `${settings.steps.length}通` },
               { key: '状態', value: '下書き → 有効にする', strong: true },
             ]}

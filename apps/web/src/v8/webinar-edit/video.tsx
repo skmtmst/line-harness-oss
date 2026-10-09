@@ -37,6 +37,7 @@ import form from './form.module.css'
 import styles from './video.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
 
@@ -448,9 +449,9 @@ function SessionRow({ webinarId, at, readOnly, editing, onEdit, menu }: {
             <TextField id={capId} aria-label={`${when}の定員（人）`} inputMode="numeric" value={input} disabled={saving} placeholder="無制限" invalid={Boolean(capError)} aria-describedby={capError ? `${capId}-error` : undefined} onChange={(event) => { setInput(event.target.value); setCapError('') }} />
             <IconButton aria-label="定員を保存" title="定員を保存" disabled={saving} onClick={() => void save()}><Check size={15} aria-hidden="true" /></IconButton>
           </span>
-        ) : <span className={styles.cell}>{session === undefined ? '—' : session?.capacity == null ? '無制限' : `${formatNumber(session.capacity)} 人`}</span>}
+        ) : <span className={styles.cell}>{session === undefined ? emptyValue('unknown') : session?.capacity == null ? '無制限' : `${formatNumber(session.capacity)} 人`}</span>}
       </span>
-      <span className={styles.colCount}><span className={styles.cell}>{session ? `${formatNumber(session.reservedCount)} 人` : '—'}</span></span>
+      <span className={styles.colCount}><span className={styles.cell}>{session ? `${formatNumber(session.reservedCount)} 人` : emptyValue('unknown')}</span></span>
       <span className={styles.colState}>
         <span className={form.pill} data-tone={session?.state === 'full' ? 'warn' : session?.state === 'open' ? 'info' : undefined}><span className={form.pillDot} aria-hidden="true" />{sessionText(session, failed)}</span>
       </span>

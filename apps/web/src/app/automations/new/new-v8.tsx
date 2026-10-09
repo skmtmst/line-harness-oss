@@ -49,6 +49,7 @@ import { WeekdaySelect } from './weekday-select'
 import { FriendMultiSelect } from './friend-multi-select'
 import { formatNumber, formatTime } from '@/lib/format'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /**
  * ルールを作る。Pencil ★V6 `Rv8Jv`（25-1-A つくる）。
@@ -2496,7 +2497,7 @@ export function NewAutomationV8({
             <dl className={styles.kvList}>
               <div className={styles.kvRow}>
                 <dt className={styles.kvKey}>人数</dt>
-                <dd className={styles.kvValue}>{previewCount === null ? '—' : `${formatNumber(previewCount)}人`}</dd>
+                <dd className={styles.kvValue}>{previewCount === null ? emptyValue('unknown') : `${formatNumber(previewCount)}人`}</dd>
               </div>
             </dl>
             <p className={styles.footnote}>
@@ -2617,15 +2618,15 @@ export function NewAutomationV8({
             <dl className={styles.kvList}>
               <div className={styles.kvRow}>
                 <dt className={styles.kvKey}>タグ</dt>
-                <dd className={styles.kvValue}>{usedTagNames.length > 0 ? usedTagNames.join('、') : 'なし'}</dd>
+                <dd className={styles.kvValue}>{usedTagNames.length > 0 ? usedTagNames.join('、') : emptyValue('none')}</dd>
               </div>
               <div className={styles.kvRow}>
                 <dt className={styles.kvKey}>シナリオ</dt>
-                <dd className={styles.kvValue}>{usedScenarioNames.length > 0 ? usedScenarioNames.join('、') : 'なし'}</dd>
+                <dd className={styles.kvValue}>{usedScenarioNames.length > 0 ? usedScenarioNames.join('、') : emptyValue('none')}</dd>
               </div>
               <div className={styles.kvRow}>
                 <dt className={styles.kvKey}>共通アクション</dt>
-                <dd className={styles.kvValue}>{usedCommonActionNames.length > 0 ? usedCommonActionNames.join('、') : 'なし'}</dd>
+                <dd className={styles.kvValue}>{usedCommonActionNames.length > 0 ? usedCommonActionNames.join('、') : emptyValue('none')}</dd>
               </div>
             </dl>
           </section>
@@ -2702,7 +2703,7 @@ export function NewAutomationV8({
           </div>
           <div className={styles.kvRow}>
             <dt className={styles.kvKey}>すること</dt>
-            <dd className={styles.kvValue}>{actionSummary || '未設定'}</dd>
+            <dd className={styles.kvValue}>{actionSummary || emptyValue('unconfigured')}</dd>
           </div>
           <div className={styles.kvRow}>
             <dt className={styles.kvKey}>最初に動くのは</dt>

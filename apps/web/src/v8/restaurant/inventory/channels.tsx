@@ -25,6 +25,7 @@ import { Status } from '../booking-kit/shell'
 import { DialogNote, RsDialog } from '../booking-kit/parts'
 import { dayLabelParen, formatAt } from './format'
 import styles from './inventory.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export type RestaurantChannel = {
   id: string
@@ -225,9 +226,9 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
                 </Td>
                 <Td>{preparing && channel.receiveMethod === 'email_forward' ? 'メール転送（未設定）' : METHOD_LABEL[channel.receiveMethod]}</Td>
                 <Td><Status value={state.value} label={state.label} /></Td>
-                <Td align="right">{preparing || channel.todayCount === null ? '—' : `${channel.todayCount}件`}</Td>
-                <Td>{preparing ? '—' : formatAt(channel.lastReceivedAt, timezone)}</Td>
-                <Td align="right">{preparing || channel.receiveMethod === 'manual' ? '—' : channel.unreadableCount ?? '—'}</Td>
+                <Td align="right">{preparing || channel.todayCount === null ? emptyValue('unknown') : `${channel.todayCount}件`}</Td>
+                <Td>{preparing ? emptyValue('unknown') : formatAt(channel.lastReceivedAt, timezone)}</Td>
+                <Td align="right">{preparing || channel.receiveMethod === 'manual' ? emptyValue('unknown') : channel.unreadableCount ?? emptyValue('unknown')}</Td>
                 <Td>
                   {channel.receiveMethod === 'manual' ? (
                     <Button href="/restaurant-test/reservations">台帳へ</Button>

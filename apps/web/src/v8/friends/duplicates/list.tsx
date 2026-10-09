@@ -26,6 +26,7 @@ import { CANDIDATE_PAGE_SIZE, useDuplicatesData } from './use-duplicates-data'
 import { CONFIDENCE_WORD, STATUS_FILTERS, STATUS_WORD, confidenceTone, slashDateTime, statusTone } from './words'
 import styles from './list.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export default function DuplicatesListV8() {
   usePageTitle('友だち')
@@ -67,7 +68,7 @@ export default function DuplicatesListV8() {
     },
     {
       key: 'linked', title: '結び付けた',
-      valueText: counts !== null ? formatNumber(counts.linked ?? 0) : '—',
+      valueText: counts !== null ? formatNumber(counts.linked ?? 0) : emptyValue('unknown'),
       unit: '組',
       detail: counts !== null ? 'これまで' : '読み込めませんでした',
       help: '統合ユーザーに結び付けた組の数です。',
@@ -83,7 +84,7 @@ export default function DuplicatesListV8() {
     },
     {
       key: 'weak', title: '根拠が足りない',
-      valueText: d.lowConfidenceCount !== null ? formatNumber(d.lowConfidenceCount) : '—',
+      valueText: d.lowConfidenceCount !== null ? formatNumber(d.lowConfidenceCount) : emptyValue('unknown'),
       unit: '組',
       detail: d.lowConfidenceCount !== null ? '名前だけ一致' : '読み込めませんでした',
       help: '名前やプロフィール画像だけが一致していて、決め手が無い組です。',
@@ -209,7 +210,7 @@ export default function DuplicatesListV8() {
                 </td></tr>
               ) : d.candidates.map((candidate) => {
                 const href = `/friends/identity-candidates?id=${encodeURIComponent(candidate.id)}`
-                const accounts = [candidate.left.lineAccountName, candidate.right.lineAccountName].filter(Boolean).join(' ／ ') || '—'
+                const accounts = [candidate.left.lineAccountName, candidate.right.lineAccountName].filter(Boolean).join(' ／ ') || emptyValue('unknown')
                 const evidence = candidate.evidenceSummary.length ? candidate.evidenceSummary.join('・') : '根拠を確認'
                 return (
                   <Tr key={candidate.id} className={styles.row}>
@@ -309,7 +310,7 @@ export default function DuplicatesListV8() {
                   <Tr key={row.accountId} className={styles.rowCompact}>
                     <Td className={styles.td}><span className={styles.cellText} title={row.accountName}>{row.accountName}</span></Td>
                     {d.data!.perAccount.map((col) => {
-                      if (row.accountId === col.accountId) return <Td key={col.accountId} className={styles.td}><span className={styles.faint}>—</span></Td>
+                      if (row.accountId === col.accountId) return <Td key={col.accountId} className={styles.td}><span className={styles.faint}>{emptyValue('unknown')}</span></Td>
                       const pair = d.data!.pairwiseOverlap!.find((p) => p.fromAccountId === row.accountId && p.toAccountId === col.accountId)
                       return <Td key={col.accountId} className={styles.td}>{formatNumber(pair?.overlap ?? 0)}</Td>
                     })}

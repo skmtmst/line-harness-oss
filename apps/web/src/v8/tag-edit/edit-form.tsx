@@ -40,6 +40,7 @@ import { ActionDrawer, RetroactiveDialog, type LinkedAction, type TagEditorValue
 import { MULTIPLIERS, PRIORITIES, actionsSummary, buildUsageRows, mileageSummary } from './model'
 import styles from './edit.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export interface TagEditHost {
   initialValues: TagEditorValues
@@ -211,7 +212,7 @@ export function TagEditForm({
             <dd>
               {row.count > 0 && row.href
                 ? <Link href={row.href} className={styles.useLink}>{`${row.count} 件 →`}</Link>
-                : <span className={row.count > 0 ? styles.useCount : styles.useNone}>{row.count > 0 ? `${row.count} 件` : row.known ? 'なし' : '—'}</span>}
+                : <span className={row.count > 0 ? styles.useCount : styles.useNone}>{row.count > 0 ? `${row.count} 件` : row.known ? emptyValue('none') : emptyValue('unknown')}</span>}
             </dd>
           </div>
         ))}
@@ -222,7 +223,7 @@ export function TagEditForm({
               <button type="button" className={styles.useLink} onClick={() => { setActionsOpen(true); window.requestAnimationFrame(() => actionsRef.current?.scrollIntoView({ block: 'start' })) }}>
                 {`${actions.length} つ →`}
               </button>
-            ) : <span className={styles.useNone}>なし</span>}
+            ) : <span className={styles.useNone}>{emptyValue('none')}</span>}
           </dd>
         </div>
       </dl>
@@ -374,8 +375,8 @@ export function TagEditForm({
                   {applyToExisting ? (
                     <div className={styles.statGrid}>
                       <div className={styles.statBox}><span className={styles.statLabel}>現在の対象者</span><span className={styles.statValue}>{tag.friendCount ?? 0}人</span></div>
-                      <div className={styles.statBox}><span className={styles.statLabel}>本人マイル対象</span><span className={styles.statValue}>{retroPreview ? `${retroPreview.selfTargets}人` : retroactiveReference ? `${tag.friendCount ?? 0}人` : '—'}</span></div>
-                      <div className={styles.statBox}><span className={styles.statLabel}>紹介者対象</span><span className={styles.statValue}>{retroPreview ? `${retroPreview.referralTargets}人` : '—'}</span></div>
+                      <div className={styles.statBox}><span className={styles.statLabel}>本人マイル対象</span><span className={styles.statValue}>{retroPreview ? `${retroPreview.selfTargets}人` : retroactiveReference ? `${tag.friendCount ?? 0}人` : emptyValue('unknown')}</span></div>
+                      <div className={styles.statBox}><span className={styles.statLabel}>紹介者対象</span><span className={styles.statValue}>{retroPreview ? `${retroPreview.referralTargets}人` : emptyValue('unknown')}</span></div>
                     </div>
                   ) : null}
                   {retroPreview && (retroPreview.selfExcluded > 0 || retroPreview.referralExcluded > 0) ? (

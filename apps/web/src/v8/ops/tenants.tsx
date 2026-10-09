@@ -23,6 +23,7 @@ import { useOpsReadOnly } from './use-ops-read-only'
 import parts from './parts.module.css'
 import styles from './tenants.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /**
  * 運営の契約先アカウント V8（絵 `XWtYC`・作る窓 `i0FTN`）。
@@ -210,11 +211,11 @@ export default function OpsTenantsV8() {
                   <span className={`${parts.num} ${styles.colStaff}`} role="cell">{row.staff_count}</span>
                   <span className={`${parts.fixed} ${styles.colBilling} ${styles.billing}`} role="cell">
                     <span className={styles.billingMain}>{row.plan_status === 'trialing' ? 'トライアル' : planLabel(row.plan_key)}</span>
-                    <span className={styles.billingSub}>{row.trial_ends_at ? `期限 ${monthDay(row.trial_ends_at)}` : row.current_period_ends_at ? `次回 ${monthDay(row.current_period_ends_at)}` : '—'}</span>
+                    <span className={styles.billingSub}>{row.trial_ends_at ? `期限 ${monthDay(row.trial_ends_at)}` : row.current_period_ends_at ? `次回 ${monthDay(row.current_period_ends_at)}` : emptyValue('unknown')}</span>
                   </span>
                   <span className={`${parts.fixed} ${styles.col90}`} role="cell">{formatDate(row.created_at).replace(/-/g, '/')}</span>
                   <span className={`${parts.fixed} ${styles.col90}`} role="cell">{monthDay(row.last_login_at)}</span>
-                  <span className={`${parts.fixed} ${styles.colFeature}`} role="cell">{row.featurePacks.includes('restaurant') ? '使う' : '—'}</span>
+                  <span className={`${parts.fixed} ${styles.colFeature}`} role="cell">{row.featurePacks.includes('restaurant') ? '使う' : emptyValue('unknown')}</span>
                 </div>
               )
             })}

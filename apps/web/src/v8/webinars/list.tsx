@@ -88,6 +88,7 @@ import styles from './list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type SortKey = 'updated' | 'created' | 'name'
 type SavedFilter = '' | 'active' | 'draft' | 'archived'
@@ -132,7 +133,7 @@ function periodSummary(webinar: WebinarListItem): string {
 }
 
 function peopleText(value: number | null | undefined): string {
-  return typeof value === 'number' && Number.isFinite(value) ? `${formatNumber(value)}人` : '—'
+  return typeof value === 'number' && Number.isFinite(value) ? `${formatNumber(value)}人` : emptyValue('unknown')
 }
 
 function metricValue(metric: WebinarOverviewMetric | undefined): number | null {
@@ -152,19 +153,19 @@ function kpiCells(overview: WebinarOverview | null) {
   return [
     {
       key: 'webinars', title: 'ウェビナー', icon: Video, value: metricValue(m?.webinars), unit: '件',
-      detail: active === null ? '—' : `公開中 ${formatNumber(active)}件`, help: '登録済みの件数です。',
+      detail: active === null ? emptyValue('unknown') : `公開中 ${formatNumber(active)}件`, help: '登録済みの件数です。',
     },
     {
       key: 'registrations', title: '申込', icon: Users, value: metricValue(m?.registrations), unit: '人',
-      detail: bookings === null ? '—' : `延べ予約 ${formatNumber(bookings)}件`, help: '全期間の申込人数です。同じ人の複数予約は1人に数えます。',
+      detail: bookings === null ? emptyValue('unknown') : `延べ予約 ${formatNumber(bookings)}件`, help: '全期間の申込人数です。同じ人の複数予約は1人に数えます。',
     },
     {
       key: 'viewers', title: '視聴', icon: CalendarClock, value: metricValue(m?.viewers), unit: '人',
-      detail: rate === null ? '—' : `申込の ${Math.round(rate * 1000) / 10}%`, help: '視聴開始の人数です。視聴完了は一覧の集計では出していません。',
+      detail: rate === null ? emptyValue('unknown') : `申込の ${Math.round(rate * 1000) / 10}%`, help: '視聴開始の人数です。視聴完了は一覧の集計では出していません。',
     },
     {
       key: 'cta', title: 'CTAクリック', icon: MousePointerClick, value: metricValue(m?.ctaTotalClicks), unit: '回',
-      detail: people === null ? '—' : `押した人 ${formatNumber(people)}人`, help: '全期間にCTAが押された延べ回数です。',
+      detail: people === null ? emptyValue('unknown') : `押した人 ${formatNumber(people)}人`, help: '全期間にCTAが押された延べ回数です。',
     },
   ]
 }
@@ -912,7 +913,7 @@ function WebinarList() {
                     </Td>
                     <Td className={styles.colStatus}><StatusPill webinar={w} /></Td>
                     <Td className={styles.colCount}>
-                      <span className={styles.numMain}>{counts ? peopleText(w.registrationCount) : '—'}</span>
+                      <span className={styles.numMain}>{counts ? peopleText(w.registrationCount) : emptyValue('unknown')}</span>
                     </Td>
                     <Td className={styles.colView}>
                       {beforeStart(w) ? (
@@ -923,7 +924,7 @@ function WebinarList() {
                           <span className={styles.numSub}>{`視聴開始 ${peopleText(w.viewerCount)}`}</span>
                         </>
                       ) : (
-                        <span className={styles.numMain} title="公開していないので視聴数はありません">—</span>
+                        <span className={styles.numMain} title="公開していないので視聴数はありません">{emptyValue('unknown')}</span>
                       )}
                     </Td>
                     <Td className={styles.colPeriod}><span className={styles.period} title={period}>{period}</span></Td>
@@ -1069,7 +1070,7 @@ function WebinarList() {
               <p className={styles.dialogValue}><StatusPill webinar={active} /></p>
               <p className={styles.dialogLabel}>申込・視聴</p>
               <p className={styles.dialogValue}>
-                申込 {showsCounts(active) ? peopleText(active.registrationCount) : '—'}　視聴開始 {showsCounts(active) ? peopleText(active.viewerCount) : '—'}
+                申込 {showsCounts(active) ? peopleText(active.registrationCount) : emptyValue('unknown')}　視聴開始 {showsCounts(active) ? peopleText(active.viewerCount) : emptyValue('unknown')}
               </p>
               <p className={styles.dialogLabel}>公開ページ</p>
               <p className={styles.dialogValue}>{publicPath(active)}</p>

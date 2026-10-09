@@ -84,6 +84,7 @@ import {
 import VarsExportPanel from './export-panel'
 import styles from './list-v8.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -904,7 +905,7 @@ function CommonVarsListV8Inner() {
 
   const folderOptions = [
     { value: '', label: listFailed ? 'すべて（—）' : `すべて（${items.length}件）` },
-    { value: UNGROUPED, label: `未分類（${unfiledCount === null ? '—' : `${unfiledCount}件`}）` },
+    { value: UNGROUPED, label: `未分類（${unfiledCount === null ? emptyValue('unknown') : `${unfiledCount}件`}）` },
     ...folders.map((folder) => ({
       value: folder.id,
       label: folder.itemCount === null || folder.itemCount === undefined
@@ -975,9 +976,9 @@ function CommonVarsListV8Inner() {
             <span className={styles.kpiLabel}>共通情報</span>
           </div>
           <p className={styles.kpiValue}>
-            {listFailed ? '—' : formatNumber(stats.total)}<span className={styles.kpiUnit}>件</span>
+            {listFailed ? emptyValue('unknown') : formatNumber(stats.total)}<span className={styles.kpiUnit}>件</span>
           </p>
-          <p className={styles.kpiDetail}>下書き {listFailed ? '—' : stats.draftCount}・止めた {listFailed ? '—' : stats.stoppedCount}</p>
+          <p className={styles.kpiDetail}>下書き {listFailed ? emptyValue('unknown') : stats.draftCount}・止めた {listFailed ? emptyValue('unknown') : stats.stoppedCount}</p>
         </div>
         <div className={styles.kpi}>
           <div className={styles.kpiHead}>
@@ -985,7 +986,7 @@ function CommonVarsListV8Inner() {
             <span className={styles.kpiLabel}>差し込んでいる所</span>
           </div>
           <p className={styles.kpiValue}>
-            {listFailed || stats.usageTotal === null ? '—' : formatNumber(stats.usageTotal)}<span className={styles.kpiUnit}>か所</span>
+            {listFailed || stats.usageTotal === null ? emptyValue('unknown') : formatNumber(stats.usageTotal)}<span className={styles.kpiUnit}>か所</span>
           </p>
           <p className={styles.kpiDetail}>テンプレート・配信など</p>
         </div>
@@ -995,7 +996,7 @@ function CommonVarsListV8Inner() {
             <span className={styles.kpiLabel}>空のまま使われている</span>
           </div>
           <p className={styles.kpiValue}>
-            {listFailed ? '—' : formatNumber(stats.emptyInUse.length)}<span className={styles.kpiUnit}>件</span>
+            {listFailed ? emptyValue('unknown') : formatNumber(stats.emptyInUse.length)}<span className={styles.kpiUnit}>件</span>
           </p>
           <p className={styles.kpiDetail}>空欄のまま送られます</p>
           {stats.emptyInUse.length > 0 && !listFailed ? (
@@ -1010,7 +1011,7 @@ function CommonVarsListV8Inner() {
             <span className={styles.kpiLabel}>期限が近い</span>
           </div>
           <p className={styles.kpiValue}>
-            {listFailed ? '—' : formatNumber(stats.expiringSoon)}<span className={styles.kpiUnit}>件</span>
+            {listFailed ? emptyValue('unknown') : formatNumber(stats.expiringSoon)}<span className={styles.kpiUnit}>件</span>
           </p>
           <p className={styles.kpiDetail}>7日以内に期限切れ</p>
         </div>
@@ -1329,7 +1330,7 @@ function CommonVarsListV8Inner() {
                               {item.usageCount === undefined ? (
                                 <span className={styles.usageNone} title="使われている場所（未取得）">—（未取得）</span>
                               ) : item.usageCount === 0 ? (
-                                <span className={styles.usageNone}>なし</span>
+                                <span className={styles.usageNone}>{emptyValue('none')}</span>
                               ) : (
                                 <Link
                                   href={`/contents/vars/edit?id=${item.id}`}
@@ -1459,7 +1460,7 @@ function CommonVarsListV8Inner() {
                     {activeItem.usageCount === undefined
                       ? '—（未取得）'
                       : activeItem.usageCount === 0
-                        ? 'なし'
+                        ? emptyValue('none')
                         : `${formatNumber(activeItem.usageCount)}か所`}
                   </p>
                   {panelStatus && statusTarget?.id === activeItem.id ? (

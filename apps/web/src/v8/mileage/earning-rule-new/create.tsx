@@ -38,6 +38,7 @@ import {
   earningRuleCancellationEvent,
 } from './rule-fields'
 import styles from './create.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const DAILY_CAPS = [
   ['', '制限なし'],
@@ -52,7 +53,7 @@ const LIST_HREF = '/mileage?tab=earning-rules'
 
 /** 数を桁区切りで出す。取れていない数は「—」。 */
 const miles = (value: number | null | undefined) =>
-  typeof value === 'number' && Number.isFinite(value) ? formatNumber(value) : '—'
+  typeof value === 'number' && Number.isFinite(value) ? formatNumber(value) : emptyValue('unknown')
 
 /** 競合の帯の「だれが・いつ」。口が返したときだけ使う（無ければ言い切らない）。 */
 function conflictWho(data: unknown): { who: string | null; at: string | null } {
@@ -260,7 +261,7 @@ export default function EarningRuleCreateV8() {
     </div>
   ) : null
 
-  const trialValue = (filled: string) => (trialBusy ? '数えています…' : trial ? filled : '—')
+  const trialValue = (filled: string) => (trialBusy ? '数えています…' : trial ? filled : emptyValue('unknown'))
   const preview = (
     <div className={styles.side}>
       <section className={styles.sideCard} aria-labelledby="er-new-trial">
@@ -289,7 +290,7 @@ export default function EarningRuleCreateV8() {
                 <HelpTip label="倍率の説明">倍率はタグ側の設定で決まります。優先度がいちばん高いタグ1枚だけが効きます。</HelpTip>
               ) : null}
             </dt>
-            <dd>{`${validAmount ? miles(value) : '—'}${dailyCap ? `（1日${dailyCap}回まで）` : ''}`}</dd>
+            <dd>{`${validAmount ? miles(value) : emptyValue('unknown')}${dailyCap ? `（1日${dailyCap}回まで）` : ''}`}</dd>
           </div>
         </dl>
       </section>

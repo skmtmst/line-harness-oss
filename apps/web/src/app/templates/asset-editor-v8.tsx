@@ -50,6 +50,7 @@ import {
   type ResearchFormat,
   type ResearchQuestion,
 } from './template-asset-editor'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 画面ごとの見出しと説明（Pencil の絵のまま）。 */
 const V8_META: Record<AssetKind, { title: string; lead: string; designNode: string }> = {
@@ -336,9 +337,9 @@ export default function TemplateAssetEditorV8({ kind, visual = false }: { kind: 
       <div className={styles.cardHead}>
         <h2 className={styles.cardTitle}>公開したあとに見られる数</h2>
       </div>
-      <div className={styles.statRow}><span className={styles.statTerm}>配った数</span><span className={styles.statValue}>—</span></div>
-      <div className={styles.statRow}><span className={styles.statTerm}>使われた数</span><span className={styles.statValue}>—</span></div>
-      <div className={styles.statRow}><span className={styles.statTerm}>当選した数</span><span className={styles.statValue}>{lottery ? '—' : '抽選なし'}</span></div>
+      <div className={styles.statRow}><span className={styles.statTerm}>配った数</span><span className={styles.statValue}>{emptyValue('unknown')}</span></div>
+      <div className={styles.statRow}><span className={styles.statTerm}>使われた数</span><span className={styles.statValue}>{emptyValue('unknown')}</span></div>
+      <div className={styles.statRow}><span className={styles.statTerm}>当選した数</span><span className={styles.statValue}>{lottery ? emptyValue('unknown') : '抽選なし'}</span></div>
     </section>
   ) : (
     <section className={styles.card}>

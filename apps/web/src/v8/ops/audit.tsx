@@ -15,6 +15,7 @@ import { OpsHead } from './shell'
 import parts from './parts.module.css'
 import styles from './audit.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /**
  * 運営の監査ログ V8（絵 `e7ljE`）。
@@ -175,8 +176,8 @@ export default function OpsAuditV8() {
                 <span className={`${parts.fixed} ${styles.colAt}`} role="cell" title={formatDateTime(row.created_at)}>{shortDateTime(row.created_at)}</span>
                 <span className={`${parts.fixed} ${styles.colWho}`} role="cell" title={row.staff_name}>{row.staff_name}</span>
                 <span className={`${parts.fixed} ${styles.colWhat}`} role="cell">{actionWord(row.action)}</span>
-                <span className={`${parts.fixed} ${styles.colTenant}`} role="cell" title={row.tenant_name ?? ''}>{row.tenant_name ?? '—'}</span>
-                <span className={parts.grow} role="cell" title={row.reason ?? ''}>{row.reason ?? '—'}</span>
+                <span className={`${parts.fixed} ${styles.colTenant}`} role="cell" title={row.tenant_name ?? ''}>{row.tenant_name ?? emptyValue('unknown')}</span>
+                <span className={parts.grow} role="cell" title={row.reason ?? ''}>{row.reason ?? emptyValue('unknown')}</span>
               </div>
             ))}
           </div>

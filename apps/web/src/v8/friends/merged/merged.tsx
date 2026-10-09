@@ -37,6 +37,7 @@ import { FriendsSectionHead } from '../shared/head'
 import MergedPersonV8 from './person'
 import { useMergedUsers, USERS_PAGE_SIZES } from './use-merged-users'
 import styles from './merged.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 所属アカウントの選びの「複数アカウントのみ」（絞り込みの口は今と同じ onlyDups）。 */
 const MULTI_ACCOUNTS = '__multi'
@@ -46,12 +47,12 @@ function linkedDay(row: UserRowData): string {
   const linkedAt = (row as UserRowData & { linkedAt?: string | null }).linkedAt
   if (!linkedAt) return '—'
   const [, m, d] = formatYmd(linkedAt).split('-')
-  return m && d ? `${Number(m)}/${Number(d)}` : '—'
+  return m && d ? `${Number(m)}/${Number(d)}` : emptyValue('unknown')
 }
 
 /** 配信に使うアカウント：友だちが1つだけの人は、そのアカウントだけに届く。 */
 function deliveryAccount(row: UserRowData): string {
-  return row.accounts.length === 1 ? `${row.accounts[0].accountName}だけ` : '—'
+  return row.accounts.length === 1 ? `${row.accounts[0].accountName}だけ` : emptyValue('unknown')
 }
 
 export default function MergedUsersV8() {
@@ -147,7 +148,7 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
               icon={null}
               title={kpi.title}
               value={kpi.value}
-              valueText={kpi.value == null ? '—' : `${formatNumber(kpi.value)} 人`}
+              valueText={kpi.value == null ? emptyValue('unknown') : `${formatNumber(kpi.value)} 人`}
               unit="人"
               detail={null}
               help={kpi.help}
@@ -250,9 +251,9 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
                           {personId ? (
                             <button type="button" className={styles.name} onClick={() => onOpen(personId)} data-qa-open="Hn9eE">{row.displayName || '名前なし'}</button>
                           ) : (
-                            <span className={`${styles.name} ${styles.nameStatic}`}>{row.displayName || '—'}</span>
+                            <span className={`${styles.name} ${styles.nameStatic}`}>{row.displayName || emptyValue('unknown')}</span>
                           )}
-                          <span className={styles.contact}>{row.emails[0] ?? row.phones[0] ?? '—'}</span>
+                          <span className={styles.contact}>{row.emails[0] ?? row.phones[0] ?? emptyValue('unknown')}</span>
                         </div>
                       </Td>
                       <Td className={styles.td}>

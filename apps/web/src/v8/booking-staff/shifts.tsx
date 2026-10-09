@@ -46,6 +46,7 @@ import styles from './shifts.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -1016,7 +1017,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
   // 閲覧のみ：時刻を選ぶ部品は置かず、いまの時刻を文字で見せる（2026-10-06 オーナー決定）。
   const timeBox = (label: string, value: string, onChange: (v: string) => void) => (canEdit
     ? <TimeField aria-label={label} value={value} invalid={badTimes.includes(label)} onChange={(v) => { if (badTimes.includes(label)) setBadTimes([]); onChange(v) }} className={styles.time} />
-    : <span aria-label={label} className={`${styles.time} ${styles.timeText}`}>{value || '—'}</span>
+    : <span aria-label={label} className={`${styles.time} ${styles.timeText}`}>{value || emptyValue('unknown')}</span>
   )
 
   return (
@@ -1285,7 +1286,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
               </div>
               {calendarId ? (
                 <p className={styles.calMeta}>
-                  <span>最後に読んだ {calendarVerifiedAt ? shortStamp(calendarVerifiedAt) : '—'}</span>
+                  <span>最後に読んだ {calendarVerifiedAt ? shortStamp(calendarVerifiedAt) : emptyValue('unknown')}</span>
                   {calendarError ? <span className={styles.calMetaError}>最新の確認で失敗しています：{calendarError}</span> : null}
                 </p>
               ) : null}

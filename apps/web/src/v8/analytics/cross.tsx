@@ -27,6 +27,7 @@ import styles from './analytics.module.css'
 import PeriodPicker, { useReportPeriod } from '@/components/shared/period-picker'
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type CrossQueueStatus = { state: 'pending' | 'running' | 'available' | 'partial' | 'unavailable' | 'failed'; queuePosition: number | null; pendingAhead: number; estimatedWaitMs: number | null; nextTickAt: string | null }
 export type CrossSaveSlot = (props: { sourceResultId: string; defaultName: string }) => ReactNode
@@ -323,7 +324,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
   const kpis = <KpiBand className={styles.band}>
     {/* 表の合計は延べ人数。集計対象は口が数えた実際の人数（重複なし）。 */}
     <KpiCard presentation="band" title="集計対象" icon={<Users size={13} aria-hidden="true" />} menu={menu('集計対象')} value={crossResult ? crossResult.totalFriends : null} unit="人" detail={crossResult ? `表の延べ ${formatNumber(grandTotal)} ${unit}` : '結果が出ると数えます'} loading={loading} />
-    <KpiCard presentation="band" title="いちばん多い組み合わせ" icon={<Grid2x2 size={13} aria-hidden="true" />} menu={menu('いちばん多い組み合わせ')} value={summary?.top.value ?? null} unit={unit} detail={summary ? `${summary.top.rowLabel} × ${summary.top.columnLabel}` : '—'} loading={loading} />
+    <KpiCard presentation="band" title="いちばん多い組み合わせ" icon={<Grid2x2 size={13} aria-hidden="true" />} menu={menu('いちばん多い組み合わせ')} value={summary?.top.value ?? null} unit={unit} detail={summary ? `${summary.top.rowLabel} × ${summary.top.columnLabel}` : emptyValue('unknown')} loading={loading} />
     <KpiCard presentation="band" title="空のマス" icon={<Square size={13} aria-hidden="true" />} menu={menu('空のマス')} value={summary?.empty ?? null} unit="マス" detail={summary ? (summary.emptyLabels.slice(0, 2).join('・') || '該当者なし') : '該当者なし'} loading={loading} />
     {/* その項目に値が入っていない人は集計が数えていない。 */}
     <KpiCard presentation="band" title="未入力" icon={<HelpCircle size={13} aria-hidden="true" />} menu={menu('未入力')} value={null} unit="人" detail="値がまだ無い人（表に出ない）" />

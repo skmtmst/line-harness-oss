@@ -26,6 +26,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import { jstShort } from './shared'
 import styles from './bookings.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 予約・申込の状態の見え方。色だけに頼らず、必ず文字で言う。 */
 type ChipTone = 'warning' | 'success' | 'info' | 'neutral' | 'danger'
@@ -502,7 +503,7 @@ function Bookings({ eventId }: { eventId: string }) {
                 </span>
                 <span role="cell">{chip(row.status)}</span>
                 <span role="cell" className={styles.cellText} title={row.offerExpiresAt ? jstShort(row.offerExpiresAt) : undefined}>
-                  {row.offerExpiresAt ? jstShort(row.offerExpiresAt) : row.status === 'waiting' ? '案内前' : '—'}
+                  {row.offerExpiresAt ? jstShort(row.offerExpiresAt) : row.status === 'waiting' ? '案内前' : emptyValue('unknown')}
                 </span>
                 <span role="cell" className={styles.rowActions}>
                   {row.source === 'booking' && row.status === 'requested' ? (
@@ -592,7 +593,7 @@ function Bookings({ eventId }: { eventId: string }) {
               <span role="cell">{chip(row.status)}</span>
               <span role="cell" className={styles.cellText}>{jstShort(row.appliedAt)}</span>
               <span role="cell" className={styles.cellText}>{jstShort(row.offeredAt)}</span>
-              <span role="cell" className={styles.cellText}>—</span>
+              <span role="cell" className={styles.cellText}>{emptyValue('unknown')}</span>
             </div>
           ))}
           {historyRows.map((entry) => (

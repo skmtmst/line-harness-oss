@@ -37,6 +37,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { DIFFERENT_PROVIDER_DETAIL, DIFFERENT_PROVIDER_LEAD, HANDOVER_PILLS, countsLine, decisionLabel, handoverPill, totalsMatch } from './handover-view'
 import styles from './handover.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type HandoverDecisionView = AccountHandoverDecision & {
   sourceName?: string
@@ -413,7 +414,7 @@ export default function AccountHandoverV8() {
   const executeDisabled = unresolved > 0 || handover.status === 'completed' || editCount > 0 || declaredMismatch
   const destinationName = destination?.name ?? '受け取り先'
 
-  return frame(`乗り換え（${account.name} → ${destination?.name ?? '—'}）`, '引き継ぎコードで両方のアカウントをつなぎました。「要確認」を全部決めるまで本実行できません。', (
+  return frame(`乗り換え（${account.name} → ${destination?.name ?? emptyValue('unknown')}）`, '引き継ぎコードで両方のアカウントをつなぎました。「要確認」を全部決めるまで本実行できません。', (
     <>
       <HandoverSteps current={pill} />
       {viewerBand}
@@ -427,7 +428,7 @@ export default function AccountHandoverV8() {
               <Button type="button" variant="text" presentation="account-inline" onClick={() => void copyCode()}>{copyState === 'copied' ? 'コピーしました' : 'コピー'}</Button>
             </span>
           </p>
-          <p className={styles.boxValue}>{account.name}（引継ぎ元・元データを残す）→ {destination?.name ?? '—'}（引継ぎ先）</p>
+          <p className={styles.boxValue}>{account.name}（引継ぎ元・元データを残す）→ {destination?.name ?? emptyValue('unknown')}（引継ぎ先）</p>
           {handover.providerMatch === 'different' ? (
             <p className={styles.boxWarn}>{DIFFERENT_PROVIDER_LEAD}。{DIFFERENT_PROVIDER_DETAIL}</p>
           ) : null}
@@ -458,12 +459,12 @@ export default function AccountHandoverV8() {
               </div></Field></div>
           ) : null}
           {declaredMismatch ? (
-            <p className={styles.boxWarn}>申告の数（{handover.declaredFriendTotal}人）と事前確認の合計（{handover.counts?.sourceTotal ?? '—'}人）が違います。差の理由を確かめてから、数を直すか事前確認をやり直してください。</p>
+            <p className={styles.boxWarn}>申告の数（{handover.declaredFriendTotal}人）と事前確認の合計（{handover.counts?.sourceTotal ?? emptyValue('unknown')}人）が違います。差の理由を確かめてから、数を直すか事前確認をやり直してください。</p>
           ) : null}
         </Card>
       </div>
 
-      <DataTable presentation="account-handover" label={`要確認 ${handover.counts?.review ?? '—'}人の判断`}>
+      <DataTable presentation="account-handover" label={`要確認 ${handover.counts?.review ?? emptyValue('unknown')}人の判断`}>
         <thead>
         <TableHeadRow>
           <Th className={styles.colName}>元の友だち</Th>
@@ -488,7 +489,7 @@ export default function AccountHandoverV8() {
                 <span className={styles.name}>{decision.candidateName ?? '候補なし'}</span>
                 <span className={styles.sub}>受け取り先の候補</span>
               </div></Td>
-              <Td className={styles.colEvidence}>{decision.evidenceLabel ?? decision.note ?? '—'}</Td>
+              <Td className={styles.colEvidence}>{decision.evidenceLabel ?? decision.note ?? emptyValue('unknown')}</Td>
               <Td className={styles.colChoice}>
                 {editable ? (
                   <Select

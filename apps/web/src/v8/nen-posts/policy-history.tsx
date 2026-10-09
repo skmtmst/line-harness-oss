@@ -16,8 +16,9 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { formatPhotoReceivedAt } from './time'
 import styles from './review.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
-const policyContent = (version: PhotoRewardPolicyVersion) => `採用 ${version.points}・公式サイト掲載 ${version.publicationPoints ? `さらに ${version.publicationPoints}` : 'なし'}`
+const policyContent = (version: PhotoRewardPolicyVersion) => `採用 ${version.points}・公式サイト掲載 ${version.publicationPoints ? `さらに ${version.publicationPoints}` : emptyValue('none')}`
 
 /** 版の日時は「9/20 10:00」の短い形（日本時間）。全文は title で読める。 */
 function shortWhen(value: string | null | undefined): string {
@@ -97,7 +98,7 @@ export default function PhotoPolicyHistoryV8({ open, canEdit, onClose, onChanged
       {loading ? <ListState kind="loading" title="版を読み込んでいます" /> : error ? <ListState kind="error" title={error} onRetry={() => void load()} /> : <>
         <div className={styles.historyTable}><DataTable><thead><TableHeadRow><Th>版</Th><Th>保存日時</Th><Th>保存した人</Th><Th>内容</Th><Th><span className="sr-only">操作</span></Th></TableHeadRow></thead><tbody>
           {versions.filter((version) => version.status !== 'reserved').map((version) => <Tr key={version.versionNumber}>
-            <Td>{`v${version.versionNumber}`}</Td><Td><span title={formatPhotoReceivedAt(version.createdAt)}>{shortWhen(version.createdAt)}</span></Td><Td>{version.createdBy || '—'}</Td><Td>{policyContent(version)}</Td>
+            <Td>{`v${version.versionNumber}`}</Td><Td><span title={formatPhotoReceivedAt(version.createdAt)}>{shortWhen(version.createdAt)}</span></Td><Td>{version.createdBy || emptyValue('unknown')}</Td><Td>{policyContent(version)}</Td>
             <Td>{version.status === 'in_use' ? <StatusBadge tone="success">いま使っている版</StatusBadge> : <Button variant="secondary" onClick={() => setSelected(version)}>比べる</Button>}</Td>
           </Tr>)}
         </tbody></DataTable></div>
@@ -107,7 +108,7 @@ export default function PhotoPolicyHistoryV8({ open, canEdit, onClose, onChanged
           <section className={styles.historyCard}>
             <h3 className={styles.railTitle}>予約中の版</h3>
             {reserved.length ? reserved.map((version) => <div key={version.versionNumber} className={styles.historyReserved}>
-              <p className={styles.historyReservedHead}><strong>{`v${version.versionNumber}`}</strong><StatusBadge tone="info">予約</StatusBadge><span className={styles.historyReservedWhen} title={version.effectiveFrom ? formatPhotoReceivedAt(version.effectiveFrom) : undefined}>{version.effectiveFrom ? `${shortWhen(version.effectiveFrom)} から` : '—'}</span></p>
+              <p className={styles.historyReservedHead}><strong>{`v${version.versionNumber}`}</strong><StatusBadge tone="info">予約</StatusBadge><span className={styles.historyReservedWhen} title={version.effectiveFrom ? formatPhotoReceivedAt(version.effectiveFrom) : undefined}>{version.effectiveFrom ? `${shortWhen(version.effectiveFrom)} から` : emptyValue('unknown')}</span></p>
               <p className={styles.historyReservedBody}>{policyContent(version)}</p>
             </div>) : <p className={styles.railNote}>予約中の版はありません</p>}
           </section>

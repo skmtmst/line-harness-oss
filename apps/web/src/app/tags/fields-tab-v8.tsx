@@ -42,6 +42,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { TagRowsSkeleton } from './tag-rows-skeleton'
 import styles from './list-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -360,7 +361,7 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
         {kpis.map((kpi) => (
           <div key={kpi.title} className={styles.kpi}>
             <span className={styles.kpiLabel}><kpi.icon size={13} aria-hidden="true" />{kpi.title}</span>
-            <p className={styles.kpiValue}>{kpi.value ?? '—'}<span className={styles.kpiUnit}>{kpi.value === null ? '' : kpi.unit}</span></p>
+            <p className={styles.kpiValue}>{kpi.value ?? emptyValue('unknown')}<span className={styles.kpiUnit}>{kpi.value === null ? '' : kpi.unit}</span></p>
             <p className={styles.kpiDetail}>{kpi.detail}</p>
           </div>
         ))}
@@ -533,9 +534,9 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
                             </ContextMenu>
                           </td>
                           <td className={styles.cellText}>{FIELD_TYPE_LABELS[field.type] ?? field.type}</td>
-                          <td className={styles.cellText} style={{ fontVariantNumeric: 'tabular-nums' }}>{knownUsageCount(field) ?? '—'}{knownUsageCount(field) === null ? '' : '人'}</td>
+                          <td className={styles.cellText} style={{ fontVariantNumeric: 'tabular-nums' }}>{knownUsageCount(field) ?? emptyValue('unknown')}{knownUsageCount(field) === null ? '' : '人'}</td>
                           <td className={styles.cellMuted} title={field.formUsageCount === undefined ? '回答フォームの使用数は未集計' : undefined}>
-                            {field.formUsageCount === undefined ? '—' : `${field.formUsageCount}個`}
+                            {field.formUsageCount === undefined ? emptyValue('unknown') : `${field.formUsageCount}個`}
                           </td>
                           <td className={styles.cellMuted}><span className={styles.cellTruncate} title={destinationLabel(field)}>{destinationLabel(field)}</span></td>
                           <td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
@@ -654,11 +655,11 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
             </div>
             <div>
               <dt className={styles.cellMuted}>使っている友だち</dt>
-              <dd className={styles.cellText}>{knownUsageCount(activeField) === null ? '—' : `${knownUsageCount(activeField)}人`}</dd>
+              <dd className={styles.cellText}>{knownUsageCount(activeField) === null ? emptyValue('unknown') : `${knownUsageCount(activeField)}人`}</dd>
             </div>
             <div>
               <dt className={styles.cellMuted}>回答フォームの使用数</dt>
-              <dd className={styles.cellText}>{activeField.formUsageCount === undefined ? '—' : `${activeField.formUsageCount}個`}</dd>
+              <dd className={styles.cellText}>{activeField.formUsageCount === undefined ? emptyValue('unknown') : `${activeField.formUsageCount}個`}</dd>
             </div>
             <div>
               <dt className={styles.cellMuted}>移行先</dt>

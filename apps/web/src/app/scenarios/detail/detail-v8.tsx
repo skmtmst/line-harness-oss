@@ -118,6 +118,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -1017,7 +1018,7 @@ export default function ScenarioDetailV8({
 
   const describeScenarioSummary = (input: { name: string; isActive: boolean; stepCount: number }): string =>
     [
-      `名前：${input.name || '（未入力）'}`,
+      `名前：${input.name || emptyValue('unconfigured')}`,
       `状態：${input.isActive ? '有効' : '停止中'}`,
       `通の数：${input.stepCount}`,
     ].join('\n')
@@ -1957,7 +1958,7 @@ export default function ScenarioDetailV8({
                 数を作らずに、繋がっていないことをそのまま書く。 */}
             <div className="flex items-baseline justify-between gap-3">
               <dt className="text-ink-faint shrink-0">配信前チェック</dt>
-              <dd className="text-ink-faint min-w-0 text-right">—</dd>
+              <dd className="text-ink-faint min-w-0 text-right">{emptyValue('unknown')}</dd>
             </div>
           </dl>
           <p className="text-ink-faint mt-2 text-xs leading-relaxed">
@@ -2397,17 +2398,17 @@ export default function ScenarioDetailV8({
             <div className={styles.kpi}>
               <p className={styles.kpiLabel}>予約中</p>
               <p className={styles.kpiValue}>
-                {stats ? formatNumber(stats.activeNow) : '—'}
+                {stats ? formatNumber(stats.activeNow) : emptyValue('unknown')}
                 <span className={styles.kpiUnit}>人</span>
               </p>
               <p className={styles.kpiDetail}>
-                {simulation ? `うち新しく始まる予定 ${formatNumber(simulation.audience.newStartPlanned)}人` : '—'}
+                {simulation ? `うち新しく始まる予定 ${formatNumber(simulation.audience.newStartPlanned)}人` : emptyValue('unknown')}
               </p>
             </div>
             <div className={styles.kpi}>
               <p className={styles.kpiLabel}>届いた</p>
               <p className={styles.kpiValue}>
-                {stats?.steps[0] ? formatNumber(stats.steps[0].reachedCount) : '—'}
+                {stats?.steps[0] ? formatNumber(stats.steps[0].reachedCount) : emptyValue('unknown')}
                 <span className={styles.kpiUnit}>人</span>
               </p>
               <p className={styles.kpiDetail}>
@@ -2421,7 +2422,7 @@ export default function ScenarioDetailV8({
               <p className={styles.kpiValue}>
                 {runs?.steps[0]?.failed.state === 'available' && runs.steps[0].failed.value !== null
                   ? formatNumber(runs.steps[0].failed.value)
-                  : '—'}
+                  : emptyValue('unknown')}
                 <span className={styles.kpiUnit}>人</span>
               </p>
               <p className={styles.kpiDetail}>
@@ -2433,7 +2434,7 @@ export default function ScenarioDetailV8({
             <div className={styles.kpi}>
               <p className={styles.kpiLabel}>終わった</p>
               <p className={styles.kpiValue}>
-                {stats ? formatNumber(stats.completed) : '—'}
+                {stats ? formatNumber(stats.completed) : emptyValue('unknown')}
                 <span className={styles.kpiUnit}>人</span>
               </p>
               <p className={styles.kpiDetail}>
@@ -2692,7 +2693,7 @@ export default function ScenarioDetailV8({
                           />
                         </span>
                         <span className={styles.statReachText}>
-                          {stat ? scenarioReachCountLabel(stat.reachedCount) : '—'}
+                          {stat ? scenarioReachCountLabel(stat.reachedCount) : emptyValue('unknown')}
                           {pct !== null ? `・${scenarioReachPercentLabel(pct)}` : ''}
                         </span>
                       </span>
@@ -2717,7 +2718,7 @@ export default function ScenarioDetailV8({
         {/* 右の欄：選んだ通のスマホ（板は 380）。 */}
         <aside className={styles.previewCol}>
           <p className={styles.previewTitle}>
-            選んだ通（{shownStep ? `${shownStep.stepOrder}通目` : '—'}）の見え方
+            選んだ通（{shownStep ? `${shownStep.stepOrder}通目` : emptyValue('unknown')}）の見え方
           </p>
           <LinePreview
             accountName={startAccountLabel === '全アカウント共通' ? '公式アカウント' : startAccountLabel}
@@ -2962,7 +2963,7 @@ export default function ScenarioDetailV8({
                       : styles.checkUnknown
                 }`}
               >
-                {item.state === 'ok' ? '✓' : item.state === 'warn' ? '!' : '—'}
+                {item.state === 'ok' ? '✓' : item.state === 'warn' ? '!' : emptyValue('unknown')}
               </span>
               <span>
                 <span className="text-ink block font-medium">{item.label}</span>

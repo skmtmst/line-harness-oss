@@ -26,6 +26,7 @@ import type { DetailChrome, EditContext } from './types'
 import styles from './analytics.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export default function AnalyticsPane({ ctx, chrome }: { ctx: EditContext; chrome: DetailChrome }) {
   const { webinar, analytics, analyticsState } = ctx
@@ -74,10 +75,10 @@ export default function AnalyticsPane({ ctx, chrome }: { ctx: EditContext; chrom
 
   const summary = analytics?.summary ?? null
   const kpis = [
-    { key: 'reservations', title: '申込', icon: History, value: summary?.reservations ?? null, unit: '人', detail: summary ? `今月 +${formatNumber(thisMonthReservations(analytics?.daily ?? []))}` : '—', help: '予約した人の数です。今月の数はサーバーの集計日（UTC）を基準にしています。' },
-    { key: 'viewers', title: '参加', icon: LogIn, value: summary?.viewers ?? null, unit: '人', detail: summary ? `申込の ${percent(summary.viewers, summary.reservations)}` : '—', help: '入場した人の数です。予約せず直接入場した人も含みます。' },
-    { key: 'completed', title: '視聴完了', icon: CircleCheck, value: summary?.completed ?? null, unit: '人', detail: summary ? `参加の ${percent(summary.completed, summary.viewers)}` : '—', help: '動画の9割以上を実際に見た人です。' },
-    { key: 'forms', title: 'フォーム送信', icon: Send, value: summary?.formSubmissions ?? null, unit: '人', detail: summary ? `CTA を押した ${formatNumber(summary.ctaClicks)} 人のうち` : '—', help: 'フォームを送信した人の数です。同じ人が複数回送信しても1人に数えます。各段の人数差は、同じ人が順番に進んだ割合を表すものではありません。' },
+    { key: 'reservations', title: '申込', icon: History, value: summary?.reservations ?? null, unit: '人', detail: summary ? `今月 +${formatNumber(thisMonthReservations(analytics?.daily ?? []))}` : emptyValue('unknown'), help: '予約した人の数です。今月の数はサーバーの集計日（UTC）を基準にしています。' },
+    { key: 'viewers', title: '参加', icon: LogIn, value: summary?.viewers ?? null, unit: '人', detail: summary ? `申込の ${percent(summary.viewers, summary.reservations)}` : emptyValue('unknown'), help: '入場した人の数です。予約せず直接入場した人も含みます。' },
+    { key: 'completed', title: '視聴完了', icon: CircleCheck, value: summary?.completed ?? null, unit: '人', detail: summary ? `参加の ${percent(summary.completed, summary.viewers)}` : emptyValue('unknown'), help: '動画の9割以上を実際に見た人です。' },
+    { key: 'forms', title: 'フォーム送信', icon: Send, value: summary?.formSubmissions ?? null, unit: '人', detail: summary ? `CTA を押した ${formatNumber(summary.ctaClicks)} 人のうち` : emptyValue('unknown'), help: 'フォームを送信した人の数です。同じ人が複数回送信しても1人に数えます。各段の人数差は、同じ人が順番に進んだ割合を表すものではありません。' },
   ]
 
   return (
@@ -151,11 +152,11 @@ function Retention({ analytics, durationSeconds }: { analytics: WebinarAnalytics
   const completed = analytics.summary.completed
   const empty = points.length === 0 || started === 0
   const maxX = Math.max(bucketSeconds, durationSeconds, ctaAt ?? 0, ...points.map((point) => point.atSeconds))
-  const rateOf = (viewers: number | null): string => (viewers === null || started <= 0 ? '—' : `${Math.round((viewers / started) * 100)}%`)
+  const rateOf = (viewers: number | null): string => (viewers === null || started <= 0 ? emptyValue('unknown') : `${Math.round((viewers / started) * 100)}%`)
   const at = (sec: number): number | null => points.find((point) => point.atSeconds >= sec)?.viewers ?? null
   const half = durationSeconds > 0 ? at(durationSeconds / 2) : null
   const ctaViewers = ctaAt !== null ? at(ctaAt) : null
-  const completedRate = started > 0 ? `${Math.round((completed / started) * 100)}%` : '—'
+  const completedRate = started > 0 ? `${Math.round((completed / started) * 100)}%` : emptyValue('unknown')
   const path = points
     .map((point, index) => `${index === 0 ? 'M' : 'L'}${((point.atSeconds / maxX) * 1000).toFixed(1)} ${((1 - Math.min(point.viewers, started) / Math.max(started, 1)) * 100).toFixed(1)}`)
     .join(' ')
@@ -242,7 +243,7 @@ function ViewerComments({ webinarId }: { webinarId: string }) {
     return () => { active = false }
   }, [webinarId, attempt])
   return (
-    <Disclosure size="compact" title="視聴者コメント" hint={comments ? `${comments.length}件` : '—'}>
+    <Disclosure size="compact" title="視聴者コメント" hint={comments ? `${comments.length}件` : emptyValue('unknown')}>
       {error ? <div role="alert" className={styles.cardText}>{error}<Button size="compact" onClick={() => setAttempt((count) => count + 1)}>もう一度読み込む</Button></div>
         : comments === null ? <p role="status" className={styles.cardText}>コメントを読み込んでいます…</p>
           : comments.length === 0 ? <p className={styles.cardText}>まだコメントはありません。</p>

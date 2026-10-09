@@ -19,6 +19,7 @@ import { MANUAL_UPDATE_GUIDE_URL } from '@/components/update/use-update-status'
 import releaseLog from '@/generated/release-log-summary.json'
 import { api, type OperationHistoryEntry } from '@/lib/api'
 import styles from './history.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Release = { version: string; released: string | null; entries: Array<{ text: string }> }
 type Deployment = NonNullable<OperationHistoryEntry['deployment']>
@@ -77,7 +78,7 @@ export function historyRows(releases: Release[], deployments: Deployment[]) {
   const latest = latestDeploymentPhases(deployments)
   const used = new Set<string>()
   const rows = latest.map((deployment) => {
-    const version = deployment.version?.replace(/^v/, '') ?? '—'
+    const version = deployment.version?.replace(/^v/, '') ?? emptyValue('unknown')
     used.add(version)
     const release = releases.find((item) => item.version.replace(/^v/, '') === version)
       ?? { version, released: deployment.occurredAt, entries: [] }
@@ -129,17 +130,17 @@ export default function UpdateHistoryV8() {
       <div className={styles.kpis} aria-label="更新の集計">
         <div className={styles.kpi}>
           <div className={styles.kpiHead}><span className={styles.kpiTile} aria-hidden="true"><GitBranch size={14} /></span><span className={styles.kpiLabel}>いまの版</span></div>
-          <p className={styles.kpiValue}>{current ? `v${current}` : '—'}</p>
+          <p className={styles.kpiValue}>{current ? `v${current}` : emptyValue('unknown')}</p>
           <p className={styles.kpiDetail}>{currentAt ? `${shortWhen(currentAt)} に更新` : '更新の記録なし'}</p>
         </div>
         <div className={styles.kpi}>
           <div className={styles.kpiHead}><span className={styles.kpiTile} aria-hidden="true"><RefreshCw size={14} /></span><span className={styles.kpiLabel}>この30日の更新</span></div>
-          <p className={styles.kpiValue}>{ready ? Math.max(recent.length, recentReleases.length) : '—'}<span className={styles.kpiUnit}>回</span></p>
+          <p className={styles.kpiValue}>{ready ? Math.max(recent.length, recentReleases.length) : emptyValue('unknown')}<span className={styles.kpiUnit}>回</span></p>
           <p className={styles.kpiDetail}>{ready ? (recent.length > 0 ? `自動 ${auto}・手動 ${recent.length - auto}` : '配備の記録なし（版の記録から）') : '読み込み中'}</p>
         </div>
         <div className={styles.kpi}>
           <div className={styles.kpiHead}><span className={styles.kpiTile} aria-hidden="true"><TriangleAlert size={14} /></span><span className={styles.kpiLabel}>失敗した更新</span></div>
-          <p className={`${styles.kpiValue} ${failed > 0 ? styles.kpiValueDanger : ''}`}>{ready ? failed : '—'}<span className={styles.kpiUnit}>回</span></p>
+          <p className={`${styles.kpiValue} ${failed > 0 ? styles.kpiValueDanger : ''}`}>{ready ? failed : emptyValue('unknown')}<span className={styles.kpiUnit}>回</span></p>
           <p className={styles.kpiDetail}>この30日</p>
         </div>
       </div>
@@ -169,7 +170,7 @@ export default function UpdateHistoryV8() {
                 <GridRow key={deployment?.deploymentId || `${release.version}|${deployment?.occurredAt ?? release.released}`}>
                   <GridCell role="cell" className={styles.cell}>{shortWhen(deployment?.occurredAt ?? release.released)}</GridCell>
                   <GridCell role="cell" className={`${styles.cell} ${styles.strong}`} title={title}>{title}</GridCell>
-                  <GridCell role="cell" className={styles.cell}>{deployment ? (isAutomatic(deployment) ? '自動' : '手動') : '—'}</GridCell>
+                  <GridCell role="cell" className={styles.cell}>{deployment ? (isAutomatic(deployment) ? '自動' : '手動') : emptyValue('unknown')}</GridCell>
                   <GridCell role="cell" className={`${styles.cell} ${styles.num}`}>—</GridCell>
                   <GridCell role="cell" className={styles.judge}><StatusBadge tone={({ good: 'success', warn: 'warning', danger: 'danger', muted: 'neutral' } as Record<string, StatusBadgeTone>)[result.tone]}>{result.label}</StatusBadge></GridCell>
                 </GridRow>

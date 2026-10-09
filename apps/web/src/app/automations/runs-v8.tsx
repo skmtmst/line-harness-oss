@@ -28,6 +28,7 @@ import { formatDateTime, formatNumber } from '@/lib/format'
 import type { AutoV8Counts, AutoV8Model } from './automations-v8'
 import styles from './automations-v8.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type RunStatus = 'queued' | 'claimed' | 'succeeded' | 'skipped' | 'waiting' | 'retry_wait' | 'partial' | 'permanent_failed' | 'cancelled'
 
@@ -437,7 +438,7 @@ export function V8RunsTab({
         </div>
         <div className={styles.kpi}>
           <p className={styles.kpiLabel}>いちばん動いた</p>
-          <p className={styles.kpiValue}>{data?.summary.mostRunName ?? '—'}</p>
+          <p className={styles.kpiValue}>{data?.summary.mostRunName ?? emptyValue('unknown')}</p>
           <p className={styles.kpiSub}>
             {data?.summary.mostRunCount !== null && data?.summary.mostRunCount !== undefined
               ? `${formatNumber(data.summary.mostRunCount)}回`
@@ -478,10 +479,10 @@ export function V8RunsTab({
           value={resultFilter}
           onChange={(value) => changeResultFilter(value)}
           options={[
-            { value: 'all', label: `すべて ${data ? formatNumber(data.summary.total) : '—'}` },
-            { value: 'executed', label: `動いた ${data ? formatNumber(data.summary.executed) : '—'}` },
-            { value: 'skipped', label: `条件に外れた ${data ? formatNumber(data.summary.skipped) : '—'}` },
-            { value: 'problems', label: `失敗 ${data ? formatNumber(data.summary.failed) : '—'}` },
+            { value: 'all', label: `すべて ${data ? formatNumber(data.summary.total) : emptyValue('unknown')}` },
+            { value: 'executed', label: `動いた ${data ? formatNumber(data.summary.executed) : emptyValue('unknown')}` },
+            { value: 'skipped', label: `条件に外れた ${data ? formatNumber(data.summary.skipped) : emptyValue('unknown')}` },
+            { value: 'problems', label: `失敗 ${data ? formatNumber(data.summary.failed) : emptyValue('unknown')}` },
           ]}
         />
       </div>

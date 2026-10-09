@@ -18,6 +18,7 @@ import { formatDay } from '@/lib/format'
 import { petAnimalTypeLabel, type NenHealthSummaryData } from '@/lib/nen-pets-api'
 import { SKIN_LABELS, TEAR_LABELS, countText, md } from './parts'
 import styles from './health.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Logs = NenHealthSummaryData['summary']['logs']
 
@@ -87,15 +88,15 @@ export default function SummaryDrawerV8({
               </div>
               <div className={styles.statBox}>
                 <dt className={styles.statLabel}>体重</dt>
-                <dd className={styles.statValue}>{s.weight ? `${s.weight.first} → ${s.weight.last} kg` : '—'}</dd>
+                <dd className={styles.statValue}>{s.weight ? `${s.weight.first} → ${s.weight.last} kg` : emptyValue('unknown')}</dd>
               </div>
               <div className={styles.statBox}>
                 <dt className={styles.statLabel}>呼吸数（平均）</dt>
-                <dd className={styles.statValue}>{s.respiratoryRateAvg == null ? '—' : `${s.respiratoryRateAvg} 回／分`}</dd>
+                <dd className={styles.statValue}>{s.respiratoryRateAvg == null ? emptyValue('unknown') : `${s.respiratoryRateAvg} 回／分`}</dd>
               </div>
               <div className={styles.statBox}>
                 <dt className={styles.statLabel}>心拍数（平均）</dt>
-                <dd className={styles.statValue}>{s.heartRateAvg == null ? '—' : `${s.heartRateAvg} 回／分`}</dd>
+                <dd className={styles.statValue}>{s.heartRateAvg == null ? emptyValue('unknown') : `${s.heartRateAvg} 回／分`}</dd>
               </div>
             </dl>
             <section className={styles.chart} aria-label="体重の30日の推移">
@@ -121,12 +122,12 @@ export default function SummaryDrawerV8({
                 {s.logs.map((log) => (
                   <div key={log.loggedOn} className={styles.logRow} role="row">
                     <span className={styles.logDate} role="cell">{md(log.loggedOn)}</span>
-                    <span className={styles.logWeight} role="cell">{log.weightKg == null ? '—' : `${log.weightKg}kg`}</span>
+                    <span className={styles.logWeight} role="cell">{log.weightKg == null ? emptyValue('unknown') : `${log.weightKg}kg`}</span>
                     <span className={styles.logStool} role="cell">{summary.labels.stool[log.stool] ?? log.stool}</span>
                     <span className={styles.logStool} role="cell">{summary.labels.appetite[log.appetite] ?? log.appetite}</span>
-                    <span className={styles.logSkin} role="cell">{log.skin ? SKIN_LABELS[log.skin] ?? log.skin : '—'}</span>
-                    <span className={styles.logTear} role="cell">{log.tearStain ? TEAR_SHORT[log.tearStain] ?? log.tearStain : '—'}</span>
-                    <span className={styles.logMemo} role="cell">{notes.get(log.loggedOn) ?? '—'}</span>
+                    <span className={styles.logSkin} role="cell">{log.skin ? SKIN_LABELS[log.skin] ?? log.skin : emptyValue('unknown')}</span>
+                    <span className={styles.logTear} role="cell">{log.tearStain ? TEAR_SHORT[log.tearStain] ?? log.tearStain : emptyValue('unknown')}</span>
+                    <span className={styles.logMemo} role="cell">{notes.get(log.loggedOn) ?? emptyValue('unknown')}</span>
                   </div>
                 ))}
               </div>
@@ -187,7 +188,7 @@ export function SummarySheet({ summary }: { summary: NenHealthSummaryData }) {
       <p>
         記録 {s.records}件／{s.days}日。
         体重 {s.weight ? `${s.weight.first}kg → ${s.weight.last}kg（最小 ${s.weight.min}・最大 ${s.weight.max}）` : '記録なし'}。
-        心拍数 平均 {s.heartRateAvg == null ? '—' : `${s.heartRateAvg}回／分`}。呼吸数 平均 {s.respiratoryRateAvg == null ? '—' : `${s.respiratoryRateAvg}回／分`}。
+        心拍数 平均 {s.heartRateAvg == null ? emptyValue('unknown') : `${s.heartRateAvg}回／分`}。呼吸数 平均 {s.respiratoryRateAvg == null ? emptyValue('unknown') : `${s.respiratoryRateAvg}回／分`}。
       </p>
       <p>便：{countText(s.stool, summary.labels.stool)}／食いつき：{countText(s.appetite, summary.labels.appetite)}／皮膚：{countText(s.skin, SKIN_LABELS)}／涙やけ：{countText(s.tearStain, TEAR_LABELS)}</p>
       <table>

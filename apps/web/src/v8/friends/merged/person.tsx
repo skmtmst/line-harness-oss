@@ -26,6 +26,7 @@ import { useMergedPerson } from '@/components/merged-person/use-merged-person'
 import styles from './person.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 9/30（日本時間）。 */
 function shortDate(iso: string): string {
@@ -197,7 +198,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
               {person.profileValues.map((value) => (
                   <li key={value.fieldKey} className={styles.value} title={value.sourceLabel ? `元：${value.sourceLabel}` : undefined}>
                     <span className={styles.valueLabel}>{FIELD_WORD[value.fieldLabel] ?? value.fieldLabel}</span>
-                    <span className={styles.valueText}>{value.valuePreview ?? '—'}</span>
+                    <span className={styles.valueText}>{value.valuePreview ?? emptyValue('unknown')}</span>
                   </li>
               ))}
             </ul>

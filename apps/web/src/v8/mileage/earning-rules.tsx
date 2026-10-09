@@ -56,6 +56,7 @@ import { CreateButton, MileageFrame, useMileageShell } from './frame'
 import { notifyToast } from '@/components/shared/toast'
 import styles from './mileage.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const EVENT_LABELS: Record<string, string> = {
   friend_added: '友だち追加',
@@ -515,7 +516,7 @@ export default function EarningRulesTab() {
   }
 
   const ready = !loading && !loadError
-  const dash = (text: string) => (ready ? text : '—')
+  const dash = (text: string) => (ready ? text : emptyValue('unknown'))
 
   /* ===== 数の帯（4マス） ===== */
   const stats = (

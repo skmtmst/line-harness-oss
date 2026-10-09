@@ -26,6 +26,7 @@ import { nenRanksApi, type NenRankSettingsData } from '@/lib/nen-ranks-api'
 import { parseYen, yen, type LoadStatus, type SavedHandler } from './parts'
 import styles from './members.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type MilestoneDraft = { id: string | null; threshold: number; title: string; benefit: string | null; notify: boolean; reachedCount: number }
 
@@ -170,7 +171,7 @@ export default function LifetimeV8({
                 <span className={row.threshold === topThreshold ? styles.lifeTitleTop : styles.lifeTitle} title={row.title}>{row.title}</span>
                 {row.threshold === topThreshold && drafts.length > 1 ? <span className={styles.lifeTitleSub}>最上位</span> : null}
               </span>
-              <span className={styles.lifeColBenefit} role="cell" title={row.benefit ?? ''}>{row.benefit ?? '未設定'}</span>
+              <span className={styles.lifeColBenefit} role="cell" title={row.benefit ?? ''}>{row.benefit ?? emptyValue('unconfigured')}</span>
               <span className={styles.lifeColReached} role="cell">{formatNumber(row.reachedCount)} 人</span>
               <span className={styles.lifeColNotify} role="cell">{row.notify ? '通知する' : '通知しない'}</span>
               <span className={styles.lifeColAction} role="cell">

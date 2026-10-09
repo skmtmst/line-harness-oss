@@ -83,6 +83,7 @@ import { focusFieldById } from '@/lib/use-form-errors'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 予定の日時（`YYYY-MM-DDTHH:mm`・日本時間）を「10/1 0:00」の形にする。 */
 export function scheduleStamp(value: string): string {
@@ -787,7 +788,7 @@ function EditCommonVarV8Inner() {
           <span className={styles.talkName}>然 - NEN -</span>
           <div className={styles.talkBubbleRow}>
             <p className={styles.talkBubble}>
-              {`いつもありがとうございます。\n${item?.name ?? '共通情報'}は ${value || '（未入力）'} です。`}
+              {`いつもありがとうございます。\n${item?.name ?? '共通情報'}は ${value || emptyValue('unconfigured')} です。`}
             </p>
             <span className={styles.talkTime}>10:00</span>
           </div>
@@ -851,10 +852,10 @@ function EditCommonVarV8Inner() {
         <h2 id="cv-edit-period-heading" className={styles.sideTitle}>使える期間</h2>
         <div className={styles.sideFields}>
           <div className={styles.field}><Field label="始まり" htmlFor="cv-valid-from">{canWrite
-              ? <DateTimeField id="cv-valid-from" value={validFrom} placeholder="指定なし" invalid={Boolean(periodFieldError)} onChange={(v) => { setSaved(false); setValidFrom(v); setPeriodFieldError('') }} />
+              ? <DateTimeField id="cv-valid-from" value={validFrom} placeholder="未設定" invalid={Boolean(periodFieldError)} onChange={(v) => { setSaved(false); setValidFrom(v); setPeriodFieldError('') }} />
               : <ReadOnlyValue id="cv-valid-from" value={readOnlyDate(validFrom)} />}</Field></div>
           <div className={styles.field}><Field label="終わり" htmlFor="cv-valid-until">{canWrite
-              ? <DateTimeField id="cv-valid-until" value={validUntil} placeholder="指定なし" invalid={Boolean(periodFieldError)} onChange={(v) => { setSaved(false); setValidUntil(v); setPeriodFieldError('') }} />
+              ? <DateTimeField id="cv-valid-until" value={validUntil} placeholder="未設定" invalid={Boolean(periodFieldError)} onChange={(v) => { setSaved(false); setValidUntil(v); setPeriodFieldError('') }} />
               : <ReadOnlyValue id="cv-valid-until" value={readOnlyDate(validUntil)} />}
 {periodFieldError ? <p className={styles.fieldError} role="alert">{periodFieldError}</p> : null}</Field></div>
         </div>
@@ -1055,7 +1056,7 @@ function EditCommonVarV8Inner() {
       title={item?.name ?? '共通情報を編集'}
       help={item ? (
         <>
-          {`${placeholderText(item.varKey)}・${typeLabel}・${stateLabel}・${usageTotal === null ? '—' : `${formatNumber(usageTotal)}か所で使っています`}`}
+          {`${placeholderText(item.varKey)}・${typeLabel}・${stateLabel}・${usageTotal === null ? emptyValue('unknown') : `${formatNumber(usageTotal)}か所で使っています`}`}
           {/* 競合の帯（板 `piWhz`）。頭の下に横いっぱい。入力は残したまま、誰の保存かを見せる。 */}
           {conflict ? (
             /* 帯は共通部品（save-conflict）に寄せた。誰が・いつ保存したかの文はこの画面のまま。 */
@@ -1547,7 +1548,7 @@ export default function EditCommonVarV8() {
 
 /** 閲覧のみで、日時の欄に入っている値を文字で見せる（空なら「指定なし」）。 */
 function readOnlyDate(value: string): string {
-  return value ? value.replace('T', ' ') : '指定なし'
+  return value ? value.replace('T', ' ') : emptyValue('unconfigured')
 }
 
 /** 閲覧のみ：選ぶ部品・日付の部品の代わりに、選んでいる値を読み取りだけの欄で見せる。 */

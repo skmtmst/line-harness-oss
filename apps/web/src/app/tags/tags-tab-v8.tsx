@@ -54,6 +54,7 @@ import {
   usageLabel,
 } from '@/components/friend-fields/tags-page-v4'
 import styles from './list-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -587,7 +588,7 @@ export default function TagsTabV8({
         {kpis.map((kpi) => (
           <div key={kpi.title} className={styles.kpi}>
             <span className={styles.kpiLabel}><kpi.icon size={13} aria-hidden="true" />{kpi.title}</span>
-            <p className={styles.kpiValue}>{kpi.value ?? '—'}<span className={styles.kpiUnit}>{kpi.value === null ? '' : kpi.unit}</span></p>
+            <p className={styles.kpiValue}>{kpi.value ?? emptyValue('unknown')}<span className={styles.kpiUnit}>{kpi.value === null ? '' : kpi.unit}</span></p>
             <p className={styles.kpiDetail}>{kpi.detail}</p>
           </div>
         ))}
@@ -792,7 +793,7 @@ export default function TagsTabV8({
                           <td>
                             <div className={styles.linkChips}>
                               {chips.length === 0
-                                ? <span className={styles.cellMuted}>—</span>
+                                ? <span className={styles.cellMuted}>{emptyValue('unknown')}</span>
                                 : chips.map((chip) => <span key={chip.label} className={`${styles.linkChip} ${chip.className}`}>{chip.label}</span>)}
                             </div>
                           </td>
@@ -911,7 +912,7 @@ export default function TagsTabV8({
               <div>
                 <dt className={styles.cellMuted}>連動</dt>
                 <dd className={styles.cellText}>
-                  {tagLinkChips(activeTag).length === 0 ? '—' : tagLinkChips(activeTag).map((chip) => chip.label).join('・')}
+                  {tagLinkChips(activeTag).length === 0 ? emptyValue('unknown') : tagLinkChips(activeTag).map((chip) => chip.label).join('・')}
                 </dd>
               </div>
               <div>

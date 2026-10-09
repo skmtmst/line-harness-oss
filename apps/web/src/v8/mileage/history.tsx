@@ -45,6 +45,7 @@ import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, Too
 import styles from './mileage.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 function viewName(item: MileageAdminHistoryItem) {
   return item.displayName || '名前未取得'
@@ -248,7 +249,7 @@ export default function HistoryTab() {
         icon={<History size={14} aria-hidden="true" />}
         value={ready ? mileagePaginationTotal(periodResult) : null}
         unit="件"
-        detail={ready ? `付けた ${formatNumber(grantedCount)}・使った ${formatNumber(countOf('spend'))}・取り消し ${formatNumber(reversalCount)}` : '—'}
+        detail={ready ? `付けた ${formatNumber(grantedCount)}・使った ${formatNumber(countOf('spend'))}・取り消し ${formatNumber(reversalCount)}` : emptyValue('unknown')}
       />
       <KpiCard
         presentation="band"
@@ -372,7 +373,7 @@ export default function HistoryTab() {
                   <span className={styles.cellSub}>{`${mileageEntryTypeLabel(item.entryType)}・${mileageStatusLabel(item.status)}`}</span>
                 </Td>
                 <Td className={`${styles.colAfter} ${styles.num}`}>
-                  <span className={styles.cellMain}>{item.balanceAfter === null ? '—' : formatNumber(item.balanceAfter)}</span>
+                  <span className={styles.cellMain}>{item.balanceAfter === null ? emptyValue('unknown') : formatNumber(item.balanceAfter)}</span>
                 </Td>
                 <Td className={styles.colWho}>
                   <span className={styles.cellMain}>

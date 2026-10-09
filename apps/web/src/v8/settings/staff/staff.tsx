@@ -53,6 +53,7 @@ import { formatDateTime } from '@/lib/format'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Channel = { email: boolean; line: boolean }
 type CopyableAccessUser = AccessUserItem & { roleBundle: Exclude<AccessRoleBundle, 'custom'> }
@@ -671,7 +672,7 @@ function TwoFactorModal({ member, onClose, onSaved }: { member: StaffMember; onC
   const save = async (entered?: string) => { const value = entered ?? code; if (saving) return; if (!/^\d{6}$/.test(value)) return setError('6桁の認証コードを入力してください'); setSaving(true); setError(''); try { await api.staff.confirmTwoFactorSetup(member.id, value); await onSaved(); onClose() } catch (caught) { setError(otpFailureMessage(messageOf(caught))) } finally { setSaving(false) } }
   return <Modal title="二段階認証を設定" onClose={onClose} wide><div className="flex items-start justify-between"><div><p className="mt-1 text-xs text-ink-secondary">認証アプリを登録して、ログインを安全にします。</p></div></div>
     <div className="mt-5 grid grid-cols-2 gap-2 text-sm"><div className="rounded-control bg-accent-soft px-4 py-3 font-medium text-accent-deep">1　QRコードを読み取る</div><div className="rounded-control bg-canvas-sunken px-4 py-3 text-ink-secondary">2　6桁コードを入力</div></div>{error && <p className="mt-4 rounded-control bg-danger-bg p-3 text-sm text-danger">{error}</p>}
-    <div className={`mt-5 grid gap-5 ${styles.twoFactorGrid}`}>{qr ? <img src={qr} alt="Authenticator登録用QRコード" className={`${styles.qrImage} rounded-control border border-hairline`} /> : <DelayedSkeleton loading skeleton={<Skeleton width={220} height={220} className="block rounded-control" />} />}<div><h3 className="font-semibold text-ink">認証アプリで読み取る</h3><p className="mt-3 text-sm leading-6 text-ink-secondary">Google Authenticator、Microsoft AuthenticatorなどでQRコードを読み取ってください。</p><div className="mt-4 rounded-control bg-info-bg p-3"><p className="text-xs text-ink-secondary">読み取れない場合はキーを手動入力</p><p className="mt-1 break-all font-mono text-sm font-bold tracking-wider text-ink">{manualKey || '—'}</p></div></div></div>
+    <div className={`mt-5 grid gap-5 ${styles.twoFactorGrid}`}>{qr ? <img src={qr} alt="Authenticator登録用QRコード" className={`${styles.qrImage} rounded-control border border-hairline`} /> : <DelayedSkeleton loading skeleton={<Skeleton width={220} height={220} className="block rounded-control" />} />}<div><h3 className="font-semibold text-ink">認証アプリで読み取る</h3><p className="mt-3 text-sm leading-6 text-ink-secondary">Google Authenticator、Microsoft AuthenticatorなどでQRコードを読み取ってください。</p><div className="mt-4 rounded-control bg-info-bg p-3"><p className="text-xs text-ink-secondary">読み取れない場合はキーを手動入力</p><p className="mt-1 break-all font-mono text-sm font-bold tracking-wider text-ink">{manualKey || emptyValue('unknown')}</p></div></div></div>
     <p id="staff-totp-label" className="mt-5 block text-sm font-medium text-ink">認証アプリに表示された6桁コード</p><div className="mt-2">{/* 共通 OTP入力（Pencil ★V8 RfHCo）。 */}<OtpInput value={code} onChange={setCode} onComplete={(entered) => void save(entered)} labelledBy="staff-totp-label" invalid={Boolean(error)} busy={saving} /></div><p className="mt-4 rounded-control bg-info-bg p-3 text-xs text-ink-secondary">登録後はLINEログインのあとに認証アプリのコード入力が必要です。</p>
     <div className="mt-6 flex justify-end gap-2"><Button variant="secondary" className="px-4 py-2 h-auto whitespace-normal" onClick={onClose}>キャンセル</Button><Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => void save()} disabled={saving || !uri}>✓ {saving ? '確認中…' : '設定を完了'}</Button></div></Modal>
 }
@@ -1029,7 +1030,7 @@ function StaffPageHost() {
         <div className={styles.cardHeadText}>
           <h2 className={styles.cardTitle}>{sectionTitle}</h2>
           <div className={styles.cardSubRow}>
-            <span className={styles.cardSub}>{summaryReady ? `${filteredUsers.length}人` : '—'}</span>
+            <span className={styles.cardSub}>{summaryReady ? `${filteredUsers.length}人` : emptyValue('unknown')}</span>
             {tab === 'members' && missing > 0 ? <span className={styles.cardWarn} title={`二段階認証が未設定の人が ${missing}人 います。高い権限の人から設定してください。`}>{`二段階認証が未設定の人が ${missing}人 います。高い権限の人から設定してください。`}</span> : null}
           </div>
         </div>
@@ -1100,8 +1101,8 @@ function StaffPageHost() {
                 <SearchField aria-label="名前・メールで探す" value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="名前・メールで探す" className={styles.search} />
                 {tab === 'members' ? (
                   <div className={styles.chips} role="group" aria-label="利用状態で絞り込む">
-                    <FilterChip selectedIcon={false} selected={statusFilter === 'active'} onChange={(selected) => setStatusFilter(selected ? 'active' : 'all')}>{`有効 ${summaryReady ? activeCount : '—'}`}</FilterChip>
-                    <FilterChip selectedIcon={false} selected={statusFilter === 'suspended'} onChange={(selected) => setStatusFilter(selected ? 'suspended' : 'all')}>{`止めた ${summaryReady ? suspendedCount : '—'}`}</FilterChip>
+                    <FilterChip selectedIcon={false} selected={statusFilter === 'active'} onChange={(selected) => setStatusFilter(selected ? 'active' : 'all')}>{`有効 ${summaryReady ? activeCount : emptyValue('unknown')}`}</FilterChip>
+                    <FilterChip selectedIcon={false} selected={statusFilter === 'suspended'} onChange={(selected) => setStatusFilter(selected ? 'suspended' : 'all')}>{`止めた ${summaryReady ? suspendedCount : emptyValue('unknown')}`}</FilterChip>
                   </div>
                 ) : null}
                 <span className={styles.spacer} />
@@ -1150,7 +1151,7 @@ function StaffPageHost() {
                   return (
                     <div key={user.id} className={styles.example}>
                       <p className={styles.exampleHead}><span className={styles.exampleName} title={user.name}>{user.name}</span><StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge></p>
-                      <p className={styles.exampleLine}>{`${V8_ROLE_LABEL[roleOf(user)]}・${user.jobTitle ?? '—'}`}</p>
+                      <p className={styles.exampleLine}>{`${V8_ROLE_LABEL[roleOf(user)]}・${user.jobTitle ?? emptyValue('unknown')}`}</p>
                       <p className={styles.exampleLine} title={accessScopeLabel(user, accountNames)}>{`見せる範囲：${user.roleBundle === 'administrator' ? 'すべて' : `${accessFeatureLabel(user)}／${scopeShort(user, accountNames)}`}`}</p>
                       <p className={styles.exampleLine} title={`最後のログイン：${formatStaffDate(user.lastLoginAt ?? undefined)}${user.lastActionAt ? `／最後の操作：${formatStaffDate(user.lastActionAt)}` : ''}`}>{`最後に入った：${shortWhen(user.lastLoginAt, nowMs)}${user.lastActionAt ? `（最後の操作 ${formatStaffDate(user.lastActionAt)}）` : ''}`}</p>
                     </div>

@@ -24,6 +24,7 @@ import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import MemberDialogV8, { MemberChangeConfirmV8, type MemberDialogValue } from './member-dialog'
 import styles from './members.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -248,7 +249,7 @@ function MembersInner() {
                 return (
                   <div key={member.id} className={styles.row} role="row">
                     <span role="cell" className={styles.cell} title={member.name}>{member.name}{isSelf ? '（あなた）' : ''}</span>
-                    <span role="cell" className={styles.cell} title={member.email ?? ''}>{member.email ?? '—'}</span>
+                    <span role="cell" className={styles.cell} title={member.email ?? ''}>{member.email ?? emptyValue('unknown')}</span>
                     <span role="cell" className={styles.cell}>{ROLE_WORDS[member.role] ?? member.role}</span>
                     <span role="cell" className={styles.cell} title={scope}>{scope}</span>
                     <span role="cell"><StatusBadge tone={STATUS_TONES[state]}>{STATUS_WORDS[state]}</StatusBadge></span>

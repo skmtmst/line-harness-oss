@@ -48,6 +48,7 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import { inputClass } from '@/components/shared/form-controls'
 import styles from './conversion-points-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** V8 の絞り込み。`all` を含む以外は v7 の `StatusFilter` と同じ。 */
 export type ConversionPointsV8Status = 'all' | ConversionDefinitionFilter
@@ -269,32 +270,32 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
         <li className={styles.kpi}>
           <span className={styles.kpiLabel}>成果地点</span>
           <div className={styles.kpiValue}>
-            {model.total == null ? '—' : <>{formatNumber(model.total)}<span className={styles.kpiValueSmall}> 件</span></>}
+            {model.total == null ? emptyValue('unknown') : <>{formatNumber(model.total)}<span className={styles.kpiValueSmall}> 件</span></>}
           </div>
           <div className={styles.kpiNote}>
             {model.stateCounts == null
-              ? '—'
+              ? emptyValue('unknown')
               : <>動いている {formatNumber(model.stateCounts.active)}・止めている {formatNumber(model.stateCounts.stopped)}</>}
           </div>
         </li>
         <li className={styles.kpi}>
           <span className={styles.kpiLabel}>この30日の成果</span>
           <div className={styles.kpiValue}>
-            {model.loadFailed ? '—' : <>{formatNumber(totalCount)}<span className={styles.kpiValueSmall}> 件</span></>}
+            {model.loadFailed ? emptyValue('unknown') : <>{formatNumber(totalCount)}<span className={styles.kpiValueSmall}> 件</span></>}
           </div>
           <div className={styles.kpiNote}>表の行の合計です{model.listTruncated ? '（直近5000件まで）' : ''}</div>
         </li>
         <li className={styles.kpi}>
           <span className={styles.kpiLabel}>この30日の金額</span>
           <div className={styles.kpiValue}>
-            {model.loadFailed ? '—' : <>¥{formatNumber(totalValue)}</>}
+            {model.loadFailed ? emptyValue('unknown') : <>¥{formatNumber(totalValue)}</>}
           </div>
           <div className={styles.kpiNote}>表の行の合計です{model.listTruncated ? '（直近5000件まで）' : ''}</div>
         </li>
         <li className={styles.kpi}>
           <span className={styles.kpiLabel}>どこからも使われていない</span>
           <div className={styles.kpiValue}>
-            {model.stateCounts == null ? '—' : <>{formatNumber(model.stateCounts.unused)}<span className={styles.kpiValueSmall}> 件</span></>}
+            {model.stateCounts == null ? emptyValue('unknown') : <>{formatNumber(model.stateCounts.unused)}<span className={styles.kpiValueSmall}> 件</span></>}
           </div>
           <div className={styles.kpiNote}>配信・流入・アフィリエイトで未使用</div>
         </li>
@@ -322,7 +323,7 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
             <li>
               <span className={`${styles.railRow} ${styles.railRowActive}`} aria-current="true">
                 <span className={styles.railName}>すべて</span>
-                <span className={styles.railCount}>{model.total == null ? '—' : formatNumber(model.total)}</span>
+                <span className={styles.railCount}>{model.total == null ? emptyValue('unknown') : formatNumber(model.total)}</span>
               </span>
             </li>
           </ul>
@@ -473,11 +474,11 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
                       </td>
                       <td className={styles.numeric}>{formatNumber(point.metrics.netCount)}件</td>
                       <td className={styles.numeric}>
-                        {point.metrics.netValue > 0 ? `¥${formatNumber(point.metrics.netValue)}` : <span className={styles.cellMuted}>—</span>}
+                        {point.metrics.netValue > 0 ? `¥${formatNumber(point.metrics.netValue)}` : <span className={styles.cellMuted}>{emptyValue('unknown')}</span>}
                       </td>
                       <td>
                         {point.usageCount === 0
-                          ? <span className={styles.cellMuted}>—</span>
+                          ? <span className={styles.cellMuted}>{emptyValue('unknown')}</span>
                           : <span title={usageLabel(point)}>{usageLabel(point)}</span>}
                       </td>
                       <td className={styles.opCell} onClick={(event) => event.stopPropagation()}>

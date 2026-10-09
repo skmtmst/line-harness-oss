@@ -27,6 +27,7 @@ import { FieldError } from '@/components/shared/form-controls'
 import { useFormErrors } from '@/lib/use-form-errors'
 import styles from './mileage.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 手でマイルを動かすときの失敗の言葉（app/mileage/friends/detail/mileage-adjustment-dialog.tsx から写した）。 */
 export function mileageAdjustmentErrorMessage(error: unknown): string {
@@ -487,12 +488,12 @@ export default function MileageAdjustDialog({
             <div className={styles.deltaCell}>
               <p className={styles.deltaLabel}>変更量</p>
               <p className={styles.deltaValue}>
-                {valid ? `${delta > 0 ? '+' : ''}${formatNumber(delta)}` : '—'}
+                {valid ? `${delta > 0 ? '+' : ''}${formatNumber(delta)}` : emptyValue('unknown')}
               </p>
             </div>
             <div className={styles.deltaCell}>
               <p className={styles.deltaLabel}>変更後の残高</p>
-              <p className={styles.deltaValue}>{valid ? formatNumber(balanceAfter) : '—'}</p>
+              <p className={styles.deltaValue}>{valid ? formatNumber(balanceAfter) : emptyValue('unknown')}</p>
             </div>
           </div>
 

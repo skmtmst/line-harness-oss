@@ -101,6 +101,7 @@ import {
 import QuickCreateV8 from './quick-create'
 import styles from './list.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -1025,7 +1026,7 @@ export default function AutoRepliesListV8() {
       detail: ready
         ? monthlyHits === null
           ? '実行結果を読み込めませんでした'
-          : `累計 ${totalHits === null ? '—' : formatNumber(totalHits)}回`
+          : `累計 ${totalHits === null ? emptyValue('unknown') : formatNumber(totalHits)}回`
         : LOAD_STATE_WORDS[visibleLoadState].label,
     },
     {
@@ -1282,18 +1283,18 @@ export default function AutoRepliesListV8() {
                           ? `テンプレート「${tpl.label}」`
                           : `${responseTypeWord(r.responseType).label}で返す`}
                     </span>
-                    <span className={styles.cellSub} title={actions.join('・') || 'なし'}>
-                      {actions.length > 0 ? `＋${actions.join('・')}` : 'なし'}
+                    <span className={styles.cellSub} title={actions.join('・') || emptyValue('none')}>
+                      {actions.length > 0 ? `＋${actions.join('・')}` : emptyValue('none')}
                     </span>
                   </Td>
                   {!narrow && (
                     <Td
                       className={styles.countCell}
-                      title={`今月 ${r.hits?.period ?? '—'}回 ／ 累計 ${r.hits?.total ?? '—'}回`}
+                      title={`今月 ${r.hits?.period ?? emptyValue('unknown')}回 ／ 累計 ${r.hits?.total ?? emptyValue('unknown')}回`}
                     >
                       {/* 数えられていないものを 0 と書かない。0 は「当たらなかった」の意味。 */}
-                      <div className={styles.countMain}>{r.hits?.period ?? '—'}<span className={styles.kpiUnit}>回</span></div>
-                      <div className={styles.countSub}>累計 {r.hits?.total == null ? '—' : formatNumber(r.hits.total)}回</div>
+                      <div className={styles.countMain}>{r.hits?.period ?? emptyValue('unknown')}<span className={styles.kpiUnit}>回</span></div>
+                      <div className={styles.countSub}>累計 {r.hits?.total == null ? emptyValue('unknown') : formatNumber(r.hits.total)}回</div>
                     </Td>
                   )}
                   <Td>
@@ -1397,8 +1398,8 @@ export default function AutoRepliesListV8() {
               }
             >
               <p>
-                {panelRow.isActive ? '有効' : '停止中'} ／ 今月 {panelRow.hits?.period ?? '—'}回 ／
-                累計 {panelRow.hits?.total ?? '—'}回
+                {panelRow.isActive ? '有効' : '停止中'} ／ 今月 {panelRow.hits?.period ?? emptyValue('unknown')}回 ／
+                累計 {panelRow.hits?.total ?? emptyValue('unknown')}回
               </p>
             </DetailPanel>
           )

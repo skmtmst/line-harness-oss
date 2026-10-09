@@ -17,6 +17,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import { restaurantGoogleApi, type GoogleConnectionData } from '@/lib/restaurant-google-api'
 import { errorMessage, formatStampFull, formatYmd } from './format'
 import styles from './google.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export default function SettingsBoard({ accountId, data, onChanged }: { accountId: string; data: GoogleConnectionData; onChanged: () => void }) {
   const canManage = data.permissions.canManageConnection
@@ -150,7 +151,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
       <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="google-account-title">
         <SectionHeader size="small" title={<span id="google-account-title">Googleアカウント</span>} />
         <dl className={styles.facts}>
-          <div className={styles.factRow}><dt className={styles.factKey}>つないでいるアカウント</dt><dd className={styles.factValue}>{connection.googleAccountEmail ?? '—'}</dd></div>
+          <div className={styles.factRow}><dt className={styles.factKey}>つないでいるアカウント</dt><dd className={styles.factValue}>{connection.googleAccountEmail ?? emptyValue('unknown')}</dd></div>
           <div className={styles.factRow}><dt className={styles.factKey}>つないだ日</dt><dd className={styles.factValue}>{formatYmd(connection.connectedAt)}</dd></div>
           <div className={styles.factRow}><dt className={styles.factKey}>状態</dt><dd className={styles.factValue}>{stateText}</dd></div>
         </dl>
@@ -162,7 +163,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
         ) : manageNote}
       </Card>
       <p className={styles.grayNote}>接続を解除すると、口コミ・投稿・パフォーマンスの取り込みが止まります。解除の前に確認の小窓が出ます。</p>
-      <p className={styles.footCaption}>{`LINEアカウント：${data.store.name}・接続店舗：${connection.locationTitle ?? '—'}・最終同期：${formatStampFull(connection.lastSyncedAt)}`}</p>
+      <p className={styles.footCaption}>{`LINEアカウント：${data.store.name}・接続店舗：${connection.locationTitle ?? emptyValue('unknown')}・最終同期：${formatStampFull(connection.lastSyncedAt)}`}</p>
       <ConfirmDialog
         open={confirmDisconnect}
         title="Googleアカウントの接続を解除しますか？"

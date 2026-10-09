@@ -38,6 +38,7 @@ import { actionSummaryText, blockedReason, canPublish, firstSendText, idempotenc
 import FriendAddDoneV8 from './done'
 import styles from './publish.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Phase = 'loading' | 'ready' | 'empty' | 'error' | 'forbidden' | 'missing'
 type RuleDetail = {
@@ -275,7 +276,7 @@ function FriendAddPublish() {
   const routeNames = rule.isFallback ? ['経路が分からなかった人'] : rule.routeNames
 
   const rows: Array<{ label: string; value: string; href: string }> = [
-    { label: '名前・フォルダ', value: `${rule.name || '（未入力）'}${rule.folderName ? `・${rule.folderName}` : ''}`, href: editHref('basic') },
+    { label: '名前・フォルダ', value: `${rule.name || emptyValue('unconfigured')}${rule.folderName ? `・${rule.folderName}` : ''}`, href: editHref('basic') },
     { label: 'だれに', value: rule.friendKind === 'returning' ? '以前からの友だち・ブロック解除した人' : 'はじめて友だち追加した人', href: editHref('basic') },
     { label: '流入リンク', value: routeNames.length > 0 ? routeNames.join('・') : '未選択', href: editHref('routes') },
     { label: '最初に送るもの', value: firstSendText(rule), href: editHref('message') },

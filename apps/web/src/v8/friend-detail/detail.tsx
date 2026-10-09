@@ -43,6 +43,7 @@ import RichMenuTab from './rich-menu-tab'
 import styles from './detail.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** タブ10個（並びと URL の値は今の画面と同じ）。 */
 export const FRIEND_DETAIL_TABS = [
@@ -137,7 +138,7 @@ function FriendDetailV8Inner() {
 
   const status = friend?.support?.status
   const subtitle = friend
-    ? `LINE 表示名：${friend.displayName || '—'}・${friend.createdAt ? `${formatDay(friend.createdAt).replace(/（.）$/, '')}に友だち追加` : '—'}・担当 ${friend.support?.operatorName ?? '未割り当て'}`
+    ? `LINE 表示名：${friend.displayName || emptyValue('unknown')}・${friend.createdAt ? `${formatDay(friend.createdAt).replace(/（.）$/, '')}に友だち追加` : emptyValue('unknown')}・担当 ${friend.support?.operatorName ?? '未割り当て'}`
     : '読み込んでいます…'
   const realName = data.fields.find((f) => f.name === '本名')?.value ?? ''
 

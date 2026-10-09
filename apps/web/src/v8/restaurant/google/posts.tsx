@@ -42,6 +42,7 @@ import {
 import { errorMessage, formatShortDay, formatShortStamp } from './format'
 import type { GoogleNav } from './google'
 import styles from './google.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 端末からのアップロードの道具（今の画面の app/contents/media-direct-upload を入口が渡す）。 */
 export interface MediaUploadHelpers {
@@ -578,7 +579,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
               size="full"
               value={form.kind === 'offer' ? '' : form.ctaType}
               onChange={(v) => set({ ctaType: v as GooglePostCtaType | '' })}
-              options={[{ value: '', label: form.kind === 'offer' ? 'なし（特典は Google の決まりで付けられません）' : 'なし' }, ...(Object.keys(CTA_LABELS) as GooglePostCtaType[]).map((k) => ({ value: k, label: CTA_LABELS[k] }))]}
+              options={[{ value: '', label: form.kind === 'offer' ? 'なし（特典は Google の決まりで付けられません）' : emptyValue('none') }, ...(Object.keys(CTA_LABELS) as GooglePostCtaType[]).map((k) => ({ value: k, label: CTA_LABELS[k] }))]}
               disabled={!editable || form.kind === 'offer'}
             />
           </Field>

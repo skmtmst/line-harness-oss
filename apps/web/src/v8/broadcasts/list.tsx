@@ -71,6 +71,7 @@ import { formatDateTime, formatNumber } from '@/lib/format'
 import QuickSendV8 from './quick-send'
 import styles from './list.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -638,7 +639,7 @@ export default function BroadcastListV8() {
       icon: Send,
       value: kpiPending ? null : (listKpis?.thisMonth ?? null),
       unit: '件',
-      detail: `${listKpis?.delivered == null ? '—' : `${formatNumber(listKpis.delivered)}人`}に届いた`,
+      detail: `${listKpis?.delivered == null ? emptyValue('unknown') : `${formatNumber(listKpis.delivered)}人`}に届いた`,
     },
     {
       key: 'openRate',
@@ -1088,14 +1089,14 @@ export default function BroadcastListV8() {
               <Td>
                 <span className={styles.cellMain}>
                   {broadcast.status === 'sent'
-                    ? (broadcast.sentAt ? formatDateTime(broadcast.sentAt) : '—')
-                    : (broadcast.scheduledAt ? formatDateTime(broadcast.scheduledAt) : '未設定')}
+                    ? (broadcast.sentAt ? formatDateTime(broadcast.sentAt) : emptyValue('unknown'))
+                    : (broadcast.scheduledAt ? formatDateTime(broadcast.scheduledAt) : emptyValue('unconfigured'))}
                 </span>
                 {broadcast.status === 'scheduled' && broadcast.scheduledAt ? <span className={styles.cellSub}>予約</span> : null}
               </Td>
               <Td>
                 {broadcast.status !== 'sent' ? (
-                  <span className={styles.cellMain}>—</span>
+                  <span className={styles.cellMain}>{emptyValue('unknown')}</span>
                 ) : (
                   <>
                     <span className={styles.resultMain}>{formatNumber(insight?.delivered ?? broadcast.successCount)}人に届いた</span>

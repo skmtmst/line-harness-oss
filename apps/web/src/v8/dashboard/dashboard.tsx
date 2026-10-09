@@ -46,6 +46,7 @@ import {
 import { RetryLabel } from '@/components/shared/retry-label'
 import styles from './dashboard.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /* 編集の引き出し（mcOqK・dnd-kit を含む重い部品）は開くまで読まない。V8 だけの作り（v7 の部品は使わない）。 */
 const DashboardEditor = dynamic(() => import('./dashboard-editor').then((module) => module.default), {
@@ -140,7 +141,7 @@ export default function DashboardV8() {
         detail: <>
           <span>{`LINEの未対応：${d.lineUnread === null ? '未取得' : `${formatNumber(d.lineUnread)}件`}`}</span>
           <span>{`メールの未対応：${d.mailUnread === null ? '未取得' : `${formatNumber(d.mailUnread)}件`}`}</span>
-          <span>{`最も古い未対応：${d.pendingOldest === null ? '—' : formatWaitRough(d.pendingOldest)}`}</span>
+          <span>{`最も古い未対応：${d.pendingOldest === null ? emptyValue('unknown') : formatWaitRough(d.pendingOldest)}`}</span>
         </>,
       }
     }
@@ -245,7 +246,7 @@ export default function DashboardV8() {
     const ops = d.sectionAvailable('operations') ? data?.operations : undefined
     const opsDetail = (text: string | null) => text ?? (data ? STATE_TEXT.error : STATE_TEXT.loading)
     if (id === 'booking-status') return <Metric title="予約状況" period="現在" href="/booking/bookings?view=list&status=requested" linkLabel="予約を見る" value={ops?.bookings?.pending ?? null} detail={opsDetail(ops?.bookings ? `今後の予約 ${ops.bookings.upcoming}件` : null)} section={data?.sections?.operations} loading={d.loading} />
-    if (id === 'inflow-top') return <Metric title="流入経路TOP3" period={dashboardPeriodLabel(d.period) ?? undefined} href="/analytics?tab=routes" linkLabel="経路別の内訳を見る" value={ops?.inflowTop?.[0]?.count ?? (ops?.inflowTop ? 0 : null)} detail={opsDetail(ops?.inflowTop ? ops.inflowTop.map((item) => `${item.name ?? '—'} ${item.count}`).join('、') || '期間内の追加なし' : null)} section={data?.sections?.operations} loading={d.loading} />
+    if (id === 'inflow-top') return <Metric title="流入経路TOP3" period={dashboardPeriodLabel(d.period) ?? undefined} href="/analytics?tab=routes" linkLabel="経路別の内訳を見る" value={ops?.inflowTop?.[0]?.count ?? (ops?.inflowTop ? 0 : null)} detail={opsDetail(ops?.inflowTop ? ops.inflowTop.map((item) => `${item.name ?? emptyValue('unknown')} ${item.count}`).join('、') || '期間内の追加なし' : null)} section={data?.sections?.operations} loading={d.loading} />
     if (id === 'funnel-alert') return <Metric title="ファネル要注意" period={dashboardPeriodLabel(d.period) ?? undefined} href="/analytics?tab=funnel" linkLabel="ファネルを見る" value={ops?.funnelAlerts ?? null} detail="" help="3人以上追加され、成果が0件の経路です" section={data?.sections?.operations} loading={d.loading} />
     if (id === 'automation-failures') return <Metric title="オートメーション失敗" period={dashboardPeriodLabel(d.period) ?? undefined} href="/automations/runs?status=problems" linkLabel="実行状況を見る" value={ops?.automationFailures ?? null} detail="" help="期間内の失敗と一部失敗の合計です" section={data?.sections?.operations} loading={d.loading} />
     if (id === 'scenario-status') return <Metric title="シナリオ配信状況" period="現在" href="/scenarios" linkLabel="シナリオを見る" value={ops?.scenarios?.active ?? null} detail={opsDetail(ops?.scenarios ? `一時停止 ${ops.scenarios.paused}件` : null)} section={data?.sections?.operations} loading={d.loading} />

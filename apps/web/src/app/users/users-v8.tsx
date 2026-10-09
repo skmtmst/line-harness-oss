@@ -28,6 +28,7 @@ import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 import { useMergedUsers, USERS_PAGE_SIZE } from './use-merged-users'
 import styles from '@/app/friends/friends-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const UID_STATUS = {
   url_token: '要確認',
@@ -111,7 +112,7 @@ export default function UsersV8() {
         <div className={styles.kpi}>
           <span className={styles.kpiLabel}>統合ユーザー</span>
           <p className={styles.kpiValue}>
-            {uniquePeople !== null ? formatNumber(uniquePeople) : '—'}
+            {uniquePeople !== null ? formatNumber(uniquePeople) : emptyValue('unknown')}
             <span className={styles.kpiUnit}>人</span>
           </p>
           <p className={styles.kpiDetail}>重複を1人にまとめた数</p>
@@ -122,7 +123,7 @@ export default function UsersV8() {
             <HelpTip label="UID連携済みの説明">このページに出ている人のうち、LINE UIDを根拠にまとめている数です。</HelpTip>
           </span>
           <p className={styles.kpiValue}>
-            {u.loading || u.error ? '—' : formatNumber(linkedUidCount)}
+            {u.loading || u.error ? emptyValue('unknown') : formatNumber(linkedUidCount)}
             <span className={styles.kpiUnit}>人</span>
           </p>
           <p className={styles.kpiDetail}>このページでUID確認済み</p>
@@ -133,7 +134,7 @@ export default function UsersV8() {
             <HelpTip label="複数アカウントの説明">このページに出ている人のうち、2つ以上のLINEアカウントに登録がある数です。</HelpTip>
           </span>
           <p className={styles.kpiValue}>
-            {u.loading || u.error ? '—' : formatNumber(multiAccountCount)}
+            {u.loading || u.error ? emptyValue('unknown') : formatNumber(multiAccountCount)}
             <span className={styles.kpiUnit}>人</span>
           </p>
           <p className={styles.kpiDetail}>送信前に配信先の確認が必要です</p>
@@ -264,11 +265,11 @@ export default function UsersV8() {
                           </button>
                         ) : (
                           <span className={styles.personName} style={{ cursor: 'default' }}>
-                            {row.displayName || '—'}
+                            {row.displayName || emptyValue('unknown')}
                           </span>
                         )}
                         <span className={styles.personSub}>
-                          {row.emails[0] ?? row.phones[0] ?? '—'}
+                          {row.emails[0] ?? row.phones[0] ?? emptyValue('unknown')}
                         </span>
                       </div>
                     </div>

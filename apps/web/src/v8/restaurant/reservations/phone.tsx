@@ -36,6 +36,7 @@ import StoreTabs from '../store-tabs/store-tabs'
 import type { PhonePreset } from './today'
 import { INACTIVE_STATUSES, dayTitle, floorOrder, slotLabel, toYmd } from './format'
 import styles from './reservations.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const STAY_MINUTES = 120
 const FALLBACK_START = 17 * 60
@@ -260,8 +261,8 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
         {history ? (
           <>
             <p className={styles.breakRow}><span>これまでの来店</span><strong>{`${history.visitCount} 回`}</strong></p>
-            <p className={styles.breakRow}><span>前回</span><strong>{lastVisit ? `${new Date(lastVisit.starts_at).getMonth() + 1}/${new Date(lastVisit.starts_at).getDate()}・${lastVisit.guest_count}名・${lastVisit.table_label || '未配席'}` : '—'}</strong></p>
-            <p className={styles.breakRow}><span>アレルギー（前回）</span><strong className={lastAllergy ? styles.alertText : undefined}>{lastAllergy || '—'}</strong></p>
+            <p className={styles.breakRow}><span>前回</span><strong>{lastVisit ? `${new Date(lastVisit.starts_at).getMonth() + 1}/${new Date(lastVisit.starts_at).getDate()}・${lastVisit.guest_count}名・${lastVisit.table_label || '未配席'}` : emptyValue('unknown')}</strong></p>
+            <p className={styles.breakRow}><span>アレルギー（前回）</span><strong className={lastAllergy ? styles.alertText : undefined}>{lastAllergy || emptyValue('unknown')}</strong></p>
           </>
         ) : (
           historyError ? <ListState kind="error" title={historyError} /> : contactUid || contactPhone ? <ListState kind="loading" title="来店履歴を読み込んでいます。" /> : <p className={styles.sideText}>お客さまを選ぶと、来店回数と前回が出ます。</p>

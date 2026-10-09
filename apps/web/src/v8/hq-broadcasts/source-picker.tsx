@@ -10,6 +10,7 @@ import SourcePickerDialog, { type SourcePickerItem, type SourcePickerFolder } fr
 import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api'
 import { hqTemplatesApi, type HqTemplateListItem } from '@/lib/hq-templates-api'
 import { bubbleFromTemplate, previewBubbleOf } from './bubbles'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const KINDS = [
   { id: 'message', label: 'テキスト' }, { id: 'carousel', label: 'カルーセル' },
@@ -31,7 +32,7 @@ export function templatePickerItem(item: HqTemplateListItem): SourcePickerItem {
 
 export function broadcastPickerItem(item: HqBroadcastRun): SourcePickerItem {
   const category = item.status === 'prepared' ? 'prepared' : item.status === 'scheduled' ? 'scheduled' : item.status
-  return { id: item.id, name: item.title, category, categoryLabel: STATES.find((state) => state.id === category)?.label ?? ({ sending: '送信中', failed: '失敗', cancelled: '取り消し済み', stopped: '停止中' }[category] ?? '—'), folderId: item.input.folderId, updatedLabel: '更新 —', tone: category === 'sent' ? 'success' : category === 'scheduled' ? 'info' : 'neutral' }
+  return { id: item.id, name: item.title, category, categoryLabel: STATES.find((state) => state.id === category)?.label ?? ({ sending: '送信中', failed: '失敗', cancelled: '取り消し済み', stopped: '停止中' }[category] ?? emptyValue('unknown')), folderId: item.input.folderId, updatedLabel: '更新 —', tone: category === 'sent' ? 'success' : category === 'scheduled' ? 'info' : 'neutral' }
 }
 
 /** ①の2つの入口。共通の窓には候補・分類・見え方だけを渡す。 */

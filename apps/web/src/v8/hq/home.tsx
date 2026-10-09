@@ -42,6 +42,7 @@ import { connectionReasonLine } from './connection-reasons'
 import styles from './home.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/folder-colors'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type StatusFilter = 'all' | 'ok' | 'warn' | 'archived'
 type View = 'cards' | 'table'
@@ -522,7 +523,7 @@ export default function HqHomeV8() {
                 <dl className={styles.stats}>
                   <div className={styles.stat}>
                     <dt>友だち</dt>
-                    <dd>{isArchived(account) && !account.stats?.friendCount ? '—' : formatNumber(account.stats?.friendCount ?? 0)}</dd>
+                    <dd>{isArchived(account) && !account.stats?.friendCount ? emptyValue('unknown') : formatNumber(account.stats?.friendCount ?? 0)}</dd>
                   </div>
                   <div className={styles.stat}>
                     <dt>今月の配信</dt>

@@ -47,6 +47,7 @@ import { daysUntilIso, eventRowState, isLowApplication, summarizeEventAttention,
 import { jstDay, jstTime } from './shared'
 import styles from './list.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -278,7 +279,7 @@ export default function EventsListV8() {
   const filterActive = Boolean(query.trim() || filter !== 'all' || folderFilter)
   const pageCount = Math.max(1, Math.ceil(listTotal / perPage))
   const current = Math.min(page, pageCount)
-  const kpiDetail = (ready: string) => (!selectedAccountId ? 'アカウントを選択' : loadStatus === 'loading' ? '—' : loadStatus === 'ready' ? ready : '読み込めませんでした')
+  const kpiDetail = (ready: string) => (!selectedAccountId ? 'アカウントを選択' : loadStatus === 'loading' ? emptyValue('unknown') : loadStatus === 'ready' ? ready : '読み込めませんでした')
 
   const kpis = [
     {
@@ -287,7 +288,7 @@ export default function EventsListV8() {
     },
     {
       key: 'active', title: '申込', icon: Users, value: dataReady ? kpi.upcoming_active : null, unit: '人',
-      detail: kpiDetail(kpi.fill_rate === null ? '今後の回への申込' : `定員 ${kpi.upcoming_capacity ?? '—'} 人に対して ${kpi.fill_rate}%`),
+      detail: kpiDetail(kpi.fill_rate === null ? '今後の回への申込' : `定員 ${kpi.upcoming_capacity ?? emptyValue('unknown')} 人に対して ${kpi.fill_rate}%`),
     },
     {
       key: 'nearly-full', title: 'あと少しで満席', icon: Hourglass, value: dataReady ? kpi.nearly_full : null, unit: '回',
@@ -296,7 +297,7 @@ export default function EventsListV8() {
     {
       key: 'low', title: '申し込みが少ない', icon: TrendingDown, value: dataReady ? kpi.low_applications : null, unit: '回',
       detail: kpiDetail(kpi.nearest_low_starts_at
-        ? `${jstDay(kpi.nearest_low_starts_at)}の回。あと ${daysUntilIso(kpi.nearest_low_starts_at) ?? '—'} 日`
+        ? `${jstDay(kpi.nearest_low_starts_at)}の回。あと ${daysUntilIso(kpi.nearest_low_starts_at) ?? emptyValue('unknown')} 日`
         : '声をかけると埋まります'),
     },
   ]
@@ -521,13 +522,13 @@ export default function EventsListV8() {
                   />
                   <Td>
                     <span className={styles.whenMain} title={when}>{when}</span>
-                    <span className={styles.whenSub}>{e.next_slot_starts_at ? '次の回' : '—'}</span>
+                    <span className={styles.whenSub}>{e.next_slot_starts_at ? '次の回' : emptyValue('unknown')}</span>
                   </Td>
-                  <Td align="right" className={styles.num}>{`${e.total_active} / ${e.total_capacity ?? '—'}`}</Td>
+                  <Td align="right" className={styles.num}>{`${e.total_active} / ${e.total_capacity ?? emptyValue('unknown')}`}</Td>
                   <Td align="right" className={styles.num}>
                     {e.pending_count > 0 ? (
                       <Link href={`/events/bookings?id=${e.id}`} className={styles.pendingLink}>{e.pending_count}</Link>
-                    ) : <span className={styles.faint}>—</span>}
+                    ) : <span className={styles.faint}>{emptyValue('unknown')}</span>}
                   </Td>
                   <Td className={styles.stateCell}>
                     <span className={styles.stateLine}>
@@ -605,7 +606,7 @@ export default function EventsListV8() {
             <p className={styles.panelLabel}>状態</p>
             <p className={styles.panelText}>{STATE_LABEL[eventRowState(active)]}</p>
             <p className={styles.panelLabel}>予約・承認待ち</p>
-            <p className={styles.panelText}>{`予約 ${active.total_active} / ${active.total_capacity ?? '—'}　承認待ち ${active.pending_count > 0 ? active.pending_count : '—'}`}</p>
+            <p className={styles.panelText}>{`予約 ${active.total_active} / ${active.total_capacity ?? emptyValue('unknown')}　承認待ち ${active.pending_count > 0 ? active.pending_count : emptyValue('unknown')}`}</p>
             <div className={styles.panelActions}>
               <Button onClick={() => router.push(`/events/bookings?id=${active.id}`)}>申込者を見る</Button>
               <Button onClick={() => router.push(`/events/preview?id=${active.id}`)}>プレビュー</Button>

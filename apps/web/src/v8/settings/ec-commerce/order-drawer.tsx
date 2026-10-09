@@ -28,6 +28,7 @@ import {
   eventStoppedStage,
 } from './ec-failure'
 import styles from './order-drawer.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type DetailState = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -232,7 +233,7 @@ export default function OrderDrawer({
                     <dt>中身</dt>
                     <dd>{order.orderLines.length ? order.orderLines.map((line) => `${line.productName} ×${line.quantity}`).join('・') : '商品明細は未取得'}</dd>
                   </div>
-                  <div className={styles.fact}><dt>金額</dt><dd>{amount ?? '—'}</dd></div>
+                  <div className={styles.fact}><dt>金額</dt><dd>{amount ?? emptyValue('unknown')}</dd></div>
                   <div className={styles.fact}>
                     <dt>EC側の注文</dt>
                     <dd>

@@ -21,6 +21,7 @@ import { downloadCsv, metricText, rangeFor, shownValue, useOverview, useRegister
 import styles from './analytics.module.css'
 import { useReportPeriod, type PeriodRange } from '@/components/shared/period-picker'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 function metricSum(metrics: Array<AnalyticsMetric<number>>): number | null {
   const values = metrics.map(shownValue)
@@ -124,7 +125,7 @@ function RoutesTable({ overview, clicks }: { overview: AnalyticsRoutesOverview['
         const previous = index > 0 ? stages[index - 1].value : null
         const rate = previous && stage.value !== null ? `前段の ${(stage.value / previous * 100).toFixed(1)}%` : undefined
         return <div key={stage.label} className={styles.routeRow} title={rate}>
-          <div className={styles.sideRow}><span className={styles.flowLabel}>{stage.label}</span><strong className={styles.sideValue}>{stage.value === null ? '—' : `${formatNumber(stage.value)} ${stage.unit}`}</strong></div>
+          <div className={styles.sideRow}><span className={styles.flowLabel}>{stage.label}</span><strong className={styles.sideValue}>{stage.value === null ? emptyValue('unknown') : `${formatNumber(stage.value)} ${stage.unit}`}</strong></div>
           <div className={styles.track} data-size="flow" aria-hidden="true"><span style={{ width: stage.value !== null && clicks ? `${Math.min(100, stage.value / clicks * 100)}%` : '0%' }} /></div>
         </div>
       })}
@@ -148,8 +149,8 @@ function RoutesTable({ overview, clicks }: { overview: AnalyticsRoutesOverview['
             <span role="cell" className={styles.num} data-w="70"><MetricText metric={item.reactionPeople} /></span>
             <span role="cell" className={styles.num} data-w="70" title={`保留 ${metricText(item.conversions.pending)}・却下 ${metricText(item.conversions.rejected)}`}><MetricText metric={item.conversions.approved} /></span>
             <span role="cell" className={styles.num} data-w="100">{shownValue(item.conversions.revenue) === null ? <span className={styles.faint} title={item.conversions.revenue.reason ?? undefined}>売上は未取得</span> : <span>{yen(shownValue(item.conversions.revenue))}</span>}</span>
-            <span role="cell" className={styles.num} data-w="100" title={`友だち1人 ${metricText(item.costPerFriend, { currency: true })}・成果1件 ${metricText(item.costPerConversion, { currency: true })}`}>{shownValue(item.adCost) === null ? <span className={styles.faint} title={item.adCost.reason ?? undefined}>—</span> : <span>{yen(shownValue(item.adCost))}</span>}</span>
-            <span role="cell" className={styles.num} data-w="100">{shownValue(item.profitAfterAdCost) === null ? <span className={styles.faint} title={item.profitAfterAdCost.reason ?? undefined}>—</span> : <span>{yen(shownValue(item.profitAfterAdCost), true)}</span>}</span>
+            <span role="cell" className={styles.num} data-w="100" title={`友だち1人 ${metricText(item.costPerFriend, { currency: true })}・成果1件 ${metricText(item.costPerConversion, { currency: true })}`}>{shownValue(item.adCost) === null ? <span className={styles.faint} title={item.adCost.reason ?? undefined}>{emptyValue('unknown')}</span> : <span>{yen(shownValue(item.adCost))}</span>}</span>
+            <span role="cell" className={styles.num} data-w="100">{shownValue(item.profitAfterAdCost) === null ? <span className={styles.faint} title={item.profitAfterAdCost.reason ?? undefined}>{emptyValue('unknown')}</span> : <span>{yen(shownValue(item.profitAfterAdCost), true)}</span>}</span>
           </div>)}
       </div>
       <p className={styles.caption}>{`「—」は費用を取得できない経路です。広告とのつなぎで費用を取り込むと出ます。0として差し引きを計算していません（帰属は「${overview.attributionLabel}」）。`}</p>

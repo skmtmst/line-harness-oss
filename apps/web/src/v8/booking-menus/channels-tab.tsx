@@ -22,6 +22,7 @@ import {
 import type { BookingStaff } from '@/lib/api'
 import styles from './settings.module.css'
 import ch from './channels.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -51,7 +52,7 @@ function formatConflictRange(conflict: BookingConflict): string {
 
 function formatConflictTime(value: string): string {
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date)
+  return Number.isNaN(date.getTime()) ? emptyValue('unknown') : new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date)
 }
 
 function StaffStatusChip({ status }: { status: BookingChannelStaff['status'] }) {
@@ -96,9 +97,9 @@ function CalendarDetailDialog({
       onCancel={onClose}
     >
       <dl className={ch.detail}>
-        <div className={ch.detailRow}><dt className={ch.detailKey}>カレンダー</dt><dd className={ch.detailValue}>{calendarId || '—'}</dd></div>
+        <div className={ch.detailRow}><dt className={ch.detailKey}>カレンダー</dt><dd className={ch.detailValue}>{calendarId || emptyValue('unknown')}</dd></div>
         <div className={ch.detailRow}><dt className={ch.detailKey}>状態</dt><dd className={ch.detailValue}><StaffStatusChip status={staff.status} /></dd></div>
-        <div className={ch.detailRow}><dt className={ch.detailKey}>外の予定（今週）</dt><dd className={ch.detailValue}>{staff.externalEventsThisWeek == null ? '—' : `${staff.externalEventsThisWeek}件`}</dd></div>
+        <div className={ch.detailRow}><dt className={ch.detailKey}>外の予定（今週）</dt><dd className={ch.detailValue}>{staff.externalEventsThisWeek == null ? emptyValue('unknown') : `${staff.externalEventsThisWeek}件`}</dd></div>
         <div className={ch.detailRow}><dt className={ch.detailKey}>最後に読んだ</dt><dd className={ch.detailValue}>{formatReadAt(staff.lastReadAt)}</dd></div>
         {staff.readError ? <div className={ch.detailRow}><dt className={ch.detailKey}>読めなかった理由</dt><dd className={ch.detailValue}>{staff.readError}</dd></div> : null}
       </dl>
@@ -377,9 +378,9 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
                   <OneLine text={person.displayName} tone="name" />
                   {role ? <OneLine text={role} tone="sub" /> : null}
                 </span>
-                <span className={ch.cell} role="cell"><OneLine text={calendarId || '—'} /></span>
+                <span className={ch.cell} role="cell"><OneLine text={calendarId || emptyValue('unknown')} /></span>
                 <span className={ch.cell} role="cell"><StaffStatusChip status={person.status} /></span>
-                <span className={`${ch.cell} ${ch.right}`} role="cell">{person.externalEventsThisWeek == null ? '—' : `${person.externalEventsThisWeek}件`}</span>
+                <span className={`${ch.cell} ${ch.right}`} role="cell">{person.externalEventsThisWeek == null ? emptyValue('unknown') : `${person.externalEventsThisWeek}件`}</span>
                 <span className={ch.cell} role="cell">{formatReadAt(person.lastReadAt)}</span>
                 <span className={ch.cell} role="cell">
                   {person.status === 'connected' ? (
@@ -416,10 +417,10 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
                   <OneLine text={label.name} tone="name" />
                   {label.sub ? <OneLine text={label.sub} tone="sub" /> : null}
                 </span>
-                <span className={`${ch.cell} ${ch.wrap}`} role="cell">{label.how || '—'}</span>
+                <span className={`${ch.cell} ${ch.wrap}`} role="cell">{label.how || emptyValue('unknown')}</span>
                 <span className={ch.cell} role="cell"><ChannelStatusChip channel={channel} /></span>
-                <span className={`${ch.cell} ${ch.right}`} role="cell">{channel.todayCount == null ? '—' : `${channel.todayCount}件`}</span>
-                <span className={ch.cell} role="cell">—</span>
+                <span className={`${ch.cell} ${ch.right}`} role="cell">{channel.todayCount == null ? emptyValue('unknown') : `${channel.todayCount}件`}</span>
+                <span className={ch.cell} role="cell">{emptyValue('unknown')}</span>
                 <span className={ch.cell} role="cell">
                   {channel.status === 'active' && (channel.key === 'line' || channel.key === 'manual') ? (
                     <Button href="/booking/bookings">予約管理へ</Button>

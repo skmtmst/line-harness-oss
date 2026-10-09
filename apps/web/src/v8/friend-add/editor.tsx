@@ -84,6 +84,7 @@ import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Step = 'basic' | 'routes' | 'message' | 'actions' | 'preview'
 type EditorRule = {
@@ -614,7 +615,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         : `テキスト ${definition.messageText.length}字`
       : step === 'basic' || step === 'routes'
         ? '手順3で作る'
-        : MESSAGE_TYPE_LABEL[definition.messageType] ?? '未設定'
+        : MESSAGE_TYPE_LABEL[definition.messageType] ?? emptyValue('unconfigured')
   const statusLabel = rule.status === 'published' ? '有効' : rule.status === 'stopped' ? '停止中' : '下書き'
   const routeSummary = step === 'basic'
     ? '手順2で選ぶ'
@@ -687,7 +688,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       help={<>
         {step === 'basic'
           ? 'いまは下書きとして作ります。最後の「確認」で有効にします。'
-          : `名前：${rule.name || '（未入力）'}・いまは${statusLabel}です`}
+          : `名前：${rule.name || emptyValue('unconfigured')}・いまは${statusLabel}です`}
       </>}
       /* 先に保存されたとき（h5rm8t）：板の頭の下に、入力欄と右の列にまたがる帯（型の notice の置き場）。
          帯は共通部品（save-conflict）。比べる窓は項目を左右に並べるこの画面のものを使う。 */
@@ -1131,7 +1132,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
           <h2 className={styles.cardTitle}>最初に送るもの</h2>
         </div>
         {!canEdit ? (
-          <ReadOnlyText label="最初に送るものの種類" value={MESSAGE_TABS.find((tab) => tab.key === definition.messageType)?.label ?? MESSAGE_TYPE_LABEL[definition.messageType] ?? '未設定'} />
+          <ReadOnlyText label="最初に送るものの種類" value={MESSAGE_TABS.find((tab) => tab.key === definition.messageType)?.label ?? MESSAGE_TYPE_LABEL[definition.messageType] ?? emptyValue('unconfigured')} />
         ) : (
         <div className={styles.chipRow} role="group" aria-label="最初に送るものの種類">
           {MESSAGE_TABS.map((tab) => {
@@ -1496,13 +1497,13 @@ function PreviewStep({ rule, definition, routeNames, runTest, testing, testOk, o
     ? '配信なし'
     : definition.messageType === 'text' && definition.messageText
       ? `テキスト ${definition.messageText.length}字`
-      : MESSAGE_TYPE_LABEL[definition.messageType] ?? '未設定'
+      : MESSAGE_TYPE_LABEL[definition.messageType] ?? emptyValue('unconfigured')
   const actionSummary = definition.actions.length === 0
-    ? 'なし'
+    ? emptyValue('none')
     : `${definition.actions.slice(0, 2).map((action) => action.label.replace(/「.*」/, '')).join('・')}の${definition.actions.length}つ`
   const overlapOk = overlapNotes.length === 0
   const rows: Array<{ label: string; value: string; href: string }> = [
-    { label: '名前・フォルダ', value: `${rule.name || '（未入力）'}${rule.folderName ? `・${rule.folderName}` : ''}`, href: hrefFor('basic') },
+    { label: '名前・フォルダ', value: `${rule.name || emptyValue('unconfigured')}${rule.folderName ? `・${rule.folderName}` : ''}`, href: hrefFor('basic') },
     { label: 'だれに', value: rule.friendKind === 'returning' ? '以前からの友だち・ブロック解除した人' : 'はじめて友だち追加した人', href: hrefFor('basic') },
     { label: '流入リンク', value: routeNames.length > 0 ? routeNames.join('・') : '未選択', href: hrefFor('routes') },
     { label: '最初に送るもの', value: `${firstSend}${definition.timing === 'immediate' ? '・追加してすぐ' : ''}`, href: hrefFor('message') },

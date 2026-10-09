@@ -86,6 +86,7 @@ import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/dupl
 import styles from './list.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -713,7 +714,7 @@ export default function ScenariosListV8() {
       icon: Workflow,
       value: overallTotal,
       unit: '件',
-      detail: `有効 ${stats ? stats.scenarios.active : '—'}・停止中 ${scenarioStopped ?? '—'}`,
+      detail: `有効 ${stats ? stats.scenarios.active : emptyValue('unknown')}・停止中 ${scenarioStopped ?? emptyValue('unknown')}`,
     },
     {
       title: '購読中',
@@ -727,7 +728,7 @@ export default function ScenariosListV8() {
       icon: UserCheck,
       value: statsFailed ? null : stats?.scenarios.completed ?? null,
       unit: '人',
-      detail: stats ? scenarioCompletionDetail(stats.scenarios.subscribers, stats.scenarios.completed) : '—',
+      detail: stats ? scenarioCompletionDetail(stats.scenarios.subscribers, stats.scenarios.completed) : emptyValue('unknown'),
     },
     {
       title: '今週送った数',
@@ -920,7 +921,7 @@ export default function ScenariosListV8() {
                 ].join('・')
                 /* 絵：送り方・通数・フォルダのあとに全角の間を空けて説明。1つの文字列で書く。 */
                 const sub = s.description ? `${meta}　${s.description}` : meta
-                const subscribers = s.subscriberCount === undefined ? '—' : formatNumber(s.subscriberCount)
+                const subscribers = s.subscriberCount === undefined ? emptyValue('unknown') : formatNumber(s.subscriberCount)
                 return (
                   <Tr
                     interactive
@@ -1286,7 +1287,7 @@ export default function ScenariosListV8() {
           >
             <p>
               {panelRow.isActive ? '有効' : '停止中'} ／ 購読{' '}
-              {panelRow.subscriberCount === undefined ? '—' : formatNumber(panelRow.subscriberCount)}人 ／
+              {panelRow.subscriberCount === undefined ? emptyValue('unknown') : formatNumber(panelRow.subscriberCount)}人 ／
               読了 {formatNumber(panelRow.completedCount ?? 0)}人
             </p>
             {panelRow.description && <p>{panelRow.description}</p>}

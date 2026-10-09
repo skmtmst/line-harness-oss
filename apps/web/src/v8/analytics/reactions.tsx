@@ -21,11 +21,12 @@ import { METRIC_STATE_TEXT, downloadCsv, metricText, rangeFor, shownValue, useOv
 import styles from './analytics.module.css'
 import { useReportPeriod } from '@/components/shared/period-picker'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 表の数。集計待ち・取得できない数は 0 にせず「—」と理由（title）。 */
 export function MetricText({ metric, percent, currency }: { metric: AnalyticsMetric<number | string>; percent?: boolean; currency?: boolean }) {
   const shown = metric.state === 'available' || metric.state === 'partial'
-  return <span className={shown && metric.value !== null ? undefined : styles.faint} title={metric.reason ?? undefined}>{shown ? metricText(metric, { percent, currency }) : '—'}</span>
+  return <span className={shown && metric.value !== null ? undefined : styles.faint} title={metric.reason ?? undefined}>{shown ? metricText(metric, { percent, currency }) : emptyValue('unknown')}</span>
 }
 
 export default function ReactionsV8({ accountId }: { accountId: string }) {

@@ -39,6 +39,7 @@ import { shortDateTime } from './words'
 import styles from './sheets.module.css'
 import { Field } from '@/components/shared/form-controls'
 import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -310,7 +311,7 @@ export default function WebhooksSheetsV8() {
   const lastKind = runs.find((run) => run.startedAt === connection?.lastSyncedAt)?.kind
   const lastSyncText = connection?.lastSyncedAt
     ? `${shortDateTime(connection.lastSyncedAt)}${lastKind ? ` ${RUN_KIND_LABEL[lastKind]}` : ''}・${connection.lastSyncStatus === 'partial' ? '一部だけ完了' : connection.lastSyncStatus === 'error' ? '失敗' : '完了'}`
-    : '—'
+    : emptyValue('unknown')
 
   /* ===== 左：書き出しのカード ===== */
   let mainCard
@@ -342,7 +343,7 @@ export default function WebhooksSheetsV8() {
         <div className={styles.statusRow}>
           <span className={styles.statusLabel}>接続しているGoogleアカウント</span>
           <span className={styles.spacer} aria-hidden="true" />
-          <span className={styles.statusValue}>{connection?.googleAccountEmail ?? '—'}</span>
+          <span className={styles.statusValue}>{connection?.googleAccountEmail ?? emptyValue('unknown')}</span>
         </div>
         <div className={styles.statusRow}>
           <span className={styles.statusLabel}>書き出し先</span>
@@ -479,7 +480,7 @@ export default function WebhooksSheetsV8() {
                   <Tr key={group.key} data-table-layout="columns">
                     <Td className={styles.colWhen}>{shortDateTime(group.startedAt)}</Td>
                     <Td className={styles.colKind}>{RUN_KIND_LABEL[group.kind] ?? group.kind}</Td>
-                    <Td className={styles.colWhat} title={group.parts.join('・')}>{group.parts.join('・') || '—'}</Td>
+                    <Td className={styles.colWhat} title={group.parts.join('・')}>{group.parts.join('・') || emptyValue('unknown')}</Td>
                     <Td className={styles.colResult}>
                       <StatusBadge tone={group.status === 'ok' ? 'success' : group.status === 'partial' ? 'warning' : group.status === 'running' ? 'neutral' : 'danger'}>{RUN_STATUS_LABEL[group.status] ?? group.status}</StatusBadge>
                     </Td>

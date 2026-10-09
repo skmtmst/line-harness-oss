@@ -40,6 +40,7 @@ import {
 import styles from './responses.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Submission = {
   id: string
@@ -61,7 +62,7 @@ const EXPORT_PAGE_LIMIT = 200
 
 function valueText(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—'
-  if (Array.isArray(value)) return value.length ? value.map(String).join('、') : '—'
+  if (Array.isArray(value)) return value.length ? value.map(String).join('、') : emptyValue('unknown')
   if (typeof value === 'object') return JSON.stringify(value)
   return String(value)
 }
@@ -370,7 +371,7 @@ function Responses() {
   const pageCount = Math.max(1, Math.ceil((total ?? 0) / pageSize))
   const firstKey = fieldKeys[0]
   const headLine = [
-    total === null ? '—' : `${formatNumber(total)}件`,
+    total === null ? emptyValue('unknown') : `${formatNumber(total)}件`,
     rate != null ? `答え終えた割合 ${formatNumber(rate)}%` : null,
   ].filter(Boolean).join('・')
   const longKey = fieldKeys.find((key) => blockByKey(key)?.type === 'textarea'
@@ -434,7 +435,7 @@ function Responses() {
       {exporting && exportProgress ? <p className={styles.railNote} role="status">{exportProgress}</p> : null}
       <section className={styles.railCard} aria-labelledby="fr-filter">
         <h2 className={styles.railTitle} id="fr-filter">絞り込み</h2>
-        <p className={styles.railNote}>{total === null ? '—' : `全 ${formatNumber(total)}件から、名前と答えで探します`}</p>
+        <p className={styles.railNote}>{total === null ? emptyValue('unknown') : `全 ${formatNumber(total)}件から、名前と答えで探します`}</p>
         <Field label={<><Search size={15} aria-hidden="true" /></>}><input
             type="search"
             value={query}
@@ -547,7 +548,7 @@ function Responses() {
             <section className={styles.card} aria-labelledby="fr-rows">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle} id="fr-rows">回答</h2>
-                <p className={styles.cardNote}>{total === null ? '—' : `全 ${formatNumber(total)}件`}</p>
+                <p className={styles.cardNote}>{total === null ? emptyValue('unknown') : `全 ${formatNumber(total)}件`}</p>
               </div>
               <table className={styles.table}>
                 <thead>
@@ -561,7 +562,7 @@ function Responses() {
                 <tbody>
                   {items.map((item) => {
                     const incomplete = incompleteOf(item)
-                    const first = firstKey ? valueText((item.data as Record<string, unknown>)[firstKey]) : '—'
+                    const first = firstKey ? valueText((item.data as Record<string, unknown>)[firstKey]) : emptyValue('unknown')
                     const isSelected = selected?.id === item.id
                     return (
                       <tr
@@ -578,7 +579,7 @@ function Responses() {
                         </td>
                         <td className={styles.ellipsis} title={first}>{first}</td>
                         <td>
-                          {incomplete === null ? <span className={styles.faint}>—</span>
+                          {incomplete === null ? <span className={styles.faint}>{emptyValue('unknown')}</span>
                             : incomplete ? <span className={`${styles.chip} ${styles.chipNg}`}>未完</span>
                               : <span className={`${styles.chip} ${styles.chipOk}`}>済み</span>}
                         </td>
@@ -589,7 +590,7 @@ function Responses() {
               </table>
               <div className={styles.pager}>
                 <span className={styles.range}>
-                  {total === null ? '—' : <ListRange total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={Math.min(page * pageSize, total)} />}
+                  {total === null ? emptyValue('unknown') : <ListRange total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={Math.min(page * pageSize, total)} />}
                 </span>
                 <Pagination page={page} pageCount={pageCount} disabled={loading} ariaLabel="回答一覧のページ送り" onPageChange={(next) => void load(next, pageSize)} />
               </div>

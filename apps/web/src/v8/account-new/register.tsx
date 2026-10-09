@@ -41,6 +41,7 @@ import {
   type DraftState, type StepNumber, type V8CheckRow,
 } from './logic'
 import styles from './register.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const V8_STEPS: ReadonlyArray<{ number: StepNumber; label: string; node: string; lead: string }> = [
   { number: 1, label: 'LINE準備', node: 'xj3zz', lead: '5段すべて通ってから登録します。接続確認が通るまで、アカウントは作られません。' },
@@ -97,7 +98,7 @@ export default function AccountRegisterV8() {
   const rowsPassed = allV8RowsPassed(checkRows)
   const createdId = connection?.id ?? ''
   const workerBase = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
-  const callbackUrl = workerBase ? `${workerBase}/auth/callback` : '—'
+  const callbackUrl = workerBase ? `${workerBase}/auth/callback` : emptyValue('unknown')
   const importingIds = (importState?.phase ?? connection?.followerImport.phase) === 'importing_ids'
   const selectedTags = tags?.filter((tag) => form.tagIds.includes(tag.id)) ?? []
   const shownStep = V8_STEPS[(createdId ? 5 : currentStep) - 1]
@@ -594,9 +595,9 @@ export default function AccountRegisterV8() {
                 <h2>登録内容を確認する</h2>
                 <p>{`表示名：${form.name.trim() || (connection?.displayName ? `${connection.displayName}（LINEから取得）` : 'LINEから取得')}`}</p>
                 <p>{`LINE ID：${form.lineId || '接続確認で取得します'}`}</p>
-                <p>{`親アカウント：${parentName ?? 'なし'}`}</p>
-                <p>{`タグ：${selectedTags.length > 0 ? selectedTags.map((tag) => tag.name).join('・') : 'なし'}`}</p>
-                <p>{`担当：${staffNames.length > 0 ? staffNames.join('・') : 'なし'}`}</p>
+                <p>{`親アカウント：${parentName ?? emptyValue('none')}`}</p>
+                <p>{`タグ：${selectedTags.length > 0 ? selectedTags.map((tag) => tag.name).join('・') : emptyValue('none')}`}</p>
+                <p>{`担当：${staffNames.length > 0 ? staffNames.join('・') : emptyValue('none')}`}</p>
               </Card>
             </div>
           )}

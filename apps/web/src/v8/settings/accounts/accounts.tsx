@@ -48,6 +48,7 @@ import {
 import styles from './accounts.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const TITLE = 'LINEアカウント'
 const DESCRIPTION = 'musubo でつないでいる LINE 公式アカウントです。既定のアカウントと、親子（本店と支店など）を決めます。'
@@ -96,7 +97,7 @@ export default function AccountsV8() {
   const ready = status === 'ready'
   // 未取得（読み込み中・取得失敗）を 0 と出さない。成功した空一覧だけ 0。
   const kpis = ready ? accountKpis(accounts) : null
-  const filterCount = (value: AccountFilter) => (ready ? accounts.filter((a) => matchesFilter(a, value)).length : '—')
+  const filterCount = (value: AccountFilter) => (ready ? accounts.filter((a) => matchesFilter(a, value)).length : emptyValue('unknown'))
 
   /** このアカウントの接続を、新しく確かめ直す。一覧全体を最新で取り直す。 */
   const recheck = useCallback(async (account: LineAccount) => {
@@ -247,7 +248,7 @@ export default function AccountsV8() {
               const webhook = webhookLabel(account)
               const parent = parentName(account, accounts)
               const archived = Boolean(account.archivedAt)
-              const friends = archived || account.stats?.friendCount == null ? '—' : account.stats.friendCount.toLocaleString('ja-JP')
+              const friends = archived || account.stats?.friendCount == null ? emptyValue('unknown') : account.stats.friendCount.toLocaleString('ja-JP')
               return (
                 <Tr key={account.id} interactive>
                   <Td className={styles.colName}><div className={styles.nameStack}>
@@ -256,11 +257,11 @@ export default function AccountsV8() {
                   </div></Td>
                   <Td className={styles.colConn}><StatusBadge tone={connection.tone}>{connection.label}</StatusBadge></Td>
                   <Td className={styles.colHook}>
-                    {archived ? <span className={styles.faint}>—</span> : <StatusBadge tone={webhook.tone}>{webhook.label}</StatusBadge>}
+                    {archived ? <span className={styles.faint}>{emptyValue('unknown')}</span> : <StatusBadge tone={webhook.tone}>{webhook.label}</StatusBadge>}
                   </Td>
                   <Td className={`${styles.colFriends} ${friends === '—' ? styles.faint : ''}`}>{friends}</Td>
                   <Td className={`${styles.colDefault} ${account.isDefault ? '' : styles.faint}`}>
-                    {account.isDefault ? <span aria-label="既定のアカウント">★</span> : '—'}
+                    {account.isDefault ? <span aria-label="既定のアカウント">★</span> : emptyValue('unknown')}
                   </Td>
                   <Td className={`${styles.colParent} ${parent === '—' ? styles.faint : ''}`} title={parent}>{parent}</Td>
                   <Td className={styles.colMenu}><div className={styles.menuBox}>

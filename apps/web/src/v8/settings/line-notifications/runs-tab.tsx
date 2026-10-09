@@ -39,6 +39,7 @@ import Select from '@/components/shared/select'
 import { api, fetchApi, type EcNotificationRun } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import styles from './screen.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const PAGE_SIZE = 20
 
@@ -72,7 +73,7 @@ function shortJst(value: string | null | undefined): string {
   if (!value) return '—'
   if (!/[zZ]|[+-]\d{2}:\d{2}$/.test(value)) {
     const m = value.match(/^\d{4}-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/)
-    return m ? `${Number(m[1])}/${Number(m[2])} ${Number(m[3])}:${m[4]}` : '—'
+    return m ? `${Number(m[1])}/${Number(m[2])} ${Number(m[3])}:${m[4]}` : emptyValue('unknown')
   }
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
@@ -83,7 +84,7 @@ function shortJst(value: string | null | undefined): string {
 function reasonWords(item: RunItem): string {
   const reason = item.reason?.trim() || ''
   if (item.nextRetryAt && !reason.includes('再試行')) return `${reason || '一時的なエラー'} → 次の再試行 ${shortJst(item.nextRetryAt)}`
-  return reason || '—'
+  return reason || emptyValue('unknown')
 }
 
 export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string | null; mode: 'history' | 'failures' }) {
@@ -246,7 +247,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
                 </Td>
                 <Td><StatusBadge tone={status.tone === 'good' ? 'success' : status.tone === 'muted' ? 'neutral' : status.tone}>{status.label}</StatusBadge></Td>
                 <Td className={styles.cell} title={reason}>{item.resolved ? `対応済み・${reason}` : reason}</Td>
-                <Td className={styles.cell}>{`${item.attemptCount == null ? '—' : `${item.attemptCount}回`}・${item.clickedAt ? 'クリックあり' : '—'}`}</Td>
+                <Td className={styles.cell}>{`${item.attemptCount == null ? emptyValue('unknown') : `${item.attemptCount}回`}・${item.clickedAt ? 'クリックあり' : emptyValue('unknown')}`}</Td>
               </Tr>
             })}
           </tbody>

@@ -48,6 +48,7 @@ import {
 import { LineCard } from '../../line-preview'
 import { formatNumber } from '@/lib/format'
 import styles from './column-new-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export default function ColumnNewV8() {
   const router = useRouter()
@@ -223,7 +224,7 @@ export default function ColumnNewV8() {
                 />
               </label>
             ) : null}
-            <p className={styles.note}>この条件では {audienceCount == null ? '—' : formatNumber(audienceCount)}人に届きます。</p>
+            <p className={styles.note}>この条件では {audienceCount == null ? emptyValue('unknown') : formatNumber(audienceCount)}人に届きます。</p>
             <Disclosure title="公開日時も記録する（任意）" size="compact">
             <div className={styles.fieldLabel}>
               <label htmlFor="nen-publish-v8">公開日時（日本時間）</label>

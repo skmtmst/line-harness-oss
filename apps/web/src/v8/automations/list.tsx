@@ -65,6 +65,7 @@ import {
   type BandCell,
 } from './shell'
 import styles from './list.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -361,10 +362,10 @@ export default function AutomationListV8() {
   /* ===== 数の帯（4つ） ===== */
   const ready = loadStatus === 'ready'
   const cells: BandCell[] = [
-    { key: 'rules', title: 'ルール', icon: <ListChecks size={13} aria-hidden="true" />, value: ready ? items.length : null, unit: '件', detail: ready ? `動いている ${activeCount}・止めている ${stoppedCount}` : '—' },
+    { key: 'rules', title: 'ルール', icon: <ListChecks size={13} aria-hidden="true" />, value: ready ? items.length : null, unit: '件', detail: ready ? `動いている ${activeCount}・止めている ${stoppedCount}` : emptyValue('unknown') },
     { key: 'runs', title: '今月動いた', icon: <Activity size={13} aria-hidden="true" />, value: summary?.executionCount30d ?? null, unit: '回', detail: 'この30日に動いた回数' },
     { key: 'failed', title: '失敗', icon: <FileWarning size={13} aria-hidden="true" />, value: summary?.failureCount30d ?? null, unit: '件', detail: '「動いた記録」からやり直せます' },
-    { key: 'skipped', title: '条件に外れた', icon: <Filter size={13} aria-hidden="true" />, value: skipped, unit: '回', detail: ready ? `だれにも当たらないルール ${neverRunCount}` : '—' },
+    { key: 'skipped', title: '条件に外れた', icon: <Filter size={13} aria-hidden="true" />, value: skipped, unit: '回', detail: ready ? `だれにも当たらないルール ${neverRunCount}` : emptyValue('unknown') },
   ]
 
   /* ===== フォルダ ===== */
@@ -387,10 +388,10 @@ export default function AutomationListV8() {
   const filterChips = (
     <div role="group" aria-label="状態で絞り込む" className={styles.chipGroup}>
       <FilterChip selected={onlyActive} onChange={(next) => { setOnlyActive(next); if (next) setOnlyStopped(false) }} icon={<Play size={13} aria-hidden="true" />}>
-        {`動いている ${ready ? activeCount : '—'}`}
+        {`動いている ${ready ? activeCount : emptyValue('unknown')}`}
       </FilterChip>
       <FilterChip selected={onlyStopped} onChange={(next) => { setOnlyStopped(next); if (next) setOnlyActive(false) }} icon={<Pause size={13} aria-hidden="true" />}>
-        {`止めている ${ready ? stoppedCount : '—'}`}
+        {`止めている ${ready ? stoppedCount : emptyValue('unknown')}`}
       </FilterChip>
     </div>
   )

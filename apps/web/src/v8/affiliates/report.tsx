@@ -38,6 +38,7 @@ import { AffiliateToolbar, RetryButton, RowMenu, SavedSelect, StateCard, Toolbar
 import styles from './affiliates.module.css'
 import PeriodPicker, { useReportPeriod } from '@/components/shared/period-picker'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type ViewKey = 'affiliate' | 'offer'
 
@@ -219,7 +220,7 @@ export default function ReportTab() {
         title="売上"
         icon={<ShoppingBag size={14} aria-hidden="true" />}
         value={null}
-        valueText={ready ? formatYen(totalRevenue) : '—'}
+        valueText={ready ? formatYen(totalRevenue) : emptyValue('unknown')}
         unit=""
         detail={ready ? '成果になった注文の合計' : state === 'loading' ? loadingWord : errorWord}
       />
@@ -228,7 +229,7 @@ export default function ReportTab() {
         title="報酬"
         icon={<Banknote size={14} aria-hidden="true" />}
         value={null}
-        valueText={ready && !hasMissingReward ? formatYen(totalReward) : '—'}
+        valueText={ready && !hasMissingReward ? formatYen(totalReward) : emptyValue('unknown')}
         unit=""
         detail={ready ? (hasMissingReward ? '未確定の報酬があります' : totalRevenue > 0 ? `売上の ${(totalReward / totalRevenue * 100).toFixed(1)}%` : '売上なし') : state === 'loading' ? loadingWord : errorWord}
       />
@@ -237,7 +238,7 @@ export default function ReportTab() {
         title="1件あたりの報酬"
         icon={<ReceiptText size={14} aria-hidden="true" />}
         value={null}
-        valueText={ready && !hasMissingReward ? formatYen(perItem) : '—'}
+        valueText={ready && !hasMissingReward ? formatYen(perItem) : emptyValue('unknown')}
         unit=""
         detail={ready ? (hasMissingReward ? '未確定の報酬があります' : false ? '成果1件あたりの平均' : hasMissingPrevReward ? '前の期間の報酬は未確定です' : `前の期間 ${formatYen(prevPerItem)}`) : state === 'loading' ? loadingWord : errorWord}
       />
@@ -302,13 +303,13 @@ export default function ReportTab() {
                   ) : (
                     <span className={styles.rowLinkText} title={row.name}>{row.name}</span>
                   )}
-                  <span className={styles.rowPlan}>{row.sub ?? '—'}</span>
+                  <span className={styles.rowPlan}>{row.sub ?? emptyValue('unknown')}</span>
                 </span>
               </Td>
               <Td className={styles.colRepConv}>
                 <span className={styles.stack}>
                   <span className={styles.cellMain}>{`${formatNumber(row.conversions)}件`}</span>
-                  <span className={styles.rowPlan}>{row.conversions > 0 && row.revenue > 0 ? formatYen(row.revenue) : '—'}</span>
+                  <span className={styles.rowPlan}>{row.conversions > 0 && row.revenue > 0 ? formatYen(row.revenue) : emptyValue('unknown')}</span>
                 </span>
               </Td>
               <Td className={styles.colRepReward}><span className={styles.cellStrong}>{rewardText(row)}</span></Td>

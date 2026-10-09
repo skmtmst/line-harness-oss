@@ -38,6 +38,7 @@ import { AffiliateFrame, useAffiliateShell } from './frame'
 import { PayoutStepUpDialog, SettlementCloseDialog } from './payment-dialogs'
 import { AffiliateToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, StatusPill, ToolbarNotices } from './parts'
 import styles from './affiliates.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type PaymentFilter = 'all' | 'bank_missing' | 'bank_ok'
 
@@ -226,7 +227,7 @@ export default function PaymentTab() {
         title="今回 払う額"
         icon={<Wallet size={14} aria-hidden="true" />}
         value={null}
-        valueText={ready && preview ? formatYen(preview.totalAmount) : '—'}
+        valueText={ready && preview ? formatYen(preview.totalAmount) : emptyValue('unknown')}
         unit=""
         detail={ready && preview ? `${formatNumber(rows.length)}人・${formatNumber(preview.conversionCount)}件` : loadState === 'loading' ? loadingWord : errorWord}
       />
@@ -235,7 +236,7 @@ export default function PaymentTab() {
         title="次の締め"
         icon={<CalendarDays size={14} aria-hidden="true" />}
         value={null}
-        valueText={ready && preview ? formatMonthDay(preview.periodTo) : '—'}
+        valueText={ready && preview ? formatMonthDay(preview.periodTo) : emptyValue('unknown')}
         unit=""
         detail={ready ? (closeInDays == null ? '締めると金額が固定されます' : closeInDays < 0 ? '締め日を過ぎています' : `あと ${formatNumber(closeInDays)}日`) : loadState === 'loading' ? loadingWord : errorWord}
       />

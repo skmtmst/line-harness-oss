@@ -15,6 +15,7 @@ import { formatNumber } from '@/lib/format'
 import type { NenHealthChangeFilter, NenHealthLastFilter, NenHealthRow, NenHealthSort } from '@/lib/nen-pets-api'
 import StatusBadge from '@/components/shared/status-badge'
 import styles from './health.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export type HealthTabKey = 'logs' | 'concern' | 'items'
 export type HealthFilters = { q: string; change: NenHealthChangeFilter; last: NenHealthLastFilter; sort: NenHealthSort }
@@ -25,7 +26,7 @@ export const TEAR_LABELS: Record<string, string> = { normal: '問題なし', mil
 
 export function countText(counts: Record<string, number>, labels: Record<string, string>): string {
   const entries = Object.entries(counts).sort((a, b) => b[1] - a[1])
-  return entries.length ? entries.map(([key, n]) => `${labels[key] ?? key} ${n}回`).join('・') : '—'
+  return entries.length ? entries.map(([key, n]) => `${labels[key] ?? key} ${n}回`).join('・') : emptyValue('unknown')
 }
 
 /** 「2026-09-30」→「9/30」。 */
@@ -94,7 +95,7 @@ export function RowMenu({ subject, items }: { subject: string; items: ActionMenu
  */
 export function WeightBars({ series, warn }: { series: Array<number | null>; warn: boolean }) {
   const known = series.filter((v): v is number => v != null)
-  if (known.length === 0) return <span className={styles.cell}>—</span>
+  if (known.length === 0) return <span className={styles.cell}>{emptyValue('unknown')}</span>
   const min = Math.min(...known)
   const max = Math.max(...known)
   const label = known.length >= 2 ? `${known[0]}kg → ${known[known.length - 1]}kg` : `${known[0]}kg`

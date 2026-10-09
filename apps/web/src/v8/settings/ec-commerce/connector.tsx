@@ -31,6 +31,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import { Field } from '@/components/shared/form-controls'
 import StatusBadge from '@/components/shared/status-badge'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /* 絵の並び（注文完了・発送完了・入金確認完了・返金完了・注文キャンセル・ペット情報更新）。 */
 const CONNECTOR_EVENT_TYPES = [
@@ -80,7 +81,7 @@ function toForm(connector: EcConnector | null): Form {
 function when(value: string | null | undefined): string {
   if (!value) return '—'
   const date = new Date(value)
-  return Number.isNaN(date.valueOf()) ? '—' : formatDateTime(date)
+  return Number.isNaN(date.valueOf()) ? emptyValue('unknown') : formatDateTime(date)
 }
 
 const READONLY_REASON = permissionDeniedMessage('store')
@@ -225,7 +226,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
               <TextField ref={secretRef} id="ec-connector-secret" type="password" autoComplete="new-password" value={form.inboundSecret} onChange={(event) => setForm({ ...form, inboundSecret: event.target.value })} placeholder="32文字以上" />
             ) : (
               <div className={styles.keyRow}>
-                <span className={styles.keyMask} id="ec-connector-secret" title={connector?.secretUpdatedAt ? `${when(connector.secretUpdatedAt)} に更新` : undefined}>{connector?.secretConfigured ? `●●●●●●●●●●●●  ${connector.secretLastFour ?? '----'}` : '未設定'}</span>
+                <span className={styles.keyMask} id="ec-connector-secret" title={connector?.secretUpdatedAt ? `${when(connector.secretUpdatedAt)} に更新` : undefined}>{connector?.secretConfigured ? `●●●●●●●●●●●●  ${connector.secretLastFour ?? '----'}` : emptyValue('unconfigured')}</span>
                 {canEdit ? <Button type="button" onClick={() => setReplacingSecret(true)}>差し替える</Button> : null}
               </div>
             )}
@@ -236,7 +237,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
           <h2 id="ec-connector-health" className={styles.cardTitle}>取り込みのようす</h2>
           <KpiBand data-kpi-presentation="cards" gridClassName={styles.minis}>
             {([['今日', data?.health.today], ['この30日', data?.health.last30Days], ['失敗', data?.health.failed]] as const).map(([label, value]) => (
-              <KpiCard key={label} density="mini" icon={null} title={label} value={null} unit="" valueText={typeof value === 'number' ? `${value.toLocaleString()} 件` : '—'} detail="" valueTone={label === '失敗' && typeof value === 'number' && value > 0 ? 'warning' : 'default'} />
+              <KpiCard key={label} density="mini" icon={null} title={label} value={null} unit="" valueText={typeof value === 'number' ? `${value.toLocaleString()} 件` : emptyValue('unknown')} detail="" valueTone={label === '失敗' && typeof value === 'number' && value > 0 ? 'warning' : 'default'} />
             ))}
           </KpiBand>
           <p className={styles.note}>{`最後に成功 ${when(data?.health.lastSucceededAt ?? null)}`}</p>

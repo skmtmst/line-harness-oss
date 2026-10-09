@@ -25,6 +25,7 @@ import { METRIC_STATE_TEXT, downloadCsv, metricCardState, metricText, periodCapt
 import styles from './analytics.module.css'
 import { useReportPeriod } from '@/components/shared/period-picker'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Category = AnalyticsUsageOverview['data']['categories'][number]
 
@@ -46,7 +47,7 @@ function referenceHealthText(metric: AnalyticsMetric<number>): string {
   const reason = metric.reason ? `: ${metric.reason}` : ''
   if (metric.state === 'failed') return `参照切れ 取得失敗${reason}`
   if (metric.state === 'unavailable' || metric.state === 'pending' || metric.state === 'insufficient') return `参照切れ 未取得${reason}`
-  if (metric.state === 'partial') return `参照切れ ${metric.value === null ? '—' : formatNumber(metric.value)}（一部のみ）${reason}`
+  if (metric.state === 'partial') return `参照切れ ${metric.value === null ? emptyValue('unknown') : formatNumber(metric.value)}（一部のみ）${reason}`
   return `参照切れ ${formatNumber(metric.value ?? 0)}`
 }
 const canTidyUsage = (item: Category) => item.unused.value !== null && item.unused.value > 0

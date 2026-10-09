@@ -32,6 +32,7 @@ import { mileStatusLabel, reviewVersionOf, text } from './photo-text'
 import { PhotoReviewDetail } from './photo-review-detail'
 import PhotoPolicyHistoryV8 from './photo-policy-history-v8'
 import styles from './photo-review-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type PhotoStatus = 'pending' | 'adopted' | 'rejected'
 type PhotoView = 'list' | 'detail' | 'publications'
@@ -251,7 +252,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
   })()
   const topReason = reasonCounts[0]?.[0]
     ? REVIEW_REASONS.find((reason) => reason.value === reasonCounts[0][0])?.label ?? '理由未記録'
-    : '—'
+    : emptyValue('unknown')
 
   const [publicationCandidate, setPublicationCandidate] = useState<{id: string; version: number; key: string} | null>(null)
   const preparePublication = async (id: string) => {
@@ -490,7 +491,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
 
       {!canEdit ? <div className={styles.readonly}><NoteBar tone="info">閲覧のみで見ています。変える操作は管理者に頼んでください。</NoteBar></div> : null}
       <ul data-design="KPIs" className={styles.kpiBand} aria-label="投稿の数の帯">
-        <KpiCellV8 icon="pending" label="審査待ち" help={`まだ決めていない写真の枚数です。注意候補 ${reviewMetrics?.attentionCount ?? '—'}件・投稿から審査までの日数：${reviewMetrics?.averageReviewMinutes == null ? '—' : formatMinutesRough(reviewMetrics.averageReviewMinutes)}`} value={countsReady ? reviewMetrics?.pendingCount ?? counts.pending : null} unit="枚" sub={reviewMetrics?.oldestPendingAt ? `いちばん古いもの ${formatWaitRough((Date.now() - Date.parse(reviewMetrics.oldestPendingAt)) / 60000)}` : 'いちばん古いもの —'} />
+        <KpiCellV8 icon="pending" label="審査待ち" help={`まだ決めていない写真の枚数です。注意候補 ${reviewMetrics?.attentionCount ?? emptyValue('unknown')}件・投稿から審査までの日数：${reviewMetrics?.averageReviewMinutes == null ? emptyValue('unknown') : formatMinutesRough(reviewMetrics.averageReviewMinutes)}`} value={countsReady ? reviewMetrics?.pendingCount ?? counts.pending : null} unit="枚" sub={reviewMetrics?.oldestPendingAt ? `いちばん古いもの ${formatWaitRough((Date.now() - Date.parse(reviewMetrics.oldestPendingAt)) / 60000)}` : 'いちばん古いもの —'} />
         <KpiCellV8 icon="help" label="今月採用" help={hasMorePhotos ? '読み込んだ写真の集計です。続きの写真は含みません' : '今月 採用した写真の枚数です'} value={countsReady ? adoptedThisMonth : null} unit={hasMorePhotos ? '枚以上' : '枚'} sub={policyPoints == null ? '1枚ごとに —' : `1枚ごとに ${formatNumber(policyPoints)}マイル`} />
         <KpiCellV8 icon="help" label="今月見送り" help={hasMorePhotos ? '読み込んだ写真の集計です。理由の内訳も続きの写真は含みません' : '今月 見送った写真の枚数です'} value={countsReady ? rejectedThisMonth.length : null} unit={hasMorePhotos ? '枚以上' : '枚'} sub={`理由：${topReason}`} />
         <KpiCellV8 icon="published" label="公式サイト掲載" help="いま載っている写真の枚数です" value={publishedCount} unit="枚" sub="いま載っている写真" />
@@ -583,7 +584,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       <Dialog open={bulkApproveOpen} title={`${selectedPendingPhotos.length}枚をまとめて採用`} description="選択した写真の件数、マイル、公開範囲を確認してください。" busy={bulkReviewing} confirmLabel="まとめて採用" cancelLabel="審査へ戻る" onCancel={() => setBulkApproveOpen(false)} onConfirm={() => void bulkReview('approve')}>
         <dl>
           <div><dt>写真</dt><dd>{selectedPendingPhotos.length}枚</dd></div>
-          <div><dt>付与するマイル</dt><dd>合計 {policyPoints == null ? '—' : `${selectedPendingPhotos.length * policyPoints}マイル`}</dd></div>
+          <div><dt>付与するマイル</dt><dd>合計 {policyPoints == null ? emptyValue('unknown') : `${selectedPendingPhotos.length * policyPoints}マイル`}</dd></div>
           <div><dt>公開範囲</dt><dd>公開しない</dd></div>
         </dl>
         <p>写真を採用しても自動公開しません。本人の公開同意を確認したあと、公式サイト掲載画面で公開先を選びます。</p>
@@ -626,7 +627,7 @@ function KpiCellV8({ icon, label, help, value, unit, sub }: { icon: 'pending' | 
         <span className={styles.kpiIcon} aria-hidden="true">{icon === 'pending' ? <History size={13} /> : icon === 'published' ? <Undo2 size={13} /> : <HelpCircle size={13} />}</span><span className={styles.kpiLabel}>{label}</span>
         <button type="button" className={styles.kpiHelp} title={help} aria-label={`${label}：${help}`}>…</button>
       </div>
-      <p className={styles.kpiValue}>{value === null ? '—' : <>{formatNumber(value)}<span className={styles.kpiUnit}>{unit}</span></>}</p>
+      <p className={styles.kpiValue}>{value === null ? emptyValue('unknown') : <>{formatNumber(value)}<span className={styles.kpiUnit}>{unit}</span></>}</p>
       <p className={styles.kpiSub}>{sub}</p>
     </li>
   )
@@ -728,7 +729,7 @@ function ReviewListV8(props: ReviewListV8Props) {
             <div className={styles.rail} data-design="Right" data-design-node="photo-rail-v8">
               <section className={styles.railCard} aria-label="報酬の決まり">
                 <h2 className={styles.railTitle}>報酬の決まり</h2>
-                <p className={styles.railRow}>採用したら <strong>{props.policyPoints == null ? '—' : `${formatNumber(props.policyPoints)}マイル`}</strong></p>
+                <p className={styles.railRow}>採用したら <strong>{props.policyPoints == null ? emptyValue('unknown') : `${formatNumber(props.policyPoints)}マイル`}</strong></p>
                 <p className={styles.railRow}>公式サイトに載ったら <strong title="掲載時の追加報酬は未接続です">—</strong></p><p className={styles.railNote}>採用すると、投稿した人にLINEでお知らせします</p>
               </section>
               <section className={styles.railCard} aria-label="確認する順">
@@ -949,7 +950,7 @@ function placementLabels(item: PublicationItem): string {
 }
 
 function viewsText(value: unknown): string {
-  return value == null ? '—' : `${formatNumber(Number(value))}`
+  return value == null ? emptyValue('unknown') : `${formatNumber(Number(value))}`
 }
 
 /**
@@ -1167,10 +1168,10 @@ function PublicationsV8({
                 </tbody>
               </DataTable>
             </div>
-            <p className={styles.listHintV8}>公式サイト掲載中 {publishedCount ?? '—'}枚のうち {items.length}枚を表示（使っている場所で絞る：サイト・NENコラム・リッチメニュー・回答フォーム・登録メディア）</p>
+            <p className={styles.listHintV8}>公式サイト掲載中 {publishedCount ?? emptyValue('unknown')}枚のうち {items.length}枚を表示（使っている場所で絞る：サイト・NENコラム・リッチメニュー・回答フォーム・登録メディア）</p>
             <details className={styles.publicationHistory}><summary>掲載の整理と外した履歴（{pendingWithdrawals.length + withdrawnItems.length}件）</summary>
               {pendingWithdrawals.map((item) => <div key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>{text(item.publication_withdrawn_at) ? 'ご本人が公開の同意を撤回しました' : '公開の同意と採用状態を確認してください'}</p><p>まだ残っている掲載先：{placementLabels(item)}</p><Button variant="secondary" disabled={!canEdit || Boolean(busyId)} onClick={() => void withdraw(item)}>掲載先から外す</Button></div>)}
-              {withdrawnItems.map((item) => <div key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>外した日時：{formatPhotoReceivedAt(item.withdrawn_at)}・{text(item.withdrawn_by_name) || '—'}</p>{(item.placements ?? []).map((placement) => <p key={text(placement.id)}>{text(placement.placement_label)}・{text(placement.removed_at) ? `${formatPhotoReceivedAt(placement.removed_at)}に外しました` : '記録あり'}</p>)}</div>)}
+              {withdrawnItems.map((item) => <div key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>外した日時：{formatPhotoReceivedAt(item.withdrawn_at)}・{text(item.withdrawn_by_name) || emptyValue('unknown')}</p>{(item.placements ?? []).map((placement) => <p key={text(placement.id)}>{text(placement.placement_label)}・{text(placement.removed_at) ? `${formatPhotoReceivedAt(placement.removed_at)}に外しました` : '記録あり'}</p>)}</div>)}
             </details>
           </section>
           <div className={styles.rail} data-design="Right" data-design-node="photo-pubs-rail-v8">

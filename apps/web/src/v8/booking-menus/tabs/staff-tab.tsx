@@ -23,6 +23,7 @@ import {
 } from './shared'
 import styles from '../settings.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const STAFF_PAGE_SIZE = 4
 
@@ -195,7 +196,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
               )}
             </span>
             <span className={styles.staffColNoAssign}>
-              <span className={styles.staffCellMain}>{person.is_designation_optional ? '入る' : '—'}</span>
+              <span className={styles.staffCellMain}>{person.is_designation_optional ? '入る' : emptyValue('unknown')}</span>
             </span>
             <span className={styles.staffColWork}>
               {extra?.work ? (() => {

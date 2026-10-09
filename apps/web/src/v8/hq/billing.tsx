@@ -40,6 +40,7 @@ import {
 import { billingFailureMessage } from './billing-failure'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import styles from './billing.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -347,10 +348,10 @@ function BillingInner() {
             {invoices.map((inv) => (
               <div key={inv.id} className={styles.row} role="row">
                 <span role="cell">{invoiceDate(inv.createdAt)}</span>
-                <span role="cell" className={styles.cell} title={inv.description ?? inv.number ?? ''}>{inv.description ?? inv.number ?? '—'}</span>
+                <span role="cell" className={styles.cell} title={inv.description ?? inv.number ?? ''}>{inv.description ?? inv.number ?? emptyValue('unknown')}</span>
                 <span role="cell" className={styles.amount}>{yen(inv.amountYen)}</span>
                 <span role="cell">
-                  <span className={inv.status === 'paid' ? `${styles.pill} ${styles.pillOk}` : inv.status === 'open' || inv.status === 'draft' ? `${styles.pill} ${styles.pillInfo}` : `${styles.pill} ${styles.pillIdle}`}><span className={styles.dot} aria-hidden="true" />{INVOICE_WORDS[inv.status ?? ''] ?? inv.status ?? '—'}</span>
+                  <span className={inv.status === 'paid' ? `${styles.pill} ${styles.pillOk}` : inv.status === 'open' || inv.status === 'draft' ? `${styles.pill} ${styles.pillInfo}` : `${styles.pill} ${styles.pillIdle}`}><span className={styles.dot} aria-hidden="true" />{INVOICE_WORDS[inv.status ?? ''] ?? inv.status ?? emptyValue('unknown')}</span>
                 </span>
                 <span role="cell">
                   {inv.hostedUrl ? (
@@ -358,7 +359,7 @@ function BillingInner() {
                       <Download aria-hidden="true" className={styles.buttonIcon} />領収書
                     </Button>
                   ) : (
-                    <span className={styles.faint}>—</span>
+                    <span className={styles.faint}>{emptyValue('unknown')}</span>
                   )}
                 </span>
               </div>

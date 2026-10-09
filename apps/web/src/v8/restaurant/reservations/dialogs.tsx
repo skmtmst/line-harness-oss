@@ -15,6 +15,7 @@ import type { RestaurantMenuItem, RestaurantReservation, RestaurantTable } from 
 import { DialogNote, RsDialog } from '../booking-kit/parts'
 import { INACTIVE_STATUSES, hm, isHold, pad2 } from './format'
 import styles from './reservations.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 function toLocalInput(iso: string): string {
   const date = new Date(iso)
@@ -124,7 +125,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
       )}
     >
       {hold ? (
-        <DialogNote>{`${reservation.note || '仮押さえ'}・解除の期限 ${reservation.hold_expires_at ? hm(reservation.hold_expires_at) : '—'}。期限を過ぎると空き卓に戻ります。台帳には履歴が残ります。`}</DialogNote>
+        <DialogNote>{`${reservation.note || '仮押さえ'}・解除の期限 ${reservation.hold_expires_at ? hm(reservation.hold_expires_at) : emptyValue('unknown')}。期限を過ぎると空き卓に戻ります。台帳には履歴が残ります。`}</DialogNote>
       ) : (
         <>
           <div className={styles.pair}>

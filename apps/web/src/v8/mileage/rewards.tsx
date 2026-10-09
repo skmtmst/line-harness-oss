@@ -48,6 +48,7 @@ import { notifyToast } from '@/components/shared/toast'
 import styles from './mileage.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const KIND_LABEL: Record<MileageRewardKind, string> = {
   coupon: 'クーポン',
@@ -489,7 +490,7 @@ export default function RewardsTab() {
         icon={<Gift size={14} aria-hidden="true" />}
         value={ready ? rewards.length : null}
         unit="件"
-        detail={ready ? `出している ${formatMileageNumber(publishedCount)}・下書き ${formatMileageNumber(draftCount)}` : '—'}
+        detail={ready ? `出している ${formatMileageNumber(publishedCount)}・下書き ${formatMileageNumber(draftCount)}` : emptyValue('unknown')}
       />
       <KpiCard
         presentation="band"
@@ -497,7 +498,7 @@ export default function RewardsTab() {
         icon={<ArrowLeftRight size={14} aria-hidden="true" />}
         value={ready ? exchangedCount ?? 0 : null}
         unit="件"
-        detail={ready ? `${formatMileageNumber(redeemedMiles ?? 0)} マイル` : '—'}
+        detail={ready ? `${formatMileageNumber(redeemedMiles ?? 0)} マイル` : emptyValue('unknown')}
       />
       <KpiCard
         presentation="band"
@@ -506,7 +507,7 @@ export default function RewardsTab() {
         value={ready && popularName ? 0 : null}
         valueText={ready && popularName ? popularName : undefined}
         unit=""
-        detail={ready ? (popularName ? `今月 ${formatMileageNumber(popularCount ?? 0)}件` : 'まだ交換されていません') : '—'}
+        detail={ready ? (popularName ? `今月 ${formatMileageNumber(popularCount ?? 0)}件` : 'まだ交換されていません') : emptyValue('unknown')}
       />
       <KpiCard
         presentation="band"

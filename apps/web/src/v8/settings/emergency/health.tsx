@@ -31,6 +31,7 @@ import { onlyWhenVisible } from '@/lib/visible-polling'
 import releaseLog from '@/generated/release-log-summary.json'
 import styles from './screen.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type ReleaseSummary = { version: string; released: string | null }
 
@@ -332,8 +333,8 @@ export function HealthPanelV8({
       const releases = (releaseLog as { releases?: ReleaseSummary[] }).releases ?? []
       const version = deployments.find((item) => item.deployment?.phase === 'succeeded' && item.deployment.version)?.deployment?.version
         ?? releases.find((item) => item.released)?.version
-        ?? '—'
-      setStats({ stops: recent.length, longest: longest > 0 ? formatMinutesRough(longest) : '—', version })
+        ?? emptyValue('unknown')
+      setStats({ stops: recent.length, longest: longest > 0 ? formatMinutesRough(longest) : emptyValue('unknown'), version })
       setStatsNote('この30日')
     } catch {
       setStats(null)
@@ -524,8 +525,8 @@ export function HealthPanelV8({
       </section>
       <KpiBand data-kpi-presentation="cards" gridClassName={styles.kpis}>
         <KpiCard presentation="card" icon={null} title="止めた回数" value={stats ? stats.stops : null} unit="" detail={statsNote} />
-        <KpiCard presentation="card" icon={null} title="いちばん長かった停止" value={null} valueText={stats?.longest ?? '—'} unit="" detail={statsNote} />
-        <KpiCard presentation="card" icon={null} title="いまの版" value={null} valueText={stats?.version ?? '—'} unit="" detail={stats ? '反映済み' : statsNote} />
+        <KpiCard presentation="card" icon={null} title="いちばん長かった停止" value={null} valueText={stats?.longest ?? emptyValue('unknown')} unit="" detail={statsNote} />
+        <KpiCard presentation="card" icon={null} title="いまの版" value={null} valueText={stats?.version ?? emptyValue('unknown')} unit="" detail={stats ? '反映済み' : statsNote} />
       </KpiBand>
     </>
   )

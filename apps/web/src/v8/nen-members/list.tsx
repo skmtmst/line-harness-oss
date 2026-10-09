@@ -27,6 +27,7 @@ import {
 } from '@/lib/nen-ranks-api'
 import { RankChip, yen } from './parts'
 import styles from './members.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -240,10 +241,10 @@ function MemberRow({
       <span role="cell"><span className={styles.numSoft}>{yen(member.lifetimeMilesYen)}</span></span>
       <span role="cell"><span className={styles.numPlain}>{formatNumber(member.mileBalance)}</span></span>
       <span role="cell" className={styles.cellText} title={member.petNames ?? ''}>
-        {member.petNames ? `${member.petNames}${member.petCount > 2 ? ` ほか${member.petCount - 2}頭` : ''}` : '—'}
+        {member.petNames ? `${member.petNames}${member.petCount > 2 ? ` ほか${member.petCount - 2}頭` : ''}` : emptyValue('unknown')}
       </span>
-      <span role="cell" className={`${styles.cellText} ${styles.mWide}`}>{member.lastPurchasedAt ? member.lastPurchasedAt.slice(5, 10).replace('-', '/') : '—'}</span>
-      <span role="cell" className={styles.mWide}><span className={styles.numStrong}>{member.mileRatePercent == null ? '—' : `${member.mileRatePercent}%`}</span></span>
+      <span role="cell" className={`${styles.cellText} ${styles.mWide}`}>{member.lastPurchasedAt ? member.lastPurchasedAt.slice(5, 10).replace('-', '/') : emptyValue('unknown')}</span>
+      <span role="cell" className={styles.mWide}><span className={styles.numStrong}>{member.mileRatePercent == null ? emptyValue('unknown') : `${member.mileRatePercent}%`}</span></span>
       <span role="cell" className={styles.mOps}>
         {/*
           行の「…」：会員の詳細（＝友だち詳細の会員の区画）・友だちを開く・ECで開く。

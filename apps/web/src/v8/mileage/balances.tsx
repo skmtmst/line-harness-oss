@@ -44,6 +44,7 @@ import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, Too
 import styles from './mileage.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 function dateOnlyDaysAgo(days: number) {
   const date = new Date()
@@ -299,7 +300,7 @@ export default function BalancesTab() {
         icon={<Users size={14} aria-hidden="true" />}
         value={ready ? summary.totalMembers : null}
         unit="人"
-        detail={ready ? `マイルを持っている ${formatMileageNumber(summary.withBalanceCount)}人` : '—'}
+        detail={ready ? `マイルを持っている ${formatMileageNumber(summary.withBalanceCount)}人` : emptyValue('unknown')}
       />
       <KpiCard
         presentation="band"
@@ -309,7 +310,7 @@ export default function BalancesTab() {
         unit=""
         detail={ready
           ? `1人あたり ${formatMileageNumber(summary.totalMembers > 0 ? Math.round(summary.available / summary.totalMembers) : 0)}`
-          : '—'}
+          : emptyValue('unknown')}
       />
       <KpiCard
         presentation="band"
@@ -386,7 +387,7 @@ export default function BalancesTab() {
         icon={<CircleDot size={13} aria-hidden="true" />}
         onChange={(selected) => { setOffset(0); setWithBalanceOnly(selected) }}
       >
-        {`残高あり ${summary === null ? '—' : formatMileageNumber(summary.withBalanceCount)}`}
+        {`残高あり ${summary === null ? emptyValue('unknown') : formatMileageNumber(summary.withBalanceCount)}`}
       </FilterChip>
       <FilterChip
         selected={pendingOnly}
@@ -470,7 +471,7 @@ export default function BalancesTab() {
                   <span className={styles.rowName} title={member.displayName}>{member.displayName}</span>
                   <span className={styles.rowSub} title={member.lineAccount.name}>{member.lineAccount.name}</span>
                 </Td>
-                <Td className={styles.colRank}><span className={styles.cellMain} title={member.rankReason}>{rankLabel(member.rank) ?? '—'}</span></Td>
+                <Td className={styles.colRank}><span className={styles.cellMain} title={member.rankReason}>{rankLabel(member.rank) ?? emptyValue('unknown')}</span></Td>
                 <Td className={`${styles.colBalance} ${styles.num}`}>
                   <span className={styles.cellMain}>{formatMileageNumber(member.available)}</span>
                   {member.pending > 0 ? <span className={styles.cellSub}>{`保留 ${formatMileageNumber(member.pending)}`}</span> : null}

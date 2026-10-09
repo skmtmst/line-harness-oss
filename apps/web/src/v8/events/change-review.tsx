@@ -24,15 +24,16 @@ import { isoToLocalInput, localInputToIso, noticeMessage, previewErrorMessage, u
 import { jstDay, jstTime } from './shared'
 import styles from './change-review.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** datetime-local（日本時間の壁時計）→「10:30」。 */
 function localTime(local: string): string {
-  return local.split('T')[1]?.slice(0, 5) ?? '—'
+  return local.split('T')[1]?.slice(0, 5) ?? emptyValue('unknown')
 }
 /** datetime-local → 「10/12（月）」。 */
 function localDay(local: string): string {
   const date = local.split('T')[0]
-  return date ? jstDay(`${date}T00:00:00+09:00`) : '—'
+  return date ? jstDay(`${date}T00:00:00+09:00`) : emptyValue('unknown')
 }
 
 export default function EventChangeReviewV8() {
@@ -261,9 +262,9 @@ function ChangeReview({ eventId }: { eventId: string }) {
                   onClick={() => setSelectedSlotId(slot.id)}
                 >
                   <span className={styles.cellStart}>{`${jstDay(slot.starts_at)}${jstTime(slot.starts_at)}〜${jstTime(slot.ends_at)}`}</span>
-                  <span className={styles.cellNum}>{slot.capacity ?? '—'}</span>
-                  <span className={styles.cellNum}>{impact ? impact.confirmed_seats : (slot.active_count ?? '—')}</span>
-                  <span className={styles.cellNum}>{impact ? impact.waiting_seats : '—'}</span>
+                  <span className={styles.cellNum}>{slot.capacity ?? emptyValue('unknown')}</span>
+                  <span className={styles.cellNum}>{impact ? impact.confirmed_seats : (slot.active_count ?? emptyValue('unknown'))}</span>
+                  <span className={styles.cellNum}>{impact ? impact.waiting_seats : emptyValue('unknown')}</span>
                   <span className={styles.cellState}>
                     {ended ? <span className={styles.chip}>終了</span>
                       : slot.is_active === 1 ? <span className={`${styles.chip} ${styles.chipOn}`}>受付する</span>

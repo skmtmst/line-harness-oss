@@ -20,6 +20,7 @@ import PeriodPicker from '@/components/shared/period-picker'
 import { OpsHead } from './shell'
 import parts from './parts.module.css'
 import styles from './dashboard.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /**
  * 運営ダッシュボード V8（絵 `CyW0E`）。
@@ -122,10 +123,10 @@ export default function OpsDashboardV8() {
         <div className={parts.stack}>
           {error ? <p role="alert" className={parts.alert}>{error}</p> : null}
           <div className={`${parts.kpis} ${kpiStyles.strip}`}>
-            <KpiCard presentation="cell" icon={<Wallet size={13} aria-hidden="true" />} title="契約中の月額合計" value={null} unit="" valueText={k ? formatYen(k.contractMonthlyTotal) : undefined} detail={k && data ? `契約中 ${k.active}・決済失敗 ${data.alerts.pastDue}（トライアルは入れない）` : '—'} loading={loading} />
-            <KpiCard presentation="cell" icon={<Banknote size={13} aria-hidden="true" />} title="今月の売上（入金済み）" value={null} unit="" valueText={k ? formatYen(k.revenueThisMonth) : undefined} detail={data ? `決済失敗 ${data.alerts.pastDue} 社` : '—'} loading={loading} />
-            <KpiCard presentation="cell" icon={<Hourglass size={13} aria-hidden="true" />} title="トライアル中" value={k ? k.trialing : null} unit="社" detail={data ? `期限 3日以内 ${data.alerts.trialEndingSoon}` : '—'} loading={loading} />
-            <KpiCard presentation="cell" icon={<Sparkles size={13} aria-hidden="true" />} title="今月の AI 利用" value={data?.ai?.callsThisMonth ?? null} unit="枚" detail={data?.ai ? 'バナー生成・下書き' : '—'} loading={loading} />
+            <KpiCard presentation="cell" icon={<Wallet size={13} aria-hidden="true" />} title="契約中の月額合計" value={null} unit="" valueText={k ? formatYen(k.contractMonthlyTotal) : undefined} detail={k && data ? `契約中 ${k.active}・決済失敗 ${data.alerts.pastDue}（トライアルは入れない）` : emptyValue('unknown')} loading={loading} />
+            <KpiCard presentation="cell" icon={<Banknote size={13} aria-hidden="true" />} title="今月の売上（入金済み）" value={null} unit="" valueText={k ? formatYen(k.revenueThisMonth) : undefined} detail={data ? `決済失敗 ${data.alerts.pastDue} 社` : emptyValue('unknown')} loading={loading} />
+            <KpiCard presentation="cell" icon={<Hourglass size={13} aria-hidden="true" />} title="トライアル中" value={k ? k.trialing : null} unit="社" detail={data ? `期限 3日以内 ${data.alerts.trialEndingSoon}` : emptyValue('unknown')} loading={loading} />
+            <KpiCard presentation="cell" icon={<Sparkles size={13} aria-hidden="true" />} title="今月の AI 利用" value={data?.ai?.callsThisMonth ?? null} unit="枚" detail={data?.ai ? 'バナー生成・下書き' : emptyValue('unknown')} loading={loading} />
           </div>
 
           <div className={parts.row}>
@@ -149,7 +150,7 @@ export default function OpsDashboardV8() {
               <h3 className={parts.panelTitle}>月ごとの売上</h3>
               {data ? <RevenueColumns rows={data.revenueByMonth} /> : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
               <div className={styles.chartFoot}>
-                <p className={parts.note}>単位：千円（月額の合計）・{data ? revenueSourceLabel(data.pricing, data.lastSyncedAt) : '—'}</p>
+                <p className={parts.note}>単位：千円（月額の合計）・{data ? revenueSourceLabel(data.pricing, data.lastSyncedAt) : emptyValue('unknown')}</p>
                 {canSyncBilling ? (
                   <Button size="compact" disabled={syncingBilling} busy={syncingBilling} busyLabel="同期しています…" onClick={() => void syncBilling()}>Stripe と同期</Button>
                 ) : null}

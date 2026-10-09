@@ -31,6 +31,7 @@ import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { EVENT_OPTIONS } from '../../line-notifications/operator-words'
 import styles from './screen.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadState = 'loading' | 'ready' | 'error' | 'forbidden'
 type DraftConditions = { recipientLabel?: string; scheduleLabel?: string }
@@ -165,7 +166,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
 
   return <>
     <KpiBand data-kpi-presentation="cards" gridClassName={`${styles.kpis} ${styles.opKpis}`} data-design="KPIs">
-      <KpiCard appearance="notification-operator" presentation="card" icon={<Bell size={14} aria-hidden="true" />} title="出しているお知らせ" value={ready ? summary?.published ?? null : null} unit="件" detail={ready ? `止めている ${summary?.stopped ?? '—'}` : '—'} loading={state === 'loading'} />
+      <KpiCard appearance="notification-operator" presentation="card" icon={<Bell size={14} aria-hidden="true" />} title="出しているお知らせ" value={ready ? summary?.published ?? null : null} unit="件" detail={ready ? `止めている ${summary?.stopped ?? emptyValue('unknown')}` : emptyValue('unknown')} loading={state === 'loading'} />
       <KpiCard appearance="notification-operator" presentation="card" icon={<Send size={14} aria-hidden="true" />} title="今日届いた数" value={ready ? summary?.acceptedToday ?? null : null} unit="件" detail="お店の人へ" loading={state === 'loading'} />
       <KpiCard appearance="notification-operator" presentation="card" icon={<Users size={14} aria-hidden="true" />} title="受け取る人" value={ready ? summary?.recipients ?? null : null} unit="人" detail="LINEログイン済み" loading={state === 'loading'} />
       <KpiCard appearance="notification-operator" presentation="card" icon={<CircleX size={14} aria-hidden="true" />} title="届かなかった" value={ready ? summary?.excludedToday ?? null : null} unit="件" detail="LINE未ログインの人" loading={state === 'loading'} />
@@ -217,7 +218,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
                 <Td className={styles.cell} title={eventWords(rule.eventType)}>{eventWords(rule.eventType)}</Td>
                 <Td className={styles.cell} title={recipients}>{recipients}</Td>
                 <Td className={`${styles.cell} ${styles.opSchedule}`} title={schedule}>{schedule}</Td>
-                <Td><span className={`${styles.opNum} ${rule.occurredToday > 0 ? styles.numStrong : styles.numFaint}`}>{rule.occurredToday > 0 ? `${rule.occurredToday}` : '—'}</span></Td>
+                <Td><span className={`${styles.opNum} ${rule.occurredToday > 0 ? styles.numStrong : styles.numFaint}`}>{rule.occurredToday > 0 ? `${rule.occurredToday}` : emptyValue('unknown')}</span></Td>
                 <Td><StatusBadge tone={published ? 'success' : 'neutral'}>{published ? '出している' : '停止中'}</StatusBadge></Td>
                 <Td className={styles.opActions}>
                   {canManage ? <>

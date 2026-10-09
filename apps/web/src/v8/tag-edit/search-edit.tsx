@@ -48,6 +48,7 @@ import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/com
 import { formatDateTime } from '@/lib/format'
 import { optionsWithCurrent, usageRowsOf, headUsageText } from './search-model'
 import styles from './search-edit.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /*
  * R185: 友だち画面で作れる条件はここでも編集できるようにする。実行側
@@ -822,7 +823,7 @@ export default function SavedSearchEditV8() {
   const countNote = previewError || preview?.error
     ? '人数をまだ数えていません。数え直してください。'
     : preview?.calculatedAt
-      ? `${formatDateTime(preview.calculatedAt)} に数えた数（LINE ${preview.byChannel.line ?? '—'}人・MAIL ${preview.byChannel.mail ?? '—'}人）。数え直している間は古い数を出しません`
+      ? `${formatDateTime(preview.calculatedAt)} に数えた数（LINE ${preview.byChannel.line ?? emptyValue('unknown')}人・MAIL ${preview.byChannel.mail ?? emptyValue('unknown')}人）。数え直している間は古い数を出しません`
       : '保存した条件でまだ数えていません。数え直すと出ます'
   const deleteReason = original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使っている所を確かめられないため削除できません' : original.usedIn.length > 0 ? `使っている所があるため削除できません（${original.usedIn.length}件）` : '削除できるか確かめられません'
 
@@ -830,7 +831,7 @@ export default function SavedSearchEditV8() {
     <div className={styles.side}>
       <div className={styles.sideHead}><h2 className={styles.sideTitle}>当てはまる人</h2></div>
       <p className={styles.count}>
-        {previewCount === null ? <span className={styles.countNum}>—</span> : <span className={styles.countNum}>{previewCount.toLocaleString('ja-JP')}</span>}
+        {previewCount === null ? <span className={styles.countNum}>{emptyValue('unknown')}</span> : <span className={styles.countNum}>{previewCount.toLocaleString('ja-JP')}</span>}
         <span className={styles.countUnit}>人</span>
       </p>
       {previewError ? <p role="alert" className={styles.errorText}>{previewError}</p> : null}

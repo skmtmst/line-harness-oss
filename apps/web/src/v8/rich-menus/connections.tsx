@@ -26,6 +26,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import { formatNumber } from '@/lib/format'
 import { analyzeConnections, type ConnectionAnalysis, type ConnectionPage } from './connection-analysis'
 import styles from './connections.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const MAX_PAGES = 10
 
@@ -181,8 +182,8 @@ function Connections() {
         <h2 className={styles.boxTitle} id="rm-state">いまの状態</h2>
         <div className={styles.row}><span>状態</span><strong>{group.status === 'published' ? '公開中' : '下書き'}</strong></div>
         <div className={styles.row}><span>出す相手</span><strong>{audienceText}</strong></div>
-        <div className={styles.row}><span>出る人</span><strong>{reach === null ? '—' : `${formatNumber(reach)}人`}</strong></div>
-        <div className={styles.row}><span>今月押された</span><strong>{taps === null ? '—' : `${formatNumber(taps)}回`}</strong></div>
+        <div className={styles.row}><span>出る人</span><strong>{reach === null ? emptyValue('unknown') : `${formatNumber(reach)}人`}</strong></div>
+        <div className={styles.row}><span>今月押された</span><strong>{taps === null ? emptyValue('unknown') : `${formatNumber(taps)}回`}</strong></div>
       </section>
     </div>
   )
@@ -253,7 +254,7 @@ function Connections() {
         {analysis.unreachablePageIds.size > 0 ? (
           <div className={styles.check}><span>どこからも来られないメニュー</span><strong className={styles.bad}>{`${analysis.unreachablePageIds.size}件`}</strong></div>
         ) : null}
-        <div className={styles.check}><span>切替先が下書きのまま</span><strong className={draftTargets.length ? styles.bad : undefined}>{draftTargets.length ? `${draftTargets.length}件` : 'なし'}</strong></div>
+        <div className={styles.check}><span>切替先が下書きのまま</span><strong className={draftTargets.length ? styles.bad : undefined}>{draftTargets.length ? `${draftTargets.length}件` : emptyValue('none')}</strong></div>
         {/* 「誰に出すか」はメニューの束ごとに決めるので、切替先だけ違うことは起きない。 */}
         <div className={styles.check}><span>切替先だけ「誰に出すか」が違う</span><strong>なし</strong></div>
       </section>

@@ -24,6 +24,7 @@ import { CANDIDATE_PAGE_SIZE, formatRelative, useDuplicatesData } from './use-du
 import DuplicatesStatsNotice from './duplicates-stats-notice'
 import { formatDateTime } from '@/lib/format'
 import styles from '@/app/friends/friends-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const CONFIDENCE_LABEL = { very_high: '最高', high: '高', medium: '中', low: '低' } as const
 
@@ -87,7 +88,7 @@ export default function DuplicatesV8() {
             <HelpTip label="確認済みの説明">統合ユーザーに紐付け済みの組数です</HelpTip>
           </span>
           <p className={styles.kpiValue}>
-            {d.statusCounts !== null ? `${formatNumber(d.statusCounts.linked ?? 0)}組` : '—'}
+            {d.statusCounts !== null ? `${formatNumber(d.statusCounts.linked ?? 0)}組` : emptyValue('unknown')}
           </p>
           <p className={styles.kpiDetail}>
             {d.statusCounts !== null ? '統合ユーザーに紐付け済みの組数です' : '読み込めませんでした'}
@@ -98,7 +99,7 @@ export default function DuplicatesV8() {
             重複配信の削減
             <HelpTip label="重複配信の削減の説明">配信前プレビューの実績を接続したあと、重複分を除いた削減の見込みをここに表示します。</HelpTip>
           </span>
-          <p className={styles.kpiValue}>—</p>
+          <p className={styles.kpiValue}>{emptyValue('unknown')}</p>
           <p className={styles.kpiDetail}>配信実績の接続を待っています</p>
         </div>
         <div className={styles.kpi}>
@@ -107,7 +108,7 @@ export default function DuplicatesV8() {
             <HelpTip label="1配信あたりの無駄の説明">重複している友だち登録の数に1通あたりの単価を掛けた見積りです。実際に送った配信の実績ではありません。</HelpTip>
           </span>
           <p className={styles.kpiValue}>
-            {d.data ? `¥${formatNumber(d.data.wastedPerBroadcastYen)}` : '—'}
+            {d.data ? `¥${formatNumber(d.data.wastedPerBroadcastYen)}` : emptyValue('unknown')}
           </p>
           <p className={styles.kpiDetail}>
             {d.data ? `¥${formatNumber(d.data.msgUnitYen)}/通の見積り` : '読み込めませんでした'}
@@ -238,7 +239,7 @@ export default function DuplicatesV8() {
                 <td>
                   {[candidate.left.lineAccountName, candidate.right.lineAccountName]
                     .filter(Boolean)
-                    .join(' ／ ') || '—'}
+                    .join(' ／ ') || emptyValue('unknown')}
                 </td>
                 <td>{formatDateTime(candidate.reviewedAt ?? candidate.detectedAt)}</td>
                 <td>
@@ -360,7 +361,7 @@ export default function DuplicatesV8() {
                       </td>
                       {d.data!.perAccount.map((col) => {
                         if (row.accountId === col.accountId) {
-                          return <td key={col.accountId} className="num" style={{ color: 'var(--color-ink-disabled)' }}>—</td>
+                          return <td key={col.accountId} className="num" style={{ color: 'var(--color-ink-disabled)' }}>{emptyValue('unknown')}</td>
                         }
                         const pair = d.data!.pairwiseOverlap!.find(
                           (p) => p.fromAccountId === row.accountId && p.toAccountId === col.accountId,

@@ -37,6 +37,7 @@ import { templateDeleteDescription } from '../template-delete-message'
 import { messageTypeText } from '../template-message-type'
 import { isTemplateDetailData, type TemplateDetailData } from '../template-detail-data'
 import styles from './detail-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Usage = NonNullable<TemplateDetailData['usedBy']>
 
@@ -559,12 +560,12 @@ export default function TemplateDetailV8() {
                             <td className={`${styles.usageVersion} ${row.fixed ? styles.usageVersionFixed : ''}`}>
                               {row.version}
                             </td>
-                            <td className={styles.usageCellText}>{row.status ?? '—'}</td>
+                            <td className={styles.usageCellText}>{row.status ?? emptyValue('unknown')}</td>
                             <td className={styles.usageOpen}>
                               {row.href ? (
                                 <Link href={row.href} className={styles.usageNameLink}>開く</Link>
                               ) : (
-                                <span className="text-ink-faint" style={{ fontSize: 12 }}>—</span>
+                                <span className="text-ink-faint" style={{ fontSize: 12 }}>{emptyValue('unknown')}</span>
                               )}
                             </td>
                           </tr>
@@ -707,12 +708,12 @@ export default function TemplateDetailV8() {
                   <div className={styles.aboutRow}>
                     <dt className={styles.aboutLabel}>今月送った数</dt>
                     <dd className={styles.aboutValue}>
-                      {monthlySends === undefined ? '読み込み中…' : monthlySends === null ? '—' : `${monthlySends.toLocaleString('ja-JP')}通`}
+                      {monthlySends === undefined ? '読み込み中…' : monthlySends === null ? emptyValue('unknown') : `${monthlySends.toLocaleString('ja-JP')}通`}
                     </dd>
                   </div>
                   <div className={styles.aboutRow}>
                     <dt className={styles.aboutLabel}>差し込み</dt>
-                    <dd className={styles.aboutValue}>{insertions.length > 0 ? insertions.join('・') : 'なし'}</dd>
+                    <dd className={styles.aboutValue}>{insertions.length > 0 ? insertions.join('・') : emptyValue('none')}</dd>
                   </div>
                   <div className={styles.aboutRow}>
                     <dt className={styles.aboutLabel}>使われている数</dt>

@@ -39,6 +39,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { TagRowsSkeleton } from './tag-rows-skeleton'
 import styles from './list-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export default function SearchesTabV8({ accountId, canEdit }: { accountId: string | null; canEdit: boolean }) {
   const router = useRouter()
@@ -266,7 +267,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
         {kpisCards.map((kpi) => (
           <div key={kpi.title} className={styles.kpi}>
             <span className={styles.kpiLabel}><kpi.icon size={13} aria-hidden="true" />{kpi.title}</span>
-            <p className={styles.kpiValue}>{kpi.value ?? '—'}<span className={styles.kpiUnit}>{kpi.value === null ? '' : kpi.unit}</span></p>
+            <p className={styles.kpiValue}>{kpi.value ?? emptyValue('unknown')}<span className={styles.kpiUnit}>{kpi.value === null ? '' : kpi.unit}</span></p>
             <p className={styles.kpiDetail}>{kpi.detail}</p>
           </div>
         ))}
@@ -434,7 +435,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
                         <td className={styles.cellMuted}>
                           {all.length > 0 ? <span className={styles.cellTruncate} title={all.join('・')}>{all.join('・')}・AND</span> : null}
                           {any.length > 0 ? <span className={styles.cellTruncate} title={any.join('・')}>いずれか1つ以上：{any.join('・')}・OR</span> : null}
-                          {all.length === 0 && any.length === 0 ? <span>指定なし</span> : null}
+                          {all.length === 0 && any.length === 0 ? <span>{emptyValue('unconfigured')}</span> : null}
                           {note ? <span className={styles.cellTruncate} title={note}>{note}</span> : null}
                         </td>
                         {/* 人数は、その条件で絞った友だち一覧へのリンク（行の「…」にも同じ口）。 */}
@@ -444,7 +445,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
                               {formatNumber(search.matchCount)}人
                             </Link>
                           ) : (
-                            <span className={styles.cellMuted}>—</span>
+                            <span className={styles.cellMuted}>{emptyValue('unknown')}</span>
                           )}
                         </td>
                         <td>
@@ -453,12 +454,12 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
                           </span>
                         </td>
                         <td className={styles.cellMuted}>
-                          <span className={styles.cellTruncate} title={search.usedIn === undefined ? '—' : search.usedIn.length === 0 ? '未使用' : search.usedIn.map((u) => `${USAGE_KIND_LABELS[u.kind]}「${u.name}」`).join('・')}>
-                            {search.usedIn === undefined ? '—' : search.usedIn.length === 0 ? '未使用' : search.usedIn.map((u) => `${USAGE_KIND_LABELS[u.kind]}「${u.name}」`).join('・')}
+                          <span className={styles.cellTruncate} title={search.usedIn === undefined ? emptyValue('unknown') : search.usedIn.length === 0 ? '未使用' : search.usedIn.map((u) => `${USAGE_KIND_LABELS[u.kind]}「${u.name}」`).join('・')}>
+                            {search.usedIn === undefined ? emptyValue('unknown') : search.usedIn.length === 0 ? '未使用' : search.usedIn.map((u) => `${USAGE_KIND_LABELS[u.kind]}「${u.name}」`).join('・')}
                           </span>
                         </td>
                         <td className={styles.cellMuted}>
-                          <span className={styles.cellText}>{search.updatedBy ?? search.createdBy ?? '—'}</span>
+                          <span className={styles.cellText}>{search.updatedBy ?? search.createdBy ?? emptyValue('unknown')}</span>
                           <span className={styles.cellSub}>{formatDateTime(search.updatedAt ?? search.createdAt)}</span>
                         </td>
                         <td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
@@ -560,7 +561,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
                     ...(any.length > 0 ? [`いずれか1つ以上：${any.join('・')}・OR`] : []),
                     ...(note ? [note] : []),
                   ]
-                  return parts.length > 0 ? parts.join('／') : '指定なし'
+                  return parts.length > 0 ? parts.join('／') : emptyValue('unconfigured')
                 })()}
               </dd>
             </div>
@@ -572,20 +573,20 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
                     {formatNumber(activeSearch.matchCount)}人
                   </Link>
                 ) : (
-                  <span className={styles.cellMuted}>—</span>
+                  <span className={styles.cellMuted}>{emptyValue('unknown')}</span>
                 )}
               </dd>
             </div>
             <div>
               <dt className={styles.cellMuted}>使用先</dt>
               <dd className={styles.cellText}>
-                {activeSearch.usedIn === undefined ? '—' : activeSearch.usedIn.length === 0 ? '未使用' : activeSearch.usedIn.map((u) => `${USAGE_KIND_LABELS[u.kind]}「${u.name}」`).join('・')}
+                {activeSearch.usedIn === undefined ? emptyValue('unknown') : activeSearch.usedIn.length === 0 ? '未使用' : activeSearch.usedIn.map((u) => `${USAGE_KIND_LABELS[u.kind]}「${u.name}」`).join('・')}
               </dd>
             </div>
             <div>
               <dt className={styles.cellMuted}>更新者・日時</dt>
               <dd className={styles.cellText}>
-                {activeSearch.updatedBy ?? activeSearch.createdBy ?? '—'}・{formatDateTime(activeSearch.updatedAt ?? activeSearch.createdAt)}
+                {activeSearch.updatedBy ?? activeSearch.createdBy ?? emptyValue('unknown')}・{formatDateTime(activeSearch.updatedAt ?? activeSearch.createdAt)}
               </dd>
             </div>
           </dl>

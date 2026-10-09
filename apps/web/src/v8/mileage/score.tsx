@@ -56,6 +56,7 @@ import { FieldError } from '@/components/shared/form-controls'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const BAND_LABELS: Record<ActionScoreBand, string> = {
   high: '点が高い',
@@ -429,9 +430,9 @@ export default function ScoreTab() {
         title="公開中のルール"
         icon={<Settings2 size={14} aria-hidden="true" />}
         value={rulesLoading || rulesError ? null : 0}
-        valueText={rulesLoading || rulesError ? undefined : publishedVersionNo === null ? 'なし' : `版 ${formatMileageNumber(publishedVersionNo)}`}
+        valueText={rulesLoading || rulesError ? undefined : publishedVersionNo === null ? emptyValue('none') : `版 ${formatMileageNumber(publishedVersionNo)}`}
         unit=""
-        detail={rulesLoading ? '—' : hasDraftChanges ? '下書きの変更あり' : '下書きとの差はありません'}
+        detail={rulesLoading ? emptyValue('unknown') : hasDraftChanges ? '下書きの変更あり' : '下書きとの差はありません'}
       />
     </KpiBand>
   )
@@ -523,7 +524,7 @@ export default function ScoreTab() {
                 </Td>
                 <Td className={styles.colTrend}>
                   <span className={styles.scoreNum} data-score-delta={change === null || change === 0 ? 'zero' : change > 0 ? 'positive' : 'negative'}>
-                    {change === null ? '—' : formatMileageChange(change)}
+                    {change === null ? emptyValue('unknown') : formatMileageChange(change)}
                   </span>
                 </Td>
                 <Td className={styles.colReact}>
@@ -975,11 +976,11 @@ export function ScoreAdjustDialog({
           </div>
           <div className={styles.deltaCell}>
             <p className={styles.deltaLabel}>変更量</p>
-            <p className={styles.deltaValue}>{validAmount ? `${formatMileageChange(delta)} 点` : '—'}</p>
+            <p className={styles.deltaValue}>{validAmount ? `${formatMileageChange(delta)} 点` : emptyValue('unknown')}</p>
           </div>
           <div className={styles.deltaCell}>
             <p className={styles.deltaLabel}>変更後</p>
-            <p className={styles.deltaValue}>{validAmount ? `${formatMileageNumber(scoreAfter)} 点` : '—'}</p>
+            <p className={styles.deltaValue}>{validAmount ? `${formatMileageNumber(scoreAfter)} 点` : emptyValue('unknown')}</p>
           </div>
         </div>
 
@@ -1074,7 +1075,7 @@ function ScoreHistoryDialog({
         <span className={styles.dlgAvatar} aria-hidden="true">{friendName.slice(0, 1)}</span>
         <div className={styles.dlgPersonText}>
           <span className={styles.dlgPersonName}>{friendName}</span>
-          <span className={styles.dlgPersonSub}>{`いま ${score != null ? formatMileageNumber(score) : '—'} 点・${bandName(band, highMin, normalMin)}`}</span>
+          <span className={styles.dlgPersonSub}>{`いま ${score != null ? formatMileageNumber(score) : emptyValue('unknown')} 点・${bandName(band, highMin, normalMin)}`}</span>
         </div>
       </div>
 
@@ -1110,7 +1111,7 @@ function ScoreHistoryDialog({
                     {formatMileageChange(item.scoreChange)}
                   </span>
                 </td>
-                <td className={styles.miniNum}>{item.scoreAfter === null ? '—' : formatMileageNumber(item.scoreAfter)}</td>
+                <td className={styles.miniNum}>{item.scoreAfter === null ? emptyValue('unknown') : formatMileageNumber(item.scoreAfter)}</td>
               </tr>
             ))}
           </tbody>

@@ -81,6 +81,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import styles from './list.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export type { NenTab } from './display'
 
@@ -244,7 +245,7 @@ export default function NenCampaignsList(props: NenCampaignsListProps) {
   )
 
   const kpiPending = loading && kpis === null
-  const kpiMissing = props.kpisFailed ? '読み込めませんでした' : kpiPending ? '読み込んでいます' : '—'
+  const kpiMissing = props.kpisFailed ? '読み込めませんでした' : kpiPending ? '読み込んでいます' : emptyValue('unknown')
   const sentDiff = kpis?.sentThisMonth != null && kpis.sentLastMonth != null ? kpis.sentThisMonth - kpis.sentLastMonth : null
   const openDetail = tab === 'history' ? '配信ごとの開封は LINE から取れません' : tab === 'columns' ? 'コラムを開いた割合' : '自動配信は開封を取れません（コラムだけ）'
   const stats = (
@@ -440,8 +441,8 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
                     </Td>
                     <Td className={styles.colTrigger}><span className={styles.cell} title={timing}>{timing}</span></Td>
                     <Td className={styles.colTarget}><span className={styles.cell} title={audience}>{audience}</span></Td>
-                    <Td className={styles.colSent}><span className={styles.num}>{sent == null ? '—' : formatNumber(sent)}</span></Td>
-                    <Td className={styles.colOrders}><span className={styles.num} title="配信からの注文は配信ごとに取れていません">—</span></Td>
+                    <Td className={styles.colSent}><span className={styles.num}>{sent == null ? emptyValue('unknown') : formatNumber(sent)}</span></Td>
+                    <Td className={styles.colOrders}><span className={styles.num} title="配信からの注文は配信ごとに取れていません">{emptyValue('unknown')}</span></Td>
                     <Td className={styles.colState}>{props.saving === setting.campaignKey ? <Pill tone="off">切り替え中</Pill> : setting.isEnabled ? <Pill tone="ok">有効</Pill> : <Pill tone="off">停止中</Pill>}</Td>
                     <Td className={styles.colMenu}><RowMenu subject={setting.label} items={menuFor(setting)} /></Td>
                   </Tr>
@@ -535,7 +536,7 @@ function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave
         onClose={onClose}
         details={[
           { label: 'クーポンを付ける', value: coupon.isEnabled ? '付ける' : '付けない' },
-          { label: '特典の名前', value: coupon.benefitLabel || '—' },
+          { label: '特典の名前', value: coupon.benefitLabel || emptyValue('unknown') },
           { label: '割引額', value: `${formatNumber(coupon.discountAmount || 0)}円` },
           { label: '使える日数', value: `${coupon.validityDays || 0}日` },
           { label: 'コードの頭の文字', value: prefix },
@@ -733,9 +734,9 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
                       </span>
                     </Td>
                     <Td className={styles.colCategory}><span className={styles.cell}>{column.category?.trim() || '分類なし'}</span></Td>
-                    <Td className={styles.colDate}><span className={styles.cell}>{column.publishedAt ? jstMonthDay(column.publishedAt) : column.deliveryAt ? `${jstMonthDay(column.deliveryAt)} 予定` : '—'}</span></Td>
+                    <Td className={styles.colDate}><span className={styles.cell}>{column.publishedAt ? jstMonthDay(column.publishedAt) : column.deliveryAt ? `${jstMonthDay(column.deliveryAt)} 予定` : emptyValue('unknown')}</span></Td>
                     <Td className={styles.colLine}>{columnBadge(column, metric?.sent ?? null)}</Td>
-                    <Td className={styles.colViews}><span className={styles.num}>{views == null ? '—' : formatNumber(views)}</span></Td>
+                    <Td className={styles.colViews}><span className={styles.num}>{views == null ? emptyValue('unknown') : formatNumber(views)}</span></Td>
                     <Td className={styles.colMenu}><RowMenu subject={column.title} items={menuFor(column)} /></Td>
                   </Tr>
                 )
@@ -897,10 +898,10 @@ function HistoryTab(props: NenCampaignsListProps & { canEdit: boolean }) {
           search={{ placeholder: '友だち・配信の名前で探す', width: 240, value: query, onChange: changeQuery }}
           filters={(
             <div role="group" aria-label="送った結果で絞り込む" className={styles.chips}>
-              {chip('sent', `送りました ${summary ? formatNumber(summary.sent) : '—'}`)}
-              {chip('pending', `これから ${summary ? formatNumber(summary.pending + summary.processing) : '—'}`)}
-              {chip('failed', `届きませんでした ${summary ? formatNumber(summary.failed) : '—'}`)}
-              {chip('skipped', `送りませんでした ${summary ? formatNumber(summary.skipped) : '—'}`)}
+              {chip('sent', `送りました ${summary ? formatNumber(summary.sent) : emptyValue('unknown')}`)}
+              {chip('pending', `これから ${summary ? formatNumber(summary.pending + summary.processing) : emptyValue('unknown')}`)}
+              {chip('failed', `届きませんでした ${summary ? formatNumber(summary.failed) : emptyValue('unknown')}`)}
+              {chip('skipped', `送りませんでした ${summary ? formatNumber(summary.skipped) : emptyValue('unknown')}`)}
             </div>
           )}
           trailing={<span className={styles.muted}>送った日が新しい順</span>}

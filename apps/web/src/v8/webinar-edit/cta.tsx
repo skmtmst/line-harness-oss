@@ -33,6 +33,7 @@ import form from './form.module.css'
 import styles from './cta.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type FormCandidates = { state: 'idle' | 'loading' | 'ready' | 'error' | 'forbidden'; items: Array<{ id: string; name: string; isActive: boolean }> }
 
@@ -255,7 +256,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
   const currentIndex = ctas === null ? 0 : Math.min(selected, Math.max(ctas.length - 1, 0))
   const current = ctas === null ? null : ctas[currentIndex] ?? null
   const errId = (part: 'title' | 'time' | 'button' | 'link') => (fields.invalid(`cta-${currentIndex}-${part}`) ? `cta-${part}-error` : undefined)
-  const formName = (id: string | null | undefined) => (id ? forms.items.find((item) => item.id === id)?.name ?? '選んだフォーム' : '未設定')
+  const formName = (id: string | null | undefined) => (id ? forms.items.find((item) => item.id === id)?.name ?? '選んだフォーム' : emptyValue('unconfigured'))
   const busy = saving || reading
 
   return (
@@ -403,7 +404,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
                 const mine = ctas?.[i]
                 const theirs = latest.ctas?.[i]
                 const describe = (card: WebinarCtaCard | undefined, time?: string) => (card ? `「${card.title || '（見出しなし）'}」／${time ?? fmtMinSec(card.atSeconds)}から` : '（なし）')
-                return <Tr key={i}><Td>{`カード${i + 1}`}</Td><Td>{describe(mine, times[i])}</Td><Td>{latest.ctas ? describe(theirs) : '—'}</Td></Tr>
+                return <Tr key={i}><Td>{`カード${i + 1}`}</Td><Td>{describe(mine, times[i])}</Td><Td>{latest.ctas ? describe(theirs) : emptyValue('unknown')}</Td></Tr>
               })}
             </tbody>
           </DataTable>

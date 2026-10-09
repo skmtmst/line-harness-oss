@@ -27,6 +27,7 @@ import {
   useFriendMigrations,
 } from './use-friend-migrations'
 import styles from '@/app/friends/friends-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export default function FriendMigrationsV8() {
   usePageTitle('CSVで書き出す・取り込む')
@@ -123,7 +124,7 @@ export default function FriendMigrationsV8() {
                 className={styles.linkAction}
                 href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}${m.exportResult.downloadUrl}`}
               >
-                CSVをダウンロード（{m.exportResult.rowCount ?? '—'}件）
+                CSVをダウンロード（{m.exportResult.rowCount ?? emptyValue('unknown')}件）
               </a>
             </p>
           ) : null}
@@ -240,7 +241,7 @@ export default function FriendMigrationsV8() {
                   <tr key={`${job.kind}-${job.id}`}>
                     <td>{formatDateTime(job.created_at)}</td>
                     <td>{job.kind === 'export' ? '書き出し' : '取り込み'}</td>
-                    <td className="num">{job.row_count ?? job.total_count ?? '—'}</td>
+                    <td className="num">{job.row_count ?? job.total_count ?? emptyValue('unknown')}</td>
                     <td>{job.created_by_name}</td>
                     <td>
                       <StatusBadge tone={job.status === 'completed' ? 'success' : 'neutral'}>

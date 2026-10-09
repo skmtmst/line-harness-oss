@@ -83,6 +83,7 @@ import { completeReorder } from '@/lib/complete-reorder'
 import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
 import { formatTriggerOffset } from './reminder-timing'
 import styles from './list-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -647,7 +648,7 @@ export default function RemindersListV8() {
       icon: Bell,
       value: statsFailed ? null : reminderStats?.total ?? null,
       unit: '件',
-      detail: reminderStats ? `有効 ${reminderStats.active}件` : '—',
+      detail: reminderStats ? `有効 ${reminderStats.active}件` : emptyValue('unknown'),
       link: null as null | (() => void),
     },
     {
@@ -888,12 +889,12 @@ export default function RemindersListV8() {
                 const view = rowView(row)
                 const planned =
                   view.status === 'draft' || view.status === 'stopped'
-                    ? '—'
+                    ? emptyValue('unknown')
                     : row.plannedDeliveries == null
-                      ? '—'
+                      ? emptyValue('unknown')
                       : `${formatNumber(row.plannedDeliveries)}通`
                 const nextSend =
-                  view.status === 'active' ? formatNextSend(row.nextScheduledAt) : '—'
+                  view.status === 'active' ? formatNextSend(row.nextScheduledAt) : emptyValue('unknown')
                 return (
                   <Tr interactive
                     key={row.id}
@@ -1023,11 +1024,11 @@ export default function RemindersListV8() {
             const view = rowView(panelRow)
             const planned =
               view.status === 'draft' || view.status === 'stopped'
-                ? '—'
+                ? emptyValue('unknown')
                 : panelRow.plannedDeliveries == null
-                  ? '—'
+                  ? emptyValue('unknown')
                   : `${formatNumber(panelRow.plannedDeliveries)}通`
-            const nextSend = view.status === 'active' ? formatNextSend(panelRow.nextScheduledAt) : '—'
+            const nextSend = view.status === 'active' ? formatNextSend(panelRow.nextScheduledAt) : emptyValue('unknown')
             return (
               <DetailPanel
                 open

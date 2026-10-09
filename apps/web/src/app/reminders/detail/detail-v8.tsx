@@ -57,6 +57,7 @@ import styles from '../wizard-v8.module.css'
 import detailStyles from './detail-v8.module.css'
 import { dateTimeLocalJst, dateTimeLocalJstToUtcIso } from './registrants-panel'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const PAGE_SIZE = 20
 /** 書き出しの上限。実行結果が多いとき、手元に全部ため込むと固まる。 */
@@ -115,7 +116,7 @@ function csvFor(items: ReminderDeliveryRun[]): string {
       formatJst(item.completedAt ?? item.startedAt),
       item.attemptCount,
       formatJst(item.nextRetryAt),
-      item.lineRequestId ?? '—',
+      item.lineRequestId ?? emptyValue('unknown'),
       item.lastErrorMessage ?? '',
     ]),
   ]

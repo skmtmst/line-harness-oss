@@ -39,10 +39,11 @@ import { PageHeading } from '@/components/templates/page-frame'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const n = (value: number) => value.toLocaleString('ja-JP')
 /** 開いた・押した・反応（API-18）。店の計測がまだ取れていない（null）は「—」。 */
-const metric = (value: number | null | undefined) => (value == null ? '—' : n(value))
+const metric = (value: number | null | undefined) => (value == null ? emptyValue('unknown') : n(value))
 /** 送ったアカウントの合計。1つでも取れていなければ「—」（足りない合計を出さない）。 */
 export function sumMetric(values: Array<number | null | undefined>): number | null {
   if (values.length === 0 || values.some((value) => value == null)) return null
@@ -110,11 +111,11 @@ export function ResultCard({ run, canManage, onRetry, onRetryAll }: {
             return (
               <Tr key={t.accountId} className={styles.row}>
                 <Td className={styles.colStore}><span className={styles.store} title={t.accountName}>{t.accountName}</span></Td>
-                <Td className={styles.colNum}><span className={styles.num} title={off ? undefined : `送った ${n(t.totalCount ?? 0)}人`}>{off ? '—' : n(t.successCount ?? 0)}</span></Td>
-                <Td className={styles.colFail}><span className={off ? styles.faint : fail > 0 ? styles.numStrong : styles.faint}>{off ? '—' : n(fail)}</span></Td>
-                <Td className={styles.colMetric}><span className={styles.num}>{off ? '—' : metric(t.openedCount)}</span></Td>
-                <Td className={styles.colMetric}><span className={styles.num}>{off ? '—' : metric(t.clickedCount)}</span></Td>
-                <Td className={styles.colMetric}><span className={styles.num}>{off ? '—' : metric(t.reactionCount)}</span></Td>
+                <Td className={styles.colNum}><span className={styles.num} title={off ? undefined : `送った ${n(t.totalCount ?? 0)}人`}>{off ? emptyValue('unknown') : n(t.successCount ?? 0)}</span></Td>
+                <Td className={styles.colFail}><span className={off ? styles.faint : fail > 0 ? styles.numStrong : styles.faint}>{off ? emptyValue('unknown') : n(fail)}</span></Td>
+                <Td className={styles.colMetric}><span className={styles.num}>{off ? emptyValue('unknown') : metric(t.openedCount)}</span></Td>
+                <Td className={styles.colMetric}><span className={styles.num}>{off ? emptyValue('unknown') : metric(t.clickedCount)}</span></Td>
+                <Td className={styles.colMetric}><span className={styles.num}>{off ? emptyValue('unknown') : metric(t.reactionCount)}</span></Td>
                 <Td className={styles.colState}><StatusBadge tone={badge.tone} title={t.blockedReasons.join('・') || undefined}>{badge.label}</StatusBadge></Td>
                 <Td className={styles.colMenu}>
                   {canManage && canRetry(run, t) ? (
@@ -178,8 +179,8 @@ function PreparedCard({ run }: { run: HqBroadcastRun }) {
             return (
               <Tr key={t.accountId} className={styles.row}>
                 <Td className={styles.colStore}><span className={styles.store} title={t.accountName}>{t.accountName}</span></Td>
-                <Td className={styles.colNum}><span className={styles.num}>{t.audienceCount === null ? '—' : `${n(t.audienceCount)}人`}</span></Td>
-                <Td className={styles.colNum}><span className={styles.faint}>{t.remaining === null ? '—' : `${n(t.remaining)}通`}</span></Td>
+                <Td className={styles.colNum}><span className={styles.num}>{t.audienceCount === null ? emptyValue('unknown') : `${n(t.audienceCount)}人`}</span></Td>
+                <Td className={styles.colNum}><span className={styles.faint}>{t.remaining === null ? emptyValue('unknown') : `${n(t.remaining)}通`}</span></Td>
                 <Td className={styles.colState}><StatusBadge tone={badge.tone} title={t.blockedReasons.join('・') || undefined}>{badge.label}</StatusBadge></Td>
                 <Td className={styles.colFail}><StatusBadge tone={go ? 'success' : 'neutral'}>{go ? '送る' : '外す'}</StatusBadge></Td>
               </Tr>
@@ -235,9 +236,9 @@ function RecipientsTab({ run }: { run: HqBroadcastRun }) {
           <tbody>
             {rows.map((row) => (
               <Tr key={row.friendId} className={styles.row}>
-                <Td className={styles.colStore}><span className={styles.store} title={row.displayName ?? undefined}>{row.displayName ?? '名前未登録'}</span></Td>
+                <Td className={styles.colStore}><span className={styles.store} title={row.displayName ?? undefined}>{row.displayName ?? emptyValue('unconfigured')}</span></Td>
                 <Td className={styles.colState}><StatusBadge tone={row.state === 'sent' ? 'success' : row.state === 'failed' ? 'danger' : 'neutral'} title={row.errorCode ?? undefined}>{stateLabel(row.state)}</StatusBadge></Td>
-                <Td className={styles.colState}><span className={styles.faint}>{row.sentAt ? jpDateTime(row.sentAt) : '—'}</span></Td>
+                <Td className={styles.colState}><span className={styles.faint}>{row.sentAt ? jpDateTime(row.sentAt) : emptyValue('unknown')}</span></Td>
               </Tr>
             ))}
           </tbody>
@@ -264,7 +265,7 @@ function ActivityTab({ run, names }: { run: HqBroadcastRun; names: Map<string, s
     }
   }, [run.id])
   useEffect(() => { void load(0, false) }, [load])
-  const account = (id: string) => run.targets.find((t) => t.accountId === id)?.accountName ?? (id ? '—' : '一括配信')
+  const account = (id: string) => run.targets.find((t) => t.accountId === id)?.accountName ?? (id ? emptyValue('unknown') : '一括配信')
   return (
     <section className={detailStyles.section} aria-label="記録">
       <h3 className={detailStyles.secTitle}>記録</h3>
@@ -481,7 +482,7 @@ export default function HqBroadcastDetail() {
   const opened = sumMetric(sentTo.map((t) => t.openedCount))
   const clicked = sumMetric(sentTo.map((t) => t.clickedCount))
   const reacted = sumMetric(sentTo.map((t) => t.reactionCount))
-  const rate = (value: number) => (delivered > 0 ? `${((value / delivered) * 100).toFixed(1)}%` : '—')
+  const rate = (value: number) => (delivered > 0 ? `${((value / delivered) * 100).toFixed(1)}%` : emptyValue('unknown'))
   const audience = run?.input?.audience?.kind === 'tag' ? `タグ：${run.input.audience.tagName}` : '友だち全員'
   const people = run ? (run.status === 'prepared' ? (totals?.sendPeople ?? 0) : sentTo.reduce((sum, t) => sum + (t.totalCount ?? 0), 0)) : 0
   const bubbles = (() => { try { return run?.input?.messageBubblesJson ? JSON.parse(run.input.messageBubblesJson) : null } catch { return null } })()
@@ -494,7 +495,7 @@ export default function HqBroadcastDetail() {
     <div className={detailStyles.stat}>
       <p className={detailStyles.statLabel}>{label}</p>
       <p className={detailStyles.statValue}>
-        <span className={detailStyles.statNum}>{value == null ? '—' : n(value)}</span>
+        <span className={detailStyles.statNum}>{value == null ? emptyValue('unknown') : n(value)}</span>
         {unit ? <span className={detailStyles.statUnit}>{unit}</span> : null}
       </p>
       <p className={detailStyles.statDetail}>{detail}</p>
@@ -608,7 +609,7 @@ export default function HqBroadcastDetail() {
                   broadcast={{ messageType: run.input?.messageType ?? 'text', messageContent: previewText(fromApiContent(run.input?.messageContent ?? ''), exampleStore), messageBubbles: bubbles }}
                   accountName={exampleStore}
                   chip={run.scheduledAt ? jpDateTime(run.scheduledAt) : '送る前の見本'}
-                  time={run.scheduledAt ? jpDateTime(run.scheduledAt).replace(/^.*）/, '') : '—'}
+                  time={run.scheduledAt ? jpDateTime(run.scheduledAt).replace(/^.*）/, '') : emptyValue('unknown')}
                 />
               </>
             ) : null}

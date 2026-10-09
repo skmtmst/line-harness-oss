@@ -25,6 +25,7 @@ import { describeFriendAddFailure } from '@/v8/friend-add/failure'
 import { MESSAGE_TYPE_LABEL } from '@/v8/friend-add/flow'
 import { DELIVERY_UNKNOWN_CODE, jstClock, jstShortDateTime, jstTitleDate, routingAction } from './status'
 import styles from './detail.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type ActionRun = FriendAddRunDetail['actionRuns'][number]
 
@@ -234,7 +235,7 @@ function FriendAddRunDetailInner() {
   const routeName = detail.attribution.status === 'captured'
     ? detail.attribution.routeName || detail.attribution.reason || '選択した経路'
     : '経路が分からない'
-  const ruleLabel = detail.rule ? `${detail.rule.name ?? '名前は未取得'}（第${detail.rule.versionNumber ?? '—'}版）` : '使用ルールは未取得'
+  const ruleLabel = detail.rule ? `${detail.rule.name ?? '名前は未取得'}（第${detail.rule.versionNumber ?? emptyValue('unknown')}版）` : '使用ルールは未取得'
   const messageType = detail.rule?.definition?.messageType
   const messageLabel = messageType ? MESSAGE_TYPE_LABEL[messageType] ?? '案内' : '案内'
   const deliveryUnknown = detail.errorCode === DELIVERY_UNKNOWN_CODE

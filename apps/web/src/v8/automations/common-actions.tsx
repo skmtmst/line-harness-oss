@@ -58,6 +58,7 @@ import {
   type BandCell,
 } from './shell'
 import styles from './common-actions.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Filter = 'all' | 'published' | 'draft' | 'old_version' | 'unused' | 'archived'
 type Summary = {
@@ -228,7 +229,7 @@ export default function CommonActionsV8() {
   /* ===== 数の帯 ===== */
   const ready = summary !== null && !loadFailed
   const cells: BandCell[] = [
-    { key: 'total', title: '共通アクション', icon: <ListChecks size={13} aria-hidden="true" />, value: ready ? summary.total : null, unit: '件', detail: ready ? `公開中 ${summary.published}・下書き ${summary.draft}` : '—' },
+    { key: 'total', title: '共通アクション', icon: <ListChecks size={13} aria-hidden="true" />, value: ready ? summary.total : null, unit: '件', detail: ready ? `公開中 ${summary.published}・下書き ${summary.draft}` : emptyValue('unknown') },
     { key: 'bindings', title: '使われている所', icon: <Link2 size={13} aria-hidden="true" />, value: ready ? summary.bindings : null, unit: 'か所', detail: ready && summary.outdated > 0 ? `古い版のまま ${summary.outdated}か所` : 'ルール・シナリオなど5機能から' },
     { key: 'executions', title: '今月動いた', icon: <Activity size={13} aria-hidden="true" />, value: ready ? summary.executions : null, unit: '回', detail: '今月（日本時間）の実行回数' },
     { key: 'failures', title: '失敗', icon: <TriangleAlert size={13} aria-hidden="true" />, value: ready ? summary.failures : null, unit: '件', detail: '「動いた記録」からやり直せます' },
@@ -337,7 +338,7 @@ export default function CommonActionsV8() {
                     <Td className={styles.colSteps}><span className={styles.main}>{`${item.actionCount}個の処理`}</span></Td>
                     <Td className={styles.colUsed}><span className={styles.main}>{`${formatNumber(item.bindingCount)} か所`}</span></Td>
                     <Td className={styles.colVersion}>
-                      <span className={styles.main}>{item.publishedVersion ? `v${item.publishedVersion}` : '—'}</span>
+                      <span className={styles.main}>{item.publishedVersion ? `v${item.publishedVersion}` : emptyValue('unknown')}</span>
                       {versionSub ? <span className={item.oldVersionBindingCount > 0 ? styles.subWarn : styles.sub}>{versionSub}</span> : null}
                     </Td>
                     <Td className={styles.colOps}>

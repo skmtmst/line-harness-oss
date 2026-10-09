@@ -30,6 +30,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import Notice from '@/components/shared/notice'
 import { formatNumber } from '@/lib/format'
 import './create-v8.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const FRIEND_PAGE_SIZE = 20
 const AFFILIATE_LIST_PATH = '/conversions?tab=affiliates'
@@ -567,7 +568,7 @@ export function NewAffiliateV8() {
                         コピー
                       </Button>
                     </span>
-                  ) : '—'}
+                  ) : emptyValue('unknown')}
                 </dd>
               </div>
               <div className="af-create-kvRow">
@@ -578,7 +579,7 @@ export function NewAffiliateV8() {
               </div>
               <div className="af-create-kvRow">
                 <dt className="af-create-kvKey">締め</dt>
-                <dd className="af-create-kvValue">{payoutCycle.trim() || '—'}</dd>
+                <dd className="af-create-kvValue">{payoutCycle.trim() || emptyValue('unknown')}</dd>
               </div>
             </dl>
             <p className="af-create-footnote">

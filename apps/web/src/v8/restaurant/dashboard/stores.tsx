@@ -15,6 +15,7 @@ import type { RestaurantSnapshot } from '@/lib/restaurant-test-api'
 import RestaurantFrame from '../common-a/frame'
 import { HalfGrid, Panel, PanelAside, Stat, StatRow, Status } from '../common-a/parts'
 import styles from './stores.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 
 export function DashboardBoard({ data }: { data: RestaurantSnapshot }) {
@@ -37,7 +38,7 @@ export function DashboardBoard({ data }: { data: RestaurantSnapshot }) {
         <Stat label="予約数" value={`${upcoming.length}件`} note="今日以降の有効予約" help="今日以降に開始する、取消・無断キャンセルでない予約の件数です。" />
         <Stat label="ご来店予定" value={`${guestCount}名`} note="今日以降の人数合計" help="今日以降の有効予約の人数の合計です。来店済みの過去分は含みません。" />
         <Stat label="空席率" value={`${Math.max(0, Math.round((1 - guestCount / Math.max(totalCapacity, 1)) * 100))}%`} note="全店舗の概算" help="分母は全店舗の収容数の合計、分子は今日以降の有効予約の人数の合計です。時間帯ごとの空きではありません。" />
-        <Stat label="売上予測" value={priced.length ? formatYen(revenue) : '—'} note={priced.length ? `コース設定 ${priced.length}件分` : 'コース設定がありません'} help="コース単価×人数の合計です。席のみ（コース未設定）の予約は含みません。固定の客単価では計算しません。" />
+        <Stat label="売上予測" value={priced.length ? formatYen(revenue) : emptyValue('unknown')} note={priced.length ? `コース設定 ${priced.length}件分` : 'コース設定がありません'} help="コース単価×人数の合計です。席のみ（コース未設定）の予約は含みません。固定の客単価では計算しません。" />
         <Stat label="未返信口コミ" value={`${unreplied}件`} note="Google口コミ" warning={unreplied > 0} />
       </StatRow>
       <Panel
@@ -67,7 +68,7 @@ export function DashboardBoard({ data }: { data: RestaurantSnapshot }) {
                   <span className={styles.storeName} title={item.name}>{item.name}</span>
                   <span className={styles.storeCode}>{item.code}</span>
                 </span>
-                <span role="cell" className={`${styles.cell} ${styles.colArea}`}>{item.area || '—'}</span>
+                <span role="cell" className={`${styles.cell} ${styles.colArea}`}>{item.area || emptyValue('unknown')}</span>
                 <span role="cell" className={`${styles.cell} ${styles.colCount} ${styles.num}`}>{`${reservations.length}件`}</span>
                 <span role="cell" className={`${styles.cell} ${styles.colGuests} ${styles.num}`}>{`${reservations.reduce((s, r) => s + r.guest_count, 0)}名`}</span>
                 <span role="cell" className={`${styles.cell} ${styles.colCapacity} ${styles.num}`}>{`${item.capacity}席`}</span>
