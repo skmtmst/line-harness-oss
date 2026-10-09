@@ -125,7 +125,7 @@ export function actionLine(rule: FriendAddRule) {
     parts.push(`＋シナリオ「${rule.scenarioName}」`)
   }
   for (const action of rule.definition.actions) {
-    if (action.type === 'start_scenario' && rule.scenarioName) continue
+    if (action.type === 'start_scenario' && rule.scenarioName && action.targetId === rule.definition.scenarioId) continue
     if (action.label) parts.push(`＋${actionName(action.label)}`)
   }
   return parts.join(' ')
@@ -745,7 +745,7 @@ function FriendAddList() {
                       >
                         <span aria-hidden="true" className={styles.grip}>⠿</span>
                       </ReorderHandle> : <span aria-hidden="true" className={`${styles.grip} ${styles.gripSpace}`} />}
-                      <span className={styles.orderNum}>{index + 1}</span>
+                      <span className={styles.orderNum}>{rule.priority}</span>
                     </span>
                   </Td>
                   <Td className={styles.colName}>
@@ -878,9 +878,12 @@ function FriendAddList() {
         <ConfirmDialog
           open={fallbackStop}
           designNode="cFo2p"
+          designLayout="stacked"
           designWidth={600}
           designTop={280}
-          designHeaderPadding="24px 24px 8px"
+          footerAlign="start"
+          designFooterGap={84}
+          confirmFirst
           titleIcon={false}
           title="「経路が分からなかった人」は止められません"
           description="いちばん最後の受け皿なので、止めると誰にも案内が届かなくなります。届く中身を変えたいときは、この設定を編集してください。止めたいときは、先に別の受け皿を有効にしてください。"
@@ -891,7 +894,7 @@ function FriendAddList() {
           }}
           onCancel={() => setFallbackStop(false)}
         >
-          <Notice tone="warn" message={`直近7日では ${countText(sinkRule?.matchedLast7Days, '人')} がこの設定で案内を受け取っています。`} />
+          <Notice tone="warn" appearance="soft" message={`直近7日では ${countText(sinkRule?.matchedLast7Days, '人')} がこの設定で案内を受け取っています。`} />
         </ConfirmDialog>
         {/* 通常の設定の一時停止の確かめ。 */}
         <ConfirmDialog

@@ -89,26 +89,4 @@ describe('03-C-はみ1: 友だち一覧の検索行は収まらない分を折�
   })
 })
 
-describe('09-C-横1: 友だち追加時配信の表は1440pxに収まる', () => {
-  const page = read('friend-add-settings/page.tsx')
-
-  it('表の最小幅を枠の実幅（834px）以下の720pxへ下げる', () => {
-    expect(page).toContain('[data-scroll-table] table { min-width: 720px; }')
-    expect(page).not.toContain('min-width: 860px')
-  })
-
-  it('lg未満の単列トラックを明示し、一覧セクションは min-w-0 で縮める', () => {
-    expect(page).toContain('grid-cols-[minmax(0,1fr)]')
-    expect(page).toMatch(/<section data-design="Rule"[^>]*className="min-w-0"/)
-  })
-
-  it('狭くなった表で操作列が切れないよう固定幅を当てる', () => {
-    expect(page).toMatch(/<Th title="状態" className="w-24">/)
-    expect(page).toMatch(/<Th title="直近7日の友だち追加数" className="w-24">/)
-    expect(page).toMatch(/<Th title="操作" className="w-40">/)
-  })
-
-  it('行リンクは1行省略＋titleで全文を確認できる（設計ルールどおり）', () => {
-    expect(page).toContain('block truncate font-bold" title={rule.name}')
-  })
-})
+// 友だち追加時配信の V7 の720px・列幅・gridクラスは廃止。V8の表示幅は絵との照合で確かめる。

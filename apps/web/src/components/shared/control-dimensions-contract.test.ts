@@ -87,7 +87,7 @@ describe('Pencil V6 の入力・選択・押し口規定', () => {
     const folderSelect = read('../chats/template-folder-select.tsx')
     const users = read('../users/users-filters.tsx')
     const tags = read('../friend-fields/tags-page-v4.tsx')
-    const broadcasts = read('../../app/broadcasts/page.tsx')
+    const broadcasts = read('../../v8/broadcasts/list.tsx')
 
     expect(folderSelect).toContain('size="field"')
     expect(users).not.toContain('className="h-9')
@@ -102,7 +102,7 @@ describe('Pencil V6 の入力・選択・押し口規定', () => {
     expect(tags).not.toContain('<select')
     expect(tags).toContain('aria-label="使用状態で絞り込む"')
     expect(tags).toContain('aria-label="表示件数"')
-    expect(broadcasts).toContain('<ListToolbar')
+    expect(broadcasts).toContain('<SearchField')
     expect(broadcasts).not.toContain('type="search"')
   })
 })

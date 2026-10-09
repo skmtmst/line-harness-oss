@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', selectedAccount: null, loading: false, accounts: [{ id: 'account-1' }] }) }))
 /**
  * Issue #967 / U049: /auto-replies/edit の手順表示を共通の Stepper に寄せる。
  *
@@ -73,7 +74,7 @@ describe('U049: 自動応答編集の手順表示を共通化', () => {
   it('ウェビナー作成と同じ Stepper 部品で5段を出す', async () => {
     await act(async () => { root.render(<AutoReplyEditPage />) })
     await flush()
-    const trail = host.querySelector('[data-design="Steps"]')
+    const trail = host.querySelector('nav[aria-label="自動応答を作る進み方"]')
     expect(trail).not.toBeNull()
     expect(trail!.getAttribute('aria-label')).toBe('自動応答を作る進み方')
     for (const label of ['基本設定', 'どんなときに動くか', '何を返すか', '優先順位', '確認']) {
@@ -84,12 +85,12 @@ describe('U049: 自動応答編集の手順表示を共通化', () => {
   it('いまの段（step=trigger → 2段目）に aria-current="step" が付く', async () => {
     await act(async () => { root.render(<AutoReplyEditPage />) })
     await flush()
-    const trail = host.querySelector('[data-design="Steps"]')
+    const trail = host.querySelector('nav[aria-label="自動応答を作る進み方"]')
     const current = trail!.querySelector('[aria-current="step"]')
     expect(current).not.toBeNull()
     expect(current!.textContent).toContain('どんなときに動くか')
     // 1段目は完了（✓）、3段目以降は未着手
-    expect(trail!.textContent).toContain('✓')
+    expect(trail!.querySelector('[data-step-state="done"]')).not.toBeNull()
   })
 })
 

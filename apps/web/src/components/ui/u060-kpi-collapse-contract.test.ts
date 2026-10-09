@@ -37,6 +37,18 @@ describe('V8の数の帯とメンバー一覧', () => {
     expect(read('app/webinars/list-v8.module.css')).toMatch(/@media \(max-width: 640px\)[^}]*\.kpiBand[^}]*repeat\(2, minmax\(0, 1fr\)\)/s)
   })
 
+  it('自動応答V8は集計を共通の数の帯へ渡す', () => {
+    const page = read('v8/auto-replies/list.tsx')
+    expect(page).toContain("import KpiBand from '@/components/shared/kpi-band'")
+    expect(page).toContain('<KpiBand data-design="KPIs">')
+    expect(page).toContain('kpis.map((kpi) => (')
+    expect(page).toContain('presentation="band"')
+    const shared = read('components/shared/kpi-band.tsx')
+    expect(shared).toContain('data-kpi-strip')
+    const css = read('components/shared/kpi-band-v8.css')
+    expect(css).toMatch(/@media \(max-width: 639px\)[\s\S]*?grid-auto-flow: row;/)
+  })
+
   it('写真審査は集計4件を狭い板で2列にする', () => {
     const page = read('app/nen-members/photo-review-v8.tsx')
     expect(page.match(/<KpiCellV8\b/g)).toHaveLength(4)
@@ -62,6 +74,7 @@ describe('V8の数の帯とメンバー一覧', () => {
 describe('KPI折りたたみの適用（#975 U060）', () => {
   const targets: Array<[string, string]> = [
     ['app/auto-replies/page.tsx', 'KpiCollapse'],
+    ['app/page.tsx', 'KpiCollapse'],
     ['app/conversions/page.tsx', 'KpiCollapse'],
     ['app/automations/page.tsx', 'KpiCollapse'],
     ['app/automations/runs/page.tsx', 'KpiCollapse'],

@@ -55,7 +55,7 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import { Tabs } from '@/components/shared/tabs'
 import PageSizeSelect from '@/components/ui/page-size-select'
-import { reminderTriggerLabel, renderReminderBodySample } from '@/components/reminders/reminder-labels'
+import { reminderTriggerLabel, reminderStopSummary, renderReminderBodySample } from '@/components/reminders/reminder-labels'
 import SheetDialog from './sheet-dialog'
 import styles from './detail.module.css'
 
@@ -562,7 +562,7 @@ function ReminderDetailV8() {
           <CreateSummaryCard
             title="いまの状態"
             rows={[
-              { key: 'state', label: '状態', value: <span className={styles.valueState} data-tone={statusLabel === '稼働中' ? 'ok' : undefined}>{statusLabel}</span> },
+              { key: 'state', label: '状態', value: <span className={styles.valueState} title={reminderStopSummary(data.reminder.stopConditions)} data-tone={statusLabel === '稼働中' ? 'ok' : undefined}>{statusLabel}</span> },
               { key: 'registrants', label: '登録者', value: `${formatNumber(data.summary.targetCount)}人` },
               { key: 'next7', label: 'これから送る（今後7日）', value: `${formatNumber(data.summary.scheduledNext7Days ?? 0)}通` },
               { key: 'month', label: '今月送った', value: `${formatNumber(data.summary.sentThisMonth ?? 0)}通` },

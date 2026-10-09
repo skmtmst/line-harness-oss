@@ -373,3 +373,5 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+.fieldError { margin: var(--tpl-field-error-margin); color: var(--color-status-danger); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }

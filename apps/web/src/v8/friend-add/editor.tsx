@@ -106,6 +106,11 @@ const STEPS: Array<{ key: Step; label: string; node: string }> = [
   { key: 'preview', label: '確認', node: 'U8Xm3X' },
 ]
 
+const EMPTY_RULE: EditorRule = {
+  name: '', folderName: null, priority: 1, friendKind: 'first_time', isFallback: false,
+  status: 'draft', matchedLast7Days: null, lastTestStatus: null, version: 0,
+}
+
 const EMPTY_DEFINITION: FriendAddRuleDefinition = {
   routeIds: [],
   scenarioId: null,
@@ -210,10 +215,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   usePageTitle('初回案内を作る')
   /* 板の頭の「← 〇〇へ」は 2026-10-08 に無くした。一覧へは上の帯のパンくずで戻る。 */
   usePageCrumbs([{ label: '友だち追加時の配信', href: '/friend-add-settings' }])
-  const [rule, setRule] = useState<EditorRule>({
-    name: '', folderName: null, priority: 1, friendKind: 'first_time', isFallback: false,
-    status: 'draft', matchedLast7Days: null, lastTestStatus: null, version: 0,
-  })
+  const [rule, setRule] = useState<EditorRule>(EMPTY_RULE)
   const [definition, setDefinition] = useState<FriendAddRuleDefinition>(EMPTY_DEFINITION)
   const [options, setOptions] = useState<FriendAddRuleOptions>({ routes: [], scenarios: [], tags: [], folders: [] })
   const [routeUses, setRouteUses] = useState<Map<string, RouteUse>>(new Map())
@@ -257,6 +259,10 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       && loadRequestRef.current.ruleId === request.ruleId
       && loadRequestRef.current.generation === request.generation
     setLoading(true)
+    setLoadedAccountId(null)
+    setSaving(false); setEnabling(false); saveInFlight.current = false
+    setTestResult(null); setValidateChecks(null); setCompare(null); setCompareBusy(false)
+    if (!ruleId) { setRule(EMPTY_RULE); setDefinition(EMPTY_DEFINITION); savedSnapshot.current = null }
     setError('')
     try {
       let kind: FriendAddRuleKind = 'first_time'
@@ -293,7 +299,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
             ? conflictRes.data.rules.reduce((max, item) => (fallbackIds.has(item.id) ? max : Math.max(max, item.priority)), 0)
             : listResponse.data.items.filter((item) => !item.isFallback).length
           setRule((current) => {
-            const initialRule = { ...current, priority: Math.max(1, maxPriority + 1) }
+            const initialRule = { ...EMPTY_RULE, priority: Math.max(1, maxPriority + 1) }
             savedSnapshot.current = editorSnapshot(initialRule, EMPTY_DEFINITION)
             return initialRule
           })
@@ -390,6 +396,8 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       const problem = validateStep(step)
       if (problem) { showFieldError(problem); return null }
     }
+    const request = loadRequestRef.current
+    const isCurrent = () => loadRequestRef.current === request
     setFieldError(null)
     saveInFlight.current = true
     setSaving(true)
@@ -399,6 +407,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       const response = ruleId
         ? await api.friendAddRules.saveDraft(ruleId, payload, saveIdempotencyKey.current)
         : await api.friendAddRules.createDraft(payload, saveIdempotencyKey.current)
+      if (!isCurrent()) return null
       if (!response.success) { setError(response.error); return null }
       const savedId = response.data.id
       saveIdempotencyKey.current = crypto.randomUUID()
@@ -412,6 +421,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       if (!ruleId || nextStep) samePageUrl.replace(`/friend-add-settings?view=edit&id=${encodeURIComponent(savedId)}&step=${nextStep ?? step}`)
       return savedId
     } catch (caught) {
+      if (!isCurrent()) return null
       if (caught instanceof ApiError && caught.status === 409) {
         setConflict(true)
       } else {
@@ -419,8 +429,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       }
       return null
     } finally {
-      saveInFlight.current = false
-      setSaving(false)
+      if (isCurrent()) { saveInFlight.current = false; setSaving(false) }
     }
   }
 
@@ -434,10 +443,12 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   /* 競合：違いを比べる（最新の保存とあなたの直しを、項目ごとに並べる）。 */
   const openCompare = async () => {
     if (!ruleId || !selectedAccountId) return
+    const request = loadRequestRef.current
     setCompareBusy(true)
     try {
       const response = await api.friendAddRules.get(selectedAccountId, ruleId)
       if (!response.success) { setError(response.error); return }
+      if (loadRequestRef.current !== request) return
       const latest = response.data.rule
       const routeText = (ids: string[]) => ids
         .map((id) => options.routes.find((route) => route.id === id)?.name ?? id)
@@ -447,13 +458,18 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         { label: 'フォルダ', mine: rule.folderName ?? '未分類', theirs: latest.folderName ?? '未分類' },
         { label: '流入リンク', mine: routeText(definition.routeIds), theirs: routeText(latest.definition.routeIds) },
         { label: '最初に送るもの', mine: definition.messageText, theirs: latest.definition.messageText },
-        { label: 'あわせて行うこと', mine: definition.actions.map((a) => a.label).join('・') || 'なし', theirs: latest.definition.actions.map((a) => a.label).join('・') || 'なし' },
+        { label: 'あわせて行うこと', mine: JSON.stringify(definition.actions), theirs: JSON.stringify(latest.definition.actions) },
+        { label: '順番', mine: String(rule.priority), theirs: String(latest.priority) },
+        { label: '友だちの区分', mine: rule.friendKind, theirs: latest.friendKind },
+        { label: '経路不明の設定', mine: String(rule.isFallback), theirs: String(latest.isFallback) },
+        ...Object.entries({scenarioId:'シナリオ',messageType:'メッセージの種類',timing:'送るタイミング',friendCondition:'友だちの条件',activeFrom:'有効期間の開始',activeUntil:'有効期間の終了',returningMode:'以前からの友だちへの送り方',startPosition:'シナリオの開始位置',deliveryChoices:'配信する内容',resendSuppressionHours:'再送を止める時間',unknownRouteAction:'経路不明のときの動作',weekdays:'曜日',timeWindows:'時間帯',internalMemo:'メモ'}).map(([key,label]) => ({label, mine: JSON.stringify(definition[key as keyof FriendAddRuleDefinition] ?? null), theirs: JSON.stringify(latest.definition[key as keyof FriendAddRuleDefinition] ?? null)})),
       ].filter((row) => row.mine !== row.theirs)
       setCompare(rows)
     } catch (caught) {
+      if (loadRequestRef.current !== request) return
       setError(describeFriendAddFailure(caught, '設定', 'load').message)
     } finally {
-      setCompareBusy(false)
+      if (loadRequestRef.current === request) setCompareBusy(false)
     }
   }
 
@@ -475,12 +491,14 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   }
 
   const runTest = async () => {
+    const request = loadRequestRef.current
     const activeId = ruleId ?? await save('preview')
     if (!activeId || !selectedAccountId || loadedAccountId !== selectedAccountId) return
     setSaving(true)
     setError('')
     try {
       const response = await api.friendAddRules.test(selectedAccountId, activeId, { routeId: null, expectedAt: null, friendId: null })
+      if (loadRequestRef.current !== request) return
       const testedMeta = {
         accountId: selectedAccountId,
         ruleId: activeId,
@@ -494,9 +512,10 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       setTestResult({ ...testedMeta, ...response.data })
       setNotice('テストが完了しました。本番の登録・送信・タグ・マイルは変更していません。')
     } catch {
+      if (loadRequestRef.current !== request) return
       setError('テストを実行できませんでした。')
     } finally {
-      setSaving(false)
+      if (loadRequestRef.current === request) setSaving(false)
     }
   }
 
@@ -543,19 +562,22 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   const enableRule = async () => {
     const activeId = ruleId ?? await save('preview')
     if (!activeId || !selectedAccountId || loadedAccountId !== selectedAccountId || enabling) return
+    const request = loadRequestRef.current
     setEnabling(true)
     setError('')
     try {
       const res = await api.friendAddRules.publish(selectedAccountId, activeId, saveIdempotencyKey.current)
+      if (loadRequestRef.current !== request) return
       if (!res.success) {
         setError('有効化できませんでした。状態を読み直してから、もう一度お試しください。')
         return
       }
       router.replace(`/friend-add-settings/publish?id=${encodeURIComponent(activeId)}&done=1`)
     } catch {
+      if (loadRequestRef.current !== request) return
       setError('有効化できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
-      setEnabling(false)
+      if (loadRequestRef.current === request) setEnabling(false)
     }
   }
 

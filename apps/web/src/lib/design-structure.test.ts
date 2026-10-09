@@ -86,7 +86,22 @@ const V8_COPY: Record<string, Record<string, string>> = {
     '最初の1つを作ると、集まった回答もここから見られます。': '答えは友だち情報に保存できます。',
   },
 }
-const SCREENS = LEGACY_SCREENS.map(([route, spec]) => [route, {
+// mainB: V8へ移った9画面には旧JSONの節・語を要求しない。
+// 見た目は★V8との画像照合、動きは各V8本体の試験が守る。ここは入口と描く本体の接続を守る。
+const MAINB_V8_SCREENS = [
+  ['/broadcasts', '@/v8/broadcasts/list', 'v8/broadcasts/list.tsx', '<ListPage'],
+  ['/broadcasts/detail', '@/v8/broadcast-detail/detail', 'v8/broadcast-detail/detail.tsx', '<PageFrame'],
+  ['/scenarios/detail', '@/v8/scenario-detail/detail', 'v8/scenario-detail/detail.tsx', '<PageFrame'],
+  ['/reminders/new', './new-v8', 'app/reminders/new/new-v8.tsx', '<CreatePage'],
+  ['/auto-replies', '@/v8/auto-replies/list', 'v8/auto-replies/list.tsx', '<ListPage'],
+  ['/auto-replies/edit', './wizard-v8', 'app/auto-replies/edit/wizard-v8.tsx', '<CreatePage'],
+  ['/friend-add-settings', '@/v8/friend-add/list', 'v8/friend-add/list.tsx', '<ListPage'],
+  ['/scenarios/mode', '@/v8/scenarios/create', 'v8/scenarios/create.tsx', '<CreatePage'],
+  ['/scenarios/first-step', '@/v8/scenario-first-step/first-step', 'v8/scenario-first-step/first-step.tsx', '<CreatePage'],
+] as const;
+const migratedRoutes = new Set<string>(MAINB_V8_SCREENS.map(([route]) => route));
+
+const SCREENS = LEGACY_SCREENS.filter(([route]) => !migratedRoutes.has(route)).map(([route, spec]) => [route, {
   ...spec,
   name: route in V8_SECTIONS ? spec.name.replace(/^V6|^V7/, 'V8') : spec.name,
   sections: V8_SECTIONS[route] ?? spec.sections,
@@ -176,6 +191,16 @@ describe('画面の骨格が設計と一致する', () => {
   it('対象の画面が登録されている', () => {
     // JSON が空になったら、以下の検査が素通りしてしまう。
     expect(SCREENS.length).toBeGreaterThan(0);
+  });
+
+  it.each(MAINB_V8_SCREENS)('%s の入口はV8本体を描く', (route, module, file, template) => {
+    const entry = readFileSync(join(APP, route, 'page.tsx'), 'utf8');
+    const imported = [...entry.matchAll(/import (\w+) from ['"]([^'"]+)['"]/g)]
+      .find((match) => match[2] === module);
+    expect(imported, `${route} が ${module} を読む`).toBeDefined();
+    expect(entry).toContain(`<${imported![1]}`);
+    const body = readFileSync(join(SRC, file), 'utf8');
+    expect(body).toContain(template);
   });
 
   it.each([

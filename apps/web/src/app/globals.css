@@ -849,6 +849,11 @@
   --tpl-rsv-facts-gap: 6px; --tpl-rsv-facts-pad: 10px 12px; --tpl-rsv-facts-radius: 8px; --tpl-rsv-fact-lh: 17px; --tpl-rsv-allergy: #b42318;
   --tpl-an-hours-gap: 10px; --tpl-an-hours-pad: 16px; --tpl-an-hours-title-lh: 20px; --tpl-an-hour-gap: 4px; --tpl-an-hours-h: 90px; --tpl-an-tick-size: 9px; --tpl-an-tick-lh: 13px;
   --tpl-bc2-stop-gap: 12px; --tpl-bc2-stop-desc-size: 12px; --tpl-bc2-stop-desc-lh: 18px; --tpl-bc2-stop-footer-gap: 8px; --tpl-bc2-stop-footer-pad: 14px;
+  --tpl-np-role-row-w: 248px; --tpl-ar-starter-gap: 9px; --tpl-bd-delivery-head-bottom: 16px;
+  --tpl-sfs-day-w: 70px;
+  --tpl-bd-side-title-size: 15px; --tpl-bd-side-title-lh: 22px;
+  --tpl-steps-compact-top-gap: 0px;
+  --tpl-field-error-margin: 0;
   --tpl-cfl-head-gap: 2px; --tpl-cfl-card-pad: 19px; --tpl-cfl-title-lh: 22px; --tpl-cfl-target-gap: 10px; --tpl-cfl-target-h: 98px; --tpl-cfl-when-gap: 8px; --tpl-cfl-kind-gap: 6px; --tpl-cfl-kind-pad: 6px 10.5px; --tpl-cfl-kind-break-h: 2px; --tpl-cfl-narrow-pad: 16px; --tpl-cfl-image-w: 448px; --tpl-cfl-body-h: 120px; --tpl-cfl-body-pad: 12px; --tpl-cfl-insert-gap: 6px; --tpl-cfl-insert-pad: 2px 8px; --tpl-cfl-counter-lh: 13px; --tpl-cfl-key-w: 140px; --tpl-cfl-row-h: 56px; --tpl-cfl-check-h: 57px; --tpl-cfl-row-pad: 10px; --tpl-cfl-value-lh: 21px; --tpl-cfl-check-gap: 10px; --tpl-cfl-done-pad: 48px; --tpl-cfl-done-w: 560px; --tpl-cfl-done-card-pad: 32px; --tpl-cfl-done-mark: 48px; --tpl-cfl-done-title-size: 18px; --tpl-cfl-done-title-lh: 26px; --tpl-cfl-done-desc-lh: 22px; --tpl-cfl-done-row-pad: 9px; --tpl-cfl-band-pad: 12px 16px; --tpl-cfl-link-gap: 16px; --tpl-cfl-num: 24px; --tpl-cfl-side-pad: 16px; --tpl-cfl-side-lh: 19px; --tpl-cfl-list-indent: 18px;
   /* 然-NEN- マイペット（wTIej・t2SMXX・eLjeQ・h7A2F）と健康日記（mIwA4・BVuYh・z2tvtX）。 */
   --tpl-nph-tab-h: 28.5px; --tpl-nph-tab-pull: -1.5px; --tpl-nph-band-top-line: inset 0 1px 0 var(--color-hairline); --tpl-nph-kpi-menu: 16px; --tpl-nph-viewer-margin: 12px 24px; --tpl-nph-note-pad: 14px 24px 0; --tpl-nph-search-w: 240px; --tpl-nph-editor-pull: -10px;
@@ -988,9 +993,9 @@
   --tpl-am-saved-w: 153px; --tpl-am-folder-w: 150px; --tpl-am-search-w: 240px;
   /* 一斉配信の詳細・予約したあと（cgiGB・pNiUk・F3X1Mo・Q28Gb・cdZBf・BeNtj）。src/v8/broadcast-detail が読む。 */
   --tpl-bd-head-pad: 20px 24px; --tpl-bd-head-gap: 14px; --tpl-bd-name-gap: 4px; --tpl-bd-title-size: var(--tpl-title-size); --tpl-bd-title-lh: var(--tpl-title-lh); --tpl-bd-badge-pad: 2px 8px; --tpl-bd-badge-gap: 5px; --tpl-bd-dot: 6px; --tpl-bd-badge-size: 12px; --tpl-bd-badge-lh: 18px;
-  --tpl-bd-meta-size: 13px; --tpl-bd-meta-lh: 20px; --tpl-bd-rail-pad-top: 8px; --tpl-bd-rail-gap: 8px; --tpl-bd-rail-step-gap: 5px; --tpl-bd-rail-mark: 18px; --tpl-bd-rail-size: 12px; --tpl-bd-rail-lh: 17px; --tpl-bd-rail-line: 20px; --tpl-bd-icon-btn: 36px;
+  --tpl-bd-meta-size: 13px; --tpl-bd-meta-lh: 20px; --tpl-bd-rail-pad-top: 8px; --tpl-bd-draft-steps-top: 0; --tpl-bd-rail-gap: 8px; --tpl-bd-rail-step-gap: 6px; --tpl-bd-rail-mark: 22px; --tpl-bd-rail-size: 13px; --tpl-bd-rail-lh: 20px; --tpl-bd-rail-line: 24px; --tpl-bd-icon-btn: 36px;
   --tpl-bd-conflict-wrap-pad: 0 24px 8px; --tpl-bd-conflict-pad: 12px 16px; --tpl-bd-conflict-gap: 12px; --tpl-bd-conflict-title-size: 14px; --tpl-bd-conflict-title-lh: 20px; --tpl-bd-conflict-desc-size: 13px; --tpl-bd-conflict-desc-lh: 19px; --tpl-bd-conflict-text-gap: 2px; --tpl-bd-conflict-icon: 18px;
-  --tpl-bd-tabs-pad: 0 24px; --tpl-bd-main-pad: 20px 28px; --tpl-bd-main-gap: 22px; --tpl-bd-side-width: 380px; --tpl-bd-side-pad: 20px 24px; --tpl-bd-side-gap: 16px; --tpl-bd-row-pad: 8px 0; --tpl-bd-row-label: 96px; --tpl-bd-row-size: 12px; --tpl-bd-row-lh: 17px;
+  --tpl-bd-tabs-pad: 0 24px; --tpl-bd-main-pad: 20px 28px; --tpl-bd-main-gap: 22px; --tpl-bd-side-width: 380px; --tpl-bd-side-pad: 16px 24px; --tpl-bd-side-gap: 16px; --tpl-bd-row-pad: 8px 0; --tpl-bd-row-label: 96px; --tpl-bd-row-size: 12px; --tpl-bd-row-lh: 17px;
   --tpl-bd-sec-size: 15px; --tpl-bd-sec-lh: 23px; --tpl-bd-sec-gap: 8px; --tpl-bd-link-size: 12px; --tpl-bd-link-lh: 18px; --tpl-bd-desc-size: 12px; --tpl-bd-desc-lh: 19px; --tpl-bd-note-size: 11px; --tpl-bd-note-lh: 18px;
   --tpl-bd-box-pad: 16px; --tpl-bd-box-gap: 12px; --tpl-bd-box-icon: 18px; --tpl-bd-box-title-size: 14px; --tpl-bd-box-title-lh: 20px; --tpl-bd-box-text-gap: 2px; --tpl-bd-soft-gap: 8px;
   /* 予約からの売上（X26oo）。app/booking/sales/sales-v8.module.css が読む。
@@ -1655,6 +1660,8 @@
   /* トークの吹き出し。届いた側（左・白）は左上、返す側（右・緑）は右上を小さく。 */
   --v8-line-bubble-in-radius: 4px 14px 14px 14px;
   --v8-line-bubble-out-radius: 14px 4px 14px 14px;
+  --v8-line-bubble-out: #a3e58c;
+  --v8-line-bubble-preview-w: 222px;
 }
 
 /*

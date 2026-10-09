@@ -1,16 +1,17 @@
 /**
  * R28: 判定順（Worker と同じ）を一覧側で扱うための小さな関数群。
  *
- * 判定順は `priority` の小さい順・同じなら作った順（Worker の ORDER BY と
- * 同じ）。順番は一覧で上下を入れ替えて決め、窓の中では数字を打たせない。
- * 入れ替えは隣り合う2件の数字の交換だけで行い、同点のときだけ動かす側を
- * 1ずらす。上下の端で詰まった同点のときだけ全件を振り直す。
+ * 個別ルールを共通ルールより先に、優先順位・キーワード・作成日時で評価する。
+ * 隣との入れ替えは、更新後の実行順が希望の順番になるか確かめる。
+ * 数字の交換や±1で同点の別の行を飛び越すときは、全体の順位を振り直す。
  */
 
 export interface OrderedRule {
   id: string
   priority: number
   createdAt: string
+  lineAccountId?: string | null
+  respondToAll?: boolean
 }
 
 /** Worker の受け付け範囲（`readPriority` と同じ）。 */
@@ -20,8 +21,16 @@ export const PRIORITY_MAX = 9999
 /** Worker の ORDER BY と同じ：小さいほど先・同じなら作った順。 */
 export function inEvaluationOrder<T extends OrderedRule>(rules: T[]): T[] {
   return [...rules].sort(
-    (a, b) => a.priority - b.priority || a.createdAt.localeCompare(b.createdAt),
+    compareEvaluationOrder,
   )
+}
+
+/** 実行側と同じ：個別・優先順位・キーワード・作った日時。 */
+export function compareEvaluationOrder(a: OrderedRule, b: OrderedRule): number {
+  return Number(!a.lineAccountId) - Number(!b.lineAccountId)
+    || a.priority - b.priority
+    || Number(Boolean(a.respondToAll)) - Number(Boolean(b.respondToAll))
+    || a.createdAt.localeCompare(b.createdAt)
 }
 
 export interface PriorityUpdate {
@@ -45,16 +54,23 @@ export function movePriorityUpdates(
   if (index < 0 || nextIndex < 0 || nextIndex >= ordered.length) return null
   const current = ordered[index]
   const neighbor = ordered[nextIndex]
+  if (Boolean(current.lineAccountId) !== Boolean(neighbor.lineAccountId)) return null
+  const desired = ordered.map(rule => rule.id)
+  ;[desired[index], desired[nextIndex]] = [desired[nextIndex], desired[index]]
   if (current.priority !== neighbor.priority) {
-    return [
-      { id: current.id, priority: neighbor.priority },
-      { id: neighbor.id, priority: current.priority },
-    ]
+    const swaps = [{ id: current.id, priority: neighbor.priority }, { id: neighbor.id, priority: current.priority }]
+    const priorities = new Map(swaps.map(update => [update.id, update.priority]))
+    if (inEvaluationOrder(ordered.map(rule => ({...rule, priority: priorities.get(rule.id) ?? rule.priority})))
+      .every((rule, position) => rule.id === desired[position])) return swaps
   }
   const moved = current.priority + delta
-  if (moved >= PRIORITY_MIN && moved <= PRIORITY_MAX) {
-    return [{ id: current.id, priority: moved }]
+  if (current.priority === neighbor.priority && moved >= PRIORITY_MIN && moved <= PRIORITY_MAX) {
+    const trial = ordered.map(rule => rule.id === id ? { ...rule, priority: moved } : rule)
+    if (inEvaluationOrder(trial).every((rule, position) => rule.id === desired[position])) {
+      return [{ id: current.id, priority: moved }]
+    }
   }
+  // 同点が3件以上あると±1だけでは隣を越えてしまう。実際の再読込順と照合する。
   // 端で詰まった同点：順序だけ変えて全件を振り直す（変わる行だけ返す）。
   const reordered = [...ordered]
   const [picked] = reordered.splice(index, 1)

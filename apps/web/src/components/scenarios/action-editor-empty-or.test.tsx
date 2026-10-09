@@ -46,26 +46,30 @@ vi.mock('./scenario-reference-data', () => ({
   },
 }))
 
-vi.mock('@/lib/api', () => ({
-  api: {
-    scenarios: {
-      list: async () => ({ success: true as const, data: [] }),
-      actions: {
-        list: async () => ({ success: true as const, data: [SEED_ACTION] }),
-        update: async (scenarioId: string, actionId: string, patch: unknown) => {
-          net.updates.push({ scenarioId, actionId, patch })
-          return { success: true as const, data: {} }
+vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    api: {
+      scenarios: {
+        list: async () => ({ success: true as const, data: [] }),
+        actions: {
+          list: async () => ({ success: true as const, data: [SEED_ACTION] }),
+          update: async (scenarioId: string, actionId: string, patch: unknown) => {
+            net.updates.push({ scenarioId, actionId, patch })
+            return { success: true as const, data: {} }
+          },
         },
+        getDraft: async () => ({ success: true as const, data: null }),
+        saveDraft: async () => ({ success: true as const, data: { version: 1 } }),
       },
-      getDraft: async () => ({ success: true as const, data: null }),
-      saveDraft: async () => ({ success: true as const, data: { version: 1 } }),
+      tags: { list: async () => ({ success: true as const, data: [] }) },
+      friendFields: { list: async () => ({ success: true as const, data: [] }) },
+      supportMarks: { list: async () => ({ success: true as const, data: [] }) },
+      segments: { count: async () => ({ success: true as const, data: { count: 0 } }) },
     },
-    tags: { list: async () => ({ success: true as const, data: [] }) },
-    friendFields: { list: async () => ({ success: true as const, data: [] }) },
-    supportMarks: { list: async () => ({ success: true as const, data: [] }) },
-    segments: { count: async () => ({ success: true as const, data: { count: 0 } }) },
-  },
-}))
+  }
+})
 
 afterEach(() => {
   cleanup()

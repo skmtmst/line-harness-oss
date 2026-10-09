@@ -147,3 +147,4 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+[data-theme='v8'] .notice[data-appearance='soft'] { border-color: transparent; }

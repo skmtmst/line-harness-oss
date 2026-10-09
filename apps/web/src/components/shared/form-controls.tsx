@@ -53,6 +53,8 @@ export function Field({
   labelSize = 'standard',
   note,
   error,
+  errorFrame = false,
+  spacing,
   help,
   helpLabel,
   helpHref,
@@ -76,6 +78,10 @@ export function Field({
   labelSize?: 'standard' | 'compact'
   note?: ReactNode
   error?: ReactNode
+  /** 複合入力を1つの欄として確かめる画面だけ、誤りの枠を付ける。 */
+  errorFrame?: boolean
+  /** カード内の入力と操作を、型の段の間隔で並べる。 */
+  spacing?: 'section'
   /**
    * 言葉の意味・単位・いつ時点の値か。ラベルのすぐ右の「？」へ入れる
    * （★V7・§2-1b）。必須の印・入力の直し方・失敗は入れない。
@@ -123,6 +129,7 @@ export function Field({
       data-label-size={labelSize}
       data-grow={grow || undefined}
       data-density={density}
+      data-spacing={spacing}
       data-field-quiet={quiet && error ? '' : undefined}
       onInput={error ? () => { if (!quiet) setQuiet(true) } : undefined}
       onBlur={quiet ? () => setQuiet(false) : undefined}
@@ -144,7 +151,7 @@ export function Field({
           </HelpTip>
         ) : null}
       </div> : null}
-      {children}
+      {errorFrame ? <div className={styles.errorFrame} data-invalid={Boolean(shownError) || undefined} role="group" aria-invalid={Boolean(shownError) || undefined} aria-describedby={describedBy}>{children}</div> : children}
       {shownError ? <p id={errorId} className={styles.error} role="alert">{shownError}</p> : null}
       {showNote ? <p id={noteId} className={styles.note}>{note}</p> : null}
       {count ? (

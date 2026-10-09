@@ -85,6 +85,6 @@ describe('broadcasts/reserved の対象未指定', () => {
     apiMocks.get.mockResolvedValue({ success: true, data: broadcast })
     render(<Page />)
     await flush()
-    expect(await screen.findByText('8月キャンペーンのお知らせ')).toBeTruthy()
+    expect(await screen.findAllByText('8月キャンペーンのお知らせ')).toBeTruthy()
   })
 })

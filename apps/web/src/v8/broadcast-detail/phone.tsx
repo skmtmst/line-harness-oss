@@ -31,7 +31,7 @@ export default function BroadcastPhone({
 }) {
   const initial = accountName.trim().charAt(0) || '然'
   const single = !(broadcast.messageBubbles?.length)
-  const plainText = broadcast.messageType === 'text' && single
+  const plainText = broadcast.messageType === 'text' && single && !broadcast.messageOptions?.buttons?.length
   /* 写真1枚は絵の「画像」（200×200・角丸16）。URL が読めないときは枠と「写真」だけ。 */
   const photo = broadcast.messageType === 'image' && single ? { url: imageUrlOf(broadcast.messageContent) } : null
   return (

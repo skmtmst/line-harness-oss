@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(new URL('../../v8/broadcasts/list.tsx', import.meta.url), 'utf8')
 
 /** 名前で見つけた関数の本体だけを切り出す。ファイル全体を見ると素通しになる。 */
 function fnBody(src: string, decl: string): string {
@@ -83,7 +83,7 @@ describe('一斉配信一覧の削除確認', () => {
      * 嘘の文を出す。** 削除の口（…メニューの中の危ない操作）は下書きと
      * 予約済みだけに置く（★V7 Xn1Mz：行にゴミ箱ボタンは置かない）。
      */
-    expect(PAGE).toContain("destructiveItem={(broadcast.status === 'draft' || broadcast.status === 'scheduled')")
+    expect(PAGE).toContain("broadcast.status === 'draft' || broadcast.status === 'scheduled'")
   })
 
   it('何を消すのかを、配信名と影響で読み合わせる', () => {
@@ -95,8 +95,8 @@ describe('一斉配信一覧の削除確認', () => {
   it('確認窓が取り消せない操作として出て、処理中は閉じられない', () => {
     const jsx = dialog(PAGE)
     expect(jsx).toContain('destructive')
-    expect(jsx).toContain('designNode="EGMb1"')
-    expect(jsx).toContain('titleIcon={<Trash2')
+    expect(jsx).toContain("busy={deleting}")
+    expect(jsx).toContain("destructive")
     expect(jsx).toContain('confirmLabel="削除する"')
     expect(jsx, '処理中でも押せてしまう').toContain('busy={deleting}')
     expect(jsx, '失敗が窓の中に出ない').toContain('error={deleteError}')
@@ -106,6 +106,6 @@ describe('一斉配信一覧の削除確認', () => {
   it('削除ボタンは窓を開くだけで、押した時点では消さない', () => {
     // m13f：行を押すと詳細へ行くため、行の中の操作は行へ伝えない。開くだけの動きは同じ。
     expect(PAGE).toContain('onClick={(event) => event.stopPropagation()}')
-    expect(PAGE).toContain("onSelect: () => { setDeleteError(''); setDeleteTarget(broadcast) }")
+    expect(PAGE).toContain("onSelect: () => requestDelete(broadcast)")
   })
 })

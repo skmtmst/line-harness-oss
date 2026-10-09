@@ -243,6 +243,7 @@
   .detailColumnAside[data-expanded] { display: block; }
 }
 
+:global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-spacing='compact'] > .steps { margin-top: var(--tpl-steps-compact-top-gap); }
 /* ページが畳まれても、窓の中のフォルダは窓の寸法で並べる。 */
 :global([data-theme='v8']) .listBody[data-dialog-layout] .folders { display: flex; }
 :global([data-theme='v8']) .listBody[data-dialog-layout] .collapsedFolders { display: none; }

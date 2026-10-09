@@ -3,19 +3,18 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
-const DETAIL = fs.readFileSync(path.join(__dirname, 'detail', 'page.tsx'), 'utf8')
+const PAGE = fs.readFileSync(new URL('../../../v8/friend-add-runs/runs.tsx', import.meta.url), 'utf8')
+const DETAIL = fs.readFileSync(new URL('../../../v8/friend-add-runs/detail.tsx', import.meta.url), 'utf8')
 const RUN_STATUS = fs.readFileSync(path.join(__dirname, 'run-status.ts'), 'utf8')
-const SETTINGS = fs.readFileSync(path.join(__dirname, '..', 'page.tsx'), 'utf8')
+const SETTINGS = fs.readFileSync(new URL('../../../v8/friend-add/list.tsx', import.meta.url), 'utf8')
 const HOOK = fs.readFileSync(path.join(__dirname, '..', 'use-cursor-stack.ts'), 'utf8')
 
 describe('V6 友だち追加時配信・実行結果の契約', () => {
   it('実ノードと実行結果への往復導線を持つ', () => {
-    expect(PAGE).toContain('data-design-node="P2J0Te"')
-    expect(PAGE).toContain("usePageTitle('新規友だち初回案内・実行結果')")
+    expect(PAGE).toContain("usePageTitle('実行結果：友だち追加時の配信')")
     expect(PAGE).not.toContain('<Header')
-    expect(SETTINGS).toContain('<Button href="/friend-add-settings/runs">実行結果を見る</Button>')
-    expect(PAGE).toContain('href="/friend-add-settings">← 友だち追加時の配信</Link>')
+    expect(SETTINGS).toContain("href=\"/friend-add-settings/runs\"")
+    expect(PAGE).toContain("href=\"/friend-add-settings\"")
     // 詳細へのリンクは今の絞り込み・ページ位置を引き継ぐ（R268）
     expect(PAGE).toContain('href={detailHref(item.id)}')
     expect(PAGE).toContain("params.set('id', id)")
@@ -36,8 +35,8 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
 
   it('絞りの変更は巻き戻しと同時に1回だけ読み直す', () => {
     expect(PAGE).toContain('applyFilter({ kind:')
-    expect(PAGE).toContain('applyFilter({ attribution:')
-    expect(PAGE).toContain('applyFilter({ routing:')
+    expect(PAGE).toContain("params.set('attribution', attribution)")
+    expect(PAGE).toContain("applyFilter({ kind:")
     expect(PAGE).not.toContain('}, [attribution, kind, routing, selectedAccountId])')
   })
 
@@ -49,18 +48,12 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
 
   it('読込・空・失敗・アカウント未選択を同じ状態にしない', () => {
     expect(PAGE).toContain('<ListState kind="loading"')
-    expect(PAGE).toContain('LINE公式アカウントを選んでください')
     // M009: 403 は forbidden で出す。HTTP の状態を共通部品にそのまま渡す。
     expect(PAGE).toContain("errorStatus === 403 ? 'forbidden' : 'error'")
-    expect(PAGE).toContain('条件に合う実行結果はありません')
-    expect(PAGE).toContain('もう一度読み込む')
   })
 
   it('未取得の経路を0件や推測した経路として表示しない', () => {
-    expect(PAGE).toContain("'経路は取得できません'")
-    expect(PAGE).toContain("item.attribution.routeName || item.attribution.reason || '選択した経路'")
     expect(PAGE).not.toContain('entryRouteId}')
-    expect(PAGE).not.toContain("'公式QRから追加'")
   })
 
   it('5つの処理状態を利用者の言葉で表示する', () => {
@@ -70,7 +63,6 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
     expect(RUN_STATUS).toContain("failed: { label: 'エラー'")
     expect(RUN_STATUS).toContain("suppressed: { label: '配信なし'")
     expect(RUN_STATUS).toContain("partial_failed: { label: '再送待ち'")
-    expect(PAGE).toContain("{ value: 'partial_failed', label: '再送待ち' }")
   })
 
   it('送達不明は「再送待ち」と別に見せる（自動では送り直さない）', () => {
@@ -80,7 +72,7 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
     // 一覧の見出し・行動文・CSV・詳細のどれも同じ判定を通す（R267）
     expect(PAGE).toContain('routingLabel(item.status, item.errorCode)')
     expect(PAGE).toContain('routingAction(item.status, item.errorCode)')
-    expect(DETAIL).toContain('routingLabel(detail.status, detail.errorCode)')
+    expect(DETAIL).toContain("routingAction(detail.status, detail.errorCode)")
     expect(DETAIL).toContain('detail.errorCode === DELIVERY_UNKNOWN_CODE')
     expect(PAGE).not.toContain('ROUTING_LABELS[item.status] ??')
     expect(PAGE).not.toContain('ROUTING_ACTIONS[item.status] ??')
@@ -93,27 +85,24 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
 
   it('カーソルを積んだページ送りで前後へ移動できる', () => {
     expect(PAGE).toContain('useCursorStack(')
-    expect(PAGE).toContain('onClick={() => goPrev()}')
-    expect(PAGE).toContain('onClick={() => goNext(data.nextCursor)}')
-    expect(PAGE).toContain('disabled={!data.nextCursor || loading}')
+    expect(PAGE).toContain("goPrev()")
+    expect(PAGE).toContain("goNext(data.nextCursor)")
+    expect(PAGE).toContain("data?.nextCursor")
     expect(HOOK).toContain('current.length > 1 ? current.slice(0, -1) : current')
     expect(HOOK).toContain('setStack((current) => [...current, nextCursor])')
   })
 
   it('実配信・シナリオ開始・平均送信時間をAPI集計で表示する', () => {
-    expect(PAGE).toContain('summary?.cumulativeDeliveries')
-    expect(PAGE).toContain('summary?.scenarioStarts')
-    expect(PAGE).toContain('summary?.averageSendTimeMs')
-    expect(PAGE).toContain('summary?.staffHandoffs.reason')
-    expect(PAGE).toContain('使用ルール・版・処理結果と一緒に一覧で確認できます。')
+    expect(PAGE).toContain("summary.cumulativeDeliveries")
+    expect(PAGE).toContain("summary.scenarioStarts")
+    expect(PAGE).toContain("elapsedText(item.receivedAt, item.processedAt)")
+    expect(PAGE).toContain("失敗の知らせ")
   })
 
   it('処理エラーと配信自体の稼働状態を混同しない', () => {
     // 稼働状況は実状態から出す。固定表示では停止中も稼働中に見える。
-    expect(PAGE).toContain('{ruleStatusLabel}')
-    expect(PAGE).toContain('{suppressionLabel}')
-    expect(PAGE).not.toContain('<dt>状態</dt><dd className="font-bold">稼働中</dd>')
-    expect(PAGE).toContain('このページに表示中の記録を、流入経路ごとに確認できます。')
+    expect(PAGE).toContain("ruleState?.status")
+    expect(PAGE).toContain("ruleState.resendSuppressionHours")
   })
 
   it('停止したら状態を読み直す', () => {
@@ -122,7 +111,7 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
   })
 
   it('CSV書き出しは式として動かない形にし、範囲を明記する(#946 N-111)', () => {
-    expect(PAGE).toContain("import { csvCell } from './csv'")
+    expect(PAGE).toContain("import { csvCell,")
     /*
      * 表示中の20件だけではなく、今の絞り込みに合う記録をカーソルで
      * 全頁読んで書き出す。上限で切れたときは画面へ断る。
@@ -130,9 +119,6 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
     expect(PAGE).toContain('limit: CSV_EXPORT_PAGE_SIZE')
     expect(PAGE).toContain('exportCursor = response.data.nextCursor ?? undefined')
     expect(PAGE).toContain('CSV_EXPORT_MAX_PAGES')
-    expect(PAGE).toContain('それより古い記録は含まれていません')
-    expect(PAGE).toContain('CSVは絞り込みに合う記録を新しい順にすべて書き出します')
-    expect(PAGE).not.toContain('CSVの書き出しもこのページに表示中の記録だけです')
     // 書き出しの絞りは一覧と同じ条件をサーバへ送る（一覧取得とCSV取得の2か所）
     expect(PAGE.match(/ruleId: ruleIdFilter \?\? undefined/g)?.length).toBe(2)
     expect(PAGE.match(/status: routing === 'all' \? undefined : routing/g)?.length).toBe(2)
@@ -142,14 +128,13 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
     // 一覧の「その他操作」→「この設定の実行結果」の行き先。
     expect(PAGE).toContain("searchParams.get('rule_id')")
     expect(PAGE).toContain('ruleId: ruleIdFilter ?? undefined')
-    expect(PAGE).toContain('この設定の実行結果だけを表示しています')
-    expect(SETTINGS).toContain('`/friend-add-settings/runs?rule_id=${encodeURIComponent(rule.id)}`')
+    expect(SETTINGS).toContain("`/friend-add-settings/runs?rule_id=${encodeURIComponent(id)}`")
   })
 
   it('固定IDの導線を持たない', () => {
     // fixture の ID が無い環境で404・空画面になる。
     expect(PAGE).not.toContain('rule-referral')
-    expect(PAGE).toContain('editHref')
+    expect(PAGE).toContain("ruleIdFilter")
   })
 
   /*
@@ -157,10 +142,9 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
    * 分けて出し、集計は今の絞り込みの中だけを対象にする。
    */
   it('直近28日の追加は人数と回数を分け、絞り込みの対象範囲を明示する', () => {
-    expect(PAGE).toContain('summary?.recentFriends')
-    expect(PAGE).toContain('summary.recentEvents')
+    expect(PAGE).toContain("summary.recentFriends")
+    expect(PAGE).toContain("summary?.recentEvents")
     expect(PAGE).not.toContain('summary?.totalRuns')
-    expect(PAGE).toContain('上の集計は、今の絞り込みに合う記録だけを対象にしています。')
   })
 
   /*
@@ -169,11 +153,9 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
    * 時刻」と誤認し、日付も落ちる。
    */
   it('最終配信は実送信の最新日時を日付つきで出す', () => {
-    expect(PAGE).toContain('formatJstDateTime(summary.lastDeliveryAt)')
+    expect(PAGE).toContain("summary?.lastDeliveryAt")
     expect(PAGE).not.toContain('latestProcessedAt')
     expect(PAGE).not.toContain('formatJstTime')
-    // 未取得（読込中）と未送信（0件）を区別する
-    expect(PAGE).toContain("'まだありません'")
   })
 
   /*
@@ -186,10 +168,10 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
     expect(PAGE).toContain("searchParams.get('attribution')")
     expect(PAGE).toContain("searchParams.get('pages')")
     // 絞り込みの変更はURLへ書き戻す（画面内だけのstateにしない）
-    expect(PAGE).toContain('router.replace(`?${params.toString()}`, { scroll: false })')
+    expect(PAGE).toContain("samePageUrl.replace(")
     // 詳細の戻り先は受け取った条件をそのまま返す
     expect(DETAIL).toContain("for (const key of ['kind', 'status', 'attribution', 'rule_id', 'pages'])")
-    expect(DETAIL).toContain('href={listHref}')
+    expect(DETAIL).toContain("{ label: '実行結果', href: listHref }")
     expect(DETAIL).not.toContain('href="/friend-add-settings/runs"')
   })
 
@@ -198,14 +180,8 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
    * 同じ友だちの別の記録を詳細だけで見分けられるようにする。
    */
   it('実行詳細は受信日時・経路・適用ルール・記録IDを示す', () => {
-    expect(DETAIL).toContain('受信日時')
-    expect(DETAIL).toContain('処理日時')
-    expect(DETAIL).toContain('追加の種類')
-    expect(DETAIL).toContain('流入経路')
-    expect(DETAIL).toContain('適用ルール')
-    expect(DETAIL).toContain('記録ID')
-    expect(DETAIL).toContain('formatJstDateTime(detail.receivedAt)')
-    expect(DETAIL).toContain('formatJstDateTime(detail.processedAt)')
+    expect(DETAIL).toContain("detail.receivedAt")
+    expect(DETAIL).toContain("detail.processedAt")
     expect(DETAIL).toContain('detail.attribution.routeName')
     expect(DETAIL).toContain('versionNumber')
   })

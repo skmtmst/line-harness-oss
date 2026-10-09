@@ -86,7 +86,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  min-width: var(--tpl-np-role-row-w);
   gap: var(--tpl-hb2-op-chip-gap);
   margin: 0;
   color: var(--color-ink-secondary);

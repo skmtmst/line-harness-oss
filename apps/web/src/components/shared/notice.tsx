@@ -50,6 +50,8 @@ export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
   heading?: ReactNode
   /** カード内などの小さな帯。本文を1行に省略し、title で全文を渡す。 */
   compact?: boolean
+  /** 枠線のない注意帯を描く板だけで指定する。既定の帯は変えない。 */
+  appearance?: 'soft'
   /** 本文（1〜2文）。`children` があるときはそちらが勝つ。 */
   message?: string
   children?: ReactNode
@@ -85,6 +87,7 @@ export default function Notice({
   density,
   heading,
   compact = false,
+  appearance,
   message,
   children,
   action,
@@ -109,6 +112,7 @@ export default function Notice({
       // 指定がないときだけ、種類から既定（危険＝alert、ほかは note）を決める。
       role={role ?? (canonical === 'danger' ? 'alert' : 'note')}
       data-compact={compact || undefined}
+      data-appearance={appearance}
       data-design-part="notice"
       data-density={density}
       data-design-node={node}

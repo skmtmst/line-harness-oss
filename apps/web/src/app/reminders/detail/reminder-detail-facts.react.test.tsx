@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -6,6 +7,7 @@ import type { ReminderDeliveryRunsResponse } from '@/lib/api'
 
 const apiMock = vi.hoisted(() => ({
   runs: vi.fn(),
+  get: vi.fn(),
   retryRun: vi.fn(),
   update: vi.fn(),
   registrantsList: vi.fn(),
@@ -23,6 +25,7 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAcco
 vi.mock('@/lib/api', () => ({
   api: { reminders: {
     runs: apiMock.runs,
+    get: apiMock.get,
     retryRun: apiMock.retryRun,
     update: apiMock.update,
     registrants: {
@@ -59,6 +62,7 @@ const RESPONSE = (overrides: Partial<ReminderDeliveryRunsResponse['reminder']> =
 })
 
 beforeEach(() => {
+  apiMock.get.mockResolvedValue({ success: true, data: { steps: [], deliveryMode: 'countdown', triggerType: 'manual' } })
   apiMock.registrantsList.mockResolvedValue({ success: true, data: [] })
   apiMock.update.mockResolvedValue({ success: true, data: {} })
 })
@@ -69,9 +73,9 @@ describe('リマインダ詳細の停止予定', () => {
   it('公開版の停止条件を実値で出す', async () => {
     apiMock.runs.mockResolvedValue({ success: true, data: RESPONSE() })
     render(<ReminderRunsPage />)
-    await waitFor(() => expect(screen.getByText('基準日から7日後に自動終了・ブロックで即時停止')).toBeTruthy())
+    await waitFor(() => expect(screen.getByTitle('基準日から7日後に自動終了・ブロックで即時停止')).toBeTruthy())
     // 「停止予定」行が固定の「—」でないことを、実値の表示で確認する。
-    expect(screen.getByText('停止予定')).toBeTruthy()
+    expect(screen.getByText('状態')).toBeTruthy()
   })
 
   it('停止条件がすべて無効なら「自動停止なし」、公開版が無ければ「未設定」と区別する', async () => {
@@ -80,22 +84,22 @@ describe('リマインダ詳細の停止予定', () => {
       data: RESPONSE({ stopConditions: { bookingCancelled: false, supportMarkCompleted: false, daysAfterTarget: null, friendBlocked: false } }),
     })
     const { unmount } = render(<ReminderRunsPage />)
-    await waitFor(() => expect(screen.getByText('自動停止なし')).toBeTruthy())
+    await waitFor(() => expect(screen.getByTitle('自動停止なし')).toBeTruthy())
     unmount()
 
     apiMock.runs.mockResolvedValue({ success: true, data: RESPONSE({ stopConditions: null }) })
     render(<ReminderRunsPage />)
-    await waitFor(() => expect(screen.getByText('未設定')).toBeTruthy())
+    await waitFor(() => expect(screen.getByTitle('未取得')).toBeTruthy())
   })
 
-  it('停止済みのリマインダは「停止済み」を出し、再開ボタンが実際にAPIを呼ぶ', async () => {
+  it('停止中のリマインダは「停止中」を出し、再開ボタンが実際にAPIを呼ぶ', async () => {
     apiMock.runs.mockResolvedValue({
       success: true,
       data: RESPONSE({ isActive: false, lifecycleStatus: 'stopped' }),
     })
     render(<ReminderRunsPage />)
-    await waitFor(() => expect(screen.getByText('停止済み')).toBeTruthy())
-    const resume = screen.getByText('リマインダを再開')
+    await waitFor(() => expect(screen.getByText('停止中')).toBeTruthy())
+    const resume = screen.getByText('再開する')
     fireEvent.click(resume)
     await waitFor(() => expect(apiMock.update).toHaveBeenCalledWith('rem-1', { isActive: true }))
   })
@@ -103,8 +107,9 @@ describe('リマインダ詳細の停止予定', () => {
   it('稼働中は一時停止ボタンが実際にAPIを呼ぶ', async () => {
     apiMock.runs.mockResolvedValue({ success: true, data: RESPONSE() })
     render(<ReminderRunsPage />)
-    const pause = await screen.findByText('リマインダを一時停止')
+    const pause = await screen.findByText('一時停止する')
     fireEvent.click(pause)
+    fireEvent.click(screen.getAllByRole('button', { name: '一時停止する' }).at(-1)!)
     await waitFor(() => expect(apiMock.update).toHaveBeenCalledWith('rem-1', { isActive: false }))
   })
 
@@ -116,7 +121,7 @@ describe('リマインダ詳細の停止予定', () => {
     render(<ReminderRunsPage />)
     // 稼働状況の「状態」と追従バーの状態の2か所に「下書き」と出る。
     await waitFor(() => expect(screen.getAllByText('下書き').length).toBeGreaterThan(0))
-    expect(screen.queryByText('リマインダを再開')).toBeNull()
-    expect(screen.getByText('リマインダの設定を編集')).toBeTruthy()
+    expect(screen.queryByText('再開する')).toBeNull()
+    expect(screen.getByText('編集を続ける')).toBeTruthy()
   })
 })

@@ -4,11 +4,8 @@ import { describe, expect, it } from 'vitest'
 
 const APP = resolve(import.meta.dirname, '../../app')
 const GRID_PAGES = [
-  'auto-replies/page.tsx',
-  'broadcasts/page.tsx',
   'contents/page.tsx',
   'contents/vars/page.tsx',
-  'friend-add-settings/page.tsx',
   'rich-menus/page.tsx',
 ]
 /* 完全切り替え：v7 page は捨て、V8 の list-v8 を見る（幅は CSS の `.split` で付ける）。 */
@@ -24,6 +21,9 @@ const V8_FOLDER_PAGES = [
 const SRC_V8 = resolve(import.meta.dirname, '../../v8')
 const NEW_V8_FOLDER_PAGES = [
   'scenarios/list.tsx',
+  'auto-replies/list.tsx',
+  'broadcasts/list.tsx',
+  'friend-add/list.tsx',
   'forms/list.tsx',
 ]
 

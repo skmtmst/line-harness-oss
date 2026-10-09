@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const page = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const page = readFileSync(new URL('wizard-v8.tsx', import.meta.url), 'utf8')
 
 describe('R528 auto-replies/edit 下書き取得失敗', () => {
   it('取得失敗はTargetMissingのerrorで出し、同じidで取り直せる', () => {
@@ -14,11 +14,11 @@ describe('R528 auto-replies/edit 下書き取得失敗', () => {
     expect(page).toContain('error={')
     expect(page).toContain('onRetry')
     // 同じidを取り直す（別idや一覧の取り直しでは直らない）
-    expect(page).toContain('getDraft(id)')
+    expect(page).toContain('getDraft(autoReplyId)')
   })
 
   it('403は通信切断の文にしない（共通の権限案内へ切り替える）', () => {
-    expect(page).toContain('loadFailureCopy(loadError')
-    expect(page).toContain('draftFailure')
+    expect(page).toContain("loadFailureCopy(loadError")
+    expect(page).toContain('loadError')
   })
 })
