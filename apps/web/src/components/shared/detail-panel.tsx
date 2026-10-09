@@ -112,7 +112,7 @@ export default function DetailPanel({
   const panel = (
     <aside
       ref={panelRef}
-      className={styles.panel} style={{ '--detail-panel-width': `${DETAIL_PANEL_WIDTH}px` } as React.CSSProperties}
+      className={styles.panel} style={{ width: DETAIL_PANEL_WIDTH }}
       role="dialog"
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
