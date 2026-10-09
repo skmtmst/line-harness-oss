@@ -1709,7 +1709,7 @@ export default function FormsListV8() {
         tabs={viewerBand}
         stats={reviewMode ? undefined : (
           /* 数の帯 4つ。管理者確認は別のアカウント群の数なので出さない。 */
-          <KpiBand data-design="KPIs" className={styles.kpiStrip}>
+          <KpiBand data-design="KPIs">
             {kpis.map((kpi) => (
               <KpiCard
                 key={kpi.key}

@@ -118,7 +118,7 @@ export interface BandCell {
 /** 数の帯（タブの直下・4つのマス）。どのタブも同じ形。 */
 export function AutomationBand({ cells, label }: { cells: BandCell[]; label: string }) {
   return (
-    <div className={styles.stats}>
+    <div>
       <KpiBand aria-label={label} data-design="KPIs">
         {cells.map((cell) => (
           <KpiCard

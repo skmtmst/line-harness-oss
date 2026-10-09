@@ -25,7 +25,8 @@
 :global([data-theme='v8']) .heading[data-heading-size='compact'] .description { font-size: var(--tpl-desc-size); line-height: var(--tpl-compact-desc-lh); }
 :global([data-theme='v8']) .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; flex-shrink: 0; }
 :global([data-theme='v8']) .tabs { padding: 0 24px; flex-shrink: 0; }
-:global([data-theme='v8']) .stats { border-block: 1px solid var(--color-hairline); flex-shrink: 0; }
+/* 境目は帯が持つ。包みは同じ線を重ねない。 */
+:global([data-theme='v8']) .stats { border: 0; flex-shrink: 0; }
 :global([data-theme='v8']) .notice { padding: 0 24px 16px; }
 :global([data-theme='v8']) .section { padding: var(--tpl-section-pad); min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-section-gap); border-bottom: 1px solid var(--color-hairline); }
 :global([data-theme='v8']) .split { display: flex; flex: 1; min-width: 0; }
@@ -107,7 +108,10 @@
 :global([data-theme='v8']) .dashboardRow[data-row='inbox'] { min-height: 349px; }
 :global([data-theme='v8']) .dashboardRow[data-row='link'] { min-height: 172px; }
 
-:global([data-theme='v8']) [data-page-template='list'] .stats { border-top: 0; }
+/* タブの下線を残し、その直後の数の帯の上線だけ消す。
+   ListPageBody 内と、タブ直後に帯を置く一覧の両方に適用する。 */
+:global([data-theme='v8']) .frame[data-page-template='list'] > .tabs ~ .listBody > .stats :global([data-kpi-strip][data-kpi-presentation='band']),
+:global([data-theme='v8']) .frame[data-page-template='list'] > :has(:global([role='tablist'])) + :global([data-kpi-strip][data-kpi-presentation='band']) { border-top: 0; }
 
 :global([data-theme='v8']) .heading[data-heading-size='large'] .title { font-size: var(--tpl-large-title-size); line-height: var(--tpl-large-title-lh); }
 :global([data-theme='v8']) [data-page-template='create'] .title { font-size: var(--tpl-create-title-size); line-height: var(--tpl-create-title-lh); }

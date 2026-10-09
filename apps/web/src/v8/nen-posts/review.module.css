@@ -34,12 +34,7 @@
   color: var(--color-action);
 }
 
-/* 数の帯（絵：タブの直下・高さ115）。上の線は場所を取らない内側の影で引く。 */
-:global([data-theme='v8']) .stats :global([data-kpi-strip][data-kpi-presentation='band']) {
-  border-block-width: 0;
-  box-shadow: var(--tpl-nm-band-top-line);
-}
-
+/* 数の帯の境目は共通の型と帯に任せる。画面側で線・影を重ねない。 */
 /* 数の帯の題（絵：12/500・行18）。共通の帯は 13 なので、この画面の帯だけ詰める。 */
 .stats :global([data-kpi-presentation='band'] > [data-design-version] > :first-child > p) {
   font-size: var(--tpl-nm-row-size);

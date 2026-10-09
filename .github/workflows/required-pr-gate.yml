@@ -645,6 +645,14 @@ jobs:
       - name: All admin page titles are 22px / 700 / 32px at 1440
         if: steps.scope.outputs.run == 'true'
         run: node scripts/visual-qa/title-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/title-audit.tsv
+      - name: List boundaries are one hairline and toolbar controls do not overlap
+        if: steps.scope.outputs.run == 'true'
+        env:
+          VISUAL_QA_BASE: http://127.0.0.1:4310
+          LIST_BOUNDARIES_OUT: /tmp/v8-guard/list-boundaries
+        run: |
+          node scripts/visual-qa/list-boundaries-regression.mjs --self-test
+          node scripts/visual-qa/list-boundaries-regression.mjs
       # 速さ予算（2026-10-04 オーナー採用「1」、同日司令塔決定で判定を変更）。
       # 主要10画面を V8 で開き、1画面3回測った真ん中で比べる。
       # 落とすのは悪化だけ：時間は基準より20%、JS は1KB超の増加。
