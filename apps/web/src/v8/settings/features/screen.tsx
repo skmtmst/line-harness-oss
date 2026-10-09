@@ -492,7 +492,7 @@ export default function FeatureSettingsScreen() {
         <ListState
           kind="error"
           title={error || '設定を読み込めませんでした'}
-          action={<Button type="button" variant="secondary" onClick={() => void load()}>もう一度試す</Button>}
+          onRetry={() => void load()}
         />
       ) : (
         <>

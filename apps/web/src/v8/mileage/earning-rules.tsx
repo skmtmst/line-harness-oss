@@ -871,7 +871,7 @@ export default function EarningRulesTab() {
     <ListState kind="error"
       title="たまる決めごとを読み込めませんでした"
       description="数の帯は「—」にしています。道具はそのまま使えます。"
-      action={<Button type="button" onClick={() => void load()}>もう一度試す</Button>}
+      onRetry={() => void load()}
     />
   ) : visible.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */

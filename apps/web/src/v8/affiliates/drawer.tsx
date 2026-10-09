@@ -350,7 +350,7 @@ export default function AffiliateDrawer({
       kind="error"
       title="この期間の集計を読み込めませんでした"
       description="選んだ期間にこの人の成果が1件も無いか、集計が読めませんでした。リンクと成果の記録は消えていません。"
-      action={<Button type="button" onClick={reloadAll}>もう一度試す</Button>}
+      onRetry={reloadAll}
     />
   ) : (
     <>
@@ -400,7 +400,7 @@ export default function AffiliateDrawer({
       kind="error"
       title="紹介で増えた友だちを読み込めませんでした"
       description="記録は消えていません。"
-      action={<Button type="button" onClick={() => { void loadJourneys(affiliate.id, genRef.current) }}>もう一度試す</Button>}
+      onRetry={() => { void loadJourneys(affiliate.id, genRef.current) }}
     />
   ) : journeys.length === 0 ? (
     <p className={styles.empty}>この人の紹介で増えた友だちはまだいません。</p>

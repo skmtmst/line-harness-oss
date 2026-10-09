@@ -263,7 +263,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
 
   let notificationBody: ReactNode
   if (loadState === 'loading') notificationBody = <ListState kind="loading" />
-  else if (loadState === 'error') notificationBody = <ListState kind="error" title="通知の設定を読み込めませんでした" description="通信を確認して、もう一度読み込んでください。" action={<Button onClick={() => void load()}>もう一度読み込む</Button>} />
+  else if (loadState === 'error') notificationBody = <ListState kind="error" title="通知の設定を読み込めませんでした" description="通信を確認して、もう一度読み込んでください。" onRetry={() => void load()} />
   else if (!settings) {
     notificationBody = <ListState kind="empty" title="通知の設定がまだありません" description="届けるものを決めて保存すると、申込・前日・開始前の通知が届くようになります。最初は全部オフから始めます。" action={readOnly ? undefined : <Button onClick={() => { const initial = emptySettings(webinarId); setSettings(initial); setBaseline(initial) }}>通知の設定を入力する</Button>} />
   } else {

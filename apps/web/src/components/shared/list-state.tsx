@@ -99,7 +99,7 @@ export default function ListState({
   'data-design'?: string
   /**
    * 捕まえた読み込み失敗（m23m）。`error` のときだけ見る。
-   * 403 は権限の案内にし、押しても直らない再試行の口は出さない。
+   * 403 は権限の案内を残し、権限変更後にも読み直せるようにする。
    * 429 は待ち秒数（`Retry-After` があれば使う）を添える。
    * 画面は `title`・`description` で上書きできる。
    */
@@ -118,7 +118,7 @@ export default function ListState({
           kind="error"
           title={title ?? failure?.title ?? preset.title}
           description={description ?? failure?.description ?? preset.description}
-          onRetry={failure && !failure.retryable ? undefined : onRetry}
+          onRetry={onRetry ?? (() => window.location.reload())}
           retrying={retrying}
         />
         {action}

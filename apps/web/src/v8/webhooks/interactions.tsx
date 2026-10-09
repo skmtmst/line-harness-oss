@@ -326,7 +326,7 @@ export default function WebhooksInteractionsV8() {
         kind="error"
         title="やり取りの記録を表示できませんでした"
         description="記録は消えていません。通信の状態を確認して、もう一度お試しください。"
-        action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+        onRetry={() => void load()}
       />
     )
   } else if (data.items.length === 0) {

@@ -115,7 +115,7 @@ export default function AdHistoryV8() {
         kind="error"
         title="広告への送信履歴を表示できませんでした"
         description="送信の記録は消えていません。読み直して、もう一度お試しください。"
-        action={<Button onClick={() => void model.reload()}>送信履歴を読み直す</Button>}
+        onRetry={() => void model.reload()}
       />
     )
   } else if (visible.length === 0) {

@@ -362,7 +362,7 @@ export default function SiteScriptV8() {
             kind="error"
             title="サイトの計測を読み込めませんでした"
             description={`${lastSeen ? `最後に受け取ったのは ${lastSeen} です。` : ''}タグが外れていないか、サイトの公開先が変わっていないかを確かめてください。`}
-            action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+            onRetry={() => void load()}
           />
         ) : <>
           <section className={styles.card} aria-labelledby="ss-sites">

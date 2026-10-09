@@ -517,7 +517,7 @@ export default function AutoReplyRunsV8() {
         {loading ? (
           <ListState kind="loading" />
         ) : error ? (
-          <ListState kind="error" description={error} action={<Button onClick={() => void load()}>再読み込み</Button>} />
+          <ListState kind="error" description={error} onRetry={() => void load()} />
         ) : items.length === 0 ? (
           <ListState kind="empty" title="実行結果はまだありません" description="自動応答が動くと、ここに結果が残ります。" />
         ) : visibleItems.length === 0 ? (

@@ -78,7 +78,7 @@ export default function ConversionReportV8({ accountId }: { accountId: string })
     {() => <div className={styles.reportStack}>
       {exportError ? <p role="alert" className={styles.caption}>{exportError}</p> : null}
       {loading ? <ListState kind="loading" title="成果レポートを読み込んでいます" />
-        : error ? <ListState kind="error" title={error} action={<Button variant="secondary" onClick={() => setAttempt((value) => value + 1)}>もう一度読む</Button>} />
+        : error ? <ListState kind="error" title={error} onRetry={() => setAttempt((value) => value + 1)} />
         : report ? <>
           <section className={styles.reportCard} aria-labelledby="conversion-daily-title">
             <div className={styles.reportHead}>

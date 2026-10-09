@@ -502,7 +502,7 @@ export default function WebhooksOutgoingV8() {
         kind="error"
         title="送り先を読み込めませんでした"
         description="登録内容は消えていません。通信の状態を確認して、もう一度お試しください。"
-        action={<Button onClick={() => void reload()}>もう一度読み込む</Button>}
+        onRetry={() => void reload()}
       />
     )
   } else if (visible.length === 0) {

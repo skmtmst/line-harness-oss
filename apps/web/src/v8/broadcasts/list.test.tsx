@@ -353,15 +353,15 @@ it('検索の通信失敗は内部の英語を出さず、読み直す案内を�
   await flush()
   expect(host.textContent).not.toContain('API error: 500')
   expect(host.textContent).toContain('再読み込みしても直らない場合はエラー報告へ')
-  expect(buttonByText('もう一度試す')).toBeTruthy()
+  expect(buttonByText('もう一度読み込む')).toBeTruthy()
   expect(host.textContent).not.toContain('まだ一斉配信がありません')
   const calls = listBroadcasts.mock.calls.length
   listBroadcasts.mockResolvedValue({ success: true, data: [base], pagination: { total: 1, limit: 20, offset: 0 } })
-  act(() => { buttonByText('もう一度試す')!.click() })
+  act(() => { buttonByText('もう一度読み込む')!.click() })
   await flush()
   expect(listBroadcasts.mock.calls.length).toBe(calls + 1)
   expect(host.textContent).toContain(base.title)
-  expect(buttonByText('もう一度試す')).toBeUndefined()
+  expect(buttonByText('もう一度読み込む')).toBeUndefined()
 })
 
 it('取得に成功して0件だったときだけ、空の一覧を出す', async () => {
@@ -369,7 +369,7 @@ it('取得に成功して0件だったときだけ、空の一覧を出す', asy
   act(() => { root.render(<BroadcastListV8 />) })
   await flush()
   expect(host.textContent).toContain('まだ一斉配信がありません')
-  expect(buttonByText('もう一度試す')).toBeUndefined()
+  expect(buttonByText('もう一度読み込む')).toBeUndefined()
 })
 
 it('WEB-014：一斉配信には手動順・つまみ・上下移動を置かない', async () => {

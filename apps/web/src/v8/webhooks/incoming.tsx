@@ -556,7 +556,7 @@ export default function WebhooksIncomingV8() {
         </div>
       ) : null}
       {incomingStatus === 'error' ? (
-        <ListState kind="error" title="受け取り口を読み込めませんでした" action={<Button onClick={() => void reload()}>もう一度読み込む</Button>} />
+        <ListState kind="error" title="受け取り口を読み込めませんでした" onRetry={() => void reload()} />
       ) : null}
       {displayed.map((item) => {
         const isSelected = selected?.id === item.id
@@ -678,7 +678,7 @@ export default function WebhooksIncomingV8() {
           {detailStatus === 'loading' ? (
             <p className={styles.cardNote}>保存されている処理を読み込んでいます。</p>
           ) : detailStatus === 'error' ? (
-            <ListState kind="error" title="届いた後の処理を表示できませんでした" action={<Button onClick={() => setDetailReloadKey((key) => key + 1)}>詳細を読み直す</Button>} />
+            <ListState kind="error" title="届いた後の処理を表示できませんでした" onRetry={() => setDetailReloadKey((key) => key + 1)} />
           ) : detail && detail.actions.length > 0 ? (
             detail.actions.map((action, index) => (
               <div key={`${action.refKind}-${index}`} className={styles.actionRow}>

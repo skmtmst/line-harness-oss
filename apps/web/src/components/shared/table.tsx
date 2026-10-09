@@ -337,9 +337,9 @@ export function TableStateRow({
         <div className={styles.stateCell} role={kind === 'error' ? 'alert' : 'status'}>
           <p className={styles.stateTitle}>{kind === 'error' ? <FailureTitle title={title ?? failure?.title ?? text.title} /> : (title ?? failure?.title ?? text.title)}</p>
           <p className={styles.stateDescription}>{description ?? failure?.description ?? text.description}</p>
-          {kind === 'error' && (failure && !failure.retryable ? undefined : onRetry) ? (
-            <button type="button" onClick={onRetry} className={styles.stateRetry}>
-              {retryLabel ?? <RetryLabel />}
+          {kind === 'error' ? (
+            <button type="button" onClick={onRetry ?? (() => window.location.reload())} className={styles.stateRetry}>
+              <RetryLabel />
             </button>
           ) : null}
         </div>

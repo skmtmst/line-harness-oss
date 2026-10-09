@@ -57,7 +57,7 @@ export default function ApplicationPreview({ accountId, draft, date, startTime, 
       <button type="button" className={styles.linkButton} onClick={() => void load()}>プレビューを開く →</button>
       <Dialog open={open} title="お客さまの申込ページの見本" onCancel={close} footer={<Button onClick={close}>閉じる</Button>}>
         {busy ? <ListState kind="loading" /> : error ? (
-          <ListState kind="error" description={error} action={<Button onClick={() => void load()}>もう一度試す</Button>} />
+          <ListState kind="error" description={error} onRetry={() => void load()} />
         ) : data ? (
           <div className={styles.previewBody}>
             <p className={styles.phoneName}>{data.name}</p>

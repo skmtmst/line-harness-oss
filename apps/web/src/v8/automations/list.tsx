@@ -465,7 +465,7 @@ export default function AutomationListV8() {
         kind="error"
         title="ルールを読み込めませんでした"
         description="ルールは消えていません。通信を確かめて、もう一度お試しください。"
-        action={<Button variant="secondary" onClick={() => void load()}>もう一度試す</Button>}
+        onRetry={() => void load()}
       />
     )
   } else if (paged.length === 0) {

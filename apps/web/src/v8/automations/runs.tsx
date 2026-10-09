@@ -486,7 +486,7 @@ export default function AutomationRunsV8() {
         kind="error"
         title="動いた記録を読み込めませんでした"
         description="記録は消えていません。通信を確かめて、もう一度お試しください。"
-        action={<Button variant="secondary" onClick={() => void load()}>もう一度試す</Button>}
+        onRetry={() => void load()}
       />
     )
   } else if (!data || data.items.length === 0) {

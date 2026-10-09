@@ -434,7 +434,7 @@ export default function WebhooksSheetsV8() {
         kind="error"
         title="連携の状態を読み込めませんでした"
         description="連携の内容は変わっていません。上で選んでいるLINEアカウントが合っているか確かめてください。"
-        action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+        onRetry={() => void load()}
       />
     )
   } else {

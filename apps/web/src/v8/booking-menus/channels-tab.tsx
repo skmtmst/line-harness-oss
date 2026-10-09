@@ -339,7 +339,7 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
 
   if (status === 'loading') return <ListState kind="loading" />
   if (status === 'error' || !data) {
-    return <ListState kind="error" title="予約経路を読み込めませんでした" description={error} action={<Button onClick={() => void load()}>もう一度読む</Button>} />
+    return <ListState kind="error" title="予約経路を読み込めませんでした" description={error} onRetry={() => void load()} />
   }
 
   return (

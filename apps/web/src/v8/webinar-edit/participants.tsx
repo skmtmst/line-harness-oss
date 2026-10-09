@@ -174,7 +174,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   } else if (state === 'loading') {
     body = <p className={styles.state} role="status">読み込み中...</p>
   } else if (state === 'error') {
-    body = <ListState kind="error" title="参加者の一覧を読み込めませんでした" description="通信を確認して、もう一度読み込んでください。" action={<Button onClick={() => setAttempt((count) => count + 1)}>もう一度読み込む</Button>} />
+    body = <ListState kind="error" title="参加者の一覧を読み込めませんでした" description="通信を確認して、もう一度読み込んでください。" onRetry={() => setAttempt((count) => count + 1)} />
   } else if (pageItems.length === 0) {
     body = <ListState kind="empty" title={filter || query.trim() !== '' ? 'この条件に当てはまる人はいません' : 'まだ参加者はいません'} />
   } else {

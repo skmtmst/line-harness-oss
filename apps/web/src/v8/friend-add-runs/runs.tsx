@@ -524,7 +524,7 @@ function FriendAddRunsInner() {
             kind={errorStatus === 403 ? 'forbidden' : 'error'}
             title="実行結果を表示できませんでした"
             description={error}
-            action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+            onRetry={() => void load()}
           />
         ) : visibleItems.length === 0 ? (
           <ListState kind="empty" title="条件に合う実行結果はありません" description="絞り込みを変えるか、次の友だち追加を待ってください。" />

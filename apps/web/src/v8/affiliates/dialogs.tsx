@@ -134,7 +134,7 @@ export function AffiliateArchiveDialog({
           kind="error"
           title="使われている場所を確認できませんでした"
           description="件数を0とは扱いません。読み直してから選んでください。"
-          action={<Button onClick={() => { void load() }}>再読み込み</Button>}
+          onRetry={() => { void load() }}
         />
       ) : impact ? (
         <div className="space-y-4">
@@ -319,7 +319,7 @@ export function AffiliatePaymentConfirmDialog({
           kind="error"
           title="確定する内容を表示できませんでした"
           description="金額を0とは扱いません。読み直してから確定してください。"
-          action={<Button onClick={() => { void load() }}>再読み込み</Button>}
+          onRetry={() => { void load() }}
         />
       ) : phase === 'empty' ? (
         <ListState

@@ -24,8 +24,8 @@ describe('ListState の再読み込み', () => {
     }
   })
 
-  it('読み直す関数が無い失敗状態にはボタンを出さない', () => {
-    expect(renderToStaticMarkup(<ListState kind="error" />)).not.toContain('<button')
+  it('読み直す関数が無い場合もページを読み直す口を出す', () => {
+    expect(renderToStaticMarkup(<ListState kind="error" />)).toContain('<button')
   })
 
   it('読み直している間は二度押しを止める', () => {

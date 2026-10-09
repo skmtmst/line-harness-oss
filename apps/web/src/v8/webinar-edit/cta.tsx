@@ -300,7 +300,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
         {message ? <Notice tone="danger">{message}</Notice> : null}
         <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
         {loadFailed ? (
-          <ListState kind="error" title="CTA カードを読み込めませんでした" description="読み込めるまで保存はできません。" action={<Button onClick={() => void loadCtas()}>もう一度読み込む</Button>} />
+          <ListState kind="error" title="CTA カードを読み込めませんでした" description="読み込めるまで保存はできません。" onRetry={() => void loadCtas()} />
         ) : ctas === null ? <ListState kind="loading" /> : <>
           {ctas.map((card, index) => (
             <div key={index} className={form.listRow} data-selected={index === currentIndex || undefined}>

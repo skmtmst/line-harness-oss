@@ -300,7 +300,7 @@ export default function CommonActionsV8() {
         kind="error"
         title="共通アクションを読み込めませんでした"
         description="登録した内容は消えていません。通信を確かめて、もう一度お試しください。"
-        action={<Button variant="secondary" onClick={() => void load()}>もう一度試す</Button>}
+        onRetry={() => void load()}
       />
     )
   } else if (items.length === 0 || (folderFilter && folderFilter !== UNFILED)) {
