@@ -148,7 +148,7 @@ export interface BandCell {
 
 /*
  * 送る・受け取る・Sheets・見本タブの帯（絵 ZSbFY）。
- * 「先月より」は先月の集計の口が無いので、今月送ったの下は成功の回数を出す。
+ * 「先月より」は先月の集計の口が無いので、直近30日 送ったの下は成功の回数を出す。
  */
 export function overviewBandCells(args: {
   outgoing: OutgoingWebhookOverview[] | null
@@ -168,7 +168,7 @@ export function overviewBandCells(args: {
     },
     {
       key: 'sent',
-      title: '今月送った',
+      title: '直近30日 送った',
       icon: <Send size={13} aria-hidden="true" />,
       value: summary ? summary.outgoing : null,
       unit: '回',
@@ -188,7 +188,7 @@ export function overviewBandCells(args: {
       icon: <Inbox size={13} aria-hidden="true" />,
       value: incomingCount,
       unit: '件',
-      detail: summary ? `今月 ${formatNumber(summary.incoming)} 回` : '集計を読み込めませんでした',
+      detail: summary ? `直近30日 ${formatNumber(summary.incoming)} 回` : '集計を読み込めませんでした',
     },
   ]
 }
