@@ -47,7 +47,7 @@ import {
   isValidIdempotencyKey,
   reserveOutboundSend,
 } from '../services/outbound-idempotency.js';
-import { compileSavedSearch } from '../services/saved-search-filter.js';
+import { compileSavedSearch, friendFieldValueSql } from '../services/saved-search-filter.js';
 import { getSavedSearchMatchPreview } from '../services/saved-search-insights.js';
 import { listLimit, listOffset } from './list-pagination.js';
 
@@ -528,12 +528,12 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
     for (const [key, value] of url.searchParams.entries()) {
       if (key.startsWith('metadata.')) {
         const metaKey = key.slice('metadata.'.length);
-        conditions.push(`json_extract(f.metadata, '$.' || ?) = ?`);
+        conditions.push(`${friendFieldValueSql()} = ?`);
         binds.push(metaKey, value);
       } else if (key.startsWith('metadataNot.')) {
         const metaKey = key.slice('metadataNot.'.length);
         conditions.push(
-          `(json_extract(f.metadata, '$.' || ?) IS NULL OR json_extract(f.metadata, '$.' || ?) != ?)`,
+          `(${friendFieldValueSql()} IS NULL OR ${friendFieldValueSql()} != ?)`,
         );
         binds.push(metaKey, metaKey, value);
       }

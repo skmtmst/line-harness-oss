@@ -149,6 +149,7 @@ export default function FriendsListV8() {
   const directQuery = (searchParams.get('q') ?? '').trim()
 
   const [friends, setFriends] = useState<FriendListItem[]>([])
+  const [fieldNames, setFieldNames] = useState<string[]>([])
   const [allTags, setAllTags] = useState<Tag[]>([])
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
@@ -302,6 +303,17 @@ export default function FriendsListV8() {
       return next
     })
   }, [])
+
+  const fieldsEnabled = featureVisibility.enabled('friend_fields')
+  useEffect(() => {
+    let cancelled = false
+    setFieldNames([])
+    if (!selectedAccountId || !fieldsEnabled) return
+    void api.friendFields.list(selectedAccountId).then(response => {
+      if (!cancelled && response.success) setFieldNames(response.data.map(field => field.name))
+    }).catch(() => { if (!cancelled) setOptionsFailed(true) })
+    return () => { cancelled = true }
+  }, [selectedAccountId, fieldsEnabled])
 
   const loadOptions = useCallback(async () => {
     const requestedAccountId = selectedAccountId
@@ -959,7 +971,7 @@ export default function FriendsListV8() {
               open={advancedOpen}
               accountId={selectedAccountId}
               tags={allTags}
-              fieldNames={[]}
+              fieldNames={fieldNames}
               marks={marks}
               scenarios={scenarios}
               onClose={() => setAdvancedOpen(false)}

@@ -53,6 +53,13 @@ function dateCondition(
   return `${label}で使えない比較方法が指定されています`;
 }
 
+/** 保存条件の項目名・ID・差し込みキーを、実際の情報欄の保存値へ解決する。 */
+export function friendFieldValueSql(): string {
+  return `(SELECT ffv.value FROM friend_field_values ffv
+    JOIN friend_fields ff ON ff.id = ffv.field_id
+    WHERE ffv.friend_id = f.id AND ? IN (ff.id, ff.name, ff.field_key) LIMIT 1)`;
+}
+
 function compileCondition(condition: SavedSearchCondition): CompiledCondition | string {
   const value = text(condition.value);
   switch (condition.kind) {
@@ -81,7 +88,7 @@ function compileCondition(condition: SavedSearchCondition): CompiledCondition | 
     case 'field': {
       const key = text(condition.key);
       if (!key) return '友だち情報の条件に項目がありません';
-      const expr = `json_extract(f.metadata, '$.' || ?)`;
+      const expr = friendFieldValueSql();
       /*
         「登録あり／なし」は値を取らない。先にここへ逃がさないと、
         値なしで保存した条件が「値がありません」で止まる。
