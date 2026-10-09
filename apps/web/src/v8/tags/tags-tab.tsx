@@ -796,7 +796,7 @@ export default function TagsTab({
                             <GripVertical className={styles.gripIcon} aria-hidden="true" />
                           </ReorderHandle>
                         ) : (
-                          <span className={styles.gripSpace} aria-hidden="true"><GripVertical className={styles.gripIcon} /></span>
+                          <span className={styles.gripSpace} aria-hidden="true" />
                         )}
                       </span>
                       <TagPill name={tag.name} color={group?.color} size="sm" href={editHref} />

@@ -13,7 +13,6 @@ import {
   Check,
   ChevronRight,
   CircleAlert,
-  GripVertical,
   Play,
   Power,
   X,
@@ -2254,7 +2253,7 @@ function AutoReplyWizardV8Inner() {
                             certain && aboveSelf ? styles.orderRowConflict : '',
                           ].join(' ')}
                         >
-                          <GripVertical size={14} aria-hidden="true" className={styles.orderGrip} />
+                          <span aria-hidden="true" className={styles.orderGrip} />
                           <span className={styles.orderNum}>{index + 1}</span>
                           <div className={styles.orderBody}>
                             <p className={styles.orderName}>

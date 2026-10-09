@@ -1,5 +1,7 @@
 'use client'
 
+import { DragHandle } from '@/components/shared/row-actions'
+
 /*
  * ★V8 タグを作る・編集（Pencil `d9xoI` 作る / `Qat9s` 編集）。
  *
@@ -384,7 +386,7 @@ export default function TagEditorV8({
                             onDragEnd={() => setDragActionId(null)}
                             className={`${styles.actionRow} ${dragActionId === action.id ? styles.actionRowDragging : ''}`}
                           >
-                            <span className={styles.actionGrip} title="ドラッグで順番を変更">⋮⋮</span>
+                            <DragHandle label={`「${action.label}」を並べ替える`} draggable onDragStart={() => setDragActionId(action.id)} onDragEnd={() => setDragActionId(null)} onMove={direction => moveAction(index, direction)} />
                             <span className={styles.actionIndex}>{index + 1}</span>
                             <span className={styles.actionType}>{action.type}</span>
                             <span className={styles.actionLabel} title={action.label}>{action.label}</span>

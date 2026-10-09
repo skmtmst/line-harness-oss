@@ -736,7 +736,7 @@ function FriendAddList() {
                         onMove={(direction) => keyboardMove(rule.id, direction)}
                       >
                         <span aria-hidden="true" className={styles.grip}>⠿</span>
-                      </ReorderHandle> : <span aria-hidden="true" className={`${styles.grip} ${styles.gripSpace}`}>⠿</span>}
+                      </ReorderHandle> : <span aria-hidden="true" className={`${styles.grip} ${styles.gripSpace}`} />}
                       <span className={styles.orderNum}>{index + 1}</span>
                     </span>
                   </Td>
