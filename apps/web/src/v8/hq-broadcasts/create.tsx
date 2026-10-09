@@ -43,6 +43,7 @@ import Select from '@/components/shared/select'
 import FolderSelect from '@/components/shared/folder-select'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
+import { useFormErrors } from '@/lib/use-form-errors'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
@@ -471,6 +472,18 @@ export default function HqBroadcastCreate() {
     return result?.run.id ?? null
   }
 
+  /*
+   * 吹き出しの不備（B-139・店の一斉配信と同じ）：帯ではなく吹き出しの中身の下に理由、頭に赤い丸、
+   * メッセージの段を開いて1つ目の吹き出しへ移る。配信名・送り先・日時は段の帯（［〇〇へ移動］つき）のまま。
+   */
+  const fields = useFormErrors()
+  bubbles.forEach((item, index) => {
+    fields.define(`bubble-${index}`, `${index + 1}通目`, () => hqBubbleProblem(item) || null, {
+      reveal: () => { if (step !== 'message') changeStep('message'); setOpenBubble(index) },
+      group: `bubble-${index}`,
+    })
+  })
+
   /** 入れていない所と、その欄のある段（店の一斉配信の「保存を押した段で理由を示す」と同じ）。 */
   const problem = (): { message: string; step: BroadcastStepKey } | null => {
     if (!title.trim()) return { message: '配信名を入れてください', step: 'basic' }
@@ -491,7 +504,10 @@ export default function HqBroadcastCreate() {
   /** 作る（下書きを固定）→ 確かめる → 問題のある店を外す。中身が変わったら同じ下書きを直す（版つき・依頼番号はそのまま）。 */
   const check = async (): Promise<{ run: HqBroadcastRun; checks: HqBroadcastPreflight[] } | null> => {
     const why = problem()
-    if (why) { setError(why.message); setErrorStep(why.step); return null }
+    if (why) {
+      if (why.step === 'message' && fields.submit().length > 0) { setError(''); setErrorStep(null); return null }
+      setError(why.message); setErrorStep(why.step); return null
+    }
     setChecking(true); setError(''); setErrorStep(null)
     try {
       let current = run
@@ -946,6 +962,8 @@ export default function HqBroadcastCreate() {
             {shows('message') ? (
               <section id="broadcast-step-message" className={formStyles.section}>
                 <MessageComposer
+                  bubbleErrors={bubbles.map((_, index) => fields.error(`bubble-${index}`))}
+                  bubbleFieldProps={(index) => fields.bind(`bubble-${index}`)}
                   bubbles={bubbles.map((item) => item.kind === 'text' ? { id: item.id, type: 'text', content: { text: item.body } } : toApiBubble(item, item.id) ?? { id: item.id, type: 'research', content: item.content })}
                   accountId={null}
                   busy={composerBusy} onBusyChange={setComposerBusy}

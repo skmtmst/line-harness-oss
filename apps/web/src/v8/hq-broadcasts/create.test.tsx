@@ -106,6 +106,17 @@ async function fillToConfirm(body = '{店名}より：1月の限定メニュー'
 }
 
 describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送るアカウント）', () => {
+  it('B-139：本文の無い吹き出しは帯にせず、吹き出しの下に理由と頭に赤い丸を出し、そこへ移る', async () => {
+    render(<HqBroadcastCreate />)
+    await toMessage()
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
+    const bubble = screen.getByLabelText('1通目の吹き出し')
+    await waitFor(() => expect(within(bubble).getByRole('alert').textContent).toBe('本文を入れてください'))
+    expect(within(bubble).getByRole('img', { name: '1通目に直す欄が1か所' })).toBeTruthy()
+    await waitFor(() => expect(bubble.contains(document.activeElement)).toBe(true))
+    expect(hq.create).not.toHaveBeenCalled()
+  })
+
   it('窓で確定した宛先を下書きに保存し、読み直しても選択と要約を戻す', async () => {
     const view = render(<HqBroadcastCreate />)
     fireEvent.change(screen.getByLabelText('配信名'), { target: { value: '宛先の下書き' } })
