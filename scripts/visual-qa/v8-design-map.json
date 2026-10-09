@@ -431,7 +431,7 @@
         "/restaurant-test/tables"
       ],
       "width": 1440,
-      "shot": "lint/V8-B/shots/vOtK2.png",
+      "shot": "lint/V8/shots/vOtK2.png",
       "url": "/restaurant-test/tables"
     },
     "BHEl9": {
@@ -3613,7 +3613,7 @@
         "/restaurant-test/inventory"
       ],
       "width": 1440,
-      "shot": "lint/V8-B/shots/eZPzk.png",
+      "shot": "lint/V8/shots/eZPzk.png",
       "url": "/restaurant-test/inventory"
     },
     "Y9ASp": {
@@ -3746,7 +3746,7 @@
         "/restaurant-test/reservations"
       ],
       "width": 1440,
-      "shot": "lint/V8-B/shots/xzR4g.png",
+      "shot": "lint/V8/shots/xzR4g.png",
       "url": "/restaurant-test/reservations"
     },
     "Z6Hx5o": {
@@ -4019,7 +4019,7 @@
         "/restaurant-test/organization"
       ],
       "width": 1440,
-      "shot": "lint/V8-B/shots/cgESv.png",
+      "shot": "lint/V8/shots/cgESv.png",
       "url": "/restaurant-test/organization"
     },
     "bglah": {
@@ -4909,7 +4909,7 @@
       "route": "/restaurant-test/inventory",
       "routes": [],
       "width": 1440,
-      "shot": "lint/V8-B/shots/mVUo3.png",
+      "shot": "lint/V8/shots/mVUo3.png",
       "url": "/restaurant-test/inventory"
     },
     "hadfk": {
@@ -5332,7 +5332,7 @@
         "/restaurant-test/reservations"
       ],
       "width": 1440,
-      "shot": "lint/V8-B/shots/R2w4j.png",
+      "shot": "lint/V8/shots/R2w4j.png",
       "url": "/restaurant-test/reservations"
     },
     "loVfW": {
@@ -7066,7 +7066,7 @@
         "/restaurant-test/line-followup"
       ],
       "width": 1440,
-      "shot": "lint/V8-B/shots/n9vvGx.png",
+      "shot": "lint/V8/shots/n9vvGx.png",
       "url": "/restaurant-test/line-followup"
     },
     "xRPdo": {
