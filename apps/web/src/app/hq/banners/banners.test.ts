@@ -68,7 +68,7 @@ describe('統括 バナー生成', () => {
 
   it('保存・実行は下部追従バーにしか置かない', () => {
     expect(projectPage).toContain('<StickyBar')
-    expect(projectPage).toContain('生成する（{input.count}枚）')
+    expect(projectPage).toContain('生成する（{input.count} 枚）')
     expect(projectPage).toContain('生成をやめる')
     expect(projectPage).toContain('条件をクリア')
     expect(panel).not.toMatch(/生成する/)
@@ -92,7 +92,7 @@ describe('統括 バナー生成', () => {
     expect(panel).toContain('usageHeading')
     expect(panel).toContain('利用量')
     expect(v8Project).toContain('usageHeading')
-    expect(v8Project).toContain('生成する（{input.count}枚）')
+    expect(v8Project).toContain('生成する（{input.count} 枚）')
     expect(projectPage).toContain('usageHeading')
   })
 
