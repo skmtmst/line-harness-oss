@@ -119,3 +119,26 @@ it('統括の情報欄のフォルダも保存色を読み、色の保存に失�
   await waitFor(() => expect(mocks.updateFolder).toHaveBeenLastCalledWith('f1', '基本情報', 2, '#ec4899'))
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 })
+
+
+it('情報欄のフォルダをその場で作ると、選んだ色を統括のAPIと閉じた欄へ渡す', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  const folder = { id: 'f-new', name: '新しい分類', color: '#ef4444', revision: 1 }
+  mocks.createFolder.mockResolvedValue(folder)
+  render(<HqAttributes type="friend_field" tab="fields" onTab={vi.fn()} />)
+  await screen.findByText('愛犬のお名前')
+  fireEvent.click(screen.getAllByRole('button', { name: '項目を作る' })[0])
+  const trigger = screen.getByRole('button', { name: '友だち情報欄のフォルダ' })
+  fireEvent.click(trigger)
+  fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' }))
+  fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: folder.name } })
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダの色：青' }))
+  fireEvent.click(screen.getByRole('radio', { name: '赤' }))
+  fireEvent.click(screen.getByRole('button', { name: '作って選ぶ' }))
+  await waitFor(() => expect(mocks.createFolder).toHaveBeenCalledWith(folder.name, folder.color))
+  await waitFor(() => expect(trigger.textContent).toBe(folder.name))
+  const expected = document.createElement('span')
+  expected.style.backgroundColor = folder.color
+  expect(trigger.querySelector<HTMLElement>('[data-folder-dot]')!.style.backgroundColor).toBe(expected.style.backgroundColor)
+  delete document.documentElement.dataset.theme
+})

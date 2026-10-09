@@ -16,6 +16,7 @@ import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
 import ListState from '@/components/shared/list-state'
 import TagsList from './list'
 import styles from './create.module.css'
@@ -100,7 +101,7 @@ function TagFolderPage() {
         const group = result.data.find((item) => item.id === editId)
         if (!group) { setLoadState('error'); return }
         setName(group.name)
-        setColor(group.color ?? DEFAULT_COLOR)
+        setColor(folderDisplayColor(group))
         setFolderAccountId(group.accountId)
         setLoadState('ready')
       })
