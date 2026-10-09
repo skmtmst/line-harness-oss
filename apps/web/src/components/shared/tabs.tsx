@@ -53,7 +53,8 @@ export function Tabs({
    * 'compact' は文字の行を詰めた段（E-1 hKRRF の店のタブ：高さ 30.5）。v7 では効かない。
    */
   size?: 'compact' | 'settings' | 'short' | 'notification'
-  spacing?: 'compact'
+  /** 'settings' は設定の板のタブ間・下余白。指定した板だけに適用する。 */
+  spacing?: 'compact' | 'settings'
 }) {
   /*
    * Issue #708（監査6 a11y）: タブは見た目どおり tablist/tab の役割を持つ。

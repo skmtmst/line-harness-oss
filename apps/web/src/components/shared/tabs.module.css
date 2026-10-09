@@ -187,6 +187,8 @@
 [data-theme='v8'] .list[data-size='compact'] .tab { min-height: 0; line-height: var(--tpl-tabs-compact-lh); }
 /* 選んだタブの下線は段の線に重ねる（絵の下線は段の高さを足さない）。 */
 [data-theme='v8'] .list[data-size='compact'] .current { margin-bottom: var(--tpl-tabs-compact-line-overlap); }
+[data-theme='v8'] .list[data-spacing='settings'] .items { gap: var(--tpl-sb-tab-gap); }
+[data-theme='v8'] .list[data-spacing='settings'] .tab { padding-bottom: var(--tpl-sb-tab-pad-bottom); }
 [data-theme='v8'] .count[data-tone='warning'] {
   display: inline-flex;
   align-items: center;

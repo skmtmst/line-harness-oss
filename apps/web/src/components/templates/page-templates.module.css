@@ -19,6 +19,7 @@
 :global([data-theme='v8']) .title { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
 :global([data-theme='v8']) .pageTitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
 :global([data-theme='v8']) .description { color: var(--color-ink-secondary); font-size: var(--tpl-desc-size); line-height: var(--tpl-desc-lh); }
+:global([data-theme='v8']) .headingTabs { margin-top: var(--tpl-head-gap); }
 /* compact は間2・説明13/20を維持し、題は標準と同じ22/700/32。 */
 :global([data-theme='v8']) .heading[data-heading-size='compact'] .headingText { gap: var(--tpl-compact-gap); }
 :global([data-theme='v8']) .heading[data-heading-size='compact'] .title { font-size: var(--tpl-compact-title-size); font-weight: var(--tpl-compact-title-weight); line-height: var(--tpl-compact-title-lh); }

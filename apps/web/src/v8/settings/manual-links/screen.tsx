@@ -9,16 +9,19 @@
  */
 import { RefreshCw, ShieldCheck } from 'lucide-react'
 import Button from '@/components/shared/button'
+import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
 import SearchField from '@/components/shared/search-field'
+import FilterChip from '@/components/shared/filter-chip'
+import Notice from '@/components/shared/notice'
+import { TextField } from '@/components/shared/text-field'
 import ListState from '@/components/shared/list-state'
-import { SbBackLink, SbSettingsScreen } from '../sb-frame/settings-screen'
+import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import { LINK_STATUS_LABEL, checkedLabel, urlLabel } from './manual-link-view'
 import { useManualLinks } from './use-manual-links'
 import styles from './screen.module.css'
 
 const TITLE = 'マニュアルの正本表'
 const DESCRIPTION = '画面の上の「マニュアル」が開く行き先を、画面ごとに決めます'
-const BACK = <SbBackLink href="/settings" label="機能設定へ" />
 /** 確かめる時刻（サーバの定時の確認と同じ）。 */
 const SCHEDULE = '毎日 4:00 に確かめる'
 
@@ -48,7 +51,7 @@ export default function ManualLinksScreen() {
   } = useManualLinks()
 
   const frame = (children: React.ReactNode) => (
-    <SbSettingsScreen boardId="cIdA2" title={TITLE} description={DESCRIPTION} identity={BACK}>
+    <SbSettingsScreen boardId="cIdA2" title={TITLE} description={DESCRIPTION}>
       {children}
     </SbSettingsScreen>
   )
@@ -78,10 +81,7 @@ export default function ManualLinksScreen() {
 
   return frame(
     <>
-      <p className={styles.note}>
-        <ShieldCheck className={styles.noteIcon} aria-hidden="true" />
-        <span>この表を直せるのは運営だけです。お客さまの組織からは見えません。</span>
-      </p>
+      <Notice tone="warn" icon={<ShieldCheck size={16} aria-hidden="true" />}>この表を直せるのは運営だけです。お客さまの組織からは見えません。</Notice>
 
       <div className={styles.toolbar}>
         <SearchField
@@ -91,17 +91,8 @@ export default function ManualLinksScreen() {
           onChange={setQuery}
           className={styles.search}
         />
-        <button type="button" className={styles.chip} aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>
-          すべて
-        </button>
-        <button
-          type="button"
-          className={styles.chip}
-          aria-pressed={filter === 'broken'}
-          onClick={() => setFilter(filter === 'broken' ? 'all' : 'broken')}
-        >
-          {`開けない ${brokenCount}`}
-        </button>
+        <FilterChip selectedIcon={false} selected={filter === 'all'} onChange={() => setFilter('all')}>すべて</FilterChip>
+        <FilterChip selectedIcon={false} selected={filter === 'broken'} onChange={(selected) => setFilter(selected ? 'broken' : 'all')}>{`開けない ${brokenCount}`}</FilterChip>
         <span className={styles.spacer} />
         <span className={styles.schedule}>{SCHEDULE}</span>
         <Button variant="secondary" disabled={checking} onClick={() => void checkAll()} busy={checking} busyLabel="確かめています…">
@@ -123,29 +114,28 @@ export default function ManualLinksScreen() {
           ) : undefined}
         />
       ) : (
-        <div className={styles.table} role="table" aria-label={`画面とマニュアルの対応 ${total}件`}>
+        <GridTable className={styles.table} label={`画面とマニュアルの対応 ${total}件`} design={{ columns: 'var(--sett-manual-columns)', gap: 'var(--tpl-sb-tbl-gap)', padding: 'var(--tpl-sb-tbl-pad)', rowPadding: 'var(--tpl-sb-tbl-row-pad)', fontSize: 'var(--tpl-sb-tbl-head)', color: 'var(--color-ink)' }}>
           <div role="rowgroup">
-            <div role="row" className={`${styles.row} ${styles.headRow}`}>
-              <span role="columnheader">画面ID</span>
-              <span role="columnheader">画面名</span>
-              <span role="columnheader">マニュアルのURL</span>
-              <span role="columnheader">確かめた日</span>
-              <span role="columnheader">状態</span>
-              <span role="columnheader"><span className={styles.srOnly}>操作</span></span>
-            </div>
+            <GridHeadRow>
+              <GridCell role="columnheader">画面ID</GridCell>
+              <GridCell role="columnheader">画面名</GridCell>
+              <GridCell role="columnheader">マニュアルのURL</GridCell>
+              <GridCell role="columnheader">確かめた日</GridCell>
+              <GridCell role="columnheader">状態</GridCell>
+              <GridCell role="columnheader"><span className={styles.srOnly}>操作</span></GridCell>
+            </GridHeadRow>
           </div>
           <div role="rowgroup">
             {shown.map((row) => {
               const key = row.taskId ?? row.screenId
               const editing = editingKey === key
               return (
-                <div role="row" key={key} className={styles.row} data-broken={row.status !== 'ok' || undefined}>
-                  <span role="cell" className={styles.cell}>{row.screenId}</span>
-                  <span role="cell" className={`${styles.cell} ${styles.name}`} title={row.name}>{row.name}</span>
-                  <span role="cell" className={styles.cell}>
+                <GridRow key={key} data-broken={row.status !== 'ok' || undefined}>
+                  <GridCell role="cell" className={styles.cell}>{row.screenId}</GridCell>
+                  <GridCell role="cell" className={`${styles.cell} ${styles.name}`} title={row.name}>{row.name}</GridCell>
+                  <GridCell role="cell" className={styles.cell} title={urlLabel(row.url)}>
                     {editing ? (
-                      <input
-                        className={styles.editInput}
+                      <TextField
                         aria-label={`${row.name}のマニュアルのURL`}
                         value={editingUrl}
                         onChange={(event) => setEditingUrl(event.target.value)}
@@ -153,12 +143,12 @@ export default function ManualLinksScreen() {
                     ) : (
                       <span className={row.url ? styles.url : styles.urlEmpty} title={row.url || undefined}>{urlLabel(row.url)}</span>
                     )}
-                  </span>
-                  <span role="cell" className={styles.cell}>{checkedLabel(row.checkedAt)}</span>
-                  <span role="cell" className={styles.cell}>
+                  </GridCell>
+                  <GridCell role="cell" className={styles.cell} title={checkedLabel(row.checkedAt)}>{checkedLabel(row.checkedAt)}</GridCell>
+                  <GridCell role="cell" className={styles.cell} title={LINK_STATUS_LABEL[row.status]}>
                     <span className={styles.status} data-status={row.status}>{LINK_STATUS_LABEL[row.status]}</span>
-                  </span>
-                  <span role="cell" className={styles.actions}>
+                  </GridCell>
+                  <GridCell role="cell" className={styles.actions}>
                     {editing ? (
                       <>
                         <Button variant="text" disabled={saving} onClick={cancelEdit}>キャンセル</Button>
@@ -169,12 +159,12 @@ export default function ManualLinksScreen() {
                         {row.url ? '直す' : '決める'}
                       </Button>
                     )}
-                  </span>
-                </div>
+                  </GridCell>
+                </GridRow>
               )
             })}
           </div>
-        </div>
+        </GridTable>
       )}
 
       {notice ? <p className={styles.footDanger}>{notice}</p> : null}
