@@ -8079,7 +8079,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: { name?: string; parentId?: string | null; displayOrder?: number }, accountId?: string) =>
+    update: (id: string, data: { name?: string; parentId?: string | null; displayOrder?: number; color?: string | null }, accountId?: string) =>
       fetchApi<ApiResponse<Folder>>(`/api/folders/${id}${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`, {
         method: 'PATCH',
         body: JSON.stringify(data),

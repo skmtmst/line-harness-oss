@@ -26,7 +26,7 @@ const kinds = [
   { path: '/api/friend-add-rules/folders', version: null },
 ];
 describe.each(kinds)('$path の色（実HTTP・SQL）', ({ path, version }) => {
-  it('6色とNULLを保存して返し、名前だけの変更で色を失わず、古い版と他の所属を拒む', async () => {
+  it('9色とNULLを保存して返し、名前だけの変更で色を失わず、古い版と他の所属を拒む', async () => {
     for (const [index, color] of [...FOLDER_SELECT_COLORS.map(item => item.value), null].entries()) {
       const created = await call(path, 'POST', { accountId: 'shop', name: `分類${index}`, color }, `folder-key-${index}-00000000`);
       expect(created.status, JSON.stringify(created.body)).toBe(201);
@@ -46,6 +46,17 @@ describe.each(kinds)('$path の色（実HTTP・SQL）', ({ path, version }) => {
     expect(folders).toEqual(expect.arrayContaining([expect.objectContaining({ id, color: null }), expect.objectContaining({ name: '分類0', color: '#3b82f6' })]));
     staff.tenantId = 'other';
     expect((await call(`${path}/${id}`, 'PATCH', { accountId: 'other-shop', name: '横取り', color: '#16a34a', ...(version ? { [version]: 3 } : {}) })).status).toBeGreaterThanOrEqual(400);
+  });
+  it('9色すべてを変更してから一覧を読み直しても残る', async () => {
+    const created = await call(path, 'POST', { accountId: 'shop', name: '読み直し', color: '#3b82f6' });
+    const id = created.body.data.id;
+    for (const [index, option] of FOLDER_SELECT_COLORS.entries()) {
+      const changed = await call(`${path}/${id}`, 'PATCH', { accountId: 'shop', name: '読み直し', color: option.value, ...(version ? { [version]: index + 1 } : {}) });
+      expect(changed.status, JSON.stringify(changed.body)).toBe(200);
+      const list = await call(version ? path : '/api/friend-add-rules?account_id=shop&kind=first_time');
+      const folders = version ? list.body.data : list.body.data.options.folders;
+      expect(folders.find((folder: any) => folder.id === id)?.color).toBe(option.value);
+    }
   });
   it('パレット外の値や型を拒み、閲覧のみから作らせない', async () => {
     for (const color of ['#123456', '#123', 'red', 1, {}, false]) expect((await call(path, 'POST', { accountId: 'shop', name: '不可', color })).status).toBe(422);
