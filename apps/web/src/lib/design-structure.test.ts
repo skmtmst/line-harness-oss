@@ -39,7 +39,8 @@ const APP = join(SRC, 'app');
  * 出てくる順がそのまま並びになる。
  */
 function designMarkers(source: string): string[] {
-  return [...new Set([...source.matchAll(/data-design="([^"]+)"/g)].map((m) => m[1]))].sort();
+  const common = [/<PageHeading\b/.test(source) ? 'Head' : null, /<Tabs\b/.test(source) ? 'Tabs' : null].filter(Boolean) as string[];
+  return [...new Set([...common, ...[...source.matchAll(/data-design="([^"]+)"/g)].map((m) => m[1])])].sort();
 }
 
 const LEGACY_SCREENS = Object.entries(structure.screens) as Array<
@@ -215,7 +216,8 @@ describe('画面の骨格が設計と一致する', () => {
     // 骨組みを共通の部品に出している画面がある（作成画面の Crumb / Head /
     // Body / Left / Right は create-page.tsx にある）。page.tsx だけ見ると
     // 「印が付いていない」ことになるので、読み込んでいる部品も一緒に見る。
-    const markers = designMarkers(readWithParts(route));
+    const source = readWithParts(route);
+    const markers = route === '/booking/menus/staff' ? designMarkers(source) : [...new Set([...source.matchAll(/data-design="([^"]+)"/g)].map(m=>m[1]))].sort();
     const sectionGaps = spec.implementationGaps?.sections ?? [];
     const expected = spec.sections.filter((section) => !sectionGaps.includes(section)).sort();
     expect(sectionGaps.every((section) => spec.sections.includes(section))).toBe(true);

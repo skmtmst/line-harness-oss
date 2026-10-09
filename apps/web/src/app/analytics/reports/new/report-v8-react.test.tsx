@@ -178,6 +178,7 @@ describe('V8 レポート作成（H5UoIu）', () => {
     const framed = container.querySelector('[data-design-node="H5UoIu"]')
     expect(framed).toBeTruthy()
     expect(container.textContent).toContain('レポートを作る')
+    await act(async () => { container.querySelector<HTMLButtonElement>('[data-template-region=heading] button[aria-expanded]')!.click() })
     expect(container.textContent).toContain('見たい数をまとめて')
     // 配信先・頻度は必須
     expect(container.textContent).toContain('必須')

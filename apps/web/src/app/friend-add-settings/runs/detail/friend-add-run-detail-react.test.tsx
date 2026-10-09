@@ -143,6 +143,7 @@ describe('R264〜R268 実行詳細', () => {
       },
     })
     await render()
+    await act(async () => { host.querySelector<HTMLButtonElement>('[data-template-region=heading] button[aria-expanded]')!.click() })
     const text = host.textContent ?? ''
     expect(text).toContain('9月16日（水）10:00')
     expect(text).toContain('はじめて')
