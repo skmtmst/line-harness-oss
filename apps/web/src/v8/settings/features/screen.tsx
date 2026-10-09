@@ -446,7 +446,7 @@ export default function FeatureSettingsScreen() {
             busy={saving}
             done={savedTick}
             doneLabel="保存しました"
-            title={!dirty ? '変更すると保存できます' : undefined}
+            title={!dirty ? '変更すると保存できます' : undefined} aria-label={!dirty ? '変更すると保存できます' : undefined}
           >
             {conflicted ? <GitCompare className={styles.btnIcon} aria-hidden="true" /> : <Save className={styles.btnIcon} aria-hidden="true" />}
             {conflicted ? '比べてから保存' : '機能設定を保存'}

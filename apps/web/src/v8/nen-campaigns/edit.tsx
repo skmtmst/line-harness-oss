@@ -367,7 +367,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
             onKeyDown={(event) => { if (event.key === 'Enter') void searchFriends() }}
           />
           <span className={styles.fullButton}>
-            <Button type="button" disabled={testing || !testTarget} busy={testing} busyLabel="送っています…" title={testTarget ? undefined : '先に相手を名前で探してください'} onClick={() => void sendTest()}>
+            <Button type="button" disabled={testing || !testTarget} busy={testing} busyLabel="送っています…" title={testTarget ? undefined : '先に相手を名前で探してください'} aria-label={testTarget ? undefined : '先に相手を名前で探してください'} onClick={() => void sendTest()}>
               <Send size={15} aria-hidden="true" />{testCandidates.length === 1 ? `${testCandidates[0].displayName ?? '名前なし'}へテストを送る` : 'テストを送る'}
             </Button>
           </span>

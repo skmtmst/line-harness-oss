@@ -434,7 +434,7 @@ function ProjectCard({ project, thumbnails, busy, canManage, onOpen, onToggleFav
       </button>
       <div className={styles.cardBody}>
         <div className={styles.cardTitleRow}>
-          <button type="button" className={styles.cardTitle} onClick={onOpen} title={project.name}>{project.name}</button>
+          <button type="button" className={styles.cardTitle} onClick={onOpen} title={project.name} aria-label={project.name}>{project.name}</button>
           {canManage ? (
             <button
               type="button"

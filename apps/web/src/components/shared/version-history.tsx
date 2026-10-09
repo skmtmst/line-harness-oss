@@ -116,7 +116,7 @@ export default function VersionHistory({
         <Button
           variant="secondary"
           disabled={!selected || !canRevert || busy}
-          title={!selected ? undefined : revertDisabledReason}
+          title={!selected ? undefined : revertDisabledReason} aria-label={!selected ? undefined : revertDisabledReason}
           onClick={onRevert}
         >
           {revertLabel}

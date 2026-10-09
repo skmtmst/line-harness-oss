@@ -543,7 +543,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
               variant="primary"
               onClick={conflict ? () => void openCompare() : () => void onPublish()}
               disabled={busy || Boolean(blocked)}
-              title={blocked ?? undefined}
+              title={blocked ?? undefined} aria-label={blocked ?? undefined}
               busy={publishing || Boolean(host?.busy)}
               busyLabel={host ? '保存中…' : '公開中…'}
             >

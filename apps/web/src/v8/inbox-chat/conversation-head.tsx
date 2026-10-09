@@ -57,7 +57,7 @@ export default function ConversationHead({
           <button
             type="button"
             className={styles.cheadName}
-            title={name}
+            title={name} aria-label={name}
             aria-expanded={nameExpanded}
             onClick={() => setNameExpanded((now) => !now)}
           >

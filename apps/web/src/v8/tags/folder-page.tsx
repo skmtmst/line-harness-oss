@@ -190,7 +190,7 @@ function TagFolderPage() {
             ) : null}
             <span className={styles.dialogFooterEnd}>
               <Button type="button" disabled={saving} onClick={close}>キャンセル</Button>
-              <Button type="button" variant="primary" disabled={saving || blockedReason !== null} title={blockedReason ?? undefined} onClick={() => void save()} busy={saving}>
+              <Button type="button" variant="primary" disabled={saving || blockedReason !== null} title={blockedReason ?? undefined} aria-label={blockedReason ?? undefined} onClick={() => void save()} busy={saving}>
                 {editId ? <FolderCheck size={15} aria-hidden="true" /> : <FolderPlus size={15} aria-hidden="true" />}
                 {editId ? 'フォルダを保存する' : 'フォルダを作る'}
               </Button>

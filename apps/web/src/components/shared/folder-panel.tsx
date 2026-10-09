@@ -220,7 +220,7 @@ export default function FolderPanel({
                   onSelect(row.id)
                 }}
                 disabled={disabled}
-                title={row.label}
+                title={row.label} aria-label={row.label}
                 aria-pressed={readOnly ? isActive : undefined}
                 aria-current={activeId === row.id ? 'true' : undefined}
                 className={`${styles.select} v7:rounded-control flex min-w-0 flex-1 items-center gap-2 v7:px-3 v7:py-2 text-left v7:text-sm transition-colors ${
@@ -304,7 +304,7 @@ export default function FolderPanel({
               type="button"
               onClick={onAddFolder}
               disabled={addFolderDisabled}
-              title={addFolderTitle}
+              title={addFolderTitle} aria-label={addFolderTitle}
               className={`${styles.add} v7:w-full`}
             >
               <FolderPlus className="v8-only" size={14} aria-hidden="true" />

@@ -186,7 +186,7 @@ export default function EditorV8({
                 variant="primary"
                 onClick={onPublish}
                 disabled={saving || publishing || Boolean(saveBlockedReason)}
-                title={blockedTitle}
+                title={blockedTitle} aria-label={blockedTitle}
                 busy={publishing}
                 busyLabel="公開中…"
               >

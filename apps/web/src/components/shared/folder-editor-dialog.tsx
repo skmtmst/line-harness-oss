@@ -64,7 +64,7 @@ export default function FolderEditorDialog({ name, nameError, nameRef, onNameCha
   return <Dialog {...dialog} busy={busy} designWidth={560} designHeaderPadding="24px 24px 0"
     footer={<div className={styles.footer}>{footer ?? <>
       <Button type="button" onClick={dialog.onCancel} disabled={busy}>{cancelLabel}</Button>
-      <Button type="button" variant="primary" onClick={onConfirm} title={confirmTitle}
+      <Button type="button" variant="primary" onClick={onConfirm} title={confirmTitle} aria-label={confirmTitle}
         disabled={busy || confirmDisabled || !name.trim()} busy={busy}>{confirmIcon}{confirmLabel}</Button>
     </>}</div>}>
     <div className={styles.body}>

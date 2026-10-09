@@ -232,7 +232,7 @@ function CreateRuleButton({ full, compact, disabled, disabledTitle, menuOpen, on
       variant="primary"
       className={full ? 'v8-folder-create w-full' : undefined}
       disabled={disabled}
-      title={disabledTitle}
+      title={disabledTitle} aria-label={disabledTitle}
       onClick={(event) => onOpenMenu(event.currentTarget)}
       aria-expanded={menuOpen}
       aria-haspopup="menu"

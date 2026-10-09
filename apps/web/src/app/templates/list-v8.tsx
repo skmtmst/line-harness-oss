@@ -1266,7 +1266,7 @@ export default function TemplatesListV8() {
                     <button
                       type="button"
                       className={styles.menuButton}
-                      title={`テンプレート「${t.name}」の操作`}
+                      title={`テンプレート「${t.name}」の操作`} aria-label={`テンプレート「${t.name}」の操作`}
                       aria-expanded={openMenuId === t.id}
                       onClick={() => setOpenMenuId((current) => (current === t.id ? null : t.id))}
                     >

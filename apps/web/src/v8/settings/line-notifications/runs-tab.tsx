@@ -239,7 +239,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
               return <Tr key={item.id}>
                 <Td className={`${styles.cell} ${styles.runWhen}`}><span className={styles.runWhen}>{shortJst(item.receivedAt)}</span></Td>
                 <Td className={styles.cell}>
-                  <button type="button" className={styles.runOpen} onClick={() => setDetailId(item.id)} title={`${item.notificationName}の記録の詳細を開く`}>{item.notificationName}</button>
+                  <button type="button" className={styles.runOpen} onClick={() => setDetailId(item.id)} title={`${item.notificationName}の記録の詳細を開く`} aria-label={`${item.notificationName}の記録の詳細を開く`}>{item.notificationName}</button>
                 </Td>
                 <Td className={styles.runWhoCell}>
                   <span className={`${styles.cell} ${styles.runWho}`}>{item.friendName || '名前は未取得'}</span>

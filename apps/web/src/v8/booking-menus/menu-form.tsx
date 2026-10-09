@@ -965,7 +965,7 @@ export default function MenuFormV8() {
                         key={person.id}
                         type="button"
                         aria-pressed={on}
-                        title={person.role ? `${person.display_name || person.name}（${person.role}）` : undefined}
+                        title={person.role ? `${person.display_name || person.name}（${person.role}）` : undefined} aria-label={person.role ? `${person.display_name || person.name}（${person.role}）` : undefined}
                         className={`${styles.staffChip} ${on ? styles.staffChipOn : ''}`}
                         onClick={() => toggleAssigned(person.id)}
                       >

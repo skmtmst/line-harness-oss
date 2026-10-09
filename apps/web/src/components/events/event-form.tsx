@@ -453,7 +453,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
                 key={t.key}
                 disabled={disabled}
                 onClick={() => !disabled && setTab(t.key)}
-                title={disabled ? 'まず「概要」を保存してください' : undefined}
+                title={disabled ? 'まず「概要」を保存してください' : undefined} aria-label={disabled ? 'まず「概要」を保存してください' : undefined}
                 className={`flex-1 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
                   active
                     ? 'border-action text-action bg-status-info-soft'

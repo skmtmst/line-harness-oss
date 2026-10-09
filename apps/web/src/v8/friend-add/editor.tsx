@@ -1143,7 +1143,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
                 type="button"
                 aria-pressed={selected}
                 disabled={!tab.enabled}
-                title={tab.reason}
+                title={tab.reason} aria-label={tab.reason}
                 className={styles.pickChip}
                 data-selected={selected || undefined}
                 onClick={() => { if (tab.key !== 'none') setDefinition((current) => ({ ...current, messageType: tab.key as FriendAddRuleDefinition['messageType'] })) }}

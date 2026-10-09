@@ -145,7 +145,7 @@ export default function BellPopover({
           <ul className={styles.list}>
             {items.map((item) => (
               <li key={item.id} className={styles.item} data-unread={item.unread}>
-                <button type="button" className={styles.row} onClick={() => onSelect(item.id)} title={item.body || undefined}>
+                <button type="button" className={styles.row} onClick={() => onSelect(item.id)} title={item.body || undefined} aria-label={item.body || undefined}>
                   <span className={styles.icon} data-category={item.category} aria-hidden="true">
                     {item.category === 'error' ? <TriangleAlert /> : <Sparkles />}
                   </span>

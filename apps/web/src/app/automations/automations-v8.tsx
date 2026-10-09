@@ -60,7 +60,7 @@ export function V8AutoCreateButton({
 }) {
   if (readonly) {
     return (
-      <Button variant="primary" disabled title="閲覧のみのため作れません">
+      <Button variant="primary" disabled title="閲覧のみのため作れません" aria-label="閲覧のみのため作れません">
         {children}
       </Button>
     )

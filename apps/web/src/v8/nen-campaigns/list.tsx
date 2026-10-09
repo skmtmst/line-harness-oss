@@ -437,7 +437,7 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
                       {canEdit ? (
                         <Link href={`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`} className={styles.name} title={setting.label}>{setting.label}</Link>
                       ) : (
-                        <button type="button" className={styles.name} title={setting.label} onClick={() => props.onPreviewCampaign(setting.campaignKey)}>{setting.label}</button>
+                        <button type="button" className={styles.name} title={setting.label} aria-label={setting.label} onClick={() => props.onPreviewCampaign(setting.campaignKey)}>{setting.label}</button>
                       )}
                     </Td>
                     <Td className={styles.colTrigger}><span className={styles.cell} title={timing}>{timing}</span></Td>
@@ -730,7 +730,7 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
                   <Tr key={column.id} className={styles.row} data-table-layout="columns" selected={props.selectedColumnId === column.id}>
                     <Td className={styles.colName}>
                       <span className={styles.nameStack}>
-                        <button type="button" className={styles.name} title={column.title} onClick={() => props.onSelectColumn(column.id)}>{column.title}</button>
+                        <button type="button" className={styles.name} title={column.title} aria-label={column.title} onClick={() => props.onSelectColumn(column.id)}>{column.title}</button>
                         {draft ? <span className={styles.sub}>下書き</span> : null}
                       </span>
                     </Td>

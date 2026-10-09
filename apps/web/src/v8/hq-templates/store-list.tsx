@@ -474,12 +474,12 @@ export default function HqStoreList(props: HqStoreListProps) {
                   name={(
                     <div className={storeStyles.dotLine}>
                       {type === 'tag' ? (
-                        canEdit ? <button type="button" className={`${storeStyles.cellTitle} ${hqStyles.hqNameButton}`} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}>
+                        canEdit ? <button type="button" className={`${storeStyles.cellTitle} ${hqStyles.hqNameButton}`} title={row.name} aria-label={row.name} onClick={() => (onOpen ?? onEdit)(row)}>
                           <TagPill name={row.name} color={folder ? folderDisplayColor(folder) : null} size="sm" />
                         </button> : <TagPill name={row.name} color={folder ? folderDisplayColor(folder) : null} size="sm" />
                       ) : <FolderDotName folder={folder ? { name: folder.name, color: folder.color } : null}>
                         {canEdit ? (
-                          <button type="button" className={`${storeStyles.cellTitle} ${hqStyles.hqNameButton}`} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}>{row.name}</button>
+                          <button type="button" className={`${storeStyles.cellTitle} ${hqStyles.hqNameButton}`} title={row.name} aria-label={row.name} onClick={() => (onOpen ?? onEdit)(row)}>{row.name}</button>
                         ) : <span className={storeStyles.cellTitle} title={row.name}>{row.name}</span>}
                       </FolderDotName>}
                     </div>

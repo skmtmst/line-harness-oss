@@ -483,7 +483,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                     aria-pressed={index === selectedIndex}
                     draggable={!busy}
                     disabled={busy}
-                    title={`${item.title || `カード ${index + 1}`}（つまんで並べ替え・Alt＋← → でも動かせます）`}
+                    title={`${item.title || `カード ${index + 1}`}（つまんで並べ替え・Alt＋← → でも動かせます）`} aria-label={`${item.title || `カード ${index + 1}`}（つまんで並べ替え・Alt＋← → でも動かせます）`}
                     onClick={() => setSelected(index)}
                     onKeyDown={(event) => onChipKey(event, index)}
                     onDragStart={() => setDragIndex(index)}
@@ -567,7 +567,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                         kinds={choiceKindOptions({ host: hqHost, current: action.kind }).filter(isTapActionKind)}
                         extraKinds={hqHost ? [] : ACTION_EXTRA_KIND}
                         renderBody={(kind) => kind !== 'action' ? undefined : (
-                          <button type="button" className={`${styles.pick} ${own.colBody}`} onClick={() => setActionsFor(ai)} title="押されたときの動きを決める">
+                          <button type="button" className={`${styles.pick} ${own.colBody}`} onClick={() => setActionsFor(ai)} title="押されたときの動きを決める" aria-label="押されたときの動きを決める">
                             <span className={styles.pickText}>{inlineActionsText(action.actions, actionOptions.tags)}</span>
                             <ChevronDown className={styles.pickIcon} aria-hidden="true" />
                           </button>

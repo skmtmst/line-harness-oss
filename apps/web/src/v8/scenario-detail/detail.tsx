@@ -2631,7 +2631,7 @@ export default function ScenarioDetailV8({
                               openEditStep(step)
                             }
                           }}
-                          title="この通を編集する"
+                          title="この通を編集する" aria-label="この通を編集する"
                         >
                           {title}
                         </button>

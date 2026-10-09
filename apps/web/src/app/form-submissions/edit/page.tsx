@@ -1032,7 +1032,7 @@ function FormEditInner() {
                           type="button"
                           onClick={() => { setTab(index); setSelectedBlockId(null) }}
                           onDoubleClick={() => renameSection(index)}
-                          title="ダブルクリックで名前を変えられます"
+                          title="ダブルクリックで名前を変えられます" aria-label="ダブルクリックで名前を変えられます"
                           className={index === tab ? 'rounded-pill bg-ink text-canvas px-3 py-1.5 text-sm font-medium' : 'rounded-pill bg-canvas-sunken text-ink-secondary px-3 py-1.5 text-sm'}
                         >
                           {index + 1} {section.name}
@@ -1186,7 +1186,7 @@ function FormEditInner() {
               <Button href="/form-submissions" variant="secondary" className="px-4 py-2 font-medium h-auto whitespace-normal">
                 キャンセル
               </Button>
-              <Button variant="secondary" className="px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => void save(false)} disabled={saving} title="フォームを保存（公開中の内容は変わりません）">
+              <Button variant="secondary" className="px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => void save(false)} disabled={saving} title="フォームを保存（公開中の内容は変わりません）" aria-label="フォームを保存（公開中の内容は変わりません）">
                 {saving ? '保存中...' : '下書きを保存する'}
               </Button>
               <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={() => setShowPublish(true)} disabled={saving}>
@@ -1501,7 +1501,7 @@ function FormEditInner() {
                     <button
                       onClick={() => setTab(i)}
                       onDoubleClick={() => renameSection(i)}
-                      title="ダブルクリックで名前を変えられます"
+                      title="ダブルクリックで名前を変えられます" aria-label="ダブルクリックで名前を変えられます"
                       className={`rounded-control px-3 py-1.5 text-sm font-medium whitespace-nowrap ${
                         tab === i
                           ? 'bg-accent-soft text-accent-deep'
@@ -1708,7 +1708,7 @@ function FormEditInner() {
       <StickyBar
         actions={(
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" className="px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => void save(false)} disabled={saving} title="フォームを保存（公開中の内容は変わりません）">
+            <Button variant="secondary" className="px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => void save(false)} disabled={saving} title="フォームを保存（公開中の内容は変わりません）" aria-label="フォームを保存（公開中の内容は変わりません）">
               {saving ? '保存中...' : '下書きを保存する'}
             </Button>
             <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={() => void save(true)} disabled={saving}>

@@ -578,7 +578,7 @@ export default function AffiliatesTabV8({
                     </td>
                     <td>
                       <div className="af-list-personCell">
-                        <button type="button" className="af-list-personName" title={row.name} onClick={() => openDrawer(row.id, false)}>
+                        <button type="button" className="af-list-personName" title={row.name} aria-label={row.name} onClick={() => openDrawer(row.id, false)}>
                           {row.name}
                         </button>
                         <span className="af-list-personCode" title={row.code}>{row.code}</span>

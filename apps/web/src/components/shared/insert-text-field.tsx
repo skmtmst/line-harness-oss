@@ -680,7 +680,7 @@ export const InsertButton = forwardRef<HTMLButtonElement, {
       data-size={size}
       onClick={onClick}
       disabled={disabled}
-      title={title}
+      title={title} aria-label={title}
       aria-haspopup={expanded === undefined ? undefined : 'menu'}
       aria-expanded={expanded}
     >

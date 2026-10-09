@@ -164,7 +164,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
                 <Tr key={item.id} className={styles.row}>
                   <Td className={`${styles.td} ${styles.colName}`}>
                     {canEdit ? (
-                      <button type="button" className={styles.name} title={item.name} onClick={() => openEdit(item)}>{item.name}</button>
+                      <button type="button" className={styles.name} title={item.name} aria-label={item.name} onClick={() => openEdit(item)}>{item.name}</button>
                     ) : <span className={styles.name} title={item.name}>{item.name}</span>}
                   </Td>
                   <Td className={styles.td}>{item.kind === 'course' ? 'コース' : '単品'}</Td>
