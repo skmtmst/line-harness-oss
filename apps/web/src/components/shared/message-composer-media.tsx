@@ -4,12 +4,13 @@ import { useEffect, useRef, useState } from 'react'
 import { FolderOpen, Play, Pause, Upload } from 'lucide-react'
 import type { BroadcastBubble, MediaItem } from '@line-crm/shared'
 import { api } from '@/lib/api'
-import MediaPickerDialog from '@/v8/template-edit/media-picker'
+import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import { extractMediaMetadata, putMediaFile, validateMediaFile } from '@/v8/contents/media-direct-upload'
 import { emptyMessageKindState, type MessageKindState } from '@/components/scenarios/message-kind-fields'
 import Button from './button'
 import { japaneseDetailOf } from './api-error-message'
 import FileDropzone from './file-drop'
+import MediaSlot from './media-slot'
 import { TextField } from './text-field'
 import styles from './message-composer.module.css'
 
@@ -86,14 +87,33 @@ export default function ComposerMedia({ bubble, accountId, onChange, disabled, o
   }
   return <>
     {audio && !accountId ? <p role="note">統括では音声のアップロードと登録メディアの選択はまだ使えません。URLと長さを入力してください。</p> : null}
-    <div className={styles.mediaChoices}>
-      {accountId ? <Button className={styles.mediaPick} disabled={busy || disabled} onClick={() => setPicker(true)}><FolderOpen size={20} aria-hidden /><strong>登録メディアから選ぶ</strong><small>{`登録メディア一覧の${audio ? '音声' : video ? '動画' : '画像'}から`}</small></Button> : null}
-      {audio && !accountId ? null : <FileDropzone variant="composer" icon={<Upload size={20} aria-hidden />} className={styles.mediaPick} title="ファイルを選ぶ・ここへドラッグ" hint={audio ? 'm4a・mp3 ／ 200MB まで ／ 長さは自動で入ります' : video ? 'MP4 ／ 200MB まで' : 'JPEG・PNG ／ 10MB まで'} accept={audio ? 'audio/mp4,audio/mpeg' : video ? 'video/mp4' : 'image/jpeg,image/png'} busy={busy} disabled={disabled} onFiles={(files) => void upload(files[0])} />}
-    </div>
-    {url ? <div className={styles.attachment}>{audio ? <AudioPreview key={url} url={url} duration={state.audio.duration} name={String(bubble.content.fileName ?? '選んだ音声')} disabled={busy || disabled} /> : video ? <video src={url} poster={String(bubble.content.previewImageUrl ?? '')} controls aria-label="動画のプレビュー" /> : <img src={url} alt="画像のプレビュー" />}{!audio ? <span title={String(bubble.content.fileName ?? '')}>{String(bubble.content.fileName ?? '選んだファイル')}</span> : null}<Button size="composer-small" disabled={busy || disabled} onClick={() => onChange(audio ? { state: { ...state, audio: { originalContentUrl: '', duration: '' } } } : {})}>外す</Button></div> : null}
+    {audio ? <>
+      <div className={styles.mediaChoices}>
+        {accountId ? <Button className={styles.mediaPick} disabled={busy || disabled} onClick={() => setPicker(true)}><FolderOpen size={20} aria-hidden /><strong>登録メディアから選ぶ</strong><small>登録メディア一覧の音声から</small></Button> : null}
+        {accountId ? <FileDropzone variant="composer" icon={<Upload size={20} aria-hidden />} className={styles.mediaPick} title="ファイルを選ぶ・ここへドラッグ" hint="m4a・mp3 ／ 200MB まで ／ 長さは自動で入ります" accept="audio/mp4,audio/mpeg" busy={busy} disabled={disabled} onFiles={(files) => void upload(files[0])} /> : null}
+      </div>
+      {url ? <div className={styles.attachment}><AudioPreview key={url} url={url} duration={state.audio.duration} name={String(bubble.content.fileName ?? '選んだ音声')} disabled={busy || disabled} /><Button size="composer-small" disabled={busy || disabled} onClick={() => onChange({ state: { ...state, audio: { originalContentUrl: '', duration: '' } } })}>外す</Button></div> : null}
+    </> : (
+      /* 画像・動画は共通の「画像を追加する所」（MediaSlot・Z7vd2・B-128）。送り先と形式の検査はこの欄が持つ。 */
+      <MediaSlot
+        kind={video ? 'video' : 'image'}
+        title={video ? '動画を追加' : '画像を追加'}
+        previewAlt={video ? '動画のプレビュー' : '画像のプレビュー'}
+        value={url || null}
+        valueName={String(bubble.content.fileName ?? '') || undefined}
+        accept={video ? 'video/mp4' : 'image/jpeg,image/png'}
+        limitText={video ? '1ファイル200メガバイト以内・MP4' : '1ファイル10メガバイト以内・JPEG・PNG'}
+        busy={busy}
+        error={error}
+        disabled={disabled}
+        onFile={(file) => void upload(file)}
+        onRemove={() => onChange({})}
+        onMediaPick={accountId ? () => setPicker(true) : undefined}
+      />
+    )}
     {video ? <TextField aria-label="動画のプレビュー画像のURL" value={String(bubble.content.previewImageUrl ?? '')} placeholder="プレビュー画像のURL（必須・https・JPEG/PNG・1MBまで）" disabled={busy || disabled} onChange={(event) => onChange({ ...bubble.content, previewImageUrl: event.target.value })} /> : null}
     {audio && !accountId ? <div className={styles.audioManual}><label>音声のURL<TextField value={state.audio.originalContentUrl} disabled={busy || disabled} onChange={(event) => onChange({ ...bubble.content, state: { ...state, audio: { ...state.audio, originalContentUrl: event.target.value } } })} /></label><label>長さ（秒）<TextField value={state.audio.duration} disabled={busy || disabled} onChange={(event) => onChange({ ...bubble.content, state: { ...state, audio: { ...state.audio, duration: event.target.value } } })} /></label></div> : null}
-    {error ? <p role="alert" className={styles.error}>{error}</p> : null}
+    {audio && error ? <p role="alert" className={styles.error}>{error}</p> : null}
     <MediaPickerDialog open={picker} accountId={accountId} kind={audio ? 'audio' : video ? 'video' : 'image'} onClose={() => setPicker(false)} onSelect={select} />
   </>
 }

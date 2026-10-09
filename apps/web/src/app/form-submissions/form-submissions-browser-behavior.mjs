@@ -203,6 +203,7 @@ async function openHarness(browser, {
       },
     ],
   }
+  let savedDetail = detail
   const context = await browser.newContext({ viewport })
   await context.addInitScript((selectedTheme) => {
     localStorage.setItem('lh_selected_account', 'account-a')
@@ -263,7 +264,8 @@ async function openHarness(browser, {
     }
     if (detail && path === `/api/forms/${detail.id}`) {
       if (request.method() === 'PUT') {
-        state.putBodies.push(JSON.parse(request.postData() ?? '{}'))
+        const body = JSON.parse(request.postData() ?? '{}')
+        state.putBodies.push(body)
         const next = putResults.shift() ?? 'ok'
         if (next === 'conflict') {
           return json({
@@ -273,9 +275,10 @@ async function openHarness(browser, {
             data: { contentRevision: detail.contentRevision + 1, updatedAt: '2026-09-11T14:32:00.000+09:00' },
           }, 409)
         }
-        return json({ success: true, data: { ...detail, contentRevision: detail.contentRevision + 1 } })
+        savedDetail = { ...savedDetail, ...body, contentRevision: savedDetail.contentRevision + 1 }
+        return json({ success: true, data: savedDetail })
       }
-      return json({ success: true, data: detail })
+      return json({ success: true, data: savedDetail })
     }
     if (path === '/api/forms') {
       if (fail) return json({ success: false, error: 'failed' }, 500)
@@ -452,6 +455,11 @@ try {
     await page.getByRole('button', { name: '並び順' }).click()
     await page.getByRole('button', { name: '回答が多い順', exact: true }).click()
     await waitForQuery(page, 'sort', 'answers')
+    // URL の更新と、API が返した並びの描画は別。先頭行が更新されるまで待つ。
+    await page.waitForFunction(
+      () => document.querySelector('tbody tr')?.textContent?.includes('フォーム23'),
+      undefined, { timeout: 10_000 },
+    )
     assert.equal((await rows(page).first().innerText()).includes('フォーム23'), true, '回答が多い順が先頭へ来る')
 
     await page.getByRole('button', { name: '次のページ' }).click()
@@ -866,7 +874,7 @@ try {
   }
 
   /*
-   * 12. V8 の編集画面で、カード（OGP）の3欄に打った文字が保存の中身まで届く（#725 を V8 でも）。
+   * 12. V8 の編集画面で、カード（OGP）の3欄が保存へ届き、再読込しても残る（#725 を V8 でも）。
    */
   {
     const detail = {
@@ -885,16 +893,36 @@ try {
     await linkDialog.waitFor({ timeout: 15_000 })
     await page.locator('#fe-og-title').fill('ごはんの相談フォーム')
     await page.locator('#fe-og-desc').fill('3分で終わります')
-    await page.locator('#fe-og-image').fill('https://example.test/ogp.png')
+    // MediaSlot は「URL で入れる」を押してから入力欄を出す。
+    assert.equal(await linkDialog.locator('#fe-og-image').count(), 0, 'V8: 画像URLは開く前に出さない')
+    await linkDialog.getByRole('button', { name: 'URL で入れる', exact: true }).click()
+    await linkDialog.locator('#fe-og-image').fill('https://example.test/ogp.png')
     await linkDialog.getByRole('button', { name: '閉じる', exact: true }).last().click()
     await linkDialog.waitFor({ state: 'detached', timeout: 10_000 })
+    const saved = page.waitForResponse((response) =>
+      new URL(response.url()).pathname === '/api/forms/form-1' && response.request().method() === 'PUT' && response.ok(),
+    )
     await page.getByRole('button', { name: '下書きを保存', exact: true }).click()
-    for (let i = 0; i < 100 && state.putBodies.length === 0; i += 1) await page.waitForTimeout(50)
+    await saved
     const sent = state.putBodies.at(-1)
     assert.ok(sent, 'V8: 保存が飛ぶ')
     assert.equal(sent.ogTitle, 'ごはんの相談フォーム', 'V8: 打った見出しが保存へ乗る')
     assert.equal(sent.ogDescription, '3分で終わります', 'V8: 打った説明が保存へ乗る')
     assert.equal(sent.ogImageUrl, 'https://example.test/ogp.png', 'V8: 打った画像URLが保存へ乗る')
+    // 編集画面を読み直し、サーバが返した値を同じ操作で確かめる。
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await page.locator('#fe-name').waitFor({ timeout: 15_000 })
+    await page.waitForFunction(
+      (expected) => document.querySelector('#fe-name')?.value === expected,
+      sent.name, { timeout: 15_000 },
+    )
+    await page.getByRole('button', { name: /^リンクの見え方：/ }).click()
+    await linkDialog.waitFor({ timeout: 15_000 })
+    assert.equal(await linkDialog.locator('#fe-og-title').inputValue(), sent.ogTitle, 'V8: 再読込で見出しが残る')
+    assert.equal(await linkDialog.locator('#fe-og-desc').inputValue(), sent.ogDescription, 'V8: 再読込で説明が残る')
+    // 保存済みの MediaSlot は URL の入口でなく画像の見本を出す。
+    assert.equal(await linkDialog.getByRole('img', { name: 'カードの画像', exact: true }).getAttribute('src'), sent.ogImageUrl,
+      'V8: 再読込で保存した画像URLを見本に使う')
     await context.close()
   }
 

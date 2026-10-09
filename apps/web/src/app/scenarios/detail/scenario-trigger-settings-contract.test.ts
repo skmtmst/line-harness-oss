@@ -47,8 +47,8 @@ describe('U027: シナリオ一覧のフォルダ領域を折り畳む', () => {
   })
 
   it('選択肢の行は増えても帯の外は1行。長い名前は FolderPanel 側で省略される', () => {
-    // 絞り込みの選択は今までどおり FolderPanel の行で行う。
+    // 絞り込みの選択は今までどおり FolderPanel（共通の ManagedFolderPanel）の行で行う。
     expect(LIST).toContain('onSelect={setFolderFilter}')
-    expect(LIST).toContain("id: UNFILED")
+    expect(LIST).toContain('unfiledId={UNFILED}')
   })
 })

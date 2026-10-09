@@ -52,6 +52,7 @@ vi.mock('@/lib/api', () => ({
   eventsApi: { listEvents: fixture.listEvents },
 }))
 
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 import NewReminderPage from './page'
 
 function fieldsOf(accountId: string) {
@@ -169,11 +170,8 @@ describe('起点の実在候補選択', () => {
     fireEvent.click(screen.getByRole('radio', { name: /イベントの予約日時/ }))
 
     await waitFor(() => expect(fixture.listEvents).toHaveBeenCalled())
-    await waitFor(() => {
-      const select = screen.getByLabelText('基準日にするイベント') as HTMLSelectElement
-      expect([...select.options].some((option) => option.value === 'event-2')).toBe(true)
-    })
-    fireEvent.change(screen.getByLabelText('基準日にするイベント'), { target: { value: 'event-2' } })
+    await waitFor(() => expect((screen.getByRole('button', { name: '基準日にするイベント：選ぶ' }) as HTMLButtonElement).disabled).toBe(false))
+    await pickEntity('基準日にするイベント', '10月の体験会')
 
     goNext()
     await waitFor(() => expect(fixture.createDraft).toHaveBeenCalled())
@@ -187,10 +185,7 @@ describe('起点の実在候補選択', () => {
     render(<NewReminderPage />)
     fillName()
     fireEvent.click(screen.getByRole('radio', { name: /イベントの予約日時/ }))
-    await waitFor(() => {
-      const select = screen.getByLabelText('基準日にするイベント') as HTMLSelectElement
-      expect([...select.options].some((option) => option.value === 'event-1')).toBe(true)
-    })
+    await waitFor(() => expect((screen.getByRole('button', { name: '基準日にするイベント：選ぶ' }) as HTMLButtonElement).disabled).toBe(false))
     await waitNextEnabled()
 
     goNext()

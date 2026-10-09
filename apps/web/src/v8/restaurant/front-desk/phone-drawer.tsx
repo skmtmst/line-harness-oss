@@ -21,6 +21,8 @@ import { TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
 import { restaurantTestApi, type RestaurantReservation, type RestaurantTable } from '@/lib/restaurant-test-api'
 import { STAY_MINUTES, freeTables, openTimes, startOf, tableNote, toYmd } from './slots'
+import { useFormErrors } from '@/lib/use-form-errors'
+import { FieldError } from '@/components/shared/form-controls'
 import styles from './front-desk.module.css'
 
 type Friend = { name: string; phone: string; lineUid: string }
@@ -68,9 +70,10 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
   /* 開くたびに空から始める。 */
   useEffect(() => {
     if (!open) return
+    fields.reset()
     setPhone(''); setFriends([]); setFriend(null); setName(''); setGuests(2); setDayChoice('today'); setPicked('')
     setTime(''); setTableId('auto'); setChangingTable(false); setMemo(''); setNotify(true); setError('')
-  }, [open])
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps -- 欄の印の片付けは開いたときだけ
 
   const date = dayChoice === 'today' ? toYmd(now) : dayChoice === 'tomorrow' ? toYmd(addDays(now, 1)) : picked
 
@@ -128,11 +131,17 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
     if (item) setName(item.name)
   }
 
+  /* 予約を入れるときに落ちた欄は、その欄の真下に理由を出して移る（B-139）。 */
+  const fields = useFormErrors()
+  fields.define('name', 'お名前', () => (name.trim() ? null : 'お名前を入れてください。'))
+  fields.define('date', '日付', () => (date ? null : '日付を選んでください。'))
+  fields.define('time', '時刻', () => (!date ? null : !time ? '時刻を選んでください。' : chosenTable ? null : 'この時刻に人数が入る卓がありません。時刻か人数を変えてください。'))
+  const describedBy = (key: string) => (fields.invalid(key) ? `e2-${key}-error` : undefined)
+
   const save = async () => {
     setError('')
-    if (!name.trim()) { setError('お名前を入れてください。'); return }
-    if (!date || !time) { setError('日付と時刻を選んでください。'); return }
-    if (!chosenTable) { setError('この時刻に人数が入る卓がありません。時刻か人数を変えてください。'); return }
+    if (fields.submit().length > 0) return
+    if (!date || !time || !chosenTable) return
     const startsAt = new Date(startOf(date, time))
     setBusy(true)
     try {
@@ -191,10 +200,11 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
             })}
           </div>
         ) : null}
-        <label className={styles.field}>
-          <span className={styles.label}>お名前</span>
-          <TextField value={name} onChange={(event) => setName(event.target.value)} autoComplete="off" />
-        </label>
+        <div className={styles.field}>
+          <label htmlFor="e2-name" className={styles.label}>お名前</label>
+          <TextField {...fields.bind('name')} id="e2-name" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'e2-name-error' : undefined} value={name} onChange={(event) => setName(event.target.value)} autoComplete="off" />
+          <FieldError id="e2-name-error">{fields.error('name')}</FieldError>
+        </div>
         <div className={styles.field}>
           <span className={styles.label} id="e2-guests">人数</span>
           <div className={styles.stepper} role="group" aria-labelledby="e2-guests">
@@ -218,13 +228,16 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
           />
           </span>
           {dayChoice === 'pick' ? (
-            <DateField value={picked} onChange={(value) => { setPicked(value); setTime('') }} min={toYmd(now)} aria-label="予約の日付" />
+            <span {...fields.bind('date')}>
+              <DateField value={picked} onChange={(value) => { setPicked(value); setTime('') }} min={toYmd(now)} aria-label="予約の日付" invalid={fields.invalid('date')} aria-describedby={describedBy('date')} />
+            </span>
           ) : null}
+          <FieldError id="e2-date-error">{fields.error('date')}</FieldError>
         </div>
         <div className={styles.field}>
           <span className={styles.label} id="e2-times">時刻（空いている時刻だけ）</span>
           {/* 時刻の札が1行出る高さを先に取る（空きが無い日・日付を選ぶ前でも下の卓・メモが上下しない）。 */}
-          <div className={styles.timeBox}>
+          <div className={styles.timeBox} {...fields.bind('time')} aria-invalid={fields.invalid('time') || undefined} aria-describedby={describedBy('time')}>
           {!date ? (
             <p className={styles.hint}>日付を選ぶと空いている時刻が出ます。</p>
           ) : times.filter(freeAt).length === 0 ? (
@@ -237,6 +250,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
             </div>
           )}
           </div>
+          <FieldError id="e2-time-error">{fields.error('time')}</FieldError>
         </div>
         <div className={styles.tableRow}>
           <div className={styles.tableText}>

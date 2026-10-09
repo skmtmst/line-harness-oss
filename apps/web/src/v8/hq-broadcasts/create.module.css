@@ -33,7 +33,6 @@
 }
 
 .accountSelection { display: flex; align-items: center; gap: var(--tpl-e49-gap-m); min-width: 0; }
-.accountSummary { flex: 1; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-caption); color: var(--color-ink-secondary); }
 
 /* 本文の下の差し込み（店の一斉配信の「差し込む：」と同じ並び） */
 .inserts {

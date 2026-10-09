@@ -99,7 +99,7 @@ describe('HQひな形の配布フロー', () => {
     fireEvent.click((await screen.findAllByRole('button', { name: 'テンプレートを作る' }))[0])
     fireEvent.change(screen.getByPlaceholderText('例：夏の定番5点'), { target: { value: '画像付き案内' } })
     fireEvent.change(screen.getByLabelText(/本文（/), { target: { value: '本文' } })
-    fireEvent.change(screen.getByLabelText('カードの画像ファイル'), { target: { files: [new File(['fixture'], 'a.png', { type: 'image/png' })] } })
+    fireEvent.change(screen.getByLabelText('画像を追加（ファイル）'), { target: { files: [new File(['fixture'], 'a.png', { type: 'image/png' })] } })
     await waitFor(() => expect((screen.getByRole('button', { name: '下書きを保存' }) as HTMLButtonElement).disabled).toBe(true))
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })); expect(calls.create).not.toHaveBeenCalled()
     finish({ id:'image',kind:'image',filename:'a.png',mimeType:'image/png',sizeBytes:32,width:1040,height:1040,durationMs:null,r2Key:'hq-templates/tenant-a/uploads/a.png',publicUrl:'https://img.test/a.png',versionId:'image',versionNo:1,contentHash:'a'.repeat(64) })

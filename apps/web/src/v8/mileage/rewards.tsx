@@ -30,7 +30,7 @@ import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel from '@/components/shared/folder-panel'
+import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import HelpTip from '@/components/shared/help-tip'
 import KpiBand from '@/components/shared/kpi-band'
@@ -65,6 +65,10 @@ const KIND_FOLDER: Record<MileageRewardKind, 'クーポン' | 'タグ・メッ�
   rank: '先行・ランク',
 }
 
+/*
+ * 使い道の種類で分けた見え方（保存しない）。作ったフォルダではないので、左のフォルダの列ではなく
+ * 上の絞り込み（「種類」の選ぶ欄）に置く（B-136 2026-10-09）。
+ */
 const FOLDERS = ['すべて', 'クーポン', 'タグ・メッセージ', 'シナリオ', '先行・ランク', '未分類'] as const
 type Folder = (typeof FOLDERS)[number]
 
@@ -513,13 +517,31 @@ export default function RewardsTab() {
     </KpiBand>
   )
 
+  /*
+   * 左の列は共通の ManagedFolderPanel。使い道のフォルダの口（mileage_reward_folders）はまだ使えるようになっていないので
+   * 「すべて」だけ。口ができたら kind を渡すだけで、追加・「…」（名前・色・並べ替え・消す）・未分類が出る。
+   */
   const folderPanel = (
-    <FolderPanel
-      heading="フォルダ"
-      rows={FOLDERS.map((key) => ({ kind: key === 'すべて' ? 'all' as const : key === '未分類' ? 'unfiled' as const : 'folder' as const, id: key, label: key, count: folderCounts.get(key) ?? 0 }))}
-      activeId={folder}
-      onSelect={(id) => { setPage(1); setFolder(id as Folder) }}
+    <ManagedFolderPanel
+      kind={null}
+      folders={[]}
+      onChanged={() => undefined}
+      canManage={!readonly}
+      itemLabel="使い道"
+      activeId="all"
+      onSelect={() => undefined}
+      allCount={folderCounts.get('すべて') ?? null}
     />
+  )
+  const kindSelect = (
+    <div className={styles.narrowFolder}>
+      <Select
+        aria-label="種類"
+        value={folder}
+        options={FOLDERS.map((key) => ({ value: key, label: key === 'すべて' ? '種類：すべて' : `${key === '未分類' ? 'そのほか' : key} ${formatMileageNumber(folderCounts.get(key) ?? 0)}` }))}
+        onChange={(value) => { setPage(1); setFolder(value as Folder) }}
+      />
+    </div>
   )
 
   const createButton = (full: boolean) => (
@@ -571,17 +593,10 @@ export default function RewardsTab() {
           if (!value) { setSearch(''); setPage(1) }
         },
       }}
-      chips={chips}
+      chips={narrow ? chips : <>{kindSelect}{chips}</>}
       narrowLead={<>
         {createButton(false)}
-        <div className={styles.narrowFolder}>
-          <Select
-            aria-label="フォルダ"
-            value={folder}
-            options={FOLDERS.map((key) => ({ value: key, label: `フォルダ：${key}` }))}
-            onChange={(value) => { setPage(1); setFolder(value as Folder) }}
-          />
-        </div>
+        {kindSelect}
       </>}
       trailing={<>
         <SavedSelect
@@ -674,7 +689,7 @@ export default function RewardsTab() {
               <Tr key={reward.id} className={styles.row} data-table-layout="columns">
                 <Td className={styles.colName}>
                   {/* 名前の前にフォルダの丸（左のフォルダの列と同じ分け方。未分類は輪）。補足は名前の頭にそろえる。 */}
-                  <FolderDotName folder={folderOf(reward) === '未分類' ? null : { name: folderOf(reward) }}>
+                  <FolderDotName folder={null}>
                     <span className={styles.rowName} title={reward.name}>{reward.name}</span>
                   </FolderDotName>
                   <span className={`${styles.rowSub} ${styles.dotIndent}`}>
@@ -831,7 +846,7 @@ export default function RewardsTab() {
       }
       stats={stats}
       folders={<>{createButton(true)}{folderPanel}</>}
-      folderNav={narrow ? undefined : { rows: FOLDERS.map((key) => ({ id: key, label: key })), activeId: folder, onSelect: (id) => { setPage(1); setFolder(id as Folder) }, createAction: readonly ? undefined : createButton(false) }}
+      folderNav={narrow ? undefined : { rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => undefined, createAction: readonly ? undefined : createButton(false) }}
       toolbar={toolbar}
       pagination={pager}
     >

@@ -56,7 +56,11 @@ type Props = FolderNameColorFieldsProps & Pick<ComponentProps<typeof Dialog>, 'o
 }
 
 /** IjVpM の低い窓。保存先やエラー処理は画面が持ち、形はここに集約する。 */
-export default function FolderEditorDialog({ name, nameError, nameRef, onNameChange, color, onColorChange, colors = FOLDER_SELECT_COLORS, allowClear, disabled, nameId, nameLabel, placeholder, maxLength, children, footer, confirmIcon, confirmTitle, confirmLabel = '追加する', cancelLabel = 'キャンセル', onConfirm, busy, confirmDisabled, ...dialog }: Props) {
+export default function FolderEditorDialog({ name, nameError, nameRef, onNameChange, color, onColorChange, colors = FOLDER_SELECT_COLORS, allowClear, disabled, nameId, nameLabel, placeholder, maxLength, children, footer, confirmIcon, confirmTitle, confirmLabel = '追加する', cancelLabel = 'キャンセル', onConfirm, busy, confirmDisabled, error, ...dialog }: Props) {
+  /*
+   * 失敗の知らせは窓の本文の中（名前と色の下）に置く。窓の下の帯（やめる・保存する）とは本文の余白で離れ、
+   * 知らせが増えたぶん窓が下へ伸びる（2026-10-09 オーナー：知らせがボタンに重なっていた）。
+   */
   return <Dialog {...dialog} busy={busy} designWidth={560} designHeaderPadding="24px 24px 0"
     footer={<div className={styles.footer}>{footer ?? <>
       <Button type="button" onClick={dialog.onCancel} disabled={busy}>{cancelLabel}</Button>
@@ -68,6 +72,7 @@ export default function FolderEditorDialog({ name, nameError, nameRef, onNameCha
       <FolderNameColorFields name={name} nameError={nameError} nameRef={nameRef} onNameChange={onNameChange} color={color} onColorChange={onColorChange}
         colors={colors} allowClear={allowClear} disabled={disabled || busy} nameId={nameId} nameLabel={nameLabel}
         placeholder={placeholder} maxLength={maxLength} onSubmit={confirmDisabled ? undefined : onConfirm} />
+      {error ? <p className={styles.error} role="alert" data-folder-dialog-error="">{error}</p> : null}
     </div>
   </Dialog>
 }

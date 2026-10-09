@@ -86,8 +86,6 @@ describe('共通部品の影響範囲', () => {
       'app/booking/menus/page.tsx',
       // #1145(★V8) の一斉配信の一覧（app/broadcasts/list-v8.tsx）は描かれなくなった。入口は src/v8/broadcasts/list.tsx（下）。
       'app/common-actions/page.tsx',
-      // N-193/N-205: 登録メディア選択窓。20件ずつのページ送りを共通へ寄せた。
-      'app/contents/media-picker-dialog.tsx',
       'app/contents/media-replacement-dialog.tsx',
       'app/contents/page.tsx',
       // #973: 共通情報の変更影響を1件ずつ確認する一覧にページ送りを追加した。
@@ -164,6 +162,8 @@ describe('共通部品の影響範囲', () => {
 
       'components/line-notifications/notification-run-list.tsx',
       'components/ops/knowledge-list.tsx',
+      // N-193/N-205・B-128: 登録メディアから選ぶ窓。3つの写しを共通部品1つにまとめた。20件ずつのページ送り。
+      'components/shared/media-picker-dialog.tsx',
       'components/staff/login-audit.tsx',
       'components/support/pending-inbox-card.tsx',
       'components/users/users-table.tsx',
@@ -196,8 +196,6 @@ describe('共通部品の影響範囲', () => {
       'v8/friend-add-runs/runs.tsx',
       // ★V8 LINE通知の送れなかったもの・記録（DrwMm・PZBVb）。src/v8 に一から書いた表の下のページ送り。
       'v8/settings/line-notifications/runs-tab.tsx',
-      // ★V8 回答フォームの編集（m1cWEy ほか）。登録メディアから選ぶ窓の写しにページ送り。
-      'v8/form-edit/media-picker.tsx',
       // V8 のリッチメニュー一覧（src/v8 に一から書いた）。
       'v8/rich-menus/list.tsx',
       // ★V8 自動応答の一覧（uE9gf）。新しい置き場（src/v8）に一から書いた。
@@ -250,8 +248,6 @@ describe('共通部品の影響範囲', () => {
       // ★V8 運営の監査ログ（e7ljE）・ナレッジ（h114s）。src/v8/ops に一から書いた。
       'v8/ops/audit.tsx',
       'v8/ops/knowledge.tsx',
-      // ★V8 テンプレートのクーポンを作る（S6FEuB）。登録メディアの選ぶ窓を src/v8 に写した。
-      'v8/template-edit/media-picker.tsx',
       // ★V8 リマインダの詳細（rbAig・loVfW）。配信予定・実行結果・登録者の表の下にページ送り。
       'v8/reminders/detail.tsx',
       // ★V8 ウェビナーの参加者（uNsEy）。表の下にページ送りを置く。

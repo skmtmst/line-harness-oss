@@ -10,6 +10,7 @@ import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import ScheduleDialog from './schedule-dialog'
 import { TextArea } from '@/components/shared/text-field'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 
 /**
  * 1人だけ選んだときの操作（設計 `BulkBar` の6つ）。
@@ -234,12 +235,7 @@ function TemplatePanel({ friendId, accountId, busy, run }: { friendId: string; a
   return (
     <div className="space-y-2">
       <Row>
-        <Select
-          aria-label="テンプレート"
-          value={id}
-          onChange={setId}
-          options={[{ value: '', label: 'テンプレートを選ぶ' }, ...templates.map((t) => ({ value: t.id, label: t.name }))]}
-        />
+        <div className="min-w-0 flex-1"><EntityKindField kind="template" label="テンプレート" options={templates} value={id} onChange={setId} /></div>
         <Go
           busy={busy || !picked}
           onClick={() =>
@@ -271,12 +267,7 @@ function ScenarioPanel({ friendId, accountId, busy, run }: { friendId: string; a
   }, [accountId])
   return (
     <Row>
-      <Select
-        aria-label="シナリオ"
-        value={id}
-        onChange={setId}
-        options={[{ value: '', label: 'シナリオを選ぶ' }, ...items.map((s) => ({ value: s.id, label: s.name }))]}
-      />
+      <div className="min-w-0 flex-1"><EntityKindField kind="scenario" label="シナリオ" options={items} accountId={accountId} value={id} onChange={setId} /></div>
       <Go
         busy={busy || !id}
         onClick={() => void run(() => api.scenarios.enroll(id, friendId), 'シナリオを開始しました')}
@@ -362,12 +353,7 @@ function TagPanel({
 
   return (
     <Row>
-      <Select
-        aria-label="タグ"
-        value={id}
-        onChange={setId}
-        options={[{ value: '', label: 'タグを選ぶ' }, ...tags.map((t) => ({ value: t.id, label: t.name }))]}
-      />
+      <div className="min-w-0 flex-1"><EntityKindField kind="tag" label="タグ" options={tags} value={id} onChange={setId} /></div>
       <Go busy={busy || !id} onClick={attach} label="付ける" />
       <Button variant="secondary" className="text-ink-secondary px-3 py-1.5 text-xs disabled:opacity-50 h-auto whitespace-normal" type="button" disabled={busy || !id} onClick={detach}>
         外す
@@ -422,12 +408,7 @@ function ReminderPanel({ friendId, busy, run }: { friendId: string; busy: boolea
   }, [])
   return (
     <Row>
-      <Select
-        aria-label="リマインダ"
-        value={id}
-        onChange={setId}
-        options={[{ value: '', label: 'リマインダを選ぶ' }, ...items.map((r) => ({ value: r.id, label: r.name }))]}
-      />
+      <div className="min-w-0 flex-1"><EntityKindField kind="reminder" label="リマインダ" options={items} value={id} onChange={setId} /></div>
       <DateTimeField
         value={targetDate}
         onChange={setTargetDate}

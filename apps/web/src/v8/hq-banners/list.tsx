@@ -10,7 +10,7 @@
  * 案内の帯・タブ・道具の段・カード（プロジェクト）／画像のます（ライブラリ）・件数と次へ。
  */
 import { useSamePageUrl } from '@/lib/use-same-page-url'
-import { CircleDot, Folder, Gauge, Inbox, Plus, Send, Sparkles, Star, Upload } from 'lucide-react'
+import { CircleDot, Folder, Gauge, Plus, Send, Sparkles, Star, Upload } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ListPage } from '@/components/templates'
@@ -19,7 +19,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
 import { notifyToast } from '@/components/shared/toast'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
@@ -246,11 +246,14 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
   }, [projects, query, view, sort])
 
   const ready = status === 'ready' && !archivedMode
-  const rows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: 'all', label: 'すべて', count: ready ? projects.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
-    { kind: 'folder' as const, id: 'favorite', label: 'お気に入り', count: ready ? projects.filter((p) => p.isFavorite).length : null, color: 'var(--color-status-info)' },
-    { kind: 'folder' as const, id: 'running', label: '生成中', count: ready ? projects.filter((p) => p.runningCount > 0).length : null, color: 'var(--color-accent)' },
-    { kind: 'folder' as const, id: 'archived', label: 'アーカイブ', count: archivedCount, color: 'var(--color-status-warn)' },
+  /*
+   * お気に入り・生成中・アーカイブは作ったフォルダではなく状態なので、左の列ではなく上の絞り込みの札に置く（B-136）。
+   * 左の列は共通の ManagedFolderPanel。プロジェクトのフォルダの口（API）がまだ無いので「すべて」だけ。
+   */
+  const viewChips: Array<{ key: ProjectView; label: string; count: number | null }> = [
+    { key: 'favorite', label: 'お気に入り', count: ready ? projects.filter((p) => p.isFavorite).length : null },
+    { key: 'running', label: '生成中', count: ready ? projects.filter((p) => p.runningCount > 0).length : null },
+    { key: 'archived', label: 'アーカイブ', count: archivedCount },
   ]
 
   const createProject = canManage ? (
@@ -258,17 +261,23 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
       <Plus aria-hidden="true" className={styles.buttonIcon} />プロジェクトを作る
     </Button>
   ) : null
-  const selectView = (id: string) => setView(id as ProjectView)
   const folders = (
     <div className={styles.folderInset}>
-      <FolderPanel
+      <ManagedFolderPanel
+        kind={null}
+        folders={[]}
+        onChanged={() => undefined}
+        canManage={canManage}
+        itemLabel="プロジェクト"
         createAction={createProject}
-        heading="見る"
-        rows={rows}
-        activeId={view}
-        onSelect={selectView}
+        activeId="all"
+        onSelect={() => setView('all')}
+        allCount={ready ? projects.length : null}
       />
     </div>
+  )
+  const viewFilter = (
+    <ViewChips chips={viewChips} active={view} onChange={(next) => setView((next ?? 'all') as ProjectView)} />
   )
 
   const body = status === 'loading' ? (
@@ -322,11 +331,12 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
       title="バナー生成"
       description="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ配ります。"
       folders={folders}
-      folderNav={{ rows, activeId: view, onSelect: selectView, createAction: createProject, label: '見る' }}
+      folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => setView('all'), createAction: createProject }}
     >
       <div className={styles.body}>
         {head}
         <BannerLimitNotice usage={usage} />
+        {viewFilter}
         <div className={styles.tools}>
           <div className={styles.projectSearch}>
             <SearchField
@@ -357,6 +367,26 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
         }}
       />
     </ListPage>
+  )
+}
+
+/** 上の絞り込みの札（見る：お気に入り・状態）。もう一度押すと外れて「すべて」に戻る。 */
+function ViewChips<K extends string>({ chips, active, onChange }: {
+  chips: Array<{ key: K; label: string; count: number | null }>
+  active: string
+  onChange: (next: K | null) => void
+}) {
+  return (
+    <div className={styles.tools}>
+      <span className={styles.toolLabel}>見る</span>
+      <div role="group" aria-label="見るもので絞り込む" className={styles.chips}>
+        {chips.map((chip) => (
+          <FilterChip key={chip.key} selected={active === chip.key} onChange={(on) => onChange(on ? chip.key : null)}>
+            {chip.count === null ? chip.label : `${chip.label} ${formatNumber(chip.count)}`}
+          </FilterChip>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -541,11 +571,11 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
   }
 
   const ready = status === 'ready'
-  const rows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: 'all', label: 'すべて', count: ready ? counts?.all ?? images.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
-    { kind: 'folder' as const, id: 'favorite', label: 'お気に入り', count: ready ? counts?.favorite ?? null : null, color: 'var(--color-status-info)' },
-    { kind: 'folder' as const, id: 'delivered', label: '配布済み', count: ready ? counts?.delivered ?? null : null, color: 'var(--color-accent)' },
-    { kind: 'folder' as const, id: 'unused', label: '未使用', count: ready ? counts?.unused ?? null : null, color: 'var(--color-status-warn)' },
+  /* お気に入り・配布済み・未使用は状態なので上の絞り込みの札へ（B-136）。左の列は共通の ManagedFolderPanel（画像のフォルダの口が無いので「すべて」だけ）。 */
+  const viewChips: Array<{ key: LibraryView; label: string; count: number | null }> = [
+    { key: 'favorite', label: 'お気に入り', count: ready ? counts?.favorite ?? null : null },
+    { key: 'delivered', label: '配布済み', count: ready ? counts?.delivered ?? null : null },
+    { key: 'unused', label: '未使用', count: ready ? counts?.unused ?? null : null },
   ]
 
   const uploadImage = canManage ? (
@@ -556,12 +586,16 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
   const selectView = (id: string) => { setView(id as LibraryView); resetPage() }
   const folders = (
     <div className={styles.folderInset}>
-      <FolderPanel
+      <ManagedFolderPanel
+        kind={null}
+        folders={[]}
+        onChanged={() => undefined}
+        canManage={canManage}
+        itemLabel="画像"
         createAction={uploadImage}
-        heading="見る"
-        rows={rows}
-        activeId={view}
-        onSelect={selectView}
+        activeId="all"
+        onSelect={() => selectView('all')}
+        allCount={ready ? counts?.all ?? images.length : null}
       />
     </div>
   )
@@ -625,10 +659,11 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
       title="バナー生成"
       description="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ配ります。"
       folders={folders}
-      folderNav={{ rows, activeId: view, onSelect: selectView, createAction: uploadImage, label: '見る' }}
+      folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => selectView('all'), createAction: uploadImage }}
     >
       <div className={styles.body}>
         {head}
+        <ViewChips chips={viewChips} active={view} onChange={(next) => selectView(next ?? 'all')} />
         <div className={styles.tools}>
           <div className={styles.librarySearch}>
             <SearchField

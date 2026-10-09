@@ -1,19 +1,44 @@
 'use client'
 
 /*
- * ③［テンプレートから選ぶ］の窓（絵 lLyFR の見出しの右）。統括のメッセージのひな形（テキスト・画像・カルーセル・
- * リッチメッセージ・クーポンなど）を名前で探して選ぶと、開いている吹き出しをそのひな形で置き換える。
- * まだ統括から送れない種類（質問・リサーチ・Flex）は選んでも置き換えず、理由を窓の中に出す。
+ * ③［テンプレートから選ぶ］の窓（絵 lLyFR の見出しの右）。共通の「作ってあるものを選ぶ窓」（EntityPickerDialog・
+ * ①の EpTBB と同じ形）で、統括のメッセージのひな形を選ぶ。右に LINE での見え方のスマホ。
+ * ［このテンプレートを使う］で、開いている吹き出しをそのひな形で置き換える。
+ * まだ統括から送れない種類（質問・リサーチ・Flex）は使っても置き換えず、理由を窓の中に出す。
  */
-import { useEffect, useState } from 'react'
-import Dialog from '@/components/shared/dialog'
+import { useEffect, useState, type ReactNode } from 'react'
+import type { MessageTemplateDefinition } from '@line-crm/shared'
+import { BubblePreview } from '@/components/broadcasts/broadcast-form'
+import { EntityPickerDialog, type EntityPickerFolder } from '@/components/shared/entity-picker'
+import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
-import SearchField from '@/components/shared/search-field'
+import Notice from '@/components/shared/notice'
 import { hqTemplatesApi, type HqTemplateListItem } from '@/lib/hq-templates-api'
-import styles from './create.module.css'
+import { bubbleFromTemplate, previewBubbleOf } from './bubbles'
+import { templatePickerItem } from './source-picker'
 
-const KIND_NAME: Record<string, string> = {
-  message: 'メッセージ', carousel: 'カルーセル', rich_message: 'リッチメッセージ', question: '質問', coupon: 'クーポン', research: 'リサーチ',
+const KINDS = [
+  { id: 'message', label: 'テキスト' }, { id: 'carousel', label: 'カルーセル' },
+  { id: 'rich_message', label: 'リッチメッセージ' }, { id: 'question', label: '質問' },
+  { id: 'coupon', label: 'クーポン' }, { id: 'research', label: 'リサーチ' },
+]
+
+function TemplatePreview({ id }: { id: string | null }) {
+  const [node, setNode] = useState<ReactNode>(null)
+  useEffect(() => {
+    if (!id) { setNode(null); return }
+    let current = true
+    setNode(<ListState kind="loading" />)
+    void Promise.resolve().then(() => hqTemplatesApi.get(id)).then((detail) => {
+      if (!current) return
+      const read = bubbleFromTemplate(id, detail.definition as MessageTemplateDefinition)
+      if ('error' in read) { setNode(<Notice tone="warn">{read.error}</Notice>); return }
+      const bubble = previewBubbleOf(read.bubble, read.bubble.body)
+      setNode(bubble ? <BubblePreview bubble={bubble} /> : null)
+    }).catch(() => { if (current) setNode(<Notice tone="warn">見え方を読み込めませんでした。</Notice>) })
+    return () => { current = false }
+  }, [id])
+  return <LinePreview fit empty={!id ? '候補を選ぶと見え方が出ます' : false}>{node}</LinePreview>
 }
 
 export default function HqTemplatePicker({ open, onClose, onPick, kind }: {
@@ -24,10 +49,10 @@ export default function HqTemplatePicker({ open, onClose, onPick, kind }: {
   onPick: (id: string) => Promise<string | null>
 }) {
   const [list, setList] = useState<HqTemplateListItem[] | null>(null)
+  const [folders, setFolders] = useState<EntityPickerFolder[]>([])
   const [loadError, setLoadError] = useState<unknown>(null)
   const [reload, setReload] = useState(0)
-  const [query, setQuery] = useState('')
-  const [busy, setBusy] = useState('')
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -35,41 +60,26 @@ export default function HqTemplatePicker({ open, onClose, onPick, kind }: {
     let current = true
     setLoadError(null)
     void hqTemplatesApi.listByKind().then((rows) => { if (current) setList(rows) }).catch((caught) => { if (current) setLoadError(caught) })
+    // フォルダは読めなくても選べる（すべてから選ぶ）。
+    void Promise.resolve().then(() => hqTemplatesApi.folders.list()).then((rows) => { if (current && Array.isArray(rows)) setFolders(rows) }).catch(() => undefined)
     return () => { current = false }
   }, [open, list, reload])
 
-  const q = query.trim().toLowerCase()
-  const rows = (list ?? []).filter((t) => (!kind || t.kind === kind) && (!q || t.name.toLowerCase().includes(q) || (t.content_summary ?? '').toLowerCase().includes(q)))
-
+  if (!open) return null
   const pick = async (id: string) => {
-    setBusy(id); setError('')
+    setBusy(true); setError('')
     const why = await onPick(id)
-    setBusy('')
+    setBusy(false)
     if (why) { setError(why); return }
-    setQuery('')
     onClose()
   }
-
-  return (
-    <Dialog open={open} title="テンプレートから選ぶ" description="統括のテンプレートを選ぶと、開いているメッセージをその内容に置き換えます。" cancelLabel="閉じる" onCancel={() => { setError(''); onClose() }} error={error || undefined}>
-      <div className={styles.picker}>
-        <SearchField aria-label="テンプレート名・内容で探す" placeholder="テンプレート名・内容で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
-        {loadError && !list ? <ListState kind="error" error={loadError} onRetry={() => { setLoadError(null); setReload((value) => value + 1) }} />
-          : !list ? <ListState kind="loading" />
-          : rows.length === 0 ? <p className={styles.pickerEmpty}>{list.length === 0 ? '統括のテンプレートがまだありません。「テンプレート」で作ってください。' : '当てはまるテンプレートがありません。'}</p>
-          : (
-            <ul className={styles.pickerList} aria-label="統括のテンプレート">
-              {rows.map((t) => (
-                <li key={t.id}>
-                  <button type="button" className={styles.pickerRow} disabled={Boolean(busy)} onClick={() => void pick(t.id)}>
-                    <strong title={t.name}>{t.name}</strong>
-                    <small title={t.content_summary ?? undefined}>{[KIND_NAME[t.kind ?? 'message'] ?? 'メッセージ', t.content_summary].filter(Boolean).join(' ・ ')}</small>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-      </div>
-    </Dialog>
-  )
+  return <EntityPickerDialog title="テンプレートから選ぶ" description="統括のテンプレートを選ぶと、開いているメッセージをその内容に置き換えます。" confirmLabel="このテンプレートを使う"
+    items={(list ?? []).filter((t) => !kind || t.kind === kind).map(templatePickerItem)} folders={folders} categories={KINDS} busy={busy} error={error || undefined}
+    createHref="/hq/templates" createLabel="テンプレートを作る"
+    state={loadError && !list ? <ListState kind="error" error={loadError} onRetry={() => { setLoadError(null); setReload((value) => value + 1) }} />
+      : !list ? <ListState kind="loading" />
+      : list.length === 0 ? <ListState kind="empty" title="統括のテンプレートがまだありません。「テンプレート」で作ってください。" /> : undefined}
+    preview={(item) => <TemplatePreview id={item?.id ?? null} />}
+    onSelect={() => setError('')}
+    onConfirm={(id) => void pick(id)} onCancel={() => { setError(''); onClose() }} />
 }

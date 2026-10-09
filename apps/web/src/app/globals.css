@@ -457,6 +457,37 @@
   --color-star-on-edge: #f59e0b;
 }
 
+/*
+ * 画像・動画・ファイルを入れる所（components/shared/media-slot）。Pencil ★V8 採用案 Z7vd2（B-128）。
+ * 店の画面・統括・v7 の画面のどれでも同じ形にするため :root に置く。
+ */
+:root {
+  --color-slot-bg: #f7f8fa;           /* 薄い灰の地（#f7f8fa） */
+  --tpl-slot-h: 260px;                /* ふだんの高さ（絵の 380×260） */
+  --tpl-slot-h-compact: 140px;        /* 小さい所（カルーセルのカード 180×140） */
+  --tpl-slot-w-compact: 180px;        /* 小さい所を横に並べるときの幅 */
+  --tpl-slot-row-gap: 12px;           /* 枠を横に並べるときの間 */
+  --tpl-slot-pad: 20px;               /* 枠の内側 */
+  --tpl-slot-pad-compact: 10px;
+  --tpl-slot-gap: 4px;                /* 題・説明・制限の間 */
+  --tpl-slot-icon: 34px;              /* ファイルの印 */
+  --tpl-slot-icon-compact: 22px;
+  --tpl-slot-icon-gap: 10px;          /* 印と題の間 */
+  --tpl-slot-title: 16px;             /* 太字の題 */
+  --tpl-slot-title-compact: 13px;
+  --tpl-slot-desc: 12px;              /* 説明・制限 */
+  --tpl-slot-desc-compact: 11px;
+  --tpl-slot-lh: 1.6;
+  --tpl-slot-pill-h: 26px;            /* 入ったときの［差し替える］［消す］ */
+  --tpl-slot-pill-pad: 0 10px;
+  --tpl-slot-pill-inset: 10px;        /* 右上からの距離 */
+  --tpl-slot-pill-gap: 6px;
+  --tpl-slot-links-gap: 14px;         /* 文字リンクの間 */
+  --tpl-slot-pill-shadow: 0 1px 2px rgb(15 23 32 / 0.12); /* ［差し替える］［消す］の薄い影 */
+  --tpl-slot-disabled-opacity: 0.6;
+  --tpl-slot-spin: 1s;                /* 取り込み中の印が1回まわる時間 */
+}
+
 :root {
   /*
    * カード（線で囲んだ箱）の線と影（2026-10-09 オーナー採用 B-137「線なし＋影のカード、境目は薄い線とくっきりした影で」）。
@@ -689,6 +720,19 @@
   --select-menu-item-size: 13px;
   --select-menu-item-line: 18px;
   --select-menu-check: 14px;
+  /* 名前の下の1行の説明（YPzmo）。 */
+  --select-menu-desc-size: 11px;
+  --select-menu-desc-line: 16px;
+  --select-menu-desc-gap: 2px;
+  /* 「押したら」の共通の欄（components/shared/tap-action-field・YPzmo）。 */
+  --tap-action-kind-w: 200px;
+  --tap-action-gap: 8px;
+  --tap-action-row-h: 40px;
+  --tap-action-pad: 0 6px 0 12px;
+  --tap-action-icon: 15px;
+  --tap-action-note-pad: 8px 12px;
+  --tap-action-option-pad: 8px 10px;
+  --tap-action-list-max-h: 320px;
   --select-menu-enter: 150ms;
   --select-menu-enter-scale: 0.97;
   /* 同じ板で「新しいフォルダ」の名前を入れる（iBuZH）。内側 10・間 8・欄 32・色の見本 18（間 6）・ボタン 28。 */
@@ -862,6 +906,9 @@
   --tpl-textarea-compact-h: 72px;
   --tpl-stamp-card-min-h: 1074px;
   --tpl-tab-count-pad: 0 6px;
+  /* 隠れた所の誤りの数の丸（B-139・ErrorCountBadge）。 */
+  --tpl-error-badge-size: 18px;
+  --tpl-error-badge-gap: 6px;
   --tpl-stamp-history-date-w: 15%;
   --tpl-stamp-history-friend-w: 20%;
   --tpl-stamp-history-count-w: 18%;
@@ -2696,6 +2743,26 @@ select:not([multiple]):not(.appearance-none) {
   --tpl-bcpick-tiny-gap: 2px;
   --tpl-bcpick-focus: 2px;
   --tpl-bcpick-mobile-preview: 30dvh;
+}
+/* 作ってあるもの・配るアカウントを選ぶ窓 dJZ7Q（picker）：欄の1行と窓の寸法。 */
+[data-theme="v8"] {
+  --tpl-picker-width: 880px;
+  --tpl-picker-narrow-width: 760px;
+  --tpl-picker-height: 560px;
+  --tpl-picker-folder-width: 190px;
+  --tpl-picker-preview-width: 250px;
+  --tpl-picker-header-pad: 18px 20px;
+  --tpl-picker-footer-pad: 12px 20px;
+  --tpl-picker-list-pad: 14px;
+  --tpl-picker-row-h: 38px;
+  --tpl-picker-row-gap: 5px;
+  --tpl-picker-row-pad: 0 10px;
+  --tpl-picker-gap: 8px;
+  --tpl-picker-tiny-gap: 4px;
+  --tpl-picker-preview-pad: 16px 14px;
+  --tpl-picker-field-h: 36px;
+  --tpl-picker-field-pad: 0 6px 0 12px;
+  --tpl-picker-embed-h: 420px;
 }
 [data-theme="v8"] { --tpl-hq-attribute-distribute-col: 76px; }
 

@@ -31,7 +31,7 @@ import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel from '@/components/shared/folder-panel'
+import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
 import IconButton from '@/components/shared/icon-button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -43,7 +43,6 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { FolderDotName } from '@/components/shared/folder-dot'
-import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
 import { ListPagePagination } from '@/components/templates'
 import {
   describeMileageCsvExportFailure,
@@ -105,22 +104,17 @@ function folderOf(rule: MileageEarningRuleV6): Exclude<FolderKey, 'all'> {
   return 'other'
 }
 
-/* 色は行の名前の前の丸と左のフォルダの列で同じものを使う（絵 OC0gy：購入は青・配信の反応は緑・紹介は橙・未分類は色の無い輪）。 */
-const FOLDERS: Array<{ key: FolderKey; label: string; color?: string }> = [
-  { key: 'all', label: 'すべて' },
-  { key: 'purchase', label: '購入', color: FOLDER_COLORS[0] },
-  { key: 'reaction', label: '配信の反応', color: FOLDER_COLORS[1] },
-  { key: 'referral', label: '紹介', color: FOLDER_COLORS[2] },
-  { key: 'other', label: '未分類' },
+/*
+ * きっかけの分け方（購入・配信の反応・紹介・そのほか）。決めごとの種類から決まる固定の分け方で、
+ * 作ったフォルダではないので、左のフォルダの列ではなく上の絞り込みに置く（B-136 2026-10-09）。
+ */
+const FOLDERS: Array<{ key: FolderKey; label: string }> = [
+  { key: 'all', label: 'きっかけ：すべて' },
+  { key: 'purchase', label: '購入' },
+  { key: 'reaction', label: '配信の反応' },
+  { key: 'referral', label: '紹介' },
+  { key: 'other', label: 'そのほか' },
 ]
-
-/** 行の名前の前の丸に渡すフォルダ。未分類は null（色の無い輪）。 */
-function folderDotOf(rule: MileageEarningRuleV6): { name: string; color?: string } | null {
-  const key = folderOf(rule)
-  if (key === 'other') return null
-  const item = FOLDERS.find((f) => f.key === key)
-  return item ? { name: item.label, color: item.color } : null
-}
 
 function isOverview(value: unknown): value is MileageEarningRulesV6Overview {
   if (!value || typeof value !== 'object') return false
@@ -566,21 +560,30 @@ export default function EarningRulesTab() {
     </CreateButton>
   )
 
+  /*
+   * 左のフォルダの列は共通の ManagedFolderPanel。決めごとをフォルダへ入れる受け口（folder_id）がまだ無いので
+   * 「すべて」だけを出す。受け口ができたら kind="mileage_rule" を渡すだけで、追加・「…」・未分類が出る。
+   */
   const folderPanel = (
-    <FolderPanel
-      heading="フォルダ"
-      rows={FOLDERS.map((item) => ({ kind: item.label === 'すべて' ? 'all' as const : item.label === '未分類' ? 'unfiled' as const : 'folder' as const, id: item.key, label: item.label, count: folderCounts.get(item.key) ?? 0, color: item.color }))}
-      activeId={folder}
-      onSelect={(id) => resetPage(() => setFolder(id as FolderKey))}
+    <ManagedFolderPanel
+      kind={null}
+      folders={[]}
+      onChanged={() => undefined}
+      canManage={!readonly}
+      itemLabel="決めごと"
+      activeId="all"
+      onSelect={() => undefined}
+      allCount={folderCounts.get('all') ?? null}
     />
   )
 
+  /* きっかけで絞る（固定の分け方）。件数も添える。 */
   const folderSelect = (
     <div className={styles.narrowFolder}>
       <Select
-        aria-label="フォルダ"
+        aria-label="きっかけ"
         value={folder}
-        options={FOLDERS.map((item) => ({ value: item.key, label: `フォルダ：${item.label}` }))}
+        options={FOLDERS.map((item) => ({ value: item.key, label: item.key === 'all' ? item.label : `${item.label} ${formatMileageNumber(folderCounts.get(item.key) ?? 0)}` }))}
         onChange={(value) => resetPage(() => setFolder(value as FolderKey))}
       />
     </div>
@@ -711,7 +714,7 @@ export default function EarningRulesTab() {
             if (!value) { setSearch(''); setPage(1) }
           },
         }}
-        filters={filterChips}
+        filters={<>{folderSelect}{filterChips}</>}
         trailing={<>{savedBox}{perPageBox}</>}
       />
     </>
@@ -806,7 +809,7 @@ export default function EarningRulesTab() {
               <Tr key={rule.id} className={styles.row} data-table-layout="columns">
                 <Td className={styles.colName}>
                   <div className={styles.rowNameLine}>
-                    <FolderDotName folder={folderDotOf(rule)}>
+                    <FolderDotName folder={null}>
                       <span className={styles.rowName} title={rule.draft.name}>{rule.draft.name}</span>
                     </FolderDotName>
                   </div>
@@ -906,7 +909,7 @@ export default function EarningRulesTab() {
       }
       stats={stats}
       folders={<>{createButton(true)}{folderPanel}</>}
-      folderNav={narrow ? undefined : { rows: FOLDERS.map((item) => ({ id: item.key, label: item.label })), activeId: folder, onSelect: (id) => resetPage(() => setFolder(id as FolderKey)), createAction: readonly ? undefined : createButton(false) }}
+      folderNav={narrow ? undefined : { rows: [{ id: 'all', label: 'すべて' }], activeId: 'all', onSelect: () => undefined, createAction: readonly ? undefined : createButton(false) }}
       toolbar={toolbar}
       pagination={pager}
       overlays={<>

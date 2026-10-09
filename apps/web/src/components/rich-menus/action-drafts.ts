@@ -33,6 +33,8 @@ export function isAreaActionConfigured(area: Area): boolean {
        * 「設定済み」。`not-a-url` のような文字列は未設定として残す。
        * （下書きへの保存は許すが、完成・公開には進めない）
        */
+      // 予約・予約履歴・来店スタンプを LIFF の無いアカウントで選んだとき（仮の {{liff_id}}）は開けないので未設定。
+      if (!area.trackedLinkId && String(data.uri ?? '').includes('{{liff_id}}')) return false
       return Boolean(area.trackedLinkId) || richMenuUriError(String(data.uri ?? '')) === null
     case 'tel':
       return Boolean(String(data.tel ?? '').trim())

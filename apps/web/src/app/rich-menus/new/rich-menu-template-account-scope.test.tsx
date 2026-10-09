@@ -127,15 +127,22 @@ describe('m18r 作成画面のテンプレート候補は選択accountで絞る'
       clickOption('テンプレートを送る')
     })
     await settle(50)
-    // acc-1 のテンプレート「お知らせ」を選ぶ
-    const templateTrigger = host.querySelector('button[aria-label="送るテンプレート"]')
+    // acc-1 のテンプレート「お知らせ」を選ぶ（選ぶ窓を開き、行を選んで［選ぶ］）
+    const templateTrigger = host.querySelector('button[aria-label="送るテンプレート：選ぶ"]')
     expect(templateTrigger).toBeTruthy()
     await act(async () => {
       fireEvent.click(templateTrigger!)
     })
     await settle(50)
+    const radio = document.querySelector('input[type="radio"][aria-label="お知らせ"]')
+    expect(radio).toBeTruthy()
     await act(async () => {
-      clickOption('お知らせ')
+      fireEvent.click(radio!)
+    })
+    const confirm = Array.from(radio!.closest('[role="dialog"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '選ぶ')
+    expect(confirm).toBeTruthy()
+    await act(async () => {
+      fireEvent.click(confirm!)
     })
     await settle(50)
     const save = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === 'この面の設定を保存する')

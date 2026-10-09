@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Chat, Scenario } from '@line-crm/shared'
 import Dialog from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import { loadOperators } from '@/lib/operators-cache'
 import type { PanelStatus } from './use-friend-detail'
@@ -276,13 +277,14 @@ export function useScenarioPicker(
           <p className={styles.secNote}>登録できるシナリオがありません。</p>
         ) : (
           <>
-            <Select
-              size="full"
+            <EntityKindField
+              kind="scenario"
+              label="登録するシナリオ"
               value={pick}
               disabled={busy}
+              accountId={accountId}
               onChange={(value) => setPick(value)}
-              aria-label="登録するシナリオを選ぶ"
-              options={[{ value: '', label: '— シナリオを選ぶ —' }, ...active.map((s) => ({ value: s.id, label: s.name }))]}
+              options={active}
             />
             {picked ? <p className={styles.memo}>「{picked.name}」に{friendName || 'この友だち'}を登録します。</p> : null}
           </>

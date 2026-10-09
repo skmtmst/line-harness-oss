@@ -179,6 +179,32 @@ describe('V8 会員（src/v8/nen-members）', () => {
     expect(JSON.parse(call![1].body).milestones[0]).toEqual({ id: 'm1', thresholdYen: 50000, title: 'はじめまして', notifyOnReach: true })
   })
 
+  it('B-139 ランク：名前を消して保存すると、口を呼ばずその行の名前の欄が赤くなり、そこへ移る', async () => {
+    await render('ranks')
+    const name = host.querySelector('input[aria-label="ランク名 1"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(name, { target: { value: '' } }) })
+    fetchApi.mockClear()
+    await click(buttons().find((b) => b.textContent?.includes('保存して EC へ同期')))
+    await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    expect(fetchApi.mock.calls.some(([, options]) => options?.method === 'PUT')).toBe(false)
+    expect(name.getAttribute('aria-invalid')).toBe('true')
+    expect(document.getElementById('rank-name-0-error')?.textContent).toBe('ランク名を入れるか、行を消してください。')
+    expect(document.activeElement).toBe(name)
+  })
+
+  it('B-139 ライフタイム：称号を消して決めると、窓は閉じず称号の欄が赤くなり、そこへ移る', async () => {
+    await render('lifetime')
+    await click(byLabel('節目「なかよし」のその他操作'))
+    await click(byText('編集する'))
+    const title = document.getElementById('milestone-title') as HTMLInputElement
+    await act(async () => { fireEvent.change(title, { target: { value: '' } }) })
+    await click(byText('決める'))
+    await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    expect(document.getElementById('milestone-title-error')?.textContent).toBe('称号を入れてください。')
+    expect(title.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(title)
+  })
+
   it('閲覧のみ：帯を出し、変える・足す・消す・保存のボタンを置かない（CSV は使える）', async () => {
     role.value = 'viewer'
     await render('ranks')

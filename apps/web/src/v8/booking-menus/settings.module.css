@@ -767,6 +767,9 @@
   background: var(--color-canvas-sunken);
   color: var(--color-ink-faint);
 }
+/* 保存で落ちた同時受付数（B-139）。枠を危険の色にする。 */
+.numInput[aria-invalid='true'] { border-color: var(--color-danger); outline-color: var(--color-danger); }
+
 
 .iconRemove {
   display: inline-flex;

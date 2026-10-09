@@ -23,7 +23,7 @@ async function startCreate(label: 'リッチメニュー画像を選ぶ' | 'メ�
   render(<TemplateConsole type={label === 'メッセージ画像を選ぶ' ? 'template' : 'rich_menu'} />)
   if (label === 'メッセージ画像を選ぶ') fireEvent.click(await screen.findByRole('tab', { name: /カルーセル/ }))
   fireEvent.click((await screen.findAllByRole('button', { name: label === 'メッセージ画像を選ぶ' ? 'テンプレートを作る' : 'メニューを作る' }))[0])
-  await screen.findByLabelText(label === 'メッセージ画像を選ぶ' ? 'カードの画像ファイル' : label)
+  await screen.findByLabelText(label === 'メッセージ画像を選ぶ' ? '画像を追加（ファイル）' : label)
 }
 
 describe('R568 cancelled or replaced uploads are reclaimed', () => {
@@ -39,7 +39,7 @@ describe('R568 cancelled or replaced uploads are reclaimed', () => {
   it('cancelling a shared message template create deletes its uploaded image', async () => {
     calls.uploadImage.mockResolvedValue(png('m.png', KEY_M))
     await startCreate('メッセージ画像を選ぶ')
-    fireEvent.change(screen.getByLabelText('カードの画像ファイル'), { target: { files: [new File(['m'], 'm.png', { type: 'image/png' })] } })
+    fireEvent.change(screen.getByLabelText('画像を追加（ファイル）'), { target: { files: [new File(['m'], 'm.png', { type: 'image/png' })] } })
     await waitFor(() => expect(calls.uploadImage).toHaveBeenCalled())
     fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
     await waitFor(() => expect(calls.deleteImage).toHaveBeenCalledWith(KEY_M))

@@ -49,6 +49,7 @@ const scenario = vi.hoisted(() => ({
   ],
 }))
 
+vi.mock('@/lib/use-feature-visibility', () => ({ useFeatureVisibility: () => ({ status: 'ready', enabled: () => true }) }))
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {
     status: number
@@ -84,6 +85,12 @@ vi.mock('@/components/scenarios/scenario-reference-data', () => ({
     })),
     templates: vi.fn(async () => ({ success: true, data: [] })),
     tags: vi.fn(async () => ({ success: true, data: [] })),
+    friendFields: vi.fn(async () => ({ success: true, data: [] })),
+    supportMarks: vi.fn(async () => ({ success: true, data: [] })),
+    scenarios: vi.fn(async () => ({ success: true, data: [] })),
+    commonVars: vi.fn(async () => ({ success: true, data: [] })),
+    reminders: vi.fn(async () => ({ success: true, data: [] })),
+    events: vi.fn(async () => ({ success: true, data: [] })),
     invalidateScenario: vi.fn(),
   },
 }))
@@ -181,6 +188,19 @@ describe('V8 シナリオ配信の編集', () => {
     expect(screen.getByText('選んだ通（1通目）の見え方')).toBeTruthy()
     expect(screen.queryByText('配る内容がまだありません')).toBeNull()
     expect(screen.getAllByText('ご登録ありがとうございます。').length).toBeGreaterThan(1)
+  })
+
+  it('B-139：新しい通の本文が空のまま追加すると、本文の欄が赤くなり真下に理由が出て、その欄へ移る', async () => {
+    await render()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'メッセージを追加する' })) })
+    await act(async () => { await Promise.resolve() })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '追加する' })) })
+    for (let i = 0; i < 2; i += 1) await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    const reason = document.getElementById('step-content-error')
+    expect(reason?.textContent).toBe('メッセージ内容を入力してください')
+    const body = screen.getByPlaceholderText('メッセージ内容を入力...')
+    expect(body.getAttribute('aria-invalid')).toBe('true')
+    expect(body.contains(document.activeElement) || document.activeElement === body).toBe(true)
   })
 
   it('閲覧のみ：帯が出て、変える操作のボタンを置かない（押せないボタンも残さない）', async () => {

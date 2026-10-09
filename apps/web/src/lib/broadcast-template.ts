@@ -1,3 +1,4 @@
+import { tapActionDef, tapActionFromUri } from './tap-actions'
 import type {
   BroadcastBubble,
   BroadcastBubbleType,
@@ -212,11 +213,16 @@ const KIND_FIELD_TYPES = new Set<BroadcastBubbleType>(['location', 'audio', 'sti
  * 作成5段の帯が同じ関数を見る（監査 R206）。Worker 側の検査と文言を
  * そろえているので、画面で通ったものが保存で断られない。
  */
-export function messageButtonsError(buttons: BroadcastMessageButton[]): string {
+export function messageButtonsError(buttons: BroadcastMessageButton[], opts: { hasLiff?: boolean } = {}): string {
   if (buttons.length > 4) return 'ボタンは4つまでです'
   for (const [index, button] of buttons.entries()) {
     const number = index + 1
     if (!button.label.trim()) return `ボタン${number}の名前を入力してください`
+    /* 予約・回答フォーム・予約履歴・来店スタンプ（LIFF のページ）は、アカウントに LIFF が無いと開けない。 */
+    if (opts.hasLiff === false && button.type === 'url' && tapActionFromUri(button.value).kind !== 'uri') {
+      return `ボタン${number}：このアカウントに LIFF が設定されていないため、「${tapActionDef(tapActionFromUri(button.value).kind)?.label}」は開けません`
+    }
+    if (button.type === 'url' && tapActionFromUri(button.value).kind === 'form' && !tapActionFromUri(button.value).refId) return `ボタン${number}の回答フォームを選んでください`
     if (!button.value.trim()) return `ボタン${number}のURLを入力してください`
     if (!/^https:\/\//i.test(button.value.trim())) return `ボタン${number}のURLは https:// から始めてください`
   }

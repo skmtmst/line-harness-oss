@@ -30,6 +30,9 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { OpsHead } from './shell'
 import { useOpsReadOnly } from './use-ops-read-only'
+import { useFormErrors } from '@/lib/use-form-errors'
+import ValidationSummary from '@/components/shared/validation-summary'
+import { FieldError } from '@/components/shared/form-controls'
 import parts from './parts.module.css'
 import styles from './announcements.module.css'
 
@@ -189,12 +192,19 @@ export default function OpsAnnouncementsV8() {
 
   const toggle = <T extends string>(list: T[], key: T): T[] => (list.includes(key) ? list.filter((k) => k !== key) : [...list, key])
 
+  /* 欄に結び付く誤りは欄で知らせて1つ目へ移る（B-139）。上の帯は LINE の設定だけ。 */
+  const fields = useFormErrors()
+  fields.define('subject', '件名', () => (form.subject.trim() ? null : '件名を入力してください'))
+  fields.define('body', '本文', () => (form.body.trim() ? null : '本文を入力してください'))
+  fields.define('audience', '宛先', () => (
+    form.audienceKind === 'plan' && form.audiencePlans.length === 0 ? 'プランを 1 つ以上選んでください'
+      : form.audienceKind === 'tenants' && form.audienceTenantIds.length === 0 ? '契約先を 1 つ以上選んでください'
+        : null
+  ))
+  fields.define('channels', '送り方', () => (form.channels.length === 0 ? '送り方を 1 つ以上選んでください' : null))
+  const describedBy = (key: string) => (fields.invalid(key) ? `ann-${key}-error` : undefined)
+
   const validation = useMemo(() => {
-    if (!form.subject.trim()) return '件名を入力してください'
-    if (!form.body.trim()) return '本文を入力してください'
-    if (form.channels.length === 0) return '送り方を 1 つ以上選んでください'
-    if (form.audienceKind === 'plan' && form.audiencePlans.length === 0) return 'プランを 1 つ以上選んでください'
-    if (form.audienceKind === 'tenants' && form.audienceTenantIds.length === 0) return '契約先を 1 つ以上選んでください'
     if (form.channels.includes('line') && !lineConfigured) return '契約者専用LINEのアカウントが未設定です。メンバー管理の「運営の情報」で指定してください'
     return ''
   }, [form, lineConfigured])
@@ -209,6 +219,7 @@ export default function OpsAnnouncementsV8() {
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy, onDiscard: () => { setForm(baseline) } })
 
   const submit = async (mode: OpsAnnouncementInput['mode']) => {
+    if (fields.submit().length > 0) { setFormError(''); setConfirmSend(false); return }
     if (validation) { setFormError(validation); setConfirmSend(false); return }
     setBusy(true)
     setFormError('')
@@ -310,15 +321,18 @@ export default function OpsAnnouncementsV8() {
           <section aria-label="作成" className={styles.form}>
             <h2 className={parts.panelTitle}>{editingId ? 'お知らせを直す' : '作成'}</h2>
             {formError && !confirmSend ? <p role="alert" className={parts.alert}>{formError}</p> : null}
-            <label className={styles.field}>
-              <span className={styles.label}>件名</span>
-              <TextField value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：9月20日 深夜のメンテナンスのお知らせ" maxLength={120} disabled={busy} />
-            </label>
-            <label className={styles.field}>
-              <span className={styles.smallLabel}>本文</span>
-              <TextArea rows={4} className={styles.body} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="お客様各位　いつも musubo をご利用いただきありがとうございます。…" maxLength={4000} disabled={busy} />
-            </label>
-            <fieldset className={styles.field}>
+            <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
+            <div className={styles.field}>
+              <label htmlFor="ann-subject" className={styles.label}>件名</label>
+              <TextField {...fields.bind('subject')} id="ann-subject" invalid={fields.invalid('subject')} aria-describedby={describedBy('subject')} value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：9月20日 深夜のメンテナンスのお知らせ" maxLength={120} disabled={busy} />
+              <FieldError id="ann-subject-error">{fields.error('subject')}</FieldError>
+            </div>
+            <div className={styles.field}>
+              <label htmlFor="ann-body" className={styles.smallLabel}>本文</label>
+              <TextArea {...fields.bind('body')} id="ann-body" invalid={fields.invalid('body')} aria-describedby={describedBy('body')} rows={4} className={styles.body} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="お客様各位　いつも musubo をご利用いただきありがとうございます。…" maxLength={4000} disabled={busy} />
+              <FieldError id="ann-body-error">{fields.error('body')}</FieldError>
+            </div>
+            <fieldset className={styles.field} {...fields.bind('audience')} aria-invalid={fields.invalid('audience') || undefined} aria-describedby={describedBy('audience')}>
               <legend className={`${styles.smallLabel} ${styles.legend}`}>
                 宛先
                 <HelpTip label="宛先の見込み">{previewLabel(preview, form.channels)}</HelpTip>
@@ -340,12 +354,14 @@ export default function OpsAnnouncementsV8() {
                     : tenants.map((t) => <FilterChip key={t.id} selected={form.audienceTenantIds.includes(t.id)} onChange={() => setForm((f) => ({ ...f, audienceTenantIds: toggle(f.audienceTenantIds, t.id) }))}>{t.name}</FilterChip>)}
                 </div>
               ) : null}
+              <FieldError id="ann-audience-error">{fields.error('audience')}</FieldError>
             </fieldset>
-            <fieldset className={styles.field}>
+            <fieldset className={styles.field} {...fields.bind('channels')} aria-invalid={fields.invalid('channels') || undefined} aria-describedby={describedBy('channels')}>
               <legend className={`${styles.smallLabel} ${styles.legend}`}>送り方</legend>
               <div className={styles.choices}>
                 {CHANNELS.map((ch) => <Checkbox key={ch.key} checked={form.channels.includes(ch.key)} disabled={busy} onCheckedChange={() => setForm((f) => ({ ...f, channels: toggle(f.channels, ch.key) }))}>{ch.label}</Checkbox>)}
               </div>
+              <FieldError id="ann-channels-error">{fields.error('channels')}</FieldError>
             </fieldset>
             {loaded && !lineConfigured ? (
               <p className={styles.warn}>契約者専用LINE のアカウントが未設定です。メンバー管理の「運営の情報」で指定すると LINE で送れます。</p>
@@ -363,7 +379,7 @@ export default function OpsAnnouncementsV8() {
               {editingId ? <Button onClick={cancelEdit} disabled={busy}>直すのをやめる</Button> : null}
               {editing ? <Button variant="danger" onClick={() => setDeleting(editing)} disabled={busy}>削除する</Button> : null}
               <Button onClick={() => void submit('draft')} disabled={busy}>下書きを保存する</Button>
-              <Button variant="primary" onClick={() => { setFormError(''); setConfirmSend(true) }} disabled={busy}>
+              <Button variant="primary" onClick={() => { setFormError(''); if (fields.submit().length === 0) setConfirmSend(true) }} disabled={busy}>
                 <Send aria-hidden="true" />{scheduled ? '配信を予約する' : '今すぐ送る'}
               </Button>
             </div>

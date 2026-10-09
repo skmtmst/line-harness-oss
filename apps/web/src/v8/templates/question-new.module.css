@@ -116,6 +116,12 @@
   outline: var(--tpl-tag-ring) solid var(--color-action);
 }
 
+/* 保存で落ちた欄（B-139）。枠を危険の色にする。 */
+.input[aria-invalid='true'],
+.input[aria-invalid='true']:focus-visible {
+  outline-color: var(--color-danger);
+}
+
 .inline {
   display: flex;
   align-items: center;

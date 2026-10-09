@@ -4,7 +4,7 @@
  * 確認の窓も閉じない（親が失敗を飲み込んで成功の扱いにしない）。
  */
 import React from 'react'
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { BannerImageDetailV8 } from './image-detail'
 
@@ -20,8 +20,12 @@ const account = { id: 'a1', name: '銀座店', archivedAt: null, basicId: 'ginza
 test('渡すのに失敗したら、選んだアカウントを残す', async () => {
   const onDeliver = vi.fn(async () => false)
   render(<BannerImageDetailV8 image={image as never} presets={[]} accounts={[account] as never} canManage onClose={() => undefined} onToggleFavorite={() => undefined} onDeliver={onDeliver} onRemove={async () => false} />)
-  await act(async () => { screen.getByRole('checkbox', { name: '銀座店へ配布' }).click() })
+  await act(async () => { screen.getByRole('button', { name: '配るアカウント：選ぶ' }).click() })
+  const dialog = await screen.findByRole('dialog', { name: '配るアカウントを選ぶ' })
+  await act(async () => { within(dialog).getByRole('checkbox', { name: '銀座店' }).click() })
+  await act(async () => { within(dialog).getByRole('button', { name: 'この 1 アカウントにする' }).click() })
   await act(async () => { screen.getByRole('button', { name: '1アカウントへ配る' }).click() })
   expect(onDeliver).toHaveBeenCalledWith(['a1'])
   expect(screen.getByRole('button', { name: '1アカウントへ配る' })).toBeTruthy()
+  expect(screen.getByText('1 アカウント')).toBeTruthy()
 })

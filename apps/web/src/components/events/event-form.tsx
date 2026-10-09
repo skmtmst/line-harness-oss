@@ -603,6 +603,7 @@ function OverviewTab({
           value={draft.image_url ? { mode: 'url', url: draft.image_url } : null}
           onChange={(v) => update('image_url', v?.mode === 'url' ? v.url : null)}
           label="イベント画像"
+          title="イベント画像を追加"
         />
       </div>
       <div>

@@ -105,12 +105,12 @@ describe('N-211 案件作成の選択肢は選択accountで絞る', () => {
       const switchName = buttonId === 'of-tag' ? 'タグを付ける' : 'シナリオ配信を始める'
   const toggle = host.querySelector<HTMLButtonElement>(`[role=switch][aria-label="${switchName}"]`)
   if (toggle?.getAttribute('aria-checked') === 'false') await act(async () => { toggle.click() })
-  const button = host.querySelector<HTMLButtonElement>(`#${buttonId}`)
+  // タグは選ぶ窓（dJZ7Q）。欄の［選ぶ］で開き、窓の候補（radio）の名前を読む。
+  const button = host.querySelector<HTMLButtonElement>(`#${buttonId} button[aria-haspopup="dialog"]`)
       expect(button).toBeTruthy()
       await act(async () => { button!.click() })
-      // 選択肢は最上層（portal）に出るので document 側を見る。
-      const labels = [...document.querySelectorAll('[role="option"]')]
-        .map((el) => el.textContent ?? '')
+      const labels = [...document.querySelectorAll('[role="dialog"] input[type="radio"]')]
+        .map((el) => el.getAttribute('aria-label') ?? '')
       return labels
     }
 
@@ -122,7 +122,14 @@ describe('N-211 案件作成の選択肢は選択accountで絞る', () => {
     await act(async () => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     })
-    const scenarioLabels = await optionLabels('of-scenario')
+    // シナリオは選ぶ窓。欄の［選ぶ］で開き、窓の候補（radio）の名前を読む。
+    const scenarioToggle = host.querySelector<HTMLButtonElement>('[role=switch][aria-label="シナリオ配信を始める"]')
+    if (scenarioToggle?.getAttribute('aria-checked') === 'false') await act(async () => { scenarioToggle.click() })
+    const scenarioOpen = host.querySelector<HTMLButtonElement>('button[aria-label="開始するシナリオ：選ぶ"]')
+    expect(scenarioOpen).toBeTruthy()
+    await act(async () => { scenarioOpen!.click() })
+    const scenarioLabels = [...document.querySelectorAll('[role="dialog"] input[type="radio"]')]
+      .map((el) => el.getAttribute('aria-label') ?? '')
     expect(scenarioLabels.some((text) => text.includes('有効シナリオ'))).toBe(true)
     expect(scenarioLabels.some((text) => text.includes('停止シナリオ'))).toBe(false)
   })

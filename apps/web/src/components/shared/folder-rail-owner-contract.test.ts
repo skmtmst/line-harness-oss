@@ -40,17 +40,17 @@ describe('オーナー指示 #582 のフォルダ欄', () => {
     expect(page).toMatch(/<FolderPanel[\s\S]*?(onAddFolder|addFolderDisabled)/)
   })
 
-  it.each(V8_FOLDER_PAGES)('%s は共通の FolderPanel と追加操作を使う', (relativePath) => {
+  it.each(V8_FOLDER_PAGES)('%s は共通の FolderPanel（ManagedFolderPanel）と追加操作を使う', (relativePath) => {
     const page = readFileSync(resolve(APP, relativePath), 'utf8')
     const css = readFileSync(resolve(APP, relativePath.replace(/\.tsx$/, '.module.css')), 'utf8')
-    expect(page).toMatch(/<FolderPanel[\s\S]*?(onAddFolder|addFolderDisabled)/)
+    expect(page).toMatch(/<FolderPanel[\s\S]*?(onAddFolder|addFolderDisabled)|<ManagedFolderPanel[\s\S]*?canManage=/)
     expect(css).toMatch(/grid-template-columns:\s*200px minmax\(0, 1fr\)/)
     expect(css).toMatch(/@container[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/s)
   })
 
-  it.each(NEW_V8_FOLDER_PAGES)('src/v8/%s は共通の FolderPanel と追加操作を型のフォルダの列へ渡す', (relativePath) => {
+  it.each(NEW_V8_FOLDER_PAGES)('src/v8/%s は共通の FolderPanel（ManagedFolderPanel）と追加操作を型のフォルダの列へ渡す', (relativePath) => {
     const page = readFileSync(resolve(SRC_V8, relativePath), 'utf8')
-    expect(page).toMatch(/<FolderPanel[\s\S]*?(onAddFolder|addFolderDisabled)/)
+    expect(page).toMatch(/<FolderPanel[\s\S]*?(onAddFolder|addFolderDisabled)|<ManagedFolderPanel[\s\S]*?canManage=/)
     expect(page).toMatch(/<ListPage[\s\S]*?folders=\{/)
     const templateCss = readFileSync(resolve(import.meta.dirname, '../templates/page-templates.module.css'), 'utf8')
     expect(templateCss).toMatch(/\.folders \{[^}]*width: var\(--tpl-folder-width\)/)
@@ -75,10 +75,8 @@ describe('オーナー指示 #582 のフォルダ欄', () => {
 
   it('V8のイベント一覧はイベント専用のフォルダを取得・作成する', () => {
     const events = readFileSync(resolve(APP, 'events/events-list-v8.tsx'), 'utf8')
-    expect(events).toContain('<FolderPanel')
+    // フォルダの列・追加の窓・「…」は共通の ManagedFolderPanel（kind="event"）が持ち、変えたら読み直す（B-136）。
     expect(events).toContain("api.folders.list('event', selectedAccountId)")
-    expect(events).toMatch(/<FolderAddDialog[\s\S]*?kind="event"/)
-    expect(events).toContain('onAdded={() => void loadFolders()}')
-    expect(events).toContain('onAddFolder=')
+    expect(events).toMatch(/<ManagedFolderPanel[\s\S]*?kind="event"[\s\S]*?onChanged=\{loadFolders\}[\s\S]*?canManage=/)
   })
 })

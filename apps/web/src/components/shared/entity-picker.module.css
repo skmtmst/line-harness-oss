@@ -1,0 +1,34 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+/* dJZ7Q：画面の欄。選んだもの＋［選ぶ］／［変える］の1行。 */
+.field { display: flex; align-items: center; gap: var(--tpl-picker-gap); min-width: 0; width: 100%; height: var(--tpl-picker-field-h); padding: var(--tpl-picker-field-pad); border: 1px solid var(--color-control-border, var(--color-hairline)); border-radius: var(--radius-control); background: var(--color-canvas); }
+.field[data-invalid] { border-color: var(--color-danger); }
+.field[data-disabled] { background: var(--color-canvas-sunken); }
+.fieldIcon { flex-shrink: 0; color: var(--color-ink-secondary); }
+.fieldValue { display: flex; align-items: baseline; gap: var(--tpl-picker-gap); flex: 1; min-width: 0; overflow: hidden; }
+.fieldName { flex-shrink: 0; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-caption); font-weight: 600; color: var(--color-ink); }
+.field[data-invalid] .fieldName { color: var(--color-danger); }
+.fieldMeta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-micro, var(--text-caption)); color: var(--color-ink-secondary); }
+.fieldPlaceholder { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-caption); color: var(--color-ink-faint); }
+
+/* 窓の下の文字リンク（作る画面へ）。 */
+.createLink { display: inline-flex; align-items: center; gap: var(--tpl-picker-tiny-gap); min-width: 0; white-space: nowrap; font-size: var(--text-caption); color: var(--color-ink-secondary); text-decoration: none; }
+.createLink:hover { color: var(--color-action); text-decoration: underline; }
+.createLink:focus-visible, .textButton:focus-visible { outline: var(--tpl-bcpick-focus) solid var(--color-action); outline-offset: var(--tpl-bcpick-focus); border-radius: var(--radius-control); }
+.note { margin: 0; font-size: var(--text-caption); color: var(--color-warning); }
+
+/* まとめて選ぶ一覧。 */
+.embedded { flex: none; height: var(--tpl-picker-embed-h); }
+.multiList { gap: var(--tpl-picker-gap); padding: var(--tpl-picker-list-pad); }
+.multiRows { display: flex; flex-direction: column; gap: var(--tpl-picker-row-gap); min-height: 0; overflow-y: auto; }
+.multiRow { display: flex; align-items: center; gap: var(--tpl-picker-gap); min-height: var(--tpl-picker-row-h); padding: var(--tpl-picker-row-pad); border-radius: var(--radius-control); }
+.multiRow[data-selected] { background: var(--color-accent-soft); }
+.multiRow[data-disabled] { color: var(--color-ink-faint); }
+.multiName { display: flex; align-items: center; gap: var(--tpl-picker-gap); flex: 1; min-width: 0; cursor: pointer; font-size: var(--text-caption); font-weight: 600; }
+.multiNameText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.multiExtra { flex-shrink: 0; display: inline-flex; align-items: center; }
+.multiMeta { flex-shrink: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-micro, var(--text-caption)); color: var(--color-ink-secondary); }
+.multiCount { display: inline-flex; align-items: center; }
+.textButton { padding: 0; border: 0; background: none; font: inherit; color: var(--color-action); cursor: pointer; }
+.textButton:hover { text-decoration: underline; }
+}

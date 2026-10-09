@@ -6,6 +6,7 @@ import styles from './folder-dot.module.css'
  * フォルダの見せる色。色が空のフォルダ（色の仕組みより前に作ったもの）は、名前から9色の1つを決まった形で選ぶ
  * （2026-10-09 オーナー「フォルダで色がつくように」）。左の列と表の丸が同じ色になるよう、どちらもこれを使う。
  */
+/* 同じ名前はいつも同じ色（B-136：色の無いフォルダが灰色の丸ばかりで、列と行の丸で見分けがつかなかった）。 */
 export function folderDisplayColor(folder: { name: string; color?: string | null }): string {
   if (folder.color) return folder.color
   let hash = 0
@@ -21,7 +22,7 @@ export function folderDisplayColor(folder: { name: string; color?: string | null
  */
 export interface FolderDotFolder {
   name: string
-  /** フォルダの色（#RRGGBB）。無いフォルダは folderDisplayColor の自動の色。 */
+  /** フォルダの色（#RRGGBB）。無いフォルダは folderDisplayColor が名前から選ぶ。 */
   color?: string | null
 }
 

@@ -22,7 +22,6 @@ import {
   Download,
   Eye,
   FilePen,
-  Inbox,
   KeyRound,
   Pause,
   Play,
@@ -44,7 +43,8 @@ import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import ManagedFolderPanel, { folderDotFor, managedFolderOptions, useManagedFolders } from '@/components/shared/managed-folder-panel'
+import { useListUrlParam } from '@/components/shared/list-url-state'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -94,6 +94,8 @@ import { focusConversionField, type ConversionFieldIssue } from './field-issue'
 import styles from './list.module.css'
 
 type StatusFilter = 'all' | ConversionDefinitionFilter
+/** フォルダの列の「未分類」（`?folder=unfiled`）。 */
+const FOLDER_UNFILED = 'unfiled'
 type PointSort = 'cv-desc' | 'value-desc' | 'name'
 
 const READONLY_REASON = 'この操作にはオーナーか管理者の権限が要ります'
@@ -274,6 +276,10 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   const [status, setStatus] = useState<StatusFilter>('all')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
+  /* 左のフォルダの列（共通の /api/folders・種類 conversion）。'' はすべて。`?folder=` で共有できる。 */
+  const [folderFilter, setFolderFilter] = useListUrlParam('folder')
+  const folderState = useManagedFolders('conversion', accountId)
+  const folders = folderState.folders
   const [loadFailed, setLoadFailed] = useState(false)
   const [reportFailed, setReportFailed] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -728,16 +734,24 @@ function ConversionList({ accountId }: { accountId: string | null }) {
 
   /* 画面で絞るのは状態だけ（探す言葉と並びは口が済ませている）。 */
   const shown = useMemo(() => points.filter((point) => {
+    if (folderFilter === FOLDER_UNFILED ? Boolean(point.folderId) : folderFilter !== '' && point.folderId !== folderFilter) return false
     if (status === 'all') return true
     if (status === 'unused') return point.usageCount === 0
     return point.state === status
-  }), [points, status])
+  }), [folderFilter, points, status])
 
   const pageCount = Math.max(1, Math.ceil(shown.length / pageSize))
   const currentPage = Math.min(page, pageCount)
   const current = useMemo(() => shown.slice((currentPage - 1) * pageSize, currentPage * pageSize), [currentPage, pageSize, shown])
   useEffect(() => { if (page > pageCount) setPage(pageCount) }, [page, pageCount])
-  useEffect(() => { setPage(1) }, [debouncedQuery, status, sort, pageSize])
+  useEffect(() => { setPage(1) }, [debouncedQuery, status, sort, pageSize, folderFilter])
+  /* アカウントを切り替えたら、前のアカウントのフォルダの選択を外す。 */
+  const folderAccountRef = useRef(accountId)
+  useEffect(() => {
+    if (folderAccountRef.current === accountId) return
+    folderAccountRef.current = accountId
+    setFolderFilter('')
+  }, [accountId, setFolderFilter])
 
   const highlightedPoint = useMemo(() => (highlightId ? points.find((point) => point.id === highlightId) ?? null : null), [points, highlightId])
   useEffect(() => {
@@ -779,16 +793,13 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   ]
 
   /* ===== フォルダ ===== */
-  /* 成果地点にはフォルダの口が無い（口が入るまで「すべて」だけ。作る・名前を変える操作は出さない）。 */
-  const folderRows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: '', label: 'すべて', count: total, icon: <Inbox size={15} aria-hidden="true" /> },
-  ]
+  /* 共通のフォルダ（種類 conversion）。すべて・各フォルダ・未分類・追加・「…」（名前・色・並べ替え・消す）。 */
   const folderSelect = (
     <Select
       aria-label="フォルダ"
-      value=""
-      onChange={() => undefined}
-      options={[{ value: '', label: 'フォルダ：すべて' }]}
+      value={folderFilter}
+      onChange={setFolderFilter}
+      options={managedFolderOptions('conversion', folders, { allId: '', unfiledId: FOLDER_UNFILED })}
     />
   )
   /* 閲覧のみには作るボタンを置かない（場所だけ空ける）。 */
@@ -1066,8 +1077,8 @@ function ConversionList({ accountId }: { accountId: string | null }) {
                     onClick={() => setPanelId((currentId) => (currentId === point.id ? null : point.id))}
                   >
                     <Td className={styles.colName}>
-                      {/* 名前の前にフォルダの丸（成果地点はまだフォルダの口が無いので未分類の輪）。札は名前の頭にそろえる。 */}
-                      <FolderDotName folder={null} dot={!narrow}>
+                      {/* 名前の前に左の列と同じフォルダの色の丸（未分類は色の無い輪）。札は名前の頭にそろえる。 */}
+                      <FolderDotName folder={folderDotFor(folders, point.folderId)} dot={!narrow}>
                       <button
                         type="button"
                         className={styles.nameButton}
@@ -1202,7 +1213,21 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       </>}
       folders={<>
         {createButton}
-        <FolderPanel activeId="" onSelect={() => undefined} rows={folderRows} />
+        <ManagedFolderPanel
+          kind="conversion"
+          accountId={accountId}
+          folders={folders}
+          onChanged={folderState.reload}
+          canManage={canEdit}
+          itemLabel="成果地点"
+          activeId={folderFilter}
+          onSelect={setFolderFilter}
+          allId=""
+          unfiledId={FOLDER_UNFILED}
+          allCount={total}
+          unfiledCount={folderState.unfiledCount}
+          error={folderState.error}
+        />
       </>}
       collapsedFolders={narrow ? undefined : <>{createInRow}{folderSelect}</>}
       toolbar={narrow ? narrowToolbar : wideToolbar}
