@@ -154,20 +154,11 @@
 .toggleLabel { color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-side-title-lh); }
 .toggleLabelSmall { color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); white-space: nowrap; }
 
-/* 中身：画像の枠 160×106・右に2つの入力（間10）。 */
+/* 中身：画像の枠（幅160）・右に2つの入力（間10）。 */
 .couponRow { display: flex; align-items: flex-start; gap: var(--tpl-rule-row-gap); width: 100%; }
-.couponImage {
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden;
-  width: var(--tpl-te-coupon-img-w); height: var(--tpl-te-coupon-img-h);
-  padding: 0; border: 0; border-radius: var(--radius-control);
-  background: var(--tpl-te-coupon-bg); color: var(--color-ink); cursor: pointer;
-}
-.couponImage img { width: 100%; height: 100%; object-fit: cover; }
-.couponImage:focus-visible { outline: var(--tpl-te-focus) solid var(--color-action); outline-offset: var(--tpl-te-focus); }
-.couponImageEmpty { display: inline-flex; align-items: center; gap: var(--tpl-label-tag-gap); font-size: var(--text-label); font-weight: 600; }
+/* クーポンの画像は画像を入れる所（MediaSlot・Z7vd2）の小さい形。幅は 160。 */
+.couponImage { display: flex; flex-direction: column; gap: var(--tpl-slot-gap); flex-shrink: 0; width: var(--tpl-te-coupon-img-w); }
 .couponFields { display: flex; flex-direction: column; gap: var(--tpl-te-url-gap); flex: 1 1 0; min-width: 0; }
-.imageDialog { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-body-gap); }
-.imageDialog > :global(*) { max-width: 100%; }
 
 /* 右の箱の数の行（34.5・下線）。 */
 .statList { margin: 0; display: flex; flex-direction: column; gap: var(--tpl-side-card-gap); }

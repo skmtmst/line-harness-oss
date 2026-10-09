@@ -12,7 +12,7 @@ export async function uploadToMediaLibrary(
   accountId: string,
   kind: MediaItem['kind'],
   onProgress: (percent: number) => void = () => {},
-): Promise<{ url: string; durationMs?: number }> {
+): Promise<{ url: string; durationMs?: number; item: MediaItem }> {
   const invalid = validateMediaFile(file)
   if (invalid) throw new Error(invalid)
   const metadata = await extractMediaMetadata(file)
@@ -32,5 +32,5 @@ export async function uploadToMediaLibrary(
   if (!media.success || media.data.item.kind !== kind || !media.data.item.url) {
     throw new Error('登録したファイルを確認できませんでした。登録メディアから選び直してください。')
   }
-  return { url: media.data.item.url, durationMs: metadata.durationMs }
+  return { url: media.data.item.url, durationMs: metadata.durationMs, item: media.data.item }
 }

@@ -9,7 +9,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { GripVertical, ImagePlus, Plus, Send, X } from 'lucide-react'
+import { GripVertical, Plus, Send, X } from 'lucide-react'
 import type { Folder, MediaItem } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -37,6 +37,8 @@ import { toActionPayload, type InlineAction } from '@/components/auto-replies/dr
 import { TemplateEditFrame } from './frame'
 import type { TemplateEditHost } from './host'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
+import MediaSlot from '@/components/shared/media-slot'
+import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
 import styles from './edit.module.css'
 
 export type AssetKind = 'coupon' | 'research'
@@ -124,7 +126,6 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   const [couponTitle, setCouponTitle] = useState(init ? init.couponTitle : visual && kind === 'coupon' ? '夏の20%オフ' : '')
   const [imageUrl, setImageUrl] = useState(init ? init.imageUrl : '')
   const [pickedMedia, setPickedMedia] = useState<MediaItem | null>(null)
-  const [imageOpen, setImageOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [couponOnce, setCouponOnce] = useState<'once' | 'unlimited'>(init ? init.couponOnce : 'once')
@@ -444,14 +445,25 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                 <h2 className={styles.cardTitle}>中身</h2>
               </div>
               <div className={styles.couponRow}>
-                <button type="button" className={styles.couponImage} onClick={() => setImageOpen(true)} aria-label="クーポンの画像を選ぶ" title="クーポンの画像（任意・1029 × 1029px 推奨）">
-                  {imageSet ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={imageUrl.trim()} alt="" />
-                  ) : (
-                    <span className={styles.couponImageEmpty}><ImagePlus size={18} aria-hidden="true" />画像を選ぶ</span>
-                  )}
-                </button>
+                <div className={styles.couponImage}>
+                  <MediaSlot
+                    size="compact"
+                    title="画像を追加"
+                    previewAlt="クーポンの画像"
+                    value={imageSet ? imageUrl.trim() : null}
+                    accept="image/jpeg,image/png"
+                    limitText="任意・1029 × 1029px"
+                    upload={!host && selectedAccountId ? async (file, progress) => {
+                      const result = await uploadToMediaLibrary(file, selectedAccountId, 'image', progress)
+                      setPickedMedia(result.item)
+                      return result.url
+                    } : undefined}
+                    onChange={(url) => { setImageUrl(url ?? ''); setPickedMedia(null) }}
+                    onMediaPick={host ? undefined : () => setPickerOpen(true)}
+                    urlEntry={{ value: imageUrl, onChange: (url) => { setImageUrl(url); setPickedMedia(null) }, label: 'クーポン画像のURL', placeholder: '画像URL' }}
+                  />
+                  {pickedMedia ? <p className={styles.hint}>選択中：{pickedMedia.filename}</p> : null}
+                </div>
                 <div className={styles.couponFields}>
                   <div className={styles.field}>
                     <label htmlFor="te-coupon-title" className={styles.label}>クーポン名</label>
@@ -690,26 +702,6 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
 
       <Dialog open={previewOpen} title="LINEでの見え方" cancelLabel="閉じる" onCancel={() => setPreviewOpen(false)}>
         <div className={styles.previewDialog}>{phone}</div>
-      </Dialog>
-
-      <Dialog
-        open={imageOpen}
-        title="クーポンの画像"
-        description="任意です。1029 × 1029px がおすすめです。"
-        cancelLabel="閉じる"
-        onCancel={() => setImageOpen(false)}
-      >
-        <div className={styles.imageDialog}>
-          {host ? null : <Button type="button" onClick={() => setPickerOpen(true)}>登録メディアから選ぶ</Button>}
-          {pickedMedia ? <p className={styles.hint}>選択中：{pickedMedia.filename}</p> : null}
-          <TextField
-            value={imageUrl}
-            onChange={(event) => { setImageUrl(event.target.value); setPickedMedia(null) }}
-            placeholder="画像URL"
-            aria-label="クーポン画像のURL"
-          />
-          {imageUrl ? <Button type="button" variant="text" onClick={() => { setImageUrl(''); setPickedMedia(null) }}>画像を外す</Button> : null}
-        </div>
       </Dialog>
 
       <MediaPickerDialog
