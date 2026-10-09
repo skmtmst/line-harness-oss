@@ -349,7 +349,7 @@ describe('R588 詳細の失敗は理由で案内を分ける', () => {
     expect(host.textContent).not.toContain('存在しないか、このLINEアカウントでは表示できません')
     const retry = [...host.querySelectorAll<HTMLButtonElement>('button')]
       .find((button) => button.textContent === 'もう一度読み込む')
-    expect(retry).toBeUndefined()
+    expect(retry).toBeTruthy()
   })
 })
 

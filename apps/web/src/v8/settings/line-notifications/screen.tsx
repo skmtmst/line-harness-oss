@@ -1211,16 +1211,14 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
   >
     {expandedSetting === null ? <Tabs label="LINE通知の中の切り替え" size="notification" items={tabsWithCounts.map(item => ({ label: item.label, href: tabHref[item.key], current: tab === item.key }))} /> : null}
     {/*
-      * #634・M031：運用者タブの件数だけが取れなかったとき、その場所に小さく1行だけ。403 は押しても直らないので再試行の口は出さない。
+      * #634・M031：運用者タブの件数だけが取れなかったとき、その場所に小さく1行だけ。403 は権限変更後に読み直せるようにする。
       */}
     {expandedSetting === null && (operatorState === 'error' || operatorState === 'forbidden') ? (
       <p role="alert" className={styles.minor}>
         {isForbiddenOrRateLimited(operatorCountError)
           ? loadFailureNotice(operatorCountError, '運用者へのお知らせ')
           : '運用者へのお知らせの件数を読み込めませんでした。'}
-        {isForbidden(operatorCountError) ? null : (
-          <button type="button" className={styles.inlineLink} onClick={() => void load()}>もう一度</button>
-        )}
+        <button type="button" className={styles.inlineLink} onClick={() => void load()}>もう一度読み込む</button>
       </p>
     ) : null}
     {!canManage && expandedSetting === null ? <p className={styles.viewerBand} role="status">閲覧のみで見ています。お知らせを出す・止める・文面を直すのは、オーナーか管理者に頼んでください。</p> : null}
@@ -1340,7 +1338,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
           />
         </div>
       )
-        : loadState === 'forbidden' ? <ListState kind="forbidden" />
+        : loadState === 'forbidden' ? <ListState kind="forbidden" onRetry={() => void load()} />
         : loadState === 'error' ? <ListState kind="error" title="顧客へのお知らせを表示できませんでした" error={customerLoadError ?? undefined} onRetry={() => void load()} />
         : settings.length === 0 ? <ListState kind="empty" title="顧客へのお知らせはまだありません" description="EC連携の取引イベントを接続すると、ここで種類ごとに管理できます。" />
         : visible.length === 0 ? <ListState kind="empty" emptyPreset="filtered" title="条件に合うものはありません" description="札や検索を外すと、すべて出ます" action={<Button variant="secondary" onClick={() => setFilter('all')}>条件を外す</Button>} />

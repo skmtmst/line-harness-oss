@@ -1129,6 +1129,7 @@ function CommonVarsListInner() {
         <span className={styles.stateIcon}><Lock size={18} aria-hidden="true" /></span>
         <p className={styles.stateTitle}>共通情報を見る権限がありません</p>
         <p className={styles.stateDesc}>オーナーか管理者に、共通情報を見られるよう頼んでください。</p>
+        <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
         <Button href="/staff" variant="secondary">できることを確かめる</Button>
       </div>
     ) : (

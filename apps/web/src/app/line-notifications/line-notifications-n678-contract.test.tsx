@@ -1219,7 +1219,7 @@ describe('#678 実DOMへマウントした画面全体', () => {
     expect(screen.getByText('今日送った')).toBeTruthy()
   })
 
-  it('403: 顧客のお知らせは「表示する権限がありません」を出し、読み直す口は出さない', async () => {
+  it('403: 顧客のお知らせは「表示する権限がありません」を出し、権限変更後に読み直せる', async () => {
     fixture.settings.mockRejectedValue(new ApiError(403))
     fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
     fixture.operatorList.mockResolvedValue({ success: true, data: { summary: { total: 0 } } })
@@ -1227,7 +1227,7 @@ describe('#678 実DOMへマウントした画面全体', () => {
     render(<LineNotificationsPage />)
 
     await waitFor(() => expect(screen.getByText('表示する権限がありません')).toBeTruthy())
-    expect(screen.queryByRole('button', { name: 'もう一度読み込む' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
   })
 
   it('500: 「表示できませんでした」を出し、実物の読み直すボタンを押すと実物のfetchをやり直して復旧する', async () => {

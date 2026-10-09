@@ -217,7 +217,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
       {!lineAccountId ? <ListState kind="empty" title="LINEアカウントを選択してください" description="上のアカウント切り替えから、確認するLINEアカウントを選んでください。" />
         : visibleState === 'loading' ? <ListState kind="loading" title={`${title}を読み込んでいます`} />
         : visibleState === 'error' ? <ListState kind="error" title={`${title}を表示できませんでした`} description="登録済みの記録は消えていません。時間をおいて読み直してください。" onRetry={() => void load()} />
-        : visibleState === 'forbidden' ? <ListState kind="forbidden" />
+        : visibleState === 'forbidden' ? <ListState kind="forbidden" onRetry={() => void load()} />
         : items.length === 0 ? <ListState kind="empty" title={mode === 'failures' ? '送れなかったお知らせはありません' : 'お知らせの記録はまだありません'} description={mode === 'failures' ? '現在の表示範囲には、確認が必要な失敗はありません。' : 'ECからのお知らせを処理すると、ここに記録が残ります。'} />
         : visibleItems.length === 0 ? <ListState kind="empty" emptyPreset="filtered" title="条件に合う記録はありません" description="検索語か絞り込みを変えてください。" />
         : <DataTable label="お知らせの記録" grid={{ columns: 'var(--tpl-rest3-run-cols)', compactColumns: 'minmax(0, .8fr) minmax(0, 1fr) minmax(0, .8fr) var(--tpl-an-col-130) minmax(0, 1.5fr) var(--tpl-an-col-88)', padding: 'var(--tpl-rest3-run-row-pad)', headPadding: 'var(--tpl-rest3-op-head-pad)' }}>

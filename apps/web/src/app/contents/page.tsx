@@ -899,11 +899,12 @@ function MediaLibraryInner() {
   }
 
   if (detailId && (detailPhase === 'unavailable' || !detailsFor)) {
-    // R588: 403は権限案内にする。押しても直らない再試行は出さない。
+    // R588: 403は権限案内を残し、権限変更後に同じIDを読み直せる。
     if (detailFailure === 'denied') {
       return (
         <ListState
           kind="forbidden"
+          onRetry={retryDetail}
           title="メディアの詳細を見る権限がありません"
           description="見るには権限が要ります。オーナーか管理者に追加を依頼してください。"
           action={<Button type="button" onClick={() => setDetailUrl(null)}>登録メディア一覧へ戻る</Button>}
