@@ -1,5 +1,6 @@
 'use client'
 
+import { notifySaved } from '@/components/shared/toast'
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import HelpTip from '@/components/shared/help-tip'
@@ -276,7 +277,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
       const response = await restaurantGoogleApi.saveDraft(accountId, reviewId, text)
       setReview(response.review)
       setAiGenerated(false)
-      setSaved('下書きを保存しました。まだGoogleには送信していません。')
+      notifySaved('下書きを保存しました。まだGoogleには送信していません。')
     } catch (err) {
       setActionError(errorMessage(err, '下書きを保存できませんでした。'))
     } finally {

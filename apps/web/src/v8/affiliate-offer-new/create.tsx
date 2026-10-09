@@ -8,6 +8,7 @@
  * 聞く項目・保存の口・送る形・入力の断り方は今の画面（app/affiliate-offers/new-offer-v8.tsx）から写した。
  * 成果地点を案件につなぐ口がまだ無い（F-23）ので、成果地点の欄は押せない形で置く（BEHAVIOR.md）。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -202,7 +203,7 @@ export default function AffiliateOfferCreateV8() {
         router.push(`${OFFER_LIST_PATH}&highlight=${encodeURIComponent(offerId)}`)
       } else {
         reset()
-        setSaveNote('下書きに保存しました。続けて作れます。')
+        notifySaved('下書きに保存しました。続けて作れます。')
       }
     } catch (caught) {
       setSaveError(caught instanceof Error ? caught.message : '保存できませんでした')

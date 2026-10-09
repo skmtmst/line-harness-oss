@@ -12,6 +12,7 @@
  *   「すぐに計測を始める」（今の画面にある）を同じ形で置く。
  * - Gqve5 の同時編集の比較・再読込はAPIが無いため出さない。紹介コードの重複は欄で知らせる。
  */
+import { notifySaved } from '@/components/shared/toast'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -281,7 +282,7 @@ export default function CreateAffiliateV8() {
         router.push(`${LIST_PATH}?affiliate=${encodeURIComponent(affiliateId)}&highlight=${encodeURIComponent(affiliateId)}`)
       } else {
         reset()
-        setSaveNote('保存しました。続けて作れます。')
+        notifySaved('保存しました。続けて作れます。')
       }
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : '保存できませんでした'

@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -32,6 +33,7 @@ const accounts = [{ id: 'a', name: '銀座本店' }, { id: 'b', name: '横浜店
 const checked = (): Preflight => ({ preflightId: 'p1', expiresAt: new Date(Date.now() + 60_000).toISOString(), stores: accounts.map(a => ({ accountId: a.id, accountName: a.name, items: [{ sourceId: 'tag1', itemKind: 'tag', name: '来店済み', expectedRevision: 'v3', duplicate: true, allowedModes: a.id === 'a' ? ['overwrite','alias'] : ['alias'] }] })) })
 const completed = { runId: 'p1', status: 'partial', stores: [{ accountId: 'a', status: 'succeeded', counts: { created: 1, overwritten: 2, aliased: 1 } }, { accountId: 'b', status: 'version_conflict', reason: '配布先で編集がありました。もう一度確認してください', counts: { created: 0, overwritten: 0, aliased: 0 } }] }
 beforeEach(() => {
+  clearToastsForTest()
   vi.resetAllMocks(); window.sessionStorage.clear(); window.history.replaceState(null, '', '/hq/templates?type=tag')
   calls.context.mockResolvedValue({ tenantId: 'tenant-a', actorId: 'owner' })
   calls.list.mockResolvedValue([template]); calls.accounts.mockResolvedValue(accounts); calls.get.mockResolvedValue(structuredClone(detail))
@@ -65,7 +67,7 @@ function replaceSessionStorage(overrides: Partial<Pick<Storage, 'getItem' | 'set
   }
   return () => { if (original) Object.defineProperty(window, 'sessionStorage', original) }
 }
-async function list() { render(<TemplateConsole type="tag" />); await screen.findByLabelText('タグ「来店済み」の操作'); fireEvent.click(screen.getByLabelText('タグ「来店済み」の操作')) }
+async function list() { render(<><TemplateConsole type="tag" /><ToastHost /></>); await screen.findByLabelText('タグ「来店済み」の操作'); fireEvent.click(screen.getByLabelText('タグ「来店済み」の操作')) }
 async function chooseStores() {
   await list(); fireEvent.click(screen.getByRole('menuitem', { name: '配る' })); await screen.findByRole('checkbox', { name: '銀座本店' })
   expect((screen.getByRole('button', { name: '0アカウントの重複を確認' }) as HTMLButtonElement).disabled).toBe(true)
@@ -94,7 +96,7 @@ describe('HQひな形の配布フロー', () => {
   it('画像登録中は保存を止め、確定した内容だけ保存できる', async () => {
     let finish!: (value: unknown) => void
     calls.uploadImage.mockImplementation(() => new Promise(resolve => { finish = resolve }))
-    render(<TemplateConsole type="template" />)
+    render(<><TemplateConsole type="template" /><ToastHost /></>)
     fireEvent.click(await screen.findByRole('tab', { name: /カルーセル/ }))
     fireEvent.click((await screen.findAllByRole('button', { name: 'テンプレートを作る' }))[0])
     fireEvent.change(screen.getByPlaceholderText('例：夏の定番5点'), { target: { value: '画像付き案内' } })
@@ -218,7 +220,7 @@ describe('HQひな形の配布フロー', () => {
     calls.result.mockResolvedValue(completed); fireEvent.click(screen.getByRole('button', { name: '結果を再確認' })); await screen.findByText(/新規 \d+件・上書き \d+件・別名 \d+件/); expect(calls.distribute).toHaveBeenCalledOnce()
   })
   it('再読み込みはURLの既存配布番号をGETで復元する', async () => {
-    window.history.replaceState(null, '', '/hq/templates?type=tag#template=t1&run=p1'); render(<TemplateConsole type="tag" />)
+    window.history.replaceState(null, '', '/hq/templates?type=tag#template=t1&run=p1'); render(<><TemplateConsole type="tag" /><ToastHost /></>)
     await screen.findByText(/新規 \d+件・上書き \d+件・別名 \d+件/); expect(calls.result).toHaveBeenCalledWith('t1', 'p1'); expect(calls.distribute).not.toHaveBeenCalled()
   })
   it.each([
@@ -229,7 +231,7 @@ describe('HQひな形の配布フロー', () => {
     const name = type === 'template' ? '来店お礼' : type === 'rich_menu' ? 'アカウントメニュー' : 'ご来店アンケート'
     calls.list.mockResolvedValue([])
     calls.create.mockResolvedValue({ template: { ...template, id: `${type}-1`, name, template_type: type }, definition })
-    render(<TemplateConsole type={type} />)
+    render(<><TemplateConsole type={type} /><ToastHost /></>)
     fireEvent.click((await screen.findAllByRole('button', { name: type === 'template' ? 'テンプレートを作る' : type === 'rich_menu' ? 'メニューを作る' : 'フォームを作る' }))[0])
     if (type === 'form') {
       fireEvent.click(screen.getByRole('button', { name: /1行で書く/ }))
@@ -244,7 +246,7 @@ describe('HQひな形の配布フロー', () => {
     expect(calls.create).toHaveBeenCalledWith(expect.objectContaining({ type, name, definition: expect.objectContaining(type === 'form' ? { form: expect.objectContaining({ name }) } : type === 'template' ? { template: expect.objectContaining({ name, messageContent: fieldValue }) } : { richMenu: expect.objectContaining({ name }) }) }), expect.any(String))
   })
   it('権限不足のAPI応答後に作成・配布を許可しない', async () => {
-    calls.accounts.mockRejectedValue(new Error('操作する権限がありません。')); render(<TemplateConsole type="tag" />); await screen.findByRole('alert')
+    calls.accounts.mockRejectedValue(new Error('操作する権限がありません。')); render(<><TemplateConsole type="tag" /><ToastHost /></>); await screen.findByRole('alert')
     expect((screen.getAllByRole('button', { name: 'タグを作る' })[0] as HTMLButtonElement).disabled).toBe(true); expect(calls.create).not.toHaveBeenCalled()
   })
   it('競合した編集は入力を保持し、自動で期待版を更新・再送しない', async () => {
@@ -271,7 +273,7 @@ describe('HQひな形の配布フロー', () => {
     await screen.findByRole('button', { name: '前回の保存を再確認' })
     const original = calls.create.mock.calls[0]
     cleanup(); window.history.replaceState(null, '', '/login'); window.history.replaceState(null, '', '/hq/templates?type=tag')
-    render(<TemplateConsole type="tag" />)
+    render(<><TemplateConsole type="tag" /><ToastHost /></>)
     await screen.findByRole('button', { name: '前回の保存を再確認' })
     expect((screen.getByLabelText('ひな形の名前') as HTMLInputElement).value).toBe('再読込する依頼')
     expect((screen.getByLabelText('ひな形の名前') as HTMLInputElement).disabled).toBe(true)
@@ -290,13 +292,13 @@ describe('HQひな形の配布フロー', () => {
     fireEvent.change(screen.getByLabelText('ひな形の名前'), { target: { value: '元の組織' } }); fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
     await waitFor(() => expect(calls.create).toHaveBeenCalledOnce())
     cleanup(); calls.context.mockResolvedValue({ tenantId: 'tenant-b', actorId: 'owner' })
-    render(<TemplateConsole type="tag" />); await screen.findByLabelText('タグ「来店済み」の操作')
+    render(<><TemplateConsole type="tag" /><ToastHost /></>); await screen.findByLabelText('タグ「来店済み」の操作')
     expect(screen.queryByRole('button', { name: '前回の保存を再確認' })).toBeNull()
     cleanup(); calls.context.mockResolvedValue({ tenantId: 'tenant-a', actorId: 'another-owner' })
-    render(<TemplateConsole type="tag" />); await screen.findByLabelText('タグ「来店済み」の操作')
+    render(<><TemplateConsole type="tag" /><ToastHost /></>); await screen.findByLabelText('タグ「来店済み」の操作')
     expect(screen.queryByRole('button', { name: '前回の保存を再確認' })).toBeNull()
     cleanup(); calls.context.mockResolvedValue({ tenantId: 'tenant-a', actorId: 'owner' })
-    render(<TemplateConsole type="tag" />); await screen.findByRole('button', { name: '前回の保存を再確認' })
+    render(<><TemplateConsole type="tag" /><ToastHost /></>); await screen.findByRole('button', { name: '前回の保存を再確認' })
     expect(calls.create).toHaveBeenCalledOnce()
   })
   it('表示後に所属先が変われば新規POSTを停止する', async () => {

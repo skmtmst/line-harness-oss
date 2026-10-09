@@ -12,6 +12,7 @@
  * - 競合（cXqlS）：同じ名前の成果地点がすでにある（入力中に見つかった／保存したら先に作られていた 409）とき、
  *   板の頭の下に帯を出し、主ボタンは「比べてから保存」になる
  */
+import { notifySaved } from '@/components/shared/toast'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -393,7 +394,7 @@ function ConversionCreate() {
       if (!res.success) throw new Error(res.error)
       if (andContinue) {
         resetForm()
-        setSavedNotice('保存しました。続けて作れます。')
+        notifySaved('保存しました。続けて作れます。')
       } else {
         router.push(`/conversions?tab=points${res.data.id ? `&highlight=${encodeURIComponent(res.data.id)}` : ''}`)
       }

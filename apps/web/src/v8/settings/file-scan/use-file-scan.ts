@@ -2,6 +2,7 @@
 
 /* app/settings/file-scan/use-file-scan.ts から写した（src/v8 は @/app を読めない）。動きは同じ。 */
 
+import { notifySaved } from '@/components/shared/toast'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useDeferredValue, useEffect, useState } from 'react'
 import { ApiError, api, type FileScanConfig, type FileScanItem } from '@/lib/api'
@@ -179,7 +180,7 @@ export function useFileScan() {
         return
       }
       setConfigOpen(false)
-      setActionDone('外の検査の設定を保存しました。')
+      notifySaved('外の検査の設定を保存しました。')
       await load()
     } catch (caught) {
       setActionError(caught instanceof ApiError && caught.status === 400
