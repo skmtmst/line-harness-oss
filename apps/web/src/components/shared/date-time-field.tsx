@@ -34,7 +34,6 @@ import styles from './date-time-field.module.css'
  *   画面側の検証が今までどおり見る
  */
 export default function DateTimeField({
-  size,
   value,
   defaultValue = '',
   size = 'default',
@@ -54,8 +53,6 @@ export default function DateTimeField({
   'aria-labelledby': ariaLabelledBy,
   'aria-describedby': ariaDescribedBy,
 }: {
-  /** 36px の入力欄と並べるときだけ compact。 */
-  size?: 'compact'
   value?: string
   defaultValue?: string
   /** 36pxの欄と並べる場合。既定は日付と同じ40px。 */
