@@ -247,6 +247,9 @@ export interface FriendField {
   /** GET /api/friends/:id/fields のときだけ付く */
   value?: string | null;
   updatedBy?: string | null;
+  fixedKey?: import("./fixed-friend-fields").FixedFriendFieldKey | null;
+  valueUpdatedAt?: string | null;
+  valueSource?: { type: string; id: string | null; name: string | null } | null;
   /** ?withUsage=1 のときだけ付く */
   usageCount?: number;
   /** この項目へ回答を保存する回答フォーム数。未取得時は省略する。 */
