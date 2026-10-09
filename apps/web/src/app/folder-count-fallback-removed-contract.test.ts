@@ -32,7 +32,10 @@ describe('フォルダ件数フォールバックの削除(#631)', () => {
 
   it('reminders: reminders.filter(...).length でフォルダ件数を数えていない', () => {
     expect(REMINDERS).not.toMatch(/reminders\.filter\(.*folderId.*\)\.length/)
-    expect(REMINDERS).toContain('folder.itemCount')
+    // フォルダの件数は共通のフォルダの列（ManagedFolderPanel）が既定でサーバーの itemCount を出す（B-136）。
+    const panel = REMINDERS.match(/<ManagedFolderPanel[\s\S]*?>/)?.[0] ?? ''
+    expect(panel).toContain('kind="reminder"')
+    expect(panel).not.toContain('countOf=')
     // 型に無い itemCount を独自キャストで足していた拡張型を消した(#631)。
     // 型に足せば、来ていない経路は型エラーになる。
     expect(REMINDERS).not.toContain('VisualFolder')
