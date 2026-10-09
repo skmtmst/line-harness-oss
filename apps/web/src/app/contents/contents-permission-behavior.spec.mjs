@@ -2,7 +2,7 @@
   N-197（機能15メディア）の権限契約試験。
 
   **実build（`apps/web/out`）を実ルーティングで開き、実ブラウザで動かす。**
-  文字列検査ではないので、`disabled` が本当に押せないか・APIを本当に呼ばないかを
+  V8の「…」を開き、権限のない管理操作が隠れるか・APIを本当に呼ばないかを
   ブラウザの側から見る。
 
   APIは1か所で受けて必ず `fulfill` する。**外へは1本も出さない。**
@@ -173,8 +173,48 @@ async function openContents(page, waitUntil = 'networkidle') {
   await expect(page.getByText(MEDIA_NAME, { exact: true }).first()).toBeVisible()
 }
 
-function usageButton(page) {
-  return page.getByRole('button', { name: `${MEDIA_NAME}の使用箇所` })
+async function openMediaMenu(page) {
+  await page.getByRole('button', { name: `${MEDIA_NAME}のその他操作`, exact: true }).click()
+  return page.getByRole('menu', { name: `${MEDIA_NAME}の操作`, exact: true })
+}
+
+async function openUsage(page) {
+  const menu = await openMediaMenu(page)
+  await menu.getByRole('menuitem', { name: '使用箇所を見る', exact: true }).click()
+}
+
+function permissionNote(page) {
+  return page.getByRole('note').filter({ hasText: '閲覧のみで見ています。' })
+}
+
+async function expectManagementHidden(page) {
+  const menu = await openMediaMenu(page)
+  await expect(menu).toBeVisible()
+  for (const name of ['使用箇所を見る', '名前を変える', 'フォルダへ移す', 'アーカイブ', '削除する', '別のメディアに差し替える']) {
+    /* 無効な項目に理由が付いて読み上げ名が長くなっても、隠す契約の違反として検出する。 */
+    await expect(menu.getByRole('menuitem', { name })).toHaveCount(0)
+  }
+  /* 閲覧・登録・ダウンロードはstaffも使える。管理操作と混同しない。 */
+  await expect(menu.getByRole('menuitem', { name: 'プレビュー', exact: true })).toBeVisible()
+  await expect(menu.getByRole('menuitem', { name: 'ダウンロード', exact: true })).toBeVisible()
+  await expect(page.getByRole('checkbox', { name: `${MEDIA_NAME}を選ぶ`, exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /選択したメディアを削除/ })).toHaveCount(0)
+  await expect(page.getByText('すべてのメディアを選択', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'メディアを登録する', exact: true }).first()).toBeVisible()
+}
+
+/** 使用箇所の照会に加え、編集・削除等の書き込み要求も実際に監視する。 */
+function managementRequestLog() {
+  const requests = []
+  return {
+    requests,
+    onRequest: (url, request) => {
+      if (/^\/api\/media\/[^/]+\/delete-impact$/.test(url.pathname)
+        || (url.pathname.startsWith('/api/media') && request.method() !== 'GET')) {
+        requests.push(`${request.method()} ${url.pathname}`)
+      }
+    },
+  }
 }
 
 test.describe('Issue #667 メディア管理権限の実挙動', () => {
@@ -186,7 +226,7 @@ test.describe('Issue #667 メディア管理権限の実挙動', () => {
   test('権限取得中は管理操作を止め、ownerの応答後に詳細を開いてAPIを読む', async ({ page }) => {
     let releaseRole
     const roleReady = new Promise((resolve) => { releaseRole = resolve })
-    let impactRequests = 0
+    const management = managementRequestLog()
 
     await stubApi(page, {
       role: 'owner',
@@ -194,20 +234,21 @@ test.describe('Issue #667 メディア管理権限の実挙動', () => {
         await roleReady
         return ok({ id: 'owner-1', name: 'Owner', role: 'owner', email: null })
       },
-      onRequest: (url) => {
-        if (/^\/api\/media\/[^/]+\/delete-impact$/.test(url.pathname)) impactRequests += 1
-      },
+      onRequest: management.onRequest,
     })
 
     await openContents(page, 'domcontentloaded')
-    await expect(page.getByText('操作権限を確認しています。').first()).toBeVisible()
-    await expect(usageButton(page).first()).toBeDisabled()
+    await expect(permissionNote(page)).toContainText('操作権限を確認しています。')
+    await expectManagementHidden(page)
+    expect(management.requests).toEqual([])
+    await page.keyboard.press('Escape')
 
     releaseRole()
-    await expect(usageButton(page).first()).toBeEnabled()
-    await usageButton(page).first().click()
-    await expect.poll(() => impactRequests).toBe(1)
+    await expect(permissionNote(page)).toHaveCount(0)
+    await openUsage(page)
+    await expect.poll(() => management.requests).toEqual(['GET /api/media/media-delete-target/delete-impact'])
     await expect(page.getByRole('heading', { name: MEDIA_NAME, exact: true })).toBeVisible()
+    await expect(page.getByRole('listitem').filter({ hasText: '夏の定番5点' })).toBeVisible()
   })
 
   test('adminは使用箇所を開ける', async ({ page }) => {
@@ -220,42 +261,22 @@ test.describe('Issue #667 メディア管理権限の実挙動', () => {
     })
 
     await openContents(page)
-    await expect(usageButton(page).first()).toBeEnabled()
-    await usageButton(page).first().click()
+    await openUsage(page)
     await expect.poll(() => impactRequests).toBe(1)
     await expect(page.getByRole('heading', { name: MEDIA_NAME, exact: true })).toBeVisible()
   })
 
   test('staffは理由付きで使用箇所を開けず、編集・削除APIも呼ばない', async ({ page }) => {
-    let impactRequests = 0
+    const management = managementRequestLog()
     await stubApi(page, {
       role: 'staff',
-      onRequest: (url) => {
-        if (/^\/api\/media\/[^/]+\/delete-impact$/.test(url.pathname)) impactRequests += 1
-      },
+      onRequest: management.onRequest,
     })
 
     await openContents(page)
-    const button = usageButton(page).first()
-    await expect(button).toBeDisabled()
-    await expect(button).toHaveAttribute('title', /管理者だけ/)
-    await expect(page.getByRole('button', { name: `${MEDIA_NAME}の名前を変える` })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: `${MEDIA_NAME}を削除` })).toHaveCount(0)
-    await expect(page.getByRole('checkbox', { name: `${MEDIA_NAME}を選ぶ` })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: /選択したメディアを削除/ })).toHaveCount(0)
-    await expect(page.getByText('すべてのメディアを選択', { exact: true })).toHaveCount(0)
-    /* 読める・持ち出せる操作は取り上げない。読取権限と編集権限を混同しないこと。 */
-    /* ★V7：ダウンロードは札の「…」の中（最上層portal）。開いてから探す。 */
-    await page.getByRole('button', { name: `${MEDIA_NAME}のその他操作` }).click()
-    await expect(page.getByRole('menuitem', { name: 'ダウンロード' })).toBeVisible()
-    /* staffの「…」には管理操作が混ざらないことも、開いた中身で見る。 */
-    await expect(page.getByRole('menuitem', { name: '編集' })).toHaveCount(0)
-    await expect(page.getByRole('menuitem', { name: '削除する' })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: 'メディアを登録する' }).first()).toBeVisible()
-
-    /* 無効なボタンは通常clickが届かない。DOM側から直接叩いても呼ばないことまで見る。 */
-    await button.evaluate((element) => element.click())
-    await expect.poll(() => impactRequests).toBe(0)
+    await expect(permissionNote(page)).toContainText('管理者だけができます')
+    await expectManagementHidden(page)
+    expect(management.requests).toEqual([])
     await expect(page.getByRole('heading', { name: MEDIA_NAME, exact: true })).toHaveCount(0)
   })
 
@@ -271,24 +292,17 @@ test.describe('Issue #667 メディア管理権限の実挙動', () => {
 
   for (const failure of ROLE_FAILURES) {
     test(`役割取得失敗（${failure.name}）はfail-closedにして理由を表示する`, async ({ page }) => {
-      let impactRequests = 0
+      const management = managementRequestLog()
       await stubApi(page, {
         role: 'owner',
         staffMe: async () => failure.reply,
-        onRequest: (url) => {
-          if (/^\/api\/media\/[^/]+\/delete-impact$/.test(url.pathname)) impactRequests += 1
-        },
+        onRequest: management.onRequest,
       })
 
       await openContents(page)
-      const button = usageButton(page).first()
-      await expect(button).toBeDisabled()
-      await expect(page.getByText(/操作権限を確認できないため、安全のため管理操作を止めています/).first()).toBeVisible()
-      await expect(page.getByRole('button', { name: `${MEDIA_NAME}を削除` })).toHaveCount(0)
-      await expect(page.getByRole('button', { name: `${MEDIA_NAME}の名前を変える` })).toHaveCount(0)
-
-      await button.evaluate((element) => element.click())
-      await expect.poll(() => impactRequests).toBe(0)
+      await expect(permissionNote(page)).toContainText('操作権限を確認できないため、安全のため管理操作を止めています')
+      await expectManagementHidden(page)
+      expect(management.requests).toEqual([])
       await expect(page.getByRole('heading', { name: MEDIA_NAME, exact: true })).toHaveCount(0)
     })
   }
@@ -303,10 +317,12 @@ test.describe('Issue #667 メディア管理権限の実挙動', () => {
     })
 
     await openContents(page)
-    await usageButton(page).first().click()
+    await openUsage(page)
     await expect(page.getByRole('heading', { name: MEDIA_NAME, exact: true })).toBeVisible()
 
-    await page.getByRole('combobox', { name: 'LINEアカウント' }).selectOption('visual-qa-account-prod')
+    await page.getByRole('button', { name: 'アカウントを切り替える', exact: true }).click()
+    await page.getByRole('menu', { name: 'LINEアカウントの切り替え', exact: true })
+      .getByRole('menuitemradio', { name: ACCOUNTS[1].name, exact: true }).click()
     await expect.poll(() => listedAccounts.at(-1)).toBe('visual-qa-account-prod')
     await expect(page.getByRole('heading', { name: MEDIA_NAME, exact: true })).toHaveCount(0)
     await expect(page.getByText(MEDIA_NAME, { exact: true }).first()).toBeVisible()
