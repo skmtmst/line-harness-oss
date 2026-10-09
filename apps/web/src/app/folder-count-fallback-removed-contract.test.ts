@@ -50,8 +50,12 @@ describe('フォルダ件数フォールバックの削除(#631)', () => {
     expect(AUTO_REPLIES).not.toMatch(/\.itemCount \?\? items\.filter/)
     expect(AUTO_REPLIES).not.toMatch(/items\.filter\(\(r\) => r\.folderId === f\.id\)\.length/)
     expect(AUTO_REPLIES).not.toMatch(/items\.filter\(\(r\) => !r\.folderId\)\.length/)
-    expect(AUTO_REPLIES).toContain('f.itemCount')
-    expect(AUTO_REPLIES).toContain('unfiledCount')
+    // フォルダの件数は共通のフォルダの列（ManagedFolderPanel）が既定でサーバーの itemCount を出す。
+    // 画面で数え直す countOf を渡していないことを見る（B-136）。
+    const panel = AUTO_REPLIES.match(/<ManagedFolderPanel[\s\S]*?\/>/)?.[0] ?? ''
+    expect(panel).toContain('kind="auto_reply"')
+    expect(panel).not.toContain('countOf=')
+    expect(panel).toContain('unfiledCount={unfiledCount}')
   })
 
   it('templates: 現在ページの行数でフォルダ件数を数えていない(#721)', () => {
