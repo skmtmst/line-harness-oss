@@ -168,10 +168,11 @@ function actionServerFilter(status: ActionTab): { status?: 'succeeded' | 'skippe
 function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit: boolean }) {
   const [overviewSlot, setOverviewSlot] = useState<AccountBound<OverviewWithLatency | null>>(() => pendingFor(accountId, null))
   const [recordsSlot, setRecordsSlot] = useState<AccountBound<ImportRecords>>(() => pendingFor(accountId, EMPTY_RECORDS))
+  const [urlPage, setUrlPage] = useListUrlValue('page', 1)
   const [pageSlot, setPageSlot] = useState<{ accountId: string | null; page: number }>({ accountId, page: 1 })
   const [query, setQuery] = useListUrlValue('q', '')
   const [searchQuery, setSearchQuery] = useListUrlValue('q', '')
-  const [status, setStatus] = useState<ActionTab>('all')
+  const [status, setStatus] = useListUrlValue<ActionTab>('status', 'all')
   const [sort, setSort] = useListUrlValue<'newest' | 'oldest'>('sort', 'newest')
   const [retryingSlot, setRetryingSlot] = useState<{ accountId: string | null; id: string | null }>({ accountId, id: null })
   const [noticeSlot, setNoticeSlot] = useState<{ accountId: string | null; notice: { tone: 'success' | 'error'; text: string } | null }>({ accountId, notice: null })
@@ -194,9 +195,9 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
   const actionSummary = recordsView.data.summary
   const actionTotal = recordsView.data.total
   const listState = recordsView.state
-  const page = pageSlot.accountId === accountId ? pageSlot.page : 1
+  const page = pageSlot.accountId === accountId ? urlPage : 1
   const notice = noticeSlot.accountId === accountId ? noticeSlot.notice : null
-  const setPage = useCallback((next: number) => setPageSlot({ accountId, page: next }), [accountId])
+  const setPage = useCallback((next: number) => { setPageSlot({ accountId, page: next }); setUrlPage(next) }, [accountId, setUrlPage])
   const setNotice = useCallback((next: { tone: 'success' | 'error'; text: string } | null) => {
     if (accountId !== currentAccountIdRef.current) return
     setNoticeSlot({ accountId, notice: next })

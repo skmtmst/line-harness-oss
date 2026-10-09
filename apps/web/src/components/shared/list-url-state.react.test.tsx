@@ -277,3 +277,9 @@ it('詳細内の一覧も絞り込みで先頭に戻り、明示したページ�
 it('タブで記録と設定を行き来しても、記録の一覧ページは覚えておく', () => {
   expect(nextListUrl({ pathname: '/visit-stamps', search: '?logPage=2&tab=history', hash: '' }, { tab: '' }, { tab: 'settings' })).toBe('/visit-stamps?logPage=2&tab=settings')
 })
+
+it('カーソル履歴はページ送りとして残し、検索を変えたら消す', () => {
+  const location = { pathname: '/hq/banners', search: '?libraryCursors=%5Bnull%2C%22next%22%5D', hash: '' }
+  expect(nextListUrl(location, { libraryCursors: '[null]' }, { libraryCursors: '[null,"next","last"]' })).toContain('libraryCursors=')
+  expect(nextListUrl(location, { q: '' }, { q: '新しい名前' })).not.toContain('libraryCursors=')
+})

@@ -105,7 +105,7 @@ export function nextListUrl<T extends Record<string, string>>(
     if (value === '' || value === defaults[key]) params.delete(key)
     else params.set(key, value)
   }
-  const isPagination = (key: string) => /(?:page|cursor|offset)$/i.test(key)
+  const isPagination = (key: string) => /(?:page|cursors?|offset)$/i.test(key)
   const changedFilter = Object.entries(patch).some(([key, value]) => !isPagination(key) && !['highlight', 'id'].includes(key) && value !== undefined && value !== (new URLSearchParams(location.search).get(key) ?? defaults[key] ?? ''))
   if (changedFilter && patch.page === undefined) params.delete('page')
   if (changedFilter && patch.cursor === undefined) params.delete('cursor')

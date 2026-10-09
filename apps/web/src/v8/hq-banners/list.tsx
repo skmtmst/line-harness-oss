@@ -9,7 +9,7 @@
  * 頭（型 ListPage）・左の「見る」の列（型のフォルダの列＋共通 FolderPanel）・数のカード4枚・
  * 案内の帯・タブ・道具の段・カード（プロジェクト）／画像のます（ライブラリ）・件数と次へ。
  */
-import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useListUrlValue, useListUrlJsonValue } from '@/components/shared/list-url-state'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { CircleDot, Folder, Gauge, Plus, Send, Sparkles, Star, Upload } from 'lucide-react'
@@ -61,6 +61,10 @@ const PROJECT_SORTS: Array<{ value: ProjectSort; label: string }> = [
 
 /** 画像ライブラリは 12 枚ずつ（絵 W5Wxr の「1–12 件 / 23 件」「次の 12 件」）。 */
 const LIBRARY_PAGE = 12
+
+function isCursorHistory(value: unknown): value is Array<string | null> {
+  return Array.isArray(value) && value.length > 0 && value[0] === null && value.every(item => item === null || typeof item === 'string')
+}
 
 export default function HqBannersListV8() {
   return (
@@ -491,7 +495,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
   const [shape, setShape] = useListUrlValue<ShapeFilter | null>('shape', null)
   const [query, setQuery] = useListUrlValue('q', '')
   /** ページごとの「この日時より前」。1ページ目は null。 */
-  const [cursors, setCursors] = useState<Array<string | null>>([null])
+  const [cursors, setCursors] = useListUrlJsonValue<Array<string | null>>('libraryCursors', [null], isCursorHistory)
   const [nextBefore, setNextBefore] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [openImage, setOpenImage] = useState<BannerImage | null>(null)
