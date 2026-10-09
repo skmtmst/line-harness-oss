@@ -3,6 +3,7 @@
  * 統括のひな形の一覧（店と同じ形＋配る口・B-27〜B-29・B-36）の動き。
  * 6種類のタブで種類を替える・配布先の列・全種類の行の［配る］（「…」の左。オーナー 2026-10-08）・閲覧のみには配る／作る口を置かない・フォルダで絞る。
  */
+import { waitFor } from '@testing-library/react'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -46,6 +47,7 @@ async function render(extra: Partial<HqStoreListProps> = {}) {
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -53,6 +55,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   host.remove()
+  delete document.documentElement.dataset.theme
 })
 
 const buttons = () => [...document.querySelectorAll('button')]
@@ -192,4 +195,15 @@ describe('フォルダの配布口を出す範囲（G-7）', () => {
     await render({ canEdit: false, folderContents: ROWS, onDistributeFolder: vi.fn() })
     expect(buttons().some((button) => button.getAttribute('aria-label')?.endsWith('の操作'))).toBe(false)
   })
+})
+
+it.each(['template', 'rich_menu', 'form', 'tag', 'scenario'] as const)('%s のひな形も色を変えて保存できる', async (type) => {
+  const h = await render({ type })
+  await act(async () => (host.querySelector('[aria-label="フォルダ「お問い合わせ」の操作"]') as HTMLButtonElement).click())
+  await act(async () => ([...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent === '色を変える') as HTMLElement).click())
+  await act(async () => (document.querySelector('[aria-label="フォルダの色：色なし"]') as HTMLButtonElement).click())
+  await act(async () => (document.querySelector('[role="radio"][aria-label="ピンク"]') as HTMLButtonElement).click())
+  await act(async () => (buttons().find((el) => el.textContent === '保存する') as HTMLButtonElement).click())
+  expect(h.onRenameFolder).toHaveBeenCalledWith(expect.objectContaining({ id: 'f-1', revision: 1 }), 'お問い合わせ', '#ec4899')
+  await waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull())
 })

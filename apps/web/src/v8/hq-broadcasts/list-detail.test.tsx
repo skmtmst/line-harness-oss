@@ -12,7 +12,7 @@ const hq = vi.hoisted(() => ({
   list: vi.fn(), get: vi.fn(),
   folders: vi.fn(async () => ({ success: true, data: [] })),
   approvalCandidates: vi.fn(async () => ({ success: true, data: [] })),
-  approval: vi.fn(),
+  approval: vi.fn(), updateFolder: vi.fn(), createFolder: vi.fn(),
 }))
 const params = vi.hoisted(() => ({ value: new URLSearchParams() }))
 vi.mock('@/lib/hq-broadcasts-api', () => ({ hqBroadcastsApi: hq }))
@@ -37,8 +37,10 @@ const run = (id: string, title: string, targets: ReturnType<typeof target>[], ex
 
 beforeEach(() => {
   params.value = new URLSearchParams()
+  document.documentElement.dataset.theme = 'v8'
+  hq.folders.mockResolvedValue({ success: true, data: [] })
 })
-afterEach(() => cleanup())
+afterEach(() => { cleanup(); delete document.documentElement.dataset.theme })
 
 describe('統括の一括配信の一覧（U4Eep0）', () => {
   it('新しい順（口の順）と古い順を入れ替える', async () => {
@@ -90,4 +92,32 @@ describe('統括の一括配信の詳細（M2tJM）', () => {
     expect(deliveryWayText({ stealthSpreadMinutes: 30 }, true)).toBe('30分かけて分けて送る')
     expect(deliveryWayText({}, false)).toBe('すぐに全員へ')
   })
+})
+
+it('統括のフォルダは色の保存に失敗しても窓を残し、再試行・読み直し後にも色が残る', async () => {
+  let saved = { id: 'f1', name: 'キャンペーン', revision: 1, item_count: 0, color: '#3b82f6' }
+  hq.folders.mockImplementation(async () => ({ success: true, data: [saved] } as never))
+  hq.list.mockResolvedValue({ data: [] })
+  hq.updateFolder.mockRejectedValueOnce(new Error('保存できませんでした')).mockImplementationOnce(async (id, name, version, color) => {
+    saved = { ...saved, name, color, revision: version + 1 }
+    return { success: true, data: saved }
+  })
+  render(<HqBroadcastList />)
+  await screen.findByRole('button', { name: 'フォルダ「キャンペーン」の操作' })
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダ「キャンペーン」の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '色を変える' }))
+  const dialog = within(screen.getByRole('dialog', { name: 'フォルダを直す' }))
+  fireEvent.click(dialog.getByRole('button', { name: 'フォルダの色：青' }))
+  expect(screen.getAllByRole('radio')).toHaveLength(10)
+  fireEvent.click(screen.getByRole('radio', { name: 'ピンク' }))
+  fireEvent.click(dialog.getByRole('button', { name: '保存する' }))
+  await waitFor(() => expect(dialog.getByRole('alert').textContent).toContain('保存できませんでした'))
+  expect(dialog.getByRole('button', { name: 'フォルダの色：ピンク' })).toBeTruthy()
+  fireEvent.click(dialog.getByRole('button', { name: '保存する' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  expect(hq.updateFolder).toHaveBeenLastCalledWith('f1', 'キャンペーン', 1, '#ec4899')
+  cleanup()
+  render(<HqBroadcastList />)
+  await screen.findByRole('button', { name: 'フォルダ「キャンペーン」の操作' })
+  expect((document.querySelector('nav [data-folder-dot]') as HTMLElement).style.backgroundColor).toBe('#ec4899')
 })

@@ -13,7 +13,7 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import { api } from '@/lib/api'
-import type { Folder } from '@line-crm/shared'
+import { FOLDER_SELECT_COLORS, type Folder } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import { isImeComposing } from './ime'
 import { useAdminTheme } from '@/lib/use-admin-theme'
@@ -58,7 +58,7 @@ export interface FolderAddDialogProps {
   placeholder?: string
   onClose: () => void
   /** 追加できたら呼ぶ。一覧を読み直す。 */
-  onAdded: () => void
+  onAdded: (folder?: Folder) => void
 }
 
 export default function FolderAddDialog({
@@ -72,7 +72,7 @@ export default function FolderAddDialog({
 }: FolderAddDialogProps) {
   const theme = useAdminTheme()
   const [name, setName] = useState(folder?.name ?? '')
-  const [color, setColor] = useState(folder?.color ?? FOLDER_COLORS[0])
+  const [color, setColor] = useState<string | null>(theme === 'v8' ? (folder ? folder.color ?? null : FOLDER_SELECT_COLORS[0].value) : folder?.color ?? FOLDER_COLORS[0])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -92,7 +92,7 @@ export default function FolderAddDialog({
         setError(res.error)
         return
       }
-      onAdded()
+      onAdded(res.data)
       onClose()
     } catch {
       setError(folder ? 'フォルダを直せませんでした' : 'フォルダを追加できませんでした')
@@ -103,8 +103,8 @@ export default function FolderAddDialog({
 
   if (theme === 'v8') return <FolderEditorDialog open
     title={folder ? 'フォルダを直す' : 'フォルダを追加'} description={note}
-    name={name} onNameChange={setName} color={color} onColorChange={(next) => setColor(next ?? FOLDER_COLORS[0])}
-    colors={FOLDER_COLORS.map((value) => ({ value, name: FOLDER_COLOR_NAMES[value] }))}
+    name={name} onNameChange={setName} color={color} onColorChange={setColor}
+    allowClear
     placeholder={placeholder} busy={saving} error={error || undefined}
     onCancel={onClose} onConfirm={() => void add()} confirmLabel={folder ? '保存する' : '追加する'}
   />

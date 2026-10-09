@@ -48,6 +48,8 @@ import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
+import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
+import { FOLDER_SELECT_COLORS, type FriendAddRuleFolder } from '@line-crm/shared'
 import FolderPanel from '@/components/shared/folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import Select from '@/components/shared/select'
@@ -203,6 +205,9 @@ function FriendAddList() {
   const { cursor, canPrev, reset: resetCursor, goPrev, goNext } = useCursorStack()
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
+  const [folderColor, setFolderColor] = useState<string | null>(FOLDER_SELECT_COLORS[0].value)
+  const [editingFolder, setEditingFolder] = useState<FriendAddRuleFolder | null>(null)
+  const [folderError, setFolderError] = useState('')
   const [folderBusy, setFolderBusy] = useState(false)
   const folderKey = useRef(crypto.randomUUID())
   const requestSequence = useRef(0)
@@ -302,9 +307,9 @@ function FriendAddList() {
   const folders = useMemo(() => {
     const counts = new Map<string | null, number>()
     for (const entry of data?.folderCounts ?? []) counts.set(entry.name, entry.count)
-    const rows: Array<{ key: string; name: string; count: number; color?: string | null }> = []
+    const rows: Array<{ id?: string; key: string; name: string; count: number; color?: string | null }> = []
     for (const option of data?.options.folders ?? []) {
-      rows.push({ key: option.name, name: option.name, color: option.color, count: counts.get(option.name) ?? 0 })
+      rows.push({ id: option.id, key: option.name, name: option.name, color: option.color, count: counts.get(option.name) ?? 0 })
     }
     const uncategorized = counts.get(null) ?? 0
     if (uncategorized > 0 || !rows.some((row) => row.name === '未分類')) {
@@ -318,21 +323,23 @@ function FriendAddList() {
     const name = folderName.trim()
     if (!name) return
     setFolderBusy(true)
-    setActionError('')
+    setFolderError('')
     try {
-      const response = await api.friendAddRules.createFolder(selectedAccountId, name, folderKey.current)
+      const response = editingFolder
+        ? await api.friendAddRules.updateFolder(selectedAccountId, editingFolder.id, { name, color: folderColor })
+        : await api.friendAddRules.createFolder(selectedAccountId, name, folderKey.current, folderColor)
       if (!response.success) {
-        setActionError(response.error)
-        setFolderDialogOpen(false)
+        setFolderError(response.error)
         return
       }
+      if (editingFolder && folder === editingFolder.name) setFolder(name)
+      setEditingFolder(null)
       folderKey.current = crypto.randomUUID()
       setFolderName('')
       setFolderDialogOpen(false)
       await load()
     } catch (caught) {
-      setActionError(describeFriendAddFailure(caught, 'フォルダ', 'create').message)
-      setFolderDialogOpen(false)
+      setFolderError(describeFriendAddFailure(caught, 'フォルダ', 'create').message)
     } finally {
       setFolderBusy(false)
     }
@@ -532,7 +539,8 @@ function FriendAddList() {
   /* 閲覧のみの人には、作る・追加・編集・削除の操作を置かない（押せない形でも出さない。オーナー 2026-10-06）。 */
   const folderRows = [
     { kind: 'all' as const, id: '', label: 'すべて', count: data?.total ?? items.length },
-    ...folders.map((entry) => ({ kind: entry.key === UNFILED ? 'unfiled' as const : 'folder' as const, id: entry.key, label: entry.name, color: entry.color, count: entry.count })),
+    ...folders.map((entry) => ({ kind: entry.key === UNFILED ? 'unfiled' as const : 'folder' as const, id: entry.key, label: entry.name, color: entry.color, count: entry.count,
+      onEdit: canEdit && entry.id && entry.key !== UNFILED ? () => { setFolderName(entry.name); setFolderColor(entry.color ?? null); setEditingFolder({ id: entry.id!, name: entry.name, color: entry.color }); setFolderError(''); setFolderDialogOpen(true) } : undefined })),
   ]
   const createButton = canEdit ? (
     <Button variant="primary" href="/friend-add-settings?view=new" className={styles.createButton}>
@@ -854,9 +862,9 @@ function FriendAddList() {
         <FolderPanel
           activeId={folder ?? ''}
           onSelect={(id) => selectFolder(id || null)}
-          onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}
+          onAddFolder={canEdit ? () => { setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setEditingFolder(null); setFolderError(''); setFolderDialogOpen(true) } : undefined}
           addFolderLabel="フォルダを追加"
-          addFolderDisabled={folderBusy}
+          addFolderDisabled={canEdit && folderBusy}
           rows={folderRows}
         >
           <p className={styles.folderNote}>フォルダを消しても、中の設定は未分類に残ります</p>
@@ -913,30 +921,12 @@ function FriendAddList() {
           onConfirm={() => void runDelete()}
           onCancel={closeDelete}
         />
-        {/* フォルダを追加する窓（v7 と同じ文）。 */}
-        <ConfirmDialog
-          open={folderDialogOpen}
-          title="流入の束を追加"
-          description="設定を整理するフォルダ名を入力してください。"
-          confirmLabel="追加する"
-          busy={folderBusy}
-          onCancel={() => {
-            setFolderDialogOpen(false)
-            setFolderName('')
-          }}
-          onConfirm={folderName.trim() ? () => void createFolder() : undefined}
-        >
-          <label className={styles.folderDialogBody}>
-            <span className={styles.folderDialogLabel}>フォルダ名</span>
-            <input
-              autoFocus
-              className={styles.folderDialogInput}
-              value={folderName}
-              onChange={(event) => setFolderName(event.target.value)}
-              maxLength={50}
-            />
-          </label>
-        </ConfirmDialog>
+        <FolderEditorDialog open={folderDialogOpen} title={editingFolder ? 'フォルダを直す' : 'フォルダを追加'}
+          description="設定を分けてしまう箱です。"
+          name={folderName} onNameChange={setFolderName} color={folderColor} onColorChange={setFolderColor} allowClear maxLength={50}
+          confirmLabel={editingFolder ? '保存する' : '追加する'} busy={folderBusy} error={folderError || undefined}
+          onCancel={() => { if (!folderBusy) { setFolderDialogOpen(false); setFolderName(''); setEditingFolder(null) } }}
+          onConfirm={() => void createFolder()} />
       </>}
     >
       {listBody}

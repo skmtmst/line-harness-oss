@@ -5,13 +5,13 @@ import HqAttributes from './attributes'
 import AttributeDistribution from './attribute-distribution'
 import { fieldDefinition, fieldOf } from './attribute-model'
 import type { HqFriendAttributeDetail } from '@line-crm/shared'
-const mocks = vi.hoisted(() => ({ role: 'owner', list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), folders: vi.fn(), stats: vi.fn(), accounts: vi.fn(), received: vi.fn(), preflight: vi.fn(), distribute: vi.fn(), result: vi.fn(), context: vi.fn() }))
+const mocks = vi.hoisted(() => ({ role: 'owner', list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), folders: vi.fn(), createFolder: vi.fn(), updateFolder: vi.fn(), stats: vi.fn(), accounts: vi.fn(), received: vi.fn(), preflight: vi.fn(), distribute: vi.fn(), result: vi.fn(), context: vi.fn() }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => mocks.role, canManageRole: (role: string) => ['owner', 'admin'].includes(role) }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn(), push: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/hq/friend-attributes' }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
 vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('@/lib/hq-templates-api', () => ({ hqTemplatesApi: { context: mocks.context } }))
-vi.mock('@/lib/hq-friend-attributes-api', () => ({ hqFriendAttributesApi: { list: mocks.list, get: mocks.get, create: mocks.create, update: mocks.update, remove: mocks.remove, listStats: mocks.stats, folders: { list: mocks.folders }, accounts: mocks.accounts, receivedVersions: mocks.received, preflight: mocks.preflight, distribute: mocks.distribute, result: mocks.result } }))
+vi.mock('@/lib/hq-friend-attributes-api', () => ({ hqFriendAttributesApi: { list: mocks.list, get: mocks.get, create: mocks.create, update: mocks.update, remove: mocks.remove, listStats: mocks.stats, folders: { list: mocks.folders, create: mocks.createFolder, update: mocks.updateFolder }, accounts: mocks.accounts, receivedVersions: mocks.received, preflight: mocks.preflight, distribute: mocks.distribute, result: mocks.result } }))
 vi.mock('./distribution-accounts', () => ({ useDistributionFolders: () => ({ folders: [], membership: new Map(), failed: false }), distributionFolderRows: () => [], accountsInFolder: (rows: unknown[]) => rows, DistributionFolderPanel: () => null }))
 const field: HqFriendAttributeDetail = { template: { id: 'field-one', name: '愛犬のお名前', description: null, template_type: 'friend_field', folder_id: null, revision: 3, updated_at: '2026-10-08' }, definition: { schemaVersion: 1, field: { name: '愛犬のお名前', fieldKey: 'dog_name', type: 'text', displayOrder: 0 }, folders: [] } }
 const mark: HqFriendAttributeDetail = { template: { id: 'mark-one', name: '未対応', description: null, template_type: 'mark', revision: 4, updated_at: '2026-10-08' }, definition: { schemaVersion: 1, mark: { name: '未対応', color: '#EF4B55', isDefault: true, displayOrder: 0 } } }
@@ -100,4 +100,22 @@ it('選択肢のID・削除した選択肢・既定値を往復で保つ', () =>
 it('配布の応答不明は結果GETで復元し、POSTを繰り返さない', async () => {
   mocks.preflight.mockResolvedValue({ preflightId: 'run', expiresAt: '2099-01-01', stores: [{ accountId: 'a', accountName: '本店', items: [{ sourceId: 'field-one', name: '項目', duplicate: false, allowedModes: ['create'] }] }] }); mocks.distribute.mockRejectedValue(new Error('network')); mocks.result.mockResolvedValue({ runId: 'run', status: 'completed', stores: [{ accountId: 'a', status: 'succeeded', reason: null, counts: { created: 1, overwritten: 0, aliased: 0 } }] })
   render(<AttributeDistribution detail={field} onClose={vi.fn()} />); await screen.findByRole('checkbox', { name: '本店' }); fireEvent.click(screen.getByRole('checkbox', { name: '本店' })); fireEvent.click(screen.getByRole('button', { name: '選んだアカウントを確かめる' })); await screen.findByRole('button', { name: 'この内容で1アカウントへ配る' }); fireEvent.click(screen.getByRole('button', { name: 'この内容で1アカウントへ配る' })); await screen.findByText('成功'); fireEvent.click(screen.getByRole('button', { name: '結果を再確認' })); await waitFor(() => expect(mocks.result).toHaveBeenCalledTimes(2)); expect(mocks.distribute).toHaveBeenCalledTimes(1)
+})
+
+it('統括の情報欄のフォルダも保存色を読み、色の保存に失敗しても窓と入力を保つ', async () => {
+  mocks.folders.mockResolvedValue([{ id: 'f1', name: '基本情報', revision: 2, color: '#8b5cf6' }])
+  mocks.updateFolder.mockRejectedValueOnce(new Error('保存できませんでした')).mockResolvedValueOnce({ id: 'f1', name: '基本情報', revision: 3, color: '#ec4899' })
+  render(<HqAttributes type="friend_field" tab="fields" onTab={vi.fn()} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'フォルダ「基本情報」の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '色を変える' }))
+  const dialog = within(screen.getByRole('dialog', { name: 'フォルダを直す' }))
+  fireEvent.click(dialog.getByRole('button', { name: 'フォルダの色：紫' }))
+  fireEvent.click(screen.getByRole('radio', { name: 'ピンク' }))
+  fireEvent.click(dialog.getByRole('button', { name: '保存する' }))
+  await waitFor(() => expect(dialog.getByRole('alert').textContent).toContain('保存できませんでした'))
+  expect(dialog.getByRole('button', { name: 'フォルダの色：ピンク' })).toBeTruthy()
+  expect(screen.queryByText('保存できませんでした', { selector: '[data-notice]' })).toBeNull()
+  fireEvent.click(dialog.getByRole('button', { name: '保存する' }))
+  await waitFor(() => expect(mocks.updateFolder).toHaveBeenLastCalledWith('f1', '基本情報', 2, '#ec4899'))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 })

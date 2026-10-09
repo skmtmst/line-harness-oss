@@ -4,6 +4,7 @@
  * V8 の言葉（名前を変える・色を変える・並べ替える・消す）、消す前の確認の窓、
  * 消すと共通のフォルダの口へ DELETE を送って読み直す。閲覧のみには「…」を出さない。
  */
+import { within } from '@testing-library/react'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -14,11 +15,12 @@ vi.hoisted(() => {
 })
 
 const remove = vi.hoisted(() => vi.fn(async () => ({ success: true, data: null })))
+const update = vi.hoisted(() => vi.fn())
 const swap = vi.hoisted(() => vi.fn(async () => ({ success: true, data: { swapped: ['a', 'b'] } })))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
-  return { ...actual, api: { ...actual.api, folders: { ...actual.api.folders, delete: remove, swapOrder: swap } } }
+  return { ...actual, api: { ...actual.api, folders: { ...actual.api.folders, delete: remove, swapOrder: swap, update } } }
 })
 
 import FolderPanel from './folder-panel'
@@ -41,6 +43,7 @@ function Screen({ enabled, onChanged, onDeleted }: { enabled: boolean; onChanged
       <FolderPanel
         activeId=""
         onSelect={() => {}}
+        onAddFolder={enabled ? () => {} : undefined}
         rows={[{ id: '', label: 'すべて', count: 3 }, ...FOLDERS.map((f, i) => ({ ...actions.rowActions(f, i), id: f.id, label: f.name, count: 1 }))]}
       />
       {actions.dialogs}
@@ -58,6 +61,7 @@ beforeEach(() => {
   root = createRoot(host)
   remove.mockClear()
   swap.mockClear()
+  update.mockReset()
 })
 
 afterEach(() => {
@@ -103,5 +107,27 @@ describe('フォルダの「…」（共通）', () => {
   it('変えられない人には「…」を出さない', async () => {
     await act(async () => { root.render(<Screen enabled={false} onChanged={() => {}} onDeleted={() => {}} />) })
     expect(menuButton('キャンペーン')).toBeNull()
+    expect(document.body.textContent).not.toContain('フォルダを追加する')
+    expect(document.body.textContent).not.toContain('色を変える')
   })
+})
+
+it('色の変更に失敗しても窓と入力を残し、再試行で名前・色・所属を保存して読み直す', async () => {
+  update.mockResolvedValueOnce({ success: false, error: '保存できませんでした' }).mockResolvedValueOnce({ success: true, data: FOLDERS[0] })
+  const onChanged = vi.fn()
+  await act(async () => root.render(<Screen enabled onChanged={onChanged} onDeleted={() => {}} />))
+  await click(menuButton('キャンペーン'))
+  await click([...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent === '色を変える'))
+  const dialog = within(document.querySelector('[role="dialog"]') as HTMLElement)
+  await click(dialog.getByRole('button', { name: /フォルダの色/ }))
+  await click([...document.querySelectorAll('[role="radio"]')].find((el) => el.getAttribute('aria-label') === 'ピンク'))
+  await click(dialog.getByRole('button', { name: '保存する' }))
+  expect(update).toHaveBeenCalledWith('f-1', { name: 'キャンペーン', color: '#ec4899' }, 'acc-1')
+  expect(dialog.getByRole('alert').textContent).toContain('保存できませんでした')
+  expect((dialog.getByRole('textbox', { name: 'フォルダ名' }) as HTMLInputElement).value).toBe('キャンペーン')
+  expect(dialog.getByRole('button', { name: 'フォルダの色：ピンク' })).toBeTruthy()
+  expect(onChanged).not.toHaveBeenCalled()
+  await click(dialog.getByRole('button', { name: '保存する' }))
+  expect(onChanged).toHaveBeenCalledOnce()
+  expect(document.querySelector('[role="dialog"]')).toBeNull()
 })

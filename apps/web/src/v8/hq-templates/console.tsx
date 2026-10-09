@@ -615,8 +615,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         folderLoadFailed={folderLoadFailed}
         folderFilter={folderFilter}
         onFolderFilter={setFolderFilter}
-        onAddFolder={async (folderName) => { await hqTemplatesApi.folders.create(folderName); await reloadFolders() }}
-        onRenameFolder={async (folder, folderName) => { await hqTemplatesApi.folders.update(folder.id, folderName, folder.revision); await reloadFolders() }}
+        onAddFolder={async (folderName, color) => { await hqTemplatesApi.folders.create(folderName, color); await reloadFolders() }}
+        onRenameFolder={async (folder, folderName, color) => { await hqTemplatesApi.folders.update(folder.id, folderName, folder.revision, color); await reloadFolders() }}
         onDeleteFolder={async (folder) => {
           await hqTemplatesApi.folders.remove(folder.id, folder.revision)
           await reloadFolders(); setTemplates(await hqTemplatesApi.list(type)); await reloadKind(); setFolderFilter('all')

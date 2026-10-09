@@ -12,7 +12,7 @@
 ## 呼ぶ口（今と同じ）
 - 一覧：`api.friendAddRules.list(accountId, kind, { cursor, limit, q, folder, status })`（`folder` は `__uncategorized` で未分類）
 - 並べ替え：`reorder(accountId, kind, ids)`（絞り込みなし・全件が見えているときだけ）
-- 止める：`stop(accountId, id, version)`／削除：`archive(accountId, id)`／フォルダ：`createFolder(accountId, name, key)`
+- 止める：`stop(accountId, id, version)`／削除：`archive(accountId, id)`／フォルダ：`createFolder(accountId, name, key, color)`／色と名前の変更：`updateFolder(accountId, id, { name, color })`
 - 作る・直す：`get`・`list`（流入リンクを使っているほかの設定を出すため、直すときも読む）・`conflicts`・`createDraft`・`saveDraft`（冪等の鍵）・`validate`・`test`・`publish`
 - 未保存の変更があるときの離脱は `useUnsavedGuard` で確かめる
 
@@ -28,3 +28,6 @@
 - ページ内の戻るリンクは置かず、型の題・説明とパンくず・キャンセルを使う
 - 下書きの保存が版の競合（409）になったら、頭の中に帯を出す：「違いを比べる」（最新の保存と項目ごとに並べる）・「最新を読み込んで続ける」
 - 1152 の作る画面は、右の列の上に「LINEでの見え方を見る」（窓で開く）
+
+## フォルダの色（fcolall・2026-10-09）
+- 追加・名前と色の変更は共通の横並びの窓。設定のフォルダ名とは別に、保存用のフォルダIDも一覧の候補から保持する。色の保存失敗は窓内に出し、入力と窓を残して再試行できる。閲覧のみには操作を出さない。
