@@ -13,6 +13,7 @@ import {
   validateRichMenuGroupForPublish,
   unpublishRichMenuGroup,
   linkRichMenuBulkChunked,
+  type AreaInput,
   type LineRichMenuClient,
   type R2Like,
 } from './rich-menu-publisher.js';
@@ -930,6 +931,31 @@ function groupWithAreas(
 
 const BOUNDS = { x: 0, y: 0, width: 100, height: 100 };
 
+describe('押したら6つの公開', () => {
+  const choices: AreaInput[] = [
+    { bounds: BOUNDS, actionType: 'uri', intent: 'url', actionData: { uri: 'https://example.com' } },
+    { bounds: BOUNDS, actionType: 'message', intent: 'text', actionData: { text: '予約したい' } },
+    { bounds: BOUNDS, actionType: 'uri', intent: 'booking', actionData: { menuId: 'menu-1' } },
+    { bounds: BOUNDS, actionType: 'uri', intent: 'form', formId: 'form-1', actionData: {} },
+    { bounds: BOUNDS, actionType: 'uri', intent: 'booking_history', actionData: {} },
+    { bounds: BOUNDS, actionType: 'uri', intent: 'visit_stamp', actionData: { cardId: 'card-1' } },
+  ];
+  it.each(choices)('保存した種類からLINE用の動きに変換: $intent', async area => {
+    const [action] = await publishAndReadActions(groupWithAreas([area], { formBaseUrl: 'https://liff.line.me/store-id' }));
+    expect(action.type).toBe(area.intent === 'text' ? 'message' : 'uri');
+    if (area.intent === 'booking') expect(action.uri).toBe('https://liff.line.me/store-id/?page=salon-book&menu_id=menu-1');
+    if (area.intent === 'visit_stamp') expect(action.uri).toBe('https://liff.line.me/store-id/?page=visit-stamps&card=card-1');
+    if (area.intent === 'booking_history') expect(action.uri).toContain('view=history');
+  });
+  it.each(choices.slice(2))('LIFF未設定は公開前に拒否: $intent', area => {
+    expect(() => validateRichMenuGroupForPublish(groupWithAreas([area]))).toThrow('LIFF');
+  });
+  it.each(['booking', 'visit_stamp'] as const)('選択先なしでも入口を開ける: %s', async intent => {
+    const [action] = await publishAndReadActions(groupWithAreas([{ bounds: BOUNDS, actionType: 'uri', intent, actionData: {} }], { formBaseUrl: 'https://liff.line.me/store-id' }));
+    expect(action.uri).toBe(`https://liff.line.me/store-id/?page=${intent === 'booking' ? 'salon-book' : 'visit-stamps'}`);
+  });
+});
+
 describe('intent から LINE の action への変換', () => {
   it('電話をかける → tel: の uri。ハイフンや括弧は落とす', async () => {
     const [action] = await publishAndReadActions(
@@ -962,7 +988,7 @@ describe('intent から LINE の action への変換', () => {
         { formBaseUrl: 'https://liff.line.me/1234-abcd' },
       ),
     );
-    expect(action).toEqual({ type: 'uri', uri: 'https://liff.line.me/1234-abcd?form=form-9' });
+    expect(action).toEqual({ type: 'uri', uri: 'https://liff.line.me/1234-abcd/?page=form&id=form-9' });
   });
 
   it('テンプレートを送る → 押されたことが届く postback', async () => {

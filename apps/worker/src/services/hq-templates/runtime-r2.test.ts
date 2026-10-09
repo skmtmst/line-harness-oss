@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { createTestD1 } from '../../test-utils/d1-sqlite.js';
 import { inspectR2RuntimeStore, executeR2RuntimeStore, type R2RuntimeBinding } from './runtime-r2.js';
+import { preflightDistribution } from './distribution.js';
 import type { HqTemplateAdapterContext, HqTemplateAuthority } from './contract.js';
+import { hqLiffActionLocator, liffActionFromUrl, type HqMessageCard, type LiffAction } from '@line-crm/shared';
 const resources:ReturnType<typeof createTestD1>[]=[];
 afterEach(()=>{for(const f of resources.splice(0))f.raw.close()});
 const digest=async(v:string|Uint8Array)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',typeof v==='string'?new TextEncoder().encode(v):v)),n=>n.toString(16).padStart(2,'0')).join('');
@@ -38,6 +40,100 @@ async function fixture(type:'template'|'rich_menu'='rich_menu') {
   const execute=(context:HqTemplateAdapterContext,db=sql.db)=>executeR2RuntimeStore({...binding,db,runId:context.idempotencyFingerprint,context});
   return {...sql,binding,bucket,objects,preflight,execute,rich,message};
 }
+
+const tapChoices: { action: HqMessageCard['buttons'][number]['action']; value: string; spec?: LiffAction }[] = [
+  { action: 'url', value: 'https://example.com' }, { action: 'message', value: '予約したい' },
+  { action: 'booking', value: '', spec: { kind: 'booking' } },
+  { action: 'form', value: 'source-form', spec: { kind: 'form', formId: 'source-form' } },
+  { action: 'booking_history', value: '', spec: { kind: 'booking_history' } },
+  { action: 'visit_stamp', value: '', spec: { kind: 'visit_stamp' } },
+  { action: 'booking', value: 'source-menu', spec: { kind: 'booking', menuId: 'source-menu' } },
+  { action: 'visit_stamp', value: 'source-card', spec: { kind: 'visit_stamp', cardId: 'source-card' } },
+];
+async function tapFixture(place: 'card' | 'carousel' | 'card_asset' | 'rich_message' | 'rich_menu', choice: typeof tapChoices[number]) {
+  const f = await fixture(place === 'rich_menu' ? 'rich_menu' : 'template');
+  f.raw.exec(`INSERT INTO forms(id,name) VALUES ('source-form','質問'),('target-form','質問');
+    INSERT INTO form_accounts(form_id,line_account_id) VALUES ('source-form','source'),('target-form','a');
+    INSERT INTO menus(id,line_account_id,name,duration_minutes,base_price) VALUES ('source-menu','source','相談',30,0),('target-menu','a','相談',30,0);
+    INSERT INTO visit_stamp_cards(id,tenant_id,name,settings_json) VALUES ('source-card','tenant','来店','{}'),('target-card','tenant','来店','{}');
+    INSERT INTO visit_stamp_card_accounts(card_id,line_account_id) VALUES ('source-card','source'),('target-card','a');`);
+  const locator = choice.spec ? hqLiffActionLocator(choice.spec) : choice.value;
+  const lineAction = choice.action === 'message' ? { type: 'message', label: '送る', text: choice.value } : { type: 'uri', label: '開く', uri: locator };
+  let definition: Record<string, unknown> = { ...f.message, media: [] };
+  if (place === 'card') definition = { ...definition, template: { ...f.message.template, messageType: 'flex', messageContent: '{}' }, card: { format: 'flex', title: '案内', body: locator, buttons: [{ id: 'one', label: '開く', action: choice.action, value: choice.value }] } };
+  if (place === 'carousel') definition = { ...definition, template: { ...f.message.template, messageType: 'carousel', messageContent: JSON.stringify([{ title: '案内', text: locator, actions: [lineAction] }]) } };
+  if (place === 'card_asset') definition = { ...definition, asset: { kind: 'card_message', payload: { cards: [{ title: '案内', description: '本文', actionType: choice.action === 'message' ? 'message' : 'uri', ...(choice.action === 'message' ? { actionText: choice.value } : { actionUrl: locator }) }] } } };
+  if (place === 'rich_menu') {
+    const intent = choice.action === 'message' ? 'text' : choice.action;
+    const actionData = choice.action === 'url' ? { uri: locator } : choice.action === 'message' ? { text: choice.value }
+      : choice.action === 'booking' && choice.value ? { menuId: choice.value } : choice.action === 'visit_stamp' && choice.value ? { cardId: choice.value } : {};
+    for (const page of f.rich.richMenu.pages) page.areas = [{ ...page.areas[0], actionType: choice.action === 'message' ? 'message' : 'uri', actionData, intent, ...(choice.action === 'form' ? { formId: choice.value } : {}) }] as typeof page.areas;
+    definition = f.rich;
+  }
+  if (place === 'rich_message') {
+    const base = 'https://example.invalid/source-map';
+    const media = [240, 300, 460, 700, 1040].map(width => {
+      const original = f.message.media[0], id = `map-${width}`, versionId = `map-v-${width}`, r2Key = `hq-templates/tenant/map/${width}`;
+      f.objects.set(r2Key, { ...f.objects.get('hq-templates/tenant/image1')!, etag: `source-${width}` });
+      f.raw.prepare("INSERT INTO media(id,line_account_id,kind,filename,mime_type,size_bytes,r2_key,public_url) VALUES (?,'source','image',?,'image/png',3,?,?)").run(id, `${width}.png`, r2Key, `${base}/${width}`);
+      f.raw.prepare("INSERT INTO media_versions(id,media_id,version_no,r2_key,mime_type,size_bytes,content_hash,scan_status) VALUES (?,?,1,?,'image/png',3,?,'verified')").run(versionId, id, r2Key, original.contentHash);
+      return { ...original, id, versionId, r2Key, publicUrl: `${base}/${width}`, filename: `${width}.png` };
+    });
+    definition = { ...definition, media, asset: { kind: 'rich_message', payload: { imageUrl: `${base}/1040`, baseUrl: base, baseSize: { width: 1040, height: 1040 }, tapAreas: [{ x: 0, y: 0, width: 100, height: 100, actionType: choice.action === 'message' ? 'message' : 'uri', ...(choice.action === 'message' ? { text: choice.value } : { uri: locator }) }] } } };
+  }
+  const json = JSON.stringify(definition);
+  f.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json, await digest(json));
+  return { ...f, locator };
+}
+describe('押したら6つ × 統括の配布', () => {
+  test.each(['card', 'carousel', 'card_asset', 'rich_message', 'rich_menu'] as const)('%s の6つと選択先ありを配布し読み戻す', async place => {
+    for (const choice of tapChoices) {
+      const f = await tapFixture(place, choice);
+      expect(await f.execute(await f.preflight())).toMatchObject({ status: 'succeeded' });
+      let result: { type: string; uri?: string; text?: string };
+      if (place === 'rich_menu') {
+        const row = f.raw.prepare('SELECT intent,action_type,action_data,form_id FROM rich_menu_areas ORDER BY rowid LIMIT 1').get() as { intent: string; action_type: string; action_data: string; form_id: string | null };
+        expect(row.intent).toBe(choice.action === 'message' ? 'text' : choice.action);
+        result = { type: row.action_type, ...JSON.parse(row.action_data) };
+        if (choice.action === 'form') expect(row.form_id).toBe('target-form');
+      } else if (place === 'card_asset') {
+        const row = f.raw.prepare("SELECT payload_json FROM broadcast_message_assets WHERE line_account_id='a'").get() as { payload_json: string };
+        const card = JSON.parse(row.payload_json).cards[0]; result = { type: card.actionType, uri: card.actionUrl, text: card.actionText };
+      } else if (place === 'rich_message') {
+        const row = f.raw.prepare("SELECT payload_json FROM broadcast_message_assets WHERE line_account_id='a'").get() as { payload_json: string };
+        const tap = JSON.parse(row.payload_json).tapAreas[0]; result = { type: tap.actionType, uri: tap.uri, text: tap.text };
+      } else {
+        const row = f.raw.prepare("SELECT message_content FROM templates WHERE line_account_id='a'").get() as { message_content: string };
+        const content = JSON.parse(row.message_content);
+        result = place === 'card' ? content.footer.contents[0].action : content[0].actions[0];
+        // 同じ仮URLを説明に書いた場合はそのまま残す。
+        expect(place === 'card' ? content.body.contents[1].text : content[0].text).toBe(f.locator);
+      }
+      expect(result.type).toBe(choice.action === 'message' ? 'message' : 'uri');
+      if (choice.spec) {
+        expect(result.uri).toContain('https://liff.line.me/liff-a/');
+        expect(liffActionFromUrl(result.uri!)).toEqual(choice.action === 'form' ? { kind: 'form', formId: 'target-form' }
+          : choice.action === 'booking' && choice.value ? { kind: 'booking', menuId: 'target-menu' }
+          : choice.action === 'visit_stamp' && choice.value ? { kind: 'visit_stamp', cardId: 'target-card' } : choice.spec);
+      } else if (choice.action === 'message') expect(result.text).toBe(choice.value);
+      else expect(result.uri).toBe(choice.value);
+      expect(f.raw.pragma('foreign_key_check')).toEqual([]);
+    }
+  });
+  test.each(['card', 'carousel', 'card_asset', 'rich_message', 'rich_menu'] as const)('%s はLIFFなしの理由を返し、書き込みしない', async place => {
+    const f = await tapFixture(place, tapChoices[2]); f.raw.exec("UPDATE line_accounts SET liff_id=NULL WHERE id='a'");
+    await expect(f.preflight()).rejects.toMatchObject({ code: 'LIFF_UNAVAILABLE' });
+    expect(f.bucket.put).not.toHaveBeenCalled();
+    f.raw.exec("UPDATE hq_templates SET current_version_id='v' WHERE id='hq'");
+    await expect(preflightDistribution(f.db, authority, 'hq', ['a'], f.bucket as unknown as R2Bucket)).rejects.toMatchObject({ code: 'LIFF_UNAVAILABLE' });
+  });
+  test.each(['card', 'carousel', 'card_asset', 'rich_message', 'rich_menu'] as const)('%s は事前検査後のLIFF変更を拒否', async place => {
+    const f = await tapFixture(place, tapChoices[2]), c = await f.preflight();
+    f.raw.exec("UPDATE line_accounts SET liff_id='changed' WHERE id='a'");
+    expect(await f.execute(c)).toMatchObject({ status: 'version_conflict' });
+    expect(f.bucket.put).not.toHaveBeenCalled();
+  });
+});
 describe('DB-bound R2 store executor',()=>{
   test('three stores get independent draft rich menus and committed owned objects',async()=>{
     const f=await fixture();for(const a of ['a','b','c'])expect((await f.execute(await f.preflight(a))).status).toBe('succeeded');
