@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import Dialog from './dialog'
 import TruncatedText, { compactUrl } from './truncated-text'
 
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
@@ -42,6 +43,18 @@ describe('省略した文字の全文確認', () => {
     fireEvent.focus(link)
     expect(screen.getByRole('tooltip').textContent).toBe(value)
     expect(link.getAttribute('href')).toBe(value)
+  })
+
+  it('窓の中の全文はEscで吹き出しだけを閉じ、次のEscで窓を閉じる', () => {
+    const cancel = vi.fn()
+    render(<Dialog open title="確認" onCancel={cancel} onConfirm={() => {}}><TruncatedText value="https://example.com/first/landing" url /></Dialog>)
+    fireEvent.mouseEnter(screen.getByText('https://example.com/…/landing'))
+    expect(screen.getByRole('tooltip')).toBeTruthy()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('tooltip')).toBeNull()
+    expect(cancel).not.toHaveBeenCalled()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(cancel).toHaveBeenCalledTimes(1)
   })
 
   it('短いURLやURL以外の文字を壊さない', () => {

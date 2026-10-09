@@ -56,11 +56,11 @@ export default function TruncatedText({ value, url = false, className, ...props 
   }, [shown, value, open, close, clear])
   useEffect(() => {
     if (!position) return
-    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') close() }
-    document.addEventListener('keydown', escape)
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape' && !event.isComposing) { event.preventDefault(); event.stopPropagation(); close() } }
+    document.addEventListener('keydown', escape, true)
     window.addEventListener?.('scroll', close, true)
     window.addEventListener?.('resize', close)
-    return () => { document.removeEventListener('keydown', escape); window.removeEventListener?.('scroll', close, true); window.removeEventListener?.('resize', close) }
+    return () => { document.removeEventListener('keydown', escape, true); window.removeEventListener?.('scroll', close, true); window.removeEventListener?.('resize', close) }
   }, [position, close])
   return <>
     <span {...props} ref={ref} className={[styles.text, className].filter(Boolean).join(' ')} data-truncated-text="" tabIndex={nested ? undefined : clipped ? 0 : undefined} aria-describedby={position ? id : undefined} aria-label={shown !== value ? value : props['aria-label']} onMouseEnter={open} onMouseLeave={leave} onFocus={open} onBlur={close}>{shown}</span>
