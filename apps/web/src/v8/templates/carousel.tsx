@@ -512,8 +512,8 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                   return (
                     <div key={ai} className={own.buttonRow}>
                       <input className={`${styles.input} ${own.colLabel}`} value={action.label} placeholder="ボタンの文字" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の文字`} onChange={(event) => setAction({ label: event.target.value })} />
+                      <div className={own.colTap}>
                       <TapActionField
-                        className={own.colTap}
                         name={`カード${selectedIndex + 1}のボタン${ai + 1}`}
                         kindLabel={`カード${selectedIndex + 1}のボタン${ai + 1}の動き`}
                         value={{ kind: action.kind, uri: action.uri, text: action.text, refId: action.formId }}
@@ -525,7 +525,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                         })}
                         kinds={choiceKindOptions({ host: Boolean(host), current: action.kind }).filter(isTapActionKind)}
                         extraKinds={host ? [] : ACTION_EXTRA_KIND}
-                        renderExtraBody={() => (
+                        renderBody={(kind) => kind !== 'action' ? undefined : (
                           <button type="button" className={`${styles.pick} ${own.colBody}`} onClick={() => setActionsFor(ai)} title="押されたときの動きを決める">
                             <span className={styles.pickText}>{inlineActionsText(action.actions, actionOptions.tags)}</span>
                             <ChevronDown className={styles.pickIcon} aria-hidden="true" />
@@ -537,6 +537,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                         sources={tapSources}
                         textMax={MESSAGE_TEXT_MAX}
                       />
+                      </div>
                       {panel.actions.length > 1 ? (
                         <button type="button" className={own.iconButton} aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}を外す`} title="このボタンを外す" onClick={() => update(selectedIndex, { actions: panel.actions.filter((_, j) => j !== ai) })}>
                           <Trash2 className={own.icon} aria-hidden="true" />

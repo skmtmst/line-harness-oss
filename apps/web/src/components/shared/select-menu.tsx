@@ -180,7 +180,8 @@ export function SelectMenuOption({
   posInSet,
 }: SelectMenuOptionProps) {
   return (
-    <li role="option" aria-selected={selected} aria-setsize={setSize} aria-posinset={posInSet} className={styles.row}>
+    // 説明つきの行も、選択肢の名前は名前だけ（説明は見た目と title で出す）。
+    <li role="option" aria-selected={selected} aria-setsize={setSize} aria-posinset={posInSet} aria-label={description ? label : undefined} className={styles.row}>
       <button
         type="button"
         className={styles.item}

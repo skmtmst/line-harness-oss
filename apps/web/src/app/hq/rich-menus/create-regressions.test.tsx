@@ -105,7 +105,7 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     expect(screen.getAllByRole('button', { name: /^面 [A-F]、動きは/ })).toHaveLength(6)
     selectArea('A'); pickIntent('URLを開く')
     fireEvent.change(screen.getByPlaceholderText('https://...'), { target: { value: 'https://example.com/booking' } })
-    selectArea('B'); pickIntent('メッセージを送る')
+    selectArea('B'); pickIntent('テキストを送る')
     fireEvent.change(screen.getByLabelText(/^送るテキスト/), { target: { value: '予約を確認する' } })
     await save()
     expect(saved().pages[0].imageR2Key).toBeNull()
@@ -125,7 +125,7 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
       const file = new File(['png'], `${letter}.png`, { type: 'image/png' })
       fireEvent.change(document.querySelectorAll('input[type="file"]')[0], { target: { files: [file] } })
       await waitFor(() => expect(host.uploadImage).toHaveBeenCalledWith(file, 'large'))
-      selectArea('A'); pickIntent('メッセージを送る')
+      selectArea('A'); pickIntent('テキストを送る')
       fireEvent.change(screen.getByLabelText(/^送るテキスト/), { target: { value: `内容${letter}` } })
     }
     await save()

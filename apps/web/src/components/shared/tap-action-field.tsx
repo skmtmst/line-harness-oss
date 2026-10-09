@@ -70,9 +70,13 @@ export interface TapActionFieldProps {
   onChange: (patch: Partial<TapActionValue>) => void
   /** 出す6つの種類（既定は全部）。並びは絵の順のまま。 */
   kinds?: readonly TapActionKind[]
-  /** 6つの後ろに足す種類。中身は renderExtraBody で描く。 */
+  /** 6つの後ろに足す種類。中身は renderBody で描く。 */
   extraKinds?: readonly TapActionExtraKind[]
-  renderExtraBody?: (kind: string) => ReactNode
+  /**
+   * 中身を画面が描く（足した種類の中身・リッチメニューの計測リンクなど）。undefined を返した種類は部品の既定の中身。
+   * LIFF の案内が出る場合は案内が先。
+   */
+  renderBody?: (kind: string) => ReactNode | undefined
   /** 店か統括か。統括は LIFF の案内を出さない（配るときに各店の LIFF に置き換える）。 */
   scope?: 'shop' | 'hq'
   /** 店のアカウントに LIFF があるか。 */
@@ -86,9 +90,8 @@ export interface TapActionFieldProps {
   layout?: 'row' | 'stack'
   /** テキストを送るの文字数の上限（LINE の決まりは画面ごとに違う）。 */
   textMax?: number
-  /** 押したらのプルダウンの読み上げ名（既定「〇〇を押したら」）。 */
+  /** 押したらのプルダウンの読み上げ名（既定「〇〇を押したら」）。幅は持たない（呼び出し側の箱で決める）。 */
   kindLabel?: string
-  className?: string
 }
 
 function kindOptionsOf(kinds: readonly TapActionKind[], extras: readonly TapActionExtraKind[], current: string) {
@@ -102,9 +105,9 @@ function kindOptionsOf(kinds: readonly TapActionKind[], extras: readonly TapActi
 }
 
 export default function TapActionField({
-  name, value, onChange, kinds = TAP_ACTION_KINDS, extraKinds = [], renderExtraBody,
+  name, value, onChange, kinds = TAP_ACTION_KINDS, extraKinds = [], renderBody,
   scope = 'shop', hasLiff, liffSettingsHref = '/accounts', readOnly = false, sources,
-  layout = 'row', textMax, kindLabel, className,
+  layout = 'row', textMax, kindLabel,
 }: TapActionFieldProps) {
   const options = useMemo(() => kindOptionsOf(kinds, extraKinds, value.kind), [kinds, extraKinds, value.kind])
   const current = options.find((option) => option.value === value.kind)
@@ -133,10 +136,14 @@ export default function TapActionField({
     />
   )
 
+  const liffMissing = Boolean(def?.needsLiff) && scope === 'shop' && !hasLiff
+  const custom = liffMissing ? undefined : renderBody?.(value.kind)
   let body: ReactNode
-  if (!def) {
-    body = renderExtraBody?.(value.kind) ?? null
-  } else if (def.needsLiff && scope === 'shop' && !hasLiff) {
+  if (custom !== undefined) {
+    body = custom
+  } else if (!def) {
+    body = null
+  } else if (liffMissing) {
     body = (
       <p className={styles.liffNote} role="note">
         <Info className={styles.icon} aria-hidden="true" />
@@ -195,7 +202,7 @@ export default function TapActionField({
   }
 
   return (
-    <div className={[styles.root, layout === 'stack' ? styles.stack : styles.row, className].filter(Boolean).join(' ')} data-tap-kind={value.kind}>
+    <div className={layout === 'stack' ? `${styles.root} ${styles.stack}` : `${styles.root} ${styles.row}`} data-tap-kind={value.kind}>
       <div className={styles.kind}>{kindControl}</div>
       <div className={styles.body}>{body}</div>
     </div>

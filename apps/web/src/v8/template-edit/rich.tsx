@@ -515,15 +515,15 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
             return (
               <div key={area.label} className={rich.areaRow} role="group" aria-label={`面 ${area.label}`}>
                 <span className={rich.areaChip} data-unset={draft.kind === 'none' || undefined}>{`${area.label} ${areaPlace(area, shapeDef.areas)}`}</span>
+                <div className={rich.areaTap}>
                 <TapActionField
-                  className={rich.areaTap}
                   name={`面 ${area.label} `}
                   kindLabel={`面 ${area.label} を押したら`}
                   value={draft}
                   onChange={(patch) => updateArea(area.label, patch as Partial<AreaDraft>)}
                   kinds={host ? HOST_AREA_KINDS : TAP_ACTION_KINDS}
                   extraKinds={AREA_NONE_KIND}
-                  renderExtraBody={() => <p className={rich.areaNone}>押しても何も起きません</p>}
+                  renderBody={(kind) => kind !== 'none' ? undefined : <p className={rich.areaNone}>押しても何も起きません</p>}
                   scope={host ? 'hq' : 'shop'}
                   hasLiff={Boolean(liffId)}
                   liffSettingsHref={selectedAccountId ? `/accounts/detail?id=${encodeURIComponent(selectedAccountId)}` : '/accounts'}
@@ -531,6 +531,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                   sources={tapSources}
                   textMax={RICH_MESSAGE_TEXT_MAX}
                 />
+                </div>
               </div>
             )
           })}

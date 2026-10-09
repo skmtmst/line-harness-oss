@@ -34,6 +34,9 @@
 
 .stack .body {
   flex: none;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--tap-action-gap);
 }
 
 .icon {
