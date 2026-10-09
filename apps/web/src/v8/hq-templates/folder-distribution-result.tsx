@@ -4,14 +4,16 @@ import { useEffect, useState } from 'react'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import TagPill from '@/components/shared/tag-pill'
 import StatusBadge from '@/components/shared/status-badge'
+import type { HqTemplateFolder } from '@line-crm/shared'
 import type { HqAccount } from '@/lib/hq-templates-api'
 import { failedStatus, folderResultRows, settledResult, type FolderRun } from './folder-distribution'
 import DistributionResultDialog from './distribution-result-dialog'
 import styles from './console.module.css'
 
-export default function FolderDistributionResult({ name, runs, accounts, busy, error, onBack, onRefresh, onRetry, onRecheck }: {
-  name: string; runs: FolderRun[]; accounts: HqAccount[]; busy: boolean; error: string
+export default function FolderDistributionResult({ name, runs, accounts, folders = [], busy, error, onBack, onRefresh, onRetry, onRecheck }: {
+  name: string; runs: FolderRun[]; accounts: HqAccount[]; folders?: HqTemplateFolder[]; busy: boolean; error: string
   onBack: () => void; onRefresh: () => void; onRetry: () => void; onRecheck: () => void
 }) {
   const rows = folderResultRows(runs)
@@ -24,7 +26,8 @@ export default function FolderDistributionResult({ name, runs, accounts, busy, e
   const [show, setShow] = useState(false)
   useEffect(() => { if (done) setShow(true) }, [done])
   const accountName = (id: string) => accounts.find((account) => account.id === id)?.name ?? id
-  const displayRows = rows.filter((row) => row.store).map((row) => ({ key: `${row.template.id}:${row.accountId}`, name: `${row.template.name} · ${row.store?.accountName ?? accountName(row.accountId)}`, store: row.store! }))
+  const colorOf = (id: string | null | undefined) => folders.find((folder) => folder.id === id)?.color
+  const displayRows = rows.filter((row) => row.store).map((row) => ({ key: `${row.template.id}:${row.accountId}`, name: row.template.template_type === 'tag' ? row.store?.accountName ?? accountName(row.accountId) : `${row.template.name} · ${row.store?.accountName ?? accountName(row.accountId)}`, tag: row.template.template_type === 'tag' ? { name: row.template.name, color: colorOf(row.template.folder_id) } : undefined, store: row.store! }))
   return <PageFrame kind="wizard" boardId="dEvJM">
     <PageHeading title={`アカウントへ配る：フォルダ「${name}」`} />
     <div className={styles.distributionNotice}>{error ? <Notice tone="danger" message={error} /> : null}</div>
@@ -34,7 +37,7 @@ export default function FolderDistributionResult({ name, runs, accounts, busy, e
       <p className={styles.note}>{`ひな形 ${new Set(rows.map((row) => row.template.id)).size} 件・成功 ${successes.length}・失敗 ${failures.length}。${unresolved ? '結果が未確認の行は、再配布せず結果を再確認してください。' : ''}`}</p>
       <div className={styles.resultList}>
         {rows.map((row) => <div className={styles.resultRow} key={`${row.template.id}:${row.accountId}`}>
-          <span className={styles.resultName} title={row.template.name}>{row.template.name}</span>
+          <span className={styles.resultName} title={row.template.name}>{row.template.template_type === 'tag' ? <TagPill name={row.template.name} color={colorOf(row.template.folder_id)} size="sm" /> : row.template.name}</span>
           <span className={styles.resultText}>{row.store?.accountName ?? accountName(row.accountId)}{row.store?.reason ? `：${row.store.reason}` : ''}</span>
           <StatusBadge size="compact" tone={row.store?.status === 'succeeded' ? 'success' : row.store && failedStatus(row.store.status) ? 'danger' : 'neutral'}>{row.store?.status === 'succeeded' ? '成功' : row.store && failedStatus(row.store.status) ? '失敗' : row.store ? '作成中' : '待っています'}</StatusBadge>
         </div>)}
