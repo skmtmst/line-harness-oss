@@ -184,7 +184,7 @@ export default function AccountsV8() {
 
         <KpiBand presentation="cards" gridClassName={styles.kpis} data-design="KPIs">
           <Kpi label="つないでいる" value={kpis?.connected} unit="アカウント" />
-          <Kpi label="稼働中" value={kpis?.active} unit="件" />
+          <Kpi label="有効" value={kpis?.active} unit="件" />
           <Kpi label="接続に問題" value={kpis?.problem} unit="件" warn />
           <Kpi label="友だちの合計" value={kpis?.friends} unit="人" />
         </KpiBand>

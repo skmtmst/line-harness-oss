@@ -76,16 +76,16 @@ describe('N-211 案件作成の選択肢は選択accountで絞る', () => {
   })
 
   /*
-   * R193: 保管済みタグ・停止中シナリオは成果承認時に実行できない。
+   * R193: アーカイブタグ・停止中シナリオは成果承認時に実行できない。
    * 作成画面の候補から外す（案件編集モーダルの #798 と同じ決まり）。
    */
-  it('保管済みタグと停止中シナリオは候補に出さない', async () => {
+  it('アーカイブタグと停止中シナリオは候補に出さない', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: unknown) => {
       const text = String(url)
       if (text.includes('/api/tags')) {
         return { ok: true, status: 200, json: async () => ({ success: true, data: [
           { id: 't1', name: '有効タグ', lineAccountId: 'acc-1', status: 'active' },
-          { id: 't2', name: '保管済みタグ', lineAccountId: 'acc-1', status: 'archived' },
+          { id: 't2', name: 'アーカイブタグ', lineAccountId: 'acc-1', status: 'archived' },
         ] }) }
       }
       if (text.includes('/api/scenarios')) {
@@ -116,7 +116,7 @@ describe('N-211 案件作成の選択肢は選択accountで絞る', () => {
 
     const tagLabels = await optionLabels('of-tag')
     expect(tagLabels.some((text) => text.includes('有効タグ'))).toBe(true)
-    expect(tagLabels.some((text) => text.includes('保管済みタグ'))).toBe(false)
+    expect(tagLabels.some((text) => text.includes('アーカイブタグ'))).toBe(false)
 
     // 開いているメニューを閉じてからシナリオ側を開く。
     await act(async () => {

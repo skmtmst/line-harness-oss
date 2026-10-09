@@ -1,3 +1,4 @@
+import { statusLabel } from '@/lib/status-labels'
 import React, { type HTMLAttributes, type ReactNode } from 'react'
 import type { StatusBadgeTone } from './status-badge'
 import styles from './status-pill.module.css'
@@ -20,6 +21,6 @@ export default function StatusPill({ children, tone = 'neutral', color, ...props
 }) {
   return <span className={styles.pill} {...props} data-tone={tone}>
     <StatusDot tone={tone} color={color} />
-    <span className={styles.name}>{children}</span>
+    <span className={styles.name}>{typeof children === 'string' ? statusLabel(children) : children}</span>
   </span>
 }

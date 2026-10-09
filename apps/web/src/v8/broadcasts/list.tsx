@@ -1,5 +1,8 @@
 'use client'
 
+import SharedStatusBadge from '@/components/shared/status-badge'
+
+
 /*
  * ★V8 一斉配信の一覧（Pencil `l5V9a`・1152 は `jjFNi`・閲覧のみは `NtCE3`）。
  *
@@ -131,13 +134,7 @@ const BADGE_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'd
 
 function StatusBadge({ broadcast }: { broadcast: ApiBroadcast }) {
   const key = broadcast.displayStatus ?? broadcast.status
-  const label = broadcast.displayStatusLabel ?? key
-  return (
-    <span className={styles.badge} data-tone={BADGE_TONE[key] ?? 'neutral'}>
-      <span className={styles.badgeDot} aria-hidden="true" />
-      {label}
-    </span>
-  )
+  return <SharedStatusBadge tone={BADGE_TONE[key] ?? 'neutral'}>{broadcast.displayStatusLabel ?? key}</SharedStatusBadge>
 }
 
 function dateRangeLabel(dateFrom: string, dateTo: string): string {

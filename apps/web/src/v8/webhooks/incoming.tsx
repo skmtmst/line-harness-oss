@@ -572,7 +572,7 @@ export default function WebhooksIncomingV8() {
             <span className={styles.inletRow}>
               <span className={styles.inletName}>{item.name}</span>
               <span className={styles.spacer} aria-hidden="true" />
-              <span className={styles.inletState}>{item.isActive ? '動いている' : '止めている'}</span>
+              <span className={styles.inletState}>{item.isActive ? '有効' : '停止中'}</span>
             </span>
             <span className={styles.inletSub}>{sourceName(item.sourceType)}から</span>
           </button>

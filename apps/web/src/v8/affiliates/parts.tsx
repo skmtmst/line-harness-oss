@@ -1,5 +1,8 @@
 'use client'
 
+import { statusLabel } from '@/lib/status-labels'
+
+
 /*
  * 成果とアフィリエイトの各タブで同じ形の部品（道具の段・よく使う絞り込み・件数・
  * 状態の札・空と失敗の1枚・行の「…」）。形は一覧の型と共通部品に任せ、
@@ -72,7 +75,7 @@ export function ToolbarNotices({
       {warn ? <div className={styles.fullRow}><Notice tone="warn">{warn}</Notice></div> : null}
       {error ? <div className={styles.fullRow}><Notice tone="danger" message={error} /></div> : null}
       {success ? <div className={styles.fullRow}><Notice tone="success" message={success} /></div> : null}
-      {children}
+      {typeof children === 'string' ? statusLabel(children) : children}
     </>
   )
 }
@@ -135,7 +138,7 @@ export function StatusPill({ tone, children }: { tone: 'active' | 'warn' | 'dang
   return (
     <span className={styles.pill} data-tone={tone}>
       <span className={styles.pillDot} aria-hidden="true" />
-      {children}
+      {typeof children === 'string' ? statusLabel(children) : children}
     </span>
   )
 }

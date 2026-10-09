@@ -115,8 +115,8 @@ const SORT_TO_API: Record<PointSort, 'count_desc' | 'value_desc' | 'name_asc'> =
 
 /* 状態の札（絵 r6dJFy の並び）。件数は口の stateCounts。 */
 const CHIPS: Array<{ value: ConversionDefinitionFilter; label: string; icon: ReactNode }> = [
-  { value: 'active', label: '動いている', icon: <Play size={13} aria-hidden="true" /> },
-  { value: 'stopped', label: '止めている', icon: <Pause size={13} aria-hidden="true" /> },
+  { value: 'active', label: '有効', icon: <Play size={13} aria-hidden="true" /> },
+  { value: 'stopped', label: '停止中', icon: <Pause size={13} aria-hidden="true" /> },
   { value: 'draft', label: '下書き', icon: <FilePen size={13} aria-hidden="true" /> },
   { value: 'invalid', label: '入力不良', icon: <TriangleAlert size={13} aria-hidden="true" /> },
   { value: 'sourceStopped', label: '起点停止', icon: <CirclePause size={13} aria-hidden="true" /> },

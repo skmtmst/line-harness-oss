@@ -379,12 +379,12 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
       )}>
         <div className={styles.mainColumn}>
           <Card layout="vertical" padding="spacious" gap="tight" surface="inset" aria-labelledby="rs-alloc-title">
-            <CardHeader size="stacked" titleId="rs-alloc-title" title="席と枠の配分（卓とつながる）" meta="総数は「座席・卓管理」の稼働中の卓から自動で決まります。ここで入れた配分を全部の時間帯に入れ、時間帯ごとに直すときは下の表の行を押します。" />
+            <CardHeader size="stacked" titleId="rs-alloc-title" title="席と枠の配分（卓とつながる）" meta="総数は「座席・卓管理」の有効の卓から自動で決まります。ここで入れた配分を全部の時間帯に入れ、時間帯ごとに直すときは下の表の行を押します。" />
             <div className={styles.totalLine}>
               <Armchair size={16} aria-hidden="true" className={styles.totalIcon} />
               <div className={styles.totalText}>
                 <p className={styles.totalValue}>{`1つの時間帯の総数 ${totalSeats}席`}</p>
-                <p className={styles.totalSub}>{`稼働中の卓 ${activeTables.length} つ${stoppedTables.length > 0 ? `（${stoppedTables.map((item) => item.code).join('・')} は停止中のため除く）` : ''}`}</p>
+                <p className={styles.totalSub}>{`有効の卓 ${activeTables.length} つ${stoppedTables.length > 0 ? `（${stoppedTables.map((item) => item.code).join('・')} は停止中のため除く）` : ''}`}</p>
               </div>
               <Button variant="text" size="inline" href="/restaurant-test/tables">座席・卓管理で変える →</Button>
             </div>

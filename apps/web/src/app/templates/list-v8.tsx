@@ -241,9 +241,9 @@ function publishStateOf(t: Template): { label: string; className: string } {
   return { label: '公開中', className: styles.publishPillLive }
 }
 
-/** 一斉配信の状態の札。予約済みは待っている途中、送信済みは終わり。 */
+/** 一斉配信の状態の札。予約中は待っている途中、送信済みは終わり。 */
 function broadcastStatusText(status: string): string {
-  if (status === 'scheduled') return '予約済み'
+  if (status === 'scheduled') return '予約中'
   if (status === 'sending') return '送信中'
   if (status === 'sent') return '送信済み'
   return '下書き'

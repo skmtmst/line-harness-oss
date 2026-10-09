@@ -2,7 +2,7 @@
 
 /*
  * ★V8 シナリオ配信の編集（src/v8 に一から組み直した版）。
- * 板：稼働中 `PMLkX`・始めた直後 `nMSiE`・停止中 `ARuZ4`・競合 `kz2B6`、
+ * 板：有効 `PMLkX`・始めた直後 `nMSiE`・停止中 `ARuZ4`・競合 `kz2B6`、
  * 窓：止める確認 `OPGU2`・複製 `Al4Ek`・開始の確認 `F1LK4e`。
  *
  * 動き（読み込み・保存・複製・削除・開始/停止・通の編集）は今までの
@@ -1118,7 +1118,7 @@ export default function ScenarioDetailV8({
   const describeScenarioSummary = (input: { name: string; isActive: boolean; stepCount: number }): string =>
     [
       `名前：${input.name || '（未入力）'}`,
-      `状態：${input.isActive ? '稼働中' : '停止中'}`,
+      `状態：${input.isActive ? '有効' : '停止中'}`,
       `通の数：${input.stepCount}`,
     ].join('\n')
 
@@ -2147,7 +2147,7 @@ export default function ScenarioDetailV8({
     </div>
   )
 
-  /* ===== ここから下は ★V8 の描画（PMLkX 稼働中 / nMSiE 始めた直後 / ARuZ4 停止中） ===== */
+  /* ===== ここから下は ★V8 の描画（PMLkX 有効 / nMSiE 始めた直後 / ARuZ4 停止中） ===== */
 
   if (loading) {
     return (

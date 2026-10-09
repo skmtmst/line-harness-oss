@@ -60,7 +60,7 @@ import {
 const customerFilters = [
   ['all', 'すべて'],
   ['enabled', '出している'],
-  ['stopped', '止めている'],
+  ['stopped', '停止中'],
   ['incomplete', '文面が未設定'],
 ] as const
 type CustomerFilter = typeof customerFilters[number][0]
@@ -1195,7 +1195,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
   }
   const statusOf = (setting: EcNotificationSetting): { label: string; tone: 'good' | 'muted' | 'warn' } => setting.isEnabled
     ? { label: '出している', tone: 'good' }
-    : isIncomplete(setting) ? { label: '文面が未設定', tone: 'warn' } : { label: '止めている', tone: 'muted' }
+    : isIncomplete(setting) ? { label: '文面が未設定', tone: 'warn' } : { label: '停止中', tone: 'muted' }
 
   return <SbSettingsScreen
     boardId={expandedSetting === null ? ({ customer: 'g3iDs', operator: 'u8xibp', failures: 'DrwMm', history: 'PZBVb' } as Record<string, string>)[tab] : undefined}

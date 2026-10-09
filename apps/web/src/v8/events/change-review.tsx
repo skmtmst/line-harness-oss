@@ -266,7 +266,7 @@ function ChangeReview({ eventId }: { eventId: string }) {
                   <span className={styles.cellState}>
                     {ended ? <span className={styles.chip}>終了</span>
                       : slot.is_active === 1 ? <span className={`${styles.chip} ${styles.chipOn}`}>受付する</span>
-                        : <span className={styles.chip}>止めている</span>}
+                        : <span className={styles.chip}>停止中</span>}
                   </span>
                 </button>
               )

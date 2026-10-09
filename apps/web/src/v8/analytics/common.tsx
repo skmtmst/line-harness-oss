@@ -1,5 +1,8 @@
 'use client'
 
+import { statusLabel } from '@/lib/status-labels'
+
+
 /* ★V8 分析の見かたで共通に使う小さな部品（期間の切り替え・数の帯の「…」・日時の短い形）。 */
 import { type ReactNode } from 'react'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -50,5 +53,5 @@ export function dataRangeCaption(from: string, to: string, cutoffAt: string): st
 
 /** 表の状態の札（点＋文字・丸い地）。緑＝動いている・灰＝止めている・青＝案内。 */
 export function StatePill({ tone, children }: { tone: 'ok' | 'neutral' | 'info' | 'warn'; children: ReactNode }) {
-  return <span className={styles.pill} data-tone={tone}>{children}</span>
+  return <span className={styles.pill} data-tone={tone}>{typeof children === 'string' ? statusLabel(children) : children}</span>
 }

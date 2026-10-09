@@ -1,5 +1,8 @@
 'use client'
 
+import StatusBadge from '@/components/shared/status-badge'
+
+
 /*
  * ★V8 シナリオ配信の一覧（Pencil「★V8 画面の地図」のシナリオ配信の行：
  * 一覧 `axFrW`・狭い板 `wjfLe`・閲覧のみ `X0QrW0`・複製の窓 `Al4Ek`、状態の板は `BxGhV`）。
@@ -88,10 +91,10 @@ const UNFILED = '__unfiled__'
 /** 1ページに出す件数の選択肢（表示は PageSizeSelect が「N件表示」にする）。 */
 const PAGE_SIZE_OPTIONS = [20, 50, 100]
 
-/** よく使う絞り込み（数えられるものだけ）。札の「停止中のみ」と対になる「稼働中のみ」。 */
+/** よく使う絞り込み（数えられるものだけ）。札の「停止中のみ」と対になる「有効のみ」。 */
 const SAVED_FILTER_OPTIONS = [
   { value: '', label: 'よく使う絞り込み' },
-  { value: 'active', label: '稼働中のみ' },
+  { value: 'active', label: '有効のみ' },
 ]
 
 type ScenarioRow = Scenario & {
@@ -145,7 +148,7 @@ export default function ScenariosListV8() {
   /* 絞り込み・検索語・ページは URL に置く（戻ると同じ一覧に戻る。動きの点検 5 番）。 */
   const [nameQuery, setNameQuery] = useListUrlParam('q')
   const [serverQuery, setServerQuery] = useState(() => clampSearchQuery(readListUrlParam('q').trim()))
-  /** よく使う絞り込み。いま数えられるのは「停止中のみ」「今月作った」「稼働中のみ」。 */
+  /** よく使う絞り込み。いま数えられるのは「停止中のみ」「今月作った」「有効のみ」。 */
   const [stoppedOnly, setStoppedOnly] = useListUrlFlag('stopped')
   const [createdThisMonthOnly, setCreatedThisMonthOnly] = useListUrlFlag('thisMonth')
   const [savedFilter, setSavedFilter] = useListUrlParam('view')
@@ -269,7 +272,7 @@ export default function ScenariosListV8() {
     return () => clearTimeout(timer)
   }, [nameQuery])
 
-  /* 「停止中のみ」と「稼働中のみ」は同時に掛からない（札が勝つ）。 */
+  /* 「停止中のみ」と「有効のみ」は同時に掛からない（札が勝つ）。 */
   const activeParam: 0 | 1 | undefined = stoppedOnly ? 0 : savedFilter === 'active' ? 1 : undefined
 
   const loadScenarioPage = useCallback(async (
@@ -700,7 +703,7 @@ export default function ScenariosListV8() {
 
   /* ===== 数の帯（4つ） ===== */
 
-  /* 板 `axFrW`：1つ目の補足は「稼働中 3・停止中 2」。止めた数は合計から出す。 */
+  /* 板 `axFrW`：1つ目の補足は「有効 3・停止中 2」。止めた数は合計から出す。 */
   const scenarioStopped = stats ? Math.max(0, stats.scenarios.total - stats.scenarios.active) : null
   const kpis = [
     {
@@ -708,7 +711,7 @@ export default function ScenariosListV8() {
       icon: Workflow,
       value: overallTotal,
       unit: '件',
-      detail: `稼働中 ${stats ? stats.scenarios.active : '—'}・停止中 ${scenarioStopped ?? '—'}`,
+      detail: `有効 ${stats ? stats.scenarios.active : '—'}・停止中 ${scenarioStopped ?? '—'}`,
     },
     {
       title: '購読中',
@@ -994,10 +997,7 @@ export default function ScenariosListV8() {
                       <div className={styles.countSub}>{`読み終えた ${formatNumber(s.completedCount ?? 0)}人`}</div>
                     </Td>
                     <Td>
-                      <span className={`${styles.statePill} ${s.isActive ? styles.statePillActive : styles.statePillStopped}`}>
-                        <span className={styles.stateDot} aria-hidden="true" />
-                        {s.isActive ? '稼働中' : '停止中'}
-                      </span>
+                      <StatusBadge status={s.isActive ? 'active' : 'stopped'} tone={s.isActive ? 'success' : 'neutral'} size="compact" />
                     </Td>
                     <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
                       {/* 横並びにして、メニューの位置の目印（空の span）が行を1段増やさないようにする。 */}
@@ -1027,7 +1027,7 @@ export default function ScenariosListV8() {
               type="button"
               variant="secondary"
               disabled={stoppableIds.length === 0}
-              title={stoppableIds.length === 0 ? '稼働中のシナリオが選ばれていません' : undefined}
+              title={stoppableIds.length === 0 ? '有効のシナリオが選ばれていません' : undefined}
               onClick={() => runBulkToggle(false, stoppableIds)}
             >
               <Square size={13} aria-hidden="true" />
@@ -1283,7 +1283,7 @@ export default function ScenariosListV8() {
             }
           >
             <p>
-              {panelRow.isActive ? '稼働中' : '停止中'} ／ 購読{' '}
+              {panelRow.isActive ? '有効' : '停止中'} ／ 購読{' '}
               {panelRow.subscriberCount === undefined ? '—' : formatNumber(panelRow.subscriberCount)}人 ／
               読了 {formatNumber(panelRow.completedCount ?? 0)}人
             </p>

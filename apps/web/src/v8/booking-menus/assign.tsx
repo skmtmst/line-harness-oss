@@ -266,7 +266,7 @@ export default function AssignMatrixV8() {
     }
   }
 
-  /* 「いま受付できる人数」（稼働中の担当だけ）と「割ってある人数」を分ける（v7 R308 と同じ）。 */
+  /* 「いま受付できる人数」（有効の担当だけ）と「割ってある人数」を分ける（v7 R308 と同じ）。 */
   const assignedCounts = useMemo(() => {
     const counts = new Map<string, number>()
     for (const m of menus) {
@@ -401,7 +401,7 @@ export default function AssignMatrixV8() {
                               title={`${staffLabel(s)}${!s.is_active ? '（止めている）' : ''}${s.is_designation_optional === 1 ? '（指名なしを受ける）' : ''}`}
                             >
                               {staffLabel(s)}
-                              {!s.is_active ? <span className={styles.matrixStaffOff}>止めている</span> : null}
+                              {!s.is_active ? <span className={styles.matrixStaffOff}>停止中</span> : null}
                             </span>
                           </Th>
                         ))}

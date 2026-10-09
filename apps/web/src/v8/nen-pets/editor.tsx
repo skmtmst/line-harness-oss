@@ -4,7 +4,7 @@
  * ★V8-B ペットの情報を直す（eLjeQ）。真ん中の窓（幅 560・上から 170）。
  * 窓の枠は共通の Dialog。中身は 対象のペット → 種別 → 名前・品種 → 性別 → 誕生日・体重 → 補足。
  * 口は今の画面と同じ（PUT /api/nen-campaigns/pets/:id、版つき保存）。
- * 誕生日を変えると、予約済みの誕生日クーポン配信は新しい誕生日で組み直される（Worker 側）。
+ * 誕生日を変えると、予約中の誕生日クーポン配信は新しい誕生日で組み直される（Worker 側）。
  * ほかの人が先に直していたら（409 VERSION_CONFLICT）止めて、入力は残したまま保存し直せる。
  */
 import { useState } from 'react'
@@ -101,7 +101,7 @@ export default function PetEditorV8({ accountId, pet, onClose, onSaved }: {
       designHeaderPadding="24px 24px 0"
       confirmIcon={<Check size={15} aria-hidden="true" />}
       title="ペットの情報を直す"
-      description="間違っている項目を直して保存します。誕生日を変えると、予約済みの誕生日クーポン配信は新しい誕生日で組み直されます。"
+      description="間違っている項目を直して保存します。誕生日を変えると、予約中の誕生日クーポン配信は新しい誕生日で組み直されます。"
       busy={saving}
       error={error}
       confirmLabel="保存する"

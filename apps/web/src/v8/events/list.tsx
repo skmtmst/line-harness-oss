@@ -66,7 +66,7 @@ const SAVED_OPTIONS = [
 
 const STATE_LABEL: Record<EventRowState, string> = {
   draft: '下書き',
-  paused: '一時停止',
+  paused: '停止中',
   cancelled: '中止',
   ended: '終了',
   full: '満席',
@@ -535,7 +535,7 @@ export default function EventsListV8() {
                           ? <span className={`${styles.pill} ${styles.pillWarn}`}>あと少しで満席</span>
                           : state === 'open' ? <span className={`${styles.pill} ${styles.pillOn}`}>公開中</span>
                             : state === 'full' ? <span className={`${styles.pill} ${styles.pillWarn}`}>満席</span>
-                              : state === 'paused' ? <span className={`${styles.pill} ${styles.pillWarn}`}>一時停止</span>
+                              : state === 'paused' ? <span className={`${styles.pill} ${styles.pillWarn}`}>停止中</span>
                                 : <span className={`${styles.pill} ${styles.pillOff}`}>{STATE_LABEL[state]}</span>}
                       {e.visible_tag_id ? (
                         <TagPill name={e.visible_tag_name ?? '消えたタグ'} size="sm" />

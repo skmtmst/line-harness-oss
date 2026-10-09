@@ -43,13 +43,13 @@ const STATUS_FILTERS: Array<{ key: string; label: string }> = [
   { key: 'active', label: '契約中' },
   { key: 'trialing', label: 'トライアル' },
   { key: 'past_due', label: '決済失敗' },
-  { key: 'suspended', label: '停止' },
+  { key: 'suspended', label: '停止中' },
   { key: 'archived', label: '解約' },
 ]
 
 /** 状態の札（利用の状態と請求の状態を1枚に：停止・解約が先、あとは請求）。 */
 function tenantState(row: OpsTenantRow): { label: string; tone: StatusBadgeTone } {
-  if (row.status === 'suspended') return { label: '停止', tone: 'neutral' }
+  if (row.status === 'suspended') return { label: '停止中', tone: 'neutral' }
   if (row.status === 'archived') return { label: '解約', tone: 'neutral' }
   if (row.plan_status === 'trialing') return { label: 'トライアル', tone: 'info' }
   if (row.plan_status === 'past_due') return { label: '決済失敗', tone: 'danger' }

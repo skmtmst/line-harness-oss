@@ -778,7 +778,7 @@ function FeedingTableV8({
 
 /**
  * ペットの情報を直す（eLjeQ）。真ん中の小窓。
- * 誕生日を変えると、予約済みの誕生日クーポン配信は新しい誕生日で組み直される。
+ * 誕生日を変えると、予約中の誕生日クーポン配信は新しい誕生日で組み直される。
  * 版つき保存：ほかの人が先に直していたら止めて、入力は残したまま保存し直せる。
  */
 function PetEditorV8({ accountId, pet, onClose, onSaved }: {
@@ -867,7 +867,7 @@ function PetEditorV8({ accountId, pet, onClose, onSaved }: {
         <div className={styles.dialogHead}>
           <div>
             <h2 className={styles.dialogTitle}>ペットの情報を直す</h2>
-            <p className={styles.dialogDesc}>間違っている項目を直して保存します。誕生日を変えると、予約済みの誕生日クーポン配信は新しい誕生日で組み直されます。</p>
+            <p className={styles.dialogDesc}>間違っている項目を直して保存します。誕生日を変えると、予約中の誕生日クーポン配信は新しい誕生日で組み直されます。</p>
           </div>
           <button type="button" className={styles.dialogClose} onClick={onClose} aria-label="閉じる">✕</button>
         </div>

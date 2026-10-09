@@ -217,7 +217,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
                 <Td className={styles.cell} title={recipients}>{recipients}</Td>
                 <Td className={`${styles.cell} ${styles.opSchedule}`} title={schedule}>{schedule}</Td>
                 <Td><span className={`${styles.opNum} ${rule.occurredToday > 0 ? styles.numStrong : styles.numFaint}`}>{rule.occurredToday > 0 ? `${rule.occurredToday}` : '—'}</span></Td>
-                <Td><StatusBadge tone={published ? 'success' : 'neutral'}>{published ? '出している' : '止めている'}</StatusBadge></Td>
+                <Td><StatusBadge tone={published ? 'success' : 'neutral'}>{published ? '出している' : '停止中'}</StatusBadge></Td>
                 <Td className={styles.opActions}>
                   {canManage ? <>
                     <Button variant="secondary" onClick={() => void testSend(rule)} disabled={busy === rule.id}>自分にテスト</Button>

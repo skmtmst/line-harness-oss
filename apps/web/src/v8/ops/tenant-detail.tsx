@@ -209,7 +209,7 @@ function DetailContent() {
                 {accounts.map((a) => (
                   <div key={a.id} className={`${parts.miniRow} ${styles.accountRow}`} role="row">
                     <span className={parts.grow} role="cell" title={a.name}>{a.name}</span>
-                    <span className={`${parts.fixed} ${styles.col90}`} role="cell">{a.archived_at || !a.is_active ? <StatusBadge tone="neutral">止めている</StatusBadge> : <StatusBadge tone="success">接続中</StatusBadge>}</span>
+                    <span className={`${parts.fixed} ${styles.col90}`} role="cell">{a.archived_at || !a.is_active ? <StatusBadge tone="neutral">停止中</StatusBadge> : <StatusBadge tone="success">接続中</StatusBadge>}</span>
                     <span className={`${parts.num} ${styles.col80}`} role="cell">{a.archived_at ? '—' : formatNumber(a.friend_count)}</span>
                     <span className={`${parts.fixed} ${styles.col80}`} role="cell">{a.archived_at ? <StatusBadge tone="neutral">アーカイブ</StatusBadge> : a.is_active ? <StatusBadge tone="success">有効</StatusBadge> : <StatusBadge tone="neutral">停止</StatusBadge>}</span>
                   </div>

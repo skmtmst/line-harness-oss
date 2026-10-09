@@ -129,7 +129,7 @@ import NewBookingMenuPage from './page'
 
 /** 同アカウントの有効タグ／同アカウントの整理済み／別アカウントの有効タグ。 */
 const TAGS = [
-  { id: 'tag-active', name: '予約済み', color: '#111111', createdAt: '2026-09-01T00:00:00Z', lineAccountId: 'account-a', status: 'active' },
+  { id: 'tag-active', name: '予約中', color: '#111111', createdAt: '2026-09-01T00:00:00Z', lineAccountId: 'account-a', status: 'active' },
   { id: 'tag-active-2', name: '常連さん', color: '#444444', createdAt: '2026-09-01T00:00:00Z', lineAccountId: 'account-a', status: 'active' },
   { id: 'tag-archived', name: '旧キャンペーン', color: '#222222', createdAt: '2026-09-01T00:00:00Z', lineAccountId: 'account-a', status: 'archived' },
   { id: 'tag-other-account', name: 'B店のタグ', color: '#333333', createdAt: '2026-09-01T00:00:00Z', lineAccountId: 'account-b', status: 'active' },
@@ -194,7 +194,7 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
     // 遅れて返った後も、待っている間の入力はそのまま残る。
     expect(nameInput().value).toBe('トリミング')
     const select = await screen.findByLabelText('予約後に付けるタグ') as HTMLSelectElement
-    expect(optionLabels(select)).toEqual(['— なし —', '予約済み', '常連さん'])
+    expect(optionLabels(select)).toEqual(['— なし —', '予約中', '常連さん'])
   })
 
   test('取得に失敗しても保存はできる文言を出し、プルダウンは出さない', async () => {
@@ -210,7 +210,7 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
   test('候補は対象アカウントの有効タグだけ。整理済みも別アカウントも出さない', async () => {
     const select = await renderNew()
     const labels = optionLabels(select)
-    expect(labels).toContain('予約済み')
+    expect(labels).toContain('予約中')
     expect(labels).not.toContain('旧キャンペーン')
     expect(labels).not.toContain('B店のタグ')
   })
@@ -227,7 +227,7 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
     // 検索を消しても選択は残る。
     fireEvent.click(screen.getByLabelText('検索語を消す'))
     expect(select.value).toBe('tag-active-2')
-    expect(optionLabels(select)).toEqual(['— なし —', '予約済み', '常連さん'])
+    expect(optionLabels(select)).toEqual(['— なし —', '予約中', '常連さん'])
 
     // 「なし」へ戻せる。
     fireEvent.change(select, { target: { value: '' } })

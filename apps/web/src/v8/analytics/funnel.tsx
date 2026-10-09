@@ -304,7 +304,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
           <div className={styles.controls}>
             <label className={styles.field} data-w="funnel"><span className={styles.fieldLabel}>ファネル</span>
               <Select id="funnel-select" value={selected} onChange={(value) => setSelected(value)} aria-label="ファネル" size="full" options={funnels.some((f) => f.status === 'active' || f.id === selected)
-                ? funnels.filter((f) => f.status === 'active' || f.id === selected).map((f) => ({ value: f.id, label: f.status === 'active' ? f.name : `${f.name}（${f.status === 'stopped' ? '停止中' : '保管済み'}）` }))
+                ? funnels.filter((f) => f.status === 'active' || f.id === selected).map((f) => ({ value: f.id, label: f.status === 'active' ? f.name : `${f.name}（${f.status === 'stopped' ? '停止中' : 'アーカイブ'}）` }))
                 : [{ value: '', label: '使えるファネルがありません' }]} />
             </label>
             <label className={styles.field} data-w="window"><span className={styles.fieldLabel}>何日以内の通過で数えるか</span>
@@ -374,7 +374,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
               <RangePickerV8 days={funnelDays} onChange={(days) => { setFunnelDays(days); setPicked(null); setRunning(false) }} />
               <Button onClick={() => void runNow()} disabled={running || selectedFunnel?.status !== 'active'} variant="secondary" busy={running} busyLabel="再集計中">{`この${funnelDays}日を再集計`}</Button>
             </div>
-            {selectedFunnel ? <p className={styles.caption}>{`${selectedFunnel.windowDays}日以内に通った人を数えます。${selectedFunnel.currentVersion ? ` 定義版 ${selectedFunnel.currentVersion.versionNumber}` : ' 現行定義の移行が必要です'}${selectedFunnel.status === 'stopped' ? ' 停止中です。再集計や対象者づくりはできません。' : ''}${selectedFunnel.status === 'archived' ? ' 保管済みです。過去の結果だけを見られます。' : ''}`}</p> : null}
+            {selectedFunnel ? <p className={styles.caption}>{`${selectedFunnel.windowDays}日以内に通った人を数えます。${selectedFunnel.currentVersion ? ` 定義版 ${selectedFunnel.currentVersion.versionNumber}` : ' 現行定義の移行が必要です'}${selectedFunnel.status === 'stopped' ? ' 停止中です。再集計や対象者づくりはできません。' : ''}${selectedFunnel.status === 'archived' ? ' アーカイブです。過去の結果だけを見られます。' : ''}`}</p> : null}
             {canManage && selectedFunnel ? <div className={styles.rowActions} data-gap="wide">
               {selectedFunnel.status === 'active' ? <>
                 <Button onClick={() => void startEdit()} disabled={editLoading || !selectedFunnel.currentVersion} variant="secondary" busy={editLoading} busyLabel="定義を読み込み中">定義を編集</Button>
@@ -402,7 +402,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
             <p className={styles.caption}>停止中は再集計と対象者づくりを止めています。保管したものは戻せません。過去の結果は残っています。</p>
             {inactiveFunnels.map((funnel) => <div key={funnel.id} className={styles.compareRow}>
               <span className={styles.cellStrong}>{funnel.name}</span>
-              <StatePill tone={funnel.status === 'stopped' ? 'warn' : 'neutral'}>{funnel.status === 'stopped' ? '停止中' : '保管済み'}</StatePill>
+              <StatePill tone={funnel.status === 'stopped' ? 'warn' : 'neutral'}>{funnel.status === 'stopped' ? '停止中' : 'アーカイブ'}</StatePill>
               <button type="button" className={styles.linkButton} onClick={() => setSelected(funnel.id)}>結果を見る</button>
               {canManage && funnel.status === 'stopped' ? <>
                 <Button onClick={() => setStatusTarget({ funnel, to: 'active' })} variant="secondary">再開</Button>

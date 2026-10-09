@@ -53,7 +53,7 @@ function versionText(version: number | null): string {
   return version === null || version === undefined ? 'いまの版' : `版${version}で固定`
 }
 
-/** 一斉配信の状態の札。予約済みは待っている途中、送信済みは終わり。 */
+/** 一斉配信の状態の札。予約中は待っている途中、送信済みは終わり。 */
 function broadcastStatusText(status: string): string {
   if (status === 'scheduled') return '予約中'
   if (status === 'sending') return '送信中'
@@ -861,7 +861,7 @@ export default function TemplateDetailV8() {
       <ConfirmDialog
         open={revertTarget !== null}
         title={`版${revertTarget}の内容で下書きを作り直しますか？`}
-        description="過去の版は変わりません。その中身で新しい下書きを作ります。予約済み・送信中の配信は、いま使っている版のままです。"
+        description="過去の版は変わりません。その中身で新しい下書きを作ります。予約中・送信中の配信は、いま使っている版のままです。"
         confirmLabel="この版に戻す"
         busy={reverting}
         error={revertError}

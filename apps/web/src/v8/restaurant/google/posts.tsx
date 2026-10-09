@@ -64,7 +64,7 @@ const CTA_LABELS: Record<GooglePostCtaType, string> = { book: '予約', order: '
 function statusBadge(post: GooglePost): { label: string; tone: StatusBadgeTone } {
   switch (post.status) {
     case 'draft': return { label: '下書き', tone: 'neutral' }
-    case 'scheduled': return { label: '予約済み', tone: 'info' }
+    case 'scheduled': return { label: '予約中', tone: 'info' }
     case 'pending_confirm': return { label: '送信確認中', tone: 'warning' }
     case 'accepted': return { label: '審査中', tone: 'info' }
     case 'published': return { label: '公開済み', tone: 'success' }
@@ -719,7 +719,7 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
       {!done && post.status !== 'cancelled' ? (
         <>
           <Checkbox checked={checked} onCheckedChange={setChecked}>公開先・本文・画像・リンク・日時を確認しました</Checkbox>
-          <p className={styles.grayNote}>予約後も編集・取消できます。送信後はGoogleの状態を取得し、予約済み・公開済み・不承認を区別します。通信結果が不明な場合は、重複投稿を避けるため先にGoogle側の状態を確認します。</p>
+          <p className={styles.grayNote}>予約後も編集・取消できます。送信後はGoogleの状態を取得し、予約中・公開済み・不承認を区別します。通信結果が不明な場合は、重複投稿を避けるため先にGoogle側の状態を確認します。</p>
           <div className={styles.formActions}>
             <Button onClick={() => go({ tab: 'posts', view: 'edit', id })} disabled={busy}>修正する</Button>
             <Button variant="primary" onClick={() => void publish()} disabled={!canPress} busy={busy} busyLabel="送信中…">この内容で予約する</Button>

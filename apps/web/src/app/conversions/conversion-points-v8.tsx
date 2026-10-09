@@ -113,8 +113,8 @@ const READONLY_REASON = 'この操作にはオーナーか管理者の権限が�
 
 const CHIPS: Array<{ value: ConversionPointsV8Status; label: string }> = [
   { value: 'all', label: 'すべて' },
-  { value: 'active', label: '動いている' },
-  { value: 'stopped', label: '止めている' },
+  { value: 'active', label: '有効' },
+  { value: 'stopped', label: '停止中' },
   { value: 'draft', label: '下書き' },
   { value: 'invalid', label: '入力不良' },
   { value: 'sourceStopped', label: '起点停止' },
@@ -462,7 +462,7 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
                         </button>
                         <span className={`${styles.statePill} ${PILL_CLASS[point.state]}`}>
                           <span className={styles.statePillDot} aria-hidden="true" />
-                          {point.state === 'active' ? '動いている' : STATE_LABELS[point.state]}
+                          {point.state === 'active' ? '有効' : STATE_LABELS[point.state]}
                         </span>
                       </td>
                       <td>
@@ -565,7 +565,7 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
               <p className={styles.panelLead}>
                 <span className={`${styles.statePill} ${PILL_CLASS[panelPoint.state]}`}>
                   <span className={styles.statePillDot} aria-hidden="true" />
-                  {panelPoint.state === 'active' ? '動いている' : STATE_LABELS[panelPoint.state]}
+                  {panelPoint.state === 'active' ? '有効' : STATE_LABELS[panelPoint.state]}
                 </span>{' '}
                 {sourceTriggerLabel(panelPoint)}・{deduplicationLabel(panelPoint.deduplicationMode, panelPoint.deduplicationWindowDays)}
               </p>

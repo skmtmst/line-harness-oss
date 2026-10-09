@@ -241,8 +241,8 @@ export function ConnectionStatus({ account, canCheck, onChecked, risk, activeFri
   const [checkError, setCheckError] = useState('')
   const state = webhookState(account)
   const webhookLabel = checking ? '確認中' : state.label
-  const autoLabel = healthFailed ? '未取得' : risk === 'normal' ? '稼働中' : risk ? '要確認' : '確認中'
-  const dotOf = (label: string) => (label === '正常' || label === '稼働中' ? 'success' : label === '要確認' ? 'danger' : 'faint') as 'success' | 'danger' | 'faint'
+  const autoLabel = healthFailed ? '未取得' : risk === 'normal' ? '有効' : risk ? '要確認' : '確認中'
+  const dotOf = (label: string) => (label === '正常' || label === '有効' ? 'success' : label === '要確認' ? 'danger' : 'faint') as 'success' | 'danger' | 'faint'
   /* Webhook の要確認は黄の丸と理由（統括のアカウントの接続と同じ）。 */
   const webhookDot = webhookLabel === '要確認' ? 'warning' : dotOf(webhookLabel)
   const revision = account?.revision

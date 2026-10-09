@@ -337,7 +337,7 @@ function ReminderDetailV8() {
     : !data.reminder.hasPublishedVersion
       ? '下書き'
       : data.reminder.isActive
-        ? '稼働中'
+        ? '有効'
         : '停止中'
 
   if (!reminderId) {

@@ -129,7 +129,7 @@ import { ApiError } from '@/lib/api'
 
 /** 同アカウントの有効タグ／同アカウントの整理済み／別アカウントの有効タグ。 */
 const TAGS = [
-  { id: 'tag-active', name: '予約済み', color: '#111111', createdAt: '2026-09-01T00:00:00Z', lineAccountId: 'account-a', status: 'active' },
+  { id: 'tag-active', name: '予約中', color: '#111111', createdAt: '2026-09-01T00:00:00Z', lineAccountId: 'account-a', status: 'active' },
   { id: 'tag-active-2', name: '常連さん', color: '#444444', createdAt: '2026-09-01T00:00:00Z', lineAccountId: 'account-a', status: 'active' },
   { id: 'tag-archived', name: '旧キャンペーン', color: '#222222', createdAt: '2026-09-01T00:00:00Z', lineAccountId: 'account-a', status: 'archived' },
   { id: 'tag-other-account', name: 'B店のタグ', color: '#333333', createdAt: '2026-09-01T00:00:00Z', lineAccountId: 'account-b', status: 'active' },
@@ -412,7 +412,7 @@ describe('既存メニューの編集窓: 予約申込時に自動付与する�
   test('候補は対象アカウントの有効タグだけ。整理済みも別アカウントも出さない', async () => {
     await openEditor({ auto_tag_id: null })
     const labels = optionLabels(autoTagSelect())
-    expect(labels).toEqual(['— なし —', '予約済み', '常連さん'])
+    expect(labels).toEqual(['— なし —', '予約中', '常連さん'])
     expect(labels).not.toContain('旧キャンペーン')
     expect(labels).not.toContain('B店のタグ')
   })
@@ -424,7 +424,7 @@ describe('既存メニューの編集窓: 予約申込時に自動付与する�
      * 並んだままになる。切替後にもう一度編集窓を開いて確かめる。
      */
     await openEditor({ auto_tag_id: null })
-    expect(optionLabels(autoTagSelect())).toEqual(['— なし —', '予約済み', '常連さん'])
+    expect(optionLabels(autoTagSelect())).toEqual(['— なし —', '予約中', '常連さん'])
 
     fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
     switchAccount('account-b')

@@ -88,7 +88,7 @@ const GROUPS: Array<{ key: GroupKey; label: string; match: (row: AffiliateListRo
   { key: 'rate', label: '売上の割合で払う', match: (row) => row.isActive && (row.rewardMode === 'rate' || (!row.rewardMode && row.commissionRate > 0)) },
   { key: 'fixed', label: '1件ごとに払う', match: (row) => row.isActive && (row.rewardMode === 'fixed' || (!row.rewardMode && row.commissionRate <= 0 && row.rewardAmount > 0)) },
   { key: 'none', label: '報酬なし（計測のみ）', match: (row) => row.isActive && (row.rewardMode === 'none' || (!row.rewardMode && row.commissionRate <= 0 && row.rewardAmount <= 0)) },
-  { key: 'stopped', label: '止めている', match: (row) => !row.isActive },
+  { key: 'stopped', label: '停止中', match: (row) => !row.isActive },
 ]
 
 

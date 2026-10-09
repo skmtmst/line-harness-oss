@@ -1,4 +1,5 @@
 import React, { type HTMLAttributes, type ReactNode } from 'react'
+import { statusLabel, type StandardStatus } from '@/lib/status-labels'
 import HelpTip from './help-tip'
 import styles from './status-badge.module.css'
 
@@ -7,6 +8,7 @@ export type StatusBadgeTone = 'neutral' | 'info' | 'warning' | 'success' | 'dang
 /** 色だけに頼らず、必ず状態を文字で伝える共通バッジ。 */
 export default function StatusBadge({
   children,
+  status,
   tone = 'neutral',
   size = 'default',
   className,
@@ -17,7 +19,8 @@ export default function StatusBadge({
   surface = 'tinted',
   ...props
 }: Omit<HTMLAttributes<HTMLSpanElement>, 'children'> & {
-  children: ReactNode
+  children?: ReactNode
+  status?: StandardStatus
   tone?: StatusBadgeTone
   size?: 'default' | 'compact' | 'micro' | 'annotation'
   /** 選んだ顧客の連携情報（rm92Y）だけ白地にする。 */
@@ -37,14 +40,15 @@ export default function StatusBadge({
    */
   dot?: boolean
 }) {
+  const label = status ? statusLabel(status) : typeof children === 'string' ? statusLabel(children) : children
   const classes = [styles.badge, styles[tone], size === 'compact' ? styles.compact : size === 'micro' ? styles.micro : size === 'annotation' ? styles.annotation : null, dot ? null : styles.noDot, className]
     .filter(Boolean)
     .join(' ')
   const hasHelp = help !== undefined && help !== null
-  const heading = helpLabel ?? (typeof children === 'string' ? children : 'この状態')
+  const heading = helpLabel ?? (typeof label === 'string' ? label : 'この状態')
   return (
     <span className={classes} data-design-node="xRvDB" data-surface={surface} {...props}>
-      {children}
+      {label}
       {hasHelp ? (
         <HelpTip label={`${heading}の説明`}>
           {help}

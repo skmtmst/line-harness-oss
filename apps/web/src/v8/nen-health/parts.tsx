@@ -1,5 +1,8 @@
 'use client'
 
+import { statusLabel } from '@/lib/status-labels'
+
+
 /*
  * ★V8 健康日記の小さな部品（言葉・日付・行の「…」・札・体重の棒）。
  * 今の画面（app/nen/health の summary-drawer.tsx・health-tab.tsx）から写した。

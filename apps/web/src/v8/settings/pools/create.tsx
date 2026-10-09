@@ -210,7 +210,7 @@ export default function PoolCreateV8() {
               </div>
               <div className={styles.fact}>
                 <dt>現在の受け入れ先</dt>
-                <dd>{selectedAccounts.length > 0 ? `${selectedAccounts.map((account) => account.name).join('・')}（稼働中の所属先からランダムに振り分け）` : '未選択'}</dd>
+                <dd>{selectedAccounts.length > 0 ? `${selectedAccounts.map((account) => account.name).join('・')}（有効の所属先からランダムに振り分け）` : '未選択'}</dd>
               </div>
             </dl>
           </section>

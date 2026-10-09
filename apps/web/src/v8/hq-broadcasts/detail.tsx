@@ -295,7 +295,7 @@ function ActivityTab({ run, names }: { run: HqBroadcastRun; names: Map<string, s
 }
 
 /**
- * 送るまでの段（店の配信の詳細と同じ帯・絵 M2tJM）。下書き →（承認待ち）→（予約済み）→ 送信中 → 送信済み。
+ * 送るまでの段（店の配信の詳細と同じ帯・絵 M2tJM）。下書き →（承認待ち）→（予約中）→ 送信中 → 送信済み。
  * 承認が絡まない・予約しない一括配信はその段を省く。分かれ道（一部失敗・失敗あり・止めた・取り消した）は札で添える。
  * 承認の状態は下書きのあいだだけ読める（送ったあとは口に無い）ので、送ったあとは承認の段を出さない。
  */
@@ -305,7 +305,7 @@ function HqDeliveryRail({ run, approvalPending }: { run: HqBroadcastRun; approva
   const steps: Array<{ key: string; label: string }> = [
     { key: 'draft', label: '下書き' },
     ...(approvalPending ? [{ key: 'approval', label: '承認待ち' }] : []),
-    ...(scheduled ? [{ key: 'scheduled', label: '予約済み' }] : []),
+    ...(scheduled ? [{ key: 'scheduled', label: '予約中' }] : []),
     { key: 'sending', label: '送信中' },
     { key: 'sent', label: '送信済み' },
   ]

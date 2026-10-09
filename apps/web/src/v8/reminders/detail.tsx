@@ -474,7 +474,7 @@ function ReminderDetailV8() {
 
   const hasErrors = data.summary.errors > 0
   const firstStep = data.steps[0] ?? null
-  const statusLabel = !data.reminder.hasPublishedVersion ? '下書き' : data.reminder.isActive ? '稼働中' : '停止中'
+  const statusLabel = !data.reminder.hasPublishedVersion ? '下書き' : data.reminder.isActive ? '有効' : '停止中'
   const nextTime = jstParts(data.summary.nextScheduledAt)?.time ?? ''
   const accountName = selectedAccount?.name ?? 'LINE公式アカウント'
   const meta = [
@@ -563,7 +563,7 @@ function ReminderDetailV8() {
           <CreateSummaryCard
             title="いまの状態"
             rows={[
-              { key: 'state', label: '状態', value: <span className={styles.valueState} title={reminderStopSummary(data.reminder.stopConditions)} data-tone={statusLabel === '稼働中' ? 'ok' : undefined}>{statusLabel}</span> },
+              { key: 'state', label: '状態', value: <span className={styles.valueState} title={reminderStopSummary(data.reminder.stopConditions)} data-tone={statusLabel === '有効' ? 'ok' : undefined}>{statusLabel}</span> },
               { key: 'registrants', label: '登録者', value: `${formatNumber(data.summary.targetCount)}人` },
               { key: 'next7', label: 'これから送る（今後7日）', value: `${formatNumber(data.summary.scheduledNext7Days ?? 0)}通` },
               { key: 'month', label: '今月送った', value: `${formatNumber(data.summary.sentThisMonth ?? 0)}通` },

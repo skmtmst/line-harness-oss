@@ -79,7 +79,7 @@ function autoSettingsToCsv(settings: NenCampaignSetting[], sentByKey: Map<string
     setting.label,
     formatCampaignTiming(setting),
     formatCampaignAudience(setting),
-    setting.isEnabled ? '動いている' : '止めている',
+    setting.isEnabled ? '有効' : '停止中',
     String(sentByKey.get(setting.campaignKey) ?? 0),
   ].map(csvCell).join(','))
   return `\uFEFF${[header.join(','), ...lines].join('\n')}`
@@ -450,7 +450,7 @@ function AutoRowV8({ setting, monthSent, onTestSend, onToggleSetting, onTabChang
       <Td align="right"><span className="text-label tabular-nums text-ink">{monthSent == null ? '—' : formatNumber(monthSent)}</span></Td>
       <Td align="right"><span className="text-label tabular-nums text-ink-secondary">—</span></Td>
       <Td>
-        {setting.isEnabled ? <StatusBadge tone="success">動いている</StatusBadge> : <StatusBadge tone="neutral">止めている</StatusBadge>}
+        {setting.isEnabled ? <StatusBadge tone="success">有効</StatusBadge> : <StatusBadge tone="neutral">停止中</StatusBadge>}
       </Td>
       <Td align="right">
         <RowActions subjectName={setting.label} menuItems={menuItems} />

@@ -334,7 +334,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
                 <span className={styles.colStatus}>
                   <span className={`${styles.statePill} ${(visOverride[menu.id] ?? menu.is_active) ? styles.statePillOn : styles.statePillOff}`}>
                     <span className={styles.stateDot} aria-hidden="true" />
-                    {(visOverride[menu.id] ?? menu.is_active) ? '公開中' : '止めている'}
+                    {(visOverride[menu.id] ?? menu.is_active) ? '公開中' : '停止中'}
                   </span>
                 </span>
                 <span className={styles.colMenu}>

@@ -147,7 +147,7 @@ function autoSettingsToCsv(settings: NenCampaignSetting[], sentByKey: Map<string
     setting.label,
     formatCampaignTiming(setting),
     formatCampaignAudience(setting),
-    setting.isEnabled ? '動いている' : '止めている',
+    setting.isEnabled ? '有効' : '停止中',
     String(sentByKey.get(setting.campaignKey) ?? 0),
   ].map(csvCell).join(','))
   return `﻿${[header.join(','), ...lines].join('\n')}`
@@ -440,7 +440,7 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
                     <Td className={styles.colTarget}><span className={styles.cell} title={audience}>{audience}</span></Td>
                     <Td className={styles.colSent}><span className={styles.num}>{sent == null ? '—' : formatNumber(sent)}</span></Td>
                     <Td className={styles.colOrders}><span className={styles.num} title="配信からの注文は配信ごとに取れていません">—</span></Td>
-                    <Td className={styles.colState}>{props.saving === setting.campaignKey ? <Pill tone="off">切り替え中</Pill> : setting.isEnabled ? <Pill tone="ok">動いている</Pill> : <Pill tone="off">止めている</Pill>}</Td>
+                    <Td className={styles.colState}>{props.saving === setting.campaignKey ? <Pill tone="off">切り替え中</Pill> : setting.isEnabled ? <Pill tone="ok">有効</Pill> : <Pill tone="off">停止中</Pill>}</Td>
                     <Td className={styles.colMenu}><RowMenu subject={setting.label} items={menuFor(setting)} /></Td>
                   </Tr>
                 )

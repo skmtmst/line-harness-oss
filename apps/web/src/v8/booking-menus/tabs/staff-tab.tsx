@@ -217,7 +217,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
             <span className={styles.staffColStatus}>
               <span className={`${styles.statePill} ${person.is_active ? styles.statePillOn : styles.statePillOff}`}>
                 <span className={styles.stateDot} aria-hidden="true" />
-                {person.is_active ? '受付中' : '止めている'}
+                {person.is_active ? '受付中' : '停止中'}
               </span>
             </span>
             <span className={styles.staffColMenu}>

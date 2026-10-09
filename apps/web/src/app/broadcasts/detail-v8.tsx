@@ -51,7 +51,7 @@ import styles from './detail-v8.module.css'
 const DELIVERY_STEPS: ReadonlyArray<{ key: string; label: string }> = [
   { key: 'draft', label: '下書き' },
   { key: 'pending_approval', label: '承認待ち' },
-  { key: 'scheduled', label: '予約済み' },
+  { key: 'scheduled', label: '予約中' },
   { key: 'preparing', label: '送信準備' },
   { key: 'sending', label: '送信中' },
   { key: 'sent', label: '送信済み' },

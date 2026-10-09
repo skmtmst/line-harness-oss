@@ -5,7 +5,7 @@
  *
  * 前は書く欄の上に「送る日時 ［日時を選ぶ］［この日時で予約する］」の段が出ていた
  * （オーナー指摘：嫌）。書く欄の下の［予約］から窓で開く。送るもの・すぐ選ぶ・
- * 日時を決める・夜中の注意・予約済みの一覧（時刻を直す・取り消す）を1つの窓に置く。
+ * 日時を決める・夜中の注意・予約中の一覧（時刻を直す・取り消す）を1つの窓に置く。
  * 予約そのものの動き（口・二度押し止め・日本時間）は画面側の今の処理をそのまま呼ぶ。
  */
 import { Clock3, FileText } from 'lucide-react'
@@ -119,7 +119,7 @@ export default function ScheduleSendDialog({
       ) : null}
       {rows.length > 0 ? (
         <div className={styles.schGroup}>
-          <p className={styles.schLabel}>予約済み（{rows.length}）</p>
+          <p className={styles.schLabel}>予約中（{rows.length}）</p>
           <ul className={styles.schRows}>
             {rows.map((row) => (
               <li key={row.id} data-inbox-v6="scheduled-row" className={styles.schRow}>

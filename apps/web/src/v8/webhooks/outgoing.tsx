@@ -399,10 +399,10 @@ export default function WebhooksOutgoingV8() {
   const chips = (
     <div role="group" aria-label="状態で絞り込む" className={styles.chips}>
       <FilterChip selected={chip === 'active'} onChange={(next) => setChip(next ? 'active' : '')} icon={<Pause size={13} aria-hidden="true" />}>
-        {ready ? `動いている ${activeCount}` : '動いている'}
+        {ready ? `動いている ${activeCount}` : '有効'}
       </FilterChip>
       <FilterChip selected={chip === 'paused'} onChange={(next) => setChip(next ? 'paused' : '')} icon={<Play size={13} aria-hidden="true" />}>
-        {ready ? `止めている ${pausedCount}` : '止めている'}
+        {ready ? `止めている ${pausedCount}` : '停止中'}
       </FilterChip>
     </div>
   )
@@ -573,7 +573,7 @@ export default function WebhooksOutgoingV8() {
                 const menuItems = menuItemsFor(item)
                 const showMenu = canManage || canTest
                 const tone = toggling ? 'neutral' : failing ? 'danger' : item.isActive ? 'active' : 'neutral'
-                const stateWord = toggling ? '切り替え中' : failing ? '失敗あり' : item.isActive ? '動いている' : '止めている'
+                const stateWord = toggling ? '切り替え中' : failing ? '失敗あり' : item.isActive ? '有効' : '停止中'
                 const nameNode = (
                   <FolderDotName folder={folderDotFor(folders, item.folderId)}>
                     {canManage ? (

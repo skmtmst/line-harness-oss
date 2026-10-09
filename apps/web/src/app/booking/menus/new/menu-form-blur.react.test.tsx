@@ -56,7 +56,7 @@ vi.stubGlobal('localStorage', memStorage)
 memStorage.setItem('lh_staff_role', 'owner')
 
 const TAGS = [
-  { id: 'tag-1', name: '予約済み', lineAccountId: 'account-a', status: 'active' },
+  { id: 'tag-1', name: '予約中', lineAccountId: 'account-a', status: 'active' },
 ]
 
 vi.mock('@/lib/api', async (importOriginal) => {

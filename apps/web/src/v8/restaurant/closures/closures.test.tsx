@@ -74,7 +74,7 @@ describe('UVnvR 休業日・貸切', () => {
       return found as HTMLElement
     })
     const board = document.querySelector('[data-design-node="UVnvR"]')!
-    expect(board.textContent).toContain('渋谷店 ・ 1つの時間帯の総数 20席（稼働中の卓 5）')
+    expect(board.textContent).toContain('渋谷店 ・ 1つの時間帯の総数 20席（有効の卓 5）')
     expect(board.textContent).not.toContain('検証環境専用')
     expect(screen.getByRole('tab', { name: '休業日・貸切' }).getAttribute('aria-selected')).toBe('true')
     expect(card.textContent).toContain('終日・全卓')

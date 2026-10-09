@@ -2,7 +2,7 @@
 
 /*
  * ★V8 シナリオ配信の編集（Pencil「★V8 画面の地図」のシナリオ配信の行：
- * 稼働中 `PMLkX`・始めた直後 `nMSiE`・停止中 `ARuZ4`、開始の確認 `F1LK4e`、
+ * 有効 `PMLkX`・始めた直後 `nMSiE`・停止中 `ARuZ4`、開始の確認 `F1LK4e`、
  * 止める確認 `OPGU2`、複製 `Al4Ek`）。
  *
  * v7 の詳細（scenario-detail-client.tsx）とは別の部品として持つ。
@@ -1018,7 +1018,7 @@ export default function ScenarioDetailV8({
   const describeScenarioSummary = (input: { name: string; isActive: boolean; stepCount: number }): string =>
     [
       `名前：${input.name || '（未入力）'}`,
-      `状態：${input.isActive ? '稼働中' : '停止中'}`,
+      `状態：${input.isActive ? '有効' : '停止中'}`,
       `通の数：${input.stepCount}`,
     ].join('\n')
 
@@ -1969,7 +1969,7 @@ export default function ScenarioDetailV8({
     </div>
   )
 
-  /* ===== ここから下は ★V8 の描画（PMLkX 稼働中 / nMSiE 始めた直後 / ARuZ4 停止中） ===== */
+  /* ===== ここから下は ★V8 の描画（PMLkX 有効 / nMSiE 始めた直後 / ARuZ4 停止中） ===== */
 
   if (loading) {
     return (

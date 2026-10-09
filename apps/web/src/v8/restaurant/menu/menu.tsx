@@ -4,7 +4,7 @@
  * ★V8 メニュー管理（板 `MJoJR`・停止の確認 `MV5Os`・追加と変更 `NkmwU`）。
  *
  * 数5（全メニュー・コース・単品・要承認・アレルギー登録）→ メニュー一覧の枠
- * （頭に追加ボタン・「…」の決まりの帯・表）。行末は「…」、保管済みだけ「再開」。
+ * （頭に追加ボタン・「…」の決まりの帯・表）。行末は「…」、アーカイブだけ「再開」。
  * 追加・変更は同じ窓、停止は確認の窓。データの口・送る形は今の画面
  * （app/restaurant-test/v8/menu.tsx）と同じ。動きは BEHAVIOR.md。
  */
@@ -124,7 +124,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
   return (
     <>
       <StatRow>
-        <Stat label="全メニュー" value={`${rows.length}`} note="公開・下書き・保管済み" />
+        <Stat label="全メニュー" value={`${rows.length}`} note="公開・下書き・アーカイブ" />
         <Stat label="コース" value={`${rows.filter((item) => item.kind === 'course').length}`} note="予約時に選択" />
         <Stat label="単品" value={`${rows.filter((item) => item.kind !== 'course').length}`} note="アラカルト" />
         <Stat label="要承認" value={`${pendingApprovals.length}`} note="価格・内容改定" warning={pendingApprovals.length > 0} />
@@ -138,7 +138,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
         ) : null}
         flush
       >
-        <p className={styles.legend}>「…」の中身：有効＝変更・停止／保管済み＝変更・再開／一度も公開していない下書き＝変更・削除</p>
+        <p className={styles.legend}>「…」の中身：有効＝変更・停止／アーカイブ＝変更・再開／一度も公開していない下書き＝変更・削除</p>
         <DataTable className={styles.table}>
           <thead>
             <TableHeadRow className={styles.headRow}>

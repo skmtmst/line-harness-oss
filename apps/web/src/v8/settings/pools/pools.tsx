@@ -30,7 +30,7 @@ import styles from './pools.module.css'
 type AccountWithStats = LineAccount & { stats?: { friendCount: number } }
 
 const TITLE = 'プール管理'
-const DESCRIPTION = '来たお客さまを振り分ける LINE アカウントをまとめる入れ物です。公開 URL から来た人を、稼働中の所属アカウントからランダムに振り分けます。'
+const DESCRIPTION = '来たお客さまを振り分ける LINE アカウントをまとめる入れ物です。公開 URL から来た人を、有効の所属アカウントからランダムに振り分けます。'
 
 /** 既定のプール（main）を先頭に、あとは作った順。 */
 export function orderPools(pools: readonly TrafficPool[]): TrafficPool[] {

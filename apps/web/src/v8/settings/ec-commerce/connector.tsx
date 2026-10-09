@@ -246,7 +246,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
         <h2 id="ec-connector-status" className={styles.cardTitle}>取り込みの状態</h2>
         <p className={styles.desc}>止めると、ネットショップからの出来事を受け取らなくなります。「設定を保存する」で効きます。</p>
         <div className={styles.statusRow}>
-          <StatusBadge tone={connector?.status === 'paused' ? 'neutral' : 'success'} size="compact">{connector?.status === 'paused' ? '止めている' : '取り込み中'}</StatusBadge>
+          <StatusBadge tone={connector?.status === 'paused' ? 'neutral' : 'success'} size="compact">{connector?.status === 'paused' ? '停止中' : '取り込み中'}</StatusBadge>
           <span className={styles.statusText}>{`最後に受け取った ${when(data?.health.lastReceivedAt ?? null)}`}</span>
           {connector && canEdit ? (
             <Button type="button" onClick={() => setForm({ ...form, status: paused ? 'connected' : 'paused' })}>{paused ? '取り込みを再開する' : '取り込みを止める'}</Button>

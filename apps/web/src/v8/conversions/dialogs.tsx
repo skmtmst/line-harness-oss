@@ -93,9 +93,9 @@ const REVERSAL_OPTIONS = [
  * 全部「動いている」に潰れてしまうので、口が導出した `state` を見る。
  */
 export const STATE_LABELS: Record<ConversionDefinitionState, string> = {
-  active: '動いている',
+  active: '有効',
   draft: '下書き',
-  stopped: '止めている',
+  stopped: '停止中',
   invalid: '入力不良',
   sourceStopped: '起点停止',
 }

@@ -502,7 +502,7 @@ export default function TagsTabV8({
       { id: 'copy', label: '複製して作る', external: true, disabled: readonly, disabledReason: readonly ? readonlyReason : undefined, onSelect: () => router.push(`/tags/new?copy=${tag.id}`) },
       { id: 'move', label: 'フォルダへ移す', disabled: readonly, disabledReason: readonly ? readonlyReason : undefined, onSelect: () => setMenuMoveFor(tag.id) },
     ]
-    /* 保管済みに戻す口は無いため、同じ確認を繰り返さない（v7 R190）。 */
+    /* アーカイブに戻す口は無いため、同じ確認を繰り返さない（v7 R190）。 */
     if (tag.status !== 'archived') {
       items_.push({
         id: 'archive',
@@ -610,7 +610,7 @@ export default function TagsTabV8({
             rows={folderRows}
           >
             <p className={styles.folderNote}>
-              フォルダを削除しても、中のタグは未分類として残ります。件数には保管済みのタグも含みます。
+              フォルダを削除しても、中のタグは未分類として残ります。件数にはアーカイブのタグも含みます。
             </p>
             {folderError ? (
               <p role="alert" className={styles.folderNote}>
@@ -775,7 +775,7 @@ export default function TagsTabV8({
                               <div className={styles.nameRow}>
                                 <span className={styles.folderDot} style={{ backgroundColor: group?.color ?? FOLDER_FALLBACK_COLOR }} />
                                 <Link href={editHref} className={styles.cellTitle} title={tag.name} onClick={(event) => event.stopPropagation()}>{tag.name}</Link>
-                                {tag.status === 'archived' && <span className={styles.miniBadge}>保管済み</span>}
+                                {tag.status === 'archived' && <span className={styles.miniBadge}>アーカイブ</span>}
                                 {tag.cleanupReasons?.includes('duplicate_name') && <span className={`${styles.miniBadge} ${styles.miniBadgeWarn}`} title="正規化した名前がほかのタグと重なっています。整理候補です。">重複名</span>}
                               </div>
                               <p className={styles.cellSub}>{formatDate(tag.createdAt)} 登録</p>

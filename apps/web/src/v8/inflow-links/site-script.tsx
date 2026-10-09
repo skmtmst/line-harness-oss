@@ -323,7 +323,7 @@ export default function SiteScriptV8() {
             <span className={styles.colDomain} role="cell"><span className={styles.cellText} title={site.domains.join('\n')}>{site.domains.join('、') || '—'}</span></span>
             <span className={styles.colState} role="cell">
               {stopped ? (
-                <StatusBadge tone="neutral" size="compact">止めている</StatusBadge>
+                <StatusBadge tone="neutral" size="compact">停止中</StatusBadge>
               ) : (
                 <StatusBadge tone="success" size="compact">{site.lastReceivedAt ? '届いている' : '受信待ち'}</StatusBadge>
               )}

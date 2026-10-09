@@ -948,7 +948,7 @@ function OutgoingV8Table({ items, canManage, canTest, manageReason, menuId, setM
                   <div className={styles.stateCell}>
                     <div>
                       <span className={`${styles.pill} ${failed ? styles.pillDanger : item.isActive ? styles.pillActive : styles.pillNeutral}`}>
-                        ● {toggling ? '切り替え中' : failed ? '失敗あり' : item.isActive ? '動いている' : '止めている'}
+                        ● {toggling ? '切り替え中' : failed ? '失敗あり' : item.isActive ? '有効' : '停止中'}
                       </span>
                     </div>
                     <div title={completedAt ? `最終 ${formatDateTime(completedAt)}` : undefined}>

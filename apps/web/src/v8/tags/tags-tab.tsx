@@ -480,7 +480,7 @@ export default function TagsTab({
       { id: 'copy', label: '複製して作る', external: true, onSelect: () => router.push(`/tags/new?copy=${tag.id}`) },
       { id: 'move', label: 'フォルダへ移す', onSelect: () => setMenuMoveFor(tag.id) },
     ]
-    /* 保管済みに戻す口は無いため、同じ確認を繰り返さない（v7 R190）。 */
+    /* アーカイブに戻す口は無いため、同じ確認を繰り返さない（v7 R190）。 */
     if (tag.status !== 'archived') {
       list.push({
         id: 'archive',
@@ -736,7 +736,7 @@ export default function TagsTab({
                         )}
                       </span>
                       <TagPill name={tag.name} color={group ? folderDisplayColor(group) : null} size="sm" compactAtNarrow href={editHref} />
-                      {tag.status === 'archived' ? <StatusBadge size="annotation" dot={false}>保管済み</StatusBadge> : null}
+                      {tag.status === 'archived' ? <StatusBadge size="annotation" dot={false}>アーカイブ</StatusBadge> : null}
                       {tag.cleanupReasons?.includes('duplicate_name') ? (
                         <StatusBadge size="annotation" tone="warning" dot={false} title="正規化した名前がほかのタグと重なっています。整理候補です。">名前が重なっている</StatusBadge>
                       ) : null}

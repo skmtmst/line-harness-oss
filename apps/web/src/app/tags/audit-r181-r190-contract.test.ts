@@ -96,7 +96,7 @@ describe('R188 並び順の名前と実装を一致させる', () => {
 })
 
 describe('R190 タグの操作名は保管に統一する', () => {
-  it('一覧の確認窓は保管と書き、保管済みに同じ確認を出さない', () => {
+  it('一覧の確認窓は保管と書き、アーカイブに同じ確認を出さない', () => {
     expect(TAGS_PAGE).toContain('を保管しますか？')
     expect(TAGS_PAGE).toContain('このタグを保管する')
     expect(TAGS_PAGE).toContain("tag.status === 'archived' ? undefined")

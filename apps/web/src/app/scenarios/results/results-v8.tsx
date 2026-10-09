@@ -325,7 +325,7 @@ export default function ScenarioResultsV8() {
     }
   }
 
-  /** 「移す」の窓を開く。移し先の候補は、いま配っているシナリオ以外の稼働中だけ。 */
+  /** 「移す」の窓を開く。移し先の候補は、いま配っているシナリオ以外の有効だけ。 */
   const openMoveDialog = async (subscription: { id: string; friendName: string }) => {
     setMoveTarget({ subscriptionId: subscription.id, friendName: subscription.friendName })
     setMoveScenarioId('')
@@ -785,7 +785,7 @@ export default function ScenarioResultsV8() {
         />
       ) : null}
 
-      {/* 「別のシナリオへ移す」の窓。移し先は稼働中の別シナリオだけ選べる。 */}
+      {/* 「別のシナリオへ移す」の窓。移し先は有効の別シナリオだけ選べる。 */}
       <Dialog
         open={moveTarget !== null}
         title={moveTarget ? `${moveTarget.friendName} を別のシナリオへ移す` : ''}
@@ -848,7 +848,7 @@ export default function ScenarioResultsV8() {
                 label: moveOptions === null
                   ? '読み込んでいます'
                   : moveChoices.length === 0
-                    ? '稼働中の他のシナリオがありません'
+                    ? '有効の他のシナリオがありません'
                     : 'シナリオを選んでください',
               },
               ...moveChoices.map((item) => ({ value: item.id, label: item.name })),

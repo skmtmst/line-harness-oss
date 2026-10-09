@@ -286,8 +286,8 @@ const EmergencyControlV8 = (
 
   const targetLabels: Record<StopTarget, { label: string; note: string }> = {
     broadcasts: { label: '予約中の一斉配信', note: '予約を下書きに戻します' },
-    scenarios: { label: 'シナリオ', note: '稼働中のシナリオ配信を止めます' },
-    reminders: { label: 'リマインダ', note: '稼働中のものを止めます' },
+    scenarios: { label: 'シナリオ', note: '有効のシナリオ配信を止めます' },
+    reminders: { label: 'リマインダ', note: '有効のものを止めます' },
     automations: { label: '自動処理', note: 'オートメーションと自動応答を止めます' },
   }
 
@@ -552,7 +552,7 @@ const EmergencyControlV8 = (
           </div>
           <p className={`${styles.kpiValue} ${isStopped ? styles.kpiValueDanger : ''}`}>
             {/* WEB312：状態が読めていないときは「動いている」と言わない。 */}
-            {previewSettled && control ? (isStopped ? '止めている' : '動いている') : '—'}
+            {previewSettled && control ? (isStopped ? '停止中' : '有効') : '—'}
           </p>
           <p className={styles.kpiDetail}>
             {impactFailed && !control ? '確認できませんでした' : calculatedAt ? `${formatOperationDate(calculatedAt)}に確認` : '確認中'}

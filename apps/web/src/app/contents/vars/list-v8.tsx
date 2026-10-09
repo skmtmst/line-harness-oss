@@ -1451,7 +1451,7 @@ function CommonVarsListV8Inner() {
                   </p>
                   <p className={styles.panelLabel}>状態</p>
                   <p className={styles.panelText}>
-                    {activeStopped ? '止めている' : (activeItem.status ?? 'active') === 'draft' ? '下書き' : '使用中'}
+                    {activeStopped ? '停止中' : (activeItem.status ?? 'active') === 'draft' ? '下書き' : '使用中'}
                   </p>
                   <p className={styles.panelLabel}>使っている所</p>
                   <p className={styles.panelText}>

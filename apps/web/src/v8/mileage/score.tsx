@@ -657,7 +657,7 @@ export default function ScoreTab() {
                     <Td className={styles.colStateWide}>
                       <span className={styles.pill} data-tone={stopped ? 'neutral' : changed ? 'warn' : 'active'}>
                         <span className={styles.pillDot} aria-hidden="true" />
-                        {stopped ? '止めている' : changed ? '下書きで変更' : '公開中'}
+                        {stopped ? '停止中' : changed ? '下書きで変更' : '公開中'}
                       </span>
                     </Td>
                     <Td className={styles.colOpsMenu}>

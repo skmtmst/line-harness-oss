@@ -7,7 +7,7 @@
  * 型は「作る」（CreatePage）：頭（戻る・タグ名・フォルダと人数）→ 左に「基本」「タグ連動」「マイル」、
  * 右に「使っている所」、下の帯（削除は左端・キャンセル／複製して作る／保存は中央）。
  * 「タグ連動」「マイル」は畳んで1行の要約を出し、「開く」で中身を出す（絵どおり）。
- * 動き（読み込み・保存・さかのぼり反映の確認・競合・削除・保管済み）は今の画面（app/tags/edit-tag-page-v8）と同じ。
+ * 動き（読み込み・保存・さかのぼり反映の確認・競合・削除・アーカイブ）は今の画面（app/tags/edit-tag-page-v8）と同じ。
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -226,7 +226,7 @@ export default function TagEditV8() {
   if (!tag || !definition) {
     return <TargetMissing kind="error" title="タグを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void load()} />
   }
-  // 保管済みのタグは通常の編集を出さない（#710）。
+  // アーカイブのタグは通常の編集を出さない（#710）。
   if (tag.status === 'archived') {
     return <ArchivedTagEditor tag={tag} accountId={selectedAccountId} onCancel={() => router.push('/tags')} onSaved={(updated) => { if (targetRef.current === targetKey && targetGenerationRef.current === targetGeneration) setTag((current) => (current ? { ...current, ...updated } : current)) }} />
   }

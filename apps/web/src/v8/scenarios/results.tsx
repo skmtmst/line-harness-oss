@@ -682,7 +682,7 @@ export default function ScenarioResultsV8() {
         />
       ) : null}
 
-      {/* 「別のシナリオへ移す」の窓。移し先は稼働中の別シナリオだけ選べる。 */}
+      {/* 「別のシナリオへ移す」の窓。移し先は有効の別シナリオだけ選べる。 */}
       <Dialog
         open={moveTarget !== null}
         title={moveTarget ? `${moveTarget.friendName} を別のシナリオへ移す` : ''}
@@ -724,7 +724,7 @@ export default function ScenarioResultsV8() {
             placeholder={moveOptions === null
               ? '（読み込んでいます）'
               : moveChoices.length === 0
-                ? '（稼働中の他のシナリオがありません）'
+                ? '（有効の他のシナリオがありません）'
                 : '（シナリオを選んでください）'}
             options={moveChoices}
           />

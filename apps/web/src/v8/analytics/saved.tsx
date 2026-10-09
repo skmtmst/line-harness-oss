@@ -24,7 +24,7 @@ import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, useRegisterE
 import styles from './analytics.module.css'
 
 const SAVED_STATE_LABELS: Record<SavedAnalyticsSnapshot['state'], string> = { available: '利用可能', partial: '一部集計', unavailable: '未取得', failed: '失敗' }
-const REPORT_STATUS_LABELS: Record<AnalyticsReportSchedule['status'], string> = { active: '動いている', paused: '止めている', archived: 'しまった' }
+const REPORT_STATUS_LABELS: Record<AnalyticsReportSchedule['status'], string> = { active: '有効', paused: '停止中', archived: 'アーカイブ' }
 const RUN_STATE_LABELS: Record<AnalyticsReportRun['state'], string> = { running: '送信中', available: '送信済み', partial: '一部だけ送信', unavailable: '未取得', failed: '失敗' }
 
 function runErrorLabel(errorCode: string | null, state: AnalyticsReportRun['state']): string | null {

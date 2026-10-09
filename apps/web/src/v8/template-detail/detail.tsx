@@ -600,7 +600,7 @@ export default function TemplateDetailV8() {
       <ConfirmDialog
         open={revertTarget !== null}
         title={`版${revertTarget}の内容で下書きを作り直しますか？`}
-        description="過去の版は変わりません。その中身で新しい下書きを作ります。予約済み・送信中の配信は、いま使っている版のままです。"
+        description="過去の版は変わりません。その中身で新しい下書きを作ります。予約中・送信中の配信は、いま使っている版のままです。"
         confirmLabel="この版に戻す"
         busy={reverting}
         error={revertError}

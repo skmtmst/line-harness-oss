@@ -129,7 +129,7 @@ function StoreForm({ store, accounts, stores, busy, onSubmit, onCancel }: {
         {store ? (
           <label className={styles.field}>
             <span className={styles.fieldLabel}>状態</span>
-            <DefaultSelect name="status" ariaLabel="状態" defaultValue={store.status} options={[{ value: 'active', label: '有効' }, { value: 'paused', label: '一時停止' }, { value: 'archived', label: '保管済' }]} />
+            <DefaultSelect name="status" ariaLabel="状態" defaultValue={store.status} options={[{ value: 'active', label: '有効' }, { value: 'paused', label: '停止中' }, { value: 'archived', label: 'アーカイブ' }]} />
           </label>
         ) : null}
         <StoreLineAccountSelect accounts={accounts} stores={stores} currentStore={store} />
