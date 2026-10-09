@@ -15,6 +15,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ListPage } from '@/components/templates'
 import KpiBand from '@/components/shared/kpi-band'
+import { formatNumber } from '@/lib/format'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
 import { notifyToast } from '@/components/shared/toast'
