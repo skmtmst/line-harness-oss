@@ -221,7 +221,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                     {active.items?.map((item) => (
                       <Tr key={item.id} className={`${styles.row} ${styles.rowTall}`}>
                         <Td className={styles.td}>
-                          <button type="button" className={`${styles.mono} ${styles.uidButton}`} title={`${item.oldUid}（詳細を見る）`} aria-label={`${item.oldUid}（詳細を見る）`} onClick={() => { m.setDetailError(null); m.setDetailItem(item) }}>
+                          <button type="button" className={`${styles.mono} ${styles.uidButton}`} title={`${item.oldUid}（詳細を見る）`}  onClick={() => { m.setDetailError(null); m.setDetailItem(item) }}>
                             {shortUid(item.oldUid)}
                           </button>
                         </Td>
@@ -326,7 +326,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                     <Tr key={run.id} className={`${styles.row} ${styles.rowRun}`} selected={active?.id === run.id || undefined}>
                       <Td className={styles.td}>{slashDateTime(run.createdAt)}</Td>
                       <Td className={styles.td}>
-                        <button type="button" className={styles.runButton} aria-current={active?.id === run.id ? 'true' : undefined} title={`${run.purpose} ・ ${formatNumber(run.counts.total)}件`} aria-label={`${run.purpose} ・ ${formatNumber(run.counts.total)}件`} onClick={() => m.selectRun(run.id)}>
+                        <button type="button" className={styles.runButton} aria-current={active?.id === run.id ? 'true' : undefined} title={`${run.purpose} ・ ${formatNumber(run.counts.total)}件`}  onClick={() => m.selectRun(run.id)}>
                           {`${accountName(run.fromAccountId)} → ${accountName(run.toAccountId)}`}
                         </button>
                       </Td>

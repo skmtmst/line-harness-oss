@@ -378,7 +378,7 @@ export default function PaymentTab() {
               <Tr key={item.affiliateId} className={styles.row} data-table-layout="columns">
                 <Td className={styles.colName}>
                   <span className={styles.stack}>
-                    <button type="button" className={styles.rowName} title={item.affiliateName} aria-label={item.affiliateName} onClick={() => setConfirmTarget({ id: item.affiliateId, name: item.affiliateName })}>{item.affiliateName}</button>
+                    <button type="button" className={styles.rowName} title={item.affiliateName}  onClick={() => setConfirmTarget({ id: item.affiliateId, name: item.affiliateName })}>{item.affiliateName}</button>
                     <span className={styles.rowPlan}>{`コード ${item.code}`}</span>
                   </span>
                 </Td>
@@ -451,7 +451,7 @@ export default function PaymentTab() {
         type="button"
         onClick={() => { void issueStatements() }}
         disabled={!closed || operationBusy || statementTargets.length === 0}
-        title={!closed ? '期間を締めると出せます' : undefined} aria-label={!closed ? '期間を締めると出せます' : undefined}
+        title={!closed ? '期間を締めると出せます' : undefined}
       >
         <FileText size={15} aria-hidden="true" /> {resumed && issuedCount > 0 ? `支払明細をまとめて出す（残り${formatNumber(statementTargets.length)}人）` : '支払明細をまとめて出す'}
       </Button>

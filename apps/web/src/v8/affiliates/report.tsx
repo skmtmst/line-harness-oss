@@ -299,7 +299,7 @@ export default function ReportTab() {
               <Td className={styles.colName}>
                 <span className={styles.stack}>
                   {view === 'affiliate' ? (
-                    <button type="button" className={styles.rowLink} title={row.name} aria-label={row.name} onClick={() => openDrawer(row.id)}>{row.name}</button>
+                    <button type="button" className={styles.rowLink} title={row.name}  onClick={() => openDrawer(row.id)}>{row.name}</button>
                   ) : (
                     <span className={styles.rowLinkText} title={row.name}>{row.name}</span>
                   )}

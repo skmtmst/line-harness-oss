@@ -483,7 +483,7 @@ export default function OffersTab() {
                       {readonly ? (
                         <span className={styles.rowNameText} title={offer.name}>{offer.name}</span>
                       ) : (
-                        <button type="button" className={styles.rowName} title={offer.name} aria-label={offer.name} onClick={() => { setEditTarget(offer); setFormOpen(true) }}>{offer.name}</button>
+                        <button type="button" className={styles.rowName} title={offer.name}  onClick={() => { setEditTarget(offer); setFormOpen(true) }}>{offer.name}</button>
                       )}
                     </FolderDotName>
                     <span className={styles.rowPlan} title={offer.description ?? undefined}>{offer.description ?? '説明はありません'}</span>

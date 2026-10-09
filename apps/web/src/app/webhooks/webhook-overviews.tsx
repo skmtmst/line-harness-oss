@@ -556,7 +556,7 @@ export function OutgoingOverview({
                                 disabled={!item.isActive && !canActivate}
                                 aria-busy={toggling || undefined}
                                 data-webhook-toggle-pending={toggling ? `outgoing:${item.id}` : undefined}
-                                title={!item.isActive && !canActivate ? 'URLと合言葉を確かめてください' : undefined} aria-label={!item.isActive && !canActivate ? 'URLと合言葉を確かめてください' : undefined}
+                                title={!item.isActive && !canActivate ? 'URLと合言葉を確かめてください' : undefined}
                               >
                                 {toggling
                                   ? (item.isActive ? '止めています…' : '動かしています…')

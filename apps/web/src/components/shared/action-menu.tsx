@@ -191,7 +191,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = 'æ“
             role="menuitem"
             className={`${styles.item} ${item.description || (item.disabled && item.disabledReason) ? styles.itemTall : ''} ${item.tone === 'danger' ? styles.danger : ''}`}
             disabled={item.disabled}
-            title={item.label} aria-label={item.label}
+            title={item.label}
             data-qa-open={item.qaOpen}
             onClick={(event) => {
               event.stopPropagation()

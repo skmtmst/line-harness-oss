@@ -573,7 +573,7 @@ function Responses() {
                       >
                         <td className={styles.when}>{shortWhen(item.createdAt)}</td>
                         <td>
-                          <button type="button" className={styles.who} title={item.friendName ?? '不明'} aria-label={item.friendName ?? '不明'} onClick={() => selectAnswer(item.id)}>
+                          <button type="button" className={styles.who} title={item.friendName ?? '不明'}  onClick={() => selectAnswer(item.id)}>
                             {item.friendName ?? '不明'}
                           </button>
                         </td>

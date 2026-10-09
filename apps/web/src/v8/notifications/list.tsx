@@ -241,7 +241,7 @@ export default function NotificationsV8() {
                     type="button"
                     className={styles.row}
                     onClick={() => openNotification(item)}
-                    title={item.body || undefined} aria-label={item.body || undefined}
+                    title={item.body || undefined}
                   >
                     <span className={styles.icon} data-category={item.category} aria-hidden="true">
                       {item.category === 'error' ? <TriangleAlert /> : <Sparkles />}

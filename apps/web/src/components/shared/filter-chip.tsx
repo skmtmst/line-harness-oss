@@ -44,7 +44,7 @@ export default function FilterChip({
       type="button"
       aria-pressed={selected}
       disabled={disabled}
-      title={title} aria-label={title}
+      title={title}
       onClick={() => onChange(!selected)}
       className="v6-filter-chip" data-size={size}
     >

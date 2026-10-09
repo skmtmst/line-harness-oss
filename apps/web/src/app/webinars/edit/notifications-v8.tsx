@@ -99,7 +99,7 @@ export default function NotificationsV8({ webinarId, webinarTitle, editor, onEdi
   }
   const testDone = !dirty && editor.notificationTest?.status === 'passed'
   const preview = editor.notificationMessages?.registration || editor.notificationMessages?.start || ''
-  const testButton = (label: string) => <Button onClick={() => setTestConfirmOpen(true)} disabled={testing || saving || testDone || !settingsReady} title={testDone ? 'テスト済みです' : !settingsReady ? '通知の設定を読み込んでから実行できます' : undefined} aria-label={testDone ? 'テスト済みです' : !settingsReady ? '通知の設定を読み込んでから実行できます' : undefined} busy={testing} busyLabel="送信中…">{testDone ? 'テスト送信済み' : label}</Button>
+  const testButton = (label: string) => <Button onClick={() => setTestConfirmOpen(true)} disabled={testing || saving || testDone || !settingsReady} title={testDone ? 'テスト済みです' : !settingsReady ? '通知の設定を読み込んでから実行できます' : undefined}  busy={testing} busyLabel="送信中…">{testDone ? 'テスト送信済み' : label}</Button>
 
   return (
     <div data-design-node="E7iAYs" data-webinar-pane="notifications">

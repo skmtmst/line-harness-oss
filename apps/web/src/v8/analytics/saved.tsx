@@ -254,7 +254,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
                 : visibleItems.map((item) => {
                   const active = selectedId === item.id
                   return <div key={item.id} className={styles.trow} role="row" data-h="pill" data-selected={active || undefined}>
-                    <span role="cell" className={styles.colMain}><button type="button" className={styles.rowButton} onClick={() => setSelectedId(item.id)} title={`${item.name}（第${item.currentVersionNumber}版・保存結果 ${item.snapshotCount}件）`} aria-label={`${item.name}（第${item.currentVersionNumber}版・保存結果 ${item.snapshotCount}件）`} aria-pressed={active}>{item.name}</button></span>
+                    <span role="cell" className={styles.colMain}><button type="button" className={styles.rowButton} onClick={() => setSelectedId(item.id)} title={`${item.name}（第${item.currentVersionNumber}版・保存結果 ${item.snapshotCount}件）`}  aria-pressed={active}>{item.name}</button></span>
                     <span role="cell" className={styles.colType} data-w="90"><span>{kindLabel(item.kind)}</span></span>
                     <span role="cell" className={styles.colType} data-w="80"><span className={styles.cellText} title={item.createdByName}>{item.createdByName}</span></span>
                     <span role="cell" className={styles.colType} data-w="100"><span>{shortDateTime(item.updatedAt)}</span></span>

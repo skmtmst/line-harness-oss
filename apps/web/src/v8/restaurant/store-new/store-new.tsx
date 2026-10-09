@@ -57,7 +57,7 @@ function Field({ label, required, help, error, children }: { label: string; requ
 function ManualButton({ href, children }: { href: string; children: ReactNode }) {
   return href
     ? <Button external href={href}   className={styles.helpButton}><BookOpen aria-hidden className={styles.icon15} />{children}</Button>
-    : <Button disabled title="マニュアルの場所はまだ決まっていません" aria-label="マニュアルの場所はまだ決まっていません" className={styles.helpButton}><BookOpen aria-hidden className={styles.icon15} />{children}</Button>
+    : <Button disabled title="マニュアルの場所はまだ決まっていません"  className={styles.helpButton}><BookOpen aria-hidden className={styles.icon15} />{children}</Button>
 }
 
 function HelpPanel({ step }: { step: number }) {

@@ -1872,7 +1872,7 @@ export default function ScenarioDetailClient({
               </Button>
               {/* 保存するものは、いま開いている編集の内容。カードの「編集」
                   「変更」を押していないときは、保存するものが無い。 */}
-              <Button variant="primary" className="px-4 py-2 font-bold border-0 h-auto whitespace-normal" onClick={handleSaveScenario} disabled={!editing || saving} title={editing ? undefined : '「編集」か「変更」を押すと、ここで保存できます'} aria-label={editing ? undefined : '「編集」か「変更」を押すと、ここで保存できます'}>
+              <Button variant="primary" className="px-4 py-2 font-bold border-0 h-auto whitespace-normal" onClick={handleSaveScenario} disabled={!editing || saving} title={editing ? undefined : '「編集」か「変更」を押すと、ここで保存できます'} >
                 {saving ? '保存中…' : '保存する'}
               </Button>
               </div>
@@ -2089,10 +2089,6 @@ export default function ScenarioDetailClient({
                   type="button"
                   onClick={() => void handleConcurrentChange(!(scenario.allowConcurrent ?? true))}
                   title={
-                    (scenario.allowConcurrent ?? true)
-                      ? 'いまは同時購読を許しています。他のシナリオが動いている人にも、このシナリオを並行して流します。押すと「同時に1つだけ」へ変わり、他のシナリオが動いている人はこのシナリオに入らなくなります。'
-                      : 'いまは同時に1つだけです。他のシナリオが動いている人はこのシナリオに入りません。すでに入っている人には影響しません。押すと同時購読を許すようになります。'
-                  } aria-label={
                     (scenario.allowConcurrent ?? true)
                       ? 'いまは同時購読を許しています。他のシナリオが動いている人にも、このシナリオを並行して流します。押すと「同時に1つだけ」へ変わり、他のシナリオが動いている人はこのシナリオに入らなくなります。'
                       : 'いまは同時に1つだけです。他のシナリオが動いている人はこのシナリオに入りません。すでに入っている人には影響しません。押すと同時購読を許すようになります。'
@@ -2374,7 +2370,7 @@ export default function ScenarioDetailClient({
                                 editingStepId === step.id ? closeStepForm() : openEditStep(step)
                               }
                               className="text-info block min-w-0 flex-1 truncate text-left text-sm hover:underline"
-                              title={title} aria-label={title}
+                              title={title}
                             >
                               {title}
                             </button>

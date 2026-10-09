@@ -231,7 +231,7 @@ function OpenAlerts({
                   </Button>
                 ) : null}
                 {canManage ? (
-                  <Button variant="secondary" disabled={busy || !canRetry} title={canRetry ? undefined : 'やり直せる通知はありません'} aria-label={canRetry ? undefined : 'やり直せる通知はありません'} onClick={() => void onRetry(alert)}>
+                  <Button variant="secondary" disabled={busy || !canRetry} title={canRetry ? undefined : 'やり直せる通知はありません'}  onClick={() => void onRetry(alert)}>
                     {alert.notification.unconfigured > 0 ? '通知先を再確認する' : '通知をやり直す'}
                   </Button>
                 ) : null}

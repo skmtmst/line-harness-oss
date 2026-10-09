@@ -109,7 +109,7 @@ export function AfterTab({ options, refs, onSubmitTagId, onChangeOptions, onChan
                 {...reorder.handleProps(slot)}
               />
               <span className={styles.actionNum}>{position + 1}</span>
-              <button type="button" className={styles.actionText} title={text} aria-label={text} onClick={() => setEditing(actions)}>{text}</button>
+              <button type="button" className={styles.actionText} title={text}  onClick={() => setEditing(actions)}>{text}</button>
               <RowActions
                 className={styles.more}
                 subjectName={`「${text}」`}

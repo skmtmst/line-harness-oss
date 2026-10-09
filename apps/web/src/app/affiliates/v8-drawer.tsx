@@ -481,7 +481,7 @@ export default function AffiliateDrawerV8({
               type="button"
               variant="primary"
               disabled={!canEdit}
-              title={canEdit ? undefined : '閲覧のみのため変更できません'} aria-label={canEdit ? undefined : '閲覧のみのため変更できません'}
+              title={canEdit ? undefined : '閲覧のみのため変更できません'}
               onClick={() => setEditing((v) => !v)}
             >
               {editing ? '編集を閉じる' : '編集'}

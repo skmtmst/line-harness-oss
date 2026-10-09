@@ -615,7 +615,7 @@ export default function AffiliatorsTab() {
 
   function nameButton(row: { id: string; name: string }) {
     return (
-      <button type="button" className={styles.rowName} title={row.name} aria-label={row.name} onClick={() => openDrawer(row.id, false)}>
+      <button type="button" className={styles.rowName} title={row.name}  onClick={() => openDrawer(row.id, false)}>
         {row.name}
       </button>
     )

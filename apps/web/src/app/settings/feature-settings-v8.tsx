@@ -563,7 +563,7 @@ export function FeatureSettingsV8() {
                 busy={saving}
                 done={savedTick}
                 doneLabel="保存しました"
-                title={!dirty ? '変更すると保存できます' : undefined} aria-label={!dirty ? '変更すると保存できます' : undefined}
+                title={!dirty ? '変更すると保存できます' : undefined}
               >
                 {conflicted ? '比べてから保存' : '機能設定を保存'}
               </Button>

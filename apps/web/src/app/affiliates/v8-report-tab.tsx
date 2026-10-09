@@ -384,7 +384,7 @@ export default function ReportTabV8({
                 {shownAffiliates.map((row) => (
                   <tr key={row.id}>
                     <td>
-                      <button type="button" className="af-list-personName" title={row.name} aria-label={row.name} onClick={() => openDrawer(row.id)}>
+                      <button type="button" className="af-list-personName" title={row.name}  onClick={() => openDrawer(row.id)}>
                         {row.name}
                       </button>
                       <span className="af-list-cellSub">{row.topOfferName ?? '—'}</span>

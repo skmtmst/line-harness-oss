@@ -284,7 +284,7 @@ function ProductTable({
               {row.editing && canEdit ? (
                 <><TextField {...fields.bind(`feeding-name-${row.key}`)} disabled={busy} aria-label="商品名" value={row.name} maxLength={40} placeholder={kind === 'nen' ? '例：然 鹿肉ジャーキー' : '例：ドライフード'} onChange={(event) => onUpdate(row.key, { name: event.target.value })} /><FieldError id={`feeding-name-${row.key}-error`}>{fields.error(`feeding-name-${row.key}`)}</FieldError></>
               ) : canEdit ? (
-                <button type="button" disabled={busy} className={styles.productNameButton} title={`${row.name}を直す`} aria-label={`${row.name}を直す`} onClick={() => onUpdate(row.key, { editing: true })}>{row.name}</button>
+                <button type="button" disabled={busy} className={styles.productNameButton} title={`${row.name}を直す`}  onClick={() => onUpdate(row.key, { editing: true })}>{row.name}</button>
               ) : (
                 <span className={styles.cell} title={row.name}>{row.name}</span>
               )}

@@ -3097,7 +3097,7 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
                             type="button"
                             onClick={() => setSelectedId(item.id)}
                             className="text-ink w-full truncate px-4 py-3 text-left text-sm font-medium"
-                            title={item.name} aria-label={item.name}
+                            title={item.name}
                             aria-pressed={active}
                           >
                             {item.name}

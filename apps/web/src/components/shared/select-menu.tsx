@@ -191,7 +191,7 @@ export function SelectMenuOption({
         data-described={description ? '' : undefined}
         onMouseEnter={onHover}
         onClick={onSelect}
-        title={description ? `${label}：${description}` : label} aria-label={description ? `${label}：${description}` : label}
+        title={description ? `${label}：${description}` : label}
       >
         {leading ? <span className={styles.leading} aria-hidden="true">{leading}</span> : null}
         {description ? (

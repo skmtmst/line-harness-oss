@@ -56,7 +56,7 @@ function Chip({ label, onClick, disabled, title, buttonRef, expanded, more = fal
       size="field"
       onClick={onClick}
       disabled={disabled}
-      title={title ?? `${label}を差し込む`} aria-label={title ?? `${label}を差し込む`}
+      title={title ?? `${label}を差し込む`}
       aria-haspopup={expanded === undefined ? undefined : 'menu'}
       aria-expanded={expanded}
     >

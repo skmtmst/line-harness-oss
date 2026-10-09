@@ -741,7 +741,7 @@ export default function ScenarioFirstStepV8() {
                   className={styles.kindChip}
                   data-active={kind === item.value || undefined}
                   disabled={Boolean(item.disabledReason)}
-                  title={item.disabledReason} aria-label={item.disabledReason}
+                  title={item.disabledReason}
                   onClick={() => changeKind(item.value)}
                 >
                   {item.label}

@@ -258,7 +258,7 @@ export default function PaymentTabV8({
           type="button"
           onClick={() => { void issueStatements() }}
           disabled={!canEdit || !closed || operationBusy || statementTargets.length === 0}
-          title={!canEdit ? '閲覧のみのため変更できません' : !closed ? '期間を締めると出せます' : undefined} aria-label={!canEdit ? '閲覧のみのため変更できません' : !closed ? '期間を締めると出せます' : undefined}
+          title={!canEdit ? '閲覧のみのため変更できません' : !closed ? '期間を締めると出せます' : undefined}
         >
           {resumed && issuedCount > 0 ? `支払明細をまとめて出す（残り${formatNumber(statementTargets.length)}人）` : '支払明細をまとめて出す'}
         </Button>

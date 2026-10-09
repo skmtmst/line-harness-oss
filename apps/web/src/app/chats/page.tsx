@@ -2782,7 +2782,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       type="button"
                       onClick={() => applySavedView(view)}
                       className="text-ink min-w-0 flex-1 truncate text-left text-xs font-semibold"
-                      title={view.name} aria-label={view.name}
+                      title={view.name}
                     >
                       {view.name}{view.isShared ? '（共有）' : ''}
                       {/*
@@ -2880,7 +2880,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               quickFilter === filter.key
                 ? 'border-accent-deep bg-accent-soft text-accent-deep'
                 : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'
-            } ${styles.chip}`} key={filter.key} type="button" onClick={() => { setQuickFilter(filter.key); dropSavedViewParam() }} aria-pressed={quickFilter === filter.key} title={filter.title} aria-label={filter.title}>
+            } ${styles.chip}`} key={filter.key} type="button" onClick={() => { setQuickFilter(filter.key); dropSavedViewParam() }} aria-pressed={quickFilter === filter.key} title={filter.title} >
             {/* V8 の絵の札は 要返信＝reply・1時間以上待ち＝clock-3 の印を文字の前に置く。v7 では出さない。 */}
             {filter.icon ? <filter.icon aria-hidden className={styles.chipIcon} /> : null}
             {filter.label}
@@ -3015,7 +3015,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     role="radio"
                     aria-checked={selected}
                     tabIndex={focusable ? 0 : -1}
-                    title={selected ? `${f.label}（もう一度押すとすべて）` : f.label} aria-label={selected ? `${f.label}（もう一度押すとすべて）` : f.label}
+                    title={selected ? `${f.label}（もう一度押すとすべて）` : f.label}
                     onClick={() => { setStatusFilter(selected ? 'all' : f.key); dropSavedViewParam() }}
                     // #639 の素のボタンの最小高さ32pxをここだけ外す。
                     // 切り替え全体の高さ32pxの中に収めるため。

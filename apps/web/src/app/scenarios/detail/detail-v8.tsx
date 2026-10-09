@@ -2174,12 +2174,6 @@ export default function ScenarioDetailV8({
                   : (scenario.allowConcurrent ?? true)
                     ? 'いまは同時購読を許しています。他のシナリオが動いている人にも、このシナリオを並行して流します。押すと「同時に1つだけ」へ変わります。'
                     : 'いまは同時に1つだけです。押すと同時購読を許すようになります。'
-              } aria-label={
-                !canEdit
-                  ? readonlyReason
-                  : (scenario.allowConcurrent ?? true)
-                    ? 'いまは同時購読を許しています。他のシナリオが動いている人にも、このシナリオを並行して流します。押すと「同時に1つだけ」へ変わります。'
-                    : 'いまは同時に1つだけです。押すと同時購読を許すようになります。'
               }
             >
               {(scenario.allowConcurrent ?? true) ? '同時に複数回受ける' : '同時に1つだけ（変える）'}
@@ -2527,7 +2521,7 @@ export default function ScenarioDetailV8({
                           }
                         }}
                         disabled={!canEdit}
-                        title={!canEdit ? readonlyReason : 'この通を編集する'} aria-label={!canEdit ? readonlyReason : 'この通を編集する'}
+                        title={!canEdit ? readonlyReason : 'この通を編集する'}
                       >
                         {title}
                       </button>
@@ -2787,7 +2781,7 @@ export default function ScenarioDetailV8({
               disabled={conflict ? !canEdit : (!editDirty || saving || !canEdit)}
               busy={saving}
               done={saveDone}
-              title={!canEdit ? readonlyReason : !editDirty ? '変えたところがありません' : undefined} aria-label={!canEdit ? readonlyReason : !editDirty ? '変えたところがありません' : undefined}
+              title={!canEdit ? readonlyReason : !editDirty ? '変えたところがありません' : undefined}
             >
               {conflict ? '比べてから保存' : '保存する'}
             </Button>

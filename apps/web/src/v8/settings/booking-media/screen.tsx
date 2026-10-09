@@ -540,7 +540,7 @@ export default function BookingMediaPage() {
                 <Button
                   align="start"
                   className={styles.targetControl}
-                  title={recipientText(notice, members)} aria-label={recipientText(notice, members)}
+                  title={recipientText(notice, members)}
                   aria-haspopup="dialog"
                   onClick={() => { setPicking({ recipientMode: notice.recipientMode, membershipIds: notice.membershipIds }); setPickError('') }}
                 >

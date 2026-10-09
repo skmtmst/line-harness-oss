@@ -534,7 +534,7 @@ export default function HqBroadcastDetail() {
                 gate === 'needsRequest' ? (
                   <Button size="field" variant="primary" onClick={() => setRequestOpen(true)}>承認を依頼する</Button>
                 ) : (
-                  <Button size="field" variant="primary" onClick={() => { setConfirmCount(''); setAsk({ kind: 'send' }) }} disabled={(totals?.sendStores ?? 0) === 0 || gate === 'pending'} title={(totals?.sendStores ?? 0) === 0 ? '送れる店がありません' : gate === 'pending' ? '承認を待っています' : undefined} aria-label={(totals?.sendStores ?? 0) === 0 ? '送れる店がありません' : gate === 'pending' ? '承認を待っています' : undefined}>
+                  <Button size="field" variant="primary" onClick={() => { setConfirmCount(''); setAsk({ kind: 'send' }) }} disabled={(totals?.sendStores ?? 0) === 0 || gate === 'pending'} title={(totals?.sendStores ?? 0) === 0 ? '送れる店がありません' : gate === 'pending' ? '承認を待っています' : undefined} >
                     <Send size={15} aria-hidden="true" />{`${n(totals?.sendStores ?? 0)}店に送る`}
                   </Button>
                 )

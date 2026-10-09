@@ -278,7 +278,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
       <ul className={styles.rows}>
         {rows.map((row) => (
           <li key={row.key} className={styles.row} data-selected={row.key === previewKey || undefined}>
-            <button type="button" className={styles.rowLabel} onClick={() => setPreviewKey(row.key)} title="右の見え方に出す" aria-label="右の見え方に出す">{row.label}</button>
+            <button type="button" className={styles.rowLabel} onClick={() => setPreviewKey(row.key)} title="右の見え方に出す" >{row.label}</button>
             <div className={styles.rowExtra}>{row.extra}</div>
             {readOnly
               ? <span className={styles.state}>{row.on ? '送る' : '送らない'}</span>
@@ -292,7 +292,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
         </ul>
       ) : null}
       {readOnly ? null : (
-        <div><Button onClick={() => setTestOpen(true)} disabled={testing || saving || testDone} title={testDone ? 'テスト済みです' : undefined} aria-label={testDone ? 'テスト済みです' : undefined} busy={testing} busyLabel="送信中…"><Send size={15} aria-hidden="true" />{testDone ? 'テスト送信済み（全部）' : 'テストを送る（全部）'}</Button></div>
+        <div><Button onClick={() => setTestOpen(true)} disabled={testing || saving || testDone} title={testDone ? 'テスト済みです' : undefined}  busy={testing} busyLabel="送信中…"><Send size={15} aria-hidden="true" />{testDone ? 'テスト送信済み（全部）' : 'テストを送る（全部）'}</Button></div>
       )}
     </>
   }

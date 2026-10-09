@@ -441,7 +441,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         ) : undefined}
         footerActions={hideForm ? <Button href="/tags?tab=marks">一覧へ戻る</Button> : <>
           <Button type="button" onClick={() => guarded(() => router.push('/tags?tab=marks'))}>キャンセル</Button>
-          <Button type="button" variant="primary" disabled={saveDisabled} title={blockedReason ?? undefined} aria-label={blockedReason ?? undefined} onClick={() => void save()} busy={saving}>
+          <Button type="button" variant="primary" disabled={saveDisabled} title={blockedReason ?? undefined}  onClick={() => void save()} busy={saving}>
             <Check size={15} aria-hidden="true" />{editing ? '保存する' : '対応マークを作る'}
           </Button>
         </>}

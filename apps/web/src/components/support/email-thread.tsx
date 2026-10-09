@@ -617,7 +617,7 @@ export default function EmailThread({
             */}
             <button
               type="button"
-              title={detail.thread.subject} aria-label={detail.thread.subject}
+              title={detail.thread.subject}
               aria-expanded={headerSubjectExpanded}
               onClick={() => setHeaderSubjectExpanded((v) => !v)}
               className={`block w-full text-left text-sm font-medium text-ink ${headerSubjectExpanded ? 'whitespace-normal break-all' : 'truncate'}`}

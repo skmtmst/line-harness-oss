@@ -333,7 +333,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
                 <FieldError id={`q-choice-${index}-error`}>{fields.error(`choice-${index}`)}</FieldError>
                 {host ? null : <div className={styles.inline}>
                   <span className={styles.smallLabel}>押されたら</span>
-                  <button type="button" className={styles.pick} title="押したときの動き（タグ・友だち情報・シナリオ・URL など）を決める" aria-label="押したときの動き（タグ・友だち情報・シナリオ・URL など）を決める" onClick={() => setActionsOpen(true)}>
+                  <button type="button" className={styles.pick} title="押したときの動き（タグ・友だち情報・シナリオ・URL など）を決める"  onClick={() => setActionsOpen(true)}>
                     <span className={styles.pickText}>{summaryOf(choice)}</span>
                     <ChevronDown className={styles.pickIcon} aria-hidden="true" />
                   </button>

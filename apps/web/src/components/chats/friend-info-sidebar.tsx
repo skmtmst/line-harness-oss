@@ -195,7 +195,7 @@ function ExpandableText({ value, className = '', empty = '未登録' }: {
   return (
     <button
       type="button"
-      title={value} aria-label={value}
+      title={value}
       aria-expanded={expanded}
       onClick={() => setExpanded((v) => !v)}
       className={`${className} min-w-0 text-left ${expanded ? 'whitespace-normal break-all' : 'truncate'}`}

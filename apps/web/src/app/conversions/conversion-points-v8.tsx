@@ -457,7 +457,7 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
                           className={styles.cellButton}
                           onClick={() => setPanelId(panelId === point.id ? null : point.id)}
                           aria-expanded={panelId === point.id}
-                          title={point.name} aria-label={point.name}
+                          title={point.name}
                         >
                           <span className={styles.cellName}>{point.name}</span>
                         </button>
@@ -604,7 +604,7 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
                     variant="secondary"
                     size="compact"
                     disabled={!canEdit || model.ingestBusy !== ''}
-                    title={canEdit ? undefined : READONLY_REASON} aria-label={canEdit ? undefined : READONLY_REASON}
+                    title={canEdit ? undefined : READONLY_REASON}
                     onClick={() => model.onToggleIngest(panelPoint)}
                     busy={model.ingestBusy === 'toggle'}
                     busyLabel="切り替えています"

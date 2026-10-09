@@ -458,7 +458,7 @@ export default function ApprovalsTab() {
                 </Td>
                 <Td className={styles.colName}>
                   <span className={styles.stack}>
-                    <button type="button" className={styles.rowName} title={personName(item.friendName)} aria-label={personName(item.friendName)} onClick={() => setDetailItem(item)}>{personName(item.friendName)}</button>
+                    <button type="button" className={styles.rowName} title={personName(item.friendName)}  onClick={() => setDetailItem(item)}>{personName(item.friendName)}</button>
                     <span className={styles.rowPlan}>{`${formatMonthDayTime(item.createdAt)} に成果`}</span>
                   </span>
                 </Td>

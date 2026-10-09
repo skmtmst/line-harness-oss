@@ -209,7 +209,7 @@ export default function ConnectorPanel({ accountId, canEdit = true }: { accountI
             <p className={styles.cardNote}>上から照らし合わせます。名前だけで自動では結びつけません。</p>
             <div className={styles.ruleList}>{IDENTITY_RULES.map(([value, label, note], index) => <Checkbox key={value} checked={form.identityRules.includes(value)} onCheckedChange={() => toggle('identityRules', value)} description={note} disabled={!canEdit}>{`順番${index + 1}：${label}`}</Checkbox>)}</div>
             <div className={styles.actions}>
-              {connector ? <Button type="button" onClick={() => setForm({ ...form, status: form.status === 'paused' ? 'connected' : 'paused' })} disabled={!canEdit} title={!canEdit ? readonlyReason : undefined} aria-label={!canEdit ? readonlyReason : undefined}>{form.status === 'paused' ? '取り込みを再開する' : '取り込みを止める'}</Button> : null}
+              {connector ? <Button type="button" onClick={() => setForm({ ...form, status: form.status === 'paused' ? 'connected' : 'paused' })} disabled={!canEdit} title={!canEdit ? readonlyReason : undefined} >{form.status === 'paused' ? '取り込みを再開する' : '取り込みを止める'}</Button> : null}
               <Button type="button" variant="primary" disabled={saving || !canEdit || !form.shopDomain || (!connector?.secretConfigured && form.inboundSecret.length < 32)} title={!canEdit ? readonlyReason : undefined} onClick={requestSave} busy={saving} busyLabel="保存しています…">設定を保存する</Button>
             </div>
             {saveBlockReason ? <p className="mt-1 text-caption leading-relaxed text-ink-faint" role="note">{saveBlockReason}</p> : null}

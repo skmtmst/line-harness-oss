@@ -1174,7 +1174,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                           data-tone={row.kind === 'shift' ? 'on' : 'break'}
                           onClick={() => setEditingDayRow(isEditing ? null : rowKey)}
                           aria-expanded={isEditing}
-                          title={row.kind === 'shift' ? '押すとこの日の時間を直せます' : '押すとこの日の休憩の時間を直せます'} aria-label={row.kind === 'shift' ? '押すとこの日の時間を直せます' : '押すとこの日の休憩の時間を直せます'}
+                          title={row.kind === 'shift' ? '押すとこの日の時間を直せます' : '押すとこの日の休憩の時間を直せます'}
                         >
                           <span className={styles.pillDot} aria-hidden="true" />
                           {row.kind === 'shift'
