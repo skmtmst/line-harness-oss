@@ -387,7 +387,7 @@ describe('G-3：保存が済んでから配るか選ぶ', () => {
     expect(await within(dialog).findByText('版 2 を配布済み')).toBeTruthy()
     expect(within(dialog).getByText('配ると上書き')).toBeTruthy()
     fireEvent.click(await within(dialog).findByRole('checkbox', { name: '直営店をまとめて選ぶ' }))
-    fireEvent.change(within(dialog).getByRole('textbox', { name: 'アカウントを探す' }), { target: { value: '本店' } })
+    fireEvent.change(within(dialog).getByRole('searchbox', { name: 'アカウントを探す' }), { target: { value: '本店' } })
     expect(within(dialog).getByText('選んだ 2 アカウント')).toBeTruthy()
     fireEvent.click(within(dialog).getByRole('button', { name: '2 アカウントへ配る' }))
     await waitFor(() => expect(calls.preflight).toHaveBeenCalledWith('t-new', ['a-1', 'a-2']))
@@ -437,6 +437,14 @@ describe('フォルダの「…」からまとめて配る（G-7）', () => {
   ]
   const checked = (id: string) => ({ preflightId: `run-${id}`, expiresAt: new Date(Date.now() + 60000).toISOString(), stores: [{ accountId: 'a-1', accountName: '然 -NEN- 本店', items: [{ sourceId: id, name: id, itemKind: 'template', duplicate: false, allowedModes: ['create'] }] }] })
   const delivered = (id: string) => ({ runId: `run-${id}`, status: 'completed', stores: [{ accountId: 'a-1', status: 'succeeded', counts: { created: 1, overwritten: 0, aliased: 0 } }] })
+  /** 配る先の欄から共通の窓を開き、アカウントを選んで確定する（dJZ7Q）。 */
+  async function pickStores(dialog: HTMLElement, names: string[]) {
+    fireEvent.click(within(dialog).getByRole('button', { name: /^配る先：(選ぶ|変える)$/ }))
+    const picker = await screen.findByRole('dialog', { name: '配るアカウントを選ぶ' })
+    for (const name of names) fireEvent.click(within(picker).getByRole('checkbox', { name }))
+    fireEvent.click(within(picker).getByRole('button', { name: `この ${names.length} アカウントにする` }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '配るアカウントを選ぶ' })).toBeNull())
+  }
   async function selectFolder() {
     fireEvent.click(await screen.findByRole('button', { name: 'フォルダ「予約」の操作' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: 'このフォルダを配る' }))
@@ -458,7 +466,7 @@ describe('フォルダの「…」からまとめて配る（G-7）', () => {
     expect(within(dialog).getByText('本文')).toBeTruthy()
     expect(within(dialog).getByText('カルーセル')).toBeTruthy()
     expect(within(dialog).getByRole('button', { name: '2 件を 0 アカウントへ配る' }).hasAttribute('disabled')).toBe(true)
-    fireEvent.click(within(dialog).getByRole('checkbox', { name: '然 -NEN- 本店' }))
+    await pickStores(dialog, ['然 -NEN- 本店'])
     fireEvent.click(within(dialog).getByRole('checkbox', { name: '予約前日のご案内' }))
     fireEvent.click(within(dialog).getByRole('checkbox', { name: '別の種類のひな形' }))
     expect(within(dialog).getByRole('button', { name: '0 件を 1 アカウントへ配る' }).hasAttribute('disabled')).toBe(true)
@@ -467,7 +475,7 @@ describe('フォルダの「…」からまとめて配る（G-7）', () => {
   it('すべての確認が済むまで配らず、順に配った結果を同じ窓へまとめる', async () => {
     render(<HqTemplatesV8 type="template" />)
     const dialog = await selectFolder()
-    fireEvent.click(within(dialog).getByRole('checkbox', { name: '然 -NEN- 本店' }))
+    await pickStores(dialog, ['然 -NEN- 本店'])
     fireEvent.click(within(dialog).getByRole('button', { name: '2 件を 1 アカウントへ配る' }))
     fireEvent.click(await screen.findByRole('button', { name: '次のひな形を確かめる（1/2）' }))
     await waitFor(() => expect(calls.preflight).toHaveBeenCalledWith('t-2', ['a-1']))
@@ -490,7 +498,7 @@ describe('フォルダの「…」からまとめて配る（G-7）', () => {
     calls.distribute.mockImplementationOnce(async () => delivered('t-1')).mockImplementationOnce(async () => ({ ...delivered('t-2'), status: 'failed', stores: [{ ...delivered('t-2').stores[0], status: 'failed', reason: '更新を確認してください' }] }))
     render(<HqTemplatesV8 type="template" />)
     const dialog = await selectFolder()
-    fireEvent.click(within(dialog).getByRole('checkbox', { name: '然 -NEN- 本店' }))
+    await pickStores(dialog, ['然 -NEN- 本店'])
     fireEvent.click(within(dialog).getByRole('button', { name: '2 件を 1 アカウントへ配る' }))
     fireEvent.click(await screen.findByRole('button', { name: '次のひな形を確かめる（1/2）' }))
     fireEvent.click(await screen.findByRole('button', { name: '2 件を 1 アカウントへ配る' }))

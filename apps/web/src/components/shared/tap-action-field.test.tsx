@@ -55,7 +55,9 @@ test('作ってあるものは窓で仮に選び、［選ぶ］でだけ値を�
   const dialog = screen.getByRole('dialog')
   // 回答フォームは必ず選ぶので「選ばない」の行は無い。
   expect(within(dialog).queryByText(/選んでください/)).toBeNull()
-  fireEvent.click(within(dialog).getByRole('button', { name: '申し込み' }))
+  // 共通の選ぶ窓（EntityPicker・dJZ7Q）で選ぶ。
+  expect(dialog.getAttribute('data-design-node')).toBe('dJZ7Q')
+  fireEvent.click(within(dialog).getByRole('radio', { name: '申し込み' }))
   expect(change).not.toHaveBeenCalled()
   fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' }))
   expect(change).toHaveBeenCalledWith({ refId: 'f2' })
@@ -67,7 +69,7 @@ test('予約メニューは任意：選んだら名前と［変える］、窓�
   expect(screen.getByText('カット＋カラー')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: '面 Aの予約メニューを変える' }))
   const dialog = screen.getByRole('dialog')
-  fireEvent.click(within(dialog).getByRole('button', { name: 'メニューを決めずに開く（予約ページの最初）' }))
+  fireEvent.click(within(dialog).getByRole('radio', { name: 'メニューを決めずに開く（予約ページの最初）' }))
   fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' }))
   expect(change).toHaveBeenCalledWith({ refId: '' })
 })

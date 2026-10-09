@@ -12,7 +12,7 @@
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
 import { useEffect, useRef, useState } from 'react'
-import { CalendarClock, ClipboardList, Coins, Eye, MessageSquare, Package, Save, Send } from 'lucide-react'
+import { CalendarClock, ClipboardList, Coins, Eye, Package, Save, Send } from 'lucide-react'
 import { checkNenCampaignBodyLength, NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared'
 import { ApiError, api, describeSaveFailure, type NenCampaignAfterAction, type NenCampaignSetting } from '@/lib/api'
 import { CreatePage } from '@/components/templates'
@@ -27,6 +27,7 @@ import Radio from '@/components/shared/radio'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import TimeField from '@/components/shared/time-field-v8'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import { useAccount } from '@/contexts/account-context'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
@@ -521,19 +522,21 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
         <div className={styles.row}>
           <div className={styles.field}>
             <span className={styles.labelSmall}>回答フォームを開かせる（任意）</span>
-            {!canEdit ? <StaticBox label="回答フォーム" value={formAction?.formName ?? '開かせない'} /> : <Select
-              id="nen-edit-form"
-              aria-label="回答フォームを開かせる（任意）"
-              size="full"
-              value={formAction?.formId ?? ''}
-              error={formIssueMessage ?? undefined}
-              onChange={chooseForm}
-              options={[
-                { value: '', label: '開かせない' },
-                ...(formAction && !selectedForm ? [{ value: formAction.formId, label: `${formAction.formName}（見つかりません）`, disabled: true }] : []),
-                ...forms.map((form) => ({ value: form.id, label: form.isActive ? form.name : `${form.name}（公開されていません）`, disabled: !form.isActive })),
-              ]}
-            />}
+            {!canEdit ? <StaticBox label="回答フォーム" value={formAction?.formName ?? '開かせない'} /> : <>
+              <EntityKindField
+                id="nen-edit-form"
+                kind="form"
+                label="回答フォームを開かせる（任意）"
+                options={forms.filter((form) => form.isActive || form.id === formAction?.formId)}
+                meta={(row) => (row.isActive === false ? '公開されていません' : undefined)}
+                placeholder="（開かせない）"
+                clearable
+                invalid={Boolean(formIssueMessage)}
+                value={formAction?.formId ?? ''}
+                onChange={chooseForm}
+              />
+              {formIssueMessage ? <p className={styles.error} role="alert">{formIssueMessage}</p> : null}
+            </>}
             {formIssueBanner && !formIssueMessage ? <p className={styles.muted}>{formIssueBanner}</p> : null}
           </div>
           <div className={styles.field}>

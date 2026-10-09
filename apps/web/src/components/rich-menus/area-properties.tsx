@@ -11,6 +11,7 @@ import {
   tapActionDef, tapActionFromUri, tapActionLiffUrl, tapActionNeedsLiff,
   type TapActionKind, type TapActionValue,
 } from '@/lib/tap-actions'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import type { Area } from './canvas-editor'
 import { RICH_MENU_ACTION_TYPE_BY_INTENT, richMenuUriError, type RichMenuAreaIntent } from '@line-crm/shared'
 
@@ -439,56 +440,26 @@ export function AreaProperties({
         </Field>
       )}
 
-      {intent === 'text' && (
-        <Field label="送るテキスト" htmlFor={`${inputId}-text`} hint="押した人が、この言葉を送ったことになります。">
-          <input
-            id={`${inputId}-text`}
-            value={(data.text as string) ?? ''}
-            onChange={(e) => onUpdate({ actionData: { ...data, text: e.target.value } })}
-            maxLength={300}
-            className={inputClass}
-          />
-        </Field>
-      )}
-
       {intent === 'template' && (
-        <Field label="送るテンプレート" hint="押されたら、こちらからこのメッセージを送ります。">
-          <Select
-            value={area.templateId ?? ''}
-            onChange={(value) => onUpdate({ templateId: value || null })}
-            aria-label="送るテンプレート"
-            options={[
-              { value: '', label: '選択...' },
-              ...templates.map((t) => ({ value: t.id, label: t.name })),
-            ]}
-            size="full"
-          />
+        <div className="block">
+          <span className="text-ink-secondary text-xs font-medium">送るテンプレート</span>
+          <span className="text-ink-faint block text-micro">押されたら、こちらからこのメッセージを送ります。</span>
+          <div className="mt-1">
+            <EntityKindField
+              kind="template"
+              label="送るテンプレート"
+              options={templates}
+              value={area.templateId ?? ''}
+              onChange={(value) => onUpdate({ templateId: value || null })}
+              clearable
+            />
+          </div>
           {templates.length === 0 && (
             <p className="mt-1 text-micro text-status-warn-deep">
               テンプレートがまだありません。先に「テンプレート」で作ってください。
             </p>
           )}
-        </Field>
-      )}
-
-      {intent === 'form' && (
-        <Field label="開く回答フォーム">
-          <Select
-            value={area.formId ?? ''}
-            onChange={(value) => onUpdate({ formId: value || null })}
-            aria-label="開く回答フォーム"
-            options={[
-              { value: '', label: '選択...' },
-              ...forms.map((f) => ({ value: f.id, label: f.name })),
-            ]}
-            size="full"
-          />
-          {forms.length === 0 && (
-            <p className="mt-1 text-micro text-status-warn-deep">
-              回答フォームがまだありません。先に「回答フォーム」で作ってください。
-            </p>
-          )}
-        </Field>
+        </div>
       )}
 
       {intent === 'switch' && (

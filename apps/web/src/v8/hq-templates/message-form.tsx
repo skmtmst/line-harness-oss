@@ -8,7 +8,7 @@
  * 保存済みの画像・カルーセルは、形を切り替えずに共通の MessageTemplateEditor で編集する。
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { ImageIcon, PlayCircle, Plus, X } from 'lucide-react'
+import { PlayCircle, Plus } from 'lucide-react'
 import type { HqMessageCard, HqMessageReference, HqTemplateFolder } from '@line-crm/shared'
 import { hqTemplatesApi, type MessageTemplateDefinition } from '@/lib/hq-templates-api'
 import { withMessageCard, withUploadedImage } from '@/lib/hq-template-authoring'
@@ -17,9 +17,10 @@ import LinePreview, { LinePreviewMessage } from '@/components/shared/line-previe
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import MediaSlot from '@/components/shared/media-slot'
-import Select from '@/components/shared/select'
 import TapActionField from '@/components/shared/tap-action-field'
 import type { TapActionKind, TapActionValue } from '@/lib/tap-actions'
+import { EntityPickerField } from '@/components/shared/entity-picker'
+import { ENTITY_KINDS } from '@/components/shared/entity-picker-sources'
 import FolderSelect from '@/components/shared/folder-select'
 import { decodeImageSize, type TemplateMedia } from './definition'
 import styles from './console.module.css'
@@ -169,16 +170,15 @@ export default function MessageForm({
                       textMax={300}
                       sources={referenceError ? {} : { form: references.filter((row) => row.kind === 'form').map((row) => ({ id: row.id, name: `${row.name}（${row.accountName}）` })) }}
                       renderBody={(kind) => kind !== 'scenario' ? undefined : (
-                        <Select
-                          aria-label={`ボタン${index + 1}の参照先`} size="full"
+                        /* 統括の参照先はアカウントをまたぐので、店のフォルダは読まず行を直接渡す（選ぶ窓 dJZ7Q）。 */
+                        <EntityPickerField
+                          label={`ボタン${index + 1}の参照先`}
+                          noun={ENTITY_KINDS.scenario.noun}
+                          icon={ENTITY_KINDS.scenario.icon}
                           disabled={disabled || Boolean(referenceError)}
+                          items={references.filter((row) => row.kind === 'scenario').map((row) => ({ id: row.id, name: row.name, meta: row.accountName, keywords: row.accountName }))}
                           value={button.value}
                           onChange={(next) => updateButton(button.id, { value: next })}
-                          options={[
-                            { value: '', label: 'シナリオを選んでください' },
-                            ...(button.value && !references.some((row) => row.kind === 'scenario' && row.id === button.value) ? [{ value: button.value, label: '保存済みの参照先（候補を確認してください）' }] : []),
-                            ...references.filter((row) => row.kind === 'scenario').map((row) => ({ value: row.id, label: `${row.name}（${row.accountName}）` })),
-                          ]}
                         />
                       )}
                     />

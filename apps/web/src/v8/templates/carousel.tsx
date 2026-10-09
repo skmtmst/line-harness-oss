@@ -17,7 +17,7 @@
 import { Suspense, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ChevronDown, Copy, ImageIcon, Plus, Send, Trash2, TriangleAlert, Zap } from 'lucide-react'
+import { ChevronDown, Copy, Plus, Send, Trash2, TriangleAlert, Zap } from 'lucide-react'
 import type { Folder, MediaItem, MessageTemplateMediaDefinition } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'

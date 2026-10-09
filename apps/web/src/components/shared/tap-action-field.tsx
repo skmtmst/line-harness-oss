@@ -16,19 +16,18 @@
  * 種類の定数と URL の組み立て・読み戻しは lib/tap-actions.ts（ここでは持たない）。
  * 保存の形は画面ごとに今のまま（この部品は値 TapActionValue を返すだけ）。
  *
- * ★差し替える所（作ってあるものを選ぶ窓）：下の `TapTargetPicker` だけ。共通の選ぶ窓
- * （作業役 picker の部品・Pen dJZ7Q）ができたら、この関数の中身をその部品の呼び出しに替える。
+ * 作ってあるものを選ぶ窓は共通の選ぶ窓（EntityPicker・Pen dJZ7Q）。下の `TapTargetPicker` で呼ぶ。
  */
-import { useId, useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { CalendarCheck, Check, ClipboardList, ExternalLink, History, Info, MessageSquare, Stamp, type LucideIcon } from 'lucide-react'
+import { CalendarCheck, ClipboardList, ExternalLink, History, Info, MessageSquare, Stamp, type LucideIcon } from 'lucide-react'
 import {
   TAP_ACTION_DEFS, TAP_ACTION_KINDS, tapActionDef,
   type TapActionKind, type TapActionValue,
 } from '@/lib/tap-actions'
 import Button from './button'
-import Dialog from './dialog'
-import SearchField from './search-field'
+import { EntityPickerDialog, type EntityPickerItem } from './entity-picker'
+import { ENTITY_KINDS, EntityKindDialog, type EntityKind } from './entity-picker-sources'
 import Select from './select'
 import { TextField } from './text-field'
 import styles from './tap-action-field.module.css'
@@ -190,6 +189,7 @@ export default function TapActionField({
         )}
         {picking ? (
           <TapTargetPicker
+            tapKind={def.kind}
             noun={target.noun}
             required={target.required}
             emptyLabel={emptyText}
@@ -211,12 +211,19 @@ export default function TapActionField({
   )
 }
 
+/** 任意の窓で「選ばない（予約ページの最初・ふつうのカード）」を表す仮の行。 */
+const NONE_ID = '__tap_none__'
+
 /**
- * 作ってあるもの（回答フォーム・予約メニュー・スタンプカード）を選ぶ窓。窓の中は仮選択で、
- * ［選ぶ］でだけ値を変える（キャンセル・Esc では変えない）。
- * ★差し替える所：共通の選ぶ窓（作業役 picker・Pen dJZ7Q）ができたらこの中身をその部品にする。
+ * 作ってあるもの（回答フォーム・予約メニュー・スタンプカード）を選ぶ窓。共通の「作ってあるものを選ぶ窓」
+ * （EntityPicker・Pen dJZ7Q・B-131）を使う。窓の中は仮選択で、［選ぶ］でだけ値を変える（キャンセル・Esc では変えない）。
+ * - 回答フォーム（必ず選ぶ）は EntityKindDialog（フォルダの列・見え方のスマホつき）
+ * - 予約メニュー・スタンプカード（任意）は先頭に「選ばない」の行を置いた EntityPickerDialog
+ * - 候補を読めなかったときは一覧の代わりに理由を出す
  */
-export function TapTargetPicker({ noun, required, emptyLabel, items, initialId, onConfirm, onCancel }: {
+export function TapTargetPicker({ tapKind, noun, required, emptyLabel, items, initialId, onConfirm, onCancel }: {
+  /** どの種類の中身か（作る画面への文字リンク・見え方の出し分けに使う）。 */
+  tapKind?: string
   noun: string
   required: boolean
   emptyLabel: string
@@ -226,43 +233,28 @@ export function TapTargetPicker({ noun, required, emptyLabel, items, initialId, 
   onConfirm: (id: string) => void
   onCancel: () => void
 }) {
-  const listId = useId()
-  const [chosen, setChosen] = useState(initialId)
-  const [query, setQuery] = useState('')
-  const rows = (items ?? []).filter((item) => !item.disabled || item.id === initialId).filter((item) => item.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
-  const row = (id: string, label: string, note?: string) => (
-    <li key={id || '__none__'}>
-      <button type="button" className={styles.option} aria-pressed={chosen === id} onClick={() => setChosen(id)} onDoubleClick={() => onConfirm(id)}>
-        <span className={styles.optionText}>
-          <span className={styles.optionName}>{label}</span>
-          {note ? <span className={styles.optionNote}>{note}</span> : null}
-        </span>
-        {chosen === id ? <Check className={styles.optionCheck} aria-hidden="true" /> : null}
-      </button>
-    </li>
-  )
+  const entity: EntityKind | undefined = tapKind === 'form' ? 'form' : tapKind === 'booking' ? 'booking_menu' : undefined
+  const usable = (items ?? []).filter((item) => !item.disabled || item.id === initialId)
+  if (required && entity && items !== undefined) {
+    return <EntityKindDialog kind={entity} options={usable.map((item) => ({ id: item.id, name: item.name }))} initialId={initialId} onConfirm={onConfirm} onCancel={onCancel} />
+  }
+  const def = entity ? ENTITY_KINDS[entity] : undefined
+  const rows: EntityPickerItem[] = [
+    ...(required ? [] : [{ id: NONE_ID, name: emptyLabel }]),
+    ...usable.map((item) => ({ id: item.id, name: item.name, meta: item.note })),
+  ]
   return (
-    <Dialog
-      open
+    <EntityPickerDialog
       title={`${noun}を選ぶ`}
-      designWidth={480}
-      confirmLabel="選ぶ"
-      confirmDisabled={required && !chosen}
-      onConfirm={() => onConfirm(chosen)}
+      items={rows}
+      initialId={initialId || (required ? '' : NONE_ID)}
+      state={items === undefined ? <p className={styles.pickerEmpty} role="alert">{`${noun}を読み込めませんでした。開き直してください。`}</p> : undefined}
+      searchPlaceholder={`${noun}の名前で探す`}
+      createHref={def?.createHref}
+      createLabel={def?.createLabel}
+      designNode="dJZ7Q"
+      onConfirm={(id) => onConfirm(id === NONE_ID ? '' : id)}
       onCancel={onCancel}
-    >
-      <div className={styles.picker}>
-        <SearchField aria-label={`${noun}を探す`} placeholder={`${noun}の名前で探す`} value={query} onChange={setQuery} onClear={() => setQuery('')} />
-        {items === undefined ? (
-          <p className={styles.pickerEmpty} role="alert">{`${noun}を読み込めませんでした。開き直してください。`}</p>
-        ) : (
-          <ul className={styles.options} id={listId} aria-label={noun}>
-            {required ? null : row('', emptyLabel)}
-            {rows.map((item) => row(item.id, item.name, item.note))}
-            {rows.length === 0 ? <li className={styles.pickerEmpty}>{items.length === 0 ? `${noun}がまだありません。` : '当てはまるものがありません。'}</li> : null}
-          </ul>
-        )}
-      </div>
-    </Dialog>
+    />
   )
 }

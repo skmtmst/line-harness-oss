@@ -1,6 +1,7 @@
 'use client'
 
 import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
@@ -810,7 +811,9 @@ export function NewAutomationV8({
   useEffect(() => {
     if (!inputError) return
     const frame = window.requestAnimationFrame(() => {
-      const control = document.getElementById(inputError.target)
+      const target = document.getElementById(inputError.target)
+      // 選ぶ窓の欄は id が行の箱に付くので、中の［選ぶ］へ移る。
+      const control = target?.querySelector<HTMLElement>('button[aria-haspopup="dialog"]') ?? target
       control?.focus()
       control?.scrollIntoView?.({ block: 'center' })
     })
@@ -2625,7 +2628,7 @@ export function NewAutomationV8({
           <div className={styles.subBox}>
             <p className={styles.subTitle}>きっかけの詳しい設定</p>
             <div className={styles.formGrid}>
-              {eventType === 'tag_change' ? <Select aria-label="きっかけのタグ" value={String(triggerConfig.tagId ?? '')} onChange={(value) => setTriggerConfig({ ...triggerConfig, tagId: value })} options={[{ value: '', label: 'どのタグか選ぶ' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]} size="full" /> : null}
+              {eventType === 'tag_change' ? <EntityKindField kind="tag" label="きっかけのタグ" placeholder="（どのタグか選ぶ）" value={String(triggerConfig.tagId ?? '')} onChange={(value) => setTriggerConfig({ ...triggerConfig, tagId: value })} options={tags} /> : null}
               {eventType === 'tag_change' ? <Select aria-label="付いたとき・外れたとき" value={String(triggerConfig.action ?? 'add')} onChange={(value) => setTriggerConfig({ ...triggerConfig, action: value })} options={[{ value: 'add', label: '付いたとき' }, { value: 'remove', label: '外れたとき' }]} size="full" /> : null}
               {eventType === 'form_submitted' ? <TextField aria-label="回答フォーム" placeholder="フォームID（空欄ならすべて）" value={String(triggerConfig.formId ?? '')} onChange={(e) => setTriggerConfig({ formId: e.target.value })} /> : null}
               {eventType === 'link_clicked' ? <TextField aria-label="計測リンク" placeholder="計測リンクID（空欄ならすべて）" value={String(triggerConfig.trackedLinkId ?? '')} onChange={(e) => setTriggerConfig({ trackedLinkId: e.target.value })} /> : null}
@@ -2780,39 +2783,42 @@ export function NewAutomationV8({
             </label>
             {editingRow.type === 'add_tag' ? (
               <ResourcePick
+                kind="tag"
                 title="付けるタグ"
                 id={`v8-tag-${editingRow.key}`}
                 error={inputError?.target === `v8-tag-${editingRow.key}` ? inputError.message : undefined}
                 selectLabel="自動化で付けるタグ"
                 value={editingRow.tagId}
                 onPick={(value) => updateAction(editingRow.key, { tagId: value })}
-                options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+                options={tags}
                 loading={tagsLoading}
                 failed={tagsFailed}
                 failedNote="タグを読み込めませんでした。画面を再読み込みしてください。"
               />
             ) : editingRow.type === 'start_scenario' ? (
               <ResourcePick
+                kind="scenario"
                 title="始めるシナリオ"
                 id={`v8-scenario-${editingRow.key}`}
                 error={inputError?.target === `v8-scenario-${editingRow.key}` ? inputError.message : undefined}
                 selectLabel="自動化で始めるシナリオ"
                 value={editingRow.scenarioId}
                 onPick={(value) => updateAction(editingRow.key, { scenarioId: value })}
-                options={scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))}
+                options={scenarios}
                 loading={tagsLoading}
                 failed={tagsFailed}
                 failedNote="シナリオを読み込めませんでした。画面を再読み込みしてください。"
               />
             ) : editingRow.type === 'common_action' ? (
               <ResourcePick
+                kind="common_action"
                 title="使う共通アクション"
                 id={`v8-common-action-${editingRow.key}`}
                 error={inputError?.target === `v8-common-action-${editingRow.key}` ? inputError.message : undefined}
                 selectLabel="自動化で使う共通アクション"
                 value={editingRow.commonActionId}
                 onPick={(value) => updateAction(editingRow.key, { commonActionId: value })}
-                options={commonActions.map((item) => ({ value: item.id, label: item.name }))}
+                options={commonActions}
                 loading={tagsLoading}
                 failed={tagsFailed}
                 failedNote="共通アクションを読み込めませんでした。画面を再読み込みしてください。"
@@ -2934,36 +2940,36 @@ function actionRowTitle(type: string): string {
   return 'メッセージを送る'
 }
 
-/* することで使う選択肢の行（タグ・シナリオ・共通アクション）。 */
+/* することで使う選択肢の行（タグ・シナリオ・共通アクション）。選ぶ窓で1つ選ぶ。 */
 function ResourcePick(props: {
+  kind: 'tag' | 'scenario' | 'common_action'
   title: string
   id: string
   selectLabel: string
   value: string
   onPick: (value: string) => void
-  options: Array<{ value: string; label: string }>
+  options: ReadonlyArray<{ id: string; name: string }>
   loading: boolean
   failed: boolean
   failedNote: string
   error?: string
 }) {
-  const { title, id, selectLabel, value, onPick, options, loading, failed, failedNote } = props
+  const { kind, title, id, selectLabel, value, onPick, options, loading, failed, failedNote } = props
   return (
     <div className={styles.field}>
-      <label className={styles.label} htmlFor={id}>{title}<RequiredBadge /></label>
-      <Select
+      <span className={styles.label}>{title}<RequiredBadge /></span>
+      <EntityKindField
+        kind={kind}
         id={id}
-        error={props.error}
+        label={selectLabel}
         value={value}
+        invalid={Boolean(props.error)}
         disabled={loading || failed}
+        placeholder="（選んでください）"
         onChange={(picked) => onPick(picked)}
-        aria-label={selectLabel}
-        size="full"
-        options={[
-          { value: '', label: '— 選んでください —' },
-          ...options.map((option) => ({ value: option.value, label: option.label })),
-        ]}
+        options={options}
       />
+      {props.error ? <p id={`${id}-error`} className={styles.inputError} role="alert">{props.error}</p> : null}
       {loading ? <p className={styles.cardDesc}>読み込んでいます</p> : null}
       {failed ? <p className={styles.cardDesc}>{failedNote}</p> : null}
     </div>

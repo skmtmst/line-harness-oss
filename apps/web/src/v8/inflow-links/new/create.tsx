@@ -30,6 +30,7 @@ import ListState from '@/components/shared/list-state'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import Select from '@/components/shared/select'
+import { EntityKindDialog } from '@/components/shared/entity-picker-sources'
 import { Th } from '@/components/shared/table'
 import Toggle from '@/components/shared/toggle'
 import { TextField } from '@/components/shared/text-field'
@@ -350,6 +351,8 @@ function InflowCreate() {
     onToggleOpen: () => void
     pickLabel: string
     picker: ReactNode
+    /** 選ぶ窓（EntityKindDialog）を開くだけの行。下の段を出さない。 */
+    dialog?: boolean
   }) => (
     <div className={styles.actionItem}>
       <div className={styles.actionRow}>
@@ -362,7 +365,7 @@ function InflowCreate() {
           {opts.value ? '変える' : '決める'}
         </Button>
       </div>
-      {opts.open ? <div className={styles.actionPick}>{opts.picker}</div> : null}
+      {opts.open ? opts.dialog ? opts.picker : <div className={styles.actionPick}>{opts.picker}</div> : null}
     </div>
   )
 
@@ -533,14 +536,15 @@ function InflowCreate() {
           open: showIntroPick,
           onToggleOpen: () => setShowIntroPick((current) => !current),
           pickLabel: '送るメッセージ',
+          dialog: true,
           picker: (
-            <Select
-              id="ir-intro"
-              value={introTemplateId}
-              onChange={(next) => { setIntroTemplateId(next); setShowIntroPick(false) }}
-              aria-label="送るメッセージ"
-              size="full"
-              options={[{ value: '', label: '送らない' }, ...templates.map((template) => ({ value: template.id, label: template.name }))]}
+            <EntityKindDialog
+              kind="template"
+              options={templates}
+              initialId={introTemplateId}
+              accountId={selectedAccountId}
+              onConfirm={(next) => { setIntroTemplateId(next); setShowIntroPick(false) }}
+              onCancel={() => setShowIntroPick(false)}
             />
           ),
         })}
@@ -552,14 +556,15 @@ function InflowCreate() {
           open: showScenarioPick,
           onToggleOpen: () => setShowScenarioPick((current) => !current),
           pickLabel: '始めるシナリオ',
+          dialog: true,
           picker: (
-            <Select
-              id="ir-scenario"
-              value={scenarioId}
-              onChange={(next) => { setScenarioId(next); setShowScenarioPick(false) }}
-              aria-label="始めるシナリオ配信"
-              size="full"
-              options={[{ value: '', label: '（始めない）' }, ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))]}
+            <EntityKindDialog
+              kind="scenario"
+              options={scenarios}
+              initialId={scenarioId}
+              accountId={selectedAccountId}
+              onConfirm={(next) => { setScenarioId(next); setShowScenarioPick(false) }}
+              onCancel={() => setShowScenarioPick(false)}
             />
           ),
         })}

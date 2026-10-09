@@ -106,7 +106,7 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     selectArea('A'); pickIntent('URLを開く')
     fireEvent.change(screen.getByPlaceholderText('https://...'), { target: { value: 'https://example.com/booking' } })
     selectArea('B'); pickIntent('テキストを送る')
-    fireEvent.change(screen.getByLabelText(/^送るテキスト/), { target: { value: '予約を確認する' } })
+    fireEvent.change(screen.getByLabelText('このボタンの送る文'), { target: { value: '予約を確認する' } })
     await save()
     expect(saved().pages[0].imageR2Key).toBeNull()
     expect(saved().pages[0].areas[0]).toMatchObject({ intent: 'url', actionData: { uri: 'https://example.com/booking' } })
@@ -137,7 +137,7 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     for (const [index, letter] of ['A', 'B', 'C'].entries()) {
       fireEvent.click(tabs().getByRole('button', { name: `タブ${index + 1}「タブ ${letter}」` }))
       selectArea('A'); pickIntent('テキストを送る')
-      fireEvent.change(screen.getByLabelText(/^送るテキスト/), { target: { value: `内容${letter}` } })
+      fireEvent.change(screen.getByLabelText('このボタンの送る文'), { target: { value: `内容${letter}` } })
     }
     await save()
     expect(saved().pages.map((page) => page.name)).toEqual(['タブ A', 'タブ B', 'タブ C'])
@@ -150,7 +150,7 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     expect(definition.richMenu.pages.map((page) => page.imageR2Key)).toEqual(saved().pages.map((page) => page.imageR2Key))
     expect(definition.richMenu.pages.map((page) => page.areas[0].actionData.text)).toEqual(['内容A', '内容B', '内容C'])
     fireEvent.click(tabs().getByRole('button', { name: 'タブ1「タブ A」' }))
-    expect((screen.getByLabelText(/^送るテキスト/) as HTMLInputElement).value).toBe('内容A')
+    expect((screen.getByLabelText('このボタンの送る文') as HTMLInputElement).value).toBe('内容A')
   })
   it('切替タブがなしなら②に直すタブの段を出さない', async () => {
     await start()
@@ -173,7 +173,7 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     await start('3つ')
     fireEvent.click(within(screen.getByRole('group', { name: '直すタブ' })).getByRole('button', { name: 'タブ3「タブ C」' }))
     selectArea('A'); pickIntent('テキストを送る')
-    fireEvent.change(screen.getByLabelText(/^送るテキスト/), { target: { value: '消えるタブ' } })
+    fireEvent.change(screen.getByLabelText('このボタンの送る文'), { target: { value: '消えるタブ' } })
     click('タブの数・名前・画像は ①形と画像 で変えます')
     fireEvent.click(within(screen.getByRole('group', { name: '切替タブの数' })).getByRole('button', { name: '2つ' }))
     const dialog = await screen.findByRole('alertdialog')

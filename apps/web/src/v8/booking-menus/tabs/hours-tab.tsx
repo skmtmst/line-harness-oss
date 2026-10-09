@@ -8,7 +8,7 @@ import { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import DateField from '@/components/shared/date-field'
 import HelpTip from '@/components/shared/help-tip'
 import { TimeField } from '@/components/shared/date-time-field'
@@ -492,6 +492,7 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
   const [time, setTime] = useState('')
   const [staffId, setStaffId] = useState('')
   const [staffOptions, setStaffOptions] = useState<BookingStaff[]>([])
+  const staffRows = useMemo(() => staffOptions.map((person) => ({ id: person.id, name: person.display_name })), [staffOptions])
   const [checking, setChecking] = useState(false)
   const [checkError, setCheckError] = useState<string | null>(null)
   const [result, setResult] = useState<BookingSlotCheckResult | null>(null)
@@ -555,14 +556,14 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
         <HelpTip label="空きを確かめるの説明">お客さまの画面と同じ条件で、その日時に受けられるか確かめます。確かめても予約は作られません。</HelpTip>
       </div>
       <div className={styles.checkGrid}>
-        <Select size="full"
-          aria-label="確かめるメニュー"
+        <EntityKindField
+          kind="booking_menu"
+          label="確かめるメニュー"
+          options={activeMenus}
           value={menuId}
           onChange={(value) => { setMenuId(value); changeCriteria() }}
-          options={[
-            ...(activeMenus.length === 0 ? [{ value: '', label: '受付中のメニューがありません' }] : []),
-            ...activeMenus.map((menu) => ({ value: menu.id, label: menu.name })),
-          ]}
+          placeholder={activeMenus.length === 0 ? '（受付中のメニューがありません）' : '（メニューを選ぶ）'}
+          meta={() => undefined}
         />
         <label className={styles.fieldLabel}>
           日付
@@ -572,14 +573,15 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
           開始時刻
           <TimeField aria-label="確かめる開始時刻" size="field" value={time} onChange={(value) => { setTime(value); changeCriteria() }} className="mt-1" />
         </label>
-        <Select size="full"
-          aria-label="確かめる担当"
+        <EntityKindField
+          kind="staff"
+          label="確かめる担当"
+          options={staffRows}
           value={staffId}
           onChange={(value) => { setStaffId(value); changeCriteria() }}
-          options={[
-            { value: '', label: '担当：指名なし' },
-            ...staffOptions.map((person) => ({ value: person.id, label: `担当：${person.display_name}` })),
-          ]}
+          clearable
+          placeholder="（担当：指名なし）"
+          meta={() => undefined}
         />
       </div>
       <div className={styles.checkAction}>

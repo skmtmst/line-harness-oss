@@ -2739,6 +2739,26 @@ select:not([multiple]):not(.appearance-none) {
   --tpl-bcpick-focus: 2px;
   --tpl-bcpick-mobile-preview: 30dvh;
 }
+/* 作ってあるもの・配るアカウントを選ぶ窓 dJZ7Q（picker）：欄の1行と窓の寸法。 */
+[data-theme="v8"] {
+  --tpl-picker-width: 880px;
+  --tpl-picker-narrow-width: 760px;
+  --tpl-picker-height: 560px;
+  --tpl-picker-folder-width: 190px;
+  --tpl-picker-preview-width: 250px;
+  --tpl-picker-header-pad: 18px 20px;
+  --tpl-picker-footer-pad: 12px 20px;
+  --tpl-picker-list-pad: 14px;
+  --tpl-picker-row-h: 38px;
+  --tpl-picker-row-gap: 5px;
+  --tpl-picker-row-pad: 0 10px;
+  --tpl-picker-gap: 8px;
+  --tpl-picker-tiny-gap: 4px;
+  --tpl-picker-preview-pad: 16px 14px;
+  --tpl-picker-field-h: 36px;
+  --tpl-picker-field-pad: 0 6px 0 12px;
+  --tpl-picker-embed-h: 420px;
+}
 [data-theme="v8"] { --tpl-hq-attribute-distribute-col: 76px; }
 
 [data-theme='v8'] { --tpl-wh-narrow-column-pad: 9px var(--tpl-af2-wh-narrow-pad); }

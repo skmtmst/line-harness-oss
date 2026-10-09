@@ -15,7 +15,7 @@ import Dialog from '@/components/shared/dialog'
 import { RowMenu } from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import Toggle from '@/components/shared/toggle'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
@@ -138,6 +138,12 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
   }, [loadForms])
 
   const published = forms.items.filter((item) => item.isActive)
+  /* 選ぶ窓の候補：公開中のフォーム。選んであるのが公開中でないときも消さずに出す。 */
+  const formRows = (current: string | null | undefined) => {
+    const kept = current && !published.some((item) => item.id === current) ? forms.items.find((item) => item.id === current) : undefined
+    return kept ? [...published, kept] : published
+  }
+  const formMeta = (row: { isActive?: boolean | null }) => row.isActive ? '公開中' : '公開中ではありません'
   const update = (index: number, patch: Partial<WebinarCtaCard>) => setCtas((prev) => (prev ? prev.map((card, j) => (j === index ? { ...card, ...patch } : card)) : prev))
 
   /* 下書きを保存：カードは読めていれば今の中身をそのまま保存する（同時編集の 409 はここでも見つける）。 */
@@ -350,7 +356,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
           <span className={form.labelSmall}>申込フォーム</span>
           {forms.state === 'ready' ? (
             <div className={styles.formSelect}>
-              {readOnly ? <ReadValue label="申込に使う回答フォーム">{editor.publicPage.form?.name ?? formName(registrationFormId)}</ReadValue> : <Select aria-label="申込に使う回答フォーム" size="full" value={registrationFormId} disabled={busy || conflict} onChange={setRegistrationFormId} options={[{ value: '', label: '申込フォームを選ぶ' }, ...published.map((item) => ({ value: item.id, label: `${item.name}（公開中）` })), ...(registrationFormId && !published.some((item) => item.id === registrationFormId) ? [{ value: registrationFormId, label: '公開中ではないフォーム' }] : [])]} />}
+              {readOnly ? <ReadValue label="申込に使う回答フォーム">{editor.publicPage.form?.name ?? formName(registrationFormId)}</ReadValue> : <EntityKindField kind="form" label="申込に使う回答フォーム" options={formRows(registrationFormId)} meta={formMeta} accountId={accountId} value={registrationFormId} disabled={busy || conflict} invalid={Boolean(registrationFormId) && !published.some((item) => item.id === registrationFormId)} onChange={setRegistrationFormId} />}
             </div>
           ) : forms.state === 'loading' ? <p className={form.cardNote}>回答フォームを読み込んでいます。</p>
             : forms.state === 'forbidden' ? <p className={form.cardNote}>回答フォームを見る権限がありません。管理者に権限の確認を頼んでください。</p>
