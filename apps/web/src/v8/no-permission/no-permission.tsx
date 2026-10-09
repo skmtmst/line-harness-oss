@@ -6,6 +6,7 @@
  * 呼ぶ側が知っている表示名だけを渡す（分からない役割を断定しない）。
  * app/no-permission/no-permission-v8.tsx（一覧の中に置く版）を写して、板全体の形にした。
  */
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { BookOpen, CircleHelp, Lock } from 'lucide-react'
 import Button from '@/components/shared/button'
 import styles from './no-permission.module.css'
