@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
   decidePrepayOnly,
@@ -70,9 +71,9 @@ bookingPlus.get(
 bookingPlus.put(
   '/api/booking/admin/noshow-settings',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const accountId = accountIdOf(c);
-    if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+    if (!accountId) return inputError(c, { success: false, error: 'account_id が必要です' }, 400, ["accountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: '対象が見つかりません' }, 404);
     }
@@ -80,22 +81,22 @@ bookingPlus.put(
       enabled?: unknown; threshold?: unknown; windowMonths?: unknown; noPaymentMode?: unknown;
     }>().catch(() => null);
     if (!body || typeof body !== 'object') {
-      return c.json({ success: false, error: '設定を送ってください' }, 400);
+      return inputError(c, { success: false, error: '設定を送ってください' }, 400, []);
     }
     const current = await getNoshowSettings(c.env.DB, accountId);
     const enabled = body.enabled === undefined ? current.enabled : body.enabled === true;
     const threshold = body.threshold === undefined ? current.threshold : Number(body.threshold);
     if (!Number.isInteger(threshold) || threshold < 1 || threshold > 100) {
-      return c.json({ success: false, error: 'threshold は 1〜100 の整数で指定してください' }, 400);
+      return inputError(c, { success: false, error: 'threshold は 1〜100 の整数で指定してください' }, 400, ["threshold"]);
     }
     const windowMonths = body.windowMonths === undefined ? current.windowMonths : Number(body.windowMonths);
     if (!Number.isInteger(windowMonths) || windowMonths < 1 || windowMonths > 120) {
-      return c.json({ success: false, error: 'windowMonths は 1〜120 の整数で指定してください' }, 400);
+      return inputError(c, { success: false, error: 'windowMonths は 1〜120 の整数で指定してください' }, 400, ["windowMonths"]);
     }
     let noPaymentMode: NoshowNoPaymentMode = current.noPaymentMode;
     if (body.noPaymentMode !== undefined) {
       if (body.noPaymentMode !== 'notice' && body.noPaymentMode !== 'notice_call') {
-        return c.json({ success: false, error: 'noPaymentMode は notice か notice_call で指定してください' }, 400);
+        return inputError(c, { success: false, error: 'noPaymentMode は notice か notice_call で指定してください' }, 400, ["noPaymentMode"]);
       }
       noPaymentMode = body.noPaymentMode;
     }
@@ -131,11 +132,11 @@ bookingPlus.get(
 bookingPlus.post(
   '/api/booking/admin/friends/:friendId/prepay',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const accountId = accountIdOf(c);
     const friendId = c.req.param('friendId')?.trim();
     if (!accountId || !friendId) {
-      return c.json({ success: false, error: 'account_id と friendId が必要です' }, 400);
+      return inputError(c, { success: false, error: 'account_id と friendId が必要です' }, 400, ["friendId"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: '対象が見つかりません' }, 404);
@@ -144,12 +145,12 @@ bookingPlus.post(
     const body = await c.req.json<{ mode?: unknown; reason?: unknown }>().catch(() => null);
     const mode = body?.mode ?? 'manual_on';
     if (mode !== 'manual_on' && mode !== 'manual_off') {
-      return c.json({ success: false, error: 'mode は manual_on か manual_off で指定してください' }, 400);
+      return inputError(c, { success: false, error: 'mode は manual_on か manual_off で指定してください' }, 400, ["mode"]);
     }
     // 印を外すときは理由を1行書く（だれがいつ外したか残す）。
     const reason = typeof body?.reason === 'string' ? body.reason.trim().slice(0, 200) : '';
     if (mode === 'manual_off' && !reason) {
-      return c.json({ success: false, error: '印を外すときは理由を1行書いてください' }, 400);
+      return inputError(c, { success: false, error: '印を外すときは理由を1行書いてください' }, 400, ["mode","reason"]);
     }
     const staff = c.get('staff');
     await setNoshowFlagMode(c.env.DB, accountId, friendId, mode);

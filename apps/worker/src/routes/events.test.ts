@@ -1301,8 +1301,8 @@ describe('POST /api/events/admin/events', () => {
       body: JSON.stringify({ name: '' }),
     });
     expect(res.status).toBe(422);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toBe('invalid_name');
+    const body = (await res.json()) as { error: string; code: string };
+    expect(body.code).toBe('invalid_name');
   });
 
   test('422 for blank name, waitlist_enabled=2, negative sort_order (点検#520軽14)', async () => {
@@ -1330,8 +1330,8 @@ describe('POST /api/events/admin/events', () => {
       body: JSON.stringify({ name: 'X', venue_url: 'javascript:alert(1)' }),
     });
     expect(res.status).toBe(422);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toBe('invalid_venue_url');
+    const body = (await res.json()) as { error: string; code: string };
+    expect(body.code).toBe('invalid_venue_url');
   });
 
   test('422 when name >255', async () => {
@@ -1352,8 +1352,8 @@ describe('POST /api/events/admin/events', () => {
       body: JSON.stringify({ name: 'X', description: 'a'.repeat(20001) }),
     });
     expect(res.status).toBe(422);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toBe('invalid_description');
+    const body = (await res.json()) as { error: string; code: string };
+    expect(body.code).toBe('invalid_description');
   });
 
   test('422 when requires_approval is not 0/1', async () => {
@@ -2017,8 +2017,8 @@ describe('event_slots admin', () => {
       }),
     });
     expect(res.status).toBe(422);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toBe('invalid_slot_range');
+    const body = (await res.json()) as { error: string; code: string };
+    expect(body.code).toBe('invalid_slot_range');
   });
 
   test('POST 422 when capacity invalid', async () => {
@@ -2080,7 +2080,7 @@ describe('event_slots admin', () => {
       body: JSON.stringify({ capacity: 2, expected_version: 1 }),
     });
     expect(res.status).toBe(409);
-    const body = (await res.json()) as { error: string };
+    const body = (await res.json()) as { error: string; code: string };
     expect(body.error).toBe('slot_capacity_below_bookings');
     expect(state.slots[0].capacity).toBe(5);
   });
@@ -2128,7 +2128,7 @@ describe('event_slots admin', () => {
       method: 'DELETE',
     });
     expect(res.status).toBe(409);
-    const body = (await res.json()) as { error: string };
+    const body = (await res.json()) as { error: string; code: string };
     expect(body.error).toBe('slot_has_bookings');
     expect(state.slots[0].deleted_at).toBeNull();
   });
@@ -2427,7 +2427,7 @@ describe('LIFF POST /api/liff/events/:id/bookings', () => {
       body: JSON.stringify({ slot_id: 's1' }),
     });
     expect(res.status).toBe(409);
-    const body = (await res.json()) as { error: string };
+    const body = (await res.json()) as { error: string; code: string };
     expect(body.error).toBe('slot_full');
   });
 
@@ -2455,7 +2455,7 @@ describe('LIFF POST /api/liff/events/:id/bookings', () => {
       body: JSON.stringify({ slot_id: 's1' }),
     });
     expect(res.status).toBe(409);
-    const body = (await res.json()) as { error: string };
+    const body = (await res.json()) as { error: string; code: string };
     expect(body.error).toBe('over_friend_limit');
   });
 
@@ -3011,7 +3011,7 @@ describe('admin bookings management', () => {
       body: JSON.stringify({ action: 'confirm' }),
     });
     expect(res.status).toBe(409);
-    const body = (await res.json()) as { error: string };
+    const body = (await res.json()) as { error: string; code: string };
     expect(body.error).toBe('already_decided');
   });
 
@@ -3033,7 +3033,7 @@ describe('admin bookings management', () => {
       body: JSON.stringify({ action: 'confirm' }),
     });
     expect(res.status).toBe(409);
-    const body = (await res.json()) as { error: string };
+    const body = (await res.json()) as { error: string; code: string };
     expect(body.error).toBe('slot_full');
     expect(state.bookings[0].status).toBe('requested');
   });
@@ -3258,7 +3258,7 @@ describe('V6 occurrence applicants / waitlist promotion routes', () => {
       },
     );
     expect(noReason.status).toBe(422);
-    await expect(noReason.json()).resolves.toEqual({ error: 'waitlist_reason_required' });
+    await expect(noReason.json()).resolves.toMatchObject({ code: 'waitlist_reason_required' , fields: expect.any(Object), error: expect.any(String) });
 
     waitlistMocks.promoteEventWaitlist.mockResolvedValueOnce({ kind: 'conflict', currentVersion: 3 });
     const conflict = await app.request(
@@ -3354,7 +3354,7 @@ describe('094 公開対象・申込締切・キャンセル待ち', () => {
     const res = await book(setupApp(state));
     expect(res.status).toBe(409);
     // 「タグが無い」ではなく「公開されていない」として返す。存在を伝えない。
-    expect((await res.json()) as { error: string }).toEqual({ error: 'event_unpublished' });
+    expect((await res.json()) as { error: string; code: string }).toEqual({ error: 'event_unpublished' });
     expect(state.bookings).toHaveLength(0);
   });
 
@@ -3387,7 +3387,7 @@ describe('094 公開対象・申込締切・キャンセル待ち', () => {
     idempotencyMocks.reserveEventIdempotency.mockResolvedValue({ kind: 'inserted' });
     const res = await book(setupApp(state));
     expect(res.status).toBe(410);
-    expect((await res.json()) as { error: string }).toEqual({ error: 'entry_closed' });
+    expect((await res.json()) as { error: string; code: string }).toEqual({ error: 'entry_closed' });
   });
 
   test('締め切りより前なら申し込める', async () => {
@@ -3418,7 +3418,7 @@ describe('094 公開対象・申込締切・キャンセル待ち', () => {
     idempotencyMocks.reserveEventIdempotency.mockResolvedValue({ kind: 'inserted' });
     const res = await book(setupApp(state));
     expect(res.status).toBe(409);
-    expect((await res.json()) as { error: string }).toEqual({ error: 'slot_full' });
+    expect((await res.json()) as { error: string; code: string }).toEqual({ error: 'slot_full' });
     expect(state.waitlist).toHaveLength(0);
   });
 
@@ -3548,7 +3548,7 @@ describe('イベント申込のカスタム質問 (#841)', () => {
         body: JSON.stringify({ name: 'X', questions }),
       });
       expect(res.status).toBe(422);
-      expect((await res.json()) as { error: string }).toEqual({ error: 'invalid_questions' });
+      expect((await res.json()) as { error: string; code: string }).toMatchObject({ code: 'invalid_questions' , fields: expect.any(Object), error: expect.any(String) });
     }
   });
 
@@ -3608,7 +3608,7 @@ describe('イベント申込のカスタム質問 (#841)', () => {
     const app = setupApp(state);
     const res = await book(app, { slot_id: 's1', answers: { q2: ['A'] } });
     expect(res.status).toBe(422);
-    expect((await res.json()) as { error: string }).toEqual({ error: 'missing_required_answers' });
+    expect((await res.json()) as { error: string; code: string }).toEqual({ error: 'missing_required_answers' });
     expect(state.bookings).toHaveLength(0);
   });
 

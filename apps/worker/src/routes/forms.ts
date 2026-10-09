@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import type { FormSubmissionPostActions } from '@line-crm/shared';
 import { Hono, type Context } from 'hono';
 import {
@@ -981,7 +982,7 @@ forms.get('/api/forms/:id', async (c) => {
 });
 
 // POST /api/forms/:id/publish — 保存済みの編集内容を不変版にして公開する。
-forms.post('/api/forms/:id/publish', async (c) => {
+forms.post('/api/forms/:id/publish', inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const manageGate = await requireFormManage(c, await getFormAccountIds(c.env.DB, id));
@@ -995,7 +996,7 @@ forms.post('/api/forms/:id/publish', async (c) => {
       ? body.expectedContentRevision
       : Number.NaN;
     if (!Number.isInteger(expected) || expected < 1) {
-      return c.json({ success: false, error: '確認した版が必要です' }, 400);
+      return inputError(c, { success: false, error: '確認した版が必要です' }, 400, ["expectedContentRevision"]);
     }
     // 公開前の検査。下書きでは許すが公開では止めるもの——分岐の循環・
     // 消えた行き先・共通ヘッダの分岐・選ぶ先が空の動作——をここで止める。
@@ -1005,7 +1006,7 @@ forms.post('/api/forms/:id/publish', async (c) => {
     if (draft && draft.content_revision === expected) {
       const publishError = validateFormForPublish(parseLayout(draft.layout, draft.fields));
       if (publishError) {
-        return c.json({ success: false, error: publishError }, 400);
+        return inputError(c, { success: false, error: publishError }, 400, ["layout"]);
       }
     }
     const result = await publishFormVersion(c.env.DB, id, expected);
@@ -1044,7 +1045,7 @@ forms.post('/api/forms/:id/publish', async (c) => {
 // 下書きの編集ができる人だけが取れる。合言葉自体は1回だけ返し、台帳には
 // SHA-256 の16進だけを残す。有効期限は24時間。試しで開く・答えるときは
 // この合言葉を添え、集計に入れず、回答後アクションも動かさない。
-forms.post('/api/forms/:id/test-token', async (c) => {
+forms.post('/api/forms/:id/test-token', inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const manageGate = await requireFormManage(c, await getFormAccountIds(c.env.DB, id));
@@ -1084,7 +1085,7 @@ forms.post('/api/forms/:id/test-token', async (c) => {
 });
 
 // POST /api/forms — create form
-forms.post('/api/forms', async (c) => {
+forms.post('/api/forms', inputJsonBoundary({"name":["string"],"description":["null","string"],"fields":["array"],"onSubmitTagId":["null","string"],"onSubmitScenarioId":["null","string"],"onSubmitMessageType":["null","string"],"onSubmitMessageContent":["null","string"],"onSubmitWebhookUrl":["null","string"],"onSubmitWebhookHeaders":["null","string"],"onSubmitWebhookFailMessage":["null","string"],"saveToMetadata":["boolean"],"ogTitle":["null","string"],"ogDescription":["null","string"],"ogImageUrl":["null","string"],"accountId":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       name: string;
@@ -1106,12 +1107,12 @@ forms.post('/api/forms', async (c) => {
     }>();
 
     if (!body.name) {
-      return c.json({ success: false, error: 'name is required' }, 400);
+      return inputError(c, { success: false, error: 'name is required' }, 400, ["name"]);
     }
     const createGate = await requireFormManage(c, [body.accountId]);
     if (createGate) return createGate;
     if (!body.accountId) {
-      return c.json({ success: false, error: 'accountId is required' }, 400);
+      return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
@@ -1119,10 +1120,10 @@ forms.post('/api/forms', async (c) => {
 
     const normalized = body.layout !== undefined ? normalizeLayoutInput(body.layout) : null;
     if (normalized && 'error' in normalized) {
-      return c.json({ success: false, error: normalized.error }, 400);
+      return inputError(c, { success: false, error: normalized.error }, 400, ["layout"]);
     }
     if (body.layout !== undefined && !normalized) {
-      return c.json({ success: false, error: 'layout の形が正しくありません' }, 400);
+      return inputError(c, { success: false, error: 'layout の形が正しくありません' }, 400, ["layout"]);
     }
     // P（読みにくい色）：文字と背景の差が 4.5:1 未満の組み合わせは作れない。
     if (normalized && !('error' in normalized) && normalized.layout) {
@@ -1131,7 +1132,7 @@ forms.post('/api/forms', async (c) => {
         normalizeFormTheme(createdLayout.options?.theme),
       );
       if (createContrastError) {
-        return c.json({ success: false, error: createContrastError }, 422);
+        return inputError(c, { success: false, error: createContrastError }, 422, ["layout"]);
       }
     }
 
@@ -1162,14 +1163,14 @@ forms.post('/api/forms', async (c) => {
 });
 
 // POST /api/forms/drafts — 公開されていない空の下書きを作り、編集画面へ進む。
-forms.post('/api/forms/drafts', async (c) => {
+forms.post('/api/forms/drafts', inputJsonBoundary({"name":["string"],"accountId":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{ name?: string; accountId?: string }>()
       .catch(() => ({} as { name?: string; accountId?: string }));
     const draftsGate = await requireFormManage(c, [body.accountId]);
     if (draftsGate) return draftsGate;
     if (!body.accountId) {
-      return c.json({ success: false, error: 'accountId is required' }, 400);
+      return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
@@ -1196,7 +1197,7 @@ forms.post('/api/forms/drafts', async (c) => {
  * 公開版・公開状態・集計（新しい ID なので回答・来訪・版は付いてこない）。
  * 複製は必ず受付停止（isActive: false）で作り、公開中の写しを作らない。
  */
-forms.post('/api/forms/:id/duplicate', async (c) => {
+forms.post('/api/forms/:id/duplicate', inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const accountIds = await getFormAccountIds(c.env.DB, id);
@@ -1253,7 +1254,7 @@ forms.post('/api/forms/:id/duplicate', async (c) => {
 });
 
 // PUT /api/forms/:id — update form
-forms.put('/api/forms/:id', async (c) => {
+forms.put('/api/forms/:id', inputJsonBoundary({"name":["string"],"description":["null","string"],"fields":["array"],"folderId":["null","string"],"onSubmitTagId":["null","string"],"onSubmitScenarioId":["null","string"],"onSubmitMessageType":["null","string"],"onSubmitMessageContent":["null","string"],"onSubmitWebhookUrl":["null","string"],"onSubmitWebhookHeaders":["null","string"],"onSubmitWebhookFailMessage":["null","string"],"saveToMetadata":["boolean"],"isActive":["boolean"],"ogTitle":["null","string"],"ogDescription":["null","string"],"ogImageUrl":["null","string"]}), async (c) => {
   try {
     const id = c.req.param('id');
     const putGate = await requireFormManage(c, await getFormAccountIds(c.env.DB, id));
@@ -1309,7 +1310,7 @@ forms.put('/api/forms/:id', async (c) => {
      */
     const hasContentUpdate = Object.keys(body).some((key) => key !== 'folderId');
     if (hasContentUpdate && (!Number.isInteger(expectedContentRevision) || expectedContentRevision < 1)) {
-      return c.json({ success: false, error: '確認した版が必要です' }, 400);
+      return inputError(c, { success: false, error: '確認した版が必要です' }, 400, ["expectedContentRevision"]);
     }
 
     let nextFolderId: string | null | undefined;
@@ -1323,7 +1324,7 @@ forms.put('/api/forms/:id', async (c) => {
         const requestAccountId = c.req.query('account_id');
         if (!folder || folder.kind !== 'form'
           || (folder.account_id !== null && folder.account_id !== requestAccountId)) {
-          return c.json({ success: false, error: 'そのフォルダはありません' }, 422);
+          return inputError(c, { success: false, error: 'そのフォルダはありません' }, 422, ["folderId"]);
         }
       }
       if (!hasContentUpdate) {
@@ -1347,10 +1348,10 @@ forms.put('/api/forms/:id', async (c) => {
     if (body.layout !== undefined) {
       const normalized = normalizeLayoutInput(body.layout);
       if (!normalized) {
-        return c.json({ success: false, error: 'layout の形が正しくありません' }, 400);
+        return inputError(c, { success: false, error: 'layout の形が正しくありません' }, 400, ["layout"]);
       }
       if ('error' in normalized) {
-        return c.json({ success: false, error: normalized.error }, 400);
+        return inputError(c, { success: false, error: normalized.error }, 400, ["layout"]);
       }
       // P（読みにくい色）：文字と背景の差が 4.5:1 未満の組み合わせは保存できない。
       const savedLayout = JSON.parse(normalized.layout) as { options?: { theme?: unknown } };
@@ -1358,7 +1359,7 @@ forms.put('/api/forms/:id', async (c) => {
         normalizeFormTheme(savedLayout.options?.theme),
       );
       if (contrastError) {
-        return c.json({ success: false, error: contrastError }, 422);
+        return inputError(c, { success: false, error: contrastError }, 422, ["layout"]);
       }
       updates.layout = normalized.layout;
       updates.fields = normalized.fields;
@@ -1422,10 +1423,10 @@ forms.get('/api/forms/:id/delete-impact', requireRole('owner', 'admin'), async (
 });
 
 // POST /api/forms/:id/archive — 公開を止め、回答と利用先を残して保管する。
-forms.post('/api/forms/:id/archive', async (c) => {
+forms.post('/api/forms/:id/archive', inputJsonBoundary(), async (c) => {
   try {
     const accountId = c.req.query('account_id')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'account_id is required' }, 400);
+    if (!accountId) return inputError(c, { success: false, error: 'account_id is required' }, 400, ["account_id"]);
     const archiveGate = await requireFormManage(c, await getFormAccountIds(c.env.DB, c.req.param('id')));
     if (archiveGate) return archiveGate;
     const body = await readBoundedFormArchiveBody(c.req.raw);
@@ -1433,7 +1434,7 @@ forms.post('/api/forms/:id/archive', async (c) => {
       ? body.expectedRevision
       : Number.NaN;
     if (!Number.isInteger(expectedRevision) || expectedRevision < 1) {
-      return c.json({ success: false, error: '確認した版が必要です' }, 400);
+      return inputError(c, { success: false, error: '確認した版が必要です' }, 400, ["expectedRevision"]);
     }
 
     const authorized = await authorizedDeleteImpact(c, c.req.param('id'), accountId);
@@ -1483,7 +1484,7 @@ forms.post('/api/forms/:id/archive', async (c) => {
     });
   } catch (error) {
     if (error instanceof FormArchiveBodyError) {
-      return c.json({ success: false, error: error.message }, error.status);
+      return inputError(c, { success: false, error: error.message }, error.status, []);
     }
     console.error('POST /api/forms/:id/archive error:', error);
     return c.json({ success: false, error: '回答フォームを保管できませんでした' }, 503);
@@ -1493,10 +1494,10 @@ forms.post('/api/forms/:id/archive', async (c) => {
 // POST /api/forms/:id/unarchive — 保管の取り消し（B 元に戻す）。
 // 保管中の行だけ現行へ戻す。戻した直後は受付停止のまま。版がずれていたら
 // 読み直しを促す（保管口と同じ競合守り）。
-forms.post('/api/forms/:id/unarchive', async (c) => {
+forms.post('/api/forms/:id/unarchive', inputJsonBoundary(), async (c) => {
   try {
     const accountId = c.req.query('account_id')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'account_id is required' }, 400);
+    if (!accountId) return inputError(c, { success: false, error: 'account_id is required' }, 400, ["account_id"]);
     const unarchiveGate = await requireFormManage(c, await getFormAccountIds(c.env.DB, c.req.param('id')));
     if (unarchiveGate) return unarchiveGate;
     const body = await readBoundedFormArchiveBody(c.req.raw);
@@ -1504,7 +1505,7 @@ forms.post('/api/forms/:id/unarchive', async (c) => {
       ? body.expectedRevision
       : Number.NaN;
     if (!Number.isInteger(expectedRevision) || expectedRevision < 1) {
-      return c.json({ success: false, error: '確認した版が必要です' }, 400);
+      return inputError(c, { success: false, error: '確認した版が必要です' }, 400, ["expectedRevision"]);
     }
 
     const authorized = await authorizedDeleteImpact(c, c.req.param('id'), accountId);
@@ -1551,7 +1552,7 @@ forms.post('/api/forms/:id/unarchive', async (c) => {
     });
   } catch (error) {
     if (error instanceof FormArchiveBodyError) {
-      return c.json({ success: false, error: error.message }, error.status);
+      return inputError(c, { success: false, error: error.message }, error.status, []);
     }
     console.error('POST /api/forms/:id/unarchive error:', error);
     return c.json({ success: false, error: '回答フォームを元に戻せませんでした' }, 503);
@@ -1697,7 +1698,7 @@ forms.get('/api/forms/:id/submissions/:submissionId', requireRole('owner', 'admi
   }
 });
 
-forms.post('/api/forms/:id/submissions/:submissionId/retry-effects', async (c) => {
+forms.post('/api/forms/:id/submissions/:submissionId/retry-effects', inputJsonBoundary(), async (c) => {
   try {
     const formId = c.req.param('id');
     const submissionId = c.req.param('submissionId');
@@ -1995,7 +1996,7 @@ forms.post('/api/forms/:id/submissions/:submissionId/retry-effects', async (c) =
 });
 
 // POST /api/forms/:id/opened — record form open event (public, used by LIFF)
-forms.post('/api/forms/:id/opened', async (c) => {
+forms.post('/api/forms/:id/opened', inputJsonBoundary(), async (c) => {
   const stopped = await stoppedPublicFormResponse(c, c.req.param('id'));
   if (stopped) return stopped;
   try {
@@ -2093,7 +2094,7 @@ forms.post('/api/forms/:id/opened', async (c) => {
 });
 
 // POST /api/forms/:id/partial — save survey answers without x_username (public, used by LIFF page 1)
-forms.post('/api/forms/:id/partial', async (c) => {
+forms.post('/api/forms/:id/partial', inputJsonBoundary({"data":["object"]}), async (c) => {
   const stopped = await stoppedPublicFormResponse(c, c.req.param('id'));
   if (stopped) return stopped;
   try {
@@ -2128,7 +2129,7 @@ forms.post('/api/forms/:id/partial', async (c) => {
      * 断り方は `/submit`（:1024）・`/files`（:891）と同じ 400 に揃える。
      */
     if (!form.is_active) {
-      return c.json({ success: false, error: 'This form is no longer accepting responses' }, 400);
+      return inputError(c, { success: false, error: 'This form is no longer accepting responses' }, 400, []);
     }
     // 回答定義に無い鍵は受け付けない。業務で使う鍵の上書きを防ぐ。
     const allowedNames = new Set(
@@ -2181,7 +2182,7 @@ forms.post('/api/forms/:id/partial', async (c) => {
  *
  * 3つ目が無いと、フォームIDさえ知っていれば誰でも画像置き場として使える。
  */
-forms.post('/api/forms/:id/files', async (c) => {
+forms.post('/api/forms/:id/files', inputJsonBoundary(), async (c) => {
   const stopped = await stoppedPublicFormResponse(c, c.req.param('id'));
   if (stopped) return stopped;
   try {
@@ -2205,7 +2206,7 @@ forms.post('/api/forms/:id/files', async (c) => {
         return c.json({ success: false, error: 'Form not found' }, 404);
       }
       if (!published.is_active) {
-        return c.json({ success: false, error: 'このフォームは受け付けていません' }, 400);
+        return inputError(c, { success: false, error: 'このフォームは受け付けていません' }, 400, []);
       }
       form = published;
     }
@@ -2213,7 +2214,7 @@ forms.post('/api/forms/:id/files', async (c) => {
     const layout = parseLayout(form.layout, form.fields);
     const acceptsFile = collectInputs(layout).some((block) => block.type === 'file');
     if (!acceptsFile) {
-      return c.json({ success: false, error: 'このフォームはファイルを受け付けていません' }, 400);
+      return inputError(c, { success: false, error: 'このフォームはファイルを受け付けていません' }, 400, []);
     }
 
     const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
@@ -2236,25 +2237,22 @@ forms.post('/api/forms/:id/files', async (c) => {
     const mimeType = (c.req.header('Content-Type') || '').split(';')[0].trim();
     const extension = FORM_UPLOAD_TYPES[mimeType];
     if (!extension) {
-      return c.json(
-        { success: false, error: '画像は jpg・png・gif・webp・heic のいずれかで送ってください' },
-        400,
-      );
+      return inputError(c, { success: false, error: '画像は jpg・png・gif・webp・heic のいずれかで送ってください' }, 400, []);
     }
 
     // 本文を読む前に、申告された長さで断れるものは断る。10MBを読み込んでから
     // 大きすぎると返すのは、相手の通信量を無駄に使う。
     const declared = Number(c.req.header('Content-Length') || 0);
     if (declared > FORM_UPLOAD_MAX_BYTES) {
-      return c.json({ success: false, error: '画像は10MBまでです' }, 400);
+      return inputError(c, { success: false, error: '画像は10MBまでです' }, 400, []);
     }
 
     const data = await c.req.arrayBuffer();
     if (data.byteLength === 0) {
-      return c.json({ success: false, error: 'ファイルが空です' }, 400);
+      return inputError(c, { success: false, error: 'ファイルが空です' }, 400, []);
     }
     if (data.byteLength > FORM_UPLOAD_MAX_BYTES) {
-      return c.json({ success: false, error: '画像は10MBまでです' }, 400);
+      return inputError(c, { success: false, error: '画像は10MBまでです' }, 400, []);
     }
 
     // 誰の・どのフォームの添付かが、キーを見れば分かるようにしておく。
@@ -2274,7 +2272,7 @@ forms.post('/api/forms/:id/files', async (c) => {
       const message = formCheck.verdict === 'quarantined'
         ? '確認のため受け付けできません。別の画像を選び直してください'
         : `受け付けできません（${formCheck.detail}）。画像を選び直してください`;
-      return c.json({ success: false, code: 'file_scan_blocked', error: message }, 422);
+      return inputError(c, { success: false, code: 'file_scan_blocked', error: message }, 422, []);
     }
     await c.env.IMAGES.put(key, data, {
       httpMetadata: { contentType: mimeType },
@@ -2366,7 +2364,7 @@ forms.get('/api/forms/:id/my-latest', async (c) => {
 // 再送・連打の二重受理を防ぐため、Idempotency-Key ヘッダ(UUID)を受け付ける。
 // キーは回答行の id そのものになり、同じキーの再送は保存済みの行を返す。
 // 同じキーで内容が違う使い回しは 409 で断る。キーが無い送信は従来どおり。
-forms.post('/api/forms/:id/submit', async (c) => {
+forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
   const stopped = await stoppedPublicFormResponse(c, c.req.param('id'));
   if (stopped) return stopped;
   try {
@@ -2375,16 +2373,16 @@ forms.post('/api/forms/:id/submit', async (c) => {
     // 二重回答になるため受け付けない(イベント予約と同じ流儀)。
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim() || null;
     if (!idempotencyKey) {
-      return c.json({ success: false, error: 'idempotency_key_required' }, 400);
+      return inputError(c, { success: false, error: 'idempotency_key_required' }, 400, []);
     }
     if (!FORM_IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
-      return c.json({ success: false, error: 'Idempotency-Key must be a UUID' }, 400);
+      return inputError(c, { success: false, error: 'Idempotency-Key must be a UUID' }, 400, []);
     }
     let body: { data?: unknown; trackedLinkId?: unknown; testToken?: unknown };
     try {
       body = await c.req.json();
     } catch {
-      return c.json({ success: false, error: 'リクエストの形式が正しくありません' }, 400);
+      return inputError(c, { success: false, error: 'リクエストの形式が正しくありません' }, 400, []);
     }
     // P（試し回答）：試し合言葉はヘッダ・クエリ・本文のどこからでも読む。
     // 正しければ下書きを読む（公開版が無くても・受付停止でも試せる）。
@@ -2410,7 +2408,7 @@ forms.post('/api/forms/:id/submit', async (c) => {
         return c.json({ success: false, error: 'Form not found' }, 404);
       }
       if (!published.is_active) {
-        return c.json({ success: false, error: 'This form is no longer accepting responses' }, 400);
+        return inputError(c, { success: false, error: 'This form is no longer accepting responses' }, 400, []);
       }
       form = published;
     }
@@ -2418,17 +2416,17 @@ forms.post('/api/forms/:id/submit', async (c) => {
     // 後の処理で落ちる前に 400 で断る。
     if (body.data !== undefined
       && (body.data === null || typeof body.data !== 'object' || Array.isArray(body.data))) {
-      return c.json({ success: false, error: '回答の形式が正しくありません' }, 400);
+      return inputError(c, { success: false, error: '回答の形式が正しくありません' }, 400, ["data"]);
     }
     const submissionData = (body.data ?? {}) as Record<string, unknown>;
     if (Object.keys(submissionData).length > FORM_SUBMIT_DATA_MAX_FIELDS
       || JSON.stringify(submissionData).length > FORM_SUBMIT_DATA_MAX_BYTES) {
-      return c.json({ success: false, error: '回答が大きすぎます' }, 400);
+      return inputError(c, { success: false, error: '回答が大きすぎます' }, 400, ["data"]);
     }
     if (body.trackedLinkId !== undefined
       && (typeof body.trackedLinkId !== 'string'
         || body.trackedLinkId.length > FORM_SUBMIT_TRACKED_LINK_MAX_LENGTH)) {
-      return c.json({ success: false, error: 'リンクの指定が正しくありません' }, 400);
+      return inputError(c, { success: false, error: 'リンクの指定が正しくありません' }, 400, ["trackedLinkId"]);
     }
     const trackedLinkId: string | undefined = typeof body.trackedLinkId === 'string'
       ? body.trackedLinkId
@@ -2489,7 +2487,7 @@ forms.post('/api/forms/:id/submit', async (c) => {
         }
       }
       if (testRejected) {
-        return c.json({ success: false, error: testRejected }, 400);
+        return inputError(c, { success: false, error: testRejected }, 400, []);
       }
       const testSubmission = await insertFormSubmissionRecord(c.env.DB, {
         id: crypto.randomUUID(),
@@ -2579,7 +2577,7 @@ forms.post('/api/forms/:id/submit', async (c) => {
         resumeSavedAnswer,
       });
       if (rejected) {
-        return c.json({ success: false, error: rejected }, 400);
+        return inputError(c, { success: false, error: rejected }, 400, ["data"]);
       }
     } else if (!resumeSavedAnswer) {
       const fields = JSON.parse(form.fields || '[]') as Array<{
@@ -2593,10 +2591,7 @@ forms.post('/api/forms/:id/submit', async (c) => {
         if (field.required) {
           const val = submissionData[field.name];
           if (val === undefined || val === null || val === '') {
-            return c.json(
-              { success: false, error: `${field.label} は必須項目です` },
-              400,
-            );
+            return inputError(c, { success: false, error: `${field.label} は必須項目です` }, 400, [`data.${field.name}`]);
           }
         }
       }
@@ -2918,7 +2913,7 @@ forms.post('/api/forms/:id/submit', async (c) => {
       if (claimCtx) {
         await failFormSubmitClaim(c.env.DB, claimCtx.scope, claimCtx.owner, claimCtx.version).catch(() => {});
       }
-      return c.json({ success: false, error: capacityRejected }, 400);
+      return inputError(c, { success: false, error: capacityRejected }, 400, []);
     }
 
     try {

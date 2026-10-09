@@ -93,6 +93,8 @@ const sortFormListItems = (forms, sort) => {
   })
 }
 
+let lastHarness
+
 const outDir = join(process.cwd(), 'apps/web/out')
 
 if (!existsSync(outDir)) {
@@ -191,10 +193,10 @@ function form(index, overrides = {}) {
 
 async function openHarness(browser, {
   role = 'admin', formsByAccount = {}, fail = false, listDelayMs = {},
-  detail = null, putResults = [], viewport = { width: 1440, height: 1000 }, theme = null,
+  detail = null, putResults = [], viewport = { width: 1440, height: 1000 },
 } = {}) {
   const state = {
-    listCalls: [], folderWrites: [], formWrites: [], putBodies: [],
+    listCalls: [], folderWrites: [], putBodies: [], publishBodies: [], fail,
     formFolders: [
       {
         id: 'fol-a', kind: 'form', accountId: 'account-a', name: 'A箱',
@@ -205,18 +207,19 @@ async function openHarness(browser, {
   }
   let savedDetail = detail
   const context = await browser.newContext({ viewport })
-  await context.addInitScript((selectedTheme) => {
+  await context.addInitScript(() => {
     localStorage.setItem('lh_selected_account', 'account-a')
     sessionStorage.setItem('lh_auth_selection_cleared', '1')
-    // 見た目を選ぶ（設定画面の「画面の見た目」と同じ置き場）。null は環境の既定のまま。
-    if (selectedTheme) localStorage.setItem('lh-admin-theme', selectedTheme)
-  }, theme)
+  })
   const page = await context.newPage()
   page.on('pageerror', (error) => console.error('browser page error:', error.message))
   page.on('console', (message) => {
     if (message.type() === 'error') console.error('browser console:', message.text())
   })
 
+  await page.route('https://example.test/ogp.png', (route) => route.fulfill({
+    contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>',
+  }))
   await page.route('**/admin/version', (route) => route.fulfill({
     contentType: 'application/json',
     body: JSON.stringify({ version: '0.24.0', worker_hash: 'test', admin_hash: 'test', liff_hash: 'test' }),
@@ -279,13 +282,14 @@ async function openHarness(browser, {
             data: { contentRevision: detail.contentRevision + 1, updatedAt: '2026-09-11T14:32:00.000+09:00' },
           }, 409)
         }
+        if (next === 'failed') return json({ success: false, error: '保存できませんでした' }, 500)
         savedDetail = { ...savedDetail, ...body, contentRevision: savedDetail.contentRevision + 1 }
         return json({ success: true, data: savedDetail })
       }
       return json({ success: true, data: savedDetail })
     }
     if (path === '/api/forms') {
-      if (fail) return json({ success: false, error: 'failed' }, 500)
+      if (state.fail) return json({ success: false, error: 'failed' }, 500)
       const accountId = url.searchParams.get('account_id')
       state.listCalls.push(accountId)
       const delay = listDelayMs[accountId ?? ''] ?? 0
@@ -325,10 +329,10 @@ async function openHarness(browser, {
     if (path === '/api/scenarios') {
       return json({ success: true, data: { items: [], total: 0, limit: 0, sort: [] } })
     }
-    // #725: デザイン設定の保存が何を送るかを見るために足した。
-    if (/^\/api\/forms\/[^/]+$/.test(path) && request.method() === 'PUT') {
-      state.formWrites.push(JSON.parse(request.postData() ?? '{}'))
-      return json({ success: true, data: { id: path.split('/').pop() } })
+    if (detail && path === `/api/forms/${detail.id}/publish` && request.method() === 'POST') {
+      state.publishBodies.push(request.postDataJSON())
+      savedDetail = { ...savedDetail, isActive: true, publishedVersionId: 'published-1', publishedContentRevision: savedDetail.contentRevision }
+      return json({ success: true, data: { id: 'published-1', contentRevision: savedDetail.contentRevision, replayed: false } })
     }
     /*
      * R25: 箱の口の見本。作る・直す・消す・並べ替えを本物と同じ形で返す。
@@ -381,7 +385,8 @@ async function openHarness(browser, {
     return json({ success: true, data: [] })
   })
 
-  return { context, page, state }
+  lastHarness = { context, page, state }
+  return lastHarness
 }
 
 /**
@@ -444,6 +449,14 @@ function waitForRowCount(page, count) {
     count,
     { timeout: 10_000 },
   )
+}
+
+async function switchAccount(page, accountId) {
+  const account = ACCOUNTS.find((item) => item.id === accountId)
+  assert.ok(account, '切り替えるアカウントを用意している')
+  await page.getByRole('button', { name: 'アカウントを切り替える', exact: true }).click()
+  await page.getByRole('menu', { name: 'LINEアカウントの切り替え', exact: true })
+    .getByRole('menuitemradio', { name: account.name, exact: true }).click()
 }
 
 const browser = await chromium.launch({ headless: true })
@@ -551,7 +564,7 @@ try {
     await page.getByText('アンケートや申し込みを LINE の中で受け付け、答えを友だち情報に保存します。').waitFor()
     assert.equal(await page.getByText(/見え方です/).count(), 0, '実装事情の文を出さない')
 
-    await page.getByLabel('LINEアカウント').selectOption('account-b')
+    await switchAccount(page, 'account-b')
     await page.getByText('本店フォーム', { exact: true }).waitFor()
     assert.equal(await page.getByText('まだ回答フォームがありません', { exact: true }).count(), 0)
     assert.deepEqual([...new Set(state.listCalls)].sort(), ['account-a', 'account-b'], '選んだアカウント以外を読まない')
@@ -570,9 +583,7 @@ try {
     const lateListA = page.waitForResponse((response) =>
       response.url().includes('/api/forms') && response.url().includes('account_id=account-a'))
     await page.goto(`${baseUrl}/form-submissions`, { waitUntil: 'domcontentloaded' })
-    const accountSelect = page.getByLabel('LINEアカウント')
-    await accountSelect.waitFor()
-    await accountSelect.selectOption('account-b')
+    await switchAccount(page, 'account-b')
     await page.getByText('本店フォーム', { exact: true }).waitFor()
     await lateListA
     await page.waitForTimeout(500)
@@ -583,125 +594,57 @@ try {
 
   // 6. 取得失敗を0件扱いにしない
   {
-    const { context, page } = await openHarness(browser, { fail: true })
+    const { context, page, state } = await openHarness(browser, { fail: true })
     await openList(page)
     await page.getByText('表示できませんでした', { exact: true }).waitFor()
     assert.equal(await page.getByRole('button', { name: 'もう一度読み込む' }).count(), 1)
     assert.equal(await page.getByText('まだ回答フォームがありません', { exact: true }).count(), 0, '失敗を0件と言わない')
+    state.fail = false
+    await page.getByRole('button', { name: 'もう一度読み込む' }).click()
+    await page.getByText('まだ回答フォームがありません', { exact: true }).waitFor()
     await context.close()
   }
 
-  /*
-   * 7. 編集保存の版競合（#723）。
-   *
-   * ほかの人が先に保存していたとき（409）、**入力を捨てないこと**。
-   * 読み直すかどうかは運用者が決める——押すまで読み直さない。
-   */
-  {
-    const detail = {
-      ...form(1, { id: 'form-1', name: 'サーバ側の名前' }),
-      contentRevision: 4,
+  // 7. V8の3タブで409になっても入力を残す。比べるだけでは書き換えず、明示した読み直しで戻す。
+  for (const tab of ['content', 'after', 'appearance']) {
+    const detail = { ...form(1, { id: 'form-1', name: 'サーバ側の名前' }), contentRevision: 4,
+      layout: { ...LAYOUT, sections: [{ id: 'section-1', name: '質問', blocks: [
+        { id: 'question-1', kind: 'input', type: 'text', name: 'answer', label: 'お名前' },
+      ] }] },
     }
     const { context, page, state } = await openHarness(browser, {
-      formsByAccount: { 'account-a': [detail] },
-      detail,
-      putResults: ['conflict'],
+      formsByAccount: { 'account-a': [detail] }, detail, putResults: ['conflict'],
     })
-    /*
-     * 編集画面へは一覧の名前で詳細パネルを開き、「編集する」から入る。直接 URL を開くと、静的書き出し
-     * された頁では `useSearchParams` が `?id=` を拾えず、読み込みが始まらない。
-     * 運用者の通り道と同じ経路で確かめる。
-     */
-    await openList(page)
-    await page.getByRole('button', { name: '「サーバ側の名前」の詳細を見る', exact: true }).click()
-    await page.getByRole('link', { name: '編集する', exact: true }).click()
-    const nameInput = page.locator('#fm-name')
-    await nameInput.waitFor({ timeout: 15_000 })
-    await page.waitForFunction(
-      () => document.querySelector('#fm-name')?.value === 'サーバ側の名前',
-      undefined, { timeout: 15_000 },
-    )
-
-    await nameInput.fill('わたしが直した名前')
-    await page.getByRole('button', { name: '下書きを保存する', exact: true }).click()
-
-    const conflictButton = page.getByRole('button', { name: '最新の内容を読み込む（入力中の内容は消えます）' })
-    await conflictButton.waitFor({ timeout: 15_000 })
-    // 確認した版を送っている（送らなければサーバが 400 にする）。
-    assert.equal(state.putBodies.length, 1, '保存を1回だけ出す')
-    assert.equal(state.putBodies[0].expectedContentRevision, 4, '読み込んだ版をそのまま送る')
-    // 相手がいつ保存したかを添える。
-    await page.getByText(/ほかの人が.*に先に保存しました/).waitFor()
-    // 二重に出さない（元の位置からは消してある）。
-    assert.equal(await page.getByText(/ほかの人が.*に先に保存しました/).count(), 1, '文言を二重に出さない')
-    // **ここが要点。入力は残っている。**
-    assert.equal(await nameInput.inputValue(), 'わたしが直した名前', '409 で入力を捨てない')
-
-    // 押すまで読み直さない。押したら相手の内容に入れ替わる。
-    await conflictButton.click()
-    await page.waitForFunction(() => document.querySelector('#fm-name')?.value === 'サーバ側の名前', undefined, { timeout: 15_000 })
-    assert.equal(await page.getByRole('button', { name: '最新の内容を読み込む（入力中の内容は消えます）' }).count(), 0,
-      '読み直したら競合の出口は消える')
-    await context.close()
-  }
-
-  /*
-   * 7b. オプション設定タブで、409 の知らせが**覆いの下敷きにならない**
-   *     （#723 独立審査の差し戻し）。
-   *
-   * 以前は知らせが基本タブの枠の中にあったので、`OptionsDialog`
-   * （`aria-modal`・`z-50`）の下に隠れていた。**DOM にあるだけでは足りない。**
-   * ここでは実物のブラウザで、その場所が本当に掴めるか（`elementFromPoint`）で見る。
-   * 重なりは実ブラウザでしか確かめられないので、この検査はここに置く。
-   * 3タブとも DOM に出ることは実マウント側（edit/save-conflict-tabs.test.tsx）で見る。
-   */
-  {
-    const detail = {
-      ...form(1, { id: 'form-1', name: 'サーバ側の名前' }),
-      contentRevision: 4,
-    }
-    const { context, page, state } = await openHarness(browser, {
-      formsByAccount: { 'account-a': [detail] },
-      detail,
-      putResults: ['conflict'],
-    })
-    await openList(page)
-    await page.getByRole('button', { name: '「サーバ側の名前」の詳細を見る', exact: true }).click()
-    await page.getByRole('link', { name: '編集する', exact: true }).click()
-    await page.locator('#fm-name').waitFor({ timeout: 15_000 })
-    await page.waitForFunction(
-      () => document.querySelector('#fm-name')?.value === 'サーバ側の名前',
-      undefined, { timeout: 15_000 },
-    )
-    /*
-     * M003：送った中身と保存されている中身が同じだと自分の再送とみなして
-     * 競合を出さない。何も変えずに保存すると再送扱いになるため、ほかの人の
-     * 編集として競合を見るには覆いの中の1欄を変えておく。基本タブの名前欄を
-     * 先に変えると未保存ガードの確認が割り込み、覆いが開かない。
-     */
-    await page.getByRole('link', { name: 'オプション設定' }).click()
-    const dialog = page.locator('[aria-modal="true"]')
-    await dialog.waitFor({ timeout: 15_000 })
-    await dialog.locator('input[aria-label="送信ボタンの文字"]').fill('わたしが直した送信文')
-
-    await dialog.getByRole('button', { name: '保存する', exact: true }).click()
-
-    const message = page.getByText(/ほかの人が.*に先に保存しました/)
-    const reload = page.getByRole('button', { name: '最新の内容を読み込む（入力中の内容は消えます）' })
-    await message.waitFor({ timeout: 15_000 })
-    assert.equal(state.putBodies.length, 1, 'オプション: 保存を1回出す')
-    assert.equal(state.putBodies[0].expectedContentRevision, 4, 'オプション: 読み込んだ版を送る')
-    assert.equal(await message.count(), 1, 'オプション: 文言を二重に出さない')
-    assert.equal(await dialog.count(), 1, 'オプション: 覆いは出たまま（閉じていない）')
-    assert.equal(await reload.isVisible(), true, 'オプション: 読み直す出口が見えている')
-
-    // **覆いの下敷きになっていないこと。**その場所で実際に掴めるかで見る。
-    const reachable = await reload.evaluate((node) => {
+    await openV8Editor(page, detail.name, tab)
+    const input = tab === 'content' ? page.locator('#fe-q-question-1')
+      : tab === 'after' ? page.locator('#fe-thanks-text') : page.locator('#fe-name')
+    const original = await input.inputValue()
+    await input.fill('わたしが直した内容')
+    await page.getByRole('button', { name: '下書きを保存', exact: true }).click()
+    const band = page.locator('[data-save-conflict]')
+    await band.waitFor({ timeout: 15_000 })
+    assert.equal(state.putBodies.length, 1, `${tab}: 保存は1回だけ`)
+    assert.equal(state.putBodies[0].expectedContentRevision, 4, `${tab}: 読み込んだ版を送る`)
+    assert.equal(await page.getByText(/^ほかの人が.*を保存しました$/).count(), 1, `${tab}: 競合の知らせは1つ`)
+    assert.equal(await input.inputValue(), 'わたしが直した内容', `${tab}: 409で入力を捨てない`)
+    await page.getByRole('button', { name: '比べてから保存', exact: true }).click()
+    const compare = page.getByRole('dialog', { name: '最新の保存と比べる', exact: true })
+    await compare.waitFor()
+    assert.equal(await input.inputValue(), 'わたしが直した内容', `${tab}: 比べるだけでは読み直さない`)
+    const reload = compare.getByRole('button', { name: '最新を読み込んで続ける', exact: true })
+    await reload.scrollIntoViewIfNeeded()
+    assert.equal(await reload.evaluate((node) => {
       const box = node.getBoundingClientRect()
       const top = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
       return node === top || node.contains(top)
-    })
-    assert.equal(reachable, true, 'オプション: 読み直す出口が覆いの下敷きになっていない')
+    }), true, `${tab}: 読み直す出口が覆いの下敷きにならない`)
+    await compare.getByRole('button', { name: 'キャンセル', exact: true }).click()
+    assert.equal(await input.inputValue(), 'わたしが直した内容', `${tab}: 比較を取り消しても入力が残る`)
+    await band.getByRole('button', { name: '最新を読み込んで続ける', exact: true }).click()
+    await page.waitForFunction(({ selector, expected }) => document.querySelector(selector)?.value === expected,
+      { selector: tab === 'content' ? '#fe-q-question-1' : tab === 'after' ? '#fe-thanks-text' : '#fe-name', expected: original })
+    assert.equal(await band.count(), 0, `${tab}: 読み直すと競合の出口が消える`)
+    console.log(`409・入力保持・比較の取り消し・明示した読み直し（${tab}）: PASS`)
     await context.close()
   }
 
@@ -737,148 +680,41 @@ try {
     await context.close()
   }
 
-  /*
-   * 9. #725 デザイン設定の死にUI。
-   *
-   *    OGPの入力は `void [...]` で捨てられていて、この窓から編集できなかった。
-   *    値は保存経路には乗っていたので「保存されているのに直す口が無い」形だった。
-   *    ここでは本物のブラウザで、**窓に打った文字が保存の中身まで届く**ことと、
-   *    押しても何も起きない操作面が残っていないことを見る。
-   *
-   *    「保存済みの値が欄に出る」ほうは、ここでは見ない。書き出した管理画面を
-   *    直接URLで開くと、`/form-submissions/edit?id=...` は `GET /api/forms/:id`
-   *    を一度も呼ばない（`useSearchParams` が最初の描画で空を返し、読み込みの
-   *    効果がそのまま素通りする）。**これは #725 の変更前からそうで、この票の
-   *    範囲外**。値が欄に出ることは、親から props を渡す実マウントの試験
-   *    `edit/form-design-settings.dead-ui.test.tsx` で見張っている。
-   */
-  {
-    const { context, page, state } = await openHarness(browser)
-    await page.goto(`${baseUrl}/form-submissions/edit?id=form-1&tab=design`, { waitUntil: 'domcontentloaded' })
-
-    const dialog = page.getByRole('dialog', { name: 'デザイン設定' })
-    await dialog.waitFor({ timeout: 15_000 })
-
-    // (1) OGPの3欄がこの窓にあり、打った文字が保存の中身へ乗る。
-    //     窓は `z-50` の覆いで下部追従帯（`z-index: 20`）を隠すので、
-    //     利用者と同じ順（打つ → 閉じる → 保存）でたどる。
-    await page.locator('#form-og-title').fill('ごはんの相談フォーム')
-    await page.locator('#form-og-description').fill('3分で終わります')
-    await page.locator('#form-og-image-url').fill('https://example.test/ogp.png')
-    // 「閉じる」は2つある（見出しの × と下段のボタン）。下段のほうを押す。
-    await dialog.getByRole('button', { name: '閉じる', exact: true }).last().click()
-    await dialog.waitFor({ state: 'detached', timeout: 10_000 })
-    // 直接URLで開くと1件取得が走らずフォーム名が空のままなので、保存の
-    // 前提条件だけ満たす（#725 の対象外。上の但し書きを参照）。
-    await page.locator('#fm-name').fill('ごはんの相談')
-    await page.getByRole('button', { name: '下書きを保存する', exact: true }).click()
-    for (let i = 0; i < 100 && state.formWrites.length === 0; i += 1) await page.waitForTimeout(50)
-    assert.equal(state.formWrites.length, 1, '保存が1回だけ飛ぶ')
-    assert.equal(state.formWrites[0].ogTitle, 'ごはんの相談フォーム', '打った見出しが保存へ乗る')
-    assert.equal(state.formWrites[0].ogDescription, '3分で終わります', '打った説明が保存へ乗る')
-    assert.equal(state.formWrites[0].ogImageUrl, 'https://example.test/ogp.png', '打った画像URLが保存へ乗る')
-
-    // (2) 窓の中に無反応な操作面が残っていない（窓を開き直して見る）
-    await page.goto(`${baseUrl}/form-submissions/edit?id=form-1&tab=design`, { waitUntil: 'domcontentloaded' })
-    await dialog.waitFor({ timeout: 15_000 })
-    assert.equal(await dialog.getByRole('button', { name: '保存する', exact: true }).count(), 0,
-      '窓の中に2つ目の保存を置かない')
-    assert.equal(await dialog.locator('#form-theme-background').count(), 0,
-      '選択肢が「なし」だけの背景画像欄を出さない')
-    assert.equal(await dialog.getByText('CSSで細かく', { exact: true }).count(), 0,
-      '中身の無い押せないタブを出さない')
-    assert.equal(await dialog.getByText('背景画像', { exact: true }).count(), 0,
-      '背景画像の見出しごと消えている')
-    await context.close()
-  }
-
-  /*
-   * 10. スマホ幅（390px）でオプション設定の動作欄が画面に収まる（R26）。
-   *
-   * 窓を開き、「アクションを設定」から動作を1つ足す。種類・対象の選択と
-   * 削除が、初期表示の画面外へ出ないこと。窓の高さも画面に収めること。
-   */
-  {
-    const detail = {
-      ...form(1, { id: 'form-1', name: 'サーバ側の名前' }),
-      contentRevision: 4,
-    }
-    const { context, page } = await openHarness(browser, {
-      formsByAccount: { 'account-a': [detail] },
-      detail,
-      viewport: { width: 390, height: 844 },
-    })
-    await page.goto(`${baseUrl}/form-submissions/edit?id=form-1&tab=options`, { waitUntil: 'domcontentloaded' })
-    const dialog = page.locator('[aria-modal="true"]')
-    await dialog.waitFor({ timeout: 15_000 })
-    const dialogBox = await dialog.boundingBox()
-    assert.equal(dialogBox.height <= 844, true, 'R26: 窓の高さが画面に収まる')
-
-    // R26: 動作の欄は折りたたみの中。閉じたままだと足す口が見えないので、
-    // 見えているかで開閉を決める（開き直しの有無で裏返らないように）。
-    const actionFold = dialog.locator('details', { hasText: 'アクションを設定' })
-    if (!(await actionFold.getByRole('button', { name: '＋ 動作を追加' }).isVisible())) {
-      await page.getByText('アクションを設定', { exact: true }).click()
-    }
-    await actionFold.getByRole('button', { name: '＋ 動作を追加' }).click()
-    // 共通 Select は素の select を置かず操作子（button）で作ってあるため、
-    // 足した動作の種類の操作子を待つのが、開いて足せたことの印になる。
-    await actionFold.getByRole('button', { name: '動作の種類' }).waitFor()
-    const edges = await actionFold.locator('button').evaluateAll((nodes) =>
-      nodes.map((node) => node.getBoundingClientRect().right),
-    )
-    for (const right of edges) {
-      assert.equal(right <= 390, true, `R26: 動作の欄が画面に収まる（右端 ${Math.round(right)}px）`)
-    }
-    const removeBox = await page.getByRole('button', { name: 'この動作を削除' }).boundingBox()
-    assert.equal(removeBox.x + removeBox.width <= 390, true, 'R26: 動作の削除が画面に収まる')
-    await context.close()
-  }
-
-  /*
-   * 11. V8 の編集画面（src/v8/form-edit）でも、版の競合で入力を捨てない（監査 WEB-314）。
-   *
-   * 7〜10 は v7 の編集画面（#fm-name・「下書きを保存する」）を見ている。本番の切り替えの
-   * 1週間後まで v7 の試験は残し、V8 の編集画面は同じ動きをここで見る。
-   * V8 の名前・カードの欄は「受付と見た目」のタブ（#fe-name・#fe-og-*）、保存は「下書きを保存」。
-   */
-  async function openV8Editor(page, formName) {
+  async function openV8Editor(page, formName, tab = 'appearance') {
     await openList(page)
     await page.getByRole('button', { name: `「${formName}」の詳細を見る`, exact: true }).click()
     await page.getByRole('link', { name: '編集する', exact: true }).click()
-    await page.getByRole('tab', { name: '受付と見た目' }).or(page.getByRole('button', { name: '受付と見た目', exact: true })).first().click()
-    await page.locator('#fe-name').waitFor({ timeout: 15_000 })
+    await page.getByRole('tab', { name: '受付と見た目', exact: true }).click()
     await page.waitForFunction(
       (expected) => document.querySelector('#fe-name')?.value === expected,
       formName, { timeout: 15_000 },
     )
+    if (tab !== 'appearance') await page.getByRole('tab', { name: tab === 'after' ? '答え終わったあと' : '中身', exact: true }).click()
   }
-  {
-    const detail = {
-      ...form(1, { id: 'form-1', name: 'サーバ側の名前' }),
-      contentRevision: 4,
-    }
-    const { context, page, state } = await openHarness(browser, {
-      formsByAccount: { 'account-a': [detail] },
-      detail,
-      putResults: ['conflict'],
-      theme: 'v8',
-    })
-    await openV8Editor(page, 'サーバ側の名前')
-    await page.locator('#fe-name').fill('わたしが直した名前')
-    await page.getByRole('button', { name: '下書きを保存', exact: true }).click()
 
-    await page.getByText(/^ほかの人が.*を保存しました$/).first().waitFor({ timeout: 15_000 })
-    assert.equal(state.putBodies.length >= 1, true, 'V8: 保存を出す')
-    assert.equal(state.putBodies[0].expectedContentRevision, 4, 'V8: 読み込んだ版をそのまま送る')
-    assert.equal(await page.locator('#fe-name').inputValue(), 'わたしが直した名前', 'V8: 409 で入力を捨てない')
-    assert.equal(await page.getByRole('button', { name: '比べてから保存', exact: true }).count(), 1,
-      'V8: 競合のあとは比べてから保存する出口を出す')
+  // 10. 390pxでV8の動作を足す窓の種類・対象・削除が画面内で操作できる。
+  {
+    const detail = { ...form(1, { id: 'form-1', name: '動作を設定するフォーム' }), contentRevision: 4 }
+    const { context, page } = await openHarness(browser, {
+      detail, viewport: { width: 390, height: 844 }, formsByAccount: { 'account-a': [detail] },
+    })
+    await page.goto(`${baseUrl}/form-submissions/edit?id=form-1&tab=after`, { waitUntil: 'domcontentloaded' })
+    await page.getByRole('button', { name: 'タグ', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: '答え終わったら行うこと', exact: true })
+    await dialog.waitFor()
+    const box = await dialog.boundingBox()
+    assert.ok(box && box.height <= 844, 'R26: 窓の高さが画面に収まる')
+    await dialog.getByRole('button', { name: '動作の種類' }).waitFor()
+    for (const right of await dialog.locator('button').evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().right))) {
+      assert.ok(right <= 390, `R26: 動作の操作が画面に収まる（右端 ${Math.round(right)}px）`)
+    }
+    const remove = await dialog.getByRole('button', { name: 'この動作を削除' }).boundingBox()
+    assert.ok(remove && remove.x + remove.width <= 390, 'R26: 動作の削除が画面に収まる')
     await context.close()
   }
 
   /*
-   * 12. V8 の編集画面で、カード（OGP）の3欄が保存へ届き、再読込しても残る（#725 を V8 でも）。
+   * 9. V8 の編集画面で、カード（OGP）の3欄が保存へ届き、再読込しても残る（#725 を V8 でも）。
    */
   {
     const detail = {
@@ -888,13 +724,14 @@ try {
     const { context, page, state } = await openHarness(browser, {
       formsByAccount: { 'account-a': [detail] },
       detail,
-      theme: 'v8',
     })
     await openV8Editor(page, 'ごはんの相談')
     // カードの3欄は「リンクの見え方」の窓の中。利用者と同じ順（開く → 打つ → 閉じる → 保存）でたどる。
     await page.getByRole('button', { name: /^リンクの見え方：/ }).click()
     const linkDialog = page.getByRole('dialog', { name: 'リンクの見え方' })
     await linkDialog.waitFor({ timeout: 15_000 })
+    assert.equal(await linkDialog.getByRole('button', { name: '保存する', exact: true }).count(), 0,
+      'V8: 設定の窓に2つ目の保存を置かない')
     await page.locator('#fe-og-title').fill('ごはんの相談フォーム')
     await page.locator('#fe-og-desc').fill('3分で終わります')
     // MediaSlot は「URL で入れる」を押してから入力欄を出す。
@@ -930,11 +767,64 @@ try {
     await context.close()
   }
 
+  // 保存が失敗しても入力を残し、手で再試行できる。下書きの保存だけでは公開しない。
+  {
+    const detail = { ...form(1, { id: 'form-1', name: '保存をやり直すフォーム' }), contentRevision: 4 }
+    const { context, page, state } = await openHarness(browser, {
+      detail, formsByAccount: { 'account-a': [detail] }, putResults: ['failed'],
+    })
+    await openV8Editor(page, detail.name)
+    await page.locator('#fe-name').fill('残しておく入力')
+    const failed = page.waitForResponse((response) => response.request().method() === 'PUT' && response.status() === 500)
+    await page.getByRole('button', { name: '下書きを保存', exact: true }).click()
+    await failed
+    await page.getByRole('alert').filter({ hasText: /保存/ }).waitFor()
+    assert.equal(await page.locator('#fe-name').inputValue(), '残しておく入力', '保存失敗でも入力が残る')
+    const saved = page.waitForResponse((response) => response.request().method() === 'PUT' && response.ok())
+    await page.getByRole('button', { name: '下書きを保存', exact: true }).click()
+    await saved
+    assert.equal(state.putBodies.length, 2, '失敗後の再試行は1回だけ送る')
+    assert.equal(state.putBodies[1].expectedContentRevision, 4, '失敗で版を進めない')
+    assert.equal(state.publishBodies.length, 0, '下書きの保存では公開しない')
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await page.waitForFunction(() => document.querySelector('#fe-name')?.value === '残しておく入力')
+    await context.close()
+    console.log('保存失敗・入力保持・再試行・読み直し: PASS')
+  }
+
+  // 公開は確認の窓で確定したときだけ。保存で返った版を送る。
+  {
+    const detail = {
+      ...form(1, { id: 'form-1', name: '公開するフォーム' }), contentRevision: 4,
+      layout: { ...LAYOUT, sections: [{ id: 'section-1', name: '質問', blocks: [
+        { id: 'question-1', kind: 'input', type: 'text', name: 'answer', label: 'お名前', required: true },
+      ] }] },
+    }
+    const { context, page, state } = await openHarness(browser, { detail, formsByAccount: { 'account-a': [detail] } })
+    await openV8Editor(page, detail.name)
+    await page.getByRole('button', { name: 'この版を公開', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'この版を公開する', exact: true })
+    await dialog.waitFor()
+    assert.equal(state.publishBodies.length, 0, '窓を開くだけでは公開しない')
+    await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click()
+    await dialog.waitFor({ state: 'detached' })
+    assert.equal(state.putBodies.length, 0, '公開を取り消すと保存も送らない')
+    await page.getByRole('button', { name: 'この版を公開', exact: true }).click()
+    await dialog.getByRole('button', { name: 'この版を公開', exact: true }).click()
+    await dialog.waitFor({ state: 'detached' })
+    assert.equal(state.putBodies.length, 1, '公開前の保存は1回')
+    assert.deepEqual(state.publishBodies, [{ expectedContentRevision: 5 }], '保存で返った版を1回だけ公開')
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await page.getByText('公開中の版と同じです', { exact: true }).waitFor()
+    await context.close()
+    console.log('公開の確認・取り消し・版・読み直し: PASS')
+  }
+
   // 管理者の編集を通すだけでなく、同じ役割の口で staff が閲覧用になることも守る。
   {
     const detail = { ...form(1, { id: 'form-1', name: '閲覧するフォーム' }), contentRevision: 4 }
     const { context, page, state } = await openHarness(browser, {
-      role: 'staff', detail, theme: 'v8', formsByAccount: { 'account-a': [detail] },
+      role: 'staff', detail, formsByAccount: { 'account-a': [detail] },
     })
     await page.goto(`${baseUrl}/form-submissions/edit?id=form-1&tab=appearance`, { waitUntil: 'domcontentloaded' })
     await page.getByText('閲覧のみで見ています。変える操作は管理者に頼んでください。', { exact: true }).waitFor({ timeout: 15_000 })
@@ -947,6 +837,11 @@ try {
   }
 
   console.log('form submissions browser behavior: PASS')
+} catch (error) {
+  console.error('browser current URL:', lastHarness.page.url())
+  console.error('browser body:', (await lastHarness.page.locator('body').innerText()).slice(0, 4000))
+  console.error('form writes:', JSON.stringify(lastHarness.state.putBodies))
+  throw error
 } finally {
   await browser.close()
   await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()))

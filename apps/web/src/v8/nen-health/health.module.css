@@ -20,24 +20,6 @@
 
 /* 数の帯の境目は共通の型と帯に任せる。画面側で線・影を重ねない。 */
 
-.kpiMenu {
-  display: inline-flex;
-  align-items: center;
-  height: var(--tpl-nph-kpi-menu);
-}
-:global([data-theme='v8']) .kpiMenu > .kpiMenuButton {
-  width: var(--tpl-nph-kpi-menu);
-  height: var(--tpl-nph-kpi-menu);
-  min-height: 0;
-  flex-basis: var(--tpl-nph-kpi-menu);
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-:global([data-theme='v8']) .kpiMenu > .kpiMenuButton:not(:focus-visible) {
-  outline-color: transparent;
-}
-
 .noteRow {
   padding: var(--tpl-nph-note-pad);
 }
@@ -345,33 +327,6 @@
   color: var(--color-ink-secondary);
   font-size: var(--text-micro);
   line-height: normal;
-}
-.statGrid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--tpl-nph-pair-gap);
-  margin: 0;
-}
-.statBox {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-nph-sub-gap);
-  padding: var(--tpl-nph-summary-note-pad);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control);
-}
-.statLabel {
-  color: var(--color-ink-faint);
-  font-size: var(--text-micro);
-  line-height: normal;
-}
-.statValue {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--text-body);
-  font-weight: 600;
-  line-height: var(--tpl-nph-stat-lh);
-  white-space: nowrap;
 }
 .chart {
   display: flex;

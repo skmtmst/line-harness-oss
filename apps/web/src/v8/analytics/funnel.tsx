@@ -21,7 +21,7 @@ import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import { api, type AnalyticsFunnelRunResult } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
-import { KpiMenu, RangePickerV8, StatePill } from './common'
+import { RangePickerV8, StatePill } from './common'
 import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, rangeFor, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
 
@@ -276,16 +276,15 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
     ? `${pickedStep.label}まで進んだが、${selectedFunnel?.windowDays ?? ''}日以内に${nextStep ? `「${nextStep.label}」へ` : '次へ'}進んでいない人です。`
     : audienceSelection === 'reached' ? `順番どおりに「${pickedStep.label}」まで通った人です。` : `「${pickedStep.label}」まで進み、まだ判定の期間中の人です。`) : ''
   const top = measurable ? (result?.[0]?.reached ?? 0) : 0
-  const menu = (title: string) => <KpiMenu title={title} onExport={exportFunnel} disabled={!result} />
   const showForm = creating || editTarget
 
   return <>
     {funnels.length > 0 ? <KpiBand className={styles.band}>
-      <KpiCard presentation="band" title="入口" icon={<LogIn size={13} aria-hidden="true" />} menu={menu('入口')} value={overall?.entry ?? null} unit="人" detail={measurable ? (overall?.entryLabel ?? '—') : run ? '判定不能' : '—'} />
-      <KpiCard presentation="band" title="最後まで" icon={<Flag size={13} aria-hidden="true" />} menu={menu('最後まで')} value={overall?.last ?? null} unit="人" detail={measurable ? (overall?.rate != null ? `入口の ${overall.rate}%` : '—') : run ? '判定不能' : '—'} />
-      <KpiCard presentation="band" title="いちばん落ちる段" icon={<ArrowDownRight size={13} aria-hidden="true" />} menu={menu('いちばん落ちる段')} value={worst ? -Math.round(worst.rate * 100) : null} unit="%" detail={worst && result ? `${result[worst.index - 1].label} → ${result[worst.index].label}` : run && !measurable ? '判定不能' : '—'} />
+      <KpiCard presentation="band" title="入口" icon={<LogIn size={13} aria-hidden="true" />} value={overall?.entry ?? null} unit="人" detail={measurable ? (overall?.entryLabel ?? '—') : run ? '判定不能' : '—'} />
+      <KpiCard presentation="band" title="最後まで" icon={<Flag size={13} aria-hidden="true" />} value={overall?.last ?? null} unit="人" detail={measurable ? (overall?.rate != null ? `入口の ${overall.rate}%` : '—') : run ? '判定不能' : '—'} />
+      <KpiCard presentation="band" title="いちばん落ちる段" icon={<ArrowDownRight size={13} aria-hidden="true" />} value={worst ? -Math.round(worst.rate * 100) : null} unit="%" detail={worst && result ? `${result[worst.index - 1].label} → ${result[worst.index].label}` : run && !measurable ? '判定不能' : '—'} />
       {/* 段ごとの到達日時を持っていない（集計は「通ったか」だけを見る）。 */}
-      <KpiCard presentation="band" title="平均の到達日数" icon={<CalendarClock size={13} aria-hidden="true" />} menu={menu('平均の到達日数')} value={null} unit="日" detail="到達日時が無く未取得" />
+      <KpiCard presentation="band" title="平均の到達日数" icon={<CalendarClock size={13} aria-hidden="true" />} value={null} unit="日" detail="到達日時が無く未取得" />
     </KpiBand> : null}
     <div className={styles.body} data-gap="tab">
       {showForm && renderForm ? renderForm({

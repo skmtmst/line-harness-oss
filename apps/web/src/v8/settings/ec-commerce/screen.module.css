@@ -9,8 +9,6 @@
   flex-shrink: 0;
 }
 
-.kpis { gap: var(--tpl-sb-group-gap); }
-
 .minor,
 .minorText {
   margin: 0;

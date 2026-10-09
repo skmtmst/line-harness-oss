@@ -1,5 +1,7 @@
 'use client'
 
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import { useMemo } from 'react'
 import Link from 'next/link'
 import type { BookingRequest } from '@/lib/api'
@@ -102,16 +104,6 @@ const CARD_STATUS_LABEL: Record<string, string> = {
 
 function money(value: number): string {
   return `¥${formatNumber(value)}`
-}
-
-function Kpi({ title, value, detail }: { title: string; value: string; detail: string }) {
-  return (
-    <div className="rounded-card border-hairline bg-canvas border px-4 py-3 shadow-card-surface">
-      <p className="text-ink-secondary text-xs font-medium">{title}</p>
-      <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{value}</p>
-      <p className="text-ink-faint mt-1 text-xs">{detail}</p>
-    </div>
-  )
 }
 
 function BookingCard({ booking, compact = false, onOpen }: {
@@ -645,20 +637,20 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
 
   return (
     <div data-design-node={mode === 'day' ? 'TV2DI' : 'SbuUI'}>
-      <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <Kpi title={`${periodWithToday}の予約`} value={countOrDash(`${activeItems.length}件`)} detail={listMissing ? listMissingDetail : `LINEから ${lineCount}・電話 ${phoneCount}`} />
-        <Kpi
+      <KpiBand className="mb-4">
+        <KpiCard value={null} unit="" icon={null} presentation="band" title={`${periodWithToday}の予約`} valueText={countOrDash(`${activeItems.length}件`)} detail={listMissing ? listMissingDetail : `LINEから ${lineCount}・電話 ${phoneCount}`} />
+        <KpiCard value={null} unit="" icon={null} presentation="band"
           title={mode === 'day' ? 'まだ空いている枠' : 'うまっている割合'}
-          value={listMissing ? '—' : mode === 'day' ? (availability.status === 'ready' ? `${capacity.freeSlots}枠` : '—') : weekRateValue}
+          valueText={listMissing ? '—' : mode === 'day' ? (availability.status === 'ready' ? `${capacity.freeSlots}枠` : '—') : weekRateValue}
           detail={listMissing ? listMissingDetail : mode === 'day' ? availabilityNote : weekRateDetail}
         />
-        <Kpi
+        <KpiCard value={null} unit="" icon={null} presentation="band"
           title={mode === 'day' ? '未承認・要対応' : 'あいている枠'}
-          value={listMissing ? '—' : mode === 'day' ? `${requested}件` : availability.status === 'ready' ? `${capacity.freeSlots}枠` : '—'}
+          valueText={listMissing ? '—' : mode === 'day' ? `${requested}件` : availability.status === 'ready' ? `${capacity.freeSlots}枠` : '—'}
           detail={listMissing ? listMissingDetail : mode === 'day' ? (requested > 0 ? '確認が必要です' : '現在、確認待ちはありません') : availabilityNote}
         />
-        <Kpi title="キャンセル" value={countOrDash(`${cancelled}件`)} detail={listMissing ? listMissingDetail : mode === 'day' ? '選んだ日' : 'この1週間'} />
-      </div>
+        <KpiCard value={null} unit="" icon={null} presentation="band" title="キャンセル" valueText={countOrDash(`${cancelled}件`)} detail={listMissing ? listMissingDetail : mode === 'day' ? '選んだ日' : 'この1週間'} />
+      </KpiBand>
 
       {/* ★V7：常に出ていた説明の帯は、色の見方だけを小さな凡例にした。 */}
       <p className="text-ink-secondary mb-3 flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-xs">

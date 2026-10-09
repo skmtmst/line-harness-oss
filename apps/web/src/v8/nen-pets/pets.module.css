@@ -19,25 +19,7 @@
 }
 
 /* 数の帯の境目は共通の型と帯に任せる。画面側で線・影を重ねない。 */
-
-.kpiMenu {
-  display: inline-flex;
-  align-items: center;
-  height: var(--tpl-nph-kpi-menu);
-}
 /* 数の帯の「…」は枠なしの小さな印（絵の 16 の印）。 */
-:global([data-theme='v8']) .kpiMenu > .kpiMenuButton {
-  width: var(--tpl-nph-kpi-menu);
-  height: var(--tpl-nph-kpi-menu);
-  min-height: 0;
-  flex-basis: var(--tpl-nph-kpi-menu);
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-:global([data-theme='v8']) .kpiMenu > .kpiMenuButton:not(:focus-visible) {
-  outline-color: transparent;
-}
 
 /* 閲覧のみの帯（数の帯の上）。 */
 .viewerBand {

@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
   recordSiteEvent,
@@ -44,7 +45,7 @@ async function visibleAccountId(c: Context<Env>): Promise<string | Response> {
   if (!accountId) {
     return scope.allowedAccountIds.length === 1
       ? scope.allowedAccountIds[0]
-      : c.json({ success: false, error: 'accountId required' }, 400);
+      : inputError(c, { success: false, error: 'accountId required' }, 400, ["account_id","accountId"]);
   }
   if (!scope.allowedAccountIds.includes(accountId)) {
     return c.json({ success: false, error: '対象が見つかりません' }, 404);
@@ -75,7 +76,7 @@ siteTracking.options('/api/site/collect', (c) => c.body(null, 204, corsHeaders()
 //
 // 認証しない。成功も失敗も 204 で返し、中身は何も返さない。
 // エラーの形を返すと、外から叩いて内部の様子を探れてしまう。
-siteTracking.post('/api/site/collect', async (c) => {
+siteTracking.post('/api/site/collect', inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{
       visitorId?: unknown;
@@ -296,13 +297,13 @@ siteTracking.get('/api/site/script.js', (c) => {
 //
 // LIFF やフォームの中から呼ぶ。ここは認証済みの経路から呼ばれる前提だが、
 // 友だちIDを当てられても「その人の行動が紐づく」だけで、情報は返さない。
-siteTracking.post('/api/site/link', requireRole('owner', 'admin', 'staff'), async (c) => {
+siteTracking.post('/api/site/link', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ visitorId?: unknown; friendId?: unknown; via?: unknown }>();
     const visitorId = String(body.visitorId ?? '');
     const friendId = String(body.friendId ?? '');
     if (!VISITOR_ID_PATTERN.test(visitorId) || !friendId) {
-      return c.json({ success: false, error: 'visitorId と friendId が必要です' }, 400);
+      return inputError(c, { success: false, error: 'visitorId と friendId が必要です' }, 400, ["visitorId","friendId"]);
     }
     const friend = await c.env.DB.prepare(
       'SELECT line_account_id FROM friends WHERE id = ?',

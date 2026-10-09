@@ -21,8 +21,9 @@ export default function SelectionDialog({ title, description, search, initialFoc
   const [mounted, setMounted] = useState(false)
   const panelRef = useOverlayFocus(mounted, onCancel, busy, initialFocusRef ? () => initialFocusRef.current : undefined)
   useEffect(() => setMounted(true), [])
+  // 外側の編集窓・引き出しより前へ出す。単独で開く窓の層は既定値のまま。
   return <OverlayDepthContext.Provider value={depth + 1}>{mounted ? createPortal(
-    <div className={styles.overlay} onMouseDown={(event) => { if (!busy && event.target === event.currentTarget) onCancel() }}>
+    <div className={styles.overlay} style={depth ? { zIndex: `calc(var(--tpl-bcpick-z) * ${depth + 1})` } : undefined} onMouseDown={(event) => { if (!busy && event.target === event.currentTarget) onCancel() }}>
       <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={`${id}-title`} aria-describedby={description ? `${id}-description` : undefined} aria-busy={busy || undefined} tabIndex={-1} className={styles.panel} data-size={size === 'wide' ? undefined : size} data-design-node={designNode}>
         <header className={styles.header}>
           <div className={styles.heading}><h2 id={`${id}-title`}>{title}</h2>{description ? <p id={`${id}-description`}>{description}</p> : null}</div>

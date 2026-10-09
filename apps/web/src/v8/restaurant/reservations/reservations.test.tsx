@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -59,7 +60,7 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
     const board = document.querySelector('[data-design-node="l9NlC0"]')!
     expect(board.textContent).toContain('今日の予約')
     expect(screen.getByText('⚠ 乳')).not.toBeNull()
-    expect(screen.getByText('承認待ち', { selector: 'span' })).not.toBeNull()
+    expect(within(board as HTMLElement).getAllByText('承認待ち', { selector: 'span' }).length).toBeGreaterThan(0)
     expect(screen.getAllByText('押さえ', { selector: 'span' }).length).toBeGreaterThan(0)
     expect(screen.getByText(/^🔒 20:00〜21:30$/)).not.toBeNull()
     expect(screen.getByText('個室B は停止中のため出していません')).not.toBeNull()

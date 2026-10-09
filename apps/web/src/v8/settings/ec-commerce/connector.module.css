@@ -67,12 +67,6 @@
   line-height: var(--tpl-rest3-ec-desc-lh);
 }
 
-.minis {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--tpl-rest3-ec-mini-gap);
-}
-
 .statusRow {
   display: flex;
   flex-wrap: wrap;

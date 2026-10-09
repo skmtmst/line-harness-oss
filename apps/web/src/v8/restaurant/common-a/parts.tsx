@@ -6,8 +6,8 @@
  * - 白い枠（CHz31「枠 店舗一覧」）：題14/700・説明11・右端の注意、下に細い線
  * - 状態の札：共通の StatusBadge（点＋文字）
  */
+import KpiBand from '@/components/shared/kpi-band'
 import type { ReactNode } from 'react'
-import KpiCard from '@/components/shared/kpi-card'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import styles from './parts.module.css'
 
@@ -30,36 +30,9 @@ export function Status({ value, label }: { value: string; label?: string }) {
   return <StatusBadge tone={statusTone(value)} className={styles.status}>{label ?? statusLabel[value] ?? value}</StatusBadge>
 }
 
-/** 数のカード。値は単位まで1つの文字で渡す（例「38件」）。 */
-export function Stat({ label, value, note, warning = false, help, size = 'regular' }: {
-  label: string
-  value: string
-  note: ReactNode
-  /** 注意を促す数（未返信口コミなど）は琥珀色。 */
-  warning?: boolean
-  help?: ReactNode
-  /** small は数が 20px（LINE来店フォロー xLpnS の6つ並び）。 */
-  size?: 'regular' | 'small'
-}) {
-  const jp = /[\u3000-\u9fff\uff00-\uffef]/.test(value)
-  return (
-    <KpiCard
-      className={`${styles.stat} ${jp ? styles.statJp : ''} ${size === 'small' ? styles.statSmall : ''}`}
-      title={label}
-      icon={null}
-      value={null}
-      unit=""
-      valueText={value}
-      valueTone={warning ? 'warning' : 'default'}
-      detail={note}
-      help={help}
-    />
-  )
-}
-
-/** 数のカードの並び（間12・同じ幅）。 */
+/** 数の帯（各マスは共通部品）。 */
 export function StatRow({ children }: { children: ReactNode }) {
-  return <div className={styles.stats}>{children}</div>
+  return <KpiBand>{children}</KpiBand>
 }
 
 /** 白い枠。flush は表など枠いっぱいの中身（内側の余白なし）。 */

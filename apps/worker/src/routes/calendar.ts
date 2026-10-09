@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
   getCalendarConnections,
@@ -59,11 +60,11 @@ calendar.get('/api/integrations/google-calendar', requireRole('owner', 'admin'),
   }
 });
 
-calendar.post('/api/integrations/google-calendar/connect', requireRole('owner', 'admin'), async (c) => {
+calendar.post('/api/integrations/google-calendar/connect', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"calendarId":["string"],"authType":["string"],"accessToken":["string"],"refreshToken":["string"],"apiKey":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{ accountId: string; calendarId: string; authType: string; accessToken?: string; refreshToken?: string; apiKey?: string }>();
     if (!body.accountId || !body.calendarId) {
-      return c.json({ success: false, error: 'accountId and calendarId are required' }, 400);
+      return inputError(c, { success: false, error: 'accountId and calendarId are required' }, 400, ["accountId","calendarId"]);
     }
     const scope = await resolveCalendarScope(c);
     if (!scope.allowedAccountIds.includes(body.accountId)) {
@@ -223,11 +224,11 @@ calendar.get('/api/integrations/google-calendar/bookings', requireRole('owner', 
   }
 });
 
-calendar.post('/api/integrations/google-calendar/book', requireRole('owner', 'admin'), async (c) => {
+calendar.post('/api/integrations/google-calendar/book', requireRole('owner', 'admin'), inputJsonBoundary({"connectionId":["string"],"friendId":["string"],"title":["string"],"startAt":["string"],"endAt":["string"],"description":["string"],"metadata":["object"]}), async (c) => {
   try {
     const body = await c.req.json<{ connectionId: string; friendId?: string; title: string; startAt: string; endAt: string; description?: string; metadata?: Record<string, unknown> }>();
     if (!body.connectionId || !body.title || !body.startAt || !body.endAt) {
-      return c.json({ success: false, error: 'connectionId, title, startAt, endAt are required' }, 400);
+      return inputError(c, { success: false, error: 'connectionId, title, startAt, endAt are required' }, 400, ["connectionId","title","startAt","endAt"]);
     }
 
     const scope = await resolveCalendarScope(c);
@@ -298,7 +299,7 @@ calendar.post('/api/integrations/google-calendar/book', requireRole('owner', 'ad
   }
 });
 
-calendar.put('/api/integrations/google-calendar/bookings/:id/status', requireRole('owner', 'admin'), async (c) => {
+calendar.put('/api/integrations/google-calendar/bookings/:id/status', requireRole('owner', 'admin'), inputJsonBoundary({"status":["string"]}), async (c) => {
   try {
     const id = c.req.param('id');
     const { status } = await c.req.json<{ status: string }>();

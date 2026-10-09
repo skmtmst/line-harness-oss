@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { mediaTabCounts } from '../services/tab-counts.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -449,7 +450,7 @@ contents.get('/api/media/quota', async (c) => {
 contents.post(
   '/api/media/upload-sessions',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary({"files":["array"]}), async (c) => {
     try {
       const body = await c.req.json<{
         accountId?: unknown;
@@ -464,7 +465,7 @@ contents.post(
       }>().catch(() => null);
       const accountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
       if (!accountId || !Array.isArray(body?.files) || body.files.length < 1 || body.files.length > 20) {
-        return c.json({ success: false, error: 'accountId と1〜20件のfilesが必要です' }, 400);
+        return inputError(c, { success: false, error: 'accountId と1〜20件のfilesが必要です' }, 400, ["accountId","files"]);
       }
       if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
         return c.json({ success: false, error: 'Not found' }, 404);
@@ -501,19 +502,19 @@ contents.post(
         if (!filename || filename.length > 255 || /[\u0000-\u001f]/.test(filename)
           || !spec || !spec.ext.includes(ext)
           || !Number.isSafeInteger(sizeBytes) || sizeBytes < 1 || sizeBytes > spec.maxBytes) {
-          return c.json({
+          return inputError(c, {
             success: false,
             code: 'media_file_invalid',
             error: `${filename || 'ファイル'}の形式、拡張子、容量を確認してください`,
-          }, 400);
+          }, 400, []);
         }
         const metadata = parseUploadMetadata(file?.metadata);
         if (metadata === undefined) {
-          return c.json({
+          return inputError(c, {
             success: false,
             code: 'media_file_invalid',
             error: `${filename}の内容情報が正しくありません`,
-          }, 400);
+          }, 400, []);
         }
         if (targetMediaId && !await getMediaById(c.env.DB, targetMediaId, accountId)) {
           return c.json({ success: false, error: 'Not found' }, 404);
@@ -580,7 +581,7 @@ contents.post(
 contents.post(
   '/api/media/upload-sessions/:id/complete',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const accountIdFromBody = async () => c.req.json<{ accountId?: unknown; etag?: unknown }>()
       .catch(() => null);
     let accountId = '';
@@ -589,7 +590,7 @@ contents.post(
       accountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
       const suppliedEtag = typeof body?.etag === 'string' ? normalizedEtag(body.etag) : '';
       if (!accountId || !suppliedEtag) {
-        return c.json({ success: false, error: 'accountId と etag が必要です' }, 400);
+        return inputError(c, { success: false, error: 'accountId と etag が必要です' }, 400, ["etag"]);
       }
       if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
         return c.json({ success: false, error: 'Not found' }, 404);
@@ -717,7 +718,7 @@ contents.post(
   },
 );
 
-contents.post('/api/media/:id/versions', requireRole('owner', 'admin', 'staff'), async (c) => {
+contents.post('/api/media/:id/versions', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{
       accountId?: unknown;
@@ -733,10 +734,10 @@ contents.post('/api/media/:id/versions', requireRole('owner', 'admin', 'staff'),
     const changeReason = typeof body?.changeReason === 'string' ? body.changeReason.trim() : '';
     if (!accountId || !uploadSessionId || !previewToken
       || !changeReason || changeReason.length > 500) {
-      return c.json({
+      return inputError(c, {
         success: false,
         error: 'accountId、確認済みuploadSessionId、previewToken、変更理由が必要です',
-      }, 400);
+      }, 400, ["accountId","uploadSessionId","previewToken","changeReason"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
@@ -825,7 +826,7 @@ contents.post('/api/media/:id/versions', requireRole('owner', 'admin', 'staff'),
 contents.post(
   '/api/media/:id/replacement-preview',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const body = await c.req.json<{ accountId?: unknown; uploadSessionId?: unknown }>()
         .catch(() => null);
@@ -834,7 +835,7 @@ contents.post(
         ? body.uploadSessionId.trim()
         : '';
       if (!accountId || !uploadSessionId) {
-        return c.json({ success: false, error: 'accountId と uploadSessionId が必要です' }, 400);
+        return inputError(c, { success: false, error: 'accountId と uploadSessionId が必要です' }, 400, ["accountId","uploadSessionId"]);
       }
       if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
         return c.json({ success: false, error: 'Not found' }, 404);
@@ -967,7 +968,7 @@ async function serveMediaFile(
   const id = c.req.param('id');
   const accountId = c.req.query('accountId')?.trim();
   if (!id) return c.json({ success: false, error: 'Not found' }, 404);
-  if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'accountId query param required' }, 400, ["accountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     if (opts.auditDownload) {
       auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
@@ -1164,11 +1165,11 @@ contents.get('/media/:id/content', async (c) => {
   }
 });
 
-contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
+contents.patch('/api/media/:id', requireRole('owner', 'admin'), inputJsonBoundary({"filename":["string"],"folderId":["null","string"],"usageReference":["object"]}), async (c) => {
   try {
     const id = c.req.param('id');
     const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!accountId) return inputError(c, { success: false, error: 'accountId query param required' }, 400, ["accountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
@@ -1189,12 +1190,12 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
     // 名前は空・長すぎ・制御文字を受け付けない（直接アップロードの申告時と同じ決まり）。
     const filename = body.filename === undefined ? undefined : String(body.filename).trim();
     if (filename !== undefined) {
-      if (!filename) return c.json({ success: false, error: 'ファイル名を入力してください' }, 400);
+      if (!filename) return inputError(c, { success: false, error: 'ファイル名を入力してください' }, 400, ["filename"]);
       if (filename.length > 255) {
-        return c.json({ success: false, error: 'ファイル名は255文字までで入力してください' }, 400);
+        return inputError(c, { success: false, error: 'ファイル名は255文字までで入力してください' }, 400, ["filename"]);
       }
       if (/[\u0000-\u001f]/.test(filename)) {
-        return c.json({ success: false, error: 'ファイル名に使えない文字が含まれています' }, 400);
+        return inputError(c, { success: false, error: 'ファイル名に使えない文字が含まれています' }, 400, ["filename"]);
       }
     }
     // 存在しない・別種のフォルダを指すと、一覧の絞り込みから消える。
@@ -1204,7 +1205,7 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
       if (folderId) {
         const folder = await getFolderById(c.env.DB, folderId);
         if (!folder || folder.kind !== 'media') {
-          return c.json({ success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400);
+          return inputError(c, { success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400, ["folderId"]);
         }
       }
     }
@@ -1221,7 +1222,7 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
       } else if (typeof raw === 'string' && isValidUsageExpiryDate(raw.trim())) {
         usageExpiresAt = raw.trim();
       } else {
-        return c.json({ success: false, error: '利用期限は日付（YYYY-MM-DD）で入力してください' }, 400);
+        return inputError(c, { success: false, error: '利用期限は日付（YYYY-MM-DD）で入力してください' }, 400, ["usageExpiresAt"]);
       }
     }
     let usageConsentNote: string | null | undefined;
@@ -1232,11 +1233,11 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
       } else if (typeof raw === 'string') {
         const note = raw.trim();
         if (note.length > 500) {
-          return c.json({ success: false, error: '同意・権利の記録は500文字までで入力してください' }, 400);
+          return inputError(c, { success: false, error: '同意・権利の記録は500文字までで入力してください' }, 400, ["usageConsentNote"]);
         }
         usageConsentNote = note || null;
       } else {
-        return c.json({ success: false, error: '同意・権利の記録は文字列で入力してください' }, 400);
+        return inputError(c, { success: false, error: '同意・権利の記録は文字列で入力してください' }, 400, ["usageConsentNote"]);
       }
     }
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
@@ -1260,7 +1261,7 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
     const refKind = typeof usageReference?.refKind === 'string' ? usageReference.refKind : '';
     const refId = typeof usageReference?.refId === 'string' ? usageReference.refId.trim() : '';
     if (!refId || !(MEDIA_REF_KINDS as readonly string[]).includes(refKind)) {
-      return c.json({ success: false, error: '切り替える使用先を指定してください' }, 400);
+      return inputError(c, { success: false, error: '切り替える使用先を指定してください' }, 400, ["usageReference"]);
     }
     const versionNo = usageReference?.versionNo;
     const target = usageReference?.mode === 'live'
@@ -1271,7 +1272,7 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
         ? { mode: 'pinned' as const, versionNo: Number(versionNo) }
         : null;
     if (!target) {
-      return c.json({ success: false, error: '参照方法（常に最新・固定する版）を指定してください' }, 400);
+      return inputError(c, { success: false, error: '参照方法（常に最新・固定する版）を指定してください' }, 400, ["usageReference"]);
     }
     try {
       const result = await retargetMediaUsageReference(c.env.DB, {
@@ -1356,13 +1357,13 @@ async function mediaArchiveRoute(c: Context<Env>, archive: boolean, mediaId: str
     : null;
   const bodyAccountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
   const accountId = c.req.query('accountId')?.trim() || bodyAccountId;
-  if (!accountId) return c.json({ success: false, error: 'accountId required' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'accountId required' }, 400, ["accountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
   const reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
   if (!reason) {
-    return c.json({ success: false, code: 'media_reason_required', error: '理由を入力してください' }, 400);
+    return inputError(c, { success: false, code: 'media_reason_required', error: '理由を入力してください' }, 400, ["reason"]);
   }
   const fn = archive ? archiveMedia : restoreMedia;
   const result = await fn(c.env.DB, {
@@ -1384,7 +1385,7 @@ async function mediaArchiveRoute(c: Context<Env>, archive: boolean, mediaId: str
   }, 409);
 }
 
-contents.post('/api/media/:id/archive', requireRole('owner', 'admin'), async (c) => {
+contents.post('/api/media/:id/archive', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     return await mediaArchiveRoute(c, true, c.req.param('id'));
   } catch (err) {
@@ -1393,7 +1394,7 @@ contents.post('/api/media/:id/archive', requireRole('owner', 'admin'), async (c)
   }
 });
 
-contents.post('/api/media/:id/restore', requireRole('owner', 'admin'), async (c) => {
+contents.post('/api/media/:id/restore', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     return await mediaArchiveRoute(c, false, c.req.param('id'));
   } catch (err) {
@@ -1514,10 +1515,10 @@ contents.get('/api/media/:id/replacement-impact', requireRole('owner', 'admin'),
 // 画面で読んだ影響は信用せず、同じ7種類を実行直前にも読み直す。
 // scope=replaceable は「置換可能な使用先だけ」を明示選択した部分実行。
 // 置き忘れ防止に、scope の省略・不正値は全件実行として扱わず 400/409 で止める。
-contents.post('/api/media/:id/replace-usages', requireRole('owner', 'admin'), async (c) => {
+contents.post('/api/media/:id/replace-usages', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'accountId が必要です' }, 400);
+    if (!accountId) return inputError(c, { success: false, error: 'accountId が必要です' }, 400, ["accountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
@@ -1529,12 +1530,12 @@ contents.post('/api/media/:id/replace-usages', requireRole('owner', 'admin'), as
       ? body.previewToken.trim()
       : (typeof body.expectedRevision === 'string' ? body.expectedRevision.trim() : '');
     if (!replacementId || !expectedRevision) {
-      return c.json({ success: false, error: '差し替え先と、確認した版が必要です' }, 400);
+      return inputError(c, { success: false, error: '差し替え先と、確認した版が必要です' }, 400, ["replacementMediaId","previewToken","expectedRevision"]);
     }
     if (body.scope !== undefined && body.scope !== null
       && (typeof body.scope !== 'string'
         || (body.scope.trim() !== 'all' && body.scope.trim() !== 'replaceable'))) {
-      return c.json({ success: false, error: 'scope は all か replaceable を指定してください' }, 400);
+      return inputError(c, { success: false, error: 'scope は all か replaceable を指定してください' }, 400, ["scope"]);
     }
     const scope: 'all' | 'replaceable' =
       typeof body.scope === 'string' && body.scope.trim() === 'replaceable'
@@ -1617,7 +1618,7 @@ contents.post('/api/media/:id/replace-usages', requireRole('owner', 'admin'), as
     });
   } catch (err) {
     if (err instanceof RequestBodyError) {
-      return c.json({ success: false, error: err.message }, err.status);
+      return inputError(c, { success: false, error: err.message }, err.status, []);
     }
     console.error('POST /api/media/:id/replace-usages error:', err);
     return c.json({ success: false, error: '使用先を差し替えられませんでした' }, 503);
@@ -2147,26 +2148,26 @@ contents.get('/api/common-vars/:id', async (c) => {
   }
 });
 
-contents.post('/api/common-vars', requireRole('owner', 'admin'), async (c) => {
+contents.post('/api/common-vars', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>();
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
-    if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    if (!accountId) return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
     const name = typeof body.name === 'string' ? body.name.trim() : '';
-    if (!name) return c.json({ success: false, error: '名前を入力してください' }, 400);
+    if (!name) return inputError(c, { success: false, error: '名前を入力してください' }, 400, ["name"]);
 
     // 差し込み名の決まりは友だち情報欄と同じ。片方だけ緩めると、
     // 「情報欄では使えないのに共通情報では使える名前」ができて混乱する。
     const keyCheck = validateFieldKey(body.varKey);
-    if (!keyCheck.ok) return c.json({ success: false, error: keyCheck.error }, 422);
+    if (!keyCheck.ok) return inputError(c, { success: false, error: keyCheck.error }, 422, ["varKey"]);
 
     // 不正な種別は黙って標準にしない。誤った種別での登録に気づけなくなる。
     const typeRaw = body.type === undefined ? 'text' : String(body.type);
     if (!(COMMON_VAR_TYPES as readonly string[]).includes(typeRaw)) {
-      return c.json({ success: false, error: '種別が正しくありません。選び直してください' }, 400);
+      return inputError(c, { success: false, error: '種別が正しくありません。選び直してください' }, 400, ["type"]);
     }
     const type = typeRaw as CommonVarType;
 
@@ -2176,41 +2177,41 @@ contents.post('/api/common-vars', requireRole('owner', 'admin'), async (c) => {
     const value = normalizeCommonVarValue(type, rawValue);
     const memo = body.memo == null ? '' : String(body.memo);
     if (name.length > 200) {
-      return c.json({ success: false, error: '名前は200文字までで入力してください' }, 400);
+      return inputError(c, { success: false, error: '名前は200文字までで入力してください' }, 400, ["name"]);
     }
     if (value === null) {
       // VAR-06: 何が悪いかを画面へ返す。画像はURL形だけを受け（VAR-03）、
       // URL型は http/https のURLだけを受ける（R36）。
-      return c.json({
+      return inputError(c, {
         success: false,
         error: type === 'image'
           ? '画像には https:// からはじまるURLを入力してください'
           : type === 'url'
             ? 'URLの値は http:// または https:// からはじまる形で入力してください'
             : '種別に合う値を入力してください',
-      }, 400);
+      }, 400, ["type","value"]);
     }
     if (memo.length > 1000) {
-      return c.json({ success: false, error: 'メモは1000文字までで入力してください' }, 400);
+      return inputError(c, { success: false, error: 'メモは1000文字までで入力してください' }, 400, ["memo"]);
     }
     const validity = parseCommonVarValidity(body);
     const fallbackValue = validity.fallbackValue === null
       ? null
       : normalizeCommonVarValue(type, validity.fallbackValue);
     if (validity.fallbackValue !== null && fallbackValue === null) {
-      return c.json({ success: false, error: '代替値は種別に合う値を入力してください' }, 400);
+      return inputError(c, { success: false, error: '代替値は種別に合う値を入力してください' }, 400, ["valid_from","valid_until","expiryBehavior","expiry_behavior","fallbackValue","fallback_value","type"]);
     }
     // Q: 鍵やトークンのような秘密の値は共通情報に置かせない。
     if (isSecretLikeValue(value) || (fallbackValue !== null && isSecretLikeValue(fallbackValue))) {
-      return c.json({
+      return inputError(c, {
         success: false,
         code: 'secret_value_not_allowed',
         error: '鍵やトークンのような秘密の値は共通情報に保存できません。外部連携の設定へ登録してください',
-      }, 422);
+      }, 422, ["type","value","valid_from","valid_until","expiryBehavior","expiry_behavior","fallbackValue","fallback_value"]);
     }
     const statusRaw = body.status === undefined ? 'active' : String(body.status);
     if (statusRaw !== 'active' && statusRaw !== 'draft') {
-      return c.json({ success: false, error: '状態は「下書き」か「使用中」で登録してください' }, 400);
+      return inputError(c, { success: false, error: '状態は「下書き」か「使用中」で登録してください' }, 400, ["status"]);
     }
 
     const created = await createCommonVar(c.env.DB, {
@@ -2231,10 +2232,10 @@ contents.post('/api/common-vars', requireRole('owner', 'admin'), async (c) => {
     return c.json({ success: true, data: serializeVar(created) }, 201);
   } catch (err) {
     if (err instanceof RequestBodyError) {
-      return c.json({ success: false, error: err.message }, err.status);
+      return inputError(c, { success: false, error: err.message }, err.status, []);
     }
     if (err instanceof CommonVarFolderError) {
-      return c.json({ success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400);
+      return inputError(c, { success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400, ["folderId"]);
     }
     if (err instanceof CommonVarKeyConflictError) {
       return c.json({ success: false, error: 'その差し込み名は既に使われています' }, 409);
@@ -2244,11 +2245,11 @@ contents.post('/api/common-vars', requireRole('owner', 'admin'), async (c) => {
   }
 });
 
-contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) => {
+contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!accountId) return inputError(c, { success: false, error: 'accountId query param required' }, 400, ["accountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
@@ -2260,72 +2261,69 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
       ? undefined
       : Number(body.expectedVersion);
     if (expectedVersion !== undefined && (!Number.isInteger(expectedVersion) || expectedVersion < 1)) {
-      return c.json({ success: false, error: 'expectedVersion must be a positive integer' }, 400);
+      return inputError(c, { success: false, error: 'expectedVersion must be a positive integer' }, 400, ["expectedVersion"]);
     }
     // 差し込み名は変えられない。変えるとテンプレートの差し込みが黙って空になる。
     if (body.varKey !== undefined && body.varKey !== existing.var_key) {
-      return c.json(
-        {
+      return inputError(c, {
           success: false,
           error:
             '差し込み名は後から変えられません。テンプレートの差し込みが空になるためです。新しく作ってください。',
-        },
-        422,
-      );
+        }, 422, ["varKey","accountId"]);
     }
     // 空の名前は作れない(登録時と同じ)。版番号なしの上書きは許すが、
     // その旨は契約テストに明記する(同時編集の衝突検出は版番号つきのみ)。
     const patchName = body.name === undefined ? undefined : String(body.name).trim();
     if (patchName !== undefined && !patchName) {
-      return c.json({ success: false, error: '名前を入力してください' }, 400);
+      return inputError(c, { success: false, error: '名前を入力してください' }, 400, ["name"]);
     }
     if (patchName !== undefined && patchName.length > 200) {
-      return c.json({ success: false, error: '名前は200文字までで入力してください' }, 400);
+      return inputError(c, { success: false, error: '名前は200文字までで入力してください' }, 400, ["name"]);
     }
     const patchValue = body.value === undefined ? undefined : normalizeCommonVarValue(existing.type as CommonVarType, String(body.value));
     if (patchValue === null) {
-      return c.json({
+      return inputError(c, {
         success: false,
         error: existing.type === 'image'
           ? '画像には https:// からはじまるURLを入力してください'
           : existing.type === 'url'
             ? 'URLの値は http:// または https:// からはじまる形で入力してください'
             : '種別に合う値を入力してください',
-      }, 400);
+      }, 400, ["value","accountId"]);
     }
     const patchMemo = body.memo === undefined ? undefined : String(body.memo);
     if (patchMemo !== undefined && patchMemo.length > 1000) {
-      return c.json({ success: false, error: 'メモは1000文字までで入力してください' }, 400);
+      return inputError(c, { success: false, error: 'メモは1000文字までで入力してください' }, 400, ["memo"]);
     }
     // Q: 変える理由は必須。後から履歴を見た人が「なぜ変えたか」を追えるようにする。
     const changeReason = typeof body.changeReason === 'string' ? body.changeReason.trim() : '';
     if (!changeReason) {
-      return c.json({
+      return inputError(c, {
         success: false,
         code: 'change_reason_required',
         error: '変える理由を入力してください',
-      }, 400);
+      }, 400, ["changeReason"]);
     }
     if (patchValue !== undefined && isSecretLikeValue(patchValue)) {
-      return c.json({
+      return inputError(c, {
         success: false,
         code: 'secret_value_not_allowed',
         error: '鍵やトークンのような秘密の値は共通情報に保存できません。外部連携の設定へ登録してください',
-      }, 422);
+      }, 422, ["value","accountId"]);
     }
     const validity = parseCommonVarValidity(body, existing);
     const normalizedFallback = validity.fallbackValue === null
       ? null
       : normalizeCommonVarValue(existing.type as CommonVarType, validity.fallbackValue);
     if (validity.fallbackValue !== null && normalizedFallback === null) {
-      return c.json({ success: false, error: '代替値は種別に合う値を入力してください' }, 400);
+      return inputError(c, { success: false, error: '代替値は種別に合う値を入力してください' }, 400, ["accountId","valid_from","valid_until","expiryBehavior","expiry_behavior","fallbackValue","fallback_value"]);
     }
     if (normalizedFallback !== null && isSecretLikeValue(normalizedFallback)) {
-      return c.json({
+      return inputError(c, {
         success: false,
         code: 'secret_value_not_allowed',
         error: '鍵やトークンのような秘密の値は代替値にも保存できません',
-      }, 422);
+      }, 422, ["accountId","valid_from","valid_until","expiryBehavior","expiry_behavior","fallbackValue","fallback_value"]);
     }
     // N-185: 影響確認なしの保存を止める。確認値は対象ID・版・使用先集合の写し。
     // 形の検査は先に済ませているため、ここからは確認値だけを見る。
@@ -2377,13 +2375,13 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
     return c.json({ success: true, data: serializeVar(updated!) });
   } catch (err) {
     if (err instanceof RequestBodyError) {
-      return c.json({ success: false, error: err.message }, err.status);
+      return inputError(c, { success: false, error: err.message }, err.status, []);
     }
     if (err instanceof CommonVarReasonRequiredError) {
-      return c.json({ success: false, code: 'change_reason_required', error: '変える理由を入力してください' }, 400);
+      return inputError(c, { success: false, code: 'change_reason_required', error: '変える理由を入力してください' }, 400, ["reason"]);
     }
     if (err instanceof CommonVarFolderError) {
-      return c.json({ success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400);
+      return inputError(c, { success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400, ["folderId"]);
     }
     if (err instanceof CommonVarVersionConflictError) {
       return c.json({
@@ -2400,26 +2398,26 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
 
 // Q: 状態の切替。下書き→使用中（公開）、使用中→止めた、止めた→使用中（再開）。
 // 値の変更ではないので影響確認は求めないが、状態を変える操作なので理由は必須。
-contents.post('/api/common-vars/:id/status', requireRole('owner', 'admin'), async (c) => {
+contents.post('/api/common-vars/:id/status', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!accountId) return inputError(c, { success: false, error: 'accountId query param required' }, 400, ["accountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
     const body = await c.req.json<Record<string, unknown>>();
     const to = String(body.to ?? '');
     if (to !== 'active' && to !== 'stopped') {
-      return c.json({ success: false, error: '状態は「使用中」か「止めた」のどちらかにしてください' }, 400);
+      return inputError(c, { success: false, error: '状態は「使用中」か「止めた」のどちらかにしてください' }, 400, ["to"]);
     }
     const changeReason = typeof body.changeReason === 'string' ? body.changeReason.trim() : '';
     if (!changeReason) {
-      return c.json({
+      return inputError(c, {
         success: false,
         code: 'change_reason_required',
         error: '変える理由を入力してください',
-      }, 400);
+      }, 400, ["changeReason"]);
     }
     const expectedVersion = body.expectedVersion === undefined
       ? undefined
@@ -2434,14 +2432,14 @@ contents.post('/api/common-vars/:id/status', requireRole('owner', 'admin'), asyn
     return c.json({ success: true, data: serializeVar(updated) });
   } catch (err) {
     if (err instanceof CommonVarStatusTransitionError) {
-      return c.json({
+      return inputError(c, {
         success: false,
         code: 'invalid_status_transition',
         error: `今の状態（${err.from === 'draft' ? '下書き' : err.from === 'active' ? '使用中' : '止めた'}）からはその操作ができません`,
-      }, 422);
+      }, 422, []);
     }
     if (err instanceof CommonVarReasonRequiredError) {
-      return c.json({ success: false, code: 'change_reason_required', error: '変える理由を入力してください' }, 400);
+      return inputError(c, { success: false, code: 'change_reason_required', error: '変える理由を入力してください' }, 400, ["reason"]);
     }
     if (err instanceof CommonVarVersionConflictError) {
       return c.json({
@@ -2476,23 +2474,23 @@ contents.get('/api/common-vars/:id/delete-impact', requireRole('owner', 'admin')
   }
 });
 
-contents.post('/api/common-vars/:id/impact-preview', requireRole('owner', 'admin'), async (c) => {
+contents.post('/api/common-vars/:id/impact-preview', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await readBoundedJson(c.req.raw);
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
-    if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    if (!accountId) return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
     if (typeof body.nextValue !== 'string') {
-      return c.json({ success: false, error: '変更後の値を入力してください' }, 400);
+      return inputError(c, { success: false, error: '変更後の値を入力してください' }, 400, ["nextValue"]);
     }
     const existing = await getCommonVarById(c.env.DB, c.req.param('id'), accountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
     if (body.expectedVersion !== undefined) {
       const expectedVersion = Number(body.expectedVersion);
       if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
-        return c.json({ success: false, error: 'expectedVersion must be a positive integer' }, 400);
+        return inputError(c, { success: false, error: 'expectedVersion must be a positive integer' }, 400, ["expectedVersion"]);
       }
       if (expectedVersion !== existing.version) {
         return c.json({
@@ -2526,7 +2524,7 @@ contents.post('/api/common-vars/:id/impact-preview', requireRole('owner', 'admin
     });
   } catch (err) {
     if (err instanceof RequestBodyError) {
-      return c.json({ success: false, error: err.message }, err.status);
+      return inputError(c, { success: false, error: err.message }, err.status, []);
     }
     console.error('POST /api/common-vars/:id/impact-preview error:', err);
     return c.json(
@@ -2536,11 +2534,11 @@ contents.post('/api/common-vars/:id/impact-preview', requireRole('owner', 'admin
   }
 });
 
-contents.post('/api/common-vars/:id/replace', requireRole('owner', 'admin'), async (c) => {
+contents.post('/api/common-vars/:id/replace', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await readBoundedJson(c.req.raw);
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
-    if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    if (!accountId) return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
@@ -2567,7 +2565,7 @@ contents.post('/api/common-vars/:id/replace', requireRole('owner', 'admin'), asy
     const replacement = await getCommonVarById(c.env.DB, replacementId, accountId);
     if (!replacement) return c.json({ success: false, error: 'Not found' }, 404);
     if (source.id === replacement.id || source.type !== replacement.type) {
-      return c.json({ success: false, error: '同じ種類の別の共通情報を選んでください' }, 422);
+      return inputError(c, { success: false, error: '同じ種類の別の共通情報を選んでください' }, 422, ["accountId","replacementId"]);
     }
     const plan = await getCommonVarReplacementPlan(c.env.DB, source, replacement);
     const revision = await commonVarReplacementRevision(plan);
@@ -2576,7 +2574,7 @@ contents.post('/api/common-vars/:id/replace', requireRole('owner', 'admin'), asy
 
     const expectedVersion = Number(body.expectedVersion);
     if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
-      return c.json({ success: false, error: 'expectedVersion is required' }, 400);
+      return inputError(c, { success: false, error: 'expectedVersion is required' }, 400, ["expectedVersion"]);
     }
     if (expectedVersion !== source.version) {
       return c.json({
@@ -2605,10 +2603,7 @@ contents.post('/api/common-vars/:id/replace', requireRole('owner', 'admin'), asy
     // Q: 差し替えて保管するときも、やった人の理由を版履歴に残す。
     const replaceReason = typeof body.changeReason === 'string' ? body.changeReason.trim() : '';
     if (!replaceReason) {
-      return c.json(
-        { success: false, error: '変えた・消した理由を入力してください', code: 'common_var_reason_required' },
-        400,
-      );
+      return inputError(c, { success: false, error: '変えた・消した理由を入力してください', code: 'common_var_reason_required' }, 400, ["changeReason"]);
     }
     const result = await applyCommonVarReplacementPlan(c.env.DB, plan, c.get('staff').id, replaceReason);
     let remainingUsageCount: number | null = null;
@@ -2633,7 +2628,7 @@ contents.post('/api/common-vars/:id/replace', requireRole('owner', 'admin'), asy
     });
   } catch (err) {
     if (err instanceof RequestBodyError) {
-      return c.json({ success: false, error: err.message }, err.status);
+      return inputError(c, { success: false, error: err.message }, err.status, []);
     }
     if (err instanceof CommonVarVersionConflictError) {
       return c.json({
@@ -2706,11 +2701,11 @@ contents.get('/api/common-vars/:id/schedules', async (c) => {
   }
 });
 
-contents.post('/api/common-vars/:id/schedules', requireRole('owner', 'admin'), async (c) => {
+contents.post('/api/common-vars/:id/schedules', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const varId = c.req.param('id');
     const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!accountId) return inputError(c, { success: false, error: 'accountId query param required' }, 400, ["accountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
@@ -2722,16 +2717,13 @@ contents.post('/api/common-vars/:id/schedules', requireRole('owner', 'admin'), a
     const effectiveFrom = typeof body.effectiveFrom === 'string' ? body.effectiveFrom : '';
     if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(effectiveFrom)
       || !isValidScheduleDateTime(effectiveFrom)) {
-      return c.json(
-        { success: false, error: '切り替える日時は 2026-09-01T10:00 の形で指定してください' },
-        400,
-      );
+      return inputError(c, { success: false, error: '切り替える日時は 2026-09-01T10:00 の形で指定してください' }, 400, ["effectiveFrom"]);
     }
     // 過ぎた日時は受け付けない。入れた瞬間に次のCronで当たり、
     // 「予約したつもりが今すぐ変わった」になる。
     const jstNowIso = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 16);
     if (effectiveFrom < jstNowIso) {
-      return c.json({ success: false, error: '過去の日時は指定できません' }, 400);
+      return inputError(c, { success: false, error: '過去の日時は指定できません' }, 400, ["effectiveFrom"]);
     }
 
     // VAR-06: 予約の値も登録・編集と同じ型検査を通す。ここを素通りさせると
@@ -2742,18 +2734,15 @@ contents.post('/api/common-vars/:id/schedules', requireRole('owner', 'admin'), a
       scheduledValue,
     );
     if (normalizedScheduled === null) {
-      return c.json(
-        { success: false, error: '更新後の値は種別に合う値を入力してください' },
-        400,
-      );
+      return inputError(c, { success: false, error: '更新後の値は種別に合う値を入力してください' }, 400, ["accountId","value"]);
     }
     // Q: 予約で入る値も秘密の値は受け付けない（登録・編集と同じ口）。
     if (isSecretLikeValue(normalizedScheduled)) {
-      return c.json({
+      return inputError(c, {
         success: false,
         code: 'secret_value_not_allowed',
         error: '鍵やトークンのような秘密の値は共通情報に保存できません',
-      }, 422);
+      }, 422, ["accountId","value"]);
     }
 
     const created = await createCommonVarSchedule(c.env.DB, {
@@ -2764,7 +2753,7 @@ contents.post('/api/common-vars/:id/schedules', requireRole('owner', 'admin'), a
     return c.json({ success: true, data: serializeSchedule(created) }, 201);
   } catch (err) {
     if (err instanceof RequestBodyError) {
-      return c.json({ success: false, error: err.message }, err.status);
+      return inputError(c, { success: false, error: err.message }, err.status, []);
     }
     console.error('POST /api/common-vars/:id/schedules error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);

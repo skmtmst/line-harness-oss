@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import type { CreateTrafficPoolRequest } from '@line-crm/shared';
 import { Hono, type Context } from 'hono';
 import {
@@ -128,20 +129,20 @@ trafficPools.get('/api/traffic-pools/accounts', async (c) => {
 });
 
 // POST /api/traffic-pools — create
-trafficPools.post('/api/traffic-pools', requireRole('owner'), async (c) => {
+trafficPools.post('/api/traffic-pools', requireRole('owner'), inputJsonBoundary({"slug":["string"],"name":["string"],"activeAccountId":["string"],"accountIds":["array"]}), async (c) => {
   let body: CreateTrafficPoolRequest;
   try { body = await c.req.json<CreateTrafficPoolRequest>(); }
-  catch { return c.json({ success: false, error: 'Invalid JSON' }, 400); }
+  catch { return inputError(c, { success: false, error: 'Invalid JSON' }, 400, []); }
   if (!body || typeof body.slug !== 'string' || !/^[a-z0-9][a-z0-9-]{1,31}$/.test(body.slug)
     || typeof body.name !== 'string' || !body.name.trim() || body.name.length > 200
     || typeof body.activeAccountId !== 'string' || !body.activeAccountId
     || (body.accountIds !== undefined && (!Array.isArray(body.accountIds) || body.accountIds.length > 50
       || body.accountIds.some((id) => typeof id !== 'string' || !id)))) {
-    return c.json({ success: false, error: 'プール名・URL名・受け入れ先を確認してください' }, 422);
+    return inputError(c, { success: false, error: 'プール名・URL名・受け入れ先を確認してください' }, 422, ["slug","name","activeAccountId","accountIds"]);
   }
   const accountIds = [...new Set(body.accountIds ?? [body.activeAccountId])];
   if (!accountIds.length || !accountIds.includes(body.activeAccountId)) {
-    return c.json({ success: false, error: '受け入れ先は1件以上必要です' }, 422);
+    return inputError(c, { success: false, error: '受け入れ先は1件以上必要です' }, 422, ["accountIds","activeAccountId"]);
   }
   try {
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), accountIds)) {
@@ -151,7 +152,7 @@ trafficPools.post('/api/traffic-pools', requireRole('owner'), async (c) => {
       WHERE id IN (${accountIds.map(() => '?').join(',')}) AND is_active = 1 AND archived_at IS NULL`)
       .bind(...accountIds).all<{ id: string }>();
     if (accounts.results.length !== accountIds.length) {
-      return c.json({ success: false, error: '稼働中のアカウントを選んでください' }, 422);
+      return inputError(c, { success: false, error: '稼働中のアカウントを選んでください' }, 422, ["accountIds","activeAccountId"]);
     }
     const pool = await createTrafficPool(c.env.DB, {
       slug: body.slug, name: body.name.trim(), activeAccountId: body.activeAccountId, accountIds,
@@ -170,7 +171,7 @@ trafficPools.use('/api/traffic-pools/:id', requireVisibleTrafficPool);
 trafficPools.use('/api/traffic-pools/:id/*', requireVisibleTrafficPool);
 
 // PUT /api/traffic-pools/:id — update (switch account here)
-trafficPools.put('/api/traffic-pools/:id', requireRole('owner'), async (c) => {
+trafficPools.put('/api/traffic-pools/:id', requireRole('owner'), inputJsonBoundary({"name":["string"],"activeAccountId":["string"],"isActive":["boolean"]}), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<{
@@ -246,11 +247,11 @@ trafficPools.get('/api/traffic-pools/:id/accounts', async (c) => {
 });
 
 // POST /api/traffic-pools/:id/accounts — add account to pool
-trafficPools.post('/api/traffic-pools/:id/accounts', requireRole('owner'), async (c) => {
+trafficPools.post('/api/traffic-pools/:id/accounts', requireRole('owner'), inputJsonBoundary({"lineAccountId":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{ lineAccountId: string }>();
     if (!body.lineAccountId) {
-      return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+      return inputError(c, { success: false, error: 'lineAccountId is required' }, 400, ["lineAccountId"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
@@ -267,7 +268,7 @@ trafficPools.post('/api/traffic-pools/:id/accounts', requireRole('owner'), async
 });
 
 // PUT /api/traffic-pools/:id/accounts/:accountId — toggle active
-trafficPools.put('/api/traffic-pools/:id/accounts/:accountId', requireRole('owner'), async (c) => {
+trafficPools.put('/api/traffic-pools/:id/accounts/:accountId', requireRole('owner'), inputJsonBoundary({"isActive":["boolean"]}), async (c) => {
   try {
     const body = await c.req.json<{ isActive: boolean }>();
     const result = await togglePoolAccount(c.env.DB, c.req.param('accountId'), body.isActive);

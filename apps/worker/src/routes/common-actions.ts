@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { Env } from '../index.js';
@@ -27,7 +28,7 @@ function accountId(c: Context<Env>): string | null {
 
 async function requireAccount(c: Context<Env>): Promise<string | Response> {
   const id = accountId(c);
-  if (!id) return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  if (!id) return inputError(c, { success: false, error: 'LINE公式アカウントを選んでください' }, 400, ["lineAccountId"]);
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   if (!scope.ids.includes(id)) {
     return c.json({ success: false, error: '対象のLINE公式アカウントが見つかりません' }, 404);
@@ -42,12 +43,12 @@ function validationResponse(c: Context<Env>, error: CommonActionValidationError)
     'not_found', 'draft_not_found', 'base_version_not_found', 'version_not_found', 'binding_not_found',
   ]);
   const status = conflict.has(error.code) ? 409 : notFound.has(error.code) ? 404 : 422;
-  return c.json({
+  return inputError(c, {
     success: false,
     error: error.message,
     code: error.code,
     ...(error.field ? { field: error.field } : {}),
-  }, status);
+  }, status, []);
 }
 
 function nonNegativeInteger(value: string | undefined, field: string): number | undefined {
@@ -150,7 +151,7 @@ commonActions.get('/api/common-actions', requireRole('owner', 'admin', 'staff'),
   }
 });
 
-commonActions.post('/api/common-actions', requireRole('owner', 'admin'), async (c) => {
+commonActions.post('/api/common-actions', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const id = await requireAccount(c);
   if (typeof id !== 'string') return id;
   const body = await c.req.json<{
@@ -206,7 +207,7 @@ commonActions.get('/api/common-actions/:id', requireRole('owner', 'admin', 'staf
 });
 
 // 監査 R480: 未使用の共通アクションを保管する。利用中は422で利用先を示す。
-commonActions.post('/api/common-actions/:id/archive', requireRole('owner', 'admin'), async (c) => {
+commonActions.post('/api/common-actions/:id/archive', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const id = await requireAccount(c);
   if (typeof id !== 'string') return id;
   return endpoint(c, async () => {
@@ -218,7 +219,7 @@ commonActions.post('/api/common-actions/:id/archive', requireRole('owner', 'admi
   });
 });
 
-commonActions.post('/api/common-actions/:id/unarchive', requireRole('owner', 'admin'), async (c) => {
+commonActions.post('/api/common-actions/:id/unarchive', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const id = await requireAccount(c);
   if (typeof id !== 'string') return id;
   return endpoint(c, async () => {
@@ -230,7 +231,7 @@ commonActions.post('/api/common-actions/:id/unarchive', requireRole('owner', 'ad
   });
 });
 
-commonActions.post('/api/common-actions/:id/duplicate', requireRole('owner', 'admin'), async (c) => {
+commonActions.post('/api/common-actions/:id/duplicate', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const id = await requireAccount(c);
   if (typeof id !== 'string') return id;
   return endpoint(c, () => duplicateCommonAction(c.env.DB, {
@@ -240,7 +241,7 @@ commonActions.post('/api/common-actions/:id/duplicate', requireRole('owner', 'ad
   }), 201);
 });
 
-commonActions.put('/api/common-actions/:id/draft', requireRole('owner', 'admin'), async (c) => {
+commonActions.put('/api/common-actions/:id/draft', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const id = await requireAccount(c);
   if (typeof id !== 'string') return id;
   const body = await c.req.json<{
@@ -273,7 +274,7 @@ commonActions.put('/api/common-actions/:id/draft', requireRole('owner', 'admin')
   });
 });
 
-commonActions.post('/api/common-actions/:id/versions', requireRole('owner', 'admin'), async (c) => {
+commonActions.post('/api/common-actions/:id/versions', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const id = await requireAccount(c);
   if (typeof id !== 'string') return id;
   const body = await c.req.json<{ fromVersionId?: unknown }>()
@@ -289,7 +290,7 @@ commonActions.post('/api/common-actions/:id/versions', requireRole('owner', 'adm
 commonActions.post(
   '/api/common-actions/:id/versions/:versionId/publish',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const id = await requireAccount(c);
     if (typeof id !== 'string') return id;
     // 監査 R477: 公開確認に使った下書きの改訂番号を照合する。
@@ -307,7 +308,7 @@ commonActions.post(
 commonActions.post(
   '/api/common-actions/:id/bindings/:bindingId/version',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const id = await requireAccount(c);
     if (typeof id !== 'string') return id;
     const body = await c.req.json<{ versionId?: unknown; expectedVersionId?: unknown }>()

@@ -1271,7 +1271,7 @@ describe('webinar notification settings', () => {
       });
 
       expect(res.status).toBe(400);
-      expect(await res.json()).toEqual({ success: false, error: message });
+      expect(await res.json()).toMatchObject({ success: false, code: message , fields: expect.any(Object), error: expect.any(String) });
     },
   );
 
@@ -1309,7 +1309,7 @@ describe('webinar notification settings', () => {
     const res = await adminReq('/api/webinars/w1/notifications/test', { method: 'POST' });
 
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ success: false, error: 'no_upcoming_session' });
+    expect(await res.json()).toMatchObject({ success: false, code: 'no_upcoming_session' , fields: expect.any(Object), error: expect.any(String) });
     expect(webinarNotificationMocks.sendWebinarNotificationTest).not.toHaveBeenCalled();
   });
 
@@ -1360,7 +1360,7 @@ describe('admin CRUD', () => {
     ['負数', -1],
     ['数値文字列', '60'],
     ['null', null],
-  ])('POST — 視聴時間が%sなら422で保存しない', async (_label, durationSeconds) => {
+  ])('POST — 視聴時間が%sなら400/422で保存しない', async (_label, durationSeconds) => {
     dbMocks.getWebinarBySlug.mockResolvedValue(null);
 
     const res = await adminReq('/api/webinars', {
@@ -1370,8 +1370,8 @@ describe('admin CRUD', () => {
       }),
     });
 
-    expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toEqual({ success: false, error: 'invalid_duration' });
+    expect(res.status).toBe(typeof durationSeconds === 'number' ? 422 : 400);
+    await expect(res.json()).resolves.toMatchObject({ success: false, fields: { durationSeconds: expect.any(String) }, error: expect.any(String) });
     expect(dbMocks.createWebinar).not.toHaveBeenCalled();
   });
 
@@ -1386,7 +1386,7 @@ describe('admin CRUD', () => {
     });
 
     expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toEqual({ success: false, error: 'invalid_duration' });
+    await expect(res.json()).resolves.toMatchObject({ success: false, code: 'invalid_duration' , fields: expect.any(Object), error: expect.any(String) });
     expect(dbMocks.createWebinar).not.toHaveBeenCalled();
   });
 
@@ -1514,7 +1514,7 @@ describe('admin CRUD', () => {
       body: JSON.stringify({ title: '未所属', slug: 'missing-account', durationSeconds: 7200 }),
     });
     expect(res.status).toBe(400);
-    expect(await res.json()).toMatchObject({ error: 'account_id_required' });
+    expect(await res.json()).toMatchObject({ code: 'account_id_required' , fields: expect.any(Object), error: expect.any(String) });
     expect(dbMocks.createWebinar).not.toHaveBeenCalled();
   });
 
@@ -1547,7 +1547,7 @@ describe('admin CRUD', () => {
       body: JSON.stringify({ comments }),
     });
     expect(res.status).toBe(400);
-    expect(await res.json()).toMatchObject({ error: 'too_many_comments' });
+    expect(await res.json()).toMatchObject({ code: 'too_many_comments' , fields: expect.any(Object), error: expect.any(String) });
     expect(dbMocks.replaceWebinarComments).not.toHaveBeenCalled();
   });
 
@@ -1918,7 +1918,7 @@ describe('admin CRUD', () => {
       }),
     });
     expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toMatchObject({ error: 'invalid_action_reference' });
+    await expect(res.json()).resolves.toMatchObject({ code: 'invalid_action_reference' , fields: expect.any(Object), error: expect.any(String) });
     expect(dbMocks.replaceWebinarActions).not.toHaveBeenCalled();
   });
 
@@ -1956,7 +1956,7 @@ describe('admin CRUD', () => {
     ['負数', -1],
     ['数値文字列', '60'],
     ['null', null],
-  ])('PUT /api/webinars/:id — 視聴時間が%sなら422で更新しない', async (_label, durationSeconds) => {
+  ])('PUT /api/webinars/:id — 視聴時間が%sなら400/422で更新しない', async (_label, durationSeconds) => {
     dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
 
     const res = await adminReq('/api/webinars/w1', {
@@ -1964,8 +1964,8 @@ describe('admin CRUD', () => {
       body: JSON.stringify({ durationSeconds }),
     });
 
-    expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toEqual({ success: false, error: 'invalid_duration' });
+    expect(res.status).toBe(typeof durationSeconds === 'number' ? 422 : 400);
+    await expect(res.json()).resolves.toMatchObject({ success: false, fields: { durationSeconds: expect.any(String) }, error: expect.any(String) });
     expect(dbMocks.updateWebinar).not.toHaveBeenCalled();
   });
 
@@ -2151,7 +2151,7 @@ describe('R95 公開は公開専用口へ集約する', () => {
       }),
     });
     expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toEqual({ success: false, error: 'publish_via_publish_endpoint' });
+    await expect(res.json()).resolves.toMatchObject({ success: false, code: 'publish_via_publish_endpoint' , fields: expect.any(Object), error: expect.any(String) });
     expect(dbMocks.createWebinar).not.toHaveBeenCalled();
   });
 });

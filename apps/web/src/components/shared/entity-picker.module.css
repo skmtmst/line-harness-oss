@@ -32,3 +32,7 @@
 .textButton { padding: 0; border: 0; background: none; font: inherit; color: var(--color-action); cursor: pointer; }
 .textButton:hover { text-decoration: underline; }
 }
+
+@layer components {
+[data-theme='v8'] .field { box-shadow: var(--control-shadow); }
+}

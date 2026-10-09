@@ -105,25 +105,6 @@
 .band [data-kpi-number] {
   font-variant-numeric: normal;
 }
-.kpiMenu {
-  display: inline-flex;
-  align-items: center;
-  height: var(--tpl-an-kpi-menu);
-}
-:global([data-theme='v8']) .kpiMenuButton {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-:global([data-theme='v8']) .kpiMenuButton:not(:focus-visible) {
-  outline: 0;
-}
-:global([data-theme='v8']) .kpiMenuButton {
-  min-height: 0;
-  width: var(--tpl-an-kpi-menu);
-  height: var(--tpl-an-kpi-menu);
-  flex: 0 0 var(--tpl-an-kpi-menu);
-}
 
 /* 本文：左に棒、右に 320 の列。1152 では1列にして右の2枚を横に並べる。 */
 .body {

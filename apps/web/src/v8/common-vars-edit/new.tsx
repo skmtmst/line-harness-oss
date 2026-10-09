@@ -184,7 +184,6 @@ export default function NewCommonVarV8() {
   const [periodFieldError, setPeriodFieldError] = useState('')
   const [secretWarningFields, setSecretWarningFields] = useState<string[] | null>(null)
   const valueRef = useRef<HTMLInputElement>(null)
-  const memoRef = useRef<HTMLTextAreaElement>(null)
   const secretWarningRef = useRef<HTMLDivElement>(null)
   const boundAccountRef = useRef(selectedAccountId)
 
@@ -716,7 +715,7 @@ export default function NewCommonVarV8() {
               onClick={() => {
                 const firstField = secretWarningFields[0]
                 setSecretWarningFields(null)
-                if (firstField === '社内メモ') memoRef.current?.focus()
+                if (firstField === '社内メモ') focusField('cv-memo')
                 else valueRef.current?.focus()
               }}
             >

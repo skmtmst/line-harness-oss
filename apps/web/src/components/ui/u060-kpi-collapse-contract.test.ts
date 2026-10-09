@@ -61,12 +61,13 @@ describe('V8の数の帯とメンバー一覧', () => {
     expect(page).toContain('kpisWithSendCountsState.map(renderKpiCard)')
   })
 
-  it('メンバー管理は集計カードを重ねず一覧と設定の案内を出す', () => {
+  it('メンバー管理は共通の数の帯と一覧と設定の案内を出す', () => {
     // 入口（app/hq/members/page.tsx）は V8 の画面を出すだけになった（2026-10-09 V7 削除）。V8 の本体を見る。
     const page = read('v8/hq/members.tsx')
     expect(page).toContain('<HqSettingsNavV8 active="members"')
     expect(page).toContain('data-design="Table"')
-    expect(page).not.toContain('<KpiCard')
+    expect(page).toContain('<KpiBand')
+    expect(page.match(/<KpiCard\b/g)).toHaveLength(4)
   })
 })
 

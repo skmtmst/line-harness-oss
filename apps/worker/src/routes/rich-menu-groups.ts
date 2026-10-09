@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { assembleRichMenuGroupInput, richMenuLiveToSnapshot } from '../services/rich-menu-group-input.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -374,51 +375,51 @@ function isJsonRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
+type Parsed<T> = { ok: true; value: T } | { ok: false; error: string; field?: string };
 
 function parseAreaInput(raw: unknown): Parsed<RichMenuAreaInput> {
-  if (!raw || typeof raw !== 'object') return { ok: false, error: 'area must be object' };
+  if (!raw || typeof raw !== 'object') return { field: 'pages', ok: false, error: 'area must be object' };
   const r = raw as Record<string, unknown>;
   const fields: (keyof RichMenuAreaInput)[] = ['boundsX', 'boundsY', 'boundsWidth', 'boundsHeight'];
   for (const f of fields) {
     if (typeof r[f] !== 'number' || !Number.isFinite(r[f]) || (r[f] as number) < 0) {
-      return { ok: false, error: `area.${f} must be a non-negative number` };
+      return { field: 'pages', ok: false, error: `area.${f} must be a non-negative number` };
     }
   }
   if ((r.boundsWidth as number) <= 0 || (r.boundsHeight as number) <= 0) {
-    return { ok: false, error: 'area width/height must be positive' };
+    return { field: 'pages', ok: false, error: 'area width/height must be positive' };
   }
   if (typeof r.actionType !== 'string' || !VALID_ACTION_TYPES.has(r.actionType)) {
-    return { ok: false, error: `area.actionType must be one of ${[...VALID_ACTION_TYPES].join('/')}` };
+    return { field: 'pages', ok: false, error: `area.actionType must be one of ${[...VALID_ACTION_TYPES].join('/')}` };
   }
   if (!r.actionData || typeof r.actionData !== 'object') {
-    return { ok: false, error: 'area.actionData must be object' };
+    return { field: 'pages', ok: false, error: 'area.actionData must be object' };
   }
   if (r.id !== undefined && r.id !== null && (typeof r.id !== 'string' || r.id.length === 0)) {
-    return { ok: false, error: 'area.id must be non-empty string when present' };
+    return { field: 'pages', ok: false, error: 'area.id must be non-empty string when present' };
   }
   if (
     r.intent !== undefined &&
     r.intent !== null &&
     (typeof r.intent !== 'string' || !VALID_INTENTS.has(r.intent))
   ) {
-    return { ok: false, error: `area.intent must be one of ${[...VALID_INTENTS].join('/')}` };
+    return { field: 'pages', ok: false, error: `area.intent must be one of ${[...VALID_INTENTS].join('/')}` };
   }
   if (r.label !== undefined && r.label !== null && typeof r.label !== 'string') {
-    return { ok: false, error: 'area.label must be string' };
+    return { field: 'pages', ok: false, error: 'area.label must be string' };
   }
   // #827 (N-155): ボタン名は端末の読み上げ(アクセシビリティ)にも使うため
   // 20 字まで。公開時の必須・上限検査と同じ上限を保存口でも掛けて、
   // 21 字以上の値を DB へ残さない。
   if (typeof r.label === 'string' && [...r.label].length > 20) {
-    return { ok: false, error: 'area.label must be 20 characters or fewer' };
+    return { field: 'pages', ok: false, error: 'area.label must be 20 characters or fewer' };
   }
   if (r.tagIds !== undefined && r.tagIds !== null) {
     if (!Array.isArray(r.tagIds) || r.tagIds.some((t) => typeof t !== 'string' || t.length === 0)) {
-      return { ok: false, error: 'area.tagIds must be an array of non-empty strings' };
+      return { field: 'pages', ok: false, error: 'area.tagIds must be an array of non-empty strings' };
     }
     if (r.tagIds.length > 20) {
-      return { ok: false, error: 'area.tagIds must be 20 items or fewer' };
+      return { field: 'pages', ok: false, error: 'area.tagIds must be 20 items or fewer' };
     }
   }
   if (
@@ -426,18 +427,18 @@ function parseAreaInput(raw: unknown): Parsed<RichMenuAreaInput> {
     r.scoreChange !== null &&
     (typeof r.scoreChange !== 'number' || !Number.isInteger(r.scoreChange))
   ) {
-    return { ok: false, error: 'area.scoreChange must be an integer' };
+    return { field: 'pages', ok: false, error: 'area.scoreChange must be an integer' };
   }
   for (const key of ['templateId', 'formId', 'trackedLinkId'] as const) {
     const v = r[key];
     if (v !== undefined && v !== null && (typeof v !== 'string' || v.length === 0)) {
-      return { ok: false, error: `area.${key} must be non-empty string when present` };
+      return { field: 'pages', ok: false, error: `area.${key} must be non-empty string when present` };
     }
   }
   for (const key of ['menuId', 'cardId']) {
     const selected = (r.actionData as Record<string, unknown>)[key];
     if (selected !== undefined && (typeof selected !== 'string' || (selected !== '' && !/^[A-Za-z0-9_-]{1,128}$/.test(selected)))) {
-      return { ok: false, error: `area.actionData.${key} must be a valid identifier` };
+      return { field: 'pages', ok: false, error: `area.actionData.${key} must be a valid identifier` };
     }
   }
   // intent が来ているなら、DB へ載せる種類は intent から決め直す。
@@ -453,7 +454,7 @@ function parseAreaInput(raw: unknown): Parsed<RichMenuAreaInput> {
     ? RICH_MENU_DB_ACTION_TYPE_BY_INTENT[intent]
     : (r.actionType as RichMenuAreaInput['actionType']);
   if (!DB_ACTION_TYPES.has(actionType)) {
-    return { ok: false, error: `area.actionType must be one of ${[...DB_ACTION_TYPES].join('/')}` };
+    return { field: 'pages', ok: false, error: `area.actionType must be one of ${[...DB_ACTION_TYPES].join('/')}` };
   }
 
   return {
@@ -478,17 +479,17 @@ function parseAreaInput(raw: unknown): Parsed<RichMenuAreaInput> {
 }
 
 function parsePageInput(raw: unknown): Parsed<RichMenuPageInput> {
-  if (!raw || typeof raw !== 'object') return { ok: false, error: 'page must be object' };
+  if (!raw || typeof raw !== 'object') return { field: 'pages', ok: false, error: 'page must be object' };
   const r = raw as Record<string, unknown>;
-  if (typeof r.name !== 'string' || r.name.length === 0) return { ok: false, error: 'page.name required' };
+  if (typeof r.name !== 'string' || r.name.length === 0) return { field: 'pages', ok: false, error: 'page.name required' };
   if (typeof r.orderIndex !== 'number' || !Number.isInteger(r.orderIndex) || r.orderIndex < 0) {
-    return { ok: false, error: 'page.orderIndex must be non-negative integer' };
+    return { field: 'pages', ok: false, error: 'page.orderIndex must be non-negative integer' };
   }
   if (r.id !== undefined && (typeof r.id !== 'string' || r.id.length === 0)) {
-    return { ok: false, error: 'page.id must be non-empty string when present' };
+    return { field: 'pages', ok: false, error: 'page.id must be non-empty string when present' };
   }
-  if (!Array.isArray(r.areas)) return { ok: false, error: 'page.areas must be array' };
-  if (r.areas.length > 20) return { ok: false, error: 'page.areas exceeds LINE limit of 20' };
+  if (!Array.isArray(r.areas)) return { field: 'pages', ok: false, error: 'page.areas must be array' };
+  if (r.areas.length > 20) return { field: 'pages', ok: false, error: 'page.areas exceeds LINE limit of 20' };
   const areas: RichMenuAreaInput[] = [];
   for (const a of r.areas) {
     const parsed = parseAreaInput(a);
@@ -507,10 +508,10 @@ function parsePageInput(raw: unknown): Parsed<RichMenuPageInput> {
 }
 
 function parsePages(raw: unknown): Parsed<RichMenuPageInput[]> {
-  if (!Array.isArray(raw) || raw.length === 0) return { ok: false, error: 'pages must be a non-empty array' };
+  if (!Array.isArray(raw) || raw.length === 0) return { field: 'pages', ok: false, error: 'pages must be a non-empty array' };
   // O(公開前の確認): ページは10まで。保存口で止め、公開前の検査でも見る。
   if (raw.length > RICH_MENU_MAX_PAGES) {
-    return { ok: false, error: `pages exceeds limit of ${RICH_MENU_MAX_PAGES}` };
+    return { field: 'pages', ok: false, error: `pages exceeds limit of ${RICH_MENU_MAX_PAGES}` };
   }
   const pages: RichMenuPageInput[] = [];
   for (const p of raw) {
@@ -521,7 +522,7 @@ function parsePages(raw: unknown): Parsed<RichMenuPageInput[]> {
   // order_index は 0..N-1 で重複なしを必須化。
   const orders = pages.map((p) => p.orderIndex).sort((a, b) => a - b);
   for (let i = 0; i < orders.length; i++) {
-    if (orders[i] !== i) return { ok: false, error: 'page.orderIndex must be 0..N-1 with no duplicates' };
+    if (orders[i] !== i) return { field: 'pages', ok: false, error: 'page.orderIndex must be 0..N-1 with no duplicates' };
   }
   // page.id (任意) が指定されている場合、payload 内で重複していないことを保証。
   // 重複していると PATCH の id 維持で existingMap が同じ row を 2 回返し PK 衝突する。
@@ -529,7 +530,7 @@ function parsePages(raw: unknown): Parsed<RichMenuPageInput[]> {
   for (const p of pages) {
     if (p.id !== undefined) {
       if (seen.has(p.id)) {
-        return { ok: false, error: `page.id "${p.id}" is duplicated in pages array` };
+        return { field: 'pages', ok: false, error: `page.id "${p.id}" is duplicated in pages array` };
       }
       seen.add(p.id);
     }
@@ -562,17 +563,17 @@ function validateRichmenuswitchInCreate(pages: RichMenuPageInput[]): string | nu
 function parseCreateBody(raw: unknown): Parsed<CreateRichMenuGroupInput> {
   if (!raw || typeof raw !== 'object') return { ok: false, error: 'body must be object' };
   const r = raw as Record<string, unknown>;
-  if (typeof r.accountId !== 'string' || r.accountId.length === 0) return { ok: false, error: 'accountId required' };
-  if (typeof r.name !== 'string' || r.name.length === 0) return { ok: false, error: 'name required' };
+  if (typeof r.accountId !== 'string' || r.accountId.length === 0) return { field: 'accountId', ok: false, error: 'accountId required' };
+  if (typeof r.name !== 'string' || r.name.length === 0) return { field: 'name', ok: false, error: 'name required' };
   if (typeof r.chatBarText !== 'string' || r.chatBarText.length === 0 || r.chatBarText.length > 14) {
-    return { ok: false, error: 'chatBarText required (1..14 chars)' };
+    return { field: 'chatBarText', ok: false, error: 'chatBarText required (1..14 chars)' };
   }
-  if (typeof r.size !== 'string' || !VALID_SIZES.has(r.size)) return { ok: false, error: 'size must be large or compact' };
+  if (typeof r.size !== 'string' || !VALID_SIZES.has(r.size)) return { field: 'size', ok: false, error: 'size must be large or compact' };
   const pages = parsePages(r.pages);
   if (!pages.ok) return pages;
   // #502中: 作成直後のフォルダ付けupdate握りつぶしをなくすため、作成口で直接受け付ける。
   if (r.folderId !== undefined && r.folderId !== null && typeof r.folderId !== 'string') {
-    return { ok: false, error: 'folderId must be a string or null' };
+    return { field: 'folderId', ok: false, error: 'folderId must be a string or null' };
   }
   // N-161: 既定ページ・配信対象・全員既定を作成時に決められるようにする。
   let defaultPageIndex: number | null = null;
@@ -582,43 +583,43 @@ function parseCreateBody(raw: unknown): Parsed<CreateRichMenuGroupInput> {
       || !Number.isInteger(r.defaultPageIndex)
       || !pages.value.some((p) => p.orderIndex === r.defaultPageIndex)
     ) {
-      return { ok: false, error: 'defaultPageIndex must be an orderIndex of one of the pages' };
+      return { field: 'defaultPageIndex', ok: false, error: 'defaultPageIndex must be an orderIndex of one of the pages' };
     }
     defaultPageIndex = r.defaultPageIndex;
   }
   if (r.isDefaultForAll !== undefined && typeof r.isDefaultForAll !== 'boolean') {
-    return { ok: false, error: 'isDefaultForAll must be boolean' };
+    return { field: 'isDefaultForAll', ok: false, error: 'isDefaultForAll must be boolean' };
   }
   if (r.targetingEnabled !== undefined && typeof r.targetingEnabled !== 'boolean') {
-    return { ok: false, error: 'targetingEnabled must be boolean' };
+    return { field: 'targetingEnabled', ok: false, error: 'targetingEnabled must be boolean' };
   }
   if (r.defaultOpen !== undefined && typeof r.defaultOpen !== 'boolean') {
-    return { ok: false, error: 'defaultOpen must be boolean' };
+    return { field: 'defaultOpen', ok: false, error: 'defaultOpen must be boolean' };
   }
   if (r.targetingPriority !== undefined) {
     if (typeof r.targetingPriority !== 'number' || !Number.isInteger(r.targetingPriority)) {
-      return { ok: false, error: 'targetingPriority must be an integer' };
+      return { field: 'targetingPriority', ok: false, error: 'targetingPriority must be an integer' };
     }
   }
   let targetingCondition: string | null = null;
   if (r.targetingCondition !== undefined && r.targetingCondition !== null) {
     if (typeof r.targetingCondition !== 'string') {
-      return { ok: false, error: 'targetingCondition must be a JSON string or null' };
+      return { field: 'targetingCondition', ok: false, error: 'targetingCondition must be a JSON string or null' };
     }
     try {
       JSON.parse(r.targetingCondition);
     } catch {
-      return { ok: false, error: 'targetingCondition must be valid JSON' };
+      return { field: 'targetingCondition', ok: false, error: 'targetingCondition must be valid JSON' };
     }
     targetingCondition = r.targetingCondition;
   }
   // 「条件で出し分ける」を選んだのに条件が空だと、公開しても誰にも出ない
   // 設定が作れる。入口で断る。
   if (r.targetingEnabled === true && !targetingCondition) {
-    return { ok: false, error: 'targetingEnabled requires targetingCondition' };
+    return { field: 'targetingCondition', ok: false, error: 'targetingEnabled requires targetingCondition' };
   }
   const switcherRejection = validateRichmenuswitchInCreate(pages.value);
-  if (switcherRejection) return { ok: false, error: switcherRejection };
+  if (switcherRejection) return { field: 'pages', ok: false, error: switcherRejection };
   return {
     ok: true,
     value: {
@@ -643,44 +644,44 @@ function parsePatchBody(raw: unknown): Parsed<{ meta: UpdateRichMenuGroupMetaInp
   const r = raw as Record<string, unknown>;
   const meta: UpdateRichMenuGroupMetaInput = {};
   if (r.name !== undefined) {
-    if (typeof r.name !== 'string' || r.name.length === 0) return { ok: false, error: 'name must be non-empty string' };
+    if (typeof r.name !== 'string' || r.name.length === 0) return { field: 'name', ok: false, error: 'name must be non-empty string' };
     meta.name = r.name;
   }
   if (r.chatBarText !== undefined) {
     if (typeof r.chatBarText !== 'string' || r.chatBarText.length === 0 || r.chatBarText.length > 14) {
-      return { ok: false, error: 'chatBarText must be 1..14 chars' };
+      return { field: 'chatBarText', ok: false, error: 'chatBarText must be 1..14 chars' };
     }
     meta.chatBarText = r.chatBarText;
   }
   if (r.isDefaultForAll !== undefined) {
-    if (typeof r.isDefaultForAll !== 'boolean') return { ok: false, error: 'isDefaultForAll must be boolean' };
+    if (typeof r.isDefaultForAll !== 'boolean') return { field: 'isDefaultForAll', ok: false, error: 'isDefaultForAll must be boolean' };
     meta.isDefaultForAll = r.isDefaultForAll;
   }
   if (r.targetingCondition !== undefined) {
     if (r.targetingCondition === null) {
       meta.targetingCondition = null;
     } else if (typeof r.targetingCondition !== 'string') {
-      return { ok: false, error: 'targetingCondition must be a JSON string or null' };
+      return { field: 'targetingCondition', ok: false, error: 'targetingCondition must be a JSON string or null' };
     } else {
       // 読めない JSON をそのまま保存すると、出し分けのたびに黙って飛ばされる。
       // 入り口で断る。
       try {
         JSON.parse(r.targetingCondition);
       } catch {
-        return { ok: false, error: 'targetingCondition must be valid JSON' };
+        return { field: 'targetingCondition', ok: false, error: 'targetingCondition must be valid JSON' };
       }
       meta.targetingCondition = r.targetingCondition;
     }
   }
   if (r.targetingPriority !== undefined) {
     if (typeof r.targetingPriority !== 'number' || !Number.isInteger(r.targetingPriority)) {
-      return { ok: false, error: 'targetingPriority must be an integer' };
+      return { field: 'targetingPriority', ok: false, error: 'targetingPriority must be an integer' };
     }
     meta.targetingPriority = r.targetingPriority;
   }
   if (r.targetingEnabled !== undefined) {
     if (typeof r.targetingEnabled !== 'boolean') {
-      return { ok: false, error: 'targetingEnabled must be boolean' };
+      return { field: 'targetingEnabled', ok: false, error: 'targetingEnabled must be boolean' };
     }
     meta.targetingEnabled = r.targetingEnabled;
   }
@@ -688,19 +689,19 @@ function parsePatchBody(raw: unknown): Parsed<{ meta: UpdateRichMenuGroupMetaInp
     if (r.folderId === null || r.folderId === '') {
       meta.folderId = null;
     } else if (typeof r.folderId !== 'string') {
-      return { ok: false, error: 'folderId must be a string' };
+      return { field: 'folderId', ok: false, error: 'folderId must be a string' };
     } else {
       meta.folderId = r.folderId;
     }
   }
   if (r.displayOrder !== undefined) {
     if (typeof r.displayOrder !== 'number' || !Number.isInteger(r.displayOrder)) {
-      return { ok: false, error: 'displayOrder must be an integer' };
+      return { field: 'displayOrder', ok: false, error: 'displayOrder must be an integer' };
     }
     meta.displayOrder = r.displayOrder;
   }
   if (r.defaultOpen !== undefined) {
-    if (typeof r.defaultOpen !== 'boolean') return { ok: false, error: 'defaultOpen must be boolean' };
+    if (typeof r.defaultOpen !== 'boolean') return { field: 'defaultOpen', ok: false, error: 'defaultOpen must be boolean' };
     meta.defaultOpen = r.defaultOpen;
   }
   let pages: RichMenuPageInput[] | undefined;
@@ -731,15 +732,12 @@ richMenuGroups.get('/api/rich-menu-groups/external/:richMenuId/image', async (c)
   );
   if (!res.ok) {
     // #502中: 不正なIDでURLが化けないよう符号化し、外部の応答本文は利用者に出さない。
-    return c.json(
-      {
+    return inputError(c, {
         success: false,
         error: res.status === 404
           ? 'LINE上に画像が見つかりませんでした'
           : 'LINEから画像を取得できませんでした',
-      },
-      res.status === 404 ? 404 : 500,
-    );
+      }, res.status === 404 ? 404 : 500, []);
   }
   return new Response(res.body, {
     headers: {
@@ -753,11 +751,11 @@ richMenuGroups.get('/api/rich-menu-groups/external/:richMenuId/image', async (c)
 // 取り込み後は通常の編集画面で操作できる。
 //
 // query: { accountId, richMenuId }
-richMenuGroups.post('/api/rich-menu-groups/import', requireRole('owner', 'admin'), async (c) => {
+richMenuGroups.post('/api/rich-menu-groups/import', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const accountId = c.req.query('accountId');
   const richMenuId = c.req.query('richMenuId');
   if (!accountId || !richMenuId) {
-    return c.json({ success: false, error: 'accountId and richMenuId query params required' }, 400);
+    return inputError(c, { success: false, error: 'accountId and richMenuId query params required' }, 400, ["accountId","richMenuId"]);
   }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'line account not found' }, 404);
@@ -789,15 +787,12 @@ richMenuGroups.post('/api/rich-menu-groups/import', requireRole('owner', 'admin'
   });
   if (!detailRes.ok) {
     // #502中: 外部の応答本文をそのまま利用者に返さない。固定の日本語に置き換える。
-    return c.json(
-      {
+    return inputError(c, {
         success: false,
         error: detailRes.status === 404
           ? 'LINE上にメニューが見つかりませんでした'
           : 'LINEからメニューを取得できませんでした',
-      },
-      detailRes.status === 404 ? 404 : 500,
-    );
+      }, detailRes.status === 404 ? 404 : 500, []);
   }
   type LineArea = {
     bounds: { x: number; y: number; width: number; height: number };
@@ -832,13 +827,10 @@ richMenuGroups.post('/api/rich-menu-groups/import', requireRole('owner', 'admin'
         ? 'compact'
         : null;
   if (!size) {
-    return c.json(
-      {
+    return inputError(c, {
         success: false,
         error: `非対応サイズ ${detail.size.width}x${detail.size.height}。管理画面は ${RICH_MENU_DIMENSIONS.large.width}×${RICH_MENU_DIMENSIONS.large.height} (Large) と ${RICH_MENU_DIMENSIONS.compact.width}×${RICH_MENU_DIMENSIONS.compact.height} (Compact) のみ対応しています。`,
-      },
-      400,
-    );
+      }, 400, ["richMenuId","accountId"]);
   }
 
   // 3. action 変換 (LINE → admin)
@@ -891,22 +883,16 @@ richMenuGroups.post('/api/rich-menu-groups/import', requireRole('owner', 'admin'
         actionData: { text: a.action.text },
       });
     } else if (a.action.type === 'richmenuswitch') {
-      return c.json(
-        {
+      return inputError(c, {
           success: false,
           error:
             'タブ切替 (richmenuswitch) を含むリッチメニューは現在インポートできません。タブ切替は管理画面で複数ページとして新規作成してください。',
-        },
-        400,
-      );
+        }, 400, []);
     } else {
-      return c.json(
-        {
+      return inputError(c, {
           success: false,
           error: `非対応アクション「${a.action.type}」を含むリッチメニューはインポートできません。`,
-        },
-        400,
-      );
+        }, 400, []);
     }
   }
 
@@ -1396,7 +1382,7 @@ function countPreviewRules(condition: SegmentCondition, depth: number): number {
  * 上位条件のどれかにも一致する人を重複として1回だけ数える。
  * 保存(PATCH)と同じく owner/admin のみ。人数の列挙を権限の弱い職員に開かない。
  */
-richMenuGroups.post('/api/rich-menu-groups/:groupId/preview-targets', requireRole('owner', 'admin'), async (c) => {
+richMenuGroups.post('/api/rich-menu-groups/:groupId/preview-targets', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const group = await getRichMenuGroupById(c.env.DB, c.req.param('groupId'));
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
     return c.json({ success: false, error: 'not found' }, 404);
@@ -1421,10 +1407,10 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/preview-targets', requireRol
       || (condition.operator !== 'AND' && condition.operator !== 'OR')
       || !Array.isArray(condition.rules))
   ) {
-    return c.json({ success: false, error: 'conditions are invalid' }, 400);
+    return inputError(c, { success: false, error: 'conditions are invalid' }, 400, ["conditions"]);
   }
   if (condition && countPreviewRules(condition, 1) > PREVIEW_MAX_RULES) {
-    return c.json({ success: false, error: '条件が複雑すぎます。条件を減らしてください' }, 400);
+    return inputError(c, { success: false, error: '条件が複雑すぎます。条件を減らしてください' }, 400, ["conditions"]);
   }
 
   try {
@@ -1536,32 +1522,32 @@ richMenuGroups.get('/api/rich-menu-groups/:groupId/usages', async (c) => {
 richMenuGroups.post(
   '/api/rich-menu-groups/:groupId/schedule',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const group = await getRichMenuGroupWithPages(c.env.DB, c.req.param('groupId'));
     if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
       return c.json({ success: false, error: 'not found' }, 404);
     }
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
     if (!idempotencyKey) {
-      return c.json({ success: false, error: 'Idempotency-Key header required' }, 400);
+      return inputError(c, { success: false, error: 'Idempotency-Key header required' }, 400, []);
     }
 
     let body: { mode?: unknown; startsAt?: unknown; endsAt?: unknown; restoreGroupId?: unknown };
     try {
       body = await c.req.json();
     } catch {
-      return c.json({ success: false, error: 'invalid JSON body' }, 400);
+      return inputError(c, { success: false, error: 'invalid JSON body' }, 400, []);
     }
     if (body.mode !== 'scheduled' && body.mode !== 'period') {
-      return c.json({ success: false, error: 'mode must be scheduled or period' }, 400);
+      return inputError(c, { success: false, error: 'mode must be scheduled or period' }, 400, ["mode"]);
     }
     if (typeof body.startsAt !== 'string' || !Number.isFinite(Date.parse(body.startsAt))) {
-      return c.json({ success: false, error: 'startsAt must be ISO 8601' }, 400);
+      return inputError(c, { success: false, error: 'startsAt must be ISO 8601' }, 400, ["startsAt"]);
     }
     const endsAt = typeof body.endsAt === 'string' && body.endsAt.length > 0 ? body.endsAt : null;
     if (body.mode === 'period') {
       if (!endsAt || !Number.isFinite(Date.parse(endsAt)) || Date.parse(endsAt) <= Date.parse(body.startsAt)) {
-        return c.json({ success: false, error: 'endsAt must be later than startsAt' }, 400);
+        return inputError(c, { success: false, error: 'endsAt must be later than startsAt' }, 400, ["endsAt","startsAt"]);
       }
     }
     const requestedRestoreGroupId = typeof body.restoreGroupId === 'string' && body.restoreGroupId.length > 0
@@ -1574,7 +1560,7 @@ richMenuGroups.post(
     if (restoreGroupId) {
       const restore = await getRichMenuGroupById(c.env.DB, restoreGroupId);
       if (!restore || restore.account_id !== group.account_id || restore.status !== 'published') {
-        return c.json({ success: false, error: 'restoreGroupId must be a published menu in the same account' }, 400);
+        return inputError(c, { success: false, error: 'restoreGroupId must be a published menu in the same account' }, 400, ["restoreGroupId"]);
       }
     }
 
@@ -1649,7 +1635,7 @@ richMenuGroups.get('/api/rich-menu-groups/:groupId/schedules', async (c) => {
 richMenuGroups.post(
   '/api/rich-menu-groups/:groupId/schedules/:scheduleId/cancel',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const group = await getRichMenuGroupWithPages(c.env.DB, c.req.param('groupId'));
     if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
       return c.json({ success: false, error: 'not found' }, 404);
@@ -1673,15 +1659,15 @@ richMenuGroups.get('/api/rich-menu-groups/:groupId', async (c) => {
   return c.json({ success: true, data: serializeGroupWithPages(group) });
 });
 
-richMenuGroups.post('/api/rich-menu-groups', requireRole('owner', 'admin'), async (c) => {
+richMenuGroups.post('/api/rich-menu-groups', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   let body: unknown;
   try {
     body = await c.req.json();
   } catch {
-    return c.json({ success: false, error: 'invalid JSON body' }, 400);
+    return inputError(c, { success: false, error: 'invalid JSON body' }, 400, []);
   }
   const parsed = parseCreateBody(body);
-  if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+  if (!parsed.ok) return inputError(c, { success: false, error: parsed.error, field: parsed.field }, 400);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [parsed.value.accountId])) {
     return c.json({ success: false, error: 'line account not found' }, 404);
   }
@@ -1698,30 +1684,21 @@ richMenuGroups.post('/api/rich-menu-groups', requireRole('owner', 'admin'), asyn
       const media = await getMediaById(c.env.DB, imageMediaId, parsed.value.accountId)
         ?? await getMediaById(c.env.DB, imageMediaId, null);
       if (!media || media.kind !== 'image' || media.archived_at) {
-        return c.json(
-          { success: false, error: '選ばれたメディアはこのアカウントの画像として使えません', data: serializeGroupWithPages(created) },
-          400,
-        );
+        return inputError(c, { success: false, error: '選ばれたメディアはこのアカウントの画像として使えません', data: serializeGroupWithPages(created) }, 400, ["imageMediaId"]);
       }
       const obj = await c.env.IMAGES.get(media.r2_key);
       if (!obj) throw new Error('media object not found in storage');
       const buf = new Uint8Array(await new Response(obj.body).arrayBuffer());
       const validation = validateRichMenuImage(buf, buf.byteLength);
       if (!validation.ok) {
-        return c.json(
-          { success: false, error: `選ばれた画像を使えません: ${validation.error}`, data: serializeGroupWithPages(created) },
-          400,
-        );
+        return inputError(c, { success: false, error: `選ばれた画像を使えません: ${validation.error}`, data: serializeGroupWithPages(created) }, 400, ["imageR2Key"]);
       }
       if (validation.size !== created.size) {
-        return c.json(
-          {
+        return inputError(c, {
             success: false,
             error: `選ばれた画像の大きさ（${validation.size === 'large' ? '大きい' : '小さい'}向け）がメニューの大きさと合いません`,
             data: serializeGroupWithPages(created),
-          },
-          400,
-        );
+          }, 400, ["imageR2Key"]);
       }
       const defaultPage = created.pages.find((p) => p.id === created.default_page_id)
         ?? created.pages[0];
@@ -1757,7 +1734,7 @@ richMenuGroups.post('/api/rich-menu-groups', requireRole('owner', 'admin'), asyn
   return c.json({ success: true, data: serializeGroupWithPages(created) });
 });
 
-richMenuGroups.patch('/api/rich-menu-groups/:groupId', requireRole('owner', 'admin'), async (c) => {
+richMenuGroups.patch('/api/rich-menu-groups/:groupId', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const groupId = c.req.param('groupId');
   const existing = await getRichMenuGroupById(c.env.DB, groupId);
   if (!existing || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [existing.account_id])) {
@@ -1768,32 +1745,26 @@ richMenuGroups.patch('/api/rich-menu-groups/:groupId', requireRole('owner', 'adm
   try {
     body = await c.req.json();
   } catch {
-    return c.json({ success: false, error: 'invalid JSON body' }, 400);
+    return inputError(c, { success: false, error: 'invalid JSON body' }, 400, []);
   }
   const parsed = parsePatchBody(body);
-  if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+  if (!parsed.ok) return inputError(c, { success: false, error: parsed.error }, 400, ["name","size","chatBarText"]);
 
   // M951: 保存に版を付ける (タグ編集の expectedVersion と同じ約束)。
   // 無し・不正は 400、古い版は 409。先に読んだ側の変更が黙って消えないようにする。
   const rawVersion = isJsonRecord(body) ? body.expectedVersion : undefined;
   if (rawVersion === undefined) {
-    return c.json(
-      {
+    return inputError(c, {
         success: false,
         error: '保存の版情報がありません。画面を読み込み直して、もう一度保存してください。',
-      },
-      400,
-    );
+      }, 400, ["expectedVersion"]);
   }
   const expectedVersion = Number(rawVersion);
   if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
-    return c.json(
-      {
+    return inputError(c, {
         success: false,
         error: '保存の版情報が正しくありません。画面を読み込み直して、もう一度保存してください。',
-      },
-      400,
-    );
+      }, 400, ["expectedVersion"]);
   }
 
   // M952: 作成口と同じ検査を保存口にも入れる。「条件で出し分ける」のに
@@ -1805,13 +1776,10 @@ richMenuGroups.patch('/api/rich-menu-groups/:groupId', requireRole('owner', 'adm
     ? parsed.value.meta.targetingCondition
     : existing.targeting_condition;
   if (effectiveTargetingEnabled && !effectiveTargetingCondition) {
-    return c.json(
-      {
+    return inputError(c, {
         success: false,
         error: '「条件で出し分ける」を使うには、出し分けの条件が必要です。条件を設定するか、「条件で出し分ける」をオフにしてください。',
-      },
-      400,
-    );
+      }, 400, ["targetingCondition"]);
   }
 
   // #827 (N-158): 公開中の定義(LINEに出ている形)は直接上書きしない。ページ構成・
@@ -1874,19 +1842,19 @@ richMenuGroups.patch('/api/rich-menu-groups/:groupId', requireRole('owner', 'adm
 richMenuGroups.post(
   '/api/rich-menu-groups/reorder-priorities',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     let body: unknown;
     try {
       body = await c.req.json();
     } catch {
-      return c.json({ success: false, error: 'invalid JSON body' }, 400);
+      return inputError(c, { success: false, error: 'invalid JSON body' }, 400, []);
     }
     const r = isJsonRecord(body) ? body : {};
     if (typeof r.accountId !== 'string' || r.accountId.length === 0) {
-      return c.json({ success: false, error: 'accountId required' }, 400);
+      return inputError(c, { success: false, error: 'accountId required' }, 400, ["accountId"]);
     }
     if (!Array.isArray(r.orderedIds) || r.orderedIds.some((id) => typeof id !== 'string')) {
-      return c.json({ success: false, error: 'orderedIds must be string array' }, 400);
+      return inputError(c, { success: false, error: 'orderedIds must be string array' }, 400, ["orderedIds"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [r.accountId])) {
       return c.json({ success: false, error: 'line account not found' }, 404);
@@ -1901,10 +1869,7 @@ richMenuGroups.post(
         return true;
       });
     if (!hasAll) {
-      return c.json(
-        { success: false, error: 'orderedIds must contain every group of the account exactly once' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'orderedIds must contain every group of the account exactly once' }, 400, ["orderedIds"]);
     }
     const now = jstNow();
     await c.env.DB.batch(
@@ -1960,7 +1925,7 @@ richMenuGroups.delete('/api/rich-menu-groups/:groupId', requireRole('owner', 'ad
 
 // ----- Image upload -----
 
-richMenuGroups.post('/api/rich-menu-groups/:groupId/pages/:pageId/image', requireRole('owner', 'admin'), async (c) => {
+richMenuGroups.post('/api/rich-menu-groups/:groupId/pages/:pageId/image', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const { groupId, pageId } = c.req.param();
   const group = await getRichMenuGroupById(c.env.DB, groupId);
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
@@ -1979,7 +1944,7 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/pages/:pageId/image', requir
   }
   const contentType = c.req.header('content-type') ?? '';
   if (contentType !== 'image/png' && contentType !== 'image/jpeg') {
-    return c.json({ success: false, error: 'content-type must be image/png or image/jpeg' }, 400);
+    return inputError(c, { success: false, error: 'content-type must be image/png or image/jpeg' }, 400, []);
   }
 
   const exists = await pageBelongsToGroup(c.env.DB, groupId, pageId);
@@ -1993,18 +1958,15 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/pages/:pageId/image', requir
 
   const buf = new Uint8Array(await c.req.arrayBuffer());
   const validation = validateRichMenuImage(buf, buf.byteLength);
-  if (!validation.ok) return c.json({ success: false, error: validation.error }, 400);
+  if (!validation.ok) return inputError(c, { success: false, error: validation.error }, 400, ["pages"]);
 
   // group.size と画像サイズが一致してないと publish 時に LINE API でコンテンツアップロードが
   // 弾かれる (richmenu の宣言サイズと content の dimensions は一致必須)。事前に拒否する。
   if (validation.size !== group.size) {
-    return c.json(
-      {
+    return inputError(c, {
         success: false,
         error: `image size '${validation.size}' does not match group size '${group.size}'`,
-      },
-      400,
-    );
+      }, 400, ["imageR2Key"]);
   }
 
   const ext = contentType === 'image/png' ? 'png' : 'jpg';
@@ -2271,10 +2233,10 @@ function createLineClient(channelAccessToken: string): LineRichMenuClient {
   };
 }
 
-richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner', 'admin'), async (c) => {
+richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
   if (!idempotencyKey) {
-    return c.json({ success: false, error: 'Idempotency-Key header required' }, 400);
+    return inputError(c, { success: false, error: 'Idempotency-Key header required' }, 400, []);
   }
   return handleManualPublish(c, c.req.param('groupId'), idempotencyKey);
 });
@@ -2623,7 +2585,7 @@ async function handleManualPublish(
     if (e instanceof PublishLeaseLostError) {
       return c.json({ success: false, error: '公開の担当が別の処理へ移りました。最新の状態を確認して、もう一度お試しください。' }, 409);
     }
-    if (e instanceof RichMenuValidationError) return c.json({ success: false, error: message }, 400);
+    if (e instanceof RichMenuValidationError) return inputError(c, { success: false, error: message }, 400, ["pages"]);
     return c.json({ success: false, error: message }, 500);
   }
 }
@@ -2691,7 +2653,7 @@ richMenuGroups.get(
 richMenuGroups.post(
   '/api/rich-menu-groups/:groupId/validate',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const groupId = c.req.param('groupId');
     const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
     if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
@@ -2729,7 +2691,7 @@ richMenuGroups.post(
 richMenuGroups.post(
   '/api/rich-menu-groups/:groupId/device-confirm',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const groupId = c.req.param('groupId');
     const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
     if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
@@ -2918,7 +2880,7 @@ richMenuGroups.get(
 richMenuGroups.post(
   '/api/rich-menu-groups/:groupId/publish-runs/:requestId/retry',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const groupId = c.req.param('groupId');
     const requestId = c.req.param('requestId');
     const group = await getRichMenuGroupById(c.env.DB, groupId);
@@ -2963,7 +2925,7 @@ richMenuGroups.post(
 richMenuGroups.post(
   '/api/rich-menu-groups/:groupId/reconcile',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const groupId = c.req.param('groupId');
     const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
     if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
@@ -3058,7 +3020,7 @@ richMenuGroups.post(
 // LINE 上の alias / richmenu / default を全削除して draft に戻す。
 // 削除フローや、別 group を default にしたい時に使う。idempotent (既に消えてる
 // alias / richmenu は 404 を許容)。
-richMenuGroups.post('/api/rich-menu-groups/:groupId/unpublish', requireRole('owner', 'admin'), async (c) => {
+richMenuGroups.post('/api/rich-menu-groups/:groupId/unpublish', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const groupId = c.req.param('groupId');
   const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
@@ -3154,22 +3116,22 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/unpublish', requireRole('own
 //     同 account 内の他 group の is_default_for_all は 0 にリセット。
 //
 // 前提: group が published かつ default_page に line_richmenu_id がセット済み。
-richMenuGroups.post('/api/rich-menu-groups/:groupId/apply-to-tag', requireRole('owner', 'admin'), async (c) => {
+richMenuGroups.post('/api/rich-menu-groups/:groupId/apply-to-tag', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const groupId = c.req.param('groupId');
   let body: unknown;
   try {
     body = await c.req.json();
   } catch {
-    return c.json({ success: false, error: 'invalid JSON body' }, 400);
+    return inputError(c, { success: false, error: 'invalid JSON body' }, 400, []);
   }
   const r = isJsonRecord(body) ? body : {};
   const mode = typeof r.mode === 'string' ? r.mode : 'bulk-link';
   if (mode !== 'bulk-link' && mode !== 'set-default') {
-    return c.json({ success: false, error: "mode must be 'bulk-link' or 'set-default'" }, 400);
+    return inputError(c, { success: false, error: "mode must be 'bulk-link' or 'set-default'" }, 400, ["mode"]);
   }
   if (mode === 'bulk-link') {
     if (r.tagId !== null && r.tagId !== undefined && typeof r.tagId !== 'string') {
-      return c.json({ success: false, error: 'tagId must be string or null' }, 400);
+      return inputError(c, { success: false, error: 'tagId must be string or null' }, 400, ["tagId"]);
     }
   }
   const tagId = (r.tagId as string | null | undefined) ?? null;
@@ -3179,20 +3141,14 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/apply-to-tag', requireRole('
     return c.json({ success: false, error: 'not found' }, 404);
   }
   if (group.status !== 'published') {
-    return c.json(
-      { success: false, error: 'group must be published before applying to friends' },
-      400,
-    );
+    return inputError(c, { success: false, error: 'group must be published before applying to friends' }, 400, []);
   }
   // default_page の line_richmenu_id を採用 (未設定なら order_index=0 の page)
   const targetPage =
     group.pages.find((p) => p.id === group.default_page_id) ??
     [...group.pages].sort((a, b) => a.order_index - b.order_index)[0];
   if (!targetPage?.line_richmenu_id) {
-    return c.json(
-      { success: false, error: 'no published rich menu found for default page' },
-      400,
-    );
+    return inputError(c, { success: false, error: 'no published rich menu found for default page' }, 400, ["order_index"]);
   }
 
   const account = await getLineAccountById(c.env.DB, group.account_id);
@@ -3234,7 +3190,7 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/apply-to-tag', requireRole('
   // LINE への link 自体は同じメニューの付け直しで無害。
   const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
   if (!idempotencyKey) {
-    return c.json({ success: false, error: 'Idempotency-Key header required' }, 400);
+    return inputError(c, { success: false, error: 'Idempotency-Key header required' }, 400, []);
   }
   const userIds = await getFollowingLineUserIdsByTag(
     c.env.DB,
@@ -3290,7 +3246,7 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/apply-to-tag', requireRole('
 richMenuGroups.post(
   '/api/rich-menu-groups/:groupId/duplicate',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const groupId = c.req.param('groupId');
     const group = await getRichMenuGroupById(c.env.DB, groupId);
     if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
@@ -3298,7 +3254,7 @@ richMenuGroups.post(
     }
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
     if (!idempotencyKey) {
-      return c.json({ success: false, error: 'Idempotency-Key header required' }, 400);
+      return inputError(c, { success: false, error: 'Idempotency-Key header required' }, 400, []);
     }
     let body: unknown = {};
     try {
@@ -3540,7 +3496,7 @@ richMenuGroups.get('/api/rich-menu-groups/:groupId/test-apply', async (c) => {
 richMenuGroups.post(
   '/api/rich-menu-groups/:groupId/test-apply',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const groupId = c.req.param('groupId');
     const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
     if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
@@ -3548,31 +3504,28 @@ richMenuGroups.post(
     }
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
     if (!idempotencyKey) {
-      return c.json({ success: false, error: 'Idempotency-Key header required' }, 400);
+      return inputError(c, { success: false, error: 'Idempotency-Key header required' }, 400, []);
     }
     let body: { confirm?: unknown } = {};
     try {
       body = await c.req.json<{ confirm?: unknown }>();
     } catch {
-      return c.json({ success: false, error: 'invalid JSON body' }, 400);
+      return inputError(c, { success: false, error: 'invalid JSON body' }, 400, []);
     }
     // 自分のLINE表示を変える操作なので、明示の確認を必須にする。
     if (body.confirm !== true) {
-      return c.json({ success: false, error: 'テスト適用には確認（confirm: true）が必要です' }, 400);
+      return inputError(c, { success: false, error: 'テスト適用には確認（confirm: true）が必要です' }, 400, ["confirm"]);
     }
 
     const staff = c.get('staff');
     const member = await getStaffById(c.env.DB, staff.id);
     const lineUserId = member?.line_user_id ?? null;
     if (!lineUserId) {
-      return c.json(
-        {
+      return inputError(c, {
           success: false,
           code: 'line_not_linked',
           error: 'あなたのLINEアカウントが連携されていません。スタッフ設定からLINE連携を行ってください。',
-        },
-        400,
-      );
+        }, 400, []);
     }
 
     const applyResult = await createRichMenuTestApplyAtomic(c.env.DB, {
@@ -3736,7 +3689,7 @@ richMenuGroups.post(
       const message = e instanceof Error ? e.message : String(e);
       await markRichMenuTestApplyFailed(c.env.DB, apply.id, message);
       if (e instanceof RichMenuValidationError) {
-        return c.json({ success: false, error: message }, 400);
+        return inputError(c, { success: false, error: message }, 400, ["pages"]);
       }
       return c.json({ success: false, error: message, data: { applyId: apply.id } }, 500);
     }
@@ -3750,7 +3703,7 @@ richMenuGroups.post(
 richMenuGroups.post(
   '/api/rich-menu-groups/:groupId/test-apply/revert',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const groupId = c.req.param('groupId');
     // pages まで読む。公開済みメニューの「適用に使ったID」を確定し、
     // 本人の今の表示がテスト適用で出したものかを照合するために使う。
@@ -3760,16 +3713,16 @@ richMenuGroups.post(
     }
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
     if (!idempotencyKey) {
-      return c.json({ success: false, error: 'Idempotency-Key header required' }, 400);
+      return inputError(c, { success: false, error: 'Idempotency-Key header required' }, 400, []);
     }
     let body: { confirm?: unknown; applyId?: unknown } = {};
     try {
       body = await c.req.json<{ confirm?: unknown; applyId?: unknown }>();
     } catch {
-      return c.json({ success: false, error: 'invalid JSON body' }, 400);
+      return inputError(c, { success: false, error: 'invalid JSON body' }, 400, []);
     }
     if (body.confirm !== true) {
-      return c.json({ success: false, error: '取り消しには確認（confirm: true）が必要です' }, 400);
+      return inputError(c, { success: false, error: '取り消しには確認（confirm: true）が必要です' }, 400, ["confirm"]);
     }
 
     const staff = c.get('staff');

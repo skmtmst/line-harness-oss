@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type MiddlewareHandler } from 'hono';
 import {
   getEntryRoutes,
@@ -98,12 +99,12 @@ entryRoutes.get('/api/entry-route-genres', async (c) => {
   }
 });
 
-entryRoutes.post('/api/entry-route-genres', requireRole('owner', 'admin'), async (c) => {
+entryRoutes.post('/api/entry-route-genres', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{ name?: string }>();
     const name = body.name?.trim();
     if (!name || name.length > 80) {
-      return c.json({ success: false, error: 'ジャンル名は1〜80文字で入力してください' }, 400);
+      return inputError(c, { success: false, error: 'ジャンル名は1〜80文字で入力してください' }, 400, ["name"]);
     }
     const row = await createEntryRouteGenre(c.env.DB, name);
     return c.json({ success: true, data: serializeGenre(row) }, 201);
@@ -116,13 +117,13 @@ entryRoutes.post('/api/entry-route-genres', requireRole('owner', 'admin'), async
   }
 });
 
-entryRoutes.patch('/api/entry-route-genres/:id', requireRole('owner', 'admin'), async (c) => {
+entryRoutes.patch('/api/entry-route-genres/:id', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"]}), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<{ name?: string }>();
     const name = body.name?.trim();
     if (!name || name.length > 80) {
-      return c.json({ success: false, error: 'ジャンル名は1〜80文字で入力してください' }, 400);
+      return inputError(c, { success: false, error: 'ジャンル名は1〜80文字で入力してください' }, 400, ["name"]);
     }
     const row = await updateEntryRouteGenre(c.env.DB, id, name);
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
@@ -175,7 +176,7 @@ entryRoutes.get('/api/entry-routes/:id', async (c) => {
 });
 
 // POST /api/entry-routes — create
-entryRoutes.post('/api/entry-routes', requireEntryRouteManagement(), async (c) => {
+entryRoutes.post('/api/entry-routes', requireEntryRouteManagement(), inputJsonBoundary({"refCode":["string"],"genre":["null","string"],"name":["string"],"tagId":["null","string"],"scenarioId":["null","string"],"redirectUrl":["null","string"],"poolId":["null","string"],"introTemplateId":["null","string"],"runAccountFriendAddScenarios":["boolean"],"isActive":["boolean"],"lineAccountId":["null","string"],"line_account_id":["null","string"],"accountId":["null","string"],"account_id":["null","string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       refCode: string;
@@ -198,13 +199,13 @@ entryRoutes.post('/api/entry-routes', requireEntryRouteManagement(), async (c) =
     const name = body.name?.trim();
     const genre = body.genre?.trim() || null;
     if (!refCode || !name) {
-      return c.json({ success: false, error: '名前と ref_code は必須です' }, 400);
+      return inputError(c, { success: false, error: '名前と ref_code は必須です' }, 400, ["refCode","name"]);
     }
     if (!/^[A-Za-z0-9_-]{1,64}$/.test(refCode)) {
-      return c.json({ success: false, error: 'ref_code は64文字以内の半角英数字・_・-で入力してください' }, 400);
+      return inputError(c, { success: false, error: 'ref_code は64文字以内の半角英数字・_・-で入力してください' }, 400, ["refCode"]);
     }
     if ((genre?.length ?? 0) > 80 || name.length > 120) {
-      return c.json({ success: false, error: 'ジャンルは80文字、名前は120文字以内で入力してください' }, 400);
+      return inputError(c, { success: false, error: 'ジャンルは80文字、名前は120文字以内で入力してください' }, 400, ["genre","name"]);
     }
     const staff = c.get('staff');
     // R39: 送りに所属が無いと機能強制で止まる。担当アカウント制の職員は
@@ -216,11 +217,11 @@ entryRoutes.post('/api/entry-routes', requireEntryRouteManagement(), async (c) =
       || staff.assignedLineAccountId
       || null;
     if (!lineAccountId) {
-      return c.json({
+      return inputError(c, {
         success: false,
         error: 'LINEアカウントを指定してください',
         code: 'LINE_ACCOUNT_REQUIRED',
-      }, 400);
+      }, 400, ["lineAccountId","line_account_id","accountId","account_id"]);
     }
     // N-011 と同じ境界で照合する。範囲外の指定は「ない」ものとして404にする。
     const decision = await resolveRequestBoundary(c.env.DB, staff, lineAccountId);
@@ -238,7 +239,7 @@ entryRoutes.post('/api/entry-routes', requireEntryRouteManagement(), async (c) =
 });
 
 // PATCH /api/entry-routes/:id — update
-entryRoutes.patch('/api/entry-routes/:id', requireEntryRouteManagement(), async (c) => {
+entryRoutes.patch('/api/entry-routes/:id', requireEntryRouteManagement(), inputJsonBoundary({"refCode":["string"],"genre":["null","string"],"name":["string"],"tagId":["null","string"],"scenarioId":["null","string"],"redirectUrl":["null","string"],"poolId":["null","string"],"introTemplateId":["null","string"],"runAccountFriendAddScenarios":["boolean"],"isActive":["boolean"],"stoppedReason":["null","string"]}), async (c) => {
   try {
     const id = c.req.param('id');
     const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
@@ -263,17 +264,17 @@ entryRoutes.patch('/api/entry-routes/:id', requireEntryRouteManagement(), async 
       }>
     >();
     if (body.refCode !== undefined && body.refCode.trim() !== existing.ref_code) {
-      return c.json({ success: false, error: 'ref_code は作成後に変更できません' }, 400);
+      return inputError(c, { success: false, error: 'ref_code は作成後に変更できません' }, 400, ["refCode"]);
     }
     if (body.genre !== undefined && body.genre !== null && (!body.genre.trim() || body.genre.trim().length > 80)) {
-      return c.json({ success: false, error: 'ジャンルは1〜80文字で入力してください' }, 400);
+      return inputError(c, { success: false, error: 'ジャンルは1〜80文字で入力してください' }, 400, ["genre"]);
     }
     if (body.name !== undefined && (!body.name.trim() || body.name.trim().length > 120)) {
-      return c.json({ success: false, error: '名前は1〜120文字で入力してください' }, 400);
+      return inputError(c, { success: false, error: '名前は1〜120文字で入力してください' }, 400, ["name"]);
     }
     if (body.stoppedReason !== undefined && body.stoppedReason !== null
       && (typeof body.stoppedReason !== 'string' || body.stoppedReason.trim().length > 200)) {
-      return c.json({ success: false, error: '停止理由は200文字以内で入力してください' }, 400);
+      return inputError(c, { success: false, error: '停止理由は200文字以内で入力してください' }, 400, ["stoppedReason"]);
     }
     delete body.refCode;
     if (typeof body.genre === 'string') body.genre = body.genre.trim();
@@ -334,7 +335,7 @@ entryRoutes.delete('/api/entry-routes/:id', requireRole('owner', 'admin'), async
 });
 
 // POST /api/entry-routes/:id/qr-pdf — printing sheet (A4, 1 page)
-entryRoutes.post('/api/entry-routes/:id/qr-pdf', requireEntryRouteManagement(), async (c) => {
+entryRoutes.post('/api/entry-routes/:id/qr-pdf', requireEntryRouteManagement(), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const staff = c.get('staff');
@@ -356,7 +357,7 @@ entryRoutes.post('/api/entry-routes/:id/qr-pdf', requireEntryRouteManagement(), 
       symbol = encodeQr(url);
     } catch (err) {
       if (err instanceof QrCapacityError) {
-        return c.json({ success: false, error: 'URLが長すぎてQRにできません' }, 400);
+        return inputError(c, { success: false, error: 'URLが長すぎてQRにできません' }, 400, []);
       }
       throw err;
     }
@@ -371,7 +372,7 @@ entryRoutes.post('/api/entry-routes/:id/qr-pdf', requireEntryRouteManagement(), 
       pdf = buildQrPrintPdf({ accountName, url, issuedAt, qr: symbol });
     } catch (err) {
       if (err instanceof QrPdfError) {
-        return c.json({ success: false, error: '印刷用PDFを作れませんでした' }, 400);
+        return inputError(c, { success: false, error: '印刷用PDFを作れませんでした' }, 400, []);
       }
       throw err;
     }

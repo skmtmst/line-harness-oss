@@ -96,7 +96,7 @@ export async function saveTemplate(db: D1Database, authority: HqTemplateAuthorit
   const type = current?.template.template_type ?? body.type;
   if (!HQ_TEMPLATE_TYPES.includes(type as HqTemplateType) || (body.type !== undefined && body.type !== type)) throw new HqTemplateError('INVALID_TYPE');
   const definition = canonicalDefinition(type as HqTemplateType, body.definition, authority), json = JSON.stringify(definition);
-  const name = boundedText(body.name), description = body.description == null || body.description === '' ? null : boundedText(body.description, 2000);
+  const name = boundedText(body.name, 200, 'name'), description = body.description == null || body.description === '' ? null : boundedText(body.description, 2000, 'description');
   const templateId = id ?? `hqt_${await digest(JSON.stringify([authority.tenantId, requestId]))}`;
   const versionId = crypto.randomUUID(), revision = current?.template.revision ?? 0, createdAt = new Date().toISOString();
   if (requestId) {

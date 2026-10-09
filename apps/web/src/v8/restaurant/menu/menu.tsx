@@ -9,6 +9,7 @@
  * （app/restaurant-test/v8/menu.tsx）と同じ。動きは BEHAVIOR.md。
  */
 import { useState } from 'react'
+import KpiCard from '@/components/shared/kpi-card'
 import { Check, Plus } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
@@ -20,7 +21,7 @@ import { formatYen } from '@/lib/format'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { fetchApi } from '@/lib/api'
 import { restaurantTestApi, type RestaurantMenuItem } from '@/lib/restaurant-test-api'
-import RestaurantShell, { Panel, Stat, StatRow, Status, type RestaurantV8Context } from '../booking-kit/shell'
+import RestaurantShell, { Panel, StatRow, Status, type RestaurantV8Context } from '../booking-kit/shell'
 import { DialogField, DialogNote, RowMore, RsDialog } from '../booking-kit/parts'
 import styles from './menu.module.css'
 
@@ -124,11 +125,11 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
   return (
     <>
       <StatRow>
-        <Stat label="全メニュー" value={`${rows.length}`} note="公開・下書き・保管済み" />
-        <Stat label="コース" value={`${rows.filter((item) => item.kind === 'course').length}`} note="予約時に選択" />
-        <Stat label="単品" value={`${rows.filter((item) => item.kind !== 'course').length}`} note="アラカルト" />
-        <Stat label="要承認" value={`${pendingApprovals.length}`} note="価格・内容改定" warning={pendingApprovals.length > 0} />
-        <Stat label="アレルギー登録" value={`${rows.filter((item) => safeArray(item.allergens_json).length > 0).length}`} note="注意品目あり" />
+        <KpiCard title="全メニュー" valueText={`${rows.length}`} detail="公開・下書き・保管済み" icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="コース" valueText={`${rows.filter((item) => item.kind === 'course').length}`} detail="予約時に選択" icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="単品" valueText={`${rows.filter((item) => item.kind !== 'course').length}`} detail="アラカルト" icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="要承認" valueText={`${pendingApprovals.length}`} detail="価格・内容改定" valueTone={pendingApprovals.length > 0 ? 'warning' : 'default'} icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="アレルギー登録" valueText={`${rows.filter((item) => safeArray(item.allergens_json).length > 0).length}`} detail="注意品目あり" icon={null} presentation="band" value={null} unit="" />
       </StatRow>
       <Panel
         title="メニュー一覧"

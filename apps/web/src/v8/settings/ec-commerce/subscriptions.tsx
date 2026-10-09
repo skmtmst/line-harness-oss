@@ -110,11 +110,11 @@ export default function EcSubscriptions({ accountId, canEdit = true }: { account
 
   const summary = data?.summary
   return <>
-    <KpiBand data-kpi-presentation="cards" gridClassName={shared.kpis}>
-      <KpiCard metricSize="small" title="続いている定期便" icon={<Repeat2 size={13} />} value={summary?.active} unit="件" detail={summary?.monthlyAmount == null ? '今月の金額は未取得' : `今月 ¥${formatNumber(summary.monthlyAmount)}`} />
-      <KpiCard metricSize="small" title="今月 はじまった" icon={<Play size={13} />} value={summary?.startedThisMonth} unit="件" detail="初回の発送済み —" help="初回の発送数はまだ数えていません。開始日はECの定期便から集計しています。" />
-      <KpiCard metricSize="small" title="今月 止まった" icon={<Pause size={13} />} value={summary?.cancelledThisMonth} unit="件" detail="休止 —・解約 —" help="休止と解約は現在の契約数です。今月の内訳は未取得です。" />
-      <KpiCard metricSize="small" title="支払いを確認" icon={<CreditCard size={13} />} value={summary?.atRisk} unit="件" detail="ECから届いた決済状態" />
+    <KpiBand presentation="band">
+      <KpiCard title="続いている定期便" icon={<Repeat2 size={13} />} value={summary?.active} unit="件" detail={summary?.monthlyAmount == null ? '今月の金額は未取得' : `今月 ¥${formatNumber(summary.monthlyAmount)}`} />
+      <KpiCard title="今月 はじまった" icon={<Play size={13} />} value={summary?.startedThisMonth} unit="件" detail="初回の発送済み —" help="初回の発送数はまだ数えていません。開始日はECの定期便から集計しています。" />
+      <KpiCard title="今月 止まった" icon={<Pause size={13} />} value={summary?.cancelledThisMonth} unit="件" detail="休止 —・解約 —" help="休止と解約は現在の契約数です。今月の内訳は未取得です。" />
+      <KpiCard title="支払いを確認" icon={<CreditCard size={13} />} value={summary?.atRisk} unit="件" detail="ECから届いた決済状態" />
     </KpiBand>
     <div className={styles.toolbar}>
       <SearchField className={styles.search} value={search} onChange={setSearch} placeholder="お客様の名前・ペット名・契約番号・中身で検索" aria-label="定期便を検索" />

@@ -34,6 +34,11 @@
 }
 
 /* 開いている間は緑の枠。1.5px に見せるため date-field と同じく内側に足す。 */
+[data-theme='v8'] .field:not(.open):not(.invalid) {
+  border-color: var(--color-control-border);
+  box-shadow: var(--control-shadow);
+}
+
 .open {
   border-color: var(--color-accent-deep);
   box-shadow: inset 0 0 0 0.5px var(--color-accent-deep);

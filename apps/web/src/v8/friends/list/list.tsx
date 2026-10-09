@@ -56,7 +56,6 @@ import MenuPortal from '@/components/shared/menu-portal'
 import BulkBar from '@/components/shared/bulk-bar'
 import Chip from '@/components/shared/chip'
 import Dialog from '@/components/shared/dialog'
-import { RowMenu } from '@/components/shared/row-actions'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import AdvancedSearchDialog, { type AdvancedSearchResult } from '@/components/friends/advanced-search-dialog'
@@ -106,16 +105,6 @@ function prefixed(label: string, options: Array<{ value: string; label: string }
 
 function isPageSize(value: number): value is PageSize {
   return (PAGE_SIZE_OPTIONS as readonly number[]).includes(value)
-}
-
-/** 数の帯の「…」。今の「受信箱を開く」はここへ移した。 */
-function KpiMenu({ title, onOpen }: { title: string; onOpen: () => void }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <span className={styles.kpiMenu}>
-      <RowMenu className={styles.kpiMenuButton} label={`${title}のメニュー`} open={open} onOpenChange={setOpen} items={[{ id: 'inbox', label: '受信箱を開く', external: true, onSelect: () => { setOpen(false); onOpen() } }]} />
-    </span>
-  )
 }
 
 export default function FriendsListV8() {
@@ -553,7 +542,6 @@ export default function FriendsListV8() {
               {kpi.delta.text}
             </span>
           ) : undefined}
-          menu={<KpiMenu title={kpi.title} onOpen={() => router.push(kpi.href)} />}
         />
       ))}
     </KpiBand>

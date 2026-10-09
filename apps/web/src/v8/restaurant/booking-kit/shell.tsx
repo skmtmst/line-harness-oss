@@ -18,10 +18,10 @@ import {
   type RestaurantStore,
 } from '@/lib/restaurant-test-api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import KpiBand from '@/components/shared/kpi-band'
 import Card, { CardHeader } from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
-import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
@@ -75,30 +75,9 @@ export function BoundaryBanner() {
   )
 }
 
-/** 数のカード。並べるときは StatRow で包む。 */
-export function Stat({ label, value, note, warning = false, help }: {
-  label: string
-  value: ReactNode
-  note: string
-  /** 注意を促す数（要承認・未配席など）は琥珀色で出す。 */
-  warning?: boolean
-  help?: ReactNode
-}) {
-  return (
-    <Card layout="vertical" padding="default" surface="inset" className={styles.stat}>
-      <p className={styles.statLabel}>
-        {label}
-        {help ? <HelpTip label={`${label}の説明`}>{help}</HelpTip> : null}
-      </p>
-      <p className={`${styles.statValue} ${warning ? styles.statValueWarning : ''} ${typeof value === 'string' && /[^\x20-\x7e]/.test(value) ? styles.statValueJp : ''}`}>{value}</p>
-      <p className={styles.statNote}>{note}</p>
-    </Card>
-  )
-}
-
-/** 数の並び。compact は予約台帳の今日（内側14・数字20）。 */
+/** 数の並び。compact は予約台帳の今日（小さい帯・数字20）。 */
 export function StatRow({ children, compact = false }: { children: ReactNode; compact?: boolean }) {
-  return <div className={`${styles.stats} ${compact ? styles.statsCompact : ''}`}>{children}</div>
+  return <KpiBand density={compact ? 'compact' : undefined}>{children}</KpiBand>
 }
 
 /** 白い枠。題・説明・右端の操作を持つ。 */

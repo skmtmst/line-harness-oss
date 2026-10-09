@@ -86,6 +86,9 @@ export default function WebhooksOutgoingV8() {
   const { selectedAccountId, accounts } = useAccount()
   const accountRef = useRef(selectedAccountId)
   accountRef.current = selectedAccountId
+  // 同じ店へ戻った場合も、切替前の要求は別の世代として扱う。
+  const accountScopeRef = useRef({ accountId: selectedAccountId })
+  if (accountScopeRef.current.accountId !== selectedAccountId) accountScopeRef.current = { accountId: selectedAccountId }
   const narrow = useNarrowViewport()
   const staffRole = useStaffRole()
   /*
@@ -176,7 +179,14 @@ export default function WebhooksOutgoingV8() {
   }, [displayed, query, folderFilter, chip, sortKey])
 
   // アカウントを替えたらページは 1 へ（来た瞬間は URL のまま）。
-  useOnAccountSwitch(selectedAccountId, () => setPage(1))
+  useOnAccountSwitch(selectedAccountId, () => {
+    setPage(1)
+    setOptimisticActive({})
+    togglingRef.current.clear()
+    setTogglingIds([])
+    setMenuId(null)
+    setCtxId(null)
+  })
   useListScrollMemory(ready)
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
   const currentPage = Math.min(page, pageCount)
@@ -189,6 +199,8 @@ export default function WebhooksOutgoingV8() {
   /* ===== 動かす・止める（押した瞬間に札を変え、裏で保存する） ===== */
   const handleToggle = async (item: OutgoingWebhookOverview, currentActive: boolean) => {
     const accountId = selectedAccountId
+    const scope = accountScopeRef.current
+    const isCurrent = () => accountScopeRef.current === scope
     if (!accountId || loadedAccountId !== accountId) {
       setError('LINEアカウントの一覧を読み直してください')
       return
@@ -207,31 +219,35 @@ export default function WebhooksOutgoingV8() {
     })
     const fail = (message: string) => {
       clear()
-      notifyToast(message, { tone: 'error', actionLabel: 'もう一度', onAction: () => { void handleToggle(item, currentActive) } })
+      notifyToast(message, { tone: 'error', actionLabel: 'もう一度', onAction: () => { if (isCurrent()) void handleToggle(item, currentActive) } })
     }
     try {
       const res = await api.webhooks.outgoing.update(item.id, accountId, { isActive: !currentActive })
-      if (accountRef.current !== accountId) return
+      if (!isCurrent()) return
       if (!res.success) {
         fail(`「${item.name}」は切り替えできませんでした。状態は変わっていません。確かめてから、もう一度お試しください。`)
         return
       }
       await reload()
+      if (!isCurrent()) return
       clear()
       notifyToast(`「${item.name}」を${!currentActive ? '動かしました' : '止めました'}。`, {
         actionLabel: '元に戻す',
-        onAction: () => { void handleToggle(item, !currentActive) },
+        onAction: () => { if (isCurrent()) void handleToggle(item, !currentActive) },
       })
     } catch (caught) {
-      if (accountRef.current !== accountId) return
+      if (!isCurrent()) return
       const forbidden = caught instanceof ApiError && caught.status === 403
       if (!forbidden) await reload().catch(() => {})
+      if (!isCurrent()) return
       fail(forbidden
         ? `「${item.name}」は統括だけが切り替えできます。必要なときは統括に頼んでください。状態は変わっていません。`
         : `「${item.name}」は切り替えの応答を受け取れませんでした。一覧の表示を確かめてください。変わっている可能性があります。`)
     } finally {
-      togglingRef.current.delete(item.id)
-      setTogglingIds((current) => current.filter((id) => id !== item.id))
+      if (isCurrent()) {
+        togglingRef.current.delete(item.id)
+        setTogglingIds((current) => current.filter((id) => id !== item.id))
+      }
     }
   }
 
@@ -366,7 +382,7 @@ export default function WebhooksOutgoingV8() {
         },
       })
     }
-    items.push({
+    if (canTest) items.push({
       id: 'test',
       label: '試しに送る',
       disabled: !item.isActive,

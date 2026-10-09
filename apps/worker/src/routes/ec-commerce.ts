@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { classifyEcErrorCode, encryptCredential, getLineAccountById, jstDateString, jstNow, nextDateString } from '@line-crm/db';
 import { EC_EVENT_TYPES, ecEventLabel, addDays, resolveShipDate, toJstMoment } from '@line-crm/shared';
@@ -846,9 +847,9 @@ ecCommerce.get(
   });
 });
 
-ecCommerce.put('/api/ec-commerce/connector', requireRole('owner', 'admin'), async (c) => {
+ecCommerce.put('/api/ec-commerce/connector', requireRole('owner', 'admin'), inputJsonBoundary({"provider":["string"],"shopDomain":["string"],"status":["string"],"inboundSecret":["string"],"expectedVersion":["number"]}), async (c) => {
   const lineAccountId = c.req.query('lineAccountId')?.trim() || '';
-  if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+  if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
@@ -871,11 +872,11 @@ ecCommerce.put('/api/ec-commerce/connector', requireRole('owner', 'admin'), asyn
     || !/^(?=.{3,253}$)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])$/.test(shopDomain)
     || eventTypes === null || identityRules === null
     || !Number.isInteger(expectedVersion) || expectedVersion < 0) {
-    return c.json({ success: false, error: 'つなぎ先の設定を確認してください' }, 400);
+    return inputError(c, { success: false, error: 'つなぎ先の設定を確認してください' }, 400, ["provider","status","shopDomain","eventTypes","identityRules","expectedVersion"]);
   }
   const inboundSecret = typeof body?.inboundSecret === 'string' ? body.inboundSecret.trim() : '';
   if (inboundSecret && inboundSecret.length < 32) {
-    return c.json({ success: false, error: 'つなぐための鍵は32文字以上で入力してください' }, 400);
+    return inputError(c, { success: false, error: 'つなぐための鍵は32文字以上で入力してください' }, 400, ["inboundSecret"]);
   }
   const current = await c.env.DB.prepare(
     `SELECT id, version, status, inbound_secret_encrypted, inbound_secret_last4, secret_updated_at
@@ -1011,11 +1012,11 @@ ecCommerce.get(
   });
 });
 
-ecCommerce.put('/api/ec-commerce/settings/:eventType', requireRole('owner', 'admin'), async (c) => {
+ecCommerce.put('/api/ec-commerce/settings/:eventType', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const eventType = c.req.param('eventType');
-  if (!EVENT_TYPE_SET.has(eventType)) return c.json({ success: false, error: 'Invalid eventType' }, 400);
+  if (!EVENT_TYPE_SET.has(eventType)) return inputError(c, { success: false, error: 'Invalid eventType' }, 400, ["eventType"]);
   const lineAccountId = c.req.query('lineAccountId')?.trim();
-  if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+  if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
@@ -1027,20 +1028,20 @@ ecCommerce.put('/api/ec-commerce/settings/:eventType', requireRole('owner', 'adm
       || typeof body.introText !== 'string' || typeof body.outroText !== 'string'
       || typeof body.buttonLabel !== 'string' || typeof body.buttonUrl !== 'string'
       || typeof body.imageUrl !== 'string') {
-    return c.json({ success: false, error: 'isEnabled, title, introText and outroText are required' }, 400);
+    return inputError(c, { success: false, error: 'isEnabled, title, introText and outroText are required' }, 400, ["isEnabled","title","introText","outroText","buttonLabel","buttonUrl","imageUrl"]);
   }
   const title = body.title.trim();
-  if (!title || title.length > 80) return c.json({ success: false, error: 'Title must be 1-80 characters' }, 400);
+  if (!title || title.length > 80) return inputError(c, { success: false, error: 'Title must be 1-80 characters' }, 400, ["title"]);
   const introText = body.introText.trim();
   const outroText = body.outroText.trim();
   if (introText.length > 800 || outroText.length > 800) {
-    return c.json({ success: false, error: 'Editable copy must be 800 characters or fewer' }, 400);
+    return inputError(c, { success: false, error: 'Editable copy must be 800 characters or fewer' }, 400, ["introText","outroText"]);
   }
   const buttonLabel = body.buttonLabel.trim();
   const buttonUrl = body.buttonUrl.trim();
   const imageUrl = body.imageUrl.trim();
   if (buttonLabel.length > 20 || !isValidHttpsUrl(buttonUrl) || !isValidHttpsUrl(imageUrl)) {
-    return c.json({ success: false, error: 'Invalid button or image' }, 400);
+    return inputError(c, { success: false, error: 'Invalid button or image' }, 400, ["buttonLabel","buttonUrl","imageUrl"]);
   }
   const now = jstNow();
   await c.env.DB.prepare(
@@ -1058,28 +1059,28 @@ ecCommerce.put('/api/ec-commerce/settings/:eventType', requireRole('owner', 'adm
   return c.json({ success: true });
 });
 
-ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), async (c) => {
+ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const body = await c.req.json<{
     eventType?: unknown; accountId?: unknown; title?: unknown; introText?: unknown; outroText?: unknown;
     buttonLabel?: unknown; buttonUrl?: unknown; imageUrl?: unknown;
   }>().catch(() => null);
   if (!body || typeof body.eventType !== 'string' || !EVENT_TYPE_SET.has(body.eventType)) {
-    return c.json({ success: false, error: 'Invalid eventType' }, 400);
+    return inputError(c, { success: false, error: 'Invalid eventType' }, 400, ["eventType"]);
   }
   if (typeof body.accountId !== 'string' || !body.accountId) {
-    return c.json({ success: false, error: 'accountId is required' }, 400);
+    return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
   }
   if (typeof body.title !== 'string' || !body.title.trim() || body.title.trim().length > 80
       || typeof body.introText !== 'string' || body.introText.trim().length > 800
       || typeof body.outroText !== 'string' || body.outroText.trim().length > 800
       || typeof body.buttonLabel !== 'string' || typeof body.buttonUrl !== 'string'
       || typeof body.imageUrl !== 'string') {
-    return c.json({ success: false, error: 'Invalid notification copy' }, 400);
+    return inputError(c, { success: false, error: 'Invalid notification copy' }, 400, ["title","introText","outroText","buttonLabel","buttonUrl","imageUrl"]);
   }
   if (body.buttonLabel.trim().length > 20
       || !isValidHttpsUrl(body.buttonUrl.trim())
       || !isValidHttpsUrl(body.imageUrl.trim())) {
-    return c.json({ success: false, error: 'Invalid button or image' }, 400);
+    return inputError(c, { success: false, error: 'Invalid button or image' }, 400, ["buttonLabel","buttonUrl","imageUrl"]);
   }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
@@ -1095,7 +1096,7 @@ ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), asy
   }
   testSendAt.set(cooldownKey, Date.now());
   const account = await getLineAccountById(c.env.DB, body.accountId);
-  if (!account?.channel_access_token) return c.json({ success: false, error: 'LINE account is not configured' }, 400);
+  if (!account?.channel_access_token) return inputError(c, { success: false, error: 'LINE account is not configured' }, 400, ["accountId"]);
 
   const recipientSetting = await c.env.DB.prepare(
     `SELECT value FROM account_settings WHERE line_account_id = ? AND key = 'test_recipients'`,
@@ -1107,13 +1108,13 @@ ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), asy
   } catch {
     friendIds = [];
   }
-  if (!friendIds.length) return c.json({ success: false, error: 'Test recipients are not configured' }, 400);
+  if (!friendIds.length) return inputError(c, { success: false, error: 'Test recipients are not configured' }, 400, []);
 
   const placeholders = friendIds.map(() => '?').join(',');
   const friends = await c.env.DB.prepare(
     `SELECT id, line_user_id FROM friends WHERE line_account_id = ? AND is_following = 1 AND id IN (${placeholders})`,
   ).bind(body.accountId, ...friendIds).all<{ id: string; line_user_id: string }>();
-  if (!friends.results.length) return c.json({ success: false, error: 'No active test recipients' }, 400);
+  if (!friends.results.length) return inputError(c, { success: false, error: 'No active test recipients' }, 400, ["accountId"]);
 
   // テスト送信の見出し・前後の文章にも {{var.*}} を書ける。
   // 消えた共通情報は空文字にせず、テスト送信を止める。

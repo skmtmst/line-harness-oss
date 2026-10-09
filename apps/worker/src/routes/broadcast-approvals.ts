@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { getBroadcastById, createNotification, type Broadcast } from '@line-crm/db';
 import { BROADCAST_APPROVE_KEY, BROADCAST_DEFINITION_PUBLISH_KEY } from '@line-crm/shared';
@@ -148,18 +149,18 @@ broadcastApprovals.get('/api/broadcasts/approval-threshold', async (c) => {
 });
 
 // PUT /api/broadcasts/approval-threshold — 境目の変更（機能設定）
-broadcastApprovals.put('/api/broadcasts/approval-threshold', requireRole('owner', 'admin'), async (c) => {
+broadcastApprovals.put('/api/broadcasts/approval-threshold', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ lineAccountId?: unknown; threshold?: unknown }>().catch(() => null);
     const lineAccountId = typeof body?.lineAccountId === 'string' ? body.lineAccountId.trim() : '';
     if (!lineAccountId) {
-      return c.json({ success: false, error: 'LINEアカウントを指定してください' }, 400);
+      return inputError(c, { success: false, error: 'LINEアカウントを指定してください' }, 400, ["lineAccountId"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントの設定は変更できません' }, 403);
     }
     const saved = await setBroadcastApprovalThreshold(c.env.DB, lineAccountId, body?.threshold);
-    if (!saved.ok) return c.json({ success: false, error: saved.error }, 400);
+    if (!saved.ok) return inputError(c, { success: false, error: saved.error }, 400, ["lineAccountId","threshold"]);
     return c.json({ success: true, data: { lineAccountId, threshold: saved.threshold } });
   } catch (err) {
     console.error('PUT /api/broadcasts/approval-threshold error:', err);
@@ -226,7 +227,7 @@ broadcastApprovals.get('/api/broadcasts/:id/approval', async (c) => {
 });
 
 // POST /api/broadcasts/:id/approval-request — 承認の依頼（送る人が押す）
-broadcastApprovals.post('/api/broadcasts/:id/approval-request', async (c) => {
+broadcastApprovals.post('/api/broadcasts/:id/approval-request', inputJsonBoundary(), async (c) => {
   try {
     const staff = c.get('staff');
     const broadcast = await loadBroadcast(c.env.DB, staff, c.req.param('id'));
@@ -235,7 +236,7 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-request', async (c) => {
       return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
     }
     if (broadcast.status !== 'draft' && broadcast.status !== 'scheduled') {
-      return c.json({ success: false, error: '下書き・予約の配信だけ承認を依頼できます' }, 400);
+      return inputError(c, { success: false, error: '下書き・予約の配信だけ承認を依頼できます' }, 400, []);
     }
     const gate = await evaluateApprovalGate(c.env.DB, broadcast);
     if (!gate.required) {
@@ -252,7 +253,7 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-request', async (c) => {
     const body = await c.req.json<{ approverStaffId?: unknown; note?: unknown }>().catch(() => null);
     const approverStaffId = typeof body?.approverStaffId === 'string' ? body.approverStaffId.trim() : '';
     if (!approverStaffId) {
-      return c.json({ success: false, error: '承認をお願いする人を選んでください' }, 400);
+      return inputError(c, { success: false, error: '承認をお願いする人を選んでください' }, 400, ["approverStaffId"]);
     }
     if (approverStaffId === staff?.id) {
       return c.json({ success: false, error: '自分の依頼は自分で承認できません。別の人を選んでください', code: 'SELF_APPROVAL' }, 403);
@@ -272,7 +273,7 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-request', async (c) => {
       : undefined;
     if (!approver || approver.is_active !== 1 || approver.invite_status !== 'active'
       || !canApproveBroadcast(approverStaff)) {
-      return c.json({ success: false, error: '承認できる人を選んでください' }, 400);
+      return inputError(c, { success: false, error: '承認できる人を選んでください' }, 400, ["approverStaffId"]);
     }
     const note = typeof body?.note === 'string' ? body.note.trim().slice(0, 500) : '';
     const now = new Date().toISOString();
@@ -311,7 +312,7 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-request', async (c) => {
 });
 
 // POST /api/broadcasts/:id/approval-approve — 承認（承認する人が押す）
-broadcastApprovals.post('/api/broadcasts/:id/approval-approve', async (c) => {
+broadcastApprovals.post('/api/broadcasts/:id/approval-approve', inputJsonBoundary(), async (c) => {
   try {
     const staff = c.get('staff');
     const broadcast = await loadBroadcast(c.env.DB, staff, c.req.param('id'));
@@ -363,7 +364,7 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-approve', async (c) => {
 });
 
 // POST /api/broadcasts/:id/approval-reject — 差し戻し（理由必須）
-broadcastApprovals.post('/api/broadcasts/:id/approval-reject', async (c) => {
+broadcastApprovals.post('/api/broadcasts/:id/approval-reject', inputJsonBoundary(), async (c) => {
   try {
     const staff = c.get('staff');
     const broadcast = await loadBroadcast(c.env.DB, staff, c.req.param('id'));
@@ -379,7 +380,7 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-reject', async (c) => {
     const body = await c.req.json<{ reason?: unknown }>().catch(() => null);
     const reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
     if (!reason) {
-      return c.json({ success: false, error: '差し戻す理由を入れてください', code: 'REASON_REQUIRED' }, 400);
+      return inputError(c, { success: false, error: '差し戻す理由を入れてください', code: 'REASON_REQUIRED' }, 400, ["reason"]);
     }
     const now = new Date().toISOString();
     const claimed = await c.env.DB.prepare(
@@ -409,7 +410,7 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-reject', async (c) => {
 });
 
 // POST /api/broadcasts/:id/approval-cancel — 依頼の取り消し（頼んだ人・owner/admin）
-broadcastApprovals.post('/api/broadcasts/:id/approval-cancel', async (c) => {
+broadcastApprovals.post('/api/broadcasts/:id/approval-cancel', inputJsonBoundary(), async (c) => {
   try {
     const staff = c.get('staff');
     const broadcast = await loadBroadcast(c.env.DB, staff, c.req.param('id'));
@@ -440,7 +441,7 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-cancel', async (c) => {
 });
 
 // POST /api/broadcasts/:id/approval-remind — もう一度知らせる（頼んだ人・owner/admin）
-broadcastApprovals.post('/api/broadcasts/:id/approval-remind', async (c) => {
+broadcastApprovals.post('/api/broadcasts/:id/approval-remind', inputJsonBoundary(), async (c) => {
   try {
     const staff = c.get('staff');
     const broadcast = await loadBroadcast(c.env.DB, staff, c.req.param('id'));

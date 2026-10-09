@@ -13,6 +13,8 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
 import { ListPage } from '@/components/templates'
 import StepUpPrompt from '@/components/step-up-prompt'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -221,12 +223,12 @@ function MembersInner() {
           <ListState kind="forbidden" title="全アカウントの担当者だけが権限者を管理できます" description="担当アカウントが限定されているため、権限者の一覧と変更はできません。" />
         ) : (
           <>
-            <div className={styles.cards} aria-label="権限者の数">
-              <StatCard label="権限者" value={kpis.total} unit="人" sub={`有効 ${kpis.active}人`} />
-              <StatCard label="招待中" value={kpis.invited} unit="人" sub="まだ承諾していない招待" />
-              <StatCard label="閲覧のみ" value={kpis.viewers} unit="人" sub="編集できない権限者" />
-              <StatCard label="担当アカウント" value={kpis.scopedAccounts} unit="アカウント" sub={`全アカウントを担当 ${kpis.allScope}人`} />
-            </div>
+            <KpiBand aria-label="権限者の数">
+              <KpiCard title="権限者" value={kpis.total} unit="人" detail={`有効 ${kpis.active}人`} />
+              <KpiCard title="招待中" value={kpis.invited} unit="人" detail="まだ承諾していない招待" />
+              <KpiCard title="閲覧のみ" value={kpis.viewers} unit="人" detail="編集できない権限者" />
+              <KpiCard title="担当アカウント" value={kpis.scopedAccounts} unit="アカウント" detail={`全アカウントを担当 ${kpis.allScope}人`} />
+            </KpiBand>
 
             <div className={styles.table} role="table" aria-label="権限者の一覧" data-design="Table">
               <div className={styles.head} role="row">
@@ -318,19 +320,5 @@ function MembersInner() {
         />
       ) : null}
     </ListPage>
-  )
-}
-
-/** 数のカード（絵 `r4ARpV` の数の帯。統括では角丸のカード4枚）。 */
-function StatCard({ label, value, unit, sub }: { label: string; value: number; unit: string; sub: string }) {
-  return (
-    <div className={styles.card}>
-      <span className={styles.cardLabel}>{label}</span>
-      <span className={styles.cardValueRow}>
-        <span className={styles.cardValue}>{value.toLocaleString('ja-JP')}</span>
-        <span className={styles.cardUnit}>{unit}</span>
-      </span>
-      <span className={styles.cardSub}>{sub}</span>
-    </div>
   )
 }

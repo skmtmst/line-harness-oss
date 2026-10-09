@@ -547,7 +547,19 @@ describe('Instagram 同時投稿', () => {
   it('画像を選ばずにInstagramへ出す設定にすると下書きで止める', async () => {
     const r = await createDraft({ ...standardBody, mediaId: null, instagram: { enabled: true, caption: null } });
     expect(r.status).toBe(400);
+    expect(r.json).toMatchObject({ error: expect.any(String), fields: { mediaId: expect.any(String) } });
     expect(instagramCalls).toHaveLength(0);
+  });
+
+  it.each([
+    [{ enabled: true, caption: '文'.repeat(2201) }, 'instagram.caption'],
+    [{ enabled: 'true', caption: null }, 'instagram.enabled'],
+    [{ enabled: true, caption: 123 }, 'instagram.caption'],
+  ])('Instagram の不正な入力を欄へ返し、下書きを増やさない', async (instagram, key) => {
+    const r = await createDraft({ ...standardBody, mediaId: 'media-ig', instagram });
+    expect(r.status).toBe(400);
+    expect(r.json).toMatchObject({ error: expect.any(String), fields: { [key]: expect.any(String) } });
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_posts').get()).toEqual({ n: 0 });
   });
 
   it('Googleへの公開が成功すると、同じ写真と文章でInstagramへも出す', async () => {
