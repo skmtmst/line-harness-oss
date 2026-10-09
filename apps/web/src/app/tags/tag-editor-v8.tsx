@@ -416,9 +416,9 @@ export default function TagEditorV8({
               <SectionTitle title="マイル" note="タグが付いたときのマイル付与と、今後の獲得倍率を決めます。" />
               <div className={styles.sectionBody}>
                 <div className={styles.fieldGrid2}>
-                  <Field note={<>このタグが付いた本人へ、一度だけ積みます。</>} label={<><span className={styles.fieldLabel}>本人へのマイル付与</span></>}><span className={styles.numberRow}><NumberInput type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={styles.input} /><span className={styles.unit}>mile</span></span>
+                  <Field note={<>このタグが付いた本人へ、一度だけ積みます。</>} label={<><span className={styles.fieldLabel}>本人へのマイル付与</span></>}><span className={styles.numberRow}><NumberInput unit="マイル" type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={styles.input} /></span>
 </Field>
-                  <Field note={<>紹介経由の友だちなら、その紹介者にも積みます。</>} label={<><span className={styles.fieldLabel}>紹介者へのマイル付与</span></>}><span className={styles.numberRow}><NumberInput type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={styles.input} /><span className={styles.unit}>mile</span></span>
+                  <Field note={<>紹介経由の友だちなら、その紹介者にも積みます。</>} label={<><span className={styles.fieldLabel}>紹介者へのマイル付与</span></>}><span className={styles.numberRow}><NumberInput unit="マイル" type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={styles.input} /></span>
 </Field>
                   <Field note={<>このタグが付いている間、次回以降の付与倍率に使います。</>} label={<><span className={styles.fieldLabel}>今後のマイル倍率</span></>}><Select aria-label="今後のマイル倍率" value={multiplier} onChange={setMultiplier} options={MULTIPLIERS.map((option) => ({ value: option.value, label: option.label }))} size="full" />
 </Field>
