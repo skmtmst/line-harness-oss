@@ -7,7 +7,7 @@
     "specs/pages/*.md"
   ],
   "designDir": "/Users/kentakenta/lh-work/design/v8",
-  "boardCount": 504,
+  "boardCount": 564,
   "retired": [],
   "boards": {
     "A0pDt": {
@@ -216,6 +216,19 @@
       "shot": "lint/V8-B/shots/B9ZAr.png",
       "url": "/hq/banners"
     },
+    "BBRDb": {
+      "doc": "V8",
+      "name": "統括 一括配信を作る（店の5つの手順と同じ・手順2に送るアカウント）",
+      "kind": "画面",
+      "route": "/hq/broadcasts/new",
+      "routes": [
+        "/hq/broadcasts/new"
+      ],
+      "width": null,
+      "shot": null,
+      "url": "/hq/broadcasts/new",
+      "unmeasurable": "幅 2520 の板（手順を横に並べた）。中の1枚ずつは目で照らす"
+    },
     "BERxg": {
       "doc": "V8-B",
       "name": "座席・卓管理 V8",
@@ -253,6 +266,18 @@
       "width": 1440,
       "shot": "lint/V8/shots/BOj1a.png",
       "url": "/getting-started"
+    },
+    "BVSbe": {
+      "doc": "V8",
+      "name": "統括 リッチメニュー 作る④ 確かめて配る V8（G-10）",
+      "kind": "画面",
+      "route": "/hq/rich-menus",
+      "routes": [
+        "/hq/rich-menus"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/rich-menus"
     },
     "BVuYh": {
       "doc": "V8-B",
@@ -335,6 +360,18 @@
       "width": 1440,
       "shot": "lint/V8/shots/C0lfUP.png",
       "url": "/friend-add-settings"
+    },
+    "C3qMCz": {
+      "doc": "V8",
+      "name": "統括 テンプレート クーポンを作る V8",
+      "kind": "画面",
+      "route": "/hq/templates",
+      "routes": [
+        "/hq/templates"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/templates"
     },
     "C67dE": {
       "doc": "V8",
@@ -594,6 +631,18 @@
       "shot": "lint/V8-B/shots/DxAAA.png",
       "url": "/webhooks"
     },
+    "DzdC3": {
+      "doc": "V8",
+      "name": "統括 友だち属性 タグ V8",
+      "kind": "画面",
+      "route": "/hq/friend-attributes",
+      "routes": [
+        "/hq/friend-attributes"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/friend-attributes"
+    },
     "E14GFm": {
       "doc": "V8-B",
       "name": "流入と計測 作る（競合の比べ）V8",
@@ -717,6 +766,19 @@
       "shot": "lint/V8-B/shots/Eo56k.png",
       "url": "/affiliates"
     },
+    "EpTBB": {
+      "doc": "V8",
+      "name": "統括 一括配信を作る① テンプレート・過去の配信を窓で選ぶ V8",
+      "kind": "小窓",
+      "route": "/hq/broadcasts/new",
+      "routes": [
+        "/hq/broadcasts/new"
+      ],
+      "width": null,
+      "shot": null,
+      "url": "/hq/broadcasts/new",
+      "unmeasurable": "幅 2600 の板（前後を横に並べた）"
+    },
     "EsYo4": {
       "doc": "V8",
       "name": "テンプレート リサーチを作る V8",
@@ -808,6 +870,18 @@
       "shot": "lint/V8/shots/FU2aU.png",
       "url": "/broadcasts/new"
     },
+    "Fkv3w": {
+      "doc": "V8",
+      "name": "統括 テンプレート リサーチを作る V8",
+      "kind": "画面",
+      "route": "/hq/templates",
+      "routes": [
+        "/hq/templates"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/templates"
+    },
     "FvbHW": {
       "doc": "V8-B",
       "name": "運営 メンバー管理 V8",
@@ -867,6 +941,18 @@
       "width": 1152,
       "shot": "lint/V8/shots/G9C4Uw.png",
       "url": "/friends/identity-candidates"
+    },
+    "GKgRk": {
+      "doc": "V8",
+      "name": "統括 一括配信③ カルーセルをここで作る（引き出し）V8（G-9）",
+      "kind": "小窓",
+      "route": "/hq/broadcasts/new",
+      "routes": [
+        "/hq/broadcasts/new"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/broadcasts/new"
     },
     "GVizd": {
       "doc": "V8",
@@ -1022,6 +1108,18 @@
       "shot": "lint/V8-B/shots/HMpVx.png",
       "url": "/hq"
     },
+    "HfK0O": {
+      "doc": "V8",
+      "name": "統括 テンプレート メッセージを作る V8",
+      "kind": "画面",
+      "route": "/hq/templates",
+      "routes": [
+        "/hq/templates"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/templates"
+    },
     "Hhl9M": {
       "doc": "V8",
       "name": "共通情報 止めるダイアログ V8",
@@ -1148,6 +1246,18 @@
       "shot": "lint/V8/shots/IWnYX.png",
       "url": "/tags?tab=searches"
     },
+    "IY3nx": {
+      "doc": "V8",
+      "name": "統括 テンプレート 質問を作る V8",
+      "kind": "画面",
+      "route": "/hq/templates",
+      "routes": [
+        "/hq/templates"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/templates"
+    },
     "If9Mh": {
       "doc": "V8",
       "name": "★P2-2 予約：電話の予約・予約の詳細 2026-10-01",
@@ -1241,6 +1351,21 @@
       "shot": "lint/V8/shots/J60utH.png",
       "url": "/templates/carousel"
     },
+    "J7HNK": {
+      "doc": "V8",
+      "name": "採用 G-4 アカウントへ配る（左にフォルダ）（B-89）",
+      "kind": "採用の図",
+      "route": "/hq/templates",
+      "routes": [
+        "/hq/templates"
+      ],
+      "width": null,
+      "shot": null,
+      "url": "/hq/templates",
+      "state": {
+        "manual": "採用の図（横に複数の画面を並べた板）。中の画面の板で測る"
+      }
+    },
     "JB8V1": {
       "doc": "V8-B",
       "name": "統括 請求 V8",
@@ -1252,6 +1377,18 @@
       "width": 1440,
       "shot": "lint/V8-B/shots/JB8V1.png",
       "url": "/hq/billing"
+    },
+    "JCDRm": {
+      "doc": "V8",
+      "name": "友だち詳細 概要 V8（Q5F2QE の中の1枚）",
+      "kind": "画面",
+      "route": "/friends/detail",
+      "routes": [
+        "/friends/detail"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/friends/detail"
     },
     "JKjsE": {
       "doc": "V8-B",
@@ -1286,6 +1423,18 @@
       "width": 1440,
       "shot": "lint/V8/shots/JV2oR.png",
       "url": "/form-submissions"
+    },
+    "JXq9G": {
+      "doc": "V8-B",
+      "name": "コンバージョン 一覧 V8",
+      "kind": "画面",
+      "route": "/conversions",
+      "routes": [
+        "/conversions"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/conversions"
     },
     "JYfda": {
       "doc": "V8-B",
@@ -1523,6 +1672,18 @@
       "shot": "lint/V8/shots/M2p63S.png",
       "url": null
     },
+    "M2tJM": {
+      "doc": "V8",
+      "name": "統括 一括配信 詳細（送った後）V8",
+      "kind": "画面",
+      "route": "/hq/broadcasts/detail",
+      "routes": [
+        "/hq/broadcasts/detail"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/broadcasts/detail"
+    },
     "M4jS9": {
       "doc": "V8-B",
       "name": "統括 メンバー 権限を変える（確認）V8",
@@ -1557,6 +1718,35 @@
       "shot": "lint/V8-B/shots/M8zhjL.png",
       "url": "/mileage/friends/detail?id=friend-1&adjust=1"
     },
+    "ME78d": {
+      "doc": "V8",
+      "name": "統括 リッチメニュー 作る②（1152） V8（G-10）",
+      "kind": "1152",
+      "route": "/hq/rich-menus",
+      "routes": [
+        "/hq/rich-menus"
+      ],
+      "width": 1152,
+      "shot": null,
+      "url": "/hq/rich-menus"
+    },
+    "MFgPZ": {
+      "doc": "V8",
+      "name": "統括 友だち属性 タグのひな形を作る V8",
+      "kind": "画面",
+      "route": "/hq/friend-attributes",
+      "routes": [
+        "/hq/friend-attributes"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/friend-attributes",
+      "state": {
+        "click": [
+          "タグを作る"
+        ]
+      }
+    },
     "MJoJR": {
       "doc": "V8-B",
       "name": "メニュー管理 V8",
@@ -1580,6 +1770,21 @@
       "width": 1440,
       "shot": "lint/V8/shots/MKQyJ.png",
       "url": "/form-submissions/responses"
+    },
+    "MLgjO": {
+      "doc": "V8",
+      "name": "採用 G-3 統括のテンプレート まず保存→配りますか？（B-88）",
+      "kind": "採用の図",
+      "route": "/hq/templates",
+      "routes": [
+        "/hq/templates"
+      ],
+      "width": null,
+      "shot": null,
+      "url": "/hq/templates",
+      "state": {
+        "manual": "採用の図（横に複数の画面を並べた板）。中の画面の板で測る"
+      }
     },
     "MRhef": {
       "doc": "V8",
@@ -1673,6 +1878,18 @@
       "shot": "lint/V8/shots/N43uVX.png",
       "url": "/friend-add-settings/runs/detail"
     },
+    "N4T9mO": {
+      "doc": "V8",
+      "name": "統括 回答フォーム 編集（予約を入れるブロック） V8",
+      "kind": "画面",
+      "route": "/hq/form-submissions",
+      "routes": [
+        "/hq/form-submissions"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/form-submissions"
+    },
     "N8ZrUl": {
       "doc": "V8-B",
       "name": "分析 使われ方 V8",
@@ -1708,6 +1925,18 @@
       "width": 1440,
       "shot": "lint/V8-B/shots/NGh7b.png",
       "url": "/webhooks/new"
+    },
+    "Ni0V8": {
+      "doc": "V8",
+      "name": "統括 テンプレート リッチビデオを作る V8",
+      "kind": "画面",
+      "route": "/hq/templates",
+      "routes": [
+        "/hq/templates"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/templates?kind=rich_video"
     },
     "NkmwU": {
       "doc": "V8-B",
@@ -1949,6 +2178,22 @@
       "shot": "lint/V8/shots/PMLkX.png",
       "url": "/scenarios/detail"
     },
+    "PUWyq": {
+      "doc": "V8",
+      "name": "E-3 ウォークインの窓 V8",
+      "kind": "画面",
+      "route": "/restaurant-test/dashboard",
+      "routes": [
+        "/restaurant-test/dashboard"
+      ],
+      "width": 1440,
+      "url": "/restaurant-test/dashboard",
+      "state": {
+        "click": [
+          "ウォークイン"
+        ]
+      }
+    },
     "PZBVb": {
       "doc": "V8-B",
       "name": "LINE通知 記録 V8",
@@ -2051,6 +2296,18 @@
       "shot": "lint/V8/shots/Qat9s.png",
       "url": "/tags/edit"
     },
+    "Qgjmc": {
+      "doc": "V8",
+      "name": "統括 友だち属性 対応マーク V8",
+      "kind": "画面",
+      "route": "/hq/friend-attributes",
+      "routes": [
+        "/hq/friend-attributes"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/friend-attributes"
+    },
     "QqER7": {
       "doc": "V8",
       "name": "予約設定 メニューを作る V8",
@@ -2087,6 +2344,21 @@
       "shot": "lint/V8-B/shots/R6kIG.png",
       "url": "/mileage"
     },
+    "R83uvQ": {
+      "doc": "V8",
+      "name": "採用 G-5 シナリオの配信方式に図解（B-92）",
+      "kind": "採用の図",
+      "route": "/scenarios",
+      "routes": [
+        "/scenarios"
+      ],
+      "width": null,
+      "shot": null,
+      "url": "/scenarios",
+      "state": {
+        "manual": "採用の図（横に複数の画面を並べた板）。中の画面の板で測る"
+      }
+    },
     "R8NNi": {
       "doc": "V8-B",
       "name": "マイル 点数の変化の明細 V8",
@@ -2122,6 +2394,21 @@
       "width": 1440,
       "shot": "lint/V8/shots/REIxB.png",
       "url": "/friend-add-settings/runs"
+    },
+    "RHvRP": {
+      "doc": "V8",
+      "name": "採用 G-2 テンプレートにリッチビデオ（B-87）",
+      "kind": "採用の図",
+      "route": "/templates",
+      "routes": [
+        "/templates"
+      ],
+      "width": null,
+      "shot": null,
+      "url": "/templates",
+      "state": {
+        "manual": "採用の図（横に複数の画面を並べた板）。中の画面の板で測る"
+      }
     },
     "RaMf3": {
       "doc": "V8-B",
@@ -2248,6 +2535,18 @@
       "width": 1440,
       "shot": "lint/V8-B/shots/SAUCs.png",
       "url": "/webhooks"
+    },
+    "SDSsr": {
+      "doc": "V8",
+      "name": "統括 テンプレート カルーセルを作る V8",
+      "kind": "画面",
+      "route": "/hq/templates",
+      "routes": [
+        "/hq/templates"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/templates"
     },
     "SXCb3": {
       "doc": "V8",
@@ -2397,6 +2696,18 @@
       "shot": "lint/V8/shots/U0aKD.png",
       "url": "/tags"
     },
+    "U4Eep0": {
+      "doc": "V8",
+      "name": "統括 一括配信 一覧 V8",
+      "kind": "画面",
+      "route": "/hq/broadcasts",
+      "routes": [
+        "/hq/broadcasts"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/broadcasts"
+    },
     "U5rxyH": {
       "doc": "V8",
       "name": "シナリオ 作る②（1152）V8",
@@ -2457,6 +2768,144 @@
       "shot": "lint/V8/shots/UTbi1.png",
       "url": "/templates/detail"
     },
+    "UUQ7T": {
+      "doc": "V8-B",
+      "name": "コンバージョン 一覧 1152 V8",
+      "kind": "1152",
+      "route": "/conversions",
+      "routes": [
+        "/conversions"
+      ],
+      "width": 1152,
+      "shot": null,
+      "url": "/conversions"
+    },
+    "UVnvR": {
+      "doc": "V8",
+      "name": "予約枠・在庫 休業日・貸切（E-10）V8",
+      "kind": "画面",
+      "route": "/restaurant-test/inventory",
+      "routes": [
+        "/restaurant-test/inventory"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/UVnvR.png",
+      "url": "/restaurant-test/inventory?tab=closures",
+      "state": {
+        "api": {
+          "match": "GET /api/restaurant-test/channel-close-tasks",
+          "body": {
+            "success": true,
+            "data": [
+              {
+                "id": "clt-1",
+                "storeId": "store-sby",
+                "slotId": null,
+                "startsAt": "2026-10-19T15:00:00.000Z",
+                "channel": "hotpepper",
+                "status": "close",
+                "reason": "closure",
+                "remainingSeats": null,
+                "recipientIds": [],
+                "createdAt": "2026-10-04T01:00:00.000Z",
+                "updatedAt": "2026-10-04T01:00:00.000Z",
+                "closureId": "cl-1",
+                "closureVersion": 1,
+                "closureKind": "temporary_closed",
+                "startDate": "2026-10-20",
+                "endDate": "2026-10-20",
+                "allDay": true,
+                "tableIds": []
+              },
+              {
+                "id": "clt-2",
+                "storeId": "store-sby",
+                "slotId": null,
+                "startsAt": "2026-10-19T15:00:00.000Z",
+                "channel": "tabelog",
+                "status": "close",
+                "reason": "closure",
+                "remainingSeats": null,
+                "recipientIds": [],
+                "createdAt": "2026-10-04T01:00:00.000Z",
+                "updatedAt": "2026-10-04T01:00:00.000Z",
+                "closureId": "cl-1",
+                "closureVersion": 1,
+                "closureKind": "temporary_closed",
+                "startDate": "2026-10-20",
+                "endDate": "2026-10-20",
+                "allDay": true,
+                "tableIds": []
+              },
+              {
+                "id": "clt-3",
+                "storeId": "store-sby",
+                "slotId": null,
+                "startsAt": "2026-10-24T09:00:00.000Z",
+                "channel": "hotpepper",
+                "status": "done",
+                "reason": "closure",
+                "remainingSeats": null,
+                "recipientIds": [],
+                "createdAt": "2026-10-04T01:00:00.000Z",
+                "updatedAt": "2026-10-04T01:00:00.000Z",
+                "closureId": "cl-2",
+                "closureVersion": 1,
+                "closureKind": "private_event"
+              },
+              {
+                "id": "clt-4",
+                "storeId": "store-sby",
+                "slotId": null,
+                "startsAt": "2026-10-24T09:00:00.000Z",
+                "channel": "tabelog",
+                "status": "done",
+                "reason": "closure",
+                "remainingSeats": null,
+                "recipientIds": [],
+                "createdAt": "2026-10-04T01:00:00.000Z",
+                "updatedAt": "2026-10-04T01:00:00.000Z",
+                "closureId": "cl-2",
+                "closureVersion": 1,
+                "closureKind": "private_event"
+              },
+              {
+                "id": "clt-5",
+                "storeId": "store-sby",
+                "slotId": null,
+                "startsAt": "2026-10-30T15:00:00.000Z",
+                "channel": "hotpepper",
+                "status": "done",
+                "reason": "closure",
+                "remainingSeats": null,
+                "recipientIds": [],
+                "createdAt": "2026-10-04T01:00:00.000Z",
+                "updatedAt": "2026-10-04T01:00:00.000Z",
+                "closureId": "cl-3",
+                "closureVersion": 1,
+                "closureKind": "private_event"
+              },
+              {
+                "id": "clt-6",
+                "storeId": "store-sby",
+                "slotId": null,
+                "startsAt": "2026-10-30T15:00:00.000Z",
+                "channel": "tabelog",
+                "status": "done",
+                "reason": "closure",
+                "remainingSeats": null,
+                "recipientIds": [],
+                "createdAt": "2026-10-04T01:00:00.000Z",
+                "updatedAt": "2026-10-04T01:00:00.000Z",
+                "closureId": "cl-3",
+                "closureVersion": 1,
+                "closureKind": "private_event"
+              }
+            ]
+          }
+        }
+      }
+    },
     "UcBQ5": {
       "doc": "V8-B",
       "name": "統括 バナー生成（参照画像を選ぶ）V8",
@@ -2468,6 +2917,18 @@
       "width": 1440,
       "shot": "lint/V8-B/shots/UcBQ5.png",
       "url": "/hq/banners/project?id=banner-project-qa-1"
+    },
+    "UgZPJ": {
+      "doc": "V8",
+      "name": "統括 リッチメニュー 作る③ 配る先 V8（G-10）",
+      "kind": "画面",
+      "route": "/hq/rich-menus",
+      "routes": [
+        "/hq/rich-menus"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/rich-menus"
     },
     "UkZLi": {
       "doc": "V8-B",
@@ -2501,6 +2962,18 @@
       "width": 1440,
       "shot": "lint/V8-B/shots/UyUMw.png",
       "url": "/webinars"
+    },
+    "V1RQfI": {
+      "doc": "V8-B",
+      "name": "コンバージョン 作る V8",
+      "kind": "画面",
+      "route": "/conversions/new",
+      "routes": [
+        "/conversions/new"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/conversions/new"
     },
     "V4LjH": {
       "doc": "V8",
@@ -2586,6 +3059,18 @@
       "width": 1152,
       "shot": "lint/V8/shots/VFxWU.png",
       "url": "/booking/menus?tab=hours"
+    },
+    "VIij4": {
+      "doc": "V8",
+      "name": "統括 リッチメニュー 作る① 形と画像 V8（G-10）",
+      "kind": "画面",
+      "route": "/hq/rich-menus",
+      "routes": [
+        "/hq/rich-menus"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/rich-menus"
     },
     "VLEaj": {
       "doc": "V8",
@@ -2679,6 +3164,21 @@
       "shot": "lint/V8-B/shots/VtJQ6.png",
       "url": "/hq"
     },
+    "W2GYgL": {
+      "doc": "V8-B",
+      "name": "採用 G-7 フォルダの…から配る（B-101）",
+      "kind": "採用の図",
+      "route": "/hq/templates",
+      "routes": [
+        "/hq/templates"
+      ],
+      "width": null,
+      "shot": null,
+      "url": "/hq/templates",
+      "state": {
+        "manual": "採用の図（横に複数の画面を並べた板）。中の画面の板で測る"
+      }
+    },
     "W5Wxr": {
       "doc": "V8-B",
       "name": "統括 バナー生成（画像ライブラリ）V8",
@@ -2758,6 +3258,19 @@
       "width": 1440,
       "shot": "lint/V8-B/shots/WSGvo.png",
       "url": "/conversions"
+    },
+    "WjFWW": {
+      "doc": "V8",
+      "name": "統括 一括配信を作る② 送るアカウントを［選ぶ］→窓 V8",
+      "kind": "小窓",
+      "route": "/hq/broadcasts/new",
+      "routes": [
+        "/hq/broadcasts/new"
+      ],
+      "width": null,
+      "shot": null,
+      "url": "/hq/broadcasts/new",
+      "unmeasurable": "幅 2600 の板（前後を横に並べた）"
     },
     "X0QrW0": {
       "doc": "V8",
@@ -2934,6 +3447,17 @@
       "shot": "lint/V8/shots/YChR6.png",
       "url": "/reminders/new"
     },
+    "YMVFD": {
+      "doc": "V8",
+      "name": "E-5 枠を閉じる知らせ V8",
+      "kind": "画面",
+      "route": "/restaurant-test/close-tasks",
+      "routes": [
+        "/restaurant-test/close-tasks"
+      ],
+      "width": 1440,
+      "url": "/restaurant-test/close-tasks"
+    },
     "YXrF6": {
       "doc": "V8-B",
       "name": "予約台帳 予約を変更 V8",
@@ -3031,6 +3555,18 @@
       "width": 1440,
       "shot": "lint/V8-B/shots/Z3FoM.png",
       "url": "/restaurant-test/reservations"
+    },
+    "Z6Hx5o": {
+      "doc": "V8",
+      "name": "一斉配信③ カルーセルをここで作る（引き出し）V8（G-9）",
+      "kind": "小窓",
+      "route": "/broadcasts/new",
+      "routes": [
+        "/broadcasts/new"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/broadcasts/new"
     },
     "Z9wXm": {
       "doc": "V8",
@@ -3327,6 +3863,18 @@
       "shot": "lint/V8-B/shots/c7dxp.png",
       "url": "/automations"
     },
+    "c7grKU": {
+      "doc": "V8-B",
+      "name": "コンバージョン 作る（競合）V8",
+      "kind": "競合",
+      "route": "/conversions/new",
+      "routes": [
+        "/conversions/new"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/conversions/new"
+    },
     "cFo2p": {
       "doc": "V8",
       "name": "友だち追加時の配信 受け皿は止められない（案内） V8",
@@ -3350,6 +3898,19 @@
       "width": 1440,
       "shot": "lint/V8/shots/cIdA2.png",
       "url": "/settings/manual-links"
+    },
+    "cJwtF": {
+      "doc": "V8",
+      "name": "回答フォーム お客さまに見える形と参考の文字（入力の種類ごと）V8",
+      "kind": "画面",
+      "route": "/form-submissions/edit",
+      "routes": [
+        "/form-submissions/edit"
+      ],
+      "width": null,
+      "shot": null,
+      "url": "/form-submissions/edit",
+      "unmeasurable": "幅 960 の説明つきの板（入力の種類ごとの見本）"
     },
     "cXqlS": {
       "doc": "V8-B",
@@ -3386,6 +3947,18 @@
         "/broadcasts/detail"
       ],
       "width": 1440
+    },
+    "cmRZc": {
+      "doc": "V8",
+      "name": "統括 リッチメニュー 作る② ボタンの動き V8（G-10）",
+      "kind": "画面",
+      "route": "/hq/rich-menus",
+      "routes": [
+        "/hq/rich-menus"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/rich-menus"
     },
     "cniyw": {
       "doc": "V8-B",
@@ -3623,6 +4196,21 @@
       "shot": "lint/V8-B/shots/eY9F3.png",
       "url": "/restaurant-test/tables"
     },
+    "eovoG": {
+      "doc": "V8",
+      "name": "受信箱 ふだん V8（M0393 の中の1枚）",
+      "kind": "画面",
+      "route": "/chats",
+      "routes": [
+        "/chats"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/chats?status=unread",
+      "state": {
+        "click": "Kyohei Yamamoto"
+      }
+    },
     "f3SoAm": {
       "doc": "V8",
       "name": "★V8 リッチメニュー 状態",
@@ -3634,6 +4222,30 @@
       "width": 1440,
       "shot": "lint/V8/shots/f3SoAm.png",
       "url": "/rich-menus"
+    },
+    "f63Jza": {
+      "doc": "V8",
+      "name": "一斉配信③ テンプレートから選ぶ（1つ選ぶ窓）V8",
+      "kind": "小窓",
+      "route": "/broadcasts/new",
+      "routes": [
+        "/broadcasts/new"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/broadcasts/new"
+    },
+    "fBSdY": {
+      "doc": "V8",
+      "name": "テンプレート カルーセルを作る（保存の誤り）V8",
+      "kind": "状態",
+      "route": "/templates/carousel",
+      "routes": [
+        "/templates/carousel"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/templates/carousel"
     },
     "faGn4": {
       "doc": "V8-B",
@@ -3710,6 +4322,18 @@
       "shot": "lint/V8-B/shots/g3iDs.png",
       "url": "/line-notifications?tab=customer"
     },
+    "g8d6ai": {
+      "doc": "V8",
+      "name": "統括 テンプレート リッチメッセージを作る V8",
+      "kind": "画面",
+      "route": "/hq/templates",
+      "routes": [
+        "/hq/templates"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/templates"
+    },
     "g98F9": {
       "doc": "V8-B",
       "name": "オートメーション 動いた記録 V8",
@@ -3751,6 +4375,24 @@
       "width": null,
       "shot": "lint/V8/shots/gLReL.png",
       "url": null
+    },
+    "gSsPR": {
+      "doc": "V8",
+      "name": "統括 友だち属性 タグのひな形 連動アクションを追加（窓）V8",
+      "kind": "小窓",
+      "route": "/hq/friend-attributes",
+      "routes": [
+        "/hq/friend-attributes"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/friend-attributes",
+      "state": {
+        "click": [
+          "タグを作る",
+          "連動アクションを追加"
+        ]
+      }
     },
     "gVjiC": {
       "doc": "V8",
@@ -3881,6 +4523,180 @@
       "shot": "lint/V8/shots/hEDTK.png",
       "url": "/templates"
     },
+    "hKRRF": {
+      "doc": "V8",
+      "name": "E-1 今日のお店（店舗ダッシュボード）V8",
+      "kind": "画面",
+      "route": "/restaurant-test/dashboard",
+      "routes": [
+        "/restaurant-test/dashboard"
+      ],
+      "width": 1440,
+      "url": "/restaurant-test/dashboard",
+      "state": {
+        "api": [
+          {
+            "match": "GET /api/restaurant-test/reservations/day",
+            "body": {
+              "success": true,
+              "data": {
+                "date": "@TODAY@",
+                "reservations": [
+                  {
+                    "id": "dash-0",
+                    "store_id": "store-sby",
+                    "store_name": "然 渋谷店",
+                    "source": "line",
+                    "external_id": null,
+                    "customer_name": "佐藤 健二",
+                    "customer_phone": null,
+                    "line_uid": "U-demo",
+                    "guest_count": 2,
+                    "starts_at": "@TODAY@T17:30:00",
+                    "ends_at": "@TODAY@T19:30:00",
+                    "table_id": "dt-0",
+                    "table_label": "T3",
+                    "course_id": null,
+                    "course_name": null,
+                    "status": "seated",
+                    "allergy_note": null,
+                    "note": null,
+                    "sync_direction": "inbound_only"
+                  },
+                  {
+                    "id": "dash-1",
+                    "store_id": "store-sby",
+                    "store_name": "然 渋谷店",
+                    "source": "phone",
+                    "external_id": null,
+                    "customer_name": "鈴木 美咲",
+                    "customer_phone": null,
+                    "line_uid": null,
+                    "guest_count": 4,
+                    "starts_at": "@TODAY@T18:00:00",
+                    "ends_at": "@TODAY@T20:00:00",
+                    "table_id": "dt-1",
+                    "table_label": "T5",
+                    "course_id": null,
+                    "course_name": null,
+                    "status": "confirmed",
+                    "allergy_note": null,
+                    "note": null,
+                    "sync_direction": "inbound_only"
+                  },
+                  {
+                    "id": "dash-2",
+                    "store_id": "store-sby",
+                    "store_name": "然 渋谷店",
+                    "source": "line",
+                    "external_id": null,
+                    "customer_name": "高橋 さくら（初来店）",
+                    "customer_phone": null,
+                    "line_uid": "U-demo",
+                    "guest_count": 2,
+                    "starts_at": "@TODAY@T18:30:00",
+                    "ends_at": "@TODAY@T20:30:00",
+                    "table_id": "dt-2",
+                    "table_label": "C1-2",
+                    "course_id": null,
+                    "course_name": null,
+                    "status": "confirmed",
+                    "allergy_note": null,
+                    "note": null,
+                    "sync_direction": "inbound_only"
+                  },
+                  {
+                    "id": "dash-3",
+                    "store_id": "store-sby",
+                    "store_name": "然 渋谷店",
+                    "source": "line",
+                    "external_id": null,
+                    "customer_name": "田中 大輔",
+                    "customer_phone": null,
+                    "line_uid": "U-demo",
+                    "guest_count": 4,
+                    "starts_at": "@TODAY@T19:00:00",
+                    "ends_at": "@TODAY@T21:00:00",
+                    "table_id": "dt-3",
+                    "table_label": "T7",
+                    "course_id": null,
+                    "course_name": null,
+                    "status": "confirmed",
+                    "allergy_note": null,
+                    "note": null,
+                    "sync_direction": "inbound_only"
+                  },
+                  {
+                    "id": "dash-4",
+                    "store_id": "store-sby",
+                    "store_name": "然 渋谷店",
+                    "source": "phone",
+                    "external_id": null,
+                    "customer_name": "伊藤 由紀",
+                    "customer_phone": null,
+                    "line_uid": null,
+                    "guest_count": 6,
+                    "starts_at": "@TODAY@T19:00:00",
+                    "ends_at": "@TODAY@T21:00:00",
+                    "table_id": "dt-4",
+                    "table_label": "個室A",
+                    "course_id": null,
+                    "course_name": null,
+                    "status": "confirmed",
+                    "allergy_note": null,
+                    "note": null,
+                    "sync_direction": "inbound_only"
+                  },
+                  {
+                    "id": "dash-5",
+                    "store_id": "store-sby",
+                    "store_name": "然 渋谷店",
+                    "source": "hotpepper",
+                    "external_id": null,
+                    "customer_name": "渡辺 翔",
+                    "customer_phone": null,
+                    "line_uid": null,
+                    "guest_count": 3,
+                    "starts_at": "@TODAY@T19:30:00",
+                    "ends_at": "@TODAY@T21:30:00",
+                    "table_id": "dt-5",
+                    "table_label": "T2",
+                    "course_id": null,
+                    "course_name": null,
+                    "status": "confirmed",
+                    "allergy_note": null,
+                    "note": null,
+                    "sync_direction": "inbound_only"
+                  },
+                  {
+                    "id": "dash-6",
+                    "store_id": "store-sby",
+                    "store_name": "然 渋谷店",
+                    "source": "line",
+                    "external_id": null,
+                    "customer_name": "山本 彩",
+                    "customer_phone": null,
+                    "line_uid": "U-demo",
+                    "guest_count": 2,
+                    "starts_at": "@TODAY@T20:00:00",
+                    "ends_at": "@TODAY@T22:00:00",
+                    "table_id": "dt-6",
+                    "table_label": "C3-4",
+                    "course_id": null,
+                    "course_name": null,
+                    "status": "confirmed",
+                    "allergy_note": null,
+                    "note": null,
+                    "sync_direction": "inbound_only"
+                  }
+                ],
+                "closures": []
+              }
+            }
+          }
+        ]
+      }
+    },
     "hKr8f": {
       "doc": "V8",
       "name": "リッチメニュー 公開した（公開の進み） V8",
@@ -3971,6 +4787,18 @@
       "width": 1440,
       "shot": "lint/V8-B/shots/hsD8e.png",
       "url": "/webhooks/new"
+    },
+    "i0Ao0R": {
+      "doc": "V8",
+      "name": "統括 テンプレート 一覧 V8",
+      "kind": "画面",
+      "route": "/hq/templates",
+      "routes": [
+        "/hq/templates"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/templates"
     },
     "i0FTN": {
       "doc": "V8-B",
@@ -4075,6 +4903,18 @@
       "width": 1440,
       "shot": "lint/V8-B/shots/iMnph.png",
       "url": "/hq/banners/project?id=banner-project-qa-1"
+    },
+    "iN6np": {
+      "doc": "V8",
+      "name": "一斉配信③ メッセージを作成 V8（G-9）",
+      "kind": "画面",
+      "route": "/broadcasts/new",
+      "routes": [
+        "/broadcasts/new"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/broadcasts/new"
     },
     "ihjfd": {
       "doc": "V8-B",
@@ -4421,6 +5261,18 @@
       "shot": "lint/V8-B/shots/nAesv.png",
       "url": "/ec-commerce"
     },
+    "nF4ts": {
+      "doc": "V8",
+      "name": "友だち一覧 ふだん V8（ywJ5H の中の1枚）",
+      "kind": "画面",
+      "route": "/friends",
+      "routes": [
+        "/friends"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/friends"
+    },
     "nGcY1": {
       "doc": "V8-B",
       "name": "予約枠・在庫 自動で合わせるルール V8（機能追加 F-24・API待ち）",
@@ -4475,6 +5327,135 @@
       "width": 1440,
       "shot": "lint/V8/shots/nUYyb.png"
     },
+    "nVvXy": {
+      "doc": "V8",
+      "name": "予約枠・在庫 臨時休業・貸切を足す（E-10）V8",
+      "kind": null,
+      "route": "/restaurant-test/inventory",
+      "routes": [
+        "/restaurant-test/inventory"
+      ],
+      "width": 1440,
+      "shot": "lint/V8/shots/nVvXy.png",
+      "url": "/restaurant-test/inventory?tab=closures",
+      "state": {
+        "api": {
+          "match": "GET /api/restaurant-test/channel-close-tasks",
+          "body": {
+            "success": true,
+            "data": [
+              {
+                "id": "clt-1",
+                "storeId": "store-sby",
+                "slotId": null,
+                "startsAt": "2026-10-19T15:00:00.000Z",
+                "channel": "hotpepper",
+                "status": "close",
+                "reason": "closure",
+                "remainingSeats": null,
+                "recipientIds": [],
+                "createdAt": "2026-10-04T01:00:00.000Z",
+                "updatedAt": "2026-10-04T01:00:00.000Z",
+                "closureId": "cl-1",
+                "closureVersion": 1,
+                "closureKind": "temporary_closed",
+                "startDate": "2026-10-20",
+                "endDate": "2026-10-20",
+                "allDay": true,
+                "tableIds": []
+              },
+              {
+                "id": "clt-2",
+                "storeId": "store-sby",
+                "slotId": null,
+                "startsAt": "2026-10-19T15:00:00.000Z",
+                "channel": "tabelog",
+                "status": "close",
+                "reason": "closure",
+                "remainingSeats": null,
+                "recipientIds": [],
+                "createdAt": "2026-10-04T01:00:00.000Z",
+                "updatedAt": "2026-10-04T01:00:00.000Z",
+                "closureId": "cl-1",
+                "closureVersion": 1,
+                "closureKind": "temporary_closed",
+                "startDate": "2026-10-20",
+                "endDate": "2026-10-20",
+                "allDay": true,
+                "tableIds": []
+              },
+              {
+                "id": "clt-3",
+                "storeId": "store-sby",
+                "slotId": null,
+                "startsAt": "2026-10-24T09:00:00.000Z",
+                "channel": "hotpepper",
+                "status": "done",
+                "reason": "closure",
+                "remainingSeats": null,
+                "recipientIds": [],
+                "createdAt": "2026-10-04T01:00:00.000Z",
+                "updatedAt": "2026-10-04T01:00:00.000Z",
+                "closureId": "cl-2",
+                "closureVersion": 1,
+                "closureKind": "private_event"
+              },
+              {
+                "id": "clt-4",
+                "storeId": "store-sby",
+                "slotId": null,
+                "startsAt": "2026-10-24T09:00:00.000Z",
+                "channel": "tabelog",
+                "status": "done",
+                "reason": "closure",
+                "remainingSeats": null,
+                "recipientIds": [],
+                "createdAt": "2026-10-04T01:00:00.000Z",
+                "updatedAt": "2026-10-04T01:00:00.000Z",
+                "closureId": "cl-2",
+                "closureVersion": 1,
+                "closureKind": "private_event"
+              },
+              {
+                "id": "clt-5",
+                "storeId": "store-sby",
+                "slotId": null,
+                "startsAt": "2026-10-30T15:00:00.000Z",
+                "channel": "hotpepper",
+                "status": "done",
+                "reason": "closure",
+                "remainingSeats": null,
+                "recipientIds": [],
+                "createdAt": "2026-10-04T01:00:00.000Z",
+                "updatedAt": "2026-10-04T01:00:00.000Z",
+                "closureId": "cl-3",
+                "closureVersion": 1,
+                "closureKind": "private_event"
+              },
+              {
+                "id": "clt-6",
+                "storeId": "store-sby",
+                "slotId": null,
+                "startsAt": "2026-10-30T15:00:00.000Z",
+                "channel": "tabelog",
+                "status": "done",
+                "reason": "closure",
+                "remainingSeats": null,
+                "recipientIds": [],
+                "createdAt": "2026-10-04T01:00:00.000Z",
+                "updatedAt": "2026-10-04T01:00:00.000Z",
+                "closureId": "cl-3",
+                "closureVersion": 1,
+                "closureKind": "private_event"
+              }
+            ]
+          }
+        },
+        "click": [
+          "臨時休業・貸切を足す"
+        ]
+      }
+    },
     "nWmLg": {
       "doc": "V8",
       "name": "自動応答 実行結果 V8",
@@ -4498,6 +5479,18 @@
       "width": 1440,
       "shot": "lint/V8/shots/nku0f.png",
       "url": "/staff"
+    },
+    "noVq4": {
+      "doc": "V8",
+      "name": "統括 リッチメニュー 一覧 V8",
+      "kind": "画面",
+      "route": "/hq/rich-menus",
+      "routes": [
+        "/hq/rich-menus"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/rich-menus"
     },
     "oRbJi": {
       "doc": "V8-B",
@@ -4627,6 +5620,18 @@
       "shot": "lint/V8/shots/p82v9.png",
       "url": "/contents/vars/new"
     },
+    "pIHp3": {
+      "doc": "V8",
+      "name": "統括 一括配信③ メッセージを作成 V8（G-9）",
+      "kind": "画面",
+      "route": "/hq/broadcasts/new",
+      "routes": [
+        "/hq/broadcasts/new"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/broadcasts/new"
+    },
     "pNiUk": {
       "doc": "V8",
       "name": "詳細（承認待ち）",
@@ -4638,6 +5643,18 @@
         "/broadcasts/detail"
       ],
       "width": 1440
+    },
+    "pQ4fH": {
+      "doc": "V8",
+      "name": "統括 テンプレート 詳細 V8",
+      "kind": "画面",
+      "route": "/hq/templates",
+      "routes": [
+        "/hq/templates"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/templates"
     },
     "piWhz": {
       "doc": "V8",
@@ -4798,6 +5815,30 @@
       "shot": "lint/V8/shots/r8dGXT.png",
       "url": "/rich-menus/edit"
     },
+    "r9qd7r": {
+      "doc": "V8-B",
+      "name": "コンバージョン 一覧（閲覧のみ）V8",
+      "kind": "閲覧のみ",
+      "route": "/conversions",
+      "routes": [
+        "/conversions"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/conversions"
+    },
+    "rE0ML": {
+      "doc": "V8",
+      "name": "リッチメニュー 作る② 回答フォームを選ぶ（1つ選ぶ窓）V8",
+      "kind": "小窓",
+      "route": "/rich-menus/new",
+      "routes": [
+        "/rich-menus/new"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/rich-menus/new"
+    },
     "rI5uh": {
       "doc": "V8-B",
       "name": "統括 バナー生成（画像の詳細）V8",
@@ -4921,6 +5962,18 @@
       "shot": "lint/V8/shots/sFwWf.png",
       "url": "/friend-add-settings"
     },
+    "scJcP": {
+      "doc": "V8",
+      "name": "統括 回答フォーム 編集（答え終わったあと） V8",
+      "kind": "画面",
+      "route": "/hq/form-submissions",
+      "routes": [
+        "/hq/form-submissions"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/form-submissions"
+    },
     "susGP": {
       "doc": "V8",
       "name": "★V8 テンプレート 状態",
@@ -4933,15 +5986,184 @@
       "shot": "lint/V8/shots/susGP.png",
       "url": "/templates"
     },
-    "sxNO5": {
+    "svUTk": {
       "doc": "V8",
-      "name": "LIFFの決まり",
-      "kind": "決まり",
-      "route": null,
-      "routes": [],
-      "width": null,
-      "shot": "lint/V8/shots/sxNO5.png",
-      "url": null
+      "name": "E-2 電話予約の引き出し V8",
+      "kind": "画面",
+      "route": "/restaurant-test/dashboard",
+      "routes": [
+        "/restaurant-test/dashboard"
+      ],
+      "width": 1440,
+      "url": "/restaurant-test/dashboard",
+      "state": {
+        "click": [
+          "電話予約",
+          "fill:電話番号=090-1111-2222",
+          "山田 花子 LINE の友だち・090-1111-2222"
+        ],
+        "api": [
+          {
+            "match": "GET /api/restaurant-test/reservations/day",
+            "body": {
+              "success": true,
+              "data": {
+                "date": "@TODAY@",
+                "reservations": [
+                  {
+                    "id": "dash-0",
+                    "store_id": "store-sby",
+                    "store_name": "然 渋谷店",
+                    "source": "line",
+                    "external_id": null,
+                    "customer_name": "佐藤 健二",
+                    "customer_phone": null,
+                    "line_uid": "U-demo",
+                    "guest_count": 2,
+                    "starts_at": "@TODAY@T17:30:00",
+                    "ends_at": "@TODAY@T19:30:00",
+                    "table_id": "dt-0",
+                    "table_label": "T3",
+                    "course_id": null,
+                    "course_name": null,
+                    "status": "seated",
+                    "allergy_note": null,
+                    "note": null,
+                    "sync_direction": "inbound_only"
+                  },
+                  {
+                    "id": "dash-1",
+                    "store_id": "store-sby",
+                    "store_name": "然 渋谷店",
+                    "source": "phone",
+                    "external_id": null,
+                    "customer_name": "鈴木 美咲",
+                    "customer_phone": null,
+                    "line_uid": null,
+                    "guest_count": 4,
+                    "starts_at": "@TODAY@T18:00:00",
+                    "ends_at": "@TODAY@T20:00:00",
+                    "table_id": "dt-1",
+                    "table_label": "T5",
+                    "course_id": null,
+                    "course_name": null,
+                    "status": "confirmed",
+                    "allergy_note": null,
+                    "note": null,
+                    "sync_direction": "inbound_only"
+                  },
+                  {
+                    "id": "dash-2",
+                    "store_id": "store-sby",
+                    "store_name": "然 渋谷店",
+                    "source": "line",
+                    "external_id": null,
+                    "customer_name": "高橋 さくら（初来店）",
+                    "customer_phone": null,
+                    "line_uid": "U-demo",
+                    "guest_count": 2,
+                    "starts_at": "@TODAY@T18:30:00",
+                    "ends_at": "@TODAY@T20:30:00",
+                    "table_id": "dt-2",
+                    "table_label": "C1-2",
+                    "course_id": null,
+                    "course_name": null,
+                    "status": "confirmed",
+                    "allergy_note": null,
+                    "note": null,
+                    "sync_direction": "inbound_only"
+                  },
+                  {
+                    "id": "dash-3",
+                    "store_id": "store-sby",
+                    "store_name": "然 渋谷店",
+                    "source": "line",
+                    "external_id": null,
+                    "customer_name": "田中 大輔",
+                    "customer_phone": null,
+                    "line_uid": "U-demo",
+                    "guest_count": 4,
+                    "starts_at": "@TODAY@T19:00:00",
+                    "ends_at": "@TODAY@T21:00:00",
+                    "table_id": "dt-3",
+                    "table_label": "T7",
+                    "course_id": null,
+                    "course_name": null,
+                    "status": "confirmed",
+                    "allergy_note": null,
+                    "note": null,
+                    "sync_direction": "inbound_only"
+                  },
+                  {
+                    "id": "dash-4",
+                    "store_id": "store-sby",
+                    "store_name": "然 渋谷店",
+                    "source": "phone",
+                    "external_id": null,
+                    "customer_name": "伊藤 由紀",
+                    "customer_phone": null,
+                    "line_uid": null,
+                    "guest_count": 6,
+                    "starts_at": "@TODAY@T19:00:00",
+                    "ends_at": "@TODAY@T21:00:00",
+                    "table_id": "dt-4",
+                    "table_label": "個室A",
+                    "course_id": null,
+                    "course_name": null,
+                    "status": "confirmed",
+                    "allergy_note": null,
+                    "note": null,
+                    "sync_direction": "inbound_only"
+                  },
+                  {
+                    "id": "dash-5",
+                    "store_id": "store-sby",
+                    "store_name": "然 渋谷店",
+                    "source": "hotpepper",
+                    "external_id": null,
+                    "customer_name": "渡辺 翔",
+                    "customer_phone": null,
+                    "line_uid": null,
+                    "guest_count": 3,
+                    "starts_at": "@TODAY@T19:30:00",
+                    "ends_at": "@TODAY@T21:30:00",
+                    "table_id": "dt-5",
+                    "table_label": "T2",
+                    "course_id": null,
+                    "course_name": null,
+                    "status": "confirmed",
+                    "allergy_note": null,
+                    "note": null,
+                    "sync_direction": "inbound_only"
+                  },
+                  {
+                    "id": "dash-6",
+                    "store_id": "store-sby",
+                    "store_name": "然 渋谷店",
+                    "source": "line",
+                    "external_id": null,
+                    "customer_name": "山本 彩",
+                    "customer_phone": null,
+                    "line_uid": "U-demo",
+                    "guest_count": 2,
+                    "starts_at": "@TODAY@T20:00:00",
+                    "ends_at": "@TODAY@T22:00:00",
+                    "table_id": "dt-6",
+                    "table_label": "C3-4",
+                    "course_id": null,
+                    "course_name": null,
+                    "status": "confirmed",
+                    "allergy_note": null,
+                    "note": null,
+                    "sync_direction": "inbound_only"
+                  }
+                ],
+                "closures": []
+              }
+            }
+          }
+        ]
+      }
     },
     "t2SMXX": {
       "doc": "V8-B",
@@ -5010,6 +6232,21 @@
       "shot": "lint/V8-B/shots/tQ2MJ.png",
       "url": "/ops/announcements"
     },
+    "tSgl6": {
+      "doc": "V8-B",
+      "name": "採用 G-6 バナー生成 選んで右下で配る（B-99）",
+      "kind": "採用の図",
+      "route": "/hq/banners/project",
+      "routes": [
+        "/hq/banners/project"
+      ],
+      "width": null,
+      "shot": null,
+      "url": "/hq/banners/project",
+      "state": {
+        "manual": "採用の図（横に複数の画面を並べた板）。中の画面の板で測る"
+      }
+    },
     "tVaUh": {
       "doc": "V8-B",
       "name": "運営 メンバーの招待 V8",
@@ -5075,6 +6312,18 @@
       "width": 1440,
       "shot": "lint/V8-B/shots/u5CuB8.png",
       "url": "/analytics"
+    },
+    "u5MM7": {
+      "doc": "V8",
+      "name": "統括 回答フォーム 編集（中身） V8",
+      "kind": "画面",
+      "route": "/hq/form-submissions",
+      "routes": [
+        "/hq/form-submissions"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/form-submissions"
     },
     "u5YC6": {
       "doc": "V8",
@@ -5267,6 +6516,25 @@
       "shot": "lint/V8/shots/v5L19Z.png",
       "url": "/booking/menus/new"
     },
+    "v7GV2": {
+      "doc": "V8",
+      "name": "受信箱 会話の中を探す（M0393 段3-13）V8",
+      "kind": "部品",
+      "route": "/chats",
+      "routes": [
+        "/chats"
+      ],
+      "width": 1440,
+      "url": "/chats",
+      "state": {
+        "click": [
+          "Kyohei Yamamoto",
+          "会話の中を探す（⌘F）",
+          "fill:会話の中を探す=定期便"
+        ]
+      },
+      "unmeasurable": "まとめ板の中の幅600の枠。帯を開いた状態を撮って目で照合（2026-10-07 司令塔）"
+    },
     "v9JWQ": {
       "doc": "V8-B",
       "name": "成果とアフィリエイト アフィリエイター（閲覧のみ）V8",
@@ -5425,6 +6693,18 @@
       "width": 1440,
       "shot": "lint/V8-B/shots/wWrpY.png",
       "url": "/webhooks"
+    },
+    "wZPua": {
+      "doc": "V8",
+      "name": "統括 回答フォーム 一覧 V8",
+      "kind": "画面",
+      "route": "/hq/form-submissions",
+      "routes": [
+        "/hq/form-submissions"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/form-submissions"
     },
     "wbDHy": {
       "doc": "V8",
@@ -5596,6 +6876,18 @@
       "shot": "lint/V8-B/shots/xLpnS.png",
       "url": "/restaurant-test/line-followup"
     },
+    "xRPdo": {
+      "doc": "V8",
+      "name": "統括 回答フォーム 編集（受付と見た目） V8",
+      "kind": "画面",
+      "route": "/hq/form-submissions",
+      "routes": [
+        "/hq/form-submissions"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/form-submissions"
+    },
     "xbHxg": {
       "doc": "V8-B",
       "name": "流入と計測 一覧 V8",
@@ -5631,6 +6923,18 @@
       "width": 1440,
       "shot": "lint/V8/shots/xn95q.png",
       "url": "/tags/edit"
+    },
+    "xqr1Q": {
+      "doc": "V8",
+      "name": "統括 友だち属性 タグのひな形を作る（所属フォルダを開いた）V8",
+      "kind": "画面",
+      "route": "/hq/friend-attributes",
+      "routes": [
+        "/hq/friend-attributes"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/friend-attributes"
     },
     "xuJ7D": {
       "doc": "V8-B",
@@ -5684,6 +6988,18 @@
       "shot": "lint/V8-B/shots/xzCK6.png",
       "url": "/restaurant-test/reservations"
     },
+    "y0sapC": {
+      "doc": "V8",
+      "name": "統括 友だち属性 友だち情報欄 V8",
+      "kind": "画面",
+      "route": "/hq/friend-attributes",
+      "routes": [
+        "/hq/friend-attributes"
+      ],
+      "width": 1440,
+      "shot": null,
+      "url": "/hq/friend-attributes"
+    },
     "y1bs9A": {
       "doc": "V8",
       "name": "LIFF 自分のイベント",
@@ -5705,6 +7021,17 @@
       "width": 1152,
       "shot": "lint/V8-B/shots/y1ztx.png",
       "url": "/inflow-links"
+    },
+    "y3GGTs": {
+      "doc": "V8",
+      "name": "E-6 SNS 連携 V8",
+      "kind": "画面",
+      "route": "/settings/sns",
+      "routes": [
+        "/settings/sns"
+      ],
+      "width": 1440,
+      "url": "/settings/sns"
     },
     "y8QQV": {
       "doc": "V8-B",
