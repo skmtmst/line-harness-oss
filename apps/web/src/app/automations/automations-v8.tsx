@@ -11,7 +11,7 @@
  * v7 を直す必要が出たら各 route 側も同じ判断を入れる。
  */
 import { useCallback, useState, type ReactNode } from 'react'
-import Link from 'next/link'
+import { Tabs } from '@/components/shared/tabs'
 import { Eye } from 'lucide-react'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useCanManageAutomations } from '@/components/automations/use-automation-permission'
@@ -111,19 +111,7 @@ export function V8AutoShell({
         {actions ? <div className={styles.headActions}>{actions}</div> : null}
       </div>
 
-      <nav className={styles.tabs} aria-label="オートメーションのタブ">
-        {TABS.map((item) => (
-          <Link
-            key={item.key}
-            href={item.href}
-            className={item.key === tab ? `${styles.tab} ${styles.tabActive}` : styles.tab}
-            aria-current={item.key === tab ? 'page' : undefined}
-          >
-            {item.label}
-            {countOf(item.key)}
-          </Link>
-        ))}
-      </nav>
+      <Tabs label="オートメーションのタブ" items={TABS.map(item => ({label:item.label, href:item.href.includes('?') ? item.href : `${item.href}?tab=${item.key}`, current:item.key===tab, count:countOf(item.key) ? Number(countOf(item.key).trim()) : undefined}))} />
 
       {readonly ? (
         <p className={styles.band} role="note">

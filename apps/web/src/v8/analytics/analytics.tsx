@@ -13,7 +13,7 @@
  * 受け付ける URL・呼ぶ口・権限は今の画面と同じ（BEHAVIOR.md）。
  */
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
-import Link from 'next/link'
+import { Tabs } from '@/components/shared/tabs'
 import { useSearchParams } from 'next/navigation'
 import { Download, Eye, Plus } from 'lucide-react'
 import { ListPage } from '@/components/templates'
@@ -62,7 +62,7 @@ export type AnalyticsSlotsV8 = {
 
 
 function readTab(params: URLSearchParams): AnalyticsTabV8 {
-  if (params.get('view') === 'conversion-report') return 'conversion-report'
+  if (params.get('tab') === 'conversion-report' || params.get('view') === 'conversion-report') return 'conversion-report'
   const raw = params.get('tab')
   // 旧キー clicks（Search Console 側の以前の表記）は URL クリックへ寄せる。知らない値は先頭へ。
   const key = raw === 'clicks' ? 'url-clicks' : raw
@@ -73,14 +73,8 @@ function Navigation({ active, savedCount }: { active: AnalyticsTabV8; savedCount
   const owner = tabOwner(active)
   const group = GROUPS.find((item) => item.tabs.some((tab) => tab.key === owner)) ?? GROUPS[0]
   return <div className={styles.navigation}>
-    <nav aria-label="分析の組" className={styles.groups}>
-      {GROUPS.map((item) => <Link key={item.label} href={hrefOf(item.tabs[0].key)} className={styles.group} aria-current={item === group ? 'true' : undefined}>{item.label}</Link>)}
-    </nav>
-    <nav aria-label="分析の見かた" className={styles.tabs}>
-      {group.tabs.map((item) => <Link key={item.key} href={hrefOf(item.key)} className={styles.tab} aria-current={item.key === owner ? 'page' : undefined}>
-        {item.key === 'saved' && savedCount != null ? `${item.label} ${savedCount}` : item.label}
-      </Link>)}
-    </nav>
+    <Tabs label="分析の組" items={GROUPS.map(item => ({label:item.label,href:hrefOf(item.tabs[0].key),current:item===group}))} />
+    <Tabs label="分析の見かた" items={group.tabs.map(item => ({label:item.label,href:hrefOf(item.key),current:item.key===owner,count:item.key==='saved' ? savedCount ?? undefined : undefined}))} />
   </div>
 }
 

@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import { Tabs } from '@/components/shared/tabs'
 
 import Notice from '@/components/shared/notice'
 import { PageHeading } from '@/components/templates/page-frame'

@@ -12,7 +12,7 @@
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
  */
 import { Suspense, useCallback, useState, type ReactNode } from 'react'
-import Link from 'next/link'
+import { Tabs } from '@/components/shared/tabs'
 import { useSearchParams } from 'next/navigation'
 import { Eye } from 'lucide-react'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -121,19 +121,7 @@ function MileageV8Inner() {
     <div data-design-node={MileageV8Node({ tab })} className={styles.board}>
       <V8Head actions={headerActions} />
 
-      <nav className={styles.tabs} aria-label="マイルのタブ">
-        {TABS.map((item) => (
-          <Link
-            key={item.key}
-            href={item.key === 'earning-rules' ? '/mileage' : `/mileage?tab=${item.key}`}
-            className={item.key === tab ? `${styles.tab} ${styles.tabActive}` : styles.tab}
-            aria-current={item.key === tab ? 'page' : undefined}
-          >
-            {item.label}
-            {tabCounts[item.key] ? ` ${tabCounts[item.key]}` : null}
-          </Link>
-        ))}
-      </nav>
+      <Tabs label="マイルのタブ" items={TABS.map(item => ({label:item.label, href:`/mileage?tab=${item.key}`, current:item.key===tab, count:tabCounts[item.key] === undefined ? undefined : Number(tabCounts[item.key]!.replaceAll(',', ''))}))} />
 
       {readonly ? (
         <p className={styles.band} role="note">

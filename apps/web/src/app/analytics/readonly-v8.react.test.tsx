@@ -42,7 +42,7 @@ describe('V8の閲覧と実測値の保護', () => {
     // 閲覧のみの人には作るボタンを置かない（オーナー決定 2026-10-06）。帯で閲覧のみと伝える。
     expect([...host.querySelectorAll('a, button')].some((el) => el.textContent?.includes('レポートを作る'))).toBe(false)
     expect(host.textContent).toContain('閲覧のみで見ています')
-    expect(host.querySelector('nav[aria-label="分析の組"] a[aria-current]')?.textContent).toBe('ふだん見る')
+    expect(host.querySelector('[role="tablist"][aria-label="分析の組"] [aria-selected="true"]')?.textContent).toBe('ふだん見る')
     expect(host.querySelector('a[href="/analytics?tab=routes"]')).not.toBeNull()
     expect(host.textContent).toContain('37')
     expect(host.textContent).not.toContain('+47')
