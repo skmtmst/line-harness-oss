@@ -595,7 +595,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
 
   const notices = <>
     {!canEdit && stage === 'list' ? <p className={styles.readonlyBand} role="note">閲覧のみで見ています。変える操作は管理者に頼んでください。</p> : null}
-    {error && stage !== 'saved' ? <Notice tone="danger" message={error} action={conflict && detail ? <Button disabled={busy} onClick={() => open(detail.template.id, 'edit')}>最新の内容を読み込む</Button> : undefined} /> : null}
+    {error && stage !== 'saved' ? <Notice tone="danger" message={error} action={conflict && detail ? <Button disabled={busy} onClick={() => open(detail.template.id, 'edit')} busy={Boolean(busy)} busyLabel="処理中…">最新の内容を読み込む</Button> : undefined} /> : null}
     {message ? <Notice tone="success" message={message} onClose={() => setMessage('')} /> : null}
   </>
 
@@ -900,12 +900,12 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   if (stage === 'edit') {
     const uncertainNotice = createUncertain ? <Notice tone="warn" message="前回の保存結果がまだ確定していません。重複を防ぐため入力を固定しています。同じ依頼を再確認し、保存済みならその結果を読み込みます。" /> : null
     const footer = createUncertain
-      ? <Button variant="primary" disabled={busy} onClick={() => save(false)}>前回の保存を再確認</Button>
+      ? <Button variant="primary" disabled={busy} onClick={() => save(false)} busy={Boolean(busy)} busyLabel="処理中…">前回の保存を再確認</Button>
       : canonicalEditorOwnsSave ? null : <>
         <Button disabled={busy} onClick={toList}>キャンセル</Button>
         {/* テキスト・カードは押せるままにし、足りない欄は保存で欄ごとに知らせる（B-139）。 */}
-        <Button disabled={busy || (Boolean(validation) && !usesMessageForm())} onClick={() => save(false)}>下書きを保存</Button>
-        <Button variant="primary" disabled={busy || (Boolean(validation) && !usesMessageForm())} onClick={() => save(true)}>保存する</Button>
+        <Button disabled={busy || (Boolean(validation) && !usesMessageForm())} onClick={() => save(false)} busy={Boolean(busy)} busyLabel="処理中…">下書きを保存</Button>
+        <Button variant="primary" disabled={busy || (Boolean(validation) && !usesMessageForm())} onClick={() => save(true)} busy={Boolean(busy)} busyLabel="処理中…">保存する</Button>
       </>
     return (
       <PageFrame kind="wizard" boardId="X4JcOf">
@@ -1123,7 +1123,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
             <p className={styles.note}>{stage === 'duplicates'
               ? '配布直前に版を再確認します。配布先で編集があれば、そのアカウントの変更を取り消します。成功したアカウントは保持され、失敗分だけ再確認できます。'
               : (result ? result.stores.map((store) => `${shortName(store.accountName ?? accountName(accounts, store.accountId))}：${store.status === 'succeeded' ? '完了' : failures.includes(store) ? '失敗' : '作成中'}`).join(' ・ ') : `配布番号：${pendingRun ?? '—'} の結果を確認しています。確認できるまでは再配布しません。`)}</p>
-            {result && failures.length ? failures.map((store) => <Notice key={store.accountId} tone="danger" message={`${store.accountName ?? accountName(accounts, store.accountId)}：${store.reason || '配布できませんでした。アカウントの現在版を再確認してください。'}${store.cleanupPending ? '（画像の後片付けを自動で再試行中です）' : ''}`} action={done ? <Button disabled={busy} onClick={() => checkStores([store.accountId])}>このアカウントだけ再確認して配布</Button> : undefined} />) : null}
+            {result && failures.length ? failures.map((store) => <Notice key={store.accountId} tone="danger" message={`${store.accountName ?? accountName(accounts, store.accountId)}：${store.reason || '配布できませんでした。アカウントの現在版を再確認してください。'}${store.cleanupPending ? '（画像の後片付けを自動で再試行中です）' : ''}`} action={done ? <Button disabled={busy} onClick={() => checkStores([store.accountId])} busy={Boolean(busy)} busyLabel="処理中…">このアカウントだけ再確認して配布</Button> : undefined} />) : null}
             {result && done ? <p className={styles.note}>{`新規 ${formatNumber(successes.reduce((sum, s) => sum + s.counts.created, 0))}件・上書き ${formatNumber(successes.reduce((sum, s) => sum + s.counts.overwritten, 0))}件・別名 ${formatNumber(successes.reduce((sum, s) => sum + s.counts.aliased, 0))}件`}</p> : null}
           </section>
         ) : null}
@@ -1132,16 +1132,16 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         <div className={styles.footer}>
           {stage === 'accounts' ? <>
             <Button disabled={busy} onClick={toList}>キャンセル</Button>
-            <Button aria-label={`${selected.length}アカウントの重複を確認`} variant="primary" disabled={busy || !selected.length} onClick={() => checkStores(selected)}><Check size={15} aria-hidden="true" />{selected.length === 1 ? '選んだ1アカウントを確かめる' : `選んだ${selected.length}アカウントを確かめる`}</Button>
+            <Button aria-label={`${selected.length}アカウントの重複を確認`} variant="primary" disabled={busy || !selected.length} onClick={() => checkStores(selected)} busy={Boolean(busy)} busyLabel="処理中…"><Check size={15} aria-hidden="true" />{selected.length === 1 ? '選んだ1アカウントを確かめる' : `選んだ${selected.length}アカウントを確かめる`}</Button>
           </> : stage === 'duplicates' && preflight ? <>
             <Button disabled={busy} onClick={() => { if (folderBatch) toList(); else { setPreflight(null); setStage('accounts') } }}><ArrowLeft size={15} aria-hidden="true" />戻る</Button>
-            {expired ? <Button disabled={busy} onClick={() => checkStores(selected)}>現在版を再確認</Button> : null}
+            {expired ? <Button disabled={busy} onClick={() => checkStores(selected)} busy={Boolean(busy)} busyLabel="処理中…">現在版を再確認</Button> : null}
             <Button variant="primary" disabled={busy || expired || !resolutions || !!pendingRun} onClick={folderBatch ? confirmFolder : run}><Send size={15} aria-hidden="true" />{folderBatch && folderBatch.index + 1 < folderBatch.runs.length ? `次のひな形を確かめる（${folderBatch.index + 1}/${folderBatch.runs.length}）` : folderBatch ? `${folderBatch.runs.length} 件を ${selected.length} アカウントへ配る` : `この内容で${preflight.stores.length}アカウントへ配る`}</Button>
           </> : <>
             <Button disabled={busy} onClick={toList}>{done ? 'ひな形一覧へ' : 'キャンセル'}</Button>
             {!done ? <Button variant="primary" disabled><Plus size={15} aria-hidden="true" />{`配っています（${finished}/${progressTotal}）`}</Button> : null}
-            {done ? <Button disabled={busy} onClick={refreshResult}>結果を再確認</Button> : <Button disabled={busy} onClick={refreshResult}>結果を再確認</Button>}
-            {done && failures.length > 0 ? <Button variant="primary" disabled={busy} onClick={() => checkStores(failures.map((s) => s.accountId))}>{`失敗${failures.length}アカウントを再確認`}</Button> : null}
+            {done ? <Button disabled={busy} onClick={refreshResult} busy={Boolean(busy)} busyLabel="処理中…">結果を再確認</Button> : <Button disabled={busy} onClick={refreshResult} busy={Boolean(busy)} busyLabel="処理中…">結果を再確認</Button>}
+            {done && failures.length > 0 ? <Button variant="primary" disabled={busy} onClick={() => checkStores(failures.map((s) => s.accountId))} busy={Boolean(busy)} busyLabel="処理中…">{`失敗${failures.length}アカウントを再確認`}</Button> : null}
           </>}
         </div>
       <DistributionResultDialog

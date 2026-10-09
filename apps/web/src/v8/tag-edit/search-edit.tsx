@@ -888,7 +888,7 @@ export default function SavedSearchEditV8() {
         footerActions={(
           <>
             <Button href="/tags?tab=searches">キャンセル</Button>
-            <Button type="button" disabled={saving} onClick={() => void duplicate()}><Copy size={14} aria-hidden="true" />複製して保存する</Button>
+            <Button type="button" disabled={saving} onClick={() => void duplicate()} busy={Boolean(saving)} busyLabel="処理中…"><Copy size={14} aria-hidden="true" />複製して保存する</Button>
             <Button type="button" variant="primary" disabled={saving || !dirty} onClick={() => void save()} busy={saving}><Check size={14} aria-hidden="true" />保存する</Button>
           </>
         )}

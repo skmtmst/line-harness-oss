@@ -502,7 +502,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
               <p className={styles.bandDesc}>あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。</p>
             </div>
             <div className={styles.bandActions}>
-              <Button type="button" onClick={() => void openCompare()} disabled={compareBusy}>
+              <Button type="button" onClick={() => void openCompare()} disabled={compareBusy} busy={Boolean(compareBusy)} busyLabel="処理中…">
                 <GitCompare size={15} aria-hidden="true" />
                 違いを比べる
               </Button>

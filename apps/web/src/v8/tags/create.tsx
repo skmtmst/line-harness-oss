@@ -215,7 +215,7 @@ function TagCreate() {
         )}
         footerActions={<>
           <Button type="button" onClick={() => guard.guarded(() => router.push('/tags'))} disabled={saving}>キャンセル</Button>
-          <Button type="button" onClick={() => void save(true)} disabled={saving}><Plus size={15} aria-hidden="true" />保存して続けて作る</Button>
+          <Button type="button" onClick={() => void save(true)} disabled={saving} busy={Boolean(saving)} busyLabel="処理中…"><Plus size={15} aria-hidden="true" />保存して続けて作る</Button>
           <Button type="button" variant="primary" onClick={() => void save(false)} busy={saving} busyLabel="作っています…"><Check size={15} aria-hidden="true" />タグを作る</Button>
         </>}
       >

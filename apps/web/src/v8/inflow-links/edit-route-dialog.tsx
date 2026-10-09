@@ -326,7 +326,7 @@ export default function EditRouteModal({
             action={(
               <Button
                 onClick={doSave}
-                disabled={submitting}
+                disabled={submitting} busy={Boolean(submitting)} busyLabel="処理中…"
               >
                 それでも保存する
               </Button>

@@ -432,7 +432,7 @@ export default function OpsSupportV8() {
                   </span>
                 )}
                 <Button href={tenantDetailHref(ticket.tenantId)}><Building2 aria-hidden="true" />契約先を開く</Button>
-                {readOnly ? null : <Button disabled={busy} onClick={() => void impersonate(ticket.tenantId, setBusy, setError)}><LogIn aria-hidden="true" />代理ログイン</Button>}
+                {readOnly ? null : <Button disabled={busy} onClick={() => void impersonate(ticket.tenantId, setBusy, setError)} busy={Boolean(busy)} busyLabel="処理中…"><LogIn aria-hidden="true" />代理ログイン</Button>}
               </div>
               <div className={styles.detailMeta}>
                 <StatusPill tone={STAGE_TONE[ticket.stage]}>{stageLabel(ticket.stage, ticket.stageLabel)}</StatusPill>
@@ -465,10 +465,10 @@ export default function OpsSupportV8() {
                       ) : replyFromAi ? (
                         <>
                           <Button onClick={() => void discardAi()} disabled={busy}>下書きを削除する</Button>
-                          <Button onClick={() => void generateAi()} disabled={busy || !detail?.ai.available}><RefreshCw aria-hidden="true" />作り直す</Button>
+                          <Button onClick={() => void generateAi()} disabled={busy || !detail?.ai.available} busy={Boolean(busy)} busyLabel="処理中…"><RefreshCw aria-hidden="true" />作り直す</Button>
                         </>
                       ) : (
-                        <Button onClick={() => void generateAi()} disabled={busy || closed || !detail?.ai.available} title={detail?.ai.available ? undefined : 'この環境では AI の下書きを使えません'}>
+                        <Button onClick={() => void generateAi()} disabled={busy || closed || !detail?.ai.available} title={detail?.ai.available ? undefined : 'この環境では AI の下書きを使えません'} busy={Boolean(busy)} busyLabel="処理中…">
                           <Sparkles aria-hidden="true" />AIで下書きを作る
                         </Button>
                       )}
@@ -500,9 +500,9 @@ export default function OpsSupportV8() {
                   </div>
                   <div className={styles.actions}>
                     {ticket.stage === 'resolved' || ticket.stage === 'closed'
-                      ? <Button disabled={busy} onClick={() => void changeStage('in_progress')}>対応中に戻す</Button>
-                      : <Button disabled={busy} onClick={() => void changeStage('resolved')}><Check aria-hidden="true" />解決済みにする</Button>}
-                    {closed ? null : <Button disabled={busy} onClick={() => void changeStage('closed')}>クローズする</Button>}
+                      ? <Button disabled={busy} onClick={() => void changeStage('in_progress')} busy={Boolean(busy)} busyLabel="処理中…">対応中に戻す</Button>
+                      : <Button disabled={busy} onClick={() => void changeStage('resolved')} busy={Boolean(busy)} busyLabel="処理中…"><Check aria-hidden="true" />解決済みにする</Button>}
+                    {closed ? null : <Button disabled={busy} onClick={() => void changeStage('closed')} busy={Boolean(busy)} busyLabel="処理中…">クローズする</Button>}
                     <span className={styles.spacer} />
                     <Button onClick={() => void saveDraft()} disabled={busy || draftSaving || closed || aiBusy} busy={draftSaving}>下書きを保存する</Button>
                     <Select aria-label="送信後の状態" value={replyStage} onChange={value => setReplyStage(value as OpsSupportStage)} disabled={busy || closed || aiBusy} options={STAGE_CHIPS.filter(item => item.key !== 'all').map(item => ({ value: item.key, label: item.key === 'new' ? '未対応' : item.label }))} />
@@ -578,7 +578,7 @@ export default function OpsSupportV8() {
           onCancel={() => { if (!busy) setConfirmReply(false) }}
           footer={(
             <div className={styles.confirmActions}>
-              <Button variant="danger" onClick={() => void clearDraftFromConfirm()} disabled={busy}>下書きを削除</Button>
+              <Button variant="danger" onClick={() => void clearDraftFromConfirm()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きを削除</Button>
               <span className={styles.spacer} />
               <Button onClick={() => { if (!busy) setConfirmReply(false) }} disabled={busy}>戻って直す</Button>
               <Button variant="primary" onClick={() => void send()} disabled={busy} busy={busy} busyLabel="送信中…">送信する</Button>

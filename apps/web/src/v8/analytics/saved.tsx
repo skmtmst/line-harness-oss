@@ -315,8 +315,8 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
             <span role="cell" className={styles.colType} data-w="130"><span>{schedule.status === 'paused' ? '—' : shortDateTime(schedule.nextRunAt).replace(/ 0(\d):/, ' $1:')}</span></span>
             <span role="cell" className={styles.colType} data-w="90"><span><StatePill tone={schedule.status === 'active' ? 'ok' : 'neutral'}>{REPORT_STATUS_LABELS[schedule.status]}</StatePill></span></span>
             <span role="cell" className={styles.colOps}>{canManage ? <span className={styles.rowActions}>
-              {schedule.status === 'active' && !schedule.isOneTime ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => void changeScheduleStatus(schedule, 'paused')}>止める</Button> : null}
-              {schedule.status === 'paused' ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => void changeScheduleStatus(schedule, 'active')}>また送る</Button> : null}
+              {schedule.status === 'active' && !schedule.isOneTime ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => void changeScheduleStatus(schedule, 'paused')} busy={Boolean(scheduleBusyId === schedule.id)} busyLabel="処理中…">止める</Button> : null}
+              {schedule.status === 'paused' ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => void changeScheduleStatus(schedule, 'active')} busy={Boolean(scheduleBusyId === schedule.id)} busyLabel="処理中…">また送る</Button> : null}
               {!schedule.isOneTime ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => setArchiveTarget(schedule)}>しまう</Button> : null}
               {!schedule.isOneTime ? <ScheduleMenu schedule={schedule} /> : null}
             </span> : null}</span>

@@ -68,7 +68,7 @@ export default function CarouselImage({ url, disabled, maxMB = 10, upload, onUpl
         onUrl={onUrl}
       />
       {file && <span className={styles.filename} title={file.name}>{file.name}</span>}
-      {error && file && !validateCarouselImage(file, maxMB) && <Button disabled={disabled || busy} onClick={() => void send(file)}>もう一度受け取る</Button>}
+      {error && file && !validateCarouselImage(file, maxMB) && <Button disabled={disabled || busy} onClick={() => void send(file)} busy={Boolean(busy)} busyLabel="処理中…">もう一度受け取る</Button>}
     </div>
   )
 }

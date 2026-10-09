@@ -605,7 +605,7 @@ function ReplaceVideoDialog({ ctx, asset, onAsset, onClose }: { ctx: EditContext
         {nexts.length > 0 ? (
           <div className={form.field}>
             <span className={form.labelSmall}>動画の準備（検査・変換・配信の形・表紙を通した動画だけ公開できます）</span>
-            <div className={form.buttons}>{nexts.map((next) => <Button key={next} disabled={busy} onClick={() => void advance(next)}>{NEXT_LABEL[next] ?? next}</Button>)}</div>
+            <div className={form.buttons}>{nexts.map((next) => <Button key={next} disabled={busy} onClick={() => void advance(next)} busy={Boolean(busy)} busyLabel="処理中…">{NEXT_LABEL[next] ?? next}</Button>)}</div>
           </div>
         ) : null}
       </div>

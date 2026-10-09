@@ -207,7 +207,7 @@ export default function CreatePage({
     <>
       <Button href={parent[1]}>キャンセル</Button>
       {onReset && (
-        <Button onClick={() => run(true)} disabled={saving}>
+        <Button onClick={() => run(true)} disabled={saving} busy={saving}>
           保存して続けて作る
         </Button>
       )}
@@ -217,11 +217,11 @@ export default function CreatePage({
     </>
   ) : (
     <>
-      <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={() => run(false)} disabled={saving}>
-        {saving ? '保存中...' : (saveLabel ?? '保存する')}
+      <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={() => run(false)} disabled={saving} busy={saving}>
+        {saveLabel ?? '保存する'}
       </Button>
       {onReset && (
-        <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => run(true)} disabled={saving}>
+        <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => run(true)} disabled={saving} busy={saving}>
           保存して続けて作る
         </Button>
       )}

@@ -541,7 +541,7 @@ function ProjectInner() {
       <Button onClick={() => void patchProject('お気に入り', { isFavorite: !project.isFavorite })} disabled={busy}>
         <Star aria-hidden="true" className={project.isFavorite ? styles.starOn : styles.icon} />{project.isFavorite ? 'お気に入りから外す' : 'お気に入り'}
       </Button>
-      <Button onClick={() => void duplicate()} disabled={busy}>
+      <Button onClick={() => void duplicate()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">
         <Copy aria-hidden="true" className={styles.icon} />複製
       </Button>
       <Button onClick={() => { setFormError(''); setFormOpen(true) }} disabled={busy}>

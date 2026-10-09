@@ -169,7 +169,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
   const footer = (
     <div className={styles.drawerFoot}>
       <Button onClick={onClose} disabled={busy}>キャンセル</Button>
-      <Button variant="primary" onClick={() => void save()} disabled={busy}>
+      <Button variant="primary" onClick={() => void save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">
         <Check size={15} aria-hidden="true" />予約を入れる
       </Button>
     </div>

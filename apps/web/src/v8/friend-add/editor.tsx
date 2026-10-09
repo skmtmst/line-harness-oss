@@ -717,7 +717,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
               <Power size={14} aria-hidden="true" />有効にする
             </Button>
           ) : (
-            <Button type="button" variant="primary" disabled={saving || enabling} onClick={() => moveToStep(nextStep.key)}>
+            <Button type="button" variant="primary" disabled={saving || enabling} onClick={() => moveToStep(nextStep.key)} busy={Boolean(saving)} busyLabel="処理中…">
               次へ：{nextStep.label}
               <ArrowRight size={15} aria-hidden="true" />
             </Button>
@@ -1571,7 +1571,7 @@ function PreviewStep({ rule, definition, routeNames, runTest, testing, testOk, o
               {canEdit ? (
                 check.href
                   ? <Link className={styles.textLink} href={check.href}>見直す</Link>
-                  : <Button type="button" variant="text" disabled={testing} onClick={runTest}>直す</Button>
+                  : <Button type="button" variant="text" disabled={testing} onClick={runTest} busy={testing} busyLabel="処理中…">直す</Button>
               ) : null}
             </li>
           ))}

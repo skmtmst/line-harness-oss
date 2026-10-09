@@ -1519,7 +1519,7 @@ export default function FormsListV8() {
                 variant="danger"
                 disabled={deleting || deleteImpactLoading || !deleteImpact?.canDelete}
                 title={deleteImpact && !deleteImpact.canDelete ? '未公開・回答なし・利用先なしのフォームだけ削除できます' : undefined}
-                onClick={() => void removeForm(true)}
+                onClick={() => void removeForm(true)} busy={Boolean(deleting)} busyLabel="処理中…"
               >
                 削除する
               </Button>

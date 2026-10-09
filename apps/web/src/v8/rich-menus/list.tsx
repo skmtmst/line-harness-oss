@@ -1209,7 +1209,7 @@ export default function RichMenusListV8() {
       footer={<>
         <Button type="button" variant="secondary" onClick={closeDelete} disabled={deleteBusy}>閉じる</Button>
         {managedDelete.status === 'published' && canEdit ? (
-          <Button type="button" variant="secondary" onClick={() => void confirmDelete()} disabled={deleteBusy}>
+          <Button type="button" variant="secondary" onClick={() => void confirmDelete()} disabled={deleteBusy} busy={Boolean(deleteBusy)} busyLabel="処理中…">
             <CloudOff size={15} aria-hidden="true" />
             LINEから取り下げる
           </Button>

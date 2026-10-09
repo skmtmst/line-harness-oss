@@ -476,7 +476,7 @@ export default function ScoreTab() {
       }}
       chips={chips}
       trailing={<>
-        <Button onClick={() => void openPreview()} disabled={!editable}>
+        <Button onClick={() => void openPreview()} disabled={!editable} busy={Boolean(previewBusy)} busyLabel="処理中…">
           <Bookmark size={15} aria-hidden="true" /> この分けかただと何人入るか
         </Button>
         <PerPageSelect value={pageSize} onChange={(next) => { setPage(1); setPageSize(next) }} />

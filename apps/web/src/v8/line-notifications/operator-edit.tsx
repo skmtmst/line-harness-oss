@@ -477,7 +477,7 @@ function OperatorEditInner() {
                   </div>
                 </div>
                 {canWrite ? (
-                  <Button type="button" variant="secondary" className={styles.wideButton} onClick={() => void testSend()} disabled={saveDisabled}>
+                  <Button type="button" variant="secondary" className={styles.wideButton} onClick={() => void testSend()} disabled={saveDisabled} busy={Boolean(saving)} busyLabel="処理中…">
                     <Send size={15} aria-hidden="true" />自分にテストを送る
                   </Button>
                 ) : null}
@@ -624,7 +624,7 @@ function OperatorEditInner() {
                   {canWrite && teamFormOpen ? (
                     <div className={styles.teamForm}>
                       <TextField aria-label="チーム名" placeholder="チーム名" value={teamName} maxLength={100} disabled={teamBusy} onChange={event => setTeamName(event.target.value)} />
-                      <Button variant="secondary" disabled={teamBusy} onClick={() => void saveTeam()}>{teamId ? 'チームを更新する' : 'チームを作る'}</Button>
+                      <Button variant="secondary" disabled={teamBusy} onClick={() => void saveTeam()} busy={Boolean(teamBusy)} busyLabel="処理中…">{teamId ? 'チームを更新する' : 'チームを作る'}</Button>
                     </div>
                   ) : null}
                   {teamError ? (

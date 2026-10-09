@@ -174,7 +174,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
             {address ? (
               <CopyTextButton value={address ?? ""} aria-label="メールアドレスをコピー"  />
             ) : canEdit ? (
-              <Button variant="primary" disabled={busy} onClick={issue}>発行する</Button>
+              <Button variant="primary" disabled={busy} onClick={issue} busy={Boolean(busy)} busyLabel="処理中…">発行する</Button>
             ) : null}
           </div>
           <div className={styles.cardActions}>

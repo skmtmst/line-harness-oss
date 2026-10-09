@@ -183,7 +183,7 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
     onEditFolder: (id) => { const folder = folders.find((row) => row.id === id); if (folder) { setFolderName(folder.name); setFolderColor(folderDisplayColor(folder)); setFolderError(''); setFolderDialog(folder) } },
     onRemoveFolder: (id) => setDeletingFolder(folders.find((row) => row.id === id) ?? null),
   }
-  const notices = <>{role !== null && !canEdit ? <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /> : null}{error ? <Notice tone="danger" message={error} action={editor && editor !== 'new' ? <Button disabled={busy} onClick={() => open(editor.template.id)}>最新の内容を読み込む</Button> : undefined} /> : null}</>
+  const notices = <>{role !== null && !canEdit ? <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /> : null}{error ? <Notice tone="danger" message={error} action={editor && editor !== 'new' ? <Button disabled={busy} onClick={() => open(editor.template.id)} busy={Boolean(busy)} busyLabel="処理中…">最新の内容を読み込む</Button> : undefined} /> : null}</>
   if (distribution && !distribution.saved) return <AttributeDistribution key={distribution.detail.template.id} detail={distribution.detail} canEdit={canEdit} onClose={() => { setDistribution(null); void load() }} />
   if (editor && canEdit) {
     const current = editor === 'new' ? null : editor

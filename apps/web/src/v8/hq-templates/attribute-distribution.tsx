@@ -121,9 +121,9 @@ export default function AttributeDistribution({ detail, saved = false, canEdit =
     {stage === 'result' ? <Notice tone={failures.length ? 'warn' : 'info'} message={result ? `配布の進み具合：${result.stores.filter((store) => store.status === 'succeeded' || failures.includes(store)).length} / ${result.stores.length}。成功 ${result.stores.filter((store) => store.status === 'succeeded').length}・失敗 ${failures.length}` : '配った結果を確認しています。確認できるまで再配布しません。'} /> : null}
     <div className={styles.footer}>
       <Button disabled={busy} onClick={close}>{done ? '一覧へ' : 'キャンセル'}</Button>
-      {stage === 'accounts' ? <Button variant="primary" disabled={busy || !accounts || !selected.length} onClick={() => void check(selected)}>選んだアカウントを確かめる</Button> : null}
-      {stage === 'confirm' ? <><Button disabled={busy} onClick={() => setStage('accounts')}>戻る</Button>{expired ? <Button disabled={busy} onClick={() => void check(selected)}>現在版を再確認</Button> : null}<Button variant="primary" disabled={busy || expired || !valid || !!pendingRun} onClick={() => void run()}>{`この内容で${selected.length}アカウントへ配る`}</Button></> : null}
-      {stage === 'result' ? <><Button disabled={busy} onClick={() => void refresh()}>結果を再確認</Button>{done && failures.length ? <Button disabled={busy} onClick={() => void check(failures.map((store) => store.accountId))}>失敗したアカウントだけ再確認</Button> : null}</> : null}
+      {stage === 'accounts' ? <Button variant="primary" disabled={busy || !accounts || !selected.length} onClick={() => void check(selected)} busy={Boolean(busy)} busyLabel="処理中…">選んだアカウントを確かめる</Button> : null}
+      {stage === 'confirm' ? <><Button disabled={busy} onClick={() => setStage('accounts')}>戻る</Button>{expired ? <Button disabled={busy} onClick={() => void check(selected)} busy={Boolean(busy)} busyLabel="処理中…">現在版を再確認</Button> : null}<Button variant="primary" disabled={busy || expired || !valid || !!pendingRun} onClick={() => void run()} busy={Boolean(busy)} busyLabel="処理中…">{`この内容で${selected.length}アカウントへ配る`}</Button></> : null}
+      {stage === 'result' ? <><Button disabled={busy} onClick={() => void refresh()} busy={Boolean(busy)} busyLabel="処理中…">結果を再確認</Button>{done && failures.length ? <Button disabled={busy} onClick={() => void check(failures.map((store) => store.accountId))} busy={Boolean(busy)} busyLabel="処理中…">失敗したアカウントだけ再確認</Button> : null}</> : null}
     </div>
   </PageFrame>
 }

@@ -85,7 +85,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
         {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
         {canManage ? (
           <div className={styles.buttonRow}>
-            <Button variant="primary" onClick={() => void startConnect()} disabled={busy || !data.oauthConfigured}><Link2 aria-hidden className={styles.icon15} />Googleアカウントを接続</Button>
+            <Button variant="primary" onClick={() => void startConnect()} disabled={busy || !data.oauthConfigured} busy={Boolean(busy)} busyLabel="処理中…"><Link2 aria-hidden className={styles.icon15} />Googleアカウントを接続</Button>
           </div>
         ) : null}
         <p className={styles.grayNote}>初回接続時に、Googleで管理できる店舗から接続先を1店舗確認します。接続後は、このLINEアカウントの店舗だけを表示します。</p>
@@ -121,8 +121,8 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
         {canManage ? (
           <div className={styles.buttonRowEnd}>
             <Button onClick={() => setConfirmDisconnect(true)} disabled={busy}>接続を取り消す</Button>
-            <Button onClick={() => void startConnect()} disabled={busy}>別のGoogleアカウントでやり直す</Button>
-            <Button variant="primary" onClick={() => (switchingLocation ? setConfirmSwitch(true) : void selectLocation())} disabled={busy || !selectedLocation}>
+            <Button onClick={() => void startConnect()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">別のGoogleアカウントでやり直す</Button>
+            <Button variant="primary" onClick={() => (switchingLocation ? setConfirmSwitch(true) : void selectLocation())} disabled={busy || !selectedLocation} busy={Boolean(busy)} busyLabel="処理中…">
               {switchingLocation ? 'この店舗に切り替える' : 'この店舗を接続する'}
             </Button>
           </div>
@@ -161,7 +161,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
         {canManage ? (
           <div className={styles.buttonRowEnd}>
             <Button variant="danger" onClick={() => setConfirmDisconnect(true)} disabled={busy}>接続を解除</Button>
-            <Button onClick={() => void startConnect()} disabled={busy}><RefreshCw aria-hidden className={styles.icon15} />Googleアカウントを再接続</Button>
+            <Button onClick={() => void startConnect()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…"><RefreshCw aria-hidden className={styles.icon15} />Googleアカウントを再接続</Button>
           </div>
         ) : manageNote}
       </Card>

@@ -143,7 +143,7 @@ export function HqApprovalBlock({
       ) : gate === 'pending' ? (
         <Notice
           tone="info"
-          action={state.viewer.isRequester ? <Button size="compact" disabled={busy} onClick={() => void run1(() => hqBroadcastsApi.cancelApproval(run.id, run.version), '承認の依頼を取り消しました')}>依頼を取り消す</Button> : undefined}
+          action={state.viewer.isRequester ? <Button size="compact" disabled={busy} onClick={() => void run1(() => hqBroadcastsApi.cancelApproval(run.id, run.version), '承認の依頼を取り消しました')} busy={Boolean(busy)} busyLabel="処理中…">依頼を取り消す</Button> : undefined}
         >
           {`${nameOf(state.approval.approverStaffId) ? `${nameOf(state.approval.approverStaffId)}さんの` : ''}承認を待っています（依頼 ${formatApprovalDateTime(state.approval.requestedAt)}）。${state.approval.note ? `ひとこと：${state.approval.note}` : ''}`}
         </Notice>

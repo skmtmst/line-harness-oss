@@ -506,7 +506,7 @@ function Bookings({ eventId }: { eventId: string }) {
                 <span role="cell" className={styles.rowActions}>
                   {row.source === 'booking' && row.status === 'requested' ? (
                     <>
-                      <Button onClick={() => void decide(row, 'confirm')} disabled={busy}>承認する</Button>
+                      <Button onClick={() => void decide(row, 'confirm')} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">承認する</Button>
                       <Button
                         onClick={() => {
                           setRejectReason('')

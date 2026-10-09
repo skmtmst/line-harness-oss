@@ -2503,7 +2503,7 @@ export function NewAutomationV8({
           <Button href={backHref}>キャンセル</Button>
           {canEdit ? (
             <>
-              <Button disabled={saving || Boolean(blockedReason)} onClick={() => void save(false)}>下書きを保存</Button>
+              <Button disabled={saving || Boolean(blockedReason)} onClick={() => void save(false)} busy={Boolean(saving)} busyLabel="処理中…">下書きを保存</Button>
               {conflict ? (
                 <Button variant="primary" onClick={() => setCompareOpen(true)}>
                   <ArrowLeftRight size={15} aria-hidden="true" />比べてから保存

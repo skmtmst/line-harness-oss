@@ -443,7 +443,7 @@ export default function PaymentTab() {
         type="button"
         onClick={() => { void preparePayout() }}
         disabled={!closed || operationBusy || Boolean(resumed?.batch)}
-        title={!closed ? '期間を締めると書き出せます' : resumed?.batch ? '銀行用CSVの準備は作成済みです' : undefined}
+        title={!closed ? '期間を締めると書き出せます' : resumed?.batch ? '銀行用CSVの準備は作成済みです' : undefined} busy={Boolean(operationBusy)} busyLabel="処理中…"
       >
         <Landmark size={15} aria-hidden="true" /> 銀行用 CSV…
       </Button>
@@ -451,7 +451,7 @@ export default function PaymentTab() {
         type="button"
         onClick={() => { void issueStatements() }}
         disabled={!closed || operationBusy || statementTargets.length === 0}
-        title={!closed ? '期間を締めると出せます' : undefined}
+        title={!closed ? '期間を締めると出せます' : undefined} busy={Boolean(operationBusy)} busyLabel="処理中…"
       >
         <FileText size={15} aria-hidden="true" /> {resumed && issuedCount > 0 ? `支払明細をまとめて出す（残り${formatNumber(statementTargets.length)}人）` : '支払明細をまとめて出す'}
       </Button>

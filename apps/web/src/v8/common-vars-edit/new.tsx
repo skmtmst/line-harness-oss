@@ -427,7 +427,7 @@ export default function NewCommonVarV8() {
           {/* 閲覧のみには押せない保存を置かない（隠す）。 */}
           {canWrite ? (
             <>
-              <Button type="button" disabled={saveDisabled} onClick={() => void save(false, true)}>
+              <Button type="button" disabled={saveDisabled} onClick={() => void save(false, true)} busy={Boolean(saving)} busyLabel="処理中…">
                 下書きを保存
               </Button>
               <Button
@@ -711,7 +711,7 @@ export default function NewCommonVarV8() {
             >
               入力に戻って修正する
             </Button>
-            <Button type="button" disabled={saving} onClick={() => void save(true)}>
+            <Button type="button" disabled={saving} onClick={() => void save(true)} busy={Boolean(saving)} busyLabel="処理中…">
               内容を確認して登録する
             </Button>
           </div>

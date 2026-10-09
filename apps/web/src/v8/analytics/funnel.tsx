@@ -351,8 +351,8 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
                 <p className={styles.audienceCount}>{`${audienceTitle} ${formatNumber(audienceCount)} 人`}</p>
                 <p className={styles.caption}>{audienceNote}</p>
                 {canManage ? <>
-                  <span><Button variant="secondary" disabled={audienceBusy || audienceCount === 0} onClick={() => void openAudience('friends')}><Users size={15} aria-hidden="true" />対象者を開く</Button></span>
-                  <span><Button variant="secondary" disabled={audienceBusy || audienceCount === 0} onClick={() => void openAudience('broadcast')}><Send size={15} aria-hidden="true" />この対象者へ配信を作成</Button></span>
+                  <span><Button variant="secondary" disabled={audienceBusy || audienceCount === 0} onClick={() => void openAudience('friends')} busy={Boolean(audienceBusy)} busyLabel="処理中…"><Users size={15} aria-hidden="true" />対象者を開く</Button></span>
+                  <span><Button variant="secondary" disabled={audienceBusy || audienceCount === 0} onClick={() => void openAudience('broadcast')} busy={Boolean(audienceBusy)} busyLabel="処理中…"><Send size={15} aria-hidden="true" />この対象者へ配信を作成</Button></span>
                 </> : <p className={styles.caption}>対象者づくりは統括・管理者が行えます。</p>}
               </> : <p className={styles.caption}>停止中・保管したファネルでは対象者づくりはできません。結果の確認だけができます。</p>)
                 : <p className={styles.caption}>{run && !measurable ? 'この結果は判定不能のため、対象者は選べません。' : '段を押すと、到達・停止・進行中の人を選べます。'}</p>}

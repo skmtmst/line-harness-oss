@@ -380,7 +380,7 @@ export default function ScenarioCreateV8() {
           <Button type="button" onClick={cancel}>キャンセル</Button>
           {canEdit ? (
             <>
-              <Button disabled={locked} onClick={() => void continueAsDraft()}>
+              <Button disabled={locked} onClick={() => void continueAsDraft()} busy={Boolean(detailsSaving)} busyLabel="処理中…">
                 あとで決める（下書きとして保存）
               </Button>
               <Button

@@ -111,7 +111,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
         <p className={styles.todayHours}>{`${formatYmdShort(today.date)}${today.holidayName ? `・${today.holidayName} ` : ''}${todayText}${today.special ? '（特別営業時間）' : ''}`}</p>
         <div className={styles.buttonRow}>
           {canChange ? <Button onClick={() => go({ tab: 'profile', view: 'hours', mode: 'text' })}><Clock aria-hidden className={styles.icon15} />営業時間を変更</Button> : null}
-          {canChange ? <Button onClick={() => void quick({ source: 'shortcut', shortcut: 'close_today' })} disabled={today.closed}><CalendarX aria-hidden className={styles.icon15} />今日を休みにする</Button> : null}
+          {canChange ? <Button onClick={() => void quick({ source: 'shortcut', shortcut: 'close_today' })} disabled={today.closed} busy={Boolean(busy)} busyLabel="処理中…"><CalendarX aria-hidden className={styles.icon15} />今日を休みにする</Button> : null}
           <Button onClick={() => setShowHolidays((v) => !v)} aria-expanded={showHolidays}><CalendarDays aria-hidden className={styles.icon15} />祝日の営業時間を確認</Button>
           {canChange ? <Button onClick={() => { setEarlyClose(closeOptions[closeOptions.length - 1]?.value ?? null); setActionError('') }} disabled={today.closed || closeOptions.length === 0}><Timer aria-hidden className={styles.icon15} />今日は早く閉める</Button> : null}
         </div>
@@ -122,7 +122,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
             <span className={styles.muted}>{`現在 ${formatPeriods(today.periods)}`}</span>
             <span className={styles.spacer} aria-hidden="true" />
             <Button onClick={() => setEarlyClose(null)} disabled={busy}>キャンセル</Button>
-            <Button variant="primary" onClick={() => void quick({ source: 'shortcut', shortcut: 'early_close_today', closeTime: earlyClose })} disabled={busy}>変更案を確認</Button>
+            <Button variant="primary" onClick={() => void quick({ source: 'shortcut', shortcut: 'early_close_today', closeTime: earlyClose })} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">変更案を確認</Button>
           </div>
         ) : null}
         {showHolidays ? (

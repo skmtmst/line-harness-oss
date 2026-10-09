@@ -152,7 +152,7 @@ function TodayStore() {
                 <Button href={firstMedium.adminUrl} target="_blank" rel="noopener noreferrer">{`${firstMedium.name}の管理画面を開く ↗`}</Button>
               ) : null}
               {canWrite && firstItem ? (
-                <Button onClick={() => void closeOne(firstItem.id, firstItem.name)} disabled={busyId === firstItem.id} aria-label={`${firstItem.name}の枠を閉じた`}>
+                <Button onClick={() => void closeOne(firstItem.id, firstItem.name)} disabled={busyId === firstItem.id} aria-label={`${firstItem.name}の枠を閉じた`} busy={Boolean(busyId === firstItem.id)} busyLabel="処理中…">
                   <Check size={15} aria-hidden="true" />閉じた
                 </Button>
               ) : null}

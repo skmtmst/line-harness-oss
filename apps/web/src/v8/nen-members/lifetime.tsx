@@ -197,7 +197,7 @@ export default function LifetimeV8({
       {readonly ? null : (
         <div className={styles.saveRow}>
           <Button variant="secondary" onClick={() => { setDirty(false); setError(''); if (settings) setDrafts(fromSettings(settings)) }} disabled={busy || !dirty}>キャンセル</Button>
-          <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty}>
+          <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty} busy={Boolean(busy)} busyLabel="処理中…">
             <Check size={15} aria-hidden="true" />保存して EC へ同期する
           </Button>
         </div>

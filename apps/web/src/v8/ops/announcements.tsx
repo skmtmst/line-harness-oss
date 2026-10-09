@@ -379,7 +379,7 @@ export default function OpsAnnouncementsV8() {
             <div className={styles.actions}>
               {editingId ? <Button onClick={cancelEdit} disabled={busy}>直すのをやめる</Button> : null}
               {editing ? <Button variant="danger" onClick={() => setDeleting(editing)} disabled={busy}>削除する</Button> : null}
-              <Button onClick={() => void submit('draft')} disabled={busy}>下書きを保存する</Button>
+              <Button onClick={() => void submit('draft')} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きを保存する</Button>
               <Button variant="primary" onClick={() => { setFormError(''); if (fields.submit().length === 0) setConfirmSend(true) }} disabled={busy}>
                 <Send aria-hidden="true" />{scheduled ? '配信を予約する' : '今すぐ送る'}
               </Button>

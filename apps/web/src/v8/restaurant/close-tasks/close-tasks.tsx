@@ -163,7 +163,7 @@ export default function CloseTasksPage() {
                       <Button size="compact" href={targetMedium.adminUrl} target="_blank" rel="noopener noreferrer">管理画面を開く ↗</Button>
                     ) : null}
                     {canWrite && target ? (
-                      <Button size="compact" onClick={() => void close(target.id, target.name)} disabled={busyId === target.id} aria-label={`${target.name}の枠を閉じた`} title={`${target.name}の枠を閉じた`}>
+                      <Button size="compact" onClick={() => void close(target.id, target.name)} disabled={busyId === target.id} aria-label={`${target.name}の枠を閉じた`} title={`${target.name}の枠を閉じた`} busy={Boolean(busyId === target.id)} busyLabel="処理中…">
                         <Check size={15} aria-hidden="true" />閉じた
                       </Button>
                     ) : null}

@@ -227,12 +227,12 @@ export default function SnsSettingsPage() {
               {canManage && igState !== 'unconfigured' ? (
                 <div className={styles.actions}>
                   {igState === 'connected' ? (
-                    <Button variant="secondary" onClick={() => void checkInstagram()} disabled={busy}>
+                    <Button variant="secondary" onClick={() => void checkInstagram()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">
                       <RefreshCw size={15} />
                       接続を確かめる
                     </Button>
                   ) : (
-                    <Button variant="primary" onClick={() => void connectInstagram()} disabled={busy}>
+                    <Button variant="primary" onClick={() => void connectInstagram()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">
                       <Camera size={15} aria-hidden />
                       Instagram にログインして接続
                     </Button>

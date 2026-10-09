@@ -1,6 +1,6 @@
 'use client'
 
-import React, { type ReactNode } from 'react'
+import React, { useRef, useState, type ReactNode } from 'react'
 import { CircleCheck, Trash2, TriangleAlert } from 'lucide-react'
 import Dialog from './dialog'
 
@@ -98,6 +98,27 @@ export default function ConfirmDialog({
   confirmDisabled = false,
   onCancel,
 }: ConfirmDialogProps) {
+  const [executing, setExecuting] = useState(false)
+  const [executionError, setExecutionError] = useState('')
+  const lock = useRef(false)
+  const runConfirm = onConfirm ? async () => {
+    if (lock.current || busy) return
+    lock.current = true
+    setExecutionError('')
+    try {
+      const pending = onConfirm() as unknown
+      if (pending && typeof (pending as PromiseLike<unknown>).then === 'function') {
+        setExecuting(true)
+        await pending
+      }
+    } catch {
+      setExecutionError('実行できませんでした。もう一度お試しください。')
+    } finally {
+      lock.current = false
+      setExecuting(false)
+    }
+  } : undefined
+
   /*
    * 未保存の離脱確認（主が取消）は印を付けない。緑のチェックは
    * 「完了・成功」の意味なので、まだ何も済んでいない窓には出さない。
@@ -119,9 +140,9 @@ export default function ConfirmDialog({
       descriptionBand={dangerBand ? 'danger' : warning ? 'warning' : undefined}
       confirmLabel={deleteName !== undefined ? '削除する' : confirmLabel}
       cancelLabel={cancelLabel}
-      busy={busy}
+      busy={busy || executing}
       confirmDisabled={confirmDisabled}
-      error={error}
+      error={error || executionError}
       primaryAction={primaryAction}
       titleIcon={shownTitleIcon}
       confirmIcon={shownConfirmIcon}
@@ -136,8 +157,8 @@ export default function ConfirmDialog({
       designTop={designTop}
       confirmation
       compact={!children}
-      onConfirm={onConfirm}
-      onCancel={onCancel}
+      onConfirm={runConfirm}
+      onCancel={() => { if (!lock.current && !busy) onCancel() }}
     >
       {children}
     </Dialog>

@@ -1250,7 +1250,7 @@ function PublicationsV8({
             </div>
             <p className={styles.listHint}>{`公式サイト掲載中 ${publishedCount ?? '—'}枚のうち ${items.length}枚を表示（使っている場所で絞る：サイト・NENコラム・リッチメニュー・回答フォーム・登録メディア）`}</p>
             <details className={styles.publicationHistory}><summary>掲載の整理と外した履歴（{pendingWithdrawals.length + withdrawnItems.length}件）</summary>
-              {pendingWithdrawals.map((item) => <div key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>{text(item.publication_withdrawn_at) ? 'ご本人が公開の同意を撤回しました' : '公開の同意と採用状態を確認してください'}</p><p>まだ残っている掲載先：{placementLabels(item)}</p>{canEdit ? <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => void withdraw(item)}>掲載先から外す</Button> : null}</div>)}
+              {pendingWithdrawals.map((item) => <div key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>{text(item.publication_withdrawn_at) ? 'ご本人が公開の同意を撤回しました' : '公開の同意と採用状態を確認してください'}</p><p>まだ残っている掲載先：{placementLabels(item)}</p>{canEdit ? <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => void withdraw(item)} busy={Boolean(busyId)} busyLabel="処理中…">掲載先から外す</Button> : null}</div>)}
               {withdrawnItems.map((item) => <div key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>外した日時：{formatPhotoReceivedAt(item.withdrawn_at)}・{text(item.withdrawn_by_name) || '—'}</p>{(item.placements ?? []).map((placement) => <p key={text(placement.id)}>{text(placement.placement_label)}・{text(placement.removed_at) ? `${formatPhotoReceivedAt(placement.removed_at)}に外しました` : '記録あり'}</p>)}</div>)}
             </details>
           </section>
@@ -1264,7 +1264,7 @@ function PublicationsV8({
                 <li>外しても採用時のマイルは戻りません</li>
                 <li>原本は公開しません。選んだ場所へ公開用画像を出します</li>
               </ul>
-              {canEdit ? <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => void openOrder()}>並び順を変える</Button> : null}
+              {canEdit ? <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => void openOrder()} busy={Boolean(busyId)} busyLabel="処理中…">並び順を変える</Button> : null}
             </section>
           </div>
         </div>

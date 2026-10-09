@@ -652,7 +652,7 @@ function VisitStampsScreen() {
                                     {row.status === 'pending' && canStamp ? (
                                       <>
                                         <Button size="compact" disabled={!!busy} onClick={() => { setDialogError(''); setRejecting(row) }}>却下</Button>
-                                        <Button size="compact" disabled={!!busy} onClick={() => void review(row, 'approve', '紙のカードの写真を確認しました')} aria-label={`${names.name}さんの ${row.stamps}個を承認`}><Check size={15} aria-hidden="true" />承認</Button>
+                                        <Button size="compact" disabled={!!busy} onClick={() => void review(row, 'approve', '紙のカードの写真を確認しました')} aria-label={`${names.name}さんの ${row.stamps}個を承認`} busy={Boolean(busy)} busyLabel="処理中…"><Check size={15} aria-hidden="true" />承認</Button>
                                       </>
                                     ) : null}
                                     <RowActions subjectName={`${names.name}さんの申請`} menuItems={[
@@ -747,7 +747,7 @@ function VisitStampsScreen() {
                         <TextField value={memo} onChange={(e) => setMemo(e.target.value)} maxLength={200} placeholder="例：レシートを確認済み" />
                       </label>
                       <span className={styles.addLine}>
-                        <Button disabled={!friendId || busy === 'grant'} onClick={() => void grant()} title={friendId ? undefined : '先に友だちを選んでください'}><Stamp size={15} aria-hidden="true" />押印を足す</Button>
+                        <Button disabled={!friendId || busy === 'grant'} onClick={() => void grant()} title={friendId ? undefined : '先に友だちを選んでください'} busy={Boolean(busy === 'grant')} busyLabel="処理中…"><Stamp size={15} aria-hidden="true" />押印を足す</Button>
                       </span>
                     </>
               ) : null}
@@ -764,7 +764,7 @@ function VisitStampsScreen() {
             actions={(
               <>
                 <Button disabled={!dirty || saving || imageBusy} onClick={() => resetDraft(card)}>キャンセル</Button>
-                <Button variant="primary" disabled={!dirty || saving || imageBusy} onClick={() => void save()}><Check size={15} aria-hidden="true" />保存する</Button>
+                <Button variant="primary" disabled={!dirty || saving || imageBusy} onClick={() => void save()} busy={Boolean(saving)} busyLabel="処理中…"><Check size={15} aria-hidden="true" />保存する</Button>
               </>
             )}
           />
