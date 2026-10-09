@@ -18,6 +18,8 @@ import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import OtpInput from '@/components/shared/otp-input'
 import { TextField } from '@/components/shared/text-field'
+import { FieldError } from '@/components/shared/form-controls'
+import { useFormErrors } from '@/lib/use-form-errors'
 import StepUpPrompt, { isStepUpRequired, stepUpFailureMessage, type StepUpRequest } from '@/components/step-up-prompt'
 import TestRecipientsSetting from '@/components/accounts/test-recipients-setting'
 import { ARCHIVE_BLOCKER_MESSAGES, parseCount, type AccountDetailView } from './view'
@@ -51,11 +53,13 @@ function Frame({ open, node, width, top, title, busy, onCancel, actions, childre
   )
 }
 
-function Field({ label, children, htmlFor }: { label: ReactNode; children: ReactNode; htmlFor?: string }) {
+/** 窓の中の1欄。誤りがあれば欄の真下に理由を出す（B-139）。id は `${htmlFor}-error`。 */
+function Field({ label, children, htmlFor, error }: { label: ReactNode; children: ReactNode; htmlFor?: string; error?: string | null }) {
   return (
     <div className={styles.field}>
       <label className={styles.label} htmlFor={htmlFor}>{label}</label>
       {children}
+      {htmlFor ? <FieldError id={`${htmlFor}-error`}>{error}</FieldError> : null}
     </div>
   )
 }
@@ -493,21 +497,25 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
     if (!busy) onClose()
   }
 
+  /* 保存で落ちた欄は、その欄の真下に理由を出して移る（B-139）。 */
+  const fields = useFormErrors()
+  fields.define('name', 'アカウント名', () => (name.trim() ? null : 'アカウント名を入れてください。'))
+  fields.define('cap', '友だちの上限', () => (Number.isNaN(parseCount(capacity)) ? '数字で入れてください。' : null))
+  fields.define('warn', '警告を出す人数', () => {
+    const capacityNext = parseCount(capacity)
+    const warnNext = parseCount(warnAt)
+    if (Number.isNaN(warnNext)) return '数字で入れてください。'
+    return capacityNext !== null && !Number.isNaN(capacityNext) && warnNext !== null && warnNext > capacityNext ? '警告を出す人数は上限以下にしてください。上限を超える値は鳴りません。' : null
+  })
+  const fieldProps = (key: string, id: string) => ({ ...fields.bind(key), invalid: fields.invalid(key), 'aria-describedby': fields.invalid(key) ? `${id}-error` : undefined })
+
   const save = async (stepUpToken?: string) => {
-    if (!name.trim()) {
-      setError('アカウント名を入れてください。')
+    if (fields.submit().length > 0) {
+      setError('')
       return
     }
     const capacityNext = parseCount(capacity)
     const warnNext = parseCount(warnAt)
-    if (Number.isNaN(capacityNext) || Number.isNaN(warnNext)) {
-      setError('友だちの上限と警告を出す人数は、数字で入れてください。')
-      return
-    }
-    if (capacityNext !== null && warnNext !== null && warnNext > capacityNext) {
-      setError('警告を出す人数は上限以下にしてください。上限を超える値は鳴りません。')
-      return
-    }
     const payload: Parameters<typeof api.lineAccounts.update>[1] = {}
     if (name.trim() !== account.name) payload.name = name.trim()
     if (canEditTimezone && timezone.trim() !== initialTimezone) payload.timezone = timezone.trim()
@@ -564,8 +572,8 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
         </>}
       >
         <div className={styles.pair}>
-          <Field label="アカウント名" htmlFor={ids.name}>
-            <TextField id={ids.name} required maxLength={100} value={name} onChange={(event) => setName(event.target.value)} disabled={busy} />
+          <Field label="アカウント名" htmlFor={ids.name} error={fields.error('name')}>
+            <TextField {...fieldProps('name', ids.name)} id={ids.name} required maxLength={100} value={name} onChange={(event) => setName(event.target.value)} disabled={busy} />
           </Field>
           {canEditTimezone ? (
             <div className={styles.narrow}>
@@ -603,11 +611,11 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
           </>
         ) : null}
         <div className={styles.pair}>
-          <Field label="友だちの上限" htmlFor={ids.cap}>
-            <TextField id={ids.cap} inputMode="numeric" placeholder="管理しない" value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={busy} />
+          <Field label="友だちの上限" htmlFor={ids.cap} error={fields.error('cap')}>
+            <TextField {...fieldProps('cap', ids.cap)} id={ids.cap} inputMode="numeric" placeholder="管理しない" value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={busy} />
           </Field>
-          <Field label="警告を出す人数" htmlFor={ids.warn}>
-            <TextField id={ids.warn} inputMode="numeric" placeholder="警告しない" value={warnAt} onChange={(event) => setWarnAt(event.target.value)} disabled={busy} />
+          <Field label="警告を出す人数" htmlFor={ids.warn} error={fields.error('warn')}>
+            <TextField {...fieldProps('warn', ids.warn)} id={ids.warn} inputMode="numeric" placeholder="警告しない" value={warnAt} onChange={(event) => setWarnAt(event.target.value)} disabled={busy} />
           </Field>
         </div>
         <Field label="アイコンのURL" htmlFor={ids.icon}>
