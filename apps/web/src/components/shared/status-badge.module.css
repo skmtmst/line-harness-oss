@@ -86,7 +86,7 @@
 [data-theme='v8'] .badge {
   flex-shrink: 0;
   justify-content: flex-start;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-family: var(--font-noto-sans-jp), system-ui, sans-serif;
   font-size: 12px;
   line-height: 18px;
