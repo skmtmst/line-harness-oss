@@ -140,6 +140,8 @@ import { useAccount } from '@/contexts/account-context'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import { useFormErrors } from '@/lib/use-form-errors'
+import { FieldError } from '@/components/shared/form-controls'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -571,6 +573,13 @@ export default function ScenarioDetailV8({
   usePageTitle(editingStepId ? `${stepForm.stepOrder}通目を編集` : 'シナリオ配信')
   const [stepSaving, setStepSaving] = useState(false)
   const [stepError, setStepError] = useState('')
+  /* 通の保存で落ちた欄は、その欄の真下に理由を出して移る（B-139）。検査は保存の直前に1つずつ見る形なので fail で結び付ける。 */
+  const stepFields = useFormErrors()
+  for (const [key, label] of [['question', '質問'], ['content', 'メッセージ内容'], ['template', 'テンプレート'], ['time', '配信する時刻']] as const) stepFields.define(key, label, () => null)
+  const failStep = (key: 'question' | 'content' | 'template' | 'time', message: string) => {
+    setStepError('')
+    stepFields.fail(key, message)
+  }
 
   /* --- 追加した窓。開いているものだけ描く --- */
   /** シナリオ全体の配信対象。 */
@@ -1385,11 +1394,11 @@ export default function ScenarioDetailV8({
      */
     if (stepForm.question) {
       if (!stepForm.question.text.trim()) {
-        setStepError('質問文を入力してください')
+        failStep('question', '質問文を入力してください')
         return
       }
       if (stepForm.question.choices.length === 0 || stepForm.question.choices.some((choice) => !choice.label.trim())) {
-        setStepError('すべての選択肢に文字を入力してください')
+        failStep('question', 'すべての選択肢に文字を入力してください')
         return
       }
       /*
@@ -1402,7 +1411,7 @@ export default function ScenarioDetailV8({
       )
       if (deadIndex >= 0) {
         const dead = deadAnswerSettings(stepForm.question.choices[deadIndex])
-        setStepError(
+        failStep('question',
           `選択肢${deadIndex + 1}はURLなどを開くだけの挙動のため、設定されている${dead.join('・')}は実行されません。設定を消すか、挙動を「何もしない」に変えてください。`,
         )
         return
@@ -1414,7 +1423,7 @@ export default function ScenarioDetailV8({
        */
       const uriError = validateChoiceUris(stepForm.question)
       if (uriError) {
-        setStepError(uriError)
+        failStep('question', uriError)
         return
       }
     } else if (stepForm.inputMode === 'direct') {
@@ -1428,18 +1437,18 @@ export default function ScenarioDetailV8({
         if (isStructuredKind(stepForm.messageType)) {
           const problem = messageKindProblem(stepForm.messageType as MessageKind, kindState)
           if (problem) {
-            setStepError(problem)
+            failStep('content', problem)
             return
           }
         }
-        setStepError('メッセージ内容を入力してください')
+        failStep('content', 'メッセージ内容を入力してください')
         return
       }
       if (stepForm.messageType === 'flex' || stepForm.messageType === 'image') {
         try {
           JSON.parse(stepForm.messageContent)
         } catch {
-          setStepError(
+          failStep('content',
             stepForm.messageType === 'flex'
               ? 'Flex メッセージの JSON が不正です'
               : '画像メッセージの JSON が不正です',
@@ -1449,7 +1458,7 @@ export default function ScenarioDetailV8({
       }
     } else {
       if (!stepForm.templateId) {
-        setStepError('テンプレートを選択してください')
+        failStep('template', 'テンプレートを選択してください')
         return
       }
     }
@@ -1459,7 +1468,7 @@ export default function ScenarioDetailV8({
      * ○に配信」）も文に入れ、どこを直すか分かるようにする。
      */
     if (deliveryMode === 'absolute_time' && !isDeliveryTimeSet(stepForm.schedule.deliveryTime)) {
-      setStepError('配信する時刻を入力してください（「購読開始から ○日後の ○に配信」の時刻の欄）')
+      failStep('time', '配信する時刻を入力してください（「購読開始から ○日後の ○に配信」の時刻の欄）')
       return
     }
     /*
@@ -1471,6 +1480,7 @@ export default function ScenarioDetailV8({
       setStepError(rangeIssue)
       return
     }
+    stepFields.reset()
     setStepSaving(true)
     setStepError('')
     try {
@@ -1744,11 +1754,14 @@ export default function ScenarioDetailV8({
             onChange={(e) => setStepForm({ ...stepForm, stepOrder: Number(e.target.value) })}
           />
         </div>
-        <ScheduleInput
-          mode={deliveryMode}
-          value={stepForm.schedule}
-          onChange={(schedule) => setStepForm({ ...stepForm, schedule })}
-        />
+        <div {...stepFields.bind('time')} aria-invalid={stepFields.invalid('time') || undefined}>
+          <ScheduleInput
+            mode={deliveryMode}
+            value={stepForm.schedule}
+            onChange={(schedule) => { stepFields.clear('time'); setStepForm({ ...stepForm, schedule }) }}
+          />
+          <FieldError id="step-time-error">{stepFields.error('time')}</FieldError>
+        </div>
         {/*
           送ったあと止めるかどうか。体調の記録をお願いして返事を待つ、と
           いった流れで要る。止めておけば、返事が来てから人が再開できる。
@@ -1812,10 +1825,12 @@ export default function ScenarioDetailV8({
                 ふつうの通に戻す
               </Button>
             </div>
+            <div {...stepFields.bind('question')} aria-invalid={stepFields.invalid('question') || undefined}>
+            <FieldError id="step-question-error">{stepFields.error('question')}</FieldError>
             <QuestionEditor
               accountId={scenario?.lineAccountId ?? null}
               value={stepForm.question}
-              onChange={(next) => setStepForm({ ...stepForm, question: next })}
+              onChange={(next) => { stepFields.clear('question'); setStepForm({ ...stepForm, question: next }) }}
               onOpenChoiceActions={
                 editingStepId
                   ? (choiceIndex) =>
@@ -1828,6 +1843,7 @@ export default function ScenarioDetailV8({
                   : undefined
               }
             />
+            </div>
             {!editingStepId && (
               <p className="text-ink-faint mt-3 text-xs">
                 選択肢ごとのアクションは、この通を保存してから設定できます。
@@ -1843,10 +1859,13 @@ export default function ScenarioDetailV8({
         {!stepForm.question && stepForm.inputMode === 'template' && (
           <div>
             <label className="block text-xs font-medium text-ink-secondary mb-1">テンプレート <span className="text-danger">*</span></label>
+            <div {...stepFields.bind('template')}>
             <Select
+              error={stepFields.error('template') ?? undefined}
               aria-label="テンプレート"
               value={stepForm.templateId ?? ''}
               onChange={(value) => {
+                stepFields.clear('template')
                 const templateId = value || null
                 const template = templates.find((item) => item.id === templateId)
                 setStepForm({
@@ -1868,6 +1887,8 @@ export default function ScenarioDetailV8({
               ]}
               size="full"
             />
+            </div>
+            <FieldError id="step-template-error">{stepFields.error('template')}</FieldError>
             <p className="text-xs text-warning mt-1">
               ⓘ テンプレートが修正されると、このステップの内容も自動で同期されます
             </p>
@@ -1890,6 +1911,7 @@ export default function ScenarioDetailV8({
               位置情報・動画・音声・スタンプは、本文ではなく専用の欄で書く。
               中身は JSON なので、生のまま書かせると必ず壊れる。
             */}
+            <div {...stepFields.bind('content')} aria-invalid={stepFields.invalid('content') || undefined}>
             {stepForm.messageType === 'carousel' ? (
               // カルーセルはテンプレートを指す形。中身はそちらが持つ。
               <CarouselPicker
@@ -1936,9 +1958,13 @@ export default function ScenarioDetailV8({
                   placeholder="メッセージ内容を入力..."
                   value={stepForm.messageContent}
                   onValueChange={(next) => setStepForm({ ...stepForm, messageContent: next })}
+                  aria-invalid={stepFields.invalid('content') || undefined}
+                  aria-describedby={stepFields.invalid('content') ? 'step-content-error' : undefined}
                 />
               </div>
             )}
+            <FieldError id="step-content-error">{stepFields.error('content')}</FieldError>
+            </div>
           </>
         )}
 

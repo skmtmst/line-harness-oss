@@ -25,12 +25,17 @@ export type FormFieldOptions = {
 /** 欄に結び付いたサーバーの誤り（欄の名前 → 理由の文）。 */
 export type ServerFieldErrors = Record<string, string | null | undefined>
 
-const FOCUSABLE = 'input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"]), [contenteditable="true"]'
+/** 入れる欄（差し込みの道具・選ぶボタンより先に選ぶ）。 */
+const ENTRY = 'input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), select:not([disabled]), [contenteditable="true"]'
+const FOCUSABLE = `${ENTRY}, button:not([disabled]), [tabindex]:not([tabindex="-1"])`
 
-/** 欄の要素から、フォーカスを受けられる要素を選ぶ（束の枠なら中の1つ目）。 */
+/**
+ * 欄の要素から、フォーカスを受けられる要素を選ぶ。束の枠なら、中の入れる欄の1つ目
+ * （上に差し込みの道具が並んでいても本文へ）、無ければ押せる所の1つ目。
+ */
 function focusTarget(el: HTMLElement): HTMLElement {
   if (el.matches(FOCUSABLE)) return el
-  return el.querySelector<HTMLElement>(FOCUSABLE) ?? el
+  return el.querySelector<HTMLElement>(ENTRY) ?? el.querySelector<HTMLElement>(FOCUSABLE) ?? el
 }
 
 /** 開く（reveal）の後、描き直しを待つ。2コマ待てば React の描き直しと配置が済む。 */
@@ -242,6 +247,16 @@ export function useFormErrors() {
     return shown
   }
 
+  /**
+   * 手続きの検査（保存の直前に1つずつ見る形）で落ちた欄を1つ出す。
+   * `define` の検査に書けない誤り（組み合わせ・別の部品の中の誤り）を欄に結び付けるときに使う。
+   * 出し方・消え方はサーバーの欄の誤りと同じ（打ち直すか次の検査で消える）。
+   */
+  const fail = (key: string, message: string): boolean => setServerErrors({ [key]: message }) > 0
+
+  /** 欄の外から直した（プルダウンを選び直したなど）ときに、その欄のサーバーの誤りを消す。 */
+  const clear = (key: string) => clearServer(key)
+
   /** 開き直した窓・空に戻した入力で、触れた印・まとめ・サーバーの誤りを消す。 */
   const reset = () => {
     touchedRef.current.clear()
@@ -250,7 +265,7 @@ export function useFormErrors() {
     bump((v) => v + 1)
   }
 
-  return { define, error, invalid, touch, bind, listProblems, countIn, focusFirst, submit, setServerErrors, reset }
+  return { define, error, invalid, touch, bind, listProblems, countIn, focusFirst, submit, setServerErrors, fail, clear, reset }
 }
 
 export type FormErrors = ReturnType<typeof useFormErrors>
