@@ -39,11 +39,9 @@ export function messageWord(message: { content: string; messageType: string }): 
 function jstParts(iso: string): { y: number; m: number; d: number; hh: number; mm: number } | null {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return null
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit', hourCycle: 'h23',
-  }).formatToParts(date)
-  const get = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? NaN)
-  return { y: get('year'), m: get('month'), d: get('day'), hh: get('hour'), mm: get('minute') }
+  // JST は夏時間なし（lib/format.ts と同じ）。一覧の各欄で Intl の変換器を作らない。
+  const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000)
+  return { y: jst.getUTCFullYear(), m: jst.getUTCMonth() + 1, d: jst.getUTCDate(), hh: jst.getUTCHours(), mm: jst.getUTCMinutes() }
 }
 
 function thisYear(): number {
