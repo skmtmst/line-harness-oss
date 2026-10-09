@@ -246,7 +246,7 @@ export function AppearanceTab(props: Props) {
               upload={props.accountId ? async (file, progress) => (await uploadToMediaLibrary(file, props.accountId as string, 'image', progress)).url : undefined}
               onChange={(url) => props.onChangeOgImageUrl(url ?? '')}
               onMediaPick={() => setPickerFor('ogImage')}
-              urlEntry={{ value: props.ogImageUrl, onChange: props.onChangeOgImageUrl, label: 'カードの画像URL', placeholder: 'https://', open: Boolean(ogImageError) }}
+              urlEntry={{ id: 'fe-og-image', value: props.ogImageUrl, onChange: props.onChangeOgImageUrl, label: 'カードの画像URL', placeholder: 'https://', open: Boolean(ogImageError) }}
             />
           </div>
         </div>

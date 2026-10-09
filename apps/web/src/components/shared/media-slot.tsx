@@ -132,7 +132,7 @@ export interface MediaSlotProps {
    * 渡すと「URL で入れる」を出し、押すと枠の下に URL の欄を開く（部品が持つ）。
    * `open` を渡すと最初から開く（URL だけが入っているときなど）。
    */
-  urlEntry?: { value: string; onChange: (url: string) => void; label: string; placeholder?: string; open?: boolean }
+  urlEntry?: { id?: string; value: string; onChange: (url: string) => void; label: string; placeholder?: string; open?: boolean }
   /** 渡すと「登録メディアから選ぶ」を出す。 */
   onMediaPick?: () => void
   /** 呼ぶ側が持つ取り込み中（`onFile` のとき）。 */
@@ -533,6 +533,7 @@ export default function MediaSlot({
       </div>
       {urlEntry && urlOpen && !readOnly ? (
         <TextField
+          id={urlEntry.id}
           type="url"
           aria-label={urlEntry.label}
           value={urlEntry.value}
