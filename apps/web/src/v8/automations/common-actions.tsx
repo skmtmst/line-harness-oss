@@ -37,10 +37,9 @@ import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/ui/page-size-select'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import { type FolderPanelRow } from '@/components/shared/folder-panel'
+import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
-import FolderAddDialog from '@/components/shared/folder-add-dialog'
-import { useFolderRowActions } from '@/components/shared/folder-row-actions'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -117,7 +116,6 @@ export default function CommonActionsV8() {
   const [loadFailed, setLoadFailed] = useState(false)
   const [folders, setFolders] = useState<Folder[]>([])
   const [folderFilter, setFolderFilter] = useState('')
-  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [archiving, setArchiving] = useState<{ item: CommonActionSummary; mode: 'archive' | 'unarchive' } | null>(null)
@@ -237,11 +235,9 @@ export default function CommonActionsV8() {
   ]
 
   /* ===== フォルダ ===== */
-  const folderActions = useFolderRowActions({ kind: 'common_action', folders, enabled: canEdit, accountId: selectedAccountId, itemLabel: '共通アクション', onChanged: loadFolders })
-
   const folderRows: FolderPanelRow[] = [
     { kind: 'all' as const, id: '', label: 'すべて', count: ready ? summary.total : null },
-    ...folders.map((folder, index) => ({ ...folderActions.rowActions(folder, index), kind: 'folder' as const, id: folder.id, label: folder.name, count: null, color: folder.color })),
+    ...folders.map((folder) => ({ kind: 'folder' as const, id: folder.id, label: folder.name, count: null, color: folder.color })),
     { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: ready ? summary.total : null },
   ]
   /* 閲覧のみには押せない「共通アクションを作る」を置かない（場所だけ空ける）。 */
@@ -407,32 +403,28 @@ export default function CommonActionsV8() {
       </>}
       folders={<>
         {createButton}
-        <FolderPanel
+        {/* 共通のフォルダの列（種類 common_action）。一覧の口がフォルダで絞れるまでは件数を出さず、未分類に全部を数える。 */}
+        <ManagedFolderPanel
+          kind="common_action"
+          accountId={selectedAccountId}
+          folders={folders}
+          onChanged={loadFolders}
+          canManage={canEdit}
+          itemLabel="共通アクション"
           activeId={folderFilter}
           onSelect={setFolderFilter}
-          onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}
-          addFolderLabel="フォルダを追加"
-          rows={folderRows}
-        >
-          {canEdit ? null : <span className={styles.addSpace} aria-hidden="true" />}
-          <p className={styles.folderNote}>フォルダを消しても、中の共通アクションは未分類に残ります</p>
-        </FolderPanel>
+          allId=""
+          unfiledId={UNFILED}
+          allCount={ready ? summary.total : null}
+          unfiledCount={ready ? summary.total : null}
+          countOf={() => null}
+          placeholder="例: 購入・予約"
+        />
       </>}
       folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: canEdit ? createButton : undefined }}
       toolbar={toolbar}
       pagination={pager}
       overlays={<>
-        {folderActions.dialogs}
-        {folderDialogOpen ? (
-          <FolderAddDialog
-            kind="common_action"
-            accountId={selectedAccountId}
-            note="共通アクションを分けてしまう箱です。消しても、入っていた共通アクションは未分類として残ります。"
-            placeholder="例: 購入・予約"
-            onClose={() => setFolderDialogOpen(false)}
-            onAdded={() => void loadFolders()}
-          />
-        ) : null}
         <Dialog
           open={Boolean(archiving)}
           title={archiving?.mode === 'unarchive'

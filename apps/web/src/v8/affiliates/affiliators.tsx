@@ -23,8 +23,7 @@ import Checkbox from '@/components/shared/checkbox'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel from '@/components/shared/folder-panel'
-import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
+import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -80,21 +79,18 @@ const SAVED_VIEWS: Array<{ value: string; label: string; filters: FilterKey[]; s
   { value: 'newest', label: '登録が新しい順', filters: [], sort: 'newest' },
 ]
 
-/** フォルダの列（見え方の切り替え。保存しない）。 */
-/* 色は行の名前の前の丸と左のフォルダの列で同じものを使う（絵 v9JWQ）。止めているは色の無い輪。 */
-const GROUPS: Array<{ key: GroupKey; label: string; color?: string; match: (row: AffiliateListRow) => boolean }> = [
-  { key: 'all', label: 'すべて', match: () => true },
-  { key: 'rate', label: '売上の割合で払う', color: FOLDER_COLORS[0], match: (row) => row.isActive && (row.rewardMode === 'rate' || (!row.rewardMode && row.commissionRate > 0)) },
-  { key: 'fixed', label: '1件ごとに払う', color: FOLDER_COLORS[1], match: (row) => row.isActive && (row.rewardMode === 'fixed' || (!row.rewardMode && row.commissionRate <= 0 && row.rewardAmount > 0)) },
-  { key: 'none', label: '報酬なし（計測のみ）', color: FOLDER_COLORS[2], match: (row) => row.isActive && (row.rewardMode === 'none' || (!row.rewardMode && row.commissionRate <= 0 && row.rewardAmount <= 0)) },
+/*
+ * 報酬の決め方で分けた見え方（保存しない）。作ったフォルダではないので、左のフォルダの列ではなく
+ * 上の絞り込み（「報酬の決め方」の選ぶ欄）に置く（B-136 2026-10-09）。
+ */
+const GROUPS: Array<{ key: GroupKey; label: string; match: (row: AffiliateListRow) => boolean }> = [
+  { key: 'all', label: '報酬の決め方：すべて', match: () => true },
+  { key: 'rate', label: '売上の割合で払う', match: (row) => row.isActive && (row.rewardMode === 'rate' || (!row.rewardMode && row.commissionRate > 0)) },
+  { key: 'fixed', label: '1件ごとに払う', match: (row) => row.isActive && (row.rewardMode === 'fixed' || (!row.rewardMode && row.commissionRate <= 0 && row.rewardAmount > 0)) },
+  { key: 'none', label: '報酬なし（計測のみ）', match: (row) => row.isActive && (row.rewardMode === 'none' || (!row.rewardMode && row.commissionRate <= 0 && row.rewardAmount <= 0)) },
   { key: 'stopped', label: '止めている', match: (row) => !row.isActive },
 ]
 
-/** 行の名前の前の丸に渡すフォルダ。止めているは null（色の無い輪）。 */
-function folderDotOf(row: AffiliateListRow): { name: string; color?: string } | null {
-  const item = GROUPS.find((g) => g.key !== 'all' && g.match(row))
-  return item && item.color ? { name: item.label, color: item.color } : null
-}
 
 export default function AffiliatorsTab() {
   const samePageUrl = useSamePageUrl()
@@ -413,22 +409,26 @@ export default function AffiliatorsTab() {
   )
 
   const groupCount = (key: GroupKey) => rows.filter(GROUPS.find((g) => g.key === key)?.match ?? (() => true)).length
+  /* 左の列は共通の ManagedFolderPanel。アフィリエイターをフォルダへ入れる口（API）がまだ無いので「すべて」だけ。 */
   const folderPanel = (
-    <FolderPanel
-      heading="フォルダ"
-      rows={GROUPS.map((item) => ({ kind: item.label === 'すべて' ? 'all' as const : item.label === '未分類' ? 'unfiled' as const : 'folder' as const, id: item.key, label: item.label, count: ready ? groupCount(item.key) : null, color: item.color }))}
-      activeId={group}
-      onSelect={(id) => resetPage(() => { setSaved(''); setGroup(id as GroupKey) })}
-      addFolderNote={<p className={styles.stateDesc}>報酬の決め方で分けた見え方です</p>}
+    <ManagedFolderPanel
+      kind={null}
+      folders={[]}
+      onChanged={() => undefined}
+      canManage={!readonly}
+      itemLabel="アフィリエイター"
+      activeId="all"
+      onSelect={() => undefined}
+      allCount={ready ? rows.length : null}
     />
   )
 
   const folderSelect = (
     <div className={styles.narrowFolder}>
       <Select
-        aria-label="フォルダ"
+        aria-label="報酬の決め方"
         value={group}
-        options={GROUPS.map((item) => ({ value: item.key, label: `フォルダ：${item.label}` }))}
+        options={GROUPS.map((item) => ({ value: item.key, label: item.key === 'all' || !ready ? item.label : `${item.label} ${groupCount(item.key)}` }))}
         onChange={(value) => resetPage(() => setGroup(value as GroupKey))}
       />
     </div>
@@ -486,7 +486,7 @@ export default function AffiliatorsTab() {
       narrow={narrow}
       notices={notices}
       search={{ placeholder: '名前・紹介コードで探す', value: query, onChange: (value) => resetPage(() => setQuery(value)) }}
-      chips={chips}
+      chips={narrow ? chips : <>{folderSelect}{chips}</>}
       trailing={trailing}
       narrowLead={<>{createButton(false)}{folderSelect}</>}
     />
@@ -538,7 +538,7 @@ export default function AffiliatorsTab() {
               </Td>
               <Td className={styles.colName}>
                 <span className={narrow ? styles.stack : `${styles.stack} ${styles.dotStack}`}>
-                  <FolderDotName folder={folderDotOf(row)}>
+                  <FolderDotName folder={null}>
                     {nameButton(row)}
                   </FolderDotName>
                   <span className={styles.rowCode} title={row.code}>{row.code}</span>
@@ -628,7 +628,7 @@ export default function AffiliatorsTab() {
         </Button>
       }
       stats={stats}
-      folderNav={{ rows: GROUPS.map((item) => ({ id: item.key, label: item.label })), activeId: group, onSelect: (id) => resetPage(() => { setSaved(''); setGroup(id as GroupKey) }), createAction: readonly ? undefined : createButton(false) }}
+      folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => undefined, createAction: readonly ? undefined : createButton(false) }}
       folders={narrow ? undefined : <>{createButton(true)}{folderPanel}</>}
       toolbar={toolbar}
       pagination={pager}

@@ -31,9 +31,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import HelpTip from '@/components/shared/help-tip'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
-import FolderAddDialog from '@/components/shared/folder-add-dialog'
-import { useFolderRowActions } from '@/components/shared/folder-row-actions'
+import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DetailPanel from '@/components/shared/detail-panel'
@@ -110,7 +108,6 @@ export default function EventsListV8() {
   const [folders, setFolders] = useState<Folder[]>([])
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   const [foldersError, setFoldersError] = useState(false)
-  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [pendingTotal, setPendingTotal] = useState<number | null>(null)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -139,17 +136,6 @@ export default function EventsListV8() {
     }
   }, [selectedAccountId])
 
-  /* フォルダの「…」：名前を変える・色を変える・並べ替える・消す（共通部品・B-35）。 */
-  const folderActions = useFolderRowActions({
-    kind: 'event',
-    folders,
-    accountId: selectedAccountId ?? null,
-    enabled: canEdit,
-    itemLabel: 'イベント',
-    countOf: (id) => folders.find((f) => f.id === id)?.itemCount ?? null,
-    onChanged: () => loadFolders(),
-    onDeleted: (id) => { if (folderFilter === id) setFolderFilter('') },
-  })
 
   useEffect(() => {
     void loadFolders()
@@ -321,28 +307,32 @@ export default function EventsListV8() {
     </Button>
   ) : <span className={styles.createSpace} aria-hidden="true" />
 
-  const folderRows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: '', label: 'すべて', count: loadStatus === 'ready' && !folderFilter ? listTotal : null },
-    ...folders.map((folder, index) => ({ kind: 'folder' as const, ...folderActions.rowActions(folder, index), id: folder.id, label: folder.name, count: folder.itemCount ?? null, color: folder.color })),
-    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
-  ]
+  const folderRows = managedFolderNavRows('event', folders, { allId: '', unfiledId: UNFILED })
 
   const folderPanel = (
-    <FolderPanel
+    <ManagedFolderPanel
+      kind="event"
+      accountId={selectedAccountId ?? null}
+      folders={folders}
+      onChanged={loadFolders}
+      canManage={canEdit && Boolean(selectedAccountId)}
+      itemLabel="イベント"
       activeId={folderFilter}
       onSelect={setFolderFilter}
-      onAddFolder={canEdit ? () => { closeDetail(); setFolderDialogOpen(true) } : undefined}
-      addFolderLabel="フォルダを追加"
-      rows={folderRows}
+      allId=""
+      unfiledId={UNFILED}
+      allCount={loadStatus === 'ready' && !folderFilter ? listTotal : null}
+      unfiledCount={unfiledCount}
+      onAddStart={closeDetail}
+      placeholder="例：教室"
     >
-      <p className={styles.folderNote}>フォルダを消しても、中のイベントは未分類に残ります。</p>
       {foldersError ? (
         <p role="alert" className={styles.folderNote}>
           フォルダを読み込めませんでした。
           <button type="button" onClick={() => void loadFolders()} className={styles.textButton}>もう一度</button>
         </p>
       ) : null}
-    </FolderPanel>
+    </ManagedFolderPanel>
   )
 
   const savedValue = filter === 'full' ? 'full' : sort === 'name' ? 'sort-name' : ''
@@ -588,17 +578,6 @@ export default function EventsListV8() {
 
   const overlays = (
     <>
-      {folderActions.dialogs}
-      {folderDialogOpen && selectedAccountId ? (
-        <FolderAddDialog
-          kind="event"
-          accountId={selectedAccountId}
-          note="イベントを分けてしまう箱です。消しても、入っていたイベントは未分類として残ります。"
-          placeholder="例：教室"
-          onClose={() => setFolderDialogOpen(false)}
-          onAdded={() => void loadFolders()}
-        />
-      ) : null}
       <DetailPanel
         open={active !== null}
         title={active?.name ?? ''}

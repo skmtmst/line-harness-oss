@@ -270,7 +270,8 @@ describe('V8 登録メディア一覧（O7hUt7）の作り', () => {
     expect(LIST_V8).toContain("{ value: 'near-limit', label: '上限に近いものだけ' }")
     expect(LIST_V8).toContain("showArchivedOnly ? 'archived'")
     expect(LIST_V8).toContain('使われている順')
-    expect(LIST_V8).toContain('<FolderPanel')
+    // フォルダの列は共通の ManagedFolderPanel（名前・色・並べ替え・消すまで・B-136）。
+    expect(LIST_V8).toMatch(/<ManagedFolderPanel[\s\S]*?kind="media"/)
     // 操作。
     expect(LIST_V8).toContain('使用箇所を見る')
     expect(LIST_V8).toContain('名前を変える')

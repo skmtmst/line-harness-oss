@@ -65,9 +65,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
-import FolderAddDialog from '@/components/shared/folder-add-dialog'
-import { useFolderRowActions } from '@/components/shared/folder-row-actions'
+import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import DetailPanel from '@/components/shared/detail-panel'
@@ -206,7 +204,6 @@ export default function RemindersListV8() {
   const [perPage, setPerPage] = useState(20)
   // apLqS・Iffil の一覧は、次に送る予定が近いものから確認する。
   const [sort, setSort] = useListUrlParam('sort', 'next')
-  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 行の詳細パネル（V8「サクサク感」C①・D・E）。開いている行のID。 */
@@ -636,21 +633,6 @@ export default function RemindersListV8() {
     const folder = folders.find((f) => f.id === row.folderId)
     return folder ? { name: folder.name, color: folder.color } : null
   }
-  const folderActions = useFolderRowActions({ kind: 'reminder', folders, enabled: canEdit, accountId: undefined, itemLabel: 'リマインダ', onChanged: loadFolders })
-
-  const folderRows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: '', label: 'すべて', count: reminderList.total ?? null, color: 'var(--color-accent)' },
-    ...folders.map((folder, index) => ({
-      ...folderActions.rowActions(folder, index),
-      kind: 'folder' as const,
-      id: folder.id,
-      label: folder.name,
-      count: folder.itemCount ?? null,
-      color: folder.color,
-    })),
-    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount, color: 'var(--color-ink-disabled)' },
-  ]
-
   const folderSelectOptions = [
     { value: '', label: 'フォルダ：すべて' },
     ...folders.map((folder) => ({ value: folder.id, label: `フォルダ：${folder.name}` })),
@@ -1204,16 +1186,6 @@ export default function RemindersListV8() {
         ))}
       </KpiBand>
 
-      {folderActions.dialogs}
-      {folderDialogOpen && (
-        <FolderAddDialog
-          kind="reminder"
-          note="リマインダを整理するフォルダです。消しても、入っていたリマインダは未分類として残ります。"
-          placeholder="例：予約"
-          onClose={() => setFolderDialogOpen(false)}
-          onAdded={() => void loadFolders()}
-        />
-      )}
 
       {/* 一時停止の窓（★V8 `RwVo5`）。確定で即反映し、裏で保存する。 */}
       <ConfirmDialog
@@ -1340,16 +1312,20 @@ export default function RemindersListV8() {
             /* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ）。 */
             <span className={`v8-folder-create ${styles.viewerCreateSpace}`} aria-hidden="true" />
           )}
-          <FolderPanel
+          <ManagedFolderPanel
+            kind="reminder"
+            folders={folders}
+            onChanged={loadFolders}
+            canManage={canEdit}
+            itemLabel="リマインダ"
             activeId={folderFilter}
             onSelect={setFolderFilter}
-            onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}
-            addFolderLabel="フォルダを追加"
-            rows={folderRows}
+            allId=""
+            unfiledId={UNFILED}
+            allCount={reminderList.total ?? null}
+            unfiledCount={unfiledCount}
+            placeholder="例：予約"
           >
-            <p className={styles.folderNote}>
-              フォルダを消しても、中のリマインダは未分類に残ります。
-            </p>
             {foldersError && (reminders.length > 0 || !reminderList.error) ? (
               <p role="alert" className={styles.folderNote}>
                 フォルダを読み込めませんでした。
@@ -1362,7 +1338,7 @@ export default function RemindersListV8() {
                 </button>
               </p>
             ) : null}
-          </FolderPanel>
+          </ManagedFolderPanel>
         </>}
         collapsedFolders={narrow ? undefined : <>
           {canEdit ? (
