@@ -159,7 +159,7 @@ describe('メニューの公開・並びは先に画面を変える', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: '止める' }))
     // 確認の窓は出さず、札がすぐ変わる。
     expect(screen.queryByText(/ますか？/)).toBeNull()
-    expect(screen.getByText('止めている')).toBeTruthy()
+    expect(screen.getByText('停止中')).toBeTruthy()
     await waitFor(() => { expect(fixture.patchMenu).toHaveBeenCalled() })
     expect(fixture.patchMenu).toHaveBeenCalledWith(
       'account-a', 'menu-1', 1, expect.objectContaining({ is_active: false }),
