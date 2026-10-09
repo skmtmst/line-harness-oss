@@ -12,6 +12,7 @@
 import React, { useState } from 'react'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushListUrlState } from '@/components/shared/list-url-state'
 import type { BookingMenu } from '@/lib/api'
 
 const updateMenu = vi.hoisted(() => vi.fn())
@@ -59,6 +60,7 @@ function Harness({ canEdit = true }: { canEdit?: boolean }) {
 }
 
 beforeEach(() => {
+  flushListUrlState()
   window.history.replaceState(null, "", "/")
   server = [
     { id: 'a', name: 'カット', sort_order: 10, version: 1 },
