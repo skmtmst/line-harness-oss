@@ -65,7 +65,7 @@ describe('見た目は V8 に固定', () => {
     }
     scan(src)
     expect([...new Set(failures)]).toEqual([])
-  })
+  }, 60_000) // 全ファイルを構文木で読むので CI では 5 秒を超える
 
   it('配備（検証・本番）と検証配備の手順に見た目の指定は無い', () => {
     for (const file of [
