@@ -75,6 +75,7 @@ const SESSION = {
 }
 
 const SLOW_MS = Number(process.env.SLOW_MS ?? 0)
+const debug = (message) => { if (process.env.DEBUG_SPEED === '1') console.log(message) }
 
 async function newPage(browser) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
@@ -145,9 +146,9 @@ async function readLcpMs(page) {
 
 /* 最初の押せるボタンを押して、次の描画までの時間を測る（INP の代わり）。 */
 async function measurePress(page) {
-  const button = page.locator('main button:enabled').first()
+  const button = page.locator('main button:enabled:visible').first()
   if ((await button.count()) === 0) return null
-  await button.scrollIntoViewIfNeeded().catch(() => {})
+  await button.scrollIntoViewIfNeeded({ timeout: 1000 }).catch(() => {})
   const start = Date.now()
   /* 押せなかったとき（CI初回は作成画面で5秒待った）は測らず null。 */
   let clicked = false
@@ -185,9 +186,12 @@ export async function stubApi(page, mockFetch) {
   })
 }
 
-async function gotoTarget(page, target) {
-  await page.goto(target, { waitUntil: 'networkidle', timeout: 20000 })
-    .catch(() => page.goto(target, { waitUntil: 'domcontentloaded', timeout: 20000 }))
+export async function gotoTarget(page, target) {
+  // networkidle/DOMContentLoaded は2,000行の描画や継続通信にも待たされる。
+  // 文書応答だけを待ち、表示完了は実データを確かめる waitForScreenReady で測る。
+  // timeout後の再移動は測定をリセットするため行わない。
+  const response = await page.goto(target, { waitUntil: 'commit', timeout: 20000 });
+  if (response && !response.ok()) throw new Error(`文書を取得できません: HTTP ${response.status()} ${target}`);
 }
 
 export async function measureScreen(browser, target, name, route) {
@@ -195,13 +199,17 @@ export async function measureScreen(browser, target, name, route) {
   try {
   if (target.stub) await stubApi(page, target.mockFetch)
   const start = Date.now()
+  debug(`${name}: document`)
   await gotoTarget(page, target.url(route))
+  debug(`${name}: data-ready`)
   await waitForScreenReady(page, route)
   if (SLOW_MS) await page.waitForTimeout(SLOW_MS)
   const showMs = Date.now() - start
   /* 押す前の落ち着いた状態で LCP と JS を読む。長い作業は押した後も足す。 */
+  debug(`${name}: lcp`)
   const lcpMs = await readLcpMs(page)
   const before = await readPageMetrics(page)
+  debug(`${name}: press`)
   const pressMs = await measurePress(page)
   const after = await readPageMetrics(page)
   return {
@@ -283,7 +291,9 @@ export function screenReady({ route, expectedRows = null }) {
 }
 
 export async function waitForScreenReady(page, route, expectedRows = null) {
-  const handle = await page.waitForFunction(screenReady, { route, expectedRows }, { timeout: 15000 })
+  // HTMLの読み込みを終えてから、実データと読込状態を確認する。
+  await page.waitForLoadState('domcontentloaded', { timeout: 60000 })
+  const handle = await page.waitForFunction(screenReady, { route, expectedRows }, { timeout: 60000 })
   const state = await handle.jsonValue()
   if (state !== true) throw new Error(`${route}: データを読み込めないため速度を測れません（${state}）`)
 }
@@ -294,7 +304,9 @@ async function measureStress(browser, target) {
   try {
   const responseState = await installStressApi(page, target)
   const start = Date.now()
+  debug('friends-2000: document')
   await gotoTarget(page, target.url('/friends'))
+  debug('friends-2000: data-ready')
   await waitForScreenReady(page, '/friends', 2000)
   const rows = assertStressResponse(responseState)
   const renderedRows = await page.locator('[data-friend-row]').count()
@@ -408,6 +420,12 @@ async function measureMedian(run) {
   }
 }
 
+function checkpoint(out, measured, error = null) {
+  if (!out) return
+  mkdirSync(dirname(out), { recursive: true })
+  writeFileSync(out, `${JSON.stringify({ measured, complete: measured.length === 11 && !error, error }, null, 2)}\n`)
+}
+
 async function main() {
   const { updateBaseline, stubDir, out, baseUrl } = parseArgs(process.argv.slice(2))
   const target = await buildTarget({ stubDir, baseUrl })
@@ -416,10 +434,18 @@ async function main() {
   const measured = []
   try {
   for (const [name, route] of Object.entries(SPEED_ROUTES)) {
+    console.log(`測定開始: ${name}`)
     measured.push(await measureMedian(() => measureScreen(browser, target, name, route)))
+    checkpoint(out, measured)
+    console.log(`測定完了: ${name} showMs=${measured.at(-1).showMs}`)
   }
+  console.log('測定開始: friends-2000')
   measured.push(await measureMedian(() => measureStress(browser, target)))
+  checkpoint(out, measured)
   return { budget, updateBaseline, out, measured }
+  } catch (error) {
+    checkpoint(out, measured, error.message)
+    throw error
   } finally {
     await browser.close()
   }
@@ -449,8 +475,7 @@ if (isMain) {
   }
 
   if (out) {
-    mkdirSync(dirname(out), { recursive: true })
-    writeFileSync(out, `${JSON.stringify({ measured }, null, 2)}\n`)
+    checkpoint(out, measured)
   }
 
   console.log('name showMs lcpMs pressMs longTaskMs jsBytes')

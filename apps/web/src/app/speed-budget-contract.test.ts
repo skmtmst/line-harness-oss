@@ -9,10 +9,11 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   applyJsBaselineAllowance,
   expandFriends,
+  gotoTarget,
   judge,
   median,
   parseArgs,
@@ -202,3 +203,22 @@ describe('引数の読み方', () => {
     expect(parsed.baseUrl).toBe('http://127.0.0.1:4310')
   })
 })
+
+describe('移動と実データの表示待ちを分ける', () => {
+  it('継続通信や負荷描画を文書移動の完了条件にしない', async () => {
+    const goto = vi.fn(async () => ({ ok: () => true }));
+    await gotoTarget({ goto }, 'http://fixture.test/friends');
+    expect(goto).toHaveBeenCalledOnce();
+    expect(goto).toHaveBeenCalledWith('http://fixture.test/friends', { waitUntil: 'commit', timeout: 20000 });
+  });
+  it('文書応答の失敗は再移動で隠さない', async () => {
+    const goto = vi.fn(async () => ({ ok: () => false, status: () => 503 }));
+    await expect(gotoTarget({ goto }, 'http://fixture.test/friends')).rejects.toThrow('HTTP 503');
+    expect(goto).toHaveBeenCalledOnce();
+  });
+  it('timeoutでも測定を再移動でリセットしない', async () => {
+    const goto = vi.fn(async () => { throw new Error('timeout'); });
+    await expect(gotoTarget({ goto }, 'http://fixture.test/friends')).rejects.toThrow('timeout');
+    expect(goto).toHaveBeenCalledOnce();
+  });
+});
