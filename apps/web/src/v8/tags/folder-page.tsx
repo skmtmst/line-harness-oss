@@ -21,18 +21,9 @@ import TagsList from './list'
 import styles from './create.module.css'
 
 /* 絵の9色。保存する値は色コード、読み上げと見出しは名前。既定は緑（基調色）。 */
-export const TAG_FOLDER_COLORS: ReadonlyArray<{ value: string; name: string }> = [
-  { value: '#EF4444', name: '赤' },
-  { value: '#F97316', name: 'オレンジ' },
-  { value: '#F59E0B', name: '黄' },
-  { value: '#06C755', name: '緑' },
-  { value: '#3B82F6', name: '青' },
-  { value: '#06B6D4', name: '水色' },
-  { value: '#7C3AED', name: '紫' },
-  { value: '#EC4899', name: 'ピンク' },
-  { value: '#6B7280', name: 'グレー' },
-]
-const DEFAULT_COLOR = TAG_FOLDER_COLORS[3].value
+import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from './folder-colors'
+export { TAG_FOLDER_COLORS } from './folder-colors'
+const DEFAULT_COLOR = DEFAULT_TAG_FOLDER_COLOR
 
 type RequestKey = { editId: string | null; generation: number }
 const sameRequest = (a: RequestKey, b: RequestKey) => a.editId === b.editId && a.generation === b.generation
