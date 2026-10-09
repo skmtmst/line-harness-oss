@@ -327,3 +327,11 @@
 [data-theme='v8'] .panel[data-width='order'] .close { width: var(--tpl-st2-od-close); height: var(--tpl-st2-od-close); flex-basis: var(--tpl-st2-od-close); border-radius: var(--radius-control); outline: 1px solid var(--color-hairline); outline-offset: -1px; }
 [data-theme='v8'] .panel[data-width='order'] .body { display: flex; flex-direction: column; gap: var(--tpl-st2-od-gap); padding: 0 var(--tpl-st2-od-pad); }
 [data-theme='v8'] .panel[data-width='order'] .footer { display: flex; justify-content: space-between; gap: var(--tpl-st2-od-gap); border: 0; padding: 0 var(--tpl-st2-od-pad) var(--tpl-st2-od-pad); }
+/* G-9: メッセージ作成の広い引き出し。ほかの引き出しは変えない。 */
+[data-theme='v8'] .panel[data-width='composer'] { width: min(var(--tpl-msg-composer-drawer-w), 100%); border-radius: var(--radius-panel) 0 0 var(--radius-panel); }
+[data-theme='v8'] .panel[data-width='composer'] .header { padding: var(--tpl-msg-composer-drawer-head-pad); align-items: center; }
+[data-theme='v8'] .panel[data-width='composer'] .title { font-size: var(--tpl-msg-composer-drawer-title); line-height: var(--tpl-msg-composer-drawer-title-lh); font-weight: 700; }
+[data-theme='v8'] .panel[data-width='composer'] .body { padding: 0; }
+[data-theme='v8'] .panel[data-width='composer'] .footer { padding: var(--tpl-msg-composer-drawer-footer-pad); }
+
+.titleRow { display: flex; align-items: center; gap: var(--tpl-msg-composer-content-gap); flex-wrap: wrap; }

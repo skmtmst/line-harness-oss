@@ -139,3 +139,5 @@ button.step:focus-visible {
   white-space: nowrap;
   border: 0;
 }
+
+.root[data-connector-size='short'] { --tpl-steps-line-w: var(--tpl-msg-composer-step-line-w); --tpl-steps-dot-gap: var(--tpl-msg-composer-step-gap); }

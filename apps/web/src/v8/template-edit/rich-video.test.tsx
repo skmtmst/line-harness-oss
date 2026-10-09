@@ -4,20 +4,32 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach,beforeEach,describe,expect,it,vi } from 'vitest'
 import { richVideoContent, richVideoDraftError, type RichVideoDraft } from './rich-video-core'
 import { messageTemplateToBubble, bubbleLegacyMessage, assetBubbleError } from '@/lib/broadcast-template'
-const mocks=vi.hoisted(()=>({role:'owner',account:'a',get:vi.fn(),create:vi.fn(),update:vi.fn(),push:vi.fn()}))
+const mocks=vi.hoisted(()=>({role:'owner',account:'a',get:vi.fn(),create:vi.fn(),update:vi.fn(),push:vi.fn(),disarm:vi.fn(),guarded:vi.fn((action:()=>void)=>action())}))
 vi.mock('next/navigation',()=>({useRouter:()=>({push:mocks.push}),usePathname:()=>'/templates/edit',useSearchParams:()=>new URLSearchParams('kind=rich_video')}))
 vi.mock('@/lib/staff-role',()=>({useStaffRole:()=>mocks.role,canManageRole:(role:string)=>role==='owner'||role==='admin'}))
 vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:mocks.account,accounts:[{id:'a',name:'本店'}]})}))
 vi.mock('@/components/shell/page-chrome',()=>({usePageTitle:()=>{},usePageCrumbs:()=>{}}))
-vi.mock('@/lib/use-unsaved-guard',()=>({useUnsavedGuard:()=>({leaveTarget:null,disarm:vi.fn()})}))
+vi.mock('@/lib/use-unsaved-guard',()=>({useUnsavedGuard:()=>({leaveTarget:null,disarm:mocks.disarm,guarded:mocks.guarded})}))
 vi.mock('@/lib/unsaved-leave-dialog',()=>({UnsavedLeaveDialog:()=>null}))
 vi.mock('@/lib/api',()=>({api:{templates:{get:mocks.get,create:mocks.create,update:mocks.update},folders:{list:async()=>({success:true,data:[]})}}}))
 import Editor from './rich-video'
+import type { TemplateEditHost } from './host'
 const draft:RichVideoDraft={name:'動画',folderId:'',originalContentUrl:'https://worker.example/images/video.mp4',previewImageUrl:'https://worker.example/images/preview.jpg',height:520,buttonEnabled:true,actionLabel:'詳しく見る',actionUrl:'https://example.com/menu',altText:'新しい動画です'}
 function stored(button=true){return {...richVideoContent({...draft,buttonEnabled:button}),baseUrl:'https://worker.example/images/imagemaps/map'}}
 beforeEach(()=>{vi.clearAllMocks();mocks.role='owner';mocks.account='a';mocks.get.mockResolvedValue({success:true,data:{id:'r',accountId:'a',name:'動画',messageType:'imagemap',messageContent:JSON.stringify(stored()),publishedVersion:1,draftRevision:0}});mocks.update.mockResolvedValue({success:true,data:{id:'r'}})})
 afterEach(cleanup)
 describe('リッチビデオ編集',()=>{
+ it('引用した動画はテンプレートを更新せず入れ直せる。入れ直しが失敗したときは変更を残す',async()=>{
+  const insert=vi.fn().mockResolvedValue(false);const cancel=vi.fn()
+  const host:TemplateEditHost={composer:{index:2,accountId:'a'},description:'',folders:[],folder:'',onFolderChange:()=>{},busy:false,onSave:insert,onCancel:cancel,initialContent:{kind:'message',name:'動画',messageType:'imagemap',messageContent:JSON.stringify(stored())}}
+  render(<Editor host={host}/>);await screen.findByDisplayValue('新しい動画です')
+  fireEvent.change(screen.getByLabelText('通知に出る文'),{target:{value:'この配信だけの通知'}})
+  fireEvent.click(screen.getByRole('button',{name:'この吹き出しに入れる'}))
+  await waitFor(()=>expect(insert).toHaveBeenCalledTimes(1))
+  expect(JSON.parse(insert.mock.calls[0][0].messageContent).altText).toBe('この配信だけの通知')
+  expect(mocks.create).not.toHaveBeenCalled();expect(mocks.update).not.toHaveBeenCalled();expect(mocks.disarm).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button',{name:'キャンセル',exact:true}));expect(mocks.guarded).toHaveBeenCalledWith(cancel)
+ })
  it('読み直した値を表示し、ボタンを外して通知文を更新して保存する',async()=>{
   render(<Editor id="r"/>);await screen.findByDisplayValue('新しい動画です');
   fireEvent.click(screen.getByRole('switch',{name:'見終わったあとのボタンを出す'}));

@@ -15,6 +15,7 @@
 import { useState } from 'react'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Button from '@/components/shared/button'
+import ComposerStickers from '@/components/shared/composer-stickers'
 
 export type MessageKind = 'location' | 'video' | 'audio' | 'sticker'
 
@@ -280,13 +281,16 @@ export function parseMessageKind(
 }
 
 export interface MessageKindFieldsProps {
+  composer?: boolean
   kind: MessageKind
   value: MessageKindState
   onChange: (next: MessageKindState) => void
 }
 
-export default function MessageKindFields({ kind, value, onChange }: MessageKindFieldsProps) {
+export default function MessageKindFields({ kind, value, onChange, composer = false }: MessageKindFieldsProps) {
   const [stickerMode, setStickerMode] = useState<'pick' | 'manual'>('pick')
+
+  if (composer && kind === 'sticker') return <ComposerStickers value={value.sticker} onChange={(sticker) => onChange({ ...value, sticker })} />
 
   if (kind === 'location') {
     const v = value.location

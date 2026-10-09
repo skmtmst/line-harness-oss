@@ -667,15 +667,17 @@ export const InsertButton = forwardRef<HTMLButtonElement, {
   onClick: () => void
   icon?: 'plus' | 'more'
   disabled?: boolean
+  size?: 'compact'
   title?: string
   expanded?: boolean
   className?: string
-}>(function InsertButton({ label, onClick, icon = 'plus', disabled, title, expanded, className }, ref: Ref<HTMLButtonElement>) {
+}>(function InsertButton({ label, onClick, icon = 'plus', disabled, size, title, expanded, className }, ref: Ref<HTMLButtonElement>) {
   return (
     <button
       ref={ref}
       type="button"
       className={`${styles.insertButton} ${className ?? ''}`}
+      data-size={size}
       onClick={onClick}
       disabled={disabled}
       title={title}

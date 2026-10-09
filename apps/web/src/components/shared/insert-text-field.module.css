@@ -110,3 +110,5 @@
 .insertButton:focus-visible { outline: 2px solid var(--color-action); outline-offset: 1px; }
 .insertButton[aria-expanded='true'] { outline-color: var(--color-accent); background: var(--color-accent-soft); }
 }
+
+.insertButton[data-size='compact'] { min-height: var(--tpl-msg-composer-insert-h); height: var(--tpl-msg-composer-insert-h); padding: var(--tpl-msg-composer-insert-pad); }

@@ -744,3 +744,8 @@ shared-button-importer v8/hq-templates/folder-distribution-dialog.tsx
 shared-button-importer v8/hq-templates/folder-distribution-result.tsx
 shared-button-importer v8/hq-broadcasts/account-picker.tsx
 shared-button-importer v8/settings/ec-commerce/subscriptions.tsx
+
+# G-9：店・統括で使う composer と引き出しの共通操作。
+shared-button-importer components/shared/message-composer.tsx
+shared-button-importer components/shared/message-composer-media.tsx
+shared-button-importer v8/template-edit/frame.tsx

@@ -20,11 +20,16 @@ export default function FilterChip({
   title,
   icon,
   selectedIcon = true,
+  size,
+  showCheck = true,
   children,
 }: {
   icon?: ReactNode
   /** 印のない絞り込み札（設定・ログインユーザーの板）。省略時は従来の ✓。 */
   selectedIcon?: boolean
+  size?: 'compact'
+  /** 選んだときの ✓ を出すか（メッセージ作成の札）。selectedIcon と同じ意味で、どちらかが false なら出さない。 */
+  showCheck?: boolean
   selected: boolean
   onChange: (selected: boolean) => void
   /** 文字の後ろに小さく出す件数。取れていないときは出さない（「—」は置かない）。 */
@@ -41,9 +46,9 @@ export default function FilterChip({
       disabled={disabled}
       title={title}
       onClick={() => onChange(!selected)}
-      className="v6-filter-chip"
+      className="v6-filter-chip" data-size={size}
     >
-      {icon ? <span className="v6-filter-chip__icon">{icon}</span> : selected && selectedIcon ? <Check aria-hidden="true" className="v6-filter-chip__icon" /> : null}
+      {icon ? <span className="v6-filter-chip__icon">{icon}</span> : selected && selectedIcon && showCheck ? <Check aria-hidden="true" className="v6-filter-chip__icon" /> : null}
       {children}
       {count === undefined || count === '' ? null : (
         <>{' '}
