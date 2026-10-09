@@ -23,6 +23,7 @@ import { KIND_TABS, sentLabel } from './store-list'
 import styles from '../template-detail/detail.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 /** 「8月21日 18:02」（日本時間）。 */
 function stamp(iso: string): string {
@@ -305,7 +306,7 @@ export default function HqTemplateDetail({
             <h2 className={styles.cardTitle}>版の履歴</h2>
             <p className={styles.cardNote}>戻すと、その版を下書きとして作り直します。配るまで配った先は変わりません</p>
           </div>
-          {versions === null && !versionsError ? <p className={styles.empty} role="status">読み込み中…</p> : versionsError ? (
+          {versions === null && !versionsError ? <DetailLoading /> : versionsError ? (
             <div className={styles.versionError}>
               <p className={styles.errorText}>版の履歴を読み込めませんでした。もう一度お試しください。</p>
               <Button variant="secondary" onClick={onReloadVersions}>もう一度読み込む</Button>

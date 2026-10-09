@@ -47,6 +47,7 @@ import styles from './detail.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 /** 表にまず見せる行数。残りは「ほか N か所を見る」で開く。 */
 const USAGE_VISIBLE = 4
@@ -280,7 +281,7 @@ export default function TemplateDetailV8() {
     return (
       <div className={styles.page} data-design-node="UTbi1">
         <div className={styles.loadingHead}>{backLink}</div>
-        <p className={styles.loading} role="status">読み込み中…</p>
+        <DetailLoading />
       </div>
     )
   }
@@ -459,7 +460,7 @@ export default function TemplateDetailV8() {
             <h2 className={styles.cardTitle}>版の履歴</h2>
             <p className={styles.cardNote}>戻すと、その版を下書きとして作り直します。公開するまで使っている所は変わりません。</p>
           </div>
-          {versions === null && !versionsError ? <p className={styles.empty} role="status">読み込み中…</p> : versionsError ? (
+          {versions === null && !versionsError ? <DetailLoading /> : versionsError ? (
             <div className={styles.versionError}>
               <p className={styles.errorText}>{versionsError}</p>
               <Button variant="secondary" onClick={() => void loadVersions()}>もう一度読み込む</Button>

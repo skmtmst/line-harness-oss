@@ -11,6 +11,7 @@ import ListRange from '@/components/ui/list-range'
 import { formatDateTime } from '@/lib/format'
 import type { FriendDetailState } from './use-friend-detail'
 import styles from './detail.module.css'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 const renderValue = (v: unknown) => (Array.isArray(v) ? v.join(', ') : String(v ?? ''))
 
@@ -18,7 +19,7 @@ export default function FormsTab({ data }: { data: FriendDetailState }) {
   const { submissions, submissionsStatus, submissionsTotal, submissionsNextCursor, submissionsLoadingMore, submissionsMoreError } = data
 
   if (submissionsStatus === 'loading' || submissionsStatus === 'idle') {
-    return <div className={styles.pane}><p className={styles.paneNote}>回答を読み込んでいます…</p></div>
+    return <div className={styles.pane}><DetailLoading /></div>
   }
   if (submissionsStatus === 'error') {
     return (

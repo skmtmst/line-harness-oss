@@ -38,6 +38,7 @@ import { messageTypeText } from '../template-message-type'
 import { isTemplateDetailData, type TemplateDetailData } from '../template-detail-data'
 import styles from './detail-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 type Usage = NonNullable<TemplateDetailData['usedBy']>
 
@@ -452,9 +453,7 @@ export default function TemplateDetailV8() {
 
       {loading || !template ? (
         <div className={styles.card} role="status">
-          <p className="text-ink-faint" style={{ margin: 0, fontSize: 13, textAlign: 'center', padding: '24px 0' }}>
-            読み込み中...
-          </p>
+          <DetailLoading />
         </div>
       ) : (
         <>
@@ -591,7 +590,7 @@ export default function TemplateDetailV8() {
                   戻すと、その版を下書きとして作り直します。公開するまで使っている所は変わりません。
                 </p>
                 {versions === null && !versionsError ? (
-                  <p className="text-ink-faint" style={{ fontSize: 13, margin: '8px 0 0' }}>読み込み中...</p>
+                  <DetailLoading />
                 ) : versionsError ? (
                   <div>
                     <p className="text-ink-secondary" style={{ fontSize: 13, margin: '8px 0' }}>{versionsError}</p>

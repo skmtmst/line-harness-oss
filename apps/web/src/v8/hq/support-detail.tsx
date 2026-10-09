@@ -38,6 +38,7 @@ import styles from './support-detail.module.css'
 import { Field } from '@/components/shared/form-controls'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
 
@@ -196,7 +197,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
           {idMissing ? (
             <TargetMissing kind="unspecified" title="開くお問い合わせが指定されていません" description="一覧から開くお問い合わせを選び直してください。" backHref="/hq/support" backLabel="問い合わせの一覧へ戻る" />
           ) : detailLoading || id === undefined ? (
-            <p className={styles.faint}>読み込んでいます…</p>
+            <DetailLoading />
           ) : detailMissing || (!loadError && !detail) ? (
             <TargetMissing kind="not-found" title="このお問い合わせは見つかりません" description="削除されたか、別の記録です。一覧から選び直してください。" backHref="/hq/support" backLabel="問い合わせの一覧へ戻る" />
           ) : loadError || !detail ? (
@@ -275,7 +276,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
           <section className={styles.history} aria-label="これまでの問い合わせ">
             <h2 className={styles.historyTitle}>これまでの問い合わせ</h2>
             {history === null ? (
-              <p className={styles.historyEmpty}>読み込んでいます…</p>
+              <DetailLoading />
             ) : !Array.isArray(history) ? (
               <p className={styles.historyEmpty}>これまでの問い合わせを読み込めませんでした。</p>
             ) : history.length === 0 ? (

@@ -26,6 +26,7 @@ import { MESSAGE_TYPE_LABEL } from '@/v8/friend-add/flow'
 import { DELIVERY_UNKNOWN_CODE, jstClock, jstShortDateTime, jstTitleDate, routingAction } from './status'
 import styles from './detail.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 type ActionRun = FriendAddRunDetail['actionRuns'][number]
 
@@ -86,7 +87,7 @@ function shortId(id: string): string {
 
 export default function FriendAddRunDetailV8() {
   return (
-    <Suspense fallback={<ListState kind="loading" />}>
+    <Suspense fallback={<DetailLoading />}>
       <FriendAddRunDetailInner />
     </Suspense>
   )
@@ -186,7 +187,7 @@ function FriendAddRunDetailInner() {
     }
   }
 
-  if (accountLoading || loading) return <ListState kind="loading" title="実行詳細を読み込んでいます" />
+  if (accountLoading || loading) return <DetailLoading label="実行詳細を読み込んでいます" />
   if (!runId) {
     return (
       <TargetMissing

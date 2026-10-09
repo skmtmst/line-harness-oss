@@ -15,6 +15,7 @@ import type { PanelStatus } from './use-friend-detail'
 import styles from './detail.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 export function useSupportEditor(friendId: string, onSaved: (notice: string) => void, onConflict: (message: string) => void, accountId: string | null = null) {
   const scopeRef = useRef({ friendId, accountId })
@@ -263,7 +264,7 @@ export function useScenarioPicker(
     >
       <div className={styles.dialogBody} data-scenario-picker>
         {listStatus === 'loading' || listStatus === 'idle' ? (
-          <p className={styles.secNote}>シナリオを読み込んでいます…</p>
+          <DetailLoading />
         ) : listStatus === 'error' ? (
           <p className={styles.secNote}>
             シナリオの選択肢を読み込めませんでした

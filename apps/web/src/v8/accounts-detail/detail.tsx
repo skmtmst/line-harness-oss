@@ -50,6 +50,7 @@ import {
 import styles from './detail.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 type Skipped = Array<{ id: string; kind: string; title: string | null; skippedAt: string }>
 
@@ -197,7 +198,7 @@ export default function AccountDetailV8() {
       />,
     )
   }
-  if (status === 'loading' || (account !== null && account.id !== id)) return frame(<ListState kind="loading" />)
+  if (status === 'loading' || (account !== null && account.id !== id)) return frame(<DetailLoading />)
   if (missing || (status === 'ready' && !account)) {
     return frame(
       <TargetMissing
@@ -350,7 +351,7 @@ export default function AccountDetailV8() {
                   ) : null}
                 </div>
                 {skipped === null ? (
-                  <ListState kind="loading" />
+                  <DetailLoading />
                 ) : skipped === 'error' ? (
                   <p className={styles.muted}>送らなかった配信の一覧を読み込めませんでした。詳細のほかの欄はそのまま使えます。</p>
                 ) : skipped.length === 0 ? (

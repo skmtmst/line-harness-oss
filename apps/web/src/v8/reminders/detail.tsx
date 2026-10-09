@@ -62,6 +62,7 @@ import styles from './detail.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 const PAGE_SIZE = 20
 /** 書き出しの上限。実行結果が多いとき、手元に全部ため込むと固まる。 */
@@ -201,7 +202,7 @@ function StatusPill({ tone, children }: { tone: 'ok' | 'warn' | 'muted'; childre
 export default function ReminderDetailV8Page() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
-    <Suspense fallback={<ListState kind="loading" />}>
+    <Suspense fallback={<DetailLoading />}>
       <ReminderDetailV8 />
     </Suspense>
   )
@@ -465,7 +466,7 @@ function ReminderDetailV8() {
       <ListState kind="empty" title="リマインダが指定されていません" description="一覧から選び直してください。" action={<Button href="/reminders">リマインダ一覧へ戻る</Button>} />
     )
   }
-  if (loading) return <ListState kind="loading" title="リマインダの詳細を読み込んでいます" />
+  if (loading) return <DetailLoading label="リマインダの詳細を読み込んでいます" />
   if (missing) {
     return (
       <ListState kind="empty" title="このリマインダは見つかりません" description="削除されたか、別の記録です。一覧から選び直してください。" action={<Button href="/reminders">リマインダ一覧へ戻る</Button>} />
@@ -770,7 +771,7 @@ function ScheduleTab({ reminderId, steps }: { reminderId: string; steps: Reminde
         <p className={styles.cardNote}>これから送る通知を予定の近い順に並べています。</p>
       </div>
       {state === 'loading' ? (
-        <ListState kind="loading" title="配信予定を読み込んでいます" />
+        <DetailLoading label="配信予定を読み込んでいます" />
       ) : state === 'error' ? (
         <ListState kind="error" title="配信予定を読み込めませんでした" onRetry={() => void load()} />
       ) : items.length === 0 ? (
@@ -898,7 +899,7 @@ function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string;
         <Button onClick={() => { setAppliedSearch(search.trim()); setPage(1) }}>探す</Button>
       </div>
       {state === 'loading' ? (
-        <ListState kind="loading" title="実行結果を読み込んでいます" />
+        <DetailLoading label="実行結果を読み込んでいます" />
       ) : state === 'error' ? (
         <ListState kind="error" title="実行結果を読み込めませんでした" onRetry={() => void load()} />
       ) : items.length === 0 ? (
@@ -1086,7 +1087,7 @@ function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canMana
         </div>
 
         {loading ? (
-          <ListState kind="loading" title="登録者を読み込んでいます" />
+          <DetailLoading label="登録者を読み込んでいます" />
         ) : error ? (
           <ListState kind="error" title="登録者を表示できませんでした" description={error} onRetry={() => void load()} />
         ) : items.length === 0 ? (

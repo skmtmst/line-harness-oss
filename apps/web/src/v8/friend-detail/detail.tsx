@@ -44,6 +44,7 @@ import styles from './detail.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 /** タブ10個（並びと URL の値は今の画面と同じ）。 */
 export const FRIEND_DETAIL_TABS = [
@@ -193,7 +194,7 @@ function FriendDetailV8Inner() {
       ) : null}
 
       {data.loading || !friend ? (
-        <div className={styles.pane}><p className={styles.paneNote}>読み込んでいます…</p></div>
+        <div className={styles.pane}><DetailLoading /></div>
       ) : tab === 'timeline' ? (
         <OverviewTab
           friend={friend}
@@ -236,7 +237,7 @@ function FriendDetailV8Inner() {
 
 export default function FriendDetailV8() {
   return (
-    <Suspense fallback={<div className={styles.pane}><p className={styles.paneNote}>読み込んでいます…</p></div>}>
+    <Suspense fallback={<div className={styles.pane}><DetailLoading /></div>}>
       <FriendDetailV8Inner />
     </Suspense>
   )

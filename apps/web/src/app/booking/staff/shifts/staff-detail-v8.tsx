@@ -50,6 +50,7 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -874,8 +875,8 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
         <div className={shell.body} data-design="Body">
           <div className={shell.main}>
             <div className={shell.stateCard}>
-              <p className={shell.stateTitle}>読み込み中</p>
-              <p className={shell.stateDesc}>担当者の勤務とシフトを読み込んでいます。</p>
+              <DetailLoading />
+              <DetailLoading />
             </div>
           </div>
         </div>
@@ -1480,7 +1481,7 @@ export function OwnShiftEntryV8() {
       <div className={shell.body} data-design="Body">
         <div className={shell.main}>
           <div className={shell.stateCard}>
-            <p className={shell.stateTitle}>読み込み中</p>
+            <DetailLoading />
             <p className={shell.stateDesc}>自分の勤務を探しています。</p>
           </div>
         </div>

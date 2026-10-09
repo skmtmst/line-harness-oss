@@ -28,6 +28,7 @@ import {
 } from '../run-status'
 import styles from './detail-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 const ACTION_LABELS: Record<string, string> = {
   tag: 'タグ操作',
@@ -72,7 +73,7 @@ function titleDate(value: string): string {
 
 export default function FriendAddRunDetailV8() {
   return (
-    <Suspense fallback={<ListState kind="loading" />}>
+    <Suspense fallback={<DetailLoading />}>
       <FriendAddRunDetailV8Inner />
     </Suspense>
   )
@@ -165,7 +166,7 @@ function FriendAddRunDetailV8Inner() {
     }
   }
 
-  if (accountLoading || loading) return <ListState kind="loading" title="実行詳細を読み込んでいます" />
+  if (accountLoading || loading) return <DetailLoading label="実行詳細を読み込んでいます" />
   if (!runId) {
     return (
       <TargetMissing

@@ -1,5 +1,7 @@
 'use client'
 
+import { DetailLoading } from '@/components/templates/detail-page'
+
 /*
  * ★V8 シナリオ配信の編集（src/v8 に一から組み直した版）。
  * 板：有効 `PMLkX`・始めた直後 `nMSiE`・停止中 `ARuZ4`・競合 `kz2B6`、
@@ -2140,18 +2142,7 @@ export default function ScenarioDetailV8({
   if (loading) {
     return (
       <div className={styles.board}>
-        <DelayedSkeleton
-          loading
-          skeleton={
-            <div className="flex flex-col gap-4">
-              <Skeleton className="block h-4 w-24" />
-              <Skeleton className="block h-8 w-1/3" />
-              <Skeleton className="block h-24 w-full" />
-              <Skeleton className="block h-14 w-full" />
-              <Skeleton className="block h-14 w-full" />
-            </div>
-          }
-        />
+        <DetailLoading />
       </div>
     )
   }

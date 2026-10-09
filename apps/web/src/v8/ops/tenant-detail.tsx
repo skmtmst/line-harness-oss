@@ -24,6 +24,7 @@ import parts from './parts.module.css'
 import styles from './tenant-detail.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 /**
  * 運営の契約先の詳細 V8（絵 `Oub6x`・停止の窓 `okXoi`）。
@@ -58,7 +59,7 @@ function shortDateTime(value: string | null | undefined): string {
 
 export default function OpsTenantDetailV8() {
   return (
-    <Suspense fallback={<ListState permissionScope="hq" kind="loading" title="契約先を読み込んでいます" />}>
+    <Suspense fallback={<DetailLoading label="契約先を読み込んでいます" />}>
       <DetailContent />
     </Suspense>
   )
@@ -123,7 +124,7 @@ function DetailContent() {
         <div className={parts.panel}>
           {error
             ? <ListState permissionScope="hq" kind="error" title="契約先を表示できませんでした" description={error} onRetry={() => void load()} />
-            : <ListState permissionScope="hq" kind="loading" title="契約先を読み込んでいます" />}
+            : <DetailLoading label="契約先を読み込んでいます" />}
         </div>
       </div>
     )

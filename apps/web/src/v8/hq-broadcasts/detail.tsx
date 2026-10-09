@@ -40,6 +40,7 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 const n = (value: number) => value.toLocaleString('ja-JP')
 /** 開いた・押した・反応（API-18）。店の計測がまだ取れていない（null）は「—」。 */
@@ -244,7 +245,7 @@ function RecipientsTab({ run }: { run: HqBroadcastRun }) {
           </tbody>
         </DataTable>
       )}
-      {state === 'loading' ? <ListState permissionScope="hq" kind="loading" /> : null}
+      {state === 'loading' ? <DetailLoading /> : null}
       {next && state === 'ready' ? <div><Button onClick={() => void load(Number(next), true)}>続きを読む</Button></div> : null}
     </section>
   )
@@ -293,7 +294,7 @@ function ActivityTab({ run, names }: { run: HqBroadcastRun; names: Map<string, s
           </tbody>
         </DataTable>
       )}
-      {state === 'loading' ? <ListState permissionScope="hq" kind="loading" /> : null}
+      {state === 'loading' ? <DetailLoading /> : null}
       {next && state === 'ready' ? <div><Button onClick={() => void load(Number(next), true)}>続きを読む</Button></div> : null}
     </section>
   )
@@ -456,7 +457,7 @@ export default function HqBroadcastDetail() {
   let body
   if (!id) body = <Notice tone="warn">一括配信が選ばれていません。一括配信の一覧から開いてください。</Notice>
   else if (loadError && !run) body = <ListState permissionScope="hq" kind="error" error={loadError} onRetry={() => void load()} />
-  else if (!run) body = <ListState permissionScope="hq" kind="loading" />
+  else if (!run) body = <DetailLoading />
   else body = run.status === 'prepared'
     ? <PreparedCard run={run} />
     : <ResultCard run={run} canManage={canManage} onRetry={(t) => setAsk({ kind: 'retry', target: t })} onRetryAll={() => setAsk({ kind: 'retry-all' })} />

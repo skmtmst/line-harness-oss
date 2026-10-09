@@ -58,6 +58,7 @@ import detailStyles from './detail-v8.module.css'
 import { dateTimeLocalJst, dateTimeLocalJstToUtcIso } from './registrants-panel'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 const PAGE_SIZE = 20
 /** 書き出しの上限。実行結果が多いとき、手元に全部ため込むと固まる。 */
@@ -126,7 +127,7 @@ function csvFor(items: ReminderDeliveryRun[]): string {
 export default function ReminderDetailV8Page() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
-    <Suspense fallback={<ListState kind="loading" />}>
+    <Suspense fallback={<DetailLoading />}>
       <ReminderDetailV8 />
     </Suspense>
   )
@@ -353,7 +354,7 @@ function ReminderDetailV8() {
     )
   }
   if (loading) {
-    return <ListState kind="loading" title="リマインダの詳細を読み込んでいます" />
+    return <DetailLoading label="リマインダの詳細を読み込んでいます" />
   }
   if (missing) {
     return (
@@ -692,7 +693,7 @@ function ScheduleTab({
       <h2 className={styles.cardTitle}>配信予定</h2>
       <p className={styles.cardNote}>これから送る通知を予定の近い順に並べています。</p>
       {state === 'loading' ? (
-        <ListState kind="loading" title="配信予定を読み込んでいます" />
+        <DetailLoading label="配信予定を読み込んでいます" />
       ) : state === 'error' ? (
         <ListState kind="error" title="配信予定を読み込めませんでした" onRetry={() => void load()} />
       ) : items.length === 0 ? (
@@ -849,7 +850,7 @@ function RunsTab({
         </Button>
       </div>
       {state === 'loading' ? (
-        <ListState kind="loading" title="実行結果を読み込んでいます" />
+        <DetailLoading label="実行結果を読み込んでいます" />
       ) : state === 'error' ? (
         <ListState kind="error" title="実行結果を読み込めませんでした" onRetry={() => void load()} />
       ) : items.length === 0 ? (
@@ -1069,7 +1070,7 @@ function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canMana
         </div>
 
         {loading ? (
-          <ListState kind="loading" title="登録者を読み込んでいます" />
+          <DetailLoading label="登録者を読み込んでいます" />
         ) : error ? (
           <ListState kind="error" title="登録者を表示できませんでした" description={error} onRetry={() => void load()} />
         ) : items.length === 0 ? (

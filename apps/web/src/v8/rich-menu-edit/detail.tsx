@@ -30,6 +30,7 @@ import { audienceOf, progressStatusText, runAudienceText, runStamp, type Progres
 import styles from './detail.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 type Group = {
   id: string
@@ -258,7 +259,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
     return <TargetMissing kind="error" title="リッチメニューを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void loadGroup()} />
   }
   const backLink = <Link href="/rich-menus" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />リッチメニューへ</Link>
-  if (!group) return <div className={styles.loadingHead}>{backLink}<p className={styles.loading} role="status">読み込み中…</p></div>
+  if (!group) return <div className={styles.loadingHead}>{backLink}<DetailLoading /></div>
 
   const audience = audienceOf(group)
   const head = latestSucceeded ? `公開しました・${runStamp(latestSucceeded.updatedAt)}` : '公開中'
@@ -304,7 +305,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
 
             <section className={styles.card} aria-label="公開の進み">
               <h2 className={styles.cardTitle}>公開の進み</h2>
-              {progressError ? <p className={styles.cardNote}>公開の進みを読み込めませんでした。</p> : progress === null ? <p className={styles.cardNote} role="status">読み込み中…</p> : progress.steps.length === 0 ? <p className={styles.cardNote}>まだ公開の記録はありません。</p> : progress.steps.map((step) => (
+              {progressError ? <p className={styles.cardNote}>公開の進みを読み込めませんでした。</p> : progress === null ? <DetailLoading /> : progress.steps.length === 0 ? <p className={styles.cardNote}>まだ公開の記録はありません。</p> : progress.steps.map((step) => (
                 <div key={step.key} className={styles.stepRow}>
                   {step.status === 'done' ? <CircleCheck size={18} aria-hidden="true" className={styles.stepOk} />
                     : step.status === 'failed' ? <CircleX size={18} aria-hidden="true" className={styles.stepNg} />

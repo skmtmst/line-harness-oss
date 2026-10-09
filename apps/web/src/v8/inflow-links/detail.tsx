@@ -46,6 +46,7 @@ import styles from './detail.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 interface MessageTemplate {
   id: string
@@ -464,7 +465,7 @@ function InflowDetailContent() {
       ) : null}
 
       {!route ? (
-        <ListState kind="loading" />
+        <DetailLoading />
       ) : <>
         <div className={styles.kpis}>
           <KpiBand aria-label={`${route.name}の概要`}>
@@ -538,7 +539,7 @@ function InflowDetailContent() {
                 <Button onClick={() => setFunnelAttempt((n) => n + 1)}>段階を再読み込み</Button>
               </div>
             ) : (
-              <ListState kind="loading" />
+              <DetailLoading />
             )}
             {funnel?.monthly && funnel.monthly.length > 0 ? (
               <section aria-label="月別内訳">
@@ -638,7 +639,7 @@ function InflowDetailContent() {
               onRetry={() => setFriendsAttempt((n) => n + 1)}
             />
           ) : friendsState === 'loading' ? (
-            <ListState kind="loading" title="この経路から来た友だちを読み込んでいます" />
+            <DetailLoading label="この経路から来た友だちを読み込んでいます" />
           ) : friendRows.length === 0 ? (
             <ListState
               kind="empty"
@@ -841,7 +842,7 @@ function InflowDetailContent() {
 export default function InflowDetailV8() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
-    <Suspense fallback={<ListState kind="loading" />}>
+    <Suspense fallback={<DetailLoading />}>
       <InflowDetailContent />
     </Suspense>
   )

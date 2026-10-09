@@ -31,6 +31,7 @@ import { inboxHrefForFriend, timelineSourceHref, timelineTypeLabel, timelineKey,
 import { SUPPORT_LABELS, SUPPORT_TONES } from './support'
 import styles from './detail.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 function GroupHead({ title, action }: { title: string; action?: React.ReactNode }) {
   return (
@@ -260,7 +261,7 @@ export default function OverviewTab({
             <Link className={styles.secLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=scenario`}>すべてを見る<ArrowRight size={12} aria-hidden /></Link>
           </div>
           {upcomingStatus === 'loading' || upcomingStatus === 'idle' ? (
-            <p className={styles.secNote}>読み込んでいます…</p>
+            <DetailLoading />
           ) : deliveryFailed ? (
             <p className={styles.secNote} role="alert">
               配信予定を読み込めませんでした
@@ -323,7 +324,7 @@ export default function OverviewTab({
             <Link className={styles.secLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=history`}>すべて見る<ArrowRight size={12} aria-hidden /></Link>
           </div>
           {data.historyStatus === 'loading' || data.historyStatus === 'idle' ? (
-            <p className={styles.secNote}>履歴を読み込んでいます…</p>
+            <DetailLoading />
           ) : data.historyStatus === 'error' ? (
             <p className={styles.secNote}>
               履歴を読み込めませんでした

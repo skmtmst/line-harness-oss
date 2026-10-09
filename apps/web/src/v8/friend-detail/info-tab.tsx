@@ -18,6 +18,7 @@ import type { FriendDetailState } from './use-friend-detail'
 import type { FriendDetailPermissions } from './permissions'
 import styles from './detail.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 /** 種類の名前は絵では出さない。ラベルの title で読めるようにする。 */
 export const BASIC_GROUP = 'basic'
@@ -82,7 +83,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
   const { fields, values, setValues, fieldsStatus, fieldFolders, fieldFoldersStatus, hiddenPersonalCount } = data
 
   if (fieldsStatus === 'loading' || fieldsStatus === 'idle') {
-    return <div className={styles.pane}><p className={styles.paneNote}>情報欄を読み込んでいます…</p></div>
+    return <div className={styles.pane}><DetailLoading /></div>
   }
   if (fieldsStatus === 'error') {
     return (

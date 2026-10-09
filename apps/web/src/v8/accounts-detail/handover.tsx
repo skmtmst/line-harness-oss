@@ -39,6 +39,7 @@ import styles from './handover.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 type HandoverDecisionView = AccountHandoverDecision & {
   sourceName?: string
@@ -345,7 +346,7 @@ export default function AccountHandoverV8() {
       />
     ))
   }
-  if (status === 'loading') return frame('乗り換え', undefined, <ListState kind="loading" />)
+  if (status === 'loading') return frame('乗り換え', undefined, <DetailLoading />)
   if (missing || (status === 'ready' && !account)) {
     return frame('乗り換え', undefined, (
       <TargetMissing
