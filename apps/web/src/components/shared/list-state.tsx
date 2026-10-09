@@ -72,6 +72,7 @@ export default function ListState({
   permissionScope = 'store',
   title,
   description,
+  permissionReason,
   action,
   onRetry,
   retrying = false,
@@ -88,6 +89,8 @@ export default function ListState({
   /** 設計どおりの文言で足りないとき（「まだタグがありません」など）だけ渡す。 */
   title?: string
   description?: string
+  /** 権限以外にも分かっている制約。頼む先の文は部品が出す。 */
+  permissionReason?: string
   /** 作成導線つきの空状態（設計 `fRgeK`）。押せる操作が画面の他所にあるなら渡さない。 */
   action?: ReactNode
   /** もう一度読み込む。`error` のときだけ押し口を出す。 */
@@ -148,7 +151,7 @@ export default function ListState({
     >
       <span className={styles.iconWrap} aria-hidden="true">{icon ?? <Icon aria-hidden="true" size={24} className={iconClass} />}</span>
       <p className={styles.title}>{title ?? preset.title}</p>
-      <p className={styles.description}>{kind === 'forbidden' ? permissionDeniedMessage(permissionScope) : description ?? preset.description}</p>
+      <p className={styles.description}>{kind === 'forbidden' ? `${permissionReason ? `${permissionReason} ` : ''}${permissionDeniedMessage(permissionScope)}` : description ?? preset.description}</p>
       {action ? <div className={styles.action}>{action}</div> : null}
     </div>
   )

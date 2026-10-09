@@ -48,7 +48,7 @@ export default function NoPermissionBoard({
           <p className={styles.cardText}>
             {roleLabel ? `いまの役割は「${roleLabel}」です。` : 'この画面を開く権限がありません。'}
             {requiredRoleLabel ? `${featureName}は「${requiredRoleLabel}」以上の役割で使えます。` : ''}
-            必要なら、管理者に役割の変更を頼んでください。
+            {permissionDeniedMessage('store')}
           </p>
           {roleLabel || adminName ? (
             <p className={styles.roleRow}>

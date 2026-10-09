@@ -1222,7 +1222,7 @@ export default function ScenariosListV8() {
         {!canEdit && (
           <div className={styles.viewerBand} role="status">
             <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
+            <span>閲覧のみで見ています。{permissionDeniedMessage('store')}</span>
           </div>
         )}
         <KpiBand data-design="KPIs">

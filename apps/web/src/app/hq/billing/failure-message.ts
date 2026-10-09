@@ -10,7 +10,7 @@ import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-er
  */
 export const BILLING_UNREACHABLE = '決済サービスにつながりませんでした。少し待って、もう一度お試しください。'
 
-export function billingFailureMessage(caught: unknown, action: string, forbidden: string): string {
+export function billingFailureMessage(caught: unknown, action: string, _forbidden: string): string {
   if (caught instanceof ApiError && caught.status === 502) return BILLING_UNREACHABLE
-  return japaneseDetailOf(caught) || describeApiFailure(caught, action, { forbidden })
+  return japaneseDetailOf(caught) || describeApiFailure(caught, action, { scope: 'hq' })
 }

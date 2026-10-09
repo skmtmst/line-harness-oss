@@ -1178,7 +1178,7 @@ export default function RemindersListV8() {
       {role !== null && !canEdit && (
         <p className={styles.viewerBand} role="status" data-design-node="a5C1p">
           <Eye size={16} aria-hidden="true" />
-          閲覧のみで見ています。変える操作は管理者に頼んでください。
+          閲覧のみで見ています。{permissionDeniedMessage('store')}
         </p>
       )}
 

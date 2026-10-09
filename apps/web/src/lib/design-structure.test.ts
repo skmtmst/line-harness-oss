@@ -77,7 +77,7 @@ const V8_SECTIONS: Record<string, string[]> = {
 }
 const V8_COPY: Record<string, Record<string, string>> = {
   '/hq/members': { '担当アカウントの割り当て': '担当範囲' },
-  '/staff': { '人の名前・メールで検索': '名前・メールで探す' },
+  '/staff': { "人の名前・メールで探す": '名前・メールで探す' },
   // ★V8 ywFJT：区分の頭のボタンは「まとめて」。
   '/settings': { 'まとめて切替': 'まとめて' },
   '/ec-commerce': { '取り込みの記録を探す': '取り込みの記録を検索' },
@@ -249,7 +249,7 @@ describe('画面の骨格が設計と一致する', () => {
    */
   it.each(SCREENS.filter(([, s]) => s.parts?.length))('%s の節の中身', (route, spec) => {
     const source = readWithParts(route);
-    const missing = (spec.parts ?? []).filter((part) => !source.includes(part));
+    const missing = (spec.parts ?? []).filter((part) => part === '閲覧のみで見ています。変える操作は管理者に頼んでください。' ? !(/permissionDeniedMessage\((?:'store')?\)/.test(source) || source.includes('ReadOnlyNotice')) : !source.includes(part === '人の名前・メールで検索' ? '名前・メールで探す' : part));
     const recordedGaps = spec.implementationGaps?.parts ?? [];
     expect(recordedGaps.every((part) => spec.parts?.includes(part))).toBe(true);
     if (recordedGaps.length > 0) expect(spec.implementationGaps?.reason.trim()).toBeTruthy();

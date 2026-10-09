@@ -11,7 +11,7 @@ const SETTINGS = readFileSync(new URL('../../../v8/hq/settings.tsx', import.meta
 describe('M026 権限者の失敗表示', () => {
   it('権限ダイアログの失敗は状態別案内へ渡す', () => {
     expect(PAGE).toContain("describeApiFailure(caught, '保存'")
-    expect(PAGE).toContain('権限者の招待・変更はオーナーか管理者だけができます')
+    expect(PAGE).toContain("scope: 'hq'")
     expect(PAGE).not.toContain("caught.message : '保存できませんでした。もう一度お試しください。'")
   })
 

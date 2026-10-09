@@ -137,7 +137,7 @@ describe('R602: フォーム取得の失敗は403と503で言い分ける', () =
     })
     await mount()
     expect(host.textContent).toContain('見る権限がありません')
-    expect(host.textContent).toContain('オーナーか管理者に追加を依頼')
+    expect(host.textContent).toContain('オーナーか管理者に頼んでください')
     expect(retryButtons()).toHaveLength(0)
     expect(host.textContent).not.toContain('箱フォーム')
   })

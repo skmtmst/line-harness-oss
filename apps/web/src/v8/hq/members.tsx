@@ -220,7 +220,7 @@ function MembersInner() {
         ) : status === 'error' ? (
           <ListState permissionScope="hq" kind="error" title="権限者を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />
         ) : restricted ? (
-          <ListState permissionScope="hq" kind="forbidden" title="全アカウントの担当者だけが権限者を管理できます" description="担当アカウントが限定されているため、権限者の一覧と変更はできません。" />
+          <ListState permissionScope="hq" kind="forbidden" title="全アカウントの担当者だけが権限者を管理できます" permissionReason="担当アカウントが限定されているため、権限者の一覧と変更はできません。" />
         ) : (
           <>
             <div className={styles.cards} aria-label="権限者の数">

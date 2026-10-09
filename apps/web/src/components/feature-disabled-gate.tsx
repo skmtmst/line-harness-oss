@@ -22,7 +22,7 @@ export function FeatureDisabledScreen({ featureId }: { featureId?: string }) {
       <ListState
         kind="forbidden"
         title="この機能は設定でオフになっています"
-        description="機能設定で有効にすると使えます。"
+        permissionReason="機能設定で有効にすると使えます。"
         action={<Button href="/settings" variant="secondary">機能設定を開く</Button>}
       />
     </section>

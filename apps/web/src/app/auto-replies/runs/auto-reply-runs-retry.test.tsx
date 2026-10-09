@@ -235,7 +235,7 @@ describe('自動応答・実行結果の再実行（N-081）', () => {
     await flush()
 
     expect(container.querySelector('[role="status"]')?.textContent)
-      .toContain('再実行する権限がありません')
+      .toContain('この操作の権限がありません')
     // 権限不足は読み直しても直らないので読み直さない。
     expect(runsMock).toHaveBeenCalledTimes(1)
   })
