@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useId, useRef, useState, type ReactNode, type Ref } from 'react'
-import { Check, Inbox } from 'lucide-react'
+import { Check } from 'lucide-react'
 import Button from './button'
 import FilterChip from './filter-chip'
 import { FolderDot } from './folder-dot'
+import FolderPanel, { type FolderPanelRow } from './folder-panel'
 import Radio from './radio'
 import SearchField from './search-field'
 import Select from './select'
@@ -72,6 +73,12 @@ export default function SourcePickerDialog({
   const folderOptions = [{ id: '', name: 'すべて' }, ...folders, { id: '__none__', name: '未分類' }]
   const countFolder = (folderId: string) => items.filter((item) => !folderId || (folderId === '__none__' ? !item.folderId : item.folderId === folderId)).length
   const listState = Boolean(state)
+  const folderRows: FolderPanelRow[] = folderOptions.map((f) => ({
+    id: f.id, label: f.name,
+    kind: !f.id ? 'all' : f.id === '__none__' ? 'unfiled' : 'folder',
+    color: folders.find((entry) => entry.id === f.id)?.color,
+    count: listState ? null : countFolder(f.id),
+  }))
   const choose = (itemId: string) => { setSelected(itemId); onSelect(itemId) }
   return <SelectionDialog title={title} description={description} busy={busy} error={error} designNode="EpTBB" onCancel={onCancel} initialFocusRef={searchRef}
     search={<SearchField ref={searchRef} aria-label={`${title}：名前で探す`} placeholder="名前で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />}
@@ -82,14 +89,11 @@ export default function SourcePickerDialog({
     </>}
   >
       <div ref={panelRef} className={styles.body}>
-        {!narrow ? <nav className={styles.folders} aria-label="候補のフォルダ">
-          <p>フォルダ</p>
-          {folderOptions.map((f) => <button type="button" key={f.id} aria-pressed={folder === f.id} className={styles.folder} disabled={busy || listState} onClick={() => setFolder(f.id)}>
-            {f.id ? <FolderDot folder={folders.find((entry) => entry.id === f.id)} /> : <Inbox size={14} aria-hidden />}<span title={f.name}>{f.name}</span><small>{listState ? '—' : countFolder(f.id)}</small>
-          </button>)}
-        </nav> : null}
+        {!narrow ? <div className={styles.folders}>
+          <FolderPanel readOnly disabled={busy || listState} rows={folderRows} activeId={folder} onSelect={setFolder} />
+        </div> : null}
         <section className={styles.list} aria-label="候補の一覧">
-          {narrow ? <Select aria-label="候補のフォルダ" value={folder} onChange={setFolder} options={folderOptions.map((f) => ({ value: f.id, label: `${f.name}（${listState ? '—' : countFolder(f.id)}）` }))} /> : null}
+          {narrow ? <Select disabled={busy || listState} aria-label="候補のフォルダ" value={folder} onChange={setFolder} options={folderOptions.map((f) => ({ value: f.id, label: `${f.name}（${listState ? '—' : countFolder(f.id)}）` }))} /> : null}
           <div className={styles.categories} aria-label="候補の絞り込み">
             {[{ id: '', label: 'すべて' }, ...categories].map((c) => <FilterChip key={c.id} selected={category === c.id} disabled={busy || listState} count={listState ? undefined : folderItems.filter((item) => !c.id || item.category === c.id).length} onChange={() => setCategory(c.id)}>{c.label}</FilterChip>)}
           </div>

@@ -145,11 +145,17 @@ export default function FolderPanel({
   children,
   createAction,
   reserveCreateSpace = false,
+  readOnly = false,
+  disabled = false,
 }: {
   /** V8: 作る操作はフォルダ列の先頭に置く。 */
   createAction?: ReactNode
   /** 閲覧のみで作る操作を隠すときも、フォルダの位置は変えない。V8 のみ。 */
   reserveCreateSpace?: boolean
+  /** 選ぶ窓用。行の選択は保ち、作成・編集・並べ替えなどの操作を出さない。 */
+  readOnly?: boolean
+  /** 読み込み・確定処理の間は選択も止める。 */
+  disabled?: boolean
   rows: FolderPanelRow[]
   activeId: string
   onSelect: (id: string) => void
@@ -184,15 +190,15 @@ export default function FolderPanel({
   return (
     // **読み上げ名を持つ。** 帯が何の分類かを、見出しの外からも辿れるように。
     <aside aria-label="フォルダ" className={`${styles.panel} v7:bg-canvas v7:rounded-card v7:border-hairline v7:h-fit overflow-visible v7:border`}>
-      {createAction ? <div className={`${styles.create} v8-only`}>{createAction}</div> : reserveCreateSpace ? <div className={`${styles.create} ${styles.createPlaceholder} v8-only`} aria-hidden="true" /> : null}
+      {!readOnly && createAction ? <div className={`${styles.create} v8-only`}>{createAction}</div> : !readOnly && reserveCreateSpace ? <div className={`${styles.create} ${styles.createPlaceholder} v8-only`} aria-hidden="true" /> : null}
       {showHeading ? <div className={`${styles.heading} v7:border-hairline flex items-center justify-between v7:border-b v7:px-4 v7:py-3`}>
         {headingHelp ? <p className="v7:text-ink v7:text-sm font-semibold">{heading}<HelpTip label={`${heading}の説明`}>{headingHelp}</HelpTip></p>
           : <p className="v7:text-ink v7:text-sm font-semibold">{heading}</p>}
         {total === undefined ? null : <span className="text-ink-faint v7:text-xs v7:tabular-nums">{total}</span>}
       </div> : null}
-      <nav className={`${styles.rows} v7:p-2`}>
+      <nav aria-label={heading} className={`${styles.rows} v7:p-2`}>
         {rows.map((row) => {
-          const hasActions = Boolean(row.leadingActions?.length || row.onEdit || row.onMoveUp || row.onMoveDown || row.onDelete)
+          const hasActions = !readOnly && Boolean(row.leadingActions?.length || row.onEdit || row.onMoveUp || row.onMoveDown || row.onDelete)
           const isActive = activeId === row.id
           const kind = row.kind ?? (row.label === 'すべて' ? 'all' : row.label === '未分類' ? 'unfiled' : 'folder')
 
@@ -210,7 +216,9 @@ export default function FolderPanel({
                   setOpenMenuId(null)
                   onSelect(row.id)
                 }}
+                disabled={disabled}
                 title={row.label}
+                aria-pressed={readOnly ? isActive : undefined}
                 aria-current={activeId === row.id ? 'true' : undefined}
                 className={`${styles.select} v7:rounded-control flex min-w-0 flex-1 items-center gap-2 v7:px-3 v7:py-2 text-left v7:text-sm transition-colors ${
                   activeId === row.id
@@ -249,8 +257,8 @@ export default function FolderPanel({
                   並べると、選択との押し間違いが増え、短い名前も狭くなる。 */}
               {/* I3L41O：選んだ行には絵どおり「…」の場所を取る。操作なしの
                   選んだ行（すべて・未分類）は空きの場所取りを置く。 */}
-              {row.trailing}
-              {isActive && !hasActions && !row.trailing ? (
+              {!readOnly && row.trailing}
+              {isActive && !hasActions && !row.trailing && !readOnly ? (
                 <div className={styles.menuSlot} aria-hidden="true" />
               ) : null}
               {hasActions && (
@@ -286,7 +294,7 @@ export default function FolderPanel({
           )
         })}
       </nav>
-      {(onAddFolder || addFolderDisabled || addFolderNote || children) && (
+      {!readOnly && (onAddFolder || addFolderDisabled || addFolderNote || children) && (
         <div className={`${styles.footer} v7:border-hairline v7:space-y-2 v7:border-t v7:p-3`}>
           {(onAddFolder || addFolderDisabled) && (
             <Button
