@@ -877,8 +877,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
         <div className={shell.body} data-design="Body">
           <div className={shell.main}>
             <div className={shell.stateCard}>
-              <DetailLoading />
-              <DetailLoading />
+              <DetailLoading label="担当者の勤務とシフトを読み込んでいます" />
             </div>
           </div>
         </div>
