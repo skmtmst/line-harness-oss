@@ -42,6 +42,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import Checkbox from '@/components/shared/checkbox'
@@ -159,6 +160,8 @@ export default function InflowListV8({
   const [poolMembers, setPoolMembers] = useState<Record<string, Set<string>>>({})
   const [poolMemberNames, setPoolMemberNames] = useState<Record<string, string[]>>({})
   const [selectedRouteIds, setSelectedRouteIds] = useState<Set<string>>(() => new Set())
+  const [stopTarget, setStopTarget] = useState<{ id: string; name: string } | null>(null)
+  const toggleLocks = useRef(new Set<string>())
   const [bulkAction, setBulkAction] = useState<BulkRouteAction | null>(null)
   // 数の帯のマスの「…」。開いているマスの名前。
   const [openTileMenu, setOpenTileMenu] = useState<string | null>(null)
@@ -241,6 +244,7 @@ export default function InflowListV8({
     setQrRoute(null)
     setSelectedRouteIds(new Set())
     setBulkAction(null)
+    setStopTarget(null)
     setOpenMenuRefCode(null)
     setPresetOpen(false)
     setAdConnected(null)
@@ -344,20 +348,30 @@ export default function InflowListV8({
    * （動きの点検・7）。失敗したら元に戻して知らせる。終わったら取り直す。
    */
   const toggleRouteActive = async (entryRouteId: string, nextActive: boolean, name: string) => {
+    if (toggleLocks.current.has(entryRouteId)) return false
+    toggleLocks.current.add(entryRouteId)
+    const accountAtRequest = selectedAccountId
+    const isCurrent = () => accountAtRequest === latestAccountRef.current
     setOpenMenuRefCode(null)
     const setActive = (active: boolean) => setRoutes((current) => current.map((route) => (route.id === entryRouteId ? { ...route, isActive: active } : route)))
     setActive(nextActive)
     try {
       const res = await api.entryRoutes.update(entryRouteId, { isActive: nextActive })
+      if (!isCurrent()) return false
       if (!res.success) throw new Error(res.error || '更新できませんでした')
       notifyToast(nextActive ? `「${name}」の受付を再開しました` : `「${name}」の受付を停止しました`)
       void load()
+      return true
     } catch (cause) {
+      if (!isCurrent()) return false
       setActive(!nextActive)
       notifyToast(
         cause instanceof ApiError && cause.status === 403 ? 'この操作を行う権限がありません' : '受付を切り替えられませんでした。',
         { tone: 'error', actionLabel: 'もう一度', onAction: () => { void toggleRouteActive(entryRouteId, nextActive, name) } },
       )
+      return false
+    } finally {
+      toggleLocks.current.delete(entryRouteId)
     }
   }
 
@@ -469,7 +483,7 @@ export default function InflowListV8({
           id: 'stop',
           label: '受付を止める',
           tone: 'danger' as const,
-          onSelect: () => void toggleRouteActive(row.entryRouteId!, false, row.name),
+          onSelect: () => { setOpenMenuRefCode(null); setStopTarget({ id: row.entryRouteId!, name: row.name }) },
         })
     }
     return items
@@ -936,6 +950,18 @@ export default function InflowListV8({
       toolbar={narrow ? narrowToolbar : wideToolbar}
       pagination={pager}
       overlays={<>
+        <ConfirmDialog
+          open={stopTarget !== null}
+          title={`「${stopTarget?.name ?? ''}」の受付を停止しますか？`}
+          description="この経路からの新しい受付が止まります。再開するまで、お客さまはこのリンクから登録できません。"
+          confirmLabel="受付を停止する"
+          destructive
+          onCancel={() => setStopTarget(null)}
+          onConfirm={async () => {
+            if (!stopTarget) return
+            if (await toggleRouteActive(stopTarget.id, false, stopTarget.name)) setStopTarget(null)
+          }}
+        />
         {editing ? (
           <EditRouteDialog
             route={editing === 'new' || (typeof editing === 'object' && 'register' in editing) ? null : editing}

@@ -99,6 +99,33 @@ const buttonByLabel = (label: string) =>
 const rowOf = (refCode: string) => host.querySelector(`[data-row-id="${ROUTES.find(row => row.refCode === refCode)?.id ?? refCode}"]`)
 
 describe('V8 流入と計測の一覧', () => {
+  it('受付を止める時だけ確認し、再開は押した直後に反映する', async () => {
+    const originalFetch = globalThis.fetch
+    const updates: Array<{ url: string; active: boolean }> = []
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.includes('/api/entry-routes/') && init?.method === 'PATCH') {
+        updates.push({ url, active: JSON.parse(String(init.body)).isActive })
+        return json({ success: true, data: route({}) })
+      }
+      return originalFetch(input, init)
+    })
+    await render()
+    await act(async () => buttonByLabel('「夏のInstagram投稿」の操作')!.click())
+    await act(async () => ([...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('受付を止める')) as HTMLElement).click())
+    expect(updates).toHaveLength(0)
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('受付を停止しますか？')
+    const stop = [...document.querySelectorAll('[role="alertdialog"] button')].find(el => el.textContent === '受付を停止する') as HTMLElement
+    await act(async () => stop.click())
+    expect(updates).toHaveLength(1)
+    expect(updates[0].active).toBe(false)
+    await act(async () => buttonByLabel('「チラシ計測リンク」の操作')!.click())
+    await act(async () => ([...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('受付を再開する')) as HTMLElement).click())
+    expect(updates).toHaveLength(2)
+    expect(updates[1].active).toBe(true)
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+  })
+
   it('行の「…」から「QRコードを見る」を選ぶと、その経路の QR コードの小窓が開く', async () => {
     await render()
     const more = buttonByLabel('「夏のInstagram投稿」の操作')
