@@ -468,7 +468,7 @@ export default function BlockEditor({
                           })
                         }
                       >
-                        {{ realName: '本名', displayName: 'システム表示名', note: '個別メモ' }[key]}
+                        {{ realName: '名前', displayName: 'システム表示名', note: '個別メモ' }[key]}
                       </Checkbox>
                     ))}
                 </div>

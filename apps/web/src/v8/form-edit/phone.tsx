@@ -102,7 +102,7 @@ function PhoneBlockWithProgress({ block, showProgress, progress, bookingMenus }:
 function PhoneBlock({ block, bookingMenus }: { block: FormBlock; bookingMenus: Props['bookingMenus'] }) {
   switch (block.kind) {
     case 'image':
-      return <PhoneImage url={block.mediaUrl} />
+      return <PhoneImage url={block.mediaUrl} alt={block.alt} />
     case 'heading':
       return <p className={styles.phoneHeading} data-level={block.level ?? 2}>{block.text}</p>
     case 'text':
@@ -115,10 +115,10 @@ function PhoneBlock({ block, bookingMenus }: { block: FormBlock; bookingMenus: P
 }
 
 /** 読めない画像は壊れた印を出さず、地の色の箱にする。 */
-function PhoneImage({ url }: { url: string }) {
+function PhoneImage({ url, alt }: { url: string; alt?: string }) {
   const [failed, setFailed] = useState(false)
   if (!url || failed) return <span className={styles.phoneImage} role="img" aria-label={url ? '画像（読み込めません）' : '画像（未設定）'} />
-  return <img className={styles.phoneImage} src={url} alt="" onError={() => setFailed(true)} />
+  return <img className={styles.phoneImage} src={url} alt={alt ?? ""} onError={() => setFailed(true)} />
 }
 
 function PhoneQuestion({ block, bookingMenus }: { block: FormInputBlock; bookingMenus: Props['bookingMenus'] }) {

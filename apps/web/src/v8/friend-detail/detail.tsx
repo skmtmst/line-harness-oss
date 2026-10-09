@@ -137,7 +137,7 @@ function FriendDetailV8Inner() {
   const subtitle = friend
     ? `LINE 表示名：${friend.displayName || '—'}・${friend.createdAt ? `${formatDay(friend.createdAt).replace(/（.）$/, '')}に友だち追加` : '—'}・担当 ${friend.support?.operatorName ?? '未割り当て'}`
     : '読み込んでいます…'
-  const realName = data.fields.find((f) => f.name === '本名')?.value ?? ''
+  const realName = data.fields.find((f) => f.fixedKey === 'name')?.value ?? data.friend?.realName ?? ''
 
   return (
     <PageFrame kind="detail" boardId="Q5F2QE">
