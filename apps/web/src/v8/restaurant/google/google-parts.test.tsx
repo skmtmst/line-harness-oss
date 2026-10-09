@@ -3,14 +3,14 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const fixture = vi.hoisted(() => ({ review: vi.fn(), createPost: vi.fn(), profile: vi.fn(), role: 'owner' }))
-vi.mock('@/lib/restaurant-google-api', () => ({ restaurantGoogleApi: { review: fixture.review, createPost: fixture.createPost, profile: fixture.profile } }))
+const fixture = vi.hoisted(() => ({ review: vi.fn(), listReviews: vi.fn(), createPost: vi.fn(), profile: vi.fn(), role: 'owner' }))
+vi.mock('@/lib/restaurant-google-api', () => ({ restaurantGoogleApi: { review: fixture.review, listReviews: fixture.listReviews, createPost: fixture.createPost, profile: fixture.profile } }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => fixture.role, canManageRole: (role: string) => role === 'owner' || role === 'admin' }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/restaurant-test/google', useSearchParams: () => new URLSearchParams() }))
 import { compareText } from './performance'
 import { formatShortStamp, formatYmd } from './format'
 import { PostEditor } from './posts'
-import { ReviewDraft } from './reviews'
+import { ReviewDraft, ReviewsBoard } from './reviews'
 import ProfileBoard from './profile'
 import type { GoogleConnectionData } from '@/lib/restaurant-google-api'
 
@@ -107,3 +107,13 @@ describe('投稿フォームの入力と保存', () => {
     expect(go).not.toHaveBeenCalled()
   })
 })
+
+it('WEB176：平均と件数は期間集計ではなく総合と表示する', async () => {
+  fixture.listReviews.mockResolvedValue({ total: 0, perPage: 20, items: [] });
+  const data = connection(true, true);
+  data.connection.averageRating = 4.5;
+  data.connection.totalReviewCount = 42;
+  render(<ReviewsBoard accountId="a" data={data} go={vi.fn()} onSynced={vi.fn()} />);
+  expect(screen.getByText('総合・42件')).toBeTruthy();
+  expect(screen.queryByText('この30日・42件')).toBeNull();
+});

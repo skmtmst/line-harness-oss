@@ -1076,7 +1076,7 @@ export default function RichMenusListV8() {
                   >
                     <span className={styles.orderInner}>
                       {/* 閲覧のみ：つまみは隠し、幅だけ空けて順番の数字の位置を保つ */}
-                      {!canEdit && <span className={styles.gripSpace} aria-hidden="true">⠿</span>}
+                      {!canEdit && <span className={styles.gripSpace} aria-hidden="true" />}
                       {canEdit && <ReorderHandle
                         label={g.name}
                         disabledReason={reorderDisabledReason}

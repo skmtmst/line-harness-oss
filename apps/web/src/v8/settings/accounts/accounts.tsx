@@ -9,7 +9,7 @@
  * 一覧（確かめ直しは live）・アーカイブ（理由・本人確認）・アーカイブから戻す。
  * 「並び順と親子を変える」は今ある並び替えの部品（components/accounts/account-ordering）を窓で開く。
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowUpDown, CircleDot, Plus, Star } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
@@ -68,6 +68,14 @@ export default function AccountsV8() {
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   const [orderingOpen, setOrderingOpen] = useState(false)
+  const [orderingBusy, setOrderingBusy] = useState(false)
+  const orderingCloseGuard = useRef<((close: () => void) => void) | null>(null)
+  const closeOrdering = () => {
+    if (orderingBusy) return
+    const close = () => { setOrderingOpen(false); void load(false) }
+    if (orderingCloseGuard.current) orderingCloseGuard.current(close)
+    else close()
+  }
 
   const load = useCallback(async (live: boolean): Promise<boolean> => {
     setStatus('loading')
@@ -176,7 +184,7 @@ export default function AccountsV8() {
 
   return (
     <div className={frame.screen}>
-      <SettingsPage boardId="V7vn3" title={TITLE} description={DESCRIPTION} actions={headActions} navigation={<SettingsInnerNav inline />}>
+      <SettingsPage layout="accounts" boardId="V7vn3" title={TITLE} description={DESCRIPTION} actions={headActions} navigation={<SettingsInnerNav inline />}>
         {notice ? (
           <Notice tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} onClose={() => setNotice(null)} />
         ) : null}
@@ -278,13 +286,14 @@ export default function AccountsV8() {
 
       <Dialog
         open={orderingOpen}
+        busy={orderingBusy}
         size="large"
         title="並び順と親子を変える"
         description="アカウントをドラッグするか、カードの「…」から移動先を選んで、親・子・孫の順に整理します。"
-        onCancel={() => { setOrderingOpen(false); void load(false) }}
-        footer={<Button variant="secondary" onClick={() => { setOrderingOpen(false); void load(false) }}>閉じる</Button>}
+        onCancel={closeOrdering}
+        footer={<Button variant="secondary" disabled={orderingBusy} onClick={closeOrdering}>閉じる</Button>}
       >
-        {orderingOpen ? <AccountOrdering /> : null}
+        {orderingOpen ? <AccountOrdering closeGuardRef={orderingCloseGuard} onBusyChange={setOrderingBusy} /> : null}
       </Dialog>
 
       <ConfirmDialog

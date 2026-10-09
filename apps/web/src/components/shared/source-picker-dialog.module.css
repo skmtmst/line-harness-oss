@@ -7,14 +7,8 @@
 .heading h2 { margin: 0; font-size: var(--text-body); font-weight: 700; }
 .heading p { margin: var(--tpl-bcpick-tiny-gap) 0 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
 .body { display: flex; flex: 1; min-height: 0; overflow: hidden; }
-.folders { flex: 0 0 var(--tpl-bcpick-folder-width); min-width: 0; padding: var(--tpl-bcpick-folder-pad); border-right: 1px solid var(--color-hairline); overflow-y: auto; }
-.folders > p { margin: 0 0 var(--tpl-bcpick-small-gap); color: var(--color-ink-secondary); font-size: var(--text-caption); }
-.folder { width: 100%; display: flex; align-items: center; gap: var(--tpl-bcpick-small-gap); padding: var(--tpl-bcpick-folder-row-pad); text-align: left; border-radius: var(--radius-control); font-size: var(--text-caption); }
-.folder span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.folder small { margin-left: auto; }
-.folder[aria-pressed='true'] { background: var(--color-surface-pearl); }
+.folders { display: flex; flex: 0 0 var(--tpl-folder-width); min-width: 0; overflow-y: auto; }
 .row[data-selected] { background: var(--color-accent-soft); }
-.folder:focus-visible { outline: var(--tpl-bcpick-focus) solid var(--color-action); outline-offset: calc(-1 * var(--tpl-bcpick-focus)); }
 .list { display: flex; flex-direction: column; gap: var(--tpl-bcpick-gap); flex: 1; min-width: 0; padding: var(--tpl-bcpick-list-pad); }
 .categories { display: flex; flex-wrap: wrap; gap: var(--tpl-bcpick-chip-gap); }
 .rows { overflow-y: auto; min-height: 0; flex: 0 1 auto; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); }
@@ -38,6 +32,7 @@
 .empty, .error { margin: 0; padding: var(--tpl-bcpick-list-pad); font-size: var(--text-caption); }
 .error { color: var(--color-danger); }
 .compactPreview { overflow-y: auto; max-height: var(--tpl-bcpick-mobile-preview); padding: var(--tpl-bcpick-small-gap); border-top: 1px solid var(--color-hairline); }
+.compactPreview summary:focus-visible { outline: var(--tpl-bcpick-focus) solid var(--color-action); outline-offset: calc(-1 * var(--tpl-bcpick-focus)); }
 .compactPreview summary { cursor: pointer; font-size: var(--text-caption); }
 @media (max-width: 700px) {
   .header { flex-wrap: wrap; }

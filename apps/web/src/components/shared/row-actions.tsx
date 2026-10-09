@@ -5,7 +5,8 @@ import { useRef, useState, type ButtonHTMLAttributes, type MouseEvent, type Reac
 import ActionMenu, { type ActionMenuItem } from './action-menu'
 import Button from './button'
 import IconButton from './icon-button'
-import ReorderHandle from './reorder-handle'
+import ReorderHandle, { type ReorderDirection } from './reorder-handle'
+export { default as ReorderHandle, useReorder } from './reorder-handle'
 import styles from './row-actions.module.css'
 
 type Base = { className?: string } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className' | 'children'>
@@ -43,7 +44,8 @@ function RowIconButton({
  * 中身は共通の並び替え部品（./reorder-handle）の `icon` の見た目。
  * 新しい画面は ReorderHandle と useReorder を直接使う（ドラッグ・上下キー・「…」を1つにする）。
  */
-export function DragHandle({ label = '並び替える', ...rest }: Base & { label?: string }) {
+export function DragHandle({ label = '並び替える', ...rest }: Base & { label?: string; onMove?: (direction: ReorderDirection) => void }) {
+  if (rest.disabled || (!rest.onMove && !rest.onKeyDown) || !rest.onDragStart) return null
   return <ReorderHandle look="icon" label={label} ariaLabel={label} title={label} {...rest} />
 }
 

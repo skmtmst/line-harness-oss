@@ -21,7 +21,7 @@ import { formatDay, formatNumber } from '@/lib/format'
 const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? formatNumber(Number(value)) : '—'
 
 export function PhotoReviewDetail({
-  canEdit = true, photo, position, total, loading, loadKind, reviewing, notice, accountNotice, assetStatus, derivatives, assetsFailed, onReloadAssets, assetProcessing, rotationSaving,
+  canEdit = true, photo, position, total, loading, loadKind, reviewing, notice, accountNotice, assetStatus, derivatives, assetsFailed, onReloadAssets, onReloadPhoto, assetProcessing, rotationSaving,
   onBack, onMove, onApprove, onReturn, onAdoptWithoutReward, onProcessReviewAsset, onSaveRotation, onDownloadOriginal, onPointAction, pointActionBusy,
 }: {
   canEdit?: boolean
@@ -37,6 +37,7 @@ export function PhotoReviewDetail({
   derivatives: PhotoDerivatives | null
   assetsFailed: boolean
   onReloadAssets: () => void
+  onReloadPhoto?: () => void
   assetProcessing: boolean
   rotationSaving: boolean
   onBack: () => void
@@ -74,7 +75,7 @@ export function PhotoReviewDetail({
   const downloadReady = stepUpMethod === 'password' ? downloadCode.length > 0 : /^\d{6}$/.test(downloadCode)
   if (loading) return <div><ListState kind="loading" title="写真を読み込んでいます" /></div>
   if (loadKind === 'forbidden') return <div><ListState kind="forbidden" /></div>
-  if (loadKind === 'error') return <div><ListState kind="error" title="写真を読み込めませんでした" /></div>
+  if (loadKind === 'error') return <div><ListState kind="error" title="写真を読み込めませんでした" description="通信状態を確認して、もう一度読み込んでください。" onRetry={onReloadPhoto} /></div>
   if (!photo || loadKind === 'empty') return <div><ListState kind="empty" title="確認する写真はありません" /></div>
 
   const risks = Array.isArray(photo.risks) ? photo.risks as Array<Record<string, unknown>> : []

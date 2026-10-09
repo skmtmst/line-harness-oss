@@ -29,6 +29,7 @@ export function DetailHead({
   title,
   subtitle,
   actions,
+  menuActions,
   current,
   participantsCount,
   onSelect,
@@ -36,13 +37,14 @@ export function DetailHead({
   title: string
   subtitle: string
   actions?: ReactNode
+  menuActions?: ReactNode
   current: PaneKey
   participantsCount: number | null
   onSelect: (key: PaneKey) => void
 }) {
   return (
     <>
-      <PageHeading title={title} description={subtitle} actions={actions} />
+      <PageHeading title={title} description={subtitle} actions={actions || menuActions ? <>{actions}{menuActions}</> : undefined} />
       <div className={styles.tabsRow}>
         <nav className={styles.tabs} aria-label="設定・参加者・分析・コメント演出" data-wc-tabs="true">
           {DETAIL_TABS.map((tab) => {

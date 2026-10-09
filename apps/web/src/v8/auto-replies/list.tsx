@@ -84,7 +84,7 @@ import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-m
 import { withViewTransition } from '@/components/shared/view-transition'
 import Pagination from '@/components/shared/pagination'
 import ReorderHandle from '@/components/shared/reorder-handle'
-import { movePriorityUpdates } from './order'
+import { compareEvaluationOrder, movePriorityUpdates } from './order'
 import {
   LOAD_STATE_WORDS,
   NO_WRITE_PERMISSION,
@@ -473,7 +473,7 @@ export default function AutoRepliesListV8() {
         return b.createdAt.localeCompare(a.createdAt)
       default:
         // 評価順は「実際に見る順」。一覧の並びと動く順を合わせる。
-        return a.priority - b.priority || a.createdAt.localeCompare(b.createdAt)
+        return compareEvaluationOrder(a, b)
     }
   }), [inChips, sortKey])
 
@@ -584,15 +584,16 @@ export default function AutoRepliesListV8() {
     const reloadIfSameAccount = () => {
       if (selectedAccountIdRef.current === requestAccountId) void load()
     }
-    const sendToggle = (targetKind: 'stop' | 'resume', targetReasonOf: (id: string) => string | null) => {
+    const sendToggle = (targetKind: 'stop' | 'resume', targetReasonOf: (id: string) => string | null, requestKeys = new Map<string, string>()) => {
       applyOptimistic(targetKind === 'resume', targetReasonOf)
       void (async () => {
         let failed = 0
         let forbidden = false
         for (const id of ids) {
           try {
+            if (!requestKeys.has(id)) requestKeys.set(id, crypto.randomUUID())
             const result = targetKind === 'stop'
-              ? await api.autoReplies.stop(id, { reason: targetReasonOf(id) }, crypto.randomUUID())
+              ? await api.autoReplies.stop(id, { reason: targetReasonOf(id) }, requestKeys.get(id)!)
               : await api.autoReplies.update(id, { isActive: true })
             if (!result.success) failed += 1
           } catch (error) {
@@ -606,7 +607,7 @@ export default function AutoRepliesListV8() {
           notifyToast(failedMessage(targetKind, forbidden), {
             tone: 'error',
             actionLabel: 'もう一度',
-            onAction: () => sendToggle(targetKind, targetReasonOf),
+            onAction: () => sendToggle(targetKind, targetReasonOf, requestKeys),
           })
           return
         }
@@ -727,8 +728,10 @@ export default function AutoRepliesListV8() {
    * コピーは必ず「停止中」で作る（AUTOREPLY-08：動かすのは別の操作）。
    * 元ルールが残っているあいだだけ確認窓を出す（stale guard）。
    */
+  const duplicateKeyRef = useRef(crypto.randomUUID())
+  useEffect(() => { duplicateKeyRef.current = crypto.randomUUID() }, [duplicateTarget?.id])
   const runDuplicate = async () => {
-    if (!duplicateTarget) return
+    if (!duplicateTarget || duplicating) return
     setDuplicating(true)
     setDuplicateError('')
     const source = duplicateTarget
@@ -759,7 +762,7 @@ export default function AutoRepliesListV8() {
         keywordMatchMode: source.keywordMatchMode === 'all' ? 'all' : 'any',
         folderId: source.folderId,
         internalMemo: source.internalMemo,
-      })
+      }, duplicateKeyRef.current)
       if (!result.success) {
         setDuplicateError('複製できませんでした。状態を読み直してからお試しください。')
         return
@@ -846,7 +849,11 @@ export default function AutoRepliesListV8() {
     while (current !== targetIndex) {
       const step = movePriorityUpdates(working, dragId, direction as -1 | 1)
       if (!step) return
-      for (const u of step) finalUpdates.set(u.id, u.priority)
+      for (const u of step) {
+        finalUpdates.set(u.id, u.priority)
+        const position = working.findIndex(rule => rule.id === u.id)
+        working[position] = { ...working[position], priority: u.priority }
+      }
       const [moved] = working.splice(current, 1)
       working.splice(current + direction, 0, moved)
       current += direction
@@ -1694,10 +1701,11 @@ export default function AutoRepliesListV8() {
         confirmIcon={pendingToggle?.kind === 'stop' ? <Pause size={16} aria-hidden="true" /> : undefined}
         designNode="i8F12"
         confirmation
+        designLayout="stacked"
         designWidth={600}
         designTop={280}
-        designHeaderPadding="24px 24px 8px"
         footerAlign="center"
+        titleIcon={false}
         error={toggleError}
         onCancel={() => {
           setToggleError('')
@@ -1739,9 +1747,9 @@ export default function AutoRepliesListV8() {
         error={deleteError}
         designNode="u8sKN"
         confirmation
+        designLayout="stacked"
         designWidth={600}
         designTop={280}
-        designHeaderPadding="24px 24px 8px"
         onCancel={() => {
           if (deleting) return
           setDeleteError('')
@@ -1787,7 +1795,7 @@ export default function AutoRepliesListV8() {
           </div>
         }
       >
-        <Notice tone="danger" message="削除は元に戻せません。しばらく使わないだけなら「止める」を使ってください。" />
+        <Notice tone="danger" appearance="soft" icon={<TriangleAlert size={16} aria-hidden="true" />} message="削除は元に戻せません。しばらく使わないだけなら「止める」を使ってください。" />
         {deleteTargetStale && (
           <p className="text-danger text-sm leading-relaxed" role="alert">
             アカウントが切り替わりました。削除する自動応答を選び直してください。

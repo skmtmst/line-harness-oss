@@ -6,7 +6,7 @@ import { TagEditForm } from '@/v8/tag-edit/edit'
 import { hqTagDefinitionToEditor, hqTagEditorToDefinition } from '@/components/friend-fields/hq-tag-definition-editor'
 import { type TagEditorValues } from '@/components/friend-fields/tag-editor-v4'
 import Notice from '@/components/shared/notice'
-import Chip from '@/components/shared/chip'
+import TagPill from '@/components/shared/tag-pill'
 import Button from '@/components/shared/button'
 import styles from './tag-editor.module.css'
 
@@ -50,7 +50,7 @@ export default function HqTagEditorV8({ definition, editing, saving, readOnly = 
     ]
     return <div className={styles.preview}>
       <h3 className={styles.title}>できあがるタグ</h3>
-      <div className={styles.chips}><Chip>{values.name || 'タグ名'}</Chip><span className={styles.folder}>{folder?.name ?? '未分類'}</span></div>
+      <div className={styles.chips}><TagPill name={values.name || 'タグ名'} color={folder?.color} /><span className={styles.folder}>{folder?.name ?? '未分類'}</span></div>
       <p className={styles.copy}>このタグは、配信の絞り込み・シナリオの開始条件・自動応答の付与先として使えます。</p>
       <h3 className={`${styles.title} ${styles.effectsTitle}`}>この設定で起きること</h3>
       <ol className={styles.steps}>{steps.map((text, index) => <li key={index}><span className={styles.number}>{index + 1}</span><span>{text}</span></li>)}</ol>

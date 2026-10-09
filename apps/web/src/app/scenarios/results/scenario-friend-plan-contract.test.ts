@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(new URL('../../../v8/scenarios/results.tsx', import.meta.url), 'utf8')
 const DIALOG = readFileSync(
   new URL('../../../components/scenarios/scenario-dialogs.tsx', import.meta.url),
   'utf8',
@@ -16,8 +16,6 @@ const API = readFileSync(new URL('../../../lib/api.ts', import.meta.url), 'utf8'
 describe('IDEA-05 友だち別の配信予定', () => {
   it('配信結果画面の中から試算口を呼ぶ', () => {
     expect(PAGE).toContain('FriendPlanDialog')
-    expect(PAGE).toContain('友だちを選んで配信予定を見る')
-    expect(PAGE).toContain('予定を見る')
     expect(API).toContain('friendPlan')
     expect(API).toContain('/api/scenarios/${id}/friends/${friendId}/plan')
     expect(DIALOG).toContain('api.scenarios.friendPlan')

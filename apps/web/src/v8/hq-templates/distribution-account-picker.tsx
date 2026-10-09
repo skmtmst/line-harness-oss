@@ -11,7 +11,9 @@ import Select from '@/components/shared/select'
 import { accountsInFolder, distributionFolderRows, DistributionFolderPanel, type useDistributionFolders } from './distribution-accounts'
 import styles from './saved-distribution-dialog.module.css'
 
-export default function DistributionAccountPicker({ accounts, folders, selected, onChange, filter, onFilter, search = '', onSearch = () => {}, received = null, receivedFailed = false, busy, compact = false, accountState, notice }: {
+export default function DistributionAccountPicker({ accounts, folders, selected, onChange, filter, onFilter, search = '', onSearch = () => {}, received = null, receivedFailed = false, busy, compact = false, accountState, notice, accountMeta, headerSearch = false, showCount = true, dialogLayout = compact }: {
+  accountMeta?: (accountId: string) => ReactNode
+  headerSearch?: boolean; showCount?: boolean; dialogLayout?: boolean
   accountState?: (accountId: string) => ReactNode; notice?: ReactNode
   accounts: Array<{ id: string; name: string }>
   folders: ReturnType<typeof useDistributionFolders>
@@ -21,18 +23,18 @@ export default function DistributionAccountPicker({ accounts, folders, selected,
   received?: HqTemplateReceivedVersion[] | null; receivedFailed?: boolean
   busy: boolean; compact?: boolean
 }) {
-  const visible = accountsInFolder(accounts, filter, folders.membership).filter((account) => account.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
+  const visible = accountsInFolder(accounts, filter, folders.membership).filter((account) => account.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
   const rows = distributionFolderRows({ accounts, ...folders, selected, onChange, disabled: busy })
   const picked = visible.filter((account) => selected.includes(account.id)).length
   return (
-    <ListPageBody dialogLayout={compact} folderWidth={190} contentInset fillWidth
+    <ListPageBody dialogLayout={dialogLayout} folderWidth={190} contentInset fillWidth
       folders={<DistributionFolderPanel compact hideHeading={compact} rows={rows} activeId={filter} onSelect={onFilter} failed={folders.failed} />}
       collapsedFolders={<>
         <Select aria-label="アカウントのフォルダ" value={filter} onChange={onFilter} options={rows.map((row) => ({ value: row.id, label: row.label }))} />
         {rows.find((row) => row.id === filter)?.trailing}
       </>}
       toolbar={<div className={styles.tools}>
-        {!compact ? <label className={styles.search}><Search size={14} aria-hidden="true" /><input aria-label="アカウントを探す" placeholder="アカウントを探す" value={search} disabled={busy} onChange={(event) => onSearch(event.target.value)} /></label> : null}
+        {!compact && !headerSearch ? <label className={styles.search}><Search size={14} aria-hidden="true" /><input aria-label="アカウントを探す" placeholder="アカウントを探す" value={search} disabled={busy} onChange={(event) => onSearch(event.target.value)} /></label> : null}
         <Checkbox checked={visible.length > 0 && picked === visible.length} indeterminate={picked > 0 && picked < visible.length} disabled={busy || visible.length === 0}
           onCheckedChange={(checked) => onChange(checked ? [...new Set([...selected, ...visible.map((account) => account.id)])] : selected.filter((id) => !visible.some((account) => account.id === id)))}>すべて選ぶ</Checkbox>
       </div>}
@@ -44,6 +46,7 @@ export default function DistributionAccountPicker({ accounts, folders, selected,
           return <div className={styles.row} data-selected={checked || undefined} key={account.id}>
             <Checkbox id={`hq-saved-${account.id}`} aria-label={account.name} checked={checked} disabled={busy} onCheckedChange={(on) => onChange(on ? [...new Set([...selected, account.id])] : selected.filter((id) => id !== account.id))} />
             <label className={styles.name} htmlFor={`hq-saved-${account.id}`} title={account.name}><FolderDotName folder={folders.membership?.get(account.id)?.folder}>{account.name}</FolderDotName></label>
+            {accountMeta ? <span className={styles.meta}>{accountMeta(account.id)}</span> : null}
             {compact ? <span className={styles.pending}>{folders.membership?.get(account.id)?.folder?.name ?? (folders.membership?.has(account.id) ? '未分類' : '—')}</span> : <>
             <span className={styles.state}>
               {accountState ? accountState(account.id) : <>{version != null ? <span className={styles.overwrite}>配ると上書き</span> : null}
@@ -55,7 +58,7 @@ export default function DistributionAccountPicker({ accounts, folders, selected,
         {visible.length === 0 ? <p className={styles.empty}>該当するアカウントがありません。</p> : null}
       </div>
       {notice}
-      {!compact ? <p className={styles.count} aria-live="polite">{`選んだ ${selected.length} アカウント`}</p> : null}
+      {!compact && showCount ? <p className={styles.count} aria-live="polite">{`選んだ ${selected.length} アカウント`}</p> : null}
     </ListPageBody>
   )
 }

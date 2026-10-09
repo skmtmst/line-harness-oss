@@ -4,6 +4,7 @@ import { createElement, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import ListState from '@/components/shared/list-state'
 import { LIST_REQUEST_TIMEOUT_MS } from '@/lib/request-timeout'
+import { classifyApiFailure } from '@/components/shared/api-error-message'
 import { readListUrlParam, writeListUrlParam } from '@/components/shared/list-url-state'
 
 export type ServerListSort = ReadonlyArray<Readonly<{
@@ -144,13 +145,12 @@ export function useOffsetServerList<T>({
      * 失敗状態へ落とす。abort で通信も止める。時間切れ後に遅れて成功しても
      * aborted 判定で捨てるので、失敗表示のまま再試行へ進める。
      * 前の行を残した読み直しでも時間切れは失敗表示へ落とす（残った行の
-     * まま「読み込み中」のままにしない）。失敗時は行も消し、画面側の
-     * 失敗の1枚が見えるようにする。
+     * まま「読み込み中」のままにしない）。失敗の案内と再試行を出す。取得済みの行は残す。
      */
     const timeout = setTimeout(() => {
       controller.abort()
       setState((current) => (current.loading
-        ? { ...current, items: [], loaded: false, loading: false, error: new Error('一覧の読み込みが時間切れになりました') }
+        ? { ...current, loading: false, error: new Error('一覧の読み込みが時間切れになりました') }
         : current))
     }, requestTimeoutMs)
     void load({ page, limit: initialLimit }, controller.signal).then(
@@ -170,8 +170,8 @@ export function useOffsetServerList<T>({
       },
       (error: unknown) => {
         if (controller.signal.aborted) return
-        // 失敗したときは行も消す。残ったままだと画面側の失敗表示が出ない。
-        setState((current) => ({ ...current, items: [], loaded: false, loading: false, error: asError(error) }))
+        // 通信の失敗では前の行を残す。権限を失ったときだけ隠す。
+        setState((current) => ({ ...current, ...(classifyApiFailure(error) === 'forbidden' ? { items: [], loaded: false } : {}), loading: false, error: asError(error) }))
       },
     ).finally(() => clearTimeout(timeout))
     return () => {
@@ -235,7 +235,6 @@ export function useCursorServerList<T>({
     activeController.current = controller
     setState((current) => ({
       ...current,
-      ...(replace ? { items: [], loaded: false } : {}),
       loading: true,
       error: null,
     }))
@@ -256,7 +255,7 @@ export function useCursorServerList<T>({
     } catch (error) {
       if (controller.signal.aborted || requestId.current !== id) return
       lastFailedCursor.current = cursor
-      setState((current) => ({ ...current, loaded: current.items.length > 0, loading: false, error: asError(error) }))
+      setState((current) => ({ ...current, ...(classifyApiFailure(error) === 'forbidden' ? { items: [], loaded: false } : { loaded: current.items.length > 0 }), loading: false, error: asError(error) }))
     } finally {
       if (activeController.current === controller) activeController.current = null
     }
@@ -269,7 +268,8 @@ export function useCursorServerList<T>({
       requestId.current += 1
       activeController.current?.abort()
       setActiveKey(requestKey)
-      setState(initialState(initialLimit))
+      lastFailedCursor.current = undefined
+      setState((current) => ({ ...current, loading: true, error: null }))
       return
     }
     void request(undefined, true)
@@ -289,6 +289,7 @@ export function useCursorServerList<T>({
 
   return {
     ...state,
+    refreshing: state.loading && state.items.length > 0,
     hasNext: Boolean(state.nextCursor),
     loadNext,
     retry,

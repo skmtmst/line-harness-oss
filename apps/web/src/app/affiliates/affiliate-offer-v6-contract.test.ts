@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 import type { AffiliateOffer } from '@/lib/api'
 import {
@@ -172,8 +172,8 @@ describe('V6 アフィリエイターを作る（xqT1Z）', () => {
   })
 
   it('URLのコピーは、コードが決まっているときだけ押せる', () => {
-    expect(NEW_PAGE).toContain('{previewUrl ? (')
-    expect(NEW_PAGE).toContain('navigator.clipboard?.writeText(previewUrl)')
+    expect(NEW_PAGE).toContain('{issuedUrl ? <div>')
+    expect(NEW_PAGE).toContain('navigator.clipboard?.writeText(issuedUrl)')
   })
 
   it('基本情報の作成後に追加情報だけ失敗しても、再押下で同じ人を増やさない', () => {

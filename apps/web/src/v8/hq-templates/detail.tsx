@@ -15,6 +15,7 @@ import { templateKind } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import LinePreview from '@/components/shared/line-preview'
+import TagPill from '@/components/shared/tag-pill'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { ChangeBox, DetailFrame } from '@/v8/template-detail/detail'
 import type { HqAccount, HqTemplateListItem, TemplateDetail } from '@/lib/hq-templates-api'
@@ -65,7 +66,7 @@ export function receivedLabels(row: HqTemplateReceivedVersion): { version: strin
 }
 
 export default function HqTemplateDetail({
-  detail, row, accounts, folderName, canEdit, busy, notices, versions, versionsError, received, onReloadVersions, onCompare, onRestore,
+  detail, row, accounts, folderName, folderColor, canEdit, busy, notices, versions, versionsError, received, onReloadVersions, onCompare, onRestore,
   onBack, onEdit, onDistribute, onDuplicate, onEnterAccount,
 }: {
   detail: TemplateDetail
@@ -73,6 +74,7 @@ export default function HqTemplateDetail({
   row?: HqTemplateListItem
   accounts: HqAccount[]
   folderName: string
+  folderColor?: string | null
   canEdit: boolean
   busy: boolean
   notices?: React.ReactNode
@@ -98,7 +100,10 @@ export default function HqTemplateDetail({
 
   const definition = detail.definition as MessageTemplateDefinition
   const kind = 'template' in definition ? templateKind(definition) : 'message'
-  const kindLabel = KIND_TABS.find((tab) => tab.kind === kind)?.label ?? 'メッセージ'
+  const tag = 'tag' in detail.definition ? detail.definition.tag : null
+  const tagFolder = tag && 'folders' in detail.definition ? detail.definition.folders.find((folder) => folder.id === tag.folderId) : null
+  const tagColor = tagFolder ? tagFolder.color ?? null : folderColor
+  const kindLabel = tag ? 'タグ' : KIND_TABS.find((tab) => tab.kind === kind)?.label ?? 'メッセージ'
   const content = 'template' in definition ? definition.template.messageContent : ''
   const summary = row?.content_summary ?? null
   const distributedNames = row?.distributed_account_names ?? []
@@ -249,7 +254,7 @@ export default function HqTemplateDetail({
               </Button>
             ) : null}
           </div>
-          <div className={styles.bodyBox}>{kind === 'message' ? content : `［${kindLabel}］${summary ?? ''}`}</div>
+          <div className={styles.bodyBox}>{tag ? <TagPill name={tag.name} color={tagColor} /> : kind === 'message' ? content : `［${kindLabel}］${summary ?? ''}`}</div>
         </section>
 
         <section className={styles.card} aria-label="配った先">

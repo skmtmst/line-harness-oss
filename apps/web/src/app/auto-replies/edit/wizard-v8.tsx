@@ -13,7 +13,6 @@ import {
   Check,
   ChevronRight,
   CircleAlert,
-  GripVertical,
   Play,
   Power,
   X,
@@ -69,7 +68,7 @@ import Select from '@/components/shared/select'
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import Toggle from '@/components/shared/toggle'
 import Notice from '@/components/shared/notice'
-import LinePreview from '@/components/shared/line-preview'
+import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import TargetMissing from '@/components/shared/target-missing'
 import ListState from '@/components/shared/list-state'
 import { notifyToast } from '@/components/shared/toast'
@@ -221,7 +220,7 @@ const EMPTY_FORM: WizardForm = {
   keywordMatchMode: 'any',
   matchType: 'exact',
   messageKinds: [],
-  weekdays: [],
+  weekdays: [0, 1, 2, 3, 4, 5, 6],
   holidayRule: 'ignore',
   timeMode: 'always',
   activeFrom: '',
@@ -258,7 +257,7 @@ function formFromSettings(s: AutoReplyDraftInput): WizardForm {
     keywordMatchMode: s.keywordMatchMode ?? 'any',
     matchType: initialMatchType({ keyword: s.keyword, matchType: s.matchType, keywords: s.keywords }),
     messageKinds: s.messageKinds ?? [],
-    weekdays: s.responseWeekdays ?? [],
+    weekdays: s.responseWeekdays?.length ? s.responseWeekdays : [0, 1, 2, 3, 4, 5, 6],
     holidayRule: (s.responseHolidayRule as HolidayRuleValue) ?? 'ignore',
     timeMode: s.activeFrom || s.activeUntil ? 'custom' : 'always',
     activeFrom: s.activeFrom ?? '',
@@ -314,6 +313,7 @@ export const STARTER_TEMPLATES: Array<{
     apply: (form) => ({
       ...form,
       ruleName: '予約変更の受付',
+      respondToAll: false, timeMode: 'always', activeFrom: '', activeUntil: '',
       actions: [{key:newActionKey(),actionType:'notify_staff',config:{notificationRuleId:'',notificationRuleVersion:0,message:'予約変更のお問い合わせがありました。受信箱を確認してください。'},onFailure:'continue'}, {key:newActionKey(),actionType:'tag',config:{op:'add',tagIds:[]},onFailure:'continue'}],
       keywordRules: [
         { keyword: '予約変更', matchType: 'contains', minLength: '', caseSensitive: true },
@@ -331,6 +331,7 @@ export const STARTER_TEMPLATES: Array<{
     apply: (form) => ({
       ...form,
       ruleName: 'よくある質問への回答',
+      respondToAll: false, timeMode: 'always', activeFrom: '', activeUntil: '',
       actions: [{key:newActionKey(),actionType:'tag',config:{op:'add',tagIds:[]},onFailure:'continue'}],
       keywordRules: [
         { keyword: '営業時間', matchType: 'contains', minLength: '', caseSensitive: true },
@@ -431,6 +432,8 @@ function AutoReplyWizardV8Inner() {
 
   const initialId = params.get('id')
   const [autoReplyId, setAutoReplyId] = useState<string | null>(initialId)
+  const ruleIdRef = useRef(autoReplyId)
+  ruleIdRef.current = autoReplyId
   const step = readStep(params.get('step'))
   const [published, setPublished] = useState<{ name: string } | null>(null)
   const stage: WizardStep | 'done' = published ? 'done' : step
@@ -443,6 +446,7 @@ function AutoReplyWizardV8Inner() {
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [loadError, setLoadError] = useState<unknown>(null)
   const [versionNumber, setVersionNumber] = useState<number | null>(null)
+  const savedVersionRef = useRef<number | null>(null)
   const [isActive, setIsActive] = useState(false)
   const [lifecycleStatus, setLifecycleStatus] = useState('draft')
   const [matchedLast28Days, setMatchedLast28Days] = useState<number | null>(null)
@@ -450,6 +454,8 @@ function AutoReplyWizardV8Inner() {
   const [matchedAccountId, setMatchedAccountId] = useState<string | null>(null)
 
   const [form, setForm] = useState<WizardForm>(EMPTY_FORM)
+  const formFingerprintRef = useRef(JSON.stringify(form))
+  formFingerprintRef.current = JSON.stringify(form)
   /** 最後に読み込み・保存した形。差分が dirty。 */
   const savedSnapshotRef = useRef(JSON.stringify(EMPTY_FORM))
   // 編集の競合（`UGrd2`：409）。入力は捨てず、比べる・読み込むを選んでもらう。
@@ -538,6 +544,7 @@ function AutoReplyWizardV8Inner() {
   })
 
   /* ===== 読み込み ===== */
+  const creationAccountId = autoReplyId ? null : selectedAccountId ?? accounts[0]?.id ?? null
   const load = useCallback(async () => {
     setLoadState('loading')
     setLoadError(null)
@@ -562,6 +569,7 @@ function AutoReplyWizardV8Inner() {
         const nextForm = formFromSettings(version.settings)
         setForm(nextForm)
         savedSnapshotRef.current = JSON.stringify(nextForm)
+        savedVersionRef.current = version.versionNumber
         setVersionNumber(version.versionNumber)
         setWasPublished(version.status === 'published')
         setMatchedLast28Days(version.matchedLast28Days ?? null)
@@ -571,7 +579,7 @@ function AutoReplyWizardV8Inner() {
         )
         // 公開済みで下書きの無いものはそのまま編集に入る。保存で新しい下書きが作られる。
       } else {
-        accountId = selectedAccountId ?? accounts[0]?.id ?? null
+        accountId = creationAccountId
         savedSnapshotRef.current = JSON.stringify(EMPTY_FORM)
         setForm(EMPTY_FORM)
       }
@@ -593,7 +601,7 @@ function AutoReplyWizardV8Inner() {
       setLoadError(caught)
       setLoadState(caught instanceof ApiError && caught.status === 404 ? 'not-found' : 'error')
     }
-  }, [autoReplyId, selectedAccountId, accounts])
+  }, [autoReplyId, creationAccountId])
 
   useEffect(() => {
     void load()
@@ -685,15 +693,17 @@ function AutoReplyWizardV8Inner() {
 
   /* ===== 手順5で読むもの（公開前チェック） ===== */
   const loadValidation = useCallback(async (ruleId: string) => {
+    const subject = assessmentSubjectRef.current
     setConfirmState('loading')
     try {
       const res = await api.autoReplies.validateDraft(ruleId)
+      if (subject !== assessmentSubjectRef.current) return
       if (!res.success || !res.data) throw new Error('validate failed')
       setValidation(res.data)
       setConflicts(res.data.conflicts ?? [])
       setConfirmState('ready')
     } catch {
-      setConfirmState('error')
+      if (subject === assessmentSubjectRef.current) setConfirmState('error')
     }
   }, [])
 
@@ -703,19 +713,6 @@ function AutoReplyWizardV8Inner() {
    * サーバーの下書きに無いので、未保存のまま飛んだときは保存してから読む
    * ——goNext と同じ約束を直接遷移にも持たせる。
    */
-  useEffect(() => {
-    if (loadState !== 'ready' || !autoReplyId) return
-    if (step !== 'priority' && step !== 'confirm') return
-    if (stepDataRequested.current.has(`${step}:${autoReplyId}`)) return
-    stepDataRequested.current.add(`${step}:${autoReplyId}`)
-    const accountId = matchedAccountId ?? selectedAccountId ?? null
-    if (step === 'priority') {
-      void loadPriorityData(autoReplyId, accountId)
-    } else {
-      void loadValidation(autoReplyId)
-      void loadOrder(autoReplyId, accountId).catch(() => setPriorityState('error'))
-    }
-  }, [loadState, autoReplyId, step, matchedAccountId, selectedAccountId, loadPriorityData, loadValidation, loadOrder])
 
   /* ===== 保存 ===== */
   const buildInput = useCallback((): AutoReplyDraftInput | InputIssue => {
@@ -815,6 +812,7 @@ function AutoReplyWizardV8Inner() {
    * 返り値は保存したルールの id。失敗したら理由を出して null。
    */
   const saveDraftNow = useCallback(async (): Promise<{ id: string; accountId: string | null } | null> => {
+    if (form.weekdays.length === 0) { setWeekdayNotice('反応する曜日を1つ以上選んでください。'); return null }
     const body = buildInput()
     if ('error' in body) {
       showInputIssue(body)
@@ -835,12 +833,14 @@ function AutoReplyWizardV8Inner() {
           expectedVersion: versionNumber,
         })
         if (!res.success) throw new Error(res.error || 'save failed')
+        savedVersionRef.current = res.data.versionNumber
         setVersionNumber(res.data.versionNumber)
       } else {
         const res = await api.autoReplies.createDraft(body, createKeyRef.current)
         if (!res.success) throw new Error(res.error || 'create failed')
         savedId = res.data.autoReplyId
         setAutoReplyId(res.data.autoReplyId)
+        savedVersionRef.current = res.data.versionNumber
         setVersionNumber(res.data.versionNumber)
         setMatchedAccountId(res.data.settings.lineAccountId || null)
         setLifecycleStatus('draft')
@@ -874,6 +874,35 @@ function AutoReplyWizardV8Inner() {
   }, [buildInput, autoReplyId, versionNumber, form, step, router, showInputIssue])
 
   // `UGrd2`「最新を読み込んで続ける」。入力中の内容は最新の版で置き換わる。
+  const inputFingerprint = JSON.stringify(form)
+  const assessmentSubjectRef = useRef('')
+  assessmentSubjectRef.current = `${autoReplyId}:${versionNumber}:${inputFingerprint}`
+  useEffect(() => {
+    setValidation(null); setDryRun(null); setAcknowledged(new Set())
+    setConfirmState('idle')
+  }, [inputFingerprint])
+  useEffect(() => {
+    if (loadState !== 'ready' || !autoReplyId || (step !== 'priority' && step !== 'confirm')) return
+    const key = `${step}:${assessmentSubjectRef.current}`
+    if (stepDataRequested.current.has(key)) return
+    stepDataRequested.current.add(key)
+    const subject = assessmentSubjectRef.current
+    void (async () => {
+      let ruleId = autoReplyId
+      let accountId = matchedAccountId ?? selectedAccountId ?? null
+      if (dirty) {
+        const saved = await saveDraftNow()
+        if (!saved) { stepDataRequested.current.delete(key); return }
+        ruleId = saved.id; accountId = saved.accountId
+        // 保存で版が上がったあとのeffectに一本化する。
+        return
+      }
+      if (subject !== assessmentSubjectRef.current) return
+      if (step === 'priority') await loadPriorityData(ruleId, accountId)
+      else { await loadValidation(ruleId); await loadOrder(ruleId, accountId).catch(() => setPriorityState('error')) }
+    })()
+  }, [loadState, autoReplyId, step, versionNumber, inputFingerprint, dirty, matchedAccountId, selectedAccountId, saveDraftNow, loadPriorityData, loadValidation, loadOrder])
+
   const reloadAfterConflict = useCallback(async () => {
     setSaveConflict(false)
     setCompareTarget(null)
@@ -933,20 +962,12 @@ function AutoReplyWizardV8Inner() {
       // 確かめる対象はサーバーの下書き。未保存のままでは確かめられないので、
       // 変更があればここで必ず保存する。
       let ruleId = autoReplyId
-      let accountId = matchedAccountId ?? selectedAccountId ?? null
       if (dirty || !autoReplyId) {
         const saved = await saveDraftNow()
         if (!saved) return
         ruleId = saved.id
-        accountId = saved.accountId
       }
       if (!ruleId) return
-      if (next === 'priority') {
-        void loadPriorityData(ruleId, accountId)
-      } else {
-        void loadValidation(ruleId)
-        void loadOrder(ruleId, accountId).catch(() => setPriorityState('error'))
-      }
       goToStep(next, ruleId ?? undefined)
     } else {
       goToStep(next)
@@ -1022,6 +1043,7 @@ function AutoReplyWizardV8Inner() {
   /* ===== 手順4：試しに送る ===== */
   const runTest = useCallback(async () => {
     if (!autoReplyId || !selectedFriendId || !testMessage.trim()) return
+    const testedInput = formFingerprintRef.current
     setInputIssue(null)
     setSaving(true)
     setError('')
@@ -1034,10 +1056,12 @@ function AutoReplyWizardV8Inner() {
         ruleId = saved.id
       }
       if (!ruleId) return
+      const testedVersion = savedVersionRef.current
       const res = await api.autoReplies.testDraft(ruleId, {
         friendId: selectedFriendId,
         incomingText: testMessage.trim(),
       })
+      if (ruleIdRef.current !== ruleId || savedVersionRef.current !== testedVersion || formFingerprintRef.current !== testedInput) return
       if (!res.success) throw new Error(res.error || 'test failed')
       if (res.data.staleTest) {
         setDryRun(null)
@@ -1058,7 +1082,7 @@ function AutoReplyWizardV8Inner() {
     () => publishGates(validation, dryRun, acknowledged),
     [validation, dryRun, acknowledged],
   )
-  const publishReady = canPublish(gates)
+  const publishReady = !dirty && canPublish(gates)
 
   const publish = useCallback(async () => {
     if (!autoReplyId || !publishReady || saving) return
@@ -1160,6 +1184,7 @@ function AutoReplyWizardV8Inner() {
     return rows
   })()
 
+  const previewAccountName = accounts?.find((account) => account.id === matchedAccountId)?.name ?? '公式アカウント'
   const thisRuleName = form.ruleName.trim() || effectiveKeywords[0]?.keyword.trim() || '名前なしのルール'
   const myPositionLabel = myIndex >= 0 ? `${myIndex + 1}番目` : 'いちばん下'
 
@@ -1307,12 +1332,11 @@ function AutoReplyWizardV8Inner() {
                   ))}
                 </dl>
               </Card>
-              {withPhone ? <LinePreview accountName="公式アカウント">
+              {withPhone ? <LinePreview accountName={previewAccountName}>
                 <div className={styles.talkStack}>
-                  <p className={styles.bubbleReply}>
+                  <LinePreviewMessage direction="outgoing" accountName={previewAccountName} avatar={null} time="">
                     {triggerSamples[0].text}
-                  </p>
-                  <p className={styles.bubbleMeta}>届いた側の見え方</p>
+                  </LinePreviewMessage>
                 </div>
               </LinePreview> : null}
             </>
@@ -1353,8 +1377,9 @@ function AutoReplyWizardV8Inner() {
                   })()}
                 </dl>
               </Card>
-              {withPhone ? <LinePreview accountName="公式アカウント">
+              {withPhone ? <LinePreview accountName={previewAccountName}>
                 <div className={styles.talkStack}>
+                  <LinePreviewMessage direction="outgoing" accountName={previewAccountName} avatar={null} time="">{triggerSamples[0].text}</LinePreviewMessage>
                   {form.mode === 'inline-image' && imageContent ? (
                     <img
                       src={imageContent.previewImageUrl}
@@ -1363,9 +1388,8 @@ function AutoReplyWizardV8Inner() {
                       style={{ padding: 0, overflow: 'hidden' }}
                     />
                   ) : (
-                    <p className={styles.bubbleReply}>{replyPreviewText}</p>
+                    <LinePreviewMessage density="compact" accountName={previewAccountName} avatar={previewAccountName.slice(0, 1)} time="">{replyPreviewText}</LinePreviewMessage>
                   )}
-                  <p className={styles.bubbleMeta}>返す側の見え方</p>
                 </div>
               </LinePreview> : null}
             </>
@@ -1420,12 +1444,12 @@ function AutoReplyWizardV8Inner() {
                   { label: '試した結果', value: dryRun ? (dryRun.draftWon ? 'このルールが返す' : '見送り') : 'まだ試していません' },
                 ]}
               />
-              {withPhone ? <LinePreview accountName="公式アカウント">
+              {withPhone ? <LinePreview accountName={previewAccountName}>
                 <div className={styles.talkStack}>
                   {testMessage.trim() ? <p className={styles.bubbleIn}>{testMessage.trim()}</p> : null}
-                  <p className={styles.bubbleReply}>
+                  <LinePreviewMessage density="compact" accountName={previewAccountName} avatar={previewAccountName.slice(0, 1)} time="">
                     {dryRun?.winner?.responseContent || replyPreviewText}
-                  </p>
+                  </LinePreviewMessage>
                   {dryRun?.winner && dryRun.winner.autoReplyId !== autoReplyId ? (
                     <p className={styles.bubbleMeta}>「{dryRun.winner.name}」が返します</p>
                   ) : (
@@ -1459,10 +1483,10 @@ function AutoReplyWizardV8Inner() {
                   </div>
                 </dl>
               </Card>
-              {withPhone ? <LinePreview accountName="公式アカウント">
+              {withPhone ? <LinePreview accountName={previewAccountName}>
                 <div className={styles.talkStack}>
-                  <p className={styles.bubbleReply}>{replyPreviewText}</p>
-                  <p className={styles.bubbleMeta}>返す側の見え方</p>
+                  <LinePreviewMessage direction="outgoing" accountName={previewAccountName} avatar={null} time="">{triggerSamples[0].text}</LinePreviewMessage>
+                  <LinePreviewMessage density="compact" accountName={previewAccountName} avatar={previewAccountName.slice(0, 1)} time="">{replyPreviewText}</LinePreviewMessage>
                 </div>
               </LinePreview> : null}
             </>
@@ -1612,7 +1636,7 @@ function AutoReplyWizardV8Inner() {
                 新しく作るルールは、一覧のいちばん下（最後に見る順番）に足されます。順番は手順4「優先順位」で確かめます。
               </Notice>
 
-              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
+              <Card padding="roomy" layout="vertical" className={`${styles.cardContent} ${styles.starterSection}`}>
                 <div className={styles.cardHeading}>
                   <h2 className={styles.cardTitle}>ひな形から作る（任意）</h2>
                   <p className={styles.cardNote}>選ぶと、条件と返信がまとめて入ります。あとから全部変えられます。</p>
@@ -1760,7 +1784,7 @@ function AutoReplyWizardV8Inner() {
                   </>
                 )}
 
-                <div className={styles.field}>
+                <div className={`${styles.field} ${!narrow ? styles.kindField : ''}`}>
                   <div className={styles.labelRow}>
                     <span className={styles.label}>反応するメッセージの種類</span>
                     {/* 1152 の板（Z2LIUx）は札の行に余地が無いので、題の行の右に置く。 */}
@@ -1838,7 +1862,7 @@ function AutoReplyWizardV8Inner() {
                 <div className={styles.field}>
                   <span className={styles.label}>曜日</span>
                   <div className={styles.weekdayRow}>
-                  <div className={styles.weekdays} role="group" aria-label="反応する曜日">
+                  <div className={styles.weekdays} role="group" aria-label="反応する曜日" aria-describedby={weekdayNotice ? 'wiz-weekday-error' : undefined} aria-invalid={Boolean(weekdayNotice)}>
                     {/* 絵 A0pDt は月曜はじまり。保存する値（0=日〜6=土）は変えない。 */}
                     {[1, 2, 3, 4, 5, 6, 0].map((index) => {
                       const label = WEEKDAY_LABELS[index]
@@ -1854,7 +1878,8 @@ function AutoReplyWizardV8Inner() {
                               ? form.weekdays.filter((d) => d !== index)
                               : [...form.weekdays, index].sort()
                             if (next.length === 0) {
-                              setWeekdayNotice('全部の曜日を外すと、このルールはどの曜日にも反応しなくなります。')
+                              setWeekdayNotice('反応する曜日を1つ以上選んでください。')
+                              return
                             } else {
                               setWeekdayNotice('')
                             }
@@ -1886,7 +1911,7 @@ function AutoReplyWizardV8Inner() {
                     </span>
                   </div>
                   </div>
-                  {weekdayNotice ? <p className={styles.hint}>{weekdayNotice}</p> : null}
+                  {weekdayNotice ? <FieldError id="wiz-weekday-error">{weekdayNotice}</FieldError> : null}
                 </div>
                 <div className={styles.field}>
                   <span className={styles.label}>時間帯</span>
@@ -2141,6 +2166,7 @@ function AutoReplyWizardV8Inner() {
                   </div>
                   <div className={styles.toggleExtra}>
                     {form.cooldownOn ? (
+                      <>
                       <span className={styles.toggleUnit}>
                         <input
                           id="wiz-cooldown"
@@ -2156,6 +2182,7 @@ function AutoReplyWizardV8Inner() {
                         />{' '}
                         分あける
                       </span>
+                      </>
                     ) : (
                       <span className={styles.toggleNote}>何度でも返す</span>
                     )}
@@ -2254,7 +2281,7 @@ function AutoReplyWizardV8Inner() {
                             certain && aboveSelf ? styles.orderRowConflict : '',
                           ].join(' ')}
                         >
-                          <GripVertical size={14} aria-hidden="true" className={styles.orderGrip} />
+                          <span aria-hidden="true" className={styles.orderGrip} />
                           <span className={styles.orderNum}>{index + 1}</span>
                           <div className={styles.orderBody}>
                             <p className={styles.orderName}>

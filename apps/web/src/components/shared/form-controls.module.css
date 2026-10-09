@@ -134,3 +134,7 @@
 [data-theme='v8'] .field[data-density="compact"] .label { color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; line-height: normal; }
 [data-theme='v8'] .field[data-density="input"] .label { color: var(--color-ink); font-size: var(--text-label); font-weight: 500; line-height: var(--tpl-rt-label-lh); }
 [data-theme='v8'] .field[data-grow] { flex: 1 1 0; }
+.errorFrame { display: contents; }
+.errorFrame[data-invalid] { display: block; outline: 1px solid var(--color-danger); outline-offset: 2px; border-radius: var(--radius-control); }
+
+[data-theme='v8'] .field[data-spacing='section'] { gap: var(--tpl-section-gap); }

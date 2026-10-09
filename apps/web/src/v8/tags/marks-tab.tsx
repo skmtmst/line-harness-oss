@@ -434,7 +434,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
                 <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
                   <span className={styles.menuAnchor}>
                     {(!host || canEdit) ? <RowMenu
-                      className={styles.menuButton}
+                      size="row"
                       label={`対応マーク「${mark.name}」の操作`}
                       items={rowMenuItems(mark)}
                       open={openMenuId === mark.id}

@@ -32,29 +32,29 @@ describe('最後の細かい板の印', () => {
   })
 
   it('一覧から開く窓にCYJ0Lを付ける', () => {
-    expect(ADV_SEARCH).toContain('data-design-node="CYJ0L"')
-    expect(SAVED_SEARCH).toContain('data-design-node="CYJ0L"')
-    expect(SINGLE_ACTIONS).toContain('data-design-node="CYJ0L"')
-    expect(FRIEND_TABLE).toContain('data-design-node="CYJ0L"')
+    expect(ADV_SEARCH).toMatch(/(?:data-design-node|boardId)="CYJ0L"/)
+    expect(SAVED_SEARCH).toMatch(/(?:data-design-node|boardId)="CYJ0L"/)
+    expect(SINGLE_ACTIONS).toMatch(/(?:data-design-node|boardId)="CYJ0L"/)
+    expect(FRIEND_TABLE).toMatch(/(?:data-design-node|boardId)="CYJ0L"/)
   })
 
   it('予約にacRIl・If9Mhを付ける', () => {
-    expect(BOOKINGS).toContain('data-design-node="acRIl"')
+    expect(BOOKINGS).toMatch(/(?:data-design-node|boardId)="acRIl"/)
     expect(BOOKING_NEW).toContain('If9Mh')
-    expect(BOOKING_DETAIL).toContain('data-design-node="If9Mh"')
+    expect(BOOKING_DETAIL).toMatch(/(?:data-design-node|boardId)="If9Mh"/)
   })
 
   it('受信箱にM0393・ダッシュボードにd8X09・mcOqKを付ける', () => {
-    expect(CHATS).toContain('data-design-node="M0393"')
-    expect(DASHBOARD).toContain('boardId="WQmep"')
-    expect(DASHBOARD_EDITOR).toContain('data-design-node="mcOqK"')
+    expect(CHATS).toMatch(/(?:data-design-node|boardId)="M0393"/)
+    expect(DASHBOARD).toMatch(/(?:data-design-node|boardId)="WQmep"/)
+    expect(DASHBOARD_EDITOR).toMatch(/(?:data-design-node|boardId)="mcOqK"/)
   })
 
   it('1152の幅違いを動的に選ぶ（a1k3d・r1l0bT・xHpkS）', () => {
-    expect(TEMPLATE_EDIT).toContain("narrowBoard ? 'a1k3d' : 'u5YC6'")
-    expect(TEMPLATE_EDIT).toContain('data-design-node={designNode}')
+    expect(TEMPLATE_EDIT).toContain("narrow ? 'a1k3d' : 'u5YC6'")
+    expect(TEMPLATE_EDIT).toContain('boardId={boardId}')
     expect(REMINDER_EDIT).toContain("narrowBoard ? 'r1l0bT' : 'p5YuP'")
-    expect(REMINDER_EDIT).toContain('data-design-node={designNode}')
+    expect(REMINDER_EDIT).toContain('boardId={boardId}')
     expect(FRIEND_ADD_EDITOR).toContain("boardId={step === 'routes' && narrow ? 'xHpkS' :")
     expect(FRIEND_ADD_EDITOR).toContain("{ key: 'routes', label: '流入リンク', node: 'h8uNW' }")
   })

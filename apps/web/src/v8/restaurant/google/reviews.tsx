@@ -138,7 +138,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
     <>
       <StatRow>
         <Stat size="small" label="未返信" value={`${data.summary.unrepliedCount}`} note="返信を待っている口コミ" warning={data.summary.unrepliedCount > 0} />
-        <Stat size="small" label="平均の評価" value={average === null || average === undefined ? '—' : `${Math.round(average * 10) / 10}`} note={`この30日・${reviewTotal}件`} />
+        <Stat size="small" label="平均の評価" value={average === null || average === undefined ? '—' : `${Math.round(average * 10) / 10}`} note={`総合・${reviewTotal}件`} />
         <Stat size="small" label="要確認" value={`${data.summary.attentionCount}`} note="評価2以下" />
         {/* Google経由の予約：結ぶ口がまだ無いので「—」（数を推測しない）。 */}
         <Stat size="small" label="Google経由の予約" value="—" note="この30日" help="予約の連携サービスと結ぶと数えます。いまは取れないので「—」です。" />

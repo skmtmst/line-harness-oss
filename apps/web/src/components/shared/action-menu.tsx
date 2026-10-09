@@ -3,6 +3,7 @@
 import { ArrowUpRight } from 'lucide-react'
 import React, { useEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import MenuPortal from './menu-portal'
+import { useV8Leave } from './overlay-utils'
 import styles from './action-menu.module.css'
 
 export type ActionMenuItem = {
@@ -60,6 +61,7 @@ export type ActionMenuProps = {
 
 /** Pencil ★V8 `hnuY9`「その他操作メニュー」を正本にした小型操作メニュー。 */
 export default function ActionMenu({ open, items, note, onClose, ariaLabel = '操作', inline = false, anchorRef }: ActionMenuProps) {
+  const leaving = useV8Leave(open, 80)
   const menuRef = useRef<HTMLDivElement>(null)
   const anchorMarkRef = useRef<HTMLSpanElement>(null)
 
@@ -139,7 +141,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
     }
   }, [inline, open])
 
-  if (!open) return null
+  if (!open && !leaving) return null
 
   const moveFocus = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Tab') {
@@ -161,6 +163,9 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
     <div
       ref={menuRef}
       role="menu"
+      aria-hidden={leaving || undefined}
+      inert={leaving || undefined}
+      data-closing={leaving || undefined}
       aria-label={ariaLabel}
       className={`${styles.menu} ${inline ? styles.inline : styles.menuPortal}`}
       onKeyDown={moveFocus}
@@ -223,8 +228,8 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
   if (inline) return menu
   return (
     <>
-      <span ref={anchorMarkRef} aria-hidden="true" className={styles.anchor} />
-      <MenuPortal open={open} getAnchor={getAnchor} onClose={onClose}>
+      {anchorRef ? null : <span ref={anchorMarkRef} aria-hidden="true" className={styles.anchor} />}
+      <MenuPortal open={open} exitDuration={80} getAnchor={getAnchor} onClose={onClose}>
         {menu}
       </MenuPortal>
     </>

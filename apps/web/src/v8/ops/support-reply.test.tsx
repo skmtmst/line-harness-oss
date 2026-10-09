@@ -6,7 +6,7 @@
  * - 219：優先度を変えても、書きかけの返信をサーバーの下書きで置き換えない
  */
 import React from 'react'
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
 vi.mock('next/navigation', () => ({
@@ -65,7 +65,7 @@ test('218：50件ちょうどなら「続きを読み込む」で51件目を足�
   expect(net.tickets).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 50 }))
 })
 
-test('219：優先度を変えても書きかけの返信を残す・217：送ると解決へ進める', async () => {
+test('219：優先度を変えても書きかけの返信を残す・217：現在の状態のまま送る', async () => {
   render(<OpsSupportV8 />)
   const box = await screen.findByLabelText('返信') as HTMLTextAreaElement
   await waitFor(() => expect(box.value).toBe('サーバーの下書き'))
@@ -81,7 +81,20 @@ test('219：優先度を変えても書きかけの返信を残す・217：送�
   expect((screen.getByLabelText('返信') as HTMLTextAreaElement).value).toBe('書きかけの返事')
   const open = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === '返信する') as HTMLButtonElement
   await act(async () => { open.click() })
-  const send = [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('送って解決にする')) as HTMLButtonElement
+  const send = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === '送信する') as HTMLButtonElement
   await act(async () => { send.click() })
-  await waitFor(() => expect(net.reply).toHaveBeenCalledWith('t1', expect.objectContaining({ body: '書きかけの返事', nextStage: 'resolved' })))
+  await waitFor(() => expect(net.reply).toHaveBeenCalledWith('t1', expect.objectContaining({ body: '書きかけの返事', nextStage: 'new' })))
+})
+
+test('217：返信の送信時に選んだ状態を確認して送る', async () => {
+  render(<OpsSupportV8 />)
+  await screen.findByLabelText('返信')
+  await waitFor(() => expect((screen.getByLabelText('返信') as HTMLTextAreaElement).value).toBe('サーバーの下書き'))
+  fireEvent.click(screen.getByRole('button', { name: /送信後の状態/ }))
+  const option = [...document.querySelectorAll('[role="option"]')].find(el => el.textContent?.trim() === '対応中') as HTMLElement
+  fireEvent.click(option.querySelector('button') ?? option)
+  fireEvent.click(screen.getByRole('button', { name: '返信する' }))
+  expect(screen.getByRole('dialog').textContent).toContain('対応中（送ったあと）')
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '送信する' })) })
+  await waitFor(() => expect(net.reply).toHaveBeenCalledWith('t1', expect.objectContaining({ nextStage: 'in_progress' })))
 })

@@ -1,5 +1,7 @@
 'use client'
 
+import { DragHandle } from '@/components/shared/row-actions'
+
 import StatusPill, { StatusDot, SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
 import Avatar from '@/components/shared/avatar'
 import { useCallback, useState, useEffect, useRef } from 'react'
@@ -20,7 +22,7 @@ import InlineEdit from '@/components/shared/inline-edit'
 import { runOptimisticWithUndo } from '@/lib/undoable'
 import PrepayBadgeV8 from '@/app/booking/prepay-badge-v8'
 import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability'
-import { GripVertical, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import v8 from '@/v8/inbox-chat/customer-panel.module.css'
@@ -997,7 +999,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                       aria-label="対応状況を変える"
                       treatment="pill"
                       icon={<StatusDot tone={SUPPORT_STATUS_TONES[effectiveStatus ?? 'unread']} />}
-                      options={STATUS_OPTIONS.map((option) => ({ ...option, leading: <StatusDot tone={SUPPORT_STATUS_TONES[option.value]} /> }))}
+                      options={STATUS_OPTIONS.map((option) => ({ ...option, tone: SUPPORT_STATUS_TONES[option.value], leading: <StatusDot tone={SUPPORT_STATUS_TONES[option.value]} /> }))}
                       value={effectiveStatus ?? 'unread'}
                       onChange={(next) => saveChatStatus(next as NonNullable<ChatStatusInfo['status']>)}
                     />
@@ -1591,15 +1593,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                     className="border-hairline rounded-control flex items-center gap-2 border px-2 py-1.5"
                   >
                     <span className="flex shrink-0 items-center">
-                      <button
-                        type="button"
-                        disabled={index === 0}
-                        onClick={() => moveGroup(group.key, -1)}
-                        aria-label={`${group.label}を上へ`}
-                        className="text-ink-faint hover:text-ink rounded-mini disabled:opacity-30"
-                      >
-                        <GripVertical aria-hidden="true" size={15} />
-                      </button>
+                      <DragHandle label={`${group.label}を並べ替える`} draggable onDragStart={() => setDraggedGroupKey(group.key)} onDragEnd={() => setDraggedGroupKey(null)} onMove={direction => moveGroup(group.key, direction)} />
                     </span>
                     <span className="text-ink min-w-0 flex-1 truncate text-xs">{group.label}</span>
                     {/* 共通の Checkbox（本物の input）。見た目だけの button にすると読み上げで「入／切」が伝わらない。 */}

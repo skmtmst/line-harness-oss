@@ -6,7 +6,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source.mjs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -175,7 +175,7 @@ describe('V8-B 乗り換え（x2dSNv）', () => {
     expect(v8css.split('\n')[0]).toContain('@layer properties, theme, base, components, utilities;')
     expect(v8css).not.toMatch(/#[0-9a-fA-F]{3,8}/)
     expect(v8css).not.toMatch(/box-shadow\s*:/)
-    expect(v8tsx).toContain('data-design-node="x2dSNv"')
+    expect(v8tsx).toMatch(/(?:data-design-node|boardId)="x2dSNv"/)
     expect(v8tsx).not.toContain('準備中')
   })
 })

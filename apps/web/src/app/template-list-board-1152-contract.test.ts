@@ -13,7 +13,7 @@ describe('テンプレート一覧の板の印（L7zA7C）', () => {
   it('list-v8.tsx の面に L7zA7C が付く', () => {
     const source = readFileSync(join(SRC, 'app/templates/list-v8.tsx'), 'utf8')
     expect(source).toContain('L7zA7C')
-    expect(source).toContain("data-design-node={narrow ? 'L7zA7C' : undefined}")
+    expect(source).toContain("boardId={narrow ? 'L7zA7C' : 'v19Ivv'}")
     expect(source).toContain('useNarrowViewport()')
   })
 

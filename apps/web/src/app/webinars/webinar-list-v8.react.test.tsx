@@ -234,17 +234,18 @@ test('v8 で詳細パネルの名前をその場で変えると保存口へ届�
   expect(host.querySelector('[data-design-node="UyUMw"]')?.textContent).toContain('改名したセミナー')
 })
 
-/* V8「サクサク感」：フォルダの追加は真ん中の窓ではなく右のパネルで。 */
-test('v8 でフォルダの追加を押すと右のパネルで名前を入れられる', async () => {
+/* フォルダの追加は名前と色を横に並べた共通の窓（FolderEditorDialog・fcolall 2026-10-09）。 */
+test('v8 でフォルダの追加を押すと共通の窓で名前と色を入れられる', async () => {
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const add = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('フォルダを追加'))
   expect(add).toBeTruthy()
   await act(async () => { (add as HTMLButtonElement).click() })
-  const panel = document.querySelector('[data-design-part="detail-panel"]')
-  expect(panel).not.toBeNull()
-  expect(panel?.textContent).toContain('フォルダを追加')
-  expect(panel?.querySelector('#webinar-v8-folder-name')).not.toBeNull()
+  const dialog = document.querySelector('[role="dialog"]')
+  expect(dialog).not.toBeNull()
+  expect(dialog?.textContent).toContain('フォルダを追加')
+  expect(dialog?.querySelector('[data-folder-name-color] input')).not.toBeNull()
+  expect(dialog?.querySelector('[data-folder-color-button]')).not.toBeNull()
 })
 
 test('v8 の読み込み中は骨組みで場所を取り「読み込み中」の文字は出さない', async () => {

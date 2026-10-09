@@ -54,11 +54,12 @@ it('共通の追加窓はIME確定で送らず、名前・色・所属を送り�
   const input = screen.getByRole('textbox', { name: 'フォルダ名' })
   fireEvent.change(input, { target: { value: ' 購入 ' } })
   fireEvent.click(screen.getByRole('button', { name: 'フォルダの色：青' }))
+  expect(screen.getAllByRole('radio')).toHaveLength(10) // 9色＋色なし
   fireEvent.click(screen.getByRole('radio', { name: '赤' }))
   fireEvent.keyDown(input, { key: 'Enter', keyCode: 229 })
   expect(api.folders.create).not.toHaveBeenCalled()
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '追加する' })) })
-  expect(api.folders.create).toHaveBeenCalledWith({ kind: 'template', name: '購入', color: '#EF4444', accountId: 'a-1' })
+  expect(api.folders.create).toHaveBeenCalledWith({ kind: 'template', name: '購入', color: '#ef4444', accountId: 'a-1' })
   expect(screen.getByRole('alert').textContent).toContain('同じ名前')
   expect((input as HTMLInputElement).value).toBe(' 購入 ')
   expect(screen.getByRole('button', { name: 'フォルダの色：赤' })).toBeTruthy()

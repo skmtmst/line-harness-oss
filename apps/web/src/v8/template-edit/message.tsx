@@ -593,7 +593,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                   value={messageContent}
                   onValueChange={(next) => updateDraft({ messageContent: next })}
                   tokenNames={tokenNames}
-                  placeholder={messageType === 'flex' ? '{"type":"bubble", …}' : '例：{{name}}さん、こんにちは。'}
+                  placeholder={messageType === 'flex' ? '{"type":"bubble", …}' : '例：いつもご利用ありがとうございます。今月のおすすめをお知らせします。'}
                 />
                 <span className={styles.bodySpacer} aria-hidden="true" />
                 <InsertRow accountId={editorAccountId} state={referenceState} references={references} length={messageContent.length} onInsert={insert} />

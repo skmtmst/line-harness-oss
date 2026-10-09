@@ -7,6 +7,7 @@ import Button from './button'
 import IconButton from './icon-button'
 import { OverlayDepthContext, useOverlayFocus, useV8Leave } from './overlay-utils'
 import styles from './dialog.module.css'
+import { useStepMotion } from './use-step-motion'
 
 export type DialogProps = {
   open: boolean
@@ -16,6 +17,10 @@ export type DialogProps = {
    * ★V8：絵の窓の幅（px）。絵ごとに 480〜720 とばらばらなので、画面が絵の値を渡す。
    * 渡さなければ size の幅のまま。v7 では効かない。
    */
+  /** 頭・説明・本文・操作を同じ余白で積む小窓（i8F12 等）。 */
+  designLayout?: 'stacked'
+  /** 確認のボタンを先に置く板だけで指定する。 */
+  confirmFirst?: boolean
   designWidth?: number
   /** ★V8：絵の窓の上からの位置（px）。渡すと上寄せにする。渡さなければ今までどおり。v7 では効かない。 */
   designTop?: number
@@ -37,6 +42,8 @@ export type DialogProps = {
   layout?: 'continuous'
   /** 手順の帯。本文のスクロールから独立させる。 */
   steps?: ReactNode
+  /** 手順の本文を閉じずに切り替える鍵。StepsのcurrentKeyは自動で読む。 */
+  stepKey?: string | number
   /** 操作の左に出す現在の手順など。 */
   footerLead?: ReactNode
   title: string
@@ -82,7 +89,9 @@ export type DialogProps = {
    */
   primaryAction?: 'confirm' | 'cancel'
   /** ★V8：下のボタンの並び。省くと今までどおり右寄せ。'center' は中央（E-3 ウォークイン PUWyq）。v7 では効かない。 */
-  footerAlign?: 'center'
+  footerAlign?: 'center' | 'start'
+  /** 絵で操作の間隔が指定されている窓だけに使う。 */
+  designFooterGap?: number
 }
 
 /** Pencil V6 `J6x4Q` と重要操作 `H2S1T4` を1つにした共通ダイアログ。 */
@@ -90,6 +99,8 @@ export default function Dialog({
   open,
   size = 'medium',
   designWidth,
+  designLayout,
+  confirmFirst,
   designTop,
   designHeaderPadding,
   designHeaderHeight,
@@ -97,6 +108,7 @@ export default function Dialog({
   titleHelp,
   layout,
   steps,
+  stepKey,
   footerLead,
   title,
   description,
@@ -120,11 +132,13 @@ export default function Dialog({
   compact = false,
   primaryAction = 'confirm',
   footerAlign,
+  designFooterGap,
 }: DialogProps) {
   const depth = useContext(OverlayDepthContext)
   const titleId = useId()
   const descriptionId = useId()
   const [mounted, setMounted] = useState(false)
+  const motion = useStepMotion(Boolean(steps) && open && mounted, stepKey ?? (React.isValidElement<{ currentKey?: string | number }>(steps) ? steps.props.currentKey : undefined))
   /* ★V8 仕上げ（M10）：閉じるときは逆再生してから外す（v8 のみ）。 */
   const leaving = useV8Leave(open)
   /*
@@ -169,7 +183,7 @@ export default function Dialog({
     <>
       {/* 絵が無いときは今までどおり h2 を直接置く。囲むと既存の余白が動く。 */}
       {titlePart}
-      {descriptionNode}
+      {designLayout === 'stacked' ? null : descriptionNode}
     </>
   )
   const panel = (
@@ -184,13 +198,17 @@ export default function Dialog({
       tabIndex={-1}
       data-closing={leaving || undefined}
       data-size={size}
+      data-design-layout={designLayout}
+      data-confirm-first={confirmFirst || undefined}
       data-layout={layout}
       data-footer-align={footerAlign}
+      data-design-footer-gap={designFooterGap !== undefined || undefined}
       data-design-width={designWidth ? '' : undefined}
       data-design-header-padding={designHeaderPadding ? '' : undefined}
       data-design-header-height={designHeaderHeight ? '' : undefined}
       data-design-content-padding={designContentPadding ? '' : undefined}
-      style={designWidth || designHeaderPadding || designHeaderHeight || designContentPadding ? ({
+      style={designWidth || designHeaderPadding || designHeaderHeight || designContentPadding || designFooterGap !== undefined ? ({
+        ...(designFooterGap !== undefined ? { '--dialog-footer-gap': `${designFooterGap}px` } : {}),
         ...(designWidth ? { '--dialog-design-width': `${designWidth}px` } : {}),
         ...(designHeaderPadding ? { '--dialog-design-header-padding': designHeaderPadding } : {}),
         ...(designHeaderHeight ? { '--dialog-design-header-height': `${designHeaderHeight}px` } : {}),
@@ -213,8 +231,9 @@ export default function Dialog({
           <X aria-hidden="true" size={18} />
         </IconButton>
       </div>
+      {designLayout === 'stacked' ? descriptionNode : null}
       {steps ? <div className={styles.steps}>{steps}</div> : null}
-      {children ? <div className={styles.content}>{children}</div> : null}
+      {children ? <div className={styles.content} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       <div className={styles.footer}>
       {footer ?? (onConfirm ? (

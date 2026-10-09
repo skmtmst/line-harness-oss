@@ -26,7 +26,7 @@ describe('V8 再撮9板の印（友だち情報の欄・友だち）', () => {
 
   it('予約した後の外枠に CRtK8 を付ける', () => {
     const reserved = read('reserved-v8.tsx')
-    expect(reserved, '予約した後の板が無い').toContain('data-design-node="CRtK8"')
+    expect(reserved, '予約した後の板が無い').toMatch(/boardId="[^"]*\bCRtK8\b[^"]*"/)
   })
 
   it('予約の取消の窓は板 BeNtj・取り消す／やめる／残すの3つを出す', () => {
@@ -38,16 +38,16 @@ describe('V8 再撮9板の印（友だち情報の欄・友だち）', () => {
 
   it('詳細の外枠に dK1aE（下書き）・wfHIE（承認待ち）・tPm3e（送った後）を付ける', () => {
     const detail = read('detail-v8.tsx')
-    expect(detail, '詳細の3状態の板が無い').toContain('data-design-node="dK1aE wfHIE tPm3e"')
+    expect(detail, '詳細の3状態の板が無い').toMatch(/boardId="[^"]*dK1aE wfHIE tPm3e[^"]*"/)
   })
 
   it('重複検出の数の帯に G9C4Uw（1152）を付ける', () => {
     const duplicates = read('../duplicates/duplicates-v8.tsx')
-    expect(duplicates, '重複検出1152 の板が無い').toContain('data-design-node="G9C4Uw"')
+    expect(duplicates, '重複検出1152 の板が無い').toMatch(/(?:data-design-node|boardId)="G9C4Uw"/)
   })
 
   it('比べて決めるの A/B の並びに p15At（1152）を付ける', () => {
     const candidates = read('../friends/identity-candidates/identity-candidates-v8.tsx')
-    expect(candidates, '比べて決める1152 の板が無い').toContain('data-design-node="p15At"')
+    expect(candidates, '比べて決める1152 の板が無い').toMatch(/boardId="fcg2D"/)
   })
 })

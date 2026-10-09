@@ -19,7 +19,7 @@ export default function StatusBadge({
 }: Omit<HTMLAttributes<HTMLSpanElement>, 'children'> & {
   children: ReactNode
   tone?: StatusBadgeTone
-  size?: 'default' | 'compact' | 'micro'
+  size?: 'default' | 'compact' | 'micro' | 'annotation'
   /** 選んだ顧客の連携情報（rm92Y）だけ白地にする。 */
   surface?: 'tinted' | 'white'
   /**
@@ -37,7 +37,7 @@ export default function StatusBadge({
    */
   dot?: boolean
 }) {
-  const classes = [styles.badge, styles[tone], size === 'compact' ? styles.compact : size === 'micro' ? styles.micro : null, dot ? null : styles.noDot, className]
+  const classes = [styles.badge, styles[tone], size === 'compact' ? styles.compact : size === 'micro' ? styles.micro : size === 'annotation' ? styles.annotation : null, dot ? null : styles.noDot, className]
     .filter(Boolean)
     .join(' ')
   const hasHelp = help !== undefined && help !== null

@@ -4,7 +4,7 @@
  * ★V8 タグ「タグ」タブ（Pencil `I1E7Bt`・1152 `aPeD8`・閲覧のみ `fkGUR`、
  * フォルダ窓 `IjVpM`、状態の板 `U0aKD`）。
  *
- * 動き（読み込み・数の帯・絞り込み・並べ替え・★・フォルダへ移す・フォルダの
+ * 動き（読み込み・数の帯・絞り込み・並べ替え・フォルダへ移す・フォルダの
  * 追加/直す/並べ替え/削除・保管・CSV・行の詳細パネル・右クリック）は
  * 今の V8 タブ（app/tags/tags-tab-v8.tsx）から写した。数え方・判定は v7 と同じ関数
  * （components/friend-fields/tags-page-v4）を使う。見た目だけを型と絵に合わせた。
@@ -24,7 +24,6 @@ import {
   Inbox,
   Plus,
   Sparkles,
-  Star,
   Tag as TagIcon,
   Users,
 } from 'lucide-react'
@@ -34,10 +33,11 @@ import { useRowLeaving } from '@/lib/use-row-leaving'
 import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { ListPageBody } from '@/components/templates'
-import { FOLDER_COLORS, FOLDER_COLOR_NAMES } from '@/components/shared/folder-add-dialog'
+import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from './folder-colors'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import StatusBadge from '@/components/shared/status-badge'
 import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
@@ -138,7 +138,7 @@ function TagFolderDialog({
   onSaved: () => void
 }) {
   const [name, setName] = useState(group?.name ?? '')
-  const [color, setColor] = useState(group?.color ?? FOLDER_COLORS[0])
+  const [color, setColor] = useState<string | null>(group ? group.color ?? null : DEFAULT_TAG_FOLDER_COLOR)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -168,8 +168,9 @@ function TagFolderDialog({
     <FolderEditorDialog open
       title={group ? 'フォルダを直す' : 'フォルダを追加'}
       description="タグを分けてしまう箱です。消しても、入っていたタグは未分類として残ります。"
-      name={name} onNameChange={setName} color={color} onColorChange={(next) => setColor(next ?? FOLDER_COLORS[0])}
-      colors={FOLDER_COLORS.map((value) => ({ value, name: FOLDER_COLOR_NAMES[value] }))}
+      name={name} onNameChange={setName} color={color} onColorChange={setColor}
+      colors={TAG_FOLDER_COLORS}
+      allowClear={Boolean(group)}
       placeholder="例: VIP" busy={saving} error={error || undefined}
       onCancel={onClose} onConfirm={() => void save()} confirmLabel={group ? '保存する' : 'フォルダを作る'}
     />
@@ -195,7 +196,7 @@ export default function TagsTab({
   const [items, setItems] = useState<Tag[]>(fixture?.items ?? [])
   const [groups, setGroups] = useState<TagGroup[]>(fixture?.groups ?? [])
   const [status, setStatus] = useState<LoadStatus>(fixture ? 'ready' : 'loading')
-  // 操作の失敗（並び替え・★・フォルダ移動）。読み込みの失敗とは別物。
+  // 操作の失敗（並び替え・フォルダ移動）。読み込みの失敗とは別物。
   const [actionError, setActionError] = useState('')
   const [stats, setStats] = useState<ListStats | null>(null)
   const [statsFailed, setStatsFailed] = useState(false)
@@ -209,7 +210,7 @@ export default function TagsTab({
   const folder = view.folder
   const usageFilter = view.usage
   const sourceFilter = view.source
-  const quick = useMemo(() => (view.quick ? view.quick.split(',') : []), [view.quick])
+  const quick = useMemo(() => (view.quick ? view.quick.split(',').filter((key) => key !== 'starred') : []), [view.quick])
   const pageSize = PAGE_SIZES.includes(Number(view.size)) ? Number(view.size) : 20
   const page = Math.max(1, Number.parseInt(view.page, 10) || 1)
   const setQuery = useCallback((next: string) => setView({ q: next, page: '1' }), [setView])
@@ -308,7 +309,6 @@ export default function TagsTab({
       if (key === 'recent' && !isThisMonth(tag.createdAt)) return false
       if (key === 'auto' && (!tag.assignSource || tag.assignSource === 'manual')) return false
       if (key === 'linked' && !linked) return false
-      if (key === 'starred' && !tag.isStarred) return false
     }
     return true
   }), [items, query, folder, usageFilter, sourceFilter, quick, deferredDelete])
@@ -378,39 +378,6 @@ export default function TagsTab({
     const visibleNext = order.map((tid) => items.find((tag) => tag.id === tid)).filter(Boolean) as Tag[]
     setItems(mergeVisibleOrder(items, visibleNext))
     await applyTagOrder(order)
-  }
-
-  /* 「一覧に出す」の星。押した瞬間に切り替え、裏で保存。失敗は戻して「もう一度」、成功は「元に戻す」。 */
-  const toggleStar = async (tag: Tag) => {
-    if (!canEdit) return
-    const next = !tag.isStarred
-    setItems((current) => current.map((item) => item.id === tag.id ? { ...item, isStarred: next } : item))
-    try {
-      const res = await api.tags.update(tag.id, {
-        lineAccountId: tag.lineAccountId ?? null,
-        expectedVersion: tag.version ?? 1,
-        isStarred: next,
-      })
-      if (!res.success) throw new Error(res.error)
-      const version = res.data?.version
-      if (typeof version === 'number') {
-        setItems((current) => current.map((item) => item.id === tag.id ? { ...item, version } : item))
-      }
-      notifyToast(next ? `「${tag.name}」を一覧に出します` : `「${tag.name}」を一覧から外します`, {
-        actionLabel: '元に戻す',
-        onAction: () => { void toggleStar({ ...tag, isStarred: next, version: typeof version === 'number' ? version : tag.version }) },
-      })
-    } catch (reason) {
-      setItems((current) => current.map((item) => item.id === tag.id ? { ...item, isStarred: tag.isStarred } : item))
-      const message = reason instanceof ApiError ? reason.message : '表示の切り替えに失敗しました。通信を確かめて、もう一度お試しください。'
-      setActionError(message)
-      notifyToast(message, {
-        tone: 'error',
-        actionLabel: 'もう一度',
-        onAction: () => { void toggleStar(tag) },
-      })
-      void load()
-    }
   }
 
   /* 「フォルダへ移す」。押した瞬間に移して裏で保存。 */
@@ -572,7 +539,7 @@ export default function TagsTab({
       id: group.id,
       label: group.name,
       count: ready ? items.filter((tag) => tag.groupId === group.id).length : null,
-      color: group.color ?? FOLDER_FALLBACK_COLOR,
+      color: group.color,
       onEdit: canEdit ? () => setFolderDialog(group) : undefined,
       onMoveUp: canEdit && index > 0 ? () => void moveGroupOrder(group, -1) : undefined,
       onMoveDown: canEdit && index < groups.length - 1 ? () => void moveGroupOrder(group, 1) : undefined,
@@ -639,9 +606,9 @@ export default function TagsTab({
       ]}
     />
   )
-  /* 「よく使う絞り込み」：重ねて絞れる5つ（v7 の QUICK_FILTERS）。開いたメニューで入れ切り。 */
+  /* 「よく使う絞り込み」：重ねて絞れる4つ（星以外の QUICK_FILTERS）。開いたメニューで入れ切り。 */
   const quickItems: ActionMenuItem[] = [
-    ...QUICK_FILTERS.map(([value, label]) => ({
+    ...QUICK_FILTERS.filter(([value]) => value !== 'starred').map(([value, label]) => ({
       id: `quick-${value}`,
       label,
       icon: quick.includes(value) ? <Check size={14} aria-hidden="true" /> : <span className={styles.checkSpace} aria-hidden="true" />,
@@ -712,14 +679,10 @@ export default function TagsTab({
       filteredDescription="検索語・フォルダ・絞り込みを外すと、すべて出ます"
     />
   ) : (
-    <DelayedSkeleton loading={!ready} skeleton={<div className={styles.skeleton} data-design-node="U0aKD" aria-busy="true" />}>
+    <DelayedSkeleton loading={!ready} skeleton={<div className={styles.skeleton} aria-busy="true" data-design-node="U0aKD" />}>
       <DataTable className={styles.table} data-design="TagTable">
         <thead>
           <TableHeadRow>
-            <Th className={styles.colStar}>
-              <Star className={styles.headStar} aria-hidden="true" />
-              <span className="sr-only">一覧に出す</span>
-            </Th>
             <Th className={styles.colName}>タグ</Th>
             {/* 左にフォルダの列があるときは表にフォルダ列を置かず、名前の前に色の丸（2026-10-07 オーナー）。1152 は列を畳むので表に出す（絵 aPeD8）。 */}
             {narrow ? <Th className={styles.colFolder}>フォルダ</Th> : null}
@@ -754,32 +717,6 @@ export default function TagsTab({
                   }
                 }}
               >
-                <Td className={styles.colStar} onClick={(event) => event.stopPropagation()}>
-                  {canEdit ? (
-                    <button
-                      type="button"
-                      className={styles.starButton}
-                      data-on={Boolean(tag.isStarred)}
-                      aria-pressed={Boolean(tag.isStarred)}
-                      aria-label={tag.isStarred ? '友だち一覧に表示しない' : '友だち一覧に表示する'}
-                      title={tag.isStarred ? '友だち一覧に表示しない' : '友だち一覧に表示する'}
-                      onClick={() => void toggleStar(tag)}
-                    >
-                      <Star className={styles.starIcon} aria-hidden="true" />
-                    </button>
-                  ) : (
-                    // 閲覧のみ：押せる星は置かず、友だち一覧に出しているかの印だけを見せる。
-                    <span
-                      className={styles.starButton}
-                      data-on={Boolean(tag.isStarred)}
-                      role="img"
-                      aria-label={tag.isStarred ? '友だち一覧に表示している' : '友だち一覧に表示していない'}
-                      title={tag.isStarred ? '友だち一覧に表示している' : '友だち一覧に表示していない'}
-                    >
-                      <Star className={styles.starIcon} aria-hidden="true" />
-                    </span>
-                  )}
-                </Td>
                 <Td className={styles.colName}>
                   <ContextMenu label={`タグ「${tag.name}」の操作`} items={tagContextItems(tag)}>
                     <div className={styles.nameRow}>
@@ -796,13 +733,13 @@ export default function TagsTab({
                             <GripVertical className={styles.gripIcon} aria-hidden="true" />
                           </ReorderHandle>
                         ) : (
-                          <span className={styles.gripSpace} aria-hidden="true"><GripVertical className={styles.gripIcon} /></span>
+                          <span className={styles.gripSpace} aria-hidden="true" />
                         )}
                       </span>
                       <TagPill name={tag.name} color={group?.color} size="sm" compactAtNarrow href={editHref} />
-                      {tag.status === 'archived' ? <span className={styles.miniBadge}>保管済み</span> : null}
+                      {tag.status === 'archived' ? <StatusBadge size="annotation" dot={false}>保管済み</StatusBadge> : null}
                       {tag.cleanupReasons?.includes('duplicate_name') ? (
-                        <span className={`${styles.miniBadge} ${styles.miniBadgeWarn}`} title="正規化した名前がほかのタグと重なっています。整理候補です。">名前が重なっている</span>
+                        <StatusBadge size="annotation" tone="warning" dot={false} title="正規化した名前がほかのタグと重なっています。整理候補です。">名前が重なっている</StatusBadge>
                       ) : null}
                     </div>
                     <p className={styles.sub}>{`${formatDate(tag.createdAt)}登録`}</p>
@@ -833,7 +770,7 @@ export default function TagsTab({
                   {/* 閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す） */}
                   {canEdit ? <span className={styles.menuAnchor}>
                     <RowMenu
-                      className={styles.menuButton}
+                      size="row"
                       label={`タグ「${tag.name}」の操作`}
                       items={rowMenuItems(tag)}
                       open={openMenuId === tag.id}

@@ -3,6 +3,7 @@
  * 統括のひな形の一覧（店と同じ形＋配る口・B-27〜B-29・B-36）の動き。
  * 6種類のタブで種類を替える・配布先の列・全種類の行の［配る］（「…」の左。オーナー 2026-10-08）・閲覧のみには配る／作る口を置かない・フォルダで絞る。
  */
+import { waitFor } from '@testing-library/react'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -46,6 +47,7 @@ async function render(extra: Partial<HqStoreListProps> = {}) {
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -53,17 +55,41 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   host.remove()
+  delete document.documentElement.dataset.theme
 })
 
 const buttons = () => [...document.querySelectorAll('button')]
 
 describe('統括のひな形の一覧（店と同じ形）', () => {
+  for (const canEdit of [true, false]) {
+    it(`タグ一覧はタグ名から始まり、星・注目の操作と絞り込みを出さない（編集=${canEdit}）`, async () => {
+      await render({ type: 'tag', kind: undefined, canEdit })
+      const heads = [...host.querySelectorAll('thead th')].map((th) => th.textContent?.trim())
+      expect(heads).toEqual(canEdit ? ['タグ', '人数', '付け方', '配布先', '', ''] : ['タグ', '人数', '付け方', '配布先', ''])
+      expect(host.querySelector('tbody tr td')?.textContent).toContain(ROWS[0].name)
+      expect(host.querySelector('svg.lucide-star')).toBeNull()
+      expect(host.querySelector('[aria-label*="友だち一覧に表示"]')).toBeNull()
+      expect(host.textContent).not.toMatch(/☆|★|注目のみ|★のみ表示/)
+      expect(buttons().some((button) => /注目|一覧に出す/.test(button.getAttribute('aria-label') ?? ''))).toBe(false)
+    })
+  }
+
   it('フォルダの保存色を左の列と名前の前に表示する', async () => {
     await render({ folders: [{ id: 'f-1', name: 'お問い合わせ', revision: 1, color: '#8b5cf6' }] })
     const dot = host.querySelector('[data-folder-dot="filed"]') as HTMLElement
     expect(dot.style.backgroundColor).toBe('#8b5cf6')
     expect(dot.getAttribute('aria-label')).toBe('フォルダ：お問い合わせ')
     expect(host.innerHTML).toContain('#8b5cf6')
+  })
+
+  it('タグ名はフォルダ色の札で出し、押すと詳細を開く', async () => {
+    const onOpen = vi.fn()
+    await render({ type: 'tag', onOpen, folders: [{ id: 'f-1', name: 'お問い合わせ', revision: 1, color: '#8b5cf6' }] })
+    const pill = host.querySelector('[role="group"][aria-label="タグ「秋の新商品」"]')!
+    expect(pill).toBeTruthy()
+    expect(pill.querySelector('[aria-hidden="true"]')!.getAttribute('style')).toContain('#8b5cf6')
+    await act(async () => { (pill.closest('button') as HTMLButtonElement).click() })
+    expect(onOpen).toHaveBeenCalledWith(ROWS[0])
   })
 
   it('配布先の列に配ったアカウントの数、配っていない行は「まだ配っていない」', async () => {
@@ -182,4 +208,15 @@ describe('フォルダの配布口を出す範囲（G-7）', () => {
     await render({ canEdit: false, folderContents: ROWS, onDistributeFolder: vi.fn() })
     expect(buttons().some((button) => button.getAttribute('aria-label')?.endsWith('の操作'))).toBe(false)
   })
+})
+
+it.each(['template', 'rich_menu', 'form', 'tag', 'scenario'] as const)('%s のひな形も色を変えて保存できる', async (type) => {
+  const h = await render({ type })
+  await act(async () => (host.querySelector('[aria-label="フォルダ「お問い合わせ」の操作"]') as HTMLButtonElement).click())
+  await act(async () => ([...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent === '色を変える') as HTMLElement).click())
+  await act(async () => (document.querySelector('[aria-label="フォルダの色：色なし"]') as HTMLButtonElement).click())
+  await act(async () => (document.querySelector('[role="radio"][aria-label="ピンク"]') as HTMLButtonElement).click())
+  await act(async () => (buttons().find((el) => el.textContent === '保存する') as HTMLButtonElement).click())
+  expect(h.onRenameFolder).toHaveBeenCalledWith(expect.objectContaining({ id: 'f-1', revision: 1 }), 'お問い合わせ', '#ec4899')
+  await waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull())
 })

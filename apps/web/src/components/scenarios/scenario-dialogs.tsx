@@ -878,6 +878,8 @@ export function TestSendDialog({
           }))
           .sort((a, b) => a.stepOrder - b.stepOrder)
 
+  const contentConfirmed = bodiesStatus === 'ready' && confirmSteps.length > 0 && confirmSteps.every((step) => Boolean(stepBodies[step.stepOrder]))
+
   const openConfirm = () => {
     setConfirmChecks(Array(REQUIRED_CONFIRMATION_COUNT).fill(false))
     setResult(null)
@@ -885,7 +887,7 @@ export function TestSendDialog({
   }
 
   const sendTest = async () => {
-    if (!selected || sending) return
+    if (!selected || sending || !allConfirmed || !contentConfirmed) return
     setSending(true)
     setResult(null)
     try {
@@ -974,7 +976,7 @@ export function TestSendDialog({
                 )}
               </Notice>
             )}
-          </div><div className="border-hairline flex justify-end gap-2 border-t px-6 py-4">{result?.ok ? (<><Button onClick={() => setConfirming(false)}>別の相手へ送る</Button><Button variant="primary" onClick={onClose}>閉じる</Button></>) : (<><Button onClick={() => setConfirming(false)} disabled={sending}>戻る</Button><Button variant="primary" disabled={!selected || sending || !allConfirmed} onClick={() => void sendTest()} busy={sending} busyLabel="送信中…">{result ? 'もう一度送る' : 'テストを送る'}</Button></>)}</div></div>
+          </div><div className="border-hairline flex justify-end gap-2 border-t px-6 py-4">{result?.ok ? (<><Button onClick={() => setConfirming(false)}>別の相手へ送る</Button><Button variant="primary" onClick={onClose}>閉じる</Button></>) : (<><Button onClick={() => setConfirming(false)} disabled={sending}>戻る</Button><Button variant="primary" disabled={!selected || sending || !allConfirmed || !contentConfirmed} onClick={() => void sendTest()} busy={sending} busyLabel="送信中…">{result ? 'もう一度送る' : 'テストを送る'}</Button></>)}</div></div>
         </div>
       </div>
     )

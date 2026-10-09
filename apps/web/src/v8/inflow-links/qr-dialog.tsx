@@ -5,7 +5,7 @@
  * 題「〇〇 の QR コード」→ QR → URL とコピー → 印刷の注 → 「印刷用 PDF」「PNG を保存」（真ん中）。
  *
  * 動きは今の小窓（app/inflow-links/referral-qr-modal.tsx）と同じ：
- * - 停止中の経路は QR・URL・保存を出さず、選び直しの案内だけ（読み取っても友だち追加できない QR を配らない）
+ * - 停止中も QR・URL・保存を残し、「停止中」と知らせる
  * - 印刷用 PDF はサーバーで作る（`api.entryRoutes.qrPdf`）。ID の無い未登録 ref では出さない
  * - PNG は `/api/qr?size=320x320&data=<URL>&download=1`
  */
@@ -24,7 +24,7 @@ export interface QrRoute {
   refCode: string
   name: string
   genre: string | null
-  /** false（停止中）のときは QR を出さない。null は未登録 ref（有効・無効の概念が無い）。 */
+  /** false（停止中）のときも QR を保存できる。null は未登録 ref（有効・無効の概念が無い）。 */
   isActive: boolean | null
   /** entry_routes の ID。あるときだけ印刷用 PDF を出せる。 */
   id?: string
@@ -50,7 +50,7 @@ export default function QrDialog({ route, onClose }: { route: QrRoute; onClose: 
   }
 
   const downloadPdf = async () => {
-    if (!route.id || stopped) return
+    if (!route.id) return
     setPdfState('working')
     try {
       const blob = await api.entryRoutes.qrPdf(route.id)
@@ -78,7 +78,7 @@ export default function QrDialog({ route, onClose }: { route: QrRoute; onClose: 
       // 絵 GtI4Y：題の下から本文まで14。今の共通の頭（上20・下8）だと本文が7下がるので、頭を57に詰める（題の位置は今のまま）
       designHeaderPadding="20px 24px 0"
       designHeaderHeight={57}
-      footer={stopped ? undefined : (
+      footer={(
         <div className={styles.actions}>
           {route.id ? (
             <Button
@@ -96,11 +96,7 @@ export default function QrDialog({ route, onClose }: { route: QrRoute; onClose: 
         </div>
       )}
     >
-      {stopped ? (
-        <p role="alert" className={styles.stopped}>
-          この経路は停止中のため、QRコードは表示できません。読み取っても友だち追加できないQRを配らないよう、出す口自体を止めています。有効な経路を選び直してください。
-        </p>
-      ) : (
+      {stopped ? <p role="status" className={styles.stopped}>停止中</p> : null}
         <div className={styles.body}>
           <div className={styles.qrWrap}>
             {/* eslint-disable-next-line @next/next/no-img-element -- Worker が作る QR コード */}
@@ -120,7 +116,6 @@ export default function QrDialog({ route, onClose }: { route: QrRoute; onClose: 
             <p role="alert" className={styles.error}>印刷用 PDF を作れませんでした。時間をおいて、もう一度お試しください。</p>
           ) : null}
         </div>
-      )}
     </Dialog>
   )
 }

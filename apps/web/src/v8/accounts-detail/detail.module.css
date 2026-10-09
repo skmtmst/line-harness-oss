@@ -7,14 +7,6 @@
 .screen {
   display: contents;
 }
-.screen [data-template-region='body'] {
-  gap: 0;
-}
-.screen [data-template-region='body'] > [data-template-region='content'] {
-  max-width: none;
-  padding: var(--tpl-acd-pad);
-  gap: var(--tpl-acd-stack-gap);
-}
 
 .headActions {
   display: flex;

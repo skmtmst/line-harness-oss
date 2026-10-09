@@ -27,6 +27,8 @@ export interface PageHeadingProps {
    * （決まりの板 q1xNMz・2026-10-08 オーナー）。題の行の右には操作（actions）だけを置く。
    */
   steps?: ReactNode
+  /** 説明が無い板で、題のすぐ下へ手順を詰める。 */
+  stepsSpacing?: 'compact'
 }
 
 /** 型の外に残るページの題も同じ文字の決まりを使う。窓・カードには使わない。 */
@@ -37,9 +39,9 @@ export function PageTitle({ children, as: Tag = 'h2', className }: {
 }
 
 /** 板の頭の寸法は型が持つ。操作・意味の説明は画面から渡す。 */
-export function PageHeading({ title, description, help, actions, crumbs, steps, headingSize, bottomSpacing, inset }: PageHeadingProps) {
+export function PageHeading({ title, description, help, actions, crumbs, steps, headingSize, bottomSpacing, inset, stepsSpacing }: PageHeadingProps) {
   /* 戻る（identity）は描かない。戻るのは上の帯のパンくずと下の帯の［キャンセル］だけ（オーナー 2026-10-08）。 */
-  return <header className={styles.heading} data-template-region="heading" data-heading-inset={inset} data-heading-size={headingSize} data-bottom-spacing={bottomSpacing} data-has-steps={!!steps || undefined} data-has-crumbs={!!crumbs || undefined}>
+  return <header className={styles.heading} data-template-region="heading" data-heading-inset={inset} data-heading-size={headingSize} data-bottom-spacing={bottomSpacing} data-has-steps={!!steps || undefined} data-steps-spacing={stepsSpacing} data-has-crumbs={!!crumbs || undefined}>
     <div className={styles.headingText}>
       <div className={styles.titleRow}><h2 className={styles.title} title={typeof title === 'string' ? title : undefined}>{title}</h2>
         {help ? <HelpTip label={typeof title === 'string' ? `${title}の説明` : '画面の説明'}>{help}</HelpTip> : null}
@@ -52,10 +54,10 @@ export function PageHeading({ title, description, help, actions, crumbs, steps, 
   </header>
 }
 
-export function PageFrame({ kind, children, boardId, standalone = false, hasFooter = false }: {
-  kind: string; children: ReactNode; boardId?: string; standalone?: boolean; hasFooter?: boolean
+export function PageFrame({ kind, children, boardId, layout, standalone = false, hasFooter = false }: {
+  kind: string; children: ReactNode; boardId?: string; layout?: string; standalone?: boolean; hasFooter?: boolean
 }) {
-  return <div className={styles.frame} data-page-template={kind} data-design-node={boardId} data-standalone={standalone || undefined} data-has-footer={hasFooter || undefined}>{children}</div>
+  return <div className={styles.frame} data-page-template={kind} data-template-layout={layout} data-design-node={boardId} data-standalone={standalone || undefined} data-has-footer={hasFooter || undefined}>{children}</div>
 }
 
 /** 型が保存帯の置き場所と追従を持つ。画面は操作と状態だけを渡す。 */

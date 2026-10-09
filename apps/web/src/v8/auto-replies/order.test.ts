@@ -100,3 +100,24 @@ describe('movePriorityUpdates: 隣との入れ替えに要る更新だけ返す'
     expect(rebuilt.map((r) => r.id)).toEqual(['b', 'a'])
   })
 })
+
+it('WEB083: 同点3件の末尾を1つ上へ動かしても先頭へ飛ばない', () => {
+  const input = ['a', 'b', 'c'].map((id, i) => rule(id, 10, `2026-09-0${i + 1}T00:00:00Z`))
+  const updates = new Map(movePriorityUpdates(input, 'c', -1)!.map(u => [u.id, u.priority]))
+  expect(inEvaluationOrder(input.map(r => ({ ...r, priority: updates.get(r.id) ?? r.priority }))).map(r => r.id)).toEqual(['a', 'c', 'b'])
+})
+
+it('WEB085: 個別を共通より先、同点ではキーワードを全メッセージより先に評価する', () => {
+  const input = [
+    { ...rule('common', 0), lineAccountId: null, respondToAll: false },
+    { ...rule('all', 10, '2026-09-01'), lineAccountId: 'a', respondToAll: true },
+    { ...rule('keyword', 10, '2026-09-02'), lineAccountId: 'a', respondToAll: false },
+  ]
+  expect(inEvaluationOrder(input).map(r => r.id)).toEqual(['keyword', 'all', 'common'])
+})
+
+it('WEB083: 異なる順位の交換でも3件目の同点を飛び越さない',()=>{
+ const input=[rule('a',0,'2026-09-03'),rule('b',1,'2026-09-01'),rule('c',1,'2026-09-02')]
+ const updates=new Map(movePriorityUpdates(input,'a',1)!.map(u=>[u.id,u.priority]))
+ expect(inEvaluationOrder(input.map(r=>({...r,priority:updates.get(r.id)??r.priority}))).map(r=>r.id)).toEqual(['b','a','c'])
+});

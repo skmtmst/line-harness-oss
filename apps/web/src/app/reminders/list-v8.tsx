@@ -67,6 +67,7 @@ import Select from '@/components/shared/select'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { useFolderRowActions } from '@/components/shared/folder-row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import DetailPanel from '@/components/shared/detail-panel'
@@ -80,6 +81,7 @@ import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-
 import { runUndoable } from '@/lib/undoable'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
+import { completeReorder } from '@/lib/complete-reorder'
 import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
 import { formatTriggerOffset } from './reminder-timing'
 import styles from './list-v8.module.css'
@@ -579,7 +581,8 @@ export default function RemindersListV8() {
     runUndoable({
       message: '並び順を変えました',
       commit: async () => {
-        const res = await api.reminders.reorder(order)
+        const fullOrder = await completeReorder(order, loadReminderPage, 500)
+        const res = await api.reminders.reorder(fullOrder)
         if (!res.success) throw new Error(res.error)
       },
       undo: () => setOptimisticRows(null),
@@ -592,9 +595,9 @@ export default function RemindersListV8() {
   }
 
   /*
-   * 動かせるのは「自分で並べた順」で、絞り込みが無く、全件が1ページに出ているときだけ
+   * 動かせるのは「自分で並べた順」で、絞り込みが無く、全件が500件以内のときだけ
    * （リッチメニュー・自動応答と同じ決まり）。保存は渡した行に 0 からの番号を振り直すため、
-   * 別の順・一部の行のまま保存すると、読み直したときに並べた順が崩れる。
+   * 別の順・一部の行のまま保存すると、読み直したときに並べた順が崩れる。全順位を読んで送り、ページ外の位置を保つ。
    */
   const reorderDisabledReason = !canEdit
     ? '閲覧のみのため並び替えできません'
@@ -602,8 +605,8 @@ export default function RemindersListV8() {
       ? '並びを「自分で並べた順」にすると動かせます'
       : filterActive
         ? '絞り込みを外すと動かせます'
-        : reminderList.pageCount > 1
-          ? '全件が1ページに収まる表示件数にすると動かせます'
+        : reminderList.total > 500
+          ? '500件を超える一覧では並び替えできません'
           : null
 
   /* ドラッグ・上下キー・「…」の上へ／下へを1つの入口にする（共通の並び替え）。 */
@@ -633,9 +636,12 @@ export default function RemindersListV8() {
     const folder = folders.find((f) => f.id === row.folderId)
     return folder ? { name: folder.name, color: folder.color } : null
   }
+  const folderActions = useFolderRowActions({ kind: 'reminder', folders, enabled: canEdit, accountId: undefined, itemLabel: 'リマインダ', onChanged: loadFolders })
+
   const folderRows: FolderPanelRow[] = [
     { kind: 'all' as const, id: '', label: 'すべて', count: reminderList.total ?? null, color: 'var(--color-accent)' },
-    ...folders.map((folder) => ({
+    ...folders.map((folder, index) => ({
+      ...folderActions.rowActions(folder, index),
       kind: 'folder' as const,
       id: folder.id,
       label: folder.name,
@@ -1198,6 +1204,7 @@ export default function RemindersListV8() {
         ))}
       </KpiBand>
 
+      {folderActions.dialogs}
       {folderDialogOpen && (
         <FolderAddDialog
           kind="reminder"

@@ -132,3 +132,19 @@
 [data-theme='v8'] .twoLine .description { color: var(--color-ink-secondary); font-size: 12px; line-height: 17px; }
 [data-theme='v8'] .twoLine .action { display: flex; gap: 12px; }
 [data-theme='v8'] .twoLine .icon { color: var(--color-warning); }
+/* 小さなカードに入れる1行の注意。既存の帯は変えない。 */
+[data-theme='v8'] .notice[data-compact] {
+  min-width: 0;
+  padding: 6px 10px;
+  gap: 6px;
+  border: 0;
+  border-radius: var(--radius-mini);
+  font-size: var(--text-micro);
+  line-height: 20px;
+}
+[data-theme='v8'] .notice[data-compact] .message {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+[data-theme='v8'] .notice[data-appearance='soft'] { border-color: transparent; }

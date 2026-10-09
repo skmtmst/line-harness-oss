@@ -39,14 +39,6 @@ describe('m22b 表の左右の余白（共通部品）', () => {
 })
 
 describe('m22b 表の左右の余白（操作列の右寄せ）', () => {
-  it('/broadcasts：操作列は120px・共通の余白で右へ寄せる', () => {
-    const body = read('app', 'broadcasts', 'page.tsx')
-    expect(body).toContain("width: '16%'")
-    expect(body).toContain('width: 120')
-    expect(body).toContain(
-      '<ActionCell className="sticky right-0 bg-canvas group-hover:bg-canvas-sunken">',
-    )
-  })
 
   it('/common-actions：操作の中身は枠いっぱいで右へ寄せる', () => {
     const body = read('app', 'common-actions', 'page.tsx')

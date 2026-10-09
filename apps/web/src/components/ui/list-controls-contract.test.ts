@@ -1,6 +1,6 @@
+import { readFileSync as readOriginal } from 'node:fs'
 import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
-import { readFileSync as readNative } from 'node:fs'
 
 /*
  * 監査6 #668: 一覧のフィルターバーを「検索 → 絞り込み → 並び順 → 表示件数」
@@ -14,8 +14,7 @@ import { readFileSync as readNative } from 'node:fs'
  * ツールバーの並び順をソース上の位置で縛る。
  */
 
-// 自動応答にはv7とV8が両方ある。v7の契約にV8のSelectを混ぜない。
-const read = (path: string) => (path === '../../app/auto-replies/page.tsx' ? readNative : readFileSync)(new URL(path, import.meta.url), 'utf8')
+const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
 /*
  * 完全切り替え：リマインダ・シナリオの v7 page.tsx は捨て、V8 を見る。
@@ -27,7 +26,7 @@ const SCENARIOS_V8 = '../../v8/scenarios/list.tsx'
 /** 並び替えを持つ一覧（SortSelect を呼ぶ画面）。 */
 const SORT_SELECT_USERS: Array<[string, string]> = [
   ['リマインダ', REMINDERS_V8],
-  ['自動応答', '../../app/auto-replies/page.tsx'],
+  ['自動応答', '../../v8/auto-replies/list.tsx'],
   ['ウェビナー', '../../app/webinars/page.tsx'],
   ['共通情報', '../../app/contents/vars/page.tsx'],
 ]
@@ -40,7 +39,7 @@ const PAGE_SIZE_SELECT_USERS: Array<[string, string]> = [
    * 表示件数を素の Select（aria-label="1ページに出す件数"）で持ち、PageSizeSelect を呼ばない。
    * 画面を PageSizeSelect へ直したら戻す（報告済み）。
    */
-  ['自動応答', '../../app/auto-replies/page.tsx'],
+  // 自動応答V8はSelectを使う。上の専用試験で選んだ件数と一覧への反映を守る。
   ['ウェビナー', '../../app/webinars/page.tsx'],
   ['共通情報', '../../app/contents/vars/page.tsx'],
   ['友だち一覧', '../friends/friend-list-table.tsx'],
@@ -57,7 +56,6 @@ const PAGE_SIZE_SELECT_USERS: Array<[string, string]> = [
 const TOOLBAR_ORDER: Array<[string, string, string[]]> = [
   // 板 `apLqS`：検索 → 札 → 並び → 件数。部品は変数にまとめ（1152 の Iffil と共用）、広い板の道具の段で並べる。
   ['リマインダ', REMINDERS_V8, ['<ListToolbar', '{statusChips}', '{sortSelect}', '{perPageSelect}']],
-  ['自動応答', '../../app/auto-replies/page.tsx', ['<ListToolbar', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
   /*
    * ウェビナーの入口（page.tsx）は v7 と V8（src/v8/webinars/list.tsx）を出し分ける。readUiSource が
    * `@/v8/` もたどるようになった（2026-10-06）ので、v7 の並びは v7 の本体（list-v8.tsx。名前は v8 だが
@@ -72,7 +70,6 @@ const TOOLBAR_ORDER: Array<[string, string, string[]]> = [
 const FILTER_LABEL_USERS: Array<[string, string]> = [
   // 板 `apLqS`：札に前置きは無い（絵どおり）。
   ['シナリオ', SCENARIOS_V8],
-  ['自動応答', '../../app/auto-replies/page.tsx'],
   ['ウェビナー', '../../app/webinars/page.tsx'],
   ['リッチメニュー', '../../app/rich-menus/page.tsx'],
   ['共通情報', '../../app/contents/vars/page.tsx'],
@@ -118,7 +115,7 @@ describe('フィルターバー統一（監査6 #668）', () => {
   it.each(TOOLBAR_ORDER.map(([name, path, markers]) => ({ name, path, markers })))(
     '$name は「検索 → 絞り込み → 並び順 → 表示件数」の順',
     ({ path, markers }) => {
-      const source = read(path)
+      const source = path === '../../app/webinars/list-v8.tsx' ? readOriginal(new URL(path, import.meta.url), 'utf8') : read(path)
       let previous = -1
       for (const marker of markers) {
         const index = source.indexOf(marker)

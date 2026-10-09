@@ -2,11 +2,13 @@
 
 import { useState } from 'react'
 import { Send } from 'lucide-react'
+import type { HqTemplateFolder } from '@line-crm/shared'
 import type { HqAccount, HqTemplate } from '@/lib/hq-templates-api'
 import Dialog from '@/components/shared/dialog'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import StatusBadge from '@/components/shared/status-badge'
+import TagPill from '@/components/shared/tag-pill'
 import DistributionAccountPicker from './distribution-account-picker'
 import { ALL_ACCOUNTS, useDistributionFolders } from './distribution-accounts'
 import styles from './folder-distribution-dialog.module.css'
@@ -16,8 +18,8 @@ export function distributionKind(row: HqTemplate) {
   return row.template_type === 'template' ? ({ message: 'メッセージ', carousel: 'カルーセル', rich_message: 'リッチメッセージ', question: '質問', coupon: 'クーポン', research: 'リサーチ' }[row.kind ?? 'message'])
     : ({ tag: 'タグ', rich_menu: 'リッチメニュー', form: '回答フォーム', scenario: 'シナリオ' }[row.template_type])
 }
-export default function FolderDistributionDialog({ name, templates, accounts, busy, error, onCancel, onConfirm }: {
-  name: string; templates: HqTemplate[]; accounts: HqAccount[]; busy: boolean; error?: string
+export default function FolderDistributionDialog({ name, templates, templateFolders = [], accounts, busy, error, onCancel, onConfirm }: {
+  name: string; templates: HqTemplate[]; templateFolders?: HqTemplateFolder[]; accounts: HqAccount[]; busy: boolean; error?: string
   onCancel: () => void; onConfirm: (templates: HqTemplate[], ids: string[]) => void
 }) {
   const [picked, setPicked] = useState(templates.map((row) => row.id))
@@ -40,7 +42,7 @@ export default function FolderDistributionDialog({ name, templates, accounts, bu
         <div className={styles.heading}><strong>配るひな形</strong><span>{`${picked.length} / ${templates.length} 件を選択`}</span></div>
         <div className={styles.list}>
           {templates.map((row) => <div className={styles.row} key={row.id}>
-            <Checkbox checked={picked.includes(row.id)} disabled={busy} onCheckedChange={(checked) => setPicked((ids) => checked ? [...ids, row.id] : ids.filter((id) => id !== row.id))}>{row.name}</Checkbox>
+            <Checkbox checked={picked.includes(row.id)} disabled={busy} onCheckedChange={(checked) => setPicked((ids) => checked ? [...ids, row.id] : ids.filter((id) => id !== row.id))}>{row.template_type === 'tag' ? <TagPill name={row.name} color={templateFolders.find((folder) => folder.id === row.folder_id)?.color} size="sm" /> : row.name}</Checkbox>
             <StatusBadge size="compact" tone="neutral">{distributionKind(row)}</StatusBadge>
           </div>)}
         </div>

@@ -20,10 +20,10 @@ import ListState from '@/components/shared/list-state'
 import TagsList from './list'
 import styles from './create.module.css'
 
-import { FOLDER_COLORS, FOLDER_COLOR_NAMES } from '@/components/shared/folder-add-dialog'
-
-export const TAG_FOLDER_COLORS = FOLDER_COLORS.map((value) => ({ value, name: FOLDER_COLOR_NAMES[value] }))
-const DEFAULT_COLOR = FOLDER_COLORS[0]
+/* 絵の9色。保存する値は色コード、読み上げと見出しは名前。既定は緑（基調色）。 */
+import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from './folder-colors'
+export { TAG_FOLDER_COLORS } from './folder-colors'
+const DEFAULT_COLOR = DEFAULT_TAG_FOLDER_COLOR
 
 type RequestKey = { editId: string | null; generation: number }
 const sameRequest = (a: RequestKey, b: RequestKey) => a.editId === b.editId && a.generation === b.generation

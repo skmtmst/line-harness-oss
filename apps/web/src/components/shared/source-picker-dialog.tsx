@@ -1,17 +1,16 @@
 'use client'
 
-import { useContext, useEffect, useId, useRef, useState, type ReactNode, type Ref } from 'react'
-import { createPortal } from 'react-dom'
-import { Check, Inbox, X } from 'lucide-react'
+import { useEffect, useId, useRef, useState, type ReactNode, type Ref } from 'react'
+import { Check } from 'lucide-react'
 import Button from './button'
-import IconButton from './icon-button'
 import FilterChip from './filter-chip'
 import { FolderDot } from './folder-dot'
+import FolderPanel, { type FolderPanelRow } from './folder-panel'
 import Radio from './radio'
 import SearchField from './search-field'
 import Select from './select'
 import StatusBadge, { type StatusBadgeTone } from './status-badge'
-import { OverlayDepthContext, useOverlayFocus } from './overlay-utils'
+import SelectionDialog from './selection-dialog'
 import styles from './source-picker-dialog.module.css'
 
 export interface SourcePickerItem {
@@ -49,7 +48,6 @@ export default function SourcePickerDialog({
   onCancel: () => void
 }) {
   const id = useId()
-  const depth = useContext(OverlayDepthContext)
   const [mounted, setMounted] = useState(false)
   const [selected, setSelected] = useState(initialId)
   const [query, setQuery] = useState('')
@@ -58,7 +56,7 @@ export default function SourcePickerDialog({
   const [limit, setLimit] = useState(20)
   const [narrow, setNarrow] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
-  const panelRef = useOverlayFocus(mounted, onCancel, busy, () => searchRef.current)
+  const panelRef = useRef<HTMLDivElement>(null)
   useEffect(() => setMounted(true), [])
   useEffect(() => {
     const panel = panelRef.current
@@ -75,23 +73,27 @@ export default function SourcePickerDialog({
   const folderOptions = [{ id: '', name: 'すべて' }, ...folders, { id: '__none__', name: '未分類' }]
   const countFolder = (folderId: string) => items.filter((item) => !folderId || (folderId === '__none__' ? !item.folderId : item.folderId === folderId)).length
   const listState = Boolean(state)
+  const folderRows: FolderPanelRow[] = folderOptions.map((f) => ({
+    id: f.id, label: f.name,
+    kind: !f.id ? 'all' : f.id === '__none__' ? 'unfiled' : 'folder',
+    color: folders.find((entry) => entry.id === f.id)?.color,
+    count: listState ? null : countFolder(f.id),
+  }))
   const choose = (itemId: string) => { setSelected(itemId); onSelect(itemId) }
-  const panel = <div className={styles.overlay} onMouseDown={(event) => { if (!busy && event.target === event.currentTarget) onCancel() }}>
-    <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={`${id}-title`} aria-describedby={`${id}-description`} aria-busy={busy || undefined} tabIndex={-1} className={styles.panel} data-design-node="EpTBB">
-      <header className={styles.header}>
-        <div className={styles.heading}><h2 id={`${id}-title`}>{title}</h2><p id={`${id}-description`}>{description}</p></div>
-        <SearchField ref={searchRef} aria-label={`${title}：名前で探す`} placeholder="名前で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
-        <IconButton aria-label="閉じる" title="閉じる" disabled={busy} onClick={onCancel}><X size={18} aria-hidden /></IconButton>
-      </header>
-      <div className={styles.body}>
-        {!narrow ? <nav className={styles.folders} aria-label="候補のフォルダ">
-          <p>フォルダ</p>
-          {folderOptions.map((f) => <button type="button" key={f.id} aria-pressed={folder === f.id} className={styles.folder} disabled={busy || listState} onClick={() => setFolder(f.id)}>
-            {f.id ? <FolderDot folder={folders.find((entry) => entry.id === f.id)} /> : <Inbox size={14} aria-hidden />}<span title={f.name}>{f.name}</span><small>{listState ? '—' : countFolder(f.id)}</small>
-          </button>)}
-        </nav> : null}
+  return <SelectionDialog title={title} description={description} busy={busy} error={error} designNode="EpTBB" onCancel={onCancel} initialFocusRef={searchRef}
+    search={<SearchField ref={searchRef} aria-label={`${title}：名前で探す`} placeholder="名前で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />}
+    footer={<>
+      <span className={styles.selection} title={picked?.name}>{picked ? `選んだもの：${picked.name}（${picked.categoryLabel}）` : '選んだもの：まだ選んでいません'}</span>
+      <Button disabled={busy} onClick={onCancel}>キャンセル</Button>
+      <Button variant="primary" busy={busy} disabled={busy || !picked || listState || confirmDisabled} onClick={() => onConfirm(selected)}><Check size={16} aria-hidden />{confirmLabel}</Button>
+    </>}
+  >
+      <div ref={panelRef} className={styles.body}>
+        {!narrow ? <div className={styles.folders}>
+          <FolderPanel readOnly disabled={busy || listState} rows={folderRows} activeId={folder} onSelect={setFolder} />
+        </div> : null}
         <section className={styles.list} aria-label="候補の一覧">
-          {narrow ? <Select aria-label="候補のフォルダ" value={folder} onChange={setFolder} options={folderOptions.map((f) => ({ value: f.id, label: `${f.name}（${listState ? '—' : countFolder(f.id)}）` }))} /> : null}
+          {narrow ? <Select disabled={busy || listState} aria-label="候補のフォルダ" value={folder} onChange={setFolder} options={folderOptions.map((f) => ({ value: f.id, label: `${f.name}（${listState ? '—' : countFolder(f.id)}）` }))} /> : null}
           <div className={styles.categories} aria-label="候補の絞り込み">
             {[{ id: '', label: 'すべて' }, ...categories].map((c) => <FilterChip key={c.id} selected={category === c.id} disabled={busy || listState} count={listState ? undefined : folderItems.filter((item) => !c.id || item.category === c.id).length} onChange={() => setCategory(c.id)}>{c.label}</FilterChip>)}
           </div>
@@ -116,15 +118,7 @@ export default function SourcePickerDialog({
         {!narrow ? <aside className={styles.preview} aria-label="選んだ候補の見え方">{preview}</aside> : null}
       </div>
       {narrow ? <details className={styles.compactPreview}><summary>選んだ候補の LINE での見え方</summary>{preview}</details> : null}
-      {error ? <p className={styles.error} role="alert">{error}</p> : null}
-      <footer className={styles.footer}>
-        <span className={styles.selection} title={picked?.name}>{picked ? `選んだもの：${picked.name}（${picked.categoryLabel}）` : '選んだもの：まだ選んでいません'}</span>
-        <Button disabled={busy} onClick={onCancel}>キャンセル</Button>
-        <Button variant="primary" busy={busy} disabled={busy || !picked || listState || confirmDisabled} onClick={() => onConfirm(selected)}><Check size={16} aria-hidden />{confirmLabel}</Button>
-      </footer>
-    </div>
-  </div>
-  return <OverlayDepthContext.Provider value={depth + 1}>{mounted ? createPortal(panel, document.body) : null}</OverlayDepthContext.Provider>
+  </SelectionDialog>
 }
 
 function folderName(id: string | null | undefined, folders: SourcePickerFolder[]) {

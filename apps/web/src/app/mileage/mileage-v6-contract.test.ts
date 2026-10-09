@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -26,10 +26,10 @@ describe('V6 マイルの正本URLと概念分離', () => {
   })
 
   it('履歴と友だち別明細をV6の実Nodeへ接続する', () => {
-    expect(HISTORY).toContain('data-design-node="MvZm5"')
+    expect(HISTORY).toMatch(/(?:data-design-node|boardId)="MvZm5"/)
     expect(HISTORY).toContain('api.mileage.history')
     expect(HISTORY).toContain("kind=\"error\"")
-    expect(FRIEND_DETAIL).toContain('data-design-node="HIU5O"')
+    expect(FRIEND_DETAIL).toMatch(/(?:data-design-node|boardId)="HIU5O"/)
     expect(FRIEND_DETAIL).toContain('api.friends.mileage')
     expect(FRIEND_DETAIL).toContain('api.mileage.friendsV6')
     expect(FRIEND_DETAIL).toContain('api.mileage.history')
@@ -56,7 +56,7 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(HISTORY).toContain('mileagePaginationTotal(result)')
     expect(HISTORY).not.toContain('result?.pagination.total')
     expect(PAGE).toContain('mileagePaginationTotal(overview)')
-    expect(PAGE).not.toContain('overview?.pagination.total')
+    expect(readFileSync(new URL('../../v8/mileage/score.tsx', import.meta.url), 'utf8')).not.toContain('overview?.pagination.total')
     expect(FRIEND_DETAIL).toContain('mileageRewardedActions(mileage.insights)')
     expect(FRIEND_DETAIL).toContain('mileageConnectedAccounts(mileage.connections)')
     expect(FRIEND_DETAIL).toContain('付与記録の回数は未取得')
@@ -112,7 +112,7 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(NEW_RULE).toContain('api.mileage.saveEarningRuleDraft')
     // #532(#521): 旧口の作成は選択中のLINEアカウントに帰属させる。
     expect(NEW_RULE).toContain('lineAccountId: selectedAccountId!')
-    expect(NEW_RULE).toContain("if (!selectedAccountId) return 'LINEアカウントを選択してください'")
+    expect(NEW_RULE).toMatch(/if \(!selectedAccountId\) \{\s*setSaveError\('LINEアカウントを選択してください'\)/)
     expect(API).toContain('lineAccountId: string\n      /** DRAFT-01: falseなら最初から停止中で作る。省略は従来どおり稼働。 */\n      isActive?: boolean\n    }, options?: { idempotencyKey?: string }) =>')
     expect(NEW_RULE).toContain('expiresAfterDays: expiryDays')
     expect(NEW_RULE).toContain('cancellationEventTypes:')
@@ -125,7 +125,8 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(NEW_RULE).toContain('<ConditionBuilder')
     expect(NEW_RULE).toContain('value={targetConditions}')
     expect(NEW_RULE).toContain('targetConditions: pruneCondition(targetConditions)')
-    expect(NEW_RULE).toContain('href="/mileage?tab=earning-rules"')
+    expect(NEW_RULE).toContain("const LIST_HREF = '/mileage?tab=earning-rules'")
+    expect(NEW_RULE).toContain('href={LIST_HREF}')
     expect(NEW_RULE).not.toContain('api.scoring.create')
   })
 
@@ -186,7 +187,7 @@ describe('V6 マイルの正本URLと概念分離', () => {
   })
 
   it('行動スコアを既存の現在値・履歴から選択アカウント単位で表示する', () => {
-    expect(ACTION_SCORE).toContain('data-design-node="z3PB2"')
+    expect(ACTION_SCORE).toMatch(/(?:data-design-node|boardId)="z3PB2"/)
     expect(ACTION_SCORE).toContain('api.actionScores.friends')
     /* 断り文は下の「3つの言い方で断る」で見る。ここは口と印だけ。 */
     expect(ACTION_SCORE).toContain('kind="loading"')

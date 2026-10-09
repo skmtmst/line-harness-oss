@@ -6,7 +6,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source.mjs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 

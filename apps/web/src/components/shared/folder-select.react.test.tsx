@@ -81,14 +81,14 @@ describe('開いた中身（dLffh）', () => {
 })
 
 describe('名前を入れる（iBuZH）', () => {
-  it('押すと同じ板が「新しいフォルダ」に替わり、名前の欄に焦点・横の色ボタンを押すと6色', async () => {
+  it('押すと同じ板が「新しいフォルダ」に替わり、名前の欄に焦点・横の色ボタンを押すと9色', async () => {
     await openMenu({ onCreate: vi.fn() })
     const input = await startCreate()
     expect(document.activeElement).toBe(input)
     expect(screen.queryByRole('listbox')).toBeNull()
     expect(screen.queryAllByRole('radio')).toHaveLength(0)
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダの色：青' })) })
-    expect(screen.getAllByRole('radio')).toHaveLength(6)
+    expect(screen.getAllByRole('radio')).toHaveLength(9)
     expect(screen.getByRole('button', { name: '作って選ぶ' })).toBeTruthy()
   })
 

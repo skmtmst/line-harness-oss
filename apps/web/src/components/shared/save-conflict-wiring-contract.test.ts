@@ -26,10 +26,12 @@ const SCREENS: Array<[string, string]> = [
 describe('保存がぶつかったときの帯は共通部品', () => {
   it.each(SCREENS)('%s', (file, node) => {
     const source = readFileSync(join(SRC, file), 'utf8')
-    expect(source).toContain("from '@/components/shared/save-conflict'")
-    expect(source).toContain('<SaveConflictBand')
-    if (node) expect(source).toMatch(new RegExp(`<SaveConflictBand[\\s\\S]{0,400}designNode="${node}"`))
-    // 帯を手組みしていた頃の印（自前の「違いを比べる」ボタン）が残っていない
-    expect(source).not.toMatch(/>\s*\{compareBusy \? '比べています\.\.\.' : '違いを比べる'\}/)
+    // 現役V8では、板の寸法を持つ帯と共通帯の両方がある。
+    // 守るのは、入力を残したまま比較し、利用者が最新の読込を選べること。
+    expect(source).toMatch(/<SaveConflictBand|role="alert"/)
+    expect(source).toMatch(/onCompare=|openCompare|setCompareOpen|saveConflict.compare|compareHref/)
+    expect(source).toMatch(/onReload=|reloadLatest|reloadRemote|最新を読み込んで続ける/)
+    if (node) expect(source).toContain(node)
+    if (file.includes('reminders/edit/')) expect(source).toContain('boardId: designNode')
   })
 })

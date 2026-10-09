@@ -44,3 +44,19 @@ it('名前の誤りは欄だけに出し、処理の誤りは設定を開いて�
   expect(screen.getAllByText('付けるタグを選んでください')).toHaveLength(1)
   expect(createDraft).not.toHaveBeenCalled()
 })
+
+it('WEB-120: 名前を変えてキャンセルすると、入力を残して未保存を確認する', async () => {
+  render(<NewAutomationV8 />)
+  const name = screen.getByRole('textbox', { name: '名前', exact: true })
+  fireEvent.change(name, { target: { value: '予約のお礼' } })
+  fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
+  expect(await screen.findByRole('dialog', { name: /保存していない変更/ })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
+  expect((screen.getByRole('textbox', { name: '名前', exact: true }) as HTMLInputElement).value).toBe('予約のお礼')
+})
+
+it('WEB-120: 何も変えていないキャンセルは未保存の確認を出さない', () => {
+  render(<NewAutomationV8 />)
+  fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
+  expect(screen.queryByRole('alertdialog')).toBeNull()
+})

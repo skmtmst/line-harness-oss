@@ -21,6 +21,12 @@ function renderEditor(props: Partial<Parameters<typeof DashboardEditorV8>[0]> = 
 }
 
 describe('V8 ダッシュボード編集', () => {
+  it('WEB246: 保存中は配置と表示を編集できない', () => {
+    renderEditor({ saving: true })
+    expect(screen.getByRole('button', { name: '写真審査を1つ上へ移動' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('switch', { name: '写真審査を表示' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.queryByRole('button', { name: '写真審査をドラッグして並べ替え' })).toBeNull()
+  })
   it('上下ボタンで順番が変わり、反映で同じ形の配置を渡す。結果は日本語で読み上げる', () => {
     const { onApply } = renderEditor()
     fireEvent.click(screen.getByRole('button', { name: '写真審査を1つ上へ移動' }))
@@ -116,4 +122,12 @@ describe('V8 ダッシュボード編集', () => {
     fireEvent.click(screen.getByRole('button', { name: 'スマホ' }))
     expect(screen.getByText(/「集計を見る」で開きます/)).toBeTruthy()
   })
+})
+
+// WEB246：保存する配置の送信後は、入力と移動を止める。
+it('保存中は全カードの表示・上下移動・つまみを操作できない', () => {
+  renderEditor({ saving: true })
+  for (const control of screen.getAllByRole('switch')) expect((control as HTMLButtonElement).disabled).toBe(true)
+  for (const control of screen.getAllByRole('button', { name: /1つ上へ移動|1つ下へ移動/ })) expect((control as HTMLButtonElement).disabled).toBe(true)
+  expect(document.querySelector('button[data-reorder-handle]')).toBeNull()
 })

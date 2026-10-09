@@ -114,7 +114,7 @@
   flex-direction: column;
   gap: var(--tpl-hq-form-gap);
   min-width: 0;
-  height: var(--tpl-hql-home-card-h);
+  min-height: var(--tpl-hql-home-card-h);
   padding: var(--tpl-hq-home-account-pad);
   border-radius: var(--radius-card);
   outline: 1px solid var(--color-hairline);
@@ -123,10 +123,7 @@
 }
 
 .cardWarn { outline-color: var(--color-status-warn-deep); }
-/*
- * JKjsE の書き出しは高さ206。通常カードの操作は下へ寄せ、要確認のカードは
- * 下に確認の行を置く。狭い板では中身に合わせた高さに戻し、はみ出しを防ぐ。
- */
+/* 帯を含む中身に高さを合わせ、並ぶカードは grid の高さを共有する。 */
 
 .cardHead {
   display: flex;
@@ -201,33 +198,19 @@
   display: flex;
   align-items: center;
   gap: var(--tpl-hq-plan-head-gap);
-  margin-top: var(--tpl-hq-body-gap);
+  margin-top: auto;
   flex-shrink: 0;
 }
-.card:not(.cardWarn) .cardButtons { margin-top: auto; }
 @container v8-page (max-width: 1099px) {
   .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .card { height: auto; min-height: var(--tpl-hql-home-card-h); }
 }
 
 .grow { flex: 1; min-width: 0; }
 
-.warnLine {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--tpl-hq-plan-head-gap);
-  margin: 0;
-  color: var(--color-status-warn-deep);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-hq-small-lh);
-}
-
-.warnText {
-  overflow: hidden;
+.reasonSlot {
   min-width: 0;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-height: 0;
+  flex: 1;
 }
 
 .linkButton {

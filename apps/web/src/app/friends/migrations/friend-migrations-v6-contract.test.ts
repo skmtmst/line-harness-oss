@@ -78,7 +78,8 @@ describe('V6 機能3 UID・CSV移行', () => {
   it('事前確認と未取得値を区別する', () => {
     expect(UID_PAGE).toContain('実データはまだ変更していません')
     expect(UID_PAGE).toContain("unresolved ?? '—'")
-    expect(CSV_PAGE).toContain("job.row_count ?? job.total_count ?? '—'")
+    // 入口は V8（v8/friends/migrations/csv.tsx）。件数が無いときは 0 にせず未取得として扱う。
+    expect(CSV_PAGE).toContain('job.row_count ?? job.total_count ?? null')
   })
 
   it('R114 出ない項目は選べないことが文に残る', () => {

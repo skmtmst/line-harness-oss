@@ -125,7 +125,7 @@ function StoreForm({ store, accounts, stores, busy, onSubmit, onCancel }: {
         <Field label="店舗コード" name="code" defaultValue={store?.code} required />
         <Field label="エリア" name="area" defaultValue={store?.area || ''} />
         <Field label="収容人数" name="capacity" type="number" defaultValue={String(store?.capacity ?? 24)} required />
-        <Field label="タイムゾーン" name="timezone" defaultValue={store?.timezone || 'Asia/Tokyo'} required />
+        <div className={styles.field}><span className={styles.fieldLabel}>タイムゾーン</span><span>日本時間（Asia/Tokyo）</span><input type="hidden" name="timezone" value="Asia/Tokyo" /></div>
         {store ? (
           <label className={styles.field}>
             <span className={styles.fieldLabel}>状態</span>

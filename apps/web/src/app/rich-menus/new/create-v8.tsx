@@ -1655,6 +1655,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   }
 
   return (
+    <fieldset disabled={busy} className="contents">
     <CreatePage boardId={
         host ? (step === 'shape' ? 'gobhu' : step === 'buttons' ? 'egdGx' : step === 'audience' ? 'K0gu1' : 'gQabc')
           : step === 'shape' ? 'JeINq' : step === 'buttons' ? 'Z0uO6' : step === 'audience' ? 'OxEMM' : 'F4gELj'
@@ -1876,6 +1877,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         <VersionCompare before={latestSummary} after={currentSummary} />
       </Dialog>
     </CreatePage>
+    </fieldset>
   )
 
   /* ======== 手順①：形と画像 ======== */

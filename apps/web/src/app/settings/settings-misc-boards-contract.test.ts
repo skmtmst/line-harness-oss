@@ -25,8 +25,10 @@ describe('設定の細かい板', () => {
     expect(FEATURE).toContain('filteredGroups.length === 0')
     expect(FEATURE).toContain('emptyPreset="filtered"')
     expect(FEATURE).toContain("onClick={() => setQuery('')}")
-    expect(MANUAL).toContain('data-design-node="bR6a1"')
-    expect(SCAN).toContain('data-design-node="bR6a1"')
+    expect(MANUAL).toContain("kind={status === 'error' ? 'error' : 'loading'}")
+    expect(MANUAL).toContain('kind="empty"')
+    expect(SCAN).toContain('kind="error"')
+    expect(SCAN).toContain('kind="empty"')
   })
 
   it('絞り込み0件には条件を外す口がある', () => {
@@ -40,12 +42,12 @@ describe('設定の細かい板', () => {
   })
 
   it('はじめの設定の順路に板IDを付ける（BOj1a）', () => {
-    expect(START).toContain('data-design-node="BOj1a"')
+    expect(START).toMatch(/(?:data-design-node|boardId)="BOj1a"/)
   })
 
   it('機能設定の競合は帯・比べる・読み直しを出す（ziYCN）', () => {
     expect(HOOK).toContain('setConflict(true)')
-    expect(FEATURE).toContain('data-design-node="ziYCN"')
+    expect(FEATURE).toMatch(/(?:data-design-node|boardId)="ziYCN"/)
     expect(FEATURE).toContain('ほかの人が先に機能設定を保存しました')
     expect(FEATURE).toContain('違いを比べる')
     expect(FEATURE).toContain('最新を読み込んで続ける')

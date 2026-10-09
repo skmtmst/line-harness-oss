@@ -13,3 +13,5 @@
 .empty { margin: 0; padding: var(--tpl-htn-empty-pad); font-size: var(--tpl-htn-text-13); color: var(--color-ink-secondary); }
 .footer { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-htn-gap-s); padding: var(--tpl-hq-save-footer-pad); border-top: 1px solid var(--color-hairline); }
 @media (max-width: 767px) { .row { flex-wrap: wrap; } .state { flex-basis: 100%; justify-content: flex-end; } .tools { flex-wrap: wrap; } }
+
+.meta { flex-shrink: 0; font-size: var(--tpl-htn-text-13); color: var(--color-ink-secondary); white-space: nowrap; }

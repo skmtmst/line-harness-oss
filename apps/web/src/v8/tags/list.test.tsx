@@ -45,7 +45,7 @@ vi.mock('@/components/shared/select', () => ({
   ),
 }))
 
-import { FRIEND_ATTRIBUTES_QA_GROUPS, FRIEND_ATTRIBUTES_QA_TAGS } from '@/components/friend-fields/tags-page-v4'
+import { FRIEND_ATTRIBUTES_QA_GROUPS, FRIEND_ATTRIBUTES_QA_TAGS, isUnused } from '@/components/friend-fields/tags-page-v4'
 import TagsList from './list'
 import { tagLinkText } from './tags-tab'
 
@@ -73,11 +73,11 @@ afterEach(async () => {
 const fixture = { items: FRIEND_ATTRIBUTES_QA_TAGS, groups: FRIEND_ATTRIBUTES_QA_GROUPS }
 
 describe('V8 タグ タグの一覧', () => {
-  it('絵の列（★・タグ・人数・付け方・連動・使っている所・操作）と4つのタブを出し、名前の前にフォルダの色の丸', async () => {
+  it('絵の列（タグ・人数・付け方・連動・使っている所・操作）と4つのタブを出し、名前の前にフォルダの色の丸', async () => {
     await render(<TagsList fixture={fixture} />)
     const heads = [...container.querySelectorAll('thead th')].map((th) => th.textContent?.trim())
     // 左にフォルダの列があるので表にフォルダ列は置かない（2026-10-07 オーナー）。
-    expect(heads).toEqual(['一覧に出す', 'タグ', '人数', '付け方', '連動', '使っている所', '操作'])
+    expect(heads).toEqual(['タグ', '人数', '付け方', '連動', '使っている所', '操作'])
     expect(container.querySelectorAll('tbody [role="group"][aria-label^="タグ「"]').length).toBe(FRIEND_ATTRIBUTES_QA_TAGS.length)
     for (const label of ['タグ', '友だち情報欄', '対応マーク', '保存した検索']) {
       expect(screen.getAllByRole('tab', { name: label }).length).toBeGreaterThan(0)
@@ -108,13 +108,15 @@ describe('V8 タグ タグの一覧', () => {
     expect(screen.queryAllByRole('button', { name: /^タグ「.+」の操作$/ })).toHaveLength(0)
   })
 
-  it('「よく使う絞り込み」で ★のみ表示 に絞れる', async () => {
+  it('「よく使う絞り込み」に星を出さず、残った未使用の絞り込みは動く', async () => {
     await render(<TagsList fixture={fixture} />)
     expect(container.querySelectorAll('tbody tr').length).toBe(FRIEND_ATTRIBUTES_QA_TAGS.length)
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'よく使う絞り込み' })) })
-    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /★のみ表示/ })) })
-    const starred = FRIEND_ATTRIBUTES_QA_TAGS.filter((tag) => tag.isStarred).length
-    expect(container.querySelectorAll('tbody tr').length).toBe(starred)
+    expect(screen.queryByRole('menuitem', { name: /★|☆|注目/ })).toBeNull()
+    expect(screen.getAllByRole('menuitem')).toHaveLength(4)
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '未使用のタグ' })) })
+    const unused = FRIEND_ATTRIBUTES_QA_TAGS.filter(isUnused).length
+    expect(container.querySelectorAll('tbody tr').length).toBe(unused)
     expect(screen.getByRole('button', { name: /よく使う絞り込み（1件選択中）/ })).toBeTruthy()
   })
 

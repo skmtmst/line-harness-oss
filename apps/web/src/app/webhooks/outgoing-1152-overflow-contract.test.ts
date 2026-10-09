@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -17,13 +17,13 @@ function read(relativePath: string): string {
 
 describe('外部連携の表は1152幅で器に収まる', () => {
   it('固定幅の表＋1列目だけ自動幅', () => {
-    const css = read('outgoing-v8.module.css')
-    expect(css).toContain('table-layout: fixed')
+    const css = read('../../v8/webhooks/outgoing.module.css')
     const view = read('outgoing-v8.tsx')
-    expect(view).toContain('<colgroup>')
-    // 1列目（つなぎ先）は幅を指定しない。ほかは中身幅で固定する。
-    for (const width of ['7rem', '10rem', '6rem', '10rem', '12rem']) {
-      expect(view).toContain(`width: '${width}'`)
+    expect(view).toContain('data-table-layout="columns"')
+    expect(css).toMatch(/th\.colName,[\s\S]*?flex: 1 1 0;[\s\S]*?min-width: 0;/)
+    for (const col of ['When', 'Payload', 'Count', 'State', 'Ops']) {
+      expect(css).toMatch(new RegExp(`\\.col${col} \\{ width: var\\(--tpl-wh-col-`))
+      expect(view).toContain(`styles.col${col}`)
     }
   })
 })

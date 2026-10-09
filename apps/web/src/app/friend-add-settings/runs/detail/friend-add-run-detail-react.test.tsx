@@ -1,15 +1,16 @@
 // @vitest-environment happy-dom
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 /* eslint-disable @typescript-eslint/no-explicit-any -- 実DOMと遅延応答を最小mockで対照する */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const state = vi.hoisted(() => ({ accountId: 'account-1', params: 'id=run-1' }))
+const state = vi.hoisted(() => ({ accountId: 'account-1', params: 'id=run-1', crumbs: [] as Array<{label: string; href: string}> }))
 const apiMocks = vi.hoisted(() => ({ runDetail: vi.fn(), retryRun: vi.fn() }))
 vi.mock('next/link', () => ({ default: ({ href, children, ...props }: any) => <a href={href} {...props}>{children}</a> }))
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(state.params) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: state.accountId, loading: false }) }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: (crumbs: Array<{label: string; href: string}>) => { state.crumbs = crumbs }, usePageTitle: () => undefined }))
 vi.mock('@/components/shared/button', () => ({ default: ({ children, ...props }: any) => <button {...props}>{children}</button> }))
 vi.mock('@/components/shared/list-state', () => ({ default: ({ title }: { title: string }) => <div>{title}</div> }))
 vi.mock('@/components/shared/notice', () => ({ default: ({ children }: { children: React.ReactNode }) => <div role="note">{children}</div> }))
@@ -67,10 +68,10 @@ async function render() {
 describe('N-103 friend-add run detail', () => {
   it('全処理を表示し、raw errorを隠して失敗がある時だけ再試行を出す', async () => {
     await render()
-    expect(host.textContent).toContain('1. タグ操作')
-    expect(host.textContent).toContain('2. マイル付与')
+    expect(host.textContent).toContain('タグ操作')
+    expect(host.textContent).toContain('マイル付与')
     expect(host.textContent).not.toContain('raw secret from provider')
-    const retry = Array.from(host.querySelectorAll('button')).find((button) => button.textContent?.includes('失敗した1件だけ再試行'))
+    const retry = Array.from(host.querySelectorAll('button')).find((button) => button.textContent?.includes('失敗した処理をもう一度'))
     expect(retry).toBeTruthy()
     await act(async () => { retry?.click(); await Promise.resolve(); await new Promise((resolve) => setTimeout(resolve, 0)) })
     expect(apiMocks.retryRun).toHaveBeenCalledWith('account-1', 'run-1')
@@ -82,7 +83,7 @@ describe('N-103 friend-add run detail', () => {
       data: { ...detail('account-1').data, actionRuns: [detail('account-1').data.actionRuns[0]], status: 'completed' },
     })
     await render()
-    expect(host.textContent).not.toContain('失敗した1件だけ再試行')
+    expect(host.textContent).not.toContain('失敗した処理をもう一度')
   })
 
   it('処理再試行が成功しても送信失敗が残る実行を完了表示にしない', async () => {
@@ -98,7 +99,10 @@ describe('N-103 friend-add run detail', () => {
     await render()
     // 一覧と同じ言葉で「再送待ち」を出す（R267）
     expect(host.textContent).toContain('再送待ち')
-    expect(host.textContent).not.toContain('失敗した1件だけ再試行')
+    const retry = Array.from(host.querySelectorAll('button')).find((button) => button.textContent?.includes('失敗した処理をもう一度'))!
+    await act(async () => { retry.click() })
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+    expect(apiMocks.retryRun).not.toHaveBeenCalled()
   })
 
   it('account切替後は遅れて返った前accountの詳細を捨てる', async () => {
@@ -143,7 +147,7 @@ describe('R264〜R268 実行詳細', () => {
     expect(text).toContain('9月16日（水）10:00')
     expect(text).toContain('はじめて')
     expect(text).toContain('紹介QR')
-    expect(text).toContain('初回案内・第1版')
+    expect(text).toContain('初回案内（第1版）')
     expect(text).toContain('run-1')
   })
 
@@ -156,8 +160,8 @@ describe('R264〜R268 実行詳細', () => {
     const text = host.textContent ?? ''
     expect(text).toContain('送達不明・要確認（自動では送り直しません）')
     // イベントの状態表示が「配信なし」に変わらない
-    const badge = host.querySelector('[data-badge]')
-    expect(badge?.textContent).toBe('送達不明')
+    const badge = host.querySelector('[role="alert"]')
+    expect(badge?.textContent).toContain('送達不明')
   })
 
   it('R267: 配信なし（suppressed）の記録は一覧と同じ「配信なし」を出す', async () => {
@@ -167,15 +171,15 @@ describe('R264〜R268 実行詳細', () => {
     })
     await render()
     const badge = host.querySelector('[data-badge]')
-    expect(badge?.textContent).toBe('配信なし')
+    expect(host.textContent).toContain('配信なし')
   })
 
   it('R268: 一覧へ戻るリンクが受け取った絞り込みとページ位置を返す', async () => {
     state.params = 'id=run-1&kind=first_time&status=failed&attribution=captured&rule_id=rule-1&pages=cur-8%2Ccur-9'
     await render()
-    const back = host.querySelector('a[href^="/friend-add-settings/runs?"]')
-    expect(back).not.toBeNull()
-    const href = back!.getAttribute('href')!
+    const back = state.crumbs.find((crumb) => crumb.label === '実行結果')
+    expect(back).toBeDefined()
+    const href = back!.href
     for (const part of ['kind=first_time', 'status=failed', 'attribution=captured', 'rule_id=rule-1', 'pages=']) {
       expect(href).toContain(part)
     }

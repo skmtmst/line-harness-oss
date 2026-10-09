@@ -203,7 +203,7 @@ describe('F-11 5段階評価・住所', () => {
     });
     setupF11();
     fireEvent.change(await screen.findByLabelText('郵便番号'), { target: { value: '100-0001' } });
-    fireEvent.click(screen.getByRole('button', { name: '住所を自動入力' }));
+    fireEvent.click(screen.getByRole('button', { name: '住所を探す' }));
     expect(await screen.findByDisplayValue('東京都')).toBeTruthy();
     expect(screen.getByDisplayValue('千代田区')).toBeTruthy();
   });
