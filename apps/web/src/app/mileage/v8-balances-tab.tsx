@@ -588,9 +588,7 @@ export default function V8BalancesTab({
         onCancel={() => { if (approvalBusyId === null) setRejectTarget(null) }}
         onConfirm={() => { if (rejectTarget) void decideApproval(rejectTarget.id, 'reject', rejectReason.trim() || undefined) }}
       >
-        <label className={styles.cellSubDark} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          差し戻す理由
-          <textarea
+        <Field label="差し戻す理由"><textarea
             className={styles.dlgTextarea}
             value={rejectReason}
             onChange={(event) => setRejectReason(event.target.value)}

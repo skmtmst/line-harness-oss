@@ -348,16 +348,10 @@ function RewardEditorInner() {
           <section className={formStyles.card} aria-label="基本">
             <h2 className={formStyles.cardTitle}>基本</h2>
             <div className={formStyles.grid2}>
-              <label className={formStyles.field}>
-                <span className={formStyles.label}>名前 <span className={formStyles.required}>必須</span></span>
-                <TextInput id="reward-name" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="例：送料無料クーポン" aria-label="名前" />
-                {touched && !form.name.trim() ? <span className={formStyles.required}>使い道の名前を入力してください</span> : null}
-              </label>
-              <label className={formStyles.field}>
-                <span className={formStyles.label}>必要マイル <span className={formStyles.required}>必須</span></span>
-                <TextInput inputMode="numeric" value={form.requiredMiles} onChange={(e) => set('requiredMiles', e.target.value)} placeholder="例：500" aria-label="必要マイル" />
-                {touched && errors.includes('必要マイルは1以上の整数で入力してください') ? <span className={formStyles.required}>必要マイルは1以上の整数で入力してください</span> : null}
-              </label>
+              <Field label="名前" required><TextInput id="reward-name" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="例：送料無料クーポン" aria-label="名前" />
+{touched && !form.name.trim() ? <span className={formStyles.required}>使い道の名前を入力してください</span> : null}</Field>
+              <Field label="必要マイル" required><TextInput inputMode="numeric" value={form.requiredMiles} onChange={(e) => set('requiredMiles', e.target.value)} placeholder="例：500" aria-label="必要マイル" />
+{touched && errors.includes('必要マイルは1以上の整数で入力してください') ? <span className={formStyles.required}>必要マイルは1以上の整数で入力してください</span> : null}</Field>
             </div>
             <Disclosure title="説明を添える（任意）" size="compact">
               <Field label="説明" htmlFor="reward-description-v8" note="一覧と交換の画面に出ます。空でも出せます">
@@ -437,9 +431,7 @@ function RewardEditorInner() {
 
           <section className={formStyles.card} aria-label="だれが交換できるか">
             <h2 className={formStyles.cardTitle}>だれが交換できるか</h2>
-            <label className={formStyles.field}>
-              <span className={formStyles.label}>交換できる人</span>
-              <Select
+            <Field label="交換できる人"><Select
                 aria-label="交換できる人"
                 size="full"
                 value={audience}

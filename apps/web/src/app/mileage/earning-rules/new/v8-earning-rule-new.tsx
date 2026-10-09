@@ -41,6 +41,7 @@ import {
 import { formatMileageNumber } from '../../mileage-display'
 import { formatNumber } from '@/lib/format'
 import formStyles from './v8-create-form.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 const DAILY_CAPS = [
   ['', '制限なし'],
@@ -277,9 +278,7 @@ export default function V8EarningRuleNew() {
           <section className={formStyles.card} aria-label="どのルールか">
             <h2 className={formStyles.cardTitle}>どのルールか</h2>
             <p className={formStyles.cardNote}>きっかけになる行動を選びます</p>
-            <label className={formStyles.field}>
-              <span className={formStyles.label}>名前 <span className={formStyles.required}>必須</span></span>
-              <TextInput
+            <Field label="名前" required><TextInput
                 id="sc-name"
                 aria-label="名前"
                 type="text"
@@ -289,9 +288,7 @@ export default function V8EarningRuleNew() {
               />
             </label>
             <div className={formStyles.grid2}>
-              <label className={formStyles.field}>
-                <span className={formStyles.label}>きっかけ <span className={formStyles.required}>必須</span></span>
-                <Select
+              <Field label="きっかけ" required><Select
                   aria-label="きっかけ"
                   value={eventType}
                   onChange={(next) => {
@@ -301,11 +298,8 @@ export default function V8EarningRuleNew() {
                   options={EVENT_TYPES.map((t) => ({ value: t.value, label: t.label }))}
                   size="full"
                 />
-                <span className={formStyles.hint}>{selected.note}</span>
-              </label>
-              <label className={formStyles.field}>
-                <span className={formStyles.label}>行動の出どころ</span>
-                <Select
+<span className={formStyles.hint}>{selected.note}</span></Field>
+              <Field label="行動の出どころ"><Select
                   aria-label="行動の出どころ"
                   value={source}
                   onChange={(next) => setSource(next)}
@@ -328,18 +322,13 @@ export default function V8EarningRuleNew() {
           <section className={formStyles.card} aria-label="何マイル付けるか">
             <h2 className={formStyles.cardTitle}>何マイル付けるか</h2>
             <div className={formStyles.grid2}>
-              <label className={formStyles.field}>
-                <span className={formStyles.label}>マイル <span className={formStyles.required}>必須</span></span>
-                <TextInput
+              <Field label="マイル" required><TextInput
                   type="number"
                   min={1}
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                />
-              </label>
-              <label className={formStyles.field}>
-                <span className={formStyles.label}>付け方</span>
-                <Select
+                /></Field>
+              <Field label="付け方"><Select
                   aria-label="付け方"
                   value={grantStyle}
                   onChange={() => {}}
@@ -380,19 +369,14 @@ export default function V8EarningRuleNew() {
           <section className={formStyles.card} aria-label="付けすぎを防ぐ">
             <h2 className={formStyles.cardTitle}>付けすぎを防ぐ</h2>
             <div className={formStyles.grid2}>
-              <label className={formStyles.field}>
-                <span className={formStyles.label}>1日に数える回数</span>
-                <Select
+              <Field label="1日に数える回数"><Select
                   aria-label="1日に数える回数"
                   value={dailyCap}
                   onChange={(next) => setDailyCap(next)}
                   size="full"
                   options={DAILY_CAPS.map(([optionValue, label]) => ({ value: optionValue, label }))}
-                />
-              </label>
-              <label className={formStyles.field}>
-                <span className={formStyles.label}>同じ対象の数えかた</span>
-                <Select
+                /></Field>
+              <Field label="同じ対象の数えかた"><Select
                   aria-label="同じ対象の数えかた"
                   value={uniqueMode}
                   onChange={(next) => setUniqueMode(next as typeof uniqueMode)}
@@ -406,20 +390,12 @@ export default function V8EarningRuleNew() {
               </label>
             </div>
             <div className={formStyles.grid2}>
-              <label className={formStyles.field}>
-                <span className={formStyles.label}>開始日</span>
-                <DateField value={validFrom} onChange={setValidFrom} aria-label="開始日" />
-              </label>
-              <label className={formStyles.field}>
-                <span className={formStyles.label}>終了日 <span className={formStyles.optional}>任意</span></span>
-                <DateField value={validUntil} onChange={setValidUntil} aria-label="終了日" />
-              </label>
+              <Field label="開始日"><DateField value={validFrom} onChange={setValidFrom} aria-label="開始日" /></Field>
+              <Field label="終了日"><DateField value={validUntil} onChange={setValidUntil} aria-label="終了日" /></Field>
             </div>
             <Disclosure title="詳しい設定（倍率・通知・取り消し・公開）" size="compact">
               <div className={formStyles.detailsBody}>
-                <label className={formStyles.field}>
-                  <span className={formStyles.label}>付いたマイルの有効期限</span>
-                  <span className={formStyles.inlineRow}>
+                <Field label="付いたマイルの有効期限"><span className={formStyles.inlineRow}>
                     <TextInput type="number" min={1} max={3650} value={expiresAfterDays} onChange={(e) => setExpiresAfterDays(e.target.value)} aria-label="有効期限の日数" />
                     <span className={formStyles.hint}>日後（空欄なら期限なし）</span>
                   </span>

@@ -520,9 +520,7 @@ export default function V8HistoryTab({
         onCancel={() => { if (!pendingBusy) setPendingAction(null) }}
         onConfirm={() => void runPendingAction()}
       >
-        <label className={styles.cellSubDark} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          理由（必須）
-          <textarea
+        <Field label="理由" required><textarea
             className={styles.dlgTextarea}
             value={pendingReason}
             onChange={(event) => setPendingReason(event.target.value)}

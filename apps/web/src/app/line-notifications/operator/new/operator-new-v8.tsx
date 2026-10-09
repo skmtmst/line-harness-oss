@@ -520,14 +520,7 @@ function NewOperatorNotificationV8Inner() {
                   }}
                   options={[{ value: '', label: 'スタッフを選んでチームを作る' }, ...teams.map(team => ({ value: team.id, label: `${team.name}（${team.staffIds.length}人）` }))]}
             <div className={styles.fieldGrid}><Field label="チーム名"><Button variant="secondary" disabled={!canWrite || teamBusy} onClick={() => void saveTeam()}>{teamId ? 'チームを更新する' : 'チームを作る'}</Button></Field></div>
-                />
-              </div>
-            </div>
-            <div className={styles.fieldGrid}>
-              <label className={styles.fieldLabel}>チーム名
-                <input aria-label="チーム名" value={teamName} maxLength={100} disabled={!canWrite || teamBusy} onChange={event => setTeamName(event.target.value)} className="w-full rounded-control border border-hairline px-3 py-2" />
-              </label>
-              <Button variant="secondary" disabled={!canWrite || teamBusy} onClick={() => void saveTeam()}>{teamId ? 'チームを更新する' : 'チームを作る'}</Button>
+                /></Field></div>
             </div>
             {teamError && <div><p role="alert">{teamError}</p><Button variant="secondary" onClick={loadTeams}>チームをもう一度読み込む</Button></div>}
             <div className={styles.recipientList}>

@@ -37,6 +37,7 @@ import {
   earningRuleCancellationEvent,
 } from '../rule-fields'
 import formStyles from '../new/v8-create-form.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 type LoadState = 'loading' | 'ready' | 'error' | 'missing'
 
@@ -265,9 +266,7 @@ function EditInner() {
               <span className={formStyles.hint}>一覧に表示される名前です。お客様には見えません。</span>
             </div>
             <div className={formStyles.grid2}>
-              <label className={formStyles.field}>
-                <span className={formStyles.label}>きっかけ <span className={formStyles.required}>必須</span></span>
-                <Select
+              <Field label="きっかけ" required><Select
                   aria-label="きっかけ"
                   value={eventType}
                   onChange={(next) => {
@@ -280,11 +279,8 @@ function EditInner() {
                   ]}
                   size="full"
                 />
-                <span className={formStyles.hint}>{selected?.note ?? 'この画面で扱えない種類です。選び直すと元には戻せません。'}</span>
-              </label>
-              <label className={formStyles.field}>
-                <span className={formStyles.label}>行動の出どころ</span>
-                <Select
+<span className={formStyles.hint}>{selected?.note ?? 'この画面で扱えない種類です。選び直すと元には戻せません。'}</span></Field>
+              <Field label="行動の出どころ"><Select
                   aria-label="行動の出どころ"
                   value={source}
                   onChange={(next) => setSource(next)}
