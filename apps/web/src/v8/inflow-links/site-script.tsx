@@ -33,6 +33,8 @@ import { TextArea, TextField } from '@/components/shared/text-field'
 import { DetailPage } from '@/components/templates'
 import { focusField } from './focus-field'
 import styles from './site-script.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 type PageRow = { host: string | null; path: string; views: number; visitors: number }
 type TrackingSummary = {
@@ -50,14 +52,7 @@ type SiteDialogState =
 
 /** 「10/1 21:14」の形（日本時間）。読めない値は出さない。 */
 function formatShort(value: string | null | undefined): string | null {
-  if (!value) return null
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return null
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo',
-  }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`
+  return polishFormatDate(value, { style: 'list', fallback: '' }) || null
 }
 
 const parseDomains = (text: string) => text.split(/[\s,]+/).map((d) => d.trim()).filter(Boolean)

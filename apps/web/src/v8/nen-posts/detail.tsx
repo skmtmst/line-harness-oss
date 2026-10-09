@@ -125,7 +125,7 @@ export function PhotoReviewDetail({
         <h2 className="mt-1 text-2xl font-extrabold text-ink">{photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender })} の写真</h2>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="mr-2 text-xs font-medium text-ink-secondary">{total > 0 ? `${total}枚のうち ${position + 1}枚目` : '—'}</span>
+        <span className="mr-2 text-xs font-medium text-ink-secondary">{total > 0 ? `${total} 枚のうち ${position + 1} 枚目` : '—'}</span>
         <Button disabled={position <= 0} onClick={() => onMove(-1)}>前の写真</Button>
         <Button disabled={position >= total - 1} onClick={() => onMove(1)}>次の写真</Button>
         <Button onClick={onBack}>並べて見るへ戻る</Button>
@@ -210,7 +210,7 @@ export function PhotoReviewDetail({
       <aside className="flex flex-col gap-3">
         <Card padding="default">
           <dl>
-            <div><dt className="text-xs font-medium text-ink-faint">送ってくれた人</dt><dd className="mt-1 text-xs font-medium text-ink">{text(photo.owner_name) || '名前未取得'}</dd><small className="mt-1 block text-xs text-ink-faint">投稿 {numberOrDash(photo.submission_count)}回目 ／ 見送ったこと {numberOrDash(photo.returned_count)}回</small></div>
+            <div><dt className="text-xs font-medium text-ink-faint">送ってくれた人</dt><dd className="mt-1 text-xs font-medium text-ink">{text(photo.owner_name) || '名前未取得'}</dd><small className="mt-1 block text-xs text-ink-faint">投稿 {numberOrDash(photo.submission_count)} 回目 ／ 見送ったこと {numberOrDash(photo.returned_count)} 回</small></div>
             <div className="mt-3 border-t border-hairline pt-3"><dt className="text-xs font-medium text-ink-faint">ペット</dt><dd className="mt-1 text-xs font-medium text-ink">{photoPetDisplayName(photo.pet_name, { fallback: '未取得', callName: photo.pet_call_name, gender: photo.pet_gender })}（{petAnimalTypeLabel(text(photo.animal_type))}・{text(photo.breed) || '品種未取得'}）</dd></div>
             <div className="mt-3 border-t border-hairline pt-3"><dt className="text-xs font-medium text-ink-faint">届いた日時</dt><dd className="mt-1 text-xs font-medium text-ink">{formatPhotoReceivedAt(photo.created_at)}</dd></div>
             <div className="mt-3 border-t border-hairline pt-3"><dt className="text-xs font-medium text-ink-faint">そえられた言葉</dt><dd className="mt-1 text-xs font-medium text-ink">{text(photo.caption) ? `「${text(photo.caption)}」` : 'コメントなし'}</dd></div>
@@ -312,8 +312,8 @@ export function PhotoReviewDetail({
     <div className="mt-4">
       <StickyBar
         status={duplicate
-          ? `${total}枚のうち ${position + 1}枚目。重複のため、却下か報酬なしで採用を選んでください。`
-          : `${total}枚のうち ${position + 1}枚目。あと${Math.max(0, total - position - 1)}枚あります。`}
+          ? `${total} 枚のうち ${position + 1} 枚目。重複のため、却下か報酬なしで採用を選んでください。`
+          : `${total} 枚のうち ${position + 1} 枚目。あと${Math.max(0, total - position - 1)} 枚あります。`}
         actions={!canEdit ? undefined : duplicate ? <>
         <Button disabled={reviewing} onClick={onReturn}>却下する</Button>
         <Button disabled title="切り取り版の生成口を接続後に使えます">切り取ってから採用</Button>

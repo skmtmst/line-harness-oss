@@ -342,7 +342,7 @@ export default function TagsTab({
       if (!result.success) message = `並び順を保存できませんでした（${result.error}）`
     } catch (caught) {
       const detail = japaneseDetailOf(caught)
-      message = `並び順を保存できませんでした。${detail ? `${detail}。` : ''}通信を確かめて、もう一度お試しください。`
+      message = `並び順を保存できませんでした。${detail ? `${detail}。` : ''} 通信を確かめて、もう一度お試しください。`
     }
     if (message !== null) {
       setItems(previous)
@@ -622,7 +622,7 @@ export default function TagsTab({
         variant="secondary"
         aria-haspopup="menu"
         aria-expanded={quickOpen}
-        aria-label={quick.length ? `よく使う絞り込み（${quick.length}件選択中）` : 'よく使う絞り込み'}
+        aria-label={quick.length ? `よく使う絞り込み（${quick.length} 件選択中）` : 'よく使う絞り込み'}
         title="よく使う絞り込み"
         data-active={quick.length > 0 || undefined}
         className={styles.quickButton}
@@ -759,7 +759,7 @@ export default function TagsTab({
                 {/* 人数は、そのタグで絞った友だち一覧へのリンク。 */}
                 <Td className={styles.colCount} onClick={(event) => event.stopPropagation()}>
                   <Link href={`/friends?tag=${encodeURIComponent(tag.id)}`} className={styles.countLink} title={`「${tag.name}」が付いている友だちを見る`}>
-                    {tag.friendCount ?? 0}人
+                    {tag.friendCount ?? 0} 人
                   </Link>
                 </Td>
                 <Td className={styles.colSource}><span className={styles.cellText} title={sourceLabel(tag)}>{sourceLabel(tag)}</span></Td>
@@ -789,7 +789,7 @@ export default function TagsTab({
       {/* 件数とページ送り（絵：左に件数・右にページ送り）。表示件数は道具の段の右端。 */}
       <div className={styles.pager}>
         <span className={styles.pagerCount}>
-          {`${filtered.length}件中 ${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, filtered.length)}件`}
+          {`${filtered.length} 件中 ${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, filtered.length)} 件`}
         </span>
         {pages > 1 ? (
           <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="タグのページ送り" />
@@ -867,7 +867,7 @@ export default function TagsTab({
         <DetailPanel
           open={activeTag !== null}
           title={activeTag?.name ?? ''}
-          description={activeTag ? `${activeGroup?.name ?? '未分類'}・${activeTag.friendCount ?? 0}人` : undefined}
+          description={activeTag ? `${activeGroup?.name ?? '未分類'}・${activeTag.friendCount ?? 0} 人` : undefined}
           onClose={() => setActiveTagId(null)}
           hasPrev={activeTagIndex > 0}
           hasNext={activeTagIndex >= 0 && activeTagIndex < visible.length - 1}
@@ -887,7 +887,7 @@ export default function TagsTab({
                 <dt>人数</dt>
                 <dd>
                   <Link href={`/friends?tag=${encodeURIComponent(activeTag.id)}`} className={styles.countLink}>
-                    {activeTag.friendCount ?? 0}人
+                    {activeTag.friendCount ?? 0} 人
                   </Link>
                 </dd>
               </div>

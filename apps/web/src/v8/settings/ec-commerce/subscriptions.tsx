@@ -21,11 +21,11 @@ import { ApiError, api, type EcSubscription, type EcSubscriptionList } from '@/l
 import { formatNumber } from '@/lib/format'
 import shared from './screen.module.css'
 import styles from './subscriptions.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 function shortDate(value: string | null): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  return Number.isNaN(date.valueOf()) ? '—' : new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).format(date)
+  return polishFormatDate(value, { style: 'list-day', fallback: '—' })
 }
 
 const FILTERS = [
@@ -126,7 +126,7 @@ export default function EcSubscriptions({ accountId, canEdit = true }: { account
         <Td><span className={shared.stack}><span className={shared.main} title={item.ownerName ?? undefined}>{item.ownerName ?? 'お客様名 —'}{item.petName ? `（${item.petName}）` : ''}</span><span className={shared.sub} title={item.items ?? undefined}>{[item.items ?? '中身 未取得', item.cycle].filter(Boolean).join('・')}</span></span></Td>
         <Td align="right">{item.amount == null ? '—' : `¥${formatNumber(item.amount)}`}</Td>
         <Td>{shortDate(item.nextShippingAt)}</Td>
-        <Td align="right">{item.continuedCount == null ? '—' : `${item.continuedCount}回`}</Td>
+        <Td align="right">{item.continuedCount == null ? '—' : `${item.continuedCount} 回`}</Td>
         <Td><span className={shared.stack}><StatusBadge tone={STATUS_TONE[item.status]} size="compact">{FILTERS.find((f) => f.key === item.status)?.label ?? item.statusLabel}</StatusBadge>{item.riskReason || item.cancellationReason ? <span className={shared.sub} title={item.riskReason ?? item.cancellationReason ?? undefined}>{item.riskReason ?? `理由「${item.cancellationReason}」`}</span> : null}</span></Td>
         <Td><span className={styles.ops}><Button href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`} variant="secondary">中身を見る</Button>{item.manageUrl ? <RowMenu label={`${item.ownerName ?? 'お客様'}のその他操作`} menuLabel="定期便の操作" open={openMenuId === item.id} onOpenChange={(open) => setOpenMenuId(open ? item.id : null)} items={[{ id: 'manage', label: 'ECで変更', onSelect: () => window.open(item.manageUrl!, '_blank', 'noopener,noreferrer') }]} /> : null}</span></Td>
       </Tr>)}</tbody>
@@ -134,10 +134,10 @@ export default function EcSubscriptions({ accountId, canEdit = true }: { account
     <NoteBar icon={null}>「支払いを確認」は EC から届いた決済状態です。将来止めるかどうかを予測した数字ではありません。「次の発送」は EC に登録された確定の予定日です。購入後の案内は <Link href="/nen-campaigns">NEN配信</Link> で管理します。</NoteBar>
     {canEdit ? <Button href="/broadcasts/new" variant="text">対象を選んで送る</Button> : null}
     <div className={shared.pager}>
-      <p className={shared.minorText}>{search.trim() ? `このページの ${formatNumber(shown.length)}件を表示（検索はページの中だけに効きます）` : <ListRange label={filter === 'all' ? '定期便' : '表示条件に合う定期便'} total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={(page - 1) * pageSize + shown.length} />}{data && data.skipped.malformedSnapshots > 0 ? `／形が読めなかったお客様のぶん ${formatNumber(data.skipped.malformedSnapshots)}件は数えていません` : ''}</p>
+      <p className={shared.minorText}>{search.trim() ? `このページの ${formatNumber(shown.length)} 件を表示（検索はページの中だけに効きます）` : <ListRange label={filter === 'all' ? '定期便' : '表示条件に合う定期便'} total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={(page - 1) * pageSize + shown.length} />}{data && data.skipped.malformedSnapshots > 0 ? `／形が読めなかったお客様のぶん ${formatNumber(data.skipped.malformedSnapshots)} 件は数えていません` : ''}</p>
       <PageSizeSelect value={v8PageSize} options={[10, 20, 50]} onChange={(value) => { setV8PageSize(value); setPage(1) }} />
       <Pagination page={page} pageCount={Math.max(1, Math.ceil(total / pageSize))} onPageChange={setPage} ariaLabel="定期便のページ送り" />
     </div>
-    {(summary?.monthlyStats ?? []).length > 0 ? <Disclosure title="月別の定期便" size="compact" hint={summary?.monthlyAmount == null ? '今月の金額は未取得' : `今月 ¥${formatNumber(summary.monthlyAmount)}`}><DataTable><thead><TableHeadRow><Th>月</Th><Th>契約数</Th><Th align="right">金額</Th></TableHeadRow></thead><tbody>{summary?.monthlyStats.slice(-6).map((item) => <Tr key={item.month}><Td>{item.month}</Td><Td>{formatNumber(item.count)}件</Td><Td align="right">¥{formatNumber(item.amount)}</Td></Tr>)}</tbody></DataTable></Disclosure> : null}
+    {(summary?.monthlyStats ?? []).length > 0 ? <Disclosure title="月別の定期便" size="compact" hint={summary?.monthlyAmount == null ? '今月の金額は未取得' : `今月 ¥${formatNumber(summary.monthlyAmount)}`}><DataTable><thead><TableHeadRow><Th>月</Th><Th>契約数</Th><Th align="right">金額</Th></TableHeadRow></thead><tbody>{summary?.monthlyStats.slice(-6).map((item) => <Tr key={item.month}><Td>{item.month}</Td><Td>{formatNumber(item.count)} 件</Td><Td align="right">¥{formatNumber(item.amount)}</Td></Tr>)}</tbody></DataTable></Disclosure> : null}
   </>
 }

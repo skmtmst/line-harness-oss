@@ -7,6 +7,7 @@
  * → 空いている時刻の札 → 卓は自動（変えられる）→ メモ → 「LINE で確認を送る」（友だちのときだけ）→［予約を入れる］。
  * 電話番号・時刻・［予約を入れる］の3〜4手で入る。保存は今の手動予約の口（source=phone）。動きは BEHAVIOR.md。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useMemo, useState } from 'react'
 import { Check, CircleCheck, Minus, Plus } from 'lucide-react'
 import type { RestaurantOpeningDay } from '@line-crm/shared'
@@ -37,7 +38,7 @@ function addDays(day: Date, days: number): Date {
 }
 
 function md(day: Date): string {
-  return `${day.getMonth() + 1}/${day.getDate()}`
+  return polishFormatDate(day, { style: 'list-day' })
 }
 
 export default function PhoneReservationDrawer({ open, accountId, storeId, tables, onClose, onSaved }: {

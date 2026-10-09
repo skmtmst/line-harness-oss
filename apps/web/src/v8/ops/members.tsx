@@ -17,6 +17,8 @@ import { TextField } from '@/components/shared/text-field'
 import { OpsHead } from './shell'
 import parts from './parts.module.css'
 import styles from './members.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 /**
  * 運営のメンバー管理 V8（絵 `FvbHW`・停止の窓 `VUyYu`）。
@@ -240,11 +242,7 @@ function confirmTitle(pending: PendingAction): string {
 
 /** 短い日時（10/2 07:10 の形）。 */
 function shortDateTime(value: string | null): string {
-  if (!value) return '—'
-  const full = formatDateTime(value)
-  const m = full.match(/^(\d+)-(\d+)-(\d+) (\d+:\d+)$/)
-  if (!m) return full
-  return `${Number(m[2])}/${Number(m[3])} ${m[4]}`
+  return polishFormatDate(value, { style: 'list', fallback: '—' })
 }
 
 function totpChip(m: OpsMember) {

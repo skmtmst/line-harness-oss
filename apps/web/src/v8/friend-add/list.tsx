@@ -11,6 +11,7 @@
  * データの口・保存の口・権限・失敗の扱いは app/friend-add-settings/list-v8.tsx と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
+import SharedStatusPill from '@/components/shared/status-pill'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -68,6 +69,7 @@ import { describeFriendAddFailure } from './failure'
 import { useCursorStack } from './use-cursor-stack'
 import styles from './list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
+import TruncatedText from '@/components/shared/truncated-text'
 
 const KIND_LABELS: Record<FriendAddRuleKind, string> = {
   first_time: 'はじめて友だち追加した人',
@@ -89,7 +91,7 @@ const STATUS_CHIPS: Array<{ key: FriendAddRuleStatus; label: string; icon: typeo
 ]
 
 function countText(value: number | null | undefined, unit: string) {
-  return value === null || value === undefined ? '—' : `${formatNumber(value)}${unit}`
+  return value === null || value === undefined ? '—' : `${formatNumber(value)} ${unit}`
 }
 
 function successRate(delivered: number | null, failed: number | null) {
@@ -149,10 +151,7 @@ function statusTone(rule: FriendAddRule) {
 
 function StatusPill({ rule }: { rule: FriendAddRule }) {
   return (
-    <span className={styles.pill} data-tone={statusTone(rule)}>
-      <span className={styles.pillDot} aria-hidden="true" />
-      {statusLabel(rule)}
-    </span>
+    <SharedStatusPill tone={statusTone(rule) === 'active' ? 'success' : statusTone(rule) === 'always' ? 'info' : 'neutral'}>{statusLabel(rule)}</SharedStatusPill>
   )
 }
 
@@ -514,7 +513,7 @@ function FriendAddList() {
   const kpis = [
     {
       key: 'rules', icon: MessageSquareMore, title: '初回案内', value: error ? null : summary?.rules ?? null, unit: '件',
-      detail: summary ? `有効 ${formatNumber(summary.active)}件` : '—',
+      detail: summary ? `有効 ${formatNumber(summary.active)} 件` : '—',
       help: 'いまある初回案内の設定数です。右の3つ（直近7日）とは期間がちがいます。',
     },
     {
@@ -751,7 +750,7 @@ function FriendAddList() {
                   </Td>
                   <Td className={styles.colName}>
                     <FolderDotName folder={folderDotOf(rule.folderName)}>
-                      <Link href={editHref(rule.id)} title={rule.name} className={styles.name}>{rule.name}</Link>
+                      <Link href={editHref(rule.id)}  className={styles.name}><TruncatedText value={String(rule.name ?? '')} /></Link>
                     </FolderDotName>
                     <span className={`${styles.sub} ${styles.nameSub}`} title={rule.routeNames.join('、') || '未選択'}>
                       <Link2 size={12} aria-hidden="true" />
@@ -775,7 +774,7 @@ function FriendAddList() {
                   </Td>
                   <Td className={styles.colName}>
                     <FolderDotName folder={folderDotOf(sinkRule.folderName)}>
-                      <Link href={editHref(sinkRule.id)} title={sinkRule.name} className={styles.name}>{sinkRule.name}</Link>
+                      <Link href={editHref(sinkRule.id)}  className={styles.name}><TruncatedText value={String(sinkRule.name ?? '')} /></Link>
                     </FolderDotName>
                     <span className={`${styles.sub} ${styles.nameSub}`} title={SINK_NOTE}>
                       <CircleHelp size={12} aria-hidden="true" />
@@ -797,7 +796,7 @@ function FriendAddList() {
 
   const pager = data && (canPrev || data.nextCursor) ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>{formatNumber(data.total ?? items.length)}件</span>
+      <span className={styles.pagerCount}>{formatNumber(data.total ?? items.length)} 件</span>
       <span className={styles.pagerButtons} aria-label="ページ送り">
         <Button disabled={!canPrev || loading} onClick={() => goPrev()}>前へ</Button>
         <Button disabled={!data.nextCursor || loading} onClick={() => data.nextCursor && goNext(data.nextCursor)}>次へ</Button>

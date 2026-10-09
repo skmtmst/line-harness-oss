@@ -94,6 +94,9 @@ import {
   type UsageDetail,
 } from './words'
 import styles from './list.module.css'
+import { formatDate as polishFormatDate, formatListDateTime as polishFormatListDateTime } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+
 
 /** 一覧のタブ。message/question は同じテンプレートの束を中身で分ける。 */
 type Section = 'message' | 'question' | 'rich_video' | BroadcastAssetKind
@@ -175,9 +178,7 @@ function normalizeTemplateSearchText(value: string): string {
 
 /** M月D日（絵 v19Ivv は曜日を書かない）。時刻は title で見せる。 */
 function formatMonthDay(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return iso
-  return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'long', day: 'numeric' }).format(date)
+  return polishFormatDate(iso, { style: 'list-day', fallback: '—' })
 }
 
 /** 一覧・検索は「いまの最新」を対象にする（下書きがあれば下書き）。 */
@@ -195,7 +196,7 @@ function excerptOf(t: Template): string {
 function sendCountText(t: Template): string {
   if (typeof t.monthlySendCount !== 'number') return '—'
   if (t.publishedAt == null && t.monthlySendCount === 0) return '—'
-  return `${formatNumber(t.monthlySendCount)}通`
+  return `${formatNumber(t.monthlySendCount)} 通`
 }
 
 /** 公開の札（`v19Ivv`：公開中／未公開の変更／下書きだけ）。 */
@@ -524,7 +525,7 @@ export default function TemplatesListV8() {
       icon: FileText,
       value: ready ? tabItems.length : null,
       unit: '件',
-      detail: ready ? `未公開の変更 ${draftChanges}件` : '—',
+      detail: ready ? `未公開の変更 ${draftChanges} 件` : '—',
     },
     {
       key: 'usage',
@@ -705,7 +706,7 @@ export default function TemplatesListV8() {
         const result = await api.templates.update(id, { folderId })
         if (!result.success) failed += 1
       }
-      return failed > 0 ? { success: false as const, error: `${failed}件` } : { success: true as const }
+      return failed > 0 ? { success: false as const, error: `${failed} 件` } : { success: true as const }
     }
     runOptimistic({
       request: send,
@@ -768,13 +769,13 @@ export default function TemplatesListV8() {
         if (!result.success) failed += 1
       }
       if (failed > 0) {
-        setBulkDeleteError(`${failed}件を削除できませんでした。状態を読み直してからお試しください。`)
+        setBulkDeleteError(`${failed} 件を削除できませんでした。状態を読み直してからお試しください。`)
         await Promise.all([load(), loadFolders()])
         return
       }
       setPendingBulkDelete(null)
       setSelectedIds(new Set())
-      notifyToast(`${pendingBulkDelete.length}件のテンプレートを削除しました`, { tone: 'success' })
+      notifyToast(`${pendingBulkDelete.length} 件のテンプレートを削除しました`, { tone: 'success' })
       await Promise.all([load(), loadFolders()])
     } catch (reason) {
       setBulkDeleteError(
@@ -1183,8 +1184,8 @@ export default function TemplatesListV8() {
                       name={
                         <div className={styles.dotLine}>
                           <FolderDotName folder={folderDotOf(t)}>
-                            <Link href={detailHref(t)} title={t.name} className={styles.cellTitle} onClick={(event) => event.stopPropagation()}>
-                              {t.name}
+                            <Link href={detailHref(t)}  className={styles.cellTitle} onClick={(event) => event.stopPropagation()}>
+                              <TruncatedText value={String(t.name ?? '')} />
                             </Link>
                           </FolderDotName>
                         </div>
@@ -1216,13 +1217,13 @@ export default function TemplatesListV8() {
                     {!narrow && (
                       <Td
                         className={styles.cellPlain}
-                        title={typeof t.totalSendCount === 'number' ? `累計 ${formatNumber(t.totalSendCount)}通` : undefined}
+                        title={typeof t.totalSendCount === 'number' ? `累計 ${formatNumber(t.totalSendCount)} 通` : undefined}
                       >
                         {sendCountText(t)}
                       </Td>
                     )}
                     {!narrow && (
-                      <Td className={styles.cellPlain} title={formatDateTime(t.updatedAt)}>
+                      <Td className={styles.cellPlain} title={polishFormatListDateTime(t.updatedAt)}>
                         {formatMonthDay(t.updatedAt)}
                       </Td>
                     )}
@@ -1248,7 +1249,7 @@ export default function TemplatesListV8() {
       {/* まとめての帯（選ぶと表の下に出る）：フォルダへ移す・まとめて削除。 */}
       {canMutateTemplates && selectedCount > 0 ? (
         <div className={styles.bulkRow} role="region" aria-label="選択中のまとめ操作">
-          <span className={styles.bulkCount}>{selectedCount}件を選択中</span>
+          <span className={styles.bulkCount}>{selectedCount} 件を選択中</span>
           <Button
             type="button"
             variant="secondary"
@@ -1285,7 +1286,7 @@ export default function TemplatesListV8() {
 
   /* ページ送りは型の pagination 枠へ。件数は部品の summary に入れる（絵：左に「26件中 1〜20件」、右に頁。帯の内側は部品の 10・20）。 */
   const showPager = view === 'ready' && filteredTemplates.length > 0
-  const pagerSummary = `${formatNumber(filteredTemplates.length)}件中 ${(safePage - 1) * pageSize + 1}〜${Math.min(safePage * pageSize, filteredTemplates.length)}件`
+  const pagerSummary = `${formatNumber(filteredTemplates.length)} 件中 ${(safePage - 1) * pageSize + 1}〜${Math.min(safePage * pageSize, filteredTemplates.length)} 件`
   const listPager = !showPager ? null : pageCount > 1 ? (
     <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage} summary={<span className={styles.pagerCount}>{pagerSummary}</span>} />
   ) : (
@@ -1460,7 +1461,7 @@ export default function TemplatesListV8() {
       {/* まとめて削除の確認窓。対象は「使っていない」ものだけ。 */}
       <ConfirmDialog
         open={pendingBulkDelete !== null}
-        title={`${pendingBulkDelete?.length ?? 0}件のテンプレートを削除しますか？`}
+        title={`${pendingBulkDelete?.length ?? 0} 件のテンプレートを削除しますか？`}
         description="どれも使われていないので、他の画面の動きは止まりません。すでに送ったメッセージは残ります。この操作は取り消せません。"
         confirmLabel="まとめて削除する"
         destructive
@@ -1553,7 +1554,7 @@ export default function TemplatesListV8() {
         title={
           moveIds && moveIds.length === 1
             ? `「${templates.find((t) => t.id === moveIds[0])?.name ?? ''}」のフォルダを移す`
-            : `${moveIds?.length ?? 0}件のテンプレートをフォルダへ移す`
+            : `${moveIds?.length ?? 0} 件のテンプレートをフォルダへ移す`
         }
         description="移動先のフォルダを選んでください。「未分類」を選ぶとフォルダから外れます。"
         confirmLabel={moving ? '移動中…' : '移動する'}
@@ -1627,7 +1628,7 @@ export default function TemplatesListV8() {
         title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
         description={`削除しても、中のテンプレートは未分類に残ります。いまこのフォルダに入っているのは${
           deletingFolder ? templates.filter((t) => t.folderId === deletingFolder.id).length : 0
-        }件です。`}
+        } 件です。`}
         confirmLabel="削除する"
         destructive
         busy={folderBusy}

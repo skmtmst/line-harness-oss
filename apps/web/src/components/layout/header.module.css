@@ -24,15 +24,15 @@
 .title {
   min-width: 0;
   color: var(--color-ink);
-  font-size: 30px;
-  font-weight: 600;
+  font-size: 22px;
+  font-weight: 700;
   line-height: 1.2;
 }
 
 .description {
   margin-top: 5px;
   color: var(--color-ink-secondary);
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
 }
 

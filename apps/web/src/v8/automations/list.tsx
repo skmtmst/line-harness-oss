@@ -65,6 +65,9 @@ import {
   type BandCell,
 } from './shell'
 import styles from './list.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -117,12 +120,7 @@ export function actionSummary(item: Pick<Automation, 'actions'>): { title: strin
 
 /** 月/日（日本時間）。 */
 function monthDay(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).formatToParts(date)
-  const month = parts.find((part) => part.type === 'month')?.value ?? ''
-  const day = parts.find((part) => part.type === 'day')?.value ?? ''
-  return `${month}/${day}`
+  return polishFormatDate(iso, { style: 'list-day', fallback: '—' })
 }
 
 function TableHead() {
@@ -500,7 +498,7 @@ export default function AutomationListV8() {
                   <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
                     <Td className={styles.colName}>
                       <FolderDotName folder={null}>
-                        <span className={styles.name} title={item.name}>{item.name}</span>
+                        <span className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></span>
                       </FolderDotName>
                     </Td>
                     <Td className={styles.colTrigger}><span className={styles.cell} title={trigger}>{trigger}</span></Td>
@@ -510,9 +508,9 @@ export default function AutomationListV8() {
                       {action.detail ? <span className={styles.sub} title={action.detail}>{action.detail}</span> : null}
                     </Td>
                     <Td className={styles.colRuns}>
-                      <span className={styles.numMain}>{`${formatNumber(item.executionCount30d)}回`}</span>
+                      <span className={styles.numMain}>{`${formatNumber(item.executionCount30d)} 回`}</span>
                       <span className={styles.numSub}>
-                        {item.isActive ? `失敗 ${formatNumber(item.failureCount30d)}回` : `更新 ${monthDay(item.updatedAt)}`}
+                        {item.isActive ? `失敗 ${formatNumber(item.failureCount30d)} 回` : `更新 ${monthDay(item.updatedAt)}`}
                       </span>
                     </Td>
                     <Td className={styles.colState}>
@@ -548,7 +546,7 @@ export default function AutomationListV8() {
   const pager = ready && pageCount > 1 ? (
     <ListPagePagination>
       <span className={styles.pagerCount}>
-        {(current - 1) * pageSize + 1}〜{(current - 1) * pageSize + paged.length} / {formatNumber(visible.length)}件
+        {(current - 1) * pageSize + 1}〜{(current - 1) * pageSize + paged.length} / {formatNumber(visible.length)} 件
       </span>
       <Pagination page={current} pageCount={pageCount} onPageChange={setPage} ariaLabel="ルール一覧のページ送り" />
     </ListPagePagination>

@@ -6,6 +6,7 @@
  * 引き出しの枠は共通の Drawer。診察時に獣医師へ見せる前提なので、記録の事実だけを並べ、判断は書かない。
  * 印刷面（SummarySheet）は画面に出ず、印刷のときだけ紙になる（今の画面と同じ data-print-sheet）。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '@/components/shared/button'
@@ -30,7 +31,7 @@ function petLine(summary: NenHealthSummaryData): string {
   const parts = [kind, summary.pet.breed, summary.pet.ageLabel === '—' ? '' : summary.pet.ageLabel].filter(Boolean).join('・')
   const end = new Date(summary.generatedAt)
   const start = new Date(end.getTime() - (summary.summary.days - 1) * 86_400_000)
-  const range = Number.isNaN(end.getTime()) ? '' : `・${start.getMonth() + 1}/${start.getDate()}〜${end.getMonth() + 1}/${end.getDate()}`
+  const range = Number.isNaN(end.getTime()) ? '' : `・${polishFormatDate(start, { style: 'list-day' })}〜${polishFormatDate(end, { style: 'list-day' })}`
   return `${summary.pet.name || summary.pet.callName}（${parts}）・${summary.owner.name}さん${range}`
 }
 
@@ -181,9 +182,9 @@ export function SummarySheet({ summary }: { summary: NenHealthSummaryData }) {
       <p><strong>健康日記 30日のまとめ</strong></p>
       <p>{summary.pet.callName || summary.pet.name}（{kind}{summary.pet.breed ? `・${summary.pet.breed}` : ''}・{summary.pet.ageLabel}）／飼い主 {summary.owner.name}／作成 {formatDay(summary.generatedAt)}</p>
       <p>
-        記録 {s.records}件／{s.days}日。
+        記録 {s.records} 件／{s.days}日。
         体重 {s.weight ? `${s.weight.first}kg → ${s.weight.last}kg（最小 ${s.weight.min}・最大 ${s.weight.max}）` : '記録なし'}。
-        心拍数 平均 {s.heartRateAvg == null ? '—' : `${s.heartRateAvg}回／分`}。呼吸数 平均 {s.respiratoryRateAvg == null ? '—' : `${s.respiratoryRateAvg}回／分`}。
+        心拍数 平均 {s.heartRateAvg == null ? '—' : `${s.heartRateAvg} 回／分`}。呼吸数 平均 {s.respiratoryRateAvg == null ? '—' : `${s.respiratoryRateAvg} 回／分`}。
       </p>
       <p>便：{countText(s.stool, summary.labels.stool)}／食いつき：{countText(s.appetite, summary.labels.appetite)}／皮膚：{countText(s.skin, SKIN_LABELS)}／涙やけ：{countText(s.tearStain, TEAR_LABELS)}</p>
       <table>

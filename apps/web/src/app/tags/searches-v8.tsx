@@ -39,6 +39,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { TagRowsSkeleton } from './tag-rows-skeleton'
 import styles from './list-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 export default function SearchesTabV8({ accountId, canEdit }: { accountId: string | null; canEdit: boolean }) {
   const router = useRouter()
@@ -413,14 +414,14 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
                               <Link
                                 href={editHref}
                                 className={styles.cellTitle}
-                                title={search.name}
+
                                 aria-label={`${search.name} を編集`}
                                 onClick={(event) => event.stopPropagation()}
                               >
-                                {search.name}
+                                <TruncatedText value={String(search.name ?? '')} />
                               </Link>
                             ) : (
-                              <span className={styles.cellTitle} title={search.name}>{search.name}</span>
+                              <span className={styles.cellTitle} ><TruncatedText value={String(search.name ?? '')} /></span>
                             )}
                             {!search.lineAccountId && (
                               <span className={`${styles.miniBadge} ${styles.miniBadgeWarn}`}>対象アカウント未割り当て</span>
@@ -453,8 +454,8 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
                           </span>
                         </td>
                         <td className={styles.cellMuted}>
-                          <span className={styles.cellTruncate} title={search.usedIn === undefined ? '—' : search.usedIn.length === 0 ? '未使用' : search.usedIn.map((u) => `${USAGE_KIND_LABELS[u.kind]}「${u.name}」`).join('・')}>
-                            {search.usedIn === undefined ? '—' : search.usedIn.length === 0 ? '未使用' : search.usedIn.map((u) => `${USAGE_KIND_LABELS[u.kind]}「${u.name}」`).join('・')}
+                          <span className={styles.cellTruncate} >
+                            <TruncatedText value={String(search.usedIn === undefined ? '—' : search.usedIn.length === 0 ? '未使用' : search.usedIn.map((u) => `${USAGE_KIND_LABELS[u.kind]}「${u.name}」`).join('・') ?? '')} />
                           </span>
                         </td>
                         <td className={styles.cellMuted}>

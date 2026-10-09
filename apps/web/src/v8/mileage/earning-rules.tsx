@@ -55,6 +55,7 @@ import {
 import { CreateButton, MileageFrame, useMileageShell } from './frame'
 import { notifyToast } from '@/components/shared/toast'
 import styles from './mileage.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 const EVENT_LABELS: Record<string, string> = {
   friend_added: '友だち追加',
@@ -155,7 +156,7 @@ const PRESETS: Array<{ value: string; label: string; active: boolean; pending: b
   { value: 'pending', label: '確定待ちありのみ', active: false, pending: true, stopped: false, sort: 'order' },
 ]
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50].map((size) => ({ value: String(size), label: `${size}件表示` }))
+const PAGE_SIZE_OPTIONS = [10, 20, 50].map((size) => ({ value: String(size), label: `${size} 件表示` }))
 
 export default function EarningRulesTab() {
   const router = useRouter()
@@ -533,7 +534,7 @@ export default function EarningRulesTab() {
         icon={<Coins size={14} aria-hidden="true" />}
         value={ready ? grantedMiles ?? 0 : null}
         unit=""
-        detail={dash(`${formatMileageNumber(grantedCount ?? 0)}件`)}
+        detail={dash(`${formatMileageNumber(grantedCount ?? 0)} 件`)}
       />
       <KpiCard
         presentation="band"
@@ -541,7 +542,7 @@ export default function EarningRulesTab() {
         icon={<Gift size={14} aria-hidden="true" />}
         value={ready ? spentMiles ?? 0 : null}
         unit=""
-        detail={dash(`交換 ${formatMileageNumber(spentCount ?? 0)}件`)}
+        detail={dash(`交換 ${formatMileageNumber(spentCount ?? 0)} 件`)}
       />
       <KpiCard
         presentation="band"
@@ -549,7 +550,7 @@ export default function EarningRulesTab() {
         icon={<Wallet size={14} aria-hidden="true" />}
         value={ready ? balanceTotal ?? 0 : null}
         unit=""
-        detail={dash(`友だち ${formatMileageNumber(friendTotal ?? 0)}人`)}
+        detail={dash(`友だち ${formatMileageNumber(friendTotal ?? 0)} 人`)}
       />
     </KpiBand>
   )
@@ -810,7 +811,7 @@ export default function EarningRulesTab() {
                 <Td className={styles.colName}>
                   <div className={styles.rowNameLine}>
                     <FolderDotName folder={null}>
-                      <span className={styles.rowName} title={rule.draft.name}>{rule.draft.name}</span>
+                      <span className={styles.rowName} ><TruncatedText value={String(rule.draft.name ?? '')} /></span>
                     </FolderDotName>
                   </div>
                   <span className={narrow ? styles.rowSub : `${styles.rowSub} ${styles.dotIndent}`}>
@@ -825,7 +826,7 @@ export default function EarningRulesTab() {
                 <Td className={styles.colValidity}><span className={styles.cellMain}>{validityText(rule)}</span></Td>
                 <Td className={`${styles.colRecent} ${styles.num}`}>
                   <span className={styles.cellMain}>{formatMileageNumber(grantedMiles30d(rule))}</span>
-                  <span className={styles.cellSub}>{`対象外 ${formatMileageNumber(rule.metrics30d.excluded)}回`}</span>
+                  <span className={styles.cellSub}>{`対象外 ${formatMileageNumber(rule.metrics30d.excluded)} 回`}</span>
                 </Td>
                 <Td className={styles.colState}>
                   <span className={styles.pill} data-tone={active ? 'active' : 'neutral'}>
@@ -893,7 +894,7 @@ export default function EarningRulesTab() {
   const pager = ready && visible.length > 0 && pageCount > 1 ? (
     <ListPagePagination>
       <span className={styles.pagerCount}>
-        {`${shown.length}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, shown.length)}件`}
+        {`${shown.length} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, shown.length)} 件`}
       </span>
       <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
     </ListPagePagination>
@@ -948,8 +949,8 @@ export default function EarningRulesTab() {
             <Notice tone="danger" message={testError} />
           ) : testResult ? (
             <dl className={styles.testList}>
-              <div><dt>条件に合う行動</dt><dd>{formatMileageNumber(testResult.matchedEvents)}回</dd></div>
-              <div><dt>対象になる友だち</dt><dd>{formatMileageNumber(testResult.matchedFriends)}人</dd></div>
+              <div><dt>条件に合う行動</dt><dd>{formatMileageNumber(testResult.matchedEvents)} 回</dd></div>
+              <div><dt>対象になる友だち</dt><dd>{formatMileageNumber(testResult.matchedFriends)} 人</dd></div>
               <div><dt>付与見込みの合計</dt><dd>{formatMileageNumber(testResult.estimatedTotalMiles)} マイル</dd></div>
               <div><dt>1人あたり最大</dt><dd>{formatMileageNumber(testResult.maxPerFriend)} マイル</dd></div>
               <div><dt>付いた直後の状態</dt><dd>{testResult.initialStatus === 'pending' ? '確定待ち' : 'すぐ使える'}</dd></div>

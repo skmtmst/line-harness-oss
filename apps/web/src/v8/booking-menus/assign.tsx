@@ -42,6 +42,7 @@ import {
 import { menuPriceLabel } from './lib/menu-price'
 import shell from './settings.module.css'
 import styles from './assign.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /* 予約設定の5タブ（settings-v8.tsx の V8_TABS と同じ並び）。 */
 const V8_TABS = [
@@ -415,7 +416,7 @@ export default function AssignMatrixV8() {
                           className={focusMenuId === m.id ? styles.matrixRowFocus : undefined}
                         >
                           <Th scope="row" className={styles.matrixMenuCell}>
-                            <span className={styles.matrixMenuName} title={m.name}>{m.name}</span>
+                            <span className={styles.matrixMenuName} ><TruncatedText value={String(m.name ?? '')} /></span>
                           </Th>
                           {staff.map((s) => {
                             const row = grid[s.id]?.[m.id]

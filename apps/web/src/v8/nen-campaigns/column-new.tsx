@@ -160,7 +160,7 @@ export default function ColumnNew() {
           <span className={styles.bubbleText}>{`【コラム】${title}\n${excerpt}\n▶ コラムを読む`}</span>
         </LinePreviewMessage>
       </LinePreview>
-      <Card role="region" layout="vertical" padding="compact" surface="inset" spacing="tight" aria-labelledby="nen-col-tips">
+      <Card role="region" layout="vertical" padding="compact" surface="standard" spacing="tight" aria-labelledby="nen-col-tips">
         <h2 className={styles.sideTitle} id="nen-col-tips">読まれるコラムの書きかた</h2>
         <ul className={styles.sideText}>
           <li>・相談の言葉から始める</li>
@@ -168,7 +168,7 @@ export default function ColumnNew() {
           <li>・差し込む言葉（お名前・ペット名）は1つまで</li>
         </ul>
       </Card>
-      <Card role="region" layout="vertical" padding="compact" surface="inset" spacing="tight" aria-labelledby="nen-col-cannot">
+      <Card role="region" layout="vertical" padding="compact" surface="standard" spacing="tight" aria-labelledby="nen-col-cannot">
         <h2 className={styles.sideTitle} id="nen-col-cannot">この画面でできないこと</h2>
         <p className={`${styles.sideText} ${styles.sideTextTight}`}>記事の本文を書く（外部サイトで書きます）・出しかたの細かい設定（一斉配信と同じ）</p>
       </Card>
@@ -196,7 +196,7 @@ export default function ColumnNew() {
       {failure ? <Notice tone="danger" message={failure.message} data-failure-kind={failure.kind} /> : null}
       {tagPruneNotice ? <Notice tone="warn" message={tagPruneNotice} onClose={() => setTagPruneNotice(null)} /> : null}
 
-      <Card layout="vertical" padding="spacious" surface="inset" spacing="roomy" aria-labelledby="nen-col-title-heading" data-nen-part="title">
+      <Card layout="vertical" padding="spacious" surface="standard" spacing="roomy" aria-labelledby="nen-col-title-heading" data-nen-part="title">
         <h2 className={`${styles.cardTitle} ${styles.cardTitleLarge}`} id="nen-col-title-heading">題名と分類</h2>
         <label className={styles.field}>
           <span className={styles.labelRow}>
@@ -224,7 +224,7 @@ export default function ColumnNew() {
         </label>
       </Card>
 
-      <Card layout="vertical" padding="spacious" surface="inset" spacing="roomy" aria-labelledby="nen-col-link" data-nen-part="article">
+      <Card layout="vertical" padding="spacious" surface="standard" spacing="roomy" aria-labelledby="nen-col-link" data-nen-part="article">
         <h2 className={`${styles.cardTitle} ${styles.cardTitleLarge}`} id="nen-col-link">記事のリンク</h2>
         <label className={styles.field}>
           <span className={styles.label}>記事の URL</span>
@@ -248,7 +248,7 @@ export default function ColumnNew() {
         </div>
       </Card>
 
-      <Card layout="vertical" padding="spacious" surface="inset" spacing="roomy" aria-labelledby="nen-col-kind">
+      <Card layout="vertical" padding="spacious" surface="standard" spacing="roomy" aria-labelledby="nen-col-kind">
         <h2 className={`${styles.cardTitle} ${styles.cardTitleLarge}`} id="nen-col-kind">届く形</h2>
         {/* 届く形は画像の URL で決まる（写真つき＝画像あり、文字だけ＝画像なし）。文字だけを選ぶと画像の URL を外し、写真つきを選ぶと画像の URL の欄へ移る。 */}
         <div className={styles.pickRow} role="radiogroup" aria-label="届く形">
@@ -257,7 +257,7 @@ export default function ColumnNew() {
         </div>
       </Card>
 
-      <Card layout="vertical" padding="spacious" surface="inset" spacing="roomy" aria-labelledby="nen-col-when" data-nen-part="publish">
+      <Card layout="vertical" padding="spacious" surface="standard" spacing="roomy" aria-labelledby="nen-col-when" data-nen-part="publish">
         <div className={styles.cardHead}>
           <h2 className={`${styles.cardTitle} ${styles.cardTitleLarge}`} id="nen-col-when">いつ・だれに出しますか</h2>
           <p className={`${styles.cardNote} ${styles.cardNoteDark}`}>この日時は下書きに記録されます。実際の配信は、一覧で「この内容で予約する」を押したときだけ始まります</p>
@@ -274,7 +274,7 @@ export default function ColumnNew() {
           <div className={styles.field}>
             <span className={styles.labelRow}>
               <span className={styles.labelSmall}>配信対象</span>
-              <span className={styles.labelNote}>{audienceCount == null ? '' : `${formatNumber(audienceCount)}人に届きます`}</span>
+              <span className={styles.labelNote}>{audienceCount == null ? '' : `${formatNumber(audienceCount)} 人に届きます`}</span>
             </span>
             {/* 1つの欄で選ぶ。空＝友だち全員、タグを選ぶ＝そのタグで絞る（「外す」で全員へ戻す）。 */}
             <EntityKindField
@@ -305,7 +305,7 @@ export default function ColumnNew() {
         ) : null}
       </Card>
 
-      <Card layout="vertical" padding="spacious" surface="inset" spacing="roomy" aria-labelledby="nen-col-read">
+      <Card layout="vertical" padding="spacious" surface="standard" spacing="roomy" aria-labelledby="nen-col-read">
         <h2 className={`${styles.cardTitle} ${styles.cardTitleLarge}`} id="nen-col-read">読んだ人にすること</h2>
         <div className={styles.row}>
           <label className={styles.field}>

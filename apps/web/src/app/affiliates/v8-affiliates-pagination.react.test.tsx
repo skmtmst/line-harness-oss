@@ -51,7 +51,7 @@ async function renderTab() {
   calls.settlementPreview.mockRejectedValue(new Error('no settlement'))
   calls.linkBaseUrl.mockResolvedValue({ success: false })
   render(<AffiliatesPage />)
-  await waitFor(() => expect(screen.getByText('25人中 1〜20人')).toBeTruthy())
+  await waitFor(() => expect(screen.getByText('25 人中 1〜20 人')).toBeTruthy())
 }
 
 describe('V8 アフィリエイター一覧の件数とページ送り', () => {

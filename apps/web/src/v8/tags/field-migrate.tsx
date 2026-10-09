@@ -460,8 +460,8 @@ function FieldMigrate() {
   const needsPollAction = executedRunId !== null && !executing && pollProblem !== ''
     && (!run || RUN_RUNNING.has(run.status))
   const pollAttention = pollProblem !== '' && (!run || RUN_RUNNING.has(run.status))
-  const status = pollAttention ? pollProblem : run ? RUN_STATUS_LABELS[run.status] : executedRunId ? '実行を受け付けました。結果を確認しています' : confirmed ? `事前確認済み：${preview?.summary.total ?? 0}人` : undefined
-  const usage = typeof source.usageCount === 'number' ? `${formatNumber(source.usageCount)}人に値が入っている` : '値が入っている人数は未集計'
+  const status = pollAttention ? pollProblem : run ? RUN_STATUS_LABELS[run.status] : executedRunId ? '実行を受け付けました。結果を確認しています' : confirmed ? `事前確認済み：${preview?.summary.total ?? 0} 人` : undefined
+  const usage = typeof source.usageCount === 'number' ? `${formatNumber(source.usageCount)} 人に値が入っている` : '値が入っている人数は未集計'
   const back = <Link href="/tags?tab=fields" className={styles.backLink}>← 友だち情報欄へ</Link>
   const rows = sample ? sampleRows(sample) : []
 
@@ -532,7 +532,7 @@ function FieldMigrate() {
             <div key={`${row.from}:${row.to}`} className={styles.sampleRow} role="row">
               <span role="cell" title={row.from}>{row.from}</span>
               <span role="cell" title={row.to}>{row.to}</span>
-              <span role="cell" className={styles.sampleCount}>{`${formatNumber(row.count)}人`}</span>
+              <span role="cell" className={styles.sampleCount}>{`${formatNumber(row.count)} 人`}</span>
             </div>
           ))}
         </div>
@@ -593,10 +593,10 @@ function FieldMigrate() {
             <p className={styles.cardNote}>登録済みの値を読み取り、移せる数だけを確かめました。まだ何も変えていません。</p>
           </div>
           <dl className={styles.placeList}>
-            <div className={styles.placeRow}><dt>値がある友だち</dt><dd>{`${preview.summary.total}人`}</dd></div>
-            <div className={styles.placeRow}><dt>そのまま移せる</dt><dd>{`${preview.summary.convertible}人`}</dd></div>
-            <div className={styles.placeRow}><dt>人が確認する</dt><dd>{`${preview.summary.review}人`}</dd></div>
-            <div className={styles.placeRow}><dt>空欄</dt><dd>{`${preview.summary.invalid}人`}</dd></div>
+            <div className={styles.placeRow}><dt>値がある友だち</dt><dd>{`${preview.summary.total} 人`}</dd></div>
+            <div className={styles.placeRow}><dt>そのまま移せる</dt><dd>{`${preview.summary.convertible} 人`}</dd></div>
+            <div className={styles.placeRow}><dt>人が確認する</dt><dd>{`${preview.summary.review} 人`}</dd></div>
+            <div className={styles.placeRow}><dt>空欄</dt><dd>{`${preview.summary.invalid} 人`}</dd></div>
           </dl>
           <div className={styles.cardHead}><h3 className={styles.labelStrong}>切り替わる使用先</h3></div>
           {preview.usageTargets.length > 0 ? (
@@ -624,9 +624,9 @@ function FieldMigrate() {
             <p className={styles.cardNote}>{RUN_STATUS_LABELS[run.status]}</p>
           </div>
           <dl className={styles.placeList}>
-            <div className={styles.placeRow}><dt>移行できた</dt><dd>{`${run.summary.succeeded}人`}</dd></div>
-            <div className={styles.placeRow}><dt>移行できなかった</dt><dd>{`${run.summary.failed}人`}</dd></div>
-            <div className={styles.placeRow}><dt>確認が必要なまま</dt><dd>{`${run.summary.review + run.summary.invalid}人`}</dd></div>
+            <div className={styles.placeRow}><dt>移行できた</dt><dd>{`${run.summary.succeeded} 人`}</dd></div>
+            <div className={styles.placeRow}><dt>移行できなかった</dt><dd>{`${run.summary.failed} 人`}</dd></div>
+            <div className={styles.placeRow}><dt>確認が必要なまま</dt><dd>{`${run.summary.review + run.summary.invalid} 人`}</dd></div>
           </dl>
           {run.rows.filter((row) => row.status === 'failed').map((row) => (
             <p key={row.friendId} className={styles.fieldError}>{`${row.sourceValue || '（空欄）'}：${row.reason ?? '失敗しました。通信を確かめて、もう一度お試しください。'}`}</p>

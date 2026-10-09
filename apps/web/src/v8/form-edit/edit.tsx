@@ -70,6 +70,8 @@ import { FormEditAttemptContext } from './field-issues'
 import { focusFieldById } from '@/lib/use-form-errors'
 import { FormPhone } from './phone'
 import styles from './edit.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+
 
 const TAB_ITEMS: { key: EditTab; label: string }[] = [
   { key: 'content', label: '中身' },
@@ -1026,7 +1028,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             )}
           </div>
           <ul className={styles.publishNotes}>
-            <li>・すでに集まった回答（{submitCount.toLocaleString('ja-JP')}件）は消えません。消した質問の答えも残ります。</li>
+            <li>・すでに集まった回答（{polishFormatNumber(submitCount)} 件）は消えません。消した質問の答えも残ります。</li>
             <li>{publishedContentRevision !== null ? `・公開するまで、いまの版${publishedContentRevision}がそのまま使われます。` : '・公開するまで、いまの版がそのまま使われます。'}</li>
           </ul>
           {/* 絵の操作は真ん中（下の帯と同じ）。窓の既定の右寄せの帯は使わない。 */}

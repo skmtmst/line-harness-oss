@@ -42,6 +42,7 @@ import {
 import { MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import styles from './mileage.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 function dateOnlyDaysAgo(days: number) {
   const date = new Date()
@@ -297,7 +298,7 @@ export default function BalancesTab() {
         icon={<Users size={14} aria-hidden="true" />}
         value={ready ? summary.totalMembers : null}
         unit="人"
-        detail={ready ? `マイルを持っている ${formatMileageNumber(summary.withBalanceCount)}人` : '—'}
+        detail={ready ? `マイルを持っている ${formatMileageNumber(summary.withBalanceCount)} 人` : '—'}
       />
       <KpiCard
         presentation="band"
@@ -331,7 +332,7 @@ export default function BalancesTab() {
   /* 承認待ちの板（黄の地）。案内の帯のすぐ下・道具の段の上。 */
   const approval = approvalRequests && approvalRequests.length > 0 ? (
     <section className={styles.approval} aria-label="承認待ちのマイル変更">
-      <p className={styles.approvalTitle}>{`承認待ちのマイル変更 ${approvalRequests.length}件`}</p>
+      <p className={styles.approvalTitle}>{`承認待ちのマイル変更 ${approvalRequests.length} 件`}</p>
       {approvalError ? <Notice tone="danger" message={approvalError} /> : null}
       {approvalRequests.map((request) => (
         <div key={request.id} className={styles.approvalRow}>
@@ -466,7 +467,7 @@ export default function BalancesTab() {
               >
                 <Td className={styles.colName}>
                   <span className={styles.rowName} title={member.displayName}>{member.displayName}</span>
-                  <span className={styles.rowSub} title={member.lineAccount.name}>{member.lineAccount.name}</span>
+                  <span className={styles.rowSub} ><TruncatedText value={String(member.lineAccount.name ?? '')} /></span>
                 </Td>
                 <Td className={styles.colRank}><span className={styles.cellMain} title={member.rankReason}>{rankLabel(member.rank) ?? '—'}</span></Td>
                 <Td className={`${styles.colBalance} ${styles.num}`}>
@@ -513,7 +514,7 @@ export default function BalancesTab() {
   const pager = !loading && !loadError && members.length > 0 && pageCount > 1 ? (
     <div className={styles.pagerRow}>
       <span className={styles.pagerCount}>
-        {`${formatMileageNumber(filteredTotal)}人中 ${formatMileageNumber(offset + 1)}〜${formatMileageNumber(Math.min(offset + members.length, filteredTotal))}人`}
+        {`${formatMileageNumber(filteredTotal)} 人中 ${formatMileageNumber(offset + 1)}〜${formatMileageNumber(Math.min(offset + members.length, filteredTotal))} 人`}
       </span>
       <Pagination page={currentPage} pageCount={pageCount} onPageChange={(nextPage) => setOffset((nextPage - 1) * pageSize)} disabled={loading} />
     </div>

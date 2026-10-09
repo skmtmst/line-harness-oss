@@ -172,7 +172,7 @@ export function overviewBandCells(args: {
       icon: <Send size={13} aria-hidden="true" />,
       value: summary ? summary.outgoing : null,
       unit: '回',
-      detail: summary ? `成功 ${formatNumber(Math.max(0, summary.outgoing - summary.outgoingFailed))}回` : '集計を読み込めませんでした',
+      detail: summary ? `成功 ${formatNumber(Math.max(0, summary.outgoing - summary.outgoingFailed))} 回` : '集計を読み込めませんでした',
     },
     {
       key: 'failed',

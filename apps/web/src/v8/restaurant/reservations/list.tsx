@@ -153,7 +153,7 @@ export default function ListView({ view, rows, total, tables, page, period, stat
           </DataTable>
         )}
         {view === 'list' && pageCount > 1 ? (
-          <Pagination spacing="roomy" page={page} pageCount={pageCount} onPageChange={onPage} ariaLabel="予約台帳のページ送り" disabled={busy} summary={`${total}件中 ${(page - 1) * PAGE_SIZE + 1}〜${Math.min((page - 1) * PAGE_SIZE + rows.length, total)}件`} />
+          <Pagination spacing="roomy" page={page} pageCount={pageCount} onPageChange={onPage} ariaLabel="予約台帳のページ送り" disabled={busy} summary={`${total} 件中 ${(page - 1) * PAGE_SIZE + 1}〜${Math.min((page - 1) * PAGE_SIZE + rows.length, total)} 件`} />
         ) : null}
       </Panel>
       <Panel title="顧客カルテ" description="電話番号または LINE UID で名寄せする設計です。">

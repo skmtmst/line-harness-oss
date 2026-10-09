@@ -51,7 +51,9 @@
   min-height: var(--tpl-wb-tm-card-h);
   padding: var(--tpl-wb-tm-card-pad);
   border-radius: var(--tpl-wb-tm-card-radius);
-  box-shadow: var(--tpl-wb-tm-ring);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
 }
 .cardTitle {
   margin: 0;

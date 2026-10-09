@@ -46,6 +46,7 @@ import { CreateButton, MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import { notifyToast } from '@/components/shared/toast'
 import styles from './mileage.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 const KIND_LABEL: Record<MileageRewardKind, string> = {
   coupon: 'クーポン',
@@ -459,7 +460,7 @@ export default function RewardsTab() {
         String(reward.currentVersion?.requiredMiles ?? ''),
         reward.benefitName ? `${KIND_LABEL[reward.rewardKind]}「${reward.benefitName}」` : KIND_LABEL[reward.rewardKind],
         benefitSub(reward) ?? '',
-        `${reward.exchangedThisMonth}件`,
+        `${reward.exchangedThisMonth} 件`,
         statusPill(reward.status).text,
       ])
       const csv = [['使い道', '必要なマイル', '交換すると渡るもの', '残り・期限', '今月交換された', '状態'], ...rows]
@@ -504,7 +505,7 @@ export default function RewardsTab() {
         value={ready && popularName ? 0 : null}
         valueText={ready && popularName ? popularName : undefined}
         unit=""
-        detail={ready ? (popularName ? `今月 ${formatMileageNumber(popularCount ?? 0)}件` : 'まだ交換されていません') : '—'}
+        detail={ready ? (popularName ? `今月 ${formatMileageNumber(popularCount ?? 0)} 件` : 'まだ交換されていません') : '—'}
       />
       <KpiCard
         presentation="band"
@@ -690,7 +691,7 @@ export default function RewardsTab() {
                 <Td className={styles.colName}>
                   {/* 名前の前にフォルダの丸（左のフォルダの列と同じ分け方。未分類は輪）。補足は名前の頭にそろえる。 */}
                   <FolderDotName folder={null}>
-                    <span className={styles.rowName} title={reward.name}>{reward.name}</span>
+                    <span className={styles.rowName} ><TruncatedText value={String(reward.name ?? '')} /></span>
                   </FolderDotName>
                   <span className={`${styles.rowSub} ${styles.dotIndent}`}>
                     {reach ? `今すぐ交換できる人 ${formatMileageNumber(reach.reachableFriendCount)}` : '今すぐ交換できる人 —'}
@@ -706,7 +707,7 @@ export default function RewardsTab() {
                   {sub ? <span className={styles.cellSub}>{sub}</span> : null}
                 </Td>
                 <Td className={`${styles.colMonth} ${styles.num}`}>
-                  <span className={styles.cellMain}>{`${formatMileageNumber(reward.exchangedThisMonth)}件`}</span>
+                  <span className={styles.cellMain}>{`${formatMileageNumber(reward.exchangedThisMonth)} 件`}</span>
                 </Td>
                 <Td className={styles.colStateWide}>
                   <span className={styles.pill} data-tone={pill.tone}>
@@ -771,7 +772,7 @@ export default function RewardsTab() {
                   )}
                 </Td>
                 <Td className={styles.colGives}><span className={styles.cellMain}>{item.failureMessage || item.failureCode || '理由を確認できませんでした'}</span></Td>
-                <Td className={`${styles.colMonth} ${styles.num}`}><span className={styles.cellMain}>{`${formatNumber(item.attemptCount)}回`}</span></Td>
+                <Td className={`${styles.colMonth} ${styles.num}`}><span className={styles.cellMain}>{`${formatNumber(item.attemptCount)} 回`}</span></Td>
                 <Td className={styles.colGives}><span className={styles.cellMain}>{formatMileageDate(item.updatedAt)}</span></Td>
                 <Td className={styles.colOpsWide}>
                   {!readonly ? (
@@ -793,7 +794,7 @@ export default function RewardsTab() {
       )}
       {Math.ceil(redemptionsTotal / REDEMPTIONS_PAGE_SIZE) > 1 ? (
         <div className={styles.subPager}>
-          <span className={styles.pagerCount}>{`要対応の交換 ${formatNumber(redemptionsTotal)}件`}</span>
+          <span className={styles.pagerCount}>{`要対応の交換 ${formatNumber(redemptionsTotal)} 件`}</span>
           <Pagination
             page={redemptionsPage}
             pageCount={Math.ceil(redemptionsTotal / REDEMPTIONS_PAGE_SIZE)}
@@ -831,7 +832,7 @@ export default function RewardsTab() {
 
   const pager = ready && visible.length > 0 && pageCount > 1 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>{`${shown.length}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, shown.length)}件`}</span>
+      <span className={styles.pagerCount}>{`${shown.length} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, shown.length)} 件`}</span>
       <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
     </ListPagePagination>
   ) : undefined

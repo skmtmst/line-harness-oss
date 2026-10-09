@@ -12,12 +12,13 @@
  * - 未接続の媒体の「つなぐ」は、今の広告とのつなぎ（v7）と同じ接続の窓を開く
  * 閲覧のみ（owner・admin 以外）には、費用を手で入れる・つなぐ・再読み込み・行の「…」・操作の行を出さない。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AtSign, Check, Eye, Music, MoreHorizontal, Plug, Plus, RefreshCw, Search, Target, ThumbsUp, UserPlus, Wallet, XCircle } from 'lucide-react'
 import type { EntryRoute } from '@line-crm/shared'
 import { api, type AdPlatform } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { formatNumber } from '@/lib/format'
+import { formatNumber, formatYen } from '@/lib/format'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
@@ -80,25 +81,17 @@ type ConversionCost = { confirmedConversionCount: number; costPerConversionMinor
 /** 費用の表示。最小通貨単位で来るので通貨に合わせて戻す。 */
 function formatMinor(amountMinor: number, currency: string): string {
   const major = currency === 'JPY' ? amountMinor : amountMinor / 100
-  return new Intl.NumberFormat('ja-JP', { style: 'currency', currency }).format(major)
+  return currency === 'JPY' ? formatYen(major) : new Intl.NumberFormat('ja-JP', { style: 'currency', currency }).format(major)
 }
 
 /** 「10/1 6:00」の形（日本時間）。読めない値は null。 */
 function shortJst(value: unknown): string | null {
-  if (typeof value !== 'string' || !value) return null
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return null
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo',
-  }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`
+  return typeof value === 'string' ? polishFormatDate(value, { style: 'list', fallback: '' }) || null : null
 }
 
 /** 「9/15」の形（費用の日付 YYYY-MM-DD）。 */
 function shortDay(day: string): string {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day)
-  return match ? `${Number(match[2])}/${match[3]}` : day
+  return polishFormatDate(day, { style: 'list-day', fallback: day })
 }
 
 function platformLabel(platform: Pick<AdPlatform, 'name' | 'displayName'>): string {

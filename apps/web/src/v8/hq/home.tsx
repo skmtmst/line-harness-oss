@@ -43,6 +43,8 @@ import { connectionReasonLine } from './connection-reasons'
 import styles from './home.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/folder-colors'
+import StatusPill from '@/components/shared/status-pill'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type StatusFilter = 'all' | 'ok' | 'warn' | 'archived'
 type View = 'cards' | 'table'
@@ -206,10 +208,10 @@ export default function HqHomeV8() {
     try {
       await Promise.all([load(), refreshAccounts()])
       setConnectionResult(failed === 0
-        ? `${succeeded}件のLINE IDと接続状態を更新しました。`
-        : `${succeeded}件を更新し、${failed}件は更新できませんでした。`)
+        ? `${succeeded} 件のLINE IDと接続状態を更新しました。`
+        : `${succeeded} 件を更新し、${failed} 件は更新できませんでした。`)
     } catch {
-      setConnectionResult(`${succeeded}件を確認しましたが、一覧を再読み込みできませんでした。`)
+      setConnectionResult(`${succeeded} 件を確認しましたが、一覧を再読み込みできませんでした。`)
     } finally {
       setConnectionProgress('')
       setCheckingConnections(false)
@@ -426,7 +428,7 @@ export default function HqHomeV8() {
       )}
     />
   ) : loading ? (
-    <ListState kind="loading" title="アカウントを読み込んでいます" />
+    <ListState kind="loading" loadingShape={view === 'cards' ? 'cards' : 'list'} title="アカウントを読み込んでいます" />
   ) : accounts.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */
     <EmptyList
@@ -476,7 +478,7 @@ export default function HqHomeV8() {
             value={String(size)}
             width={110}
             onChange={(value) => { setSize(Number(value)); resetPage() }}
-            options={PAGE_SIZES.map((value) => ({ value: String(value), label: `${value}件表示` }))}
+            options={PAGE_SIZES.map((value) => ({ value: String(value), label: `${value} 件表示` }))}
           />
         </div>
       </div>
@@ -518,7 +520,7 @@ export default function HqHomeV8() {
                     {/* B-31：名前の下は1行で省略し、全文は title。 */}
                     <p className={styles.meta} title={metaOf(account)}>{metaOf(account)}</p>
                   </div>
-                  <span className={state.tone === 'ok' ? `${styles.pill} ${styles.pill_ok}` : state.tone === 'warn' ? `${styles.pill} ${styles.pill_warn}` : `${styles.pill} ${styles.pill_idle}`}><span className={styles.dot} aria-hidden="true" />{state.label}</span>
+                  <StatusPill tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusPill>
                 </div>
                 <dl className={styles.stats}>
                   <div className={styles.stat}>
@@ -560,11 +562,11 @@ export default function HqHomeV8() {
                 <span role="cell" className={styles.rowName}>
                   <span className={styles.logo} aria-hidden="true">{brandInitial(tenantName || name)}</span>
                   <span className={styles.cardName}>
-                    <span className={styles.name} title={name}>{name}</span>
+                    <span className={styles.name} ><TruncatedText value={String(name ?? '')} /></span>
                     <span className={styles.meta}>{metaOf(account)}</span>
                   </span>
                 </span>
-                <span role="cell"><span className={state.tone === 'ok' ? `${styles.pill} ${styles.pill_ok}` : state.tone === 'warn' ? `${styles.pill} ${styles.pill_warn}` : `${styles.pill} ${styles.pill_idle}`}><span className={styles.dot} aria-hidden="true" />{state.label}</span></span>
+                <span role="cell"><StatusPill tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusPill></span>
                 <span role="cell" className={styles.num}>{formatNumber(account.stats?.friendCount ?? 0)}</span>
                 <span role="cell" className={styles.num}>{formatNumber(account.stats?.messagesThisMonth ?? 0)}</span>
                 <span role="cell">{cardActions(account)}</span>
@@ -576,7 +578,7 @@ export default function HqHomeV8() {
 
       <div className={styles.footer}>
         <span className={styles.range}>
-          {filtered.length === 0 ? '0件' : `${formatNumber(filtered.length)}件中 ${formatNumber((current - 1) * size + 1)}〜${formatNumber((current - 1) * size + shown.length)}件`}
+          {filtered.length === 0 ? '0件' : `${formatNumber(filtered.length)} 件中 ${formatNumber((current - 1) * size + 1)}〜${formatNumber((current - 1) * size + shown.length)} 件`}
         </span>
 
         {pageCount > 1 ? <Pagination page={current} pageCount={pageCount} onPageChange={setPage} ariaLabel="アカウントのページ送り" /> : null}

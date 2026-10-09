@@ -516,7 +516,7 @@ export default function FriendsListV8() {
     },
     {
       key: 'added', title: '今月の追加', icon: UserPlus, value: stats?.addedThisMonth ?? null,
-      detail: stats ? `前月 ${formatNumber(stats.addedLastMonth)}人` : statsFailed ? '読み込めませんでした' : '—',
+      detail: stats ? `前月 ${formatNumber(stats.addedLastMonth)} 人` : statsFailed ? '読み込めませんでした' : '—',
       delta: stats ? { text: `${addedDiff >= 0 ? '+' : ''}${addedDiff}`, tone: addedDiff < 0 ? 'neutral' : 'up' } : null,
       href: '/chats',
     },
@@ -632,7 +632,7 @@ export default function FriendsListV8() {
             注目のみ
           </FilterChip>
         </div>
-        <span className={styles.count}>{loadStatus === 'ready' && !refreshing ? `${formatNumber(total)}件` : '—'}</span>
+        <span className={styles.count}>{loadStatus === 'ready' && !refreshing ? `${formatNumber(total)} 件` : '—'}</span>
         {broadcastHandoffHref ? (
           <Link href={broadcastHandoffHref} data-broadcast-handoff className={styles.handoff} title="今の絞り込み条件を対象に一斉配信を作ります。人数は送信時に最新の友だちへ計算し直します。">
             <Megaphone size={14} aria-hidden="true" />
@@ -640,7 +640,7 @@ export default function FriendsListV8() {
           </Link>
         ) : null}
         <span className={styles.spacer} />
-        {selectedCount > 0 ? <span className={styles.selectedCount}>{selectedCount}件選択中</span> : null}
+        {selectedCount > 0 ? <span className={styles.selectedCount}>{selectedCount} 件選択中</span> : null}
         <span className={styles.columnsBox}>
           <button ref={columnsButtonRef} type="button" aria-expanded={columnsOpen} onClick={() => setColumnsOpen((current) => !current)} className={styles.textButton}>
             <Columns3 size={16} aria-hidden="true" />
@@ -671,7 +671,7 @@ export default function FriendsListV8() {
           width={98}
           value={String(pageSize)}
           onChange={(value) => resetPageWith(() => setPageSize(Number(value) as PageSize))}
-          options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size}件表示` }))}
+          options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size} 件表示` }))}
         />
         <Select
           aria-label="並び順"
@@ -692,9 +692,9 @@ export default function FriendsListV8() {
       {hasScoreRange ? (
         <div className={styles.applied}>
           <span>
-            行動スコア：{scoreMin !== undefined ? `${scoreMin}点以上` : ''}
+            行動スコア：{scoreMin !== undefined ? `${scoreMin} 点以上` : ''}
             {scoreMin !== undefined && scoreMax !== undefined ? '〜' : ''}
-            {scoreMax !== undefined ? `${scoreMax}点以下` : ''}
+            {scoreMax !== undefined ? `${scoreMax} 点以下` : ''}
             {scoredOnly ? '（点数がついている人のみ）' : ''}
           </span>
           <Link href="/friends" className={styles.linkButton}>この条件を外す</Link>
@@ -879,7 +879,7 @@ export default function FriendsListV8() {
   const pager = (
     <div className={styles.pager}>
       <span className={styles.pagerCount}>
-        {loadStatus === 'ready' ? `${formatNumber(total)}人中 ${formatNumber(rangeStart)}〜${formatNumber(rangeEnd)}人` : '—'}
+        {loadStatus === 'ready' ? `${formatNumber(total)} 人中 ${formatNumber(rangeStart)}〜${formatNumber(rangeEnd)} 人` : '—'}
       </span>
       <Pagination page={page} pageCount={totalPages} onPageChange={setPage} disabled={loadStatus !== 'ready'} ariaLabel="友だち一覧のページ" />
     </div>

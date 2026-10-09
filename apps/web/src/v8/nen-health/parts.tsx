@@ -22,7 +22,7 @@ export const TEAR_LABELS: Record<string, string> = { normal: '問題なし', mil
 
 export function countText(counts: Record<string, number>, labels: Record<string, string>): string {
   const entries = Object.entries(counts).sort((a, b) => b[1] - a[1])
-  return entries.length ? entries.map(([key, n]) => `${labels[key] ?? key} ${n}回`).join('・') : '—'
+  return entries.length ? entries.map(([key, n]) => `${labels[key] ?? key} ${n} 回`).join('・') : '—'
 }
 
 /** 「2026-09-30」→「9/30」。 */
@@ -34,7 +34,7 @@ export function md(date: string | null | undefined): string {
 /** 件数の文（「6件中 1〜6件」）。 */
 export function rangeText(total: number, page: number, size: number): string {
   if (total === 0) return '0件'
-  return `${formatNumber(total)}件中 ${(page - 1) * size + 1}〜${Math.min(total, page * size)}件`
+  return `${formatNumber(total)} 件中 ${(page - 1) * size + 1}〜${Math.min(total, page * size)} 件`
 }
 
 /**

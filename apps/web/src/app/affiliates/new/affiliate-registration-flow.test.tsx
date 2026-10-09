@@ -222,7 +222,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     // 1ページ目は20件（＋「結びつけない」の空欄）。45件を全部は出さない。
     const select = byLabel<HTMLSelectElement>('LINEの友だちと結びつける')
     expect(select.options.length).toBe(21)
-    expect(hasText('全45件')).toBe(true)
+    expect(hasText('全45 件')).toBe(true)
 
     // 検索は選択中のLINEアカウントへ固定して投げている。
     expect(friendsList).toHaveBeenCalledWith(

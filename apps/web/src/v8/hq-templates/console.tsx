@@ -74,6 +74,7 @@ import HqStoreList from './store-list'
 import HqTagEditorV8 from './tag-editor'
 import HqTemplateDetail, { inUseVersionOf } from './detail'
 import styles from './console.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 const PAGE_TITLES: Record<TemplateType, string> = { tag: 'タグ', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム', scenario: 'シナリオ' }
 /** 一覧の段の住所（上の帯のパンくずの行き先）。シナリオのひな形はテンプレートの住所の中にある。 */
@@ -964,7 +965,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                 />
               ) : <p role="alert">この種類のひな形は、ここでは編集できません。</p>}
               {!canonicalEditorOwnsSave ? uncertainNotice : null}
-              {!canonicalEditorOwnsSave ? <p className={styles.note}>{`参照先 ${referenceCount(type, definition)}件を含めて配布します。`}</p> : null}
+              {!canonicalEditorOwnsSave ? <p className={styles.note}>{`参照先 ${referenceCount(type, definition)} 件を含めて配布します。`}</p> : null}
             </section>
           )}
           {footer ? <div className={styles.footer}>{footer}</div> : null}
@@ -1063,7 +1064,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                     <td><Checkbox id={`hq-dist-${account.id}`} aria-label={account.name} checked={on} disabled={busy || stage !== 'accounts'} onCheckedChange={(checked) => setSelected((current) => checked ? [...current, account.id] : current.filter((id) => id !== account.id))} /></td>
                     <td>
                       <label className={styles.nameLabel} htmlFor={`hq-dist-${account.id}`}>
-                        <FolderDotName folder={accountFolders.membership?.get(account.id)?.folder}><span className={styles.name} title={account.name}>{account.name}</span></FolderDotName>
+                        <FolderDotName folder={accountFolders.membership?.get(account.id)?.folder}><span className={styles.name} ><TruncatedText value={String(account.name ?? '')} /></span></FolderDotName>
                         <span className={styles.sub}>{on ? (stage === 'result' ? progressLabel(account.id) || '配る' : '配る') : '配らない'}</span>
                       </label>
                     </td>
@@ -1120,7 +1121,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
               ? '配布直前に版を再確認します。配布先で編集があれば、そのアカウントの変更を取り消します。成功したアカウントは保持され、失敗分だけ再確認できます。'
               : (result ? result.stores.map((store) => `${shortName(store.accountName ?? accountName(accounts, store.accountId))}：${store.status === 'succeeded' ? '完了' : failures.includes(store) ? '失敗' : '作成中'}`).join(' ・ ') : `配布番号：${pendingRun ?? '—'} の結果を確認しています。確認できるまでは再配布しません。`)}</p>
             {result && failures.length ? failures.map((store) => <Notice key={store.accountId} tone="danger" message={`${store.accountName ?? accountName(accounts, store.accountId)}：${store.reason || '配布できませんでした。アカウントの現在版を再確認してください。'}${store.cleanupPending ? '（画像の後片付けを自動で再試行中です）' : ''}`} action={done ? <Button disabled={busy} onClick={() => checkStores([store.accountId])}>このアカウントだけ再確認して配布</Button> : undefined} />) : null}
-            {result && done ? <p className={styles.note}>{`新規 ${formatNumber(successes.reduce((sum, s) => sum + s.counts.created, 0))}件・上書き ${formatNumber(successes.reduce((sum, s) => sum + s.counts.overwritten, 0))}件・別名 ${formatNumber(successes.reduce((sum, s) => sum + s.counts.aliased, 0))}件`}</p> : null}
+            {result && done ? <p className={styles.note}>{`新規 ${formatNumber(successes.reduce((sum, s) => sum + s.counts.created, 0))} 件・上書き ${formatNumber(successes.reduce((sum, s) => sum + s.counts.overwritten, 0))} 件・別名 ${formatNumber(successes.reduce((sum, s) => sum + s.counts.aliased, 0))} 件`}</p> : null}
           </section>
         ) : null}
         </div>

@@ -173,7 +173,7 @@ function FriendAddRunDetailInner() {
         setNotice('失敗した処理を再試行できませんでした。状態を読み直してください。')
         return
       }
-      setNotice(`${response.data.retried}件の失敗処理を再試行しました。`)
+      setNotice(`${response.data.retried} 件の失敗処理を再試行しました。`)
       await load()
     } catch (caught) {
       // M011：409 は応答が消えたあとの再送（実際は通っている）ことがあるので、読み直してから文を出す。
@@ -311,7 +311,7 @@ function FriendAddRunDetailInner() {
                     <span className={styles.stepText}>
                       <span className={styles.stepTitle}>{actionTitle(action, detail.configuredActions)}</span>
                       <span className={styles.stepSub} data-kind={message || state === 'wait' ? undefined : 'time'}>
-                        {message ?? (state === 'wait' ? `${time}・実行を待っています` : action.attemptCount > 1 ? `${time}・${action.attemptCount}回目` : time)}
+                        {message ?? (state === 'wait' ? `${time}・実行を待っています` : action.attemptCount > 1 ? `${time}・${action.attemptCount} 回目` : time)}
                       </span>
                     </span>
                   </li>

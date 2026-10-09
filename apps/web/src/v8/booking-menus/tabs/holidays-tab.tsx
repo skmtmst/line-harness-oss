@@ -285,7 +285,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
 
       <p className={styles.closedNote}>
         {bookingCountOnClosed !== null && bookingCountOnClosed > 0
-          ? `すでに入っている予約は消えません。休みにした日に予約がある人には、お店から連絡してください（${bookingCountOnClosed}件）。`
+          ? `すでに入っている予約は消えません。休みにした日に予約がある人には、お店から連絡してください（${bookingCountOnClosed} 件）。`
           : 'すでに入っている予約は消えません。休みにした日に予約がある人には、お店から連絡してください。'}
       </p>
       </section>

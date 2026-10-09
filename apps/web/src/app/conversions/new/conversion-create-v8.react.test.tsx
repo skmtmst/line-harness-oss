@@ -128,7 +128,7 @@ describe('★V8-B 成果地点を作る（j8p3yj・競合cXqlS）', () => {
     expect(screen.getByRole('button', { name: /保存して数えはじめる/ })).toBeTruthy()
     // 試算（250ms待ってから読む）
     await eventually(() => {
-      expect(host.textContent).toContain('52件')
+      expect(host.textContent).toContain('52 件')
     })
   })
 

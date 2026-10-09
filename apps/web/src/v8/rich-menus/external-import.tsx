@@ -73,7 +73,7 @@ export function ExternalImportWorkspace({
       {loading ? <ListState kind="loading" title="LINEのメニューを読み込んでいます" /> : null}
       {!loading && error && !external ? <ListState kind="error" title="LINEのメニューを表示できませんでした" onRetry={onReload} /> : null}
       {!loading && !error && unmanaged.length === 0 ? (
-        <div className="bg-canvas rounded-card border-hairline border">
+        <div className="bg-canvas rounded-card content-card border">
           <ListState kind="empty" title="管理画面の外のメニューはありません" description="LINE側だけにあるメニューが見つかると、ここに表示します。" />
         </div>
       ) : null}
@@ -84,7 +84,7 @@ export function ExternalImportWorkspace({
             <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h2 className="text-ink text-sm font-bold">LINE側にあって、この管理画面に無いメニュー</h2>
-                <span className="text-ink-faint text-xs">{unmanaged.length}件</span>
+                <span className="text-ink-faint text-xs">{unmanaged.length} 件</span>
               </div>
               <div className="space-y-2">
                 {unmanaged.map((menu) => {

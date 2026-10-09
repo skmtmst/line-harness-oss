@@ -27,6 +27,8 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { useAutomationManage } from './shell'
 import { describeVersionChanges } from './version-diff'
 import styles from './versions.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 /** 利用先の種類（今の画面と同じ言葉）。 */
 const CONSUMER_LABELS: Record<string, string> = {
@@ -78,11 +80,7 @@ export function consumerBreakdown(bindings: Array<{ consumerType: string }>): st
 
 /** 「9/24」（日本時間）。 */
 function monthDay(iso: string | null): string {
-  if (!iso) return '—'
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).formatToParts(date)
-  return `${parts.find((part) => part.type === 'month')?.value ?? ''}/${parts.find((part) => part.type === 'day')?.value ?? ''}`
+  return polishFormatDate(iso, { style: 'list-day', fallback: '—' })
 }
 
 function VersionsInner() {
@@ -382,12 +380,12 @@ function VersionsInner() {
         <div className={styles.compare}>
           <section>
             <p className={styles.compareLabel}>現在の版</p>
-            <p className={styles.compareValue}>{`v${pendingBinding?.versionNumber ?? '—'}・${pendingVersion?.actions.length ?? '—'}個の処理`}</p>
+            <p className={styles.compareValue}>{`v${pendingBinding?.versionNumber ?? '—'}・${pendingVersion?.actions.length ?? '—'} 個の処理`}</p>
             <p className={styles.cardLead}>{pendingVersion ? stepChain(pendingVersion.actions) : '未取得'}</p>
           </section>
           <section>
             <p className={styles.compareLabel}>更新後</p>
-            <p className={styles.compareValue}>{`v${published?.versionNumber ?? '—'}・${published?.actions.length ?? '—'}個の処理`}</p>
+            <p className={styles.compareValue}>{`v${published?.versionNumber ?? '—'}・${published?.actions.length ?? '—'} 個の処理`}</p>
             <p className={styles.cardLead}>{published ? stepChain(published.actions) : '未取得'}</p>
           </section>
         </div>
@@ -400,7 +398,7 @@ function VersionsInner() {
           </section>
         ) : null}
         <p className={styles.cardLead}>
-          {`影響：実行中 ${pendingBinding?.runningCount ?? '—'}件、待機中 ${pendingBinding?.waitingCount ?? '—'}件は現在の版のまま完了します。`}
+          {`影響：実行中 ${pendingBinding?.runningCount ?? '—'} 件、待機中 ${pendingBinding?.waitingCount ?? '—'} 件は現在の版のまま完了します。`}
         </p>
         {dialogError ? <p className={styles.errorText} role="alert">{dialogError}</p> : null}
       </Dialog>

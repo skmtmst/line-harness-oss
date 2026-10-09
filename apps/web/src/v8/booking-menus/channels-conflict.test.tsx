@@ -29,7 +29,7 @@ afterEach(() => { cleanup(); vi.resetAllMocks() })
 
 it('2件の名前・メニュー・受付経路と日本時間を返事どおりに表示する', () => {
   render(<ConflictDialog accountId="a" conflict={conflict} staff={staff} onClose={() => {}} onDone={() => {}} />)
-  expect(screen.getByRole('heading').textContent).toContain('10/3（土） 13:00')
+  expect(screen.getByRole('heading').textContent).toContain('10月3日（土） 13:00')
   expect(screen.getByText(/① LINE（musubo）・山田さん・トリミング・13:00〜14:00/)).toBeTruthy()
   expect(screen.getByText(/② 外部取り込み・鈴木さん・シャンプー・13:00〜13:45/)).toBeTruthy()
   expect(screen.getByText(conflict.guidance!)).toBeTruthy()

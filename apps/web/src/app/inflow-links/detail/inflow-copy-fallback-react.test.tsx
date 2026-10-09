@@ -119,7 +119,7 @@ describe('流入経路のURLコピーに失敗したとき（V6R-S3-f）', () =>
 
  it('shows server totals and monthly detail even when the friend page is empty',async()=>{
   render(<InflowLinkDetailPage />); await screen.findByRole('button',{name:'URL をコピー'});
-  expect(await screen.findByText(/いま残っている 98人/)).toBeTruthy();
-  expect(screen.getByRole('region',{name:'月別内訳'}).textContent).toContain('100人');
+  expect(await screen.findByText(/いま残っている 98 人/)).toBeTruthy();
+  expect(screen.getByRole('region',{name:'月別内訳'}).textContent).toContain('100 人');
   expect(screen.getByText(/1人あたり.*1,200/)).toBeTruthy();
  });

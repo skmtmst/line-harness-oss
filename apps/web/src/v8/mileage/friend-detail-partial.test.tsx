@@ -48,6 +48,6 @@ afterEach(cleanup)
 
 test('最新100件より多いとき、今月の数は「数えられません」、件数は一部と書く', async () => {
   render(<FriendDetailV8 />)
-  await screen.findByText('最新100件だけでは数えられません')
-  expect(screen.getByText(/最新100件（全340件）のうち/)).toBeTruthy()
+  await screen.findByText('最新100 件だけでは数えられません')
+  expect(screen.getByText(/最新100 件（全340 件）のうち/)).toBeTruthy()
 })

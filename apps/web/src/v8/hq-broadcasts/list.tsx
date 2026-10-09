@@ -154,9 +154,9 @@ export default function HqBroadcastList() {
   const openReached = sentTargets.reduce((sum, t) => sum + t.successCount, 0)
   const openRate = openKnown && openReached > 0 ? Math.round((sentTargets.reduce((sum, t) => sum + (t.openedCount ?? 0), 0) / openReached) * 1000) / 10 : null
   const kpis = [
-    { key: 'scheduled', title: '予約中', icon: CalendarClock, value: ready ? counts.scheduled : null, unit: '件', detail: ready ? `下書き ${formatNumber(counts.draft)}件` : '—' },
-    { key: 'sent', title: '送った配信', icon: Send, value: ready ? counts.sent : null, unit: '件', detail: ready ? `${formatNumber(delivered)}人に届いた` : '—' },
-    { key: 'error', title: 'エラー', icon: AlertCircle, value: ready ? counts.error : null, unit: '件', detail: ready ? `失敗したアカウント ${formatNumber(failedStores)}件` : '—' },
+    { key: 'scheduled', title: '予約中', icon: CalendarClock, value: ready ? counts.scheduled : null, unit: '件', detail: ready ? `下書き ${formatNumber(counts.draft)} 件` : '—' },
+    { key: 'sent', title: '送った配信', icon: Send, value: ready ? counts.sent : null, unit: '件', detail: ready ? `${formatNumber(delivered)} 人に届いた` : '—' },
+    { key: 'error', title: 'エラー', icon: AlertCircle, value: ready ? counts.error : null, unit: '件', detail: ready ? `失敗したアカウント ${formatNumber(failedStores)} 件` : '—' },
     { key: 'open', title: '平均の開封率', icon: MailOpen, value: ready ? openRate : null, unit: '%', detail: ready ? (openRate == null ? 'まだ数えていません' : '送った配信の合計') : '—' },
   ]
 
@@ -333,7 +333,7 @@ export default function HqBroadcastList() {
                 <Td>
                   {sent ? (
                     <>
-                      <span className={styles.resultMain}>{`${formatNumber(reached)}人に届いた`}</span>
+                      <span className={styles.resultMain}>{`${formatNumber(reached)} 人に届いた`}</span>
                       {failed > 0 ? <span className={styles.cellSub}>{`失敗したアカウント ${formatNumber(failed)}`}</span> : rateLine(live, reached) ? <span className={styles.cellSub}>{rateLine(live, reached)}</span> : null}
                     </>
                   ) : <span className={styles.cellMain}>—</span>}
@@ -356,7 +356,7 @@ export default function HqBroadcastList() {
 
   const pager = runs && filtered.length > 0 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>{pageCount > 1 ? `${formatNumber(filtered.length)}件中 ${(current - 1) * pageSize + 1}〜${Math.min(current * pageSize, filtered.length)}件` : `${formatNumber(filtered.length)}件`}</span>
+      <span className={styles.pagerCount}>{pageCount > 1 ? `${formatNumber(filtered.length)} 件中 ${(current - 1) * pageSize + 1}〜${Math.min(current * pageSize, filtered.length)} 件` : `${formatNumber(filtered.length)} 件`}</span>
       {pageCount > 1 ? <Pagination page={current} pageCount={pageCount} onPageChange={setPage} ariaLabel="一括配信のページ送り" /> : null}
     </ListPagePagination>
   ) : null

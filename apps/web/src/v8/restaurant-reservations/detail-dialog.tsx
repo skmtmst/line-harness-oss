@@ -8,6 +8,7 @@
  * 取り消すは確かめの窓（台帳側の CancelReservationDialog）を通し、変更するは今の変更の窓へ移る。
  * 閲覧のみ（canWrite=false）には 取り消す・変更する を置かない（閉じるだけ）。動きは BEHAVIOR.md。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useState } from 'react'
 import { Pencil } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -20,19 +21,22 @@ import {
 import { RsDialog } from '../restaurant/booking-kit/parts'
 import { INACTIVE_STATUSES, hm, mdWeek, sourceName } from '../restaurant/reservations/format'
 import styles from './detail-dialog.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+import { formatYen as polishFormatYen } from '@/lib/format'
+
 
 type History = { state: 'loading' } | { state: 'none' } | { state: 'error' } | { state: 'ready'; count: number; last: string | null }
 
 /** 「10/2（金）19:00〜21:00 ・ T4（4人卓）」。卓が無ければ「未配席」。 */
 export function detailWhen(item: RestaurantReservation, table: RestaurantTable | null): string {
-  const seat = table ? `${table.code}（${table.max_capacity}人卓）` : item.table_label || '未配席'
+  const seat = table ? `${table.code}（${table.max_capacity} 人卓）` : item.table_label || '未配席'
   return `${mdWeek(new Date(item.starts_at))}${hm(item.starts_at)}〜${hm(item.ends_at)} ・ ${seat}`
 }
 
 /** 「秋の鹿肉コース 8,800円 ・ Hot Pepper から」。コースが無ければ「席のみ」。 */
 export function detailCourse(item: RestaurantReservation, course: RestaurantMenuItem | null): string {
   const name = item.course_name || course?.name || ''
-  const price = course?.price ? ` ${course.price.toLocaleString('ja-JP')}円` : ''
+  const price = course?.price ? ` ${polishFormatYen(course.price)}` : ''
   return `${name ? `${name}${price}` : '席のみ'} ・ ${sourceName(item.source)} から`
 }
 
@@ -40,10 +44,9 @@ function historyText(history: History): string {
   if (history.state === 'loading') return 'これまでの来店を読んでいます…'
   if (history.state === 'none') return 'これまでの来店：連絡先が無いので数えられません'
   if (history.state === 'error') return 'これまでの来店を読めませんでした'
-  if (history.count === 0) return 'これまでの来店 0回（はじめて）'
-  const last = history.last ? new Date(history.last) : null
-  const lastText = last && !Number.isNaN(last.getTime()) ? `・前回 ${last.getMonth() + 1}/${last.getDate()}` : ''
-  return `これまでの来店 ${history.count}回${lastText}`
+  if (history.count === 0) return 'これまでの来店 0 回（はじめて）'
+  const last = polishFormatDate(history.last, { style: 'list-day', fallback: '' })
+  return `これまでの来店 ${history.count.toLocaleString('ja-JP')} 回${last ? `・前回 ${last}` : ''}`
 }
 
 export default function ReservationDetailDialog({ reservation, accountId, tables, courses, busy, canWrite, onClose, onCancel, onRestore, onEdit }: {

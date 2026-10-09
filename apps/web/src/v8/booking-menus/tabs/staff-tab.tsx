@@ -2,6 +2,7 @@
 
 /* ⑤ 担当スタッフ（VLEaj）（settings-v8.tsx から分割。見た目・動きは変えない） */
 
+import SharedStatusPill from '@/components/shared/status-pill'
 import { useState } from 'react'
 import Link from 'next/link'
 import { ListChecks, Plus } from 'lucide-react'
@@ -124,7 +125,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
   return (
     <div className={styles.tabStack} data-design="Table">
       <div className={styles.staffHeadRow}>
-        <h2 className={styles.staffHeadTitle}>{`担当スタッフ ${staff.length}人`}</h2>
+        <h2 className={styles.staffHeadTitle}>{`担当スタッフ ${staff.length} 人`}</h2>
         <div className={styles.staffHeadActions}>
           <Button href="/booking/menus/staff"><ListChecks size={15} aria-hidden="true" />担当メニューをまとめて決める</Button>
           {canEdit ? <Button variant="primary" onClick={() => setEditing(EMPTY_STAFF)}><Plus size={15} aria-hidden="true" />スタッフを登録</Button> : null}
@@ -215,10 +216,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
               <span className={styles.staffCellSub}>ログイン：{memberLabel(person)}</span>
             </span>
             <span className={styles.staffColStatus}>
-              <span className={`${styles.statePill} ${person.is_active ? styles.statePillOn : styles.statePillOff}`}>
-                <span className={styles.stateDot} aria-hidden="true" />
-                {person.is_active ? '受付中' : '止めている'}
-              </span>
+              <SharedStatusPill tone={person.is_active ? 'success' : 'neutral'}>{person.is_active ? '受付中' : '止めている'}</SharedStatusPill>
             </span>
             <span className={styles.staffColMenu}>
               <RowMenu

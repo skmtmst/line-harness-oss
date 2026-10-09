@@ -426,7 +426,7 @@ export default function CreateAffiliateV8() {
                   </div>
                 ) : (
                   <div className={styles.friendSearch}>
-                    <p className={styles.cardNote}>{friendLoading ? '友だちを読み込んでいます' : `全${formatNumber(friendTotal)}件`}</p>
+                    <p className={styles.cardNote}>{friendLoading ? '友だちを読み込んでいます' : `全${formatNumber(friendTotal)} 件`}</p>
                     {friendPageCount > 1 ? (
                       <Select
                         id="af-friend-page"

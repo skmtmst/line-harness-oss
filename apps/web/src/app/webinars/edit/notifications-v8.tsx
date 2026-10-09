@@ -104,11 +104,11 @@ export default function NotificationsV8({ webinarId, webinarTitle, editor, onEdi
   return (
     <div data-design-node="E7iAYs" data-webinar-pane="notifications">
       <div className="min-w-0 space-y-4">
-        <section className="border-hairline bg-canvas rounded-card border p-5">
+        <section className="content-card bg-canvas rounded-card border p-5">
           <WebinarNotifications webinarId={webinarId} onLoaded={handleLoaded} onDirtyChange={setNotificationDirty} registerSave={registerNotificationSave} />
           <div className="mt-3">{testButton('テストを送る（全部）')}</div>
         </section>
-        <fieldset disabled={saving} className="border-hairline bg-canvas min-w-0 rounded-card border p-5">
+        <fieldset disabled={saving} className="content-card bg-canvas min-w-0 rounded-card border p-5">
           <h2 className="text-ink text-base font-semibold">視聴後にすること <HelpTip label="視聴後にすることの説明">見たかどうかで、タグを付けたりシナリオを始めたりします。</HelpTip></h2>
           {actionError ? <Notice tone="info" action={<Button onClick={() => setActionAttempt((value) => value + 1)}>もう一度読み込む</Button>}>視聴後の設定を読み込めませんでした。</Notice> : <ul className="divide-hairline my-3 divide-y">
             {(['completed', 'cta_clicked', 'unviewed'] as const).map((trigger) => <li key={trigger} className="flex items-center gap-4 py-3"><span className="text-ink w-24 shrink-0 text-sm font-semibold">{TRIGGER_LABEL[trigger]}</span><span className="text-ink-secondary min-w-0 flex-1 truncate text-sm" title={actions?.filter((a) => a.trigger === trigger).map((a) => ACTION_LABEL[a.actionType]).join('・')}>{actions === null ? '読み込んでいます' : actions.filter((a) => a.trigger === trigger).map((a) => ACTION_LABEL[a.actionType]).join('・') || 'まだ何もしない'}</span><Button size="compact" onClick={onOpenActions} aria-label={`${TRIGGER_LABEL[trigger]}の動きを変える`}>…</Button></li>)}

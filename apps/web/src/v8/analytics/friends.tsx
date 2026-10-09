@@ -31,6 +31,7 @@ import {
   useRegisterExport,
 } from './parts'
 import styles from './analytics.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type Day = AnalyticsFriendsOverview['data']['days'][number]
 type Campaign = AnalyticsFriendsOverview['data']['campaigns'][number]
@@ -42,7 +43,7 @@ function DailyBars({ days, campaigns, selected, onSelect }: { days: Day[]; campa
     <div className={styles.bars} role="list" aria-label="日ごとの増減">
       {days.map((day) => {
         const marks = campaigns.filter((item) => item.date === day.date)
-        const label = `${Number(day.date.slice(5, 7))}月${Number(day.date.slice(8, 10))}日（${analyticsWeekday(day.date)}） 増加 ${day.added}人・減少 ${day.removed}人・差し引き ${day.net}人${marks.length ? `　${marks.map((item) => item.name).join('、')}` : ''}`
+        const label = `${Number(day.date.slice(5, 7))}月${Number(day.date.slice(8, 10))}日（${analyticsWeekday(day.date)}） 増加 ${day.added} 人・減少 ${day.removed} 人・差し引き ${day.net} 人${marks.length ? `　${marks.map((item) => item.name).join('、')}` : ''}`
         return <button key={day.date} type="button" role="listitem" className={styles.day} data-selected={selected === day.date || undefined} aria-label={label} title={label} onClick={() => onSelect(selected === day.date ? '' : day.date)}>
           <span className={styles.dayUp}>
             {marks.map((item) => <i key={item.id} className={styles.dayMark} data-kind={item.kind} aria-hidden="true" />)}
@@ -72,8 +73,8 @@ function RouteBreakdown({ accountId, from, to }: { accountId: string; from: stri
   const max = Math.max(1, ...routes.map((route) => shownValue(route.friendAdds) ?? 0))
   if (routes.length === 0) return <p className={styles.sideNote}>この期間に流入リンクから増えた友だちはいません</p>
   return <ul className={styles.routeRows}>{routes.map((route) => <li key={route.id} className={styles.routeRow}>
-    <div className={styles.sideRow}><span className={styles.sideName} title={route.name}>{route.name}</span><strong className={styles.sideValue}>{`${metricText(route.friendAdds)} 人`}</strong></div>
-    <div className={styles.track} title={`現在 ${metricText(route.currentFriends)}人・1人あたり ${metricText(route.costPerFriend)}円`}><span style={{ width: `${(shownValue(route.friendAdds) ?? 0) / max * 100}%` }} /></div>
+    <div className={styles.sideRow}><span className={styles.sideName} ><TruncatedText value={String(route.name ?? '')} /></span><strong className={styles.sideValue}>{`${metricText(route.friendAdds)} 人`}</strong></div>
+    <div className={styles.track} title={`現在 ${metricText(route.currentFriends)} 人・1人あたり ${metricText(route.costPerFriend)} 円`}><span style={{ width: `${(shownValue(route.friendAdds) ?? 0) / max * 100}%` }} /></div>
   </li>)}</ul>
 }
 
@@ -110,7 +111,7 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
 
   return <>
     <KpiBand className={styles.band}>
-      <KpiCard presentation="band" title="増えた" icon={<Users size={13} aria-hidden="true" />} value={addedValue} unit="人" {...metricCardState(overview.metrics.added, { detail: `この${days}日。初回 ${metricText(overview.metrics.firstTime)}人` }, state.retry)} />
+      <KpiCard presentation="band" title="増えた" icon={<Users size={13} aria-hidden="true" />} value={addedValue} unit="人" {...metricCardState(overview.metrics.added, { detail: `この${days}日。初回 ${metricText(overview.metrics.firstTime)} 人` }, state.retry)} />
       <KpiCard presentation="band" title="減った" icon={<UserMinus size={13} aria-hidden="true" />} value={removedValue} unit="人" {...metricCardState(overview.metrics.removed, { detail: `この${days}日・解除を含む` }, state.retry)} />
       <KpiCard presentation="band" title="差し引き" icon={<ArrowLeftRight size={13} aria-hidden="true" />} value={netValue} unit="人" signed {...metricCardState(overview.metrics.net, { detail: `友だちは ${metricText(overview.metrics.currentFriends)} 人` }, state.retry)} />
       <KpiCard presentation="band" title="ブロック率" icon={<CircleHelp size={13} aria-hidden="true" />} value={null} unit="%" detail="ブロックの数は未取得" />
@@ -132,7 +133,7 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
             ? <DailyBars days={overview.days} campaigns={overview.campaigns} selected={selectedDate} onSelect={setSelectedDate} />
             : <div className={styles.emptyChart} role="status"><p>{reasonShownInBanner ? (METRIC_STATE_TEXT[overview.state] || '未取得') : pendingReason}</p>{overview.state === 'pending' ? <p>日ごとの集計は数分ごとに自動で更新されます。しばらくしても変わらないときは、時間をおいて開き直してください。</p> : null}</div>}
           {daysShown && (selectedDay || overview.campaigns.length > 0) ? <div className={styles.notes}>
-            {selectedDay ? <p className={styles.note}><i data-kind="selected" aria-hidden="true" />{`${shortDate(selectedDay.date)}（${analyticsWeekday(selectedDay.date)}） 増加 ${selectedDay.added}人・減少 ${selectedDay.removed}人・差し引き ${selectedDay.net}人`}</p> : null}
+            {selectedDay ? <p className={styles.note}><i data-kind="selected" aria-hidden="true" />{`${shortDate(selectedDay.date)}（${analyticsWeekday(selectedDay.date)}） 増加 ${selectedDay.added} 人・減少 ${selectedDay.removed} 人・差し引き ${selectedDay.net} 人`}</p> : null}
             {overview.campaigns.map((item) => <p key={item.id} className={styles.note}><i data-kind={item.kind} aria-hidden="true" />{`${shortDate(item.date)} ${item.kind === 'scenario' ? 'シナリオを始めた' : '一斉配信'}「${item.name}」`}</p>)}
           </div> : null}
         </section>

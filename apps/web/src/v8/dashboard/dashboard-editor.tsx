@@ -61,6 +61,7 @@ import SegmentedControl from '@/components/shared/segmented'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import styles from './dashboard-editor.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 const CARD_DEFINITION_MAP = new Map(DASHBOARD_CARD_DEFINITIONS.map((card) => [card.id, card]))
 const GROUPS: DashboardGroup[] = ['today', 'main', 'right']
@@ -104,7 +105,7 @@ function CardRow({ item, definition, canMoveUp, canMoveDown, disabled, onMove, o
         <GripVertical aria-hidden="true" />
       </ReorderHandle> : <span className={styles.grip} aria-hidden="true" />}
       <div className={styles.names}>
-        <span className={styles.name} title={definition.label}>{definition.label}</span>
+        <span className={styles.name} ><TruncatedText value={String(definition.label ?? '')} /></span>
         <span className={styles.where} title={definition.description}>{definition.description}</span>
       </div>
       <div role="group" aria-label={`${definition.label}の順番`} className={styles.moves}>
@@ -167,7 +168,7 @@ function Preview({ draft }: { draft: DashboardPreferences }) {
         ) : (
           <div className={styles.previewStack}>
             {mobileToday.map((item) => <span key={item.id} className={styles.previewCard} data-small="">{labelOf(item.id)}</span>)}
-            {folded > 0 ? <span className={styles.previewCard} data-muted="">ほか {folded}件（「集計を見る」で開きます）</span> : null}
+            {folded > 0 ? <span className={styles.previewCard} data-muted="">ほか {folded} 件（「集計を見る」で開きます）</span> : null}
             {visible('main').map((item) => <span key={item.id} className={styles.previewCard}>{labelOf(item.id)}</span>)}
             {visible('right').map((item) => <span key={item.id} className={styles.previewCard} data-aside="">{labelOf(item.id)}</span>)}
           </div>

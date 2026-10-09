@@ -28,26 +28,19 @@ import {
   eventStoppedStage,
 } from './ec-failure'
 import styles from './order-drawer.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 type DetailState = 'loading' | 'ready' | 'error' | 'forbidden'
 
 /** 日本時間の「10/1 21:02」。 */
 function shortTime(value: string | null): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.valueOf())) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`
+  return polishFormatDate(value, { style: 'list', fallback: '—' })
 }
 
 /** 日本時間の「10/4」。 */
 function shortDay(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.valueOf())) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')}`
+  return polishFormatDate(value, { style: 'detail' })
 }
 
 function money(currency: string, amount: number | null): string | null {
@@ -105,8 +98,8 @@ function EventRow({ event, retryingId, onRetry, canEdit }: { event: EcOrderDetai
                       : action.status === 'pending' || action.status === 'processing' ? '処理中です'
                         : '失敗しました。通信を確かめて、もう一度お試しください。')}
                   {kind ? `（${kind.label}）` : ''}
-                  {action.attemptCount > 0 ? `・${action.attemptCount}/${action.maxAttempts}回` : '・まだ試していません'}
-                  {action.attempts.length > 1 ? `・手動で戻した ${action.attempts.filter((attempt) => attempt.triggerKind === 'manual').length}回` : ''}
+                  {action.attemptCount > 0 ? `・${action.attemptCount}/${action.maxAttempts} 回` : '・まだ試していません'}
+                  {action.attempts.length > 1 ? `・手動で戻した ${action.attempts.filter((attempt) => attempt.triggerKind === 'manual').length} 回` : ''}
                 </span>
                 {kind && (action.status === 'retryable_failed' || action.status === 'permanent_failed' || action.status === 'skipped') ? <span className={styles.hint}>{kind.hint}</span> : null}
                 {canEdit && action.retryAvailable ? (

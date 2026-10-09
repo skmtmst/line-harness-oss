@@ -99,7 +99,7 @@ export default function Reserved({
           </span>
         </div>
         <p className={styles.desc}>
-          {`${scheduledLabel} に、${audienceCount === null ? '対象の友だち' : `${formatNumber(audienceCount)}人`}へ送ります。開始の前までは確かめる・取り消すができます。`}
+          {`${scheduledLabel} に、${audienceCount === null ? '対象の友だち' : `${formatNumber(audienceCount)} 人`}へ送ります。開始の前までは確かめる・取り消すができます。`}
         </p>
       </header>
 
@@ -117,10 +117,10 @@ export default function Reserved({
               <Row label="管理名" value={broadcast.title} />
               <Row
                 label="配信対象"
-                value={`${audienceLabel}${audienceCount === null ? '' : ` ${formatNumber(audienceCount)}人`}${estimate && estimate.hiddenExcluded > 0 ? `（除く見込み ${formatNumber(estimate.hiddenExcluded)}人）` : ''}`}
+                value={`${audienceLabel}${audienceCount === null ? '' : ` ${formatNumber(audienceCount)} 人`}${estimate && estimate.hiddenExcluded > 0 ? `（除く見込み ${formatNumber(estimate.hiddenExcluded)} 人）` : ''}`}
               />
               <Row label="送る日時" value={scheduledLabel} />
-              <Row label="メッセージ" value={`${messageTypeLabel(broadcast.messageType)} ${bubbleCount}通`} />
+              <Row label="メッセージ" value={`${messageTypeLabel(broadcast.messageType)} ${bubbleCount} 通`} />
               <Row label="状態" value={`予約中${approverLabel}`} />
             </dl>
             <p className={styles.slack}>
@@ -190,7 +190,7 @@ export default function Reserved({
         open={cancelOpen}
         title={broadcast.title}
         description={broadcast.scheduledAt
-          ? `${scheduledLabel} に送る予定の ${audienceCount === null ? '対象の友だち' : `${formatNumber(audienceCount)}人`} に送らなくなります。取り消すと下書きに戻り、もう一度予約できます。${broadcast.approvalStatus && broadcast.approvalStatus !== 'none' ? '承認はやり直しになります。' : ''}`
+          ? `${scheduledLabel} に送る予定の ${audienceCount === null ? '対象の友だち' : `${formatNumber(audienceCount)} 人`} に送らなくなります。取り消すと下書きに戻り、もう一度予約できます。${broadcast.approvalStatus && broadcast.approvalStatus !== 'none' ? '承認はやり直しになります。' : ''}`
           : '予約が取り消され、この配信は送られなくなります。書いた内容は下書きとして残るので、作り直しにはなりません。'}
         busy={cancelling}
         error={cancelError}

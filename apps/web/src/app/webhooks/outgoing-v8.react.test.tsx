@@ -143,7 +143,7 @@ test('v8 で失敗がある行は失敗ありの札と失敗の内訳が出る',
   await renderPage()
   const board = host.querySelector('[data-design-node="ZSbFY"]')
   expect(board?.textContent).toContain('失敗あり')
-  expect(board?.textContent).toContain('失敗 2回')
+  expect(board?.textContent).toContain('失敗 2 回')
   // 板 `ZSbFY` 行3の操作欄。「…」の中の「失敗をやり直す」ではなく表のボタンの文言で見る。
   expect(board?.textContent).toContain('やり直す')
 })

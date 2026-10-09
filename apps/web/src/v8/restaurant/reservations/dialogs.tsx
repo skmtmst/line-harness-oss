@@ -15,6 +15,9 @@ import type { RestaurantMenuItem, RestaurantReservation, RestaurantTable } from 
 import { DialogNote, RsDialog } from '../booking-kit/parts'
 import { INACTIVE_STATUSES, hm, isHold, pad2 } from './format'
 import styles from './reservations.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+import { formatYen as polishFormatYen } from '@/lib/format'
+
 
 function toLocalInput(iso: string): string {
   const date = new Date(iso)
@@ -95,7 +98,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
   ]
   const courseOptions = [
     { value: '', label: '席のみ' },
-    ...courses.filter((course) => course.status === 'active' || course.id === reservation.course_id).map((course) => ({ value: course.id, label: `${course.name} ${course.price.toLocaleString()}円` })),
+    ...courses.filter((course) => course.status === 'active' || course.id === reservation.course_id).map((course) => ({ value: course.id, label: `${course.name} ${polishFormatYen(course.price)}` })),
   ]
   return (
     <RsDialog

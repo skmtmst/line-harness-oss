@@ -514,7 +514,7 @@ export default function AdvancedSearchDialog({
             </div>
           </section>
 
-          <section className="rounded-card border border-hairline bg-canvas p-3">
+          <section className="rounded-card border content-card bg-canvas p-3">
           <div className="flex items-center gap-2 px-1 pb-2">
             <span className="bg-surface-pearl text-ink-secondary rounded-pill px-2 py-0.5 text-xs font-medium">
               すべて
@@ -759,7 +759,7 @@ export default function AdvancedSearchDialog({
           </section>
 
           <div className="grid gap-2 sm:grid-cols-2">
-            <label className="rounded-card border border-hairline bg-canvas px-3 py-2">
+            <label className="rounded-card border content-card bg-canvas px-3 py-2">
               <span className="text-nano text-ink-faint">並び順</span>
                 <Select
                   aria-label="並び順"
@@ -774,7 +774,7 @@ export default function AdvancedSearchDialog({
                 />
             </label>
             {/* FRIEND-04: 表示件数も条件の一部として適用する。 */}
-            <label className="rounded-card border border-hairline bg-canvas px-3 py-2">
+            <label className="rounded-card border content-card bg-canvas px-3 py-2">
               <span className="text-nano text-ink-faint">表示件数</span>
               <Select
                 aria-label="表示件数"

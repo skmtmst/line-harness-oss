@@ -284,7 +284,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
       }).sort((a, b) => b.pct - a.pct)
       if (others.length > 0 && others[0].pct > 0) out.push(`同じ「${summary.top.columnLabel}」でも、「${others[0].row}」は ${Math.round(others[0].pct)}% です`)
     }
-    if (summary.empty > 0) out.push(`${summary.empty}個のマスに該当者がいません。掛け合わせが細かすぎるかもしれません`)
+    if (summary.empty > 0) out.push(`${summary.empty} 個のマスに該当者がいません。掛け合わせが細かすぎるかもしれません`)
     return out
   }, [summary, rowTotals, rows, lookup])
 
@@ -363,7 +363,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
       {loading ? <div className={styles.waitBox} role="status">
         <p className={styles.audienceCount}>{restoredCrossRun ? '進行中の集計を確認しています。' : '集計を受け付けました。終わるまでこの画面で確認しています。'}</p>
         <p>{`現在の状態: ${crossQueue?.state === 'running' ? '処理中です' : 'このLINEアカウント内で待ち順に並んでいます'}`}</p>
-        {crossQueue?.queuePosition != null ? <p>{`このLINEアカウント内の順番は${crossQueue.queuePosition}番目です${crossQueue.pendingAhead === 0 ? '（このアカウントであなたの前にはありません）' : `（このアカウントであなたの前に${crossQueue.pendingAhead}件あります）`}`}</p> : null}
+        {crossQueue?.queuePosition != null ? <p>{`このLINEアカウント内の順番は${crossQueue.queuePosition}番目です${crossQueue.pendingAhead === 0 ? '（このアカウントであなたの前にはありません）' : `（このアカウントであなたの前に${crossQueue.pendingAhead} 件あります）`}`}</p> : null}
         {crossQueue?.estimatedWaitMs != null && crossQueue.estimatedWaitMs > 0 ? <p>{`最短で約${formatWait(crossQueue.estimatedWaitMs)}分です。他の処理状況により延びることがあります${crossQueue.nextTickAt && formatNextTick(crossQueue.nextTickAt) ? `（次回処理は${formatNextTick(crossQueue.nextTickAt)}ごろ）` : ''}`}</p> : null}
         <p className={styles.caption}>同じ分析をもう一度押す必要はありません。このままお待ちください。結果が出た後はこの画面で確認でき、失敗・時間切れのときも集計し直せます。</p>
       </div>
@@ -393,7 +393,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
                 const strength = summary && summary.max > 0 ? n / summary.max : 0
                 const active = picked?.rowKey === row.key && picked?.columnKey === col.key
                 return <button key={col.key} type="button" className={styles.gridCell} data-active={active || undefined} data-strong={strength > 0.5 || undefined} data-empty={n === 0 || undefined} disabled={n === 0} aria-pressed={active}
-                  aria-label={`${row.label} × ${col.label} ${formatNumber(n)}${unit}`}
+                  aria-label={`${row.label} × ${col.label} ${formatNumber(n)} ${unit}`}
                   onClick={() => setPickedKey({ rowKey: row.key, columnKey: col.key })}
                   style={n > 0 ? { backgroundColor: `color-mix(in srgb, var(--color-accent) ${Math.round((0.16 + strength * 0.7) * 100)}%, transparent)` } : undefined}>{formatNumber(n)}</button>
               })}
@@ -405,7 +405,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
             </div>
           </section>
           <aside className={styles.funnelSide} data-w="cross" aria-labelledby="cross-picked-title">
-            <h2 id="cross-picked-title" className={styles.hoursTitle}>{picked ? `${picked.rowLabel} × ${picked.columnLabel}（${formatNumber(picked.value)}${unit}${unit === '回' ? `・${formatNumber(picked.uniqueFriends)}人` : ''}）` : 'マスを選んでください'}</h2>
+            <h2 id="cross-picked-title" className={styles.hoursTitle}>{picked ? `${picked.rowLabel} × ${picked.columnLabel}（${formatNumber(picked.value)}${unit}${unit === '回' ? `・${formatNumber(picked.uniqueFriends)} 人` : ''}）` : 'マスを選んでください'}</h2>
             {picked && canManage ? <>
               <span><Button variant="secondary" disabled={audienceBusy} onClick={() => void openAudience('friends')}><Users size={15} aria-hidden="true" />対象者を開く</Button></span>
               <span><Button variant="secondary" disabled={audienceBusy} onClick={() => void openAudience('broadcast')}><Send size={15} aria-hidden="true" />この対象者へ配信を作成</Button></span>

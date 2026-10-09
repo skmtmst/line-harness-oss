@@ -24,6 +24,9 @@ import { restaurantTestApi, type RestaurantMenuItem } from '@/lib/restaurant-tes
 import RestaurantShell, { Panel, StatRow, Status, type RestaurantV8Context } from '../booking-kit/shell'
 import { DialogField, DialogNote, RowMore, RsDialog } from '../booking-kit/parts'
 import styles from './menu.module.css'
+import { formatDateTime as polishFormatDateTime } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+
 
 export function safeArray(value: string): string[] {
   try {
@@ -164,7 +167,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
                   <Td className={`${styles.td} ${styles.colName}`}>
                     {canEdit ? (
                       <button type="button" className={styles.name} title={item.name} onClick={() => openEdit(item)}>{item.name}</button>
-                    ) : <span className={styles.name} title={item.name}>{item.name}</span>}
+                    ) : <span className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></span>}
                   </Td>
                   <Td className={styles.td}>{item.kind === 'course' ? 'コース' : '単品'}</Td>
                   <Td className={`${styles.td} ${styles.colPrice}`} align="right">{formatYen(item.price)}</Td>
@@ -173,7 +176,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
                   <Td className={styles.td}><span className={styles.clip} title={allergens.join('・') || 'なし'}>{allergens.join('・') || 'なし'}</span></Td>
                   <Td className={styles.td}>
                     {pending ? (
-                      <span title={`新価格 ${formatYen(item.pendingPrice ?? 0)}${item.pendingEffectiveAt ? `・${new Date(item.pendingEffectiveAt).toLocaleString('ja-JP')}から` : ''}`}>
+                      <span title={`新価格 ${formatYen(item.pendingPrice ?? 0)}${item.pendingEffectiveAt ? `・${polishFormatDateTime(new Date(item.pendingEffectiveAt))}から` : ''}`}>
                         <Status value="pending" label={item.priceChangeStatus === 'approved' ? '開始待ち' : '申請中'} />
                       </span>
                     ) : <Status value={archived ? 'archived' : draftItem ? 'draft' : item.status === 'paused' ? 'paused' : 'active'} />}

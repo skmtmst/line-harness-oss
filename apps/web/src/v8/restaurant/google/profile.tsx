@@ -84,7 +84,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
   const closeOptions = TIME_OPTIONS.filter((t) => today.periods.length > 0 && t > today.periods[today.periods.length - 1].open).map((t) => ({ value: t, label: t }))
   const updates = data.googleUpdates
   const special = profile.specialHours.length
-    ? profile.specialHours.slice(0, 4).map((s) => `${formatYmdShort(s.date)} ${s.closed ? '休業' : formatPeriods(s.periods)}`).join('、') + (profile.specialHours.length > 4 ? ` ほか${profile.specialHours.length - 4}件` : '')
+    ? profile.specialHours.slice(0, 4).map((s) => `${formatYmdShort(s.date)} ${s.closed ? '休業' : formatPeriods(s.periods)}`).join('、') + (profile.specialHours.length > 4 ? ` ほか${profile.specialHours.length - 4} 件` : '')
     : '今後の予定はありません'
   const infoRows: Array<[string, string]> = [
     ['店名', profile.title ?? '—'],
@@ -96,7 +96,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
   const moreRows: Array<[string, string]> = [
     ['通常の営業時間', summarizeWeekly(profile.regularHours)],
     ['特別営業時間', special],
-    ['写真・店舗紹介', `${data.photoCount === null ? '店舗写真 —' : `店舗写真 ${data.photoCount}枚`} / ${profile.description ? '紹介文あり' : '紹介文なし'}`],
+    ['写真・店舗紹介', `${data.photoCount === null ? '店舗写真 —' : `店舗写真 ${data.photoCount} 枚`} / ${profile.description ? '紹介文あり' : '紹介文なし'}`],
   ]
 
   return (
@@ -104,7 +104,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
       {role !== null && !canManageRole(role) ? <Notice tone="info">閲覧のみです。営業時間と店舗情報を確認できます。</Notice> : null}
       {data.stale ? <Notice tone="warn" action={<Button variant="text" onClick={() => void load(true)}>{syncing ? '取得中…' : 'もう一度取得'}</Button>}>{`Googleから最新の情報を読み込めませんでした。前回取得した内容（${formatStampFull(data.fetchedAt)}）を表示しています。`}</Notice> : null}
       {!data.stale && data.closed ? <Notice tone="danger">Google側で「臨時休業」または「閉業」になっています。営業時間の変更はGoogleビジネスプロフィールで営業状態を戻してから行ってください。</Notice> : null}
-      {!data.stale && !data.closed && data.pendingChangeCount > 0 ? <Notice tone="info" action={<Button variant="text" onClick={() => go({ tab: 'profile', view: 'history', result: 'pending' })}>状態を確認</Button>}>{`Googleに変更を送信しました。反映を確認できるまで「反映確認中」と表示します（${data.pendingChangeCount}件）。`}</Notice> : null}
+      {!data.stale && !data.closed && data.pendingChangeCount > 0 ? <Notice tone="info" action={<Button variant="text" onClick={() => go({ tab: 'profile', view: 'history', result: 'pending' })}>状態を確認</Button>}>{`Googleに変更を送信しました。反映を確認できるまで「反映確認中」と表示します（${data.pendingChangeCount} 件）。`}</Notice> : null}
       {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
       <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="gb-today-title">
         <SectionHeader size="small" title={<span id="gb-today-title">本日の営業時間</span>} />
@@ -161,7 +161,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
         </div>
       </Card>
       <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="gb-google-updates-title">
-        <SectionHeader size="small" title={<span id="gb-google-updates-title">Google側の変更を確認</span>} note={updates && updates.fields.length > 0 ? <StatusBadge tone="warning">{`確認が必要 ${updates.fields.length}件`}</StatusBadge> : <StatusBadge tone="neutral">{updates ? '確認が必要な変更はありません' : '未確認'}</StatusBadge>} />
+        <SectionHeader size="small" title={<span id="gb-google-updates-title">Google側の変更を確認</span>} note={updates && updates.fields.length > 0 ? <StatusBadge tone="warning">{`確認が必要 ${updates.fields.length} 件`}</StatusBadge> : <StatusBadge tone="neutral">{updates ? '確認が必要な変更はありません' : '未確認'}</StatusBadge>} />
         <p className={styles.warnNote}>Google やお客さまの提案で、店舗情報が変わることがあります。違いがあれば、ここで確かめて採るか戻すかを選びます。</p>
         {showDiff && updates ? (
           <dl className={styles.diffList}>

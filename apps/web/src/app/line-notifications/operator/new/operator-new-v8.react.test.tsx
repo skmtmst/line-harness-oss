@@ -186,7 +186,7 @@ test('作るときはチームがあれば最初のチームを選び、スタ�
     return response({ success: true, data: { id: 'rule-1', version: 1 } })
   }))
   await renderPage()
-  expect(host?.textContent).toContain('中目黒店（2人）')
+  expect(host?.textContent).toContain('中目黒店（2 人）')
   expect(host?.textContent).not.toContain('受け取るスタッフ')
   await act(async () => {
     Array.from(host!.querySelectorAll('button')).find((button) => button.textContent?.includes('運用者へのお知らせを公開'))!.click()

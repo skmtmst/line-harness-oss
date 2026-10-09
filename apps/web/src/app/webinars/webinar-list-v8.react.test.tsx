@@ -133,7 +133,7 @@ test('v8 では UyUMw の一覧（帯・表・視聴の2行）が出る', async 
   expect(board?.textContent).toContain('248')
   expect(board?.textContent).toContain('41')
   // 表の見出しと行：状態の札・視聴の2行・公開期間。
-  expect(board?.textContent).toContain('視聴開始 98人')
+  expect(board?.textContent).toContain('視聴開始 98 人')
   expect(board?.textContent).toContain('視聴完了 —')
   expect(board?.textContent).toContain('公開中')
   expect(board?.textContent).toContain('編集')

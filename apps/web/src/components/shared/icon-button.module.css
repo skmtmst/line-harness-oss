@@ -3,13 +3,13 @@
 .button {
   display: inline-flex;
   width: 32px;
-  height: 32px;
+  height: 36px;
   flex: 0 0 32px;
   align-items: center;
   justify-content: center;
-  border: 0;
-  border-radius: var(--radius-icon);
-  background: transparent;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
   color: var(--color-ink-faint);
   cursor: pointer;
   transition:
@@ -138,3 +138,7 @@
 }
 [data-theme='v8'] .button[data-variant='plain']:not(:focus-visible) { outline-color: transparent; background: transparent; }
 }
+
+/* B-152・仕上げ7 */
+[data-theme='v8'] .button:disabled { opacity: var(--polish-disabled-opacity); }
+[data-theme='v8'] .button:is(:hover, :active):not(:disabled) { filter: none; }

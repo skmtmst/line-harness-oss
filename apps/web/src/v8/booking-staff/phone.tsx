@@ -7,10 +7,13 @@
  *   ③ 日時を選ぶ … 勤務とシフト（d5fmnM）・自分の勤務（E3YDK）
  * 中身は実データ（作り物の名前は置かない）。今までの app/booking/menus/liff-phone-v8.tsx から写した。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import type { ReactNode } from 'react'
 import type { BookingAvailabilitySlot, BookingMenu, BookingStaff } from '@/lib/api'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import styles from './phone.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+
 
 const WEEKDAY_JP = '日月火水木金土'
 const STEP_LABELS = ['メニュー', '担当', '日時', '確認']
@@ -22,8 +25,7 @@ function addDaysStr(date: string, days: number): string {
 }
 
 export function formatJpDay(date: string): string {
-  const d = new Date(`${date}T00:00:00Z`)
-  return `${d.getUTCMonth() + 1}月${d.getUTCDate()}日（${WEEKDAY_JP[d.getUTCDay()]}）`
+  return polishFormatDate(date, { style: 'day' })
 }
 
 /** LINE の予約画面の時刻は先頭の0を落とす（09:00 → 9:00。絵 d5fmnM・E3YDK）。 */
@@ -34,7 +36,7 @@ export function phoneTime(time: string): string {
 export function priceLabel(menu: Pick<BookingMenu, 'price_mode' | 'base_price'>): string {
   if (menu.price_mode === 'inquiry') return 'お問い合わせ'
   if (menu.price_mode === 'free' || menu.base_price === 0) return '無料'
-  return `¥${menu.base_price.toLocaleString('ja-JP')}`
+  return `¥${polishFormatNumber(menu.base_price)}`
 }
 
 function PhoneChrome({ step, children, foot }: { step: number; children: ReactNode; foot: ReactNode }) {

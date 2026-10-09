@@ -20,6 +20,8 @@ import { OpsHead } from './shell'
 import KnowledgeArticleV8 from './knowledge-article'
 import parts from './parts.module.css'
 import styles from './ops-knowledge-v8.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 /**
  * 運営のナレッジ V8（絵 `h114s`・記事 `R5ckwJ`）。
@@ -181,7 +183,5 @@ export default function OpsKnowledgeV8() {
 
 /** 10/1 の形（年は出さない）。読めない日付は —。 */
 function shortDate(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.valueOf())) return knowledgeDate(value)
-  return date.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' })
+  return polishFormatDate(value, { style: 'list-day', fallback: '—' })
 }

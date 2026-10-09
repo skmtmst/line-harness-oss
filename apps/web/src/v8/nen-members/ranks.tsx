@@ -289,7 +289,7 @@ export default function RankSettingsV8({
 
       <div className={styles.rankSplit}>
         <div className={styles.rankMain}>
-          <Card layout="vertical" padding="spacious" surface="inset" spacing="normal" aria-labelledby="nen-rank-rules">
+          <Card layout="vertical" padding="spacious" surface="standard" spacing="normal" aria-labelledby="nen-rank-rules">
             <div className={styles.cardHead}>
               <h2 id="nen-rank-rules" className={styles.cardTitle}>ランクの決まり</h2>
               <p className={styles.cardDesc}>通年の購入額でランクが決まります</p>
@@ -304,7 +304,7 @@ export default function RankSettingsV8({
             </div>
           </Card>
 
-          <Card layout="vertical" padding="spacious" surface="inset" spacing="normal" aria-labelledby="nen-rank-list">
+          <Card layout="vertical" padding="spacious" surface="standard" spacing="normal" aria-labelledby="nen-rank-list">
             <div className={styles.cardHead}>
               <h2 id="nen-rank-list" className={styles.cardTitle}>ランク</h2>
               <p className={styles.cardDesc}>上から高い順。行の「…」から消すと、そのランクの会員を移し先のランクへ反映します</p>
@@ -363,7 +363,7 @@ export default function RankSettingsV8({
           </Card>
         </div>
 
-        <Card layout="vertical" padding="spacious" surface="inset" spacing="normal" className={styles.sideCard} aria-labelledby="nen-rank-sync">
+        <Card layout="vertical" padding="spacious" surface="standard" spacing="normal" className={styles.sideCard} aria-labelledby="nen-rank-sync">
           <div className={styles.cardHead}>
             <h2 id="nen-rank-sync" className={styles.cardTitle}>ECとの同期</h2>
             <p className={styles.cardDesc}>保存すると、ランクをネットショップへ送り、タグも付け替えます。送れなかったときは、理由がここに出ます</p>

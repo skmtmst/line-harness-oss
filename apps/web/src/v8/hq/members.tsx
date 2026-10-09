@@ -25,6 +25,8 @@ import { canResendInvite, lastLoginShort, memberKpis, memberStatus, sortMembersB
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import MemberDialogV8, { MemberChangeConfirmV8, type MemberDialogValue } from './member-dialog'
 import styles from './members.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 

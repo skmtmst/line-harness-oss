@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
+import TruncatedText from './truncated-text'
 import styles from './folder-dot.module.css'
 
 /**
@@ -45,11 +46,11 @@ export function FolderDot({ folder }: { folder?: FolderDotFolder | null }) {
  * `dot={false}` は丸を置かず名前だけを返す（丸の無い絵の板。例：1152 の板でまだ丸を描いていない一覧）。
  */
 export function FolderDotName({ folder, dot = true, children }: { folder?: FolderDotFolder | null; dot?: boolean; children: ReactNode }) {
-  if (!dot) return <>{children}</>
+  if (!dot) return <>{typeof children === 'string' ? <TruncatedText value={children} /> : children}</>
   return (
     <span className={styles.line}>
       <FolderDot folder={folder} />
-      <span className={styles.name}>{children}</span>
+      {typeof children === 'string' ? <TruncatedText className={styles.name} value={children} /> : <span className={styles.name}>{children}</span>}
     </span>
   )
 }

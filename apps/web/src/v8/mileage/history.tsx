@@ -262,7 +262,7 @@ export default function HistoryTab() {
         icon={<TrendingDown size={14} aria-hidden="true" />}
         value={ready ? Math.abs(amountOf('spend')) : null}
         unit="マイル"
-        detail={`交換 ${formatNumber(countOf('spend'))}件`}
+        detail={`交換 ${formatNumber(countOf('spend'))} 件`}
       />
       <KpiCard
         presentation="band"
@@ -432,8 +432,8 @@ export default function HistoryTab() {
       <div className={styles.pagerRow}>
         <span className={styles.pagerCount}>
           {spentOnly
-            ? `${formatNumber(total ?? 0)}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, total ?? 0)}件のうち、使った・取り消し ${formatNumber(items.length)}件`
-            : `${formatNumber(total ?? 0)}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, total ?? 0)}件`}
+            ? `${formatNumber(total ?? 0)} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, total ?? 0)} 件のうち、使った・取り消し ${formatNumber(items.length)} 件`
+            : `${formatNumber(total ?? 0)} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, total ?? 0)} 件`}
         </span>
         {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} disabled={loading} /> : null}
       </div>

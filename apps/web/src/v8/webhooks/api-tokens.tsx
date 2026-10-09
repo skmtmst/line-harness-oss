@@ -42,6 +42,8 @@ import {
   useWebhookOverview,
 } from './shell'
 import styles from './api-tokens.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'disabled'
 
@@ -70,21 +72,11 @@ export function scopeLabel(scope: string): string {
 
 /** 作った日は「2026/06/02」、最後に使ったは「9/30 10:02」（絵の書き方）。読めない日時は「—」。 */
 export function tokenDate(value: string | null): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('year')}/${get('month')}/${get('day')}`
+  return polishFormatDate(value, { style: 'list-day', fallback: '—' })
 }
 
 export function tokenUsedAt(value: string | null): string {
-  if (!value) return 'まだ使っていません'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`
+  return polishFormatDate(value, { style: 'list', fallback: value ? '—' : 'まだ使っていません' })
 }
 
 export default function WebhooksApiTokensV8() {

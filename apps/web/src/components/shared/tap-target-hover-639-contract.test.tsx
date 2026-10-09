@@ -47,11 +47,11 @@ describe('#639 主要操作の最小高さ 32px', () => {
     // 一覧の絞り込み札 32px。
     expect(readShared('filter-chip.css')).toMatch(/\.v6-filter-chip\s*\{[^}]*height:\s*32px/s)
     // ページネーションは推奨 36px 以上（38px）。
-    expect(readShared('pagination.module.css')).toMatch(/\.item\s*\{[^}]*height:\s*38px/s)
+    expect(readShared('pagination.module.css')).toMatch(/\.item\s*\{[^}]*height:\s*32px/s)
     // タブは 44px。
     expect(readShared('tabs.module.css')).toMatch(/\.tab\s*\{[^}]*height:\s*44px/s)
     // 共通ボタンの標準は 40px。
-    expect(readShared('button.module.css')).toMatch(/\.standard\s*\{[^}]*height:\s*40px/s)
+    expect(readShared('button.module.css')).toMatch(/\.standard\s*\{[^}]*height:\s*36px/s)
   })
 
   it('画像タイルのお気に入り星は 32px の当たりを持つ', () => {

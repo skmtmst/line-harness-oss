@@ -216,7 +216,7 @@ describe('V8 回答フォーム一覧', () => {
 
   it('1ページに収まるときは件数だけ（N件）', async () => {
     await mount()
-    expect(screen.getByText('1件')).toBeTruthy()
+    expect(screen.getByText('1 件')).toBeTruthy()
   })
 
   it('一覧の口へ件数 20・最新の回答順で頼む', async () => {

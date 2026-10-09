@@ -23,6 +23,8 @@ import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { formatDay, formatNumber } from '@/lib/format'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 /** EC連携画面（order-detail-drawer）の状態文言とそろえる。 */
 const ORDER_STATUS_TEXT: Record<string, string> = {
@@ -73,10 +75,7 @@ function formatMoney(currency: string, amount: number | null): string {
 }
 
 function formatDate(iso: string): string {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  return formatDay(d)
+  return polishFormatDate(iso, { style: 'detail', fallback: '—' })
 }
 
 export default function RefOrdersPanel({
@@ -135,7 +134,7 @@ export default function RefOrdersPanel({
   return (
     <div>
       <p className="text-xs font-semibold text-ink-faint uppercase">
-        この経路からの注文{state === 'ready' ? `（全${formatNumber(total)}件）` : ''}
+        この経路からの注文{state === 'ready' ? `（全${formatNumber(total)} 件）` : ''}
       </p>
       {/*
         IDEA-18: 帰属ルールと計測できない範囲を明細のすぐそばで説明する。

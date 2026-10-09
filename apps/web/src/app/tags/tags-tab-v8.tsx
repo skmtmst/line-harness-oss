@@ -54,6 +54,7 @@ import {
   usageLabel,
 } from '@/components/friend-fields/tags-page-v4'
 import styles from './list-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -774,14 +775,14 @@ export default function TagsTabV8({
                             <ContextMenu label={`タグ「${tag.name}」の操作`} items={tagContextItems(tag)}>
                               <div className={styles.nameRow}>
                                 <FolderDot folder={group} />
-                                <Link href={editHref} className={styles.cellTitle} title={tag.name} onClick={(event) => event.stopPropagation()}>{tag.name}</Link>
+                                <Link href={editHref} className={styles.cellTitle}  onClick={(event) => event.stopPropagation()}><TruncatedText value={String(tag.name ?? '')} /></Link>
                                 {tag.status === 'archived' && <span className={styles.miniBadge}>保管済み</span>}
                                 {tag.cleanupReasons?.includes('duplicate_name') && <span className={`${styles.miniBadge} ${styles.miniBadgeWarn}`} title="正規化した名前がほかのタグと重なっています。整理候補です。">重複名</span>}
                               </div>
                               <p className={styles.cellSub}>{formatDate(tag.createdAt)} 登録</p>
                             </ContextMenu>
                           </td>
-                          <td className={styles.cellMuted}><span className={styles.cellTruncate} title={group?.name ?? '未分類'}>{group?.name ?? '未分類'}</span></td>
+                          <td className={styles.cellMuted}><span className={styles.cellTruncate} ><TruncatedText value={String(group?.name ?? '未分類')} /></span></td>
                           {/* 人数は、そのタグで絞った友だち一覧へのリンク（V8 の新しい導線）。 */}
                           <td onClick={(event) => event.stopPropagation()}>
                             <Link href={`/friends?tag=${encodeURIComponent(tag.id)}`} className={styles.countLink} title={`「${tag.name}」が付いている友だちを見る`}>

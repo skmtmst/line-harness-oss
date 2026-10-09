@@ -274,7 +274,7 @@ describe('回答フォームの編集（V8）', () => {
     await screen.findByText('ページ1 のブロック')
     fireEvent.click(screen.getByRole('button', { name: 'この版を公開' }))
     const dialog = await screen.findByRole('dialog', { name: 'この版を公開する' })
-    expect(within(dialog).getByText(/すでに集まった回答（1,284件）は消えません/)).toBeTruthy()
+    expect(within(dialog).getByText(/すでに集まった回答（1,284 件）は消えません/)).toBeTruthy()
     fireEvent.click(within(dialog).getByRole('button', { name: 'この版を公開' }))
     await waitFor(() => expect(formsPublish).toHaveBeenCalledWith('form-1', 'acc-1', 8))
     expect(formsUpdate.mock.invocationCallOrder[0]).toBeLessThan(formsPublish.mock.invocationCallOrder[0])

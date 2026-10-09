@@ -111,7 +111,7 @@ describe('リッチメニューV8一覧のタップ数', () => {
     const rendered = await renderV8List()
     const row = await rendered.findByText('秋メニュー')
     const tableRow = row.closest('tr') ?? row.closest('[role="row"]') ?? rendered.container
-    expect(within(tableRow as HTMLElement).getByText('7回')).toBeTruthy()
+    expect(within(tableRow as HTMLElement).getByText('7 回')).toBeTruthy()
   })
 
   test('更新日列とボタンの文言を行に出す（v7と同じ情報）', async () => {

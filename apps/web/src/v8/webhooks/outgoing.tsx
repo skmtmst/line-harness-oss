@@ -60,6 +60,7 @@ import {
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import { eventLabel, isHttpsUrl, maskedUrl, payloadLabel, shortDateTime, urlHost } from './words'
 import styles from './outgoing.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type SavedFilter = '' | 'active' | 'paused' | 'failed'
 type SortKey = 'volume' | 'name'
@@ -593,9 +594,9 @@ export default function WebhooksOutgoingV8() {
                 const nameNode = (
                   <FolderDotName folder={folderDotFor(folders, item.folderId)}>
                     {canManage ? (
-                      <Link href={`/webhooks/edit?id=${item.id}`} className={styles.name} title={item.name}>{item.name}</Link>
+                      <Link href={`/webhooks/edit?id=${item.id}`} className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></Link>
                     ) : (
-                      <span className={styles.name} title={item.name}>{item.name}</span>
+                      <span className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></span>
                     )}
                   </FolderDotName>
                 )
@@ -645,9 +646,9 @@ export default function WebhooksOutgoingV8() {
                       {/* 名前の前に左の列と同じフォルダの色の丸（未分類は色の無い輪）。 */}
                       <FolderDotName folder={folderDotFor(folders, item.folderId)}>
                         {canManage ? (
-                          <Link href={`/webhooks/edit?id=${item.id}`} className={styles.name} title={item.name}>{item.name}</Link>
+                          <Link href={`/webhooks/edit?id=${item.id}`} className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></Link>
                         ) : (
-                          <span className={styles.name} title={item.name}>{item.name}</span>
+                          <span className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></span>
                         )}
                       </FolderDotName>
                       <span className={`${styles.sub} ${styles.nameSub}`} title={item.url}>{maskedUrl(item.url)}</span>
@@ -655,11 +656,11 @@ export default function WebhooksOutgoingV8() {
                     <Td className={styles.colWhen}><span className={styles.cellText} title={when}>{when}</span></Td>
                     <Td className={styles.colPayload}><span className={styles.cellText} title={payload}>{payload}</span></Td>
                     <Td align="right" className={styles.colCount}>
-                      <span className={styles.num}>{formatNumber(item.deliverySummary.total)}回</span>
+                      <span className={styles.num}>{formatNumber(item.deliverySummary.total)} 回</span>
                       <span className={styles.numSub}>
                         {item.deliverySummary.failed > 0
-                          ? `失敗 ${formatNumber(item.deliverySummary.failed)}回`
-                          : `送信中 ${formatNumber(item.deliverySummary.pending)}回`}
+                          ? `失敗 ${formatNumber(item.deliverySummary.failed)} 回`
+                          : `送信中 ${formatNumber(item.deliverySummary.pending)} 回`}
                       </span>
                     </Td>
                     <Td className={styles.colState}>
@@ -708,7 +709,7 @@ export default function WebhooksOutgoingV8() {
   const pager = ready && pageCount > 1 ? (
     <ListPagePagination>
       <span className={styles.pagerCount}>
-        {(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + visible.length} / {formatNumber(filtered.length)}件
+        {(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + visible.length} / {formatNumber(filtered.length)} 件
       </span>
       <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="送り先一覧のページ送り" />
     </ListPagePagination>

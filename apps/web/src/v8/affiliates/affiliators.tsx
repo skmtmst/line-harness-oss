@@ -342,10 +342,10 @@ export default function AffiliatorsTab() {
       const failed = results.filter((r) => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success)).length
       const done = bulkTargets.length - failed
       if (failed === 0) {
-        notifyToast(`${formatNumber(done)}人の紹介を止めました。`)
+        notifyToast(`${formatNumber(done)} 人の紹介を止めました。`)
         setSelected(new Set())
       } else {
-        notifyToast(`${formatNumber(done)}人を止めました。${formatNumber(failed)}人は止められませんでした。`)
+        notifyToast(`${formatNumber(done)} 人を止めました。${formatNumber(failed)} 人は止められませんでした。`)
       }
       setBulkConfirm(false)
       void loadList()
@@ -547,8 +547,8 @@ export default function AffiliatorsTab() {
                 </span>
               </Td>
               <Td className={`${styles.colLinks} ${styles.num}`}><span className={styles.cellNum}>{`${formatNumber(row.linkCount)}本`}</span></Td>
-              <Td className={`${styles.colFriends} ${styles.num}`}><span className={styles.cellNum}>{`${formatNumber(row.friendAdds)}人`}</span></Td>
-              <Td className={`${styles.colConv} ${styles.num}`}><span className={styles.cellNum}>{`${formatNumber(row.totalConversions)}件`}</span></Td>
+              <Td className={`${styles.colFriends} ${styles.num}`}><span className={styles.cellNum}>{`${formatNumber(row.friendAdds)} 人`}</span></Td>
+              <Td className={`${styles.colConv} ${styles.num}`}><span className={styles.cellNum}>{`${formatNumber(row.totalConversions)} 件`}</span></Td>
               <Td className={`${styles.colReward} ${styles.num}`}><span className={styles.cellNum}>{formatYen(row.rewardAmount)}</span></Td>
               <Td className={styles.colOps}>
                 <span className={styles.rowActions}>
@@ -605,7 +605,7 @@ export default function AffiliatorsTab() {
   const pager = ready && shownRows.length > 0 && pageCount > 1 ? (
     <ListPagePagination>
       <span className={styles.pagerCount}>
-        {`${formatNumber(shownRows.length)}人中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, shownRows.length)}人`}
+        {`${formatNumber(shownRows.length)} 人中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, shownRows.length)} 人`}
       </span>
       <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} />
     </ListPagePagination>
@@ -640,7 +640,7 @@ export default function AffiliatorsTab() {
         />
         <ConfirmDialog
           open={bulkConfirm}
-          title={`${formatNumber(bulkTargets.length)}人の紹介をまとめて止めますか？`}
+          title={`${formatNumber(bulkTargets.length)} 人の紹介をまとめて止めますか？`}
           description="止めると、その人たちの紹介リンクからの成果はこれから数えません。認めるのを待っている成果がある人は、行の「…」の紹介を止めるで中身を確かめてから止めてください。"
           confirmLabel="まとめて止める"
           destructive

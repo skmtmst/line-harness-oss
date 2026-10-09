@@ -9,6 +9,7 @@
  * 定期便・つなぎ先・注文の状況のパネルは今の部品を入口（page.tsx）から差し込む。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { CircleDot, Plug, Star } from 'lucide-react'
@@ -107,7 +108,7 @@ function actionStatusLabel(action: { status: EcActionExecutionStatus; eventType:
 
 function actionDone(action: EcActionExecution): string {
   if (action.status === 'retryable_failed' || action.status === 'permanent_failed') {
-    return action.errorMessage ?? `${action.attemptCount}回やり直しました`
+    return action.errorMessage ?? `${action.attemptCount} 回やり直しました`
   }
   if (action.status === 'skipped') {
     return action.eventType === 'ec.order.shipped' && action.errorCode === 'notification_disabled'
@@ -117,15 +118,11 @@ function actionDone(action: EcActionExecution): string {
   return ACTION_LABEL[action.eventType] ?? `未対応の出来事（${action.eventType}）`
 }
 
-const SHORT_DATE_TIME = new Intl.DateTimeFormat('ja-JP', {
-  timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
-})
+
 
 /** 一覧の日時（年なし・例 9/30 10:12、日本時間）。壊れた値は「—」。 */
 function dateTime(value: string | null): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  return Number.isNaN(date.valueOf()) ? '—' : SHORT_DATE_TIME.format(date)
+  return polishFormatDate(value, { style: 'list' })
 }
 
 /** 補足の日時（年なし・曜日つき）。 */
@@ -491,7 +488,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
         <div className={styles.pager}>
           <span className={styles.minorText}>
             <ListRange label="取り込みの記録" total={actionTotal} first={(page - 1) * ACTION_PAGE_SIZE + 1} last={(page - 1) * ACTION_PAGE_SIZE + actions.length} />
-            {` 最後に届いた ${longDateTime(overview?.lastReceivedAt ?? null)}・今日 ${overview ? formatNumber(overview.last24h) : '—'}件。注文の本文や接続用の秘密値は表示しません。`}
+            {` 最後に届いた ${longDateTime(overview?.lastReceivedAt ?? null)}・今日 ${overview ? formatNumber(overview.last24h) : '—'} 件。注文の本文や接続用の秘密値は表示しません。`}
           </span>
           {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} /> : null}
         </div>

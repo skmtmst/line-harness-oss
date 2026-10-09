@@ -41,6 +41,7 @@ import type { SavedSearchConditionLabels } from '@/components/friends/saved-sear
 import { filterSavedSearches, savedSearchKpiValues, type SavedSearchUsageFilter } from '@/components/friend-fields/saved-search-kpis'
 import { formatDay, formatNumber } from '@/lib/format'
 import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 const PAGE_SIZES = [10, 20, 50]
 const MAX_SAVED = 50
@@ -272,7 +273,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
         : search.usedIn === undefined
           ? '使用先を確認できないため削除できません'
           : (search.usedIn?.length ?? 0) > 0
-            ? `使用中のため削除できません（${search.usedIn?.length ?? 0}件）`
+            ? `使用中のため削除できません（${search.usedIn?.length ?? 0} 件）`
             : '削除できるか確認できません'
       list.push({
         id: 'delete',
@@ -373,11 +374,11 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
                   <ContextMenu label={`保存した検索「${search.name}」の操作`} items={searchContextItems(search)}>
                     <div className={styles.nameRow}>
                       {editHref ? (
-                        <Link href={editHref} className={`${styles.name} ${styles.nameLink}`} title={search.name} onClick={(event) => event.stopPropagation()}>
-                          {search.name}
+                        <Link href={editHref} className={`${styles.name} ${styles.nameLink}`}  onClick={(event) => event.stopPropagation()}>
+                          <TruncatedText value={String(search.name ?? '')} />
                         </Link>
                       ) : (
-                        <span className={styles.name} title={search.name}>{search.name}</span>
+                        <span className={styles.name} ><TruncatedText value={String(search.name ?? '')} /></span>
                       )}
                       {!search.lineAccountId ? (
                         <StatusBadge tone="warning" size="annotation" dot={false}>対象アカウント未割り当て</StatusBadge>
@@ -388,7 +389,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
                 </Td>
                 <Td className={styles.searchColCount} onClick={(event) => event.stopPropagation()}>
                   <span className={styles.cellText} title={search.matchCountError ?? undefined}>
-                    {search.matchCount !== null && search.matchCount !== undefined ? `${formatNumber(search.matchCount)}人` : '—'}
+                    {search.matchCount !== null && search.matchCount !== undefined ? `${formatNumber(search.matchCount)} 人` : '—'}
                   </span>
                 </Td>
                 <Td className={styles.searchColShare}><span className={styles.cellText}>{search.isShared ? '全員' : '自分だけ'}</span></Td>
@@ -421,7 +422,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
       {pages > 1 ? (
         <div className={styles.pager}>
           <span className={styles.pagerCount}>
-            {`${filteredList.length}件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, filteredList.length)}件`}
+            {`${filteredList.length} 件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, filteredList.length)} 件`}
           </span>
           <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="保存した検索のページ送り" />
         </div>
@@ -545,7 +546,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
               <dt>該当</dt>
               <dd>
                 {activeSearch.lineAccountId && activeSearch.matchCount !== null && activeSearch.matchCount !== undefined ? (
-                  <Link href={`/friends?savedSearch=${activeSearch.id}`} className={styles.countLink}>{`${formatNumber(activeSearch.matchCount)}人`}</Link>
+                  <Link href={`/friends?savedSearch=${activeSearch.id}`} className={styles.countLink}>{`${formatNumber(activeSearch.matchCount)} 人`}</Link>
                 ) : '—'}
               </dd>
             </div>

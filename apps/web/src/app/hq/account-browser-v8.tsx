@@ -18,6 +18,7 @@ import { TextField } from '@/components/shared/text-field'
 import { formatNumber } from '@/lib/format'
 import { Folder, LayoutGrid, List as ListIcon, LogIn, Plus, Settings } from 'lucide-react'
 import './readonly-v8.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type StatusFilter = 'all' | 'ok' | 'warn' | 'archived'
 type TagFilter = string | null
@@ -64,7 +65,7 @@ function AccountName({ account }: { account: AccountWithStats }) {
         </span>
       )}
       <div className="min-w-0">
-        <p title={name} className="truncate text-label font-bold text-ink">{name}</p>
+        <p  className="truncate text-label font-bold text-ink"><TruncatedText value={String(name ?? '')} /></p>
         <p title={handle} className="truncate text-micro text-ink-faint">
           @{handle}・権限者 {formatNumber(account.stats?.staffCount ?? 0)}人
         </p>
@@ -324,7 +325,7 @@ export default function AccountBrowser({
               return (
                 <article
                   key={account.id}
-                  className={warned ? 'flex flex-col gap-3 rounded-card border border-status-warn bg-canvas p-4' : 'flex flex-col gap-3 rounded-card border border-hairline bg-canvas p-4'}
+                  className={warned ? 'flex flex-col gap-3 rounded-card border content-card bg-canvas p-4' : 'flex flex-col gap-3 rounded-card border content-card bg-canvas p-4'}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <AccountName account={account} />

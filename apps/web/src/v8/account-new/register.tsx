@@ -41,6 +41,9 @@ import {
   type DraftState, type StepNumber, type V8CheckRow,
 } from './logic'
 import styles from './register.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+
 
 const V8_STEPS: ReadonlyArray<{ number: StepNumber; label: string; node: string; lead: string }> = [
   { number: 1, label: 'LINE準備', node: 'xj3zz', lead: '5段すべて通ってから登録します。接続確認が通るまで、アカウントは作られません。' },
@@ -448,7 +451,7 @@ export default function AccountRegisterV8() {
         <div ref={stepPanelRef} tabIndex={-1} className={styles.stepBody}>
           {currentStep === 1 && !createdId && (
             <div className={styles.split} data-design-node="xj3zz">
-              <Card surface="inset" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="アカウントの用意方法">
+              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="アカウントの用意方法">
                 {draftRestored && (
                   <Notice tone="info" message="端末の下書きから続けます。チャネルシークレットだけ入れ直してください。" onClose={() => setDraftRestored(false)} />
                 )}
@@ -484,7 +487,7 @@ export default function AccountRegisterV8() {
 
           {currentStep === 2 && !createdId && (
             <div className={styles.split} data-design-node="JYfda">
-              <Card surface="inset" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="接続に必要な4項目">
+              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="接続に必要な4項目">
                 <h2 className={styles.panelTitle}>接続に必要な4項目</h2>
                 <p className={styles.groupLabel}>Messaging API</p>
                 <div className={styles.twoCol}>
@@ -518,7 +521,7 @@ export default function AccountRegisterV8() {
           )}
 
           {currentStep === 3 && !createdId && (
-            <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acct-basic-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="基本情報" data-design-node="GwKE2" data-step="3">
+            <Card surface="standard" layout="vertical" contentPadding="var(--tpl-acct-basic-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="基本情報" data-design-node="GwKE2" data-step="3">
               <h2 className={styles.panelTitle}>基本情報</h2>
               <div className={styles.basicGrid}>
                 <label className={styles.label} htmlFor="v8-display-name">表示名</label>
@@ -569,7 +572,7 @@ export default function AccountRegisterV8() {
               <div className={styles.field}>
                 <span className={styles.groupLabel}>Callback URL</span>
                 <Card layout="horizontal" surface="muted" corner="control" contentPadding="var(--tpl-htn-endpoint-pad)" gap="var(--tpl-htn-panel-gap)">
-                  <span className={styles.endpointValue} title={callbackUrl}>{callbackUrl}</span>
+                  <span className={styles.endpointValue} ><TruncatedText value={String(callbackUrl ?? '')} url /></span>
                   <CopyButton value={callbackUrl} />
                 </Card>
               </div>
@@ -602,7 +605,7 @@ export default function AccountRegisterV8() {
           )}
 
           {createdId && connection && (
-            <Card surface="inset" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="登録完了" data-design-node="TvXII">
+            <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="登録完了" data-design-node="TvXII">
               <h2 className={styles.panelTitle}>登録が完了しました</h2>
               <p className={styles.doneLine}>
                 <CircleCheck size={22} aria-hidden="true" />
@@ -612,7 +615,7 @@ export default function AccountRegisterV8() {
                 {connection.followerImport.capability === 'available' && form.importFriends ? <>
                   <div className={styles.progressHead}>
                     <strong>{importingIds ? '既存の友だちを取り込んでいます' : '既存の友だちを取り込みました'}</strong>
-                    <strong>{importingIds ? `${importedCount.toLocaleString('ja-JP')}人 / ${progressTotal !== null ? `${progressTotal.toLocaleString('ja-JP')}人` : '確認中'}` : `${importedCount.toLocaleString('ja-JP')}人`}</strong>
+                    <strong>{importingIds ? `${polishFormatNumber(importedCount)} 人 / ${progressTotal !== null ? `${polishFormatNumber(progressTotal)} 人` : '確認中'}` : `${polishFormatNumber(importedCount)} 人`}</strong>
                   </div>
                   <div className={styles.progressTrack} role="progressbar" aria-valuenow={progressRate} aria-valuemin={0} aria-valuemax={100} aria-label="友だちの取り込み">
                     <span className={styles.progressFill} style={{ width: `${progressRate}%` }} />
@@ -690,7 +693,7 @@ export default function AccountRegisterV8() {
               <ResultRow label="Webhook の利用" value={checkRows[2].state === 'passed' ? 'LINE 側で「オン」でした' : 'まだ確かめていません'} state={checkRows[2].state} />
               <ResultRow
                 label="ボットの情報"
-                value={connection?.displayName ? `表示名「${connection.displayName}」${connection.verification?.followerTotal != null ? `・友だち ${connection.verification.followerTotal.toLocaleString('ja-JP')} 人` : ''}` : 'まだ確かめていません'}
+                value={connection?.displayName ? `表示名「${connection.displayName}」${connection.verification?.followerTotal != null ? `・友だち ${polishFormatNumber(connection.verification.followerTotal)} 人` : ''}` : 'まだ確かめていません'}
                 state={!connection ? 'todo' : connection.displayName ? 'passed' : 'failed'}
               />
               <Tr>

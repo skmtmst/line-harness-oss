@@ -77,7 +77,7 @@ export function SendPathCoveragePanel({ accountId, revision }: { accountId: stri
   const excluded = data.paths.filter((path) => path.capability === null)
   if (excluded.length > 0) groups.push({ title: '対象外（止まりません）', stopped: false, excluded: true, paths: excluded })
 
-  return <section className="border-hairline rounded-card overflow-hidden border bg-canvas">
+  return <section className="content-card rounded-card overflow-hidden border bg-canvas">
     <div className="border-hairline border-b px-4 py-3">
       <h2 className="text-base font-bold text-ink">停止が届く送信経路</h2>
       <p className="mt-0.5 text-xs text-ink-faint">緊急停止が実際に届く経路と、対象外の経路の一覧です。{formatOperationDate(data.evaluatedAt)}時点</p>

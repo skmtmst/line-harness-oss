@@ -171,7 +171,9 @@
   min-width: 0;
   padding: var(--tpl-sa-staff-card-pad);
   border-radius: var(--radius-card);
-  box-shadow: var(--tpl-sa-ring);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
 }
 
 .cardHead {
@@ -397,7 +399,9 @@
   gap: var(--tpl-sa-card-gap);
   padding: var(--tpl-sa-card-pad);
   border-radius: var(--radius-card);
-  box-shadow: var(--tpl-sa-ring);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
 }
 
 .roleCardHead {
@@ -434,7 +438,8 @@
   padding: var(--tpl-sa-card-pad);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
-  box-shadow: var(--tpl-sa-ring);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
 }
 
 .asideTitle {

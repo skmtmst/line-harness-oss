@@ -178,8 +178,8 @@ function describeConditionRule(
     case 'support_mark': {
       const count = Array.isArray(v?.markIds) ? v.markIds.length : 0
       return v?.exclude === true
-        ? `選んだ対応マーク（${count}件）の人を除く`
-        : `対応マーク（${count}件）の人`
+        ? `選んだ対応マーク（${count} 件）の人を除く`
+        : `対応マーク（${count} 件）の人`
     }
     case 'friend_field':
       return '友だち情報で絞る人'
@@ -2609,7 +2609,7 @@ export function NewAutomationV8({
         ) : null}
         {!normalizedEventQuery && !expandedEvents ? (
           <button type="button" className={styles.linkButton} onClick={() => setShowAllEvents(true)}>
-            ほかのきっかけもすべて見る（あと{EVENTS.length - REPRESENTATIVE_TRIGGER_EVENTS.length}件）
+            ほかのきっかけもすべて見る（あと{EVENTS.length - REPRESENTATIVE_TRIGGER_EVENTS.length} 件）
           </button>
         ) : null}
         {usesKeyword ? (
@@ -2876,7 +2876,7 @@ export function NewAutomationV8({
           <div className={styles.kvRow}><dt>きっかけ</dt><dd>{selectedEvent.label}（{triggerConfigSummary}）</dd></div>
           <div className={styles.kvRow}>
             <dt>だれに</dt>
-            <dd>{targetSummary}{previewCount !== null ? ` 見込み ${formatNumber(previewCount)}人` : ''}</dd>
+            <dd>{targetSummary}{previewCount !== null ? ` 見込み ${formatNumber(previewCount)} 人` : ''}</dd>
           </div>
           <div className={styles.kvRow}><dt>すること</dt><dd>{actionSummary || '未設定'}</dd></div>
           <div className={styles.kvRow}>
@@ -2916,7 +2916,7 @@ export function NewAutomationV8({
                 <p className={styles.sideNote}>保存されている内容</p>
                 <p className={styles.subTitle}>{conflict.serverName || '（名前なし）'}</p>
                 <p className={styles.sideNote}>{conflict.serverEventLabel}</p>
-                <p className={styles.sideNote}>処理 {conflict.serverActionCount}件</p>
+                <p className={styles.sideNote}>処理 {conflict.serverActionCount} 件</p>
               </section>
             </div>
             <p className={styles.sideNote}>

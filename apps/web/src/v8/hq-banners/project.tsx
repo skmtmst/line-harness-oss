@@ -363,7 +363,7 @@ function ProjectInner() {
     const failures: string[] = []
     try {
       for (const [index, image] of batch.entries()) {
-        setDistributionProgress(`${batch.length}枚中 ${index + 1}枚目を配っています（${ids.length}アカウント）`)
+        setDistributionProgress(`${batch.length} 枚中 ${index + 1} 枚目を配っています（${ids.length}アカウント）`)
         try {
           const response = await api.hqBanners.images.deliver(image.id, ids)
           if (!response.success) throw new Error(response.error)
@@ -374,7 +374,7 @@ function ProjectInner() {
         }
       }
       setSelectedImages((current) => current.filter((id) => !succeeded.includes(id)))
-      setDistributionProgress(`${batch.length}枚中 ${succeeded.length}枚を${ids.length}アカウントへ配りました。${failures.length > 0 ? `失敗 ${failures.length}枚。失敗した画像を選んだままにしています。` : ''}`)
+      setDistributionProgress(`${batch.length} 枚中 ${succeeded.length} 枚を${ids.length}アカウントへ配りました。${failures.length > 0 ? `失敗 ${failures.length} 枚。失敗した画像を選んだままにしています。` : ''}`)
       if (failures.length > 0) setDistributionError(failures.join(' ／ '))
     } finally {
       distributionLock.current = false
@@ -569,7 +569,7 @@ function ProjectInner() {
             {/* G-6（sr0Po）：画像を押すと詳細、選ぶ操作はその下の右端。 */}
             <div className={styles.galleryHead}>
               <h3 id={galleryHeadId} className={styles.galleryTitle}>このプロジェクトの画像</h3>
-              <span className={styles.hint}>{`${images.length}枚`}</span>
+              <span className={styles.hint}>{`${images.length} 枚`}</span>
               <span className={styles.hint}>画像を押すと詳細</span>
             </div>
             <div className={styles.galleryTools}>
@@ -594,7 +594,7 @@ function ProjectInner() {
               */}
             {running ? (
               <div className={styles.runningBand} role="status" aria-live="polite">
-                <LoaderCircle aria-hidden="true" className={`${styles.icon} ${styles.spin}`} />
+                <Hourglass aria-hidden="true" className={styles.icon} />
                 <span className={styles.runningText}>{`${Math.min(doneSoFar + 1, running.requestedCount)} / ${running.requestedCount} 枚目を作っています。閉じても作り続けます`}</span>
               </div>
             ) : null}
@@ -674,7 +674,7 @@ function ProjectInner() {
               <Button variant="primary" disabled={busy || archived} onClick={openDistribution}><Send aria-hidden="true" className={styles.icon} />{`${selectedImages.length} 枚をアカウントへ配る`}</Button>
             </> : undefined }}
             info={<span className={styles.generationInfo}>
-              <span>{`今日の残り ${usage?.today.remaining ?? '—'}枚`}</span>
+              <span>{`今日の残り ${usage?.today.remaining ?? '—'} 枚`}</span>
               {exportSizeText(presets, input.presetKey) ? <ExportSizeChip text={exportSizeText(presets, input.presetKey)} /> : <span>寸法 —</span>}
             </span>}
             actions={
@@ -692,7 +692,7 @@ function ProjectInner() {
                   <Button variant="primary" onClick={() => void startGeneration()} disabled={busy || starting || Boolean(blockedReason)} busy={starting}>
                     <Sparkles aria-hidden="true" className={styles.icon} />
                     {/* 板 `b1So7a`「生成する（2枚）」＝v7 と同じ言葉。パネルの見出し `S0ay0i`「画像を生成」とは別。 */}
-                    生成する（{input.count}枚）
+                    生成する（{input.count} 枚）
                   </Button>
                 </>
               )
@@ -702,7 +702,7 @@ function ProjectInner() {
       </div>
 
       {distributionOpen ? <SavedDistributionDialog
-        title={`${selectedImages.length > 0 ? `${selectedImages.length}枚の画像を` : '画像を'}アカウントへ配る`}
+        title={`${selectedImages.length > 0 ? `${selectedImages.length} 枚の画像を` : '画像を'}アカウントへ配る`}
         help="選んだ画像は、アカウントの登録メディア（フォルダ「02_バナー」）に入ります。配布済みの画像は増えません。"
         accounts={distributionTargets} folders={distributionFolders}
         selected={distributionAccounts} onChange={setDistributionAccounts}
@@ -711,7 +711,7 @@ function ProjectInner() {
         accountState={(id) => {
           const selected = images.filter((image) => selectedImages.includes(image.id))
           const count = selected.filter((image) => image.deliveredAccountIds.includes(id)).length
-          return <span className={styles.hint}>{selected.length > 0 ? `${selected.length}枚中 ${count}枚を配布済み` : '—'}</span>
+          return <span className={styles.hint}>{selected.length > 0 ? `${selected.length} 枚中 ${count} 枚を配布済み` : '—'}</span>
         }}
         notice={distributionProgress ? <p className={styles.distributionProgress} role="status" aria-live="polite">{distributionProgress}</p> : null}
         canDistribute={selectedImages.length > 0}
@@ -801,7 +801,7 @@ function PendingTile({ running, label }: { running: boolean; label: string }) {
   return (
     <article className={styles.tile} role="status" aria-live="polite">
       <div className={`${styles.tileImage} ${styles.pending}`}>
-        {running ? <LoaderCircle aria-hidden="true" className={`${styles.pendingIcon} ${styles.spin}`} /> : <Hourglass aria-hidden="true" className={styles.pendingIcon} />}
+        <Hourglass aria-hidden="true" className={styles.pendingIcon} />
         <span className={styles.pendingText}>{running ? '作っています…' : '待っています'}</span>
       </div>
       <div className={styles.tileMeta}><span className={styles.metaText}>{label}</span></div>

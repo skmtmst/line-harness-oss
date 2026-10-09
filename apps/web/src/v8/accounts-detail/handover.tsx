@@ -36,6 +36,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { DIFFERENT_PROVIDER_DETAIL, DIFFERENT_PROVIDER_LEAD, HANDOVER_PILLS, countsLine, decisionLabel, handoverPill, totalsMatch } from './handover-view'
 import styles from './handover.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type HandoverDecisionView = AccountHandoverDecision & {
   sourceName?: string
@@ -266,7 +267,7 @@ export default function AccountHandoverV8() {
       setRollbackOpen(false)
       const detail = await api.accountHandovers.get(handover.id)
       if (detail.success) setHandover(detail.data as HandoverView)
-      notifyToast(`切り戻しました。${formatNumber(res.data.restoredCount)}人を元のアカウントへ戻しました。`)
+      notifyToast(`切り戻しました。${formatNumber(res.data.restoredCount)} 人を元のアカウントへ戻しました。`)
     } catch (caught) {
       setRollbackError(apiMessage(caught, '切り戻せませんでした。期限（7日間）を過ぎていないか確かめてください。'))
     } finally {
@@ -314,7 +315,7 @@ export default function AccountHandoverV8() {
       const detail = await api.accountHandovers.get(handover.id)
       if (detail.success) setHandover(detail.data as HandoverView)
       const moved = result.data.movedCount ?? result.data.plannedCount ?? 0
-      notifyToast(result.data.failureReason ?? `本実行が終わりました。${formatNumber(moved)}人を移しました。`)
+      notifyToast(result.data.failureReason ?? `本実行が終わりました。${formatNumber(moved)} 人を移しました。`)
     } catch {
       setExecuteError('本実行できませんでした。しばらくおいてから、もう一度お試しください。')
     } finally {
@@ -460,12 +461,12 @@ export default function AccountHandoverV8() {
             </div>
           ) : null}
           {declaredMismatch ? (
-            <p className={styles.boxWarn}>申告の数（{handover.declaredFriendTotal}人）と事前確認の合計（{handover.counts?.sourceTotal ?? '—'}人）が違います。差の理由を確かめてから、数を直すか事前確認をやり直してください。</p>
+            <p className={styles.boxWarn}>申告の数（{handover.declaredFriendTotal} 人）と事前確認の合計（{handover.counts?.sourceTotal ?? '—'} 人）が違います。差の理由を確かめてから、数を直すか事前確認をやり直してください。</p>
           ) : null}
         </Card>
       </div>
 
-      <DataTable presentation="account-handover" label={`要確認 ${handover.counts?.review ?? '—'}人の判断`}>
+      <DataTable presentation="account-handover" label={`要確認 ${handover.counts?.review ?? '—'} 人の判断`}>
         <thead>
         <TableHeadRow>
           <Th className={styles.colName}>元の友だち</Th>
@@ -483,7 +484,7 @@ export default function AccountHandoverV8() {
           return (
             <Tr key={decision.id}>
               <Td className={styles.colName}><div className={styles.nameStack}>
-                <span className={styles.name} title={name}>{name}</span>
+                <span className={styles.name} ><TruncatedText value={String(name ?? '')} /></span>
                 <span className={styles.sub}>元の友だち</span>
               </div></Td>
               <Td className={styles.colName}><div className={styles.nameStack}>
@@ -518,7 +519,7 @@ export default function AccountHandoverV8() {
         <div className={styles.pendingBand}>
           {decisionError
             ? <p role="alert" className={styles.pendingText}>{decisionError}</p>
-            : <p className={styles.pendingText}>{editCount}件の書き換えをまだ保存していません。保存するまで本実行へ進めません。</p>}
+            : <p className={styles.pendingText}>{editCount} 件の書き換えをまだ保存していません。保存するまで本実行へ進めません。</p>}
           <Button type="button" disabled={refreshing || !countsAreComplete} busy={refreshing} busyLabel="確認中…" onClick={() => void rerunPreview()}>
             <RotateCcw size={14} aria-hidden="true" />事前確認をやり直す
           </Button>
@@ -527,7 +528,7 @@ export default function AccountHandoverV8() {
       ) : null}
 
       <div className={styles.duo}>
-        <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-ho-box-pad)" gap="var(--tpl-acd-ho-list-gap)" className={styles.card}>
+        <Card surface="standard" layout="vertical" contentPadding="var(--tpl-acd-ho-box-pad)" gap="var(--tpl-acd-ho-list-gap)" className={styles.card}>
           <h3 className={styles.cardTitle}>戻せること</h3>
           <p className={styles.list}>{[
             '・7日以内は、今回作った対応付けだけを戻せます',
@@ -535,7 +536,7 @@ export default function AccountHandoverV8() {
             '・送信済みのメッセージは取り消せません',
           ].join('\n')}</p>
         </Card>
-        <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-ho-box-pad)" gap="var(--tpl-acd-ho-list-gap)" className={styles.card}>
+        <Card surface="standard" layout="vertical" contentPadding="var(--tpl-acd-ho-box-pad)" gap="var(--tpl-acd-ho-list-gap)" className={styles.card}>
           <h3 className={styles.cardTitle}>気をつけること</h3>
           <p className={styles.list}>{[
             '・本実行しても、元のアカウントの友だち・履歴・元のID と所属は残します',
@@ -568,7 +569,7 @@ export default function AccountHandoverV8() {
       {/* 切り戻し（X-3）。本実行から7日間だけ。変更なので見るだけの人には出さない。 */}
       {canManage && handover.status === 'completed' && !handover.rolledBackAt && handover.rollbackDeadline
         && handover.rollbackDeadline > new Date().toISOString() ? (
-          <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-ho-box-pad)" gap="var(--tpl-acd-ho-list-gap)" className={styles.card}>
+          <Card surface="standard" layout="vertical" contentPadding="var(--tpl-acd-ho-box-pad)" gap="var(--tpl-acd-ho-list-gap)" className={styles.card}>
             <h3 className={styles.cardTitle}>移した友だちを元へ戻す</h3>
             <p className={styles.list}>{formatDateTime(handover.rollbackDeadline)} まで切り戻せます。動かした友だちだけを元のアカウントへ戻します。</p>
             <span><Button type="button" variant="danger" onClick={() => { setRollbackError(''); setRollbackOpen(true) }}>切り戻す</Button></span>

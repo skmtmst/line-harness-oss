@@ -16,9 +16,12 @@ const SRC = join(__dirname, '..', '..')
 const GLOBALS = readFileSync(join(SRC, 'app', 'globals.css'), 'utf8')
 
 function token(name: string): string {
-  const match = GLOBALS.match(new RegExp(`--color-${name}:\\s*(#[0-9a-fA-F]{6});`))
+  const match = GLOBALS.match(new RegExp(`--color-${name}:\\s*(#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?);`))
   if (!match) throw new Error(`--color-${name} が見つからない`)
-  return match[1]
+  const hex = match[1]
+  if (hex.length === 7) return hex
+  const alpha = parseInt(hex.slice(7, 9), 16) / 255
+  return '#' + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * alpha + 255 * (1 - alpha)).toString(16).padStart(2, '0')).join('')
 }
 
 function luminance(hex: string): number {

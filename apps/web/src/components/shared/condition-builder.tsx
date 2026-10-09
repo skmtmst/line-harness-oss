@@ -337,7 +337,7 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
           <button type="button" className="font-semibold underline" onClick={() => setOptionsAttempt((n) => n + 1)}>読み直す</button>
         </p>
       ) : null}
-      <div className="border-hairline rounded-card border p-4">
+      <div className="content-card rounded-card border p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <p className="text-ink text-sm font-bold">
             「すべて満たす」必要がある条件<span className="text-ink-faint ml-1 font-normal">(and条件)</span>

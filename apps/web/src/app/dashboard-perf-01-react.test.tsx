@@ -195,7 +195,7 @@ describe('PERF-01 補足データはカードごとに独立して反映する',
     await render()
 
     // 健全性の応答は来ていないが、写真審査カードは確定値を出す。
-    expect(host.textContent).toContain('確認待ち 3件')
+    expect(host.textContent).toContain('確認待ち 3 件')
     // 予約カードも件数（集計APIの todayActiveTotal）が出る。
     const bookingsCard = Array.from(host.querySelectorAll('[data-kpi-presentation] p[title]'))
       .find((node) => node.textContent?.trim() === '今日の予約')
@@ -215,7 +215,7 @@ describe('PERF-01 補足データはカードごとに独立して反映する',
     net.health = () => Promise.resolve(fail(500))
     await render()
 
-    expect(host.textContent).toContain('確認待ち 3件')
+    expect(host.textContent).toContain('確認待ち 3 件')
     const bookingsCard = Array.from(host.querySelectorAll('[data-kpi-presentation] p[title]'))
       .find((node) => node.textContent?.trim() === '今日の予約')
     expect(bookingsCard?.closest('[data-kpi-presentation]')?.textContent).toContain('1')

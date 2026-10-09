@@ -12,6 +12,7 @@
  * 空のまま使われているときの黄色の帯は表の列の上、行の右端は「…」
  * （編集・止める／再開する・削除する）。右クリックでも同じものが出る。
  */
+import SharedStatusPill from '@/components/shared/status-pill'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -91,6 +92,9 @@ import {
 } from './model'
 import VarsExportPanel from './export-panel'
 import styles from './list.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -147,9 +151,7 @@ function formatListDate(value: string): string {
 
 /** 「10/7まで」の札の日付。年月は要らず、月日だけ出す。 */
 function formatMonthDay(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return `${date.getMonth() + 1}/${date.getDate()}まで`
+  return polishFormatDate(value, { style: 'list-day', fallback: '—' })
 }
 
 /*
@@ -803,7 +805,7 @@ function CommonVarsListInner() {
   const prepareRemoveSelected = async () => {
     if (selected.size === 0 || !selectedAccountId) return
     if (selected.size > MAX_BATCH_DELETE_COUNT) {
-      setError(`一度に削除できるのは${MAX_BATCH_DELETE_COUNT}件までです。フォルダや検索で絞り込んで分けて削除してください。`)
+      setError(`一度に削除できるのは${MAX_BATCH_DELETE_COUNT} 件までです。フォルダや検索で絞り込んで分けて削除してください。`)
       return
     }
     const request = {
@@ -828,7 +830,7 @@ function CommonVarsListInner() {
       const blocked = impacts.filter(({ impact }) => !impact.canDelete)
       if (blocked.length > 0) {
         const references = blocked.reduce((sum, { impact }) => sum + impact.total, 0)
-        setError(`${blocked.length}件は、合計${references}か所で使用中のため削除できません。`)
+        setError(`${blocked.length} 件は、合計${references}か所で使用中のため削除できません。`)
         return
       }
     } catch {
@@ -883,7 +885,7 @@ function CommonVarsListInner() {
         setDeleteBatchError(
           failed.length === targets.length
             ? '選択した共通情報を削除できませんでした。状態を読み直してから、もう一度お試しください。'
-            : `${failed.length}件の共通情報を削除できませんでした。削除できなかったものだけを残しています。`,
+            : `${failed.length} 件の共通情報を削除できませんでした。削除できなかったものだけを残しています。`,
         )
         await load()
         return
@@ -1257,7 +1259,7 @@ function CommonVarsListInner() {
                 const badge = stateBadge(item)
                 const valueText = formatVarValue(item.type, item.value)
                 const pending = item.nextSchedule ?? null
-                const updateTitle = `最終更新 ${formatListDate(item.updatedAt)}${!pending ? ' ／ 予定なし' : ` ／ ${formatStamp(pending.effectiveFrom)} に ${formatVarValue(item.type, pending.value) || '（空）'}へ${(item.pendingScheduleCount ?? 0) > 1 ? ` ほか${(item.pendingScheduleCount ?? 1) - 1}件` : ''}`}`
+                const updateTitle = `最終更新 ${formatListDate(item.updatedAt)}${!pending ? ' ／ 予定なし' : ` ／ ${formatStamp(pending.effectiveFrom)} に ${formatVarValue(item.type, pending.value) || '（空）'}へ${(item.pendingScheduleCount ?? 0) > 1 ? ` ほか${(item.pendingScheduleCount ?? 1) - 1} 件` : ''}`}`
                 return (
                   <Tr
                     interactive
@@ -1291,11 +1293,11 @@ function CommonVarsListInner() {
                           <FolderDotName folder={folderDotOf(item)}>
                             <Link
                               href={`/contents/vars/edit?id=${item.id}`}
-                              title={item.name}
+
                               className={styles.nameLink}
                               onClick={(event) => event.stopPropagation()}
                             >
-                              {item.name}
+                              <TruncatedText value={String(item.name ?? '')} />
                             </Link>
                           </FolderDotName>
                         </div>
@@ -1313,10 +1315,7 @@ function CommonVarsListInner() {
                       {valueText || <span className={styles.valueEmpty}>（空）</span>}
                     </Td>
                     <Td>
-                      <span className={styles.statePill} data-tone={badge.tone}>
-                        <span className={styles.stateDot} aria-hidden="true" />
-                        {badge.label}
-                      </span>
+                      <SharedStatusPill tone={badge.tone}>{badge.label}</SharedStatusPill>
                     </Td>
                     {!narrow && (
                       <Td onClick={(event) => event.stopPropagation()}>
@@ -1367,8 +1366,8 @@ function CommonVarsListInner() {
   const pagerSummary = filtered.length === 0
     ? '0件'
     : pageCount > 1
-      ? `${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)} / ${formatNumber(filtered.length)}件`
-      : `${formatNumber(filtered.length)}件`
+      ? `${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)} / ${formatNumber(filtered.length)} 件`
+      : `${formatNumber(filtered.length)} 件`
   const listPager = listFailed || !selectedAccountId || filtered.length === 0 ? null : pageCount > 1 ? (
     <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={<span className={styles.pagerCount}>{pagerSummary}</span>} />
   ) : (
@@ -1478,7 +1477,7 @@ function CommonVarsListInner() {
                 <TriangleAlert size={14} aria-hidden="true" />
                 <span>
                   予約中の{statusScheduled[0].kindLabel}「{statusScheduled[0].name}」が送られなくなります。
-                  {statusScheduled.length > 1 ? `ほか${formatNumber(statusScheduled.length - 1)}件` : ''}
+                  {statusScheduled.length > 1 ? `ほか${formatNumber(statusScheduled.length - 1)} 件` : ''}
                 </span>
               </p>
             ) : null}
@@ -1744,8 +1743,8 @@ function CommonVarsListInner() {
         open={deleteTargets.length > 0}
         title={deleteTargets.length === 1
           ? `「${deleteTargets[0]?.name ?? ''}」を削除しますか？`
-          : `「${deleteTargets[0]?.name ?? ''}」ほか${deleteTargets.length - 1}件を削除しますか？`}
-        description={`選択した${deleteTargets.length}件の共通情報と、登録値・次回予約を削除します。テンプレート、配信、フォルダ、友だちは削除しません。この操作は元に戻せません。`}
+          : `「${deleteTargets[0]?.name ?? ''}」ほか${deleteTargets.length - 1} 件を削除しますか？`}
+        description={`選択した${deleteTargets.length} 件の共通情報と、登録値・次回予約を削除します。テンプレート、配信、フォルダ、友だちは削除しません。この操作は元に戻せません。`}
         confirmLabel="削除する"
         destructive
         busy={deleting}

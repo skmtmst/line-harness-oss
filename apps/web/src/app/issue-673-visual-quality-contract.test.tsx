@@ -30,10 +30,9 @@ describe('#673 A. カード・パネルの立体感', () => {
     expect(GLOBALS_CODE).toMatch(/--shadow-card-surface:\s*var\(--card-shadow\);/)
   })
 
-  it('浮いて見える面の影はカードより一段強い層状影', () => {
+  it('浮く面はV8の8px・24pxの影', () => {
     const float = GLOBALS_CODE.match(/--shadow-float:\s*([^;]+);/)?.[1] ?? ''
-    expect(float.split(',').length).toBeGreaterThanOrEqual(3)
-    expect(float).toContain('0px 0px 0px 1px')
+    expect(float).toBe('0 8px 24px #1d1d1f1f')
   })
 
   it('モーダル・フォルダパネル・パネル内メニューは属性入口でトークンを読む', () => {

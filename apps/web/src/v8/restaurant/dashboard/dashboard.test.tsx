@@ -55,7 +55,7 @@ describe('hKRRF 今日のお店', () => {
     for (const label of ['ダッシュボード', '予約（今日・今月・一覧）', '座席・卓', '予約枠・在庫', '今日の予約', '来店予定', '空席（いま）', '未返信の口コミ', '予約サイト・グルメ媒体', 'Instagram の新着']) {
       expect(board.textContent).toContain(label)
     }
-    expect(board.textContent).toContain('他の予約サイトの枠を閉じてください（未対応 1件）')
+    expect(board.textContent).toContain('他の予約サイトの枠を閉じてください（未対応 1 件）')
     expect(board.textContent).toContain('ホットペッパー')
     /* 設定で保存した管理画面の URL が、知らせのボタンと右の列のリンクに使われる（提案 E-4 とのつなぎ）。 */
     expect(screen.getByRole('link', { name: 'ホットペッパーの管理画面を開く ↗' }).getAttribute('href')).toBe('https://manager.hotpepper.jp/')

@@ -111,7 +111,7 @@ export function splitItems(items: CommonVarDeleteImpactItem[]): {
 export function unavailableText(impact: CommonVarDeleteImpact): string | null {
   if (impact.unavailableReferences.length === 0) return null
   return impact.unavailableReferences
-    .map((ref) => `${ref.kindLabel}${formatNumber(ref.count)}件（${ref.reason}）`)
+    .map((ref) => `${ref.kindLabel}${formatNumber(ref.count)} 件（${ref.reason}）`)
     .join('／')
 }
 

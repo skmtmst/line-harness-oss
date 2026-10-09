@@ -24,14 +24,12 @@ import MergedDeliveryDialog from '@/components/merged-person/merged-delivery-dia
 import MergedProfileDialog from '@/components/merged-person/merged-profile-dialog'
 import { useMergedPerson } from '@/components/merged-person/use-merged-person'
 import styles from './person.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 /** 9/30（日本時間）。 */
 function shortDate(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return iso
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')}`
+  return polishFormatDate(iso, { style: 'list-day', fallback: '—' })
 }
 
 const FIELD_WORD: Record<string, string> = { メールアドレス: 'メール', 電話番号: '電話' }

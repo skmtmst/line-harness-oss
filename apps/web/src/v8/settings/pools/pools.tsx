@@ -26,6 +26,9 @@ import { RowMenu } from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
 import frame from '../sa-frame.module.css'
 import styles from './pools.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+
 
 type AccountWithStats = LineAccount & { stats?: { friendCount: number } }
 
@@ -201,7 +204,7 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
         ) : null}
       </div>
       <div className={styles.urlRow}>
-        <span className={styles.url} title={publicUrl}>{publicUrl}</span>
+        <span className={styles.url} ><TruncatedText value={String(publicUrl ?? '')} url /></span>
         <Button variant="secondary" onClick={() => void onCopy()}>
           <Copy size={15} aria-hidden="true" />{copied ? 'コピー済' : '公開 URL コピー'}
         </Button>
@@ -300,10 +303,10 @@ function PoolMembers({ poolId, accounts, canManage, onChange }: {
         {members.map((m) => {
           const acc = accounts.find((a) => a.id === m.lineAccountId)
           const name = acc?.name ?? m.lineAccountId
-          const friends = acc?.stats?.friendCount == null ? '—' : acc.stats.friendCount.toLocaleString('ja-JP')
+          const friends = acc?.stats?.friendCount == null ? '—' : polishFormatNumber(acc.stats.friendCount)
           return (
             <li key={m.id} className={styles.member}>
-              <span className={styles.memberName} title={name}>{name}</span>
+              <span className={styles.memberName} ><TruncatedText value={String(name ?? '')} /></span>
               <span className={styles.memberFriends}>{`友だち ${friends}`}</span>
               {canManage ? (
                 <Button variant="secondary" onClick={() => { setRemoveError(''); setRemoveTarget({ id: m.id, name }) }}>外す</Button>

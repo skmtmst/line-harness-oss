@@ -199,14 +199,14 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
               width={96}
               value={String(u.pageSize)}
               onChange={(value) => u.setPageSize(Number(value))}
-              options={USERS_PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))}
+              options={USERS_PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))}
             />
           </div>
 
           <section className={styles.panel} aria-labelledby="merged-users-title">
             <div className={styles.panelHead}>
               <h3 id="merged-users-title" className={styles.panelTitle}>統合ユーザー</h3>
-              <p className={styles.panelSub}>{u.loading && u.total === 0 ? '更新中…' : `${formatNumber(u.total)}人`}</p>
+              <p className={styles.panelSub}>{u.loading && u.total === 0 ? '更新中…' : `${formatNumber(u.total)} 人`}</p>
             </div>
             <DataTable className={styles.table}>
               <colgroup>
@@ -275,7 +275,7 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
             {u.total > 0 && !u.error ? (
               <div className={styles.pager}>
                 <span className={styles.pagerCount}>
-                  {`${formatNumber(u.total)}人中 ${formatNumber((u.page - 1) * u.pageSize + 1)}〜${formatNumber(Math.min(u.page * u.pageSize, u.total))}人`}
+                  {`${formatNumber(u.total)} 人中 ${formatNumber((u.page - 1) * u.pageSize + 1)}〜${formatNumber(Math.min(u.page * u.pageSize, u.total))} 人`}
                 </span>
                 {pageCount > 1 ? <Pagination page={u.page} pageCount={pageCount} onPageChange={u.setPage} disabled={u.loading} ariaLabel="統合ユーザーのページ" /> : null}
               </div>

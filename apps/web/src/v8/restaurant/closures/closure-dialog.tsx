@@ -275,7 +275,7 @@ export default function ClosureDialog({
               <div className={styles.affected} data-affected="">
                 <p className={styles.affectedTitle}>
                   <AlertTriangle size={16} aria-hidden="true" />
-                  {`${days}の予約が ${rows.length}件あります（保存しても取り消しません${editing && preview.contacted > 0 ? `・連絡済み ${preview.contacted}件` : ''}）`}
+                  {`${days}の予約が ${rows.length} 件あります（保存しても取り消しません${editing && preview.contacted > 0 ? `・連絡済み ${preview.contacted} 件` : ''}）`}
                 </p>
                 {rows.map((row) => (
                   <div key={row.id} className={styles.affectedRow}>
@@ -293,7 +293,7 @@ export default function ClosureDialog({
                     )}
                   </div>
                 ))}
-                {preview.waitlist > 0 ? <p className={styles.hint}>{`キャンセル待ちの ${preview.waitlist}件には、閉じた時間帯の空きを案内しません。`}</p> : null}
+                {preview.waitlist > 0 ? <p className={styles.hint}>{`キャンセル待ちの ${preview.waitlist} 件には、閉じた時間帯の空きを案内しません。`}</p> : null}
               </div>
             ) : (
               <p className={styles.hint}>{`${days}の予約はありません。`}</p>

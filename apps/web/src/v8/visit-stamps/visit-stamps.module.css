@@ -26,7 +26,9 @@
   gap: var(--tpl-e78-card-gap);
   padding: var(--tpl-e78-card-pad);
   border-radius: var(--tpl-e78-radius);
-  box-shadow: var(--tpl-e78-ring);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
 }
 
 .cardTall {
@@ -398,7 +400,9 @@
   gap: var(--tpl-e78-card-gap-s);
   padding: var(--tpl-e78-card-pad);
   border-radius: var(--tpl-e78-radius);
-  box-shadow: var(--tpl-e78-ring);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
 }
 
 .stepper {
@@ -454,7 +458,7 @@
 
   .side {
     width: 100%;
-  }
+}
 }
 
 .historyTable .colWhen { width: var(--tpl-stamp-history-date-w); }
@@ -497,7 +501,8 @@
   .appearance { flex-wrap: wrap; }
   .hoursRow { flex-wrap: wrap; }
   .paperRow { flex-direction: column; }
-  .side { width: 100%; }
+  .side { width: 100%;
+}
   .colWhy { width: 22%; }
   .colActor { width: 18%; }
   .colWhen { width: 16%; }

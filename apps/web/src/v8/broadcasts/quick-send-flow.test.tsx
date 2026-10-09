@@ -88,10 +88,10 @@ it('対象を変えたあとに遅れて届いた前の人数を捨てる', asyn
   await act(async () => { fireEvent.click(within(picker).getByRole('radio', { name: '購入者' })) })
   await act(async () => { fireEvent.click(within(picker).getByRole('button', { name: '選ぶ' })) })
   await estimate()
-  expect(screen.getByText(/10人に届く見込み/)).toBeTruthy()
+  expect(screen.getByText(/10 人に届く見込み/)).toBeTruthy()
   await act(async () => { resolveOld({ success: true, data: { audienceCount: 2000, hiddenExcluded: 0 } }) })
   expect(screen.queryByText(/2,000人に届く見込み/)).toBeNull()
-  expect(screen.getByText(/10人に届く見込み/)).toBeTruthy()
+  expect(screen.getByText(/10 人に届く見込み/)).toBeTruthy()
 })
 
 it('書きかけでアカウントを切り替えると確認まで止まる', async () => {

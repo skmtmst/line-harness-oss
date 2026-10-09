@@ -38,6 +38,7 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './screen.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 export type MediaRow = {
   code: string
@@ -93,7 +94,7 @@ export function recipientText(settings: Pick<NoticeSettings, 'recipientMode' | '
   if (settings.recipientMode === 'manager') return '店長'
   if (settings.recipientMode === 'selected') {
     const names = settings.membershipIds.map((id) => members.find((m) => m.id === id)?.staff_name).filter((name): name is string => !!name)
-    return names.length > 0 ? `${names.join('・')}（${names.length}人）` : `選んだスタッフ（${settings.membershipIds.length}人）`
+    return names.length > 0 ? `${names.join('・')}（${names.length} 人）` : `選んだスタッフ（${settings.membershipIds.length} 人）`
   }
   return '当日の責任者（いなければ店長）'
 }
@@ -392,7 +393,7 @@ export default function BookingMediaPage() {
                 <Td className={styles.colName}>
                   <span className={styles.nameCell}>
                     <span className={styles.mark} aria-hidden="true">{row.name.slice(0, 1)}</span>
-                    <span className={styles.name} title={row.name}>{row.name}</span>
+                    <span className={styles.name} ><TruncatedText value={String(row.name ?? '')} /></span>
                   </span>
                 </Td>
                 <Td className={styles.colPage}><UrlCell url={row.pageUrl} /></Td>
@@ -561,7 +562,7 @@ export default function BookingMediaPage() {
                   </Button>
                 </>
               )}
-              status={changes > 0 ? <span aria-live="polite">{dirty.length > 0 ? `変えた媒体 ${dirty.length}件${noticeDirty ? '・知らせの設定' : ''}（まだ保存していません）` : '知らせの設定を変えました（まだ保存していません）'}</span> : undefined}
+              status={changes > 0 ? <span aria-live="polite">{dirty.length > 0 ? `変えた媒体 ${dirty.length} 件${noticeDirty ? '・知らせの設定' : ''}（まだ保存していません）` : '知らせの設定を変えました（まだ保存していません）'}</span> : undefined}
           />
         ) : null}
       </PageFrame>

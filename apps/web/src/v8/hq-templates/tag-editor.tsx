@@ -63,7 +63,7 @@ export default function HqTagEditorV8({ definition, folders = [], onCreateFolder
       definition.tag.manualAssignmentAllowed === false ? 'このタグは手で付けず、連携や自動処理から付けます。' : '一覧・チャット・CSV から、このタグを手で付けられます。',
       values.linked ? 'タグが付いたら、設定したマイルと連動アクションが動きます。' : '連動はOFFなので、付いてもマイル付与やメッセージ送信は動きません。',
       values.linked && values.multiplierBps ? `今後の獲得マイルは ${values.multiplierBps / 10000} 倍になります。` : '今後の獲得マイルは変わりません。',
-      values.linked && values.actions.length ? `${values.actions.length}件の連動アクションを上から順に実行します。` : '配信の絞り込み・シナリオの開始条件・自動応答の付与先として選べます。',
+      values.linked && values.actions.length ? `${values.actions.length} 件の連動アクションを上から順に実行します。` : '配信の絞り込み・シナリオの開始条件・自動応答の付与先として選べます。',
     ]
     return <div className={styles.preview}>
       <h3 className={styles.title}>できあがるタグ</h3>

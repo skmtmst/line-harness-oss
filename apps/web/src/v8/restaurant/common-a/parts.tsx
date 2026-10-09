@@ -7,6 +7,7 @@
  * - 状態の札：共通の StatusBadge（点＋文字）
  */
 import KpiBand from '@/components/shared/kpi-band'
+import { formatDate as polishFormatDate } from '@/lib/format'
 import type { ReactNode } from 'react'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import styles from './parts.module.css'
@@ -70,9 +71,5 @@ export function HalfGrid({ children }: { children: ReactNode }) {
 
 /** 年/月/日 時:分（絵の「2026/09/30 10:12」）。 */
 export function formatStamp(value: string | null | undefined): string {
-  if (!value) return '—'
-  const date = new Date(value.includes('T') ? value : value.replace(' ', 'T'))
-  if (Number.isNaN(date.getTime())) return '—'
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+  return polishFormatDate(value, { style: 'list' })
 }

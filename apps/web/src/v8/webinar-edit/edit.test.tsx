@@ -216,7 +216,7 @@ describe('V8 ウェビナーの編集', () => {
   it('コメント演出（Omqd4）：その場で直して、秒の順に並べて保存する', async () => {
     nav.search = 'id=webinar-1&pane=comments'
     await render(<WebinarEditV8 />)
-    const body = host.querySelector('input[aria-label="1行目の本文"]') as HTMLInputElement
+    const body = host.querySelector('input[aria-label="1 行目の本文"]') as HTMLInputElement
     expect(body.value).toBe('わかりやすい！')
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
     await act(async () => {
@@ -232,7 +232,7 @@ describe('V8 ウェビナーの編集', () => {
       { atSeconds: -60, authorName: '田中', body: 'こんばんは' },
       { atSeconds: 45, authorName: 'まさ', body: 'とてもわかりやすい' },
     ] })
-    expect(host.textContent).toContain('2件保存しました')
+    expect(host.textContent).toContain('2 件保存しました')
   })
   it('B-139 CTA：別のカードに足りない欄があると、そのカードを開いて見出しの欄へ移り、カードの行に赤い印を付ける', async () => {
     nav.search = 'id=webinar-1&pane=cta'

@@ -1,5 +1,7 @@
 'use client'
 
+import TruncatedText from '@/components/shared/truncated-text'
+
 /*
  * ★V8 分析「URLクリック」（Pencil `iK4cQ`）。
  * 数の帯 → 道具の段（探す・状態・期間・CSV）→ URLごとの表 → 数え方の注。
@@ -33,11 +35,10 @@ function sourceOf(item: Link): { kind: string; name: string; all: string } {
   const first = item.usageLocations[0]
   if (!first) return { kind: '—', name: '', all }
   const match = /^(.+?)「(.+)」$/.exec(first)
-  const more = item.usageLocations.length > 1 ? ` ほか${item.usageLocations.length - 1}件` : ''
+  const more = item.usageLocations.length > 1 ? ` ほか${item.usageLocations.length - 1} 件` : ''
   return match ? { kind: match[1], name: `${match[2]}${more}`, all } : { kind: first, name: more.trim(), all }
 }
 
-const shortUrl = (url: string) => url.replace(/^https?:\/\//, '')
 
 export default function UrlClicksV8({ accountId }: { accountId: string }) {
   const [pageSize, setPageSize] = useState(10)
@@ -114,7 +115,7 @@ export default function UrlClicksV8({ accountId }: { accountId: string }) {
             const actions = [item.actions?.tagName, item.actions?.scenarioName].filter(Boolean).join('・')
             const when = `最初 ${item.firstClickedAt ? formatAnalyticsDateTime(item.firstClickedAt.value) : '—'} ／ 最後 ${item.lastClickedAt ? formatAnalyticsDateTime(item.lastClickedAt.value) : '—'}`
             return <div key={item.trackedLinkId} className={styles.trow} role="row" data-h="two">
-              <span role="cell" className={styles.colMain} title={when}><strong className={styles.cellStrong}>{item.name}</strong><span className={styles.cellSub} title={item.originalUrl}>{shortUrl(item.originalUrl)}</span></span>
+              <span role="cell" className={styles.colMain} title={when}><strong className={styles.cellStrong}>{item.name}</strong><TruncatedText className={styles.cellSub} value={item.originalUrl} url /></span>
               <span role="cell" className={styles.colType} data-w="170" title={source.all || undefined}><strong className={styles.cellStrong}>{source.kind}</strong>{source.name ? <span className={styles.cellSub}>{source.name}</span> : null}</span>
               <span role="cell" className={styles.num} data-w="100"><MetricText metric={item.clicks} /></span>
               <span role="cell" className={styles.num} data-w="90" title={`届いた人数 ${shownValue(item.deliveredPeople) ?? '—'}`}><MetricText metric={item.knownClickPeople} /></span>
@@ -124,9 +125,9 @@ export default function UrlClicksV8({ accountId }: { accountId: string }) {
           })}
       </div>
       {links.length > 10 ? <div className={styles.pager}>
-        <span>{`${links.length}件中 ${links.length ? currentPage * pageSize + 1 : 0}〜${Math.min((currentPage + 1) * pageSize, links.length)}件（取得した範囲）`}</span>
+        <span>{`${links.length} 件中 ${links.length ? currentPage * pageSize + 1 : 0}〜${Math.min((currentPage + 1) * pageSize, links.length)} 件（取得した範囲）`}</span>
         <span className={styles.spacer} />
-        <Select aria-label="表示件数" value={String(pageSize)} options={[10, 20, 50].map((value) => ({ value: String(value), label: `${value}件` }))} onChange={(value) => { setPageSize(Number(value)); setPage(0) }} />
+        <Select aria-label="表示件数" value={String(pageSize)} options={[10, 20, 50].map((value) => ({ value: String(value), label: `${value} 件` }))} onChange={(value) => { setPageSize(Number(value)); setPage(0) }} />
         <Button variant="secondary" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>前へ</Button>
         <Button variant="secondary" disabled={currentPage === lastPage} onClick={() => setPage(currentPage + 1)}>次へ</Button>
       </div> : null}

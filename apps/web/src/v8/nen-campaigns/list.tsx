@@ -79,6 +79,8 @@ import {
 } from './display'
 import StatusBadge from '@/components/shared/status-badge'
 import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { formatYen as polishFormatYen } from '@/lib/format'
 
 export type { NenTab } from './display'
 
@@ -166,7 +168,7 @@ function downloadCsv(text: string, name: string) {
 /** 件数の文（「7件中 1〜7件」）。 */
 function rangeText(total: number, page: number, size: number): string {
   if (total === 0) return '0件'
-  return `${formatNumber(total)}件中 ${(page - 1) * size + 1}〜${Math.min(total, page * size)}件`
+  return `${formatNumber(total)} 件中 ${(page - 1) * size + 1}〜${Math.min(total, page * size)} 件`
 }
 
 /** 状態の札（点＋文字）。tone は 動いている＝ok・予約中＝info・止めている／送っていない＝off。 */
@@ -392,7 +394,7 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
                   ]}
                 />
               </span>
-              <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))} />
+              <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))} />
             </>
           )}
         />
@@ -431,7 +433,7 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
                   <Tr key={setting.campaignKey} className={styles.row} data-table-layout="columns">
                     <Td className={styles.colName}>
                       {canEdit ? (
-                        <Link href={`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`} className={styles.name} title={setting.label}>{setting.label}</Link>
+                        <Link href={`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`} className={styles.name} ><TruncatedText value={String(setting.label ?? '')} /></Link>
                       ) : (
                         <button type="button" className={styles.name} title={setting.label} onClick={() => props.onPreviewCampaign(setting.campaignKey)}>{setting.label}</button>
                       )}
@@ -534,7 +536,7 @@ function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave
         details={[
           { label: 'クーポンを付ける', value: coupon.isEnabled ? '付ける' : '付けない' },
           { label: '特典の名前', value: coupon.benefitLabel || '—' },
-          { label: '割引額', value: `${formatNumber(coupon.discountAmount || 0)}円` },
+          { label: '割引額', value: `${polishFormatYen(coupon.discountAmount || 0)}` },
           { label: '使える日数', value: `${coupon.validityDays || 0}日` },
           { label: 'コードの頭の文字', value: prefix },
           { label: '2月29日生まれの子への平年の扱い', value: leapLabel },
@@ -597,7 +599,7 @@ function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave
         </div>
         <div className={styles.sample}>
           <span className={styles.sampleLabel}>届く見本</span>
-          <strong className={styles.sampleTitle}>{`${coupon.benefitLabel || 'お誕生日クーポン'} ${formatNumber(coupon.discountAmount || 0)}円引き`}</strong>
+          <strong className={styles.sampleTitle}>{`${coupon.benefitLabel || 'お誕生日クーポン'} ${polishFormatYen(coupon.discountAmount || 0)}引き`}</strong>
           <span className={styles.sampleCode}>{`コード ${prefix}-1234・使える日数 ${coupon.validityDays || 0}日`}</span>
         </div>
         <p className={styles.muted}>クーポンが使われた記録は「コンバージョン」で確認できます。</p>
@@ -700,7 +702,7 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
                   ]}
                 />
               </span>
-              <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))} />
+              <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))} />
             </>
           )}
         />
@@ -799,7 +801,7 @@ function SelectedColumn(props: NenCampaignsListProps & { canEdit: boolean }) {
   const schedulePast = plan.when === 'schedule' && isPastScheduledAt(plan.scheduledAt)
   const scheduleInvalid = plan.when === 'schedule' && (!scheduledIso || schedulePast)
   const columnEnabled = props.settings.some((setting) => setting.campaignKey === 'column' && setting.isEnabled)
-  const audience = `${selected.targetMode === 'tag' ? 'タグで絞り込み' : '友だち 全員'}（${num(audienceCount)}人）`
+  const audience = `${selected.targetMode === 'tag' ? 'タグで絞り込み' : '友だち 全員'}（${num(audienceCount)} 人）`
 
   return (
     <Card variant="panel" aria-label={`選んだコラム：${selected.title}`}>
@@ -851,8 +853,8 @@ function SelectedColumn(props: NenCampaignsListProps & { canEdit: boolean }) {
         open={confirm !== null}
         title={confirm?.scheduledAt ? `「${confirm.column.title}」を配信予約しますか？` : `「${confirm?.column.title ?? ''}」を今すぐ配信しますか？`}
         description={confirm?.scheduledAt
-          ? `${jstDateTime(confirm.scheduledAt)}（日本時間）に、${audienceCount == null ? '対象' : `約${num(audienceCount)}人`}の友だちへ送ります。`
-          : `すぐに配信待ちに入り、${audienceCount == null ? '対象' : `約${num(audienceCount)}人`}の友だちへ送られます。`}
+          ? `${jstDateTime(confirm.scheduledAt)}（日本時間）に、${audienceCount == null ? '対象' : `約${num(audienceCount)} 人`}の友だちへ送ります。`
+          : `すぐに配信待ちに入り、${audienceCount == null ? '対象' : `約${num(audienceCount)} 人`}の友だちへ送られます。`}
         confirmLabel={confirm?.scheduledAt ? '予約する' : '送る'}
         onConfirm={() => { if (confirm) props.onDeliverColumn(confirm.column, confirm.scheduledAt); setConfirm(null) }}
         onCancel={() => setConfirm(null)}

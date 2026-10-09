@@ -36,6 +36,8 @@ import {
   type SubmissionPostActions,
 } from './summary'
 import styles from './responses.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 type Submission = {
   id: string
@@ -96,10 +98,7 @@ function retryEffectsFailureText(error: unknown): string {
 }
 /** 「9/30 17:40」（日本時間）。絵どおり年と曜日は出さない。 */
 function shortWhen(iso: string): string {
-  const time = Date.parse(iso)
-  if (!Number.isFinite(time)) return '—'
-  const jst = new Date(time + 9 * 3600_000)
-  return `${jst.getUTCMonth() + 1}/${jst.getUTCDate()} ${jst.toISOString().slice(11, 16)}`
+  return polishFormatDate(iso, { style: 'list', fallback: '—' })
 }
 function shortDay(iso: string): string {
   return shortWhen(iso).split(' ')[0] ?? ''
@@ -259,7 +258,7 @@ function Responses() {
   const exportAll = async () => {
     if (!selectedAccountId || !form || exporting) return
     if (total !== null && total > MAX_EXPORT_ROWS) {
-      setExportError(`回答が${formatNumber(total)}件あり、一度に書き出せる上限（${formatNumber(MAX_EXPORT_ROWS)}件）を超えています。`)
+      setExportError(`回答が${formatNumber(total)} 件あり、一度に書き出せる上限（${formatNumber(MAX_EXPORT_ROWS)} 件）を超えています。`)
       return
     }
     setExporting(true)
@@ -279,7 +278,7 @@ function Responses() {
         expected = result.data.total
         if (expected > MAX_EXPORT_ROWS) throw new Error('export_too_many')
         all.push(...result.data.items.map(normalizedSubmission))
-        setExportProgress(`${formatNumber(Math.min(all.length, expected))} / ${formatNumber(expected)}件を取得中`)
+        setExportProgress(`${formatNumber(Math.min(all.length, expected))} / ${formatNumber(expected)} 件を取得中`)
         currentPage += 1
       } while (all.length < expected && currentPage <= 1001)
       if (all.length < expected) throw new Error('export_incomplete')
@@ -287,7 +286,7 @@ function Responses() {
       saveCsv(`${form.name}-回答.csv`, all, keys, labels)
     } catch (caught) {
       setExportError(caught instanceof Error && caught.message === 'export_too_many'
-        ? `回答が一度に書き出せる上限（${formatNumber(MAX_EXPORT_ROWS)}件）を超えています。`
+        ? `回答が一度に書き出せる上限（${formatNumber(MAX_EXPORT_ROWS)} 件）を超えています。`
         : 'CSVを書き出せませんでした。もう一度お試しください。')
     } finally {
       setExporting(false)
@@ -366,7 +365,7 @@ function Responses() {
   const pageCount = Math.max(1, Math.ceil((total ?? 0) / pageSize))
   const firstKey = fieldKeys[0]
   const headLine = [
-    total === null ? '—' : `${formatNumber(total)}件`,
+    total === null ? '—' : `${formatNumber(total)} 件`,
     rate != null ? `答え終えた割合 ${formatNumber(rate)}%` : null,
   ].filter(Boolean).join('・')
   const longKey = fieldKeys.find((key) => blockByKey(key)?.type === 'textarea'
@@ -430,7 +429,7 @@ function Responses() {
       {exporting && exportProgress ? <p className={styles.railNote} role="status">{exportProgress}</p> : null}
       <section className={styles.railCard} aria-labelledby="fr-filter">
         <h2 className={styles.railTitle} id="fr-filter">絞り込み</h2>
-        <p className={styles.railNote}>{total === null ? '—' : `全 ${formatNumber(total)}件から、名前と答えで探します`}</p>
+        <p className={styles.railNote}>{total === null ? '—' : `全 ${formatNumber(total)} 件から、名前と答えで探します`}</p>
         <label className={styles.search}>
           <Search size={15} aria-hidden="true" />
           <input
@@ -473,10 +472,10 @@ function Responses() {
                 <div className={styles.alert} role="status">
                   <AlertCircle size={18} aria-hidden="true" className={styles.alertIcon} />
                   <div className={styles.alertText}>
-                    <p className={styles.alertTitle}>{`後処理が終わっていない回答が ${incompleteItems.length}件あります`}</p>
+                    <p className={styles.alertTitle}>{`後処理が終わっていない回答が ${incompleteItems.length} 件あります`}</p>
                     <p className={styles.alertNote}>{`答えは保存されています。${failedSteps.join('・') || '後処理'}が終わっていません${(total ?? 0) > items.length ? '（表示中のページから数えています）' : ''}。`}</p>
                   </div>
-                  <Button onClick={() => { selectAnswer(incompleteItems[0]?.id ?? null); setView('rows') }}>{`その${incompleteItems.length}件を見る`}</Button>
+                  <Button onClick={() => { selectAnswer(incompleteItems[0]?.id ?? null); setView('rows') }}>{`その${incompleteItems.length} 件を見る`}</Button>
                 </div>
               ) : null}
               {summaries.map((fieldSummary) => {
@@ -487,7 +486,7 @@ function Responses() {
                 const rating = block?.type === 'rating' ? summary?.ratingFields?.find((field) => field.key === fieldSummary.key) : undefined
                 const sub = rating
                   ? `5段階・平均 ${ratingAverageText(rating.average)}`
-                  : `${kind ? `${kind}・` : ''}${answered === 0 ? 'まだ答えがありません' : `${formatNumber(answered)}件が答えた`}`
+                  : `${kind ? `${kind}・` : ''}${answered === 0 ? 'まだ答えがありません' : `${formatNumber(answered)} 件が答えた`}`
                 /* 5段階は ★5・★4・★3以下 の3段にまとめる（絵 v0SbYR）。 */
                 const values: Array<[string, number]> = block?.type === 'rating'
                   ? [
@@ -512,7 +511,7 @@ function Responses() {
                             <dd className={styles.barTrack} aria-hidden="true">
                               <meter className={styles.meter} min={0} max={Math.max(1, max)} value={count} />
                             </dd>
-                            <dd className={styles.barCount}>{`${formatNumber(count)}件（${formatNumber(Math.round((count / answered) * 100))}%）`}</dd>
+                            <dd className={styles.barCount}>{`${formatNumber(count)} 件（${formatNumber(Math.round((count / answered) * 100))}%）`}</dd>
                           </div>
                         ))}
                       </dl>
@@ -526,7 +525,7 @@ function Responses() {
                   <section className={`${styles.card} ${styles.quoteCard}`} aria-label={labels[longKey] ?? longKey}>
                     <div className={styles.cardHead}>
                       <h2 className={styles.cardTitle}>{labels[longKey] ?? longKey}</h2>
-                      <p className={styles.cardNote}>{`複数行・${formatNumber(recents.length)}件`}</p>
+                      <p className={styles.cardNote}>{`複数行・${formatNumber(recents.length)} 件`}</p>
                     </div>
                     <ul className={styles.quotes}>
                       {recents.slice(0, 2).map((item) => {
@@ -556,7 +555,7 @@ function Responses() {
             <section className={styles.card} aria-labelledby="fr-rows">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle} id="fr-rows">回答</h2>
-                <p className={styles.cardNote}>{total === null ? '—' : `全 ${formatNumber(total)}件`}</p>
+                <p className={styles.cardNote}>{total === null ? '—' : `全 ${formatNumber(total)} 件`}</p>
               </div>
               <table className={styles.table}>
                 <thead>

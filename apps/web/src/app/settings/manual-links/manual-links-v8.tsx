@@ -15,6 +15,7 @@ import {
 import { useManualLinks } from './use-manual-links'
 import { SettingsShellV8 } from '../settings-nav-v8'
 import styles from '../settings-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /**
  * マニュアルの正本表の V8 画面（★V8-B `cIdA2`）。
@@ -166,7 +167,7 @@ export function ManualLinksV8() {
                 return (
                   <Tr key={key}>
                     <Td>{row.screenId}</Td>
-                    <Td><span className={styles.urlCell} title={row.name}>{row.name}</span></Td>
+                    <Td><span className={styles.urlCell} ><TruncatedText value={String(row.name ?? '')} url /></span></Td>
                     <Td>
                       {editing ? (
                         <input
@@ -181,7 +182,7 @@ export function ManualLinksV8() {
                         </span>
                       )}
                     </Td>
-                    <Td><span className={styles.urlCell} title={checkedLabel(row.checkedAt)}>{checkedLabel(row.checkedAt)}</span></Td>
+                    <Td><span className={styles.urlCell} ><TruncatedText value={String(checkedLabel(row.checkedAt) ?? '')} url /></span></Td>
                     <Td>
                       <StatusBadge tone={row.status === 'ok' ? 'success' : row.status === 'broken' ? 'danger' : 'neutral'} size="compact">{LINK_STATUS_LABEL[row.status]}</StatusBadge>
                     </Td>

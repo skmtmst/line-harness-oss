@@ -245,7 +245,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
   const cancelOptions = withCurrent(BEFORE_MINUTE_CHOICES, draft.cancelDeadlineMinutesBefore)
     .map((minutes) => ({ value: String(minutes), label: beforeLabel(minutes) }))
   const maxOptions = withCurrent(MAX_ACTIVE_CHOICES, draft.maxActiveBookingsPerFriend)
-    .map((count) => ({ value: String(count), label: `${count}件` }))
+    .map((count) => ({ value: String(count), label: `${count} 件` }))
   const dayBeforeText = draft.reminderDayBeforeTime
     ? `前日の ${draft.reminderDayBeforeTime} に送ります`
     : '24時間前に送ります'
@@ -311,7 +311,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
             ) : <span className="text-sm text-ink-secondary">{draft.approvalMode === 'manual' ? 'オン' : 'オフ'}</span>}
           </div>
           <div className={styles.ruleLine}>
-            <span className={styles.ruleLineLabel}>{`同じ人の予約は同時に ${draft.maxActiveBookingsPerFriend}件 まで`}</span>
+            <span className={styles.ruleLineLabel}>{`同じ人の予約は同時に ${draft.maxActiveBookingsPerFriend} 件 まで`}</span>
             {canEdit ? (
               <span className={styles.ruleLineSelect}>
                 <Select

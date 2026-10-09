@@ -220,7 +220,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
   const saved = (result: ClosureSaved) => {
     const editing = dialog?.mode === 'edit'
     onDialog(null)
-    const tail = result.reservations > 0 ? `重なる予約 ${result.reservations}件は取り消していません。1件ずつ連絡してください。` : ''
+    const tail = result.reservations > 0 ? `重なる予約 ${result.reservations} 件は取り消していません。1件ずつ連絡してください。` : ''
     const google = result.google === 'made' ? 'Google の営業時間の案も作りました。' : result.google === 'failed' ? 'Google の案は作れませんでした。右の列からもう一度作れます。' : ''
     notifyToast(`${editing ? '変えました。' : `${rangeTitle(result.closure)}を閉じました。`}${tail}${google}`, result.google === 'failed' ? { tone: 'error' } : undefined)
     if (result.google === 'made') setMadeGoogle((ids) => [...ids, result.closure.id])
@@ -247,7 +247,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
           <div className={styles.band} role="status" data-closure-band="">
             <Bell size={18} aria-hidden="true" className={styles.bandIcon} />
             <div className={styles.bandText}>
-              <p className={styles.bandTitle}>{`${dayTitle(first.closure.startDate)}の${KIND_LABEL[first.closure.kind]}：他の予約サイトの枠を閉じてください（未対応 ${first.t.open.length}件）`}</p>
+              <p className={styles.bandTitle}>{`${dayTitle(first.closure.startDate)}の${KIND_LABEL[first.closure.kind]}：他の予約サイトの枠を閉じてください（未対応 ${first.t.open.length} 件）`}</p>
               <p className={styles.bandDetail}>
                 {`LINE の受付は止めました → ${first.t.open.map((t) => nameOf(t.channel)).join('・')}の ${first.closure.startDate === first.closure.endDate ? dayShort(first.closure.startDate) : rangeTitle(first.closure)} を${first.closure.allDay ? '終日' : ` ${timeText(first.closure)} `}閉じてください`}
               </p>
@@ -303,8 +303,8 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
                         <>
                           <span className={`${styles.mark} ${tone === 'closed' ? styles.markClosed : ''}`}>{KIND_LABEL[hit.kind]}</span>
                           <span className={styles.cellNote}>{hit.allDay ? `終日・${tablesText(hit.tableIds, tables)}` : timeText(hit)}</span>
-                          <span className={styles.cellNote}>{hit.allDay ? (count === null ? '' : `予約 ${count}件`) : tablesText(hit.tableIds, tables)}</span>
-                          {hits.length > 1 ? <span className={styles.cellNote}>{`ほか ${hits.length - 1}件`}</span> : null}
+                          <span className={styles.cellNote}>{hit.allDay ? (count === null ? '' : `予約 ${count} 件`) : tablesText(hit.tableIds, tables)}</span>
+                          {hits.length > 1 ? <span className={styles.cellNote}>{`ほか ${hits.length - 1} 件`}</span> : null}
                         </>
                       ) : holiday ? (
                         <span className={`${styles.mark} ${styles.markHoliday}`}>定休</span>
@@ -367,7 +367,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
                   </li>
                 )
               })}
-              {list.length > UPCOMING_LIMIT ? <li className={styles.sideEmpty}>{`ほか ${list.length - UPCOMING_LIMIT}件（カレンダーの月を進めると見られます）`}</li> : null}
+              {list.length > UPCOMING_LIMIT ? <li className={styles.sideEmpty}>{`ほか ${list.length - UPCOMING_LIMIT} 件（カレンダーの月を進めると見られます）`}</li> : null}
             </ul>
           )}
 

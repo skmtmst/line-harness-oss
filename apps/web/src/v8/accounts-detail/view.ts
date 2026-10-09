@@ -1,5 +1,5 @@
 import type { LineAccount } from '@line-crm/shared'
-import { formatNumber, formatTime, formatYmd } from '@/lib/format'
+import { formatNumber, formatListDateTime, formatListDay } from '@/lib/format'
 
 /*
  * LINEアカウントの詳細（★V8 ihjfd）の言葉。画面から切り離し、描かずに確かめられるようにする。
@@ -27,23 +27,12 @@ export function toTab(value: string | null): DetailTab {
   return (DETAIL_TABS as readonly string[]).includes(value ?? '') ? (value as DetailTab) : 'overview'
 }
 
-/** `10/2 06:00`（日本時間）。値が無ければ null。 */
+/** 接続の記録の日時。未取得・無効値は null。 */
 export function shortDateTime(value: string | null | undefined): string | null {
-  if (!value) return null
-  const ymd = formatYmd(value)
-  if (!ymd) return null
-  const [, m, d] = ymd.split('-').map(Number)
-  const [h, min] = formatTime(value).split(':')
-  return `${m}/${d} ${h.padStart(2, '0')}:${min}`
+  return formatListDateTime(value, '') || null
 }
-
-/** `9/28`（日本時間）。値が無ければ null。 */
 export function shortDay(value: string | null | undefined): string | null {
-  if (!value) return null
-  const ymd = formatYmd(value)
-  if (!ymd) return null
-  const [, m, d] = ymd.split('-').map(Number)
-  return `${m}/${d}`
+  return formatListDay(value, '') || null
 }
 
 /** 接続を確かめ直す必要があるか。止まっている・Webhook が合っていない・最後の確認が通っていない。 */

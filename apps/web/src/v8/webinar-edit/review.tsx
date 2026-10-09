@@ -94,7 +94,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
     try {
       const res = await webinarApi.testNotifications(webinar.id)
       setNotifyConfirm(false)
-      setNotice(`通知をテスト送信しました。成功 ${res.data.sent}件・失敗 ${res.data.failed}件`)
+      setNotice(`通知をテスト送信しました。成功 ${res.data.sent} 件・失敗 ${res.data.failed} 件`)
       const refreshed = await webinarApi.editor(webinar.id)
       ctx.onEditorChange(refreshed.data)
     } catch (cause) {
@@ -123,7 +123,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
   const summary: Array<[string, string]> = [
     ['開催形式', editor.deliveryKind === 'scheduled' ? '日時指定・開催回あり' : editor.deliveryKind === 'external' ? '外部の動画' : 'オンデマンド・いつでも視聴'],
     ['公開期間', publicationStateLabel(webinar.publicationState, webinar.publicationStartsAt, webinar.publicationEndsAt) ?? '—（公開期間は未設定）'],
-    ['CTA', ctx.ctaCount > 0 ? `${ctx.ctaCount}件` : '未設定'],
+    ['CTA', ctx.ctaCount > 0 ? `${ctx.ctaCount} 件` : '未設定'],
     ['通知', notifyCount === null ? '—' : `${notifyCount.on} つ${notifyCount.missedOff ? '（見逃し案内は止めている）' : ''}`],
     ['視聴後の動き', (() => { const check = checks.find((item) => item.key === 'action_dependencies'); return check ? check.detail || check.label : '—' })()],
   ]
@@ -152,7 +152,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
           {readOnly ? null : <Button disabled={testing !== false || publishing} onClick={() => setNotifyConfirm(true)}><Send size={15} aria-hidden="true" />テストを送る</Button>}
         </div>
         {!ctx.canOpenPublicPage && ctx.publicPageReason ? <p className={form.previewNote}>{ctx.publicPageReason}</p> : null}
-        {ctx.analytics ? <p className={form.previewNote}>{`申込 ${formatNumber(ctx.analytics.summary.reservations)}人`}</p> : null}
+        {ctx.analytics ? <p className={form.previewNote}>{`申込 ${formatNumber(ctx.analytics.summary.reservations)} 人`}</p> : null}
       </>}
     >
       <section className={form.card} data-gap="tight" aria-labelledby="webinar-review-title" data-wc-pane="review">

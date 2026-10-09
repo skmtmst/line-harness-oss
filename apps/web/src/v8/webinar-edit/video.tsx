@@ -35,16 +35,14 @@ import { ReadValue } from './parts'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './video.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
 
 /** JST の「10/8（木）20:00」。 */
 function shortJst(iso: string): string {
-  const time = Date.parse(iso)
-  if (Number.isNaN(time)) return iso
-  const d = new Date(time + 9 * 60 * 60 * 1000)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}（${WEEKDAY[d.getUTCDay()]}）${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`
+  return polishFormatDate(iso, { style: 'list', fallback: '—' })
 }
 /** datetime-local の字面を JST で（`2026-10-01T10:00`）。 */
 function localJst(value: string | null | undefined): string {
@@ -70,7 +68,7 @@ function sessionText(session: WebinarSessionCapacity | null | undefined, failed:
   if (session === null) return '定員なし'
   if (session.state === 'closed') return '受付終了'
   if (session.state === 'full') return '満員'
-  return session.remaining === null ? '受付中' : `残り ${formatNumber(session.remaining)}人`
+  return session.remaining === null ? '受付中' : `残り ${formatNumber(session.remaining)} 人`
 }
 
 /** 開催回1つぶんの定員・申込（口 webinarApi.webinarSession）。 */
@@ -359,7 +357,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
         </section>
       ) : (
         <section className={form.card} data-gap="tight" aria-labelledby="webinar-rules-title">
-          <div className={form.cardHeadRow}><h2 id="webinar-rules-title" className={form.cardTitle}>{`配信枠 ${webinar.schedule.length}件`}</h2></div>
+          <div className={form.cardHeadRow}><h2 id="webinar-rules-title" className={form.cardTitle}>{`配信枠 ${webinar.schedule.length} 件`}</h2></div>
           <p className={styles.desc}>視聴できる時間の枠です。枠が0件だと公開できません。</p>
           {webinar.schedule.map((rule, index) => <RuleRow key={index} rule={rule} webinarId={webinar.id} menu={ruleMenu(index, `枠${index + 1}`)} />)}
           {webinar.schedule.length === 0 ? <p className={form.cardNote}>まだ枠がありません。下の「枠を足す」から足してください。</p> : null}

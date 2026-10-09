@@ -22,6 +22,9 @@ import { OpsHead } from './shell'
 import { useOpsReadOnly } from './use-ops-read-only'
 import parts from './parts.module.css'
 import styles from './tenants.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+
 
 /**
  * 運営の契約先アカウント V8（絵 `XWtYC`・作る窓 `i0FTN`）。
@@ -60,10 +63,7 @@ function tenantState(row: OpsTenantRow): { label: string; tone: StatusBadgeTone 
 
 /** 10/4 の形。 */
 function monthDay(value: string | null | undefined): string {
-  if (!value) return '—'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' })
+  return polishFormatDate(value, { style: 'list-day', fallback: '—' })
 }
 
 export default function OpsTenantsV8() {
@@ -201,7 +201,7 @@ export default function OpsTenantsV8() {
               return (
                 <div key={row.id} className={`${parts.miniRow} ${styles.row}`} role="row">
                   <span className={parts.grow} role="cell">
-                    <Link href={tenantDetailHref(row.id)} className={parts.link} title={row.name}>{row.name}</Link>
+                    <Link href={tenantDetailHref(row.id)} className={parts.link} ><TruncatedText value={String(row.name ?? '')} /></Link>
                   </span>
                   <span className={`${parts.fixed} ${styles.col90}`} role="cell">{row.plan_status === 'trialing' && !row.plan_key ? 'トライアル' : planLabel(row.plan_key)}</span>
                   <span className={`${parts.fixed} ${styles.col90}`} role="cell"><StatusBadge tone={state.tone}>{state.label}</StatusBadge></span>

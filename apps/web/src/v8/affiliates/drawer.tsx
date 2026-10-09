@@ -402,7 +402,7 @@ export default function AffiliateDrawer({
     <p className={styles.empty}>この人の紹介で増えた友だちはまだいません。</p>
   ) : (
     <section className={styles.section} aria-label="紹介で増えた友だち">
-      <h3 className={styles.sectionTitle}>{`紹介で増えた友だち（${formatNumber(journeys.length)}人${journeyMore ? 'ほか' : ''}）`}</h3>
+      <h3 className={styles.sectionTitle}>{`紹介で増えた友だち（${formatNumber(journeys.length)} 人${journeyMore ? 'ほか' : ''}）`}</h3>
       <div className={styles.list}>
         {journeys.map((journey) => {
           const duplicate = report?.duplicateFlags.some((flag) => flag.friendId === journey.friendId)

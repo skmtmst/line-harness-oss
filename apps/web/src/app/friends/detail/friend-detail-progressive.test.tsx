@@ -455,7 +455,7 @@ describe('NEXT-10 履歴は実際の活動履歴につながっている', () =>
 
   it('名寄せ件数は固定文ではなく実際の統合情報から出す', async () => {
     await render()
-    await eventually(() => expect(document.body.textContent).toContain('2件のLINEアカウントで同じ人としてつながっています'))
+    await eventually(() => expect(document.body.textContent).toContain('2 件のLINEアカウントで同じ人としてつながっています'))
     expect(document.body.textContent).toContain('支店アカウント')
     expect(document.body.textContent).not.toContain('現在は1アカウントのみ')
   })

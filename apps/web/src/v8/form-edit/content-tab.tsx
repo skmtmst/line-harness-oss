@@ -143,7 +143,7 @@ export function ContentTab(props: Props) {
       <Dialog
         open={!props.readOnly && removing}
         title="このページを消す"
-        description={`「${section?.name ?? ''}」と、その中のブロック${section?.blocks.length ?? 0}個を消します。この操作は元に戻せません。`}
+        description={`「${section?.name ?? ''}」と、その中のブロック${section?.blocks.length ?? 0} 個を消します。この操作は元に戻せません。`}
         confirmLabel="消す"
         onConfirm={() => {
           setRemoving(false)

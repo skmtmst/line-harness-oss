@@ -19,6 +19,7 @@ import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-pan
 import Toggle from '@/components/shared/toggle'
 import SearchField from '@/components/shared/search-field'
 import styles from './inbox-chat.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 export type TemplatePickerSideKey = 'frequent' | 'all' | 'none' | `folder:${string}`
 
@@ -119,7 +120,7 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
                               : <span className={styles.tpBox} aria-hidden="true" />
                           ) : null}
                           <span className={styles.tpCardText}>
-                            <span className={styles.tpCardName} title={template.name}>{template.name}</span>
+                            <span className={styles.tpCardName} ><TruncatedText value={String(template.name ?? '')} /></span>
                             <span className={styles.tpCardBody}>{template.content}</span>
                           </span>
                         </button>
@@ -130,7 +131,7 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
               )}
               {props.remaining > 0 ? (
                 <Button variant="secondary" size="compact" onClick={props.onLoadMore} disabled={props.loadingMore}>
-                  {props.loadingMore ? '読み込み中...' : `さらに表示（残り${props.remaining}件）`}
+                  {props.loadingMore ? '読み込み中...' : `さらに表示（残り${props.remaining} 件）`}
                 </Button>
               ) : null}
             </div>
@@ -146,7 +147,7 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
               <span className={styles.tpBandOrder} title={packItems.map((item) => item.name).join(' → ')}>
                 {packItems.map((item, index) => `${'①②③④⑤'[index] ?? `${index + 1}.`} ${item.name}`).join(' → ')}
               </span>
-              <span className={styles.tpBandCount}>{packItems.length} / {PACK_MAX}通</span>
+              <span className={styles.tpBandCount}>{packItems.length} / {PACK_MAX} 通</span>
             </div>
           ) : null}
           <div className={styles.tpFoot}>
@@ -165,7 +166,7 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
               <Button onClick={props.onClose}>キャンセル</Button>
               <Button variant="primary" onClick={props.onConfirm} disabled={props.confirmDisabled}>
                 {packMode
-                  ? <><Send aria-hidden="true" size={15} />{packItems.length}通を続けて送る</>
+                  ? <><Send aria-hidden="true" size={15} />{packItems.length} 通を続けて送る</>
                   : <><CornerDownLeft aria-hidden="true" size={15} />入力欄に入れる</>}
               </Button>
             </div>

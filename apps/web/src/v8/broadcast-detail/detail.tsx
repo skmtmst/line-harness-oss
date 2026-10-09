@@ -64,6 +64,7 @@ import {
   rateText,
 } from './display'
 import styles from './detail.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /** 送るまでの6段階。承認が絡まない・予約しない配信はその段を省く。 */
 const DELIVERY_STEPS: ReadonlyArray<{ key: string; label: string }> = [
@@ -198,7 +199,7 @@ export default function BroadcastDetail({
     try {
       const res = await api.broadcasts.testSend(broadcast.id)
       if (!res.success) throw new Error(res.error)
-      notifyToast(`テスト送信が完了しました（成功 ${res.sent ?? 0}件・失敗 ${res.failed ?? 0}件）。`)
+      notifyToast(`テスト送信が完了しました（成功 ${res.sent ?? 0} 件・失敗 ${res.failed ?? 0} 件）。`)
     } catch {
       notifyToast('テスト送信できませんでした。テスト送信先の設定と配信内容を確認してください。', { tone: 'error' })
     } finally {
@@ -251,7 +252,7 @@ export default function BroadcastDetail({
 
   const total = broadcast.totalCount
   const bubbleCount = broadcast.messageBubbles?.length ?? (broadcast.messageContent ? 1 : 0)
-  const messageText = `${messageTypeLabel(broadcast.messageType)} ${bubbleCount}通`
+  const messageText = `${messageTypeLabel(broadcast.messageType)} ${bubbleCount} 通`
   const scheduledLabel = broadcast.scheduledAt ? formatBroadcastDateTime(broadcast.scheduledAt) : null
   const approvalStatus = approval.state?.approval.status ?? null
 
@@ -364,7 +365,7 @@ export default function BroadcastDetail({
         <aside className={styles.side} aria-label="配信した設定とメッセージ">
           <h3 className={styles.secTitle}>配信した設定</h3>
           <dl className={styles.rows}>
-            <Row label="対象" value={`${audienceLabel} ${formatNumber(total)}人`} />
+            <Row label="対象" value={`${audienceLabel} ${formatNumber(total)} 人`} />
             <Row
               label={isSent ? '送った日時' : '送る日時'}
               value={
@@ -414,7 +415,7 @@ export default function BroadcastDetail({
         open={cancelOpen}
         title={broadcast.title}
         description={broadcast.scheduledAt
-          ? `${formatBroadcastDateTime(broadcast.scheduledAt)} に送る予定の ${formatNumber(total)}人 に送らなくなります。取り消すと下書きに戻り、もう一度予約できます。${approvalStatus && approvalStatus !== 'none' ? '承認はやり直しになります。' : ''}`
+          ? `${formatBroadcastDateTime(broadcast.scheduledAt)} に送る予定の ${formatNumber(total)} 人 に送らなくなります。取り消すと下書きに戻り、もう一度予約できます。${approvalStatus && approvalStatus !== 'none' ? '承認はやり直しになります。' : ''}`
           : '予約が取り消され、この配信は送られなくなります。書いた内容は下書きとして残るので、作り直しにはなりません。'}
         busy={cancelling}
         error={cancelError}
@@ -478,7 +479,7 @@ export function CancelReservationDialog({
 /** 見出しの下の1行：種類・対象（人数）・送る/送った日時。 */
 function metaLine(broadcast: ApiBroadcast, audienceLabel: string): string {
   const kind = messageTypeLabel(broadcast.messageType)
-  const audience = broadcast.status === 'sent' ? audienceLabel : `${audienceLabel}（${formatNumber(broadcast.totalCount)}人）`
+  const audience = broadcast.status === 'sent' ? audienceLabel : `${audienceLabel}（${formatNumber(broadcast.totalCount)} 人）`
   const when = broadcast.status === 'sent'
     ? (broadcast.sentAt ? `${formatBroadcastDateTime(broadcast.sentAt)} に送信` : '送信済み')
     : broadcast.status === 'sending'
@@ -649,7 +650,7 @@ function Overview({
         <section aria-label="承認の依頼" className={styles.section}>
           <h3 className={styles.secTitle}>承認を依頼する</h3>
           <p className={styles.desc}>
-            {formatNumber(state.gate.recipientCount)}人への配信です。承認されるまで送られません。
+            {formatNumber(state.gate.recipientCount)} 人への配信です。承認されるまで送られません。
           </p>
           <ApprovalRequestFields
             recipientCount={state.gate.recipientCount}
@@ -726,11 +727,11 @@ function Overview({
                     <div className={styles.linkTop}>
                       <div className={styles.linkText}>
                         <p className={styles.linkTitle} title={link.label}>{link.label}</p>
-                        <p className={styles.linkUrl} title={link.url}>{link.url}</p>
+                        <p className={styles.linkUrl} ><TruncatedText value={String(link.url ?? '')} url /></p>
                       </div>
                       <p className={styles.linkCount}>
-                        {`押した ${formatNumber(link.uniqueClickCount)}人（${rateText(link.clickRate)}）`}
-                        {link.clickCount != null ? `・押された回数 ${formatNumber(link.clickCount)}回` : ''}
+                        {`押した ${formatNumber(link.uniqueClickCount)} 人（${rateText(link.clickRate)}）`}
+                        {link.clickCount != null ? `・押された回数 ${formatNumber(link.clickCount)} 回` : ''}
                       </p>
                     </div>
                     <progress
@@ -841,7 +842,7 @@ function ApprovalBox({
       </p>
       <p className={styles.approvalRequest}>{request}</p>
       <dl className={styles.facts}>
-        <div className={styles.fact}><dt>送る相手</dt><dd>{formatNumber(state.gate.recipientCount)}人</dd></div>
+        <div className={styles.fact}><dt>送る相手</dt><dd>{formatNumber(state.gate.recipientCount)} 人</dd></div>
         <div className={styles.fact}><dt>送る日時</dt><dd>{scheduledLabel ?? '今すぐ送る'}</dd></div>
         <div className={styles.fact}><dt>メッセージ</dt><dd>{`${messageText}（右のスマホ）`}</dd></div>
       </dl>

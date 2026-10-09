@@ -9,6 +9,9 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import type { AnalyticsMetric, AnalyticsMetricState } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { formatYen as polishFormatYen } from '@/lib/format'
+
 
 export function downloadCsv(filename: string, rows: Array<Array<string | number | null | undefined>>) {
   const csv = rows.map((row) => row.map(csvCell).join(',')).join('\n')
@@ -85,7 +88,7 @@ export function metricText(
   if (value.value === null) return '—'
   if (typeof value.value === 'string') return value.value
   if (options?.percent) return `${Math.round(value.value * 1000) / 10}%`
-  if (options?.currency) return `${formatNumber(value.value)}円`
+  if (options?.currency) return `${polishFormatYen(value.value)}`
   return formatNumber(value.value)
 }
 
@@ -118,17 +121,11 @@ export function metricCardState(
 }
 
 export function formatAnalyticsDateTime(value: string | null): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return formatDateTime(date)
+  return polishFormatDate(value, { style: 'detail', fallback: '—' })
 }
 
 export function formatAnalyticsDate(value: string | null): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return formatDay(date)
+  return polishFormatDate(value, { style: 'detail', fallback: '—' })
 }
 
 const WEEKDAY_JP = ['日', '月', '火', '水', '木', '金', '土'] as const
@@ -138,7 +135,7 @@ export function analyticsWeekday(date: string): string {
 
 /** YYYY-MM-DD を「9/15」に。 */
 export function shortDate(date: string): string {
-  return `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`
+  return polishFormatDate(date, { style: 'list-day', fallback: '—' })
 }
 
 export function periodCaption(from: string, to: string, cutoffAt: string): string {

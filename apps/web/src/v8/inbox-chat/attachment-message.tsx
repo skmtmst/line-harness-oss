@@ -9,6 +9,7 @@
 import { Download, FileText } from 'lucide-react'
 import { formatExpiry, formatSize, parseSentAttachment } from './attachments'
 import styles from './inbox-chat.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 export default function AttachmentMessage({ messageType, content }: { messageType: string; content: string }) {
   const view = parseSentAttachment(messageType, content)
@@ -31,7 +32,7 @@ export default function AttachmentMessage({ messageType, content }: { messageTyp
     <>
       <FileText aria-hidden className={styles.sentFileIcon} />
       <span className={styles.sentFileText}>
-        <span className={styles.sentFileName} title={view.name}>{view.name}</span>
+        <span className={styles.sentFileName} ><TruncatedText value={String(view.name ?? '')} /></span>
         {sub ? <span className={styles.sentFileSub}>{sub}</span> : null}
       </span>
       {view.url ? <Download aria-hidden className={styles.sentFileIcon} /> : null}

@@ -310,7 +310,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
               <Select aria-label="何日以内の通過で数えるか" disabled size="full" onChange={() => {}} value={String(selectedFunnel?.windowDays ?? '')} options={[{ value: String(selectedFunnel?.windowDays ?? ''), label: selectedFunnel ? `${selectedFunnel.windowDays}日以内` : '未取得' }]} />
             </label>
             {run ? <label className={styles.field} data-w="group"><span className={styles.fieldLabel}>比較する条件</span>
-              <Select id="funnel-group" value={groupKey} onChange={(value) => { setGroupKey(value); setPicked(null) }} aria-label="比較する条件" size="full" options={run.groups.map((group) => ({ value: group.key, label: `${group.label}（入口 ${formatNumber(group.entrants)}人）` }))} />
+              <Select id="funnel-group" value={groupKey} onChange={(value) => { setGroupKey(value); setPicked(null) }} aria-label="比較する条件" size="full" options={run.groups.map((group) => ({ value: group.key, label: `${group.label}（入口 ${formatNumber(group.entrants)} 人）` }))} />
             </label> : null}
             <span className={styles.spacer} />
             {canManage ? <Button variant="secondary" onClick={() => setCreating(true)}><Plus size={15} aria-hidden="true" />ファネルを作る</Button> : null}
@@ -332,7 +332,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
               {result.map((step, i) => {
                 const previous = i > 0 ? result[i - 1] : null
                 const dropRate = previous && previous.reached > 0 ? previous.droppedAfter / previous.reached * 100 : null
-                return <button key={step.stepOrder} type="button" className={styles.funnelStep} data-selected={shownPick === i || undefined} disabled={!measurable} onClick={() => setPicked(i)} aria-pressed={shownPick === i} title={previous ? `止まった ${previous.droppedAfter}人・進行中 ${previous.inProgressAfter}人` : undefined}>
+                return <button key={step.stepOrder} type="button" className={styles.funnelStep} data-selected={shownPick === i || undefined} disabled={!measurable} onClick={() => setPicked(i)} aria-pressed={shownPick === i} title={previous ? `止まった ${previous.droppedAfter} 人・進行中 ${previous.inProgressAfter} 人` : undefined}>
                   <span className={styles.funnelNumber}>{i + 1}</span>
                   <span className={styles.funnelLabel} title={step.label}>{step.label}</span>
                   <span className={styles.funnelMeasure}>

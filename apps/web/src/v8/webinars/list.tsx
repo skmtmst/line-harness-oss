@@ -12,6 +12,7 @@
  * データの口・保存の口・権限・失敗の扱いは app/webinars/list-v8.tsx と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
+import SharedStatusPill from '@/components/shared/status-pill'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import type { ReactNode } from 'react'
@@ -86,6 +87,7 @@ import {
 } from './helpers'
 import styles from './list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type SortKey = 'updated' | 'created' | 'name'
 type SavedFilter = '' | 'active' | 'draft' | 'archived'
@@ -130,7 +132,7 @@ function periodSummary(webinar: WebinarListItem): string {
 }
 
 function peopleText(value: number | null | undefined): string {
-  return typeof value === 'number' && Number.isFinite(value) ? `${formatNumber(value)}人` : '—'
+  return typeof value === 'number' && Number.isFinite(value) ? `${formatNumber(value)} 人` : '—'
 }
 
 function metricValue(metric: WebinarOverviewMetric | undefined): number | null {
@@ -150,11 +152,11 @@ function kpiCells(overview: WebinarOverview | null) {
   return [
     {
       key: 'webinars', title: 'ウェビナー', icon: Video, value: metricValue(m?.webinars), unit: '件',
-      detail: active === null ? '—' : `公開中 ${formatNumber(active)}件`, help: '登録済みの件数です。',
+      detail: active === null ? '—' : `公開中 ${formatNumber(active)} 件`, help: '登録済みの件数です。',
     },
     {
       key: 'registrations', title: '申込', icon: Users, value: metricValue(m?.registrations), unit: '人',
-      detail: bookings === null ? '—' : `延べ予約 ${formatNumber(bookings)}件`, help: '全期間の申込人数です。同じ人の複数予約は1人に数えます。',
+      detail: bookings === null ? '—' : `延べ予約 ${formatNumber(bookings)} 件`, help: '全期間の申込人数です。同じ人の複数予約は1人に数えます。',
     },
     {
       key: 'viewers', title: '視聴', icon: CalendarClock, value: metricValue(m?.viewers), unit: '人',
@@ -162,7 +164,7 @@ function kpiCells(overview: WebinarOverview | null) {
     },
     {
       key: 'cta', title: 'CTAクリック', icon: MousePointerClick, value: metricValue(m?.ctaTotalClicks), unit: '回',
-      detail: people === null ? '—' : `押した人 ${formatNumber(people)}人`, help: '全期間にCTAが押された延べ回数です。',
+      detail: people === null ? '—' : `押した人 ${formatNumber(people)} 人`, help: '全期間にCTAが押された延べ回数です。',
     },
   ]
 }
@@ -199,10 +201,7 @@ function toContextItems(items: ActionMenuItem[]): ContextMenuItem[] {
 
 function StatusPill({ webinar }: { webinar: WebinarListItem }) {
   return (
-    <span className={styles.pill} data-tone={statusTone(webinar)}>
-      <span className={styles.pillDot} aria-hidden="true" />
-      {statusLabel(webinar)}
-    </span>
+    <SharedStatusPill tone={statusTone(webinar) === 'active' ? 'success' : statusTone(webinar) === 'scheduled' ? 'info' : 'neutral'}>{statusLabel(webinar)}</SharedStatusPill>
   )
 }
 
@@ -906,7 +905,7 @@ function WebinarList() {
                           </button>
                         </FolderDotName>
                       </ContextMenu>
-                      <span className={styles.slug} title={publicPath(w)}>{publicPath(w)}</span>
+                      <span className={styles.slug} ><TruncatedText value={String(publicPath(w) ?? '')} /></span>
                     </Td>
                     <Td className={styles.colStatus}><StatusPill webinar={w} /></Td>
                     <Td className={styles.colCount}>
@@ -950,7 +949,7 @@ function WebinarList() {
   const pager = hasListData && pageCount > 1 ? (
     <ListPagePagination>
       <span className={styles.pagerCount}>
-        {(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + visibleItems.length} / {formatNumber(visibleTotal)}件
+        {(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + visibleItems.length} / {formatNumber(visibleTotal)} 件
       </span>
       <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り" />
     </ListPagePagination>
@@ -1083,7 +1082,7 @@ function WebinarList() {
         <ConfirmDialog
           open={deletingFolder !== null}
           title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
-          description={`削除しても、中のウェビナーは未分類に残ります。いまこのフォルダに入っているのは${deletingFolder?.count ?? 0}件です。`}
+          description={`削除しても、中のウェビナーは未分類に残ります。いまこのフォルダに入っているのは${deletingFolder?.count ?? 0} 件です。`}
           confirmLabel="削除する"
           destructive
           busy={folderBusy}

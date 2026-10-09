@@ -65,7 +65,7 @@ function bodyLines(item: WebhookInteraction): { main: string; sub: string } {
   const tail = rest.join('・')
   const retried = item.retryOfId
     ? '前の失敗をやり直した記録'
-    : item.status === 'failed' && item.attemptCount > 1 ? `${item.attemptCount}回やり直して失敗` : ''
+    : item.status === 'failed' && item.attemptCount > 1 ? `${item.attemptCount} 回やり直して失敗` : ''
   return { main: head || '—', sub: [tail, retried].filter(Boolean).join('・') }
 }
 
@@ -214,10 +214,10 @@ export default function WebhooksInteractionsV8() {
       if (accountRef.current !== accountId) return
       if (!response.success) throw new Error(response.error)
       const d = response.data
-      const remainingNote = d.remaining > 0 ? `まだ失敗のまま残っているものが${d.remaining}件あります。もう一度押すと続きをやり直します。` : ''
-      const reviewNote = d.needsReview > 0 ? `届いたか分からないものが${d.needsReview}件あります。相手先の記録で同じ処理がないか確かめてから、一覧で1件ずつやり直してください。` : ''
-      const excludedNote = d.excluded > 0 ? `送り先が消えた・止まっている・自動の送り直し中などで、対象外のものが${d.excluded}件あります。` : ''
-      const message = `${d.requested}件を確認し、${d.succeeded}件が届きました。届かなかったもの ${d.failed}件、対象外 ${d.skipped}件です。${remainingNote}${reviewNote}${excludedNote}`
+      const remainingNote = d.remaining > 0 ? `まだ失敗のまま残っているものが${d.remaining} 件あります。もう一度押すと続きをやり直します。` : ''
+      const reviewNote = d.needsReview > 0 ? `届いたか分からないものが${d.needsReview} 件あります。相手先の記録で同じ処理がないか確かめてから、一覧で1件ずつやり直してください。` : ''
+      const excludedNote = d.excluded > 0 ? `送り先が消えた・止まっている・自動の送り直し中などで、対象外のものが${d.excluded} 件あります。` : ''
+      const message = `${d.requested} 件を確認し、${d.succeeded} 件が届きました。届かなかったもの ${d.failed} 件、対象外 ${d.skipped} 件です。${remainingNote}${reviewNote}${excludedNote}`
       if (d.failed > 0 || d.skipped > 0 || d.remaining > 0 || d.needsReview > 0 || d.excluded > 0) setNotice(message)
       else notifyToast(message)
       await load()
@@ -382,7 +382,7 @@ export default function WebhooksInteractionsV8() {
   const pager = loaded && data.total > 0 ? (
     <div className={styles.pagerRow}>
       <span className={styles.pagerLead}>
-        <span className={styles.pagerCount}>{`${formatNumber(data.total)}件中 ${rangeFirst}〜${rangeLast}件`}</span>
+        <span className={styles.pagerCount}>{`${formatNumber(data.total)} 件中 ${rangeFirst}〜${rangeLast} 件`}</span>
         <span className={styles.smallSelect}>
           <Select
             aria-label="1ページに出す件数"

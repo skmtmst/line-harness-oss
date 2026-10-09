@@ -63,7 +63,7 @@ describe('会話の中の動画・ファイル', () => {
     render(<AttachmentMessage messageType="file" content={JSON.stringify({ attachmentId: 'f1', filename: '案内.pdf', size: 482133, url: 'https://w.example/f1', expiresAt: '2026-11-07T03:00:00.000Z' })} />)
     const link = screen.getByRole('link', { name: '案内.pdf を開く' }) as HTMLAnchorElement
     expect(link.href).toBe('https://w.example/f1')
-    expect(link.textContent).toContain('11/7まで')
+    expect(link.textContent).toContain('11月7日（土）まで')
   })
 
   it('動画は再生できる枠、読めない形は文字だけ', () => {

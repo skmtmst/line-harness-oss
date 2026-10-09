@@ -42,7 +42,7 @@ export function runStatusView(run: UidMigrationDetail, unresolved: number | null
       return {
         description: '実データはまだ変更していません。',
         badgeTone: unresolved === 0 ? 'success' : 'warning',
-        badgeLabel: unresolved === 0 ? '確認完了' : `要確認 ${unresolved ?? '—'}件`,
+        badgeLabel: unresolved === 0 ? '確認完了' : `要確認 ${unresolved ?? '—'} 件`,
       }
   }
 }

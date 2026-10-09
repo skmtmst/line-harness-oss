@@ -207,7 +207,7 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
             ) : null}
             {active.status === 'completed' ? (
               <span className="text-ink-secondary">
-                {formatNumber((active.rowCount ?? 0))}件
+                {formatNumber((active.rowCount ?? 0))} 件
                 （{formatJstDateTime(active.expiresAt)}まで）
               </span>
             ) : null}
@@ -243,13 +243,13 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
 
       {jobs.length > 1 ? (
         <details className="text-ink-secondary w-full text-xs">
-          <summary className="cursor-pointer">最近の書き出し（{jobs.length}件）</summary>
+          <summary className="cursor-pointer">最近の書き出し（{jobs.length} 件）</summary>
           <ul className="border-hairline divide-hairline mt-1 divide-y rounded-control border">
             {jobs.slice(0, RECENT_LIMIT).map((job) => (
               <li key={job.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
                 <span>
                   {formatJstDateTime(job.createdAt)}・{job.createdByName}
-                  {job.rowCount != null ? `・${formatNumber(job.rowCount)}件` : ''}
+                  {job.rowCount != null ? `・${formatNumber(job.rowCount)} 件` : ''}
                 </span>
                 <span className="flex items-center gap-2">
                   <StatusBadge tone={statusTone(job.status)} size="compact">

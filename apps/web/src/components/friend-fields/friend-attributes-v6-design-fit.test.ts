@@ -153,7 +153,7 @@ describe('XBkiQ 保存した検索の編集', () => {
 
   it('共有範囲のところで、上限と共有すると何が起きるかを先に言う', () => {
     expect(shareField).toContain('label="共有の説明"')
-    expect(shareField).toContain('保存できるのは50件までです（いま${savedCount}件）')
+    expect(shareField).toContain('保存できるのは50件までです（いま${savedCount} 件）')
     expect(shareField).toContain('一斉配信・オートメーションの対象条件からも呼び出せます')
   })
 

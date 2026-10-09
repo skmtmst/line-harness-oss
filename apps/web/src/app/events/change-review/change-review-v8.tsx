@@ -162,7 +162,7 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
       />
 
       {applied && (
-        <div className="bg-canvas rounded-card border-hairline border p-4" role="status">
+        <div className="bg-canvas rounded-card content-card border p-4" role="status">
           <p className="text-ink text-sm font-bold">変えました</p>
           <p className="text-ink-secondary mt-1 text-sm">
             影響した申込は確定 {applied.confirmed}人・待ち {applied.waiting}人で、LINEのお知らせは {applied.notified}人に送りました。

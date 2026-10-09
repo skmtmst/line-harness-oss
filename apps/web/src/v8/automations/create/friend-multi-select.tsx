@@ -6,6 +6,7 @@ import { RequiredBadge } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import { api } from '@/lib/api'
 import { FRIEND_SELECT_LIMIT, normalizeFriendIds } from './trigger-helpers'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /**
  * 対象の友だちの複数選択（R22・設計G-2）。
@@ -85,7 +86,7 @@ export function FriendMultiSelect({
   return (
     <div>
       <p id="au-friends-label" className="text-xs font-medium text-ink">
-        対象の友だち（{ids.length}人）<RequiredBadge />
+        対象の友だち（{ids.length} 人）<RequiredBadge />
       </p>
       {ids.length > 0 ? (
         <ul aria-labelledby="au-friends-label" className="mt-2 flex flex-wrap gap-2">
@@ -133,7 +134,7 @@ export function FriendMultiSelect({
                   const full = ids.length >= FRIEND_SELECT_LIMIT && !selected
                   return (
                     <li key={option.id} className="flex items-center justify-between gap-2 border-t border-hairline px-3 py-2 first:border-t-0">
-                      <span className="min-w-0 truncate text-sm text-ink" title={option.name}>{option.name}</span>
+                      <span className="min-w-0 truncate text-sm text-ink" ><TruncatedText value={String(option.name ?? '')} /></span>
                       {selected ? (
                         <span className="shrink-0 text-xs font-medium text-accent-deep">選択中 ✓</span>
                       ) : (

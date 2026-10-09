@@ -43,7 +43,7 @@
   border: 0;
   border-radius: var(--radius-segment);
   background: transparent;
-  font-size: var(--text-label);
+  font-size: var(--text-body);
   font-weight: 500;
   line-height: 1.5;
   color: var(--color-ink-secondary);
@@ -140,4 +140,10 @@
 }
 
 [data-theme='v8'] .root[data-size='sticker'] { height: var(--seg-timing-h); max-width: 100%; gap: 0; }
-[data-theme='v8'] .root[data-size='sticker'] .item { padding: var(--tpl-msg-composer-sticker-switch-pad); font-size: var(--text-label); line-height: var(--tpl-msg-composer-text-lh); white-space: nowrap; }
+[data-theme='v8'] .root[data-size='sticker'] .item { padding: var(--tpl-msg-composer-sticker-switch-pad); font-size: var(--text-body); line-height: var(--tpl-msg-composer-text-lh); white-space: nowrap; }
+
+/* B-152②：役割ごとの文字の段。 */
+[data-theme='v8'] .item, [data-theme='v8'] .selected, html[data-theme='v8'] .root[data-size] .item, html[data-theme='v8'] .root[data-appearance] .selected { font-weight: var(--polish-weight-body); }
+
+/* B-152⑨：切り替える各ボタンの角丸。 */
+html[data-theme='v8'] .root .item, html[data-theme='v8'] .root .thumb, html[data-theme='v8'] .root[data-size] .thumb { border-radius: var(--polish-radius-control); }

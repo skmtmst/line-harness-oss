@@ -36,6 +36,9 @@ import StoreTabs from '../store-tabs/store-tabs'
 import type { PhonePreset } from './today'
 import { INACTIVE_STATUSES, dayTitle, floorOrder, slotLabel, toYmd } from './format'
 import styles from './reservations.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+import { formatYen as polishFormatYen } from '@/lib/format'
+
 
 const STAY_MINUTES = 120
 const FALLBACK_START = 17 * 60
@@ -223,7 +226,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
 
   const preview = (
     <div className={styles.phoneSide}>
-      <Card frame="inset" layout="vertical" padding="default" className={styles.phoneSideCard} aria-labelledby="rs-phone-tables">
+      <Card frame="raised" layout="vertical" padding="default" className={styles.phoneSideCard} aria-labelledby="rs-phone-tables">
         <h3 id="rs-phone-tables" className={styles.sideTitle}>{time ? `${time}〜${endsAt} の卓（2時間）` : '時間を選ぶと卓が出ます'}</h3>
         {time ? (
           <>
@@ -247,7 +250,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
           </>
         ) : null}
       </Card>
-      <Card frame="inset" layout="vertical" padding="default" className={styles.phoneSideCard} aria-labelledby="rs-phone-line">
+      <Card frame="raised" layout="vertical" padding="default" className={styles.phoneSideCard} aria-labelledby="rs-phone-line">
         <h3 id="rs-phone-line" className={styles.sideTitle}>{`お客さまに LINE で確認を送る（${kind === 'customer' && notify ? 'オン' : 'オフ'}）`}</h3>
         <div className={styles.linePreview}>
           <p className={styles.linePreviewTitle}>{kind === 'hold' ? '（押さえは送りません）' : 'ご予約を承りました'}</p>
@@ -255,7 +258,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
           <p className={styles.linePreviewStore}>{storeName}</p>
         </div>
       </Card>
-      <Card frame="inset" layout="vertical" padding="default" className={styles.phoneSideCard} aria-labelledby="rs-phone-who">
+      <Card frame="raised" layout="vertical" padding="default" className={styles.phoneSideCard} aria-labelledby="rs-phone-who">
         <h3 id="rs-phone-who" className={styles.sideTitle}>この方について</h3>
         {history ? (
           <>
@@ -288,7 +291,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
         )}
       >
         <form ref={formRef} className={styles.phoneForm} onSubmit={save} noValidate>
-          <Card frame="inset" padding="spacious" layout="vertical" className={styles.phoneCard} aria-labelledby="rs-phone-kind">
+          <Card frame="raised" padding="spacious" layout="vertical" className={styles.phoneCard} aria-labelledby="rs-phone-kind">
             <h2 id="rs-phone-kind" className={styles.phoneCardTitle}>何を入れますか</h2>
             <RadioCardGroup legend="何を入れますか" className={styles.kindCards}>
               <RadioCard name="rs-phone-kind" value="customer" checked={kind === 'customer'} onChange={setKind} icon={<UserPlus size={16} aria-hidden="true" />} title="お客さまの予約を入れる" note="電話・店頭で受けた予約" />
@@ -301,7 +304,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
             ) : null}
           </Card>
           {kind === 'customer' ? (
-            <Card frame="inset" padding="spacious" layout="vertical" className={styles.phoneCard} aria-labelledby="rs-phone-who-title">
+            <Card frame="raised" padding="spacious" layout="vertical" className={styles.phoneCard} aria-labelledby="rs-phone-who-title">
               <div className={styles.phoneCardHead}>
                 <h2 id="rs-phone-who-title" className={styles.phoneCardTitle}>だれの予約ですか</h2>
                 <p className={styles.phoneCardText}>LINE の友だちなら名前で探して結びつけます。LINE 未連携の電話番号でも入れられます</p>
@@ -354,7 +357,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
               )}
             </Card>
           ) : null}
-          <Card frame="inset" padding="spacious" layout="vertical" className={styles.phoneCard} aria-labelledby="rs-phone-when">
+          <Card frame="raised" padding="spacious" layout="vertical" className={styles.phoneCard} aria-labelledby="rs-phone-when">
             <h2 id="rs-phone-when" className={styles.phoneCardTitle}>いつ・何人・どの卓</h2>
             <div className={styles.pair}>
               <Field label="日付" htmlFor="rs-phone-date" error={fields.error('date')}>
@@ -390,20 +393,20 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
               <Field labelSize="compact" label="コース">
                 <Select aria-label="コース" size="full" value={courseId} onChange={setCourseId} options={[
                   { value: '', label: '席のみ' },
-                  ...courses.map((c) => ({ value: c.id, label: `${c.name} ${c.price.toLocaleString()}円` })),
+                  ...courses.map((c) => ({ value: c.id, label: `${c.name} ${polishFormatYen(c.price)}` })),
                 ]} />
               </Field>
             </div>
             <p className={styles.phoneNote}>自動で選ぶと、人数が入る卓のうち余る席が一番少ない卓にします（座席・卓管理の自動配席ルール）</p>
           </Card>
-          <Card frame="inset" padding="spacious" layout="vertical" className={styles.phoneCard} aria-labelledby="rs-phone-allergy">
+          <Card frame="raised" padding="spacious" layout="vertical" className={styles.phoneCard} aria-labelledby="rs-phone-allergy">
             <h2 id="rs-phone-allergy" className={styles.phoneCardTitle}>要望・アレルギー</h2>
             <Field label="アレルギー・特記事項" htmlFor="rs-phone-allergy-input">
               <TextField id="rs-phone-allergy-input" value={allergy} onChange={(event) => setAllergy(event.target.value)} />
             </Field>
           </Card>
           {kind === 'customer' ? (
-            <Card frame="inset" padding="spacious" layout="vertical" className={styles.phoneCard} aria-labelledby="rs-phone-send">
+            <Card frame="raised" padding="spacious" layout="vertical" className={styles.phoneCard} aria-labelledby="rs-phone-send">
               <div className={styles.phoneCardHead}>
                 <h2 id="rs-phone-send" className={styles.phoneCardTitle}>お客さまに何を送りますか</h2>
                 <p className={styles.phoneCardText}>LINE とつながっている方には予約の案内を送れます。送らない選択もできます</p>

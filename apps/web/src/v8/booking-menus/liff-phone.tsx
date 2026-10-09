@@ -12,9 +12,12 @@
  * 出ることを確かめるための見本なので、作り物の名前は置かない）。
  * 選ぶ中身が無いときは空き枠の代わりにその旨を出す。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import type { BookingAvailabilitySlot, BookingMenu, BookingStaff } from '@/lib/api'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import styles from './settings.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+
 
 const WEEKDAY_JP = '日月火水木金土'
 const STEP_LABELS = ['メニュー', '担当', '日時', '確認']
@@ -37,14 +40,13 @@ function daysFrom(date: string): string[] {
 }
 
 function formatJpDay(date: string): string {
-  const d = new Date(`${date}T00:00:00Z`)
-  return `${d.getUTCMonth() + 1}月${d.getUTCDate()}日（${WEEKDAY_JP[d.getUTCDay()]}）`
+  return polishFormatDate(date, { style: 'day' })
 }
 
 function priceLabel(menu: Pick<BookingMenu, 'price_mode' | 'base_price'>): string {
   if (menu.price_mode === 'free') return '無料'
   if (menu.price_mode === 'inquiry') return 'お問い合わせ'
-  return `¥${menu.base_price.toLocaleString('ja-JP')}`
+  return `¥${polishFormatNumber(menu.base_price)}`
 }
 
 /** 写しの中の読み込み待ちの骨組み（札2枚の形。写し全体が role="img" のため読み上げは付けない）。 */

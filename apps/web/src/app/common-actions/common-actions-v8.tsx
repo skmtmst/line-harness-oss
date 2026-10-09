@@ -35,6 +35,7 @@ import {
   type AutoV8Model,
 } from '@/app/automations/automations-v8'
 import styles from '@/app/automations/automations-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type Filter = 'all' | 'published' | 'draft' | 'old_version' | 'unused' | 'archived'
 
@@ -336,7 +337,7 @@ export function V8CommonActionsTab({
               {items.map((item) => (
                 <tr key={item.id}>
                   <td>
-                    <p className={styles.cellMain} title={item.name}>{item.name}</p>
+                    <p className={styles.cellMain} ><TruncatedText value={String(item.name ?? '')} /></p>
                     <p className={styles.cellSub} title={item.description ?? undefined}>{item.description || '説明はありません'}</p>
                   </td>
                   <td>

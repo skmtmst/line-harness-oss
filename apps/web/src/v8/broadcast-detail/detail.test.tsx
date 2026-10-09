@@ -237,7 +237,7 @@ describe('V8 一斉配信を予約したあと', () => {
     await render(<Reserved {...props} cancelOpen />)
     const dialog = document.querySelector('[role="alertdialog"], [role="dialog"]')!
     expect(dialog.textContent).toContain('「8月キャンペーンのお知らせ」の予約を取り消しますか？')
-    expect(dialog.textContent).toContain('1,213人 に送らなくなります。取り消すと下書きに戻り、もう一度予約できます。')
+    expect(dialog.textContent).toContain('1,213 人 に送らなくなります。取り消すと下書きに戻り、もう一度予約できます。')
     const order = [...dialog.querySelectorAll('button')].map((button) => button.textContent?.trim()).filter((text) => text && text !== '')
     expect(order.slice(-3)).toEqual(['予約を取り消す', 'やめる', '予約のまま残す'])
     await act(async () => { buttonText('予約を取り消す')!.click() })

@@ -80,6 +80,9 @@ import {
 import { formatNumber } from '@/lib/format'
 import styles from './edit.module.css'
 import { focusFieldById } from '@/lib/use-form-errors'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+
 
 /** 予定の日時（`YYYY-MM-DDTHH:mm`・日本時間）を「10/1 0:00」の形にする。 */
 export function scheduleStamp(value: string): string {
@@ -99,14 +102,7 @@ export function changeText(before: string, after: string): string {
 
 /** 履歴の日時（ISO）を日本時間の「9/01 10:00」の形にする。 */
 export function historyStamp(value: string): string {
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return value
-  const jst = new Date(parsed.getTime() + 9 * 3600_000)
-  const m = jst.getUTCMonth() + 1
-  const d = String(jst.getUTCDate()).padStart(2, '0')
-  const hh = String(jst.getUTCHours()).padStart(2, '0')
-  const mm = String(jst.getUTCMinutes()).padStart(2, '0')
-  return `${m}/${d} ${hh}:${mm}`
+  return polishFormatDate(value, { style: 'list', fallback: '—' })
 }
 
 /** 「いま」より前は予約できない。入れた瞬間に当たって、予約に見えない。 */
@@ -1510,7 +1506,7 @@ function ImpactRows({
             <div key={`${row.kind}-${row.name}-${index}`} className={styles.impactRow}>
               <div className={styles.impactHead}>
                 <span className={styles.impactKind}>{row.kindLabel}</span>
-                <span className={styles.impactName} title={row.name}>{row.name}</span>
+                <span className={styles.impactName} ><TruncatedText value={String(row.name ?? '')} /></span>
                 <span className={styles.impactSpacer} aria-hidden="true" />
                 <span className={usageTone(row.status) === 'warning' ? styles.impactStatusWarn : styles.impactStatus}>{row.status}</span>
               </div>

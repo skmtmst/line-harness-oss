@@ -62,6 +62,7 @@ import { MediaQuotaGuidance } from './media-quota-guidance'
 import MediaReplacementDialog from './media-replacement-dialog'
 import MediaUploadDialog from './media-upload-dialog'
 import styles from './list-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type MediaSort = 'newest' | 'oldest' | 'name' | 'size' | 'usage'
 const UNGROUPED = '__ungrouped__'
@@ -1923,8 +1924,8 @@ function MediaCardV8({
               <span className={styles.nameDot}>
                 <FolderDot folder={folder} />
               </span>
-              <span className={styles.fileName} title={item.filename}>
-                {item.filename}
+              <span className={styles.fileName} >
+                <TruncatedText value={String(item.filename ?? '')} />
               </span>
             </span>
             <p className={styles.meta}>

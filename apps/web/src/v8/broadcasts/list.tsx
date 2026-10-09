@@ -7,6 +7,7 @@
  * 型（ListPage）と共通部品で一から組み直した。データの口・保存先は今と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import SharedStatusPill from '@/components/shared/status-pill'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
@@ -67,6 +68,8 @@ import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import QuickSendV8 from './quick-send'
 import styles from './list.module.css'
+import { formatListDateTime as polishFormatListDateTime } from '@/lib/format'
+
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -133,10 +136,7 @@ function StatusBadge({ broadcast }: { broadcast: ApiBroadcast }) {
   const key = broadcast.displayStatus ?? broadcast.status
   const label = broadcast.displayStatusLabel ?? key
   return (
-    <span className={styles.badge} data-tone={BADGE_TONE[key] ?? 'neutral'}>
-      <span className={styles.badgeDot} aria-hidden="true" />
-      {label}
-    </span>
+    <SharedStatusPill tone={BADGE_TONE[key] ?? 'neutral'}>{label}</SharedStatusPill>
   )
 }
 
@@ -640,7 +640,7 @@ export default function BroadcastListV8() {
       icon: Send,
       value: kpiPending ? null : (listKpis?.thisMonth ?? null),
       unit: '件',
-      detail: `${listKpis?.delivered == null ? '—' : `${formatNumber(listKpis.delivered)}人`}に届いた`,
+      detail: `${listKpis?.delivered == null ? '—' : `${formatNumber(listKpis.delivered)} 人`}に届いた`,
     },
     {
       key: 'openRate',
@@ -1090,8 +1090,8 @@ export default function BroadcastListV8() {
               <Td>
                 <span className={styles.cellMain}>
                   {broadcast.status === 'sent'
-                    ? (broadcast.sentAt ? formatDateTime(broadcast.sentAt) : '—')
-                    : (broadcast.scheduledAt ? formatDateTime(broadcast.scheduledAt) : '未設定')}
+                    ? (broadcast.sentAt ? polishFormatListDateTime(broadcast.sentAt) : '—')
+                    : (broadcast.scheduledAt ? polishFormatListDateTime(broadcast.scheduledAt) : '未設定')}
                 </span>
                 {broadcast.status === 'scheduled' && broadcast.scheduledAt ? <span className={styles.cellSub}>予約</span> : null}
               </Td>
@@ -1100,7 +1100,7 @@ export default function BroadcastListV8() {
                   <span className={styles.cellMain}>—</span>
                 ) : (
                   <>
-                    <span className={styles.resultMain}>{formatNumber(insight?.delivered ?? broadcast.successCount)}人に届いた</span>
+                    <span className={styles.resultMain}>{formatNumber(insight?.delivered ?? broadcast.successCount)} 人に届いた</span>
                     {insight && (insight.openRate != null || insight.clickRate != null) ? (
                       <span className={styles.cellSub}>
                         {[
@@ -1150,8 +1150,8 @@ export default function BroadcastListV8() {
     <ListPagePagination>
       <span className={styles.pagerCount}>
         {pageCount > 1
-          ? `${formatNumber(resultTotal ?? visibleBroadcasts.length)}件中 ${rangeFirst}〜${rangeLast}件`
-          : `${formatNumber(resultTotal ?? visibleBroadcasts.length)}件`}
+          ? `${formatNumber(resultTotal ?? visibleBroadcasts.length)} 件中 ${rangeFirst}〜${rangeLast} 件`
+          : `${formatNumber(resultTotal ?? visibleBroadcasts.length)} 件`}
       </span>
       {pageCount > 1 ? (
         <Pagination page={page} pageCount={pageCount} onPageChange={goPage} ariaLabel="一斉配信のページ送り" />
@@ -1300,7 +1300,7 @@ export default function BroadcastListV8() {
                 {panelRow.status === 'sent'
                   ? (panelRow.sentAt ? `送信済み：${formatDateTime(panelRow.sentAt)}` : '送信済み')
                   : (panelRow.scheduledAt ? `予約：${formatDateTime(panelRow.scheduledAt)}` : '下書き')}
-                {panelRow.status === 'sent' ? ` ／ ${formatNumber(insight?.delivered ?? panelRow.successCount)}人に届いた` : ''}
+                {panelRow.status === 'sent' ? ` ／ ${formatNumber(insight?.delivered ?? panelRow.successCount)} 人に届いた` : ''}
               </p>
             </DetailPanel>
           )
@@ -1310,7 +1310,7 @@ export default function BroadcastListV8() {
           title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
           description={`削除しても、中の配信は未分類に残ります。いまこのフォルダに入っているのは${
             deletingFolder ? broadcasts.filter((b) => b.folderId === deletingFolder.id).length : 0
-          }件です。`}
+          } 件です。`}
           confirmLabel="削除する"
           destructive
           busy={folderBusy}

@@ -3,6 +3,7 @@
  * src/v8 からは @/app を読めないので、今の画面（app/templates）の
  * 決め事を写している。言い回しを変えるときは両方を見る。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import type { api } from '@/lib/api'
 
 /** 詳細口（GET /api/templates/:id）が返す1件分の形。 */
@@ -141,7 +142,7 @@ export function buildUsageRows(usage: TemplateUsage | null | undefined): UsageRo
     ...usage.scenarioSteps.map((u) => ({
       key: `scenario-step-${u.stepId}`,
       kind: 'シナリオ配信',
-      name: `${u.scenarioName}・${u.stepOrder}通目`,
+      name: `${u.scenarioName}・${u.stepOrder} 通目`,
       version: versionText(u.templateVersion ?? null),
       versionNumber: u.templateVersion ?? null,
       fixed: u.templateVersion !== null && u.templateVersion !== undefined,
@@ -235,14 +236,5 @@ export function lineChanges(before: string, after: string): Array<{ kind: 'remov
 
 /** 「8月21日 18:02」（日本時間）。年が違うときは年も出す。 */
 export function shortStamp(value: string | null | undefined, now: Date = new Date()): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit', hourCycle: 'h23' })
-      .formatToParts(date).map((p) => [p.type, p.value]),
-  )
-  const nowYear = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric' }).formatToParts(now).find((p) => p.type === 'year')?.value
-  const head = parts.year !== nowYear ? `${parts.year}年` : ''
-  return `${head}${parts.month}月${parts.day}日 ${parts.hour}:${parts.minute}`
+  return polishFormatDate(value, { style: 'detail', now })
 }

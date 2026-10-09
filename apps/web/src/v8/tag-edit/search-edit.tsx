@@ -49,6 +49,8 @@ import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/com
 import { formatDateTime } from '@/lib/format'
 import { optionsWithCurrent, usageRowsOf, headUsageText } from './search-model'
 import styles from './search-edit.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+
 
 /*
  * R185: 友だち画面で作れる条件はここでも編集できるようにする。実行側
@@ -830,15 +832,15 @@ export default function SavedSearchEditV8() {
   const countNote = previewError || preview?.error
     ? '人数をまだ数えていません。数え直してください。'
     : preview?.calculatedAt
-      ? `${formatDateTime(preview.calculatedAt)} に数えた数（LINE ${preview.byChannel.line ?? '—'}人・MAIL ${preview.byChannel.mail ?? '—'}人）。数え直している間は古い数を出しません`
+      ? `${formatDateTime(preview.calculatedAt)} に数えた数（LINE ${preview.byChannel.line ?? '—'} 人・MAIL ${preview.byChannel.mail ?? '—'} 人）。数え直している間は古い数を出しません`
       : '保存した条件でまだ数えていません。数え直すと出ます'
-  const deleteReason = original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使っている所を確かめられないため削除できません' : original.usedIn.length > 0 ? `使っている所があるため削除できません（${original.usedIn.length}件）` : '削除できるか確かめられません'
+  const deleteReason = original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使っている所を確かめられないため削除できません' : original.usedIn.length > 0 ? `使っている所があるため削除できません（${original.usedIn.length} 件）` : '削除できるか確かめられません'
 
   const side = (
     <div className={styles.side}>
       <div className={styles.sideHead}><h2 className={styles.sideTitle}>当てはまる人</h2></div>
       <p className={styles.count}>
-        {previewCount === null ? <span className={styles.countNum}>—</span> : <span className={styles.countNum}>{previewCount.toLocaleString('ja-JP')}</span>}
+        {previewCount === null ? <span className={styles.countNum}>—</span> : <span className={styles.countNum}>{polishFormatNumber(previewCount)}</span>}
         <span className={styles.countUnit}>人</span>
       </p>
       {previewError ? <p role="alert" className={styles.errorText}>{previewError}</p> : null}
@@ -880,7 +882,7 @@ export default function SavedSearchEditV8() {
         title={original.name}
         identity={<Link href="/tags?tab=searches" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />保存した検索へ</Link>}
         description={[
-          previewCount === null ? '人数はまだ数えていません' : `${previewCount.toLocaleString('ja-JP')}人が当てはまる`,
+          previewCount === null ? '人数はまだ数えていません' : `${polishFormatNumber(previewCount)} 人が当てはまる`,
           original.isShared ? '全員に共有' : '自分だけ',
           headUsageText(original.usedIn),
         ].join('・')}
@@ -914,7 +916,7 @@ export default function SavedSearchEditV8() {
             <span className={styles.labelRow}>
               <span className={styles.label}>共有</span>
               {/* 設計 XBkiQ：共有を選ぶ場所で、上限と共有すると何が起きるかを先に言う。 */}
-              <HelpTip label="共有の説明">{`${savedCount === null ? '保存できるのは50件までです。' : `保存できるのは50件までです（いま${savedCount}件）。`}共有すると、一斉配信・オートメーションの対象条件からも呼び出せます。`}</HelpTip>
+              <HelpTip label="共有の説明">{`${savedCount === null ? '保存できるのは50件までです。' : `保存できるのは50件までです（いま${savedCount} 件）。`}共有すると、一斉配信・オートメーションの対象条件からも呼び出せます。`}</HelpTip>
             </span>
             <div className={styles.seg} role="radiogroup" aria-label="共有">
               <button type="button" role="radio" aria-checked={isShared} className={isShared ? styles.segOn : styles.segBtn} onClick={() => setIsShared(true)}>全員</button>
@@ -979,7 +981,7 @@ export default function SavedSearchEditV8() {
             </div>
             <div className={styles.field}>
               <span className={styles.label}>表示件数</span>
-              <Select aria-label="表示件数" value={String(conditions.list?.limit ?? 20)} onChange={(value) => patchConditions({ ...conditions, list: { ...conditions.list, limit: Number(value) as 10 | 20 | 30 | 40 | 50 } })} options={[10, 20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size}件` }))} width={120} />
+              <Select aria-label="表示件数" value={String(conditions.list?.limit ?? 20)} onChange={(value) => patchConditions({ ...conditions, list: { ...conditions.list, limit: Number(value) as 10 | 20 | 30 | 40 | 50 } })} options={[10, 20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size} 件` }))} width={120} />
             </div>
           </div>
           <p className={styles.hint}>{`表示列：${conditions.list?.columns?.join('・') || '名前・タグ・担当者'}`}</p>

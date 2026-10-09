@@ -14,6 +14,9 @@ import Pagination from '@/components/shared/pagination'
 import { OpsHead } from './shell'
 import parts from './parts.module.css'
 import styles from './audit.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+
 
 /**
  * 運営の監査ログ V8（絵 `e7ljE`）。
@@ -50,11 +53,7 @@ function actionWord(action: string): string {
 
 /** 短い日時（10/1 15:20 の形）。 */
 function shortDateTime(value: string | null | undefined): string {
-  if (!value) return '—'
-  const full = formatDateTime(value)
-  const m = full.match(/^(\d+)-(\d+)-(\d+) (\d+:\d+)$/)
-  if (!m) return full
-  return `${Number(m[2])}/${Number(m[3])} ${m[4]}`
+  return polishFormatDate(value, { style: 'list', fallback: '—' })
 }
 
 export default function OpsAuditV8() {
@@ -172,7 +171,7 @@ export default function OpsAuditV8() {
             {rows.map((row) => (
               <div key={row.id} className={parts.miniRow} role="row">
                 <span className={`${parts.fixed} ${styles.colAt}`} role="cell" title={formatDateTime(row.created_at)}>{shortDateTime(row.created_at)}</span>
-                <span className={`${parts.fixed} ${styles.colWho}`} role="cell" title={row.staff_name}>{row.staff_name}</span>
+                <span className={`${parts.fixed} ${styles.colWho}`} role="cell" ><TruncatedText value={String(row.staff_name ?? '')} /></span>
                 <span className={`${parts.fixed} ${styles.colWhat}`} role="cell">{actionWord(row.action)}</span>
                 <span className={`${parts.fixed} ${styles.colTenant}`} role="cell" title={row.tenant_name ?? ''}>{row.tenant_name ?? '—'}</span>
                 <span className={parts.grow} role="cell" title={row.reason ?? ''}>{row.reason ?? '—'}</span>

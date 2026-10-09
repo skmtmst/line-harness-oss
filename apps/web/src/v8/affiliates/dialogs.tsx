@@ -23,6 +23,8 @@ import {
   type AffiliateSettlementPreview,
 } from '@/lib/api'
 import { formatDay, formatNumber } from '@/lib/format'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 type LoadPhase = 'loading' | 'ready' | 'empty' | 'error'
 
@@ -31,10 +33,7 @@ function yen(value: number): string {
 }
 
 function dateLabel(value: string | null): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return formatDay(date)
+  return polishFormatDate(value, { style: 'day', fallback: '—' })
 }
 
 export function AffiliateArchiveDialog({
@@ -148,7 +147,7 @@ export function AffiliateArchiveDialog({
             <dl className="mt-2 divide-y divide-danger/20 text-sm">
               <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">発行ずみの紹介リンク</dt><dd className="text-ink mt-0.5 font-semibold">{formatNumber(impact.activeLinks)}本</dd></div><Button variant="danger" className="bg-canvas px-3 py-1.5 text-xs text-danger h-auto whitespace-normal" href={`/affiliates?affiliate=${encodeURIComponent(target?.id ?? '')}`}>ここを開く</Button></div>
               <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">支払いを確定していない報酬</dt><dd className="text-ink mt-0.5 font-semibold">{yen(impact.unsettledReward)}</dd></div><Button variant="danger" className="bg-canvas px-3 py-1.5 text-xs text-danger h-auto whitespace-normal" href="/affiliates?tab=payment">ここを開く</Button></div>
-              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">認めるのを待っている成果</dt><dd className="text-ink mt-0.5 font-semibold">{formatNumber(impact.pendingConversions)}件</dd></div><Button variant="danger" className="bg-canvas px-3 py-1.5 text-xs text-danger h-auto whitespace-normal" href={`/affiliates?tab=approvals&affiliate=${encodeURIComponent(target?.id ?? '')}`}>ここを開く</Button></div>
+              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">認めるのを待っている成果</dt><dd className="text-ink mt-0.5 font-semibold">{formatNumber(impact.pendingConversions)} 件</dd></div><Button variant="danger" className="bg-canvas px-3 py-1.5 text-xs text-danger h-auto whitespace-normal" href={`/affiliates?tab=approvals&affiliate=${encodeURIComponent(target?.id ?? '')}`}>ここを開く</Button></div>
             </dl>
             <p className="text-danger mt-2 text-xs leading-5">
               紹介リンクは開けなくなります。過去の成果・報酬・支払いの記録は消えません。
@@ -331,7 +330,7 @@ export function AffiliatePaymentConfirmDialog({
         <div className="space-y-3">
           <dl className="grid grid-cols-2 gap-3 rounded-control bg-canvas-sunken p-4 sm:grid-cols-4">
             <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">確定する額</dt><dd className="text-ink mt-1 text-lg font-medium">{yen(preview.amount)}</dd></div>
-            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">成果の件数</dt><dd className="text-ink mt-1 text-lg font-medium">{formatNumber(preview.conversionCount)}件</dd></div>
+            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">成果の件数</dt><dd className="text-ink mt-1 text-lg font-medium">{formatNumber(preview.conversionCount)} 件</dd></div>
             <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">締め日</dt><dd className="text-ink mt-1 text-lg font-medium">{dateLabel(periodTo ?? preview.closeDate)}</dd></div>
             <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">支払日</dt><dd className="mt-1 text-lg font-medium text-success">{dateLabel(preview.paymentDate)}</dd></div>
           </dl>
@@ -341,7 +340,7 @@ export function AffiliatePaymentConfirmDialog({
               <thead><TableHeadRow><Th>案件</Th><Th align="right">認めた</Th><Th align="right">1件の報酬</Th><Th align="right">小計</Th></TableHeadRow></thead>
               <tbody className="divide-hairline divide-y">
                 {preview.breakdown.map((line) => (
-                  <tr key={line.offerName}><td className="text-ink px-3 py-2 font-medium">{line.offerName}</td><td className="text-ink-secondary px-3 py-2 text-right">{formatNumber(line.conversions)}件</td><td className="text-ink-secondary px-3 py-2 text-right">{line.unitReward == null ? '—' : yen(line.unitReward)}</td><td className="text-ink px-3 py-2 text-right font-semibold">{yen(line.subtotal)}</td></tr>
+                  <tr key={line.offerName}><td className="text-ink px-3 py-2 font-medium">{line.offerName}</td><td className="text-ink-secondary px-3 py-2 text-right">{formatNumber(line.conversions)} 件</td><td className="text-ink-secondary px-3 py-2 text-right">{line.unitReward == null ? '—' : yen(line.unitReward)}</td><td className="text-ink px-3 py-2 text-right font-semibold">{yen(line.subtotal)}</td></tr>
                 ))}
               </tbody>
             </table>

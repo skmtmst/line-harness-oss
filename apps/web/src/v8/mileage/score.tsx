@@ -53,6 +53,9 @@ import { mileagePaginationTotal } from './display'
 import styles from './mileage.module.css'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError } from '@/components/shared/form-controls'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+
 
 const BAND_LABELS: Record<ActionScoreBand, string> = {
   high: '点が高い',
@@ -74,9 +77,9 @@ const BAND_TONE: Record<ActionScoreBand, 'active' | 'neutral' | 'warn'> = {
 }
 
 function bandName(band: ActionScoreBand, highMin: number, normalMin: number) {
-  if (band === 'high') return `点が高い（${formatMileageNumber(highMin)}点〜）`
-  if (band === 'normal') return `中くらい（${formatMileageNumber(normalMin)}〜${formatMileageNumber(highMin - 1)}点）`
-  return `低い（〜${formatMileageNumber(normalMin - 1)}点）`
+  if (band === 'high') return `点が高い（${formatMileageNumber(highMin)} 点〜）`
+  if (band === 'normal') return `中くらい（${formatMileageNumber(normalMin)}〜${formatMileageNumber(highMin - 1)} 点）`
+  return `低い（〜${formatMileageNumber(normalMin - 1)} 点）`
 }
 
 function bandOf(score: number, highMin: number, normalMin: number): ActionScoreBand {
@@ -90,7 +93,7 @@ function frequencyText(rule: ActionScoreRule): string {
   const limit = rule.frequency.limit
   switch (rule.frequency.kind) {
     case 'unlimited': return '何回でも'
-    case 'per_day': return `1日${limit}回まで`
+    case 'per_day': return `1日${limit} 回まで`
     case 'per_subject': return '同じ対象は1回'
     case 'per_subject_per_day': return '同じ対象は1日1回'
     case 'once_per_period': return '期間中1回'
@@ -99,7 +102,7 @@ function frequencyText(rule: ActionScoreRule): string {
 }
 
 function ruleValueText(rule: ActionScoreRule): string {
-  if (rule.operation === 'set') return `${formatMileageNumber(rule.value)}点にする`
+  if (rule.operation === 'set') return `${formatMileageNumber(rule.value)} 点にする`
   return `${rule.value > 0 ? '+' : ''}${formatMileageNumber(rule.value)}`
 }
 
@@ -574,7 +577,7 @@ export default function ScoreTab() {
         aria-controls="ml-score-rules"
         onClick={() => setRulesOpen((open) => !open)}
       >
-        <span className={styles.rulesToggleTitle}>{`できごとの決めごと${editable ? ` ${formatMileageNumber(editable.rules.length)}件` : ''}`}</span>
+        <span className={styles.rulesToggleTitle}>{`できごとの決めごと${editable ? ` ${formatMileageNumber(editable.rules.length)} 件` : ''}`}</span>
         <span className={styles.rulesToggleHint}>{publishedVersionNo === null ? '公開中のルールはありません' : `公開中 版 ${formatMileageNumber(publishedVersionNo)}`}</span>
         {rulesOpen ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
       </button>
@@ -650,7 +653,7 @@ export default function ScoreTab() {
                 return (
                   <Tr key={rule.id} className={styles.row} data-table-layout="columns">
                     <Td className={styles.colName}>
-                      <span className={styles.rowNameInk} title={rule.name}>{rule.name}</span>
+                      <span className={styles.rowNameInk} ><TruncatedText value={String(rule.name ?? '')} /></span>
                       <span className={styles.rowSub}>{frequencyText(rule)}</span>
                     </Td>
                     <Td className={styles.colGives}><span className={styles.cellMain}>{ruleValueText(rule)}</span></Td>
@@ -702,7 +705,7 @@ export default function ScoreTab() {
     <>
       <div className={styles.pagerRow}>
         <span className={styles.pagerCount}>
-          {`${formatMileageNumber(total)}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, total)}件`}
+          {`${formatMileageNumber(total)} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, total)} 件`}
         </span>
         <span className={styles.chipGroup}>
           <Button onClick={exportCurrentPage} disabled={!overview?.items.length}>
@@ -999,11 +1002,7 @@ export function ScoreAdjustDialog({
 
 /* 明細の日時（絵は「9/02 19:20」。日・時を2桁にそろえ、行の幅をそろえる）。日本時間で出す。 */
 function formatScoreHistoryTime(value: string): string {
-  const time = new Date(value).getTime()
-  if (Number.isNaN(time)) return '—'
-  const jst = new Date(time + 9 * 60 * 60 * 1000)
-  const two = (n: number) => String(n).padStart(2, '0')
-  return `${jst.getUTCMonth() + 1}/${two(jst.getUTCDate())} ${two(jst.getUTCHours())}:${two(jst.getUTCMinutes())}`
+  return polishFormatDate(value, { style: 'detail', fallback: '—' })
 }
 
 /*

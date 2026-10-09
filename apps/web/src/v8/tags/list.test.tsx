@@ -127,7 +127,7 @@ describe('V8 タグ タグの一覧', () => {
     await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '未使用のタグ' })) })
     const unused = FRIEND_ATTRIBUTES_QA_TAGS.filter(isUnused).length
     expect(container.querySelectorAll('tbody tr').length).toBe(unused)
-    expect(screen.getByRole('button', { name: /よく使う絞り込み（1件選択中）/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /よく使う絞り込み（1 件選択中）/ })).toBeTruthy()
   })
 
   it('タブを押すとそのタブの本文に切り替わる', async () => {

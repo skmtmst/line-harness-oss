@@ -22,13 +22,13 @@ import { ChangeBox, DetailFrame } from '@/v8/template-detail/detail'
 import type { HqAccount, HqTemplateListItem, TemplateDetail } from '@/lib/hq-templates-api'
 import { KIND_TABS, sentLabel } from './store-list'
 import styles from '../template-detail/detail.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+
 
 /** 「8月21日 18:02」（日本時間）。 */
 function stamp(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  const j = new Date(d.getTime() + 9 * 60 * 60 * 1000)
-  return `${j.getUTCMonth() + 1}月${j.getUTCDate()}日 ${j.getUTCHours()}:${String(j.getUTCMinutes()).padStart(2, '0')}`
+  return polishFormatDate(iso, { style: 'detail', fallback: '—' })
 }
 
 /** 本文の差し込み（{{name}} など）の名前。 */
@@ -283,7 +283,7 @@ export default function HqTemplateDetail({
               {distributedNames.map((name) => (
                 <div key={name} className={styles.usageRow}>
                   <span className={styles.usageKind} title={name}>{shortName(name)}</span>
-                  <span className={styles.usageNameQuiet} title={name}>{name}</span>
+                  <span className={styles.usageNameQuiet} ><TruncatedText value={String(name ?? '')} /></span>
                   <span className={styles.usageVersion}>—</span>
                   <span className={styles.usageState}>受け取り済み</span>
                   {enterButton(accountIdOf(name))}

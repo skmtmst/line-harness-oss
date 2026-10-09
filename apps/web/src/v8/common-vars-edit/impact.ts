@@ -122,7 +122,7 @@ export function historicalText(impact: CommonVarDeleteImpact | CommonVarChangeIm
 export function hiddenText(impact: CommonVarDeleteImpact | CommonVarChangeImpact): string | null {
   if (impact.unavailableReferences.length === 0) return null
   return impact.unavailableReferences
-    .map((ref) => `${ref.kindLabel}${formatNumber(ref.count)}件（${ref.reason}）`)
+    .map((ref) => `${ref.kindLabel}${formatNumber(ref.count)} 件（${ref.reason}）`)
     .join('／')
 }
 
@@ -157,7 +157,7 @@ export function reflectionScopeText(
     (label) => !(REFLECTION_STATUS_ORDER as readonly string[]).includes(label),
   )
   return `内訳: ${[...known, ...unknown]
-    .map((label) => `${label}${formatNumber(counts.get(label)!)}件`)
+    .map((label) => `${label}${formatNumber(counts.get(label)!)} 件`)
     .join('・')}`
 }
 

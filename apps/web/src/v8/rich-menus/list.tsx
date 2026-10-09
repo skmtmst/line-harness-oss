@@ -8,6 +8,7 @@
  * 直さず、型（ListPage）と共通部品で一から書いた。データの口・権限・失敗時の
  * 扱いは古い一覧と同じ（BEHAVIOR.md）。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import Link from 'next/link'
@@ -79,6 +80,7 @@ import { ExternalImportWorkspace, type LineMenu } from './external-import'
 import { richMenuError, richMenuErrorAll } from './errors'
 import BlockedDeleteDialog, { type BlockedRow } from './blocked-dialog'
 import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /** フォルダに入れていないものを選ぶための、内部だけの値。 */
 const UNFILED = '__unfiled__'
@@ -150,7 +152,7 @@ function audienceMainText(g: RichMenuGroupListItem, tagNameById: Map<string, str
 function audienceSubText(g: RichMenuGroupListItem): string | null {
   if (g.publishingAt && g.isDefaultForAll) return `${shortDay(g.publishingAt)} から既定`
   if (g.targetingEnabled && g.targetingCondition) {
-    return g.audienceCount != null ? `対象 ${formatNumber(g.audienceCount)}人` : '対象の人数は未取得'
+    return g.audienceCount != null ? `対象 ${formatNumber(g.audienceCount)} 人` : '対象の人数は未取得'
   }
   if (g.isDefaultForAll) return '（既定）'
   return null
@@ -158,9 +160,7 @@ function audienceSubText(g: RichMenuGroupListItem): string | null {
 
 /** 「10/5」の形（予約の札・「から既定」）。 */
 const shortDay = (value: string): string => {
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' }).format(d)
+  return polishFormatDate(value, { style: 'list-day' })
 }
 
 /** 消せない理由の短い言い方（yOyCg：「何になっているか」だけ。外し方は右の操作）。 */
@@ -1089,15 +1089,15 @@ export default function RichMenusListV8() {
                     <FolderDotName folder={folderDotOf(g.folderId)}>
                       <Link
                         href={`/rich-menus/edit?id=${g.id}`}
-                        title={g.name}
+
                         className={styles.name}
                         onClick={(event) => event.stopPropagation()}
                       >
-                        {g.name}
+                        <TruncatedText value={String(g.name ?? '')} />
                       </Link>
                     </FolderDotName>
-                    <span className={`${styles.sub} ${styles.nameSub}`} title={`${shape}・ボタン「${g.chatBarText}」・${formatDay(g.updatedAt)} 更新`}>
-                      {`${shape}・ボタン「${g.chatBarText}」・${formatDay(g.updatedAt)} 更新`}
+                    <span className={`${styles.sub} ${styles.nameSub}`} >
+                      <TruncatedText value={String(`${shape}・ボタン「${g.chatBarText}」・${formatDay(g.updatedAt)} 更新`)} />
                     </span>
                   </Td>
                   <Td className={styles.audienceCell}>
@@ -1120,10 +1120,10 @@ export default function RichMenusListV8() {
                   <Td
                       className={styles.countMain}
                       title={g.monthlyStats?.uniqueAudience.value != null
-                        ? `のべ${formatNumber(g.monthlyStats.uniqueAudience.value)}人${g.monthlyStats.uniqueAudience.state === 'partial' ? '（記録開始後）' : ''}`
+                        ? `のべ${formatNumber(g.monthlyStats.uniqueAudience.value)} 人${g.monthlyStats.uniqueAudience.state === 'partial' ? '（記録開始後）' : ''}`
                         : undefined}
                     >
-                      {taps == null ? '—' : `${formatNumber(taps)}回`}
+                      {taps == null ? '—' : `${formatNumber(taps)} 回`}
                     </Td>
                   <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
                     <div className={styles.menuBox}>
@@ -1150,8 +1150,8 @@ export default function RichMenusListV8() {
     <div className={styles.pagerRow}>
       <span className={styles.pagerCount}>
         {pageCount > 1
-          ? `${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, groupTotal)} / ${formatNumber(groupTotal)}件`
-          : `${formatNumber(groupTotal)}件`}
+          ? `${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, groupTotal)} / ${formatNumber(groupTotal)} 件`
+          : `${formatNumber(groupTotal)} 件`}
       </span>
       {pageCount > 1 ? (
         <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="リッチメニューのページ送り" />
@@ -1323,7 +1323,7 @@ export default function RichMenusListV8() {
             unit={groupKpiReady && groupFacets?.published != null ? '件' : ''}
             detail={groupKpiReady
               ? groupFacets?.published != null
-                ? `下書き ${(groupFacets?.total ?? groupTotal) - groupFacets.published}件`
+                ? `下書き ${(groupFacets?.total ?? groupTotal) - groupFacets.published} 件`
                 : '下書き —'
               : groupKpiUnavailableText}
           />
@@ -1343,7 +1343,7 @@ export default function RichMenusListV8() {
             unit=""
             valueText={topArea ? topArea.label || '名前のないボタン' : '—'}
             detail={topArea
-              ? `${topAreaGroupName ? `${topAreaGroupName}・` : ''}${formatNumber(topArea.taps)}回`
+              ? `${topAreaGroupName ? `${topAreaGroupName}・` : ''}${formatNumber(topArea.taps)} 回`
               : tapKpiReady
                 ? (tapStats?.total ?? 0) > 0
                   ? '内訳はまだ集まっていません'

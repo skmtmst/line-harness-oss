@@ -56,6 +56,7 @@ import {
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import { shortDateTime } from './words'
 import styles from './incoming.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -655,7 +656,7 @@ export default function WebhooksIncomingV8() {
           <div className={styles.fieldRow}>
             <div className={styles.field}>
               <span className={styles.fieldLabel}>受け取る URL（相手のサービスに貼る）</span>
-              <span className={styles.valueBox} title={endpointUrl(selected.id)}>{endpointUrl(selected.id)}</span>
+              <span className={styles.valueBox} ><TruncatedText value={String(endpointUrl(selected.id) ?? '')} url /></span>
             </div>
             <Button onClick={() => { void navigator.clipboard.writeText(endpointUrl(selected.id)); notifyToast('受け取る URL を写しました') }}>
               <Copy size={15} aria-hidden="true" />写す
@@ -767,7 +768,7 @@ export default function WebhooksIncomingV8() {
                       {item.kind === 'candidate'
                         ? '1人の友だちに一致'
                         : item.kind === 'ambiguous'
-                          ? item.candidates.length > 0 ? `${item.candidates.length}人の友だちに一致` : '2人以上に一致'
+                          ? item.candidates.length > 0 ? `${item.candidates.length} 人の友だちに一致` : '2人以上に一致'
                           : '一致する友だちがいません'}
                     </Td>
                     <Td className={styles.miniOps}>
@@ -790,7 +791,7 @@ export default function WebhooksIncomingV8() {
                 </DataTable>
                 {(unmatchedTotal ?? detail.pendingUnmatched ?? 0) > unmatched.length ? (
                   <div className={styles.moreRow}>
-                    <span className={styles.cardNote}>ほか{(unmatchedTotal ?? detail.pendingUnmatched ?? 0) - unmatched.length}件あります。</span>
+                    <span className={styles.cardNote}>ほか{(unmatchedTotal ?? detail.pendingUnmatched ?? 0) - unmatched.length} 件あります。</span>
                     <Button disabled={unmatchedMoreBusy} busy={unmatchedMoreBusy} onClick={() => { setUnmatchedMoreBusy(true); setUnmatchedShown((shown) => shown + UNMATCHED_PAGE_SIZE) }}>さらに表示</Button>
                   </div>
                 ) : null}
@@ -930,7 +931,7 @@ export default function WebhooksIncomingV8() {
                 {testResult.match.status === 'matched'
                   ? '1人の友だちに一致しました'
                   : testResult.match.status === 'ambiguous'
-                    ? `同じ値の友だちが${testResult.match.friendIds.length}人います。実際に届くと保留になり、人が選びます。`
+                    ? `同じ値の友だちが${testResult.match.friendIds.length} 人います。実際に届くと保留になり、人が選びます。`
                     : '一致する友だちがいません'}
               </p>
               <span className={styles.fieldLabel}>動く予定の処理</span>
@@ -938,7 +939,7 @@ export default function WebhooksIncomingV8() {
                 <div key={action.refIndex} className={styles.actionRow}>
                   <span className={styles.actionName}>{incomingActionLabel(action.refKind)}：{action.displayName}</span>
                   <span className={styles.spacer} aria-hidden="true" />
-                  <span className={styles.actionTarget}>{action.ok ? `(${action.plan?.length ?? 0}件の処理)` : action.error}</span>
+                  <span className={styles.actionTarget}>{action.ok ? `(${action.plan?.length ?? 0} 件の処理)` : action.error}</span>
                 </div>
               )) : <p className={styles.cardNote}>動く処理はまだ決めていません</p>}
             </div>

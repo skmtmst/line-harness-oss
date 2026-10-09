@@ -30,6 +30,8 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { Field } from '@/components/shared/form-controls'
 import StatusBadge from '@/components/shared/status-badge'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+
 
 /* 絵の並び（注文完了・発送完了・入金確認完了・返金完了・注文キャンセル・ペット情報更新）。 */
 const CONNECTOR_EVENT_TYPES = [
@@ -201,7 +203,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
   const paused = form.status === 'paused'
   const showSecretInput = canEdit && (!connector?.secretConfigured || replacingSecret)
   const impact = data?.impact
-  const impactWords = (value: number | null | undefined) => (typeof value === 'number' ? `${value}件` : '未取得')
+  const impactWords = (value: number | null | undefined) => (typeof value === 'number' ? `${value} 件` : '未取得')
 
   return (
     <div className={styles.board} data-design-node="iLJmw">
@@ -235,7 +237,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
           <h2 id="ec-connector-health" className={styles.cardTitle}>取り込みのようす</h2>
           <KpiBand presentation="band" density="compact">
             {([['今日', data?.health.today], ['この30日', data?.health.last30Days], ['失敗', data?.health.failed]] as const).map(([label, value]) => (
-              <KpiCard key={label} icon={null} title={label} value={null} unit="" valueText={typeof value === 'number' ? `${value.toLocaleString()} 件` : '—'} detail="" valueTone={label === '失敗' && typeof value === 'number' && value > 0 ? 'warning' : 'default'} />
+              <KpiCard key={label} icon={null} title={label} value={null} unit="" valueText={typeof value === 'number' ? `${polishFormatNumber(value)} 件` : '—'} detail="" valueTone={label === '失敗' && typeof value === 'number' && value > 0 ? 'warning' : 'default'} />
             ))}
           </KpiBand>
           <p className={styles.note}>{`最後に成功 ${when(data?.health.lastSucceededAt ?? null)}`}</p>

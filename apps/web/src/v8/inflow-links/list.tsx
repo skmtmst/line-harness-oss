@@ -79,6 +79,7 @@ import {
   type TrackedLinkRow,
 } from './rows'
 import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 interface MessageTemplate {
   id: string
@@ -532,7 +533,7 @@ export default function InflowListV8({
         selected={filter === 'has-friends'}
         onChange={() => toggleFilter('has-friends')}
         icon={<UserPlus size={13} aria-hidden="true" />}
-        title={routeCountAvailable ? `友だち追加あり ${formatNumber(hasFriendsCount)}件` : undefined}
+        title={routeCountAvailable ? `友だち追加あり ${formatNumber(hasFriendsCount)} 件` : undefined}
       >
         友だち追加あり
       </FilterChip>
@@ -697,11 +698,11 @@ export default function InflowListV8({
                 const menuItems = rowMenuItems(r)
                 const menuLabel = `「${r.name}」の操作`
                 const nameNode = r.source === 'entry_route' && r.entryRouteId ? (
-                  <Link href={`/inflow-links/detail?id=${r.entryRouteId}`} className={styles.nameLink} title={r.name}>
-                    {r.name}
+                  <Link href={`/inflow-links/detail?id=${r.entryRouteId}`} className={styles.nameLink} >
+                    <TruncatedText value={String(r.name ?? '')} />
                   </Link>
                 ) : (
-                  <span className={styles.nameText} title={r.name}>{r.name}</span>
+                  <span className={styles.nameText} ><TruncatedText value={String(r.name ?? '')} /></span>
                 )
                 return (
                   <Tr key={r.refCode} interactive className={styles.row} data-table-layout="columns" data-row-id={r.refCode}>
@@ -732,7 +733,7 @@ export default function InflowListV8({
                           <FolderDotName folder={r.genre ? { name: r.genre } : null}>{nameNode}</FolderDotName>
                         </div>
                       )}
-                      <span className={narrow ? styles.refCode : `${styles.refCode} ${styles.dotIndentPad}`} title={r.refCode}>{r.refCode}</span>
+                      <span className={narrow ? styles.refCode : `${styles.refCode} ${styles.dotIndentPad}`} ><TruncatedText value={String(r.refCode ?? '')} /></span>
                       {status ? (
                         <span
                           className={narrow ? styles.pill : `${styles.pill} ${styles.dotIndentMargin}`}
@@ -752,7 +753,7 @@ export default function InflowListV8({
                     </Td>
                     <Td className={styles.colPool}>
                       {pool ? (
-                        <span className={styles.cellMain} title={pool.name}>{pool.name}</span>
+                        <span className={styles.cellMain} ><TruncatedText value={String(pool.name ?? '')} /></span>
                       ) : r.source === 'tracked_link' ? (
                         <span className={styles.cellMain} title="追加先の振り分けは全体設定に従います。">—</span>
                       ) : (
@@ -766,8 +767,8 @@ export default function InflowListV8({
                     <Td className={styles.colFriends}>
                       {summaryAvailable && r.stats ? (
                         <>
-                          <span className={styles.cellMain}>{`${formatNumber(r.stats.friendCount)}人`}</span>
-                          <span className={styles.cellSub}>{`累計 ${formatNumber(r.stats.friendCount)}人`}</span>
+                          <span className={styles.cellMain}>{`${formatNumber(r.stats.friendCount)} 人`}</span>
+                          <span className={styles.cellSub}>{`累計 ${formatNumber(r.stats.friendCount)} 人`}</span>
                         </>
                       ) : (
                         <span className={styles.cellMain}>—</span>
@@ -836,7 +837,7 @@ export default function InflowListV8({
   const pager = !loading && !loadFailed && pageCount > 1 ? (
     <ListPagePagination>
       <span className={styles.pagerCount}>
-        {(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + currentRows.length} / {formatNumber(sortedRows.length)}件
+        {(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + currentRows.length} / {formatNumber(sortedRows.length)} 件
       </span>
       <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="流入経路のページ送り" />
     </ListPagePagination>
@@ -884,7 +885,7 @@ export default function InflowListV8({
             unit={summaryAvailable && summary ? '人' : ''}
             loading={loading}
             detail={summaryAvailable && summary
-              ? `累計。経路が分かる人 ${formatNumber(summary.friendsWithRef)}人`
+              ? `累計。経路が分かる人 ${formatNumber(summary.friendsWithRef)} 人`
               : loading ? '読み込んでいます' : '読み込めませんでした'}
           />
           <KpiCard

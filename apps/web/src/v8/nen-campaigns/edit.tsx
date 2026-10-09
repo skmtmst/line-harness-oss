@@ -331,7 +331,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   const kindIsRich = Boolean(merged.imageUrl)
   // 下の帯の左は短く（長いと折り返して帯が高くなる）。くわしい決めごとは見出しの説明に書く。
   const status = merged.isEnabled
-    ? pendingCount !== null && pendingCount > 0 ? `動いています・配信待ち ${formatNumber(pendingCount)}通は前の中身のまま` : '動いています'
+    ? pendingCount !== null && pendingCount > 0 ? `動いています・配信待ち ${formatNumber(pendingCount)} 通は前の中身のまま` : '動いています'
     : '停止中です（保存しても送り始めません）'
 
   const preview = (
@@ -341,7 +341,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
           <span className={styles.bubbleText}>{`${previewBody(merged.bodyText)}${merged.buttonLabel ? `\n▶ ${merged.buttonLabel}` : ''}`}</span>
         </LinePreviewMessage>
       </LinePreview>
-      <Card role="region" layout="vertical" padding="compact" surface="inset" spacing="tight" aria-labelledby="nen-edit-tips">
+      <Card role="region" layout="vertical" padding="compact" surface="standard" spacing="tight" aria-labelledby="nen-edit-tips">
         <h2 className={styles.sideTitle} id="nen-edit-tips">気をつけること（一般的な目安）</h2>
         <ul className={styles.sideText}>
           <li>・吹き出しは少なめが安心です</li>
@@ -349,12 +349,12 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
           <li>・誕生日配信は 10:00 に固定です</li>
         </ul>
       </Card>
-      <Card role="region" layout="vertical" padding="compact" surface="inset" spacing="tight" aria-labelledby="nen-edit-cannot">
+      <Card role="region" layout="vertical" padding="compact" surface="standard" spacing="tight" aria-labelledby="nen-edit-cannot">
         <h2 className={styles.sideTitle} id="nen-edit-cannot">この画面でできないこと</h2>
         <p className={`${styles.sideText} ${styles.sideTextTight}`}>記事の本文を書く（外部サイトで書きます）・出しかたの細かい設定（一斉配信と同じ）</p>
       </Card>
       {canEdit ? (
-        <Card role="region" layout="vertical" padding="compact" surface="inset" spacing="controls" aria-labelledby="nen-edit-test">
+        <Card role="region" layout="vertical" padding="compact" surface="standard" spacing="controls" aria-labelledby="nen-edit-test">
           <h2 className={`${styles.sideTitle} ${styles.sideTitleSmall}`} id="nen-edit-test">自分にテストを送る</h2>
           <SearchField
             aria-label="テスト送信の相手を名前で探す"
@@ -400,7 +400,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       {error ? <Notice tone="danger" message={error} /> : null}
       {notice ? <Notice tone="success" message={notice} /> : null}
 
-      <Card layout="vertical" padding="spacious" surface="inset" spacing="normal" aria-labelledby="nen-edit-flow">
+      <Card layout="vertical" padding="spacious" surface="standard" spacing="normal" aria-labelledby="nen-edit-flow">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="nen-edit-flow">配信フロー</h2>
           <p className={styles.cardNote}>{formAction && mileageAction ? '回答フォームへの送信をきっかけにマイルを付けます' : 'きっかけから届くまでの流れです'}</p>
@@ -414,7 +414,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
         </ol>
       </Card>
 
-      <Card layout="vertical" padding="spacious" surface="inset" spacing="normal" aria-labelledby="nen-edit-when">
+      <Card layout="vertical" padding="spacious" surface="standard" spacing="normal" aria-labelledby="nen-edit-when">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="nen-edit-when">いつ送りますか</h2>
           <p className={styles.cardNote}>このアカウントでの反応がいい時間帯は、分析の「配信の反応」で見られます</p>
@@ -476,7 +476,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
         )}
       </Card>
 
-      <Card layout="vertical" padding="spacious" surface="inset" spacing="normal" aria-labelledby="nen-edit-what">
+      <Card layout="vertical" padding="spacious" surface="standard" spacing="normal" aria-labelledby="nen-edit-what">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="nen-edit-what">送るもの</h2>
           <p className={styles.cardNote}>この配信は1通で届きます</p>
@@ -514,7 +514,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
         <p className={styles.caution}>差し込む名前が長いと、送るときに長すぎる場合があります。1回にたくさんの吹き出しを送るとブロックされやすい傾向があります（一般的な目安）。</p>
       </Card>
 
-      <Card layout="vertical" padding="spacious" surface="inset" spacing="normal" aria-labelledby="nen-edit-after">
+      <Card layout="vertical" padding="spacious" surface="standard" spacing="normal" aria-labelledby="nen-edit-after">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="nen-edit-after">押されたあとにすること</h2>
           <p className={styles.cardNote}>{`メッセージの「${merged.buttonLabel?.replace(/（.*?）/, '') || 'ボタン'}」を押した人に何をするかです`}</p>

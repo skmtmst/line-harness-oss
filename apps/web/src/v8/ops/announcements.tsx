@@ -35,6 +35,8 @@ import ValidationSummary from '@/components/shared/validation-summary'
 import { FieldError } from '@/components/shared/form-controls'
 import parts from './parts.module.css'
 import styles from './announcements.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 /**
  * 運営のお知らせ配信 V8（絵 `tQ2MJ`・送る前の確認 `TJUUl`）。
@@ -83,9 +85,9 @@ function toLocalInput(iso: string | null): string {
 
 function previewLabel(p: OpsAudiencePreview | null, channels: OpsAnnouncementChannel[]): string {
   if (!p) return '宛先を数えています…'
-  const words = [`${p.tenants}件の契約先・${p.staff}人の権限者`]
-  if (channels.includes('line')) words.push(`うち契約者専用LINEに登録済みの${p.lineLinked}人へ届きます`)
-  if (channels.includes('email')) words.push(`メールは${p.withEmail}人に届きます`)
+  const words = [`${p.tenants} 件の契約先・${p.staff} 人の権限者`]
+  if (channels.includes('line')) words.push(`うち契約者専用LINEに登録済みの${p.lineLinked} 人へ届きます`)
+  if (channels.includes('email')) words.push(`メールは${p.withEmail} 人に届きます`)
   return words.join('。')
 }
 
@@ -106,10 +108,7 @@ function longPublishAt(local: string): string {
 
 /** 一覧の小さい日時（9/18 10:00）。 */
 function shortDateTime(value: string | null): string {
-  if (!value) return '—'
-  const full = formatDateTime(value)
-  const m = full.match(/^(\d+)-(\d+)-(\d+) (\d+:\d+)$/)
-  return m ? `${Number(m[2])}/${Number(m[3])} ${m[4]}` : full
+  return polishFormatDate(value, { style: 'list', fallback: '—' })
 }
 
 function confirmAudience(form: Form, preview: OpsAudiencePreview | null): string {
@@ -229,7 +228,7 @@ export default function OpsAnnouncementsV8() {
         : await api.ops.announcements.create(input(mode), createKey)
       if (!res.success) { setFormError('保存できませんでした'); return }
       setConfirmSend(false)
-      setNotice(mode === 'draft' ? '下書きとして保存しました' : mode === 'schedule' ? `${formatDateTime(res.data.publishAt)} に配信を予約しました` : `送りました（${res.data.recipientsTotal}人。LINE ${res.data.lineSent}・メール ${res.data.mailSent}）`)
+      setNotice(mode === 'draft' ? '下書きとして保存しました' : mode === 'schedule' ? `${formatDateTime(res.data.publishAt)} に配信を予約しました` : `送りました（${res.data.recipientsTotal} 人。LINE ${res.data.lineSent}・メール ${res.data.mailSent}）`)
       setBaseline(EMPTY)
       setForm(EMPTY)
       setEditingId(null)
@@ -388,7 +387,7 @@ export default function OpsAnnouncementsV8() {
         <section aria-label="配信済みの表" className={styles.list}>
           <div className={styles.listHead}>
             <h3 className={parts.panelTitle}>配信済み・予約・下書き</h3>
-            <HelpTip label="契約者専用LINEの登録状況">{linked ? `契約者専用LINEの登録 ${linked.linked}人 / ${linked.total}人` : '登録状況を読み込んでいます'}</HelpTip>
+            <HelpTip label="契約者専用LINEの登録状況">{linked ? `契約者専用LINEの登録 ${linked.linked} 人 / ${linked.total} 人` : '登録状況を読み込んでいます'}</HelpTip>
           </div>
           {!loaded ? (
             <ListState kind="loading" title="読み込んでいます" />

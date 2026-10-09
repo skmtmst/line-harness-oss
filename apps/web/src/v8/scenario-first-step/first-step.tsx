@@ -11,6 +11,7 @@
  * 1通目は飛ばせる。書かせないと進めない形にすると、あとで考えたい人が
  * 適当な本文を入れて先へ進む。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -484,8 +485,8 @@ export default function ScenarioFirstStepV8() {
    */
   const exampleStart = new Date()
   exampleStart.setHours(14, 0, 0, 0)
-  const dayLabel = (d: Date) => `${d.getMonth() + 1}月${d.getDate()}日（${WEEKDAYS[d.getDay()]}）`
-  const hm = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+  const dayLabel = (d: Date) => polishFormatDate(d, { style: 'day' })
+  const hm = (d: Date) => polishFormatDate(d, { style: 'time' })
   const arrivalText = (() => {
     if (mode === 'absolute_time') {
       if (!TIME_RE.test(deliveryTime)) return null

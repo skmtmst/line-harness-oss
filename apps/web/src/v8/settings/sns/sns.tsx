@@ -24,6 +24,7 @@ import { restaurantGoogleApi, type GoogleConnectionData } from '@/lib/restaurant
 import { api } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import styles from './sns.module.css'
+import { formatDate } from '@/lib/format'
 
 const GOOGLE_STATE: Record<string, string> = {
   connected: '接続しています',
@@ -178,9 +179,10 @@ export default function SnsSettingsPage() {
             <>
               <Row label="いまの状態" value={GOOGLE_STATE[google.connection.status] ?? '—'} />
               <Row label="接続しているビジネス" value={google.connection.locationTitle ?? '—'} />
+              <Row label="最終同期" value={formatDate(google.connection.lastSyncedAt, { style: 'detail', fallback: '—' })} />
               <div className={styles.actions}>
                 <Button variant="secondary" href="/restaurant-test/google?tab=settings">
-                  <Settings size={15} />
+                  <Settings size={16} />
                   Googleビジネスの設定を開く
                 </Button>
                 {googleConnected && canManage ? (
@@ -228,12 +230,12 @@ export default function SnsSettingsPage() {
                 <div className={styles.actions}>
                   {igState === 'connected' ? (
                     <Button variant="secondary" onClick={() => void checkInstagram()} disabled={busy}>
-                      <RefreshCw size={15} />
+                      <RefreshCw size={16} />
                       接続を確かめる
                     </Button>
                   ) : (
                     <Button variant="primary" onClick={() => void connectInstagram()} disabled={busy}>
-                      <Camera size={15} aria-hidden />
+                      <Camera size={16} aria-hidden />
                       Instagram にログインして接続
                     </Button>
                   )}

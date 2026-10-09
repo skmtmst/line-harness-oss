@@ -39,6 +39,8 @@ import Select from '@/components/shared/select'
 import { api, fetchApi, type EcNotificationRun } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import styles from './screen.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 const PAGE_SIZE = 20
 
@@ -65,19 +67,12 @@ const STATUS: Record<EcNotificationRun['status'], { label: string; tone: 'good' 
   failed: { label: '送れなかった', tone: 'danger' },
 }
 
-const JST = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit', hourCycle: 'h23' })
+
 
 /** 「10/1 21:30」。オフセットの無い古い行は既に日本時間として読む（今の部品と同じ決まり）。 */
 function shortJst(value: string | null | undefined): string {
-  if (!value) return '—'
-  if (!/[zZ]|[+-]\d{2}:\d{2}$/.test(value)) {
-    const m = value.match(/^\d{4}-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/)
-    return m ? `${Number(m[1])}/${Number(m[2])} ${Number(m[3])}:${m[4]}` : '—'
-  }
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = Object.fromEntries(JST.formatToParts(date).map((p) => [p.type, p.value]))
-  return `${parts.month}/${parts.day} ${parts.hour}:${parts.minute}`
+  const normalized = value && !/[zZ]|[+-]\d{2}:\d{2}$/.test(value) ? `${value.replace(' ', 'T')}+09:00` : value
+  return polishFormatDate(normalized, { style: 'list', fallback: '—' })
 }
 
 function reasonWords(item: RunItem): string {
@@ -246,7 +241,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
                 </Td>
                 <Td><StatusBadge tone={status.tone === 'good' ? 'success' : status.tone === 'muted' ? 'neutral' : status.tone}>{status.label}</StatusBadge></Td>
                 <Td className={styles.cell} title={reason}>{item.resolved ? `対応済み・${reason}` : reason}</Td>
-                <Td className={styles.cell}>{`${item.attemptCount == null ? '—' : `${item.attemptCount}回`}・${item.clickedAt ? 'クリックあり' : '—'}`}</Td>
+                <Td className={styles.cell}>{`${item.attemptCount == null ? '—' : `${item.attemptCount} 回`}・${item.clickedAt ? 'クリックあり' : '—'}`}</Td>
               </Tr>
             })}
           </tbody>
@@ -257,7 +252,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
       <div className={styles.runFoot}>
         {mode === 'failures'
           ? <Notice tone="info" icon={null}>個人の既読は見られません。試行回数と次の再試行予定は送信台帳の記録を表示します。検索と絞り込みは表示中のページの中だけに効きます。</Notice>
-          : <p className={styles.minor}>{`表示中の20件を絞り込み・${formatNumber(total)}件中 ${(page - 1) * PAGE_SIZE + 1}〜${Math.min(page * PAGE_SIZE, total)}件`}</p>}
+          : <p className={styles.minor}>{`表示中の20件を絞り込み・${formatNumber(total)} 件中 ${(page - 1) * PAGE_SIZE + 1}〜${Math.min(page * PAGE_SIZE, total)} 件`}</p>}
         {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} /> : null}
       </div>
     ) : null}
@@ -276,7 +271,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
           {(detail.attemptHistory?.length ?? 0) > 0 ? (
             <ul className={styles.runAttempts} aria-label="試行の履歴">
               {detail.attemptHistory!.map((attempt) => (
-                <li key={`${detail.id}-${attempt.number}`}>{`${attempt.number}回目 ${shortJst(attempt.attemptedAt)}／${attempt.outcome === 'provider_accepted' ? 'LINE API受付済み' : attempt.error || '送信失敗'}`}</li>
+                <li key={`${detail.id}-${attempt.number}`}>{`${attempt.number} 回目 ${shortJst(attempt.attemptedAt)}／${attempt.outcome === 'provider_accepted' ? 'LINE API受付済み' : attempt.error || '送信失敗'}`}</li>
               ))}
             </ul>
           ) : <p className={styles.minor}>試行の履歴はまだありません。</p>}

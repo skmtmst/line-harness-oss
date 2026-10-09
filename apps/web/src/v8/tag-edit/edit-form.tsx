@@ -238,7 +238,7 @@ export function TagEditForm({
         identity={host ? undefined : <Link href="/tags" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />タグへ</Link>}
         description={host ? <>{host.description}{readOnly ? <p className={styles.roBand} role="note">閲覧のみで見ています。変える操作は管理者に頼んでください。</p> : null}</> : (
           <>
-            {`${groupName}フォルダ・${tag.friendCount ?? 0}人に付いている・${formatDay(tag.createdAt)}作成`}
+            {`${groupName}フォルダ・${tag.friendCount ?? 0} 人に付いている・${formatDay(tag.createdAt)}作成`}
             {readOnly ? <p className={styles.roBand} role="note" data-design-node="fkGUR">閲覧のみで見ています。変える操作は管理者に頼んでください。</p> : null}
             {conflictBand}
           </>
@@ -383,7 +383,7 @@ export function TagEditForm({
                     </KpiBand>
                   ) : null}
                   {retroPreview && (retroPreview.selfExcluded > 0 || retroPreview.referralExcluded > 0) ? (
-                    <p className={styles.hint}>{`すでに付与済みの人（本人${retroPreview.selfExcluded}人・紹介者${retroPreview.referralExcluded}人）は対象から外れています。`}</p>
+                    <p className={styles.hint}>{`すでに付与済みの人（本人${retroPreview.selfExcluded} 人・紹介者${retroPreview.referralExcluded} 人）は対象から外れています。`}</p>
                   ) : null}
                   <div className={styles.subHead}>
                     <h3 className={styles.subTitle}>タグが付いたときに積むマイル</h3>

@@ -76,8 +76,8 @@ describe('FvbHW メンバー管理の絵合わせ', () => {
     expect(body).not.toContain('キャンセル')
     // 行
     expect(body).toContain('Kenta Kawano（自分）')
-    expect(body).toContain('10/2 07:10')
-    expect(body).toContain('10/1 22:40')
+    expect(body).toContain('10/02 07:10')
+    expect(body).toContain('10/01 22:40')
     expect(body).toContain('2要素認証待ち')
     expect(body).toContain('招待中')
     expect(body).toContain('停止')

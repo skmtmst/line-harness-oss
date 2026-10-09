@@ -24,6 +24,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import styles from './create.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /** slug は URL に出る。日本語や記号を許すと /pool/xxx が壊れる。 */
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{1,31}$/
@@ -165,7 +166,7 @@ export default function PoolCreateV8() {
             </div>
             {selectedAccounts.map((account) => (
               <div key={account.id} className={styles.account}>
-                <span className={styles.accountName} title={account.name}>{account.name}</span>
+                <span className={styles.accountName} ><TruncatedText value={String(account.name ?? '')} /></span>
                 {accountHandle(account) ? <span className={styles.accountSub}>{accountHandle(account)}</span> : null}
                 <span className={styles.spacer} />
                 <Button

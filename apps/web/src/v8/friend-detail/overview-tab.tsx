@@ -30,6 +30,7 @@ import type { FriendDetailPermissions } from './permissions'
 import { inboxHrefForFriend, timelineSourceHref, timelineTypeLabel, timelineKey, type FriendTimelineItem } from './timeline'
 import { SUPPORT_LABELS, SUPPORT_TONES } from './support'
 import styles from './detail.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 function GroupHead({ title, action }: { title: string; action?: React.ReactNode }) {
   return (
@@ -207,8 +208,8 @@ export default function OverviewTab({
               <GroupHead title="フォーム回答" action={<Link className={styles.groupLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=forms`}>すべて見る</Link>} />
               <p className={styles.value}>
                 {typeof friend.formSubmissionTotal === 'number'
-                  ? friend.formSubmissionTotal > 0 ? `${friend.formSubmissionTotal}件` : '回答はまだありません'
-                  : friend.formSubmissions?.length ? `${friend.formSubmissions.length}件` : '回答はまだありません'}
+                  ? friend.formSubmissionTotal > 0 ? `${friend.formSubmissionTotal} 件` : '回答はまだありません'
+                  : friend.formSubmissions?.length ? `${friend.formSubmissions.length} 件` : '回答はまだありません'}
               </p>
             </section>
           </div>
@@ -273,7 +274,7 @@ export default function OverviewTab({
               <span className={styles.rowIcon}>{nextDelivery.kind === 'scenario' ? <Workflow size={17} aria-hidden /> : <Bell size={17} aria-hidden />}</span>
               <span className={styles.rowBody}>
                 <span className={styles.rowTop}>
-                  <span className={styles.rowTitle} title={nextDelivery.name}>{nextDelivery.name}</span>
+                  <span className={styles.rowTitle} ><TruncatedText value={String(nextDelivery.name ?? '')} /></span>
                   <span className={styles.rowSub}>{`${formatDateTime(nextDelivery.scheduledAt)} に送信予定`}</span>
                 </span>
                 {/* 進み具合（何通目まで）は口がまだ無い。棒の場所だけ取って、行の高さを絵にそろえる。 */}
@@ -309,7 +310,7 @@ export default function OverviewTab({
                 : mileageStatus === 'error'
                   ? <>つながり情報を読み込めませんでした<button type="button" className={styles.retry} onClick={() => void data.loadMileage()}>もう一度試す</button></>
                   : mileageInsights && mileageInsights.accountCount > 1
-                    ? `${mileageInsights.accountCount}件のLINEアカウントで同じ人としてつながっています${mileageConnections.length ? `（${mileageConnections.map((c) => c.accountName).join('・')}）` : ''}。重複候補が見つかると、根拠と確信度を表示します。`
+                    ? `${mileageInsights.accountCount} 件のLINEアカウントで同じ人としてつながっています${mileageConnections.length ? `（${mileageConnections.map((c) => c.accountName).join('・')}）` : ''}。重複候補が見つかると、根拠と確信度を表示します。`
                     : 'このアカウントのみに登録があります。重複候補が見つかると、根拠と確信度を表示します。'}
             </p>
           </div>

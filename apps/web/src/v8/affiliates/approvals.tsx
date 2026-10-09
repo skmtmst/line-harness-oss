@@ -537,7 +537,7 @@ export default function ApprovalsTab() {
       {bulkResult ? (
         <div className={styles.subSection} role="status" aria-label="まとめて処理の結果">
           <Notice tone={bulkResult.conflicted.length + bulkResult.denied.length + bulkResult.failed.length > 0 ? 'warn' : 'success'}>
-            {`まとめて処理の結果：成功 ${formatNumber(bulkResult.succeeded.length)}件／ほかの人が先に判断 ${formatNumber(bulkResult.conflicted.length)}件／権限なし ${formatNumber(bulkResult.denied.length)}件／失敗 ${formatNumber(bulkResult.failed.length)}件`}
+            {`まとめて処理の結果：成功 ${formatNumber(bulkResult.succeeded.length)} 件／ほかの人が先に判断 ${formatNumber(bulkResult.conflicted.length)} 件／権限なし ${formatNumber(bulkResult.denied.length)} 件／失敗 ${formatNumber(bulkResult.failed.length)} 件`}
           </Notice>
           <ul className={styles.resultList}>
             {bulkResult.conflicted.map((entry) => (
@@ -562,7 +562,7 @@ export default function ApprovalsTab() {
 
   const pager = ready && shownItems.length > 0 && pageCount > 1 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>{`${formatNumber(shownItems.length)}件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, shownItems.length)}件`}</span>
+      <span className={styles.pagerCount}>{`${formatNumber(shownItems.length)} 件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, shownItems.length)} 件`}</span>
       <Pagination page={currentPage} pageCount={pageCount} onPageChange={(value) => { setPage(value); clearSelections() }} />
     </ListPagePagination>
   ) : undefined
@@ -609,8 +609,8 @@ export default function ApprovalsTab() {
           <ConfirmDialog
             open
             title={bulkConfirm.action === 'approved'
-              ? `選んだ${formatNumber(bulkConfirm.items.length)}件を認めますか`
-              : `選んだ${formatNumber(bulkConfirm.items.length)}件を認めない（却下）にしますか`}
+              ? `選んだ${formatNumber(bulkConfirm.items.length)} 件を認めますか`
+              : `選んだ${formatNumber(bulkConfirm.items.length)} 件を認めない（却下）にしますか`}
             description="1件ずつ同じ判断の決まりで処理します。ほかの人が先に判断した成果は上書きせず残します。"
             confirmLabel={bulkConfirm.action === 'approved' ? '認める' : '認めない（却下）'}
             destructive={bulkConfirm.action === 'rejected'}

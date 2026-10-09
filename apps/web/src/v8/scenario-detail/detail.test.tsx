@@ -178,14 +178,14 @@ describe('V8 シナリオ配信の編集', () => {
     for (const name of ['配信結果を見る', 'まとめて下見', 'まとめてテストを送る', '設定を変える', '一時停止する', 'このシナリオを削除する', 'キャンセル', '複製する', '保存する']) {
       expect(screen.getAllByRole(name === '配信結果を見る' ? 'link' : 'button', { name }).length, name).toBeGreaterThan(0)
     }
-    expect(screen.getByText('保存済み 10月1日 14:02')).toBeTruthy()
+    expect(screen.getByText('保存済み 10月1日（木）14:02')).toBeTruthy()
     expect(screen.getByText('友だち追加のとき')).toBeTruthy()
     expect(screen.getByText('送っています')).toBeTruthy()
     expect(screen.getByText('何もしない（一時停止）')).toBeTruthy()
     expect(screen.getByText('購読開始から0日後 10:00')).toBeTruthy()
     expect(screen.getByText('1日後 20:00')).toBeTruthy()
     // 選んだ通（先頭）の中身が右のスマホに出る（「配る内容がまだありません」の空の箱にしない）。
-    expect(screen.getByText('選んだ通（1通目）の見え方')).toBeTruthy()
+    expect(screen.getByText('選んだ通（1 通目）の見え方')).toBeTruthy()
     expect(screen.queryByText('配る内容がまだありません')).toBeNull()
     expect(screen.getAllByText('ご登録ありがとうございます。').length).toBeGreaterThan(1)
   })

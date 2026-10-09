@@ -71,7 +71,7 @@ const PERIOD_OPTIONS: Array<{ value: FriendPeriod; label: string }> = [
   { value: 'this', label: '今月' },
   { value: 'last', label: '先月' },
 ]
-const PAGE_SIZE_OPTIONS = [10, 20, 50].map((n) => ({ value: String(n), label: `${n}件表示` }))
+const PAGE_SIZE_OPTIONS = [10, 20, 50].map((n) => ({ value: String(n), label: `${n} 件表示` }))
 
 const DELETE_CHOICES: ReadonlyArray<readonly [DeleteChoice, string, string]> = [
   ['stop', '新しい人を受けるのをやめる（おすすめ）', 'URLは残し、「受付を終了しました」と表示します。'],
@@ -352,7 +352,7 @@ function InflowDetailContent() {
   })
   const friendPageCount = Math.max(1, Math.ceil(friendRows.length / friendPageSize))
   const friendPageRows = friendRows.slice((friendPage - 1) * friendPageSize, friendPage * friendPageSize)
-  const friendSummary = `${formatNumber(friendRows.length)}人中 ${(friendPage - 1) * friendPageSize + 1}〜${Math.min(friendPage * friendPageSize, friendRows.length)}人`
+  const friendSummary = `${formatNumber(friendRows.length)} 人中 ${(friendPage - 1) * friendPageSize + 1}〜${Math.min(friendPage * friendPageSize, friendRows.length)} 人`
 
   // 削除の窓を開く。「…」と帯の「止める」から、選ぶ内容だけ変える。
   const openDelete = (choice: DeleteChoice) => {
@@ -468,7 +468,7 @@ function InflowDetailContent() {
             <KpiCard presentation="band" icon={null} title="今月 友だちになった" value={monthTotal} unit="人"
               detail={`先月より ${monthDelta == null ? '—' : `${monthDelta >= 0 ? '+' : ''}${formatNumber(monthDelta)}`}`} />
             <KpiCard presentation="band" icon={null} title="累計" value={funnel ? funnel.friend_add_count : null} unit="人"
-              detail={`${createdDate}から・いま残っている ${funnel?.remainingCount == null ? '—' : formatNumber(funnel.remainingCount)}人`} />
+              detail={`${createdDate}から・いま残っている ${funnel?.remainingCount == null ? '—' : formatNumber(funnel.remainingCount)} 人`} />
             <KpiCard presentation="band" icon={null} title="ブロック" value={funnel?.blockedCount ?? null} unit="人"
               detail={blockRate == null ? '割合は集計できません' : `友だちになった人の ${blockRate}%`} />
             <KpiCard presentation="band" icon={null} title="成果（コンバージョン）" value={funnel ? funnel.cv_count : null} unit="件"
@@ -545,9 +545,9 @@ function InflowDetailContent() {
                   <thead><TableHeadRow><Th>月</Th><Th>友だち追加</Th><Th>いま残っている</Th><Th>ブロック</Th><Th>成果</Th><Th>金額</Th></TableHeadRow></thead>
                   <tbody>{funnel.monthly.map((month) => (
                     <Tr key={month.month}>
-                      <Td>{month.month}</Td><Td>{`${formatNumber(month.friendAddCount)}人`}</Td>
-                      <Td>{`${formatNumber(month.remainingCount)}人`}</Td><Td>{`${formatNumber(month.blockedCount)}人`}</Td>
-                      <Td>{`${formatNumber(month.conversionCount)}件`}</Td><Td>{yen(month.conversionValueSum)}</Td>
+                      <Td>{month.month}</Td><Td>{`${formatNumber(month.friendAddCount)} 人`}</Td>
+                      <Td>{`${formatNumber(month.remainingCount)} 人`}</Td><Td>{`${formatNumber(month.blockedCount)} 人`}</Td>
+                      <Td>{`${formatNumber(month.conversionCount)} 件`}</Td><Td>{yen(month.conversionValueSum)}</Td>
                     </Tr>
                   ))}</tbody>
                 </DataTable>
@@ -555,7 +555,7 @@ function InflowDetailContent() {
               </section>
             ) : null}
             <div className={styles.ordersRow}>
-              <h3 className={styles.ordersTitle}>{`注文の明細 ${ordersSummary ? formatNumber(ordersSummary.total) : '—'}件`}</h3>
+              <h3 className={styles.ordersTitle}>{`注文の明細 ${ordersSummary ? formatNumber(ordersSummary.total) : '—'} 件`}</h3>
               <Button onClick={() => setShowOrders((current) => !current)} aria-expanded={showOrders}>注文を見る</Button>
             </div>
             {showOrders ? <RefOrdersPanel refCode={route.refCode} onSummaryChange={setOrdersSummary} /> : null}
@@ -719,7 +719,7 @@ function InflowDetailContent() {
           <section className={styles.box} aria-labelledby="inflow-links-to">
             <h2 className={styles.boxTitle} id="inflow-links-to">この経路のつながる先</h2>
             <dl className={styles.kv}>
-              <div className={styles.kvRow}><dt>コンバージョン</dt><dd>{funnel ? `${formatNumber(funnel.cv_count)}件` : '—'}</dd></div>
+              <div className={styles.kvRow}><dt>コンバージョン</dt><dd>{funnel ? `${formatNumber(funnel.cv_count)} 件` : '—'}</dd></div>
               <div className={styles.kvRow}><dt>シナリオ配信</dt><dd>{scenarioName ?? 'なし'}</dd></div>
               <div className={styles.kvRow}><dt>マイル</dt><dd>なし</dd></div>
             </dl>
@@ -781,7 +781,7 @@ function InflowDetailContent() {
             <Notice tone="danger" message="削除すると、次のことが起きます">
               <ul className={styles.deleteEffects}>
                 <li>貼り付けたURL・QRコード：このURLを置いた投稿や広告から開けなくなります（差し替えが必要）</li>
-                <li>{`この経路から来た記録：${formatNumber(funnel?.friend_add_count ?? 0)}人の流入元と成果は過去の記録として残ります`}</li>
+                <li>{`この経路から来た記録：${formatNumber(funnel?.friend_add_count ?? 0)} 人の流入元と成果は過去の記録として残ります`}</li>
                 <li>追加時の動き：新しい友だちへのタグ付けとシナリオ開始が止まります</li>
               </ul>
             </Notice>

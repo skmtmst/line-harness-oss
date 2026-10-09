@@ -44,6 +44,9 @@ import {
   type UsageRow,
 } from './model'
 import styles from './detail.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+
 
 /** 表にまず見せる行数。残りは「ほか N か所を見る」で開く。 */
 const USAGE_VISIBLE = 4
@@ -306,8 +309,8 @@ export default function TemplateDetailV8() {
     <div key={row.key} className={styles.usageRow}>
       <span className={styles.usageKind}>{row.kind}</span>
       {row.href
-        ? <Link href={row.href} className={styles.usageName} title={row.name}>{row.name}</Link>
-        : <span className={styles.usageNameQuiet} title={row.name}>{row.name}</span>}
+        ? <Link href={row.href} className={styles.usageName} ><TruncatedText value={String(row.name ?? '')} /></Link>
+        : <span className={styles.usageNameQuiet} ><TruncatedText value={String(row.name ?? '')} /></span>}
       <span className={row.fixed ? styles.usageVersionFixed : styles.usageVersion} title={row.version}>{row.version}</span>
       <span className={styles.usageState}>{row.status ?? '—'}</span>
       {row.href
@@ -349,7 +352,7 @@ export default function TemplateDetailV8() {
         <dl className={styles.aboutList}>
           <div className={styles.aboutRow}><dt>種類</dt><dd>{messageTypeText(template.messageType)}</dd></div>
           <div className={styles.aboutRow}><dt>フォルダ</dt><dd>{folderLabel}</dd></div>
-          <div className={styles.aboutRow}><dt>今月送った数</dt><dd>{monthlySends === undefined ? '読み込み中…' : monthlySends === null ? '—' : `${monthlySends.toLocaleString('ja-JP')}通`}</dd></div>
+          <div className={styles.aboutRow}><dt>今月送った数</dt><dd>{monthlySends === undefined ? '読み込み中…' : monthlySends === null ? '—' : `${polishFormatNumber(monthlySends)} 通`}</dd></div>
           <div className={styles.aboutRow}><dt>差し込み</dt><dd title={insertions.join('・')}>{insertions.length > 0 ? insertions.join('・') : 'なし'}</dd></div>
         </dl>
       </section>
@@ -536,7 +539,7 @@ export default function TemplateDetailV8() {
               {usageRows.slice(0, PUBLISH_VISIBLE).map((row) => (
                 <div key={row.key} className={styles.dialogRow}>
                   <span className={styles.usageKind}>{row.kind}</span>
-                  <span className={styles.dialogName} title={row.name}>{row.name}</span>
+                  <span className={styles.dialogName} ><TruncatedText value={String(row.name ?? '')} /></span>
                   <span className={styles.dialogState}>{publishRowState(row)}</span>
                 </div>
               ))}
@@ -569,7 +572,7 @@ export default function TemplateDetailV8() {
           {usageRows.slice(0, BLOCKED_VISIBLE).map((row) => (
             <div key={row.key} className={styles.blockedRow}>
               <span className={styles.usageKind}>{row.kind}</span>
-              <span className={styles.dialogName} title={row.name}>{row.name}</span>
+              <span className={styles.dialogName} ><TruncatedText value={String(row.name ?? '')} /></span>
               {row.href
                 ? <Link href={row.href} className={styles.ghostButton}><ExternalLink size={14} aria-hidden="true" />開いて差し替える</Link>
                 : <span className={styles.dialogState}>開ける画面がありません</span>}

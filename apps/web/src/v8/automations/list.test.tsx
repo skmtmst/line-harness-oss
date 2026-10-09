@@ -167,7 +167,7 @@ describe('V8 オートメーションの動いた記録（g98F9）', () => {
     expect(host.textContent).toContain('1 つ')
     expect(host.textContent).toContain('0.3 秒')
     expect(host.textContent).toContain('動いた 2,988')
-    expect(host.textContent).toContain('1件中 1〜1件')
+    expect(host.textContent).toContain('1 件中 1〜1 件')
   })
 })
 

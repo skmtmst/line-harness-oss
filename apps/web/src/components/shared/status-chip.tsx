@@ -18,7 +18,7 @@ const TONE: Record<StatusChipStatus, StatusBadgeTone> = {
   ready: 'info',
   reserved: 'info',
   running: 'success',
-  paused: 'warning',
+  paused: 'neutral',
   ended: 'neutral',
 }
 

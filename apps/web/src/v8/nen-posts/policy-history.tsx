@@ -15,16 +15,14 @@ import DateTimeField from '@/components/shared/date-time-field'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { formatPhotoReceivedAt } from './time'
 import styles from './review.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 const policyContent = (version: PhotoRewardPolicyVersion) => `採用 ${version.points}・公式サイト掲載 ${version.publicationPoints ? `さらに ${version.publicationPoints}` : 'なし'}`
 
 /** 版の日時は「9/20 10:00」の短い形（日本時間）。全文は title で読める。 */
 function shortWhen(value: string | null | undefined): string {
-  const time = Date.parse(String(value ?? ''))
-  if (!Number.isFinite(time)) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(time))
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`
+  return polishFormatDate(value, { style: 'list', fallback: '—' })
 }
 
 /** N1br7.html の表＋予約中の版＋新しい版の入力。保存は既存の版APIへ送る。 */
