@@ -1,4 +1,4 @@
-import { hasTapExtras, validateTapExtrasTree, type TapExtras } from './tap-extras.js';
+import { validateTapExtrasTree, type TapExtras } from './tap-extras.js';
 import { validateFlexMessage } from './line-message-limits.js';
 /**
  * 配信用素材 → LINE の正規形。
@@ -238,7 +238,6 @@ export function richMessageActions(payload: AssetPayloadInput, height: number): 
       if (!/^(https?:|line:|tel:)/i.test(uri) || uri.length > 1000) return { error: `タップ範囲${index + 1}のリンク先を確認してください` };
       actions.push({ ...action, type: 'uri', linkUri: uri });
     } else if (area.actionType === 'message') {
-      if (hasTapExtras(area.tapExtras as TapExtras)) return { error: `タップ範囲${index + 1}のテキストを送る動きでは、タグ・加点を使えません` };
       const message = text(area.text ?? area.value);
       if (!message || message.length > 400) return { error: `タップ範囲${index + 1}の送る文章は1〜400文字で入力してください` };
       actions.push({ ...action, type: 'message', text: message });

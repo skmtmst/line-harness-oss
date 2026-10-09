@@ -15,6 +15,11 @@ vi.mock('../services/account-access.js', () => ({
 vi.mock('../services/broadcast-media-storage.js', () => ({
   storeBroadcastMedia: vi.fn(),
 }));
+// 保存・公開の実SQLを検査する。画像変換の外部サービスは別の試験で守る。
+vi.mock('../services/imagemap-images.js', () => ({
+  IMAGEMAP_WIDTHS: [240,300,460,700,1040],
+  prepareImagemapImages: async (_env: unknown, payload: unknown) => payload,
+}));
 vi.mock('../services/file-scan.js', () => ({
   builtinFileScan: vi.fn(() => ({ verdict: 'clean' })),
   checkKeyGate: vi.fn(async () => ({ allowed: true })),
@@ -217,6 +222,21 @@ describe('F4 素材の公開・下書き・版', () => {
 });
 
 describe('押下の追加処理の保存HTTP', () => {
+  it('リッチのテキストにもタグ・合計点を保存し、公開した版に保持する', async () => {
+    store.raw.exec(`INSERT INTO tenants(id,name) VALUES ('tenant-1','Tenant');
+      INSERT INTO tags(id,name,line_account_id) VALUES ('tag-own','興味','account-1');`);
+    const payload={imageUrl:'https://example.test/map/1040',baseUrl:'https://example.test/map',baseSize:{width:1040,height:520},tapAreas:[{x:0,y:0,width:100,height:100,actionType:'message',text:'予約したい',tapExtras:{tagIds:['tag-own'],scoreChange:10}}]};
+    const response=await createAsset({lineAccountId:'account-1',kind:'rich_message',name:'予約案内',payload});
+    expect(response.status).toBe(201);
+    const body=await response.json() as {data:{id:string;payload:unknown}};
+    expect(body.data.payload).toMatchObject(payload);
+    const published=await app().request(`/api/broadcast-message-assets/${body.data.id}/publish`,{method:'POST',headers:{'content-type':'application/json','Idempotency-Key':'publish-rich-text-extras'},body:JSON.stringify({expectedVersion:0,expectedDraftRevision:1})},bindings);
+    expect(published.status).toBe(200);
+    const saved=await getBroadcastMessageAsset(store.db,body.data.id);
+    expect(JSON.parse(saved!.payload_json)).toEqual(payload);
+    expect(saved!.published_version).toBe(1);
+  });
+
   it('タグ・加点を保存して読み戻し、別店と小数の更新は元の下書きを変えない', async () => {
     store.raw.exec(`INSERT INTO tenants(id,name) VALUES ('tenant-1','Tenant');
       INSERT INTO tags(id,name,line_account_id) VALUES ('tag-own','興味','account-1'),('tag-out','別店','account-2');`);

@@ -24,6 +24,15 @@ describe('押されたときの追加処理の契約', () => {
     expect(rich.ok).toBe(true);
     if(rich.ok) expect(JSON.parse(rich.message.messageContent).actions[0].tapExtras).toEqual(extras);
   });
+  it('リッチのテキストにも追加処理を保存し、400文字までの検査を保つ', () => {
+    const tapExtras={tagIds:['t1'],scoreChange:10};
+    const payload={baseUrl:'https://example.test/image',imageUrl:'https://example.test/image/1040',baseSize:{width:1040,height:520},tapAreas:[{x:0,y:0,width:100,height:100,actionType:'message',text:'予約したい',tapExtras}]};
+    const rich=convertBroadcastAsset('rich_message','案内',payload);
+    expect(rich.ok).toBe(true);
+    if(rich.ok) expect(JSON.parse(rich.message.messageContent).actions).toEqual([{type:'message',text:'予約したい',tapExtras,area:{x:0,y:0,width:1040,height:520}}]);
+    for(const message of ['', 'あ'.repeat(401)]) expect(convertBroadcastAsset('rich_message','案内',{...payload,tapAreas:[{...payload.tapAreas[0],text:message}]}).ok).toBe(false);
+    expect(convertBroadcastAsset('rich_message','案内',{...payload,tapAreas:[{...payload.tapAreas[0],text:'あ'.repeat(400)}]}).ok).toBe(true);
+  });
   it('統括カードの保存と配布で追加処理を保つ', () => {
     const tapExtras={tagIds:['t1'],scoreChange:10};
     const card=parseHqMessageCard({format:'flex',title:'案内',body:'本文',buttons:[{id:'b',label:'開く',action:'url',value:'https://example.test',tapExtras}]});

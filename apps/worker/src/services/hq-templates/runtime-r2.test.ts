@@ -487,8 +487,8 @@ describe('DB-bound R2 store executor',()=>{
 });
 
 describe('押下のタグ・合計スコアを各店へ配る', () => {
-  test.each(['card', 'carousel', 'card_asset', 'rich_asset', 'question', 'coupon', 'research'] as const)('%s のタグを店のIDへ付け替え、点数を保存する', async place => {
-    const f = place === 'rich_asset' ? await tapFixture('rich_message', tapChoices[0]) : await fixture('template');
+  test.each(['card', 'carousel', 'card_asset', 'rich_asset', 'rich_text', 'question', 'coupon', 'research'] as const)('%s のタグを店のIDへ付け替え、点数を保存する', async place => {
+    const f = place === 'rich_asset' || place === 'rich_text' ? await tapFixture('rich_message', place === 'rich_text' ? tapChoices.find(choice => choice.action === 'message')! : tapChoices[0]) : await fixture('template');
     f.raw.exec("INSERT INTO tags(id,name,line_account_id) VALUES ('source-tap-tag','予約に興味','source')");
     const extras = { tagIds: ['source-tap-tag'], scoreChange: 10 };
     const action = { type: 'uri', label: '予約', uri: 'https://example.test', tapExtras: extras };
@@ -497,7 +497,7 @@ describe('押下のタグ・合計スコアを各店へ配る', () => {
     if (place === 'card') definition.card = { format: 'flex', title: '案内', body: '予約はこちら', buttons: [{ id: 'one', label: '予約', action: 'url', value: 'https://example.test', tapExtras: extras }] };
     if (place === 'carousel') definition.template = { ...template, messageType: 'carousel', messageContent: JSON.stringify([{ title: '案内', text: '予約はこちら', actions: [action] }]) };
     if (place === 'card_asset') definition.asset = { kind: 'card_message', payload: { cards: [{ title: '案内', description: '予約はこちら', actionType: 'uri', actionUrl: 'https://example.test', tapExtras: extras }], moreCard: false } };
-    if (place === 'rich_asset') {
+    if (place === 'rich_asset' || place === 'rich_text') {
       const saved = f.raw.prepare("SELECT definition_json FROM hq_template_versions WHERE id='v'").get() as { definition_json: string };
       const rich = JSON.parse(saved.definition_json);
       rich.asset.payload.tapAreas[0].tapExtras = extras;
@@ -517,6 +517,7 @@ describe('押下のタグ・合計スコアを各店へ配る', () => {
     expect(row.content).toContain(tag.id);
     expect(row.content).not.toContain('source-tap-tag');
     expect(row.content).toContain('"scoreChange":10');
+    if (place === 'rich_text') expect(JSON.parse(row.content).tapAreas[0]).toMatchObject({ actionType: 'message', text: tapChoices.find(choice => choice.action === 'message')!.value });
     expect(f.raw.pragma('foreign_key_check')).toEqual([]);
   });
 });
