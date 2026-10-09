@@ -6,18 +6,19 @@
  * オーナー 10-08：「店の一斉配信とほぼ同じ画面にする。違いは送るアカウントを選ぶだけ」。
  * 店の一斉配信を作る画面（components/broadcasts/broadcast-form.tsx）と同じ5段・同じ部品（段の帯・選ぶカード・
  * LINE の見え方・下の帯）・同じ見た目（店の CSS をそのまま読む）で組む。統括だけの口は2つ：
- *   - ② 配信対象の上の「送るアカウント」（J5DH6o：フォルダの札で絞り、アカウントのカードにチェック）
+ *   - ② 配信対象の上の「送るアカウント」（選ぶボタンから共通の窓で選択）
  *   - ⑤ 最終確認の「アカウントごとの確かめ」（送る人数・今月の送信枠の残り・LINE の接続・止めているか。問題のある店は外す）
  * 読み書きは統括の一括配信の口（API-7 の hq-broadcasts）。店の口（承認・テスト送信・分散・配信後のアクション・
  * 除くタグ・詳細条件）は統括の口に無いので出さない（BEHAVIOR.md の「今の口で出せないもの」）。
  */
+import BroadcastAccountPicker, { type BroadcastAccount } from './account-picker'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Steps } from '@/components/templates/steps'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AlertTriangle, ArrowDown, ArrowRight, ArrowUp, CheckCircle2, Eye, Plus, Save, Send, Trash2 } from 'lucide-react'
-import type { Folder, HqBroadcastInput, HqBroadcastPreflight, HqBroadcastRun, LineAccount, MessageTemplateDefinition, SegmentCondition } from '@line-crm/shared'
+import type { Folder, HqBroadcastInput, HqBroadcastPreflight, HqBroadcastRun, MessageTemplateDefinition, SegmentCondition } from '@line-crm/shared'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import Dialog from '@/components/shared/dialog'
 import { SingleOperatorFields } from '@/components/broadcasts/broadcast-approval'
@@ -27,14 +28,11 @@ import { TARGET_MODES } from '@/lib/broadcast-audience'
 import { pruneCondition } from '@/lib/segment-condition'
 import { HqApprovalBlock, HqTestSendDialog, approvalGate, useHqApproval } from './approval'
 import Button from '@/components/shared/button'
-import CheckCard from '@/components/shared/check-card'
 import Checkbox from '@/components/shared/checkbox'
 import Combobox from '@/components/shared/combobox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
-import FilterChip from '@/components/shared/filter-chip'
-import { FolderDot, FolderDotName } from '@/components/shared/folder-dot'
 import HelpTip from '@/components/shared/help-tip'
 import SearchField from '@/components/shared/search-field'
 import InsertTextField, { InsertButton, type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
@@ -74,7 +72,7 @@ import { hostDefinition } from '@/v8/hq-templates/console'
 import { freshDefinition } from '@/lib/hq-template-authoring'
 import styles from './create.module.css'
 
-type Store = Pick<LineAccount, 'id' | 'name' | 'tags'> & { friendCount: number; folderId: string | null; folder: Folder | null }
+type Store = BroadcastAccount
 /** 配信対象（店の一斉配信と同じ4つ。名前は店の口と同じ：詳細条件は advanced）。 */
 type Audience = 'all' | 'scenario' | 'tag' | 'advanced'
 type Method = 'new' | 'template' | 'duplicate'
@@ -94,9 +92,6 @@ const TITLE_MAX = 60
 const BODY_MAX = 5000
 /** 表に1行ずつ出すのは4店まで。残りは「ほか N店」にまとめ、「…」から全部を開く。 */
 const ROWS_SHOWN = 4
-/** 「すべて」の札と、フォルダに入っていないアカウントの札。 */
-const ALL = '__all__'
-const UNFILED = '__none__'
 
 const KIND_LABEL = HQ_KIND_LABEL
 
@@ -196,7 +191,9 @@ export default function HqBroadcastCreate() {
   const [stores, setStores] = useState<Store[] | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
   const [loadError, setLoadError] = useState<unknown>(null)
-  const [folderFilter, setFolderFilter] = useState<string>(params.get('folder') ?? ALL)
+  const [foldersFailed, setFoldersFailed] = useState(false)
+  const [accountPickerOpen, setAccountPickerOpen] = useState(false)
+  const accountPickerTrigger = useRef<HTMLButtonElement>(null)
   const [accountIds, setAccountIds] = useState<string[]>([])
   /* 昔の入口（?tag=<アカウントのタグ>）と、タグで作った下書き。読んだあとはアカウントを1つずつ選んだ形に直す。 */
   const legacyTags = useRef<string[]>(params.get('tag') ? [params.get('tag')!] : [])
@@ -306,9 +303,10 @@ export default function HqBroadcastCreate() {
         if (!accounts.success) throw new Error(accounts.error)
         const list: Store[] = accounts.data
           .filter((a) => !a.archivedAt)
-          .map((a) => ({ id: a.id, name: a.name, tags: a.tags ?? [], friendCount: a.stats?.friendCount ?? 0, folderId: a.folderId ?? null, folder: a.folder ?? null }))
+          .map((a) => ({ ...a, friendCount: a.stats?.friendCount ?? null }))
         setStores(list)
         if (folderList?.success) setFolders(folderList.data.folders)
+        setFoldersFailed(!folderList?.success)
         const sent = runs ? runs.data.filter((r) => r.status !== 'prepared') : []
         setRecent(sent.slice(0, 2))
         if (legacyTags.current.length > 0) {
@@ -675,11 +673,12 @@ export default function HqBroadcastCreate() {
     samePage: (url) => url.pathname === '/hq/broadcasts/new',
   })
 
-  const visibleStores = (stores ?? []).filter((s) => folderFilter === ALL || (folderFilter === UNFILED ? !s.folderId : s.folderId === folderFilter))
-  const unfiledCount = (stores ?? []).filter((s) => !s.folderId).length
-  const friendTotal = chosen.filter((s) => !excluded.includes(s.id)).reduce((sum, s) => sum + s.friendCount, 0)
+  const sendableChosen = chosen.filter((s) => !excluded.includes(s.id))
+  const friendTotal = sendableChosen.some((s) => s.friendCount == null) ? null : sendableChosen.reduce((sum, s) => sum + (s.friendCount ?? 0), 0)
+  const accountSummary = chosen.length === 0 ? 'まだ選んでいません' : `${formatNumber(chosen.length)} アカウント：${chosen.slice(0, 2).map((account) => account.name).join('・')}${chosen.length > 2 ? ` ほか${chosen.length - 2}` : ''}`
+  const closeAccountPicker = () => { setAccountPickerOpen(false); requestAnimationFrame(() => accountPickerTrigger.current?.focus()) }
   const totals = checks && !stale ? sendTotals(checks) : null
-  const peopleLabel = totals ? `${formatNumber(totals.sendPeople)}人` : audience === 'all' && chosen.length > 0 ? `${formatNumber(friendTotal)}人` : '—人'
+  const peopleLabel = totals ? `${formatNumber(totals.sendPeople)}人` : audience === 'all' && chosen.length > 0 && friendTotal != null ? `${formatNumber(friendTotal)}人` : '—人'
   const audienceLabel = audience === 'tag' ? (tagName ? `タグ：${tagName}` : 'タグ：未選択')
     : audience === 'scenario' ? (scenarioName ? `シナリオ「${scenarioName}」を購読中` : 'シナリオ購読中の全員')
     : audience === 'advanced' ? (savedName ? `保存した条件「${savedName}」${pruneCondition(condition) ? '＋詳細条件' : ''}` : pruneCondition(condition) ? '詳細条件' : '詳細条件：未設定')
@@ -846,35 +845,10 @@ export default function HqBroadcastCreate() {
                 <div className={styles.accounts} data-design-node="J5DH6o">
                   <h3>送るアカウント</h3>
                   {loadError && !stores ? <ListState kind="error" error={loadError} onRetry={() => window.location.reload()} /> : !stores ? <ListState kind="loading" /> : (
-                    <>
-                      <div className={styles.folderChips} role="group" aria-label="フォルダで絞る">
-                        <FilterChip selected={folderFilter === ALL} onChange={() => setFolderFilter(ALL)} count={stores.length}>すべて</FilterChip>
-                        {folders.map((f) => (
-                          <FilterChip key={f.id} selected={folderFilter === f.id} onChange={() => setFolderFilter(folderFilter === f.id ? ALL : f.id)} icon={<FolderDot folder={f} />} count={stores.filter((s) => s.folderId === f.id).length}>{f.name}</FilterChip>
-                        ))}
-                        {unfiledCount > 0 && folders.length > 0 ? (
-                          <FilterChip selected={folderFilter === UNFILED} onChange={() => setFolderFilter(folderFilter === UNFILED ? ALL : UNFILED)} icon={<FolderDot folder={null} />} count={unfiledCount}>未分類</FilterChip>
-                        ) : null}
-                      </div>
-                      <div className={styles.accountCards}>
-                        {visibleStores.map((s) => (
-                          <CheckCard
-                            key={s.id}
-                            size="compact"
-                            checked={accountIds.includes(s.id)}
-                            onChange={(on) => setAccountIds((ids) => (on ? [...ids, s.id] : ids.filter((x) => x !== s.id)))}
-                            title={<span title={s.name}><FolderDotName folder={s.folder}>{s.name}</FolderDotName></span>}
-                            note={`友だち ${formatNumber(s.friendCount)} 人`}
-                          />
-                        ))}
-                        {visibleStores.length === 0 ? <p className="text-xs text-ink-faint">このフォルダにアカウントはありません。</p> : null}
-                      </div>
-                      <p className={styles.accountsNote} aria-live="polite">
-                        {chosen.length === 0
-                          ? 'アカウントを選んでください。送る相手は、下の条件で各アカウントの友だちから選びます。'
-                          : `${formatNumber(chosen.length)} アカウントを選んでいます。送る相手は、下の条件で各アカウントの友だちから選びます。`}
-                      </p>
-                    </>
+                    <div className={styles.accountSelection}>
+                      <p className={styles.accountSummary} title={accountSummary} aria-live="polite">{accountSummary}</p>
+                      {canManage ? <Button ref={accountPickerTrigger} onClick={() => setAccountPickerOpen(true)}>{chosen.length ? '選び直す' : 'アカウントを選ぶ'}</Button> : null}
+                    </div>
                   )}
                 </div>
                 <h3>配信対象</h3>
@@ -1021,19 +995,18 @@ export default function HqBroadcastCreate() {
                               value={body}
                               onValueChange={setBody}
                               extraTokens={STORE_INSERT_CHIPS}
-                              placeholder="{店名}より：…"
+                              placeholder="例：いつもご利用ありがとうございます。今月のおすすめをお知らせします。"
                               className="border-hairline rounded-control w-full resize-none border p-3 text-sm focus:border-accent focus:outline-none"
                             />
                             <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
                               <span className={styles.inserts}>
-                                <span className="text-ink-faint">差し込む：</span>
+                                <span className="text-ink-faint">差し込む：<HelpTip label="差し込みの説明">店名・店の電話番号・予約ページは、送るアカウントごとの値に置き換わります。共通情報が無いアカウントは最終確認で外します。</HelpTip></span>
                                 {STORE_INSERTS.map((item) => (
                                   <InsertButton key={item.label} label={item.label.slice(1, -1)} title={item.help} onClick={() => insert(item.label)} />
                                 ))}
                               </span>
                               <span className="text-ink-faint">{`${formatNumber(body.length)} / ${formatNumber(BODY_MAX)}`}</span>
                             </div>
-                            <p className="mt-2 text-xs text-ink-faint">{'{店名}・{店の電話番号}・{予約ページ} は、送るアカウントの名前と共通情報に置き換わります。共通情報が無いアカウントは最終確認で外します。'}</p>
                           </section>
                         ) : HQ_NOT_YET.has(kind) ? (
                           <p className={styles.notYet} role="note">{notYetText(kind)}</p>
@@ -1249,14 +1222,14 @@ export default function HqBroadcastCreate() {
               <Button className={formStyles.previewClose} size="compact" onClick={() => setPreviewOpen(false)}>閉じる</Button>
             </div>
             <div className={previewDevice === 'pc' ? formStyles.pcPreview : formStyles.phonePreview}>
-              <LinePreview accountName={exampleStore} caption={when === 'now' ? '今日' : sendWhenLabel} note={`${exampleStore}の例です。差し込みはアカウントごとに変わります（{予約ページ}は省いて見せています）。`}
+              <LinePreview accountName={exampleStore} caption={when === 'now' ? '今日' : sendWhenLabel} note={`${exampleStore}の例です。差し込みはアカウントごとに変わります（予約ページは省いて見せています）。`}
                 empty={previewBubbles.every((item) => !item) ? 'メッセージは「メッセージを作成」で作ります' : false}>
                 <div className="flex flex-col gap-3 text-ink">
                   {previewBubbles.map((item, index) => (item ? <BubblePreview key={bubbles[index].id} bubble={item} accountName={exampleStore} /> : null))}
                 </div>
               </LinePreview>
             </div>
-            <p className={formStyles.previewCaption}>{'{店名} は例のアカウントの名前で見せています'}</p>
+            <p className={formStyles.previewCaption}>{'店名は例のアカウントの名前で見せています'}</p>
             <div className={formStyles.previewSummary}><h3>設定内容</h3><dl>{[
               ['送るアカウント', chosen.length ? `${accountsLabel}（${formatNumber(chosen.length)}）` : '未選択'],
               ['送る相手', `${audienceFull}（${peopleLabel}）`],
@@ -1324,6 +1297,8 @@ export default function HqBroadcastCreate() {
           return bubble ? <BubblePreview key={item.id} bubble={bubble} /> : null
         })}
         onClose={() => { setBasicPicker(null); requestAnimationFrame(() => basicPickerTrigger.current?.focus()) }} /> : null}
+      {accountPickerOpen && stores && canManage ? <BroadcastAccountPicker accounts={stores} folders={folders} foldersFailed={foldersFailed} initialIds={accountIds} initialFolder={params.get('folder') ?? undefined}
+        onConfirm={(ids) => { setAccountIds(ids); closeAccountPicker() }} onCancel={closeAccountPicker} /> : null}
       <HqTemplatePicker open={pickerOpen} onClose={() => setPickerOpen(false)} onPick={pickTemplate} />
       <Dialog
         open={saveTplOpen}

@@ -300,8 +300,7 @@ export default function QuestionEditor({
           <CharCount value={value.intro ?? ''} max={4500} />
         </div>
         <p className="text-ink-faint mt-0.5 mb-1.5 text-xs leading-relaxed">
-          質問の前に、ふつうのテキストメッセージとして流れます。空なら送りません。差し込み（
-          <code className="text-ink-faint">{'{{name}}'}</code> など）が使えます。
+          質問の前に、ふつうのテキストメッセージとして流れます。空なら送りません。名前などの差し込みが使えます。
         </p>
         <textarea
           id={`${fieldBase}-intro`}
