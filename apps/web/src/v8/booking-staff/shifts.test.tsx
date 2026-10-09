@@ -15,6 +15,7 @@ const fixture = vi.hoisted(() => ({
   push: vi.fn(),
   myStaff: [] as Array<Record<string, unknown>>,
   putBreaks: vi.fn(), putRules: vi.fn(), putDates: vi.fn(),
+  rules: [{ weekday: 1, start_time: '10:00', end_time: '19:00' }] as Array<{ weekday: number; start_time: string; end_time: string }>,
 }))
 
 const stableRouter = { replace: (...args: unknown[]) => fixture.replace(...args), push: (...args: unknown[]) => fixture.push(...args) }
@@ -42,7 +43,7 @@ vi.mock('@/lib/api', () => {
       getSettings: async () => ({ success: true, data: { timeZone: 'Asia/Tokyo', exceptions: [], businessHoursConfigured: false, businessHours: [] } }),
       listMenus: async () => ({ menus: [] }),
       listExceptions: async () => ({ success: true, data: { items: [] } }),
-      getAvailabilityRules: async () => ({ rules: [{ weekday: 1, start_time: '10:00', end_time: '19:00' }] }),
+      getAvailabilityRules: async () => ({ rules: fixture.rules }),
       getShifts: async () => ({ shifts: [] }),
       getBreaks: async () => ({
         version: 'v1',
@@ -81,6 +82,7 @@ beforeEach(() => {
   fixture.myStaff = []
   fixture.replace.mockClear()
   fixture.putRules.mockReset().mockResolvedValue({ ok: true })
+  fixture.rules = [{ weekday: 1, start_time: '10:00', end_time: '19:00' }]
   fixture.putDates.mockReset()
   fixture.putBreaks.mockReset()
   fixture.putBreaks.mockImplementation(async (_a: unknown, _s: unknown, _v: unknown, rows: Array<{ weekday: number; start_time: string; end_time: string }>) => ({
@@ -169,6 +171,19 @@ describe('勤務とシフト（管理者）', () => {
     await waitFor(() => { expect(fixture.putBreaks).toHaveBeenCalled() })
     const rows = fixture.putBreaks.mock.calls[0][3] as Array<{ weekday: number }>
     expect(rows.map((r) => r.weekday)).toEqual([1, 2, 4, 5])
+  })
+
+  test('B-139：曜日の時間が逆さまのまま保存すると、送らずその曜日の時刻の欄を赤くし、終わりの欄へ移る', async () => {
+    fixture.rules = [{ weekday: 1, start_time: '19:00', end_time: '10:00' }]
+    render(<StaffShiftsV8 staffId="bs-1" />)
+    await screen.findByRole('button', { name: '休憩の曜日（月〜金）を選ぶ' })
+    fireEvent.click(screen.getAllByRole('button', { name: '保存' })[0])
+    await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    expect(fixture.putRules).not.toHaveBeenCalled()
+    const end = document.querySelector('[aria-label="月曜日の終わり"]') as HTMLElement
+    expect(end.getAttribute('aria-invalid')).toBe('true')
+    expect(document.querySelector('[aria-label="月曜日の始まり"]')?.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(end)
   })
 
   test('変える権限が無い人には、保存・足す・ごみ箱のボタンを置かない', async () => {
