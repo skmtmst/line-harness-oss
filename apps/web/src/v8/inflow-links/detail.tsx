@@ -427,7 +427,7 @@ function InflowDetailContent() {
       actions={route ? (
         <div className={styles.headActions}>
           <Button onClick={() => setQrOpen(true)}><QrCode size={15} aria-hidden="true" />QR コードを表示</Button>
-          <CopyTextButton value={url ?? ""} aria-label="URLをコピー"  />
+          <CopyTextButton value={url ?? ""} label="URL をコピー" aria-label="URL をコピー"  />
           {readonly ? null : (
             <Button onClick={() => setEditingRoute(true)}><Pencil size={15} aria-hidden="true" />リンクを編集</Button>
           )}

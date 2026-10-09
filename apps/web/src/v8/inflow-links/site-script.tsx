@@ -390,8 +390,8 @@ export default function SiteScriptV8() {
                     <div className={styles.codeBox}><code className={styles.code}>{snippet}</code></div>
                     {copyFailed ? <p className={styles.small} role="alert">コピーできませんでした。上のコードを選んでコピーしてください。</p> : null}
                     <div className={styles.buttons}>
-                      <CopyTextButton value={snippet ?? ""} aria-label="コードをコピー"  />
-                      <CopyTextButton value={`ホームページの</head>の直前に、この1行をそのまま貼ってください。ページごとに書き換える必要はありません。\n${snippet}`} aria-label="制作会社へ送る文をコピー"  />
+                      <CopyTextButton value={snippet ?? ""} label="コードをコピー" aria-label="コードをコピー"  />
+                      <CopyTextButton value={`ホームページの</head>の直前に、この1行をそのまま貼ってください。ページごとに書き換える必要はありません。\n${snippet}`} label="制作会社へ送る文をコピー" aria-label="制作会社へ送る文をコピー"  />
                     </div>
                   </>
                 ) : (

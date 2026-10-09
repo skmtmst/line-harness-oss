@@ -87,7 +87,7 @@ afterEach(() => {
 })
 
 describe('共通情報の一覧: 差し込みキーのコピー（#665）', () => {
-  it('行のコピーボタンを押すと省略前のキー全文がクリップボードへ入り、「コピー済み」が出る', async () => {
+  it('行のコピーボタンを押すと省略前のキー全文がクリップボードへ入り、「コピーしました」が出る', async () => {
     const writeText = vi.fn(async (_text: string) => undefined)
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -104,6 +104,6 @@ describe('共通情報の一覧: 差し込みキーのコピー（#665）', () =
     // 表示は省略されるが、コピーされるのは差し込み用の全文。
     expect(writeText).toHaveBeenCalledTimes(1)
     expect(writeText).toHaveBeenCalledWith('{{var.audit_user_name_for_long_key}}')
-    expect(button.textContent).toBe('コピー済み')
+    expect(button.textContent).toBe('コピーしました')
   })
 })
