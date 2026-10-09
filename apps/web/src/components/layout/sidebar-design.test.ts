@@ -72,7 +72,7 @@ const DESIGN: Array<{ section: string | null; items: string[] }> = [
     section: '飲食店向け（テスト）',
     items: [
       '店舗ダッシュボード', '組織・権限', '承認ワークフロー', '予約台帳', '座席・卓管理',
-      '予約枠・在庫', 'メニュー管理', 'Googleビジネス', 'LINE来店フォロー',
+      '予約枠・在庫', 'メニュー管理', 'デリバリー受注', 'Googleビジネス', 'LINE来店フォロー',
     ],
   },
 ];
@@ -150,6 +150,7 @@ const ROUTES: Record<string, string> = {
   '座席・卓管理': '/restaurant-test/tables',
   '予約枠・在庫': '/restaurant-test/inventory',
   メニュー管理: '/restaurant-test/menu',
+  デリバリー受注: '/restaurant-test/delivery',
   'Googleビジネス': '/restaurant-test/google',
   LINE来店フォロー: '/restaurant-test/line-followup',
 };
@@ -179,7 +180,9 @@ describe('サイドバーが V6正式共通メニューの契約と一致する'
     // 2026-09-16 採用: 「マイペット」「健康日記」（★V6 37-3／37-4）を足して 48。
     const total = actual.reduce((sum, s) => sum + s.items.length, 0);
     // 2026-10-07 提案 E-7: 「予約」の組に「来店スタンプ」を足して 49。
-    expect(total).toBe(49);
+    // 2026-10-09 承認（デリバリー受注_v02.pen）: 「飲食店向け（テスト）」に
+    // 「デリバリー受注」を足して 50。
+    expect(total).toBe(50);
   });
 
   it('項目の行き先が仕様どおり', () => {

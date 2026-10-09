@@ -166,6 +166,18 @@ export type AuditAction =
   | 'restaurant.google.post.publish'
   | 'restaurant.google.post.instagram_retry'
   | 'restaurant.google.post.remove'
+  // デリバリー受注（Uber Eats・出前館・ロケットナウ）。店舗の操作は各サービスへ送るため必ず残す。
+  | 'restaurant.delivery.order.accept'
+  | 'restaurant.delivery.order.reject'
+  | 'restaurant.delivery.order.ready'
+  | 'restaurant.delivery.order.handed_over'
+  | 'restaurant.delivery.order.cancel'
+  | 'restaurant.delivery.menu.sold_out'
+  | 'restaurant.delivery.menu.resume'
+  | 'restaurant.delivery.intake.stop'
+  | 'restaurant.delivery.intake.resume'
+  // 履歴CSVの書き出し（注文番号・金額が店舗の外へ出るため、他の出力と同じく残す）。
+  | 'restaurant.delivery.history.export'
   // #818: 広告費の手入力と、管理画面からの取り直し
   | 'ad_cost.manual_entry'
   | 'ad_cost.import'

@@ -4032,6 +4032,58 @@
       "parentColumn": "id"
     }
   },
+  "rt_delivery_orders": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_delivery_order_items": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "order_id",
+      "parent": "rt_delivery_orders",
+      "parentColumn": "id"
+    }
+  },
+  "rt_delivery_events": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "rt_delivery_dispatches": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_delivery_menu_items": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_delivery_service_states": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
   "visit_stamp_pin_attempts": {
     "category": "purge",
     "scope": {
