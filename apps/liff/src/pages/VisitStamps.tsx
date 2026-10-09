@@ -285,7 +285,7 @@ export default function VisitStamps() {
             const selected = chosen?.id === r.id;
             return (
               <li key={r.id}>
-                <Button variant="choice"
+                <Button variant="reward-row"
                   type="button"
                   disabled={!ok}
                   onClick={() => setPicked(r.id)}
@@ -364,7 +364,7 @@ function ShowReward({ redemption, shopName, onBack, onUse }: {
               ))}
             </span>
             <LiffInput
-              ref={input}
+              ref={input} appearance="pin"
               aria-label="店員の暗証番号（4桁）"
               inputMode="numeric"
               autoComplete="off"
@@ -471,7 +471,7 @@ function PaperCard({ accountId, cardId, requests, onSent, onBack }: { accountId:
               </>
             )}
           </div>
-          <LiffInput ref={fileRef} type="file" accept="image/*" capture="environment"  aria-label="紙のカードの写真"
+          <LiffInput ref={fileRef} appearance="concealed" type="file" accept="image/*" capture="environment"  aria-label="紙のカードの写真"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) { if (photo) URL.revokeObjectURL(photo.url); setPhoto({ file: f, url: URL.createObjectURL(f) }); setError(''); } e.target.value = ''; }} />
           {/* 絵の「撮り直す」は高さ36の枠のボタン（副ボタン 44 より低い）。 */}
           <Button variant="secondary" type="button" onClick={() => fileRef.current?.click()} >
@@ -481,9 +481,9 @@ function PaperCard({ accountId, cardId, requests, onSent, onBack }: { accountId:
         <div className="flex flex-col gap-2">
           <h2 className="text-sm leading-[21px] font-semibold text-ink">② 押してある数</h2>
           <div className="flex items-center gap-3">
-            <Button variant="secondary" type="button" aria-label="1個へらす" disabled={stamps <= 1} onClick={() => setStamps((n) => Math.max(1, n - 1))} ><Icon name="minus" className="h-4 w-4" /></Button>
+            <Button variant="icon" type="button" aria-label="1個へらす" disabled={stamps <= 1} onClick={() => setStamps((n) => Math.max(1, n - 1))} ><Icon name="minus" className="h-4 w-4" /></Button>
             <span className="liff-num text-xl leading-[30px] font-bold text-ink" aria-live="polite">{`${stamps} 個`}</span>
-            <Button variant="secondary" type="button" aria-label="1個ふやす" disabled={stamps >= 100} onClick={() => setStamps((n) => Math.min(100, n + 1))} ><Icon name="plus" className="h-4 w-4" /></Button>
+            <Button variant="icon" type="button" aria-label="1個ふやす" disabled={stamps >= 100} onClick={() => setStamps((n) => Math.min(100, n + 1))} ><Icon name="plus" className="h-4 w-4" /></Button>
           </div>
         </div>
         {error ? <p role="alert" className="text-[13px] leading-5 text-danger">{error}</p> : null}

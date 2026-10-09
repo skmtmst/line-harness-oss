@@ -183,9 +183,9 @@ export function DateYmdField({
 }
 
 /** LIFF の全画面が使う素の欄。識別子・電話・選択・添付の意味は変えない。 */
-export const LiffInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & {appearance?:'night'}>(function LiffInput({className, appearance, type='text',...props},ref) {
+export const LiffInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & {appearance?:'night'|'concealed'|'pin'}>(function LiffInput({className, appearance, type='text',...props},ref) {
  const choice=type==='radio'||type==='checkbox'
- return <input {...props} ref={ref} type={type} className={[choice?styles.choiceInput:appearance==='night'?styles.nightInput:styles.input,className].filter(Boolean).join(' ')} />
+ return <input {...props} ref={ref} type={type} className={[appearance==='concealed'?styles.concealedInput:appearance==='pin'?styles.pinInput:choice?styles.choiceInput:appearance==='night'?styles.nightInput:styles.input,className].filter(Boolean).join(' ')} />
 })
 export const LiffTextArea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function LiffTextArea({className,rows=3,...props},ref){return <textarea {...props} ref={ref} rows={rows} className={[styles.input,styles.textarea,className].filter(Boolean).join(' ')} />})
 export function RequiredMark() { return <span aria-hidden="true" className={styles.required}>必須</span> }

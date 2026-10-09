@@ -13,3 +13,8 @@ it('共通の欄とボタンは入力途中・選択・押せない状態の動�
  const edit=vi.fn(),save=vi.fn();render(<><LiffInput aria-label="暗証番号" type="password" inputMode="numeric" value="0012" onChange={edit}/><Button disabled onClick={save}>保存</Button></>)
  const input=screen.getByLabelText('暗証番号') as HTMLInputElement;expect(input.value).toBe('0012');fireEvent.change(input,{target:{value:'0000'}});expect(edit).toHaveBeenCalled();fireEvent.click(screen.getByRole('button'));expect(save).not.toHaveBeenCalled()
 })
+
+it('補助の日付・添付とPINは共通の欄で隠し、選択中の人数は共通ボタンが示す',()=>{
+ const {container}=render(<><LiffInput aria-label="別の日" type="date" appearance="concealed"/><LiffInput aria-label="PIN" type="password" appearance="pin"/><Button variant="chip" role="radio" aria-checked={true}>2名</Button></>)
+ expect(screen.getByLabelText('別の日').className).toContain('concealedInput');expect(screen.getByLabelText('PIN').className).toContain('pinInput');expect(screen.getByRole('radio',{name:'2名'}).className).toContain('bg-liff-soft');expect(container.querySelector('input[type=password]')).toBeTruthy()
+})

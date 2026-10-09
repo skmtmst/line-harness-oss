@@ -405,7 +405,7 @@ export default function EventBookings() {
                   const selected = pendingChange.selectedSlotId === s.id;
                   return (
                     <li key={s.id}>
-                      <Button variant="choice"
+                      <Button variant="slot-row"
                         type="button"
                         disabled={disabled}
                         aria-pressed={selected}

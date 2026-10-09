@@ -261,7 +261,7 @@ function DaySlots({
             return (
               <span key={t.start} className="relative block">
                 {timeButton}
-                <Button variant="secondary"
+                <Button variant="overlay-bell"
                   type="button"
                   onClick={() => onWaitlist(pickOf(day, t))}
                   aria-label={`${t.start}に空いたら知らせる`}
@@ -656,7 +656,7 @@ export default function DateTimePicker({
   const toggleButton = (target: DateView, label: string) => {
     const active = view === target;
     return (
-      <Button variant="text"
+      <Button variant="segment"
         key={target}
         ref={target === 'list' ? listButtonRef : calendarButtonRef}
         type="button"

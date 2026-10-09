@@ -243,7 +243,7 @@ export default function Event() {
                 const fullLabel = full && !disabled ? '満席・キャンセル待ち' : seatLabel(s);
                 return (
                   <li key={s.id}>
-                    <Button variant="choice"
+                    <Button variant="slot-row"
                       type="button"
                       disabled={disabled}
                       aria-pressed={selected}

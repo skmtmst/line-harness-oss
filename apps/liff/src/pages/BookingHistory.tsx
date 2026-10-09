@@ -315,7 +315,7 @@ export default function BookingHistory() {
                     pendingChange.selected?.date === slot.date && pendingChange.selected?.start === slot.start;
                   return (
                     <li key={`${slot.date}-${slot.start}`}>
-                      <Button variant="choice"
+                      <Button variant="slot-row"
                         type="button"
                         disabled={busy}
                         aria-pressed={selected}

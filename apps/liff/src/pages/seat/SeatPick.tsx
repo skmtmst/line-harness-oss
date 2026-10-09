@@ -86,7 +86,7 @@ export default function SeatPick({
         {GUESTS.map((n) => {
           const on = n === 5 ? many : guestCount === n;
           return (
-            <Button variant="secondary"
+            <Button variant="chip"
               key={n}
               type="button"
               role="radio"
@@ -123,7 +123,7 @@ export default function SeatPick({
           const off = v === 'closed' || (Array.isArray(v) && !hasOpenSlot(v));
           const on = c.date === date;
           return (
-            <Button variant="secondary"
+            <Button variant="weekday"
               key={c.date}
               type="button"
               role="radio"
@@ -152,7 +152,7 @@ export default function SeatPick({
           {inChips ? 'ほかの日を選ぶ ›' : `ほかの日：${md(date)}（${weekday(date)}） ›`}
         </Button>
         <LiffInput
-          ref={otherRef}
+          ref={otherRef} appearance="concealed"
           type="date"
           min={today}
           value={date}
@@ -186,7 +186,7 @@ export default function SeatPick({
             const on = s.startsAt === startsAt;
             const hm = zonedParts(s.startsAt, timeZone).hm;
             return (
-              <Button variant="secondary"
+              <Button variant="choice"
                 key={s.startsAt}
                 type="button"
                 role="radio"

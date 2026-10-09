@@ -47,3 +47,6 @@
 
 .nightInput { width: 100%; min-width: 0; height: 44px; border: 0; border-radius: 999px; padding: 0 16px; background: var(--color-night-panel); color: white; font-size: 13px; }
 .nightInput::placeholder { color: var(--color-night-dim); }
+
+.concealedInput { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; padding: 0; border: 0; }
+.pinInput { position: absolute; inset-inline: 0; bottom: 0; height: 48px; width: 100%; cursor: text; opacity: 0; }

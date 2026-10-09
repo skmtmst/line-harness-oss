@@ -73,7 +73,7 @@ export default function RepeatCard({
   if (!ready) return null;
 
   return (
-    <Button variant="secondary"
+    <Button variant="row"
       type="button"
       onClick={() => onRepeat(ready.menu, ready.staff)}
       aria-label="前回と同じで予約する"

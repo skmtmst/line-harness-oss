@@ -14,7 +14,7 @@ export default function Button({
   ref,
   ...rest
 }: {
-  variant?: 'primary' | 'secondary' | 'danger' | 'text' | 'choice' | 'icon' | 'backdrop' | 'calendar' | 'weekday' | 'row' | 'chip' | 'night-cta' | 'night-text' | 'sound' | 'send';
+  variant?: 'primary' | 'secondary' | 'danger' | 'text' | 'choice' | 'icon' | 'backdrop' | 'calendar' | 'weekday' | 'row' | 'chip' | 'night-cta' | 'night-text' | 'sound' | 'send' | 'slot-row' | 'reward-row' | 'overlay-bell' | 'segment';
   children?: ReactNode;
   full?: boolean;
   className?: string;
@@ -37,6 +37,10 @@ export default function Button({
     'night-cta': `${focus} flex min-h-12 w-full items-center justify-center rounded-xl bg-night-cta text-[15px] font-bold text-white`,
     'night-text': `${focus} inline-flex min-h-11 items-center justify-center text-night-mine disabled:opacity-50`,
     sound: `${focus} pointer-events-auto inline-flex min-h-11 items-center gap-1 rounded-full bg-black/60 px-2.5 text-xs font-semibold text-white`,
+    'slot-row': `${focus} flex min-h-11 w-full items-center justify-between gap-3 rounded-(--liff-radius) border px-4 py-2.5 text-left disabled:bg-shell-gray disabled:text-ink-faint ${selected ? 'border-liff-primary bg-liff-primary text-(--liff-on-primary)' : 'border-hairline bg-canvas text-ink'}`,
+    'reward-row': `${focus} flex min-h-11 w-full items-center gap-2.5 text-left disabled:cursor-default ${selected ? 'font-semibold' : ''}`,
+    'overlay-bell': `${focus} absolute -top-1.5 -right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-canvas text-liff-primary shadow outline-1 -outline-offset-1 outline-liff-line-strong liff-hit`,
+    segment: `${focus} flex min-h-11 items-center justify-center rounded-(--liff-radius) px-3 text-xs ${selected ? 'bg-canvas font-semibold text-ink' : 'text-liff-sub'}`,
     send: `${focus} flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-liff-primary text-white disabled:opacity-50`,
   };
   const tone =
