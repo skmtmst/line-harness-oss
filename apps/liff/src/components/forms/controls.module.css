@@ -38,3 +38,5 @@
 .ymdPart .input { text-align: center; }
 
 .wrap:focus-within .temporalHint { display: none; }
+
+.input[aria-invalid="true"] { border-color: var(--color-danger); outline: 1px solid var(--color-danger); }
