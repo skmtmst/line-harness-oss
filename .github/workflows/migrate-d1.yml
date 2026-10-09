@@ -205,16 +205,7 @@ jobs:
             fi
           fi
 
-          npx wrangler d1 execute "$DB_NAME" --remote --command \
-            "CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"
-
-          applied=$(npx wrangler d1 execute "$DB_NAME" --remote \
-            --command "SELECT name FROM _migrations" --json \
-            | node -e "
-              const d = JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8'));
-              const rows = d[0]?.results ?? [];
-              console.log(rows.map((r) => r.name).join('\n'));
-            ")
+          applied=$(bash scripts/deploy/list-applied-d1-migrations.sh "$DB_NAME")
 
           pending_count=0
           for f in $(ls packages/db/migrations/*.sql | sort); do
@@ -236,6 +227,8 @@ jobs:
 
           apply_count=$(wc -l < "$apply_file" | tr -d ' ')
           echo "count=$apply_count" >> "$GITHUB_OUTPUT"
+          echo "total_count=$pending_count" >> "$GITHUB_OUTPUT"
+          echo "未適用の総数: ${pending_count} 件 / 今回の対象: ${apply_count} 件"
           {
             echo "## 未適用のマイグレーション: ${pending_count} 件"
             echo
@@ -308,6 +301,9 @@ jobs:
         env:
           DB_NAME: ${{ steps.db.outputs.name }}
         run: |
+          # 初期化はapplyだけ。復元点を取ってから書き込みを始める。
+          npx wrangler d1 execute "$DB_NAME" --remote --command \
+            "CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"
           bash scripts/deploy/apply-d1-migrations.sh \
             "$DB_NAME" "$RUNNER_TEMP/d1-pending-migrations.txt"
 
@@ -316,7 +312,13 @@ jobs:
         env:
           MODE: ${{ inputs.mode }}
           COUNT: ${{ steps.pending.outputs.count }}
+          TOTAL_COUNT: ${{ steps.pending.outputs.total_count }}
         run: |
+          if [ -z "$TOTAL_COUNT" ]; then
+            echo "未適用件数は取得できませんでした。0件とは判断できません。"
+            exit 1
+          fi
+          echo "未適用の総数: $TOTAL_COUNT 件 / 今回の対象: $COUNT 件"
           if [ "$MODE" != "apply" ]; then
             echo "dry-run です。何も当てていません。"
             echo "実際に当てるには mode を apply にして、もう一度実行してください。"
