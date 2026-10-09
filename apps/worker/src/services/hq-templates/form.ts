@@ -1,5 +1,5 @@
 import { normalizeScopedTagName } from '@line-crm/db';
-import { layoutToFields, normalizeLayout, type FormLayout } from '@line-crm/shared';
+import { layoutToFields, normalizeLayout, validateFormDefinition, type FormLayout } from '@line-crm/shared';
 import { unsupportedHqTemplateAdapter, requireHqTemplateAuthority, type HqTemplateAdapter, type HqTemplateAdapterContext, type HqTemplateAdapterInput, type HqTemplateAuthority, type HqTemplateReference, type HqTemplateStatement, type HqTemplateSnapshotToken, type HqTemplateStoreAtomicCommitPlan, } from './contract.js';
 import { bindScenarioGraphRevision, loadScenarioReferenceGraph, scenarioGraphSnapshotToken, ScenarioGraphError } from './scenario-graph.js';
 /** Unbound callers remain closed until the common executor provides dependencies. */
@@ -96,8 +96,10 @@ function visitLayout(value: unknown, resolve: (kind: 'tag' | 'scenario', id: str
         return value;
     const result: Record<string, unknown> = {};
     for (const [key, item] of Object.entries(value)) {
-        if (['url', 'linkUrl', 'thanksUrl'].includes(key)) validatePortableUrl(item);
-        if (['friendFieldId', 'friendFieldIds', 'choiceFriendFieldId', 'fieldId', 'templateId', 'reminderId', 'mediaUrl', 'backgroundImageUrl'].includes(key) && item != null && item !== '' && !(Array.isArray(item) && !item.length))
+        if (['url', 'linkUrl', 'thanksUrl', 'mediaUrl'].includes(key)) validatePortableUrl(item);
+        if (key === 'mediaUrl' && typeof item === 'string' && /\/(?:images\/(?:media|form-uploads)|api\/media|media)\//i.test(item))
+            throw new FormTemplateError('UNSUPPORTED_REFERENCE');
+        if (['friendFieldId', 'friendFieldIds', 'choiceFriendFieldId', 'fieldId', 'templateId', 'reminderId', 'backgroundImageUrl'].includes(key) && item != null && item !== '' && !(Array.isArray(item) && !item.length))
             throw new FormTemplateError('UNSUPPORTED_REFERENCE');
         if ((key === 'tagId' || key === 'scenarioId') && item != null && item !== '')
             result[key] = resolve(key === 'tagId' ? 'tag' : 'scenario', text(item, 160));
@@ -131,8 +133,10 @@ export function parseFormTemplateDefinition(input: HqTemplateAdapterInput): Form
     const layout = form.layout == null ? null : normalizeLayout(form.layout);
     if (form.layout != null && !layout)
         throw new FormTemplateError('INVALID_DEFINITION');
-    if (layout)
+    if (layout) {
         visitLayout(layout, (_kind, id) => id);
+        if (validateFormDefinition(layout)) throw new FormTemplateError('INVALID_DEFINITION');
+    }
     let fields: Record<string, unknown>[];
     if (layout)
         fields = layoutToFields(layout) as unknown as Record<string, unknown>[];

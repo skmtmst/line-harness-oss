@@ -1,3 +1,5 @@
+import { FIXED_FRIEND_FIELDS, ageFromBirthday, type FixedFriendFieldKey } from "./fixed-friend-fields";
+
 /**
  * 回答フォームの中身（レイアウト）。
  *
@@ -35,6 +37,21 @@ export type FormInputType =
   | "rating" // 5段階評価（F11）
   | "address" // 住所（F11・郵便番号から補完）
   | "booking"; // 予約を入れる（フォームの中で空き枠を選ぶ）
+
+/** 保存するブロックの許可一覧。画面・Workerで同じ一覧を使う。 */
+export const FORM_INPUT_TYPES: readonly FormInputType[] = [
+  "text", "textarea", "radio", "checkbox", "select", "file", "date", "prefecture", "rating", "address", "booking",
+];
+const FORM_BLOCK_KINDS = ["input", "image", "heading", "text", "button"];
+
+/** 旧い fields だけを受け取る口でも未知の種類を通さない。 */
+export function legacyFormFieldTypeError(fields: unknown): string | null {
+  if (!Array.isArray(fields)) return "入力欄の形を確認してください";
+  const allowed = [...FORM_INPUT_TYPES, "email", "tel", "number", "heading"];
+  return fields.some(field => !field || typeof field !== "object" ||
+    !allowed.includes(String((field as Record<string, unknown>).type ?? "text")))
+    ? "この入力欄の種類は保存できません" : null;
+}
 
 /** 単一行の入力制限。空欄や「指定なし」は検証しない。 */
 export type FormInputFormat =
@@ -158,6 +175,8 @@ export interface FormInputBlock {
   placeholder?: string;
   defaultValue?: string;
   destinations?: FormDestinations;
+  /** 7つの基本項目への自動保存。統括から配っても同じ意味を持つ。 */
+  fixedField?: FixedFriendFieldKey;
   limit?: FormInputLimit;
   /** 選択肢系（radio / checkbox / select）で、選んだときに何をするか */
   choiceMode?: "tag" | "friendField" | "action";
@@ -178,12 +197,23 @@ export interface FormInputBlock {
   booking?: FormBookingConfig | null;
 }
 
+/** 既存のメール・電話・住所・本名のブロックも同じ基本欄へ保存する。 */
+export function fixedFieldForBlock(block: FormInputBlock): FixedFriendFieldKey | undefined {
+  if (block.fixedField) return block.fixedField;
+  if (block.destinations?.realName) return "name";
+  if (block.type === "address") return "address";
+  if (block.type === "text" && block.limit?.format === "email") return "email";
+  if (block.type === "text" && block.limit?.format === "tel") return "tel";
+  return undefined;
+}
+
 /** 飾りのブロック（入力欄ではないもの）。 */
 export type FormDecorationBlock =
   | {
       id: string;
       kind: "image";
       mediaUrl: string;
+      alt?: string;
       size?: "normal" | "full";
       linkUrl?: string;
     }
@@ -616,6 +646,7 @@ function safeJsonArray(raw: string): unknown[] {
 export function normalizeLayout(input: unknown): FormLayout | null {
   if (!input || typeof input !== "object") return null;
   const raw = input as Record<string, unknown>;
+  if (formBlockTypeError(input)) return null;
 
   const sections = Array.isArray(raw.sections)
     ? raw.sections
@@ -1024,6 +1055,16 @@ export function validateAnswer(
   }
   if (isEmpty) return null;
 
+  if (block.fixedField) {
+    if (block.fixedField === "birthday" && ageFromBirthday(String(value)) === null) return `${block.label} は過去の存在する日付で入力してください`;
+    if (block.fixedField === "age" && (!/^\d{1,3}$/.test(String(value)) || Number(value) > 150)) return `${block.label} は0〜150の整数で入力してください`;
+    const spec = FIXED_FRIEND_FIELDS.find(f => f.key === block.fixedField);
+    if (spec && spec.format !== "none") {
+      const problem = validateAnswer({ ...block, fixedField: undefined, limit: { ...block.limit, format: spec.format } }, value);
+      if (problem) return problem;
+    }
+  }
+
   // 選択肢系
   if (hasChoices(block)) {
     const selected = Array.isArray(value) ? value.map(String) : [String(value)];
@@ -1169,7 +1210,30 @@ function isHttpUrl(value: string): boolean {
  * 動作のように、下書きは許すが公開では止めるものは
  * `validateFormForPublish` が見る。
  */
+/** 保存前に未知のブロックを拒否する。正規化で消してから検証すると誤って保存できてしまう。 */
+export function formBlockTypeError(input: unknown): string | null {
+  if (!input || typeof input !== "object") return null;
+  const raw = input as Record<string, unknown>;
+  const groups = [raw.header, ...(Array.isArray(raw.sections) ? raw.sections.map(s => s && typeof s === "object" ? (s as Record<string, unknown>).blocks : []) : [])];
+  for (const blocks of groups) {
+    if (!Array.isArray(blocks)) continue;
+    for (const block of blocks) {
+      if (!block || typeof block !== "object") return "ブロックの種類を確認してください";
+      const b = block as Record<string, unknown>;
+      if (!FORM_BLOCK_KINDS.includes(String(b.kind))) return "このブロックの種類は保存できません";
+      if (b.kind === "input" && !FORM_INPUT_TYPES.includes(b.type as FormInputType)) return "この入力欄の種類は保存できません";
+      if (b.fixedField !== undefined) {
+        const spec = FIXED_FRIEND_FIELDS.find(f => f.key === b.fixedField);
+        if (b.kind !== "input" || !spec || b.type !== spec.type) return "決まった答えの種類を確認してください";
+      }
+    }
+  }
+  return null;
+}
+
 export function validateFormDefinition(layout: FormLayout): string | null {
+  const typeError = formBlockTypeError(layout);
+  if (typeError) return typeError;
   const seenNames = new Set<string>();
   const groups: { where: string; blocks: FormBlock[] }[] = [
     { where: "共通ヘッダ", blocks: layout.header },

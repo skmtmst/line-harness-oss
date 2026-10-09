@@ -99,6 +99,8 @@ import {
   formatAddressValue,
   layoutToFields,
   normalizeLayout,
+  formBlockTypeError,
+  legacyFormFieldTypeError,
   parseLayout,
   validateFormDefinition,
   validateFormForPublish,
@@ -798,6 +800,8 @@ async function writeLegacyFriendFields(
  * 見出しが読んでいて、layout だけ更新すると両者がずれる。
  */
 function normalizeLayoutInput(raw: unknown): { layout: string; fields: string } | { error: string } | null {
+  const typeError = formBlockTypeError(raw);
+  if (typeError) return { error: typeError };
   const layout = normalizeLayout(raw);
   if (!layout) return null;
   // 保存できる定義かをここで止める。画面側と同じ `validateFormDefinition`
@@ -1117,6 +1121,10 @@ forms.post('/api/forms', async (c) => {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
 
+    if (body.fields !== undefined && body.layout === undefined) {
+      const fieldError = legacyFormFieldTypeError(body.fields);
+      if (fieldError) return c.json({ success: false, error: fieldError }, 400);
+    }
     const normalized = body.layout !== undefined ? normalizeLayoutInput(body.layout) : null;
     if (normalized && 'error' in normalized) {
       return c.json({ success: false, error: normalized.error }, 400);
@@ -1341,6 +1349,10 @@ forms.put('/api/forms/:id', async (c) => {
     if ('folderId' in body) updates.folderId = nextFolderId;
     if (body.name !== undefined) updates.name = body.name;
     if (body.description !== undefined) updates.description = body.description;
+    if (body.fields !== undefined && body.layout === undefined) {
+      const fieldError = legacyFormFieldTypeError(body.fields);
+      if (fieldError) return c.json({ success: false, error: fieldError }, 400);
+    }
     if (body.fields !== undefined) updates.fields = JSON.stringify(body.fields);
     // layout を受け取ったときは、fields もそこから作り直す。片方だけ新しい
     // 状態にすると、送信時の必須チェックが古い項目を見に行く。

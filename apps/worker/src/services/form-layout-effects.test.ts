@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   enrollFriendInReminder: vi.fn(),
   enrollFriendInScenario: vi.fn(),
   getFriendFieldById: vi.fn(),
+  getFixedFriendField: vi.fn(),
   getMessageTemplateById: vi.fn(),
   removeTagFromFriend: vi.fn(),
   setFriendFieldValue: vi.fn(),
@@ -23,6 +24,7 @@ vi.mock('@line-crm/db', async (importOriginal) => {
     enrollFriendInReminder: mocks.enrollFriendInReminder,
     enrollFriendInScenario: mocks.enrollFriendInScenario,
     getFriendFieldById: mocks.getFriendFieldById,
+    getFixedFriendField: mocks.getFixedFriendField,
     getMessageTemplateById: mocks.getMessageTemplateById,
     removeTagFromFriend: mocks.removeTagFromFriend,
     setFriendFieldValue: mocks.setFriendFieldValue,
@@ -87,6 +89,7 @@ beforeEach(() => {
     type: 'text',
     options_json: null,
   });
+  mocks.getFixedFriendField.mockResolvedValue({ id: 'fixed-name', type: 'text', ec_is_master: 0 });
   mocks.setFriendFieldValue.mockResolvedValue(undefined);
 });
 
@@ -269,7 +272,7 @@ describe('回答を配る', () => {
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
   });
 
-  test('本名・システム表示名・個別メモは friends の列に書く', async () => {
+  test('名前は固定欄へ、システム表示名・個別メモは friends の列へ書く', async () => {
     const layout = layoutWith([
       input({
         name: 'full_name',
@@ -287,10 +290,10 @@ describe('回答を配る', () => {
     });
 
     expect(calls).toHaveLength(1);
-    expect(calls[0].sql).toContain('real_name = ?');
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(db, expect.objectContaining({ fieldId: 'fixed-name', value: '山田太郎', updatedBy: 'form' }));
     expect(calls[0].sql).toContain('system_display_name = ?');
     expect(calls[0].sql).toContain('private_memo = ?');
-    expect(calls[0].binds.slice(0, 3)).toEqual(['山田太郎', '山田太郎', '山田太郎']);
+    expect(calls[0].binds.slice(0, 2)).toEqual(['山田太郎', '山田太郎']);
   });
 
   test('選んだ選択肢のタグだけを付ける', async () => {

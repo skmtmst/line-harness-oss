@@ -15,6 +15,8 @@
 import type { Message } from '@line-crm/line-sdk';
 import {
   collectReachableInputs,
+  fixedFieldForBlock,
+  formatAddressValue,
   formChoiceIsSelected,
   hasChoices,
   isCalendarDateString,
@@ -31,6 +33,7 @@ import {
   enrollFriendInReminder,
   enrollFriendInScenario,
   getFriendFieldById,
+  getFixedFriendField,
   getMessageTemplateById,
   jstNow,
   removeTagFromFriend,
@@ -308,6 +311,7 @@ export async function applyFormLayoutEffects(input: FormEffectInput): Promise<Fo
       value,
       friendId,
       destinationWrites,
+      input.formId,
     ));
 
     if (hasChoices(block)) {
@@ -450,16 +454,31 @@ async function writeDestinations(
   value: unknown,
   friendId: string,
   stats: FormDestinationWriteStats,
+  formId?: string,
 ): Promise<void> {
   const dest = block.destinations;
-  if (!dest) return;
+  const fixedKey = fixedFieldForBlock(block);
+  if (!dest && !fixedKey) return;
   // 未回答（空文字・空白だけ・空の選択肢）は「更新しない」。
   // 空欄を登録先へ流すと空文字での上書き＝既存の登録を消してしまうため、
   // 書き込みを始める前にここで止める。明示的に消す操作は設けない。
   if (isFormAnswerEmpty(value)) return;
   const text = toText(value);
 
-  for (const fieldId of dest.friendFieldIds ?? []) {
+  if (fixedKey) {
+    await trackDestinationWrite(stats, 1, async () => {
+      const target = await getFixedFriendField(db, fixedKey);
+      if (!target) throw new Error('fixed friend field mapping missing');
+      const fixedValue = fixedKey === 'address' ? formatAddressValue(value) : text;
+      await setFriendFieldValue(db, {
+        friendId, fieldId: target.id, value: fixedValue, updatedBy: 'form',
+        field: target, ...(formId ? { sourceType: 'form', sourceId: formId } : {}),
+      });
+      return true;
+    });
+  }
+
+  for (const fieldId of dest?.friendFieldIds ?? []) {
     // 書けない相手(EC正・削除済み)は数えない。数えると「失敗」になり、
     // 再送しても直らない工程が未完のまま残る。
     const target = await getFriendFieldById(db, fieldId);
@@ -477,6 +496,7 @@ async function writeDestinations(
         value: checked.value,
         updatedBy: 'form',
         field: target,
+        ...(formId ? { sourceType: 'form', sourceId: formId } : {}),
       });
       return true;
     });
@@ -484,15 +504,15 @@ async function writeDestinations(
 
   const columns: string[] = [];
   const values: string[] = [];
-  if (dest.realName) {
+  if (dest?.realName && fixedKey !== 'name') {
     columns.push('real_name = ?');
     values.push(text);
   }
-  if (dest.displayName) {
+  if (dest?.displayName) {
     columns.push('system_display_name = ?');
     values.push(text);
   }
-  if (dest.note) {
+  if (dest?.note) {
     columns.push('private_memo = ?');
     values.push(text);
   }
