@@ -12,7 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
-import { FolderDotName } from '@/components/shared/folder-dot'
+import { FolderDot, FolderDotName } from '@/components/shared/folder-dot'
 import { brandInitial } from '@/components/layout/brand-initial'
 import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -341,6 +341,7 @@ export default function HqHomeV8() {
       label: f.name,
       count: typeof f.itemCount === 'number' ? f.itemCount : (folderCounts.get(f.id) ?? 0),
       color: f.color,
+      icon: <FolderDot folder={{ name: f.name, color: f.color }} />,
       onEdit: canManage ? () => openFolderDialog(f) : undefined,
       onMoveUp: canManage && index > 0 ? () => void moveFolder(index, -1) : undefined,
       onMoveDown: canManage && index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
@@ -526,19 +527,15 @@ export default function HqHomeV8() {
                     <dd>{`${formatNumber(account.stats?.messagesThisMonth ?? 0)} 通`}</dd>
                   </div>
                 </dl>
+                <div className={styles.reasonSlot}>
+                  {warned ? (() => {
+                    const reason = connectionReasonLine(account)
+                    return <Notice tone="warn" compact title={reason.title} message={reason.text}
+                      action={canManage ? <button type="button" onClick={() => void refreshConnectionInfo()} disabled={checkingConnections} className={styles.linkButton}>更新する</button> : undefined}
+                    />
+                  })() : null}
+                </div>
                 {cardActions(account)}
-                {warned ? (() => {
-                  /* 要確認の理由を、引っかかった確認ごとの言葉で1行に。長ければ省略し title で全文。 */
-                  const reason = connectionReasonLine(account)
-                  return (
-                    <p className={styles.warnLine}>
-                      <span className={styles.warnText} title={reason.title}>{reason.text}</span>
-                      {canManage ? (
-                        <button type="button" onClick={() => void refreshConnectionInfo()} disabled={checkingConnections} className={styles.linkButton}>更新する</button>
-                      ) : null}
-                    </p>
-                  )
-                })() : null}
               </article>
             )
           })}

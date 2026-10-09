@@ -123,3 +123,19 @@
 
 /* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
 [data-theme='v8'] .notice { -webkit-font-smoothing: auto; }
+
+/* 小さなカードに入れる1行の注意。既存の帯は変えない。 */
+[data-theme='v8'] .notice[data-compact] {
+  min-width: 0;
+  padding: 6px 10px;
+  gap: 6px;
+  border: 0;
+  border-radius: 6px;
+  font-size: var(--text-micro);
+  line-height: 20px;
+}
+[data-theme='v8'] .notice[data-compact] .message {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
