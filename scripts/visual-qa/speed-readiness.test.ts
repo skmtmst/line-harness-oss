@@ -8,10 +8,10 @@ function routingPage() {
   return {
     route: async (_pattern: string, handler: Handler) => { handlers.push(handler) },
     async request() {
-      let answer: { body: string; status: number } | null = null
-      const route = { request: () => ({ url: () => 'http://api.test/api/friends?limit=20', method: () => 'GET' }), fulfill: async (value: typeof answer) => { answer = value } }
+      let answer: { body: string; status: number; headers: Record<string, string> } | null = null
+      const route = { request: () => ({ url: () => 'http://api.test/api/friends?limit=20', method: () => 'GET', headers: () => ({ origin: 'http://web.test' }) }), fulfill: async (value: typeof answer) => { answer = value } }
       await handlers[handlers.length - 1](route)
-      return answer as unknown as { body: string; status: number }
+      return answer as unknown as { body: string; status: number; headers: Record<string, string> }
     },
   }
 }
@@ -32,6 +32,15 @@ describe('WEB236 速度検査の成立条件', () => {
     const { data } = JSON.parse(answer.body)
     expect(data.items).toHaveLength(2000)
     expect(data.total).toBe(2000)
+  })
+  it.each(['stub', 'stress'])('通信差し替えでもログイン情報付き通信の CORS を守る（%s）', async (kind) => {
+    const page = routingPage()
+    if (kind === 'stub') await stubApi(page, mockFetch)
+    else await installStressApi(page, { stub: true, mockFetch })
+    expect((await page.request()).headers).toMatchObject({
+      'Access-Control-Allow-Origin': 'http://web.test',
+      'Access-Control-Allow-Credentials': 'true',
+    })
   })
   it('元データの取得失敗を2,000行にしない', async () => {
     const page = routingPage()
