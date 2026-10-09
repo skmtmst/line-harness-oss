@@ -170,7 +170,7 @@ function TagFolderDialog({
       name={name} onNameChange={setName} color={color} onColorChange={setColor}
       colors={TAG_FOLDER_COLORS}
       placeholder="例: VIP" busy={saving} error={error || undefined}
-      onCancel={onClose} onConfirm={() => void save()} confirmLabel={group ? '保存する' : 'フォルダを作る'}
+      onCancel={onClose} onConfirm={() => save()} confirmLabel={group ? '保存する' : 'フォルダを作る'}
     />
   )
 }
@@ -900,7 +900,7 @@ export default function TagsTab({
         busy={folderBusy}
         error={folderError || undefined}
         onCancel={() => { if (!folderBusy) setDeletingGroup(null) }}
-        onConfirm={() => void removeGroup()}
+        onConfirm={() => removeGroup()}
       />
 
       {deleteTarget && (

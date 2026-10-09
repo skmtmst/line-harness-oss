@@ -352,7 +352,7 @@ function FriendAddRunDetailInner() {
         description="届かなかった処理だけをもう一度行います。相手には新しく届きます。"
         confirmLabel="もう一度行う"
         busy={retrying}
-        onConfirm={() => void retry()}
+        onConfirm={() => retry()}
         onCancel={() => { if (!retrying) setResendConfirmOpen(false) }}
       />
     </PageFrame>

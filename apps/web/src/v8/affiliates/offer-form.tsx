@@ -242,7 +242,7 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
       error={formError ?? undefined}
       confirmLabel={isEdit ? '更新' : '作成'}
       cancelLabel="キャンセル"
-      onConfirm={() => { void handleSubmit() }}
+      onConfirm={() => { return handleSubmit() }}
       onCancel={onClose}
     >
       <div className="space-y-4" ref={formRef} onInput={() => setFieldErrors({})}>

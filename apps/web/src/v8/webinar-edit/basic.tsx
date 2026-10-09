@@ -189,7 +189,7 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
         busy={saving || testing}
         error={error || undefined}
         onCancel={() => { if (!saving && !testing) setTestConfirm(false) }}
-        onConfirm={() => void runTest()}
+        onConfirm={() => runTest()}
       >
         {dirty ? <p className={styles.cardNote}>変えた基本設定を保存してから送ります。</p> : null}
       </ConfirmDialog>

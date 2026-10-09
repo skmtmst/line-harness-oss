@@ -599,12 +599,12 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
               onClose={() => { setRejectingPhotoId(null); setReasonError(''); setReasonFieldError('') }}
               onConfirm={() => {
                 if (reasonCode === 'other' && !reasonNote.trim()) { setReasonFieldError('そのほかの理由を入力してください'); focusFormField('photo-reject-note'); return }
-                void review(rejectingPhotoId, 'rejected', { reasonCode, reasonNote: reasonNote.trim(), resubmitInvite, watchSubmitter })
+                return review(rejectingPhotoId, 'rejected', { reasonCode, reasonNote: reasonNote.trim(), resubmitInvite, watchSubmitter })
               }}
             />
           ) : null}
 
-          <Dialog open={bulkApproveOpen} title={`${selectedPendingPhotos.length}枚をまとめて採用`} description="選択した写真の件数、マイル、公開範囲を確認してください。" busy={bulkReviewing} confirmLabel="まとめて採用" cancelLabel="審査へ戻る" onCancel={() => setBulkApproveOpen(false)} onConfirm={() => void bulkReview('approve')}>
+          <Dialog open={bulkApproveOpen} title={`${selectedPendingPhotos.length}枚をまとめて採用`} description="選択した写真の件数、マイル、公開範囲を確認してください。" busy={bulkReviewing} confirmLabel="まとめて採用" cancelLabel="審査へ戻る" onCancel={() => setBulkApproveOpen(false)} onConfirm={() => bulkReview('approve')}>
             <dl className={styles.bulkSummary}>
               <div><dt>写真</dt><dd>{selectedPendingPhotos.length}枚</dd></div>
               <div><dt>付与するマイル</dt><dd>合計 {policyPoints == null ? '—' : `${formatNumber(selectedPendingPhotos.length * policyPoints)} マイル`}</dd></div>
@@ -614,7 +614,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
           </Dialog>
           <Dialog open={bulkReturnOpen} title={`${selectedPendingPhotos.length}枚をまとめて見送り`} description="選んだ理由と補足は、選択した写真すべてに記録され、投稿者へLINEで届きます。" tone="destructive" busy={bulkReviewing} error={reasonError} confirmLabel="この理由でまとめて見送り" cancelLabel="審査へ戻る" onCancel={() => { setBulkReturnOpen(false); setReasonError(''); setReasonFieldError('') }} onConfirm={() => {
             if (reasonCode === 'other' && !reasonNote.trim()) { setReasonFieldError('そのほかの理由を入力してください'); focusFormField('photo-reject-note'); return }
-            void bulkReview('return', { reasonCode, reasonNote: reasonNote.trim() })
+            return bulkReview('return', { reasonCode, reasonNote: reasonNote.trim() })
           }}>
             <div role="radiogroup" aria-label="見送り理由" className={styles.pillGroup}>
               {REVIEW_REASONS.map((reason) => (
@@ -630,7 +630,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
 
           <Dialog open={Boolean(publicationCandidate)} title="公式サイトに掲載しますか？"
             description="公開の同意と採用状態を確認して、公開用画像を掲載します。追加報酬は初回掲載の版で写真ごとに一度だけ手続きします。"
-            confirmLabel="公式サイトに掲載する" error={notice} busy={Boolean(reviewing)} onConfirm={() => void confirmPublication()}
+            confirmLabel="公式サイトに掲載する" error={notice} busy={Boolean(reviewing)} onConfirm={() => confirmPublication()}
             onCancel={() => { if (!reviewing) setPublicationCandidate(null) }} />
           <PhotoPolicyHistoryV8 canEdit={canEdit}
             open={historyOpen}
@@ -1223,7 +1223,7 @@ function PublicationsV8({
   return (
     <>
       <Dialog open={orderItems !== null} title="掲載順を変える" description="上から順に公式サイトへ表示します。全件と確認した版をまとめて保存します。"
-        confirmLabel="並び順を保存する" error={notice} busy={busyId === 'order'} onConfirm={() => void saveOrder()}
+        confirmLabel="並び順を保存する" error={notice} busy={busyId === 'order'} onConfirm={() => saveOrder()}
         onCancel={() => { if (!busyId) { setOrderItems(null); void load() } }}>
         <ol>{orderItems?.map((item, index) => <li key={text(item.id)} className={styles.orderRow}>
           <span className={styles.orderName}>{index+1}・{photoPetDisplayName(item.pet_name, { honorific: false })}</span>
@@ -1318,7 +1318,7 @@ function PublicationsV8({
           </div>
         </div>
       )}
-      <Dialog open={Boolean(editing)} title="使う場所" description="同意のある写真の掲載先を選びます。原本は公開しません。" busy={Boolean(busyId)} error={notice} confirmLabel="保存する" onCancel={() => { if (!busyId) setEditing(null) }} onConfirm={() => void savePlacements()}>
+      <Dialog open={Boolean(editing)} title="使う場所" description="同意のある写真の掲載先を選びます。原本は公開しません。" busy={Boolean(busyId)} error={notice} confirmLabel="保存する" onCancel={() => { if (!busyId) setEditing(null) }} onConfirm={() => savePlacements()}>
         {placementChoices.map((choice) => <Checkbox key={choice.type} checked={selectedPlacements.includes(choice.type)} onCheckedChange={(checked) => setSelectedPlacements((current) => checked ? [...current, choice.type] : current.filter((type) => type !== choice.type))}>{choice.label}</Checkbox>)}
       </Dialog>
     </>

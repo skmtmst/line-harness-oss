@@ -1311,7 +1311,7 @@ export default function ScenariosListV8() {
           destructive
           busy={deleting}
           error={deleteError}
-          onConfirm={targetStillListed ? () => void runDelete() : undefined}
+          onConfirm={targetStillListed ? () => runDelete() : undefined}
           onCancel={() => {
             if (deleting) return
             setDeleteTarget(null)
@@ -1350,7 +1350,7 @@ export default function ScenariosListV8() {
           confirmIcon={<Copy size={14} aria-hidden="true" />}
           busy={duplicating}
           error={duplicateError}
-          onConfirm={() => void runDuplicate()}
+          onConfirm={() => runDuplicate()}
           onCancel={() => {
             if (duplicating) return
             setDuplicateTarget(null)

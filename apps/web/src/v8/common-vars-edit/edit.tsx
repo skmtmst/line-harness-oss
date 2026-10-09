@@ -1304,7 +1304,7 @@ function EditCommonVarV8Inner() {
           deleteAccountSwitched || deletePhase !== 'ready' || !deleteImpact?.canDelete
             || !deleteReason.trim()
             ? undefined
-            : () => void remove()
+            : () => remove()
         }
         onCancel={closeDelete}
       >
@@ -1412,7 +1412,7 @@ function EditCommonVarV8Inner() {
         destructive
         busy={clearSchedulesBusy}
         error={clearSchedulesError || undefined}
-        onConfirm={clearSchedulesBusy ? undefined : () => void clearSchedules()}
+        onConfirm={clearSchedulesBusy ? undefined : () => clearSchedules()}
         onCancel={() => { if (!clearSchedulesBusy) setClearSchedulesOpen(false) }}
       />
 

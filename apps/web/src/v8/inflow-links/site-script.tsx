@@ -502,7 +502,7 @@ export default function SiteScriptV8() {
         busy={siteBusy}
         error={siteDialog?.error ?? undefined}
         confirmLabel={siteDialog?.mode === 'edit' ? '保存する' : '追加する'}
-        onConfirm={() => void saveSite()}
+        onConfirm={() => saveSite()}
         onCancel={() => setSiteDialog(null)}
       >
         {siteDialog ? (
@@ -528,7 +528,7 @@ export default function SiteScriptV8() {
         busy={siteBusy}
         error={stopDialog?.error ?? undefined}
         confirmLabel="計測を止める"
-        onConfirm={() => void stopSite()}
+        onConfirm={() => stopSite()}
         onCancel={() => { if (!siteBusy) setStopDialog(null) }}
       >
         {stopDialog ? (
@@ -549,7 +549,7 @@ export default function SiteScriptV8() {
         description={resumeTarget ? `「${resumeTarget.label}」から届く分をまた数え始めます。止めていた間の分は数えていません。` : ''}
         confirmLabel="再開する"
         busy={siteBusy}
-        onConfirm={() => void resumeSite()}
+        onConfirm={() => resumeSite()}
         onCancel={() => { if (!siteBusy) setResumeTarget(null) }}
       />
     </DetailPage>

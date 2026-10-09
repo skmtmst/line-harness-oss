@@ -237,7 +237,7 @@ function SessionsCard() {
       description="他の端末はすべてログイン画面へ戻ります。この端末のログインは続きます。"
       confirmLabel="すべて終了する"
       busy={revokingId === 'others'}
-      onConfirm={() => void revokeOthers()}
+      onConfirm={() => revokeOthers()}
       onCancel={() => { if (revokingId === 'others') return; setConfirmOthers(false) }}
     />
   </section>
@@ -571,7 +571,7 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
       confirmLabel="保存する"
       busy={saving}
       error={saveConfirmError}
-      onConfirm={() => void save()}
+      onConfirm={() => save()}
       onCancel={() => { if (saving) return; setSaveConfirmOpen(false); setSaveConfirmError('') }}
     />
     {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
@@ -657,7 +657,7 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
       confirmLabel="解除する"
       busy={unlinking}
       error={unlinkError}
-      onConfirm={() => void unlinkLine()}
+      onConfirm={() => unlinkLine()}
       onCancel={() => { if (unlinking) return; setUnlinkOpen(false); setUnlinkError('') }}
     >
       <p className="text-ink-secondary text-sm">通知設定でLINEを選んでいるお知らせは、解除したあと届かなくなります。メールを選んでいるぶんはそのまま届きます。</p>
@@ -1190,7 +1190,7 @@ function StaffPageHost() {
         confirmLabel="解除する"
         busy={disablingTwoFactor}
         error={disableError}
-        onConfirm={() => void runDisableTwoFactor()}
+        onConfirm={() => runDisableTwoFactor()}
         onCancel={() => { if (disablingTwoFactor) return; setDisablingTarget(null); setDisableError('') }}
       >
         <p className={styles.dialogNote}>解除しても、権限・担当範囲・ログインの記録は変わりません。</p>
@@ -1202,7 +1202,7 @@ function StaffPageHost() {
         confirmLabel="外す"
         busy={removing}
         error={removeError}
-        onConfirm={() => void runRemove()}
+        onConfirm={() => runRemove()}
         onCancel={() => { if (removing) return; setRemovingTarget(null); setRemoveError('') }}
       >
         <p className={styles.dialogNote}>これまでの設定と操作記録は残ります。</p>

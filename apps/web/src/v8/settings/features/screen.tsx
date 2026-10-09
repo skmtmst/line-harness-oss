@@ -570,7 +570,7 @@ export default function FeatureSettingsScreen() {
         confirmLabel="比べてから保存"
         busy={saving}
         onCancel={() => setCompareOpen(false)}
-        onConfirm={() => { if (!validateReason()) { setCompareOpen(false); return }; setCompareOpen(false); void save() }}
+        onConfirm={() => { if (!validateReason()) { setCompareOpen(false); return }; setCompareOpen(false); return save() }}
       >
         <ul className={styles.compareList}>
           {Object.keys(features).filter((key) => features[key] !== savedFeatures[key]).map((key) => (
@@ -628,7 +628,7 @@ export default function FeatureSettingsScreen() {
           setImpactOpen(false)
           setImpactError('')
         }}
-        onConfirm={() => void confirmImpactSave()}
+        onConfirm={() => confirmImpactSave()}
       >
         <div>
           {impactGroups.map((group) => (

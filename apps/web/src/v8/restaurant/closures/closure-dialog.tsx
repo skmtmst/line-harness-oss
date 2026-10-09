@@ -185,7 +185,7 @@ export default function ClosureDialog({
       busy={busy}
       error={error || undefined}
       confirmLabel={editing ? '変更を保存' : days === 'この日' ? 'この日を閉じる' : 'この期間を閉じる'}
-      onConfirm={() => void save()}
+      onConfirm={() => save()}
       onCancel={onClose}
     >
       <div className={styles.form} ref={formRef}>

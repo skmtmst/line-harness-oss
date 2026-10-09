@@ -288,7 +288,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
         busy={busy}
         onClose={() => setCancelId('')}
         onConfirm={(id) => {
-          void save(() => restaurantTestApi.updateReservation(accountId, id, { status: 'cancelled' }), cancelling && cancelling.hold_expires_at && cancelling.status === 'pending' ? '押さえを解除しました。' : '予約を取り消しました。').then((ok) => { if (ok) setCancelId('') })
+          return save(() => restaurantTestApi.updateReservation(accountId, id, { status: 'cancelled' }), cancelling && cancelling.hold_expires_at && cancelling.status === 'pending' ? '押さえを解除しました。' : '予約を取り消しました。').then((ok) => { if (ok) setCancelId('') })
         }}
       />
       <InboundTrialDialog

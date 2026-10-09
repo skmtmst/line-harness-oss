@@ -527,7 +527,7 @@ export default function OpsSupportV8() {
         busy={busy}
         error={createError || undefined}
         designNode="Izau1"
-        onConfirm={() => void create()}
+        onConfirm={() => create()}
         onCancel={() => { if (!busy) setCreating(false) }}
       >
         <div className={parts.dialogBody}>

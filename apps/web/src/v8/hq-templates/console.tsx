@@ -671,7 +671,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
             confirmLabel="削除する"
             busy={busy}
             onCancel={() => { if (!busy) setRemove(null) }}
-            onConfirm={() => void perform(async () => {
+            onConfirm={() => perform(async () => {
               if (!remove) return
               await hqTemplatesApi.remove(remove.id, remove.revision)
               setTemplates((current) => current.filter((t) => t.id !== remove.id))

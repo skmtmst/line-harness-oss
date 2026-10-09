@@ -332,7 +332,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
         confirmLabel="止めて保存する"
         destructive
         busy={saving}
-        onConfirm={() => { setEmptyConfirm(null); void save() }}
+        onConfirm={() => { setEmptyConfirm(null); return save() }}
         onCancel={() => { if (!saving) setEmptyConfirm(null) }}
       />
       <UnsavedLeaveDialog

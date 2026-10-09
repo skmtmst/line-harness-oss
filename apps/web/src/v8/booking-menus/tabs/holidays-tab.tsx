@@ -327,7 +327,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
         busy={busy}
         error={deleteError ?? undefined}
         onCancel={() => { if (!busy) { setDeleteTarget(null); setDeleteError(null) } }}
-        onConfirm={() => void remove()}
+        onConfirm={() => remove()}
       />
     </div>
   )

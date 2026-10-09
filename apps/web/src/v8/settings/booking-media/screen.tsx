@@ -645,7 +645,7 @@ export default function BookingMediaPage() {
         description="予約を受けないグルメ媒体（口コミ・紹介のサイトなど）を足します。予約メールは取り込みません。足したら行の「…」から URL を入れます。"
         confirmLabel="足す"
         busy={addBusy}
-        onConfirm={() => void addMedium()}
+        onConfirm={() => addMedium()}
         onCancel={() => setAdding(false)}
         error={addError || undefined}
       >

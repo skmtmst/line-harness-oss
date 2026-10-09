@@ -583,7 +583,7 @@ export default function AccountHandoverV8() {
         confirmLabel={executing ? '実行中…' : '本実行する'}
         busy={executing}
         error={executeError}
-        onConfirm={() => void executeHandover()}
+        onConfirm={() => executeHandover()}
         onCancel={() => { if (!executing) { setConfirmOpen(false); setExecuteError('') } }}
       />
       <ConfirmDialog
@@ -593,7 +593,7 @@ export default function AccountHandoverV8() {
         confirmLabel={cancelling ? '取り消し中…' : '引き継ぎを取り消す'}
         destructive
         busy={cancelling}
-        onConfirm={() => void runCancel()}
+        onConfirm={() => runCancel()}
         onCancel={() => { if (!cancelling) setCancelOpen(false) }}
       />
       <ConfirmDialog
@@ -604,7 +604,7 @@ export default function AccountHandoverV8() {
         destructive
         busy={rollingBack}
         error={rollbackError}
-        onConfirm={() => void runRollback()}
+        onConfirm={() => runRollback()}
         onCancel={() => { if (!rollingBack) { setRollbackOpen(false); setRollbackError('') } }}
       />
     </>

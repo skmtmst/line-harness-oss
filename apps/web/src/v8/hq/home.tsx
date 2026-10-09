@@ -650,7 +650,7 @@ export default function HqHomeV8() {
         onCancel={() => { if (!folderSaving) setFolderDialog(null) }}
         designNode="JKjsE" busy={folderSaving} error={folderError || undefined}
         confirmLabel={folderDialog?.editing ? '保存する' : '追加する'} cancelLabel="やめる"
-        onConfirm={() => void saveFolder()}
+        onConfirm={() => saveFolder()}
       />
 
       {deleteFolder ? (
@@ -663,7 +663,7 @@ export default function HqHomeV8() {
           destructive
           busy={folderSaving}
           error={folderError || undefined}
-          onConfirm={() => void removeFolder(deleteFolder)}
+          onConfirm={() => removeFolder(deleteFolder)}
           onCancel={() => { if (!folderSaving) setDeleteFolder(null) }}
         />
       ) : null}

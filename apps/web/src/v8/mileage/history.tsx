@@ -471,7 +471,7 @@ export default function HistoryTab() {
           busy={pendingBusy}
           error={pendingError || undefined}
           onCancel={() => { if (!pendingBusy) setPendingAction(null) }}
-          onConfirm={() => void runPendingAction()}
+          onConfirm={() => runPendingAction()}
         >
           <label className={styles.fieldLabel}>
             理由（必須）

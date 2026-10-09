@@ -550,7 +550,7 @@ export default function HqStoreList(props: HqStoreListProps) {
             confirmLabel={folderDialog?.editing ? '保存する' : '追加する'}
             cancelLabel="やめる"
             onCancel={() => { if (!folderBusy) setFolderDialog(null) }}
-            onConfirm={() => void saveFolder()}
+            onConfirm={() => saveFolder()}
           />
           <ConfirmDialog
             open={deletingFolder !== null}
@@ -562,7 +562,7 @@ export default function HqStoreList(props: HqStoreListProps) {
             busy={folderBusy}
             error={folderError || undefined}
             onCancel={() => { if (!folderBusy) setDeletingFolder(null) }}
-            onConfirm={() => void removeFolder()}
+            onConfirm={() => removeFolder()}
           />
         </>
       )}

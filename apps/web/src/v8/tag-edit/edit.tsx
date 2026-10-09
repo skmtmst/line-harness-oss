@@ -262,7 +262,7 @@ export default function TagEditV8() {
         confirmLabel="最新を読み込んで続ける"
         busy={compareBusy}
         error={compareError || undefined}
-        onConfirm={() => void reloadAfterConflict()}
+        onConfirm={() => reloadAfterConflict()}
         onCancel={() => {
           setCompareTarget(null)
           setCompareError('')

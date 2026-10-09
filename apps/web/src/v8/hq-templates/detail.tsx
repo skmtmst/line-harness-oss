@@ -352,7 +352,7 @@ export default function HqTemplateDetail({
         confirmLabel="この版に戻す"
         busy={restoring}
         error={restoreError || undefined}
-        onConfirm={() => void restore()}
+        onConfirm={() => restore()}
         onCancel={() => {
           if (restoring) return
           setRestoreTarget(null)

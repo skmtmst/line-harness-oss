@@ -281,7 +281,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
         busy={removing}
         error={removeError || undefined}
         onCancel={() => { if (!removing) setRemoveTarget(null) }}
-        onConfirm={() => void remove()}
+        onConfirm={() => remove()}
       />
 
     </div>

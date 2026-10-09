@@ -361,7 +361,7 @@ function ChangeReview({ eventId }: { eventId: string }) {
         cancelLabel="戻って直す"
         confirmLabel={`変えて ${preview?.total_confirmed ?? 0} 人にお知らせする`}
         busy={applyBusy}
-        onConfirm={() => { setConfirmOpen(false); void runApply() }}
+        onConfirm={() => { setConfirmOpen(false); return runApply() }}
         onCancel={() => setConfirmOpen(false)}
       >
         <div className={styles.confirmBody}>

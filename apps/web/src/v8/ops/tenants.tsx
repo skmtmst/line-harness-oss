@@ -234,7 +234,7 @@ export default function OpsTenantsV8() {
         busy={createBusy}
         error={createError || undefined}
         designNode="i0FTN"
-        onConfirm={() => void create()}
+        onConfirm={() => create()}
         onCancel={closeCreate}
       >
         <div className={parts.dialogBody}>

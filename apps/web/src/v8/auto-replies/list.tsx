@@ -1761,7 +1761,7 @@ export default function AutoRepliesListV8() {
         confirmLabel={duplicating ? '複製中…' : '複製する'}
         busy={duplicating}
         error={duplicateError}
-        onConfirm={() => void runDuplicate()}
+        onConfirm={() => runDuplicate()}
         onCancel={() => {
           if (duplicating) return
           setDuplicateTarget(null)

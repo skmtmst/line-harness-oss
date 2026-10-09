@@ -248,7 +248,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
       confirmLabel="書き出す"
       busy={busy === 'csv'}
       error={exportError || undefined}
-      onConfirm={() => void exportCsv()}
+      onConfirm={() => exportCsv()}
       onCancel={closeExport}
     >
       <Field htmlFor="operator-export-reason" label="書き出す理由" error={exportReasonError}><TextField ref={exportReasonRef} id="operator-export-reason" value={exportReason} onChange={(event) => { setExportReasonError(''); setExportReason(event.target.value) }} placeholder="例：月次の運用確認" autoFocus /></Field>

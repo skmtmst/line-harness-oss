@@ -764,7 +764,7 @@ function InflowDetailContent() {
           confirmLabel={deleteChoice === 'stop' ? '受けるのをやめる' : deleteChoice === 'redirect' ? '別のリンクへ送る' : 'この経路を削除する'}
           onConfirm={() => {
             if (deleteChoice === 'delete' && deleteConfirmationName !== route.name) return
-            void applyDeleteChoice()
+            return applyDeleteChoice()
           }}
           onCancel={() => { if (!deleting) setDeleteOpen(false) }}
         >

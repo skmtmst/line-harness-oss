@@ -617,7 +617,7 @@ export default function ApprovalsTab() {
             confirmLabel={bulkConfirm.action === 'approved' ? '認める' : '認めない（却下）'}
             destructive={bulkConfirm.action === 'rejected'}
             busy={actioning !== null}
-            onConfirm={() => { void runBulkDecide(bulkConfirm.action, bulkConfirm.items) }}
+            onConfirm={() => { return runBulkDecide(bulkConfirm.action, bulkConfirm.items) }}
             onCancel={() => setBulkConfirm(null)}
           >
             <ul className={styles.resultList}>

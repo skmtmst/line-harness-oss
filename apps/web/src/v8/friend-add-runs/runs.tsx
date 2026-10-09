@@ -640,7 +640,7 @@ function FriendAddRunsInner() {
         busy={stopBusy}
         error={stopError || undefined}
         onCancel={() => { if (!stopBusy) setStopOpen(false) }}
-        onConfirm={() => void stopDelivery()}
+        onConfirm={() => stopDelivery()}
       />
     </DetailPage>
   )

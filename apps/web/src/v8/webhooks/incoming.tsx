@@ -829,7 +829,7 @@ export default function WebhooksIncomingV8() {
           busy={creating}
           error={createFieldError.form}
           onCancel={() => { if (!creating) setShowCreate(false) }}
-          onConfirm={() => void runCreate()}
+          onConfirm={() => runCreate()}
           confirmLabel="作る"
           confirmIcon={<Plus size={15} aria-hidden="true" />}
         >
@@ -924,7 +924,7 @@ export default function WebhooksIncomingV8() {
           destructive
           busy={deleting}
           error={deleteError || undefined}
-          onConfirm={() => void runDelete()}
+          onConfirm={() => runDelete()}
           onCancel={() => { if (!deleting) { setDeleteTarget(null); setDeleteError('') } }}
         />
 
@@ -935,7 +935,7 @@ export default function WebhooksIncomingV8() {
           description="新しい合言葉を設定します。保存したあとは二度と全部は表示されません。前の合言葉は24時間だけ使えるので、相手側の切り替え中も受け取りは止まりません。"
           error={rotateError || undefined}
           onCancel={() => { setRotateTarget(null); setRotateSecret('') }}
-          onConfirm={() => void runRotate()}
+          onConfirm={() => runRotate()}
           confirmLabel="保存する"
         >
           <div className={styles.fieldRow}>

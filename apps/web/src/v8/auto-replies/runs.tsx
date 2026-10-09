@@ -646,7 +646,7 @@ export default function AutoReplyRunsV8() {
         destructive
         busy={stopping}
         designNode="i8F12"
-        onConfirm={() => void stopRule()}
+        onConfirm={() => stopRule()}
         onCancel={() => { if (!stopping) { setStopOpen(false); setStopReason('') } }}
       >
         <input

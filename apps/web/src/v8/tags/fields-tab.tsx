@@ -628,7 +628,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
         busy={folderBusy}
         error={folderError || undefined}
         onCancel={() => { if (!folderBusy) setDeletingFolder(null) }}
-        onConfirm={() => void removeFolder()}
+        onConfirm={() => removeFolder()}
       />
 
       <ConfirmDialog

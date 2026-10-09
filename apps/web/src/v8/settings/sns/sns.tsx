@@ -259,7 +259,7 @@ export default function SnsSettingsPage() {
         description="解除すると、口コミの取り込みと投稿の公開が止まります。あとでもう一度つなぎ直せます。"
         confirmLabel="解除する"
         busy={busy}
-        onConfirm={() => void runDisconnect()}
+        onConfirm={() => runDisconnect()}
         onCancel={() => setConfirm(null)}
       />
       <ConfirmDialog
@@ -269,7 +269,7 @@ export default function SnsSettingsPage() {
         description="解除すると、Googleビジネスの投稿を Instagram へ同時に出せなくなります。あとでもう一度つなぎ直せます。"
         confirmLabel="解除する"
         busy={busy}
-        onConfirm={() => void runDisconnect()}
+        onConfirm={() => runDisconnect()}
         onCancel={() => setConfirm(null)}
       />
     </PageFrame>

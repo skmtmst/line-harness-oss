@@ -1289,7 +1289,7 @@ export default function BroadcastListV8() {
           destructive
           busy={folderBusy}
           error={folderError || undefined}
-          onConfirm={() => void removeFolder()}
+          onConfirm={() => removeFolder()}
           onCancel={() => {
             if (folderBusy) return
             setDeletingFolder(null)
@@ -1304,7 +1304,7 @@ export default function BroadcastListV8() {
           destructive
           busy={deleting}
           error={deleteError}
-          onConfirm={() => void handleDelete()}
+          onConfirm={() => handleDelete()}
           onCancel={() => {
             if (deleting) return
             setDeleteTarget(null)

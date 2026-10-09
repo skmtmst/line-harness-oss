@@ -525,7 +525,7 @@ export default function WebhooksSheetsV8() {
           designTop={280}
           busy={busy === 'disconnect'}
           confirmLabel="接続を解除する"
-          onConfirm={() => void handleDisconnect()}
+          onConfirm={() => handleDisconnect()}
           onCancel={() => { if (busy !== 'disconnect') setDisconnectFor(null) }}
         />
       )}

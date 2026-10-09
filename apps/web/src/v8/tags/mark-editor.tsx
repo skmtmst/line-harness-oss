@@ -555,7 +555,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
           error={archiveError}
           onReplacement={setReplacementMarkId}
           onCancel={() => { if (!archiving) { setArchiveOpen(false); setArchiveImpact(null) } }}
-          onConfirm={() => void confirmArchive(selected)}
+          onConfirm={() => confirmArchive(selected)}
         />
       ) : null}
       {/* きまりを作る・直すは今の自動変更ルールの部品を窓で開く。閉じたら読み直す。 */}
@@ -571,7 +571,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         busy={ruleBusy}
         error={ruleError || undefined}
         onCancel={() => { if (!ruleBusy) setStoppingRule(null) }}
-        onConfirm={() => void stopRule()}
+        onConfirm={() => stopRule()}
       />
     </>
   )

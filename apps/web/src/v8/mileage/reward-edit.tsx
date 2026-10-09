@@ -555,7 +555,7 @@ function RewardEditorInner() {
         busy={saving}
         error={failure || undefined}
         onCancel={() => setPublishOpen(false)}
-        onConfirm={() => void save(true)}
+        onConfirm={() => save(true)}
       />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した使い道" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage>

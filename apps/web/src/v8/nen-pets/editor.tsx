@@ -106,7 +106,7 @@ export default function PetEditorV8({ accountId, pet, onClose, onSaved }: {
       busy={saving}
       error={error}
       confirmLabel="保存する"
-      onConfirm={() => void save()}
+      onConfirm={() => save()}
       onCancel={onClose}
     >
       <div className={styles.editor}>

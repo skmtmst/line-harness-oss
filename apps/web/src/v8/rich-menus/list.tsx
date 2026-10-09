@@ -1403,7 +1403,7 @@ export default function RichMenusListV8() {
             setDuplicateTarget(null)
             setDuplicateError(null)
           }}
-          onConfirm={() => void confirmDuplicate()}
+          onConfirm={() => confirmDuplicate()}
         />
 
         <ConfirmDialog
@@ -1419,7 +1419,7 @@ export default function RichMenusListV8() {
             setImportTarget(null)
             setImportError(null)
           }}
-          onConfirm={() => void confirmImport()}
+          onConfirm={() => confirmImport()}
         >
           <div className={styles.impact}>
             <p><strong>管理画面に追加するもの：</strong>名前・画像・ボタンの設定</p>

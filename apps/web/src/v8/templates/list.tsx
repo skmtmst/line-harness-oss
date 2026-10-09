@@ -1387,7 +1387,7 @@ export default function TemplatesListV8() {
         destructive busy={deleting} error={deleteError}
         designNode="V6JFnd"
         confirmDisabled={pendingDelete !== null && pendingDelete.accountId !== selectedAccountId}
-        onConfirm={() => void confirmDelete()}
+        onConfirm={() => confirmDelete()}
         onCancel={() => { if (!deleting) { setPendingDelete(null); setDeleteError('') } }}
       >
         <Notice tone="danger" message="削除は元に戻せません。" />
@@ -1403,7 +1403,7 @@ export default function TemplatesListV8() {
         destructive
         busy={bulkDeleting}
         error={bulkDeleteError}
-        onConfirm={() => void runBulkDelete()}
+        onConfirm={() => runBulkDelete()}
         onCancel={() => {
           if (bulkDeleting) return
           setPendingBulkDelete(null)
@@ -1496,7 +1496,7 @@ export default function TemplatesListV8() {
         confirmLabel={moving ? '移動中…' : '移動する'}
         busy={moving}
         error={moveError}
-        onConfirm={() => void runMove()}
+        onConfirm={() => runMove()}
         onCancel={() => {
           if (moving) return
           setMoveIds(null)
@@ -1527,7 +1527,7 @@ export default function TemplatesListV8() {
         confirmLabel={duplicating ? '複製中…' : '複製する'}
         busy={duplicating}
         error={duplicateError}
-        onConfirm={() => void runDuplicate()}
+        onConfirm={() => runDuplicate()}
         onCancel={() => {
           if (duplicating) return
           setDuplicateTarget(null)
@@ -1570,7 +1570,7 @@ export default function TemplatesListV8() {
         busy={folderBusy}
         error={folderError || undefined}
         onCancel={() => { if (!folderBusy) { setDeletingFolder(null); setFolderError('') } }}
-        onConfirm={() => void removeFolder()}
+        onConfirm={() => removeFolder()}
       />
 
       {/* 行の詳細パネル。一覧は左に見えたまま。 */}

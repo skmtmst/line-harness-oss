@@ -207,7 +207,7 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
         destructive
         busy={deleting}
         error={deleteError}
-        onConfirm={() => void onDelete()}
+        onConfirm={() => onDelete()}
         onCancel={() => {
           if (deleting) return
           setConfirmOpen(false)
@@ -338,7 +338,7 @@ function PoolMembers({ poolId, accounts, canManage, onChange }: {
         confirmLabel="外す"
         busy={removing}
         error={removeError}
-        onConfirm={() => void onRemove()}
+        onConfirm={() => onRemove()}
         onCancel={() => {
           if (removing) return
           setRemoveTarget(null)

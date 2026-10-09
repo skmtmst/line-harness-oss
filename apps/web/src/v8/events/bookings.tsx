@@ -662,7 +662,7 @@ function Bookings({ eventId }: { eventId: string }) {
         confirmLabel="キャンセルする"
         busy={cancelling}
         error={cancelError}
-        onConfirm={() => void runAdminCancel()}
+        onConfirm={() => runAdminCancel()}
         onCancel={() => {
           if (cancelling) return
           setCancelError('')
@@ -718,7 +718,7 @@ function Bookings({ eventId }: { eventId: string }) {
         confirmLabel={waitlistDialog?.kind === 'reorder' ? '入れ替える' : '実行する'}
         busy={waitlistBusy}
         error={waitlistError}
-        onConfirm={() => void runWaitlistOperation()}
+        onConfirm={() => runWaitlistOperation()}
         onCancel={() => {
           if (waitlistBusy) return
           setWaitlistError('')
@@ -790,7 +790,7 @@ function Bookings({ eventId }: { eventId: string }) {
         confirmLabel="送る"
         busy={broadcastBusy}
         error={broadcastError}
-        onConfirm={() => void sendBroadcast()}
+        onConfirm={() => sendBroadcast()}
         onCancel={() => {
           if (broadcastBusy) return
           setBroadcastError('')

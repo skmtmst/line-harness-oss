@@ -771,7 +771,7 @@ export default function ScoreTab() {
           busy={rulesBusy}
           error={rulesActionError || undefined}
           onCancel={() => { if (!rulesBusy) setPublishConfirm(false) }}
-          onConfirm={() => void publishDraft()}
+          onConfirm={() => publishDraft()}
         />
         <ConfirmDialog
           open={stopConfirm}
@@ -782,7 +782,7 @@ export default function ScoreTab() {
           busy={rulesBusy}
           error={rulesActionError || undefined}
           onCancel={() => { if (!rulesBusy) setStopConfirm(false) }}
-          onConfirm={() => void stopPublished()}
+          onConfirm={() => stopPublished()}
         />
         <ConfirmDialog
           open={removeTarget !== null}
@@ -911,7 +911,7 @@ export function ScoreAdjustDialog({
       cancelLabel="キャンセル"
       busy={busy}
       error={error || undefined}
-      onConfirm={() => void submit()}
+      onConfirm={() => submit()}
       onCancel={() => { if (!busy) onCancel() }}
     >
       {/* 絵 Nv7An：縦に間 14 の1列。ラベルと入れ物の間は 6。 */}

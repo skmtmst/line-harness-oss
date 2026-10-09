@@ -417,7 +417,7 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
         busy={busy}
         error={error ?? undefined}
         onCancel={() => { if (!busy) setConfirmDelete(false) }}
-        onConfirm={() => void remove()}
+        onConfirm={() => remove()}
       />
     </div>
   )

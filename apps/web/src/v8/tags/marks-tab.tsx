@@ -587,7 +587,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
           error={deleteError}
           onReplacement={setReplacementMarkId}
           onCancel={() => { if (!deleting) { setPendingDelete(null); setArchiveImpact(null) } }}
-          onConfirm={() => void confirmRemove(pendingDelete)}
+          onConfirm={() => confirmRemove(pendingDelete)}
         />
       ) : null}
     </>

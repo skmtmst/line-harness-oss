@@ -172,7 +172,7 @@ export function HqApprovalBlock({
         busy={busy}
         error={message || undefined}
         onCancel={() => { if (!busy) { setMessage(''); onRequestClose() } }}
-        onConfirm={approverId ? () => void run1(() => hqBroadcastsApi.requestApproval(run.id, run.version, approverId, note.trim() || undefined), '承認を依頼しました').then((ok) => { if (ok) onRequestClose() }) : undefined}
+        onConfirm={approverId ? () => run1(() => hqBroadcastsApi.requestApproval(run.id, run.version, approverId, note.trim() || undefined), '承認を依頼しました').then((ok) => { if (ok) onRequestClose() }) : undefined}
       >
         <ApprovalRequestFields
           recipientCount={state.gate.recipientCount}
@@ -237,7 +237,7 @@ export function HqTestSendDialog({
       busy={busy}
       error={error || undefined}
       onCancel={() => { if (!busy) { setError(''); onClose() } }}
-      onConfirm={chosen ? () => void send() : undefined}
+      onConfirm={chosen ? () => send() : undefined}
     >
       {accounts.length === 0 ? <p className="text-ink-faint text-xs">先に送るアカウントを選んでください。</p> : (
         <HqAccountSelectField label="テストを送るアカウント" accounts={accounts} value={chosen} onChange={setAccountId} disabled={busy} />

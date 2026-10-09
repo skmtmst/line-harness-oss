@@ -619,7 +619,7 @@ function ReminderDetailV8() {
         destructive
         busy={deleting}
         error={deleteError}
-        onConfirm={() => void runDelete()}
+        onConfirm={() => runDelete()}
         onCancel={() => setConfirmDelete(false)}
       />
     </PageFrame>

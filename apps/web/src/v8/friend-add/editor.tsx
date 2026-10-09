@@ -803,7 +803,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         title="最新の保存とあなたの直しの違い"
         description={compare && compare.length === 0 ? '項目の違いはありません。最新を読み込んで続けてください。' : '左があなたの直し、右が先に保存された内容です。'}
         confirmLabel="最新を読み込んで続ける"
-        onConfirm={() => void reloadAfterConflict()}
+        onConfirm={() => reloadAfterConflict()}
         onCancel={() => setCompare(null)}
       >
         {compare && compare.length > 0 ? (

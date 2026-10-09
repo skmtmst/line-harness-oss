@@ -629,7 +629,7 @@ export default function HqBroadcastDetail() {
           destructive={ask.kind === 'cancel' || ask.kind === 'stop'}
           warning={ask.kind === 'send'}
           busy={busy}
-          onConfirm={ask.kind !== 'send' || gate !== 'single' || (approval.state && Number(confirmCount) === approval.state.gate.recipientCount) ? () => void act() : undefined}
+          onConfirm={ask.kind !== 'send' || gate !== 'single' || (approval.state && Number(confirmCount) === approval.state.gate.recipientCount) ? () => act() : undefined}
           onCancel={() => setAsk(null)}
         >
           {ask.kind === 'send' && gate === 'single' && approval.state ? <SingleOperatorFields recipientCount={approval.state.gate.recipientCount} value={confirmCount} onChange={setConfirmCount} /> : null}

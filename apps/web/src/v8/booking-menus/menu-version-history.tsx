@@ -172,7 +172,7 @@ export default function MenuVersionHistory({
         cancelLabel="キャンセル"
         busy={reverting}
         onCancel={() => setConfirming(false)}
-        onConfirm={() => void doRevert()}
+        onConfirm={() => doRevert()}
       />
     </Drawer>
   )

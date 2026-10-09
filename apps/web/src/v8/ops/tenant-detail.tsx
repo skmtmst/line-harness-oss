@@ -291,7 +291,7 @@ function DetailContent() {
           confirmLabel="代理ログインを始める"
           busy={busy}
           error={error || undefined}
-          onConfirm={() => void impersonate()}
+          onConfirm={() => impersonate()}
           onCancel={() => { if (!busy) setImpersonateConfirm(false) }}
         />
       ) : null}
@@ -352,7 +352,7 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
       busy={busy}
       error={error || undefined}
       designNode={target === 'suspended' ? 'okXoi' : undefined}
-      onConfirm={() => void submit()}
+      onConfirm={() => submit()}
       onCancel={onClose}
     >
       <div className={parts.dialogBody}>

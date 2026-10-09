@@ -1694,7 +1694,7 @@ function CommonVarsListInner() {
         destructive
         busy={deleting}
         error={deleteBatchError || undefined}
-        onConfirm={() => void removeSelected()}
+        onConfirm={() => removeSelected()}
         onCancel={() => {
           if (deleting) return
           batchRequestRef.current = {

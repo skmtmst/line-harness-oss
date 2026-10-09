@@ -588,7 +588,7 @@ export default function TemplateDetailV8() {
         destructive
         busy={deleting}
         error={deleteError}
-        onConfirm={() => void remove()}
+        onConfirm={() => remove()}
         onCancel={() => {
           if (deleting) return
           setDeleteOpen(false)
@@ -604,7 +604,7 @@ export default function TemplateDetailV8() {
         confirmLabel="この版に戻す"
         busy={reverting}
         error={revertError}
-        onConfirm={() => void doRevert()}
+        onConfirm={() => doRevert()}
         onCancel={() => {
           if (reverting) return
           setRevertTarget(null)

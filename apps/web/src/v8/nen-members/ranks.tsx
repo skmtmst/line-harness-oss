@@ -405,7 +405,7 @@ export default function RankSettingsV8({
         busy={busy}
         confirmLabel={moving > 0 ? `${formatNumber(moving)} 人を移して消す` : '消す'}
         cancelLabel="キャンセル"
-        onConfirm={moving > 0 && !replacement ? undefined : () => void removeRank()}
+        onConfirm={moving > 0 && !replacement ? undefined : () => removeRank()}
         onCancel={() => setRemoveTarget(null)}
       >
         <div className={styles.removeBody}>
@@ -444,7 +444,7 @@ export default function RankSettingsV8({
         confirmLabel="この内容で保存する"
         cancelLabel="閉じる"
         busy={busy}
-        onConfirm={() => void save(true)}
+        onConfirm={() => save(true)}
         onCancel={() => setComparing(false)}
       >
         {conflict ? (

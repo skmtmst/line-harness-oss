@@ -124,6 +124,6 @@ export default function PhotoPolicyHistoryV8({ open, canEdit, onClose, onChanged
       </>}
       </div>
     </Dialog>
-    <ConfirmDialog open={revertOpen} title={`v${selected?.versionNumber}に戻しますか？`} description="過去の版は変わりません。その中身で新しい版を作ります。付与済みのマイルは変わりません。" busy={saving} error={saveError} confirmLabel="この版に戻す" onConfirm={() => void revert()} onCancel={() => { if (!saving) setRevertOpen(false) }} />
+    <ConfirmDialog open={revertOpen} title={`v${selected?.versionNumber}に戻しますか？`} description="過去の版は変わりません。その中身で新しい版を作ります。付与済みのマイルは変わりません。" busy={saving} error={saveError} confirmLabel="この版に戻す" onConfirm={() => revert()} onCancel={() => { if (!saving) setRevertOpen(false) }} />
   </>
 }

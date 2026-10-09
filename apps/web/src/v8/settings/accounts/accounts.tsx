@@ -292,7 +292,7 @@ export default function AccountsV8() {
         busy={busy}
         error={dialogError || undefined}
         onCancel={() => { if (!busy) { setArchiveTarget(null); setArchiveReason(''); setDialogError('') } }}
-        onConfirm={() => void runArchive()}
+        onConfirm={() => runArchive()}
       >
         <label className={styles.reason}>
           <span className={styles.reasonLabel}>アーカイブの理由（任意）</span>
@@ -315,7 +315,7 @@ export default function AccountsV8() {
         busy={busy}
         error={dialogError || undefined}
         onCancel={() => { if (!busy) { setRestoreTarget(null); setDialogError('') } }}
-        onConfirm={() => void runRestore()}
+        onConfirm={() => runRestore()}
       />
       {stepUp ? <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} /> : null}
     </>

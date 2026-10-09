@@ -746,7 +746,7 @@ function ProjectInner() {
         busy={busy}
         designNode="I0w2e"
         onConfirm={() => {
-          void patchProject('アーカイブ', { archived: true }).then((updated) => {
+          return patchProject('アーカイブ', { archived: true }).then((updated) => {
             setArchiveConfirm(false)
             if (updated) router.push('/hq/banners')
           })

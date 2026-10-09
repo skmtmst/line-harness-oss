@@ -449,7 +449,7 @@ export default function OpsAnnouncementsV8() {
         busy={busy}
         error={formError || undefined}
         designNode="TJUUl"
-        onConfirm={() => void submit(scheduled ? 'schedule' : 'send')}
+        onConfirm={() => submit(scheduled ? 'schedule' : 'send')}
         onCancel={() => { if (!busy) setConfirmSend(false) }}
       >
         <div className={parts.dialogBody}>
@@ -473,7 +473,7 @@ export default function OpsAnnouncementsV8() {
         destructive
         busy={busy}
         error={formError}
-        onConfirm={() => void remove()}
+        onConfirm={() => remove()}
         onCancel={() => { if (!busy) setDeleting(null) }}
       />
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />

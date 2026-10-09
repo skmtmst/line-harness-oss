@@ -238,7 +238,7 @@ function IntakeAddressPanel({ accountId, store, readOnly }: { accountId: string;
         confirmLabel="発行する"
         busy={issuing}
         onCancel={() => setReissueOpen(false)}
-        onConfirm={() => void issue()}
+        onConfirm={() => issue()}
       />
       </div>
     </Panel>

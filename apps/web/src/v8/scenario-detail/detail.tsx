@@ -3038,7 +3038,7 @@ export default function ScenarioDetailV8({
         confirmLabel="この内容ではじめる"
         busy={startBusy}
         error={startError}
-        onConfirm={preflightLoading || preflightFailed ? undefined : () => void handleStart()}
+        onConfirm={preflightLoading || preflightFailed ? undefined : () => handleStart()}
         // WEB228：「内容と対象を確かめました」のチェックが入るまで「この内容ではじめる」を押せない。
         confirmDisabled={!startConfirmed}
         onCancel={() => {
@@ -3244,7 +3244,7 @@ export default function ScenarioDetailV8({
         destructive
         busy={deletingStepId !== null}
         error={deleteStepError}
-        onConfirm={() => void handleDeleteStep()}
+        onConfirm={() => handleDeleteStep()}
         onCancel={() => {
           if (deletingStepId) return
           setDeleteStepTarget(null)
@@ -3269,7 +3269,7 @@ export default function ScenarioDetailV8({
         destructive
         busy={deletingScenario}
         error={deleteScenarioError}
-        onConfirm={() => void handleDeleteScenario()}
+        onConfirm={() => handleDeleteScenario()}
         onCancel={() => {
           if (deletingScenario) return
           setDeleteScenarioOpen(false)
@@ -3291,7 +3291,7 @@ export default function ScenarioDetailV8({
         destructive
         busy={discardingDuplicate}
         error={discardDuplicateError}
-        onConfirm={() => void handleDiscardDuplicate()}
+        onConfirm={() => handleDiscardDuplicate()}
         onCancel={() => {
           if (discardingDuplicate) return
           setDiscardDuplicateOpen(false)

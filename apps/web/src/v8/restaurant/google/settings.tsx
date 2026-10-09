@@ -127,7 +127,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
             </Button>
           </div>
         ) : manageNote}
-        <ConfirmDialog open={confirmDisconnect} title="接続をやり直しますか？" description="いま進めている接続を取り消します。口コミの履歴は残ります。" confirmLabel="取り消す" destructive busy={busy} onConfirm={() => void disconnect()} onCancel={() => setConfirmDisconnect(false)} />
+        <ConfirmDialog open={confirmDisconnect} title="接続をやり直しますか？" description="いま進めている接続を取り消します。口コミの履歴は残ります。" confirmLabel="取り消す" destructive busy={busy} onConfirm={() => disconnect()} onCancel={() => setConfirmDisconnect(false)} />
         <ConfirmDialog
           open={confirmSwitch}
           title="接続する店舗を切り替えますか？"
@@ -135,7 +135,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
           confirmLabel="切り替える"
           destructive
           busy={busy}
-          onConfirm={() => void selectLocation(true)}
+          onConfirm={() => selectLocation(true)}
           onCancel={() => setConfirmSwitch(false)}
         />
       </Card>
@@ -175,7 +175,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
         destructive
         busy={busy}
         error={actionError}
-        onConfirm={() => void disconnect()}
+        onConfirm={() => disconnect()}
         onCancel={() => setConfirmDisconnect(false)}
       />
     </>

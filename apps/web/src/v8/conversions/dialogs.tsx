@@ -449,7 +449,7 @@ export function ConversionReversalDialog(props: ConversionReversalDialogProps) {
       busy={reversalBusy}
       error={reversalError || undefined}
       confirmLabel={reversalKind === 'restore' ? '取消を戻す' : '取り消す'}
-      onConfirm={() => void submitReversal()}
+      onConfirm={() => submitReversal()}
       onCancel={() => setReversalTarget(null)}
     >
       <label className="block">

@@ -427,7 +427,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
         confirmLabel="消して開ける"
         busy={removing !== null && busy === `remove-${removing.id}`}
         error={removeError || undefined}
-        onConfirm={() => void remove()}
+        onConfirm={() => remove()}
         onCancel={() => setRemoving(null)}
       />
     </>

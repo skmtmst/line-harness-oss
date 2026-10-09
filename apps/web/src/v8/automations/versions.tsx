@@ -369,7 +369,7 @@ function VersionsInner() {
         onConfirm={() => {
           if (!pendingBinding || !published || !selectedAccountId) return
           setDialogError('')
-          void run(`binding:${pendingBinding.id}`, () => api.commonActions.updateBinding(detail.id, selectedAccountId, {
+          return run(`binding:${pendingBinding.id}`, () => api.commonActions.updateBinding(detail.id, selectedAccountId, {
             bindingId: pendingBinding.id,
             versionId: published.id,
             expectedVersionId: pendingBinding.versionId,

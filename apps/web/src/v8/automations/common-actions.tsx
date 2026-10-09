@@ -439,7 +439,7 @@ export default function CommonActionsV8() {
             : archiving && archiving.item.bindingCount > 0 ? '閉じる' : '保管する'}
           busy={archivingBusy}
           onCancel={() => setArchiving(null)}
-          onConfirm={() => void confirmArchive()}
+          onConfirm={() => confirmArchive()}
         >
           {archiving?.mode === 'archive' && archiving.item.bindingCount > 0 ? (
             <p className={styles.dialogWarn} role="alert">

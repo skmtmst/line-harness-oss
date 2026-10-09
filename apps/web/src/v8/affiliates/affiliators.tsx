@@ -643,7 +643,7 @@ export default function AffiliatorsTab() {
           confirmLabel="まとめて止める"
           destructive
           busy={bulkBusy}
-          onConfirm={() => { void runBulkArchive() }}
+          onConfirm={() => { return runBulkArchive() }}
           onCancel={() => setBulkConfirm(false)}
         />
         {drawerRow ? (

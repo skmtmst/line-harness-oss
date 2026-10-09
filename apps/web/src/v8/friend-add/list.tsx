@@ -906,7 +906,7 @@ function FriendAddList() {
           confirmLabel="止める"
           busy={stopBusy}
           error={stopError}
-          onConfirm={() => void runStop()}
+          onConfirm={() => runStop()}
           onCancel={() => {
             if (stopBusy) return
             setStopTarget(null)
@@ -923,7 +923,7 @@ function FriendAddList() {
           destructive
           busy={deleteBusy}
           error={deleteError}
-          onConfirm={() => void runDelete()}
+          onConfirm={() => runDelete()}
           onCancel={closeDelete}
         />
         <FolderEditorDialog open={folderDialogOpen} title={editingFolder ? 'フォルダを直す' : 'フォルダを追加'}
@@ -931,7 +931,7 @@ function FriendAddList() {
           name={folderName} onNameChange={setFolderName} color={folderColor} onColorChange={setFolderColor} maxLength={50}
           confirmLabel={editingFolder ? '保存する' : '追加する'} busy={folderBusy} error={folderError || undefined}
           onCancel={() => { if (!folderBusy) { setFolderDialogOpen(false); setFolderName(''); setEditingFolder(null) } }}
-          onConfirm={() => void createFolder()} />
+          onConfirm={() => createFolder()} />
       </>}
     >
       {listBody}

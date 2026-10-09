@@ -519,7 +519,7 @@ export default function AdsV8() {
         confirmIcon={<Check size={15} aria-hidden="true" />}
         busy={manualBusy}
         error={manualError || undefined}
-        onConfirm={() => void submitManualEntry()}
+        onConfirm={() => submitManualEntry()}
         onCancel={() => { if (!manualBusy) setManualOpen(false) }}
       >
         <div className={styles.dialogBody}>
@@ -564,7 +564,7 @@ export default function AdsV8() {
         confirmLabel="取り消す"
         busy={cancelBusy}
         error={cancelError || undefined}
-        onConfirm={() => void submitCancel()}
+        onConfirm={() => submitCancel()}
         onCancel={() => { if (!cancelBusy) setCancelTarget(null) }}
       >
         {cancelTarget ? (

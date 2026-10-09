@@ -375,7 +375,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {testResult ? <p role="status" className={form.previewNote}>{testResult}</p> : null}
 
-      <ConfirmDialog open={testOpen} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" busy={testing} onCancel={() => { if (!testing) setTestOpen(false) }} onConfirm={() => void runTest()}>
+      <ConfirmDialog open={testOpen} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" busy={testing} onCancel={() => { if (!testing) setTestOpen(false) }} onConfirm={() => runTest()}>
         <p className={form.cardNote}>{dirty ? '保存していない設定を保存してから送ります。' : ''}{`対象：「${webinar.title}」の入っている通知。本文は設定済みのものを送ります。`}</p>
       </ConfirmDialog>
       {actionsOpen && actions ? (
@@ -418,7 +418,7 @@ function ActionsDialog({ webinarId, initialTrigger, actions, onClose, onSaved }:
     }
   }
   return (
-    <Dialog open title="視聴後の動きを変える" description="見終わった・CTA を押した・見ていない、の場合ごとに動きを決めます。" confirmLabel="保存する" busy={saving} error={error || undefined} onConfirm={() => void save()} onCancel={() => { if (!saving) onClose() }}>
+    <Dialog open title="視聴後の動きを変える" description="見終わった・CTA を押した・見ていない、の場合ごとに動きを決めます。" confirmLabel="保存する" busy={saving} error={error || undefined} onConfirm={() => save()} onCancel={() => { if (!saving) onClose() }}>
       <div className={styles.dialogBody}>
         <Select aria-label="どの場合か" size="full" value={trigger} onChange={(value) => setTrigger(value as WebinarAction['trigger'])} options={TRIGGERS.map((item) => ({ value: item.key, label: item.label }))} />
         {visible.length === 0 ? <p className={form.cardNote}>この場合の動きはまだありません。</p> : visible.map((action, index) => {

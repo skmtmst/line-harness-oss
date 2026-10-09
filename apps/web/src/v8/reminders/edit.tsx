@@ -652,7 +652,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
         cancelLabel="閉じる"
         busy={sendBusy}
         error={testIssue}
-        onConfirm={() => void sendTest()}
+        onConfirm={() => sendTest()}
         onCancel={() => setTestConfirm(false)}
       />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="この手順への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
@@ -663,7 +663,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
         confirmLabel="最新を読み込んで続ける"
         busy={compareBusy}
         error={compareError || undefined}
-        onConfirm={() => void reloadAfterConflict()}
+        onConfirm={() => reloadAfterConflict()}
         onCancel={() => {
           setCompareTarget(null)
           setCompareError('')

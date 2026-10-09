@@ -343,7 +343,7 @@ export default function WebhooksApiTokensV8() {
           confirmIcon={<KeyRound size={15} />}
           busy={creating}
           error={createError || undefined}
-          onConfirm={() => void handleCreate()}
+          onConfirm={() => handleCreate()}
           onCancel={() => { if (!creating) setCreateOpen(false) }}
         >
           <div className={styles.createBody}>
@@ -412,7 +412,7 @@ export default function WebhooksApiTokensV8() {
           confirmLabel="入れ替える"
           busy={mutating}
           error={dialogError}
-          onConfirm={() => void handleRotate()}
+          onConfirm={() => handleRotate()}
           onCancel={() => {
             if (mutating) return
             setRotateTarget(null)
@@ -427,7 +427,7 @@ export default function WebhooksApiTokensV8() {
           destructive
           busy={mutating}
           error={dialogError}
-          onConfirm={() => void handleRevoke()}
+          onConfirm={() => handleRevoke()}
           onCancel={() => {
             if (mutating) return
             setRevokeTarget(null)

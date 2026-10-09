@@ -126,7 +126,7 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
       busy={busy}
       error={error}
       confirmLabel="保存する"
-      onConfirm={() => void save()}
+      onConfirm={() => save()}
       onCancel={() => setOpen(false)}
     >
       <div className={styles.dialogBody} data-support-editor>
@@ -262,7 +262,7 @@ export function useScenarioPicker(
       busy={busy}
       error={error}
       confirmLabel="このシナリオに登録する"
-      onConfirm={() => void enroll()}
+      onConfirm={() => enroll()}
       onCancel={() => setOpen(false)}
     >
       <div className={styles.dialogBody} data-scenario-picker>

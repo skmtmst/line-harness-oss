@@ -116,6 +116,6 @@ export default function HqBroadcastSourcePicker({ mode, initialId, onTemplate, o
         : selectedRun ? renderBroadcast(selectedRun) : null}
     </LinePreview>}
     confirmDisabled={mode === 'template' && (previewLoading || Boolean(previewError) || !preview)} busy={busy} error={error}
-    onSelect={(id) => { if (mode === 'template' && id !== selected) { setPreview(null); setPreviewError(''); setPreviewLoading(true) }; setSelected(id); setError('') }} onConfirm={(id) => void confirmSelection(id)} onCancel={onClose}
+    onSelect={(id) => { if (mode === 'template' && id !== selected) { setPreview(null); setPreviewError(''); setPreviewLoading(true) }; setSelected(id); setError('') }} onConfirm={(id) => confirmSelection(id)} onCancel={onClose}
   />
 }

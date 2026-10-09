@@ -2860,7 +2860,7 @@ export function NewAutomationV8({
         busy={saving}
         onConfirm={() => {
           setActivateConfirmOpen(false)
-          void save(true)
+          return save(true)
         }}
         onCancel={() => setActivateConfirmOpen(false)}
       >
@@ -2893,7 +2893,7 @@ export function NewAutomationV8({
         onCancel={() => setCompareOpen(false)}
         onConfirm={() => {
           setCompareOpen(false)
-          void save(false, true)
+          return save(false, true)
         }}
       >
         {conflict ? (

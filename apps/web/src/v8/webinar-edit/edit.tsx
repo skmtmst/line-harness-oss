@@ -412,7 +412,7 @@ function EditInner() {
       {pane === 'analytics' ? <AnalyticsPane ctx={ctx} chrome={detailChrome} /> : null}
       {keep('comments', <CommentsPane ctx={ctx} chrome={detailChrome} onDirtyChange={dirtyReporterFor('comments')} registerSave={saveRegistrarFor('comments')} />)}
       {leaveDialog}
-      <ConfirmDialog open={pauseVersion !== null} title="ウェビナーを停止しますか？" description="新しい視聴を受け付けなくなります。" confirmLabel="停止する" busy={pausing} error={pauseError || undefined} onConfirm={() => void pause()} onCancel={() => { if (!pausing) setPauseVersion(null) }} />
+      <ConfirmDialog open={pauseVersion !== null} title="ウェビナーを停止しますか？" description="新しい視聴を受け付けなくなります。" confirmLabel="停止する" busy={pausing} error={pauseError || undefined} onConfirm={() => pause()} onCancel={() => { if (!pausing) setPauseVersion(null) }} />
     </div>
   )
 }

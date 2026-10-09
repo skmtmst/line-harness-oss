@@ -592,7 +592,7 @@ function ReplaceVideoDialog({ ctx, asset, onAsset, onClose }: { ctx: EditContext
   }
   const nexts = asset === null ? (['uploaded'] as WebinarVideoAsset['stage'][]) : asset ? NEXT_STAGE[asset.stage] ?? [] : []
   return (
-    <Dialog open title="動画を差し替える" description="登録メディアの動画から選びます。保存しても、公開中の内容は「確認」で公開し直すまで変わりません。" confirmLabel="保存する" busy={busy} error={error || undefined} onConfirm={() => void save()} onCancel={() => { if (!busy) onClose() }}>
+    <Dialog open title="動画を差し替える" description="登録メディアの動画から選びます。保存しても、公開中の内容は「確認」で公開し直すまで変わりません。" confirmLabel="保存する" busy={busy} error={error || undefined} onConfirm={() => save()} onCancel={() => { if (!busy) onClose() }}>
       <div className={styles.dialogBody}>
         {mediaError ? <Notice tone="info">登録メディアの動画を読み込めませんでした。</Notice> : null}
         <Select label="動画" aria-label="動画" size="full" value={choice} disabled={media === null && !mediaError} onChange={setChoice} options={[

@@ -622,7 +622,7 @@ export default function EventsListV8() {
         confirmLabel="削除する"
         busy={deleteBusy}
         error={deleteError}
-        onConfirm={() => void confirmDeleteEvent()}
+        onConfirm={() => confirmDeleteEvent()}
         onCancel={() => {
           if (deleteBusy) return
           setDeleteError('')

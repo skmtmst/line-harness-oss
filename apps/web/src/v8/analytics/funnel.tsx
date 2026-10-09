@@ -422,7 +422,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
       confirmLabel={statusTarget?.to === 'stopped' ? '停止する' : statusTarget?.to === 'archived' ? '保管する' : '再開する'}
       destructive={statusTarget?.to === 'archived'}
       busy={statusBusy}
-      onConfirm={() => void applyStatusChange()}
+      onConfirm={() => applyStatusChange()}
       onCancel={() => setStatusTarget(null)}
     />
   </>

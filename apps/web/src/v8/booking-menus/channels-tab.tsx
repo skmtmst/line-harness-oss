@@ -148,7 +148,7 @@ function ConnectDialog({
       cancelLabel="やめる"
       busy={busy}
       error={error || undefined}
-      onConfirm={() => void save()}
+      onConfirm={() => save()}
       onCancel={onClose}
     >
       <TextField aria-label="カレンダーの ID" value={calendarId} onChange={(e) => setCalendarId(e.target.value)} placeholder="例：shop@example.com" />
@@ -208,7 +208,7 @@ export function ConflictDialog({
         cancelLabel="あとで"
         busy={busy}
         error={error || undefined}
-        onConfirm={canEdit ? () => void move() : undefined}
+        onConfirm={canEdit ? () => move() : undefined}
         onCancel={onClose}
       >
         {conflict.bookings?.length ? (

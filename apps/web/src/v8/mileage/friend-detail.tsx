@@ -580,7 +580,7 @@ function FriendDetailInner() {
         error={pendingError}
         confirmLabel={pendingAction?.kind === 'void' ? 'この理由で取消す' : 'この理由で確定する'}
         cancelLabel="キャンセル"
-        onConfirm={() => void runPendingAction()}
+        onConfirm={() => runPendingAction()}
         onCancel={() => { if (!pendingBusy) { setPendingAction(null); setPendingReason(''); setPendingError('') } }}
       >
         <div className={styles.dlgBody}>

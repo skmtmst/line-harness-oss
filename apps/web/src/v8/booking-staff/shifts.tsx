@@ -1355,7 +1355,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
         destructive
         busy={deleting}
         onCancel={() => setRemoveTarget(null)}
-        onConfirm={() => void removeDayEntry()}
+        onConfirm={() => removeDayEntry()}
       />
       <ConfirmDialog
         open={confirmDisconnect}
@@ -1365,7 +1365,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
         destructive
         busy={disconnecting}
         onCancel={() => setConfirmDisconnect(false)}
-        onConfirm={() => void disconnectCalendar()}
+        onConfirm={() => disconnectCalendar()}
       />
     </div>
   )

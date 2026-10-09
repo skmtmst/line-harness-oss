@@ -405,7 +405,7 @@ export default function BroadcastDetail({
         destructive
         busy={deleting}
         error={deleteError || undefined}
-        onConfirm={() => void deleteBroadcast()}
+        onConfirm={() => deleteBroadcast()}
         onCancel={() => { if (!deleting) setDeleteOpen(false) }}
       />
       <CancelReservationDialog
@@ -416,7 +416,7 @@ export default function BroadcastDetail({
           : '予約が取り消され、この配信は送られなくなります。書いた内容は下書きとして残るので、作り直しにはなりません。'}
         busy={cancelling}
         error={cancelError}
-        onConfirm={() => void cancelReservation()}
+        onConfirm={() => cancelReservation()}
         onClose={() => { if (!cancelling) setCancelOpen(false) }}
       />
     </PageFrame>

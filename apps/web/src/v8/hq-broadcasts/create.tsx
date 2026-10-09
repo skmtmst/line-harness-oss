@@ -1181,7 +1181,7 @@ export default function HqBroadcastCreate() {
         confirmLabel={when === 'now' ? '送る' : '予約する'}
         busy={sending}
         warning
-        onConfirm={gate !== 'single' || (approval.state && Number(confirmCount) === approval.state.gate.recipientCount) ? () => void send() : undefined}
+        onConfirm={gate !== 'single' || (approval.state && Number(confirmCount) === approval.state.gate.recipientCount) ? () => send() : undefined}
         onCancel={() => setConfirmOpen(false)}
       >
         {gate === 'single' && approval.state ? <SingleOperatorFields recipientCount={approval.state.gate.recipientCount} value={confirmCount} onChange={setConfirmCount} /> : null}
@@ -1214,7 +1214,7 @@ export default function HqBroadcastCreate() {
         cancelLabel="やめる"
         busy={saveTplBusy}
         error={saveTplError || undefined}
-        onConfirm={() => void saveAsTemplate()}
+        onConfirm={() => saveAsTemplate()}
         onCancel={() => setSaveTplOpen(false)}
       >
         <label className={formStyles.nameField}>

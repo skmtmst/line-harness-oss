@@ -1028,7 +1028,7 @@ function WebinarList() {
             busy={archiving}
             error={archiveError || undefined}
             onCancel={() => { if (!archiving) setArchiveTarget(null) }}
-            onConfirm={() => void archiveSelected()}
+            onConfirm={() => archiveSelected()}
           />
         ) : null}
         {(folderFormOpen || editingFolder) ? (
@@ -1093,7 +1093,7 @@ function WebinarList() {
             setDeletingFolder(null)
             setFolderError('')
           }}
-          onConfirm={() => void removeFolder()}
+          onConfirm={() => removeFolder()}
         />
       </>}
     >

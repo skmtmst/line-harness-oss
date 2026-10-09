@@ -1319,7 +1319,7 @@ export default function FormsListV8() {
         destructive
         busy={folderBusy}
         error={folderError || undefined}
-        onConfirm={() => void removeFolder()}
+        onConfirm={() => removeFolder()}
         onCancel={() => {
           if (folderBusy) return
           setDeletingFolder(null)
@@ -1485,7 +1485,7 @@ export default function FormsListV8() {
         destructive
         busy={stopping || stopImpactLoading}
         error={stopError || undefined}
-        onConfirm={stopError || stopRevision !== null ? () => void stopAccepting() : undefined}
+        onConfirm={stopError || stopRevision !== null ? () => stopAccepting() : undefined}
         onCancel={() => {
           if (stopping) return
           setStopTarget(null)

@@ -259,7 +259,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
         confirmLabel="削除する"
         destructive
         busy={busyId === confirmRemove?.id}
-        onConfirm={() => void removePost()}
+        onConfirm={() => removePost()}
         onCancel={() => setConfirmRemove(null)}
       />
     </>

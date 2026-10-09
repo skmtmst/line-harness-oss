@@ -127,7 +127,7 @@ export default function Dialog({
   tone = 'default',
   descriptionBand,
   dirty,
-  busy = false,
+  busy: providedBusy,
   initialFocusId,
   error,
   confirmLabel = '保存する',
@@ -147,6 +147,34 @@ export default function Dialog({
   footerAlign,
   designFooterGap,
 }: DialogProps) {
+  const [automaticBusy, setAutomaticBusy] = useState(false)
+  const [automaticError, setAutomaticError] = useState('')
+  const automaticLock = useRef(false)
+  const automaticGeneration = useRef(0)
+  useEffect(() => {
+    if (open) return
+    automaticGeneration.current += 1
+    automaticLock.current = false
+    setAutomaticBusy(false)
+    setAutomaticError('')
+  }, [open])
+  const busy = providedBusy ?? automaticBusy
+  const runConfirm = onConfirm ? () => {
+    if (busy || automaticLock.current) return
+    const pending = onConfirm() as unknown
+    if (providedBusy !== undefined || !pending || typeof (pending as PromiseLike<unknown>).then !== 'function') return
+    const generation = automaticGeneration.current
+    automaticLock.current = true
+    setAutomaticBusy(true)
+    setAutomaticError('')
+    void Promise.resolve(pending).catch(() => {
+      if (generation === automaticGeneration.current) setAutomaticError('実行できませんでした。もう一度お試しください。')
+    }).finally(() => {
+      if (generation !== automaticGeneration.current) return
+      automaticLock.current = false
+      setAutomaticBusy(false)
+    })
+  } : undefined
   const formInput = useFormInputDirty(open)
   const isDirty = dirty ?? (confirmation ? false : formInput.dirty)
   const discard = useOverlayDiscard(open, isDirty, busy, onCancel)
@@ -256,7 +284,7 @@ export default function Dialog({
       {designLayout === 'stacked' ? descriptionNode : null}
       {steps ? <div className={styles.steps}>{steps}</div> : null}
       {children ? <div className={styles.content} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
-      {error ? <p className={styles.error} role="alert">{error}</p> : null}
+      {error || automaticError ? <p className={styles.error} role="alert">{error || automaticError}</p> : null}
       <div className={styles.footer} onClickCapture={(event) => {
         const button = (event.target as Element).closest?.('button')
         if (isDirty && button && /^(閉じる|キャンセル)$/.test(button.textContent?.trim() ?? '')) {
@@ -287,7 +315,7 @@ export default function Dialog({
             data-dialog-action={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
             variant={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
             className={styles.designButton}
-            onClick={onConfirm}
+            onClick={runConfirm}
             disabled={busy || confirmDisabled} busy={busy} busyLabel="処理中…">
             {!busy && confirmIcon ? <span className={styles.buttonIcon} aria-hidden="true">{confirmIcon}</span> : null}
             {confirmLabel}

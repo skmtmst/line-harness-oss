@@ -609,7 +609,7 @@ export default function AutomationListV8() {
           destructive={pending?.kind === 'archive'}
           busy={working}
           error={actionError}
-          onConfirm={() => void confirmPending()}
+          onConfirm={() => confirmPending()}
           onCancel={() => { if (!working) setPending(null) }}
         />
         <Dialog
