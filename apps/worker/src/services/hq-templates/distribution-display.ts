@@ -21,6 +21,9 @@ export function captureDistributionName(runId: string, tenantId: string, account
     sql: `UPDATE hq_template_distribution_results SET created_name=(
       SELECT CASE r.item_kind
         WHEN 'tag' THEN (SELECT name FROM tags WHERE id=r.target_id AND line_account_id=r.target_account_id)
+        WHEN 'auto_reply' THEN (SELECT name FROM auto_replies WHERE id=r.target_id AND line_account_id=r.target_account_id)
+        WHEN 'friend_add_rule' THEN (SELECT name FROM friend_add_rules WHERE id=r.target_id AND line_account_id=r.target_account_id)
+        WHEN 'reminder' THEN (SELECT name FROM reminders WHERE id=r.target_id AND line_account_id=r.target_account_id)
         WHEN 'scenario' THEN (SELECT name FROM scenarios WHERE id=r.target_id AND line_account_id=r.target_account_id)
         WHEN 'template' THEN CASE WHEN json_type(v.definition_json,'$.asset')='object'
           THEN (SELECT name FROM broadcast_message_assets WHERE id=r.target_id AND line_account_id=r.target_account_id)
@@ -35,8 +38,9 @@ export function captureDistributionName(runId: string, tenantId: string, account
       WHERE r.preflight_id=hq_template_distribution_results.preflight_id
         AND r.tenant_id=hq_template_distribution_results.tenant_id
         AND r.target_account_id=hq_template_distribution_results.target_account_id
-        AND r.item_kind=COALESCE(t.extended_type,t.template_type)
-        AND (t.template_type<>'template' OR t.extended_type IS NOT NULL OR r.source_id='template:' || json_extract(v.definition_json,'$.template.id'))
+        AND r.item_kind=COALESCE(t.delivery_type,t.extended_type,t.template_type)
+        AND (t.delivery_type IS NULL OR r.source_id=t.delivery_type)
+        AND (t.template_type<>'template' OR t.extended_type IS NOT NULL OR t.delivery_type IS NOT NULL OR r.source_id='template:' || json_extract(v.definition_json,'$.template.id'))
       LIMIT 1)
       WHERE run_id=? AND tenant_id=? AND target_account_id=? AND status='succeeded' AND created_name IS NULL`,
     bindings: [runId, tenantId, accountId],

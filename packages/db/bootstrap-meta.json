@@ -562,7 +562,8 @@
     "617_store_common_folders.sql",
     "618_hq_banner_folders.sql",
     "619_hq_folder_display_order.sql",
-    "620_migrate_private_memo_to_chat_notes.sql"
+    "620_migrate_private_memo_to_chat_notes.sql",
+    "622_hq_delivery_templates.sql"
   ],
-  "migrationCount": 563
+  "migrationCount": 564
 }

@@ -587,7 +587,7 @@ type DraftReadResult =
   | { ok: false; error: string };
 
 /** 既存の作成・更新と同じ制約で、公開前の定義だけを読む。 */
-async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftReadResult> {
+export async function readDraftSettings(db: D1Database, raw: unknown, checkReferences = true): Promise<DraftReadResult> {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return { ok: false, error: '設定の形式が正しくありません' };
   }
@@ -633,7 +633,7 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
       return { ok: false, error: `${label}が大きすぎます` };
     }
   }
-  const folderError = await validateAutoReplyFolder(db, extras.value.folderId);
+  const folderError = checkReferences ? await validateAutoReplyFolder(db, extras.value.folderId) : null;
   if (folderError) return { ok: false, error: folderError };
   if (extras.value.actions) {
     const parsedActions = parseAutoReplyActions(JSON.stringify(extras.value.actions));
@@ -641,7 +641,7 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
       return { ok: false, error: '応答したあとにすることの設定を確認してください' };
     }
     for (const action of parsedActions) {
-      const error = await validateAutoReplyOperatorAction(db,action,body.lineAccountId as string,false);
+      const error = checkReferences ? await validateAutoReplyOperatorAction(db,action,body.lineAccountId as string,false) : null;
       if (error) return {ok:false,error};
     }
     // 失敗したら止めるか続けるかは stop/continue のどちらかだけ受け付ける。
@@ -659,7 +659,7 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
   let responseType = typeof body.responseType === 'string' && body.responseType ? body.responseType : 'text';
   let responseContent = typeof body.responseContent === 'string' ? body.responseContent : '';
   let templateLineAccountId: string | null = null;
-  if (templateId) {
+  if (templateId && checkReferences) {
     const template = await getTemplateById(db, templateId);
     if (!template) return { ok: false, error: '選んだテンプレートを確認できません' };
     templateLineAccountId = template.line_account_id ?? null;

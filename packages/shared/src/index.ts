@@ -72,3 +72,4 @@ export * from './liff-action.js';
 export * from './liff-state.js';
 
 export * from './research-form.js';
+export * from './hq-delivery-templates.js';

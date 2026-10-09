@@ -256,7 +256,7 @@ const CONDITION_AST_MESSAGES: Record<Exclude<ConditionAstError, 'legacy_text'>, 
   unbuildable: '友だち条件に、値が足りない条件があります。',
 };
 
-function validateInput(body: RuleInput): string | null {
+export function validateInput(body: RuleInput): string | null {
   if (!body.name?.trim()) return '設定名が必要です';
   if (body.name.trim().length > 60) return '設定名は60文字以内で入力してください';
   if (!body.friendKind || !KINDS.has(body.friendKind)) return '判定する人が正しくありません';
@@ -342,7 +342,7 @@ export type FriendAddRuleReferenceError = {
   message: string;
 };
 
-async function validateReferences(
+export async function validateReferences(
   db: D1Database,
   accountId: string,
   definition: FriendAddRuleDefinition,
