@@ -96,7 +96,7 @@ async function render() {
 
 const buttonByLabel = (label: string) =>
   [...document.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === label) as HTMLButtonElement | undefined
-const rowOf = (refCode: string) => host.querySelector(`[data-row-id="${refCode}"]`)
+const rowOf = (refCode: string) => host.querySelector(`[data-row-id="${ROUTES.find(row => row.refCode === refCode)?.id ?? refCode}"]`)
 
 describe('V8 流入と計測の一覧', () => {
   it('行の「…」から「QRコードを見る」を選ぶと、その経路の QR コードの小窓が開く', async () => {
