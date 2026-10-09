@@ -52,6 +52,7 @@ vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.Re
 
 import HqBroadcastCreate from './create'
 import HqBroadcastDetail from './detail'
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 
 const check = (accountId: string, accountName: string, audienceCount: number, blockedReasons: string[] = []) => ({
   accountId, accountName, audienceCount, remaining: 10000, connected: true, paused: false, blockedReasons, excluded: false, broadcastId: null,
@@ -288,10 +289,8 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     await selectAccounts('銀座店')
     fireEvent.click(screen.getByRole('radio', { name: /タグで絞り込んで配信する/ }))
     await waitFor(() => expect(tagList).toHaveBeenCalledWith({ accountId: 'a1' }))
-    const box = screen.getByRole('combobox', { name: '含めるタグ' })
-    await waitFor(() => expect((box as HTMLInputElement).disabled).toBe(false))
-    fireEvent.focus(box)
-    fireEvent.click(await screen.findByRole('option', { name: /VIP/ }))
+    await waitFor(() => expect((screen.getByRole('button', { name: '含めるタグ：選ぶ' }) as HTMLButtonElement).disabled).toBe(false))
+    await pickEntity('含めるタグ', 'VIP')
     fireEvent.click(screen.getByRole('button', { name: 'メッセージ設定へ' }))
     fireEvent.change(screen.getByLabelText('本文'), { target: { value: 'ご案内' } })
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
