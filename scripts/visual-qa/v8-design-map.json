@@ -157,7 +157,7 @@
       "routes": [
         "/booking/bookings"
       ],
-      "width": "今月・一覧の見え方。range の値は実装に合わせて確かめる（AC 10-09）",
+      "width": 1440,
       "shot": "lint/V8/shots/R8tlbw.png",
       "url": "/booking/bookings?range=all"
     },
