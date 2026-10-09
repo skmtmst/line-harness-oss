@@ -292,7 +292,7 @@ export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes,
  * 確認ボタンはサーバーの計算が返ってくるまで押せない。実行時は
  * previewToken を保存APIへ渡し、サーバー側で対象の再計算と照合する。
  */
-export function RetroactiveDialog({ values, count, tagId, accountId, onCancel, onSave, referenceState = false }: { values: TagEditorValues; count: number; tagId: string | null; accountId: string | null; onCancel: () => void; onSave: (previewToken: string) => void; referenceState?: boolean }) {
+export function RetroactiveDialog({ values, count, tagId, accountId, onCancel, onSaveWithoutApplying, onSave, referenceState = false }: { values: TagEditorValues; count: number; tagId: string | null; accountId: string | null; onCancel: () => void; onSaveWithoutApplying: () => void; onSave: (previewToken: string) => void; referenceState?: boolean }) {
   const [accepted, setAccepted] = useState(referenceState)
   const [preview, setPreview] = useState<TagRetroactivePreview | null>(null)
   const [previewError, setPreviewError] = useState('')
@@ -356,7 +356,7 @@ export function RetroactiveDialog({ values, count, tagId, accountId, onCancel, o
         )}
         <Checkbox className="mt-3" checked={accepted} onCheckedChange={setAccepted}>人数と合計マイルを確認しました</Checkbox>
         <div className="mt-4 flex justify-end gap-2">
-          <Button variant="secondary" className="px-4 py-2.5 font-medium text-ink-secondary h-auto whitespace-normal" type="button" onClick={onCancel}>反映しないで保存する</Button>
+          <Button variant="secondary" className="px-4 py-2.5 font-medium text-ink-secondary h-auto whitespace-normal" type="button" onClick={onSaveWithoutApplying}>反映しないで保存する</Button>
           <Button variant="primary" className="px-4 py-2.5 font-bold border-0 h-auto whitespace-normal" type="button" disabled={!accepted || loading || Boolean(previewError)} onClick={() => onSave(preview?.previewToken ?? '')}>{loading ? '対象を計算中…' : 'さかのぼって反映して保存する'}</Button>
         </div>
         <p className="mt-3 whitespace-nowrap text-xs leading-4 text-ink-faint">新規作成のときはこのダイアログは出ません。まだ誰にもタグが付いていないため、送信やマイル付与も起きません。</p>
@@ -668,7 +668,7 @@ export default function TagEditorV4({
       />
 
       {drawerOpen && <ActionDrawer accountId={accountId} suppliedResources={resources} allowedActionTypes={allowedActionTypes} referenceState={referenceDrawerState} onClose={() => setDrawerOpen(false)} onAdd={(action) => { setActions((current) => [...current, action]); setDrawerOpen(false) }} />}
-      {retroactiveOpen && <RetroactiveDialog referenceState={referenceRetroactiveState} values={values} count={tag?.friendCount ?? 0} tagId={tag?.id ?? null} accountId={accountId} onCancel={() => { setRetroactiveOpen(false); void onSave({ ...values, applyToExisting: false }, false, false) }} onSave={(previewToken) => { setRetroactiveOpen(false); void onSave(values, false, true, previewToken) }} />}
+      {retroactiveOpen && <RetroactiveDialog referenceState={referenceRetroactiveState} values={values} count={tag?.friendCount ?? 0} tagId={tag?.id ?? null} accountId={accountId} onCancel={() => setRetroactiveOpen(false)} onSaveWithoutApplying={() => { setRetroactiveOpen(false); void onSave({ ...values, applyToExisting: false }, false, false) }} onSave={(previewToken) => { setRetroactiveOpen(false); void onSave(values, false, true, previewToken) }} />}
     </div>
   )
 }

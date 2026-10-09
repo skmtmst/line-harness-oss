@@ -538,7 +538,7 @@ export default function TagEditorV8({
       </fieldset>
 
       {drawerOpen && <ActionDrawer accountId={accountId} suppliedResources={resources} allowedActionTypes={allowedActionTypes} referenceState={referenceDrawerState} onClose={() => setDrawerOpen(false)} onAdd={(action) => { setActions((current) => [...current, action]); setDrawerOpen(false) }} />}
-      {retroactiveOpen && <RetroactiveDialog referenceState={referenceRetroactiveState} values={values} count={tag?.friendCount ?? 0} tagId={tag?.id ?? null} accountId={accountId} onCancel={() => { setRetroactiveOpen(false); void onSave({ ...values, applyToExisting: false }, false, false) }} onSave={(previewToken) => { setRetroactiveOpen(false); void onSave(values, false, true, previewToken) }} />}
+      {retroactiveOpen && <RetroactiveDialog referenceState={referenceRetroactiveState} values={values} count={tag?.friendCount ?? 0} tagId={tag?.id ?? null} accountId={accountId} onCancel={() => setRetroactiveOpen(false)} onSaveWithoutApplying={() => { setRetroactiveOpen(false); void onSave({ ...values, applyToExisting: false }, false, false) }} onSave={(previewToken) => { setRetroactiveOpen(false); void onSave(values, false, true, previewToken) }} />}
     </div>
   )
 }

@@ -639,7 +639,8 @@ export function TagEditForm({
           count={tag.friendCount ?? 0}
           tagId={tag.id}
           accountId={accountId}
-          onCancel={() => { setRetroactiveOpen(false); void onSave({ ...values, applyToExisting: false }, false) }}
+          onCancel={() => setRetroactiveOpen(false)}
+          onSaveWithoutApplying={() => { setRetroactiveOpen(false); void onSave({ ...values, applyToExisting: false }, false) }}
           onSave={(previewToken) => { setRetroactiveOpen(false); void onSave(values, true, previewToken) }}
         />
       ) : null}
