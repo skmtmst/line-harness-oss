@@ -28,6 +28,8 @@ import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { isStepUpRequired, useStepUpGate } from '@/components/step-up-prompt'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
+import { focusFieldById } from '@/lib/use-form-errors'
+import ValidationSummary from '@/components/shared/validation-summary'
 import styles from './create.module.css'
 
 /*
@@ -95,6 +97,11 @@ const SAMPLES: Record<string, { when: string; lines: string[] }> = {
     lines: ['{', '  "できごと": "注文が確定した",', '  "注文番号": "ord_123…",', '  "金額": 4980,', '  "友だち": "菅野 亮"', '}'],
   },
 }
+
+/* 保存で落ちた欄へ移る順と、その欄の要素（B-139）。 */
+const FIELD_ORDER = ['name', 'url', 'secret', 'events'] as const
+const FIELD_IDS: Record<(typeof FIELD_ORDER)[number], string> = { name: 'wh-new-name', url: 'wh-new-url', secret: 'wh-new-secret', events: 'wh-new-events' }
+const FIELD_LABELS: Record<(typeof FIELD_ORDER)[number], string> = { name: '名前', url: '送り先の URL', secret: '秘密の鍵', events: 'いつ送りますか' }
 
 /* 1欄ずつの確かめ。文は「何をすれば直るか」を1文で書く。 */
 function validateName(value: string): string | null {
@@ -201,7 +208,10 @@ function WebhooksCreateV8Inner() {
     const errors = validate()
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) {
-      setError('直す所があります。赤い理由を確かめてください。')
+      /* 上の帯で済ませず、赤い欄の1つ目へ移る（B-139）。 */
+      setError(null)
+      const first = FIELD_ORDER.find((key) => errors[key])
+      if (first) focusFieldById(FIELD_IDS[first])
       return
     }
     setSaving(true)
@@ -344,6 +354,11 @@ function WebhooksCreateV8Inner() {
       )}
     >
       {error ? <Notice tone="danger">{error}</Notice> : null}
+      <ValidationSummary
+        problems={FIELD_ORDER.filter((key) => fieldErrors[key]).map((key) => ({ key, label: FIELD_LABELS[key] }))}
+        onFocusFirst={() => { const first = FIELD_ORDER.find((key) => fieldErrors[key]); if (first) focusFieldById(FIELD_IDS[first]) }}
+        minProblems={2}
+      />
 
       <section className={styles.card} aria-labelledby="wh-new-direction">
         <h2 className={styles.cardTitle} id="wh-new-direction">どちら向きの連携か</h2>
@@ -443,7 +458,7 @@ function WebhooksCreateV8Inner() {
           <RadioCard variant="row" name="wh-new-mode" value="all" checked={sendAll} onChange={() => setSendAll(true)} title="すべて送る" />
           <RadioCard variant="row" name="wh-new-mode" value="selected" checked={!sendAll} onChange={() => setSendAll(false)} title="選んだものだけ送る" />
         </RadioCardGroup>
-        {fieldErrors.events ? <p className={styles.fieldError} role="alert">{fieldErrors.events}</p> : null}
+        {fieldErrors.events ? <p id="wh-new-events" tabIndex={-1} className={styles.fieldError} role="alert">{fieldErrors.events}</p> : null}
         {!sendAll ? (
           <>
             {EVENT_GROUPS.map((group) => (

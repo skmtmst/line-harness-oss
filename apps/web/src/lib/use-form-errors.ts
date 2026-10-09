@@ -39,6 +39,23 @@ function afterPaint(run: () => void) {
 }
 
 /**
+ * 欄の id へ移る（B-139）。閉じた段（details）の中なら開き、スクロールしてから
+ * フォーカスする。自前の誤りの表（`Record<欄, 文>`）を持つ画面が、1つ目の欄へ移るときに使う。
+ * 描き直しの後に呼べるよう、次のコマで動く。
+ */
+export function focusFieldById(id: string) {
+  requestAnimationFrame(() => {
+    const el = typeof document === 'undefined' ? null : document.getElementById(id)
+    if (!el) return
+    const disclosure = el.closest('details')
+    if (disclosure && !disclosure.open) disclosure.open = true
+    const target = focusTarget(el)
+    target.scrollIntoView?.({ block: 'center' })
+    target.focus({ preventScroll: true })
+  })
+}
+
+/**
  * 欄の検証を「離れた時点で1回・直せばすぐ消える・送るとき全部」に揃える
  * （★V7 sTJsh §6・B-139 欄で知らせて移る）。
  *
