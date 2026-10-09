@@ -10,6 +10,8 @@
  * 絵に無い「新しい友だちに最初から付ける」は右の列の下の空きに置く。並び順は一覧で並べ替える（ここでは今の値を保つ）。
  * きまりの中身を変える・作るは、今の自動変更ルールの部品（SupportMarkRulesPanel）を窓で開く。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
+import { notifySaved } from '@/components/shared/toast'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -297,8 +299,11 @@ function MarkEditorBody({ markId }: { markId?: string }) {
           automationRules: createRule ? [{ name: `${name.trim()}：${eventLabel(ruleEvent)}`, event: ruleEvent, condition: null, priority: 0, manualProtectionMinutes: ruleProtectionMinutes, isActive: ruleActive } satisfies SaveSupportMarkAutomationRule] : [],
         }, attemptKey())
       if (!result.success) throw new Error(result.error)
-      disarm()
-      router.push('/tags?tab=marks')
+      notifySaved()
+      if (editing && markId) {
+        setItems((rows) => rows.map((row) => row.id === markId ? { ...row, ...result.data } : row))
+        setBaseline({ name, color, displayOrder, isDefault })
+      } else { disarm(); router.push(createPageReturnHref('/tags?tab=marks', result.data.id)) }
     } catch (reason) {
       const status = (reason as { status?: number } | null)?.status
       const code = (reason as { code?: string } | null)?.code

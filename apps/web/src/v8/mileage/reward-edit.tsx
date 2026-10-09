@@ -9,6 +9,8 @@
  * 欄は1つも落とさない。絵に無い欄（説明・交換したときの案内・交換後に使える日数・種類ごとの説明）は
  * 最後の「そのほか（任意）」の段にまとめ、欄の説明は「？」へ入れる。
  */
+import { notifySaved } from '@/components/shared/toast'
+import { createPageReturnHref } from '@/components/shared/create-page'
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Check, FlaskConical, Plus } from 'lucide-react'
@@ -262,7 +264,7 @@ function RewardEditorInner() {
     if (!saved.success) throw new Error('failed')
     setReward(saved.data)
     setBaseline(JSON.stringify(form))
-    if (!rewardId) router.replace(`/mileage/rewards/edit?id=${encodeURIComponent(saved.data.id)}`)
+
     return saved.data
   }
 
@@ -280,9 +282,11 @@ function RewardEditorInner() {
           saved.currentVersion?.revision,
         )
         if (!published.success) throw new Error('failed')
+        setReward(published.data)
       }
       setPublishOpen(false)
-      router.push('/mileage?tab=rewards')
+      notifySaved(thenPublish ? '公開しました' : '下書きを保存しました')
+      if (!editing) router.push(createPageReturnHref('/mileage?tab=rewards', saved.id))
     } catch (err) {
       setFailure(
         err instanceof ApiError && err.message && !/^API error/.test(err.message)

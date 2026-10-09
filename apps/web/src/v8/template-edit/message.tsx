@@ -332,8 +332,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   })
 
   const leave = (savedId: string) => {
-    disarm()
-    router.push(createPageReturnHref('/templates', savedId))
+    if (!id) { disarm(); router.push(createPageReturnHref('/templates', savedId)) }
   }
 
   const publishNow = async (templateId: string): Promise<boolean> => {

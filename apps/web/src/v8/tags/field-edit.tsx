@@ -6,6 +6,7 @@
  * 読み込み・版の衝突（R517）・共通項目の保護・保存の動きは今の入口（app/tags/edit-field-page-v8.tsx）と同じ。
  * 中身は src/v8 の FieldEditor。受け付ける URL：`/tags/fields/edit?id=<項目>`。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { FriendField, Folder } from '@line-crm/shared'
@@ -158,7 +159,9 @@ export default function FieldEdit() {
         version: field.version,
       })
       if (!res.success) throw new Error(res.error)
-      router.push(`/tags?tab=fields&highlight=${res.data.id}`)
+      setField(res.data)
+      setSiblings((rows) => rows.map((row) => row.id === res.data.id ? res.data : row))
+      notifySaved()
     } catch (reason) {
       if (reason instanceof ApiError && reason.status === 409
         && (reason as { code?: string }).code === 'VERSION_CONFLICT') {

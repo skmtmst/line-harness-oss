@@ -1,5 +1,6 @@
 'use client'
 
+import { notifySaved } from '@/components/shared/toast'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -153,7 +154,9 @@ export default function TemplateRichVideoEditor({ id = null, visual = false, hos
         const inserted = await host.onSave({kind:'message',name:draft.name.trim(),messageType:'imagemap',messageContent:saved.data.messageContent}, alsoSave)
         if (inserted === false) return
       }
-      setClean(snapshot);disarm();if (!host) router.push(createPageReturnHref('/templates', res.data.id))
+      setClean(snapshot);
+      if (host) disarm()
+      else { notifySaved(); if (!id) { disarm(); router.push(createPageReturnHref('/templates', res.data.id)) } }
     }catch(cause){if(current===generation.current)setError(cause instanceof Error?cause.message:'保存できませんでした。もう一度お試しください。')}
     finally{saveLock.current=false;if(current===generation.current)setBusy(false)}
   }

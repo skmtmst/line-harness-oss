@@ -14,6 +14,7 @@
  * 409 は板 v5L19Z の帯を出し、「違いを比べる」「最新を読み込んで続ける」
  * 「比べてから保存」で扱う（いきなり上書きしない）。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
 import { notifySaved } from '@/components/shared/toast'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -694,7 +695,13 @@ export default function MenuFormV8() {
       }
       setCreatedMenuNeedingFollowUp(null)
       notifySaved(editTarget ? 'メニューを保存しました' : publish ? 'メニューを公開しました' : '下書きを保存しました')
-      router.push('/booking/menus')
+      if (editTarget) {
+        const fresh = await bookingApi.listMenus(selectedAccountId)
+        const updated = fresh.menus.find((menu) => menu.id === menuId)
+        if (updated) setEditTarget(updated)
+        else setEditTarget({ ...editTarget, version })
+        baselineRef.current = currentSignature
+      } else { router.push(createPageReturnHref('/booking/menus', menuId)) }
     } catch (e) {
       if (e instanceof ApiError && e.code === 'tag_not_found') {
         setSaveError('選んだタグは削除されたため保存できませんでした。タグを選び直してください。')
