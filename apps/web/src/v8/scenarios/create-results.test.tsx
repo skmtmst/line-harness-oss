@@ -260,6 +260,7 @@ describe('作る①：書きかけをシナリオの下書きの口へ残す（�
     await settle(2100)
     expect(drafts.size).toBe(1)
     fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存せずに移る' }))
     await settle(0)
     expect(drafts.size).toBe(0)
     expect(push).toHaveBeenCalledWith('/scenarios')

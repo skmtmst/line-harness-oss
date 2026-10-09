@@ -324,28 +324,28 @@ describe('R305 編集窓は共通Dialog（フォーカス・Esc・破棄確認�
     const dialog = screen.getByRole('dialog', { name: 'メニュー編集' })
     fireEvent.change(within(dialog).getByLabelText(/名前/), { target: { value: 'カラー' } })
     fireEvent.keyDown(document, { key: 'Escape' })
-    await screen.findByText('変更を破棄しますか？')
+    await screen.findByText('入力を破棄しますか？')
     // 破棄を選ぶまで編集窓は閉じない。
     expect(screen.getByRole('dialog', { name: 'メニュー編集' })).toBeTruthy()
   })
 
-  test('破棄確認で「破棄する」を押すと閉じ、「編集に戻る」では入力を残して戻る', async () => {
+  test('破棄確認で「破棄する」を押すと閉じ、「編集を続ける」では入力を残して戻る', async () => {
     await openEditor()
     const dialog = screen.getByRole('dialog', { name: 'メニュー編集' })
     const nameInput = within(dialog).getByLabelText(/名前/) as HTMLInputElement
     fireEvent.change(nameInput, { target: { value: 'カラー' } })
     fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
-    await screen.findByText('変更を破棄しますか？')
+    await screen.findByText('入力を破棄しますか？')
 
     // 戻るを選ぶと入力を残したまま編集へ戻る。
-    fireEvent.click(screen.getByRole('button', { name: '編集に戻る' }))
-    await waitFor(() => expect(screen.queryByText('変更を破棄しますか？')).toBeNull())
+    fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
+    await waitFor(() => expect(screen.queryByText('入力を破棄しますか？')).toBeNull())
     expect(nameInput.value).toBe('カラー')
     expect(screen.getByRole('dialog', { name: 'メニュー編集' })).toBeTruthy()
 
     // 破棄を選ぶと窓ごと閉じる。
     fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
-    await screen.findByText('変更を破棄しますか？')
+    await screen.findByText('入力を破棄しますか？')
     fireEvent.click(screen.getByRole('button', { name: '破棄する' }))
     await waitFor(() => expect(screen.queryByText('メニュー編集')).toBeNull())
   })

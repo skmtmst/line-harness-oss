@@ -27,3 +27,14 @@ test('元の入力へ戻したときは確認を挟まない', () => {
   fireEvent.click(screen.getByRole('button', { name: '閉じる' }))
   expect(close).toHaveBeenCalledTimes(1)
 })
+
+test('本文の編集欄も入力を破棄する前に確認する', () => {
+  const close = vi.fn()
+  render(<Dialog open title="本文" onCancel={close}><div contentEditable role="textbox" aria-label="本文" suppressContentEditableWarning>元の本文</div></Dialog>)
+  const input = screen.getByRole('textbox')
+  input.textContent = '変更した本文'
+  fireEvent.input(input)
+  fireEvent.click(screen.getByRole('button', { name: '閉じる' }))
+  expect(close).not.toHaveBeenCalled()
+  expect(screen.getByRole('dialog', { name: '入力を破棄しますか？' })).toBeTruthy()
+})

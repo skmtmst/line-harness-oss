@@ -3,7 +3,7 @@ import { useLayoutEffect, useRef, useState, type SyntheticEvent } from 'react'
 
 /** 共通の入力を持つ窓の初期値と現在値を比べる。値は画面のメモリーだけに置く。 */
 export function formInputSnapshot(root: HTMLElement): string {
-  const controls = root.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | HTMLElement>('input,textarea,select,[role="combobox"],[role="switch"],[role="checkbox"],[role="radio"],[aria-haspopup="listbox"]')
+  const controls = root.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | HTMLElement>('input,textarea,select,[contenteditable="true"],[role="combobox"],[role="switch"],[role="checkbox"],[role="radio"],[aria-haspopup="listbox"]')
   return JSON.stringify(Array.from(controls, (control) => {
     if (control instanceof HTMLInputElement) return [control.name || control.id, control.type, control.type === 'checkbox' || control.type === 'radio' ? control.checked : control.value]
     if (control instanceof HTMLTextAreaElement || control instanceof HTMLSelectElement) return [control.name || control.id, control.value]
