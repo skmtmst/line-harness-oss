@@ -16,6 +16,7 @@ import type { Message } from '@line-crm/line-sdk';
 import {
   collectReachableInputs,
   formChoiceIsSelected,
+  formatAnswerValue,
   hasChoices,
   isCalendarDateString,
   isFormAnswerEmpty,
@@ -457,7 +458,7 @@ async function writeDestinations(
   // 空欄を登録先へ流すと空文字での上書き＝既存の登録を消してしまうため、
   // 書き込みを始める前にここで止める。明示的に消す操作は設けない。
   if (isFormAnswerEmpty(value)) return;
-  const text = toText(value);
+  const text = formatAnswerValue(block, value);
 
   for (const fieldId of dest.friendFieldIds ?? []) {
     // 書けない相手(EC正・削除済み)は数えない。数えると「失敗」になり、

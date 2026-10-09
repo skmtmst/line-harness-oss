@@ -1080,3 +1080,17 @@ test('飛ばしたセクションの値が送られても定員・登録先・�
   expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
   expect(mocks.attachTag).not.toHaveBeenCalled();
 });
+
+describe('住所・予約の登録先は読める文字で保存する', () => {
+  test.each([
+    ['address', { postalCode: '1234567', prefecture: '東京都', city: '新宿区', addressLine1: '1-2', addressLine2: 'A' }, '〒123-4567 東京都新宿区1-2A'],
+    ['booking', { menuId: 'm', staffId: 's', startsAt: '2026-10-10T01:30:00Z' }, '10/10 10:30'],
+  ] as const)('%s を情報欄・本名・表示名・メモへ保存する', async (type, value, expected) => {
+    const { db, calls } = fakeDb();
+    await applyFormLayoutEffects({ db, friendId: 'friend-1', answers: { answer: value },
+      layout: layoutWith([input({ name: 'answer', type, destinations: { friendFieldIds: ['ff-1'], realName: true, displayName: true, note: true } })]),
+    });
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ value: expected }));
+    expect(calls.find((c) => c.sql.startsWith('UPDATE friends'))?.binds.slice(0, 3)).toEqual([expected, expected, expected]);
+  });
+});

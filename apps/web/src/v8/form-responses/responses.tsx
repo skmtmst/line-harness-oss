@@ -12,6 +12,7 @@ import { useSearchParams } from 'next/navigation'
 import { AlertCircle, ArrowLeft, ArrowRight, Download, Pencil, RotateCw, Search, User } from 'lucide-react'
 import type { FormBlock, FormInputType, FormLayout } from '@line-crm/shared'
 import { fetchApi, ApiError } from '@/lib/api'
+import { formAnswerText } from '@/lib/form-answer'
 import { csvCell } from '@/lib/presentation'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { useAccount } from '@/contexts/account-context'
@@ -55,11 +56,8 @@ type InputBlock = Extract<FormBlock, { kind: 'input' }>
 const MAX_EXPORT_ROWS = 5000
 const EXPORT_PAGE_LIMIT = 200
 
-function valueText(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—'
-  if (Array.isArray(value)) return value.length ? value.map(String).join('、') : '—'
-  if (typeof value === 'object') return JSON.stringify(value)
-  return String(value)
+function valueText(value: unknown, block?: InputBlock): string {
+  return formAnswerText(value, block) || '—'
 }
 function normalizedSubmission(item: Submission): Submission {
   if (typeof item.data !== 'string') return item
@@ -69,12 +67,12 @@ function normalizedSubmission(item: Submission): Submission {
     return { ...item, data: {} }
   }
 }
-function saveCsv(filename: string, rows: Submission[], fieldKeys: string[], labels: Record<string, string>) {
+function saveCsv(filename: string, rows: Submission[], fieldKeys: string[], labels: Record<string, string>, blocks: InputBlock[]) {
   const header = ['回答ID', '答えた人', '答えた日時', ...fieldKeys.map((key) => labels[key] ?? key)]
   const lines = [header.map(csvCell).join(',')]
   for (const row of rows) {
     const data = row.data as Record<string, unknown>
-    lines.push([row.id, row.friendName ?? '不明', formatDateTime(row.createdAt), ...fieldKeys.map((key) => data[key])].map(csvCell).join(','))
+    lines.push([row.id, row.friendName ?? '不明', formatDateTime(row.createdAt), ...fieldKeys.map((key) => formAnswerText(data[key], blocks.find(block => block.name === key || block.id === key)))].map(csvCell).join(','))
   }
   const url = URL.createObjectURL(new Blob([`﻿${lines.join('\r\n')}`], { type: 'text/csv;charset=utf-8' }))
   const anchor = document.createElement('a')
@@ -243,7 +241,7 @@ function Responses() {
   const summaries = useMemo(() => fieldKeys.map((key) => {
     const counts = new Map<string, number>()
     for (const item of items) {
-      const value = valueText((item.data as Record<string, unknown>)[key])
+      const value = valueText((item.data as Record<string, unknown>)[key], blockByKey(key))
       if (value === '—') continue
       counts.set(value, (counts.get(value) ?? 0) + 1)
     }
@@ -284,7 +282,7 @@ function Responses() {
       } while (all.length < expected && currentPage <= 1001)
       if (all.length < expected) throw new Error('export_incomplete')
       const keys = [...new Set([...fieldKeys, ...all.flatMap((item) => Object.keys(item.data as Record<string, unknown>))])]
-      saveCsv(`${form.name}-回答.csv`, all, keys, labels)
+      saveCsv(`${form.name}-回答.csv`, all, keys, labels, inputBlocks)
     } catch (caught) {
       setExportError(caught instanceof Error && caught.message === 'export_too_many'
         ? `回答が一度に書き出せる上限（${formatNumber(MAX_EXPORT_ROWS)}件）を超えています。`
@@ -383,7 +381,7 @@ function Responses() {
               <dd>{shortWhen(selected.createdAt)}</dd>
             </div>
             {fieldKeys.map((key) => {
-              const value = valueText((selected.data as Record<string, unknown>)[key])
+              const value = valueText((selected.data as Record<string, unknown>)[key], blockByKey(key))
               return (
                 <div key={key} className={styles.detailRow}>
                   <dt title={labels[key] ?? key}>{labels[key] ?? key}</dt>
@@ -570,7 +568,7 @@ function Responses() {
                 <tbody>
                   {items.map((item) => {
                     const incomplete = incompleteOf(item)
-                    const first = firstKey ? valueText((item.data as Record<string, unknown>)[firstKey]) : '—'
+                    const first = firstKey ? valueText((item.data as Record<string, unknown>)[firstKey], blockByKey(firstKey)) : '—'
                     const isSelected = selected?.id === item.id
                     return (
                       <tr
