@@ -154,8 +154,8 @@ test.describe('Issue #710 保管済みタグの編集は名前と説明だけ（
     await expect(page.getByText('このタグは保管済みです')).toBeVisible()
     await expect(page.getByLabel('タグ名')).toHaveValue(ARCHIVED_TAG.name)
     await expect(page.getByLabel('説明')).toHaveValue(ARCHIVED_TAG.description)
-    // 通常の編集フォーム(TagEditorV4)固有の見出しが出ていないことを見る。
-    await expect(page.getByText('タグが付いたときの連動')).toHaveCount(0)
+    // 通常の編集フォーム固有の段（V8 の「タグ連動」）が出ていないことを見る。
+    await expect(page.getByRole('region', { name: 'タグ連動' })).toHaveCount(0)
   })
 
   test('archived タグの名前を直して保存すると、名前と説明だけ送られる', async ({ page }) => {
@@ -183,7 +183,7 @@ test.describe('Issue #710 保管済みタグの編集は名前と説明だけ（
     await page.goto(`${BASE}/tags/edit?id=${ACTIVE_TAG.id}`, { waitUntil: 'networkidle' })
 
     await expect(page.getByText('このタグは保管済みです')).toHaveCount(0)
-    await expect(page.getByText('タグが付いたときの連動')).toBeVisible()
+    await expect(page.getByRole('region', { name: 'タグ連動' })).toBeVisible()
   })
 
   test('一覧は archived タグに「保管済み」バッジを出し、active タグには出さない', async ({ page }) => {
@@ -192,11 +192,11 @@ test.describe('Issue #710 保管済みタグの編集は名前と説明だけ（
 
     await page.goto(`${BASE}/tags`, { waitUntil: 'networkidle' })
 
-    await expect(page.getByRole('link', { name: ARCHIVED_TAG.name, exact: true })).toBeVisible()
-    await expect(page.getByRole('link', { name: ACTIVE_TAG.name, exact: true })).toBeVisible()
-    const rows = page.locator('tr').filter({ has: page.getByRole('link', { name: ARCHIVED_TAG.name, exact: true }) })
+    await expect(page.getByRole('link', { name: `タグ「${ARCHIVED_TAG.name}」を編集`, exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: `タグ「${ACTIVE_TAG.name}」を編集`, exact: true })).toBeVisible()
+    const rows = page.locator('tr').filter({ has: page.getByRole('link', { name: `タグ「${ARCHIVED_TAG.name}」を編集`, exact: true }) })
     await expect(rows.getByText('保管済み')).toBeVisible()
-    const activeRows = page.locator('tr').filter({ has: page.getByRole('link', { name: ACTIVE_TAG.name, exact: true }) })
+    const activeRows = page.locator('tr').filter({ has: page.getByRole('link', { name: `タグ「${ACTIVE_TAG.name}」を編集`, exact: true }) })
     await expect(activeRows.getByText('保管済み')).toHaveCount(0)
   })
 })
