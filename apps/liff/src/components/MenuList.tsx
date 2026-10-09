@@ -1,3 +1,4 @@
+import { bookingPriceText } from '../lib/booking-price.js';
 import { useEffect, useMemo, useState } from 'react';
 import { api, type MenuItem } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
@@ -120,7 +121,7 @@ export default function MenuList({
                   <span className="mt-[3px] block text-xs">
                     <span className="font-semibold text-ink">{m.duration_minutes}分</span>
                     <span className="ml-2 font-bold text-liff-primary">
-                      {m.base_price === 0 ? '無料' : `¥${m.base_price.toLocaleString()}`}
+                      {bookingPriceText(m.base_price, m.price_mode)}
                     </span>
                   </span>
                 </span>
