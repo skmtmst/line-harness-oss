@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest'
  * 見本の数字が変わったらここも直す。共通部品の中身は M10 の持ち物なので見ない。
  */
 const HERE = dirname(fileURLToPath(import.meta.url))
-const css = readFileSync(new URL('list-v8.module.css', import.meta.url), 'utf8')
+const css = readFileSync(join(HERE, 'list-v8.module.css'), 'utf8')
 
 describe('ウェビナーの一覧は板 UyUMw の数字どおり', () => {
   it('数の帯のマスは余白 16/20・間 8', () => {

@@ -1,10 +1,11 @@
 'use client'
 
-import { Suspense } from 'react'
-import ListState from '@/components/shared/list-state'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import WebinarNewV8 from '@/v8/webinar-edit/new'
+import WebinarNewCurrent from './new-v8'
 
-/** 次のリリースはV8。URLと機能ゲートを保って既存のV8画面へ渡す。 */
-export default function Page() {
-  return <Suspense fallback={<ListState kind="loading" />}><WebinarNewV8 /></Suspense>
+/* V8 のときだけ新しい作る画面（src/v8/webinar-edit/new）。それ以外は今の作る画面のまま。 */
+export default function WebinarNewPage() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <WebinarNewV8 /> : <WebinarNewCurrent />
 }

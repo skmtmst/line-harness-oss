@@ -247,8 +247,12 @@ function Connections() {
             <Button href={buttonsHref}>{`${page.name}を開いて直す`}</Button>
           </div>
         ))}
-        {analysis.missingTargetEdges.length > 0 && <div className={styles.check}><span>切替先が見つからないタブ</span><strong className={analysis.missingTargetEdges.length ? styles.bad : undefined}>{analysis.missingTargetEdges.length ? `${analysis.missingTargetEdges.length}件` : 'なし'}</strong></div>}
-        {analysis.unreachablePageIds.size > 0 && <div className={styles.check}><span>どこからも来られないメニュー</span><strong className={analysis.unreachablePageIds.size ? styles.bad : undefined}>{analysis.unreachablePageIds.size ? `${analysis.unreachablePageIds.size}件` : 'なし'}</strong></div>}
+        {analysis.missingTargetEdges.length > 0 ? (
+          <div className={styles.check}><span>切替先が見つからないタブ</span><strong className={styles.bad}>{`${analysis.missingTargetEdges.length}件`}</strong></div>
+        ) : null}
+        {analysis.unreachablePageIds.size > 0 ? (
+          <div className={styles.check}><span>どこからも来られないメニュー</span><strong className={styles.bad}>{`${analysis.unreachablePageIds.size}件`}</strong></div>
+        ) : null}
         <div className={styles.check}><span>切替先が下書きのまま</span><strong className={draftTargets.length ? styles.bad : undefined}>{draftTargets.length ? `${draftTargets.length}件` : 'なし'}</strong></div>
         {/* 「誰に出すか」はメニューの束ごとに決めるので、切替先だけ違うことは起きない。 */}
         <div className={styles.check}><span>切替先だけ「誰に出すか」が違う</span><strong>なし</strong></div>

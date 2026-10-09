@@ -149,10 +149,6 @@ export default function MediaDetailDialog({
 }) {
   const fileInputId = useId()
   const requestRef = useRef(0)
-  const versionGeneration = useRef(0)
-  const versionLock = useRef(false)
-  const versionTarget = useRef(`${accountId}:${item?.id}`)
-  versionTarget.current = `${accountId}:${item?.id}`
   const [impact, setImpact] = useState<MediaUsageImpact | null>(null)
   const [usageSwitching, setUsageSwitching] = useState<string | null>(null)
   const [usageError, setUsageError] = useState('')
@@ -310,8 +306,6 @@ export default function MediaDetailDialog({
   }, [loadImpact])
 
   useEffect(() => {
-    versionGeneration.current += 1
-    versionLock.current = false
     setVersionFile(null)
     setVersionPhase('idle')
     setVersionProgress(0)
@@ -322,12 +316,9 @@ export default function MediaDetailDialog({
     setVersionDownloadError('')
     setTermsEditing(false)
     setTermsError('')
-    return () => { versionGeneration.current += 1 }
-  }, [item?.id, accountId])
+  }, [item?.id])
 
   function chooseVersionFile(file: File | null) {
-    if (versionLock.current) return
-    versionGeneration.current += 1
     setVersionPreview(null)
     setVersionProgress(0)
     setVersionError('')
@@ -354,10 +345,7 @@ export default function MediaDetailDialog({
   }
 
   async function prepareVersion() {
-    if (!item || !accountId || !versionFile || versionLock.current) return
-    versionLock.current = true
-    const generation = versionGeneration.current, target = versionTarget.current
-    const current = () => generation === versionGeneration.current && target === versionTarget.current
+    if (!item || !accountId || !versionFile || versionPhase === 'uploading') return
     setVersionPhase('uploading')
     setVersionProgress(0)
     setVersionError('')
@@ -373,13 +361,10 @@ export default function MediaDetailDialog({
           metadata: await extractMediaMetadata(versionFile),
         }],
       })
-      if (!current()) return
       const session = prepared.success ? prepared.data.sessions[0] : null
       if (!session) throw new Error('送信の準備結果を確認できませんでした')
-      const etag = await putMediaFile(session, versionFile, progress => { if (current()) setVersionProgress(progress) })
-      if (!current()) return
+      const etag = await putMediaFile(session, versionFile, setVersionProgress)
       const completed = await api.media.completeUpload(session.id, { accountId, etag })
-      if (!current()) return
       if (!completed.success || completed.data.status !== 'verified') {
         throw new Error('差し替え用ファイルを確認できませんでした')
       }
@@ -387,24 +372,19 @@ export default function MediaDetailDialog({
         accountId,
         uploadSessionId: session.id,
       })
-      if (!current()) return
       if (!previewed.success) throw new Error(previewed.error)
       setVersionPreview(previewed.data)
       setVersionPhase('preview')
     } catch (caught) {
-      if (!current()) return
       setVersionPhase('error')
       setVersionError(caught instanceof ApiError || caught instanceof Error
         ? caught.message
         : '差し替え内容を確認できませんでした')
-    } finally { if (current()) versionLock.current = false }
+    }
   }
 
   async function publishVersion() {
-    if (!item || !accountId || !versionPreview?.canReplace || !changeReason.trim() || versionLock.current) return
-    versionLock.current = true
-    const generation = versionGeneration.current, target = versionTarget.current
-    const current = () => generation === versionGeneration.current && target === versionTarget.current
+    if (!item || !accountId || !versionPreview?.canReplace || !changeReason.trim()) return
     setVersionPhase('publishing')
     setVersionError('')
     try {
@@ -414,16 +394,14 @@ export default function MediaDetailDialog({
         previewToken: versionPreview.previewToken,
         changeReason: changeReason.trim(),
       })
-      if (!current()) return
       if (!response.success) throw new Error(response.error)
       onVersionCreated(`「${item.filename}」へ第${response.data.versionNo}版を追加しました。使用先の固定版は変えていません。`)
     } catch (caught) {
-      if (!current()) return
       setVersionPhase('preview')
       setVersionError(caught instanceof ApiError || caught instanceof Error
         ? caught.message
         : '新しい版を追加できませんでした')
-    } finally { if (current()) versionLock.current = false }
+    }
   }
 
   if (!item) return null
@@ -454,7 +432,7 @@ export default function MediaDetailDialog({
           <Button type="button" onClick={() => void downloadItem()} disabled={downloading} busy={downloading} busyLabel="取得中…">ダウンロード
           </Button>
           {downloadError ? <p className="text-danger text-xs" role="alert">{downloadError}</p> : null}
-          {canManage && impact && impact.usageCount > 0 ? (
+          {impact && impact.usageCount > 0 ? (
             <Button type="button" variant="primary" onClick={() => onOpenReplacement(item)}>使用先を差し替える</Button>
           ) : null}
         </div>
@@ -475,7 +453,7 @@ export default function MediaDetailDialog({
             )}
           </div>
 
-          {canManage ? <section className="border-hairline rounded-card border bg-canvas p-4">
+          <section className="border-hairline rounded-card border bg-canvas p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="text-ink text-sm font-bold">この{item.kind === 'image' ? '画像' : 'メディア'}を差し替える</h3>
@@ -498,7 +476,7 @@ export default function MediaDetailDialog({
                 {versionFile ? <p className="text-ink mt-2 text-xs font-medium">{versionFile.name}</p> : null}
               </div>
             </label>
-            <input id={fileInputId} type="file" disabled={versionPhase === 'uploading' || versionPhase === 'publishing'} className="sr-only" accept={mediaAcceptForKind(item.kind)} onChange={(event) => chooseVersionFile(event.target.files?.[0] ?? null)} />
+            <input id={fileInputId} type="file" className="sr-only" accept={mediaAcceptForKind(item.kind)} onChange={(event) => chooseVersionFile(event.target.files?.[0] ?? null)} />
             {versionPhase === 'uploading' ? (
               <div className="mt-3" aria-live="polite">
                 <div className="flex justify-between text-xs"><span>保存先へ直接送信しています</span><span>{versionProgress}%</span></div>
@@ -534,7 +512,7 @@ export default function MediaDetailDialog({
                 </Button>
               )}
             </div>
-          </section> : null}
+          </section>
         </div>
 
         <aside className="space-y-4">

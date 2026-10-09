@@ -32,7 +32,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ accounts: [{ id: 'account-a', liffId: 'liff' }], loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => undefined, usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
 vi.mock('@/components/webinars/webinar-form', () => ({ default: () => <div>基本設定</div> }))
 vi.mock('@/components/webinars/webinar-notifications', () => ({ default: () => <div>通知設定</div> }))
 vi.mock('@/components/shared/select', () => ({
@@ -142,7 +142,6 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
-  document.documentElement.dataset.theme = 'v8'
   fixture.params = new URLSearchParams('id=webinar-1&pane=participants')
   net.calls.length = 0
   installFetch()
@@ -168,16 +167,14 @@ describe('ウェビナー参加者の分類表示と絞り込み (IDEA-10)', () 
     await act(async () => { root.render(<EditWebinarPage />) })
     await flush()
 
-
+    await act(async () => { (host.querySelector('button[aria-label="分類の根拠"]') as HTMLButtonElement).click() })
     // 分類の根拠（完了閾値 540秒=9:00 はサーバー応答の rule から）。
-    expect(host.textContent).toContain('視聴完了＝動画の9割')
+    expect(host.textContent).toContain('分類の根拠')
     expect(host.textContent).toContain('9:00')
     // 未参加・途中離脱・完了・録画/ライブの区別。
-    expect(host.textContent).toContain('見ていない')
-    expect(host.textContent).toContain('途中で離れた')
-    expect(host.textContent).toContain('40%')
-    expect(host.textContent).toContain('視聴完了')
-    expect(host.textContent).toContain('95%')
+    expect(host.textContent).toContain('未参加')
+    expect(host.textContent).toContain('途中離脱 40%')
+    expect(host.textContent).toContain('視聴完了 95%')
     expect(host.textContent).toContain('ライブ1')
     expect(host.textContent).toContain('録画1')
     // 「未視聴」という断定表示はしない。
@@ -188,13 +185,13 @@ describe('ウェビナー参加者の分類表示と絞り込み (IDEA-10)', () 
     await act(async () => { root.render(<EditWebinarPage />) })
     await flush()
 
-    const select = host.querySelector('select[aria-label="よく使う絞り込み"]') as HTMLSelectElement | null
+    const select = host.querySelector('select[aria-label="参加者の分類で絞り込む"]') as HTMLSelectElement | null
     expect(select).not.toBeNull()
     const labels = Array.from(select!.querySelectorAll('option')).map((option) => option.textContent)
     expect(labels).toEqual([
-      'よく使う絞り込み',
-      '見ていない（申込のみ）',
-      '途中で離れた',
+      'すべての申込・参加者',
+      '未参加（申込のみ・入場記録なし）',
+      '途中離脱（入場したが未完了）',
       '視聴完了',
       '計測外',
     ])
@@ -208,7 +205,7 @@ describe('ウェビナー参加者の分類表示と絞り込み (IDEA-10)', () 
     expect(net.calls.some((call) => call.includes('participants?') && call.includes('filter=unviewed'))).toBe(true)
     // #1053: CSVは直リンクではなくボタン＋認証付き取得。押すとfilter付きで取る。
     const csvButton = Array.from(host.querySelectorAll('button'))
-      .find((b) => b.textContent?.replace(/\s/g, '').includes('CSVで書き出す')) as HTMLButtonElement | undefined
+      .find((b) => b.textContent?.includes('CSVで書き出す')) as HTMLButtonElement | undefined
     expect(csvButton).not.toBeUndefined()
     const callsBefore = net.calls.length
     await act(async () => { csvButton!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })

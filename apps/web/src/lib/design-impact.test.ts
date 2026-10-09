@@ -88,7 +88,11 @@ describe('共通部品の影響範囲', () => {
       'app/common-actions/page.tsx',
       // N-193/N-205: 登録メディア選択窓。20件ずつのページ送りを共通へ寄せた。
       'app/contents/media-picker-dialog.tsx',
+      'app/contents/media-replacement-dialog.tsx',
+      'app/contents/page.tsx',
       // #973: 共通情報の変更影響を1件ずつ確認する一覧にページ送りを追加した。
+      'app/contents/vars/impact-review.tsx',
+      'app/contents/vars/page.tsx',
       // ★V8-B コンバージョンの一覧（r6dJFy）。表の下にページ送りを置く。
       'app/conversions/conversion-points-v8.tsx',
       'app/conversions/page.tsx',
@@ -144,6 +148,7 @@ describe('共通部品の影響範囲', () => {
       'app/restaurant-test/google/google-profile.tsx',
       // #919: 予約台帳が増えても消えないよう、期間・状態の絞り込みと20件ずつのページ送りに寄せた。
       'app/restaurant-test/restaurant-console.tsx',
+      'app/rich-menus/page.tsx',
       'app/staff/page.tsx',
       // タグV8の4タブ（タグ・情報欄・対応マーク・保存した検索）。
       // 表の下にページ送りがあり、1ページごとの件数を選べる。
@@ -152,6 +157,8 @@ describe('共通部品の影響範囲', () => {
       'app/webhooks/webhook-interactions.tsx',
       'app/webhooks/webhook-overviews.tsx',
       // ★V8-B ウェビナー一覧（UyUMw）。表の下にページ送りを置く。
+      'app/webinars/edit/participants-v8.tsx',
+      'app/webinars/list-v8.tsx',
       'components/friend-fields/tags-page-v4.tsx',
 
       'components/line-notifications/notification-run-list.tsx',

@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL('../../v8/contents/list.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.tsx'), 'utf8')
 
 /** メディアの削除確認（設計 `YfTfJ` 15-1-C ／ 契約 #610）。 */
 describe('メディアの削除確認', () => {

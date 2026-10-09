@@ -2,7 +2,7 @@
 
 /* ★V8 写し：src/app/contents/media-upload-dialog.tsx から写した（src/v8 は src/app を import しない決まり）。中身は同じ。直すときは両方を直す。 */
 
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
@@ -20,9 +20,7 @@ import { formatNumber } from '@/lib/format'
 
 type UploadState = 'ready' | 'preparing' | 'uploading' | 'verifying' | 'done' | 'error'
 
-type Session = Extract<Awaited<ReturnType<typeof api.media.prepareUploads>>, { success: true }>['data']['sessions'][number]
 type UploadEntry = {
-  attempt?: { session: Session; etag?: string }
   file: File
   state: UploadState
   message: string
@@ -66,8 +64,6 @@ export default function MediaUploadDialog({
   onComplete: () => void
 }) {
   const inputId = useId()
-  const generation = useRef(0)
-  const lock = useRef(false)
   const [mounted, setMounted] = useState(false)
   const [entries, setEntries] = useState<UploadEntry[]>([])
   const [folderId, setFolderId] = useState('')
@@ -78,15 +74,12 @@ export default function MediaUploadDialog({
   useEffect(() => setMounted(true), [])
 
   useEffect(() => {
-    generation.current += 1
-    lock.current = false
     if (!open) return
     setEntries([])
     setFolderId(initialFolderId === '__ungrouped__' ? '' : initialFolderId)
     setBusy(false)
     setError('')
-    return () => { generation.current += 1 }
-  }, [initialFolderId, open, accountId])
+  }, [initialFolderId, open])
 
   const readyCount = useMemo(
     () => entries.filter((entry) => entry.state === 'ready').length,
@@ -107,7 +100,6 @@ export default function MediaUploadDialog({
   }
 
   function stage(files: File[]) {
-    if (lock.current) return
     const next = files.slice(0, 20).map((file) => {
       const message = validateMediaFile(file)
       return { file, state: message ? 'error' : 'ready', message, retryable: false, progress: 0 } satisfies UploadEntry
@@ -117,67 +109,54 @@ export default function MediaUploadDialog({
   }
 
   async function uploadReady() {
-    if (!accountId || readyCount === 0 || busy || lock.current) return
-    lock.current = true
-    const request = generation.current
-    const updateEntries = (update: (current: UploadEntry[]) => UploadEntry[]) => { if (request === generation.current) setEntries(update) }
+    if (!accountId || readyCount === 0 || busy) return
     setBusy(true)
     setError('')
     let completed = 0
     const pending = entries
       .map((entry, index) => ({ entry, index }))
       .filter(({ entry }) => entry.state === 'ready')
-    updateEntries((current) => current.map((entry) => (
+    setEntries((current) => current.map((entry) => (
       entry.state === 'ready' ? { ...entry, state: 'preparing', message: '送信を準備しています', progress: 0 } : entry
     )))
     try {
-      const fresh = pending.filter(({ entry }) => !entry.attempt)
-      const prepared = fresh.length ? await api.media.prepareUploads({
+      const prepared = await api.media.prepareUploads({
         accountId,
-        files: await Promise.all(fresh.map(async ({ entry }) => ({
+        files: await Promise.all(pending.map(async ({ entry }) => ({
           filename: entry.file.name,
           mimeType: entry.file.type,
           sizeBytes: entry.file.size,
           folderId: folderId || null,
           metadata: await extractMediaMetadata(entry.file),
         }))),
-      }) : { success: true as const, data: { sessions: [] as Session[] } }
-      if (request !== generation.current) return
-      if (!prepared.success || prepared.data.sessions.length !== fresh.length) {
+      })
+      if (!prepared.success || prepared.data.sessions.length !== pending.length) {
         throw new Error('送信の準備結果を確認できませんでした')
       }
-      fresh.forEach(({ entry, index }, position) => {
-        entry.attempt = { session: prepared.data.sessions[position] }
-        updateEntries(current => current.map((item, i) => i === index ? { ...item, attempt: entry.attempt } : item))
-      })
       for (let position = 0; position < pending.length; position += 1) {
         const selected = pending[position]
-        const attempt = selected?.entry.attempt
-        const session = attempt?.session
-        if (!selected || !session || !attempt || request !== generation.current) continue
+        const session = prepared.data.sessions[position]
+        if (!selected || !session) continue
         const { index, entry } = selected
         try {
-          updateEntries((current) => current.map((item, entryIndex) => (
+          setEntries((current) => current.map((item, entryIndex) => (
             entryIndex === index ? { ...item, state: 'uploading', message: '送信中 0%', progress: 0 } : item
           )))
-          const etag = attempt.etag ?? await putMediaFile(session, entry.file, (progress) => {
-            updateEntries((current) => current.map((item, entryIndex) => (
+          const etag = await putMediaFile(session, entry.file, (progress) => {
+            setEntries((current) => current.map((item, entryIndex) => (
               entryIndex === index
                 ? { ...item, progress, message: `送信中 ${progress}%` }
                 : item
             )))
           })
-          attempt.etag = etag
-          if (request !== generation.current) return
-          updateEntries((current) => current.map((item, entryIndex) => (
+          setEntries((current) => current.map((item, entryIndex) => (
             entryIndex === index ? { ...item, state: 'verifying', message: '中身を確認しています', progress: 100 } : item
           )))
           const response = await api.media.completeUpload(session.id, { accountId, etag })
-          if (request !== generation.current) return
           if (!response.success || response.data.status !== 'completed') throw new Error('登録を完了できませんでした')
           completed += 1
           const mediaId = response.data.mediaId ?? null
-          updateEntries((current) => current.map((item, entryIndex) => (
+          setEntries((current) => current.map((item, entryIndex) => (
             entryIndex === index
               ? { ...item, state: 'done', message: '入りました', retryable: false, progress: 100, mediaId, scanStatus: 'pending' }
               : item
@@ -187,7 +166,7 @@ export default function MediaUploadDialog({
             try {
               const scan = await api.fileScan.forMedia(mediaId, accountId)
               const status = scan.success ? scan.data.scan?.status ?? null : null
-              updateEntries((current) => current.map((item, entryIndex) => (
+              setEntries((current) => current.map((item, entryIndex) => (
                 entryIndex === index ? { ...item, scanStatus: status ?? 'pending' } : item
               )))
             } catch {
@@ -198,7 +177,7 @@ export default function MediaUploadDialog({
           const message = caught instanceof ApiError || caught instanceof Error
             ? caught.message
             : '登録できませんでした'
-          updateEntries((current) => current.map((item, entryIndex) => (
+          setEntries((current) => current.map((item, entryIndex) => (
             entryIndex === index ? { ...item, state: 'error', message, retryable: true } : item
           )))
         }
@@ -207,13 +186,11 @@ export default function MediaUploadDialog({
       const message = caught instanceof ApiError || caught instanceof Error
         ? caught.message
         : '送信を準備できませんでした'
-      updateEntries((current) => current.map((item) => (
+      setEntries((current) => current.map((item) => (
         item.state === 'preparing' ? { ...item, state: 'error', message, retryable: true } : item
       )))
-      if (request === generation.current) setError(message)
+      setError(message)
     }
-    if (request !== generation.current) return
-    lock.current = false
     setBusy(false)
     if (completed > 0) onComplete()
   }

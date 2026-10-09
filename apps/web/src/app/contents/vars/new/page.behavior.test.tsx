@@ -29,7 +29,6 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
-      staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
       commonVars: { ...actual.api.commonVars, create: api.create },
       folders: { ...actual.api.folders, list: api.foldersList },
     },
@@ -42,7 +41,7 @@ vi.mock('next/link', () => ({
 }))
 
 const routerPush = vi.fn()
-vi.mock('next/navigation', () => ({ usePathname: () => '/', useSearchParams: () => new URLSearchParams(),
+vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: routerPush, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
 }))
 
@@ -177,7 +176,6 @@ async function setDateTimeValue(id: string, iso: string) {
 }
 
 beforeEach(() => {
-  vi.stubGlobal('localStorage', { getItem: (key: string) => key === 'lh_staff_role' ? 'owner' : null, setItem: vi.fn(), removeItem: vi.fn() })
   vi.clearAllMocks()
   fixture.accountId = 'account-1'
   api.foldersList.mockResolvedValue({ success: true, data: [] })
@@ -203,7 +201,7 @@ describe('共通情報の新規作成(実React)', () => {
     await setDateTimeValue('cv-valid-until', '2026-09-16T12:00')
     await setValue(byId('cv-expiry-behavior'), 'fallback')
     await setValue(byId('cv-fallback-value'), '受付終了')
-    await click(byExactText('button', '保存して公開'))
+    await click(byExactText('button', '登録する'))
 
     expect(api.create).toHaveBeenCalledWith(expect.objectContaining({
       validFrom: '2026-09-16T10:00', validUntil: '2026-09-16T12:00',
@@ -217,7 +215,7 @@ describe('共通情報の新規作成(実React)', () => {
     await setValue(byId('cv-key'), 'invalid_window')
     await setDateTimeValue('cv-valid-from', '2026-09-16T10:00')
     await setDateTimeValue('cv-valid-until', '2026-09-16T10:00')
-    await click(byExactText('button', '保存して公開'))
+    await click(byExactText('button', '登録する'))
     expect(api.create).not.toHaveBeenCalled()
     expect(host.textContent).toContain('有効終了は有効開始より後にしてください')
   })
@@ -231,14 +229,14 @@ describe('共通情報の新規作成(実React)', () => {
     await render()
     await setValue(byId('cv-name'), `${type}の項目`)
     await setValue(byId('cv-key'), `${type}_value`)
-    await click(Array.from(document.querySelectorAll<HTMLElement>('[role=radio]')).find(el => el.textContent?.includes(({ long_text: '長文', date: '年月日', datetime: '日時', boolean: 'はい／いいえ', number: '数値', url: 'URL', image: '画像', text: '標準' } as Record<string,string>)[type]))!)
+    await click(document.querySelector(`input[name="cv-type"][value="${type}"]`) as HTMLInputElement)
 
     const control = byId('cv-value')
     expect(control.tagName).toBe(tagName)
     if (type === 'date') await setDateValue('cv-value', value)
     else if (type === 'datetime') await setDateTimeValue('cv-value', value)
     else await setValue(control, value)
-    await click(byExactText('button', '保存して公開'))
+    await click(byExactText('button', '登録する'))
 
     expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ type, value }))
   })
@@ -248,7 +246,7 @@ describe('共通情報の新規作成(実React)', () => {
     await setValue(byId('cv-name'), '営業時間')
     await setValue(byId('cv-key'), 'shop_hours')
     await setValue(byId('cv-memo'), 'パスワード: hunter2')
-    await click(byExactText('button', '保存して公開'))
+    await click(byExactText('button', '登録する'))
 
     expect(document.querySelector('[role="alertdialog"]')).not.toBeNull()
     expect(host.textContent).toContain('社内メモ')
@@ -260,7 +258,7 @@ describe('共通情報の新規作成(実React)', () => {
     await setValue(byId('cv-name'), '途中の下書き')
 
     const backLink = Array.from(document.querySelectorAll('a')).find(
-      (el) => el.textContent?.trim() === 'キャンセル',
+      (el) => el.textContent?.trim() === '共通情報一覧へ戻る',
     ) as HTMLAnchorElement
     expect(backLink).not.toBeUndefined()
 
@@ -287,7 +285,7 @@ describe('共通情報の新規作成(実React)', () => {
     await setValue(byId('cv-name'), 'account-1の下書き')
     await setValue(byId('cv-key'), 'draft_key')
     await setValue(byId('cv-memo'), 'password: hunter2')
-    await click(byExactText('button', '保存して公開'))
+    await click(byExactText('button', '登録する'))
     expect(document.querySelector('[role="alertdialog"]')).not.toBeNull()
 
     // ヘッダーのアカウント選択(ページ遷移なし)で account-2 へ切り替える。
@@ -303,7 +301,7 @@ describe('共通情報の新規作成(実React)', () => {
     // account-2 用に改めて入力し、account-2 として正しく登録できる。
     await setValue(byId('cv-name'), 'account-2の値')
     await setValue(byId('cv-key'), 'a2_key')
-    await click(byExactText('button', '保存して公開'))
+    await click(byExactText('button', '登録する'))
 
     expect(api.create).toHaveBeenCalledTimes(1)
     expect(api.create.mock.calls[0][0]).toMatchObject({ accountId: 'account-2', name: 'account-2の値' })
@@ -322,9 +320,9 @@ describe('共通情報の新規作成: 型別の入力エラー(VAR-06, 実React
     await render()
     await setValue(byId('cv-name'), '営業中フラグ')
     await setValue(byId('cv-key'), 'is_open')
-    await click(Array.from(document.querySelectorAll<HTMLElement>('[role=radio]')).find(el => el.textContent?.includes('はい／いいえ'))!)
+    await click(document.querySelector('input[name="cv-type"][value="boolean"]') as HTMLInputElement)
     // 「選んでください」のまま登録する。
-    await click(byExactText('button', '保存して公開'))
+    await click(byExactText('button', '登録する'))
 
     expect(api.create).not.toHaveBeenCalled()
     expect(host.textContent).toContain('値を選んでください')
@@ -335,8 +333,8 @@ describe('共通情報の新規作成: 型別の入力エラー(VAR-06, 実React
     await render()
     await setValue(byId('cv-name'), '開店日')
     await setValue(byId('cv-key'), 'open_date')
-    await click(Array.from(document.querySelectorAll<HTMLElement>('[role=radio]')).find(el => el.textContent?.includes('年月日'))!)
-    await click(byExactText('button', '保存して公開'))
+    await click(document.querySelector('input[name="cv-type"][value="date"]') as HTMLInputElement)
+    await click(byExactText('button', '登録する'))
 
     expect(api.create).not.toHaveBeenCalled()
     expect(host.textContent).toContain('値の日付を入力してください')
@@ -346,9 +344,9 @@ describe('共通情報の新規作成: 型別の入力エラー(VAR-06, 実React
     await render()
     await setValue(byId('cv-name'), 'ロゴ')
     await setValue(byId('cv-key'), 'logo_url')
-    await click(Array.from(document.querySelectorAll<HTMLElement>('[role=radio]')).find(el => el.textContent?.includes('画像'))!)
+    await click(document.querySelector('input[name="cv-type"][value="image"]') as HTMLInputElement)
     await setValue(byId('cv-value'), 'not-an-image')
-    await click(byExactText('button', '保存して公開'))
+    await click(byExactText('button', '登録する'))
 
     expect(api.create).not.toHaveBeenCalled()
     expect(host.textContent).toContain('https://')
@@ -358,13 +356,13 @@ describe('共通情報の新規作成: 型別の入力エラー(VAR-06, 実React
     await render()
     await setValue(byId('cv-name'), '店舗リンク')
     await setValue(byId('cv-key'), 'shop_link')
-    await click(Array.from(document.querySelectorAll<HTMLElement>('[role=radio]')).find(el => el.textContent?.includes('URL'))!)
+    await click(host.querySelector('input[name="cv-type"][value="url"]') as HTMLInputElement)
     await setValue(byId('cv-value'), 'これはURLではありません')
-    await click(byExactText('button', '保存して公開'))
+    await click(byExactText('button', '登録する'))
 
     expect(api.create).not.toHaveBeenCalled()
     // 欄のすぐ下に出る。
-    const valueField = byId('cv-value').closest('div')?.parentElement
+    const valueField = byId('cv-value').closest('div')
     expect(valueField?.textContent).toContain('http://')
     expect((document.activeElement as HTMLElement | null)?.id).toBe('cv-value')
   })
@@ -373,9 +371,9 @@ describe('共通情報の新規作成: 型別の入力エラー(VAR-06, 実React
     await render()
     await setValue(byId('cv-name'), '店舗リンク')
     await setValue(byId('cv-key'), 'shop_link2')
-    await click(Array.from(document.querySelectorAll<HTMLElement>('[role=radio]')).find(el => el.textContent?.includes('URL'))!)
+    await click(host.querySelector('input[name="cv-type"][value="url"]') as HTMLInputElement)
     await setValue(byId('cv-value'), 'https://example.com/shop')
-    await click(byExactText('button', '保存して公開'))
+    await click(byExactText('button', '登録する'))
 
     expect(api.create).toHaveBeenCalledTimes(1)
     expect(api.create.mock.calls[0][0]).toMatchObject({ type: 'url', value: 'https://example.com/shop' })
@@ -385,11 +383,11 @@ describe('共通情報の新規作成: 型別の入力エラー(VAR-06, 実React
     await render()
     await setValue(byId('cv-name'), 'ロゴ')
     await setValue(byId('cv-key'), 'logo_url2')
-    await click(Array.from(document.querySelectorAll<HTMLElement>('[role=radio]')).find(el => el.textContent?.includes('画像'))!)
+    await click(document.querySelector('input[name="cv-type"][value="image"]') as HTMLInputElement)
     await setValue(byId('cv-value'), 'https://cdn.example.com/logo.png')
     await setValue(byId('cv-expiry-behavior'), 'fallback')
     await setValue(byId('cv-fallback-value'), 'not-an-image')
-    await click(byExactText('button', '保存して公開'))
+    await click(byExactText('button', '登録する'))
 
     expect(api.create).not.toHaveBeenCalled()
     expect(host.textContent).toContain('代替値は https:// からはじまるURLで入力してください')
@@ -402,7 +400,7 @@ describe('共通情報の新規作成: 型別の入力エラー(VAR-06, 実React
     await setValue(byId('cv-name'), '営業時間')
     await setValue(byId('cv-key'), 'shop_hours')
     await setValue(byId('cv-value'), '10:00-18:00')
-    await click(byExactText('button', '保存して公開'))
+    await click(byExactText('button', '登録する'))
 
     expect(host.textContent).toContain('種別に合う値を入力してください')
     expect(host.textContent).not.toContain('保存に失敗しました。通信を確かめて、もう一度お試しください。')
@@ -414,7 +412,7 @@ describe('共通情報の新規作成: 型別の入力エラー(VAR-06, 実React
     await setValue(byId('cv-name'), '営業時間')
     await setValue(byId('cv-key'), 'shop_hours')
     await setValue(byId('cv-value'), '10:00-18:00')
-    await click(byExactText('button', '保存して公開'))
+    await click(byExactText('button', '登録する'))
 
     expect(host.textContent).toContain('その差し込み名は既に使われています')
     expect((document.activeElement as HTMLElement | null)?.id).toBe('cv-key')
@@ -426,7 +424,7 @@ describe('共通情報の新規作成: 型別の入力エラー(VAR-06, 実React
     await setValue(byId('cv-name'), '営業時間')
     await setValue(byId('cv-key'), 'shop_hours')
     await setValue(byId('cv-value'), '10:00-18:00')
-    await click(byExactText('button', '保存して公開'))
+    await click(byExactText('button', '登録する'))
 
     expect(host.textContent).toContain('通信が切れている可能性があります')
     // 入力は消さない。
@@ -456,7 +454,7 @@ describe('日本語の秘密値検知(限定語彙+区切り記号必須とい�
     await setValue(byId('cv-name'), '営業時間')
     await setValue(byId('cv-key'), 'shop_hours')
     await setValue(byId('cv-memo'), memo)
-    await click(byExactText('button', '保存して公開'))
+    await click(byExactText('button', '登録する'))
 
     expect(document.querySelector('[role="alertdialog"]')).not.toBeNull()
     expect(api.create).not.toHaveBeenCalled()
@@ -475,7 +473,7 @@ describe('日本語の秘密値検知(限定語彙+区切り記号必須とい�
     await setValue(byId('cv-name'), '営業時間')
     await setValue(byId('cv-key'), 'shop_hours2')
     await setValue(byId('cv-memo'), memo)
-    await click(byExactText('button', '保存して公開'))
+    await click(byExactText('button', '登録する'))
 
     // 誤検知していなければ、警告を出さずにそのまま送信まで進む。
     expect(document.querySelector('[role="alertdialog"]')).toBeNull()
@@ -483,6 +481,3 @@ describe('日本語の秘密値検知(限定語彙+区切り記号必須とい�
     expect(api.create.mock.calls[0][0]).toMatchObject({ memo })
   })
 })
-
-// These scenarios exercise owner actions; permission restrictions are covered separately.
-vi.mock('@/lib/staff-capability', async (importOriginal) => ({ ...await importOriginal<typeof import('@/lib/staff-capability')>(), isOwnerOrAdmin: () => true }))

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(new URL('../../v8/templates/list.tsx', import.meta.url), 'utf8') + readFileSync(new URL('../../components/shared/detail-panel.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
 
 /*
  * D010: 一覧の詳細パネルの×は素のテキストだけで、読み上げでは無名ボタンに
@@ -13,7 +13,7 @@ const PAGE = readFileSync(new URL('../../v8/templates/list.tsx', import.meta.url
  */
 describe('テンプレート一覧の詳細パネルの閉じるボタン（D010）', () => {
   it('共通の IconButton を使っている', () => {
-    expect(PAGE).toContain("from '@/components/shared/detail-panel'")
+    expect(PAGE).toContain("from '@/components/shared/icon-button'")
   })
 
   it('閉じるボタンに読み上げ用の名前がある', () => {

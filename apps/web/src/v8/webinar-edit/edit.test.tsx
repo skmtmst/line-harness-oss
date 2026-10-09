@@ -107,7 +107,7 @@ beforeEach(() => {
     if (path.endsWith('/comments')) return json({ data: comments })
     if (path.endsWith('/notifications')) return json({ data: { settings: { webinarId: 'webinar-1', version: 1, registrationEnabled: true, dayBeforeEnabled: true, dayBeforeTime: '19:00', hourBeforeEnabled: false, hourBeforeMinutes: 15, startEnabled: true, missedEnabled: false, missedTime: '10:00', missedWindowDays: 3, completedEnabled: true, updatedAt: '' }, overview: { total: 10, pending: 0, sent: 9, failed: 1, skipped: 0, cancelled: 0, skippedReasons: [], audience: { people: 10, bookings: 10, definition: 'active_registrations' } } } })
     if (path.endsWith('/actions')) return json({ data: [] })
-    if (path.endsWith('/ctas')) return json({ version: 1, updatedBy: null, updatedAt: null, data: [{ atSeconds: 300, kind: 'url', title: '資料', body: null, buttonLabel: '受け取る', autoOpen: false, formId: null, url: 'https://example.com' }] })
+    if (path.endsWith('/ctas')) return json({ data: [{ atSeconds: 300, kind: 'url', title: '資料', body: null, buttonLabel: '受け取る', autoOpen: false, formId: null, url: 'https://example.com' }] })
     if (path.endsWith('/video-asset')) return json({ data: { asset: null } })
     if (path.endsWith('/publish-validation')) return json({ data: { version: 3, checks: [{ key: 'video_ready', label: '動画の準備ができている', status: 'passed', detail: null }], blockers: [], warnings: [] } })
     if (path === '/api/forms') return json({ success: true, data: [] })
@@ -132,7 +132,7 @@ const buttons = () => [...document.querySelectorAll('button')] as HTMLButtonElem
 const buttonText = (text: string) => buttons().find((button) => button.textContent?.trim() === text)
 
 describe('V8 ウェビナーの編集', () => {
-  it('入口はテーマ設定にかかわらずV8の画面を出す', async () => {
+  it('入口は V8 のときだけ新しい画面を出す（v7 の見た目では今の画面のまま）', async () => {
     nav.search = 'id=webinar-1&pane=participants'
     await render(<EditPage />)
     expect(host.querySelector('[data-wc-editor="v8"]')).toBeTruthy()
@@ -140,7 +140,7 @@ describe('V8 ウェビナーの編集', () => {
     act(() => { root.unmount() })
     root = createRoot(host)
     await render(<EditPage />)
-    expect(host.querySelector('[data-wc-editor="v8"]')).toBeTruthy()
+    expect(host.querySelector('[data-wc-editor="v8"]')).toBeNull()
   })
 
   it('参加者（uNsEy）：頭・タブ（参加者の人数つき）・数の帯・表・チャットへの道', async () => {

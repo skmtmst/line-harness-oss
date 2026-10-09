@@ -1,17 +1,19 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL("./../../v8/rich-menus/list.tsx", import.meta.url), 'utf8')
+const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 
 describe('V6 リッチメニュー削除確認 szXsT', () => {
   it('管理画面とLINE上の削除を共通確認窓へ寄せる', () => {
     expect(PAGE).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")
+    expect(PAGE).toContain('designNode="szXsT"')
     expect(PAGE).toContain("setDeleteTarget({ kind: 'managed', group })")
-    expect(PAGE).toContain("kind: 'external'; menu")
+    expect(PAGE).toContain("setDeleteTarget({ kind: 'external', menu })")
     expect(PAGE.match(/\bconfirm\(/g) ?? []).toHaveLength(0)
   })
 
   it('管理画面外のメニューは追加・上書き・LINE側への影響を確認してから取り込む', () => {
+    expect(PAGE).toContain('data-qa-open="TL7tp"')
     expect(PAGE).toContain('管理画面に追加するもの：')
     expect(PAGE).toContain('上書きするもの：')
     expect(PAGE).toContain('すでに管理中のメニューは重ねて取り込みません。')
@@ -37,7 +39,8 @@ describe('V6 リッチメニュー削除確認 szXsT', () => {
     expect(PAGE).toContain("setDeleteTarget({ kind: 'managed', group })")
     // ★V7 `Xn1Mz`（行の「…」統一）：削除口は共通 RowActions のメニューへそろえた。
     // 公開中→szXsT・下書き→szXsT-draft の分け方は menuButtonProps で残す。
-    expect(PAGE).toContain('<RowMenu')
+    expect(PAGE).toContain('<RowActions')
+    expect(PAGE).toContain("'data-qa-open': g.status === 'published' ? 'szXsT' : 'szXsT-draft'")
     expect(PAGE).toContain("? await api.richMenuGroups.unpublish(deleteTarget.group.id)")
     expect(PAGE).toContain("? 'LINEから取り下げる'")
     expect(PAGE).toContain('取り下げたあと、管理画面から削除できます。')

@@ -17,7 +17,7 @@ import type { WebinarListItem } from '@/lib/api'
 import { WebinarListContent } from './list-v8'
 
 /* 一覧の行操作（R94 参加者・分析・演出への移動）が使う router の撮影口。 */
-vi.mock('next/navigation', () => ({ usePathname: () => '/', useSearchParams: () => new URLSearchParams(),
+vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
 }))
 

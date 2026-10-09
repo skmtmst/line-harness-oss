@@ -21,7 +21,7 @@ const fixture = vi.hoisted(() => ({
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
-vi.mock('next/navigation', () => ({ usePathname: () => '/', useSearchParams: () => new URLSearchParams(),
+vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: fixture.push }),
 }))
 vi.mock('@/contexts/account-context', () => ({
@@ -93,9 +93,9 @@ describe('ウェビナー作成からの段遷移 (#1002 DETAIL-03)', () => {
     await flush()
 
     await act(async () => {
-      fireEvent.change(host.querySelector('#webinar-new-title')!, { target: { value: '回帰ウェビナー' } })
+      fireEvent.change(host.querySelector('#webinar-v8-title')!, { target: { value: '回帰ウェビナー' } })
     })
-    await act(async () => { buttonByText('動画の設定へ').click() })
+    await act(async () => { buttonByText('→ 動画の設定へ').click() })
     await flush()
 
     expect(fixture.create).toHaveBeenCalledTimes(1)
@@ -107,11 +107,11 @@ describe('ウェビナー作成からの段遷移 (#1002 DETAIL-03)', () => {
     await render()
     await flush()
 
-    const titleInput = host.querySelector('#webinar-new-title')! as HTMLInputElement
+    const titleInput = host.querySelector('#webinar-v8-title')! as HTMLInputElement
     await act(async () => {
       fireEvent.change(titleInput, { target: { value: '残したい名前' } })
     })
-    await act(async () => { buttonByText('動画の設定へ').click() })
+    await act(async () => { buttonByText('→ 動画の設定へ').click() })
     await flush()
 
     expect(fixture.push).not.toHaveBeenCalled()

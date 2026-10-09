@@ -51,8 +51,7 @@ export default function MediaReplacementDialog({
     setCandidatePage(1)
     setCandidateQueryInput('')
     setCandidateQuery('')
-    return () => { requestRef.current += 1; candidateRequestRef.current += 1 }
-  }, [source?.id, accountId])
+  }, [source])
 
   useEffect(() => {
     if (!source || !accountId) { setCandidates([]); setCandidateTotal(0); setCandidatePhase('empty'); return }
@@ -85,7 +84,6 @@ export default function MediaReplacementDialog({
   }, [accountId, candidatePage, candidateQuery, source])
 
   async function selectReplacement(id: string) {
-    const request = ++requestRef.current
     setReplacementId(id)
     setImpact(null)
     setError('')
@@ -93,6 +91,8 @@ export default function MediaReplacementDialog({
       setPhase('idle')
       return
     }
+    const request = requestRef.current + 1
+    requestRef.current = request
     setPhase('loading')
     try {
       const response = await api.media.replacementImpact(source.id, id, accountId)
@@ -113,10 +113,9 @@ export default function MediaReplacementDialog({
    * 部分実行は専用ボタンの文言で明示確認してから呼ばれる。
    */
   async function replace(mode: 'all' | 'partial') {
-    if (!source || !accountId || !impact || busy || phase !== 'ready' || replacementId !== impact.replacement.id) return
+    if (!source || !accountId || !impact || busy) return
     if (mode === 'all' && !impact.canReplace) return
     if (mode === 'partial' && !impact.canPartiallyReplace) return
-    const request = requestRef.current
     setBusy(true)
     setError('')
     try {
@@ -125,7 +124,6 @@ export default function MediaReplacementDialog({
         expectedRevision: impact.revision,
         scope: mode === 'partial' ? 'replaceable' : 'all',
       })
-      if (request !== requestRef.current) return
       if (!response.success) throw new Error(response.error)
       const verification = response.data.verification === 'verified'
         ? '差し替え後の使用先も確認できました。'
@@ -136,7 +134,6 @@ export default function MediaReplacementDialog({
         : ''
       onComplete(`${response.data.replacedUsageCount}か所を「${impact.replacement.filename}」へ差し替えました。${remaining}${verification}`)
     } catch (caught) {
-      if (request !== requestRef.current) return
       const message = caught instanceof ApiError || caught instanceof Error
         ? caught.message
         : '使用先を差し替えられませんでした'

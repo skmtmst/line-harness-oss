@@ -48,7 +48,7 @@ const QUESTION = {
 
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {},
-  api: { staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
+  api: {
     templates: {
       list: () => Promise.resolve({ success: true, data: mockState.templates }),
       get: () => Promise.resolve({ success: false, error: '詳細は開かない' }),
@@ -62,8 +62,6 @@ vi.mock('@/lib/api', () => ({
 }))
 
 beforeEach(() => {
-  window.history.replaceState(null, '', '/templates')
-  window.dispatchEvent(new PopStateEvent('popstate'))
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => (key === 'lh_staff_role' ? 'owner' : null),
     setItem: () => {},
@@ -116,7 +114,7 @@ describe('R135 質問タブと絞り込み札の分離', () => {
       fireEvent.click(screen.getByRole('tab', { name: /質問/ }))
     })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '使っていない' }))
+      fireEvent.click(screen.getByRole('button', { name: '未使用' }))
     })
     // タブは質問のまま。
     expect(screen.getByRole('tab', { name: /質問/ }).getAttribute('aria-selected')).toBe('true')
@@ -126,5 +124,3 @@ describe('R135 質問タブと絞り込み札の分離', () => {
     expect(tableText('メッセージ2')).toBeNull()
   })
 })
-
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/templates' }))

@@ -23,7 +23,7 @@ const fixture = vi.hoisted(() => ({
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
-vi.mock('next/navigation', () => ({ usePathname: () => '/', useSearchParams: () => new URLSearchParams(),
+vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: fixture.push }),
 }))
 vi.mock('@/contexts/account-context', () => ({
@@ -84,7 +84,7 @@ async function flush() {
 }
 
 function backLink(): HTMLAnchorElement {
-  const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent?.trim() === 'キャンセル')
+  const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent?.includes('ウェビナーへ'))
   if (!link) throw new Error('一覧への戻りリンクが見つかりません')
   return link as HTMLAnchorElement
 }
@@ -94,7 +94,7 @@ function dialog(): HTMLElement | null {
 }
 
 async function typeTitle(value: string) {
-  const titleInput = host.querySelector('#webinar-new-title')! as HTMLInputElement
+  const titleInput = host.querySelector('#webinar-v8-title')! as HTMLInputElement
   await act(async () => {
     fireEvent.change(titleInput, { target: { value } })
   })
@@ -164,6 +164,6 @@ describe('ウェビナー作成の未保存離脱確認（R18）', () => {
     await flush()
     expect(dialog()).toBeNull()
     expect(fixture.push).not.toHaveBeenCalled()
-    expect((host.querySelector('#webinar-new-title') as HTMLInputElement).value).toBe('QAウェビナー')
+    expect((host.querySelector('#webinar-v8-title') as HTMLInputElement).value).toBe('QAウェビナー')
   })
 })

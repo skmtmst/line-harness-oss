@@ -24,7 +24,7 @@ class ApiError extends Error {
 vi.mock('@/lib/api', () => ({
   ApiError,
   fetchApi: () => Promise.resolve({ success: true, data: {} }),
-  api: { staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
+  api: {
     media: {
       deleteImpact: () => Promise.resolve({
         success: true,
@@ -208,7 +208,6 @@ async function clearExpiresDate() {
 }
 
 beforeEach(() => {
-  window.history.replaceState(null, '', '/contents')
   fixture.updates.length = 0
   fixture.downloadedVersions.length = 0
   fixture.itemUpdated.length = 0

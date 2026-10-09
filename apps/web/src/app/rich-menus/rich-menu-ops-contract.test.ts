@@ -4,11 +4,11 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const LIST_PAGE = readFileSync(new URL('../../v8/rich-menus/list.tsx', import.meta.url), 'utf8')
-const EDIT_PAGE = readFileSync(new URL('../../v8/rich-menu-edit/detail.tsx', import.meta.url), 'utf8') + readFileSync(new URL('new/create-v8.tsx', import.meta.url), 'utf8')
+const LIST_PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const EDIT_PAGE = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
 const PUBLISH_HISTORY = readFileSync(join(HERE, 'edit', 'publish-history.tsx'), 'utf8')
 const TEST_APPLY = readFileSync(join(HERE, 'edit', 'test-apply-section.tsx'), 'utf8')
-const NEW_PAGE = readFileSync(new URL('new/create-v8.tsx', import.meta.url), 'utf8')
+const NEW_PAGE = readFileSync(join(HERE, 'new', 'page.tsx'), 'utf8')
 const CREATE_FORM = readFileSync(
   join(HERE, '..', '..', 'components', 'rich-menus', 'rich-menu-create-form.tsx'),
   'utf8',
@@ -25,15 +25,21 @@ describe('一覧の検索はボタン名にも当たる', () => {
 /** #899 / N-164: 登録メディアの選択が作成フォームへ戻る */
 describe('作成画面の登録メディア選択', () => {
   it('メディア選択ダイアログを今のアカウントで開き、選択がフォームへ戻る', () => {
-expect(NEW_PAGE).toContain('<MediaPickerDialog')
-    expect(NEW_PAGE).toContain('accountId={accountId}')
+    expect(NEW_PAGE).toContain("import MediaPickerDialog from '@/app/contents/media-picker-dialog'")
+    expect(NEW_PAGE).toContain('accountId={selectedAccount?.id ?? null}')
+    expect(NEW_PAGE).toContain('onSelect={(item) => {')
     expect(NEW_PAGE).toContain('setSelectedMedia(item)')
+    // キャンセルは入力を捨てない（onClose は閉じるだけ）
+    expect(NEW_PAGE).toContain('onClose={() => setMediaPickerOpen(false)}')
+    // 選んだ画像のプレビューがフォーム内に残る
+    expect(NEW_PAGE).toContain('api.media.contentUrl(selectedMedia.id, selectedAccount.id)')
+    // 作成APIへ imageMediaId を渡す
     expect(NEW_PAGE).toContain('imageMediaId: selectedMedia?.id')
   })
 
   it('アカウントを切り替えたら前のアカウントの選択を持ち込まない', () => {
-expect(NEW_PAGE).toContain('setSelectedMedia(null)')
-    expect(NEW_PAGE).toContain('[accountId')
+    expect(NEW_PAGE).toContain('setSelectedMedia(null)')
+    expect(NEW_PAGE).toContain('[selectedAccount?.id]')
   })
 
   it('選んだメディアも未保存の入力として数える', () => {
@@ -44,9 +50,8 @@ expect(NEW_PAGE).toContain('setSelectedMedia(null)')
 /** #900 / N-151: 履歴・失敗だけの再試行・照合 */
 describe('公開履歴・再試行・照合', () => {
   it('編集画面に履歴セクションがあり owner/admin のみ出す', () => {
-expect(EDIT_PAGE).toContain('api.richMenuGroups.publishRuns(groupId)')
-    expect(EDIT_PAGE).toContain("role === 'owner' || role === 'admin'")
-    expect(EDIT_PAGE).toContain('canOperate')
+    expect(EDIT_PAGE).toContain("import { PublishHistorySection } from './publish-history'")
+    expect(EDIT_PAGE).toContain('canOperate ? <PublishHistorySection')
   })
 
   it('失敗したrunだけに再試行ボタンを出し、照合は dryRun → 明示修復の順', () => {
@@ -79,7 +84,7 @@ describe('一覧と編集からの複製', () => {
   })
 
   it('編集画面にも複製がある', () => {
-expect(EDIT_PAGE).toContain('open={duplicateOpen}')
+    expect(EDIT_PAGE).toContain("confirmKind === 'duplicate'")
     expect(EDIT_PAGE).toContain('api.richMenuGroups.duplicate')
   })
 })
@@ -87,9 +92,9 @@ expect(EDIT_PAGE).toContain('open={duplicateOpen}')
 /** #903 / N-156: staffへは合計だけ */
 describe('staffへの影響人数は合計のみ', () => {
   it('編集画面は staff を読み取り専用にし、集計だけを読む', () => {
-expect(EDIT_PAGE).toContain('if (aggregateOnly)')
-    expect(EDIT_PAGE).toContain('api.richMenuGroups.audienceSummary(group.id)')
-    expect(EDIT_PAGE).toContain("staffRole === 'staff' || staffRole === 'viewer'")
+    expect(EDIT_PAGE).toContain('audienceSummary')
+    expect(EDIT_PAGE).toContain('aggregateOnly')
+    expect(EDIT_PAGE).toContain('readOnly={aggregateOnly}')
   })
 })
 
@@ -104,7 +109,14 @@ describe('作成時の既定ページ・出し分け・切替', () => {
   })
 
   it('作成APIへ全部送り、切替の行き先は targetPageIndex に直す', () => {
-for(const field of ['defaultPageIndex: 0', 'isDefaultForAll:', "targetingEnabled: audience === 'targeted'", 'targetingPriority,', 'targetPageIndex']) expect(NEW_PAGE).toContain(field)
+    expect(NEW_PAGE).toContain('defaultPageIndex: value.defaultPageIndex')
+    expect(NEW_PAGE).toContain('isDefaultForAll:')
+    expect(NEW_PAGE).toContain('targetingEnabled: value.targetingEnabled')
+    expect(NEW_PAGE).toContain('targetingPriority: value.targetingPriority')
+    expect(NEW_PAGE).toContain('targetPageIndex')
+    // 切替ボタンを新規作成で選べる
+    expect(NEW_PAGE).toContain('NEW_MENU_INTENTS_WITH_SWITCH')
+    // 行き先未設定の切替を黙って送らない
     expect(NEW_PAGE).toContain('行き先ページが決まっていません')
   })
 })

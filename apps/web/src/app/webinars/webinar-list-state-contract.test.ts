@@ -8,8 +8,8 @@ import { ApiError } from '@/lib/api'
 import { webinarLoadFailure } from './webinar-load-failure'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(new URL('list-v8.tsx', import.meta.url), 'utf8')
-const OVERVIEW = readFileSync(new URL('overview-view.ts', import.meta.url), 'utf8')
+const PAGE = readFileSync(join(HERE, 'list-v8.tsx'), 'utf8')
+const OVERVIEW = readFileSync(join(HERE, 'overview-view.ts'), 'utf8')
 
 /**
  * ウェビナー一覧（設計 `ZC13r` 10-1 ／ `zCQXe` 10-1-L）の、

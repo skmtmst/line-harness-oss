@@ -54,7 +54,6 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
-      staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
       templates: {
         ...actual.api.templates,
         get: calls.templatesGet,
@@ -128,17 +127,14 @@ const validDetail = {
 }
 
 beforeEach(() => {
-  document.documentElement.dataset.theme = 'v8'
   routing.pushed = []
   calls.templatesGet.mockReset()
   const store = new Map<string, string>([['lh_staff_role', 'owner']])
-  const storage = {
+  vi.stubGlobal('localStorage', {
     getItem: (key: string) => store.get(key) ?? null,
     setItem: (key: string, value: string) => void store.set(key, value),
     removeItem: (key: string) => void store.delete(key),
-  }
-  vi.stubGlobal('localStorage', storage)
-  Object.defineProperty(window, 'localStorage', { configurable: true, value: storage })
+  })
 })
 
 afterEach(async () => {
@@ -155,8 +151,8 @@ describe('D008: 形の違う詳細応答', () => {
 
     expect(screenText()).toContain('このテンプレートは見つかりません')
     // 存在しない相手への操作口は出さない。
-    expect(byText('a', '編集する')).toBeNull()
-    expect(byText('button', '削除する')).toBeNull()
+    expect(byText('a', 'テンプレートを編集')).toBeNull()
+    expect(byText('button', 'テンプレートを削除する')).toBeNull()
     expect(byText('button', '使用中のため削除できません')).toBeNull()
   })
 
@@ -165,11 +161,8 @@ describe('D008: 形の違う詳細応答', () => {
 
     await mountAt('?id=tmpl-1')
 
-    expect(screenText()).toContain('name')
-    expect(screenText()).toContain('さん、いつもありがとうございます。')
-    expect(byText('a', '編集する')).not.toBeNull()
-    expect(document.querySelector('button[aria-label="そのほかの操作"]')).not.toBeNull()
+    expect(screenText()).toContain('{{name}}さん、いつもありがとうございます。')
+    expect(byText('a', 'テンプレートを編集')).not.toBeNull()
+    expect(byText('button', 'テンプレートを削除する')).not.toBeNull()
   })
 })
-
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a', accounts: [], loading: false }) }))

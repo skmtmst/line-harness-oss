@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const EDIT = readFileSync(new URL("./new/create-v8.tsx", import.meta.url), 'utf8')
-const CONNECTIONS = readFileSync(new URL("./../../v8/rich-menus/connections.tsx", import.meta.url), 'utf8')
+const EDIT = readFileSync(new URL('./edit/page.tsx', import.meta.url), 'utf8')
+const CONNECTIONS = readFileSync(new URL('./connections/page.tsx', import.meta.url), 'utf8')
 const CANVAS = readFileSync(
   new URL('../../components/rich-menus/canvas-editor.tsx', import.meta.url),
   'utf8',
@@ -18,7 +18,8 @@ const TAG_MODAL = readFileSync(
  */
 describe('#578 リッチメニューの軽整理', () => {
   it('取得結果を as で断定せず、形を確かめる', () => {
-expect(EDIT).toContain('!Array.isArray((res.data as Group).pages)')
+    expect(EDIT).toContain('function isGroupResponse')
+    expect(EDIT).not.toContain('res.data as Group')
     expect(CONNECTIONS).toContain('function isRichMenuGroupResponse')
     expect(CONNECTIONS).not.toContain('response.data as RichMenuGroup')
   })
@@ -36,9 +37,9 @@ expect(EDIT).toContain('!Array.isArray((res.data as Group).pages)')
   })
 
   it('取り下げの部分的失敗を日本語の定型文に写す', () => {
-const detail = readFileSync(new URL('../../v8/rich-menu-edit/detail.tsx', import.meta.url), 'utf8')
-    expect(detail).toContain("richMenuError(caught, 'unpublish')")
-    expect(detail).not.toContain('warnings.join(')
+    expect(EDIT).toContain('unpublishWarningText')
+    expect(EDIT).not.toContain('warnings.join(')
+    expect(EDIT).toContain('切り替え設定の一部を取り下げきれていません')
   })
 
   it('タグ取得の失敗を黙らせず、注記と再試しを出す', () => {

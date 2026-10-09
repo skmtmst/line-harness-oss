@@ -261,8 +261,6 @@ export function installTestDom(): DomDocument {
   const view = globalThis as unknown as Record<string, unknown>
   document.defaultView = view
   view.document = document
-  view.addEventListener = document.addEventListener.bind(document)
-  view.removeEventListener = document.removeEventListener.bind(document)
   view.window = view
   view.Node = DomNode
   view.Element = DomElement

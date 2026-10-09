@@ -4,9 +4,9 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const LIST_PAGE = readFileSync(new URL('../../v8/rich-menus/list.tsx', import.meta.url), 'utf8')
-const EDIT_PAGE = readFileSync(new URL('new/create-v8.tsx', import.meta.url), 'utf8')
-const NEW_PAGE = readFileSync(new URL('new/create-v8.tsx', import.meta.url), 'utf8')
+const LIST_PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const EDIT_PAGE = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
+const NEW_PAGE = readFileSync(join(HERE, 'new', 'page.tsx'), 'utf8')
 const MODAL = readFileSync(
   join(HERE, '..', '..', 'components', 'rich-menus', 'apply-to-tag-modal.tsx'),
   'utf8',
@@ -22,8 +22,8 @@ describe('優先順の入替は1口でそろえる', () => {
 
   it('隠れているメニューも含めて全部送る', () => {
     // 絞り込み中の画面だけを基準にすると、隠れているメニューとの優先関係が壊れる。
-    expect(LIST_PAGE).toContain('moveTargetingGroup(ordered, id')
-    expect(LIST_PAGE).toContain('updates.map((u) => u.id)')
+    expect(LIST_PAGE).toContain('moveTargetingGroup(groups, group.id')
+    expect(LIST_PAGE).toContain('reordered.map((item) => item.id)')
   })
 })
 

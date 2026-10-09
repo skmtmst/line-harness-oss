@@ -32,7 +32,6 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
-      staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
       commonVars: {
         ...actual.api.commonVars,
         create: api.create,
@@ -53,7 +52,7 @@ vi.mock('next/link', () => ({
 }))
 
 const navigation = vi.hoisted(() => ({ query: 'id=var-1' }))
-vi.mock('next/navigation', () => ({ usePathname: () => '/',
+vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(navigation.query),
 }))
@@ -118,10 +117,12 @@ function byExactText(tag: string, text: string): HTMLElement {
 }
 
 /** 編集画面の社内メモ欄。id/aria-labelを持たないためplaceholderで探す。 */
-function memoInput(): HTMLTextAreaElement {
-  const found = document.getElementById('cv-memo') as HTMLTextAreaElement | null
+function memoInput(): HTMLInputElement {
+  const found = Array.from(document.querySelectorAll('input')).find(
+    (el) => el.getAttribute('placeholder') === '運用上の注意や、この値の使い方を書きます',
+  )
   if (!found) throw new Error('編集画面の社内メモ欄が見つかりません')
-  return found
+  return found as HTMLInputElement
 }
 
 async function setValue(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string) {
@@ -206,7 +207,6 @@ async function clearPickerDate(id: string) {
 }
 
 beforeEach(() => {
-  vi.stubGlobal('localStorage', { getItem: (key: string) => key === 'lh_staff_role' ? 'owner' : null, setItem: vi.fn(), removeItem: vi.fn() })
   vi.clearAllMocks()
   navigation.query = 'id=var-1'
   api.foldersList.mockResolvedValue({ success: true, data: [] })
@@ -240,7 +240,7 @@ describe('共通情報: 保存した社内メモの再表示(実React)', () => {
     await setValue(byId('cv-expiry-behavior'), 'fallback')
     await setValue(byId('cv-fallback-value'), '受付終了')
     await setValue(byId('cv-change-reason'), '期間の修正')
-    await click(Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(el => /^(保存する|[\d,]+か所に反映して保存)$/.test(el.textContent?.trim() ?? ''))!)
+    await click(byExactText('button', '共通情報を保存する'))
     expect(api.update).toHaveBeenCalledWith('var-1', 'account-1', expect.objectContaining({
       expectedVersion: 3, validFrom: '2026-09-16T10:00', validUntil: '2026-09-16T12:00',
       expiryBehavior: 'fallback', fallbackValue: '受付終了', changeReason: '期間の修正',
@@ -275,7 +275,7 @@ describe('共通情報: 保存した社内メモの再表示(実React)', () => {
       await setValue(control, nextValue)
     }
     await setValue(byId('cv-change-reason'), '値の更新')
-    await click(Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(el => /^(保存する|[\d,]+か所に反映して保存)$/.test(el.textContent?.trim() ?? ''))!)
+    await click(byExactText('button', '共通情報を保存する'))
 
     expect(api.update).toHaveBeenCalledWith('var-1', 'account-1', expect.objectContaining({
       value: nextValue, expectedVersion: 1, impactProof: 'proof-1', changeReason: '値の更新',
@@ -289,7 +289,7 @@ describe('共通情報: 保存した社内メモの再表示(実React)', () => {
     await setValue(byId('cv-key'), 'redisplay_check')
     await setValue(byId('cv-value'), '平日 10:00〜18:00')
     await setValue(byId('cv-memo'), '更新は毎月1日に確認する')
-    await click(byExactText('button', '保存して公開'))
+    await click(byExactText('button', '登録する'))
 
     expect(api.create).toHaveBeenCalledTimes(1)
     const created = api.create.mock.calls[0][0]
@@ -334,7 +334,7 @@ describe('共通情報の編集: 型別の入力エラー(VAR-06, 実React)', ()
     await settle()
 
     await clearPickerDate('cv-value')
-    await click(Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(el => /^(保存する|[\d,]+か所に反映して保存)$/.test(el.textContent?.trim() ?? ''))!)
+    await click(byExactText('button', '共通情報を保存する'))
 
     expect(api.update).not.toHaveBeenCalled()
     expect(host.textContent).toContain('値の日付を入力してください')
@@ -354,7 +354,7 @@ describe('共通情報の編集: 型別の入力エラー(VAR-06, 実React)', ()
 
     await setValue(byId('cv-expiry-behavior'), 'fallback')
     await setValue(byId('cv-fallback-value'), 'not-an-image')
-    await click(Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(el => /^(保存する|[\d,]+か所に反映して保存)$/.test(el.textContent?.trim() ?? ''))!)
+    await click(byExactText('button', '共通情報を保存する'))
 
     expect(api.update).not.toHaveBeenCalled()
     expect(host.textContent).toContain('代替値は https:// からはじまるURLで入力してください')
@@ -373,14 +373,11 @@ describe('共通情報の編集: 型別の入力エラー(VAR-06, 実React)', ()
     await settle()
 
     await setValue(byId('cv-value'), 'これはURLではありません')
-    await click(Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(el => /^(保存する|[\d,]+か所に反映して保存)$/.test(el.textContent?.trim() ?? ''))!)
+    await click(byExactText('button', '共通情報を保存する'))
 
     expect(api.update).not.toHaveBeenCalled()
     expect(host.textContent).toContain('http://')
-    const valueField = byId('cv-value').closest('[data-var-field]') ?? byId('cv-value').parentElement?.parentElement?.parentElement
+    const valueField = byId('cv-value').closest('div')
     expect(valueField?.textContent).toContain('http://')
   })
 })
-
-// These scenarios exercise owner actions; permission restrictions are covered separately.
-vi.mock('@/lib/staff-capability', async (importOriginal) => ({ ...await importOriginal<typeof import('@/lib/staff-capability')>(), isOwnerOrAdmin: () => true }))

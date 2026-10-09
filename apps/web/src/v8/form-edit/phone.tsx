@@ -102,7 +102,7 @@ function PhoneBlockWithProgress({ block, showProgress, progress, bookingMenus }:
 function PhoneBlock({ block, bookingMenus }: { block: FormBlock; bookingMenus: Props['bookingMenus'] }) {
   switch (block.kind) {
     case 'image':
-      return <PhoneImage key={block.mediaUrl} url={block.mediaUrl} />
+      return <PhoneImage url={block.mediaUrl} />
     case 'heading':
       return <p className={styles.phoneHeading} data-level={block.level ?? 2}>{block.text}</p>
     case 'text':

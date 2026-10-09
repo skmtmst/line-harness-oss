@@ -59,7 +59,7 @@ const DISPLAY_NAMES = [/ＷＥＬＣＯＭＥ/, '本文の行', '差し込みの
 
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {},
-  api: { staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
+  api: {
     templates: {
       list: (_query: unknown, accountId: string) => {
         mockState.listCalls.push(accountId)
@@ -73,9 +73,6 @@ vi.mock('@/lib/api', () => ({
 }))
 
 beforeEach(() => {
-  document.documentElement.dataset.theme = 'v8'
-  window.history.replaceState(null, '', '/templates')
-  window.dispatchEvent(new PopStateEvent('popstate'))
   // N-144: 変更操作は owner/admin だけに出す。操作を試す試験は owner で立てる。
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => (key === 'lh_staff_role' ? 'owner' : null),
@@ -112,7 +109,7 @@ async function renderPage(waitForName: string | RegExp = '本文の行') {
   await tableFindText(waitForName)
   return {
     ...rendered,
-    input: screen.getByRole('searchbox', { name: 'テンプレートを検索' }),
+    input: screen.getByLabelText('名前・本文・差し込んでいる項目で検索'),
     TemplatesPage,
   }
 }
@@ -126,7 +123,7 @@ async function search(input: HTMLElement, query: string) {
 describe('テンプレート一覧の検索', () => {
   test('名前・本文・差し込み項目をNFKC・大小文字非依存・空白正規化で検索する', async () => {
     const { input } = await renderPage()
-    expect(input.getAttribute('placeholder')).toBe('名前・本文で探す')
+    expect(input.getAttribute('placeholder')).toBe('テンプレート名で検索（本文・差し込んでいる項目も対象）')
 
     await search(input, '  welcome vip  ')
     expect(tableText(/ＷＥＬＣＯＭＥ/)).toBeTruthy()
@@ -149,7 +146,7 @@ describe('テンプレート一覧の検索', () => {
     expect(tableText('通常の行')).toBeNull()
 
     await search(input, '存在しない検索語')
-    expect(screen.queryByText('条件に合うものがありません')).toBeTruthy()
+    expect(screen.queryByText('条件に合うテンプレートはありません')).toBeTruthy()
     expect(tableText('長文の行')).toBeNull()
 
     await search(input, ' \n\t ')
@@ -201,7 +198,7 @@ describe('テンプレート一覧の検索', () => {
     const { input } = await renderPage('営業の差し込み')
 
     await search(input, '対象語')
-    fireEvent.click(screen.getAllByRole('button', { name: /営業/ }).find(el => el.hasAttribute('data-folder-row')) ?? screen.getAllByRole('button', { name: /営業/ })[0])
+    fireEvent.click(screen.getByRole('button', { name: /^営業\s+2$/ }))
     fireEvent.click(screen.getByRole('button', { name: '差し込みあり' }))
 
     expect(tableText('営業の差し込み')).toBeTruthy()
@@ -232,7 +229,7 @@ describe('テンプレート一覧の検索', () => {
     })
     expect(tableText('A社テンプレート')).toBeNull()
 
-    const input = screen.getByRole('searchbox', { name: 'テンプレートを検索' })
+    const input = screen.getByLabelText('名前・本文・差し込んでいる項目で検索')
     await search(input, '切替後')
     expect(tableText('B社テンプレート')).toBeTruthy()
     expect(mockState.listCalls).toEqual(['account-a', 'account-b'])
@@ -270,9 +267,9 @@ describe('テンプレート一覧の検索', () => {
     const row = within(table).getByText('書き換えた行').closest('tr')!
     expect(within(row).getByText(/書き換え後の新しい本文/)).toBeTruthy()
     expect(within(row).queryByText(/古い公開版の本文/)).toBeNull()
-    expect(within(row).getByText('未公開の変更')).toBeTruthy()
+    expect(within(row).getByText('編集中')).toBeTruthy()
     const unpublishedRow = within(table).getByText('まだ公開していない行').closest('tr')!
-    expect(within(unpublishedRow).getByText('下書きだけ')).toBeTruthy()
+    expect(within(unpublishedRow).getByText('未公開')).toBeTruthy()
 
     // 下書きの本文で検索できる
     await search(input, '書き換え後')
@@ -285,5 +282,3 @@ describe('テンプレート一覧の検索', () => {
     expect(tableText('書き換えた行')).toBeNull()
   })
 })
-
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/templates' }))

@@ -34,7 +34,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
 }))
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/',
+vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {}, replace: () => {}, back: () => {} }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -52,7 +52,7 @@ vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {
     status = 500
   },
-  api: { staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
+  api: {
     commonVars: {
       list: (): Promise<ApiResult> => Promise.resolve({ success: true, data: fixture.items }),
     },
@@ -63,7 +63,6 @@ vi.mock('@/lib/api', () => ({
 }))
 
 beforeEach(() => {
-  window.history.replaceState(null, '', '/contents/vars')
   document.documentElement.dataset.theme = 'v8'
 })
 

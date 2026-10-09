@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const PAGE = fs.readFileSync(new URL('../../../v8/webinar-edit/cta.tsx', import.meta.url), 'utf8') + fs.readFileSync(new URL('../../../v8/webinar-edit/edit.tsx', import.meta.url), 'utf8')
+const PAGE = fs.readFileSync(path.join(__dirname, 'cta-v8.tsx'), 'utf8') + fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 const API = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
 const ERROR_TEXT = fs.readFileSync(
   path.join(__dirname, '..', '..', '..', 'components', 'webinars', 'webinar-error-text.ts'),
@@ -19,8 +19,8 @@ describe('N-113 ウェビナーの申込フォーム選択の契約', () => {
     /* 口は account_id で絞る。別アカウントは器の段階で混ざらない。 */
     expect(PAGE).toContain('/api/forms?account_id=')
     /* 停止中は候補から外す（公開中だけ）。 */
-    expect(PAGE).toContain('published')
-    expect(PAGE).toContain('.filter((item) => item.isActive)')
+    expect(PAGE).toContain('publishedForms')
+    expect(PAGE).toContain('.filter((form) => form.isActive)')
     /* 判定材料の isActive を口の型に含める。 */
     expect(API).toContain('isActive: boolean')
   })
@@ -39,15 +39,15 @@ describe('N-113 ウェビナーの申込フォーム選択の契約', () => {
   it('選択値を registration_form_id として保存し再読込後も復元する', () => {
     /* 保存は版付きの editor 口へ registrationFormId として送る。 */
     expect(PAGE).toContain('webinarApi.saveEditor(webinarId')
-    expect(PAGE).toContain('registrationFormId: registrationFormId || null')
+    expect(PAGE).toContain('registrationFormId: selectedRegistrationFormId || null')
     expect(PAGE).toContain('expectedVersion: editor.version')
     /* 保存結果を親の editor へ流し、表示中の版を更新する。 */
-    expect(PAGE).toContain('ctx.onEditorChange(response.data)')
+    expect(PAGE).toContain('onEditorChange(response.data)')
     /* 開き直し時は保存済みの registrationFormId を初期値にする。 */
-    expect(PAGE).toContain('useState(editor.registrationFormId ??')
+    expect(PAGE).toContain('useState<string>(editor.registrationFormId ??')
     /* 二重保存を防ぐ。 */
-    expect(PAGE).toContain('disabled={busy || ctas === null || forms.state !==')
-    expect(PAGE).toContain('busy={saving')
+    expect(PAGE).toContain('disabled={conflict || readingLatest || savingRegistrationForm')
+    expect(PAGE).toContain('busy={savingRegistrationForm')
   })
 
   it('停止・削除・別アカウントは拒否理由を表示し選び直しを促す', () => {
@@ -61,29 +61,28 @@ describe('N-113 ウェビナーの申込フォーム選択の契約', () => {
     expect(ERROR_TEXT).toContain('form_account_mismatch')
     /* 候補に無い選択・保存済みには警告を出す。 */
     expect(PAGE).toContain('前に選んだフォームは使えなくなりました')
-    expect(PAGE).toContain('公開中ではないフォーム')
+    expect(PAGE).toContain('保存済みの申込フォームは公開中ではありません')
     expect(PAGE).toContain('role="alert"')
   })
 
   it('選択→保存→再読込→公開前確認の一連の流れがつながる', () => {
     /* 保存済みの表示は editor の公開フォーム詳細から描く。 */
-    expect(PAGE).toContain('editor.publicPage.form')
+    expect(PAGE).toContain('editor.publicPage?.form')
     /* 公開前確認は公開フォームの有効状態を見る。 */
-    expect(fs.readFileSync(new URL('../../../v8/webinar-edit/review.tsx', import.meta.url), 'utf8')).toContain('webinarApi.publishValidation(webinar.id)')
+    expect(fs.readFileSync(path.join(__dirname, 'review-v8.tsx'), 'utf8')).toContain('webinarApi.publishValidation(webinar.id)')
     expect(WORKER).toContain("key: 'form_active'")
     /* 保存後の案内で公開前確認へ誘導する。 */
-    expect(PAGE).toContain('申込に使う回答フォーム')
+    expect(PAGE).toContain('公開前確認で申込フォーム')
   })
 
   it('CTA内のフォームと申込フォームを混同しない', () => {
     /* CTA側は CTA カードの formId のまま。 */
     expect(PAGE).toContain('current.formId')
     /* 申込側は registrationFormId のまま。別名で扱う。 */
-    expect(PAGE).toContain('registrationFormId')
+    expect(PAGE).toContain('selectedRegistrationFormId')
     expect(PAGE).toContain('editor.registrationFormId')
     /* 画面の説明文でも別物だと書く。 */
-    expect(PAGE).toContain('申込に使う回答フォーム')
-    expect(PAGE).toContain('申し込みのときに答えてもらうフォームです')
+    expect(PAGE).toContain('CTAボタンで使うフォームとは別です')
   })
 
   it('外部への送信を足さない（保存と取得だけ）', () => {

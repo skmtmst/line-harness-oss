@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const SRC = readFileSync(new URL('create-v8.tsx', import.meta.url), 'utf8')
-const CSS = readFileSync(new URL('create-v8.module.css', import.meta.url), 'utf8')
+const SRC = readFileSync(join(HERE, 'create-v8.tsx'), 'utf8')
+const CSS = readFileSync(join(HERE, 'create-v8.module.css'), 'utf8')
 
 /** MenuPreview の本体（function MenuPreview から次の関数まで）。 */
 const menuPreview = SRC.slice(SRC.indexOf('function MenuPreview('), SRC.indexOf('function groupFromSeed('))

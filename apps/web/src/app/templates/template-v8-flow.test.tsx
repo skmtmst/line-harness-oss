@@ -38,7 +38,7 @@ const mocks = vi.hoisted(() => ({
   list: vi.fn(async () => ({ success: true, data: mocks.rows })),
   foldersList: vi.fn(async () => ({ success: true, data: [] })),
   counts: vi.fn(async () => ({ success: true, data: {} })),
-  create: vi.fn(async (_payload: Record<string, unknown>) => ({ success: true, data: { id: 't-new' } })),
+  create: vi.fn(async () => ({ success: true, data: { id: 't-new' } })),
   get: vi.fn(async () => ({ success: true, data: detailRow(null) })),
   versions: vi.fn(async () => ({ success: true, data: [] })),
   publish: vi.fn(async () => ({ success: true, data: { publishedVersion: 1 } })),
@@ -48,7 +48,7 @@ const mocks = vi.hoisted(() => ({
   replace: vi.fn(),
 }))
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/',
+vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mocks.push, replace: mocks.replace, refresh: vi.fn(), back: vi.fn(), forward: vi.fn(), prefetch: vi.fn() }),
   useSearchParams: () => new URLSearchParams(mocks.query),
 }))
@@ -76,7 +76,6 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
-      staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
       folders: { ...actual.api.folders, list: mocks.foldersList },
       broadcastMessageAssets: { ...actual.api.broadcastMessageAssets, counts: mocks.counts },
       templates: {
@@ -108,8 +107,6 @@ async function mount(node: React.ReactNode) {
 }
 
 beforeEach(() => {
-  window.history.replaceState(null, '', '/templates')
-  window.dispatchEvent(new PopStateEvent('popstate'))
   mocks.query = ''
   mocks.rows = [templateRow('t-1', 'はじめの型', '2026-09-01T00:00:00+09:00')]
   mocks.push.mockClear()
@@ -170,7 +167,6 @@ describe('V8 テンプレートの通し', () => {
   })
 
   it('作る画面で保存して公開すると知らせが出て一覧へ戻る', async () => {
-    mocks.get.mockImplementation(async () => ({ success: true, data: { ...detailRow(null), ...mocks.create.mock.calls.at(-1)?.[0] } }))
     mocks.query = ''
     await mount(<TemplateEditPage />)
     const nameInput = document.getElementById('te-name') as HTMLInputElement

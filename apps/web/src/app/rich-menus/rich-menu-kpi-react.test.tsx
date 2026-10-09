@@ -51,17 +51,17 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 
 // 複製後の編集画面への遷移に使う。KPIの試験では遷移しない。
-vi.mock('next/navigation', () => ({ usePathname: () => '/', useSearchParams: () => new URLSearchParams(),
+vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {}, replace: () => {}, back: () => {} }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => undefined, usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
 
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {
     status = 500
   },
-  api: { staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
+  api: {
     richMenuGroups: {
       listPage: (accountId: string) => fixture.listPage(accountId),
       external: (accountId: string) => fixture.external(accountId),
@@ -74,7 +74,6 @@ vi.mock('@/lib/api', () => ({
 }))
 
 beforeEach(() => {
-  window.history.replaceState(null, '', '/rich-menus')
   fixture.selectedAccount = { id: 'account-a', name: 'A社' }
   fixture.listPage = () => Promise.resolve(listResult(3, 2, 1))
   fixture.tapStats = () => Promise.resolve(tapResult(12, { label: '予約ボタン', taps: 7 }))
@@ -100,6 +99,7 @@ describe('リッチメニュー一覧のKPI', () => {
 
     await within(kpis).findByText('12')
     expect(kpis.hidden).toBe(false)
+    expect(kpis.dataset.groupKpiState).toBe('ready')
     // R12: 全体（3）はKPIに重ねて出さず、「すべて」の行とページ送りだけにする。
     expect(within(kpis).queryByText('3')).toBeNull()
     expect(within(kpis).queryByText('2')).toBeTruthy()
@@ -115,6 +115,7 @@ describe('リッチメニュー一覧のKPI', () => {
     const { kpis } = await renderPage()
 
     expect(kpis.hidden).toBe(false)
+    expect(kpis.dataset.groupKpiState).toBe('loading')
     expect(within(kpis).getAllByText('読み込んでいます').length).toBeGreaterThan(0)
     expect(within(kpis).queryByText('0')).toBeNull()
   })
@@ -131,7 +132,7 @@ describe('リッチメニュー一覧のKPI', () => {
     fixture.listPage = () => Promise.reject(new Error('list failed'))
     fixture.tapStats = () => Promise.reject(new Error('stats failed'))
     const failed = await renderPage()
-    await within(failed.kpis).findAllByText('一覧を読み込めませんでした')
+    await within(failed.kpis).findAllByText('一覧を取得できませんでした')
     expect(within(failed.kpis).getAllByText('集計を取れませんでした')).toHaveLength(2)
     expect(within(failed.kpis).queryByText('0')).toBeNull()
   })

@@ -4,8 +4,6 @@
  * 行が出る・札で絞れる・行の「…」から止める窓と削除の窓が開く（板 Hhl9M・xxKtW）・
  * 閲覧のみでは帯が出て作るボタンを出さない・空のまま使われている帯の「直す」で絞れる。
  */
-import { fireEvent, screen } from '@testing-library/react'
-import { ApiError } from '@/lib/api'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -19,7 +17,6 @@ const listFolders = vi.hoisted(() => vi.fn())
 const deleteImpact = vi.hoisted(() => vi.fn())
 const replacementCandidates = vi.hoisted(() => vi.fn())
 const replacementImpact = vi.hoisted(() => vi.fn())
-const replaceVar = vi.hoisted(() => vi.fn())
 const listExports = vi.hoisted(() => vi.fn())
 const staffRole = vi.hoisted(() => ({ value: 'owner' as string }))
 
@@ -35,7 +32,6 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         deleteImpact,
         replacementCandidates,
         replacementImpact,
-        replace: replaceVar,
         listExports,
       },
       folders: { ...actual.api.folders, list: listFolders },
@@ -212,32 +208,4 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
     expect(create).toHaveLength(0)
     expect(host.querySelector('button[aria-label^="共通情報「"][aria-label$="」の操作"]')).toBeNull()
   })
-})
-
-it('WEB-129: 差し替え409後に影響を取り直し、待ち表示を解除する', async () => {
- replacementCandidates.mockResolvedValue({ success: true, data: { source: { ...company, version: 1 }, candidates: [{ ...contact, version: 1 }] } })
- replacementImpact.mockResolvedValue({ success: true, data: { source: { ...company, version: 1 }, replacement: contact, canReplace: true, revision: 'r', items: [], blockingTotal: 15 } })
- replaceVar.mockRejectedValue(new ApiError(409, '競合'))
- act(() => root.render(<CommonVarsListV8 />)); await flush()
- act(() => buttonByLabel('共通情報「会社名」の操作').click()); await flush()
- act(() => buttonByText('削除する').click()); await flush()
- const reason = screen.getByLabelText('消した理由・止める理由（記録に残ります）')
- act(() => fireEvent.change(reason, { target: { value: '情報をまとめる' } }))
- act(() => buttonByText('差し替えて消す').click()); await flush()
- expect(replaceVar).toHaveBeenCalledTimes(1)
- expect((screen.getByRole('button', { name: '閉じる' }) as HTMLButtonElement).disabled).toBe(false)
- expect((buttonByText('差し替えて消す') as HTMLButtonElement).disabled).toBe(false)
-})
-it('WEB-130: 名前の変更は理由と版を確かめる既存の編集画面へ進む', async () => {
- act(() => root.render(<CommonVarsListV8 />)); await flush()
- act(() => { fireEvent.click(screen.getAllByText('会社名')[0]) }); await flush()
- expect(screen.queryByRole('button', { name: '共通情報の名前を変更する' })).toBeNull()
- expect(document.querySelector('a[href="/contents/vars/edit?id=v-company"]')).toBeTruthy()
-})
-
-it('WEB-131: 上限で全件を読めないとき、取得した範囲を示して絞り込みで取れると案内しない', async () => {
- listVars.mockResolvedValue({ success: true, data: [company, contact], meta: { limited: true } })
- act(() => root.render(<CommonVarsListV8 />)); await flush()
- expect(document.body.textContent).toContain('取得した範囲')
- expect(document.body.textContent).not.toContain('フォルダや検索で絞り込んでください')
 })

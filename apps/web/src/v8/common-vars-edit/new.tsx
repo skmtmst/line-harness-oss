@@ -95,9 +95,7 @@ function sensitiveFieldLabels(value: string, memo: string): string[] {
 }
 
 function focusField(id: string) {
-  const field = document.getElementById(id)
-  field?.focus()
-  field?.scrollIntoView?.({ block: 'center' })
+  document.getElementById(id)?.focus()
 }
 
 function focusTargetForReason(message: string): string | null {
@@ -128,9 +126,9 @@ function validateVarKey(value: string): string | null {
  * 欄の下の赤い1行。4欄で同じ形にするため1か所にまとめる。
  * 直書きの className を欄ごとに増やさない（design-debt の計数）。
  */
-function VarFieldError({ message, id }: { message: string; id?: string }) {
+function VarFieldError({ message }: { message: string }) {
   if (!message) return null
-  return <p id={id} className={styles.fieldError} role="alert">{message}</p>
+  return <p className={styles.fieldError} role="alert">{message}</p>
 }
 
 function suggestKey(name: string): string {
@@ -181,8 +179,6 @@ export default function NewCommonVarV8() {
   /* 名前・差し込み名は欄から離れたとき（blur）に確かめ、直したらその場で消す。 */
   const [nameFieldError, setNameFieldError] = useState('')
   const [keyFieldError, setKeyFieldError] = useState('')
-  const [periodFieldError, setPeriodFieldError] = useState('')
-  const [warningAsDraft, setWarningAsDraft] = useState(false)
   const [secretWarningFields, setSecretWarningFields] = useState<string[] | null>(null)
   const valueRef = useRef<HTMLInputElement>(null)
   const memoRef = useRef<HTMLTextAreaElement>(null)
@@ -257,22 +253,6 @@ export default function NewCommonVarV8() {
 
   const spec = TYPES.find((t) => t.key === type) ?? TYPES[0]
 
-  const showFieldFailure = (message: string, target = focusTargetForReason(message)) => {
-    if (target === 'cv-value') {
-      setValueFieldError(message)
-      valueErrorMessageRef.current = message
-    } else if (target === 'cv-fallback-value') {
-      setFallbackFieldError(message)
-      fallbackErrorMessageRef.current = message
-    } else if (target === 'cv-key') setKeyFieldError(message)
-    else if (target === 'cv-name') setNameFieldError(message)
-    else if (target === 'cv-valid-from' || target === 'cv-valid-until') setPeriodFieldError(message)
-    else return false
-    setError('')
-    requestAnimationFrame(() => focusField(target))
-    return true
-  }
-
   const save = async (allowSensitive = false, asDraft = false) => {
     if (saving) return
     if (!selectedAccountId) {
@@ -285,42 +265,37 @@ export default function NewCommonVarV8() {
       return
     }
     const accountAtRequest = selectedAccountId
-    if (validateVarName(name)) {
-      setError('')
-      setNameFieldError(validateVarName(name)!)
+    if (!name.trim()) {
+      setError('共通情報名を入力してください')
       focusField('cv-name')
       return
     }
-    if (validateVarKey(varKey)) {
-      setError('')
-      setKeyFieldError(validateVarKey(varKey)!)
+    if (!varKey.trim()) {
+      setError('差し込み名を入力してください')
       focusField('cv-key')
       return
     }
     const valueError = commonVarValueError(type, value)
     if (valueError) {
-      setError('')
+      setError(valueError)
       setValueFieldError(valueError)
       valueErrorMessageRef.current = valueError
       focusField('cv-value')
       return
     }
     if (validFrom && validUntil && validFrom >= validUntil) {
-      setError('')
-      setPeriodFieldError('有効終了は有効開始より後にしてください')
-      focusField('cv-valid-until')
+      setError('有効終了は有効開始より後にしてください')
       return
     }
     if (expiryBehavior === 'fallback') {
       if (!fallbackValue) {
-        setError('')
-        setFallbackFieldError('期限切れ時に使う代替値を入力してください')
+        setError('期限切れ時に使う代替値を入力してください')
         focusField('cv-fallback-value')
         return
       }
       const fallbackError = commonVarValueError(type, fallbackValue, '代替値')
       if (fallbackError) {
-        setError('')
+        setError(fallbackError)
         setFallbackFieldError(fallbackError)
         fallbackErrorMessageRef.current = fallbackError
         focusField('cv-fallback-value')
@@ -334,7 +309,7 @@ export default function NewCommonVarV8() {
         : null
     if (secretField) {
       const message = '鍵やトークンのような秘密の値は共通情報に保存できません。外部連携の設定へ登録してください'
-      setError('')
+      setError(message)
       if (secretField === 'cv-value') {
         setValueFieldError(message)
         valueErrorMessageRef.current = message
@@ -347,7 +322,6 @@ export default function NewCommonVarV8() {
     }
     const sensitiveFields = sensitiveFieldLabels(value, memo)
     if (sensitiveFields.length > 0 && !allowSensitive) {
-      setWarningAsDraft(asDraft)
       setSecretWarningFields(sensitiveFields)
       setError('')
       return
@@ -373,19 +347,35 @@ export default function NewCommonVarV8() {
       const res = await api.commonVars.create(payload)
       if (accountAtRequest !== latestAccountRef.current) return
       if (!res.success) {
-        if (!showFieldFailure(res.error)) setError(res.error)
+        setError(res.error)
+        const target = focusTargetForReason(res.error)
+        if (target === 'cv-value') {
+          setValueFieldError(res.error)
+          valueErrorMessageRef.current = res.error
+        } else if (target === 'cv-fallback-value') {
+          setFallbackFieldError(res.error)
+          fallbackErrorMessageRef.current = res.error
+        }
         return
       }
       router.push('/contents/vars')
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) {
-        setError('')
-        setKeyFieldError('その差し込み名は既に使われています')
+        setError('その差し込み名は既に使われています')
         focusField('cv-key')
       } else {
-        const fieldFailure = e instanceof ApiError && (e.status === 400 || e.status === 422)
-          && showFieldFailure(e.message, e.status === 422 ? 'cv-key' : focusTargetForReason(e.message))
-        if (!fieldFailure) setError(describeSaveFailure(e))
+        setError(describeSaveFailure(e))
+        if (e instanceof ApiError && (e.status === 400 || e.status === 422)) {
+          const target = e.status === 422 ? 'cv-key' : focusTargetForReason(e.message)
+          if (target) focusField(target)
+          if (target === 'cv-value') {
+            setValueFieldError(e.message)
+            valueErrorMessageRef.current = e.message
+          } else if (target === 'cv-fallback-value') {
+            setFallbackFieldError(e.message)
+            fallbackErrorMessageRef.current = e.message
+          }
+        }
       }
     } finally {
       setSaving(false)
@@ -415,7 +405,7 @@ export default function NewCommonVarV8() {
           パスワード・APIキー・トークンなどは保存できません（入れると止めます）。配信文に誤って差し込まれるおそれがあります。外部連携の設定に登録してください。
         </p>
       </div>
-      <LinePreview title="差し込んだときの見え方" caption="差し込んだ例" accountName="然 - NEN -" note="差し込んだときの見え方です。名前と中身を入れると、ここが変わります。">
+      <LinePreview caption="差し込んだ例" accountName="然 - NEN -" note="差し込んだときの見え方です。名前と中身を入れると、ここが変わります。">
         <div className={styles.talkRow}>
           <span className={styles.talkIcon} aria-hidden="true">然</span>
           <div className={styles.talkCol}>
@@ -598,10 +588,10 @@ export default function NewCommonVarV8() {
             中身 {COMMON_VAR_VALUE_REQUIRED.has(type) && <span className={styles.required}>*</span>}
           </label>
           {type === 'boolean' ? (
-            <Select size="full" aria-label="中身" id="cv-value" aria-invalid={Boolean(valueFieldError)} aria-describedby={valueFieldError ? "cv-value-error" : undefined} value={value} onChange={(next) => { setValue(next); setSecretWarningFields(null) }} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
+            <Select size="full" aria-label="中身" id="cv-value" value={value} onChange={(next) => { setValue(next); setSecretWarningFields(null) }} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
           ) : type === 'long_text' ? (
             <textarea
-              id="cv-value" aria-invalid={Boolean(valueFieldError)} aria-describedby={valueFieldError ? "cv-value-error" : undefined}
+              id="cv-value"
               maxLength={10000}
               value={value}
               onChange={(e) => {
@@ -615,20 +605,20 @@ export default function NewCommonVarV8() {
             />
           ) : type === 'date' ? (
             <DateField
-              id="cv-value" aria-invalid={Boolean(valueFieldError)} aria-describedby={valueFieldError ? "cv-value-error" : undefined}
+              id="cv-value"
               value={value}
               onChange={(v) => { setValue(v); setSecretWarningFields(null) }}
             />
           ) : type === 'datetime' ? (
             <DateTimeField
-              id="cv-value" aria-invalid={Boolean(valueFieldError)} aria-describedby={valueFieldError ? "cv-value-error" : undefined}
+              id="cv-value"
               value={value}
               onChange={(v) => { setValue(v); setSecretWarningFields(null) }}
             />
           ) : (
             <input
               ref={valueRef}
-              id="cv-value" aria-invalid={Boolean(valueFieldError)} aria-describedby={valueFieldError ? "cv-value-error" : undefined}
+              id="cv-value"
               type={type === 'number' ? 'number' : 'text'}
               maxLength={type === 'number' ? undefined : VALUE_MAX}
               value={value}
@@ -638,7 +628,7 @@ export default function NewCommonVarV8() {
               title={type === 'number' ? undefined : `${value.length}/${VALUE_MAX}文字`}
             />
           )}
-          <VarFieldError id="cv-value-error" message={valueFieldError} />
+          <VarFieldError message={valueFieldError} />
         </div>
       </section>
 
@@ -652,8 +642,7 @@ export default function NewCommonVarV8() {
           <label htmlFor="cv-valid-until" className={styles.fieldLabel}>終わり</label>
           <label htmlFor="cv-expiry-behavior" className={styles.fieldLabel}>期間の外では</label>
           <DateTimeField id="cv-valid-from" value={validFrom} onChange={setValidFrom} />
-          <div><DateTimeField id="cv-valid-until" value={validUntil} invalid={Boolean(periodFieldError)} onChange={(next) => { setValidUntil(next); setPeriodFieldError('') }} />
-            <VarFieldError message={periodFieldError} /></div>
+          <DateTimeField id="cv-valid-until" value={validUntil} onChange={setValidUntil} />
           <div className={styles.selectBox}>
             <Select size="full" aria-label="期間の外では" id="cv-expiry-behavior" value={expiryBehavior} onChange={(next) => setExpiryBehavior(next as 'stop' | 'fallback')} options={[{ value: 'stop', label: '配信を止める' }, { value: 'fallback', label: '代替値を使う' }]} />
           </div>
@@ -662,21 +651,21 @@ export default function NewCommonVarV8() {
           <div className={styles.field}>
             <label htmlFor="cv-fallback-value" className={styles.fieldLabel}>代替値</label>
             {type === 'boolean' ? (
-              <Select size="full" aria-label="代替値" id="cv-fallback-value" aria-invalid={Boolean(fallbackFieldError)} aria-describedby={fallbackFieldError ? "cv-fallback-value-error" : undefined} value={fallbackValue} onChange={(next) => setFallbackValue(next)} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
+              <Select size="full" aria-label="代替値" id="cv-fallback-value" value={fallbackValue} onChange={(next) => setFallbackValue(next)} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
             ) : type === 'date' ? (
-              <DateField id="cv-fallback-value" aria-invalid={Boolean(fallbackFieldError)} aria-describedby={fallbackFieldError ? "cv-fallback-value-error" : undefined} value={fallbackValue} onChange={setFallbackValue} />
+              <DateField id="cv-fallback-value" value={fallbackValue} onChange={setFallbackValue} />
             ) : type === 'datetime' ? (
-              <DateTimeField id="cv-fallback-value" aria-invalid={Boolean(fallbackFieldError)} aria-describedby={fallbackFieldError ? "cv-fallback-value-error" : undefined} value={fallbackValue} onChange={setFallbackValue} />
+              <DateTimeField id="cv-fallback-value" value={fallbackValue} onChange={setFallbackValue} />
             ) : (
               <input
-                id="cv-fallback-value" aria-invalid={Boolean(fallbackFieldError)} aria-describedby={fallbackFieldError ? "cv-fallback-value-error" : undefined}
+                id="cv-fallback-value"
                 type={type === 'number' ? 'number' : 'text'}
                 value={fallbackValue}
                 onChange={(e) => setFallbackValue(e.target.value)}
                 className={styles.fieldInput}
               />
             )}
-            <VarFieldError id="cv-fallback-value-error" message={fallbackFieldError} />
+            <VarFieldError message={fallbackFieldError} />
           </div>
         )}
       </section>
@@ -727,7 +716,7 @@ export default function NewCommonVarV8() {
             >
               入力に戻って修正する
             </Button>
-            <Button type="button" disabled={saving} onClick={() => void save(true, warningAsDraft)}>
+            <Button type="button" disabled={saving} onClick={() => void save(true)}>
               内容を確認して登録する
             </Button>
           </div>

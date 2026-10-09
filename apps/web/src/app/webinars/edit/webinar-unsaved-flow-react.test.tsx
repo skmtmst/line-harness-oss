@@ -48,7 +48,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.accountId, accounts: [{ id: fixture.accountId, liffId: 'liff' }], loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => undefined, usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
 
 /*
   通知の子タブは別口を持つのでここでは形だけにする。
@@ -56,21 +56,22 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => undefine
   「通知を変更する」は入力を汚す操作の身代わり——実物ではON/OFFや時刻の
   変更が dirty を立て、保存で baseline が更新されて dirty が降りる。
 */
-vi.mock('@/v8/webinar-edit/notifications', () => ({
-  default: function NotificationsPaneMock({ chrome, registerSave, onDirtyChange }: {
-    chrome: { status?: React.ReactNode; footerActions: React.ReactNode; steps: React.ReactNode }
+vi.mock('@/components/webinars/webinar-notifications', () => ({
+  default: function NotificationsPaneMock({ onLoaded, registerSave, onDirtyChange }: {
+    onLoaded?: (data: { settings: unknown; overview: unknown } | null) => void
     registerSave?: (save: (() => Promise<boolean>) | null) => void
     onDirtyChange?: (dirty: boolean) => void
   }) {
     React.useEffect(() => {
+      onLoaded?.({ settings: { registrationEnabled: false, dayBeforeEnabled: false }, overview: null })
       /* 保存できたら未保存の印を降ろす（実物は baseline を保存結果へ更新する）。 */
       registerSave?.(async () => { onDirtyChange?.(false); return true })
       onDirtyChange?.(false)
       return () => registerSave?.(null)
-    }, [registerSave, onDirtyChange])
+    }, [onLoaded, registerSave, onDirtyChange])
     return (
       <div>
-        通知設定{chrome.steps}{chrome.status}{chrome.footerActions}
+        通知設定
         <button type="button" onClick={() => onDirtyChange?.(true)}>通知を変更する</button>
       </div>
     )
@@ -190,7 +191,6 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
-  document.documentElement.dataset.theme = 'v8'
   fixture.params = new URLSearchParams('id=webinar-1')
   fixture.push.mockClear()
   net.calls.length = 0
@@ -254,7 +254,7 @@ const putCalls = () => net.calls.filter((call) => call.method === 'PUT' && call.
 const participantCalls = () => net.calls.filter((call) => call.path.includes('/participants'))
 
 function listLink(): HTMLAnchorElement {
-  const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent?.trim() === 'キャンセル')
+  const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent?.includes('ウェビナー一覧'))
   if (!link) throw new Error('list link not found')
   return link
 }
@@ -389,7 +389,7 @@ describe('Issue #1060 pane内の戻ると公開後の遷移では離脱確認を
     expect(beforeUnload().defaultPrevented).toBe(true)
 
     /* STEP 5 確認へ進み、公開を実行する。 */
-    await act(async () => { buttonContaining('確認').click() })
+    await act(async () => { buttonContaining('STEP 5').click() })
     await flush()
     await act(async () => { buttonByText('この版を公開').click() })
     await flush()
@@ -413,17 +413,17 @@ describe('DETAIL-04 未保存の入力を段の往復で消さない', () => {
     /* 固定バーの「下書き保存」は飾りではない。押せて、実際に保存する。 */
     expect(buttonByText('下書きを保存').disabled).toBe(false)
 
-    await act(async () => { buttonContaining('動画の設定へ').click() })
+    await act(async () => { buttonContaining('動画へ').click() })
     await flush()
 
     expect(putCalls()).toHaveLength(1)
-    expect(paneVisible('[data-design-node="VWNaA"]')).toBe(true)
+    expect(paneVisible('div[data-design-node="VWNaA"]')).toBe(true)
 
     /* STEP 1 へ戻る。保存済みの新しいタイトルがそのまま残る。 */
-    await act(async () => { buttonContaining('基本設定').click() })
+    await act(async () => { buttonContaining('STEP 1').click() })
     await flush()
 
-    expect(paneVisible('[data-design-node="VWNaA"]')).toBe(false)
+    expect(paneVisible('div[data-design-node="VWNaA"]')).toBe(false)
     expect(Array.from(host.querySelectorAll('input')).some((el) => el.value === '変更したタイトル')).toBe(true)
   })
 
@@ -435,9 +435,9 @@ describe('DETAIL-04 未保存の入力を段の往復で消さない', () => {
     await flush()
 
     /* 保存せず STEP 4（通知）へ。戻ると入力は残っている。 */
-    await act(async () => { buttonContaining('通知').click() })
+    await act(async () => { buttonContaining('STEP 4').click() })
     await flush()
-    await act(async () => { buttonContaining('基本設定').click() })
+    await act(async () => { buttonContaining('STEP 1').click() })
     await flush()
 
     expect(Array.from(host.querySelectorAll('input')).some((el) => el.value === 'まだ保存していない題名')).toBe(true)
@@ -455,7 +455,7 @@ describe('DETAIL-04 未保存の入力を段の往復で消さない', () => {
 
     expect(putCalls()).toHaveLength(1)
     /* 段は基本設定のまま。保存できたので未保存の印は消える。 */
-    expect(host.querySelector('[data-design-node="VWNaA"]')).toBeNull()
+    expect(host.querySelector('div[data-design-node="VWNaA"]')).toBeNull()
     expect(Array.from(host.querySelectorAll('input')).some((el) => el.value === '下書きで保存する題名')).toBe(true)
     expect(host.textContent).not.toContain('保存していない変更があります')
   })
@@ -467,12 +467,12 @@ describe('DETAIL-04 未保存の入力を段の往復で消さない', () => {
 
     await act(async () => { fireEvent.change(titleInput(), { target: { value: '失敗時に残る題名' } }) })
     await flush()
-    await act(async () => { buttonContaining('動画の設定へ').click() })
+    await act(async () => { buttonContaining('動画へ').click() })
     await flush()
 
     expect(putCalls()).toHaveLength(1)
     /* 動画の段へは進まず、入力は消えない。 */
-    expect(host.querySelector('[data-design-node="VWNaA"]')).toBeNull()
+    expect(host.querySelector('div[data-design-node="VWNaA"]')).toBeNull()
     expect(Array.from(host.querySelectorAll('input')).some((el) => el.value === '失敗時に残る題名')).toBe(true)
     expect(host.textContent).toContain('保存できませんでした')
   })
@@ -480,26 +480,27 @@ describe('DETAIL-04 未保存の入力を段の往復で消さない', () => {
 
 describe('DETAIL-05 無反応のボタンを残さない', () => {
   it('動画の段: 非公開では「PCで見る」を押せない形にして理由を出す', async () => {
-    fixture.params = new URLSearchParams('id=webinar-1&pane=review')
+    fixture.params = new URLSearchParams('id=webinar-1&pane=video')
     await render()
     await flush()
 
-    expect(Array.from(host.querySelectorAll('a')).some(a => a.textContent?.includes('公開ページを見る'))).toBe(false)
+    const button = buttonByText('PCで見る')
+    expect(button.disabled).toBe(true)
     expect(host.textContent).toContain('公開すると、友だちが見るページを確認できます。')
   })
 
   it('動画の段: 公開中なら「PCで見る」は公開URLへのリンクになる', async () => {
     net.webinarStatus = 'active'
-    fixture.params = new URLSearchParams('id=webinar-1&pane=review')
+    fixture.params = new URLSearchParams('id=webinar-1&pane=video')
     await render()
     await flush()
 
-    const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent?.includes('公開ページを見る'))
+    const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent?.includes('PCで見る'))
     expect(link?.getAttribute('href')).toBe('https://liff.example.test/preview')
   })
 
   it('通知の段: 「テスト送信」は確認を挟んで実際にテスト送信の口を呼ぶ', async () => {
-    fixture.params = new URLSearchParams('id=webinar-1&pane=basic')
+    fixture.params = new URLSearchParams('id=webinar-1&pane=notifications')
     await render()
     await flush()
 
@@ -512,15 +513,16 @@ describe('DETAIL-05 無反応のボタンを残さない', () => {
     await flush()
 
     expect(net.calls.some((call) => call.method === 'POST' && call.path.endsWith('/notifications/test'))).toBe(true)
-    expect(host.textContent).toContain('通知テスト：成功 2件・失敗 0件')
+    expect(host.textContent).toContain('テスト送信しました。成功 2件・失敗 0件')
   })
 
   it('通知の段: 非公開では「公開ページを見る」を押せない形にして理由を出す', async () => {
-    fixture.params = new URLSearchParams('id=webinar-1&pane=review')
+    fixture.params = new URLSearchParams('id=webinar-1&pane=notifications')
     await render()
     await flush()
 
-    expect(Array.from(host.querySelectorAll('a')).some(a => a.textContent?.includes('公開ページを見る'))).toBe(false)
+    const button = buttonByText('公開ページを見る')
+    expect(button.disabled).toBe(true)
     expect(host.textContent).toContain('公開すると、友だちが見るページを確認できます。')
   })
 })
@@ -629,7 +631,7 @@ describe('DETAIL-07 コメントと参加者の読み込みを分ける', () => 
     await render()
     await flush()
 
-    expect(host.textContent).toContain('参加者の一覧を読み込めませんでした')
+    expect(host.textContent).toContain('参加者一覧を読み込めませんでした。')
     /* 失敗したのは参加者だけ。集計のカードは出続ける。 */
     expect(host.textContent).toContain('申込')
 

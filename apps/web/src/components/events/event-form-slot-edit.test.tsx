@@ -16,7 +16,6 @@ import type { EventItem, EventSlot } from '@/lib/api'
 
 const eventsGet = vi.hoisted(() => vi.fn())
 const listSlots = vi.hoisted(() => vi.fn())
-const createSlots = vi.hoisted(() => vi.fn())
 const updateSlot = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -31,7 +30,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       ...actual.eventsApi,
       getEvent: eventsGet,
       listSlots,
-      updateSlot, createSlots,
+      updateSlot,
     },
   }
 })
@@ -268,32 +267,4 @@ describe('予約枠の編集（入口29）', () => {
     expect(host.textContent).toContain('定員12')
     expect(listSlots).toHaveBeenCalledTimes(2)
   })
-})
-
-it('WEB-271: 日をまたぐ枠の定員だけ直しても保存済み日時を変えない', async () => {
- const overnight = { ...bookedSlot, starts_at: '2026-10-01T14:00:00.000Z', ends_at: '2026-10-01T16:30:00.000Z' }
- listSlots.mockResolvedValue({ items: [overnight] })
- await renderForm()
- await click(tabButton('2. 予約枠')!)
- await click(button('編集')!)
- const dialog = document.querySelector('[role="dialog"]')!
- const input = dialog.querySelector('input[type="number"]')!
- await act(async () => { fireEvent.change(input, { target: { value: '10' } }) })
- const save = [...dialog.querySelectorAll('button')].find(b => b.textContent?.includes('保存'))!
- await click(save)
- expect(updateSlot).toHaveBeenCalledWith('acc-1', 'ev-1', 'slot-1', expect.objectContaining({ starts_at: overnight.starts_at, ends_at: overnight.ends_at, capacity: 10 }), expect.anything())
-})
-
-it('WEB-272: 単一枠の追加成功後に一覧の読み直しが失敗しても二重追加を許さない', async () => {
- createSlots.mockResolvedValue({ items: [bookedSlot] })
- listSlots.mockResolvedValueOnce({ items: [] }).mockRejectedValue(new Error('一覧の通信失敗'))
- await renderForm()
- await click(tabButton('2. 予約枠')!)
- await click(button('＋ 枠を追加する')!)
- const dialog = document.querySelector('[role="dialog"]')!
- await click([...dialog.querySelectorAll('button')].find(b => b.textContent === '追加する')!)
- expect(createSlots).toHaveBeenCalledTimes(1)
- expect(document.querySelector('[role="dialog"][aria-label="予約枠を追加"]')).toBeNull()
- expect(document.body.textContent).toContain('予約枠は追加済み')
- expect(createSlots.mock.calls[0][2][0].client_key).toEqual(expect.any(String))
 })

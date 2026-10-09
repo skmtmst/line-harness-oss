@@ -115,7 +115,6 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const [ogTitle, setOgTitle] = useState('')
   const [ogDescription, setOgDescription] = useState('')
   const [ogImageUrl, setOgImageUrl] = useState('')
-  const [focusOgImageRequest, setFocusOgImageRequest] = useState(0)
   const [layout, setLayoutState] = useState<FormLayout>(() => host?.initial.layout ?? emptyLayout())
   const [page, setPage] = useState(0)
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
@@ -177,19 +176,10 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     })
   }, [])
 
-  const targetIdentity = `${selectedAccountId ?? ''}:${id}`
-  const currentTarget = useRef(targetIdentity)
-  currentTarget.current = targetIdentity
-  const loadGeneration = useRef(0)
-  const [referenceErrors, setReferenceErrors] = useState<string[]>([])
-
   /** フォーム本体の読み込み。初回と、競合で「最新を読み込んで続ける」を押したとき。 */
   const loadForm = useCallback(async () => {
     if (!id || !selectedAccountId) return false
-    const generation = loadGeneration.current
-    const target = targetIdentity
     const res = await api.forms.get(id, selectedAccountId)
-    if (generation !== loadGeneration.current || target !== currentTarget.current) return false
     if (!res.success) return false
     const nextLayout = res.data.layout ?? emptyLayout()
     const loaded: Snapshot = {
@@ -224,7 +214,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     savedSnapshot.current = JSON.stringify(loaded)
     setFormLoaded(true)
     return true
-  }, [id, selectedAccountId, params, clearConflict, targetIdentity])
+  }, [id, selectedAccountId, params, clearConflict])
 
   const reloadAfterConflict = async () => {
     setError('')
@@ -262,15 +252,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   }, [showPublish, id, publishedVersionId, contentRevision])
 
   useEffect(() => {
-    const generation = ++loadGeneration.current
-    const target = targetIdentity
-    const current = () => generation === loadGeneration.current && target === currentTarget.current
     setFormLoadFailed(null)
-    setFormLoaded(false); setLoading(true); savedSnapshot.current = null
-    setContentRevision(null); contentRevisionRef.current = null
-    setTestToken(null); setPublishedSide(null); setShowPublish(false); setPublishedVersionId(null)
-    undoStack.current = []; redoStack.current = []; pageFromUrl.current = false
-    clearConflict(); setError(''); setNotice(''); setRefs(EMPTY_REFS); setReferenceErrors([])
     const hosted = hostRef.current
     if (hosted) {
       /* 統括のひな形：読み込んだ中身を入れるだけ（店の口は呼ばない）。 */
@@ -296,42 +278,50 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     }
     void (async () => {
       try {
+        // 参照一覧は選んでいる公式アカウントに絞る（別アカウントのタグ等を混ぜない）。
+        const tagPath = selectedAccountId ? `/api/tags?lineAccountId=${encodeURIComponent(selectedAccountId)}` : '/api/tags'
+        const accountFilter = selectedAccountId ? { accountId: selectedAccountId } : undefined
+        const [tagRes, ffRes, scenarioRes, reminderRes, templateRes] = await Promise.all([
+          fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(tagPath),
+          selectedAccountId ? api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }) : Promise.resolve({ success: true as const, data: [] }),
+          api.scenarios.list(accountFilter),
+          api.reminders.list(accountFilter),
+          api.templates.list(undefined, selectedAccountId ?? undefined),
+        ])
+        setRefs({
+          tags: tagRes.success ? tagRes.data.map((t) => ({ id: t.id, name: t.name })) : [],
+          friendFields: ffRes.success ? ffRes.data.map((f) => ({ id: f.id, name: f.name, ecIsMaster: f.ecIsMaster })) : [],
+          scenarios: scenarioRes.success ? scenarioRes.data.map((s) => ({ id: s.id, name: s.name })) : [],
+          reminders: reminderRes.success ? reminderRes.data.map((r) => ({ id: r.id, name: r.name })) : [],
+          templates: templateRes.success ? templateRes.data.map((t) => ({ id: t.id, name: t.name, type: t.messageType })) : [],
+          bookingMenus: [],
+          bookingMenuStaff: {},
+        })
+        // 「予約を入れる」欄のメニュー選び。本体の読み込みを待たせない。読めなくても欄は置ける。
+        if (selectedAccountId) {
+          bookingApi
+            .listMenus(selectedAccountId)
+            .then((menuRes) => {
+              const bookingMenus = (menuRes.menus ?? [])
+                .filter((m) => m.is_active === 1)
+                .map((m) => ({ id: m.id, name: m.name, durationMinutes: m.duration_minutes }))
+              setRefs((prev) => ({ ...prev, bookingMenus }))
+            })
+            .catch(() => {})
+        }
         const ok = await loadForm()
-        if (!current()) return
         if (!ok && id && selectedAccountId) setFormLoadFailed('missing')
       } catch (caught) {
-        if (!current()) return
         if (caught instanceof ApiError && caught.status === 404) setFormLoadFailed('missing')
         else if (classifyApiFailure(caught) === 'forbidden') setFormLoadFailed('forbidden')
-        else { setError('読み込みに失敗しました。もう一度読み込んでください。'); setFormLoadFailed('error') }
-      } finally { if (current()) setLoading(false) }
+        else {
+          setError('読み込みに失敗しました。もう一度読み込んでください。')
+          setFormLoadFailed('error')
+        }
+      } finally {
+        setLoading(false)
+      }
     })()
-    // 候補ごとの失敗は本体の読み込みやほかの候補を止めない。
-    const tagPath = selectedAccountId ? `/api/tags?lineAccountId=${encodeURIComponent(selectedAccountId)}` : '/api/tags'
-    const accountFilter = selectedAccountId ? { accountId: selectedAccountId } : undefined
-    const labels = ['タグ', '友だち情報', 'シナリオ', 'リマインダ', 'テンプレート']
-    void Promise.allSettled([
-      fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(tagPath),
-      selectedAccountId ? api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }) : Promise.resolve({ success: true as const, data: [] }),
-      api.scenarios.list(accountFilter), api.reminders.list(accountFilter), api.templates.list(undefined, selectedAccountId ?? undefined),
-    ]).then((results) => {
-      if (!current()) return
-      const failed: string[] = []
-      const lists = results.map((result, index) => {
-        if (result.status === 'fulfilled' && result.value.success) return result.value.data
-        if (!(result.status === 'rejected' && result.reason instanceof ApiError && result.reason.code === 'FEATURE_DISABLED')) failed.push(labels[index])
-        return []
-      })
-      setReferenceErrors(failed)
-      const [tags, friendFields, scenarios, reminders, templates] = lists as Array<Array<{ id: string; name: string; ecIsMaster?: boolean; messageType?: string }>>
-      setRefs((prev) => ({ ...prev, tags, friendFields: friendFields.map((f) => ({ ...f, ecIsMaster: Boolean(f.ecIsMaster) })), scenarios, reminders, templates: templates.map((t) => ({ id: t.id, name: t.name, type: t.messageType ?? 'text' })) }))
-    })
-    if (selectedAccountId) void bookingApi.listMenus(selectedAccountId).then((menuRes) => {
-      if (!current()) return
-      const bookingMenus = (menuRes.menus ?? []).filter((m) => m.is_active === 1).map((m) => ({ id: m.id, name: m.name, durationMinutes: m.duration_minutes }))
-      setRefs((prev) => ({ ...prev, bookingMenus }))
-    }).catch(() => { if (current()) setReferenceErrors((prev) => [...prev, '予約メニュー']) })
-    return () => { loadGeneration.current += 1 }
     // loadForm は params を読むが、読み込み直すのは id・アカウント・再試行のときだけ。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, reloadKey, selectedAccountId])
@@ -514,7 +504,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   /* ---------------- 保存・公開 ---------------- */
 
   /** 保存を断る理由（無ければ null）。自動保存の「通せる形か」にも同じものを使う。 */
-  const saveProblem = (publishAfter: boolean): { message: string; name?: boolean; ogImage?: boolean } | null => {
+  const saveProblem = (publishAfter: boolean): { message: string; name?: boolean } | null => {
     if (!host && !selectedAccountId) return { message: 'LINE公式アカウントを選んでください' }
     if (!name.trim()) return { message: 'フォーム名を入力してください', name: true }
     const allBlocks = layout.header.concat(layout.sections.flatMap((s) => s.blocks))
@@ -531,7 +521,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     const layoutError = validateFormLayoutForSave(layout)
     if (layoutError) return { message: layoutError }
     const ogImageError = ogImageUrlError(ogImageUrl)
-    if (ogImageError) return { message: ogImageError, ogImage: true }
+    if (ogImageError) return { message: ogImageError }
     // 文字と背景の差が 4.5:1 未満の組み合わせは保存できない（保存APIも同じ検査をする）。
     const contrastError = formThemeContrastError(normalizeFormTheme(layout.options?.theme))
     if (contrastError) return { message: contrastError }
@@ -560,18 +550,11 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
    * 競合（409）だけは自動でも帯を出す（このまま書くと相手の変更が消えるため）。
    */
   const save = async (publishAfter = false, { silent = false }: { silent?: boolean } = {}): Promise<boolean> => {
-    const target = currentTarget.current, generation = loadGeneration.current
-    const isCurrent = () => target === currentTarget.current && generation === loadGeneration.current
     const problem = saveProblem(publishAfter)
     if (problem) {
       if (silent) return false
-      setError(problem.name || problem.ogImage ? '' : problem.message)
+      setError(problem.message)
       setNameError(problem.name ? problem.message : null)
-      if (problem.name || problem.ogImage) {
-        setEditTab('appearance')
-        if (problem.ogImage) setFocusOgImageRequest((value) => value + 1)
-        requestAnimationFrame(() => { const field = document.getElementById(problem.ogImage ? 'fe-og-image' : 'fe-name'); field?.focus(); field?.scrollIntoView?.({ block: 'center' }) })
-      }
       return false
     }
     if (!silent) setNameError(null)
@@ -583,7 +566,6 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     }
     if (!selectedAccountId) return false
     while (saveInFlight.current) await saveInFlight.current.catch(() => undefined)
-    if (!isCurrent()) return false
     const expectedRevision = contentRevisionRef.current
     if (expectedRevision === null) return false
     if (!silent) {
@@ -636,7 +618,6 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         reconciledOwnSave = true
         res = { success: true, data: { id, contentRevision: ownRevision, updatedAt: '' } }
       }
-      if (!isCurrent()) return false
       if (!res.success) {
         if (!silent) setError(res.error)
         return false
@@ -646,7 +627,6 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       clearConflict()
       if (publishAfter) {
         const published = await api.forms.publish(id, selectedAccountId, res.data.contentRevision)
-        if (!isCurrent()) return false
         if (!published.success) {
           setError(published.error)
           return false
@@ -678,7 +658,6 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       }
       return true
     } catch (e) {
-      if (!isCurrent()) return false
       // ほかの人が先に保存していた（409）。入力はそのまま残し、読み直すかは運用者が決める。
       if (e instanceof ApiError && e.status === 409) {
         const data = e.data as { updatedAt?: unknown } | null
@@ -695,7 +674,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     } finally {
       saveInFlight.current = null
       settle()
-      if (!silent && isCurrent()) setSaving(false)
+      if (!silent) setSaving(false)
     }
   }
 
@@ -902,10 +881,13 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
           </Link>
         )
       )}
-      description={statusLine}
-      bottomSpacing="compact"
-      tabsAfterSpacing="form"
-      tabs={<Tabs label="編集する内容" items={TAB_ITEMS.map((t) => ({ label: t.label, current: editTab === t.key, onClick: () => changeTab(t.key) }))} />}
+      steps={(
+        <div className={styles.tabs}>
+          {/* 型は説明をタブの下へ置くので、絵どおり題の下・タブの上に出すためここに置く。 */}
+          <p className={styles.status}>{statusLine}</p>
+          <Tabs label="編集する内容" items={TAB_ITEMS.map((t) => ({ label: t.label, current: editTab === t.key, onClick: () => changeTab(t.key) }))} />
+        </div>
+      )}
       preview={preview}
       previewToggle={conflictBand}
       footerActions={footerActions}
@@ -915,7 +897,6 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     >
       <div className={styles.root} data-fe-root>
         {host?.notice}
-        {referenceErrors.map(label => <Notice key={label} tone="danger" message={`${label}の候補を読み込めませんでした。候補だけ再読み込みするには画面を開き直してください。`} />)}
         {!conflict && error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
         {notice ? <Notice tone="success" message={notice} onClose={() => setNotice('')} /> : null}
         {loading || !formLoaded ? (
@@ -955,13 +936,11 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             ogTitle={ogTitle}
             ogDescription={ogDescription}
             ogImageUrl={ogImageUrl}
-            focusOgImageRequest={focusOgImageRequest}
             onChangeOptions={patchOptions}
             onChangeName={(next) => {
               setName(next)
               if (next.trim()) setNameError(null)
             }}
-            onBlurName={() => setNameError(name.trim() ? null : 'フォーム名を入力してください')}
             onChangeDescription={setDescription}
             onChangeOgTitle={setOgTitle}
             onChangeOgDescription={setOgDescription}

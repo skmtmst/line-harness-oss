@@ -2,12 +2,12 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 // 文言の正本は rich-menu-errors.ts（★V7・★V8 の一覧で共有）。
-const PAGE = readFileSync(new URL("./../../v8/rich-menus/list.tsx", import.meta.url), 'utf8')
+const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
   + readFileSync(new URL('./rich-menu-errors.ts', import.meta.url), 'utf8')
 
 describe('V6 リッチメニューのエラー表示', () => {
   it('APIの内部エラーを画面や警告へそのまま出さない', () => {
-    expect(PAGE).toContain("import { api,")
+    expect(PAGE).toContain("import { api, ApiError } from '@/lib/api'")
     expect(PAGE).toContain("setError(richMenuError(e, 'load'))")
     expect(PAGE).not.toContain('e instanceof Error ? e.message : String(e)')
     expect(PAGE).not.toContain('LINE 公式アカウントの状態取得に失敗しました:')
@@ -23,7 +23,7 @@ describe('V6 リッチメニューのエラー表示', () => {
 
   it('一覧・並び替え・削除・LINEからの削除・取り込みを別の文にする', () => {
     for (const action of ['load', 'reorder', 'import']) {
-      expect(PAGE).toMatch(new RegExp(`richMenuError\\([^,]+, '${action}'\\)`))
+      expect(PAGE).toContain(`richMenuError(e, '${action}')`)
     }
     expect(PAGE).toContain("deleteTarget.group.status === 'published' ? 'unpublish' : 'delete'")
     expect(PAGE).toContain(": 'externalDelete'")

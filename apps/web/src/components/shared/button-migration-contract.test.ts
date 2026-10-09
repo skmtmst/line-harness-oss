@@ -110,7 +110,7 @@ describe('標準ボタンの第1段階移行', () => {
     }
     for (const handler of [
       'onClick={exportCsv}',
-      'onClick={openPicker}',
+      'onClick={handleCreate}',
       "onAddFolder={readonly ? undefined : () => setEditingGenre('new')}",
       'onClick={save}',
       'onClick={onCancel}',

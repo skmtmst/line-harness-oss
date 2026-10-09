@@ -5,7 +5,7 @@
  * ボタンの言葉。いちばん下に、フォームの名前と覚え書き（お客さまには出ない）。
  * 色と書体の決まり（文字と背景の差 4.5:1）は今までのデザイン設定と同じ。
  */
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Image as ImageIcon, Sparkles, Link2 } from 'lucide-react'
 import {
   FORM_THEME_DEFAULT,
@@ -46,13 +46,11 @@ type Props = {
   /** 統括のひな形（host.ts）：背景の画像・リンクの見え方は置き場が無い（配った先で決める）。 */
   portable?: boolean
   name: string
-  onBlurName?: () => void
   nameError: string | null
   description: string
   ogTitle: string
   ogDescription: string
   ogImageUrl: string
-  focusOgImageRequest?: number
   onChangeOptions: (next: Partial<FormOptions>) => void
   onChangeName: (next: string) => void
   onChangeDescription: (next: string) => void
@@ -67,18 +65,6 @@ export function AppearanceTab(props: Props) {
   const contrastError = formThemeContrastError(normalizeFormTheme(theme))
   const [pickerFor, setPickerFor] = useState<'background' | 'ogImage' | null>(null)
   const [linkOpen, setLinkOpen] = useState(false)
-  useEffect(() => {
-    if (props.focusOgImageRequest) setLinkOpen(true)
-  }, [props.focusOgImageRequest])
-  useEffect(() => {
-    if (!linkOpen || !props.focusOgImageRequest) return
-    const frame = requestAnimationFrame(() => {
-      const field = document.getElementById('fe-og-image')
-      field?.focus()
-      field?.scrollIntoView?.({ block: 'center' })
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [linkOpen, props.focusOgImageRequest])
   const patchTheme = (next: Partial<FormTheme>) => onChangeOptions({ theme: { ...theme, ...next } })
   const deadlineOn = options.deadline?.enabled ?? false
   const ogImageError = ogImageUrlError(props.ogImageUrl)
@@ -224,7 +210,7 @@ export function AppearanceTab(props: Props) {
         </div>
         <div className={styles.field}>
           <label className={styles.fieldLabel} htmlFor="fe-name">フォーム名</label>
-          <TextField id="fe-name" onBlur={props.onBlurName} value={props.name} invalid={Boolean(props.nameError)} onChange={(e) => props.onChangeName(e.target.value)} />
+          <TextField id="fe-name" value={props.name} invalid={Boolean(props.nameError)} onChange={(e) => props.onChangeName(e.target.value)} />
           {props.nameError ? <p role="alert" className={styles.fieldError}>{props.nameError}</p> : null}
         </div>
         <div className={styles.field}>
@@ -246,7 +232,7 @@ export function AppearanceTab(props: Props) {
           <div className={styles.field}>
             <label className={styles.fieldLabel} htmlFor="fe-og-image">カードの画像URL</label>
             <TextField id="fe-og-image" type="url" inputMode="url" placeholder="https://" value={props.ogImageUrl} invalid={Boolean(ogImageError)} onChange={(e) => props.onChangeOgImageUrl(e.target.value)} />
-            {ogImageError ? <p id="fe-og-image-error" role="alert" className={styles.fieldError}>{ogImageError}</p> : null}
+            {ogImageError ? <p role="alert" className={styles.fieldError}>{ogImageError}</p> : null}
           </div>
           <span>
             <Button onClick={() => setPickerFor('ogImage')}>

@@ -111,7 +111,6 @@ function ensureStorage() {
 }
 
 beforeEach(() => {
-  window.history.replaceState(null, '', '/contents')
   ensureStorage()
   staffRole = 'admin'
   host = document.createElement('div')
@@ -216,9 +215,20 @@ describe('V8 登録メディア一覧（O7hUt7）の切り替え', () => {
     expect(dots[0].getAttribute('data-folder-dot')).toBe('filed')
     expect(dots[1].getAttribute('data-folder-dot')).toBe('unfiled')
   })
+
+  test('v7 では従来の一覧が出て、新しい一覧は出ない', async () => {
+    document.documentElement.dataset.theme = 'v7'
+    await renderPage()
+    expect(host?.querySelector('[data-design-node="g89Tc"]')).not.toBeNull()
+    expect(host?.querySelector('[data-design-node="O7hUt7"]')).toBeNull()
+  })
 })
 
 describe('V8 登録メディア一覧（O7hUt7）の作り', () => {
+  test('v8 のときだけ新しい形を出す分岐を持つ', () => {
+    expect(PAGE).toContain("theme === 'v8' ? <MediaLibraryListV8 /> : <MediaLibraryInner />")
+    expect(PAGE).toContain('data-design-node="g89Tc"')
+  })
 
   test('数の帯・道具の段・表示範囲とページ送りを持つ', () => {
     expect(LIST_V8).toContain('boardId="O7hUt7"')

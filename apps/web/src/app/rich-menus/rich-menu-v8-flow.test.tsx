@@ -223,7 +223,6 @@ class MemoryStorage {
 }
 
 beforeEach(() => {
-  window.history.replaceState(null, '', '/rich-menus')
   const g = globalThis as unknown as { crypto?: { randomUUID?: () => string } }
   if (!g.crypto) g.crypto = {}
   if (!g.crypto.randomUUID) g.crypto.randomUUID = () => 'test-uuid-1'

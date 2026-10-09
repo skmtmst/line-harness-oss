@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL("./../../../../v8/common-vars-edit/new.tsx", import.meta.url), 'utf8')
+const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 
 describe('共通情報の新規作成', () => {
   it('社内メモを入力して既存の登録APIへ渡す', () => {

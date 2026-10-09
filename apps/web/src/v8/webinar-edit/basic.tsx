@@ -88,13 +88,7 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
     const titleError = values.title.trim() ? undefined : 'ウェビナー名を入力してください。'
     const slugError = SLUG_PATTERN.test(values.slug.trim()) ? undefined : '公開ページのURLは半角の英小文字・数字・ハイフンで入力してください。'
     setFieldErrors({ title: titleError, slug: slugError })
-    if (titleError || slugError) {
-      setError('')
-      const field = document.getElementById(titleError ? 'webinar-basic-title' : 'webinar-basic-slug')
-      field?.focus()
-      field?.scrollIntoView?.({ block: 'center' })
-      return false
-    }
+    if (titleError || slugError) return false
     if (values.folderId !== saved.folderId && folderState !== 'ready') {
       setError('フォルダをもう一度読み込んでから保存してください。')
       return false

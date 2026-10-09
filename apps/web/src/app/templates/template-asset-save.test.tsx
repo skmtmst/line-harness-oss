@@ -22,7 +22,7 @@ const emptyList = () => Promise.resolve({ success: true, data: [] })
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.accountId, loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => undefined, usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
 
 /*
  * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
@@ -41,7 +41,7 @@ vi.mock('@/components/shared/select', () => ({
   ),
 }))
 vi.mock('@/lib/api', () => ({
-  api: { staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
+  api: {
     broadcastMessageAssets: {
       create: (input: { lineAccountId: string; kind: string; name: string; payload: Record<string, unknown> }) => {
         fixture.createCalls.push(input)
@@ -186,8 +186,6 @@ async function nameAndSave() {
 }
 
 beforeEach(() => {
-  window.history.replaceState(null, '', '/templates')
-  window.dispatchEvent(new PopStateEvent('popstate'))
   fixture.accountId = 'account-a'
   fixture.createCalls.length = 0
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
@@ -420,5 +418,3 @@ describe('NEXT-24: 「自分に送って確かめる」は無反応にしない'
     expect(host.textContent).toContain('一斉配信に組み込むと、配信の画面からテスト送信できます')
   })
 })
-
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/templates' }))

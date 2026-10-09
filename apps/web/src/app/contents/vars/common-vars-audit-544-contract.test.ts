@@ -5,11 +5,11 @@ import { describe, expect, it } from 'vitest'
 import { impactCsv } from './impact-review'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(new URL('../../../v8/common-vars/list.tsx', import.meta.url), 'utf8')
-const EXPORT_PANEL = readFileSync(new URL('export-panel.tsx', import.meta.url), 'utf8')
-const IMPACT_REVIEW = readFileSync(new URL('impact-review.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const EXPORT_PANEL = readFileSync(join(HERE, 'export-panel.tsx'), 'utf8')
+const IMPACT_REVIEW = readFileSync(join(HERE, 'impact-review.tsx'), 'utf8')
 const WORKER_EXPORT = readFileSync(join(HERE, '..', '..', '..', '..', '..', 'worker', 'src', 'routes', 'common-var-exports.ts'), 'utf8')
-const EDIT_PAGE = readFileSync(new URL('../../../v8/common-vars-edit/edit.tsx', import.meta.url), 'utf8')
+const EDIT_PAGE = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
 const API = readFileSync(join(HERE, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
 const MOCK_API = readFileSync(join(HERE, '..', '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'), 'utf8')
 const FIXTURES = readFileSync(join(HERE, '..', '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'fixtures.mjs'), 'utf8')
@@ -63,7 +63,7 @@ describe('#544 N4 編集画面の値欄に入力上限を付ける', () => {
     // 日付・日時種別は★V7の選択部品（文字数制限の概念がない）で、文章・数値種別だけが入力欄のまま。
     expect(EDIT_PAGE).toContain('<DateField id="cv-value"')
     expect(EDIT_PAGE).toContain('<DateTimeField id="cv-value"')
-    expect(EDIT_PAGE).toContain('maxLength={200}')
+    expect(EDIT_PAGE).toMatch(/maxLength=\{item\.type === 'number' \? undefined : 200\}/)
   })
 })
 

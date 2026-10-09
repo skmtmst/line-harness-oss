@@ -44,7 +44,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   return {
     ...actual,
     fetchApi: vi.fn(async () => ({ success: true, data: [] })),
-    api: { staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
+    api: {
       ...actual.api,
       // 「予約を入れる」欄のメニュー・担当読み。予約を使わない店では空。
       // 素通しすると実通信で試験が環境へ依存するので、ここで空を返す。
@@ -82,8 +82,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
-const navigation = vi.hoisted(() => ({ query: 'id=form-1&tab=appearance' }))
-vi.mock('next/navigation', () => ({ usePathname: () => '/',
+const navigation = vi.hoisted(() => ({ query: 'id=form-1&tab=basic' }))
+vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(navigation.query),
 }))
@@ -94,7 +94,7 @@ vi.mock('next/link', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-1', loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => undefined, usePageTitle: () => {} }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
 
 const { default: EditFormPage } = await import('./page')
 
@@ -117,7 +117,6 @@ function findButton(text: string): HTMLButtonElement | undefined {
 }
 
 beforeEach(() => {
-  document.documentElement.dataset.theme = 'v8'
   net.putCount = 0
   net.saveResult = 'conflict'
   container = document.createElement('div')
@@ -134,23 +133,17 @@ afterEach(async () => {
 
 describe('保存が 409 で弾かれたときの知らせ（3つのタブ）', () => {
   for (const [tab, saveLabel] of [
-    ['content', '下書きを保存'],
-    ['appearance', '下書きを保存'],
-    ['after', '下書きを保存'],
+    ['basic', '下書きを保存する'],
+    ['design', '下書きを保存する'],
+    ['options', '下書きを保存する'],
   ] as const) {
-    it(`${tab} タブでも、文言と「最新を読み込んで続ける」が DOM に出る`, async () => {
+    it(`${tab} タブでも、文言と「読み直す」が DOM に出る`, async () => {
       navigation.query = `id=form-1&tab=${tab}`
       await act(async () => {
         root.render(<EditFormPage />)
       })
       await flush()
 
-      const appearance = [...container.querySelectorAll('button')].find(el => el.textContent === '受付と見た目')!
-      await act(async () => { appearance.click() })
-      const name = container.querySelector<HTMLInputElement>('#fe-name')!
-      await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(name, '自分の変更'); name.dispatchEvent(new Event('input', { bubbles: true })) })
-      const target = [...container.querySelectorAll('button')].find(el => el.textContent === ({ content: '中身', after: '答え終わったあと', appearance: '受付と見た目' } as Record<string,string>)[tab])!
-      await act(async () => { target.click() })
       const save = findButton(saveLabel)
       expect(save, `${tab}: 保存ボタンがある`).toBeTruthy()
       await act(async () => {
@@ -161,36 +154,36 @@ describe('保存が 409 で弾かれたときの知らせ（3つのタブ）', (
       expect(net.putCount).toBe(1)
       // 文言が出ている。デザインタブで出ないのが差し戻し理由だった。
       expect(container.textContent).toContain('ほかの人が')
-      expect(container.textContent).toContain('を保存しました')
-      // 最新を読み込んで続ける出口も出ている。
-      const reload = [...container.querySelectorAll('button')].find(el => el.textContent?.includes('最新を読み込んで続ける'))
-      expect(reload, `${tab}: 最新を読み込んで続ける出口がある`).toBeTruthy()
+      expect(container.textContent).toContain('先に保存しました')
+      // 読み直す出口も出ている。
+      const reload = container.querySelector('[data-qa="form-edit-conflict-reload"]')
+      expect(reload, `${tab}: 読み直す出口がある`).toBeTruthy()
       // 二重に出さない（元の位置からは消してある）。
-      expect([...container.querySelectorAll('button')].filter(el => el.textContent?.includes('最新を読み込んで続ける')).length).toBe(1)
+      expect(container.querySelectorAll('[data-qa="form-edit-conflict-reload"]').length).toBe(1)
       // タブの外（共通部品）に出ている。
-      expect(reload!.closest('[data-save-conflict]')).toBeTruthy()
+      expect(reload!.closest('[data-design-part="save-conflict-bar"]')).toBeTruthy()
     })
   }
 
   it('保存が通ったときは知らせを出さない', async () => {
     net.saveResult = 'ok'
-    navigation.query = 'id=form-1&tab=appearance'
+    navigation.query = 'id=form-1&tab=design'
     await act(async () => {
       root.render(<EditFormPage />)
     })
     await flush()
     await act(async () => {
-      findButton('下書きを保存')!.click()
+      findButton('下書きを保存する')!.click()
     })
     await flush()
     expect(net.putCount).toBe(1)
-    expect(container.querySelector('[data-save-conflict]')).toBeNull()
+    expect(container.querySelector('[data-design-part="save-conflict-bar"]')).toBeNull()
     /*
      * 成功の「保存しました」は基本タブの枠の中にあるので、デザインタブでは
      * 出ない。**これは #723 の差し戻し理由ではなく、前からの作り**なので
      * ここでは触らない（失敗が黙るのと違い、成功が黙っても作業は消えない）。
      * 司令塔へは所見として報告した。
      */
-    expect(container.textContent).not.toContain('ほかの人が')
+    expect(container.textContent).not.toContain('保存しました')
   })
 })

@@ -9,7 +9,7 @@ import {
   splitItems,
   unavailableText,
   usageText,
-} from '@/v8/common-vars/model'
+} from './delete-impact'
 
 const impact = (over: Record<string, unknown> = {}) =>
   ({

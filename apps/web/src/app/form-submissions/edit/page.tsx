@@ -1,10 +1,1821 @@
 'use client'
 
-import { Suspense } from 'react'
-import ListState from '@/components/shared/list-state'
-import FormEditV8 from '@/v8/form-edit/edit'
+/**
+ * 回答フォーム編集（設計 V2 6-3-1）。
+ *
+ * 作りは「左に出来上がり・右に設定」。ブロックを足す・並べ替える作業は、
+ * 出来上がりを見ながらでないと決められないので、プレビューを常に横に置く。
+ *
+ * 上のタブは、共通ヘッダ（全ページの先頭に出る部分）と、ページ（セクション）。
+ * ページを分けると、選択肢に「この人はこっちのページへ」という分岐が付く。
+ *
+ * `name`（回答データの見出し）は作ったあと変えない。ここを変えると、
+ * それまでの回答と結びつかなくなる。画面には出すだけで、編集させない。
+ */
 
-/** 次のリリースはV8。URLと機能ゲートを保って既存のV8画面へ渡す。 */
-export default function Page() {
-  return <Suspense fallback={<ListState kind="loading" />}><FormEditV8 /></Suspense>
+import ListState from '@/components/shared/list-state'
+import PageHeader from '@/components/shared/page-header'
+import { notifyToast } from '@/components/shared/toast'
+import Select from '@/components/shared/select'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
+import {
+  emptyLayout,
+  formThemeContrastError,
+  newBlockId,
+  normalizeFormTheme,
+  validateFormForPublish,
+  type FormBlock,
+  type FormInputType,
+  type FormLayout,
+  type FormOptions,
+  type FormSection,
+  type FormTheme,
+} from '@line-crm/shared'
+import { normalizeSectionName } from '@/components/forms/section-name'
+import { api, ApiError, bookingApi, fetchApi, type BookingMenu } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
+import { Field, inputClass, TextArea, TextInput } from '@/components/shared/form-controls'
+import BlockEditor, { BLOCK_MENU } from '@/components/forms/block-editor'
+import FormPreview from '@/components/forms/form-preview'
+import FormDesignSettings from './form-design-settings'
+import { ogImageUrlError, validateLayoutForSave } from './form-validate'
+import OptionsDialog from '@/components/forms/options-dialog'
+import { describeFormUpdates } from '@/components/forms/form-update-summary'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import StickyBar from '@/components/shared/sticky-bar'
+import SaveConflictBar from '@/components/shared/save-conflict-bar'
+import TargetMissing from '@/components/shared/target-missing'
+import { AfterActionsSection, ReceptionSection, ThanksSection, WordsSection } from '@/components/forms/options-sections'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import FormEditV8 from '@/v8/form-edit/edit'
+import Toggle from '@/components/shared/toggle'
+import { conflictMessage } from './form-conflict-message'
+import { describeConflictDiff, type ConflictSide } from './form-conflict-diff'
+import { formSavedContentMatches, type FormSavedContent } from './form-save-reconcile'
+import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { EMPTY_REFS, type FormRefs } from '@/components/forms/form-refs'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import ActionMenu from '@/components/shared/action-menu'
+import Button from '@/components/shared/button'
+import {
+  formJumpsInto as jumpsInto,
+  makeFormBlock as makeBlock,
+  takenFormAnswerNames as takenAnswerNames,
+  uniqueFormCopyName as uniqueCopyName,
+} from '@/components/forms/form-definition-operations'
+import { formatDateTime } from '@/lib/format'
+
+/** 共通ヘッダを指す番号。セクションの添字と混ぜないために -1 を使う。 */
+const HEADER_TAB = -1
+
+/**
+ * そのページへ飛ばしている選択肢の数。
+ *
+ * ページを消すと、この分岐は行き先を失って「次へ進む」に戻る。消す前に
+ * 何本つなぎ直すのかを言うために数える。**数え漏らしを作らないよう、
+ * 全ページの入力ブロックを見る**（自分自身のページも数える。消えるまでは
+ * 分岐として生きているため）。
+ */
+/**
+ * 複製の回答キーを一意にする。
+ *
+ * 回答は `name` を鍵に保存される。`${base}_copy` が既にあれば
+ * `_copy2`、`_copy3` と番号を足して、重ならない名前を作る。
+ */
+function FormEditInner() {
+  const params = useSearchParams()
+  const id = params.get('id') ?? ''
+  const editorTab = params.get('tab') === 'design'
+    ? 'design'
+    : params.get('tab') === 'options'
+      ? 'options'
+      : 'basic'
+  const { selectedAccount, selectedAccountId } = useAccount()
+
+  /**
+   * 友だちに配るURL。
+   *
+   * LIFF のURLにパスを足すと、LIFFアプリの同じパスへ転送される。回答画面は
+   * `/forms/:id` に置いてあるので、この形でそのまま開く。
+   * アカウントに LIFF を登録していないと作れないため、そのときは案内を出す。
+   */
+  const liffId = selectedAccount?.liffId ?? null
+  const answerUrl = liffId ? `https://liff.line.me/${liffId}/forms/${id}` : null
+
+  const [name, setName] = useState('')
+  /* 保存前に欄を離れたとき出す直し方（文は保存時と同じ）。 */
+  const [nameError, setNameError] = useState<string | null>(null)
+  usePageTitle(name || '回答フォーム編集')
+  // 1152の板（`ITBAB`）。折り畳みはCSSが担い、ここでは板の印だけを切り替える。
+  const narrow = useNarrowViewport()
+  const [description, setDescription] = useState('')
+  const [isActive, setIsActive] = useState(true)
+  const [submitCount, setSubmitCount] = useState(0)
+  const [onSubmitTagId, setOnSubmitTagId] = useState('')
+  const [ogTitle, setOgTitle] = useState('')
+  const [ogDescription, setOgDescription] = useState('')
+  const [ogImageUrl, setOgImageUrl] = useState('')
+  const [layout, setLayoutState] = useState<FormLayout>(emptyLayout)
+  const [tab, setTab] = useState(0)
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
+  const [refs, setRefs] = useState<FormRefs>(EMPTY_REFS)
+  const [showOptions, setShowOptions] = useState(editorTab === 'options')
+  const theme = useAdminTheme()
+  /** V8 の3つのタブ（中身・答え終わったあと・受付と見た目）。v7 の ?tab= とは別に動く。 */
+  const [v8Tab, setV8Tab] = useState<'content' | 'after' | 'appearance'>('content')
+  const [showAddMenu, setShowAddMenu] = useState(false)
+  const addMenuButtonRef = useRef<HTMLButtonElement>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  /** 本体が読めたかどうか。読めていないときの保存・入力の失敗と分ける。 */
+  const [formLoaded, setFormLoaded] = useState(false)
+  /** 取得の失敗の内訳（保存・入力の失敗とは分ける）。403は権限不足で再試行しない（M002）。 */
+  const [formLoadFailed, setFormLoadFailed] = useState<'missing' | 'forbidden' | 'error' | null>(null)
+  /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
+  const [reloadKey, setReloadKey] = useState(0)
+  // 保存済み・読み直し直後の姿。タブ移動やタブを閉じる前の確認に使う。
+  const savedSnapshot = useRef<string | null>(null)
+  /**
+   * 読み込んだ時点の編集の版(#723)。保存でそのまま送り返す。
+   *
+   * 押すたびに取り直すと楽観ロックの意味が無くなるので、**読み込みと
+   * 保存成功のときだけ**入れ替える。
+   */
+  const [contentRevision, setContentRevision] = useState<number | null>(null)
+  const [publishedVersionId, setPublishedVersionId] = useState<string | null>(null)
+  /*
+   * P（公開前の試し）：試し合言葉と試しURL。合言葉の生の値はこの画面でしか
+   * 見られない。試しは保存済みの下書きに出る（保存していない変更は出ない）。
+   */
+  const [testToken, setTestToken] = useState<string | null>(null)
+  const [testExpiresAt, setTestExpiresAt] = useState<string | null>(null)
+  const [testBusy, setTestBusy] = useState(false)
+  const [testError, setTestError] = useState('')
+  /**
+   * ほかの人が先に保存していたとき（409）。
+   *
+   * **入力は捨てない。**自動で読み直すと入力が消えるので、読み直すかどうかは
+   * 運用者に決めてもらう。`updatedAt` は相手がいつ保存したかの手がかり。
+   */
+  const [conflict, setConflict] = useState<{ updatedAt: string } | null>(null)
+  // V8の公開の確かめ（Z9wXm）と競合の比べ（J1pdB）。v7の直接公開は変えない。
+  const [showPublish, setShowPublish] = useState(false)
+  const [compareTarget, setCompareTarget] = useState<ConflictSide | null>(null)
+  const [compareBusy, setCompareBusy] = useState(false)
+  const [compareError, setCompareError] = useState('')
+
+  useEffect(() => {
+    if (editorTab === 'options') setShowOptions(true)
+  }, [editorTab])
+
+  // 元に戻す / やり直す。並べ替えは失敗しても取り返せるようにする。
+  const undoStack = useRef<FormLayout[]>([])
+  const redoStack = useRef<FormLayout[]>([])
+
+  const setLayout = useCallback((next: FormLayout | ((prev: FormLayout) => FormLayout)) => {
+    setLayoutState((prev) => {
+      const resolved = typeof next === 'function' ? next(prev) : next
+      undoStack.current = [...undoStack.current.slice(-49), prev]
+      redoStack.current = []
+      return resolved
+    })
+  }, [])
+
+  const undo = () => {
+    const prev = undoStack.current.pop()
+    if (!prev) return
+    setLayoutState((current) => {
+      redoStack.current = [...redoStack.current, current]
+      return prev
+    })
+  }
+
+  const redo = () => {
+    const next = redoStack.current.pop()
+    if (!next) return
+    setLayoutState((current) => {
+      undoStack.current = [...undoStack.current, current]
+      return next
+    })
+  }
+
+  /**
+   * フォーム本体の読み込み。初回と、競合（409）で運用者が「最新の内容を
+   * 読み込む」を押したときに使う。
+   *
+   * **押されるまで呼ばない。**自動で読み直すと入力が消える。
+   */
+  const loadForm = useCallback(async () => {
+    if (!id || !selectedAccountId) return false
+    const res = await api.forms.get(id, selectedAccountId)
+    if (!res.success) return false
+    // layout はサーバ側が必ず作って返す（古いフォームは fields から）
+    const nextLayout = res.data.layout ?? emptyLayout()
+    const loaded = {
+      name: res.data.name,
+      description: res.data.description ?? '',
+      isActive: res.data.isActive,
+      onSubmitTagId: res.data.onSubmitTagId ?? '',
+      ogTitle: res.data.ogTitle ?? '',
+      ogDescription: res.data.ogDescription ?? '',
+      ogImageUrl: res.data.ogImageUrl ?? '',
+      layout: nextLayout,
+    }
+    setName(loaded.name)
+    setDescription(loaded.description)
+    setIsActive(loaded.isActive)
+    setSubmitCount(res.data.submitCount ?? 0)
+    setOnSubmitTagId(loaded.onSubmitTagId)
+    setOgTitle(loaded.ogTitle)
+    setOgDescription(loaded.ogDescription)
+    setOgImageUrl(loaded.ogImageUrl)
+    setLayoutState(nextLayout)
+    setContentRevision(res.data.contentRevision)
+    setPublishedVersionId(res.data.publishedVersionId)
+    setConflict(null)
+    // 未保存のままタブ移動したときの確認に使う。読み直しが基準。
+    savedSnapshot.current = JSON.stringify(loaded)
+    setFormLoaded(true)
+    return true
+  }, [id, selectedAccountId])
+
+  const reloadAfterConflict = async () => {
+    setError('')
+    setNotice('')
+    try {
+      await loadForm()
+      setNotice('最新の内容を読み込みました')
+    } catch {
+      setError('読み込みに失敗しました。もう一度読み込んでください。')
+    }
+  }
+
+  // J1pdB「違いを比べる」。最新を取って比べるだけで、画面は書き換えない。
+  const openCompare = async () => {
+    if (!id || !selectedAccountId || compareBusy) return
+    setCompareBusy(true)
+    setCompareError('')
+    try {
+      const res = await api.forms.get(id, selectedAccountId)
+      if (!res.success) {
+        setCompareError('最新の内容を取れませんでした。もう一度お試しください。')
+        return
+      }
+      setCompareTarget({
+        name: res.data.name,
+        description: res.data.description ?? '',
+        layout: res.data.layout ?? emptyLayout(),
+      })
+    } catch {
+      setCompareError('最新の内容を取れませんでした。もう一度お試しください。')
+    } finally {
+      setCompareBusy(false)
+    }
+  }
+
+  useEffect(() => {
+    setFormLoadFailed(null)
+    void (async () => {
+      try {
+        // 参照一覧は選んでいる公式アカウントに絞る。絞らないと別アカウントの
+        // タグ等が混ざり、付け間違いの元になる。
+        const tagPath = selectedAccountId
+          ? `/api/tags?lineAccountId=${encodeURIComponent(selectedAccountId)}`
+          : '/api/tags'
+        const accountFilter = selectedAccountId ? { accountId: selectedAccountId } : undefined
+        const [tagRes, ffRes, scenarioRes, reminderRes, templateRes] = await Promise.all([
+          fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(tagPath),
+          selectedAccountId ? api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }) : Promise.resolve({ success: true as const, data: [] }),
+          api.scenarios.list(accountFilter),
+          api.reminders.list(accountFilter),
+          api.templates.list(undefined, selectedAccountId ?? undefined),
+        ])
+        setRefs({
+          tags: tagRes.success ? tagRes.data.map((t) => ({ id: t.id, name: t.name })) : [],
+          friendFields: ffRes.success
+            ? ffRes.data.map((f) => ({ id: f.id, name: f.name, ecIsMaster: f.ecIsMaster }))
+            : [],
+          scenarios: scenarioRes.success
+            ? scenarioRes.data.map((s) => ({ id: s.id, name: s.name }))
+            : [],
+          reminders: reminderRes.success
+            ? reminderRes.data.map((r) => ({ id: r.id, name: r.name }))
+            : [],
+          templates: templateRes.success
+            ? templateRes.data.map((t) => ({ id: t.id, name: t.name, type: t.messageType }))
+            : [],
+          bookingMenus: [],
+          bookingMenuStaff: {},
+        })
+        // 「予約を入れる」欄のメニュー選び。本体の読み込みを待たせないよう後追い。
+        // 予約を使わない店では空のまま。読めなくても欄は置ける。
+        if (selectedAccountId) {
+          bookingApi
+            .listMenus(selectedAccountId)
+            .then((menuRes) => {
+              const bookingMenus = (menuRes.menus ?? [])
+                .filter((m) => m.is_active === 1)
+                .map((m) => ({ id: m.id, name: m.name, durationMinutes: m.duration_minutes }))
+              setRefs((prev) => ({ ...prev, bookingMenus }))
+            })
+            .catch(() => {})
+        }
+
+        const ok = await loadForm()
+        // id なし・未選択は別の面で出す。ここは取得して見つからないときだけ。
+        if (!ok && id && selectedAccountId) setFormLoadFailed('missing')
+      } catch (caught) {
+        if (caught instanceof ApiError && caught.status === 404) {
+          setFormLoadFailed('missing')
+        } else if (classifyApiFailure(caught) === 'forbidden') {
+          // M002：権限不足は通信障害ではない。再試行を出さず理由を示す。
+          setFormLoadFailed('forbidden')
+        } else {
+          setError('読み込みに失敗しました。もう一度読み込んでください。')
+          setFormLoadFailed('error')
+        }
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [id, loadForm, reloadKey, selectedAccountId])
+
+  // 「予約を入れる」欄の担当選び。欄のメニューが決まったものだけ読む。
+  // 読めなくても欄は置ける（だれでも扱い）。公開前にメニュー必須で止める。
+  useEffect(() => {
+    if (!selectedAccountId) return
+    const menuIds = new Set<string>()
+    for (const section of layout.sections) {
+      for (const b of section.blocks) {
+        if (b.kind === 'input' && b.type === 'booking' && b.booking?.menuId) {
+          menuIds.add(b.booking.menuId)
+        }
+      }
+    }
+    const missing = [...menuIds].filter((menuId) => refs.bookingMenuStaff?.[menuId] === undefined)
+    if (missing.length === 0) return
+    let cancelled = false
+    void (async () => {
+      const entries = await Promise.all(
+        missing.map(async (menuId) => {
+          try {
+            const res = await bookingApi.listMenuStaff(selectedAccountId, menuId)
+            return [menuId, res.staff.map((s) => ({ id: s.id, name: s.display_name }))] as const
+          } catch {
+            return [menuId, []] as const
+          }
+        }),
+      )
+      if (cancelled) return
+      setRefs((prev) => ({
+        ...prev,
+        bookingMenuStaff: { ...(prev.bookingMenuStaff ?? {}), ...Object.fromEntries(entries) },
+      }))
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedAccountId, layout, refs.bookingMenuStaff])
+
+  // いま編集している並び（共通ヘッダ か セクション）
+  const blocks = useMemo(
+    () => (tab === HEADER_TAB ? layout.header : (layout.sections[tab]?.blocks ?? [])),
+    [layout, tab],
+  )
+
+  const setBlocks = (next: FormBlock[]) =>
+    setLayout((prev) =>
+      tab === HEADER_TAB
+        ? { ...prev, header: next }
+        : {
+            ...prev,
+            sections: prev.sections.map((s, i) => (i === tab ? { ...s, blocks: next } : s)),
+          },
+    )
+
+  const selectedIndex = blocks.findIndex((b) => b.id === selectedBlockId)
+
+  const addBlock = (kind: string, type?: FormInputType) => {
+    const inputCount = layout.sections.reduce(
+      (n, s) => n + s.blocks.filter((b) => b.kind === 'input').length,
+      layout.header.filter((b) => b.kind === 'input').length,
+    )
+    const block = makeBlock(kind, type, inputCount)
+    setBlocks([...blocks, block])
+    setSelectedBlockId(block.id)
+    setShowAddMenu(false)
+  }
+
+  const patchBlock = (blockId: string, patch: Partial<FormBlock>) =>
+    setBlocks(blocks.map((b) => (b.id === blockId ? ({ ...b, ...patch } as FormBlock) : b)))
+
+  const moveBlock = (delta: number) => {
+    if (selectedIndex < 0) return
+    const to = selectedIndex + delta
+    if (to < 0 || to >= blocks.length) return
+    const next = [...blocks]
+    const [row] = next.splice(selectedIndex, 1)
+    next.splice(to, 0, row)
+    setBlocks(next)
+  }
+
+  const duplicateBlock = () => {
+    if (selectedIndex < 0) return
+    const source = blocks[selectedIndex]
+    // 回答キーが重なると片方の答えが消える。既存の名前と突き合わせて一意にする。
+    const taken = takenAnswerNames(layout)
+    const copy: FormBlock =
+      source.kind === 'input'
+        ? { ...source, id: newBlockId(), name: uniqueCopyName(source.name, taken) }
+        : { ...source, id: newBlockId() }
+    const next = [...blocks]
+    next.splice(selectedIndex + 1, 0, copy)
+    setBlocks(next)
+    setSelectedBlockId(copy.id)
+  }
+
+  const removeBlock = () => {
+    if (selectedIndex < 0) return
+    setBlocks(blocks.filter((_, i) => i !== selectedIndex))
+    setSelectedBlockId(null)
+  }
+
+  // ---- ページ（セクション） ----
+  const addSection = () => {
+    const section: FormSection = {
+      id: newBlockId('s'),
+      name: `セクション${layout.sections.length + 1}`,
+      blocks: [],
+    }
+    setLayout((prev) => ({ ...prev, sections: [...prev.sections, section] }))
+    setTab(layout.sections.length)
+  }
+
+  const renameSection = (index: number) => {
+    const current = layout.sections[index]
+    if (!current) return
+    const next = window.prompt('ページの名前', current.name)
+    // 空のページ名は作らせない。取り消し・空白だけも元のままにする。
+    const name = normalizeSectionName(next)
+    if (name === null) return
+    setLayout((prev) => ({
+      ...prev,
+      sections: prev.sections.map((s, i) => (i === index ? { ...s, name } : s)),
+    }))
+  }
+
+  const duplicateSection = (index: number) => {
+    const source = layout.sections[index]
+    const copy: FormSection = {
+      id: newBlockId('s'),
+      name: `${source.name}のコピー`,
+      blocks: (() => {
+        // ページ内の複製同士でも重ねないよう、作るたびに一覧へ足す。
+        const taken = takenAnswerNames(layout)
+        return source.blocks.map((b) => {
+          if (b.kind !== 'input') return { ...b, id: newBlockId() }
+          const name = uniqueCopyName(b.name, taken)
+          taken.add(name)
+          return { ...b, id: newBlockId(), name }
+        })
+      })(),
+    }
+    setLayout((prev) => ({
+      ...prev,
+      sections: [...prev.sections.slice(0, index + 1), copy, ...prev.sections.slice(index + 1)],
+    }))
+    setTab(index + 1)
+  }
+
+  /*
+   * ページの削除。**ブラウザの `confirm()` は使わない。**
+   * 何個のブロックが消えるのか、どの分岐がつなぎ直されるのかを本文で読ませる。
+   *
+   * **`destructive` は付けない。** ここで消えるのは画面上の下書きだけで、
+   * 「元に戻す」で戻せるし、保存するまで保存済みのフォームは変わらない。
+   * 戻せる操作に赤い窓を出すと、本当に戻せない操作と見分けがつかなくなる。
+   */
+  const [removeSectionIndex, setRemoveSectionIndex] = useState<number | null>(null)
+  const removeSectionTarget =
+    removeSectionIndex === null ? null : (layout.sections[removeSectionIndex] ?? null)
+
+  const removeSection = (index: number) => {
+    if (layout.sections.length <= 1) return
+    const target = layout.sections[index]
+    if (!target) return
+    setRemoveSectionIndex(null)
+    setLayout((prev) => ({
+      ...prev,
+      // 消えるページへ飛ばしていた選択肢は、行き先を外して「次へ進む」に戻す
+      sections: prev.sections
+        .filter((_, i) => i !== index)
+        .map((s) => ({
+          ...s,
+          blocks: s.blocks.map((b) =>
+            b.kind === 'input' && b.choices
+              ? {
+                  ...b,
+                  choices: b.choices.map((c) =>
+                    c.jumpToSectionId === target.id ? { ...c, jumpToSectionId: null } : c,
+                  ),
+                }
+              : b,
+          ),
+        })),
+    }))
+    setTab(Math.max(0, index - 1))
+  }
+
+  const askRemoveSection = (index: number) => {
+    if (layout.sections.length <= 1) return
+    // 中身が無いページは、消えるものが無いので確認しない。
+    if ((layout.sections[index]?.blocks.length ?? 0) === 0) {
+      removeSection(index)
+      return
+    }
+    setRemoveSectionIndex(index)
+  }
+
+  // いまの入力と保存済みの姿を比べる。読み直し前は何も比べない。
+  const currentSnapshot = JSON.stringify({
+    name,
+    description,
+    isActive,
+    onSubmitTagId,
+    ogTitle,
+    ogDescription,
+    ogImageUrl,
+    layout,
+  })
+  const dirty = savedSnapshot.current !== null && currentSnapshot !== savedSnapshot.current
+
+  /*
+   * 「保存せずに移る」を選んだとき、保存済み・読み直し直後の姿へ戻す。
+   *
+   * `?tab=` だけ変わる移動や、移動先から同じ画面へ戻ったときに「消えます」と
+   * 言ったはずの変更が残っていると困る。画面がアンマウントされない
+   * 移動でも、実際に捨てた形にしてから離れる（FORM-19）。
+   */
+  const discardChanges = useCallback(() => {
+    const snapshot = savedSnapshot.current
+    if (!snapshot) return
+    const saved = JSON.parse(snapshot) as {
+      name: string
+      description: string
+      isActive: boolean
+      onSubmitTagId: string
+      ogTitle: string
+      ogDescription: string
+      ogImageUrl: string
+      layout: FormLayout
+    }
+    setName(saved.name)
+    setDescription(saved.description)
+    setIsActive(saved.isActive)
+    setOnSubmitTagId(saved.onSubmitTagId)
+    setOgTitle(saved.ogTitle)
+    setOgDescription(saved.ogDescription)
+    setOgImageUrl(saved.ogImageUrl)
+    setLayoutState(saved.layout)
+    // 捨てたあとの「元に戻す」で破棄した変更が蘇らないよう、履歴も切る。
+    undoStack.current = []
+    redoStack.current = []
+    setSelectedBlockId(null)
+  }, [])
+
+  /*
+   * 未保存の変更がある間、画面を離れる操作を止める共通の番兵（DETAIL-04系）。
+   * タブ移動のリンク・左メニュー・戻る操作・再読込を同じ確認対話へ寄せる。
+   * 一覧へのリンク（パンくずの「回答フォーム」）も同じ捕まえ方で止まる。
+   */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
+    dirty,
+    busy: saving,
+    onDiscard: discardChanges,
+  })
+
+  const save = async (publishAfter = false): Promise<boolean> => {
+    if (!selectedAccountId) {
+      setError('LINE公式アカウントを選んでください')
+      return false
+    }
+    if (!name.trim()) {
+      setError('フォーム名を入力してください')
+      setNameError('フォーム名を入力してください')
+      return false
+    }
+    setNameError(null)
+    const unnamed = layout.header
+      .concat(layout.sections.flatMap((s) => s.blocks))
+      .find((b) => b.kind === 'input' && !b.label.trim())
+    if (unnamed) {
+      setError('タイトルが空のブロックがあります')
+      return false
+    }
+    // 回答キーが重なると片方の答えが消える。保存の直前にも止める。
+    const seenNames = new Set<string>()
+    const dup = layout.header
+      .concat(layout.sections.flatMap((s) => s.blocks))
+      .find((b) => {
+        if (b.kind !== 'input') return false
+        if (seenNames.has(b.name)) return true
+        seenNames.add(b.name)
+        return false
+      })
+    if (dup) {
+      setError('回答キーが重なっています。複製した入力欄を確認してください')
+      return false
+    }
+    // 空の選択肢・URLの形・期限の形。壊れた定義のまま保存させない。
+    const layoutError = validateLayoutForSave(layout)
+    if (layoutError) {
+      setError(layoutError)
+      return false
+    }
+
+    /*
+     * FORM-18: カードの画像URLは https:// だけ受け付ける。
+     * 欄の注記と同じ決めごとを保存でも守る。**入力は残す**——値を
+     * 消すと直せないので、理由だけ出して送らない。
+     */
+    const ogImageError = ogImageUrlError(ogImageUrl)
+    if (ogImageError) {
+      setError(ogImageError)
+      return false
+    }
+
+    /*
+     * P（読みにくい色）：文字と背景の差が 4.5:1 未満の組み合わせは保存できない。
+     * 下書きも公開も同じ決まり（保存APIも同じ検査をする。ここで先に止めるのは、
+     * 保存だけ済んで「保存できませんでした」に化けるのを防ぐため）。
+     */
+    const contrastError = formThemeContrastError(normalizeFormTheme(layout.options?.theme))
+    if (contrastError) {
+      setError(contrastError)
+      return false
+    }
+
+    // 公開に進むときだけ、公開前の検査を通す。分岐の循環・消えた行き先・
+    // 共通ヘッダの分岐・選ぶ先が空の動作は、下書きでは許すが公開は止める。
+    // （公開APIも同じ検査をする。ここで先に止めるのは、保存だけ済んで
+    // 「公開に失敗しました」に化けるのを防ぐため）
+    if (publishAfter) {
+      const publishError = validateFormForPublish(layout)
+      if (publishError) {
+        setError(publishError)
+        return false
+      }
+    }
+
+    if (contentRevision === null) {
+      setError('読み込みが終わっていません。少し待ってから、もう一度お試しください')
+      return false
+    }
+
+    setSaving(true)
+    setError('')
+    setNotice('')
+    /*
+     * M003：送った中身。409のときに「自分の再送か」を確かめるために残す。
+     * 版・時刻は比べない（利用者の入力だけを比べる）。下の保存の送り値と
+     * 同じ決めごとにすること（isActive の扱いを含む）。
+     */
+    const sentContent: FormSavedContent = {
+      name: name.trim(),
+      description: description.trim() || null,
+      layout,
+      onSubmitTagId: onSubmitTagId || null,
+      // 未公開の下書きは publish API が成功するまで受付中にしない。
+      isActive: publishedVersionId ? isActive : false,
+      ogTitle: ogTitle.trim() || null,
+      ogDescription: ogDescription.trim() || null,
+      ogImageUrl: ogImageUrl.trim() || null,
+    }
+    /*
+     * M003：保存されている中身を読み直し、送った中身と同じなら
+     * 自分の再送（応答消失後の再送）とみなして版を返す。違えば null
+     * （ほかの人の編集）。読み直しに失敗しても null に倒す。
+     * サーバ側の要求キー永続化は migration 番号待ちのため、
+     * ここでは内容照合で区別する。
+     */
+    const confirmOwnSave = async (): Promise<number | null> => {
+      try {
+        const current = await api.forms.get(id, selectedAccountId)
+        if (!current.success) return null
+        const actual: FormSavedContent = {
+          name: current.data.name,
+          description: current.data.description,
+          layout: current.data.layout,
+          onSubmitTagId: current.data.onSubmitTagId,
+          isActive: current.data.isActive,
+          ogTitle: current.data.ogTitle,
+          ogDescription: current.data.ogDescription,
+          ogImageUrl: current.data.ogImageUrl,
+        }
+        return formSavedContentMatches(sentContent, actual) ? current.data.contentRevision : null
+      } catch {
+        return null
+      }
+    }
+    let reconciledOwnSave = false
+    try {
+      let res: Awaited<ReturnType<typeof api.forms.update>>
+      try {
+        res = await api.forms.update(id, selectedAccountId, {
+          name: sentContent.name,
+          description: sentContent.description,
+          layout: sentContent.layout,
+          onSubmitTagId: sentContent.onSubmitTagId,
+          // 未公開の下書きは publish API が成功するまで受付中にしない。
+          isActive: publishedVersionId ? isActive : false,
+          ogTitle: sentContent.ogTitle,
+          ogDescription: sentContent.ogDescription,
+          ogImageUrl: sentContent.ogImageUrl,
+          expectedContentRevision: contentRevision,
+        })
+      } catch (updateError) {
+        // M003：409でも送った中身と同じものが保存されていたら、応答消失後の
+        // 自分の再送であり、ほかの人ではない。保存済みとして下の通常処理へ。
+        if (!(updateError instanceof ApiError) || updateError.status !== 409) throw updateError
+        const ownRevision = await confirmOwnSave()
+        if (ownRevision === null) throw updateError
+        reconciledOwnSave = true
+        res = { success: true, data: { id, contentRevision: ownRevision, updatedAt: '' } }
+      }
+      if (!res.success) {
+        setError(res.error)
+        return false
+      }
+      // 次の保存はこの版を送る。取り直さないと、続けて保存したときに
+      // 自分の1回目と衝突する。
+      setContentRevision(res.data.contentRevision)
+      setConflict(null)
+      if (publishAfter) {
+        const published = await api.forms.publish(id, selectedAccountId, res.data.contentRevision)
+        if (!published.success) {
+          setError(published.error)
+          return false
+        }
+        setPublishedVersionId(published.data.id)
+        setIsActive(true)
+        setNotice(published.data.replayed ? 'この版は公開済みです' : 'この版を公開しました')
+        notifyToast(published.data.replayed ? 'この版は公開済みです' : 'この版を公開しました')
+      } else {
+        setNotice(publishedVersionId ? '下書きを保存しました。公開中の内容は変わっていません' : '下書きを保存しました')
+        notifyToast('下書きを保存しました')
+      }
+      if (publishAfter) {
+        savedSnapshot.current = JSON.stringify({
+            name, description, isActive: true, onSubmitTagId,
+            ogTitle, ogDescription, ogImageUrl, layout,
+          })
+      } else if (reconciledOwnSave) {
+        // 再送で保存済みだったときは、送った姿を基準にする（前後の空白の差を残さない）。
+        savedSnapshot.current = JSON.stringify({
+            name: sentContent.name,
+            description: sentContent.description ?? '',
+            isActive: sentContent.isActive,
+            onSubmitTagId: sentContent.onSubmitTagId ?? '',
+            ogTitle: sentContent.ogTitle ?? '',
+            ogDescription: sentContent.ogDescription ?? '',
+            ogImageUrl: sentContent.ogImageUrl ?? '',
+            layout: sentContent.layout,
+          })
+      } else {
+        savedSnapshot.current = currentSnapshot
+      }
+      return true
+    } catch (e) {
+      /*
+       * #723: ほかの人が先に保存していた（409）。
+       *
+       * **入力はそのまま画面に残す。**読み直すと入力が消えるので、ここでは
+       * 読み直さない。読み直すかどうかは運用者が決める（下のボタン）。
+       * 文言は共通情報の編集（`contents/vars`）と同じ言い方に揃える。
+       * 保管・削除の「影響が変わりました」とは意味が違うので使わない。
+       */
+      if (e instanceof ApiError && e.status === 409) {
+        const data = e.data as { updatedAt?: unknown } | null
+        const updatedAt = typeof data?.updatedAt === 'string' ? data.updatedAt : ''
+        setConflict({ updatedAt })
+        setError(conflictMessage(updatedAt))
+        return false
+      }
+      // M001：保存の失敗理由は共通部品に任せる。内部文・英語文をそのまま出さない。
+      setError(describeApiFailure(e, '保存', {
+        forbidden: 'このLINEアカウントや権限では保存できません。選んでいるアカウントと権限を確認してください。',
+      }))
+      return false
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /*
+   * P（公開前の試し）：試し合言葉を取って試しURLを作る。試しは保存済みの
+   * 下書きに出る。試しの回答は集計に入らず、回答後の動作も動かない。
+   */
+  const startTest = async () => {
+    if (!selectedAccountId || testBusy) return
+    setTestBusy(true)
+    setTestError('')
+    try {
+      const res = await api.forms.issueTestToken(id, selectedAccountId)
+      if (!res.success) throw new Error(res.error)
+      setTestToken(res.data.token)
+      setTestExpiresAt(res.data.expiresAt)
+    } catch {
+      setTestError('試し合言葉を作れませんでした。もう一度お試しください。')
+    } finally {
+      setTestBusy(false)
+    }
+  }
+  const testUrl = answerUrl && testToken
+    ? `${answerUrl}${answerUrl.includes('?') ? '&' : '?'}test_token=${encodeURIComponent(testToken)}`
+    : null
+
+  /*
+    対象が無いときは、タブ・入力・右の案内・固定バーのどれも出さない。
+    代わりに ★V7 TargetMissing を出す（設計 `x5cgUH`）。
+  */
+  if (!id) {
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="編集する回答フォームが指定されていません"
+        description="一覧から編集するフォームを選び直してください。"
+        backHref="/form-submissions"
+        backLabel="回答フォーム一覧へ戻る"
+      />
+    )
+  }
+  if (!loading && !selectedAccountId) {
+    return (
+      <ListState
+        kind="empty"
+        title="LINE公式アカウントを選んでください"
+        description="選ぶとフォームを編集できます。"
+      />
+    )
+  }
+  if (!loading && formLoadFailed === 'missing') {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このフォームは見つかりません"
+        description="削除されたか、リンクが古くなっています。一覧から選び直してください。"
+        accountName={selectedAccount?.name}
+        backHref="/form-submissions"
+        backLabel="回答フォーム一覧へ戻る"
+      />
+    )
+  }
+  if (!loading && formLoadFailed === 'error' && !formLoaded) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="フォームを読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => {
+          setLoading(true)
+          setReloadKey((k) => k + 1)
+        }}
+      />
+    )
+  }
+  /*
+   * M002：権限不足は通信障害ではない。再試行ボタンは出さず、
+   * アカウントの選び直しと管理者への確認を案内する。
+   */
+  if (!loading && formLoadFailed === 'forbidden' && !formLoaded) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このフォームを開く権限がありません"
+        description="選んでいるアカウントでは開けません。アカウントを選び直すか、管理者に権限を確認してください。"
+        accountName={selectedAccount?.name}
+        backHref="/form-submissions"
+        backLabel="回答フォーム一覧へ戻る"
+      />
+    )
+  }
+
+  if (theme === 'v8') {
+    // 部品として置くと親の描き直しごとに入力が作り直されてしまうため、
+    // そのまま呼ぶ（フックは使っていない）。
+    return renderV8Edit()
+  }
+
+  function renderV8Edit() {
+    const node = v8Tab === 'content' ? 'm1cWEy' : v8Tab === 'after' ? 'XXFT4' : 'tpRRT'
+    const patchOptions = (next: Partial<FormOptions>) => {
+      setLayout((prev) => ({ ...prev, options: { ...prev.options, ...next } }))
+    }
+    const copyAnswerUrl = () => {
+      if (!answerUrl) return
+      void navigator.clipboard
+        .writeText(answerUrl)
+        .then(() => setNotice('URLをコピーしました'))
+        .catch(() => window.prompt('コピーしてください:', answerUrl))
+    }
+    return (
+      <div className="flex flex-col gap-4" data-design-node={node}>
+        <div>
+          <PageHeader
+            breadcrumb={[{ label: '回答フォーム', href: '/form-submissions' }, { label: name || 'フォーム名未設定' }]}
+            title={name || 'フォーム名未設定'}
+            description="中身・答え終わったあと・受付と見た目を整えます。"
+          />
+          {dirty && publishedVersionId && (
+            <p className="text-ink-secondary mt-1 text-xs">下書き・公開中の版と違うところがあります</p>
+          )}
+        </div>
+
+        <div role="tablist" aria-label="編集する内容" className="border-hairline flex gap-4 border-b text-sm">
+          {(
+            [
+              { key: 'content', label: '中身' },
+              { key: 'after', label: '答え終わったあと' },
+              { key: 'appearance', label: '受付と見た目' },
+            ] as const
+          ).map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={v8Tab === tab.key}
+              onClick={() => setV8Tab(tab.key)}
+              className={v8Tab === tab.key ? 'text-ink border-ink border-b-2 pb-2 font-bold' : 'text-ink-secondary pb-2'}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {conflict && (
+          <div data-design-node="J1pdB" className="border-accent bg-accent-soft flex flex-wrap items-center gap-3 rounded-card border p-4">
+            <p className="text-ink min-w-0 flex-1 text-sm">
+              <span className="font-bold">{conflictMessage(conflict.updatedAt)}</span>
+              <span className="mt-0.5 block text-xs">あなたが直した所はまだ保存されていません。このまま保存すると、相手の変更が消えます。</span>
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => void openCompare()} disabled={compareBusy}>
+                {compareBusy ? '比べています...' : '違いを比べる'}
+              </Button>
+              <Button variant="primary" onClick={() => void reloadAfterConflict()}>
+                最新を読み込んで続ける
+              </Button>
+            </div>
+          </div>
+        )}
+        {!conflict && error && (
+          <p role="alert" className="text-danger text-sm">{error}</p>
+        )}
+
+        {loading || !formLoaded ? (
+          <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
+            読み込み中...
+          </div>
+        ) : (
+          <div className="grid items-start gap-4 xl:grid-cols-3">
+            <div className="flex min-w-0 flex-col gap-4 xl:col-span-2">
+              {v8Tab === 'content' && (
+                <>
+                  <section className="bg-canvas rounded-card border-hairline border p-4">
+                    <h2 className="text-ink text-sm font-bold">フォームのこと</h2>
+                    <div className="mt-3 grid gap-3">
+                      <div className="grid items-end gap-3 sm:grid-cols-2">
+                        <Field label="フォーム名" htmlFor="v8-fm-name" required>
+                          <TextInput id="v8-fm-name" type="text" value={name} onChange={(e) => setName(e.target.value)} />
+                        </Field>
+                        <div>
+                          <span className="text-ink-secondary mb-1 block text-xs font-medium">公開状態</span>
+                          <Toggle checked={isActive} onChange={setIsActive} label="公開状態" />
+                          <span className="text-ink-secondary text-xs">{isActive ? '公開中' : '停止中'}</span>
+                        </div>
+                      </div>
+                      <Field label="説明（覚え書き・お客さまには出ません）" htmlFor="v8-fm-desc">
+                        <TextArea id="v8-fm-desc" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} className="resize-y" />
+                      </Field>
+                      <div className="flex flex-wrap items-end gap-3">
+                        <Field label="回答したときに付けるタグ" htmlFor="v8-fm-tag" note="このフォームに答えた人を、あとから絞り込めます。">
+                          <Select
+                            id="v8-fm-tag"
+                            aria-label="回答したときに付けるタグ"
+                            value={onSubmitTagId}
+                            onChange={(value) => setOnSubmitTagId(value)}
+                            options={[{ value: '', label: '— 付けない —' }, ...refs.tags.map((t) => ({ value: t.id, label: t.name }))]}
+                            size="full"
+                          />
+                        </Field>
+                        <Link href={`/form-submissions/responses?id=${encodeURIComponent(id)}`} className="text-action text-sm">
+                          回答 {submitCount}件
+                        </Link>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="bg-canvas rounded-card border-hairline border p-4">
+                    <h2 className="text-ink text-sm font-bold">ページ</h2>
+                    <p className="text-ink-faint mt-1 text-xs">ページごとに「次へ」で進みます</p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {layout.sections.map((section, index) => (
+                        <button
+                          key={section.id}
+                          type="button"
+                          onClick={() => { setTab(index); setSelectedBlockId(null) }}
+                          onDoubleClick={() => renameSection(index)}
+                          title="ダブルクリックで名前を変えられます"
+                          className={index === tab ? 'rounded-pill bg-ink text-canvas px-3 py-1.5 text-sm font-medium' : 'rounded-pill bg-canvas-sunken text-ink-secondary px-3 py-1.5 text-sm'}
+                        >
+                          {index + 1} {section.name}
+                        </button>
+                      ))}
+                      <button type="button" onClick={addSection} className="text-ink-secondary px-2 py-1.5 text-sm">
+                        ＋ ページを足す
+                      </button>
+                    </div>
+                  </section>
+
+                  <section className="bg-canvas rounded-card border-hairline border p-4">
+                    <h2 className="text-ink text-sm font-bold">ページ{tab + 1}のブロック</h2>
+                    <p className="text-ink-faint mt-1 text-xs">つまみで並べ替え。押すと設定が開きます</p>
+                    <div data-design="Inspector" className="mt-3 space-y-3">
+                      {blocks.length === 0 ? (
+                        <p className="text-ink-faint bg-canvas rounded-card border-hairline border border-dashed p-8 text-center text-sm">
+                          「ブロックを足す」から作ってください
+                        </p>
+                      ) : (
+                        blocks.map((block, index) => (
+                          <BlockEditor
+                            key={block.id}
+                            block={block}
+                            index={index}
+                            sections={layout.sections}
+                            refs={refs}
+                            inHeader={tab === HEADER_TAB}
+                            selected={block.id === selectedBlockId}
+                            onSelect={() => setSelectedBlockId(block.id)}
+                            onChange={(patch) => patchBlock(block.id, patch)}
+                          />
+                        ))
+                      )}
+                    </div>
+                  </section>
+
+                  <section className="bg-canvas rounded-card border-hairline border p-4">
+                    <h2 className="text-ink text-sm font-bold">ブロックを足す</h2>
+                    {BLOCK_GROUPS.map((group) => (
+                      <div key={group.title} className="mt-3">
+                        <h3 className="text-ink-secondary text-xs font-medium">{group.title}</h3>
+                        <div className="mt-1.5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                          {(group.inputTypes
+                            ? group.inputTypes.map((input) => BLOCK_MENU.find((m) => m.type === input))
+                            : (group.decoLabels ?? []).map((label) => BLOCK_MENU.find((m) => m.type === undefined && m.label === label))
+                          )
+                            .filter((m): m is (typeof BLOCK_MENU)[number] => Boolean(m))
+                            .map((m) => (
+                              <Button
+                                key={m.label}
+                                variant="secondary"
+                                onClick={() => addBlock(m.kind, m.type)}
+                                className="h-auto flex-col items-start gap-0.5 px-3 py-2 text-left whitespace-normal"
+                              >
+                                <span className="block font-medium">{m.label}</span>
+                                <span className="text-ink-faint block text-xs font-normal">{BLOCK_HINTS[m.type ?? m.label] ?? ''}</span>
+                              </Button>
+                            ))}
+                        </div>
+                      </div>
+                    ))}
+                  </section>
+                </>
+              )}
+
+              {v8Tab === 'after' && (
+                <div className="flex flex-col gap-4">
+                  <ThanksSection value={layout.options} onChange={patchOptions} />
+                  <AfterActionsSection value={layout.options} refs={refs} onChange={patchOptions} />
+                </div>
+              )}
+
+              {v8Tab === 'appearance' && (
+                <div className="flex flex-col gap-4">
+                  <ReceptionSection value={layout.options} onChange={patchOptions} />
+                  <WordsSection value={layout.options} onChange={patchOptions} />
+                  <section className="bg-canvas rounded-card border-hairline border p-4">
+                    <h2 className="text-ink text-sm font-bold">色と文字</h2>
+                    <p className="text-ink-faint mt-1 text-xs">お客さまの画面の色・書体・背景を変えます</p>
+                    <div className="mt-3">
+                      <FormDesignSettings
+                        formId={id}
+                        accountId={selectedAccountId}
+                        value={layout.options.theme}
+                        ogTitle={ogTitle}
+                        ogDescription={ogDescription}
+                        ogImageUrl={ogImageUrl}
+                        onChange={(theme) => patchOptions({ theme })}
+                        onOgTitleChange={setOgTitle}
+                        onOgDescriptionChange={setOgDescription}
+                        onOgImageUrlChange={setOgImageUrl}
+                      />
+                    </div>
+                  </section>
+                </div>
+              )}
+            </div>
+
+            <div className="flex min-w-0 flex-col gap-4">
+              <section className="bg-canvas rounded-card border-hairline border p-4">
+                <h2 className="text-ink text-sm font-bold">回答用URL</h2>
+                {answerUrl ? (
+                  <>
+                    <div className="mt-2 flex items-center gap-1">
+                      <TextInput readOnly value={answerUrl} onFocus={(e) => e.currentTarget.select()} aria-label="回答用URL" className="text-xs" />
+                      <Button variant="secondary" className="shrink-0 px-2 py-2 text-xs whitespace-nowrap h-auto" onClick={copyAnswerUrl}>
+                        コピー
+                      </Button>
+                    </div>
+                    <p className="text-ink-faint mt-1 text-xs">友だちに配るURLです。LINEの中で開きます。</p>
+                    <Button variant="secondary" onClick={() => void startTest()} disabled={testBusy || !answerUrl} className="mt-2" title="保存済みの下書きをお客さま画面で開きます。試しの回答は集計に入りません" busy={testBusy} busyLabel="用意しています...">
+                      公開前に試す（試しのURLを作る）
+                    </Button>
+                    {testError && <p role="alert" className="text-danger mt-1 text-xs whitespace-pre-wrap">{testError}</p>}
+                    {testUrl && (
+                      <p className="mt-1 text-xs break-all">
+                        <Link href={testUrl} target="_blank" rel="noreferrer" className="text-action">
+                          試しのURLを開く
+                        </Link>
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-ink-secondary mt-2 text-sm">回答用URLを発行する設定がまだありません。LINEアカウント設定を確認してください。</p>
+                )}
+              </section>
+
+              <section className="bg-canvas rounded-card border-hairline border p-4">
+                <h2 className="text-ink text-sm font-bold">お客さまに見える形</h2>
+                <div className="mt-2">
+                  <FormPreview layout={layout} sectionIndex={tab === HEADER_TAB ? 0 : tab} />
+                </div>
+              </section>
+            </div>
+          </div>
+        )}
+
+        {notice && <p className="text-success text-sm" role="status">{notice}</p>}
+
+        <UnsavedLeaveDialog
+          open={leaveTarget !== null}
+          subject="フォームへの変更"
+          onConfirm={confirmLeave}
+          onCancel={cancelLeave}
+        />
+
+        <StickyBar
+          actions={(
+            <div className="flex flex-wrap gap-2">
+              <Button href="/form-submissions" variant="secondary" className="px-4 py-2 font-medium h-auto whitespace-normal">
+                キャンセル
+              </Button>
+              <Button variant="secondary" className="px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => void save(false)} disabled={saving} title="フォームを保存（公開中の内容は変わりません）">
+                {saving ? '保存中...' : '下書きを保存する'}
+              </Button>
+              <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={() => setShowPublish(true)} disabled={saving}>
+                この版を公開
+              </Button>
+            </div>
+          )}
+        />
+
+        <ConfirmDialog
+          open={showPublish}
+          title="この版を公開する"
+          description="公開すると、配っているURLを開いた人に新しい内容が出ます。"
+          confirmLabel="この版を公開"
+          busy={saving}
+          error={error || undefined}
+          designNode="Z9wXm"
+          onConfirm={() => {
+            void (async () => {
+              const ok = await save(true)
+              if (ok) setShowPublish(false)
+            })()
+          }}
+          onCancel={() => setShowPublish(false)}
+        >
+          <ul className="text-ink-secondary mt-3 space-y-1 text-xs">
+            <li>・すでに集まった回答（{submitCount}件）は消えません。消した質問の答えも残ります。</li>
+            <li>・公開するまで、今の版がそのまま使われます。</li>
+          </ul>
+        </ConfirmDialog>
+
+        <ConfirmDialog
+          open={compareTarget !== null || compareError !== ''}
+          title="最新の保存と比べる"
+          description="あなたの下書きと、相手が保存した最新の内容の違いです。読み込むまでは画面は変わりません。"
+          confirmLabel="最新を読み込んで続ける"
+          busy={compareBusy}
+          error={compareError || undefined}
+          onConfirm={() => {
+            setCompareTarget(null)
+            setCompareError('')
+            void reloadAfterConflict()
+          }}
+          onCancel={() => {
+            setCompareTarget(null)
+            setCompareError('')
+          }}
+        >
+          {compareTarget && (() => {
+            const mine: ConflictSide = { name, description, layout }
+            const { lines, omitted } = describeConflictDiff(mine, compareTarget)
+            return lines.length === 0 ? (
+              <p className="text-ink-secondary mt-3 text-sm">違いは見つかりませんでした。そのまま読み込めます。</p>
+            ) : (
+              <ul className="mt-3 space-y-1.5 text-sm">
+                {lines.map((line, index) => (
+                  <li key={index} className="flex items-start gap-2">
+                    <span aria-hidden className={line.kind === 'remove' ? 'text-danger font-bold' : line.kind === 'add' ? 'text-success font-bold' : 'text-accent-deep font-bold'}>
+                      {line.kind === 'remove' ? '−' : line.kind === 'add' ? '＋' : '・'}
+                    </span>
+                    <span className="text-ink">{line.text}</span>
+                  </li>
+                ))}
+                {omitted > 0 && (
+                  <li className="text-ink-faint text-xs">ほか{omitted}件の違いがあります</li>
+                )}
+              </ul>
+            )
+          })()}
+        </ConfirmDialog>
+
+        {showOptions && theme !== 'v8' && (
+          <OptionsDialog
+            value={layout.options}
+            refs={refs}
+            onChange={(next: FormOptions) => setLayout((prev) => ({ ...prev, options: next }))}
+            onClose={() => setShowOptions(false)}
+            onSave={async () => {
+              const res = await save(false)
+              if (res !== null) setShowOptions(false)
+            }}
+          />
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-4" data-design-node={narrow ? 'ITBAB' : undefined}>
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <nav className="text-ink-faint text-xs" data-design="Crumb">
+        <Link href="/form-submissions" className="hover:underline">
+          回答フォーム
+        </Link>
+        <span className="mx-1.5">/</span>
+        <span>{name || '（名前なし）'}</span>
+      </nav>
+
+      <nav className="flex flex-wrap gap-2" aria-label="回答フォームの編集画面">
+        <Button
+          href={`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=basic`}
+          variant={editorTab === 'basic' ? 'primary' : 'secondary'}
+        >
+          フォーム編集
+        </Button>
+        <Button
+          href={`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=design`}
+          variant={editorTab === 'design' ? 'primary' : 'secondary'}
+        >
+          デザイン設定
+        </Button>
+        <Button
+          href={`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=options`}
+          variant={editorTab === 'options' ? 'primary' : 'secondary'}
+        >
+          オプション設定
+        </Button>
+      </nav>
+
+      {/*
+        #723: 保存の失敗は3つのタブすべてで届かせる。
+        位置と重なりは共通部品が持つので、ここに `z-[60]` を手書きしない。
+        競合のときだけ「最新の内容を読み込む」を添える（押すまで読み直さない）。
+      */}
+      {error && (
+        <SaveConflictBar
+          message={error}
+          actionLabel={conflict ? '最新の内容を読み込む（入力中の内容は消えます）' : undefined}
+          onAction={conflict ? () => void reloadAfterConflict() : undefined}
+          actionQa="form-edit-conflict-reload"
+        />
+      )}
+
+      {loading || !formLoaded ? (
+        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
+          読み込み中...
+        </div>
+      ) : (
+        <>
+          <div
+            data-design="Meta"
+            className="bg-canvas rounded-card border-hairline grid gap-4 border p-4 sm:grid-cols-2 xl:grid-cols-5"
+          >
+            <Field label="フォーム名" htmlFor="fm-name" required error={nameError}>
+              <input
+                id="fm-name"
+                type="text"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value)
+                  if (nameError !== null) setNameError(e.target.value.trim() ? null : 'フォーム名を入力してください')
+                }}
+                onBlur={() => setNameError(name.trim() ? null : 'フォーム名を入力してください')}
+                className={inputClass}
+                aria-invalid={nameError !== null}
+              />
+            </Field>
+
+            <Field label="公開状態" htmlFor="fm-active">
+              <Select id="fm-active" aria-label="公開状態" value={isActive ? '1' : '0'} onChange={(value) => setIsActive(value === '1')} options={[{ value: "1", label: "公開中" }, { value: "0", label: "停止中" }]} size="full" />
+            </Field>
+
+            <Field
+              label="回答したときに付けるタグ"
+              htmlFor="fm-tag"
+              note="このフォームに答えた人を、あとから絞り込めます。"
+            >
+              <Select
+                id="fm-tag"
+                aria-label="回答したときに付けるタグ"
+                value={onSubmitTagId}
+                onChange={(value) => setOnSubmitTagId(value)}
+                options={[{ value: '', label: '— 付けない —' }, ...refs.tags.map((t) => ({ value: t.id, label: t.name }))]}
+                size="full"
+              />
+            </Field>
+
+            <Field
+              label="回答用URL"
+              note={
+                answerUrl
+                  ? '友だちに配るURLです。LINEの中で開きます。'
+                  : '回答用URLを発行する設定がまだありません。LINEアカウント設定を確認してください。'
+              }
+            >
+              {answerUrl ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    readOnly
+                    value={answerUrl}
+                    onFocus={(e) => e.currentTarget.select()}
+                    className={`${inputClass} text-xs`}
+                  />
+                  <Button variant="secondary" className="text-ink-secondary shrink-0 px-2 py-2 text-xs whitespace-nowrap h-auto" onClick={() => {
+                      void navigator.clipboard
+                        .writeText(answerUrl)
+                        .then(() => setNotice('URLをコピーしました'))
+                        .catch(() => window.prompt('コピーしてください:', answerUrl))
+                    }}>
+                    コピー
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-ink-faint rounded-control border-hairline border px-3 py-2 text-sm">
+                  —
+                </p>
+              )}
+            </Field>
+
+            <div>
+              <p className="text-ink-faint text-xs">回答</p>
+              <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+                {submitCount}
+                <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+              </p>
+            </div>
+          </div>
+
+          {/*
+            P（公開前の試し）：下書きをお客さま画面で試す。試しの回答は集計に
+            入らず、回答後の動作も動かない。合言葉は24時間有効。
+            説明の帯は1本の決まりに触れないよう、帯ではなく枠で出す。
+          */}
+          <div className="bg-canvas rounded-card border-hairline mt-4 border p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-ink text-sm font-semibold">公開前に試す</p>
+                <p className="text-ink-secondary mt-0.5 text-xs">
+                  保存済みの下書きをお客さま画面で開きます。試しの回答は集計に入らず、回答後の動作も動きません。保存していない変更は試しに出ないので、先に下書きを保存してください。
+                </p>
+              </div>
+              <Button
+                onClick={() => void startTest()}
+                disabled={testBusy || !answerUrl}
+                title={answerUrl ? '試し合言葉を取って試しURLを作ります' : '回答用URLがまだ無いため試せません'} busy={testBusy} busyLabel="用意しています...">テスト回答を始める
+              </Button>
+            </div>
+            {testError && <p role="alert" className="text-danger mt-2 text-xs">{testError}</p>}
+            {testUrl && (
+              <div className="mt-3">
+                <div className="flex items-center gap-1">
+                  <input
+                    readOnly
+                    value={testUrl}
+                    onFocus={(e) => e.currentTarget.select()}
+                    aria-label="試しURL"
+                    className={`${inputClass} text-xs`}
+                  />
+                  <Button
+                    onClick={() => {
+                      void navigator.clipboard
+                        .writeText(testUrl)
+                        .catch(() => window.prompt('コピーしてください:', testUrl))
+                    }}
+                  >
+                    コピー
+                  </Button>
+                </div>
+                <p className="text-ink-faint mt-1 text-xs">
+                  {testExpiresAt ? `このURLは${formatDateTime(testExpiresAt)}まで使えます。` : ''}
+                  試しは友だち登録済みのLINEで開いてください。
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-[minmax(320px,26rem)_minmax(0,1fr)]">
+            {/* ---- 出来上がり ---- */}
+            <section data-design="Preview" className="min-w-0 xl:sticky xl:top-4 xl:self-start">
+              <h2 className="text-ink-secondary mb-1 text-xs font-semibold">お客さまに見える形</h2>
+              <p className="mb-2 text-xs text-ink-faint">実際にお客さまが見る画面です</p>
+              <FormPreview layout={layout} sectionIndex={tab === HEADER_TAB ? 0 : tab} />
+              <p className="mt-2 text-center text-xs text-ink-faint">
+                このフォームは {selectedAccount?.name ?? '選択中のLINE公式アカウント'} が作成しています
+              </p>
+            </section>
+
+            {/* ---- 設定 ---- */}
+            {editorTab === 'design' ? (
+              <FormDesignSettings
+                formId={id}
+                accountId={selectedAccountId}
+                value={layout.options.theme}
+                ogTitle={ogTitle}
+                ogDescription={ogDescription}
+                ogImageUrl={ogImageUrl}
+                onChange={(theme: FormTheme) => setLayout((prev) => ({
+                  ...prev,
+                  options: { ...prev.options, theme },
+                }))}
+                onOgTitleChange={setOgTitle}
+                onOgDescriptionChange={setOgDescription}
+                onOgImageUrlChange={setOgImageUrl}
+              />
+            ) : (
+            <section data-design-node="m1cWEy" className="flex min-w-0 flex-col gap-4">
+              {/* タブ */}
+              <div className="border-hairline flex flex-wrap items-center gap-1 border-b pb-2">
+                <button
+                  onClick={() => setTab(HEADER_TAB)}
+                  className={`rounded-control px-3 py-1.5 text-sm font-medium whitespace-nowrap ${
+                    tab === HEADER_TAB
+                      ? 'bg-accent-soft text-accent-deep'
+                      : 'text-ink-secondary hover:bg-canvas-sunken'
+                  }`}
+                >
+                  共通ヘッダ
+                </button>
+
+                {layout.sections.map((section, i) => (
+                  <span key={section.id} className="flex items-center">
+                    <button
+                      onClick={() => setTab(i)}
+                      onDoubleClick={() => renameSection(i)}
+                      title="ダブルクリックで名前を変えられます"
+                      className={`rounded-control px-3 py-1.5 text-sm font-medium whitespace-nowrap ${
+                        tab === i
+                          ? 'bg-accent-soft text-accent-deep'
+                          : 'text-ink-secondary hover:bg-canvas-sunken'
+                      }`}
+                    >
+                      {section.name}
+                    </button>
+                    {tab === i && (
+                      <span className="flex items-center">
+                        <button
+                          onClick={() => duplicateSection(i)}
+                          className="text-ink-faint hover:text-ink px-1 text-xs"
+                          title="このページを複製"
+                        >
+                          複製
+                        </button>
+                        {layout.sections.length > 1 && (
+                          <button
+                            onClick={() => askRemoveSection(i)}
+                            className="text-danger px-1 text-xs"
+                            title="このページを削除"
+                          >
+                            削除する
+                          </button>
+                        )}
+                      </span>
+                    )}
+                  </span>
+                ))}
+
+                <button
+                  onClick={addSection}
+                  className="text-accent-deep hover:bg-accent-soft rounded-control px-2 py-1.5 text-sm font-bold"
+                  title="ページを足す"
+                >
+                  ＋
+                </button>
+              </div>
+
+              {/* ツールバー */}
+              <div
+                data-design="Blocks"
+                className="flex flex-wrap items-center justify-between gap-2 py-2"
+              >
+                <span className="text-ink text-sm font-bold">ブロック設定</span>
+                <div className="flex flex-wrap items-center gap-1">
+                  <button
+                    onClick={undo}
+                    className="text-ink-secondary hover:bg-canvas-sunken rounded-control px-2 py-1 text-xs"
+                  >
+                    元に戻す
+                  </button>
+                  <button
+                    onClick={redo}
+                    className="text-ink-secondary hover:bg-canvas-sunken rounded-control px-2 py-1 text-xs"
+                  >
+                    やり直す
+                  </button>
+                  <button
+                    onClick={() => moveBlock(-1)}
+                    disabled={selectedIndex < 0}
+                    className="text-ink-secondary hover:bg-canvas-sunken rounded-control px-2 py-1 text-xs disabled:opacity-40"
+                  >
+                    上に移動
+                  </button>
+                  <button
+                    onClick={() => moveBlock(1)}
+                    disabled={selectedIndex < 0}
+                    className="text-ink-secondary hover:bg-canvas-sunken rounded-control px-2 py-1 text-xs disabled:opacity-40"
+                  >
+                    下に移動
+                  </button>
+                  <button
+                    onClick={duplicateBlock}
+                    disabled={selectedIndex < 0}
+                    className="text-ink-secondary hover:bg-canvas-sunken rounded-control px-2 py-1 text-xs disabled:opacity-40"
+                  >
+                    複製
+                  </button>
+                  <button
+                    onClick={removeBlock}
+                    disabled={selectedIndex < 0}
+                    className="text-danger hover:bg-danger-bg rounded-control px-2 py-1 text-xs disabled:opacity-40"
+                  >
+                    削除する
+                  </button>
+
+                  <div className="relative" data-design-node="WOPjZ">
+                    <Button variant="primary" className="px-3 py-1.5 text-xs font-medium border-0 h-auto whitespace-normal" ref={addMenuButtonRef} onClick={() => setShowAddMenu((v) => !v)} aria-expanded={showAddMenu} aria-haspopup="menu">
+                      ＋ ブロックを追加する（15種）
+                    </Button>
+                    <ActionMenu
+                      open={showAddMenu}
+                      ariaLabel="追加するブロック"
+                      onClose={() => setShowAddMenu(false)}
+                      anchorRef={addMenuButtonRef}
+                      items={['飾り', '入力'].flatMap((group) =>
+                        BLOCK_MENU.filter((m) => m.group === group).map((m, index) => ({
+                          id: `${m.kind}-${m.type ?? ''}`,
+                          label: m.label,
+                          sectionBefore: index === 0 ? group : undefined,
+                          onSelect: () => addBlock(m.kind, m.type),
+                        })),
+                      )}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* ブロック。設計では「一覧」と「選んだものの設定」が別の枠だが、
+                  ここでは1枚のブロックに設定をそのまま出している。1つずつ
+                  選び直さないと中身が見えないと、2つの質問の差（片方だけ
+                  タグを付ける等）を見比べられないため。 */}
+              <div data-design="Inspector" className="space-y-3">
+                {blocks.length === 0 ? (
+                  <p className="text-ink-faint bg-canvas rounded-card border-hairline border border-dashed p-8 text-center text-sm">
+                    「ブロックを追加」から作ってください
+                  </p>
+                ) : (
+                  blocks.map((block, index) => (
+                    <BlockEditor
+                      key={block.id}
+                      block={block}
+                      index={index}
+                      sections={layout.sections}
+                      refs={refs}
+                      inHeader={tab === HEADER_TAB}
+                      selected={block.id === selectedBlockId}
+                      onSelect={() => setSelectedBlockId(block.id)}
+                      onChange={(patch) => patchBlock(block.id, patch)}
+                    />
+                  ))
+                )}
+              </div>
+
+              {/*
+                送信時に更新する情報の一覧（IDEA-13）。
+                各質問が友だちのどの情報を更新するか・どんな条件で更新するかを、
+                保存・公開の前にまとめて確認できるようにする。質問が増えた
+                フォームでは、ブロックを1つずつ開かなくても全体を見通せる。
+              */}
+              {(() => {
+                const overview = describeFormUpdates(layout, refs, onSubmitTagId)
+                if (overview.questions.length === 0 && overview.formWide.length === 0) {
+                  return null
+                }
+                return (
+                  <details className="bg-canvas rounded-card border-hairline border p-4">
+                    <summary className="text-ink cursor-pointer text-sm font-bold">
+                      送信時に更新する情報（{overview.questions.length}件の質問
+                      {overview.formWide.length > 0 ? `・フォーム全体${overview.formWide.length}件` : ''}）
+                    </summary>
+                    <ul className="mt-3 space-y-2">
+                      {overview.questions.map((question) => (
+                        <li key={question.blockId} className="text-xs">
+                          <span className="text-ink font-medium">{question.label}</span>
+                          <ul className="text-ink-faint mt-0.5 list-disc space-y-0.5 pl-5">
+                            {question.lines.map((line) => (
+                              <li key={line}>{line}</li>
+                            ))}
+                          </ul>
+                        </li>
+                      ))}
+                      {overview.formWide.map((line) => (
+                        <li key={line} className="text-ink-secondary text-xs">
+                          ・{line}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )
+              })()}
+
+              <div className="bg-canvas rounded-card border-hairline space-y-4 border p-4">
+                <Field
+                  label="説明"
+                  htmlFor="fm-desc"
+                  note="回答の一覧で、フォームの覚え書きに使います。"
+                >
+                  <textarea
+                    id="fm-desc"
+                    rows={2}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className={`${inputClass} resize-y`}
+                  />
+                </Field>
+
+                {/*
+                  #723: 失敗の知らせは、この中ではなくタブの外（`SaveConflictBar`）へ
+                  出す。ここに書くと、デザイン設定タブでは DOM にも出ず、
+                  オプション設定タブでは覆いの下敷きになる。二重に出さないため
+                  ここからは消してある。
+                */}
+                {notice && <p className="text-success text-sm">{notice}</p>}
+              </div>
+            </section>
+            )}
+          </div>
+        </>
+      )}
+
+      <StickyBar
+        actions={(
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" className="px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => void save(false)} disabled={saving} title="フォームを保存（公開中の内容は変わりません）">
+              {saving ? '保存中...' : '下書きを保存する'}
+            </Button>
+            <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={() => void save(true)} disabled={saving}>
+              {saving ? '処理中...' : 'この版を公開'}
+            </Button>
+          </div>
+        )}
+      />
+
+      {/*
+        ページを消す前の確認。**「元に戻す」で戻せるので `destructive` は付けない。**
+        保存するまで、保存済みのフォームと集まった回答は変わらない。
+      */}
+      <ConfirmDialog
+        open={removeSectionTarget !== null}
+        title={removeSectionTarget ? `ページ「${removeSectionTarget.name}」を削除しますか？` : ''}
+        description="このページと、中に置いたブロックを画面から外します。保存するまで、保存済みのフォームは変わりません。"
+        confirmLabel="削除する"
+        onConfirm={() => {
+          if (removeSectionIndex !== null) removeSection(removeSectionIndex)
+        }}
+        onCancel={() => setRemoveSectionIndex(null)}
+      >
+        {removeSectionTarget && (
+          <ul className="text-ink-secondary space-y-1 text-xs leading-5">
+            <li>
+              ・消えること: このページのブロック
+              <span className="tabular-nums">{removeSectionTarget.blocks.length}</span>
+              個が一緒に外れます。
+            </li>
+            {/* 行き先を失った分岐は「次へ進む」に戻る。何本つなぎ直すのかを先に言う。 */}
+            {jumpsInto(layout, removeSectionTarget.id) > 0 && (
+              <li>
+                ・つなぎ直すこと: このページへ飛ばしていた選択肢
+                <span className="tabular-nums">{jumpsInto(layout, removeSectionTarget.id)}</span>
+                件は、行き先が外れて「次へ進む」に戻ります。
+              </li>
+            )}
+            <li>・残ること: すでに集まった回答は消えません。</li>
+            <li>・戻せます: 上の「元に戻す」で戻せます。保存するまで保存済みのフォームは変わりません。</li>
+          </ul>
+        )}
+      </ConfirmDialog>
+
+      {/*
+        未保存のまま画面を離れようとしたときの確認。保存済みのフォームと
+        集まった回答は変わらないが、画面上の下書きは消えるので聞く。
+      */}
+      <UnsavedLeaveDialog
+        open={leaveTarget !== null}
+        subject="フォームへの変更"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
+      />
+
+      {showOptions && (
+        <OptionsDialog
+          value={layout.options}
+          refs={refs}
+          onChange={(options: FormOptions) => setLayout((prev) => ({ ...prev, options }))}
+          onClose={() => setShowOptions(false)}
+          onSave={async () => {
+            const saved = await save()
+            if (saved) setShowOptions(false)
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+export default function FormEditPage() {
+  // V8 は src/v8/form-edit に一から書いた画面（動きは同じ場所の BEHAVIOR.md）。
+  // ここの renderV8Edit は切り替えの日まで残す（契約の試験が読む）。
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <FormEditV8 />
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <FormEditInner />
+    </Suspense>
+  )
+}
+
+/**
+ * 足すブロックの4組（m1cWEy）。型に無いもの（5段階・時刻・メール電話・住所・
+ * 予約を入れる）は口も無いため出さない。
+ */
+const BLOCK_GROUPS: { title: string; inputTypes?: FormInputType[]; decoLabels?: string[] }[] = [
+  { title: '選んでもらう', inputTypes: ['radio', 'checkbox', 'select', 'prefecture'] },
+  { title: '書いてもらう', inputTypes: ['text', 'textarea'] },
+  { title: '日にち・予約', inputTypes: ['date', 'file'] },
+  { title: '飾り', decoLabels: ['画像', '見出し', 'テキスト', 'ボタン'] },
+]
+
+/** 足す欄の短い説明（m1cWEy）。種類の札は BLOCK_MENU の名前を使う。 */
+const BLOCK_HINTS: Record<string, string> = {
+  radio: '1つだけ選ぶ',
+  checkbox: 'いくつでも選ぶ',
+  select: 'たくさんの中から1つ',
+  prefecture: '47の中から1つ',
+  text: '名前・会員番号など',
+  textarea: '複数行のフリーテキスト',
+  date: 'カレンダーで選ぶ',
+  file: '写真・書類を送る',
+  画像: 'ロゴ・写真',
+  見出し: '区切りの題',
+  テキスト: '説明の文',
+  ボタン: '別のページを開く',
 }

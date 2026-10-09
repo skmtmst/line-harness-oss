@@ -104,7 +104,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
     setLoadState('loading')
     try {
       const res = await webinarApi.notifications(webinarId)
-      if (!res.data?.settings || typeof res.data.settings.version !== 'number') throw new Error('shape')
+      if (!res.data || typeof res.data !== 'object') throw new Error('shape')
       if (request !== generation.current) return
       setSettings(res.data.settings)
       setBaseline(res.data.settings)

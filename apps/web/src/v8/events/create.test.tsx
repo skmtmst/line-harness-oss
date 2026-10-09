@@ -1,14 +1,12 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { fireEvent, render, screen, cleanup, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, cleanup } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const createEvent = vi.hoisted(() => vi.fn())
 const createSlots = vi.hoisted(() => vi.fn())
-const updateEvent = vi.hoisted(() => vi.fn())
-const getEvent = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/api', () => ({ eventsApi: { createEvent, createSlots, updateEvent, getEvent }, ApiError: class extends Error {} }))
+vi.mock('@/lib/api', () => ({ eventsApi: { createEvent, createSlots }, ApiError: class extends Error {} }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push, replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }))
 vi.mock('next/link', () => ({ default: ({ children, href, ...rest }: React.PropsWithChildren<{ href: string }>) => <a href={href} {...rest}>{children}</a> }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a' }) }))
@@ -61,24 +59,4 @@ describe('イベント作成の入力確認', () => {
     expect(screen.getAllByRole('alert')).toHaveLength(1)
     expect(createEvent).not.toHaveBeenCalled()
   })
-})
-
-it('WEB-151/153: 枠の作成が失敗しても下書きを保ち、直した名前で続きから公開する', async () => {
- createEvent.mockResolvedValue({ id: 'made', version: 1 })
- getEvent.mockResolvedValue({ id: 'made', version: 1, is_published: 0 })
- updateEvent.mockImplementation(async (_a, _id, body) => ({ id: 'made', version: 2, ...body }))
- createSlots.mockRejectedValueOnce(new Error('枠の通信失敗')).mockResolvedValue({ items: [] })
- render(<EventsCreate />)
- fireEvent.change(screen.getByLabelText('イベント名'), { target: { value: '体験会' } })
- fireEvent.change(screen.getByLabelText('定員'), { target: { value: '20' } })
- fireEvent.click(screen.getByRole('button', { name: '公開する' }))
- await waitFor(() => expect(screen.getByRole('button', { name: '公開する' }).hasAttribute('disabled')).toBe(false))
- expect(createEvent.mock.calls[0][1].is_published).toBe(0)
- expect(updateEvent).not.toHaveBeenCalled()
- fireEvent.change(screen.getByLabelText('イベント名'), { target: { value: '名前を修正' } })
- fireEvent.click(screen.getByRole('button', { name: '公開する' }))
- await waitFor(() => expect(push).toHaveBeenCalled())
- expect(createEvent).toHaveBeenCalledTimes(1)
- expect(updateEvent.mock.calls[0][2]).toMatchObject({ name: '名前を修正', is_published: 0 })
- expect(updateEvent.mock.calls.at(-1)?.[2].is_published).toBe(1)
 })

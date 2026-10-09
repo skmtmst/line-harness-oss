@@ -10,10 +10,8 @@
  * 「押されたら」は今の質問の部品（QuestionEditor）を窓で開いて決める（タグ・友だち情報・シナリオ・URL などの全部の設定が残る）。
  * 受け付ける URL：`/templates/questions/new`・`?id=<テンプレート>`（直す）。
  */
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useFieldValidation } from '@/lib/use-field-validation'
-import { TextField } from '@/components/shared/text-field'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronDown, Plus, Send, Trash2 } from 'lucide-react'
 import type { Folder, Scenario, Tag } from '@line-crm/shared'
@@ -78,8 +76,6 @@ export function choiceActionText(choice: QuestionChoice, tags: Array<Pick<Tag, '
 }
 
 function QuestionNew({ host }: { host?: TemplateEditHost }) {
-  const active = useRef(true)
-  useEffect(() => { active.current = true; return () => { active.current = false } }, [])
   const router = useRouter()
   const params = useSearchParams()
   /* 統括の入口（host）では店のテンプレートを読まない（新しく作るだけ）。 */
@@ -106,9 +102,6 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState('')
-  const fields = useFieldValidation()
-  const reject = (id: string, message: string) => { setError(''); fields.reject(id, message) }
-  const choiceErrorId = () => `q-choice-${Math.max(0, question.choices.findIndex((choice) => !choice.label.trim()))}`
   const [publishConfirm, setPublishConfirm] = useState(false)
   const [actionsOpen, setActionsOpen] = useState(false)
   const [canMutate] = useState(() => (typeof window === 'undefined' ? true : isOwnerOrAdmin()))
@@ -167,21 +160,20 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const dirty = snapshotOf({ name, category, folderId, question }) !== savedSnapshot
   const { leaveTarget, confirmLeave, cancelLeave, guarded, disarm } = useUnsavedGuard({ dirty, busy: saving || publishing })
 
-  const savedQuestion = useRef<{ id: string; snapshot: string; version: number; revision: number } | null>(null)
   const save = async (questionStatus: 'draft' | 'published'): Promise<boolean> => {
     if (host) {
-      if (!name.trim()) { reject('q-template-name', 'テンプレート名を入力してください。'); return false }
-      if (!question.text.trim()) { reject('q-question-text', '質問文を入力してください。'); return false }
-      if (question.choices.length === 0 || question.choices.some((choice) => !choice.label.trim())) { reject(choiceErrorId(), 'すべての選択肢に文字を入力してください。'); return false }
+      if (!name.trim()) { setError('テンプレート名を入力してください。'); return false }
+      if (!question.text.trim()) { setError('質問文を入力してください。'); return false }
+      if (question.choices.length === 0 || question.choices.some((choice) => !choice.label.trim())) { setError('すべての選択肢に文字を入力してください。'); return false }
       setError('')
       disarm()
       host.onSave({ kind: 'question', name: name.trim(), question: question as unknown as Record<string, unknown>, messageContent: question.intro?.trim() || question.text }, questionStatus === 'published')
       return false
     }
     if (!selectedAccountId) { setError('上のバーでLINE公式アカウントを選んでください。'); return false }
-    if (!name.trim()) { reject('q-template-name', 'テンプレート名を入力してください。'); return false }
-    if (!question.text.trim()) { reject('q-question-text', '質問文を入力してください。'); return false }
-    if (question.choices.length === 0 || question.choices.some((choice) => !choice.label.trim())) { reject(choiceErrorId(), 'すべての選択肢に文字を入力してください。'); return false }
+    if (!name.trim()) { setError('テンプレート名を入力してください。'); return false }
+    if (!question.text.trim()) { setError('質問文を入力してください。'); return false }
+    if (question.choices.length === 0 || question.choices.some((choice) => !choice.label.trim())) { setError('すべての選択肢に文字を入力してください。'); return false }
     setSaving(true)
     setError('')
     const payload = {
@@ -195,44 +187,17 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
       folderId,
     }
     try {
-      const sentSnapshot = snapshotOf({ name, category, folderId, question })
-      let saved = savedQuestion.current
-      if (!saved || saved.snapshot !== sentSnapshot) {
-        const targetId = id || saved?.id
-        const result = targetId ? await api.templates.update(targetId, { ...payload, questionStatus: 'draft' }) : await api.templates.create({ ...payload, questionStatus: 'draft' })
-        if (!active.current) return false
-        if (!result.success) { setError(result.error || '保存できませんでした。'); return false }
-        saved = { id: result.data.id, snapshot: sentSnapshot, version: 0, revision: 0 }
-        savedQuestion.current = saved
-        setSavedSnapshot(sentSnapshot)
-        const detail = await api.templates.get(saved.id)
-        if (!active.current) return false
-        if (!detail.success) throw new Error('保存後の状態を読み込めませんでした。')
-        saved.version = detail.data.publishedVersion ?? 0
-        saved.revision = detail.data.draftRevision ?? 0
-      }
-      if (questionStatus === 'published') {
-        // 読み直しが失敗した場合は、同じIDの版を確かめてから再開する。
-        if (!saved.revision) {
-          const detail = await api.templates.get(saved.id)
-          if (!active.current) return false
-          if (!detail.success) throw new Error('保存後の状態を読み込めませんでした。')
-          saved.version = detail.data.publishedVersion ?? 0; saved.revision = detail.data.draftRevision ?? 0
-        }
-        const published = await api.templates.publish(saved.id, { expectedVersion: saved.version, expectedDraftRevision: saved.revision })
-        if (!active.current) return false
-        if (!published.success) throw new Error(published.error || '公開できませんでした。')
-      }
+      const result = id ? await api.templates.update(id, payload) : await api.templates.create(payload)
+      if (!result.success) { setError(result.error || '保存できませんでした。'); return false }
       return true
     } catch (caught) {
-      if (!active.current) return false
-      setError((savedQuestion.current ? '下書きは保存済みです。' : '') + describeApiFailure(caught, '保存', { forbidden: '質問テンプレートの作成・変更はオーナーと管理者だけができます。' }))
+      setError(describeApiFailure(caught, '保存', { forbidden: '質問テンプレートの作成・変更はオーナーと管理者だけができます。' }))
       return false
     } finally {
       setSaving(false)
     }
   }
-  const leaveToList = () => { if (!active.current) return; disarm(); router.push('/templates') }
+  const leaveToList = () => { disarm(); router.push('/templates') }
   const onSaveDraft = async () => { if (await save('draft')) leaveToList() }
   /* 使われている質問を公開すると利用先へ新しい内容が届くので、使用先があれば確認の窓を挟む（cuR8I）。 */
   const onPublish = async () => {
@@ -254,7 +219,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   if (host ? host.readOnly : !canMutate) {
     return (
       <TemplateEditFrame boardId="l87p1J" title="質問テンプレート" description="質問テンプレートの作成・変更はオーナーと管理者だけができます" side={null}>
-        <p className={styles.note} role="status">閲覧のみで見ています。一覧で中身を確認できます。</p>
+        <p className={styles.note}>一覧で中身を確認できます。</p>
         <Link href="/templates" className={styles.back}>一覧へ戻る</Link>
       </TemplateEditFrame>
     )
@@ -305,8 +270,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
           <div className={styles.row}>
             <label className={`${styles.field} ${styles.grow}`}>
               <span className={styles.label}>テンプレート名</span>
-              <TextField id="q-template-name" {...fields.attributes('q-template-name')} className={styles.input} value={name} maxLength={120} placeholder="例：継続の意思をうかがう" onChange={(event) => { fields.clear('q-template-name'); setName(event.target.value) }} />
-              {fields.error('q-template-name') ? <p id="q-template-name-error" role="alert" className={styles.fieldError}>{fields.error('q-template-name')}</p> : null}
+              <input className={styles.input} value={name} maxLength={120} placeholder="例：継続の意思をうかがう" onChange={(event) => setName(event.target.value)} />
             </label>
             <div className={`${styles.field} ${styles.folder}`}>
               <span className={styles.pickLabel}>フォルダ</span>
@@ -340,8 +304,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
           </label>
           <label className={styles.field}>
             <span className={styles.label}>質問文（160文字まで）</span>
-            <TextField id="q-question-text" {...fields.attributes('q-question-text')} className={styles.input} value={question.text} maxLength={160} placeholder="来月も定期便を続けますか？" onChange={(event) => { fields.clear('q-question-text'); setQuestion((current) => ({ ...current, text: event.target.value })) }} />
-            {fields.error('q-question-text') ? <p id="q-question-text-error" role="alert" className={styles.fieldError}>{fields.error('q-question-text')}</p> : null}
+            <input className={styles.input} value={question.text} maxLength={160} placeholder="来月も定期便を続けますか？" onChange={(event) => setQuestion((current) => ({ ...current, text: event.target.value }))} />
           </label>
           <div className={styles.inline}>
             <span className={styles.pickLabel} id="q-mode">答え方</span>
@@ -367,8 +330,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
                 </div>
                 <label className={styles.field}>
                   <span className={styles.label}>ボタンの文字（20文字まで）</span>
-                  <TextField id={`q-choice-${index}`} {...fields.attributes(`q-choice-${index}`)} className={styles.input} value={choice.label} maxLength={20} onChange={(event) => { fields.clear(`q-choice-${index}`); setChoice(index, { label: event.target.value }) }} />
-                  {fields.error(`q-choice-${index}`) ? <p id={`q-choice-${index}-error`} role="alert" className={styles.fieldError}>{fields.error(`q-choice-${index}`)}</p> : null}
+                  <input className={styles.input} value={choice.label} maxLength={20} onChange={(event) => setChoice(index, { label: event.target.value })} />
                 </label>
                 {host ? null : <div className={styles.inline}>
                   <span className={styles.smallLabel}>押されたら</span>
@@ -423,13 +385,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
 export default function QuestionNewV8({ host }: { host?: TemplateEditHost } = {}) {
   return (
     <Suspense fallback={<ListState kind="loading" title="質問テンプレートを準備しています" />}>
-      <BoundQuestion host={host} />
+      <QuestionNew host={host} />
     </Suspense>
   )
-}
-
-function BoundQuestion({ host }: { host?: TemplateEditHost }) {
-  const params = useSearchParams()
-  const { selectedAccountId } = useAccount()
-  return <QuestionNew key={host ? 'hq' : `${selectedAccountId}:${params.get('id')}`} host={host} />
 }

@@ -112,14 +112,3 @@ describe('カルーセルに手元の画像を入れる', () => {
     expect(save).not.toHaveBeenCalled(); expect(calls.create).not.toHaveBeenCalled()
   })
 })
-
-it('B-79: 登録完了の返事を失っても、同じ送信の確認から再開する', async () => {
- calls.complete.mockRejectedValueOnce(new Error('返事を受け取れませんでした'))
- render(<Carousel />); fill(); choose(file())
- await screen.findByRole('alert')
- fireEvent.click(screen.getByRole('button', { name: 'もう一度受け取る' }))
- await waitFor(() => expect(screen.getByAltText('カードの画像')).toBeTruthy())
- expect(calls.prepare).toHaveBeenCalledTimes(1)
- expect(calls.put).toHaveBeenCalledTimes(1)
- expect(calls.complete).toHaveBeenCalledTimes(2)
-})

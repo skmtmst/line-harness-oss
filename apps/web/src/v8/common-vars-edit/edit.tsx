@@ -14,8 +14,6 @@
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useFieldValidation } from '@/lib/use-field-validation'
-import { TextField, TextArea } from '@/components/shared/text-field'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft,
@@ -150,9 +148,6 @@ function EditCommonVarV8Inner() {
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
-  const targetRef = useRef({ id, account: selectedAccountId, generation: 0 })
-  if (targetRef.current.id !== id || targetRef.current.account !== selectedAccountId) targetRef.current = { id, account: selectedAccountId, generation: targetRef.current.generation + 1 }
-  const impactGeneration = useRef(0)
   // 1152 の板（C67dE）：右の列の上に「LINEでの見え方を見る」を置き、スマホは窓で開く。
   const narrow = useNarrowViewport()
 
@@ -169,8 +164,6 @@ function EditCommonVarV8Inner() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const fields = useFieldValidation()
-  const reject = (id: string, message: string) => { setError(''); fields.reject(id, message) }
   const [loadFailure, setLoadFailure] = useState<'missing' | 'error' | null>(null)
   const [foldersError, setFoldersError] = useState(false)
   const [schedulesError, setSchedulesError] = useState(false)
@@ -192,7 +185,6 @@ function EditCommonVarV8Inner() {
 
   const [draft, setDraft] = useState<{ date: string; time: string; value: string } | null>(null)
   const [clearSchedulesOpen, setClearSchedulesOpen] = useState(false)
-  const scheduleLock = useRef(false)
   const [addingSchedule, setAddingSchedule] = useState(false)
   const [clearSchedulesBusy, setClearSchedulesBusy] = useState(false)
   const [clearSchedulesError, setClearSchedulesError] = useState('')
@@ -212,14 +204,12 @@ function EditCommonVarV8Inner() {
     nextValue?: string,
     expectedVersion?: number,
   ) => {
-    const generation = ++impactGeneration.current
-    const target = targetRef.current
     setImpactState('loading')
     try {
       const res = nextValue === undefined
         ? await api.commonVars.deleteImpact(varId, accountId)
         : await api.commonVars.impactPreview(varId, accountId, nextValue, expectedVersion)
-      if (accountId !== latestAccountRef.current || varId !== targetRef.current.id || target !== targetRef.current || generation !== impactGeneration.current) return
+      if (accountId !== latestAccountRef.current) return
       if (!res.success) {
         setImpact(null)
         setImpactState('error')
@@ -228,7 +218,7 @@ function EditCommonVarV8Inner() {
       setImpact(res.data)
       setImpactState('ready')
     } catch (e) {
-      if (accountId !== latestAccountRef.current || target !== targetRef.current || generation !== impactGeneration.current) return
+      if (accountId !== latestAccountRef.current) return
       setImpact(null)
       setImpactState(impactStateFromError(e))
     }
@@ -264,10 +254,9 @@ function EditCommonVarV8Inner() {
   }, [])
 
   const loadSchedules = useCallback(async (varId: string, accountId: string) => {
-    const target = targetRef.current
     try {
       const scheduleList = await api.commonVars.schedules(varId, accountId)
-      if (accountId !== latestAccountRef.current || varId !== targetRef.current.id || target !== targetRef.current) return
+      if (accountId !== latestAccountRef.current) return
       if (scheduleList.success) {
         setSchedules(scheduleList.data)
         setSchedulesError(false)
@@ -275,7 +264,7 @@ function EditCommonVarV8Inner() {
         setSchedulesError(true)
       }
     } catch {
-      if (accountId !== latestAccountRef.current || varId !== targetRef.current.id || target !== targetRef.current) return
+      if (accountId !== latestAccountRef.current) return
       setSchedulesError(true)
     }
   }, [])
@@ -293,8 +282,6 @@ function EditCommonVarV8Inner() {
   }, [])
 
   const load = useCallback(async () => {
-    const target = { ...targetRef.current, generation: targetRef.current.generation + 1 }; targetRef.current = target
-    setItem(null); setImpact(null); setSchedules([]); setDraft(null); setSaving(false); setAddingSchedule(false); scheduleLock.current = false; setDeleteTarget(null); setDeleting(false); setDeleteError(''); setPreviewOpen(false); setConflict(null); setCompareOpen(false); setClearSchedulesOpen(false); setClearSchedulesBusy(false); setClearSchedulesError(''); setStatusAction(null); setStatusBusy(false); setStatusError('')
     if (!id) {
       setLoading(false)
       setError('')
@@ -329,7 +316,7 @@ function EditCommonVarV8Inner() {
           (caught: unknown) => ({ ok: false as const, caught }),
         ),
       ])
-      if (accountAtRequest !== latestAccountRef.current || target !== targetRef.current) return
+      if (accountAtRequest !== latestAccountRef.current) return
       if (folderResult.ok && folderResult.data.success) {
         setFolders(folderResult.data.data)
         setFoldersError(false)
@@ -361,17 +348,16 @@ function EditCommonVarV8Inner() {
       applyDetail(found)
       setConflict(null)
     } catch {
-      if (accountAtRequest !== latestAccountRef.current || target !== targetRef.current) return
+      if (accountAtRequest !== latestAccountRef.current) return
       setError('読み込みに失敗しました。もう一度読み込んでください。')
       setLoadFailure('error')
     } finally {
-      if (accountAtRequest === latestAccountRef.current && target === targetRef.current) setLoading(false)
+      if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
   }, [accountLoading, applyDetail, id, selectedAccountId])
 
   useEffect(() => {
     void load()
-    return () => { targetRef.current = { ...targetRef.current, generation: targetRef.current.generation + 1 } }
   }, [load])
 
   /*
@@ -385,8 +371,6 @@ function EditCommonVarV8Inner() {
   const [compareOpen, setCompareOpen] = useState(false)
 
   const refreshBaseline = async (varId: string, accountId: string, err?: ApiError) => {
-    const target = targetRef.current
-    if (varId !== target.id || accountId !== target.account) return null
     const body = err?.data as { currentVersion?: unknown } | undefined
     if (typeof body?.currentVersion === 'number' && Number.isInteger(body.currentVersion)) {
       const currentVersion = body.currentVersion
@@ -394,7 +378,7 @@ function EditCommonVarV8Inner() {
     }
     try {
       const detail = await api.commonVars.detail(varId, accountId)
-      if (accountId !== latestAccountRef.current || target !== targetRef.current) return null
+      if (accountId !== latestAccountRef.current) return null
       if (detail.success) {
         setItem(detail.data)
         return detail.data
@@ -410,55 +394,53 @@ function EditCommonVarV8Inner() {
   const save = async () => {
     if (!item || saving || !selectedAccountId) return
     const accountAtRequest = selectedAccountId
-    const target = targetRef.current
     if (!name.trim()) {
-      reject('cv-name', '共通情報名を入力してください')
+      setError('共通情報名を入力してください')
       return
     }
     const valueError = commonVarValueError(item.type, value)
     if (valueError) {
-      reject('cv-value', valueError)
-      setValueFieldError('')
+      setError(valueError)
+      setValueFieldError(valueError)
       document.getElementById('cv-value')?.focus()
       return
     }
     if (validFrom && validUntil && validFrom >= validUntil) {
-      reject('cv-valid-until', '有効終了は有効開始より後にしてください')
+      setError('有効終了は有効開始より後にしてください')
       return
     }
     if (expiryBehavior === 'fallback') {
       if (!fallbackValue) {
-        reject('cv-fallback-value', '期限切れ時に使う代替値を入力してください')
+        setError('期限切れ時に使う代替値を入力してください')
         document.getElementById('cv-fallback-value')?.focus()
         return
       }
       const fallbackError = commonVarValueError(item.type, fallbackValue, '代替値')
       if (fallbackError) {
-        reject('cv-fallback-value', fallbackError)
-        setFallbackFieldError('')
+        setError(fallbackError)
+        setFallbackFieldError(fallbackError)
         document.getElementById('cv-fallback-value')?.focus()
         return
       }
     }
     if (isSecretLikeVarValue(value)) {
       const message = '鍵やトークンのような秘密の値は共通情報に保存できません'
-      reject('cv-value', message)
-      setValueFieldError('')
+      setError(message)
+      setValueFieldError(message)
       document.getElementById('cv-value')?.focus()
       return
     }
     if (expiryBehavior === 'fallback' && isSecretLikeVarValue(fallbackValue)) {
       const message = '鍵やトークンのような秘密の値は代替値にも保存できません'
-      reject('cv-fallback-value', message)
-      setFallbackFieldError('')
+      setError(message)
+      setFallbackFieldError(message)
       document.getElementById('cv-fallback-value')?.focus()
       return
     }
     if (!changeReason.trim()) {
       const message = '変える理由を入力してください'
-      setError('')
+      setError(message)
       setReasonFieldError(message)
-      requestAnimationFrame(() => document.getElementById('cv-change-reason')?.scrollIntoView?.({ block: 'center' }))
       document.getElementById('cv-change-reason')?.focus()
       return
     }
@@ -472,7 +454,7 @@ function EditCommonVarV8Inner() {
       } catch {
         preview = null
       }
-      if (accountAtRequest !== latestAccountRef.current || target !== targetRef.current) return
+      if (accountAtRequest !== latestAccountRef.current) return
       if (!preview || !preview.success) {
         setError('影響を確認できませんでした。しばらく待って保存し直してください')
         return
@@ -490,7 +472,7 @@ function EditCommonVarV8Inner() {
         expiryBehavior,
         fallbackValue: expiryBehavior === 'fallback' ? fallbackValue : null,
       })
-      if (accountAtRequest !== latestAccountRef.current || target !== targetRef.current) return
+      if (accountAtRequest !== latestAccountRef.current) return
       if (!res.success) {
         setError(res.error)
         if (res.error.includes('代替値')) setFallbackFieldError(res.error)
@@ -501,12 +483,10 @@ function EditCommonVarV8Inner() {
       setChangeReason('')
       setConflict(null)
       setCompareOpen(false)
-      const confirmed = await refreshBaseline(item.id, accountAtRequest)
-      if (!confirmed && target === targetRef.current) setError('保存は済みましたが、表示を読み直せませんでした。再読み込みしてください。')
+      void load()
     } catch (e) {
-      if (target !== targetRef.current) return
       if (e instanceof ApiError && (e.status === 428 || e.status === 409)) {
-        if (accountAtRequest !== latestAccountRef.current || target !== targetRef.current) return
+        if (accountAtRequest !== latestAccountRef.current) return
         // 409 は頭の下の帯（piWhz）が知らせるので、本文の上に同じ知らせを重ねない。
         if (e.status === 428) setError(saveErrorText(e))
         const fresh = await refreshBaseline(item.id, accountAtRequest, e)
@@ -525,7 +505,7 @@ function EditCommonVarV8Inner() {
       }
       setError(saveErrorText(e))
     } finally {
-      if (target === targetRef.current) setSaving(false)
+      setSaving(false)
     }
   }
 
@@ -539,7 +519,6 @@ function EditCommonVarV8Inner() {
   }
 
   const [deleteTarget, setDeleteTarget] = useState<{ item: CommonVar; accountId: string } | null>(null)
-  const deleteGeneration = useRef(0)
   const [deleteReason, setDeleteReason] = useState('')
   const [deletePhase, setDeletePhase] = useState<'loading' | 'ready' | 'error'>('loading')
   const [deleteImpact, setDeleteImpact] = useState<CommonVarDeleteImpact | null>(null)
@@ -568,8 +547,6 @@ function EditCommonVarV8Inner() {
 
   const openDelete = async () => {
     if (!item || !selectedAccountId) return
-    const scope = targetRef.current
-    const generation = ++deleteGeneration.current
     const target = { item, accountId: selectedAccountId }
     setDeleteTarget(target)
     setDeleteImpact(null)
@@ -578,19 +555,17 @@ function EditCommonVarV8Inner() {
     setDeletePhase('loading')
     try {
       const res = await api.commonVars.deleteImpact(target.item.id, target.accountId)
-      if (scope !== targetRef.current || generation !== deleteGeneration.current) return
+      if (latestAccountRef.current !== target.accountId) return
       if (!res.success) throw new Error(res.error)
       setDeleteImpact(res.data)
       setDeletePhase('ready')
     } catch {
-      if (scope !== targetRef.current || generation !== deleteGeneration.current) return
       setDeletePhase('error')
     }
   }
 
   const closeDelete = () => {
     if (deleting) return
-    deleteGeneration.current += 1
     setDeleteTarget(null)
     setDeleteImpact(null)
     setDeleteError('')
@@ -601,39 +576,32 @@ function EditCommonVarV8Inner() {
   const remove = async () => {
     if (!deleteTarget || deleting || deleteAccountSwitched) return
     if (deletePhase !== 'ready' || !deleteImpact?.canDelete) return
-    const scope = targetRef.current
-    const generation = deleteGeneration.current
     setDeleting(true)
     setDeleteError('')
     try {
       const res = await api.commonVars.delete(deleteTarget.item.id, deleteTarget.accountId, deleteReason.trim())
-      if (scope !== targetRef.current || generation !== deleteGeneration.current) return
       if (!res.success) throw new Error(res.error)
       router.push('/contents/vars')
     } catch (e) {
-      if (scope !== targetRef.current || generation !== deleteGeneration.current) return
       if (e instanceof ApiError && e.status === 409) {
         setDeleteError('いま使われ始めたため、削除できませんでした。使用先を読み直しました。')
         try {
           const again = await api.commonVars.deleteImpact(deleteTarget.item.id, deleteTarget.accountId)
-          if (scope !== targetRef.current || generation !== deleteGeneration.current) return
           if (again.success) setDeleteImpact(again.data)
           else setDeletePhase('error')
         } catch {
-          if (scope !== targetRef.current || generation !== deleteGeneration.current) return
           setDeletePhase('error')
         }
         return
       }
       setDeleteError('削除できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
-      if (scope === targetRef.current && generation === deleteGeneration.current) setDeleting(false)
+      setDeleting(false)
     }
   }
 
   const addSchedule = async () => {
-    if (addingSchedule || scheduleLock.current || !item || !draft || !selectedAccountId) return
-    const target = targetRef.current
+    if (addingSchedule || !item || !draft || !selectedAccountId) return
     if (!draft.date) {
       setError('開始日を入れてください')
       return
@@ -644,7 +612,6 @@ function EditCommonVarV8Inner() {
       setScheduleFieldError(scheduleValueError)
       return
     }
-    scheduleLock.current = true
     setError('')
     setAddingSchedule(true)
     try {
@@ -652,7 +619,6 @@ function EditCommonVarV8Inner() {
         effectiveFrom: `${draft.date}T${draft.time || '00:00'}`,
         value: draft.value,
       })
-      if (target !== targetRef.current) return
       if (!res.success) {
         setError(res.error)
         if (res.error.includes('更新後の値') || res.error.includes('種別')) {
@@ -663,44 +629,37 @@ function EditCommonVarV8Inner() {
       setDraft(null)
       await refreshBaseline(item.id, selectedAccountId)
     } catch (e) {
-      if (target !== targetRef.current) return
       setError(scheduleErrorText(e))
     } finally {
-      if (target === targetRef.current) { scheduleLock.current = false; setAddingSchedule(false) }
+      setAddingSchedule(false)
     }
   }
 
   const removeSchedule = async (scheduleId: string) => {
     if (!item || !selectedAccountId) return
-    const target = targetRef.current
     setError('')
     try {
       await api.commonVars.deleteSchedule(item.id, scheduleId, selectedAccountId)
-      if (target !== targetRef.current) return
       await refreshBaseline(item.id, selectedAccountId)
     } catch {
-      if (target !== targetRef.current) return
       setError('予約の削除に失敗しました。通信を確かめて、もう一度お試しください。')
     }
   }
 
   const clearSchedules = async () => {
     if (!item || !selectedAccountId) return
-    const target = targetRef.current
     setClearSchedulesBusy(true)
     setClearSchedulesError('')
     try {
       for (const schedule of schedules) {
         await api.commonVars.deleteSchedule(item.id, schedule.id, selectedAccountId)
-        if (target !== targetRef.current) return
       }
       setClearSchedulesOpen(false)
       await refreshBaseline(item.id, selectedAccountId)
     } catch {
-      if (target !== targetRef.current) return
       setClearSchedulesError('消せなかった予定があります。通信を確かめて、もう一度お試しください。')
     } finally {
-      if (target === targetRef.current) setClearSchedulesBusy(false)
+      setClearSchedulesBusy(false)
     }
   }
 
@@ -724,7 +683,6 @@ function EditCommonVarV8Inner() {
 
   const applyStatus = async () => {
     if (!item || !selectedAccountId || !statusAction) return
-    const target = targetRef.current
     const reason = statusReason.trim()
     if (!reason) {
       setStatusError('変える理由を入力してください')
@@ -738,7 +696,6 @@ function EditCommonVarV8Inner() {
         changeReason: reason,
         expectedVersion: item.version,
       })
-      if (target !== targetRef.current) return
       if (!res.success) {
         setStatusError(res.error)
         return
@@ -747,14 +704,13 @@ function EditCommonVarV8Inner() {
       setStatusReason('')
       await load()
     } catch (e) {
-      if (target !== targetRef.current) return
       setStatusError(
         e instanceof ApiError && e.status === 409
           ? '別の担当者が先に更新しました。最新内容を読み直してください。'
           : '状態を変えられませんでした。通信を確かめて、もう一度お試しください。',
       )
     } finally {
-      if (target === targetRef.current) setStatusBusy(false)
+      setStatusBusy(false)
     }
   }
 
@@ -825,7 +781,6 @@ function EditCommonVarV8Inner() {
 
   const previewTalk = (
     <LinePreview
-      title="差し込んだときの見え方"
       caption={schedules.length > 0 && schedules[0] ? `${scheduleStamp(schedules[0].effectiveFrom)} から` : undefined}
       accountName="然 - NEN -"
       note="差し込んだときの見え方です。新しい中身を入れると、ここが変わります。"
@@ -852,17 +807,15 @@ function EditCommonVarV8Inner() {
         <div className={styles.sideFields}>
           <div className={styles.field}>
             <label htmlFor="cv-name" className={styles.fieldLabelStrong}>名前</label>
-            <TextField
-              {...fields.attributes('cv-name')}
+            <input
               id="cv-name"
               type="text"
               maxLength={200}
               value={name}
-              onChange={(e) => { fields.clear('cv-name'); setSaved(false); setName(e.target.value) }}
+              onChange={(e) => { setSaved(false); setName(e.target.value) }}
               className={styles.fieldInput}
               readOnly={!canWrite}
             />
-            {fields.error('cv-name') ? <p id="cv-name-error" role="alert" className={styles.fieldError}>{fields.error('cv-name')}</p> : null}
           </div>
           {canWrite ? (
             <FolderSelect
@@ -910,9 +863,8 @@ function EditCommonVarV8Inner() {
           <div className={styles.field}>
             <label htmlFor="cv-valid-until" className={styles.fieldLabelStrong}>終わり</label>
             {canWrite
-              ? <DateTimeField {...fields.attributes('cv-valid-until')} invalid={Boolean(fields.error('cv-valid-until'))} id="cv-valid-until" value={validUntil} placeholder="指定なし" onChange={(v) => { setSaved(false); fields.clear('cv-valid-until'); setValidUntil(v) }} />
+              ? <DateTimeField id="cv-valid-until" value={validUntil} placeholder="指定なし" onChange={(v) => { setSaved(false); setValidUntil(v) }} />
               : <ReadOnlyValue id="cv-valid-until" value={readOnlyDate(validUntil)} />}
-            {fields.error('cv-valid-until') ? <p id="cv-valid-until-error" role="alert" className={styles.fieldError}>{fields.error('cv-valid-until')}</p> : null}
           </div>
         </div>
         <div className={styles.sideFields}>
@@ -946,8 +898,7 @@ function EditCommonVarV8Inner() {
               ) : (item.type as string) === 'datetime' ? (
                 <DateTimeField id="cv-fallback-value" value={fallbackValue} onChange={(v) => { setSaved(false); setFallbackValue(v) }} />
               ) : (
-                <TextField
-                  {...fields.attributes('cv-fallback-value')}
+                <input
                   id="cv-fallback-value"
                   type={item.type === 'number' ? 'number' : 'text'}
                   value={fallbackValue}
@@ -957,7 +908,6 @@ function EditCommonVarV8Inner() {
                   readOnly={!canWrite}
                 />
               )}
-              {fields.error('cv-fallback-value') ? <p id="cv-fallback-value-error" role="alert" className={styles.fieldError}>{fields.error('cv-fallback-value')}</p> : null}
               {fallbackFieldError ? <p className={styles.fieldError} role="alert">{fallbackFieldError}</p> : null}
             </div>
           )}
@@ -1059,7 +1009,7 @@ function EditCommonVarV8Inner() {
             const actor = entry.actorName ?? (entry.actorId ? '担当者名を確認できません' : '担当者未記録')
             const what = previous
               ? `${changeText(previous.value, entry.value)}・${actor}${entry.changeReason ? `「${entry.changeReason}」` : ''}`
-              : `作成・${actor}${entry.changeReason ? `「${entry.changeReason}」` : ''}`
+              : `作成・${actor}`
             return (
               <li key={entry.id} className={styles.historyItem}>
                 <span className={styles.historyDate}>{historyStamp(entry.createdAt)}</span>
@@ -1219,18 +1169,17 @@ function EditCommonVarV8Inner() {
                 ) : item.type === 'boolean' ? (
                   <Select size="full" aria-label="新しい中身" id="cv-value" value={value} onChange={(next) => { setSaved(false); setValue(next) }} options={[{ value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
                 ) : (item.type as string) === 'long_text' ? (
-                  <TextArea {...fields.attributes('cv-value')} id="cv-value" value={value} onChange={(e) => { setSaved(false); fields.clear('cv-value'); setValue(e.target.value) }} className={styles.fieldArea} rows={2} readOnly={!canWrite} />
+                  <textarea id="cv-value" value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} className={styles.fieldArea} rows={2} readOnly={!canWrite} />
                 ) : (item.type as string) === 'date' ? (
                   <DateField id="cv-value" value={value} onChange={(v) => { setSaved(false); setValue(v) }} />
                 ) : (item.type as string) === 'datetime' ? (
                   <DateTimeField id="cv-value" value={value} onChange={(v) => { setSaved(false); setValue(v) }} />
                 ) : (
-                  <TextField
-                    {...fields.attributes('cv-value')}
+                  <input
                     id="cv-value"
                     type={item.type === 'number' ? 'number' : 'text'}
                     value={value}
-                    onChange={(e) => { setSaved(false); fields.clear('cv-value'); setValue(e.target.value) }}
+                    onChange={(e) => { setSaved(false); setValue(e.target.value) }}
                     className={styles.fieldInput}
                     aria-label="新しい中身"
                     readOnly={!canWrite}
@@ -1238,7 +1187,6 @@ function EditCommonVarV8Inner() {
                 )}
               </div>
             </div>
-            {fields.error('cv-value') ? <p id="cv-value-error" role="alert" className={styles.fieldError}>{fields.error('cv-value')}</p> : null}
             {valueFieldError ? <p className={styles.fieldError} role="alert">{valueFieldError}</p> : null}
             <div className={styles.field}>
               <label htmlFor="cv-change-reason" className={styles.fieldLabelStrong}>
@@ -1555,7 +1503,7 @@ function ImpactRows({
   return (
     <>
       {rows.length === 0 ? (
-        <p className={styles.cardNote}>{impact.total > 0 ? 'すぐ変わる使用先の文はありません。送信済みの文はこれから変わりません。' : '使われている場所がないため、確かめる文はありません。'}</p>
+        <p className={styles.cardNote}>使われている場所がないため、確かめる文はありません。</p>
       ) : (
         <div className={styles.impactList}>
           {visible.map((row, index) => (

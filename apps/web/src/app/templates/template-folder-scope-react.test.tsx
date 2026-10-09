@@ -37,7 +37,7 @@ vi.mock('@/contexts/account-context', () => ({
 
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {},
-  api: { staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
+  api: {
     templates: {
       list: () => Promise.resolve({ success: true, data: TEMPLATES }),
       get: (id: string) => Promise.resolve({
@@ -84,8 +84,6 @@ vi.mock('next/link', () => ({
 import TemplatesPage from './page'
 
 beforeEach(() => {
-  window.history.replaceState(null, '', '/templates')
-  window.dispatchEvent(new PopStateEvent('popstate'))
   fixture.accountId = 'account-a'
   foldersList.mockReset()
   foldersList.mockImplementation((kind: string, accountId?: string) =>

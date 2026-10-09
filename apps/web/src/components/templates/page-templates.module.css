@@ -221,10 +221,6 @@
 :global([data-theme='v8']) [data-page-template='detail'] .heading[data-bottom-spacing='compact'] {
   padding-bottom: calc(var(--tpl-detail-head-pad-bottom) - var(--tpl-head-gap));
 }
-/* 説明の直下にタブを置く作成画面。手順の枠をタブの置き場に使わない。 */
-:global([data-theme='v8']) [data-page-template='create'] .heading[data-bottom-spacing='compact'] {
-  padding-bottom: var(--tpl-head-gap);
-}
 
 /* 回答などの本文と補助欄を組む口。既存の詳細には使わない限り効かない。 */
 .detailColumns { display: grid; grid-template-columns: minmax(0, 1fr) var(--tpl-ev-fr-rail-w); align-items: start; gap: var(--tpl-ev-fr-col-gap); margin-right: var(--tpl-ev-bk-pull-side); }
@@ -256,10 +252,6 @@
   :global([data-theme='v8']) .listBody[data-dialog-layout] .collapsedFolders { display: flex; }
 }
 :global([data-theme='v8']) .heading[data-heading-inset='none'] { padding: 0; }
-:global([data-theme='v8']) .tabs[data-tabs-after-spacing='form'] { padding-bottom: var(--tpl-create-tabs-after); }
-
-:global([data-theme='v8']) [data-page-template='create'] .heading[data-has-steps] { padding-bottom: var(--tpl-create-steps-bottom); }
-
 /* B-40: 設定の板の違いは SettingsPage.layout から選ぶ。 */
 :global([data-theme='v8']) .frame:is([data-template-layout='accounts'], [data-template-layout='account-detail'], [data-template-layout='account-handover']) .settings { gap: 0; }
 :global([data-theme='v8']) .frame[data-template-layout='accounts'] .settingsContent { max-width: none; padding: var(--tpl-sa-content-pad); gap: var(--tpl-sa-gap); }

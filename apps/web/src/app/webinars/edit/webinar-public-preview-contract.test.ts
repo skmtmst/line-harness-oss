@@ -3,12 +3,11 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const REVIEW = fs.readFileSync(new URL('../../../v8/webinar-edit/review.tsx', import.meta.url), 'utf8')
-const PAGE = REVIEW + fs.readFileSync(new URL('../../../v8/webinar-edit/edit.tsx', import.meta.url), 'utf8') + fs.readFileSync(new URL('../../../v8/webinar-edit/chrome.tsx', import.meta.url), 'utf8')
+const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 
 describe('V6 ウェビナー公開ページ確認の契約', () => {
   it('実ノードと行き先が分かる操作名を持つ', () => {
-    expect(PAGE).toContain('公開ページを見る')
+    expect(PAGE).toContain('data-design-node="GB0NR"')
     expect(PAGE).toContain('公開ページを見る')
     expect(PAGE).not.toContain('プレビューは準備中です')
   })
@@ -16,7 +15,7 @@ describe('V6 ウェビナー公開ページ確認の契約', () => {
   it('ウェビナー編集APIが検査したLIFF URLだけを使う', () => {
     expect(PAGE).toContain('const publicUrl = editor.publicPage.url')
     expect(PAGE).toContain('webinarApi.editor(id)')
-    expect(PAGE).toContain('webinarApi.testPublicPage(webinar.id, version.current)')
+    expect(PAGE).toContain('webinarApi.testPublicPage(webinar.id, editor.version)')
     expect(PAGE).not.toContain('selectedAccountId')
   })
 
@@ -26,14 +25,13 @@ describe('V6 ウェビナー公開ページ確認の契約', () => {
     expect(PAGE).toContain('rel="noreferrer"')
     expect(PAGE).toContain('公開すると、友だちが見るページを確認できます')
     expect(PAGE).toContain('LIFF IDが設定されていません')
-    expect(REVIEW).toContain('ctx.canOpenPublicPage && ctx.publicUrl')
-    expect(REVIEW).toContain('!ctx.canOpenPublicPage && ctx.publicPageReason')
+    expect(PAGE).toContain('<Button disabled title={publicPageReason}>公開ページを見る</Button>')
   })
 
   it('アカウント読込中や所属未取得をLIFF未設定と言い切らない', () => {
     expect(PAGE).toContain('const { accounts, loading: accountsLoading } = useAccount()')
     expect(PAGE).toContain("accountsLoading\n    ? 'LINE公式アカウントを確認しています。'")
-    expect(PAGE).toContain('!webinar.accountId || !account')
+    expect(PAGE).toContain('!webinar.accountId || !webinarAccount')
     expect(PAGE).toContain('このウェビナーのLINE公式アカウントを確認できません')
   })
 

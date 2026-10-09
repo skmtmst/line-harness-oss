@@ -7,7 +7,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 
 describe('template Button canonical import (#600)', () => {
   it('テンプレート画面は中継部品を使わず共通Buttonを直接読む', () => {
-    for (const path of ['../../v8/template-detail/detail.tsx', '../../v8/template-edit/asset.tsx']) {
+    for (const path of ['detail/page.tsx', 'template-asset-editor.tsx']) {
       const source = readFileSync(join(HERE, path), 'utf8')
       expect(source).toContain("from '@/components/shared/button'")
       expect(source).not.toContain('template-button')

@@ -15,7 +15,7 @@ import type { ApiForm } from '@/lib/api'
 
 const navigation = vi.hoisted(() => ({
   pathname: '/form-submissions/edit',
-  query: 'id=form-1&tab=appearance',
+  query: 'id=form-1&tab=design',
   push: vi.fn(),
   replace: vi.fn(),
   back: vi.fn(),
@@ -60,7 +60,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     // ページは参照一覧を素の fetchApi で取る。通信が要ると試験が環境へ
     // 依存するので、ここで空の一覧を返す。
     fetchApi: vi.fn(async () => ({ success: true, data: [] })),
-    api: { staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
+    api: {
       ...actual.api,
       // 「予約を入れる」欄のメニュー・担当読み。予約を使わない店では空。
       // 素通しすると実通信で試験が環境へ依存するので、ここで空を返す。
@@ -139,10 +139,9 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
-  document.documentElement.dataset.theme = 'v8'
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-  window.history.replaceState(null, '', '/form-submissions/edit?id=form-1&tab=appearance')
-  navigation.query = 'id=form-1&tab=appearance'
+  window.history.replaceState(null, '', '/form-submissions/edit?id=form-1&tab=design')
+  navigation.query = 'id=form-1&tab=design'
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -161,12 +160,10 @@ async function show(over: Partial<ApiForm> = {}) {
   await act(async () => {
     for (let step = 0; step < 10; step += 1) await Promise.resolve()
   })
-  const link = [...host.querySelectorAll('button')].find(b => b.textContent?.includes('リンクの見え方：'))!
-  await act(async () => { link.click() })
 }
 
 function ogInput(): HTMLInputElement {
-  const input = document.querySelector<HTMLInputElement>('#fe-og-image')
+  const input = host.querySelector<HTMLInputElement>('#form-og-image-url')
   expect(input, 'カードの画像URLの欄がある').toBeTruthy()
   return input!
 }
@@ -179,7 +176,7 @@ function setOgUrl(value: string) {
 }
 
 async function clickSave() {
-  const button = [...host.querySelectorAll('button')].find((b) => b.textContent === '下書きを保存' && !b.disabled)
+  const button = [...host.querySelectorAll('button')].find((b) => b.textContent === '下書きを保存する' && !b.disabled)
   expect(button, '「下書きを保存」がある').toBeTruthy()
   await act(async () => {
     button!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -192,21 +189,15 @@ describe('カードの画像URLは https だけ（FORM-18）', () => {
     await show()
     await act(async () => { setOgUrl('http://example.com/og.png') })
     expect(ogInput().value).toBe('http://example.com/og.png')
-    expect(document.querySelector('#fe-og-image-error')?.textContent).toBe(OG_IMAGE_URL_ERROR)
+    expect(host.querySelector('#form-og-image-url-error')?.textContent).toBe(OG_IMAGE_URL_ERROR)
   })
 
   it('http:// のままでは保存を送らず、理由を出す', async () => {
     await show()
     await act(async () => { setOgUrl('http://example.com/og.png') })
-    const close = [...document.querySelectorAll<HTMLButtonElement>('[role=dialog] button')].find((button) => button.textContent === '閉じる')!
-    await act(async () => { close.click(); await new Promise((resolve) => setTimeout(resolve, 250)) })
-    expect(document.querySelector('#fe-og-image')).toBeNull()
     await clickSave()
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 40)) })
-    expect(document.activeElement).toBe(ogInput())
-    expect(ogInput().getAttribute('aria-invalid')).toBe('true')
     expect(formsUpdate).not.toHaveBeenCalled()
-    expect(document.body.textContent).toContain(OG_IMAGE_URL_ERROR)
+    expect(host.textContent).toContain(OG_IMAGE_URL_ERROR)
     // 入力は消えない。直してもう一度保存できる。
     expect(ogInput().value).toBe('http://example.com/og.png')
   })
@@ -215,7 +206,7 @@ describe('カードの画像URLは https だけ（FORM-18）', () => {
     formsUpdate.mockResolvedValue({ success: true, data: { contentRevision: 2 } })
     await show()
     await act(async () => { setOgUrl('  https://cdn.example.com/og.png  ') })
-    expect(document.querySelector('#fe-og-image-error')).toBeNull()
+    expect(host.querySelector('#form-og-image-url-error')).toBeNull()
     await clickSave()
     expect(formsUpdate).toHaveBeenCalledTimes(1)
     expect(formsUpdate.mock.calls[0][2]).toMatchObject({ ogImageUrl: 'https://cdn.example.com/og.png' })

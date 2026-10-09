@@ -64,6 +64,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Pagination from '@/components/shared/pagination'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import InlineEdit from '@/components/shared/inline-edit'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import BulkBar from '@/components/shared/bulk-bar'
@@ -599,7 +600,6 @@ function CommonVarsListInner() {
 
   const selectReplacement = async (nextId: string) => {
     if (!deleteTarget || !selectedAccountId) return
-    deleteRequestRef.current = { ...deleteRequestRef.current, generation: deleteRequestRef.current.generation + 1 }
     setReplacementId(nextId)
     setReplacementImpact(null)
     if (!nextId) {
@@ -651,14 +651,12 @@ function CommonVarsListInner() {
     resetDeleteState()
   }
 
-  const replacementOperation = useRef(0)
   const confirmReplacement = async () => {
     if (!deleteTarget || !selectedAccountId || !replacementImpact?.canReplace || deleteBusy) return
     if (!deleteReason.trim()) {
       setDeleteError('消した理由を入力してください。')
       return
     }
-    const operation = ++replacementOperation.current
     const request = {
       accountId: selectedAccountId,
       itemId: deleteTarget.id,
@@ -687,7 +685,7 @@ function CommonVarsListInner() {
         setDeleteError('差し替えを完了できませんでした。状態を読み直して、もう一度お試しください。')
       }
     } finally {
-      if (operation === replacementOperation.current && deleteRequestRef.current.accountId === request.accountId && deleteRequestRef.current.itemId === request.itemId) setDeleteBusy(false)
+      if (deleteRequestRef.current.generation === request.generation) setDeleteBusy(false)
     }
   }
 
@@ -804,6 +802,15 @@ function CommonVarsListInner() {
   const activeStopped = (activeItem?.status ?? 'active') === 'stopped'
 
   /* 名前のその場の書き換え。Enter で保存・Esc でやめる。 */
+  const renameVar = async (item: CommonVar, next: string) => {
+    const accountId = selectedAccountId
+    if (!accountId) return
+    const name = next.trim()
+    if (!name || name === item.name) return
+    const res = await api.commonVars.update(item.id, accountId, { name })
+    if (!res.success) throw new Error(res.error ?? 'rename_failed')
+    setItems((rows) => rows.map((v) => (v.id === item.id ? { ...v, name } : v)))
+  }
 
   /* 右クリックは「…」と同じ項目。消す操作は赤くする。 */
   const contextItem = contextId ? (items.find((v) => v.id === contextId) ?? null) : null
@@ -1168,7 +1175,7 @@ function CommonVarsListInner() {
       {listLimited && !listFailed ? (
         <div className={styles.alertBand} role="status">
           <TriangleAlert size={16} aria-hidden="true" />
-          <span className={styles.alertText}>一覧・検索・集計は取得した範囲（先頭200件まで）だけが対象です。それより後の情報はこの画面には出ません。</span>
+          <span className={styles.alertText}>表示は最初の200件までです。フォルダや検索で絞り込んでください。</span>
         </div>
       ) : null}
       {error && !listFailed ? (
@@ -1402,7 +1409,7 @@ function CommonVarsListInner() {
   const kpis = [
     {
       key: 'total',
-      title: listLimited ? '取得した共通情報' : '共通情報',
+      title: '共通情報',
       icon: Braces,
       value: listFailed ? null : stats.total,
       unit: '件',
@@ -1441,11 +1448,6 @@ function CommonVarsListInner() {
       <Dialog
         open={statusTarget !== null && deleteTarget === null && !panelStatus}
         designNode="Hhl9M"
-        designWidth={600}
-        designTop={240}
-        designHeaderPadding="24px 24px 0"
-        designContentPadding="14px 24px 4px"
-        designHeadingGap={22}
         title={statusTarget ? `「${statusTarget.name}」を${statusAction === 'stop' ? '止める' : '再開する'}` : ''}
         description={
           statusAction === 'stop'
@@ -1609,8 +1611,7 @@ function CommonVarsListInner() {
                 {deleteImpact.canDelete ? (
                   <>
                     <p className={styles.dialogLead}>{usageText(deleteImpact)}</p>
-                    {deleteImpact.historicalTotal > 0 ? <p className={styles.dialogLead}>送信済みの文はこれから変わりません。</p> : null}
-                    {deleteImpact.blockingTotal > 0 && consequenceText(deleteImpact) ? (
+                    {consequenceText(deleteImpact) ? (
                       <p className={styles.dialogLead}>{consequenceText(deleteImpact)}</p>
                     ) : null}
                   </>
@@ -1886,7 +1887,17 @@ function CommonVarsListInner() {
         >
           <div className={styles.panelBody}>
             <p className={styles.panelLabel}>名前</p>
-            <p className={styles.panelText}>{activeItem.name}</p>
+            {canWrite ? (
+              <InlineEdit
+                value={activeItem.name}
+                label="共通情報の名前"
+                maxLength={100}
+                onSave={(next) => renameVar(activeItem, next)}
+              />
+            ) : (
+              // 閲覧のみ：鉛筆は置かず、名前だけを見せる。
+              <p className={styles.panelText}>{activeItem.name}</p>
+            )}
             <p className={styles.panelLabel}>中身</p>
             <p className={styles.panelText}>
               {formatVarValue(activeItem.type, activeItem.value) || '（空）'}

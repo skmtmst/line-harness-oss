@@ -4,13 +4,13 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(new URL('../../../v8/common-vars/list.tsx', import.meta.url), 'utf8')
-const NEW_PAGE = readFileSync(new URL('../../../v8/common-vars-edit/new.tsx', import.meta.url), 'utf8')
-const EDIT_PAGE = readFileSync(new URL('../../../v8/common-vars-edit/edit.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const NEW_PAGE = readFileSync(join(HERE, 'new', 'page.tsx'), 'utf8')
+const EDIT_PAGE = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
 const API = readFileSync(join(HERE, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
 const WORKER = readFileSync(join(HERE, '..', '..', '..', '..', '..', 'worker', 'src', 'routes', 'contents.ts'), 'utf8')
 
-describe('V8共通情報一覧', () => {
+describe('V6共通情報一覧', () => {
   it('次回予約は一覧APIで受け取り、行ごとのAPI呼出をしない', () => {
     expect(PAGE).toContain('item.nextSchedule')
     expect(PAGE).not.toContain('api.commonVars.schedules(item.id)')
@@ -36,20 +36,46 @@ describe('V8共通情報一覧', () => {
     expect(EDIT_PAGE).toContain('setSchedulesError(true)')
   })
 
+  it('一覧は種別を出さず、Qで「状態」列を足した7列を固定する', () => {
+    const headings = [...PAGE.matchAll(/<Th[^>]*>([\s\S]*?)<\/Th>/g)]
+      .map((match) => match[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim())
+      .slice(1)
+    expect(headings).toEqual([
+      '共通情報',
+      '差し込みキー',
+      '状態',
+      '中身',
+      '使われている場所',
+      '更新・次の変更',
+      '操作',
+    ])
+    expect(headings).not.toContain('種別')
+    expect(PAGE).not.toContain('VAR_TYPE_LABELS[item.type]')
+    expect(PAGE).toContain("import { TableHeadRow, Th } from '@/components/shared/table'")
+    expect(PAGE).toContain('item.usageCount === 0')
+    expect(PAGE).toContain('formatListDate(item.updatedAt)')
+    // VAR-01: 差し込みキー列は実行時に効く {{var.<varKey>}} を出す。
+    // {表示名} は本文で置き換えられないので案内しない。
+    expect(PAGE).toContain('placeholderText(item.varKey)')
+    expect(PAGE).not.toContain('placeholderText(item.name)')
+    expect(EDIT_PAGE).toContain('placeholderText(item.varKey)')
+    expect(EDIT_PAGE).not.toContain('placeholderText(item.name)')
+  })
+
   it('一覧は空・期限つき・未使用の絞り込みとCSVを実際に操作できる', () => {
-    expect(PAGE).toContain("setChip((currentChip) => (currentChip === next ? 'all' : next))")
+    expect(PAGE).toContain("setStateFilter(value)")
     expect(PAGE).toContain("label: '使われている数が多い順'")
     // N-192: CSVは端末生成から監査台帳つきのサーバ出力へ切り替えた。
     expect(PAGE).toContain('VarsExportPanel')
     expect(API).toContain('createExport')
     expect(API).toContain('/api/common-vars/exports')
-    expect(PAGE).toContain('が空のまま')
+    expect(PAGE).toContain('中身が空のまま使われているものが')
   })
 
   it('初回空と検索0件を言い分ける', () => {
-expect(PAGE).toContain('まだ共通情報がありません')
-    expect(PAGE).toContain('filtered={items.length > 0}')
-    expect(PAGE).toContain('onClearFilters={clearVarFilters}')
+    expect(PAGE).toContain('まだ共通情報がありません')
+    expect(PAGE).toContain('条件に合う共通情報はありません')
+    expect(PAGE).toContain('共通情報を作る')
   })
 
   it('削除前に使用先を確認し、API側も使用中の削除を止める', () => {
@@ -81,12 +107,13 @@ expect(PAGE).toContain('まだ共通情報がありません')
   })
 
   it('一覧・新規・編集は共通情報キーのゲートの内側にある(#862)', () => {
-for (const path of ['page.tsx', 'new/page.tsx', 'edit/page.tsx']) {
-      const entry = readFileSync(join(HERE, path), 'utf8');
-      expect(entry).toContain('FeatureGate')
-      expect(entry).toContain('feature="common_vars"')
+    for (const [name, src] of [['一覧', PAGE], ['新規', NEW_PAGE], ['編集', EDIT_PAGE]] as const) {
+      expect(src, name).toContain('FeatureGate')
+      expect(src, name).toContain('feature="common_vars"')
     }
-    const mediaEntry = readFileSync(new URL('../page.tsx', import.meta.url), 'utf8')
-    expect(mediaEntry).toContain('feature="media"')
+    // 登録メディア一覧はメディアキーで閉じる（共通情報とは別キー）。
+    const mediaPage = readFileSync(join(HERE, '..', 'page.tsx'), 'utf8')
+    expect(mediaPage).toContain('FeatureGate')
+    expect(mediaPage).toContain('feature="media"')
   })
 })

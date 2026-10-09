@@ -118,14 +118,13 @@ export function describeConflictDiff(mine: ConflictSide, incoming: ConflictSide,
   for (const [blockId, entry] of mineBlocks) {
     const other = incomingBlocks.get(blockId)
     if (!other) push('add', `「${sectionNameOf(entry.sectionId)}」に${KIND_WORD[entry.block.kind]}「${blockTitle(entry.block)}」を足そうとしています`)
-    else if (canonicalize(other.block) !== canonicalize(entry.block) || other.sectionId !== entry.sectionId) {
+    else if (other.block.kind !== entry.block.kind || blockTitle(other.block) !== blockTitle(entry.block)) {
       push('change', `「${sectionNameOf(entry.sectionId)}」の${KIND_WORD[entry.block.kind]}「${blockTitle(other.block)}」の中身を変えようとしています`)
     }
   }
   for (const [blockId, entry] of incomingBlocks) {
     if (!mineBlocks.has(blockId)) push('remove', `「${sectionNameOf(entry.sectionId)}」の${KIND_WORD[entry.block.kind]}「${blockTitle(entry.block)}」を消そうとしています（最新にあります）`)
   }
-  if (canonicalize(mine.layout.sections.map((s) => [s.id, s.blocks.map((b) => b.id)])) !== canonicalize(incoming.layout.sections.map((s) => [s.id, s.blocks.map((b) => b.id)])) || canonicalize(mine.layout.header.map((b) => b.id)) !== canonicalize(incoming.layout.header.map((b) => b.id))) push('change', 'ページ・項目の配置が違います')
   if (JSON.stringify(mine.layout.options) !== JSON.stringify(incoming.layout.options)) {
     push('change', '答え終わったあと・受付のきまり・見た目の言葉のどれかが違います')
   }

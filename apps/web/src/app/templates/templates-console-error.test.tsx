@@ -47,7 +47,7 @@ const TEMPLATES = [
 
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {},
-  api: { staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
+  api: {
     templates: {
       list: () => Promise.resolve({ success: true, data: TEMPLATES }),
       get: () => Promise.resolve({ success: false, error: '詳細は開かない' }),
@@ -61,9 +61,6 @@ const consoleErrors: string[] = []
 let restore: (() => void) | null = null
 
 beforeEach(() => {
-  document.documentElement.dataset.theme = 'v8'
-  window.history.replaceState(null, '', '/templates')
-  window.dispatchEvent(new PopStateEvent('popstate'))
   // N-144: 変更操作は owner/admin だけに出す。操作を試す試験は owner で立てる。
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => (key === 'lh_staff_role' ? 'owner' : null),
@@ -107,7 +104,7 @@ describe('#615 テンプレート画面が React console error を出さない',
     for (let attempt = 0; attempt < 200 && screen.queryAllByText('来店お礼').length === 0; attempt += 1) {
       await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)) })
     }
-    expect(screen.queryByRole('searchbox', { name: 'テンプレートを検索' })).toBeTruthy()
+    expect(screen.queryByLabelText('名前・本文・差し込んでいる項目で検索')).toBeTruthy()
     expect(screen.queryAllByText('来店お礼').length).toBeGreaterThan(0)
 
     expect(consoleErrors).toEqual([])
@@ -126,5 +123,3 @@ describe('#615 テンプレート画面が React console error を出さない',
     expect(PAGE).not.toContain('onChange={() => {}}')
   })
 })
-
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/templates' }))

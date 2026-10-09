@@ -195,7 +195,7 @@ async function waitForText(text: string) {
   for (let index = 0; index < 30 && !host.textContent?.includes(text); index += 1) {
     await act(async () => { await settle() })
   }
-  expect(host.textContent, host.textContent ?? '').toContain(text)
+  expect(host.textContent).toContain(text)
 }
 
 function folderPanel(): HTMLElement {
@@ -205,7 +205,6 @@ function folderPanel(): HTMLElement {
 }
 
 beforeEach(() => {
-  document.documentElement.dataset.theme = 'v8'
   fixture.accountId = 'account-a'
   fixture.mediaBehavior = 'ok'
   fixture.foldersBehavior = 'ok'
@@ -239,7 +238,7 @@ describe('R587 フォルダだけの失敗は一覧と容量を隠さない', ()
     // 取得済みの一覧と容量は見せる。
     await waitForText(MEDIA_A.filename)
     expect(host.textContent).toContain('使っている容量')
-    expect(host.querySelector('[data-list-state=error]')).toBeNull()
+    expect(host.textContent).not.toContain('表示できませんでした')
     // フォルダ欄だけ失敗と再試行。
     const panel = folderPanel()
     expect(panel.textContent).toContain('フォルダを読み込めませんでした')
@@ -266,16 +265,16 @@ describe('R587 フォルダだけの失敗は一覧と容量を隠さない', ()
   it('一覧の失敗でも容量は未取得と偽らない（容量の取得は残る）', async () => {
     fixture.mediaBehavior = 'fail503'
     await renderPage()
-    await waitForText('読み込めませんでした')
+    await waitForText('表示できませんでした')
     // 容量の取得自体は生きているので「—（未取得）」にしない。
     expect(host.textContent).toContain('使っている容量')
-    expect(host.textContent).toContain('使っている容量1 KB')
+    expect(host.textContent).not.toContain('—（未取得）')
   })
 
   it('一覧が失敗を返しても全体の失敗と再試行になる', async () => {
     fixture.mediaBehavior = 'failFalse'
     await renderPage()
-    await waitForText('読み込めませんでした')
+    await waitForText('表示できませんでした')
     const retry = [...host.querySelectorAll<HTMLButtonElement>('button')]
       .find((button) => button.textContent === 'もう一度読み込む')
     expect(retry).toBeTruthy()
@@ -285,7 +284,7 @@ describe('R587 フォルダだけの失敗は一覧と容量を隠さない', ()
   it('メディア自体の失敗は一覧全体の失敗と再試行になる', async () => {
     fixture.mediaBehavior = 'fail503'
     await renderPage()
-    await waitForText('読み込めませんでした')
+    await waitForText('表示できませんでした')
     const retry = [...host.querySelectorAll<HTMLButtonElement>('button')]
       .find((button) => button.textContent === 'もう一度読み込む')
     expect(retry).toBeTruthy()
@@ -303,11 +302,11 @@ describe('R588 詳細の失敗は理由で案内を分ける', () => {
     window.history.replaceState({}, '', '/contents?id=media-a')
     fixture.detailBehavior = 'fail503'
     await renderPage()
-    await waitForText('読み込めませんでした')
+    await waitForText('表示できませんでした')
     expect(host.textContent).toContain('通信が切れたか、サーバが応えませんでした')
     expect(host.textContent).not.toContain('存在しないか、このLINEアカウントでは表示できません')
     const retry = [...host.querySelectorAll<HTMLButtonElement>('button')]
-      .find((button) => button.textContent === 'もう一度試す')
+      .find((button) => button.textContent === 'もう一度読み込む')
     expect(retry).toBeTruthy()
 
     // 同じIDで読み直すと開ける。
@@ -321,11 +320,11 @@ describe('R588 詳細の失敗は理由で案内を分ける', () => {
     window.history.replaceState({}, '', '/contents?id=media-a')
     fixture.detailBehavior = 'failFalse'
     await renderPage()
-    await waitForText('読み込めませんでした')
+    await waitForText('表示できませんでした')
     expect(host.textContent).toContain('通信が切れたか、サーバが応えませんでした')
     expect(host.textContent).not.toContain('存在しないか、このLINEアカウントでは表示できません')
     const retry = [...host.querySelectorAll<HTMLButtonElement>('button')]
-      .find((button) => button.textContent === 'もう一度試す')
+      .find((button) => button.textContent === 'もう一度読み込む')
     expect(retry).toBeTruthy()
   })
 
@@ -337,7 +336,7 @@ describe('R588 詳細の失敗は理由で案内を分ける', () => {
     expect(host.textContent).toContain('存在しないか、このLINEアカウントでは表示できません')
     expect(host.textContent).not.toContain('通信が切れたか')
     const retry = [...host.querySelectorAll<HTMLButtonElement>('button')]
-      .find((button) => button.textContent === 'もう一度試す')
+      .find((button) => button.textContent === 'もう一度読み込む')
     expect(retry).toBeUndefined()
   })
 
@@ -349,7 +348,7 @@ describe('R588 詳細の失敗は理由で案内を分ける', () => {
     expect(host.textContent).toContain('オーナーか管理者に追加を依頼してください')
     expect(host.textContent).not.toContain('存在しないか、このLINEアカウントでは表示できません')
     const retry = [...host.querySelectorAll<HTMLButtonElement>('button')]
-      .find((button) => button.textContent === 'もう一度試す')
+      .find((button) => button.textContent === 'もう一度読み込む')
     expect(retry).toBeUndefined()
   })
 })
@@ -365,7 +364,7 @@ describe('m26m 初回503の偽ゼロを出さない', () => {
   it('初回一覧503では「すべて」に件数を出さず、表の下に0件も出さない', async () => {
     fixture.mediaBehavior = 'fail503'
     await renderPage()
-    await waitForText('読み込めませんでした')
+    await waitForText('表示できませんでした')
     // 総数不明なので「すべて0」とは出さない（数は出さない約束）。
     expect(folderRowButton('すべて').textContent).toBe('すべて')
     // 表の下の件数も偽ゼロにしない（「20件表示」の選択欄と混同しないよう完全一致で見る）。
@@ -374,13 +373,13 @@ describe('m26m 初回503の偽ゼロを出さない', () => {
     expect(host.textContent).not.toContain('件中')
     // 容量の取得は生きているので残る。
     expect(host.textContent).toContain('使っている容量')
-    expect(host.textContent).toContain('使っている容量1 KB')
+    expect(host.textContent).not.toContain('—（未取得）')
   })
 
   it('一覧503後の読み直しで正しい件数が戻る', async () => {
     fixture.mediaBehavior = 'fail503'
     await renderPage()
-    await waitForText('読み込めませんでした')
+    await waitForText('表示できませんでした')
     expect(folderRowButton('すべて').textContent).toBe('すべて')
 
     fixture.mediaBehavior = 'ok'
@@ -411,7 +410,7 @@ describe('m26m 初回503の偽ゼロを出さない', () => {
     expect(folderRowButton('すべて').textContent).toBe('すべて2')
 
     const imageChips = [...host.querySelectorAll<HTMLButtonElement>('button')]
-      .filter((button) => /^画像(?: |$)/.test(button.textContent ?? ''))
+      .filter((button) => button.textContent === '画像')
     expect(imageChips).toHaveLength(1)
     await act(async () => { imageChips[0].click(); await settle() })
     await waitForText('1件中 1〜1件を表示')

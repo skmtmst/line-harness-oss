@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { templateDeleteDescription } from './template-delete-message'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(new URL('../../v8/templates/list.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
 
 /**
  * 名前で見つけた関数の本体だけを切り出す。
@@ -69,27 +69,35 @@ describe('テンプレート一覧の削除確認', () => {
   })
 
   it('確認窓が取り消せない操作として出て、処理中は閉じられない', () => {
-const from = PAGE.indexOf('<Dialog\n        open={pendingDelete');
-    const jsx = PAGE.slice(from, PAGE.indexOf('</Dialog>', from));
-    expect(jsx).toContain('pendingDelete?.item.name')
-    expect(jsx).toContain('busy={deleting}')
-    expect(jsx).toContain('error={deleteError}')
-    expect(jsx).toContain('if (deleting) return')
-    expect(jsx).toContain('削除したあと、5秒間')
+    const jsx = dialog(PAGE, '/>')
+    expect(jsx, '対象の名前を読ませていない').toContain('pendingDelete?.name')
+    expect(jsx, '何が起きるかを本文で読ませていない').toContain('templateDeleteDescription(pendingDelete?.usageCount ?? 0)')
+    expect(jsx, '取り消せない操作の色になっていない').toContain('destructive')
+    expect(jsx).toContain('confirmLabel="削除する"')
+    expect(jsx, '処理中でも押せてしまう').toContain('busy={deleting}')
+    expect(jsx, '失敗が窓の中に出ない').toContain('error={deleteError}')
+    expect(jsx, '処理中に閉じられてしまう').toContain('if (deleting) return')
   })
 
   it('削除を押しただけでは消えず、窓を開くだけにする', () => {
-const body = fnBody(PAGE, 'const handleDelete = (t:')
-    expect(body).not.toContain('api.templates.delete')
-    expect(body).toContain('setPendingDelete({ item: t, accountId: selectedAccountId })')
+    const body = fnBody(PAGE, 'const handleDelete = (template:')
+    expect(body, '押した時点で消しにいっている').not.toContain('api.templates.delete')
+    expect(body, '窓を開いていない').toContain('setPendingDelete({ id, name, usageCount })')
   })
 
   it('使用中は消さず、使用先と差し替え導線を確認窓に出す', () => {
-const body = fnBody(PAGE, 'const handleDelete = (t:')
-    expect(body).toMatch(/if \(t.usageCount > 0\)[\s\S]*setBlockedDelete[\s\S]*return/)
-    expect(PAGE).toContain('href={row.href}')
-    expect(PAGE).toContain('blockedRows.slice(0, BLOCKED_ROWS_SHOWN).map')
-    expect(PAGE).not.toContain('replacementDestinations[0]')
+    const body = fnBody(PAGE, 'const handleDelete = (template:')
+    expect(body, '使用中でも窓を開いてしまう').toMatch(
+      /if \(usageCount > 0\)[\s\S]*setBlockedDelete\(\{ id, name, usageCount \}\)[\s\S]*return/,
+    )
+    expect(PAGE, '使用中の行から使用先へ行けない').toContain('使用先を見る')
+    expect(PAGE).toContain('使用中のテンプレートは削除できません')
+    expect(PAGE).toContain('replacementDestinations.map')
+    // N-135: 使用先が複数あっても各行が個別のリンクになる。
+    // 「差し替える画面へ」ボタンが replacementDestinations[0] だけを
+    // 開いていた退行を固定する。
+    expect(PAGE, '1件目だけを開く導線に戻ってはいけない').not.toContain('replacementDestinations[0]')
+    expect(PAGE, '使用先の行が個別リンクになっていない').toContain('href={href}')
   })
 })
 

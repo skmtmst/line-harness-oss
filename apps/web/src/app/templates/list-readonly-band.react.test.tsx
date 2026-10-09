@@ -31,7 +31,7 @@ vi.mock('@/components/shell/page-chrome', () => ({
 }))
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {},
-  api: { staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
+  api: {
     templates: {
       list: () => Promise.resolve({ success: true, data: [] }),
     },
@@ -51,8 +51,6 @@ import TemplatesListV8 from './list-v8'
 const BAND = '閲覧のみで見ています。変える操作は管理者に頼んでください。'
 
 beforeEach(() => {
-  window.history.replaceState(null, '', '/templates')
-  window.dispatchEvent(new PopStateEvent('popstate'))
   document.documentElement.dataset.theme = 'v8'
 })
 

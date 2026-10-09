@@ -20,19 +20,18 @@ const ACCOUNTS: Record<string, { id: string; name: string }> = {
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({
-    accounts: Object.values(ACCOUNTS),
     selectedAccountId: accountState.id,
     selectedAccount: ACCOUNTS[accountState.id],
     loading: false,
   }),
 }))
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/',
+vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
-  useSearchParams: () => new URLSearchParams('id=scope-menu&step=buttons'),
+  useSearchParams: () => new URLSearchParams(''),
 }))
 
-import NewRichMenuPage from './create-v8'
+import NewRichMenuPage from './page'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -51,19 +50,11 @@ function stubFetch() {
     const text = String(url)
     fetchUrls.push(text)
     const parsed = new URL(text, 'http://localhost')
-    if (parsed.pathname === '/api/staff/me') return { ok: true, status: 200, json: async () => ({ success: true, data: { role: 'owner' } }) }
-    if (parsed.pathname === '/api/rich-menu-groups/scope-menu') return { ok: true, status: 200, json: async () => ({ success: true, data: {
-      id: 'scope-menu', accountId: 'acc-1', name: '候補の切り替え', chatBarText: 'メニュー', size: 'large', status: 'draft',
-      defaultPageId: 'scope-page', defaultOpen: true, isDefaultForAll: true, targetingEnabled: false, targetingCondition: null, targetingPriority: 0, folderId: null, version: 1,
-      pages: [{ id: 'scope-page', name: 'トップ', orderIndex: 0, aliasId: '', imageR2Key: null, imageContentType: null, lineRichmenuId: null,
-        areas: [{ id: 'scope-area', boundsX: 0, boundsY: 0, boundsWidth: 2500, boundsHeight: 1686, actionType: 'message', actionData: { text: 'メニュー' }, tagIds: [], templateId: null }] }],
-    } }) }
-
     if (parsed.pathname === '/api/templates') {
       const accountId = parsed.searchParams.get('account_id')
       return { ok: true, status: 200, json: async () => ({ success: true, data: accountId ? (TEMPLATES_BY_ACCOUNT[accountId] ?? []) : [] }) }
     }
-    return { ok: true, status: 200, json: async () => ({ success: true, data: parsed.pathname === '/api/rich-menu-groups' ? { items: [], total: 0, page: 1, limit: 200 } : [] }) }
+    return { ok: true, status: 200, json: async () => ({ success: true, data: [] }) }
   }))
 }
 
@@ -88,8 +79,6 @@ function clickOption(label: string) {
 
 describe('m18r 作成画面のテンプレート候補は選択accountで絞る', () => {
   beforeEach(() => {
-  document.documentElement.dataset.theme = 'v8'
-    window.history.replaceState(null, '', '/rich-menus/new?id=scope-menu&step=buttons')
     accountState.id = 'acc-1'
     stubFetch()
     host = document.createElement('div')
@@ -107,7 +96,7 @@ describe('m18r 作成画面のテンプレート候補は選択accountで絞る'
 
   it('テンプレート一覧の取得に選択accountが付く', async () => {
     await act(async () => {
-      root.render(<NewRichMenuPage editGroupId="scope-menu" />)
+      root.render(<NewRichMenuPage />)
     })
     await settle(100)
     expect(templateUrls().length).toBeGreaterThan(0)
@@ -118,11 +107,16 @@ describe('m18r 作成画面のテンプレート候補は選択accountで絞る'
 
   it('切り替えたら前の候補にしかない選択を外して知らせる', async () => {
     await act(async () => {
-      root.render(<NewRichMenuPage editGroupId="scope-menu" />)
+      root.render(<NewRichMenuPage />)
     })
     await settle(100)
     // 1面目の動きを開き、動きを「テンプレートを送る」に変える
-
+    const setup = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === '設定する')
+    expect(setup).toBeTruthy()
+    await act(async () => {
+      fireEvent.click(setup!)
+    })
+    await settle(50)
     const intentTrigger = host.querySelector('button[aria-label="押したときの動き"]')
     expect(intentTrigger).toBeTruthy()
     await act(async () => {
@@ -144,11 +138,16 @@ describe('m18r 作成画面のテンプレート候補は選択accountで絞る'
       clickOption('お知らせ')
     })
     await settle(50)
-
+    const save = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === 'この面の設定を保存する')
+    expect(save).toBeTruthy()
+    await act(async () => {
+      fireEvent.click(save!)
+    })
+    await settle(50)
     // acc-2（テンプレート「予約確認」だけ）へ切り替える
     accountState.id = 'acc-2'
     await act(async () => {
-      root.render(<NewRichMenuPage editGroupId="scope-menu" />)
+      root.render(<NewRichMenuPage />)
     })
     await settle(150)
     expect(templateUrls().some((url) => url.includes('account_id=acc-2'))).toBe(true)

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL("./../../v8/contents/list.tsx", import.meta.url), 'utf8')
+const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const UPLOAD = readFileSync(new URL('./media-upload-dialog.tsx', import.meta.url), 'utf8')
 const DETAIL = readFileSync(new URL('./media-detail-dialog.tsx', import.meta.url), 'utf8')
 const REPLACEMENT = readFileSync(new URL('./media-replacement-dialog.tsx', import.meta.url), 'utf8')
@@ -10,13 +10,19 @@ const WORKER = readFileSync(new URL('../../../../worker/src/routes/contents.ts',
 const DB = readFileSync(new URL('../../../../../packages/db/src/media.ts', import.meta.url), 'utf8')
 const GUIDANCE = readFileSync(new URL('./media-quota-guidance.tsx', import.meta.url), 'utf8')
 
-describe('V8 登録メディア一覧の契約', () => {
+describe('V6 登録メディア一覧の契約', () => {
+  it('V6の実Nodeと共通状態部品を使う', () => {
+    expect(PAGE).toContain('data-design-node="g89Tc"')
+    expect(PAGE).toContain('<ListState kind="loading"')
+    expect(PAGE).toContain('kind="error"')
+    expect(PAGE).toContain('kind="empty"')
+  })
 
   it('未取得の使用数を0件に見せない', () => {
-expect(PAGE).toContain('item.usageCount === undefined')
-    expect(PAGE).toContain('使用先：確かめられません')
-    expect(PAGE).toContain('使用先：')
-    expect(PAGE).toContain('item.usageCount === 0')
+    expect(PAGE).toContain("? '使用先を確認できません'")
+    expect(PAGE).toContain("item.usageCount === 0")
+    expect(PAGE).toContain("? 'どこでも使っていない'")
+    expect(PAGE).toContain('`${item.usageCount}か所で使用中`')
   })
 
   it('使っていないメディアだけを一覧で絞り込める', () => {
@@ -51,7 +57,7 @@ expect(PAGE).toContain('item.usageCount === undefined')
     expect(PAGE).toContain('quota.limitBytes')
     expect(PAGE).toContain('<MediaQuotaGuidance')
     expect(PAGE).toContain('quota={quota}')
-    expect(PAGE).toContain('showNearLimitOnly ? \'near-limit\'')
+    expect(PAGE).toContain('selected={showNearLimitOnly}')
     expect(PAGE).toContain('nearLimitOnly: showNearLimitOnly')
     // 棒と残量とstate別の案内は案内側に寄せている。
     expect(GUIDANCE).toContain('quota.remainingBytes')
@@ -155,6 +161,7 @@ expect(PAGE).toContain('item.usageCount === undefined')
     expect(PAGE).toContain('disabled={!isKnownUnused(item) || !!item.archivedAt}')
     expect(PAGE).toContain('使用先を確認できないため選べません')
     expect(PAGE).toContain('removableSelected.length !== selected.size')
+    expect(PAGE).not.toContain('item.usageCount === undefined || item.usageCount === 0')
   })
 
   it('選択中のLINEアカウントを一覧・登録・変更・使用先・削除へ渡す', () => {

@@ -28,7 +28,6 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
-      staff: { me: () => Promise.resolve({ success: true, data: { role: globalThis.localStorage?.getItem?.('lh_staff_role') ?? 'owner' } }) },
       commonVars: { ...actual.api.commonVars, create: api.create },
       folders: { ...actual.api.folders, list: api.foldersList },
     },
@@ -41,7 +40,7 @@ vi.mock('next/link', () => ({
 }))
 
 const routerPush = vi.fn()
-vi.mock('next/navigation', () => ({ usePathname: () => '/', useSearchParams: () => new URLSearchParams(),
+vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: routerPush, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
 }))
 
@@ -110,7 +109,6 @@ async function click(element: HTMLElement) {
 }
 
 beforeEach(() => {
-  vi.stubGlobal('localStorage', { getItem: (key: string) => key === 'lh_staff_role' ? 'owner' : null, setItem: vi.fn(), removeItem: vi.fn() })
   vi.clearAllMocks()
   api.foldersList.mockResolvedValue({ success: true, data: [] })
   api.create.mockResolvedValue({ success: true, data: { id: 'var-1' } })
@@ -142,7 +140,7 @@ describe('共通情報の新規登録：フォルダ取得の失敗と真偽値�
     await setValue(byId('cv-name'), '営業時間')
     await setValue(byId('cv-key'), 'shop_hours')
     await setValue(byId('cv-value'), '受付中')
-    await click(byExactText('button', '保存して公開'))
+    await click(byExactText('button', '登録する'))
     await settle()
 
     expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ folderId: null }))
@@ -176,7 +174,7 @@ describe('共通情報の新規登録：フォルダ取得の失敗と真偽値�
     await setValue(byId('cv-name'), '営業時間')
     await setValue(byId('cv-key'), 'shop_hours')
     await setValue(byId('cv-value'), '受付中')
-    await click(byExactText('button', '保存して公開'))
+    await click(byExactText('button', '登録する'))
     await settle()
 
     expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ folderId: 'f-1' }))
@@ -187,10 +185,10 @@ describe('共通情報の新規登録：フォルダ取得の失敗と真偽値�
     await settle()
     await setValue(byId('cv-name'), '受付可否')
     await setValue(byId('cv-key'), 'is_open')
-    await click(Array.from(document.querySelectorAll<HTMLElement>('[role=radio]')).find(el => el.textContent?.includes('はい／いいえ'))!)
+    await click(document.querySelector('input[name="cv-type"][value="boolean"]') as HTMLInputElement)
 
     // 空欄のまま登録すると入力エラーが欄直下と画面下部の両方に出る。
-    await click(byExactText('button', '保存して公開'))
+    await click(byExactText('button', '登録する'))
     await settle()
     expect(api.create).not.toHaveBeenCalled()
     const fieldError = document.querySelector('#cv-value')?.parentElement?.textContent ?? ''
@@ -206,11 +204,8 @@ describe('共通情報の新規登録：フォルダ取得の失敗と真偽値�
     expect(document.querySelectorAll('[role="alert"]').length).toBe(0)
 
     // そのまま登録できる。
-    await click(byExactText('button', '保存して公開'))
+    await click(byExactText('button', '登録する'))
     await settle()
     expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ type: 'boolean', value: 'true' }))
   })
 })
-
-// These scenarios exercise owner actions; permission restrictions are covered separately.
-vi.mock('@/lib/staff-capability', async (importOriginal) => ({ ...await importOriginal<typeof import('@/lib/staff-capability')>(), isOwnerOrAdmin: () => true }))

@@ -81,5 +81,3 @@
 .insertButton:focus-visible { outline: 2px solid var(--color-action); outline-offset: 1px; }
 .insertButton[aria-expanded='true'] { outline-color: var(--color-accent); background: var(--color-accent-soft); }
 }
-
-.editor[aria-invalid='true'], .editor[aria-invalid='true']:focus { outline: 2px solid var(--color-danger); outline-offset: -2px; }
