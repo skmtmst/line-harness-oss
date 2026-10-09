@@ -144,3 +144,6 @@
 
 /* B-152②：役割ごとの文字の段。 */
 [data-theme='v8'] .item, [data-theme='v8'] .selected, html[data-theme='v8'] .root[data-size] .item, html[data-theme='v8'] .root[data-appearance] .selected { font-weight: var(--polish-weight-body); }
+
+/* B-152⑨：切り替える各ボタンの角丸。 */
+html[data-theme='v8'] .root .item, html[data-theme='v8'] .root .thumb, html[data-theme='v8'] .root[data-size] .thumb { border-radius: var(--polish-radius-control); }
