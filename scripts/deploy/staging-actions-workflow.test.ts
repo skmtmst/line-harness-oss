@@ -134,4 +134,12 @@ describe('Deploy Cloudflare Staging workflow', () => {
       'test "$actual" = "$EXPECTED_GOOGLE_BUSINESS_WRITE_ENABLED"',
     );
   });
+  it('stamps the source HEAD before build and checks public metadata after deploy', () => {
+    expect(workflow).toContain('stamp-staging-version.ts "$worker_root"');
+    expect(workflow.indexOf('stamp-staging-version.ts')).toBeLessThan(workflow.indexOf('pnpm --filter worker build'));
+    expect(workflow).toContain('$STAGING_API_URL/admin/version');
+    expect(workflow).toContain('.git_commit == $commit and .version == $version');
+    expect(workflow).toContain('test "$matched" = true');
+  });
+
 });
