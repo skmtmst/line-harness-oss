@@ -548,6 +548,11 @@
   color: var(--color-ink);
   font-size: var(--text-label);
 }
+/* 保存で落ちた欄（B-139）。枠を危険の色にする。 */
+.dlgInput[aria-invalid='true'],
+.dlgTextarea[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
 .delta3 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

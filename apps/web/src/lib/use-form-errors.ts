@@ -242,7 +242,15 @@ export function useFormErrors() {
     return shown
   }
 
-  return { define, error, invalid, touch, bind, listProblems, countIn, focusFirst, submit, setServerErrors }
+  /** 開き直した窓・空に戻した入力で、触れた印・まとめ・サーバーの誤りを消す。 */
+  const reset = () => {
+    touchedRef.current.clear()
+    serverRef.current.clear()
+    setSubmitted(false)
+    bump((v) => v + 1)
+  }
+
+  return { define, error, invalid, touch, bind, listProblems, countIn, focusFirst, submit, setServerErrors, reset }
 }
 
 export type FormErrors = ReturnType<typeof useFormErrors>
