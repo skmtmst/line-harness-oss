@@ -7,6 +7,7 @@
  * 型（ListPage）と共通部品で一から組み直した。データの口・保存先は今と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -896,15 +897,7 @@ export default function BroadcastListV8() {
   )
 
   const sortButton = (
-    <button
-      type="button"
-      className={styles.sortButton}
-      aria-label={`並び順：${sortKey === 'newest' ? '新しい順' : '古い順'}（押すと入れ替え）`}
-      onClick={() => setSortKey((current) => (current === 'newest' ? 'oldest' : 'newest'))}
-    >
-      <ArrowUpDown size={14} aria-hidden="true" />
-      {sortKey === 'newest' ? '新しい順' : '古い順'}
-    </button>
+<ListToolbarSort value={sortKey} onChange={(value) => { setSortKey(value as typeof sortKey); setPage(1) }} options={[{ value: 'newest', label: '新しい順' }, { value: 'oldest', label: '古い順' }]} />
   )
 
   const folderSelect = (

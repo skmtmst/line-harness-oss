@@ -8,6 +8,7 @@
  * （app/form-submissions/list-v8.tsx）と同じ。見た目だけを型（ListPage）と部品で組み直した。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
@@ -960,7 +961,7 @@ export default function FormsListV8() {
   )
   const sortBox = (
     <div className={styles.sortBox}>
-      <Select
+      <ListToolbarSort
         aria-label="並び順"
         label="並び"
         value={formSort}

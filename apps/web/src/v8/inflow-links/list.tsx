@@ -9,6 +9,7 @@
  * データの口と判断は今の一覧（app/inflow-links/page.tsx の InflowLinksPageInner）と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -563,7 +564,7 @@ export default function InflowListV8({
             ))}
           </div>
           <span className={styles.presetLabel}>並び順</span>
-          <Select
+          <ListToolbarSort
             aria-label="並び順"
             value={sort}
             options={SORT_OPTIONS}

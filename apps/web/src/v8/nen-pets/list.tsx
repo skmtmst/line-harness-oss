@@ -6,6 +6,7 @@
  * 表は「見出し 36・行 56」。1152 では 年齢・避妊去勢・運動量 を隠し、年齢は種類の後ろへ寄せる。
  * 取得の口・指定は今の画面と同じ（GET /api/nen/pets）。
  */
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -117,7 +118,7 @@ export default function PetsListV8({
           onChange={(value) => change({ weight: value === 'stale' || value === 'fresh' ? value : '' })}
           options={[{ value: '', label: '体重更新：すべて' }, { value: 'fresh', label: '体重更新：90日以内' }, { value: 'stale', label: '体重更新：90日以上前' }]}
         />
-        <Select
+        <ListToolbarSort
           aria-label="並び順"
           width={170}
           value={query.sort}

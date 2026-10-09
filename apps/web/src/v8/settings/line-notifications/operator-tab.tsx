@@ -1,5 +1,6 @@
 'use client'
 
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import Notice from '@/components/shared/notice'
@@ -179,7 +180,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
         <SearchField aria-label="お知らせを検索" placeholder="お知らせ名・きっかけで探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
       </div>
       <div className={styles.opSort}>
-        <Select aria-label="並び順" value="frequent" onChange={() => undefined} options={[{ value: 'frequent', label: 'よく届く順' }]} />
+        <ListToolbarSort aria-label="並び順" value="frequent" onChange={() => undefined} options={[{ value: 'frequent', label: 'よく届く順' }]} />
       </div>
     </div>
 

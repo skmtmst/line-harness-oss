@@ -8,6 +8,7 @@
  * 直さず、型（ListPage）と共通部品で一から書いた。データの口・権限・失敗時の
  * 扱いは古い一覧と同じ（BEHAVIOR.md）。
  */
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import Link from 'next/link'
@@ -859,7 +860,7 @@ export default function RichMenusListV8() {
   const sortBox = (
     <div className={styles.sortBox} title={`並び：${SORT_OPTIONS.find((o) => o.value === sortKey)?.label ?? ''}`}>
       <ArrowDownUp size={14} aria-hidden="true" className={styles.sortIcon} />
-      <Select
+      <ListToolbarSort
         aria-label="並び順"
         value={sortKey}
         onChange={(value) => setSortKey(value as SortKey)}

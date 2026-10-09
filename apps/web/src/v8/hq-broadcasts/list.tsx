@@ -9,6 +9,7 @@
  *   - 結果の列はアカウントの合計（届いた人数・失敗したアカウント）
  * 1行＝1回の一括配信。行を押すと詳細（送った結果）へ。動きは BEHAVIOR.md。
  */
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -260,15 +261,7 @@ export default function HqBroadcastList() {
             options={[{ value: '10', label: '10件表示' }, { value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }]}
           />
         </div>
-        <button
-          type="button"
-          className={styles.sortButton}
-          aria-label={`並び順：${sortKey === 'newest' ? '新しい順' : '古い順'}（押すと入れ替え）`}
-          onClick={() => { setSortKey((current) => (current === 'newest' ? 'oldest' : 'newest')); setPage(1) }}
-        >
-          <ArrowUpDown size={14} aria-hidden="true" />
-          {sortKey === 'newest' ? '新しい順' : '古い順'}
-        </button>
+<ListToolbarSort value={sortKey} onChange={(value) => { setSortKey(value as typeof sortKey); setPage(1) }} options={[{ value: 'newest', label: '新しい順' }, { value: 'oldest', label: '古い順' }]} />
       </div>
     </div>
   )

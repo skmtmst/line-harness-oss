@@ -12,6 +12,7 @@
  * 空のまま使われているときの黄色の帯は表の列の上、行の右端は「…」
  * （編集・止める／再開する・削除する）。右クリックでも同じものが出る。
  */
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
@@ -972,37 +973,7 @@ function CommonVarsListInner() {
   )
   /* 並び替え：絵に無いが今の機能。場所を取らないよう印だけのボタン＋メニュー。 */
   const orderLabel = ORDER_OPTIONS.find((option) => option.value === order)?.label ?? ''
-  const orderBox = (
-    <>
-      <IconButton
-        title={`並び替え：${orderLabel}`}
-        aria-label={`並び替え：${orderLabel}`}
-        aria-haspopup="menu"
-        aria-expanded={orderMenuOpen}
-        onClick={(event) => {
-          orderAnchorRef.current = event.currentTarget
-          setOrderMenuOpen((open) => !open)
-        }}
-      >
-        <ArrowUpDown size={15} aria-hidden="true" />
-      </IconButton>
-      <ActionMenu
-        open={orderMenuOpen}
-        onClose={() => setOrderMenuOpen(false)}
-        anchorRef={orderAnchorRef}
-        ariaLabel="並び替え"
-        items={ORDER_OPTIONS.map((option) => ({
-          id: option.value,
-          label: option.value === order ? `${option.label}（いまの並び）` : option.label,
-          onSelect: () => {
-            setOrderMenuOpen(false)
-            setOrder(option.value)
-            setPage(1)
-          },
-        }))}
-      />
-    </>
-  )
+  const orderBox = <ListToolbarSort value={order} onChange={(value) => { setOrder(value as typeof order); setPage(1) }} options={ORDER_OPTIONS} />
   const perPageBox = (
     <div className={styles.perPageBox}>
       <Select

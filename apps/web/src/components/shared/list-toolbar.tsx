@@ -2,6 +2,7 @@
 import type React from 'react'
 
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import Select, { type SelectProps } from './select'
 import SearchField from './search-field'
 import styles from './list-toolbar.module.css'
 
@@ -44,9 +45,11 @@ export default function ListToolbar({
   actions,
   filters,
   trailing,
+  sort,
   layout = 'band',
 }: {
   search: ListToolbarSearch
+  sort?: ListToolbarSortProps
   /** 1行目。検索の右に置く、動くものだけ（保存した検索・この条件を保存）。 */
   actions?: ReactNode
   /** 2行目・左。札・日付などの絞り込み。 */
@@ -77,10 +80,10 @@ export default function ListToolbar({
         />
         {actions}
       </div>
-      {filters || trailing ? (
+      {filters || trailing || sort ? (
         <div className={styles.row2}>
           {filters ? <div className={styles.filters} data-toolbar-tools>{filters}</div> : null}
-          {trailing ? <div className={styles.trailing} data-toolbar-tools>{trailing}</div> : null}
+          {trailing || sort ? <div className={styles.trailing} data-toolbar-tools>{sort ? <ListToolbarSort {...sort} /> : null}{trailing}</div> : null}
         </div>
       ) : null}
     </div>
@@ -116,4 +119,10 @@ export function ListToolbarOptional({ children, label = 'ほかの絞り込み',
     <summary aria-label={label} title={label}>…</summary>
     <div data-toolbar-optional-content>{children}</div>
   </details>
+}
+
+export type ListToolbarSortProps = Omit<SelectProps, 'aria-label' | 'label'> & { label?: string; 'aria-label'?: string }
+/** 並びの名前と選ぶ操作はこの欄にそろえる。 */
+export function ListToolbarSort(props: ListToolbarSortProps) {
+  return <span data-list-sort><Select {...props} label="並び" aria-label="並び" /></span>
 }

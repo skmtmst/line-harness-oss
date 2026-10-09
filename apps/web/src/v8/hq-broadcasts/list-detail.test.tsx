@@ -49,9 +49,10 @@ describe('統括の一括配信の一覧（U4Eep0）', () => {
     await screen.findByText('新しい配信')
     const titles = () => screen.getAllByRole('link').map((el) => el.textContent).filter((text) => text?.endsWith('配信'))
     expect(titles()).toEqual(['新しい配信', '古い配信'])
-    fireEvent.click(screen.getByRole('button', { name: /並び順：新しい順/ }))
+    fireEvent.click(screen.getByRole('button', { name: '並び' }))
+    fireEvent.click(within(screen.getByRole('option', { name: '古い順' })).getByRole('button'))
     expect(titles()).toEqual(['古い配信', '新しい配信'])
-    expect(screen.getByRole('button', { name: /並び順：古い順/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '並び' })).toBeTruthy()
   })
 
   it('平均の開封率は送った配信の開いた人÷届いた人。数えていない店があれば「—」', async () => {

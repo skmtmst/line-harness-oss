@@ -9,6 +9,7 @@
  * 定期便・つなぎ先・注文の状況のパネルは今の部品を入口（page.tsx）から差し込む。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
@@ -389,7 +390,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
         ))}
         <span className={styles.spacer} />
         <span className={styles.sortBox}>
-          <Select
+          <ListToolbarSort
             aria-label="取り込みの並び順"
             value={sort}
             onChange={(value) => setSort(value as typeof sort)}

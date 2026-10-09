@@ -1,5 +1,6 @@
 'use client'
 
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import HelpTip from '@/components/shared/help-tip'
 
@@ -160,7 +161,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
         >
           <RefreshCw aria-hidden className={`${styles.icon16} ${syncing ? styles.spin : ''}`} />
         </IconButton>
-        <Select aria-label="並び順" width={150} value={order} onChange={(value) => { setOrder(value as GoogleReviewOrder); setPage(1) }} options={ORDER_OPTIONS} />
+        <ListToolbarSort aria-label="並び順" width={150} value={order} onChange={(value) => { setOrder(value as GoogleReviewOrder); setPage(1) }} options={ORDER_OPTIONS} />
       </div>
       {connection.status === 'expired' ? <Notice tone="danger" action={<Link href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で再接続</Link>}>Googleとの接続を確認してください（認可切れ）。前回取得した口コミを表示しています。</Notice> : null}
       {connection.status === 'no_permission' ? <Notice tone="danger" action={<Link href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で接続を確認</Link>}>この店舗を操作する権限がありません。</Notice> : null}
