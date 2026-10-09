@@ -76,7 +76,9 @@ export type KpiCardProps = {
   variant?: 'v5' | 'v6' | 'broadcast'
   /** V8 は画面の絵に合わせてカードか線で区切るマスを選ぶ。 */
   presentation?: 'card' | 'band' | 'cell' | 'inline'
-  density?: 'compact' | 'comfortable'
+  density?: 'compact' | 'comfortable' | 'record' | 'mini'
+  /** 小さい数値の設定カード（22/26）。 */
+  metricSize?: 'small'
   className?: string
   hidden?: boolean
   id?: string
@@ -123,6 +125,7 @@ export default function KpiCard({
   presentation = 'card',
   density = 'comfortable',
   className,
+  metricSize,
   valueTone = 'default',
   valueText,
   ...cardProps
@@ -152,6 +155,7 @@ export default function KpiCard({
       className={classes}
       data-kpi-presentation={presentation}
       data-kpi-density={density}
+      data-kpi-metric-size={metricSize}
       aria-busy={loading || undefined}
       data-design-version={variant}
       {...cardProps}

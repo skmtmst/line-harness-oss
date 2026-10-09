@@ -45,6 +45,7 @@ export function FieldError({ id, children }: { id: string; children: ReactNode }
 /** 1行の入力欄。ラベルと説明の付け方を全画面でそろえる。 */
 export function Field({
   label,
+  size,
   htmlFor,
   required,
   requiredAppearance,
@@ -67,6 +68,7 @@ export function Field({
   /** 小さな連携フォームのラベルと間隔。 */
   density?: 'compact' | 'input'
   grow?: boolean
+  size?: 'compact'
   htmlFor?: string
   required?: boolean
   /** 設定カードの絵で、必須を任意と同じ薄い文字で示す。 */
@@ -130,6 +132,7 @@ export function Field({
       data-grow={grow || undefined}
       data-density={density}
       data-spacing={spacing}
+      data-field-size={size}
       data-field-quiet={quiet && error ? '' : undefined}
       onInput={error ? () => { if (!quiet) setQuiet(true) } : undefined}
       onBlur={quiet ? () => setQuiet(false) : undefined}

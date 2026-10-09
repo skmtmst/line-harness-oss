@@ -286,3 +286,48 @@
   [data-theme='v8'] .frame[data-table-presentation='columns'] th[data-cell-collapse='narrow'],
   [data-theme='v8'] .frame[data-table-presentation='columns'] .bodyCell[data-cell-collapse='narrow'] { display: none; }
 }
+/* 設定内の詰めた一覧。指定した表だけに効く（通常の一覧は変えない）。 */
+[data-theme='v8'] .frame[data-table-density] {
+  overflow: hidden;
+  border-radius: var(--tpl-sb-card-radius);
+  outline: 1px solid var(--color-hairline);
+  --table-pad: var(--tpl-st2-id-row-pad);
+}
+[data-theme='v8'] .frame[data-table-density='records'] { --table-pad: var(--tpl-sb-ec-row-pad); }
+[data-theme='v8'] .frame[data-table-density] .table,
+[data-theme='v8'] .frame[data-table-density] :is(thead, tbody) { display: block; }
+[data-theme='v8'] .frame[data-table-density] tr {
+  display: grid;
+  grid-template-columns: var(--table-columns);
+  align-items: center;
+  column-gap: var(--tpl-sb-ec-gap);
+  height: auto;
+  padding: var(--table-pad);
+  box-shadow: var(--tpl-sb-line-top);
+}
+[data-theme='v8'] .frame[data-table-density] thead tr {
+  padding: var(--tpl-st2-id-row-pad);
+  border: 0;
+  box-shadow: none;
+  background: var(--color-surface-pearl);
+}
+[data-theme='v8'] .frame[data-table-density='records'] thead tr { padding: var(--tpl-sb-ec-head-pad); }
+[data-theme='v8'] .frame[data-table-density] .table :is(th, td) {
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  font-size: var(--text-caption);
+  line-height: var(--tpl-sb-ec-lh);
+}
+[data-theme='v8'] .frame[data-table-density] .table th {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-sb-row-sub);
+  font-weight: 600;
+  line-height: var(--tpl-sb-row-sub-lh);
+}
+
+[data-theme='v8'] .frame[data-table-density] .table :is(th, td)[data-align='right'] { padding-right: var(--tpl-rest3-ec-row-gap); }
+
+[data-theme='v8'] .frame[data-table-density] .table td[colspan] { grid-column: 1 / -1; }

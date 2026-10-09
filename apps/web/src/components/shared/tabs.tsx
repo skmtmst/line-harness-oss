@@ -52,7 +52,7 @@ export function Tabs({
    * 段の詰め方。省くと今までどおり（v8 は文字20＋下12）。
    * 'compact' は文字の行を詰めた段（E-1 hKRRF の店のタブ：高さ 30.5）。v7 では効かない。
    */
-  size?: 'compact'
+  size?: 'compact' | 'settings'
   spacing?: 'compact'
 }) {
   /*

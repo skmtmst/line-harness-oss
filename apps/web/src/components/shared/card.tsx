@@ -5,6 +5,8 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'>
   children: ReactNode
   frame?: 'raised' | 'inset'
   layout?: 'block' | 'vertical'
+  /** 設定の箱は16の余白・10の間。 */
+  spacing?: 'settings'
   overflow?: 'visible' | 'hidden'
   padding?: 'none' | 'compact' | 'default' | 'roomy' | 'spacious'
   corner?: 'card' | 'segment'
@@ -30,6 +32,7 @@ export default function Card({
   appearance,
   gap,
   surface,
+  spacing,
   ...props
 }: CardProps) {
   const classes = [
@@ -51,7 +54,7 @@ export default function Card({
     .join(' ')
 
   return (
-    <section className={classes} data-design-part="card" data-appearance={appearance} data-gap={gap} {...props}>
+    <section className={classes} data-design-part="card" data-appearance={appearance} data-gap={gap} data-spacing={spacing} {...props}>
       {children}
     </section>
   )

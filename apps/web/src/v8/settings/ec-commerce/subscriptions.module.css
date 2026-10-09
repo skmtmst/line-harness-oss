@@ -1,0 +1,3 @@
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-sb-ctl-gap); }
+.search { width: var(--tpl-ecc-sub-search); flex: 0 1 auto; min-width: 0; }
+.ops { display: flex; align-items: center; gap: var(--tpl-sb-ctl-gap); }

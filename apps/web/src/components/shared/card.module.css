@@ -140,3 +140,10 @@
 .headerStacked .title, .headerPanel .title { margin: 0; font-size: var(--text-body); font-weight: 700; line-height: var(--tpl-rs-lh-14); }
 .headerStacked .meta, .headerPanel .meta { color: var(--color-ink-faint); font-size: var(--text-micro); font-weight: 400; line-height: var(--tpl-rs-lh-11); }
 .headerPanel { padding: var(--tpl-rs-panel-head-pad); box-shadow: var(--tpl-rs-line-bottom); }
+
+[data-theme='v8'] .card[data-spacing='settings'] {
+  display: flex; flex-direction: column; min-width: 0;
+  gap: var(--tpl-rest3-ec-card-gap); padding: var(--tpl-rest3-ec-card-pad);
+  border: 0; border-radius: var(--tpl-rest3-ec-radius);
+  outline: 1px solid var(--color-hairline); outline-offset: -1px; box-shadow: none;
+}

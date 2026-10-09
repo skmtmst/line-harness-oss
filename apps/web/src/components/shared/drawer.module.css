@@ -319,3 +319,11 @@
 [data-theme='v8'] .panel[data-layout='inset'] .body { padding: 0; }
 [data-theme='v8'] .panel[data-layout='inset'] .footer { padding: 0; border: 0; gap: var(--tpl-toolbar-gap); }
 [data-theme='v8'] .panel[data-layout='inset'] .close { width: var(--tpl-af-dr-close); height: var(--tpl-af-dr-close); flex-basis: var(--tpl-af-dr-close); border: 1px solid var(--color-hairline); border-radius: var(--radius-control); color: var(--color-ink-secondary); }
+/* 注文の参照（nAesv）：本文と頭の間16・下の操作は左右。ほかの幅は変えない。 */
+[data-theme='v8'] .panel[data-width='order'] { width: min(var(--tpl-st2-od-w), 100%); gap: var(--tpl-st2-od-gap); }
+[data-theme='v8'] .panel[data-width='order'] .header { border: 0; padding: var(--tpl-st2-od-pad) var(--tpl-st2-od-pad) 0; }
+[data-theme='v8'] .panel[data-width='order'] .title { font-size: var(--tpl-st2-od-title); font-weight: 700; line-height: var(--tpl-st2-od-title-lh); }
+[data-theme='v8'] .panel[data-width='order'] .description { margin-top: var(--tpl-st2-od-head-text-gap); color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-st2-od-text-lh); }
+[data-theme='v8'] .panel[data-width='order'] .close { width: var(--tpl-st2-od-close); height: var(--tpl-st2-od-close); flex-basis: var(--tpl-st2-od-close); border-radius: var(--radius-control); outline: 1px solid var(--color-hairline); outline-offset: -1px; }
+[data-theme='v8'] .panel[data-width='order'] .body { display: flex; flex-direction: column; gap: var(--tpl-st2-od-gap); padding: 0 var(--tpl-st2-od-pad); }
+[data-theme='v8'] .panel[data-width='order'] .footer { display: flex; justify-content: space-between; gap: var(--tpl-st2-od-gap); border: 0; padding: 0 var(--tpl-st2-od-pad) var(--tpl-st2-od-pad); }

@@ -1,5 +1,5 @@
 import React from 'react'
-import type { ReactNode, ThHTMLAttributes, TdHTMLAttributes, HTMLAttributes } from 'react'
+import type { ReactNode, ThHTMLAttributes, TdHTMLAttributes, HTMLAttributes, CSSProperties } from 'react'
 import shell from './data-table.module.css'
 import { loadFailureCopy } from './api-error-message'
 import HelpTip from './help-tip'
@@ -83,7 +83,7 @@ export function Th({
   const heading = helpLabel ?? (typeof children === 'string' ? children : 'この項目')
 
   return (
-    <th className={classes} scope={scope} data-cell-collapse={collapseAt} {...cellProps}>
+    <th className={classes} data-align={align} scope={scope} data-cell-collapse={collapseAt} {...cellProps}>
       {truncate ? <span className={styles.truncated} title={typeof children === 'string' ? children : undefined}>{children}</span> : children}
       {hasHelp ? (
         <HelpTip label={`${heading}の説明`}>
@@ -106,18 +106,25 @@ export function DataTable({
   'data-design': dataDesign,
   presentation,
   density,
+  columns,
+  label,
 }: {
   children: ReactNode
   className?: string
   'data-design'?: string
   /** 時間×卓と予約一覧の寸法、飲食店のカード内の密度。指定した表だけに適用する。 */
   presentation?: 'ledger' | 'calendar' | 'inventory' | 'channels' | 'columns'
-  /** 連携画面の3種類の行。指定のない表の見た目は変えない。 */
-  density?: 'reviews' | 'media' | 'sample'
+  /** 連携画面の3種類の行（reviews・media・sample）と設定内の詰めた一覧（compact・records）。指定のない表の見た目は変えない。 */
+  density?: 'reviews' | 'media' | 'sample' | 'compact' | 'records'
+  /** 列の幅を持つ設定一覧。共通の枠・セル・行で描く。 */
+  columns?: string
+  label?: string
 }) {
+  const tableDensity = density === 'compact' || density === 'records' ? density : undefined
+  const rowDensity = tableDensity ? undefined : density
   return (
-    <div className={[shell.frame, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={density} data-table-presentation={presentation}>
-      <table className={shell.table} data-design={dataDesign}>{children}</table>
+    <div className={[shell.frame, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} style={columns ? { '--table-columns': columns } as CSSProperties : undefined}>
+      <table className={shell.table} data-design={dataDesign} aria-label={label}>{children}</table>
     </div>
   )
 }
@@ -178,7 +185,7 @@ export function Td({ children, align = 'left', className, collapseAt, ...cellPro
     align === 'center' && styles.center,
     className,
   ].filter(Boolean).join(' ')
-  return <td className={classes} data-cell-collapse={collapseAt} {...cellProps}>{children}</td>
+  return <td className={classes} data-align={align} data-cell-collapse={collapseAt} {...cellProps}>{children}</td>
 }
 
 /** 名前・副題・注記を同じ列にまとめる先頭セル。 */
