@@ -1,0 +1,18 @@
+/* 隠れた所の誤りの数（B-139）。タブの件数の札（warning）と同じ大きさで、色だけ危険。 */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: var(--tpl-error-badge-size);
+  height: var(--tpl-error-badge-size);
+  margin-left: var(--tpl-error-badge-gap);
+  padding: var(--tpl-tab-count-pad);
+  border-radius: var(--radius-pill);
+  background: var(--color-danger);
+  color: var(--color-canvas);
+  font-size: var(--text-micro);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}

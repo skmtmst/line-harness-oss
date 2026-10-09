@@ -4,6 +4,7 @@ import { ArrowUpDown, Check, ChevronDown, ChevronUp } from 'lucide-react'
 import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { isImeComposing } from './ime'
+import { joinDescribedBy, useFieldContext } from './field-context'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import MenuPortal from './menu-portal'
 import { SELECT_MENU_ROW_STRIDE, SelectMenu, SelectMenuAction, SelectMenuOption, SelectMenuSpacer, splitOptionHeads } from './select-menu'
@@ -104,8 +105,11 @@ export default function Select({
   createAction,
   menuHeading,
 }: SelectProps) {
+  // Field の中に置くと、欄の誤り（赤）と説明の読み上げを受け取る（B-139）。
+  const field = useFieldContext()
+  const invalid = Boolean(error) || Boolean(field?.invalid)
   const generatedId = useId()
-  const buttonId = id ?? `${generatedId}-button`
+  const buttonId = id ?? field?.controlId ?? `${generatedId}-button`
   const listboxId = `${generatedId}-listbox`
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -268,7 +272,7 @@ export default function Select({
         styles[size === 'page-size' ? 'pageSize' : size],
         open ? styles.open : null,
         disabled ? styles.disabled : null,
-        error ? styles.invalid : null,
+        invalid ? styles.invalid : null,
         className,
       ]
         .filter(Boolean)
@@ -296,7 +300,8 @@ export default function Select({
         aria-controls={listboxId}
         aria-expanded={open}
         aria-haspopup="listbox"
-        aria-invalid={Boolean(error) || undefined}
+        aria-invalid={invalid || undefined}
+        aria-describedby={joinDescribedBy(field?.describedBy)}
         disabled={disabled}
         onClick={() => setOpen((current) => !current)}
         onKeyDown={onButtonKeyDown}
