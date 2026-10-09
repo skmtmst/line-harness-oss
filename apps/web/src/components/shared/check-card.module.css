@@ -172,3 +172,6 @@
 
 /* B-152・仕上げ7：誤りのある欄もキーボードの輪は青。 */
 [data-theme='v8'] .box:focus-visible, [data-theme='v8'] .invalid .box:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
+
+/* B-152⑩：説明文は省略せず、必要な行数で読む。 */
+[data-theme='v8'] .note, html[data-theme='v8'] .card:is(.compact, .row) .note { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }

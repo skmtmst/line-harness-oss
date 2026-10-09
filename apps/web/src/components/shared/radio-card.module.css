@@ -367,3 +367,6 @@
 [data-theme='v8'] .card:not(.row):has(.radio:focus-visible) { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
 [data-theme='v8'] .disabled { opacity: var(--polish-disabled-opacity); }
 html[data-theme='v8'] .disabled .radio:disabled { opacity: var(--polish-enabled-opacity); }
+
+/* B-152⑩：説明文は省略せず、必要な行数で読む。 */
+[data-theme='v8'] .note, html[data-theme='v8'] .card:is(.compact, .row) .note { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
