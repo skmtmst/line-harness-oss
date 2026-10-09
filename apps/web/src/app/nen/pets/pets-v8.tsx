@@ -52,6 +52,7 @@ import { birthdayDraft, normalizeBirthdayInput } from './pet-editor'
 import type { PetTab } from './page'
 import styles from './pets-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -641,7 +642,7 @@ function FeedingV8({ accountId }: { accountId: string }) {
               <label className={styles.fieldLabel}>
                 おやつの上限（%）
                 <span className={styles.treatInput}>
-                  <TextField aria-label="おやつの上限（%）" inputMode="numeric" value={treatLimit} onChange={(event) => { setTreatLimit(event.target.value); setDirty(true); setNotice('') }} />
+                  <NumberInput numericText aria-label="おやつの上限（%）" inputMode="numeric" value={treatLimit} onChange={(event) => { setTreatLimit(event.target.value); setDirty(true); setNotice('') }} />
                 </span>
               </label>
               <p className={styles.treatNote}>1日の必要カロリーのうち、おやつに回す割合</p>

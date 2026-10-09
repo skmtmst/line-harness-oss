@@ -30,6 +30,7 @@ import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
 import { ogImageUrlError } from './model'
 import styles from './edit.module.css'
 import { Field } from '@/components/shared/form-controls'
+import NumberInput from '@/components/shared/number-field'
 
 type ColorKey = keyof Pick<FormTheme, 'main' | 'sub' | 'accent' | 'error' | 'text'>
 const COLOR_ROLES: { key: ColorKey; label: string }[] = [
@@ -106,7 +107,7 @@ export function AppearanceTab(props: Props) {
           />
         </div>
         {options.totalLimit?.enabled ? (
-          <div className={styles.limitRow}><Field label="締め切る件数" htmlFor="fe-total-limit"><TextField
+          <div className={styles.limitRow}><Field label="締め切る件数" htmlFor="fe-total-limit"><NumberInput
               id="fe-total-limit"
               type="number"
               min={1}

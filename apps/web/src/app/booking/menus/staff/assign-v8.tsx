@@ -41,6 +41,7 @@ import {
 import { menuPriceLabel } from '../../lib/menu-price'
 import shell from '../settings-v8.module.css'
 import styles from './assign-v8.module.css'
+import NumberInput from '@/components/shared/number-field'
 
 /* 予約設定の5タブ（settings-v8.tsx の V8_TABS と同じ並び）。 */
 const V8_TABS = [
@@ -445,7 +446,7 @@ export default function AssignMatrixV8() {
                     <label className={styles.field}>
                       <span className={styles.label}>このスタッフの所要時間</span>
                       <span className={styles.unitField}>
-                        <input
+                        <NumberInput
                           type="number"
                           min={1}
                           disabled={!canEditMenus || !selectedRow.is_offered}
@@ -466,7 +467,7 @@ export default function AssignMatrixV8() {
                       <span className={styles.label}>このスタッフの料金</span>
                       <span className={styles.unitField}>
                         <span className={styles.unitSuffix}>¥</span>
-                        <input
+                        <NumberInput
                           type="number"
                           min={0}
                           disabled={!canEditMenus || !selectedRow.is_offered}

@@ -27,6 +27,7 @@ import {
 import styles from '../settings.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 /* 候補は v7（/booking/menus の BookingRulesEditor）と同じ。 */
 const TIME_ZONE_CHOICES = [
@@ -88,7 +89,7 @@ function RuleNumberFieldV8({ label, unit, min, max, value, onChange, trackEmpty,
   const hint = hintNumber === null || Number.isNaN(hintNumber) ? null : humanize?.(hintNumber)
   return (
     <Field label={<>{label}</>}><span className="mt-1 flex items-center gap-2">
-        <input
+        <NumberInput unit={unit}
           aria-label={label}
           type="number"
           min={min}
@@ -107,7 +108,7 @@ function RuleNumberFieldV8({ label, unit, min, max, value, onChange, trackEmpty,
           }}
           className={styles.numInput}
         />
-        <span className="text-ink-faint whitespace-nowrap text-xs">{unit}</span>
+        
       </span>
 {hint ? <span className="text-ink-faint mt-1 block text-xs">＝{hint}</span> : null}</Field>
   )

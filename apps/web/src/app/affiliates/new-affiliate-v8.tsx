@@ -31,6 +31,7 @@ import Notice from '@/components/shared/notice'
 import { formatNumber } from '@/lib/format'
 import './create-v8.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 const FRIEND_PAGE_SIZE = 20
 const AFFILIATE_LIST_PATH = '/conversions?tab=affiliates'
@@ -477,7 +478,7 @@ export function NewAffiliateV8() {
               <label className="af-create-fieldLabel" htmlFor="af-rate">
                 売上に対する割合
                 <span className="af-create-toolbar">
-                  <TextField
+                  <NumberInput unit="%"
                     id="af-rate"
                     type="number"
                     min={0}
@@ -486,7 +487,7 @@ export function NewAffiliateV8() {
                     onChange={(event) => setCommissionRate(event.target.value)}
                     placeholder="10"
                   />
-                  <span className="af-create-footnote">%</span>
+                  
                 </span>
               </label>
             ) : null}
@@ -504,7 +505,7 @@ export function NewAffiliateV8() {
               <label className="af-create-fieldLabel" htmlFor="af-hold">
                 <span className="af-create-toolbar">保留期間<HelpTip label="保留期間の意味">返品・キャンセルを考慮する期間です。</HelpTip></span>
                 <span className="af-create-toolbar">
-                  <TextField
+                  <NumberInput
                     id="af-hold"
                     type="number"
                     min={0}

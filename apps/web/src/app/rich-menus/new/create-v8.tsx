@@ -115,6 +115,7 @@ import styles from './create-v8.module.css'
 import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
 import { HQ_RICH_MENU_INTENTS, type HqRichMenuSeed } from '@/lib/hq-rich-menu-create'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 /* ---------- 手順 ---------- */
 
@@ -2349,7 +2350,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               </li>
             </ol>
             <Field label="順番（1 がいちばん先）" htmlFor="rm-hq-order">
-              <TextInput id="rm-hq-order" inputMode="numeric" value={String(targetingPriority + 1)} onChange={(e) => {
+              <NumberInput numericText id="rm-hq-order" inputMode="numeric" value={String(targetingPriority + 1)} onChange={(e) => {
                 const next = Number(e.target.value.replace(/[^0-9]/g, ''))
                 setTargetingPriority(Number.isFinite(next) && next > 0 ? Math.min(next, 999) - 1 : 0)
               }} />

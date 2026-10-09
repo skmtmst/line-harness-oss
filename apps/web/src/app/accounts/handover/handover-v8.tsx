@@ -38,6 +38,7 @@ import {
 import { formatDateTime, formatNumber } from '@/lib/format'
 import styles from './handover-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 type HandoverDecisionView = AccountHandoverDecision & {
   sourceName?: string
@@ -591,7 +592,7 @@ export default function HandoverV8() {
                 <span className="text-ink-faint text-xs">
                   移し元システムが言う友だち数（申告。分からなければ空欄）
                 </span>
-                <TextInput
+                <NumberInput
                   type="number"
                   min={0}
                   className="mt-1 w-40"

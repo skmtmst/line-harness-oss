@@ -22,6 +22,7 @@ import {
   type OfferTermsFieldValues,
   type ParsedOfferTerms,
 } from './offer-terms'
+import NumberInput from '@/components/shared/number-field'
 
 // ── Offer form modal ─────────────────────────────────────────────────────────
 
@@ -253,10 +254,10 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
           <TextArea id={descriptionId} value={description} onChange={(event) => setDescription(event.target.value)} rows={2} placeholder="案件の説明（任意）" />
         </Field>
         <Field label="報酬額（円）" htmlFor={rewardAmountId} error={fieldErrors.rewardAmount}>
-          <TextField id={rewardAmountId} type="number" min={0} step={1} value={rewardAmount} onChange={(event) => setRewardAmount(event.target.value)} placeholder="例：3000" />
+          <NumberInput unit="円" id={rewardAmountId} type="number" min={0} step={1} value={rewardAmount} onChange={(event) => setRewardAmount(event.target.value)} placeholder="例：3000" />
         </Field>
         <Field label="成果承認時の付与マイル" htmlFor={rewardMilesId} error={fieldErrors.rewardMiles} note="承認された紹介1件ごとに紹介者へ付与します">
-          <TextField id={rewardMilesId} type="number" min={0} step={1} value={rewardMiles} onChange={(event) => setRewardMiles(event.target.value)} placeholder="例：500" />
+          <NumberInput id={rewardMilesId} type="number" min={0} step={1} value={rewardMiles} onChange={(event) => setRewardMiles(event.target.value)} placeholder="例：500" />
         </Field>
 
         {isEdit && termsFailed ? (

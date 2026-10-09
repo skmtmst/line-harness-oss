@@ -49,6 +49,7 @@ import styles from './staff-detail-v8.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -1220,7 +1221,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
                 </span>
                 <label className={styles.fieldLabel}>
                   週の数（1〜12）
-                  <input aria-label="まとめて作る週の数" type="number" min={1} max={12} value={genWeeks} onChange={(event) => setGenWeeks(event.target.value)} className={`${styles.input} mt-1`} />
+                  <NumberInput aria-label="まとめて作る週の数" type="number" min={1} max={12} value={genWeeks} onChange={(event) => setGenWeeks(event.target.value)} className={`${styles.input} mt-1`} />
                 </label>
                 <div className={styles.genAction}>
                   <Button variant="primary" onClick={() => void generateFromRules()} disabled={generating} busy={generating} busyLabel="作成中…">作る</Button>

@@ -119,6 +119,7 @@ import { useAccount } from '@/contexts/account-context'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -1589,7 +1590,7 @@ export default function ScenarioDetailV8({
           <div className="space-y-3">
         <div>
           <label className="block text-xs font-medium text-ink-secondary mb-1">ステップ順序</label>
-          <input
+          <NumberInput
             type="number"
             min={1}
             className="w-32 border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"

@@ -82,6 +82,7 @@ import styles from './list.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 export type { NenTab } from './display'
 
@@ -569,9 +570,9 @@ function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave
         </div>
         <Field label="特典の名前"><TextField value={coupon.benefitLabel} maxLength={40} onChange={(event) => onChange({ ...coupon, benefitLabel: event.target.value })} /></Field>
         <div className={styles.fieldPair}>
-          <Field label="割引額（円）"><TextField {...fields.bind('coupon-discount')} type="number" min={1} max={100000} inputMode="numeric" value={coupon.discountAmount} onChange={(event) => onChange({ ...coupon, discountAmount: Number(event.target.value) })} />
+          <Field label="割引額（円）"><NumberInput unit="円" {...fields.bind('coupon-discount')} type="number" min={1} max={100000} inputMode="numeric" value={coupon.discountAmount} onChange={(event) => onChange({ ...coupon, discountAmount: Number(event.target.value) })} />
 <FieldError id="coupon-discount-error">{fields.error('coupon-discount')}</FieldError></Field>
-          <Field label="使える日数"><TextField {...fields.bind('coupon-days')} type="number" min={1} max={365} inputMode="numeric" value={coupon.validityDays} onChange={(event) => onChange({ ...coupon, validityDays: Number(event.target.value) })} />
+          <Field label="使える日数"><NumberInput {...fields.bind('coupon-days')} type="number" min={1} max={365} inputMode="numeric" value={coupon.validityDays} onChange={(event) => onChange({ ...coupon, validityDays: Number(event.target.value) })} />
 <FieldError id="coupon-days-error">{fields.error('coupon-days')}</FieldError></Field>
         </div>
         <Field label="コードの頭の文字（10文字まで・大文字）"><TextField {...fields.bind('coupon-prefix')} value={coupon.codePrefix} maxLength={10} title="半角大文字・数字・- で3〜10文字" onChange={(event) => onChange({ ...coupon, codePrefix: event.target.value.toUpperCase() })} />

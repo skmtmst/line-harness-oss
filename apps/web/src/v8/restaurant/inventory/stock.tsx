@@ -38,6 +38,7 @@ import type { RestaurantChannel } from './channels'
 import styles from './inventory.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 type Alloc = { ota: number; line: number; walkin: number }
 type Hours = RestaurantOpeningDay[]
@@ -73,7 +74,7 @@ function storeToday(timezone: string | undefined): string {
 
 function NumberField({ label, value, onChange, canEdit, invalid = false }: { label: string; value: number; onChange: (value: number) => void; canEdit: boolean; invalid?: boolean }) {
   return (
-    <TextField
+    <NumberInput
       type="number"
       min={0}
       aria-label={label}

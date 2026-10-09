@@ -45,6 +45,7 @@ import styles from './assign.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
+import NumberInput from '@/components/shared/number-field'
 
 /* 予約設定の5タブ（settings-v8.tsx の V8_TABS と同じ並び）。 */
 const V8_TABS = [
@@ -459,7 +460,7 @@ export default function AssignMatrixV8() {
                     </h3>
                   <div className={styles.overrideFields}>
                     <Field label="このスタッフの所要時間"><span className={styles.unitField}>
-                        <input
+                        <NumberInput
                           type="number"
                           min={1}
                           disabled={!canEditMenus || !selectedRow.is_offered}
@@ -477,7 +478,7 @@ export default function AssignMatrixV8() {
                       </span></Field>
                     <Field label="このスタッフの料金"><span className={styles.unitField}>
                         <span className={styles.unitSuffix}>¥</span>
-                        <input
+                        <NumberInput
                           type="number"
                           min={0}
                           disabled={!canEditMenus || !selectedRow.is_offered}

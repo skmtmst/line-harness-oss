@@ -33,6 +33,7 @@ import { FieldError } from '@/components/shared/form-controls'
 import styles from './create.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import NumberInput from '@/components/shared/number-field'
 
 const OFFER_LIST_PATH = '/conversions?tab=offers'
 
@@ -316,9 +317,9 @@ export default function AffiliateOfferCreateV8() {
           <p className={styles.cardNote}>アフィリエイター側の決まりが「定額」のときにこの額を使います</p>
         </div>
         <div className={styles.pair}>
-          <div className={styles.field}><Field label="報酬額（円）" htmlFor="of-amount"><TextField {...fields.bind('amount')} invalid={fields.invalid('amount')} aria-describedby={describedBy('amount')} id="of-amount" type="number" min={0} step={1} value={rewardAmount} onChange={(event) => setRewardAmount(event.target.value)} placeholder="2000" readOnly={!canEdit} />
+          <div className={styles.field}><Field label="報酬額（円）" htmlFor="of-amount"><NumberInput unit="円" {...fields.bind('amount')} invalid={fields.invalid('amount')} aria-describedby={describedBy('amount')} id="of-amount" type="number" min={0} step={1} value={rewardAmount} onChange={(event) => setRewardAmount(event.target.value)} placeholder="2000" readOnly={!canEdit} />
 <FieldError id="of-amount-error">{fields.error('amount')}</FieldError></Field></div>
-          <div className={styles.field}><Field label="マイル" htmlFor="of-miles" help={<>現金とマイルは併用できます。マイルは標準プログラムで付けます。</>}><TextField {...fields.bind('miles')} invalid={fields.invalid('miles')} aria-describedby={describedBy('miles')} id="of-miles" type="number" min={0} step={1} value={rewardMiles} onChange={(event) => setRewardMiles(event.target.value)} placeholder="200" readOnly={!canEdit} />
+          <div className={styles.field}><Field label="マイル" htmlFor="of-miles" help={<>現金とマイルは併用できます。マイルは標準プログラムで付けます。</>}><NumberInput {...fields.bind('miles')} invalid={fields.invalid('miles')} aria-describedby={describedBy('miles')} id="of-miles" type="number" min={0} step={1} value={rewardMiles} onChange={(event) => setRewardMiles(event.target.value)} placeholder="200" readOnly={!canEdit} />
 <FieldError id="of-miles-error">{fields.error('miles')}</FieldError></Field></div>
         </div>
       </section>

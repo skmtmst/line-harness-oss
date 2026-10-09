@@ -27,6 +27,7 @@ import { nenRanksApi, type NenFeedingData, type NenFeedingKind } from '@/lib/nen
 import { Pill } from './parts'
 import styles from './pets.module.css'
 import { Field } from '@/components/shared/form-controls'
+import NumberInput from '@/components/shared/number-field'
 
 /** 係数の説明（Worker `services/nen-feeding.ts` の ENERGY_FACTORS と同じ値）。 */
 const FACTOR_ROWS: Array<{ label: string; dog: string; cat: string }> = [
@@ -191,7 +192,7 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
             <div className={styles.treat}><Field label="おやつの上限（%）" htmlFor="nen-treat-limit"><span className={styles.treatRow}>
                 <span className={styles.treatInput}>
                   {canEdit ? (
-                    <TextField disabled={busy} id="nen-treat-limit" inputMode="numeric" value={treatLimit} onChange={(event) => { setTreatLimit(event.target.value); touch() }} />
+                    <NumberInput numericText unit="%" disabled={busy} id="nen-treat-limit" inputMode="numeric" value={treatLimit} onChange={(event) => { setTreatLimit(event.target.value); touch() }} />
                   ) : (
                     <TextField id="nen-treat-limit" value={treatLimit} readOnly />
                   )}

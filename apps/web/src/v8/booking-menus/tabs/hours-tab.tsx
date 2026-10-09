@@ -31,6 +31,7 @@ import {
 import styles from '../settings.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import NumberInput from '@/components/shared/number-field'
 
 export function HoursTabV8({ accountId, settings, settingsStatus, settingsError, resources, resourcesStatus, resourcesError, canEdit, menus, onSaved, onReload, onResourceSaved, onResourceCreated, onResourceDeleted, onResourcesRetry }: {
   accountId: string
@@ -220,7 +221,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                       size="compact"
                     />
                     <span className={styles.sameTimeLabel}>同時</span>
-                    <input
+                    <NumberInput
                       aria-label={`${label}の同時受付数（${index + 1}区間目）`}
                       aria-invalid={isBad(weekday, index, 'capacity') || undefined}
                       type="number"
@@ -491,7 +492,7 @@ export function ResourceDialog({ open, onClose, accountId, resource, onSaved }: 
       <div className="grid gap-3">
         <Field label="設備名"><input aria-label="設備名" value={name} onChange={(event) => setName(event.target.value)} disabled={saving} maxLength={100} className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></Field>
         <Field label="種類"><input aria-label="種類" value={type} onChange={(event) => setType(event.target.value)} disabled={saving} maxLength={50} placeholder="例：部屋・席・機器" className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></Field>
-        <Field label="受付上限"><input aria-label="受付上限" type="number" min={1} max={1000} value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={saving} className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm tabular-nums focus:outline-none focus:ring-2" /></Field>
+        <Field label="受付上限"><NumberInput aria-label="受付上限" type="number" min={1} max={1000} value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={saving} className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm tabular-nums focus:outline-none focus:ring-2" /></Field>
         {error ? <p className="text-danger text-xs" role="alert">{error}</p> : null}
         <div className="flex justify-end gap-2">
           <Button onClick={() => { if (!saving) onClose() }} disabled={saving}>キャンセル</Button>

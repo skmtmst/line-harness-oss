@@ -52,6 +52,7 @@ import styles from './visit-stamps.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 type PaperRow = { id: string; card_id?: string; friend_id: string; photo_url: string; stamps: number; status: string; created_at?: string }
 type FriendLite = { id: string; displayName?: string | null; metadata?: Record<string, unknown> | null }
@@ -522,10 +523,10 @@ function VisitStampsScreen() {
                 </div>
                 {settings.mode === 'amount' ? (
                   <div className={`${styles.row2} ${styles.amount}`}>
-                    <Field label="何円ごとに 1個"><TextField {...fieldProps('amountUnit')} value={`${settings.amountUnit.toLocaleString('ja-JP')} 円`} readOnly={ro} inputMode="numeric"
+                    <Field label="何円ごとに 1個"><NumberInput numericText {...fieldProps('amountUnit')} unit="円" value={settings.amountUnit.toLocaleString('ja-JP')} readOnly={ro} inputMode="numeric"
                         onChange={(e) => { const n = Number(e.target.value.replace(/[^\d]/g, '')); set({ amountUnit: Number.isFinite(n) ? n : 0 }) }} />
 {fieldError('amountUnit')}</Field>
-                    <Field label="1回の上限"><TextField {...fieldProps('maxPerVisit')} value={`${settings.maxPerVisit} 個`} readOnly={ro} inputMode="numeric"
+                    <Field label="1回の上限"><NumberInput numericText {...fieldProps('maxPerVisit')} unit="個" value={settings.maxPerVisit} readOnly={ro} inputMode="numeric"
                         onChange={(e) => { const n = Number(e.target.value.replace(/[^\d]/g, '')); set({ maxPerVisit: Number.isFinite(n) ? n : 0 }) }} />
 {fieldError('maxPerVisit')}</Field>
                   </div>
@@ -536,7 +537,7 @@ function VisitStampsScreen() {
                     <Radio name="stamp-interval" checked={interval.mode === 'same_day'} disabled={ro} onChange={() => set({ stampInterval: { mode: 'same_day' } })}>同じ日は1回まで（0時で戻る）</Radio>
                     <div className={styles.hoursRow}>
                       <Radio name="stamp-interval" checked={interval.mode === 'hours'} disabled={ro} onChange={() => set({ stampInterval: { mode: 'hours', hours: interval.hours ?? 3 } })}>前の押印から</Radio>
-                      <TextField {...fieldProps('intervalHours')} aria-label="押印をあける時間" type="number" min={1} max={23} value={interval.hours ?? 3} readOnly={ro} onChange={e => set({ stampInterval: { mode: 'hours', hours: Number(e.target.value) } })} />
+                      <NumberInput {...fieldProps('intervalHours')} aria-label="押印をあける時間" type="number" min={1} max={23} value={interval.hours ?? 3} readOnly={ro} onChange={e => set({ stampInterval: { mode: 'hours', hours: Number(e.target.value) } })} />
                       <span className={styles.plain}>時間あける（1〜23）</span>
                     </div>
                     {fieldError('intervalHours')}
@@ -572,8 +573,8 @@ function VisitStampsScreen() {
                   </span>
                   {ro ? null : <RowActions subjectName="会員ランクの倍率" menuItems={[{ id: 'edit', label: 'ランクと倍率を変える', onSelect: () => setRankOpen(true) }]} />}
                 </div>
-                <Field label="カードを受け取った時のボーナス友だちがカードを受け取った時に押す数（0〜50）＋"><TextField {...fieldProps('receiptBonus')} aria-label="カードを受け取った時のボーナス" type="number" min={0} max={50} readOnly={ro} value={settings.receiptBonus ?? 0} onChange={e => set({ receiptBonus: Number(e.target.value) })} />
-<span>個</span></Field>
+                <Field label="カードを受け取った時のボーナス友だちがカードを受け取った時に押す数（0〜50）＋"><NumberInput unit="個" {...fieldProps('receiptBonus')} aria-label="カードを受け取った時のボーナス" type="number" min={0} max={50} readOnly={ro} value={settings.receiptBonus ?? 0} onChange={e => set({ receiptBonus: Number(e.target.value) })} />
+</Field>
                 {fieldError('receiptBonus')}
                 <div className={styles.row2}>
                   <div className={styles.field}>

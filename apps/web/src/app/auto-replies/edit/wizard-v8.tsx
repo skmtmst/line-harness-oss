@@ -107,6 +107,7 @@ import styles from './wizard-v8.module.css'
 import InsertTextField from '@/components/shared/insert-text-field'
 import { FieldError } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 /*
  * ★V8 自動応答の作成・編集・有効化。
@@ -2169,7 +2170,7 @@ function AutoReplyWizardV8Inner() {
                     {form.cooldownOn ? (
                       <>
                       <span className={styles.toggleUnit}>
-                        <input
+                        <NumberInput
                           id="wiz-cooldown"
                           aria-invalid={!!fieldError('wiz-cooldown') || undefined}
                           aria-describedby={fieldError('wiz-cooldown') ? 'wiz-cooldown-error' : undefined}

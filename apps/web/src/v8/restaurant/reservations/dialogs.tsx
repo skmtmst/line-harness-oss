@@ -16,6 +16,7 @@ import { DialogNote, RsDialog } from '../booking-kit/parts'
 import { INACTIVE_STATUSES, hm, isHold, pad2 } from './format'
 import styles from './reservations.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 function toLocalInput(iso: string): string {
   const date = new Date(iso)
@@ -138,7 +139,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
           </div>
           <div className={styles.pair}>
             <Field label="人数" htmlFor="rs-edit-guests" error={fields.error('count')}>
-              <TextField id="rs-edit-guests" invalid={fields.invalid('count')} type="number" min={1} max={100} required readOnly={!canWrite} value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} />
+              <NumberInput id="rs-edit-guests" invalid={fields.invalid('count')} type="number" min={1} max={100} required readOnly={!canWrite} value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} />
             </Field>
             <Field labelSize="compact" label="卓">
               {canWrite ? (
@@ -252,7 +253,7 @@ export function InboundTrialDialog({ open, busy, onClose, onSubmit }: {
           <TextField id="rs-trial-name" invalid={fields.invalid('name')} required value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} />
         </Field>
         <Field label="人数" htmlFor="rs-trial-guests" error={fields.error('count')}>
-          <TextField id="rs-trial-guests" invalid={fields.invalid('count')} type="number" min={1} max={100} required value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} />
+          <NumberInput id="rs-trial-guests" invalid={fields.invalid('count')} type="number" min={1} max={100} required value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} />
         </Field>
       </div>
       <Field label="開始日時" htmlFor="rs-trial-start" error={fields.error('start')}>

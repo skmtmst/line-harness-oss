@@ -37,6 +37,7 @@ import type { PhonePreset } from './today'
 import { INACTIVE_STATUSES, dayTitle, floorOrder, slotLabel, toYmd } from './format'
 import styles from './reservations.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 const STAY_MINUTES = 120
 const FALLBACK_START = 17 * 60
@@ -297,7 +298,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
             </RadioCardGroup>
             {kind === 'hold' ? (
               <Field label="仮押さえの期限（分）" htmlFor="rs-phone-hold" error={fields.error('hold')}>
-                <TextField id="rs-phone-hold" aria-label="仮押さえの期限（分）" type="number" min={1} max={120} value={holdMinutes} onChange={(event) => setHoldMinutes(event.target.value)} />
+                <NumberInput unit="分" id="rs-phone-hold" aria-label="仮押さえの期限（分）" type="number" min={1} max={120} value={holdMinutes} onChange={(event) => setHoldMinutes(event.target.value)} />
               </Field>
             ) : null}
           </Card>
@@ -362,7 +363,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
                 <DateField size="compact" id="rs-phone-date" invalid={fields.invalid('date')} value={date} onChange={(next) => { setDate(next); setTime('') }} />
               </Field>
               <Field label="人数" htmlFor="rs-phone-count" error={fields.error('count')}>
-                <TextField id="rs-phone-count" type="number" min={1} max={100} required value={count} onChange={(event) => setCount(event.target.value)} />
+                <NumberInput id="rs-phone-count" type="number" min={1} max={100} required value={count} onChange={(event) => setCount(event.target.value)} />
               </Field>
             </div>
             <div className={styles.timeBlock}>

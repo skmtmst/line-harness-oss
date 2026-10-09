@@ -27,6 +27,7 @@ import TestRecipientsSetting from '@/components/accounts/test-recipients-setting
 import { ARCHIVE_BLOCKER_MESSAGES, parseCount, type AccountDetailView } from './view'
 import styles from './dialogs.module.css'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
+import NumberInput from '@/components/shared/number-field'
 
 /** 窓の枠。題・右上の×・中身・下の操作（右寄せ）。 */
 function Frame({ open, node, width, top, title, busy, onCancel, actions, children }: {
@@ -634,10 +635,10 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
         ) : null}
         <div className={styles.pair}>
           <Field label="友だちの上限" htmlFor={ids.cap} error={fields.error('cap')}>
-            <TextField {...fieldProps('cap')} id={ids.cap} inputMode="numeric" placeholder="管理しない" value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={busy} />
+            <NumberInput numericText {...fieldProps('cap')} id={ids.cap} inputMode="numeric" placeholder="管理しない" value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={busy} />
           </Field>
           <Field label="警告を出す人数" htmlFor={ids.warn} error={fields.error('warn')}>
-            <TextField {...fieldProps('warn')} id={ids.warn} inputMode="numeric" placeholder="警告しない" value={warnAt} onChange={(event) => setWarnAt(event.target.value)} disabled={busy} />
+            <NumberInput numericText {...fieldProps('warn')} id={ids.warn} inputMode="numeric" placeholder="警告しない" value={warnAt} onChange={(event) => setWarnAt(event.target.value)} disabled={busy} />
           </Field>
         </div>
         <ImageUploader

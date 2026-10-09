@@ -27,6 +27,7 @@ import { parseYen, yen, type LoadStatus, type SavedHandler } from './parts'
 import styles from './members.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 type MilestoneDraft = { id: string | null; threshold: number; title: string; benefit: string | null; notify: boolean; reachedCount: number }
 
@@ -217,7 +218,7 @@ export default function LifetimeV8({
       >
         {editing ? (
           <div className={styles.editBody}>
-            <Field label="節目（累計の金額）"><TextField {...fields.bind('milestone-threshold')} inputMode="numeric" placeholder="¥50,000" value={editing.threshold} onChange={(event) => setEditing({ ...editing, threshold: event.target.value })} />
+            <Field label="節目（累計の金額）"><NumberInput numericText {...fields.bind('milestone-threshold')} inputMode="numeric" placeholder="¥50,000" value={editing.threshold} onChange={(event) => setEditing({ ...editing, threshold: event.target.value })} />
 <FieldError id="milestone-threshold-error">{fields.error('milestone-threshold')}</FieldError></Field>
             <Field label="称号"><TextField {...fields.bind('milestone-title')} maxLength={30} placeholder="なかよし" value={editing.title} onChange={(event) => setEditing({ ...editing, title: event.target.value })} />
 <FieldError id="milestone-title-error">{fields.error('milestone-title')}</FieldError></Field>

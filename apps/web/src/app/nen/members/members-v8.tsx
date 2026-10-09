@@ -56,6 +56,7 @@ import type { LoadStatus, MemberTab } from './page'
 import { RankChip, yen } from './rank-view'
 import styles from './members-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -806,7 +807,7 @@ export function RankSettingsTabV8({
                         </Td>
                         <Td className="w-36">
                           <span className="flex items-center gap-2">
-                            <TextField aria-label={`しきい値 ${index + 1}`} inputMode="numeric" value={row.threshold} disabled={readonly || isBase} onChange={(event) => update(index, { threshold: event.target.value })} />
+                            <NumberInput numericText aria-label={`しきい値 ${index + 1}`} inputMode="numeric" value={row.threshold} disabled={readonly || isBase} onChange={(event) => update(index, { threshold: event.target.value })} />
                             <span className="shrink-0 text-caption font-semibold text-ink-faint">円〜{isBase ? '（固定）' : null}</span>
                           </span>
                         </Td>
@@ -1063,8 +1064,8 @@ function LifetimeTabV8({
                 <Tr key={row.id ?? `new-${index}`}>
                   <Td className="w-44">
                     <span className="flex items-center gap-2">
-                      <TextField aria-label={`節目 ${index + 1}`} inputMode="numeric" value={row.threshold} disabled={readonly} onChange={(event) => update(index, { threshold: event.target.value })} />
-                      <span className="shrink-0 text-caption font-semibold text-ink-faint">円</span>
+                      <NumberInput numericText unit="円" aria-label={`節目 ${index + 1}`} inputMode="numeric" value={row.threshold} disabled={readonly} onChange={(event) => update(index, { threshold: event.target.value })} />
+                      
                     </span>
                   </Td>
                   <Td className="w-48"><TextField aria-label={`称号 ${index + 1}`} value={row.title} maxLength={30} disabled={readonly} onChange={(event) => update(index, { title: event.target.value })} /></Td>

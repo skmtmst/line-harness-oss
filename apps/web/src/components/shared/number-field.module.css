@@ -1,0 +1,3 @@
+.row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.row > input { flex: 1 1 0; min-width: 0; }
+.unit { flex-shrink: 0; color: var(--color-ink-faint); font-size: var(--text-caption); white-space: nowrap; }

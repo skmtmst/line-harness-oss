@@ -27,6 +27,7 @@ import {
 } from './change-review-model'
 import styles from './change-review-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 /** datetime-local の入力値（壁時計）を見やすく出す。 */
 function formatLocalInput(local: string): string {
@@ -258,7 +259,7 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
                   </label>
                   <label className="grid gap-1 text-xs font-medium text-ink-secondary">
                     定員
-                    <input
+                    <NumberInput
                       type="number"
                       min={1}
                       value={activeEdit?.capacity ?? ''}

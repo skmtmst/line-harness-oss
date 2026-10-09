@@ -39,6 +39,7 @@ import {
 } from './rule-fields'
 import styles from './create.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 const DAILY_CAPS = [
   ['', '制限なし'],
@@ -380,7 +381,7 @@ export default function EarningRuleCreateV8() {
         <div className={styles.fieldRow}>
           <div className={styles.field}>
             <Field label="マイル" htmlFor="er-amount" error={errorOf('er-amount')}>
-              <TextField id="er-amount" type="number" min={1} aria-label="マイル" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <NumberInput id="er-amount" type="number" min={1} aria-label="マイル" value={amount} onChange={(e) => setAmount(e.target.value)} />
             </Field>
           </div>
           <div className={styles.field}>
@@ -464,7 +465,7 @@ export default function EarningRuleCreateV8() {
           <div className={styles.detailsBody}>
             <Field label="付いたマイルの有効期限" htmlFor="er-expiry" error={errorOf('er-expiry')}>
               <span className={styles.inlineRow}>
-                <TextField id="er-expiry" type="number" min={1} max={3650} value={expiresAfterDays} onChange={(e) => setExpiresAfterDays(e.target.value)} aria-label="有効期限の日数" />
+                <NumberInput id="er-expiry" type="number" min={1} max={3650} value={expiresAfterDays} onChange={(e) => setExpiresAfterDays(e.target.value)} aria-label="有効期限の日数" />
                 <span className={styles.cardNote}>日後（空欄なら期限なし）</span>
               </span>
             </Field>

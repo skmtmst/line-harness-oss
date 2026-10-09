@@ -32,6 +32,7 @@ import { EVENT_DEFAULT_DRAFT, ENTRY_CUTOFF_OPTIONS, NONE, jstToUtcIso, todayJst 
 import styles from './create.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import NumberInput from '@/components/shared/number-field'
 
 const PER_FRIEND_OPTIONS = [
   { value: NONE, label: '制限なし' },
@@ -336,7 +337,7 @@ function EventsCreateV8Inner() {
           </div>
         </div>
         <div className={styles.pair}>
-          <div className={styles.field}><Field label="定員" htmlFor="ev-new-cap"><TextField
+          <div className={styles.field}><Field label="定員" htmlFor="ev-new-cap"><NumberInput numericText
               id="ev-new-cap"
               inputMode="numeric"
               value={capacity}

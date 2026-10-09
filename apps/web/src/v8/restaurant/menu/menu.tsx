@@ -24,6 +24,7 @@ import RestaurantShell, { Panel, Stat, StatRow, Status, type RestaurantV8Context
 import { DialogField, DialogNote, RowMore, RsDialog } from '../booking-kit/parts'
 import styles from './menu.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 export function safeArray(value: string): string[] {
   try {
@@ -228,7 +229,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
         </DialogField>
         <div className={styles.pair}>
           <DialogField label="価格（税込）" htmlFor="rs-menu-price">
-            <TextField id="rs-menu-price" type="number" min={0} required value={draft.price} onChange={(event) => setDraft({ ...draft, price: event.target.value })} />
+            <NumberInput id="rs-menu-price" type="number" min={0} required value={draft.price} onChange={(event) => setDraft({ ...draft, price: event.target.value })} />
           </DialogField>
           <DialogField label="提供時間" kind="select">
             <Select

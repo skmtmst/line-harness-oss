@@ -9,6 +9,7 @@ import { Th } from '@/components/shared/table'
 import { WEBINAR_SAKURA_COMMENTS_MAX } from '@/components/webinars/webinar-limits'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
 import { ApiError, webinarApi, type WebinarSakuraComment } from '@/lib/api'
+import NumberInput from '@/components/shared/number-field'
 
 function validateImportRow(raw: unknown): WebinarSakuraComment | string {
   if (typeof raw !== 'object' || raw === null) return 'オブジェクトではありません'
@@ -149,7 +150,7 @@ export default function CommentsV8({ webinarId, onDirtyChange, registerSave }: {
                     {comments.map((c, i) => (
                       <tr key={i}>
                         <td className="px-4 py-2">
-                          <input
+                          <NumberInput
                             type="number"
                             value={c.atSeconds}
                             onChange={(e) => update(i, { atSeconds: Number(e.target.value) })}

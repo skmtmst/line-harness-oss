@@ -16,6 +16,7 @@ import { FieldError } from '@/components/shared/form-controls'
 import { useFormErrors, type FormErrors } from '@/lib/use-form-errors'
 import { WEEKDAYS, minuteLabel } from './display'
 import styles from './visit-stamps.module.css'
+import NumberInput from '@/components/shared/number-field'
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <SharedField label={label}>{children}</SharedField>
@@ -48,7 +49,7 @@ export function RewardDialog({ open, reward, onClose, onSave }: {
       onConfirm={() => { if (fields.submit().length === 0) onSave({ id: reward?.id ?? `reward-${Date.now().toString(36)}`, name: name.trim(), stamps: n }) }}>
       <div className={styles.dialogBody}>
         <CheckedField id="vs-reward-name" label="特典の名前" fields={fields} name="name"><TextField {...checkedProps(fields, 'name', 'vs-reward-name')} value={name} onChange={(e) => setName(e.target.value)} placeholder="例：ドリンク 1杯" maxLength={100} /></CheckedField>
-        <CheckedField id="vs-reward-stamps" label="何個で使えるか" fields={fields} name="stamps"><TextField {...checkedProps(fields, 'stamps', 'vs-reward-stamps')} value={stamps} onChange={(e) => setStamps(e.target.value)} inputMode="numeric" placeholder="例：5" /></CheckedField>
+        <CheckedField id="vs-reward-stamps" label="何個で使えるか" fields={fields} name="stamps"><NumberInput numericText {...checkedProps(fields, 'stamps', 'vs-reward-stamps')} value={stamps} onChange={(e) => setStamps(e.target.value)} inputMode="numeric" placeholder="例：5" /></CheckedField>
       </div>
     </Dialog>
   )
@@ -145,7 +146,7 @@ export function BonusDialog({ open, value, onClose, onSave }: { open: boolean; v
   fields.define('count', 'はじめての来店で足す個数', () => (Number.isInteger(n) && n >= 1 ? null : '1 以上の数で入れてください。'))
   return (
     <Dialog open={open} title="初回来店ボーナス" confirmLabel="変える" onCancel={onClose} onConfirm={() => { if (fields.submit().length === 0) onSave(n) }}>
-      <CheckedField id="vs-bonus-count" label="はじめての来店で足す個数" fields={fields} name="count"><TextField {...checkedProps(fields, 'count', 'vs-bonus-count')} value={count} onChange={(e) => setCount(e.target.value)} inputMode="numeric" /></CheckedField>
+      <CheckedField id="vs-bonus-count" label="はじめての来店で足す個数" fields={fields} name="count"><NumberInput numericText {...checkedProps(fields, 'count', 'vs-bonus-count')} value={count} onChange={(e) => setCount(e.target.value)} inputMode="numeric" /></CheckedField>
     </Dialog>
   )
 }

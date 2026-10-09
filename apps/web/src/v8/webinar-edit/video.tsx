@@ -38,6 +38,7 @@ import styles from './video.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
 
@@ -446,7 +447,7 @@ function SessionRow({ webinarId, at, readOnly, editing, onEdit, menu }: {
       <span className={styles.colCap}>
         {editing ? (
           <span className={styles.capEdit}>
-            <TextField id={capId} aria-label={`${when}の定員（人）`} inputMode="numeric" value={input} disabled={saving} placeholder="無制限" invalid={Boolean(capError)} aria-describedby={capError ? `${capId}-error` : undefined} onChange={(event) => { setInput(event.target.value); setCapError('') }} />
+            <NumberInput numericText id={capId} aria-label={`${when}の定員（人）`} inputMode="numeric" value={input} disabled={saving} placeholder="無制限" invalid={Boolean(capError)} aria-describedby={capError ? `${capId}-error` : undefined} onChange={(event) => { setInput(event.target.value); setCapError('') }} />
             <IconButton aria-label="定員を保存" title="定員を保存" disabled={saving} onClick={() => void save()}><Check size={15} aria-hidden="true" /></IconButton>
           </span>
         ) : <span className={styles.cell}>{session === undefined ? emptyValue('unknown') : session?.capacity == null ? '無制限' : `${formatNumber(session.capacity)} 人`}</span>}
@@ -594,7 +595,7 @@ function ReplaceVideoDialog({ ctx, asset, onAsset, onClose }: { ctx: EditContext
           ...(media ?? []).map((item) => ({ value: item.id, label: item.filename })),
           ...(choice && choice !== EXTERNAL && media && !media.some((item) => item.id === choice) ? [{ value: choice, label: '今の動画' }] : []),
         ]} />
-        <div className={form.field}><Field label="動画の長さ（分）" htmlFor="wd-minutes"><TextField id="wd-minutes" inputMode="numeric" value={minutes} invalid={Boolean(minutesError)} aria-describedby={minutesError ? 'wd-minutes-error' : undefined} onChange={(event) => { setMinutes(event.target.value); setMinutesError('') }} />
+        <div className={form.field}><Field label="動画の長さ（分）" htmlFor="wd-minutes"><NumberInput numericText unit="分" id="wd-minutes" inputMode="numeric" value={minutes} invalid={Boolean(minutesError)} aria-describedby={minutesError ? 'wd-minutes-error' : undefined} onChange={(event) => { setMinutes(event.target.value); setMinutesError('') }} />
 <FieldError id="wd-minutes-error">{minutesError}</FieldError></Field></div>
         {nexts.length > 0 ? (
           <div className={form.field}>

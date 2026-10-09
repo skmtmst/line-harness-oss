@@ -47,6 +47,7 @@ import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -1251,7 +1252,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                   <span className={layout.label}>開始日</span>
                   <span className={styles.dateBox}><DateField aria-label="まとめて作り始める日" value={genFrom} onChange={setGenFrom} /></span>
                 </div>
-                <div className={layout.field}><Field label="週の数（1〜12）" htmlFor="bks-weeks"><input id="bks-weeks" aria-label="まとめて作る週の数" type="number" min={1} max={12} value={genWeeks} onChange={(event) => setGenWeeks(event.target.value)} className={layout.input} /></Field></div>
+                <div className={layout.field}><Field label="週の数（1〜12）" htmlFor="bks-weeks"><NumberInput id="bks-weeks" aria-label="まとめて作る週の数" type="number" min={1} max={12} value={genWeeks} onChange={(event) => setGenWeeks(event.target.value)} className={layout.input} /></Field></div>
                 {canEdit ? (
                   <Button variant="primary" onClick={() => void generateFromRules()} disabled={generating} busy={generating} busyLabel="作成中…">
                     <CalendarPlus className={styles.btnIcon} aria-hidden="true" />作る

@@ -43,6 +43,7 @@ import { AffiliatePaymentConfirmDialog } from './dialogs'
 import { StatusPill } from './parts'
 import styles from './affiliate-drawer.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 const JOURNEY_PAGE_SIZE = 30
 
@@ -596,12 +597,12 @@ function SettlementEditor({
           { value: 'fixed', label: '成果1件ごとに定額' },
           { value: 'rate', label: '売上に対する割合' },
         ]} />
-        {rewardMode === 'rate' ? <TextField aria-label="報酬の割合（%）" type="number" min={0} max={100} step="0.1" value={rate} onChange={(e) => setRate(e.target.value)} /> : null}
+        {rewardMode === 'rate' ? <NumberInput aria-label="報酬の割合（%）" type="number" min={0} max={100} step="0.1" value={rate} onChange={(e) => setRate(e.target.value)} /> : null}
         <Field label="連絡先" htmlFor="af-settlement-email" error={fieldErrors.email}>
           <TextField id="af-settlement-email" ref={emailRef} type="email" value={email} onChange={(event) => { setEmail(event.target.value); setFieldErrors((old) => ({ ...old, email: undefined })) }} placeholder="partner@example.com" />
         </Field>
         <Field label="確定までの保留（日）" htmlFor="af-settlement-hold" error={fieldErrors.hold}>
-          <TextField id="af-settlement-hold" ref={holdRef} type="number" min={0} max={365} value={holdDays} onChange={(event) => { setHoldDays(event.target.value); setFieldErrors((old) => ({ ...old, hold: undefined })) }} placeholder="なし" />
+          <NumberInput unit="日" id="af-settlement-hold" ref={holdRef} type="number" min={0} max={365} value={holdDays} onChange={(event) => { setHoldDays(event.target.value); setFieldErrors((old) => ({ ...old, hold: undefined })) }} placeholder="なし" />
         </Field>
         <Field label="支払いサイクル" htmlFor="af-settlement-cycle">
           <TextField id="af-settlement-cycle" value={payoutCycle} onChange={(event) => setPayoutCycle(event.target.value)} placeholder="例：月末締め翌月末払い" maxLength={100} />

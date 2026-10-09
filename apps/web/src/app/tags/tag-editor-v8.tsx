@@ -37,6 +37,7 @@ import {
 } from '@/components/friend-fields/tag-editor-v4'
 import styles from './tag-editor-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 /** 連動 OFF のときに出す「ON にすると何ができるか」（v7 と同じ内容）。 */
 const LINKED_PREVIEW = [
@@ -420,12 +421,12 @@ export default function TagEditorV8({
                 <div className={styles.fieldGrid2}>
                   <label className={styles.field}>
                     <span className={styles.fieldLabel}>本人へのマイル付与</span>
-                    <span className={styles.numberRow}><input type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={styles.input} /><span className={styles.unit}>mile</span></span>
+                    <span className={styles.numberRow}><NumberInput type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={styles.input} /><span className={styles.unit}>mile</span></span>
                     <span className={styles.fieldHint}>このタグが付いた本人へ、一度だけ積みます。</span>
                   </label>
                   <label className={styles.field}>
                     <span className={styles.fieldLabel}>紹介者へのマイル付与</span>
-                    <span className={styles.numberRow}><input type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={styles.input} /><span className={styles.unit}>mile</span></span>
+                    <span className={styles.numberRow}><NumberInput type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={styles.input} /><span className={styles.unit}>mile</span></span>
                     <span className={styles.fieldHint}>紹介経由の友だちなら、その紹介者にも積みます。</span>
                   </label>
                   <label className={styles.field}>

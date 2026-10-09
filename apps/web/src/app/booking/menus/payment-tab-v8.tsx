@@ -7,6 +7,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { bookingApi, type BookingMenu, type BookingPaymentAdminConfig } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import NumberInput from '@/components/shared/number-field'
 
 type PayMode = 'none' | 'onsite' | 'online'
 type PayProvider = 'none' | 'onsite' | 'stripe'
@@ -156,7 +157,7 @@ export default function PaymentTabV8({ accountId, menus, canEdit }: {
         {draft.mode === 'online' && (
           <label>
             仮押さえの期限（分）
-            <input
+            <NumberInput
               type="number"
               min={5}
               max={1440}

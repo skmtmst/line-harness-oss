@@ -36,6 +36,7 @@ import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import { formatCampaignTiming } from '../campaign-display'
 import { formatNumber } from '@/lib/format'
 import styles from './campaign-editor-v8.module.css'
+import NumberInput from '@/components/shared/number-field'
 
 const TRIGGER_LABEL: Record<string, string> = {
   'ec.order.confirmed': '注文を受け付けたとき',
@@ -320,7 +321,7 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
                 きっかけ
                 <p className={styles.static}>{triggerLabel(setting)}</p>
                 {!isBirthday ? <label className={styles.delay}>
-                  <TextInput aria-label="きっかけからの日数" type="number" min={0} max={365}
+                  <NumberInput aria-label="きっかけからの日数" type="number" min={0} max={365}
                     value={String(merged.delayDays)} onChange={(event) => setDraft((previous) => ({ ...previous, delayDays: Number(event.target.value) }))} />
                   <span>日後</span>
                 </label> : null}
@@ -417,7 +418,7 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
             {mileageAction?.kind === 'award_mileage' ? (
               <div className={styles.actionRow}>
                 <div>
-                  <label className={styles.fieldLabel}>回答後に付けるマイル<TextInput aria-label="回答後に付けるマイル" type="number" min={1} max={1_000_000} step={1} value={mileageAction.amount || ''} onChange={(event) => setActions(actions.map((action) => action === mileageAction ? { ...action, amount: Number(event.target.value) } : action))} /></label>
+                  <label className={styles.fieldLabel}>回答後に付けるマイル<NumberInput aria-label="回答後に付けるマイル" type="number" min={1} max={1_000_000} step={1} value={mileageAction.amount || ''} onChange={(event) => setActions(actions.map((action) => action === mileageAction ? { ...action, amount: Number(event.target.value) } : action))} /></label>
                   <p className={styles.note}>回答フォームへの送信をきっかけにしています</p>
                 </div>
                 <Button type="button" variant="secondary" aria-label="マイル付与を外す" onClick={() => setActions(actions.filter((action) => action !== mileageAction))}>外す</Button>

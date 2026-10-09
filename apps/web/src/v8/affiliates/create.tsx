@@ -34,6 +34,7 @@ import { SettingCheckbox } from '@/components/shared/checkbox'
 import { distributionUrl } from './display'
 import styles from './create.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 const FRIEND_PAGE_SIZE = 20
 const LIST_PATH = '/affiliates'
@@ -463,7 +464,7 @@ export default function CreateAffiliateV8() {
         </RadioCardGroup>
         {payoutKind === 'rate' ? (
           <Field label="売上に対する割合（%）" htmlFor="af-rate" error={fieldErrors.rate}>
-            <TextField id="af-rate" type="number" min={0} step="0.1" value={commissionRate} onChange={(event) => { setCommissionRate(event.target.value); clearField('rate') }} placeholder="10" />
+            <NumberInput unit="%" id="af-rate" type="number" min={0} step="0.1" value={commissionRate} onChange={(event) => { setCommissionRate(event.target.value); clearField('rate') }} placeholder="10" />
           </Field>
         ) : null}
         <div className={styles.grid2}>

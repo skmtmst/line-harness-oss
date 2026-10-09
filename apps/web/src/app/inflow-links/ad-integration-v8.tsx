@@ -33,6 +33,7 @@ import { RowActions } from '@/components/shared/row-actions'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import styles from './ad-integration-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 const LOG_PAGE_SIZE = 20
 
@@ -608,7 +609,7 @@ function ManualEntryDialogs({ model }: { model: AdV8Model }) {
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-amount-v8">費用（円）</label>
-            <TextField
+            <NumberInput numericText
               id="ad-cost-amount-v8"
               inputMode="numeric"
               value={model.manualAmount}

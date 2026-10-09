@@ -13,6 +13,7 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { formatPhotoReceivedAt } from './photo-review-time'
 import styles from './photo-review-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 const policyContent = (version: PhotoRewardPolicyVersion) => `採用 ${version.points} マイル・公式サイト掲載 さらに ${version.publicationPoints ?? 0} マイル`
 
@@ -88,8 +89,8 @@ export default function PhotoPolicyHistoryV8({ open, canEdit, onClose, onChanged
           <section className={styles.railCard}><h3 className={styles.railTitle}>予約中の版</h3>{reserved.length ? reserved.map((version) => <div key={version.versionNumber}><p>v{version.versionNumber} <Chip tone="info">予約</Chip></p><p className={styles.railNote}>{version.effectiveFrom ? `${formatPhotoReceivedAt(version.effectiveFrom)}から` : emptyValue('unknown')}</p><p className={styles.railNote}>{policyContent(version)}</p></div>) : <p className={styles.railNote}>予約中の版はありません</p>}</section>
           {canEdit ? <form className={styles.railCard} onSubmit={(event) => { event.preventDefault(); void save() }}>
             <h3 className={styles.railTitle}>引き出し：新しい版を作る</h3><p className={styles.railRow}>保存しても、使い始めの日時までは今の版のままです。</p>
-            <div className={styles.historyFields}><label className={styles.fieldLabel}>採用したら（マイル）<TextField aria-label="採用したら（マイル）" inputMode="numeric" value={points} onChange={(event) => setPoints(event.target.value.replace(/[^0-9]/g, '').slice(0, 6))} disabled={saving} /></label>
-              <label className={styles.fieldLabel}>掲載されたら（さらに）<TextField aria-label="掲載されたら（さらに）" inputMode="numeric" value={publicationPoints} onChange={(event) => setPublicationPoints(event.target.value.replace(/[^0-9]/g, '').slice(0, 6))} disabled={saving} /></label></div>
+            <div className={styles.historyFields}><label className={styles.fieldLabel}>採用したら（マイル）<NumberInput numericText aria-label="採用したら（マイル）" inputMode="numeric" value={points} onChange={(event) => setPoints(event.target.value.replace(/[^0-9]/g, '').slice(0, 6))} disabled={saving} /></label>
+              <label className={styles.fieldLabel}>掲載されたら（さらに）<NumberInput numericText aria-label="掲載されたら（さらに）" inputMode="numeric" value={publicationPoints} onChange={(event) => setPublicationPoints(event.target.value.replace(/[^0-9]/g, '').slice(0, 6))} disabled={saving} /></label></div>
             <p className={styles.railNote}>掲載時の追加報酬は、同じ写真に一度だけ付与します。</p>
             <label className={styles.fieldLabel}>ひとこと（なぜ変えるか）<TextField value={summary} maxLength={200} disabled={saving} onChange={(event) => setSummary(event.target.value)} /></label>
             <label className={styles.fieldLabel}>使い始め（日本時間・空ならすぐ）<TextField type="datetime-local" value={effective} disabled={saving} onChange={(event) => setEffective(event.target.value)} /></label>

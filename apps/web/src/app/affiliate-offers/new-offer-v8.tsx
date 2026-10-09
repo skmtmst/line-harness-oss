@@ -18,6 +18,7 @@ import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import { formatNumber } from '@/lib/format'
 import '../affiliates/create-v8.css'
+import NumberInput from '@/components/shared/number-field'
 
 const OFFER_LIST_PATH = '/conversions?tab=offers'
 
@@ -273,7 +274,7 @@ export function NewOfferV8() {
             <div className="af-create-grid2">
               <label className="af-create-fieldLabel" htmlFor="of-amount">
                 報酬額（円）
-                <TextField
+                <NumberInput
                   id="of-amount"
                   type="number"
                   min={0}
@@ -285,7 +286,7 @@ export function NewOfferV8() {
               </label>
               <label className="af-create-fieldLabel" htmlFor="of-miles">
                 マイル（任意） 任意
-                <TextField
+                <NumberInput
                   id="of-miles"
                   type="number"
                   min={0}

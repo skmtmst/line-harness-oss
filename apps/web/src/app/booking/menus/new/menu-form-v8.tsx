@@ -52,6 +52,7 @@ import styles from './menu-form-v8.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -854,7 +855,7 @@ export default function MenuFormV8() {
               <label className={styles.field}>
                 <span className={styles.label}>かかる時間</span>
                 <span className={styles.unitField}>
-                  <input
+                  <NumberInput unit="分"
                     type="number"
                     min={1}
                     value={durationMinutes}
@@ -870,7 +871,7 @@ export default function MenuFormV8() {
                     aria-label="かかる時間（分）"
                     aria-invalid={fieldErrors.duration !== undefined}
                   />
-                  <span className={styles.unitSuffix}>分</span>
+                  
                 </span>
                 {fieldErrors.duration !== undefined ? (
                   <span className="text-danger mt-1 text-xs" role="alert">{fieldErrors.duration}</span>
@@ -880,7 +881,7 @@ export default function MenuFormV8() {
                 <span className={styles.label}>金額（空なら「お問い合わせ」）</span>
                 <span className={styles.unitField}>
                   <span className={styles.unitSuffix}>¥</span>
-                  <input
+                  <NumberInput
                     type="number"
                     min={0}
                     value={basePrice}
@@ -984,22 +985,22 @@ export default function MenuFormV8() {
                   <div className={styles.ruleRow}>
                     <span className={styles.ruleLabel}>先の予約が取れる範囲</span>
                     <span className={`${styles.ruleValue} ${styles.ruleOwn}`}>
-                      <input type="number" min={1} value={windowDays} onChange={(e) => setWindowDays(e.target.value)} aria-label="先の予約が取れる範囲（日）" />
+                      <NumberInput type="number" min={1} value={windowDays} onChange={(e) => setWindowDays(e.target.value)} aria-label="先の予約が取れる範囲（日）" />
                       <span className={styles.unitSuffix}>日先まで</span>
                     </span>
                   </div>
                   <div className={styles.ruleRow}>
                     <span className={styles.ruleLabel}>受付の締め切り</span>
                     <span className={`${styles.ruleValue} ${styles.ruleOwn}`}>
-                      <input type="number" min={1} value={cutoffHours} onChange={(e) => setCutoffHours(e.target.value)} aria-label="受付の締め切り（時間前）" />
-                      <span className={styles.unitSuffix}>時間前</span>
+                      <NumberInput unit="時間前" type="number" min={1} value={cutoffHours} onChange={(e) => setCutoffHours(e.target.value)} aria-label="受付の締め切り（時間前）" />
+                      
                     </span>
                   </div>
                   <div className={styles.ruleRow}>
                     <span className={styles.ruleLabel}>キャンセルの期限</span>
                     <span className={`${styles.ruleValue} ${styles.ruleOwn}`}>
-                      <input type="number" min={1} value={cancelDeadlineHours} onChange={(e) => setCancelDeadlineHours(e.target.value)} aria-label="キャンセルの期限（時間前）" />
-                      <span className={styles.unitSuffix}>時間前</span>
+                      <NumberInput unit="時間前" type="number" min={1} value={cancelDeadlineHours} onChange={(e) => setCancelDeadlineHours(e.target.value)} aria-label="キャンセルの期限（時間前）" />
+                      
                     </span>
                   </div>
                 </>
@@ -1038,20 +1039,20 @@ export default function MenuFormV8() {
               <label className={styles.field}>
                 <span className={styles.label}>同時に受けられる件数</span>
                 <span className={styles.unitField}>
-                  <input
+                  <NumberInput unit="件"
                     type="number"
                     min={1}
                     value={concurrentCapacity}
                     onChange={(e) => setConcurrentCapacity(e.target.value)}
                     aria-label="同時に受けられる件数"
                   />
-                  <span className={styles.unitSuffix}>件</span>
+                  
                 </span>
               </label>
               <label className={styles.field}>
                 <span className={styles.label}>後の空き時間（片付け・移動）</span>
                 <span className={styles.unitField}>
-                  <input
+                  <NumberInput unit="分"
                     type="number"
                     min={0}
                     value={bufferAfterMinutes}
@@ -1067,7 +1068,7 @@ export default function MenuFormV8() {
                     aria-label="後の空き時間（分）"
                     aria-invalid={fieldErrors.buffer !== undefined}
                   />
-                  <span className={styles.unitSuffix}>分</span>
+                  
                 </span>
                 {fieldErrors.buffer !== undefined ? (
                   <span className="text-danger mt-1 text-xs" role="alert">{fieldErrors.buffer}</span>

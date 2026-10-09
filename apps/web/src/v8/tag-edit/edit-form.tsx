@@ -41,6 +41,7 @@ import { MULTIPLIERS, PRIORITIES, actionsSummary, buildUsageRows, mileageSummary
 import styles from './edit.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 export interface TagEditHost {
   initialValues: TagEditorValues
@@ -386,9 +387,9 @@ export function TagEditForm({
                     <h3 className={styles.subTitle}>タグが付いたときに積むマイル</h3>
                   </div>
                   <div className={styles.pair}>
-                    <Field label="本人へのマイル付与"><span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{reward || '0'}</span> : <input type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={styles.input} />}<span className={styles.unit}>mile</span></span>
+                    <Field label="本人へのマイル付与"><span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{reward || '0'}</span> : <NumberInput type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={styles.input} />}<span className={styles.unit}>mile</span></span>
 <span className={styles.hint}>このタグが付いた本人へ、一度だけ積みます。</span></Field>
-                    <Field label="紹介者へのマイル付与"><span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{referralReward || '0'}</span> : <input type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={styles.input} />}<span className={styles.unit}>mile</span></span>
+                    <Field label="紹介者へのマイル付与"><span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{referralReward || '0'}</span> : <NumberInput type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={styles.input} />}<span className={styles.unit}>mile</span></span>
 <span className={styles.hint}>紹介経由の友だちなら、その紹介者にも積みます。</span></Field>
                   </div>
                   {readOnly ? (

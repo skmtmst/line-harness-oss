@@ -28,6 +28,7 @@ import { useFormErrors } from '@/lib/use-form-errors'
 import styles from './mileage.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 /** 手でマイルを動かすときの失敗の言葉（app/mileage/friends/detail/mileage-adjustment-dialog.tsx から写した）。 */
 export function mileageAdjustmentErrorMessage(error: unknown): string {
@@ -383,7 +384,7 @@ export default function MileageAdjustDialog({
           <div className={`${styles.dlgGrid2} ${styles.dateGrid}`}>
             <div>
               <p className={styles.dlgFieldLabel}>マイル数</p>
-              <input
+              <NumberInput numericText
                 {...fields.bind('amount')}
                 className={styles.dlgInput}
                 inputMode="numeric"
@@ -467,7 +468,7 @@ export default function MileageAdjustDialog({
               <p className={styles.dlgPersonName}>高額調整の承認境界が未設定です</p>
               <p className={styles.dlgPersonSub}>この値以上は、この画面では実行せず、別のオーナー承認を必要とします。</p>
               <div className={styles.policyRow}>
-                <input
+                <NumberInput numericText
                   className={styles.dlgInput}
                   inputMode="numeric"
                   value={policyThresholdText}

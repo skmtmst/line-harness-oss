@@ -51,6 +51,7 @@ import {
   type ResearchQuestion,
 } from './template-asset-editor'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 /** 画面ごとの見出しと説明（Pencil の絵のまま）。 */
 const V8_META: Record<AssetKind, { title: string; lead: string; designNode: string }> = {
@@ -599,14 +600,14 @@ export default function TemplateAssetEditorV8({ kind, visual = false }: { kind: 
                   <div className={styles.fieldRowEven}>
                     <Field label="当たる確率" htmlFor="ta8-lottery-rate">
                       <span className="flex items-center gap-2">
-                        <input id="ta8-lottery-rate" type="number" min={1} max={100} className={inputClass} value={lotteryRate} onChange={(event) => setLotteryRate(event.target.value)} />
-                        <span className={styles.muted}>%</span>
+                        <NumberInput unit="%" id="ta8-lottery-rate" type="number" min={1} max={100} className={inputClass} value={lotteryRate} onChange={(event) => setLotteryRate(event.target.value)} />
+                        
                       </span>
                     </Field>
                     <Field label="当選人数の上限" htmlFor="ta8-winner-limit">
                       <span className="flex items-center gap-2">
-                        <input id="ta8-winner-limit" type="number" min={1} className={inputClass} value={winnerLimit} onChange={(event) => setWinnerLimit(event.target.value)} />
-                        <span className={styles.muted}>人</span>
+                        <NumberInput unit="人" id="ta8-winner-limit" type="number" min={1} className={inputClass} value={winnerLimit} onChange={(event) => setWinnerLimit(event.target.value)} />
+                        
                       </span>
                     </Field>
                   </div>

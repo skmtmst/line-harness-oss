@@ -16,6 +16,7 @@ import { ctaCardProblems } from './cta-card-validation'
 import { extractEditConflict } from './webinar-edit-conflict-band'
 import type { CompareMine } from './webinar-edit-compare-dialog'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 /* 申込フォームの候補（編集画面の CtaDesignStep と同じ形）。 */
 type FormCandidates = {
@@ -338,7 +339,7 @@ export default function CtaV8({
                     </label>
                     <label className="block">
                       <span className="text-ink-secondary mb-1 block text-xs font-medium">出す時刻（分:秒）</span>
-                      <input
+                      <NumberInput numericText
                         value={times[currentIndex] ?? ''}
                         onChange={(e) =>
                           setTimes((prev) => prev.map((t, j) => (j === currentIndex ? e.target.value : t)))

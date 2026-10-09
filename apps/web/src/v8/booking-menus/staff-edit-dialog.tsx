@@ -15,6 +15,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
 import { api, type BookingStaff } from '@/lib/api'
+import NumberInput from '@/components/shared/number-field'
 
 export function StaffEditModal({
   staff,
@@ -118,7 +119,7 @@ export function StaffEditModal({
             />
           </Field>
           <Field label="並び順">
-            <input
+            <NumberInput
               type="number"
               value={form.sort_order ?? 0}
               onChange={(e) => set('sort_order', Number(e.target.value))}

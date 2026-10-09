@@ -59,6 +59,7 @@ import {
 } from './first-step/first-step-form'
 import { formatNumber } from '@/lib/format'
 import styles from './first-step-v8.module.css'
+import NumberInput from '@/components/shared/number-field'
 
 const modeLabel: Record<DeliveryMode, string> = {
   absolute_time: '時刻で指定',
@@ -614,7 +615,7 @@ export default function ScenarioFirstStepV8() {
                         <div className={styles.field}>
                           <span className={styles.fieldLabel}>購読開始から</span>
                           <div className={styles.whenInputs}>
-                            <input
+                            <NumberInput
                               type="number"
                               min={0}
                               value={offsetDays}
@@ -648,7 +649,7 @@ export default function ScenarioFirstStepV8() {
                           <div className={styles.field}>
                             <span className={styles.fieldLabel}>さらに</span>
                             <div className={styles.whenInputs}>
-                              <input
+                              <NumberInput unit="時間"
                                 type="number"
                                 min={0}
                                 max={23}
@@ -659,8 +660,8 @@ export default function ScenarioFirstStepV8() {
                                 className={styles.whenNumber}
                                 aria-label="さらに何時間後"
                               />
-                              <span className={styles.whenUnit}>時間</span>
-                              <input
+                              
+                              <NumberInput
                                 type="number"
                                 min={0}
                                 max={59}

@@ -28,6 +28,7 @@ import type {
 import { deduplicationLabel } from './dedup'
 import { originInfoOf } from './origin-labels'
 import { readExclusionView, type ExclusionCondition } from './exclusion'
+import NumberInput from '@/components/shared/number-field'
 
 /**
  * 編集の入力（N-252）。
@@ -555,7 +556,7 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
             ) : null}</Field>
           {editForm.valueMode === 'fixed' ? (
             <Field label="1件あたりの金額" htmlFor="cv-edit-value" error={editFieldIssue?.field === 'cv-edit-value' ? editFieldIssue.message : undefined}>
-              <TextField
+              <NumberInput numericText
                 aria-label="1件あたりの金額"
                 inputMode="numeric"
                 value={editForm.fixedValue}
@@ -571,7 +572,7 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
             /></Field>
           {editForm.deduplicationMode === 'window' ? (
             <Field label="数えない日数（1〜365）" htmlFor="cv-edit-window" error={editFieldIssue?.field === 'cv-edit-window' ? editFieldIssue.message : undefined}>
-              <TextField
+              <NumberInput numericText
                 aria-label="数えない日数"
                 inputMode="numeric"
                 value={editForm.deduplicationWindowDays}
@@ -594,7 +595,7 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
             help="友だち追加からこの日数までの成果を数えます。同じ人を数えない「数えない日数」とは別の設定です。"
             helpLabel="計測期間"
           >
-            <TextField
+            <NumberInput numericText unit="日"
               aria-label="友だち追加からの計測期間"
               inputMode="numeric"
               value={editForm.attributionDays}

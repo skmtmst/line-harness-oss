@@ -63,6 +63,7 @@ import { describeReminderDiff } from './reminder-conflict-diff'
 import styles from '../wizard-v8.module.css'
 import { formatNumber } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 /*
  * ★V8 リマインダを作る・手順2〜5と完了。
@@ -1199,7 +1200,7 @@ function TimingEditor({
     return (
       <div className={styles.timingRow}>
         <span>基準日の</span>
-        <TextInput
+        <NumberInput unit="日"
           type="number"
           min={0}
           max={365}
@@ -1211,7 +1212,7 @@ function TimingEditor({
             if (Number.isInteger(next) && next >= 0) onChange({ offsetDays: after ? next : -next })
           }}
         />
-        <span>日</span>
+        
         <Select
           value={after ? 'after' : 'before'}
           onChange={(next) => onChange({ offsetDays: next === 'after' ? days : -days })}
@@ -1245,7 +1246,7 @@ function TimingEditor({
   return (
     <div className={styles.timingRow}>
       <span>基準日の</span>
-      <TextInput
+      <NumberInput
         type="number"
         min={0}
         aria-label="基準日からの時間"

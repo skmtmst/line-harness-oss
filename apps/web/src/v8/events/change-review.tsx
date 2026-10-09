@@ -25,6 +25,7 @@ import { jstDay, jstTime } from './shared'
 import styles from './change-review.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 /** datetime-local（日本時間の壁時計）→「10:30」。 */
 function localTime(local: string): string {
@@ -290,7 +291,7 @@ function ChangeReview({ eventId }: { eventId: string }) {
 {endError ? <p id="ev-cr-end-error" className={styles.fieldError} role="alert">{endError}</p> : null}</Field></div>
           </div>
           <div className={styles.pair}>
-            <div className={styles.field}><Field label="定員" htmlFor="ev-cr-cap"><TextField
+            <div className={styles.field}><Field label="定員" htmlFor="ev-cr-cap"><NumberInput numericText
                 id="ev-cr-cap"
                 inputMode="numeric"
                 aria-invalid={Boolean(capacityError) || undefined}
