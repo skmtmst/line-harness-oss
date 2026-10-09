@@ -1967,6 +1967,8 @@ export type BroadcastMessageAsset = {
   id: string;
   lineAccountId: string | null;
   kind: BroadcastAssetKind;
+  publishedVersion?: number;
+  publishedPayload?: Record<string, unknown>;
   name: string;
   payload: Record<string, unknown>;
   createdAt: string;
@@ -4065,6 +4067,7 @@ export type TemplateQuestion = {
     reply?: string
     repeatReply?: string
     addTagIds?: string[]
+    scoreChange?: number | null
     removeTagIds?: string[]
     field?: { fieldId: string; value: string }
   }>
@@ -6593,7 +6596,7 @@ export const api = {
       body: JSON.stringify({ lineAccountId: accountId, expectedVersion, ...data }),
     }),
     // 色は受け取らない。印の色はフォルダ（tagGroups）に付く。
-    create: (data: { name: string; groupId?: string | null }) =>
+    create: (data: { name: string; groupId?: string | null; lineAccountId?: string }) =>
       fetchApi<ApiResponse<Tag>>('/api/tags', {
         method: 'POST',
         body: JSON.stringify(data),

@@ -1,3 +1,5 @@
+import { handleResearchTap } from '../services/research-tap.js';
+import { handleExtraPostback } from '../services/tap-extras.js';
 import {stableWebhookStepId} from '../services/incoming-webhook-receipts.js';
 import { workflowLineClient } from '../services/workflow-line-client.js';
 import type { WorkflowExecution } from '../services/workflow-execution.js';
@@ -1197,7 +1199,17 @@ async function handleEvent(
     const friend = await ensureFriendFromWebhookUser(db, lineClient, userId, lineAccountId);
     if (!friend) return;
 
-    const rawPostbackData = (event as unknown as { postback: { data: string } }).postback.data;
+    let rawPostbackData = (event as unknown as { postback: { data: string } }).postback.data;
+    if (rawPostbackData.startsWith('tx=')) {
+      const inner = await replay('tap_extra', () => handleExtraPostback(execution?.mutationDb('tap_extra') ?? db, friend.id, lineAccountId ?? null, rawPostbackData, event.webhookEventId));
+      if (inner === null) return;
+      rawPostbackData = inner;
+    }
+    if (rawPostbackData.startsWith('research:')) {
+      const text = await replay('research_tap', () => handleResearchTap(db, friend.id, lineAccountId ?? null, rawPostbackData));
+      if (event.replyToken) await lineClient.replyMessage(event.replyToken, [{ type: 'text', text }]);
+      return;
+    }
     if (rawPostbackData.startsWith('coupon_use:')) {
       const assetId = rawPostbackData.slice('coupon_use:'.length);
       const result = await redeemCoupon(db, friend, lineAccountId ?? null, assetId, event.webhookEventId);

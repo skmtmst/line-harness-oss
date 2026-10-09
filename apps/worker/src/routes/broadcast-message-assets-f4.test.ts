@@ -215,3 +215,24 @@ describe('F4 素材の公開・下書き・版', () => {
     expect(total).toBe(listBody.data.length);
   });
 });
+
+describe('押下の追加処理の保存HTTP', () => {
+  it('タグ・加点を保存して読み戻し、別店と小数の更新は元の下書きを変えない', async () => {
+    store.raw.exec(`INSERT INTO tenants(id,name) VALUES ('tenant-1','Tenant');
+      INSERT INTO tags(id,name,line_account_id) VALUES ('tag-own','興味','account-1'),('tag-out','別店','account-2');`);
+    const payload={...COUPON,tapExtras:{tagIds:['tag-own'],scoreChange:10}};
+    const response=await createAsset({lineAccountId:'account-1',kind:'coupon',name:'追加処理',payload});
+    expect(response.status).toBe(201);
+    const body=await response.json() as {data:{id:string;payload:unknown}};
+    expect(body.data.payload).toMatchObject(payload);
+    const loaded=await app().request('/api/broadcast-message-assets?lineAccountId=account-1',{},bindings);
+    expect(await loaded.json()).toMatchObject({data:[{payload}]});
+    for (const tapExtras of [{tagIds:['tag-out'],scoreChange:10},{tagIds:['tag-own'],scoreChange:1.5}]) {
+      const rejected=await app().request(`/api/broadcast-message-assets/${body.data.id}`,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({name:'更新',payload:{...COUPON,tapExtras}})},bindings);
+      expect(rejected.status).toBe(422);
+      expect(await rejected.json()).toMatchObject({code:'TAP_EXTRA_INVALID',field:'tapExtras'});
+    }
+    const after=await app().request('/api/broadcast-message-assets?lineAccountId=account-1',{},bindings);
+    expect(await after.json()).toMatchObject({data:[{payload}]});
+  });
+});

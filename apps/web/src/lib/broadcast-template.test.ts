@@ -40,6 +40,18 @@ describe('broadcast template conversion', () => {
     expect(bubble.content).toMatchObject({ assetId: 'asset-1', assetName: '夏クーポン' })
   })
 
+  it('pins research choices and tap extras to the published version, including when a draft exists', () => {
+    const published = [{ format: 'single', required: true, text: '質問', choices: ['公開済み'], choiceTapExtras: [{ scoreChange: 10 }] }]
+    const bubble = contentTemplateToBubble({
+      id: 'survey', lineAccountId: 'store', kind: 'research', name: 'アンケート', publishedVersion: 2,
+      publishedPayload: { questions: published },
+      payload: { questions: [{ format: 'single', required: true, text: '下書き', choices: ['未公開'], choiceTapExtras: [{ scoreChange: 100 }] }] },
+      createdAt: '', updatedAt: '',
+    })
+    expect(bubble.content).toMatchObject({ assetId: 'survey', assetVersion: 2, questions: published })
+    expect(bubbleLegacyMessage(bubble).messageContent).toContain('research:survey:2:0:0')
+  })
+
   it('uses raw Flex JSON as the legacy message content', () => {
     expect(bubbleLegacyMessage({
       id: 'bubble-id',

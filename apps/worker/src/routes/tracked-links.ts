@@ -1,3 +1,4 @@
+import { extrasFromTrackedLink } from '../services/tap-extras.js';
 import { recordTrackedClick, processTrackedClick } from '../services/tracked-click-steps.js';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
@@ -389,7 +390,7 @@ trackedLinks.get('/t/:linkId', async (c) => {
   const accountId=await resolveLinkAccountId(c.env.DB,link);
   const points=friendId ? await getUrlReachConversionPoints(c.env.DB,link.original_url,accountId) : [];
   const click=await recordTrackedClick(c.env.DB,{linkId:link.id,friendId,accountId,tagId:link.tag_id,scenarioId:link.scenario_id,
-    linkName:link.name,conversionPointIds:points.map(point=>point.id)});
+    linkName:link.name,conversionPointIds:points.map(point=>point.id),tapExtras:extrasFromTrackedLink(link)});
   c.executionCtx.waitUntil(processTrackedClick(c.env,click.id,click.plan).catch(()=>{
     console.error('tracked_click_work_pending');
   }));

@@ -1,3 +1,4 @@
+import { hasTapExtras, validateTapExtrasTree, type TapExtras } from './tap-extras.js';
 import { validateFlexMessage } from './line-message-limits.js';
 /**
  * 配信用素材 → LINE の正規形。
@@ -14,6 +15,7 @@ import { validateFlexMessage } from './line-message-limits.js';
 export type BroadcastAssetKind = 'rich_message' | 'card_message' | 'coupon' | 'research';
 
 export interface AssetCardInput {
+  tapExtras?: TapExtras;
   imageUrl?: unknown;
   title?: unknown;
   description?: unknown;
@@ -26,6 +28,7 @@ export interface AssetCardInput {
 export interface AssetPayloadInput {
   cards?: unknown;
   moreCard?: unknown;
+  tapExtras?: TapExtras;
   imageUrl?: unknown;
   description?: unknown;
   actionUrl?: unknown;
@@ -34,6 +37,7 @@ export interface AssetPayloadInput {
   tapAreas?: unknown;
   coordinateUnit?: unknown;
   assetId?: unknown;
+  assetVersion?: unknown;
   startsAt?: unknown;
   endsAt?: unknown;
   oncePerFriend?: unknown;
@@ -96,6 +100,8 @@ function httpsUrl(value: string): boolean {
  * が保存・送信の直前で具体的に指摘する。
  */
 export function validateAssetPayload(kind: BroadcastAssetKind, payload: AssetPayloadInput): string | null {
+  const extrasError = validateTapExtrasTree(payload);
+  if (extrasError) return extrasError;
   if (kind === 'card_message') {
     const cards = Array.isArray(payload.cards) ? payload.cards : [];
     if (cards.length < 1 || cards.length > ASSET_MAX_PANELS) {
@@ -122,6 +128,7 @@ export function validateAssetPayload(kind: BroadcastAssetKind, payload: AssetPay
       if(!item || typeof item!=='object') return '質問の内容を確認してください';
       const q=item as Record<string,unknown>;
       if(!text(q.text) || !['single','multiple','free'].includes(String(q.format)) || typeof q.required!=='boolean') return '質問文・答え方・必須の指定を確認してください';
+      if(q.choiceTapExtras !== undefined && (!Array.isArray(q.choiceTapExtras) || q.choiceTapExtras.length !== (q.format === 'free' ? 0 : Array.isArray(q.choices) ? q.choices.length : 0))) return '選択肢ごとの追加処理を確認してください';
       if(q.format!=='free' && (!Array.isArray(q.choices) || q.choices.length<1 || q.choices.length>13 || q.choices.some(choice=>!text(choice)))) return '選択肢は1〜13件で設定してください';
     }
     // 質問のみでも店のリサーチとして保存できる。
@@ -151,6 +158,7 @@ function convertCardMessage(name: string, payload: AssetPayloadInput): AssetConv
     actionUrl: text(card.actionUrl),
     actionType: card.actionType ?? 'uri',
     actionText: text(card.actionText),
+    tapExtras: card.tapExtras,
   }));
 
   // 画像の有無は全部そろえる決まり。1枚だけ違うと、その枚だけ高さが
@@ -181,8 +189,8 @@ function convertCardMessage(name: string, payload: AssetPayloadInput): AssetConv
       ...(card.title ? { title: card.title } : {}),
       text: body,
       actions: [card.actionType === 'message'
-        ? { type: 'message', label: card.actionLabel || '送る', text: card.actionText }
-        : { type: 'uri', label: card.actionLabel || '詳しく見る', uri: card.actionUrl }],
+        ? { type: 'message', label: card.actionLabel || '送る', text: card.actionText, ...(card.tapExtras ? { tapExtras: card.tapExtras } : {}) }
+        : { type: 'uri', label: card.actionLabel || '詳しく見る', uri: card.actionUrl, ...(card.tapExtras ? { tapExtras: card.tapExtras } : {}) }],
     });
   }
 
@@ -224,12 +232,13 @@ export function richMessageActions(payload: AssetPayloadInput, height: number): 
     const right = Math.min(1040, Math.round(percent ? (x + w) * 10.4 : x + w));
     const bottom = Math.min(height, Math.round(percent ? (y + h) * height / 100 : y + h));
     if (right <= left || bottom <= top) return { error: `タップ範囲${index + 1}が小さすぎます` };
-    const action = { area: { x: left, y: top, width: right - left, height: bottom - top }, ...(text(area.label) ? { label: text(area.label).slice(0,100) } : {}) };
+    const action = { ...(area.tapExtras ? { tapExtras: area.tapExtras } : {}), area: { x: left, y: top, width: right - left, height: bottom - top }, ...(text(area.label) ? { label: text(area.label).slice(0,100) } : {}) };
     if (area.actionType === 'uri') {
       const uri = text(area.uri ?? area.value ?? area.linkUri);
       if (!/^(https?:|line:|tel:)/i.test(uri) || uri.length > 1000) return { error: `タップ範囲${index + 1}のリンク先を確認してください` };
       actions.push({ ...action, type: 'uri', linkUri: uri });
     } else if (area.actionType === 'message') {
+      if (hasTapExtras(area.tapExtras as TapExtras)) return { error: `タップ範囲${index + 1}のテキストを送る動きでは、タグ・加点を使えません` };
       const message = text(area.text ?? area.value);
       if (!message || message.length > 400) return { error: `タップ範囲${index + 1}の送る文章は1〜400文字で入力してください` };
       actions.push({ ...action, type: 'message', text: message });
@@ -267,7 +276,7 @@ function convertCoupon(name: string, payload: AssetPayloadInput): AssetConversio
   const bubble = { type: 'bubble',
     ...(text(payload.imageUrl) ? { hero: { type: 'image', url: text(payload.imageUrl), size: 'full', aspectMode: 'fit' } } : {}),
     body: { type: 'box', layout: 'vertical', spacing: 'md', contents: body },
-    footer: { type: 'box', layout: 'vertical', contents: [{ type: 'button', style: 'primary', action: { type: 'postback', label: '使う', data: `coupon_use:${assetId}` } }] },
+    footer: { type: 'box', layout: 'vertical', contents: [{ type: 'button', style: 'primary', action: { type: 'postback', label: '使う', data: `coupon_use:${assetId}`, ...(payload.tapExtras ? { tapExtras: payload.tapExtras } : {}) } }] },
   };
   const sizeError = validateFlexMessage(bubble);
   if (sizeError) return {ok:false,error:sizeError};
@@ -291,6 +300,21 @@ export function couponDate(value: string): number {
 }
 
 function convertNotice(kind: 'research', payload: AssetPayloadInput): AssetConversion {
+  if (Array.isArray(payload.questions) && payload.questions.length) {
+    const error = validateAssetPayload('research', payload);
+    if (error) return { ok: false, error };
+    const assetId = text(payload.assetId);
+    if (!assetId) return { ok: false, error: 'リサーチを素材として保存してから選んでください' };
+    const version = Number(payload.assetVersion);
+    if (!Number.isSafeInteger(version) || version < 1) return { ok: false, error: 'リサーチを公開してから選んでください' };
+    const questions = payload.questions as Array<{ text: string; format: string; choices: string[] }>;
+    if (questions.some(q => q.format === 'free')) return { ok: false, error: '自由入力の質問は回答フォームで作ってください' };
+    const bubbles = questions.map((q, qi) => ({ type: 'bubble', body: { type: 'box', layout: 'vertical', contents: [{ type: 'text', text: q.text, wrap: true, weight: 'bold' }] }, footer: { type: 'box', layout: 'vertical', contents: q.choices.map((label, ci) => ({ type: 'button', action: { type: 'postback', label: label.slice(0,20), data: `research:${assetId}:${version}:${qi}:${ci}`, displayText: label.slice(0,300) } })) } }));
+    const contents = bubbles.length === 1 ? bubbles[0] : { type: 'carousel', contents: bubbles };
+    const sizeError = validateFlexMessage(contents);
+    if (sizeError) return { ok: false, error: sizeError };
+    return { ok: true, message: { messageType: 'flex', messageContent: JSON.stringify(contents), altText: questions[0].text.slice(0,400) } };
+  }
   // リサーチの内容とリンク先をそのまま
   // 読める文にする。**素材の中身の JSON を本文にしない。**
   const description = text(payload.description);
