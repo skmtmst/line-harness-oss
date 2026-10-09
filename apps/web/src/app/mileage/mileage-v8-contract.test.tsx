@@ -293,6 +293,19 @@ test('v8 のたまる決めごとは板 OC0gy に切り替わる', async () => {
   expect(host.textContent).not.toContain('準備中')
 })
 
+test('v8 のたまる決めごと：きっかけ（購入・配信の反応・紹介）は上の絞り込み。左のフォルダの列は「すべて」だけで押せない口を置かない（B-136）', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  await act(async () => root.render(<MileagePage />))
+  await settle()
+  await eventually(() => expect(host.textContent).toContain('友だち追加'))
+  const nav = host.querySelector('nav[aria-label="フォルダ"]') as HTMLElement
+  const rows = [...nav.querySelectorAll('button[title]')].map((b) => b.getAttribute('title'))
+  expect(rows).toEqual(['すべて'])
+  expect(nav.textContent).not.toContain('購入')
+  expect(host.textContent).not.toContain('フォルダを追加')
+  expect(host.querySelector('button[aria-label="きっかけ"], [aria-label="きっかけ"]')).toBeTruthy()
+})
+
 test('v8 のタブごとに板 ID が替わる（S35pO・CJlf4・oRbJi・IRPw8）', async () => {
   document.documentElement.dataset.theme = 'v8'
   for (const [tab, node, word] of [
