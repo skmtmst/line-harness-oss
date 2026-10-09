@@ -203,7 +203,7 @@ export async function executeQuestionAnswer(
     && (a.choice_index ?? null)===choiceIndex)) await stage(`action:${action.id}`,async owned=>{
       const references=await validateScenarioActionReferences(db,target.scenarioAccountId,action.action_type,JSON.parse(action.config_json))
       if(!references.ok)throw new Error('answer_resource_unavailable')
-      const outcome=await runActionRows(owned,[action],friend.id,{fires:target.pinnedActions?'pinned':'live',accountId:target.scenarioAccountId})
+      const outcome=await runActionRows(owned,[action],friend.id,{fires:target.pinnedActions?'pinned':'live',accountId:target.scenarioAccountId,sourceEventId:execution.sourceEventId,executorDependencies:{resolveLineAccessToken:async()=> 'existing-client',createLineClient:()=>lineClient}})
       if(outcome.failed || outcome.skippedIncomplete) throw new Error('answer_action_failed')
       return outcome
     })

@@ -130,6 +130,9 @@ export default function InlineActionRowsV8({ actions, onChange, ...options }: Pr
                     marks={options.marks}
                     scenarios={options.scenarios}
                     vars={options.vars}
+                    templates={options.templates}
+                    reminders={options.reminders}
+                    events={options.events}
                     onChange={(config) => update(action.key, { config })}
                   />
                 )}

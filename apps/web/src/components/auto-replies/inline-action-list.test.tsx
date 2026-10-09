@@ -71,3 +71,9 @@ it('担当者通知の通知先と本文を編集し、必要な版も保存す�
  expect(changed).toHaveBeenCalledWith([expect.objectContaining({config:{notificationRuleId:'r',notificationRuleVersion:2,message:'確認してください'}})]);
  expect(screen.getByText(/通知先と本文が選ばれていません/)).toBeTruthy();
 });
+
+it.each([['send_template','テンプレート','案内'],['reminder','リマインダ','翌日'],['event_booking','イベント予約','相談会']] as const)('%sの候補を編集欄に渡す', (actionType,label,selected) => {
+  render(<InlineActionList actions={[{key:'target',actionType,config:{templateId:'t',reminderId:'r',eventId:'e'},onFailure:'continue'}]} onChange={()=>{}} {...EMPTY_OPTIONS} templates={[{id:'t',name:'案内'}]} reminders={[{id:'r',name:'翌日'}]} events={[{id:'e',name:'相談会'}]} />)
+  expect(screen.getByText(selected)).toBeTruthy()
+  expect(screen.getByRole('button',{name:label+'：変える'})).toBeTruthy()
+})

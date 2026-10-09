@@ -1,9 +1,9 @@
-import { runActionRows, type ScenarioActionRow } from './scenario-actions.js';
+import { runActionRows, type ScenarioActionRow, type RunActionRowsOptions } from './scenario-actions.js';
 import { couponDate, couponPayloadError } from '@line-crm/shared';
 import { getBroadcastMessageAsset, toJstString, type Friend } from '@line-crm/db';
 
 /** 署名検証済みWebhookだけが呼ぶ。1文で期限・回数・イベント再送を確かめる。 */
-export async function redeemCoupon(db: D1Database, friend: Friend, accountId: string | null, assetId: string, eventId: string, now = new Date()): Promise<{ ok: boolean; message: string; replayed?: boolean }> {
+export async function redeemCoupon(db: D1Database, friend: Friend, accountId: string | null, assetId: string, eventId: string, now = new Date(), runtime: RunActionRowsOptions = {}): Promise<{ ok: boolean; message: string; replayed?: boolean }> {
   if (friend.line_account_id !== accountId) return { ok:false,message:'このクーポンは使えません' };
   const existing = await db.prepare('SELECT id FROM coupon_redemptions WHERE incoming_event_id = ? AND friend_id = ?').bind(eventId,friend.id).first();
   if (existing) return { ok: true, message: 'クーポンの使用を記録しました', replayed: true };
@@ -26,7 +26,7 @@ export async function redeemCoupon(db: D1Database, friend: Friend, accountId: st
         choice_index: null, sort_order: index, action_type: action.actionType,
         config_json: JSON.stringify(action.config ?? {}), condition_json: null, repeat_on_refire: 1,
       })) as ScenarioActionRow[];
-      const effects = await runActionRows(db, rows, friend.id, { accountId });
+      const effects = await runActionRows(db, rows, friend.id, { ...runtime, accountId, sourceEventId: eventId });
       if (effects.failed || effects.skippedIncomplete) return { ok: true, message: 'クーポンの使用を記録しました。使用後の処理に失敗したため、お店に確認してください' };
       return { ok: true, message: 'クーポンの使用を記録しました' };
     } catch { return { ok: true, message: 'クーポンの使用を記録しました。使用後の処理に失敗したため、お店に確認してください' }; }

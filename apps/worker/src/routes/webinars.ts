@@ -573,6 +573,7 @@ webinarRoutes.post('/api/liff/webinars/:slug/heartbeat', async (c) => {
         friendId: auth.friendId,
         sessionStartAt,
         trigger: 'completed',
+        executorDependencies: { credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY, operatorMailEnv: c.env },
       }).catch((err) => console.error('webinar completed actions failed:', err)));
     }
     return c.json({ ok: true });
@@ -797,6 +798,7 @@ webinarRoutes.post('/api/liff/webinars/:slug/cta-click', async (c) => {
       friendId: auth.friendId,
       sessionStartAt,
       trigger: 'cta_clicked',
+      executorDependencies: { credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY, operatorMailEnv: c.env },
     }).catch((err) => console.error('webinar cta actions failed:', err)));
     return c.json({ ok: true });
   } catch (err) {

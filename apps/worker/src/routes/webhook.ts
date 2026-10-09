@@ -1221,7 +1221,7 @@ async function handleEvent(
     const rawPostbackData = (event as unknown as { postback: { data: string } }).postback.data;
     if (rawPostbackData.startsWith('coupon_use:')) {
       const assetId = rawPostbackData.slice('coupon_use:'.length);
-      const result = await redeemCoupon(db, friend, lineAccountId ?? null, assetId, event.webhookEventId);
+      const result = await redeemCoupon(db, friend, lineAccountId ?? null, assetId, event.webhookEventId, new Date(), {executorDependencies:{resolveLineAccessToken:async()=> 'existing-client',createLineClient:()=>lineClient}});
       if (!result.replayed && event.replyToken) await lineClient.replyMessage(event.replyToken, [{ type: 'text', text: result.message }]);
       return;
     }
@@ -1257,6 +1257,7 @@ async function handleEvent(
         const result = await handleCarouselTap(db, lineClient, friend, carouselTap, {
           lineAccountId,
           replyToken: event.replyToken,
+          sourceEventId: event.webhookEventId,
         });
         // 制限にかかったときは、ここで終わる。自動応答まで回すと、
         // 「もう押せません」と自動応答の両方が届く。
