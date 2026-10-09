@@ -31,7 +31,6 @@ import {
   Circle,
   CircleCheck,
   CircleAlert,
-  Image as ImageIcon,
   RectangleHorizontal,
   RectangleVertical,
   Repeat,
@@ -63,6 +62,7 @@ import Dialog from '@/components/shared/dialog'
 import VersionCompare from '@/components/shared/version-compare'
 import LinePreview from '@/components/shared/line-preview'
 import TapAreaEditor from '@/components/shared/tap-area-editor'
+import MediaSlot from '@/components/shared/media-slot'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import { CanvasEditor, areaDisplayName, type Area } from '@/components/rich-menus/canvas-editor'
 import { AreaProperties, intentLabelOf, intentOf } from '@/components/rich-menus/area-properties'
@@ -485,7 +485,6 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const { selectedAccount } = useAccount()
   const publishAttempt = useRef(new ManualPublishAttempt())
   /* ①の画像の枠ごとのファイル入力（タブの順）。 */
-  const tabFileInputs = useRef<Array<HTMLInputElement | null>>([])
 
   /*
    * 重ねの撮影用に `?step=buttons|audience|publish` で最初の手順を指定できる。
@@ -2086,28 +2085,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     }
   }
 
-  /** 枠ごとのファイル入力（見えない）。読み上げ名で枠と結ぶ。 */
-  function slotFileInput(index: number, label: string) {
-    return (
-      <input
-        ref={(el) => { tabFileInputs.current[index] = el }}
-        type="file"
-        accept="image/png,image/jpeg"
-        className="sr-only"
-        aria-label={label}
-        tabIndex={-1}
-        onChange={(e) => {
-          const file = e.target.files?.[0] ?? null
-          e.target.value = ''
-          handlePickedFile(file, index)
-        }}
-      />
-    )
-  }
-
   /*
-   * 画像の入れ方は今のまま（ファイル・登録メディア）。
-   * ImageSlot（共通部品・作業役 imgslot）ができたら、renderSingleImage と renderTabImageSlot の中身をそれに差し替える。
+   * 画像の枠は共通の「画像を追加する所」（MediaSlot・Z7vd2・B-128）。
+   * 入れ方は今のまま（ファイル・登録メディア）。作る前は選んだファイルを手元に置き、作った後はページへ送る（handlePickedFile）。
    */
   function renderSingleImage() {
     const dims = RICH_MENU_DIMENSIONS[size]
@@ -2116,68 +2096,38 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     const canPick = Boolean(accountId) || Boolean(host)
     return (
       <>
-        {slotFileInput(0, '画像のファイル')}
         <div className={styles.imageRow}>
-          {image ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element -- 認証つきの管理用URL・ローカルの見本 */}
-              <img src={image.src} alt={`選択中の画像: ${image.name}`} className={styles.imageThumb} />
-              <div className={styles.imageMeta}>
+          <div className={styles.imageSlot}>
+            <MediaSlot
+              size="compact"
+              title="画像を追加"
+              previewAlt={image ? `選択中の画像: ${image.name}` : undefined}
+              value={image?.src ?? null}
+              accept="image/png,image/jpeg"
+              limitText="PNG・JPEG・1MB まで"
+              aspectRatio={`${dims.width} / ${dims.height}`}
+              disabled={!canPick || busy}
+              removable={Boolean(image?.removable)}
+              onFile={(file) => handlePickedFile(file, 0)}
+              onRemove={() => clearPendingImage(0)}
+              onMediaPick={host ? undefined : accountId ? () => { setImagePickTarget(0); setMediaPickerOpen(true) } : undefined}
+            />
+          </div>
+          <div className={styles.imageMeta}>
+            {image ? (
+              <>
                 <span className="font-semibold text-ink">{image.name}</span>
                 <span className={imageOk === true ? styles.imageMetaOk : undefined}>
                   {image.dims ? `${image.dims.w}×${image.dims.h}・` : ''}
                   {image.kb !== null ? `${image.kb}KB` : ''}
                   {imageOk === true ? '・大きさは合っています' : imageOk === false ? '・大きさが合いません' : ''}
                 </span>
-                <span className="flex gap-2">
-                  {host ? null : <Button type="button" onClick={() => { setImagePickTarget(0); setMediaPickerOpen(true) }} disabled={!accountId}>
-                    <ImageIcon size={15} aria-hidden /> 登録メディアから選ぶ
-                  </Button>}
-                  {image.removable ? (
-                    <Button type="button" onClick={() => clearPendingImage(0)}>
-                      選ばない
-                    </Button>
-                  ) : (
-                    <Button type="button" onClick={() => tabFileInputs.current[0]?.click()} disabled={!canPick || busy}>
-                      ファイルを選ぶ
-                    </Button>
-                  )}
-                </span>
-                <button type="button" className={styles.guideLink} onClick={() => setImageGuideOpen(true)}>
-                  <BookOpen size={15} aria-hidden />画像の作り方（大きさ・押しやすい余白）
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              {/* 板 `JeINq`：絵の画像の枠（180×121）。画像なしでは押すとファイルを選ぶ。 */}
-              <Button
-                type="button"
-                aria-label="画像ファイルを選ぶ"
-                disabled={!canPick}
-                onClick={() => tabFileInputs.current[0]?.click()}
-                className="bg-success-bg text-accent-deep h-30 w-45 shrink-0 rounded-control border border-hairline text-caption font-semibold disabled:opacity-50"
-              >
-                <span className="flex flex-col items-center justify-center gap-1">
-                  <ImageIcon size={20} aria-hidden />
-                  画像を選ぶ
-                </span>
-              </Button>
-              <div className="flex min-w-0 flex-1 flex-col gap-2">
-                <span className="flex flex-wrap gap-2">
-                  {host ? null : <Button type="button" onClick={() => { setImagePickTarget(0); setMediaPickerOpen(true) }} disabled={!accountId}>
-                    <ImageIcon size={15} aria-hidden /> 登録メディアから選ぶ
-                  </Button>}
-                  <Button type="button" onClick={() => tabFileInputs.current[0]?.click()} disabled={!canPick}>
-                    ファイルを選ぶ
-                  </Button>
-                </span>
-                <button type="button" className={styles.guideLink} onClick={() => setImageGuideOpen(true)}>
-                  <BookOpen size={15} aria-hidden />画像の作り方（大きさ・押しやすい余白）
-                </button>
-              </div>
-            </>
-          )}
+              </>
+            ) : null}
+            <button type="button" className={styles.guideLink} onClick={() => setImageGuideOpen(true)}>
+              <BookOpen size={15} aria-hidden />画像の作り方（大きさ・押しやすい余白）
+            </button>
+          </div>
         </div>
         {imageOk === false ? (
           <p className={styles.fieldError} role="alert">
@@ -2199,36 +2149,20 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     return (
       <div key={index} className={styles.tabImageSlot}>
         <span className={styles.tabImageHead}>{`タブ${index + 1}「${tabName}」`}</span>
-        {slotFileInput(index, `タブ${index + 1}の画像のファイル`)}
-        <button
-          type="button"
-          className={styles.tabImageBox}
-          data-filled={image ? '' : undefined}
-          style={{ aspectRatio: `${dims.width} / ${dims.height}` }}
-          aria-label={`タブ${index + 1}の画像ファイルを選ぶ`}
+        <MediaSlot
+          size="compact"
+          title={`タブ${index + 1}の画像を追加`}
+          previewAlt={image ? `タブ${index + 1}の画像: ${image.name}` : undefined}
+          value={image?.src ?? null}
+          accept="image/png,image/jpeg"
+          limitText="1MB まで"
+          aspectRatio={`${dims.width} / ${dims.height}`}
           disabled={!canPick}
-          onClick={() => tabFileInputs.current[index]?.click()}
-        >
-          {image ? (
-            // eslint-disable-next-line @next/next/no-img-element -- 認証つきの管理用URL・ローカルの見本
-            <img src={image.src} alt={`タブ${index + 1}の画像: ${image.name}`} />
-          ) : (
-            <span className={styles.tabImageEmpty}>
-              <ImageIcon size={18} aria-hidden />
-              画像を追加
-            </span>
-          )}
-        </button>
-        <span className="flex flex-wrap gap-2">
-          {host ? null : <Button type="button" size="compact" onClick={() => { setImagePickTarget(index); setMediaPickerOpen(true) }} disabled={!accountId || unsaved}>
-            <ImageIcon size={15} aria-hidden /> 登録メディアから選ぶ
-          </Button>}
-          {image?.removable ? (
-            <Button type="button" size="compact" onClick={() => clearPendingImage(index)}>
-              選ばない
-            </Button>
-          ) : null}
-        </span>
+          removable={Boolean(image?.removable)}
+          onFile={(file) => handlePickedFile(file, index)}
+          onRemove={() => clearPendingImage(index)}
+          onMediaPick={host || !accountId ? undefined : () => { setImagePickTarget(index); setMediaPickerOpen(true) }}
+        />
         {unsaved ? <p className={styles.fieldHint}>下書きを保存すると、このタブの画像を入れられます。</p> : null}
         {imageOk === false ? (
           <p className={styles.fieldError} role="alert">

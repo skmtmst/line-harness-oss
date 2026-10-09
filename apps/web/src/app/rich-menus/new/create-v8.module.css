@@ -154,14 +154,8 @@
   flex-wrap: wrap;
 }
 
-.imageThumb {
-  width: 180px;
-  height: auto;
-  border-radius: var(--radius-control, 8px);
-  border: 1px solid var(--color-hairline);
-  object-fit: cover;
-  background: var(--color-canvas-sunken);
-}
+/* 画像の枠（MediaSlot）の幅。絵の置き場 180。 */
+.imageSlot { width: 180px; flex-shrink: 0; }
 
 .imageMeta {
   display: flex;
@@ -566,17 +560,10 @@
 /* 採用案 K6Ot7O：①のタブの名前（タブの数だけ横に並べる）。 */
 .tabNameGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: var(--tpl-hb2-op-col-gap); }
 
-/* 採用案 K6Ot7O：①の画像（タブごとに1枚）。枠を横に並べ、上にタブ〇「名前」。
- * ImageSlot（共通部品）ができたら枠はそちらへ移す。 */
+/* 採用案 K6Ot7O：①の画像（タブごとに1枚）。枠（MediaSlot）を横に並べ、上にタブ〇「名前」。 */
 .tabImageGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: var(--tpl-hb2-op-col-gap); }
 .tabImageSlot { display: flex; flex-direction: column; gap: var(--tpl-hb2-op-field-gap); min-width: 0; }
 .tabImageHead { overflow: hidden; color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.tabImageBox { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; padding: 0; overflow: hidden; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas-sunken); color: var(--color-ink-secondary); font: inherit; cursor: pointer; }
-.tabImageBox[data-filled] { background: var(--color-success-bg); }
-.tabImageBox:disabled { cursor: default; opacity: 0.6; }
-.tabImageBox:focus-visible { outline: 2px solid var(--color-action); outline-offset: 1px; }
-.tabImageBox img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.tabImageEmpty { display: flex; flex-direction: column; align-items: center; gap: var(--tpl-hb2-op-field-gap); font-size: var(--text-caption); font-weight: 600; }
 
 /* 採用案 K6Ot7O：②の頭は「直すタブ」の切り替えと、①へ戻る文字リンクの1段だけ。 */
 .tabSwitchRow { display: flex; align-items: center; gap: var(--tpl-hb2-op-col-gap); flex-wrap: wrap; min-width: 0; }

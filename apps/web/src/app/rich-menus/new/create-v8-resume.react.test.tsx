@@ -149,10 +149,10 @@ describe('作りかけの下書きを ?id= で開き直す', () => {
     URLs.revokeObjectURL = () => {}
     for (const index of [1, 2]) {
       await act(async () => {
-        fireEvent.change(screen.getByLabelText(`タブ${index}の画像のファイル`), { target: { files: [new File(['png'], `t${index}.png`, { type: 'image/png' })] } })
+        fireEvent.change(screen.getByLabelText(`タブ${index}の画像を追加（ファイル）`), { target: { files: [new File(['png'], `t${index}.png`, { type: 'image/png' })] } })
       })
     }
-    expect(screen.getByRole('button', { name: 'タブ2の画像ファイルを選ぶ' }).querySelector('img')).not.toBeNull()
+    expect(screen.getByRole('group', { name: 'タブ2の画像を追加' }).querySelector('img')).not.toBeNull()
     await act(async () => { fireEvent.change(screen.getByLabelText('メニュー名（友だちには見えません）'), { target: { value: 'タブのメニュー' } }) })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '次へ：ボタンの動き' })) })
     await settle()

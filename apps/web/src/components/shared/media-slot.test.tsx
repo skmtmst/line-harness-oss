@@ -158,3 +158,9 @@ it('ファイルを受け取る口が無いときは、枠を押しても窓を�
   expect(screen.queryByText(/ドラッグ＆ドロップ/)).toBeNull()
   expect(screen.getByRole('button', { name: 'URL で入れる' })).toBeTruthy()
 })
+
+it('外せないもの（removable=false）は［差し替える］だけを出し、［消す］は出さない', () => {
+  render(<MediaSlot title="メイン画像を追加" value="https://cdn.example/a.png" removable={false} onFile={() => {}} />)
+  expect(screen.getByRole('button', { name: '差し替える' })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: '消す' })).toBeNull()
+})

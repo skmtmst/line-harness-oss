@@ -124,7 +124,7 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     expect(screen.getByRole('heading', { name: '画像（タブごとに1枚）' })).toBeTruthy()
     for (const [index, letter] of ['A', 'B', 'C'].entries()) {
       expect((screen.getByLabelText(`タブ${index + 1}の名前（トーク画面のタブに出ます）`) as HTMLInputElement).value).toBe(`タブ ${letter}`)
-      fireEvent.change(screen.getByLabelText(`タブ${index + 1}の画像のファイル`), { target: { files: [new File(['png'], `${letter}.png`, { type: 'image/png' })] } })
+      fireEvent.change(screen.getByLabelText(`タブ${index + 1}の画像を追加（ファイル）`), { target: { files: [new File(['png'], `${letter}.png`, { type: 'image/png' })] } })
     }
     click('次へ：ボタンの動き')
     await screen.findByText('画像の上で面を選ぶ')

@@ -124,6 +124,8 @@ export interface MediaSlotProps {
   onFile?: (file: File) => void
   /** 消す。渡さなければ `onChange(null)`。 */
   onRemove?: () => void
+  /** false で［消す］を出さない（登録済みで外せないものなど。差し替えはできる）。 */
+  removable?: boolean
   /** 渡すと「URL で入れる」を出す（押したときの動きは呼ぶ側）。 */
   onUrl?: () => void
   /**
@@ -172,6 +174,7 @@ export default function MediaSlot({
   onChange,
   onFile,
   onRemove,
+  removable = true,
   onUrl,
   urlEntry,
   onMediaPick,
@@ -433,9 +436,11 @@ export default function MediaSlot({
                 差し替える
               </button>
             ) : null}
-            <button type="button" className={styles.pill} disabled={disabled} onClick={(event) => { stop(event); clear() }}>
-              消す
-            </button>
+            {removable ? (
+              <button type="button" className={styles.pill} disabled={disabled} onClick={(event) => { stop(event); clear() }}>
+                消す
+              </button>
+            ) : null}
           </span>
         )}
         {error ? <span className={styles.filledError} role="alert">{error}</span> : null}
