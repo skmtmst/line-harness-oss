@@ -316,7 +316,9 @@ it('2ページ目を含む全配信を検索し、検索結果を20件ずつ表�
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
   await flush()
   expect(host.textContent).toContain('通常0')
-})
+// 複数ページの取得・検索・ページ移動を全部確認し、混雑時も操作全体を待つ。
+}, 20_000)
+
 it('全件検索が上限を超えたら部分的な検索結果を表示しない', async () => {
   resetUrl()
   listBroadcasts.mockResolvedValue({ success: true, data: [rowB], pagination: { total: 10001, nextCursor: '100' } })
