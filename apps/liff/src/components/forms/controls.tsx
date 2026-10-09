@@ -1,7 +1,37 @@
 /** LIFF と管理画面の見本で共有する入力の形。通信・送信は呼ぶ側が持つ。 */
-import { useEffect, useState, useRef, forwardRef, type InputHTMLAttributes, type ReactNode, type LabelHTMLAttributes, type TextareaHTMLAttributes, type SelectHTMLAttributes } from 'react'
+import { useEffect, useState, useRef, forwardRef, type InputHTMLAttributes, type ReactNode, type LabelHTMLAttributes, type TextareaHTMLAttributes, type SelectHTMLAttributes, type Ref } from 'react'
 import { PREFECTURES, type FormInputBlock, type FormFileAnswer } from '@line-crm/shared'
 import styles from './controls.module.css'
+
+/** 欄名と必要度の表示。札を読み上げ名へ混ぜず、欄との結び付きを保つ。 */
+export function FieldMark({ required = false }: { required?: boolean }) {
+  return <span aria-hidden="true" className={required ? styles.required : styles.optional}>{required ? '必須' : '任意'}</span>
+}
+
+export function FieldLabel({ required = false, children, ...props }: LabelHTMLAttributes<HTMLLabelElement> & { required?: boolean }) {
+  return <div className={styles.label}><label {...props}>{children}</label><FieldMark required={required} /></div>
+}
+
+export function FieldCount({ value, max, night = false }: { value: string; max: number; night?: boolean }) {
+  return <p className={`${styles.count} ${night ? styles.nightCount : ''}`}>{value.length}/{max}文字</p>
+}
+
+function examplePlaceholder(value?: string) {
+  return value?.replace(/^例\s*[:：]\s*/, '例：')
+}
+
+export function TextInput({ appearance = 'default', className = '', placeholder, ref, ...props }: InputHTMLAttributes<HTMLInputElement> & { ref?: Ref<HTMLInputElement>; appearance?: 'default' | 'night' | 'hidden' | 'pin' }) {
+  const look = appearance === 'hidden' ? 'sr-only' : appearance === 'pin' ? styles.pin : appearance === 'night' ? styles.nightInput : styles.input
+  return <input {...props} ref={ref} placeholder={examplePlaceholder(placeholder)} className={`${look} ${className}`} />
+}
+
+export function TextArea({ className = '', placeholder, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea {...props} placeholder={examplePlaceholder(placeholder)} className={`${styles.input} ${styles.textarea} ${className}`} />
+}
+
+export function ChoiceInput(props: InputHTMLAttributes<HTMLInputElement>) {
+  return <input {...props} className={styles.choiceInput} />
+}
 
 type Mark = 'calendar' | 'clock' | 'chevron' | 'clip'
 export function FieldIcon({ mark }: { mark: Mark }) {
@@ -22,14 +52,14 @@ export function FormTextControl({ block, value, onChange, ...props }: {
   const temporal = block.type === 'date' ? 'date' : format === 'time' ? 'time' : null
   const hint = block.placeholder || (temporal === 'date' ? '年/月/日' : temporal === 'time' ? '--:--' : '')
   const field = block.type === 'textarea' ? (
-    <textarea id={props.id} aria-describedby={props['aria-describedby']} aria-invalid={props['aria-invalid']} style={props.style} readOnly={props.readOnly}
+    <TextArea id={props.id} aria-describedby={props['aria-describedby']} aria-invalid={props['aria-invalid']} aria-required={props['aria-required']} style={props.style} readOnly={props.readOnly}
       rows={3} value={value} placeholder={block.placeholder || undefined} maxLength={block.limit?.max}
-      onChange={(e) => onChange(e.target.value)} className={`${styles.input} ${styles.textarea}`} />
+      onChange={(e) => onChange(e.target.value)} />
   ) : (
     <div className={styles.wrap}>
-      <input {...props} type={temporal ?? (format === 'email' ? 'email' : format === 'tel' ? 'tel' : 'text')}
+      <TextInput {...props} type={temporal ?? (format === 'email' ? 'email' : format === 'tel' ? 'tel' : 'text')}
         value={value} placeholder={block.placeholder || undefined} maxLength={block.limit?.max}
-        onChange={(e) => onChange(e.target.value)} className={styles.input} data-temporal={temporal || undefined} data-empty={temporal && !value || undefined} />
+        onChange={(e) => onChange(e.target.value)} data-temporal={temporal || undefined} data-empty={temporal && !value || undefined} />
       {temporal && !value ? <span className={styles.temporalHint} aria-hidden="true">{hint}</span> : null}
       {temporal ? <span className={styles.endIcon}><FieldIcon mark={temporal === 'date' ? 'calendar' : 'clock'} /></span> : null}
     </div>
@@ -124,7 +154,7 @@ export function AddressControls({ draft, placeholder, onChange, onLookup, lookin
       {/* 候補は入力部品の呼ぶ側からではなく共通の正本を使う。 */}
       {PREFECTURES.map((p) => <option key={p} value={p}>{p}</option>)}
     </FormSelectControl>
-    {(['city', 'addressLine1', 'addressLine2'] as const).map((key, i) => <label key={key} className={styles.stack}><span className={styles.note}>{['市区町村', '番地', '建物名・部屋番号（任意）'][i]}</span><input type="text" aria-label={['市区町村', '番地', '建物名'][i]} value={draft[key]} placeholder={key === 'addressLine1' ? placeholder || undefined : undefined} onChange={(e) => onChange({ ...draft, [key]: e.target.value })} className={styles.input} /></label>)}
+    {(['city', 'addressLine1', 'addressLine2'] as const).map((key, i) => <label key={key} className={styles.stack}><span className={styles.note}>{['市区町村', '番地', '建物名・部屋番号'][i]}{key === 'addressLine2' && <FieldMark />}</span><TextInput type="text" aria-label={['市区町村', '番地', '建物名'][i]} value={draft[key]} placeholder={key === 'addressLine1' ? placeholder || undefined : undefined} onChange={(e) => onChange({ ...draft, [key]: e.target.value })} /></label>)}
   </div>
 }
 

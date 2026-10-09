@@ -1,4 +1,4 @@
-import { LiffFieldLabel } from '../components/forms/controls.js'
+import { TextInput, TextArea, ChoiceInput, FieldLabel, FieldCount, FormChoiceRow } from '../components/forms/controls.js';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api, type EventDetail, type EventSlot } from '../lib/api.js';
@@ -204,38 +204,37 @@ export default function EventConfirm() {
               const value = answers[q.id];
               return (
                 <div key={q.id}>
-                  <LiffFieldLabel as="span" id={`eq-label-${q.id}`} label={q.label} required={q.required} />
+                  <FieldLabel id={`eq-label-${q.id}`} htmlFor={q.type === 'text' || q.type === 'textarea' ? `eq-${q.id}` : undefined} required={q.required}>
+                    {q.label}
+                  </FieldLabel>
                   {q.type === 'text' && (
-                    <LiffInput
-                      type="text"
+                    <TextInput
+                      id={`eq-${q.id}`} type="text"
                       aria-labelledby={`eq-label-${q.id}`}
                       value={typeof value === 'string' ? value : ''}
                       onChange={(e) => setAnswers((cur) => ({ ...cur, [q.id]: e.target.value }))}
-
                     />
                   )}
                   {q.type === 'textarea' && (
-                    <LiffTextArea
-                      aria-labelledby={`eq-label-${q.id}`}
+                    <TextArea
+                      id={`eq-${q.id}`} aria-labelledby={`eq-label-${q.id}`}
                       value={typeof value === 'string' ? value : ''}
                       onChange={(e) => setAnswers((cur) => ({ ...cur, [q.id]: e.target.value }))}
                       rows={3}
-
                     />
                   )}
                   {q.type === 'radio' && (
                     <div className="space-y-1" role="radiogroup" aria-labelledby={`eq-label-${q.id}`}>
                       {(q.options ?? []).map((opt) => (
-                        <label key={opt} className="flex min-h-11 items-center gap-2 text-sm text-ink">
-                          <LiffInput
+                        <FormChoiceRow key={opt} selected={value === opt}>
+                          <ChoiceInput
                             type="radio"
                             name={`eq-${q.id}`}
                             checked={value === opt}
                             onChange={() => setAnswers((cur) => ({ ...cur, [q.id]: opt }))}
-
                           />
                           {opt}
-                        </label>
+                        </FormChoiceRow>
                       ))}
                     </div>
                   )}
@@ -245,8 +244,8 @@ export default function EventConfirm() {
                         const chosen = Array.isArray(value) ? value : [];
                         const checked = chosen.includes(opt);
                         return (
-                          <label key={opt} className="flex min-h-11 items-center gap-2 text-sm text-ink">
-                            <LiffInput
+                          <FormChoiceRow key={opt} selected={checked}>
+                            <ChoiceInput
                               type="checkbox"
                               checked={checked}
                               onChange={() =>
@@ -255,10 +254,9 @@ export default function EventConfirm() {
                                   [q.id]: checked ? chosen.filter((x) => x !== opt) : [...chosen, opt],
                                 }))
                               }
-
                             />
                             {opt}
-                          </label>
+                          </FormChoiceRow>
                         );
                       })}
                     </div>
@@ -269,17 +267,17 @@ export default function EventConfirm() {
           </div>
         )}
 
-        <label className="block">
-          <span className="block text-sm font-bold text-ink">備考</span>
-          <LiffTextArea
-            value={note}
+        <div className="space-y-2">
+          <FieldLabel htmlFor="event-note">備考</FieldLabel>
+          <TextArea
+            id="event-note" value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={3}
             maxLength={5000}
             placeholder="質問や伝えたいことがあれば"
-            className="mt-2"
           />
-        </label>
+          <FieldCount value={note} max={5000} />
+        </div>
 
         {submitError && (
           <p role="alert" className="text-sm leading-6 text-danger">
@@ -299,7 +297,6 @@ export default function EventConfirm() {
         <Button variant="text"
           type="button"
           onClick={back}
-          className="self-center"
         >
           ← 戻る
         </Button>

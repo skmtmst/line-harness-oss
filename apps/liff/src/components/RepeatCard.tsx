@@ -1,8 +1,8 @@
+import Button from './ui/Button.js';
 import { useEffect, useState } from 'react';
 import { api, type LastBookingResponse, type MenuItem, type StaffItem } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
 import Icon from './ui/Icon.js';
-import Button from './ui/Button.js'
 
 /** 前回の日を「2026/9/20（土）」と出す。店の暦日（JST）で切る。 */
 export function formatPreviousDate(startsAt: string): string {
@@ -73,11 +73,10 @@ export default function RepeatCard({
   if (!ready) return null;
 
   return (
-    <Button variant="row"
+    <Button variant="option"
       type="button"
       onClick={() => onRepeat(ready.menu, ready.staff)}
       aria-label="前回と同じで予約する"
-
     >
       {ready.photoUrl ? (
         <img

@@ -1,5 +1,5 @@
+import Button from './ui/Button.js';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import Button from './ui/Button.js'
 
 /*
  * お客様の画面（LIFF）の「？」。管理画面の shared/help-tip と同じ約束。
@@ -74,14 +74,13 @@ export default function HelpTip({
         if (!wrapRef.current?.contains(event.relatedTarget as Node)) setOpen(false);
       }}
     >
-      <Button variant="secondary"
+      <Button variant="icon"
         ref={buttonRef}
         type="button"
         aria-label={label}
         aria-describedby={open ? tipId : undefined}
         aria-expanded={open}
         onClick={toggle}
-
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <circle cx="12" cy="12" r="10" />

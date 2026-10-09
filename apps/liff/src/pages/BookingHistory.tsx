@@ -199,13 +199,12 @@ export default function BookingHistory() {
                   { key: 'past', label: 'これまで' },
                 ] as const
               ).map((t) => (
-                <Button variant="text"
+                <Button variant="tab" selected={tab === t.key}
                   key={t.key}
                   type="button"
                   role="tab"
                   aria-selected={tab === t.key}
                   onClick={() => setTab(t.key)}
-                  className="flex-1"
                 >
                   {t.label}
                 </Button>
@@ -267,7 +266,7 @@ export default function BookingHistory() {
         }
         description="キャンセルすると元に戻せません。キャンセルの期限を過ぎると、ここからは変えられません（トークでご連絡ください）。"
         confirmLabel="キャンセルする"
-        cancelLabel="やめる"
+        cancelLabel="閉じる"
         destructive
         busy={busy}
         onCancel={() => {
@@ -280,7 +279,7 @@ export default function BookingHistory() {
         title={pendingChange ? `「${pendingChange.booking.menu_name}」の日時を変えますか` : ''}
         description="空いている日時から選びます。新しい日時を取れたときだけ、今の予約が変わります。"
         confirmLabel="この日時に変える"
-        cancelLabel="やめる"
+        cancelLabel="閉じる"
         busy={busy}
         error={pendingChange?.error ?? undefined}
         onCancel={() => {
@@ -315,14 +314,13 @@ export default function BookingHistory() {
                     pendingChange.selected?.date === slot.date && pendingChange.selected?.start === slot.start;
                   return (
                     <li key={`${slot.date}-${slot.start}`}>
-                      <Button variant="slot-row"
+                      <Button variant="optionRow" selected={selected}
                         type="button"
                         disabled={busy}
                         aria-pressed={selected}
                         onClick={() =>
                           setPendingChange((prev) => (prev ? { ...prev, selected: slot, error: null } : prev))
                         }
-
                       >
                         <span
                           className={`liff-num text-sm font-semibold whitespace-nowrap ${selected ? 'text-(--liff-on-primary)' : 'text-ink'}`}

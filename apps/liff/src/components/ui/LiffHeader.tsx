@@ -1,9 +1,9 @@
+import Button from './Button.js';
 import { useEffect, useState } from 'react';
 import liff from '@line/liff';
 import { api } from '../../lib/api.js';
 import { logFailure } from '../../lib/user-message.js';
 import Icon from './Icon.js';
-import Button from './Button.js'
 
 // 店名は画面ごとに読み直さない。最初に取れた値をモジュールに持つ。
 let cachedShopName: string | null = null;
@@ -47,7 +47,6 @@ export default function LiffHeader({ title }: { title: string }) {
           type="button"
           aria-label="閉じる"
           onClick={() => liff.closeWindow()}
-          className="shrink-0"
         >
           <Icon name="x" className="h-5 w-5" />
         </Button>

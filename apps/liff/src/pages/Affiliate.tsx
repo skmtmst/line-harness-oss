@@ -1,3 +1,4 @@
+import { TextInput, FieldLabel } from '../components/forms/controls.js';
 import liff from '@line/liff';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { LOAD_FAILED_MESSAGE, SUBMIT_FAILED_MESSAGE, logFailure } from '../lib/user-message.js';
@@ -267,26 +268,25 @@ function CopyButton({
 
   return (
     <>
-      <Button variant="text"
+      <Button variant="secondary" className="w-auto shrink-0"
         type="button"
         onClick={handleCopy}
-        className="shrink-0 shrink-0"
       >
         {!compact && <Icon name="copy" className="h-3.5 w-3.5" />}
-        {copied ? 'コピー済み' : 'コピー'}
+        {copied ? 'コピーしました' : 'コピーする'}
       </Button>
       {manualCopy && (
         <div className="w-full space-y-1">
           <p className="text-xs text-ink-secondary">
             自動コピーできませんでした。下のURLを選択してコピーしてください。
           </p>
-          <LiffInput
+          <TextInput
             ref={urlRef}
             type="text"
+            aria-label="紹介のURL"
             readOnly
             value={url}
             onFocus={(e) => e.currentTarget.select()}
-
           />
         </div>
       )}
@@ -588,11 +588,10 @@ function CompactOfferRow({
       <p className="min-w-0 flex-1 truncate text-xs text-ink" title={offer.name}>
         {offer.name}・リンクを発行する
       </p>
-      <Button variant="text"
+      <Button variant="secondary" className="w-auto shrink-0"
         type="button"
         onClick={() => void handleEnroll()}
         disabled={busy || offer.halted}
-        className="shrink-0"
       >
         {busy ? '発行中…' : '発行する'}
       </Button>
@@ -738,38 +737,38 @@ function AddOfferLinkForm({
   if (!open) {
     return (
       <Button variant="secondary" onClick={() => setOpen(true)}>
-        ＋ SNSごとのリンクを発行
+        ＋ SNSごとのリンクを発行する
       </Button>
     );
   }
 
   return (
     <div className="space-y-2">
-      <LiffInput
+      <FieldLabel htmlFor="affiliate-link-label">リンクの名前</FieldLabel>
+      <TextInput
+        id="affiliate-link-label"
         type="text"
         value={label}
         onChange={(e) => setLabel(e.target.value)}
-        placeholder="例: X用、Instagram用"
-
+        placeholder="例：X用、Instagram用"
         disabled={busy}
       />
       {error && <p className="text-xs font-bold text-danger">{error}</p>}
       <div className="flex gap-2">
         <div className="flex-1">
           <Button variant="primary" onClick={handleAdd} disabled={busy}>
-            {busy ? '発行中…' : 'リンクを発行'}
+            {busy ? '発行中…' : 'リンクを発行する'}
           </Button>
         </div>
-        <Button variant="secondary"
+        <Button variant="text"
           type="button"
           onClick={() => {
             setOpen(false);
             setError(null);
           }}
           disabled={busy}
-          className="shrink-0"
         >
-          やめる
+          キャンセル
         </Button>
       </div>
     </div>

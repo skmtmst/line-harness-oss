@@ -16,5 +16,5 @@ it('共通の欄とボタンは入力途中・選択・押せない状態の動�
 
 it('補助の日付・添付とPINは共通の欄で隠し、選択中の人数は共通ボタンが示す',()=>{
  const {container}=render(<><LiffInput aria-label="別の日" type="date" appearance="concealed"/><LiffInput aria-label="PIN" type="password" appearance="pin"/><Button variant="chip" role="radio" aria-checked={true}>2名</Button></>)
- expect(screen.getByLabelText('別の日').className).toContain('concealedInput');expect(screen.getByLabelText('PIN').className).toContain('pinInput');expect(screen.getByRole('radio',{name:'2名'}).className).toContain('bg-liff-soft');expect(container.querySelector('input[type=password]')).toBeTruthy()
+ expect(screen.getByLabelText('別の日').className).toContain('concealedInput');expect(screen.getByLabelText('PIN').className).toContain('pinInput');expect(screen.getByRole('radio',{name:'2名'}).getAttribute('aria-checked')).toBe('true');expect(screen.getByRole('radio',{name:'2名'}).getAttribute('data-selected')).toBe('true');expect(container.querySelector('input[type=password]')).toBeTruthy()
 })

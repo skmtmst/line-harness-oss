@@ -246,13 +246,12 @@ function DaySlots({
           {times.map((t) => {
             const active = selected?.date === day && selected?.start === t.start;
             const timeButton = (
-              <Button variant="choice"
+              <Button variant="time" selected={active} unavailable={!t.open}
                 key={t.start}
                 type="button"
                 onClick={() => onSelect(pickOf(day, t))}
                 disabled={!t.open}
                 aria-pressed={active}
-
               >
                 {t.start}
               </Button>
@@ -261,11 +260,10 @@ function DaySlots({
             return (
               <span key={t.start} className="relative block">
                 {timeButton}
-                <Button variant="overlay-bell"
+                <Button variant="notify" className="absolute -top-1.5 -right-1.5"
                   type="button"
                   onClick={() => onWaitlist(pickOf(day, t))}
                   aria-label={`${t.start}に空いたら知らせる`}
-
                 >
                   <Icon name="bell" className="h-[14px] w-[14px]" />
                 </Button>
@@ -656,14 +654,13 @@ export default function DateTimePicker({
   const toggleButton = (target: DateView, label: string) => {
     const active = view === target;
     return (
-      <Button variant="segment"
+      <Button variant="tab" selected={active}
         key={target}
         ref={target === 'list' ? listButtonRef : calendarButtonRef}
         type="button"
         role="radio"
         aria-checked={active}
         onClick={() => switchView(target)}
-        className="flex-1"
       >
         {label}
       </Button>
@@ -694,12 +691,11 @@ export default function DateTimePicker({
         </Button>
       )}
       {view === 'list' && settings?.calendarMode === 'month-only' ? (
-        <Button variant="text" type="button" className="self-center" onClick={() => switchView('calendar')}>日を選び直す</Button>
+        <Button variant="text" type="button" onClick={() => switchView('calendar')}>日を選び直す</Button>
       ) : null}
       <Button variant="text"
         type="button"
         onClick={onBackToStaff}
-        className="self-center"
       >
         ← 担当を選び直す
       </Button>
@@ -764,7 +760,6 @@ export default function DateTimePicker({
                 onClick={() => moveWeek(-1)}
                 disabled={!canPrevWeek}
                 aria-label="前の週"
-                className="shrink-0"
               >
                 <Icon name="chevron-left" className="h-[18px] w-[18px]" />
               </Button>
@@ -786,7 +781,7 @@ export default function DateTimePicker({
                   const pressable = selectable || state === 'full';
                   const active = d === listDay;
                   return (
-                    <Button variant="weekday"
+                    <Button variant="day" selected={active} unavailable={state === 'closed' || state === 'empty'}
                       key={d}
                       type="button"
                       onClick={() => {
@@ -797,7 +792,6 @@ export default function DateTimePicker({
                       aria-pressed={active}
                       aria-label={dayStateLabel(d, state)}
                       title={dayStateLabel(d, state)}
-
                     >
                       <span className="text-[10px] text-liff-sub">{formatWeekday(d)}</span>
                       <span
@@ -830,7 +824,6 @@ export default function DateTimePicker({
                 onClick={() => moveWeek(1)}
                 disabled={!canNextWeek}
                 aria-label="次の週"
-                className="shrink-0"
               >
                 <Icon name="chevron-right" className="h-[18px] w-[18px]" />
               </Button>
@@ -886,7 +879,6 @@ export default function DateTimePicker({
                 onClick={() => setMonth(addMonths(month, -1))}
                 disabled={!canPrevMonth}
                 aria-label="前の月"
-
               >
                 <Icon name="chevron-left" className="h-[18px] w-[18px]" />
               </Button>
@@ -898,7 +890,6 @@ export default function DateTimePicker({
                 onClick={() => setMonth(addMonths(month, 1))}
                 disabled={!canNextMonth}
                 aria-label="次の月"
-
               >
                 <Icon name="chevron-right" className="h-[18px] w-[18px]" />
               </Button>
@@ -938,7 +929,7 @@ export default function DateTimePicker({
                     const pressable = selectable || state === 'full';
                     const active = d === calDay;
                     return (
-                      <Button variant="calendar" full={state === 'full'}
+                      <Button variant="calendarDay" selected={active} unavailable={!selectable} full={state === 'full'}
                         key={d}
                         type="button"
                         onClick={() => {
@@ -948,7 +939,6 @@ export default function DateTimePicker({
                         disabled={!pressable}
                         aria-pressed={active}
                         aria-label={dayStateLabel(d, state)}
-
                       >
                         <span className="liff-num text-sm leading-tight">{dayNum}</span>
                         <span className="flex h-1.5 items-center leading-none">

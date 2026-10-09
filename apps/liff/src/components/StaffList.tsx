@@ -1,11 +1,11 @@
 import { bookingPriceText } from '../lib/booking-price.js';
+import Button from './ui/Button.js';
 import { useEffect, useState } from 'react';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
 import LoadErrorView from './LoadErrorView.js';
 import LoadingView from './LoadingView.js';
 import Icon from './ui/Icon.js';
-import Button from './ui/Button.js'
 
 /**
  * 1-b 担当を選ぶ (★V8・biNP5)。札を押すと選ばれるだけで、進むのは下の操作の帯。
@@ -73,11 +73,10 @@ export default function StaffList({
                 .join('・');
           return (
             <li key={s.id}>
-              <Button variant="row"
+              <Button variant="option" selected={selected}
                 type="button"
                 onClick={() => onSelect(s)}
                 aria-pressed={selected}
-
               >
                 {s.profile_image_url ? (
                   <img

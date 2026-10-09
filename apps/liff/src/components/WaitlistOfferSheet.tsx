@@ -20,7 +20,7 @@ if (!entry || !active) return; setWorking(true); setError(null); try {
 }
   async function cancel() { setWorking(true); setError(null); try { if (seat) await api.cancelSeatWaitlist(id); else await api.cancelWaitlist(id); setMessage('取り消しました。次の方へ案内します。'); } catch { setError('取り消せませんでした。もう一度お試しください。'); } finally { setWorking(false); } }
   return <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="空いたら知らせる">
-    <Button variant="backdrop"  aria-label="閉じる" onClick={onClose} />
+    <Button variant="overlay" aria-label="閉じる" onClick={onClose} />
     <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-md rounded-t-(--liff-radius-lg) bg-canvas p-4 pb-8">
       <h2 className="text-[15px] font-bold text-ink">{decline ? '今回は見送る' : '空きが出ました'}</h2>
       {entry && <p className="mt-1 text-[13px] text-liff-sub">{new Date(entry.starts_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}・{'guest_count' in entry ? `${entry.store_name} ${entry.guest_count}名` : `${entry.menu_name}・${entry.staff_name}`}</p>}

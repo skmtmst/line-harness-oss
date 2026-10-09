@@ -236,13 +236,12 @@ export default function EventBookings() {
                   { key: 'past', label: 'これまで' },
                 ] as const
               ).map((t) => (
-                <Button variant="text"
+                <Button variant="tab" selected={tab === t.key}
                   key={t.key}
                   type="button"
                   role="tab"
                   aria-selected={tab === t.key}
                   onClick={() => setTab(t.key)}
-                  className="flex-1"
                 >
                   {t.label}
                 </Button>
@@ -296,37 +295,34 @@ export default function EventBookings() {
                             {/* 板 y1bs9A：変える・キャンセルは文の列の下に小さく並べる。 */}
                             {canCancel(b) && (
                               <div className="flex items-center gap-2 pt-1.5">
-                                <Button variant="text"
+                                <Button variant="secondary" className="w-auto"
                                   type="button"
                                   onClick={() => {
                                     void openChange(b);
                                   }}
                                   disabled={busy}
-
                                 >
                                   時間を変える
                                 </Button>
-                                <Button variant="text"
+                                <Button variant="secondary" className="w-auto"
                                   type="button"
                                   onClick={() => {
                                     setActionError(null);
                                     setPendingCancel(b);
                                   }}
                                   disabled={busy}
-
                                 >
                                   キャンセルする
                                 </Button>
                               </div>
                             )}
                           </div>
-                          <Button variant="secondary"
+                          <Button variant="arrow"
                             type="button"
                             aria-label={`${b.event_name}のイベントを見る`}
                             onClick={() =>
                               navigate({ pathname: `/events/${b.event_id}`, search })
                             }
-                            className="shrink-0"
                           >
                             <Icon name="chevron-right" className="h-[18px] w-[18px]" />
                           </Button>
@@ -350,7 +346,7 @@ export default function EventBookings() {
         }
         description="キャンセル待ちの方へ順番に案内されます。前日を過ぎるとここからは変えられません（お店へご連絡ください）。"
         confirmLabel="キャンセルする"
-        cancelLabel="やめる"
+        cancelLabel="閉じる"
         destructive
         busy={busy}
         onCancel={() => {
@@ -367,7 +363,7 @@ export default function EventBookings() {
             : ''
         }
         confirmLabel="この時間に変える"
-        cancelLabel="やめる"
+        cancelLabel="閉じる"
         busy={busy}
         error={pendingChange?.changeError ?? undefined}
         onCancel={() => {
@@ -405,7 +401,7 @@ export default function EventBookings() {
                   const selected = pendingChange.selectedSlotId === s.id;
                   return (
                     <li key={s.id}>
-                      <Button variant="slot-row"
+                      <Button variant="optionRow" selected={selected} unavailable={disabled}
                         type="button"
                         disabled={disabled}
                         aria-pressed={selected}
@@ -414,7 +410,6 @@ export default function EventBookings() {
                             prev ? { ...prev, selectedSlotId: s.id, changeError: null } : prev,
                           )
                         }
-
                       >
                         <span
                           className={`liff-num text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-(--liff-on-primary)' : 'text-ink'}`}

@@ -1,11 +1,11 @@
 import { bookingPriceText } from '../lib/booking-price.js';
+import Button from './ui/Button.js';
 import { useEffect, useMemo, useState } from 'react';
 import { api, type MenuItem } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
 import LoadErrorView from './LoadErrorView.js';
 import LoadingView from './LoadingView.js';
 import Icon from './ui/Icon.js';
-import Button from './ui/Button.js'
 
 const ALL_CATEGORY = 'すべて';
 
@@ -73,12 +73,11 @@ export default function MenuList({
           {[ALL_CATEGORY, ...categories].map((c) => {
             const active = c === category;
             return (
-              <Button variant="chip"
+              <Button variant="chip" selected={active}
                 key={c}
                 type="button"
                 onClick={() => setCategory(c)}
                 aria-pressed={active}
-                className="shrink-0"
               >
                 {c}
               </Button>
@@ -91,11 +90,10 @@ export default function MenuList({
           const selected = m.id === selectedId;
           return (
             <li key={m.id}>
-              <Button variant="row"
+              <Button variant="option" selected={selected}
                 type="button"
                 onClick={() => onSelect(m)}
                 aria-pressed={selected}
-
               >
                 <span
                   className="h-14 w-14 shrink-0 rounded-[10px] bg-liff-photo"
