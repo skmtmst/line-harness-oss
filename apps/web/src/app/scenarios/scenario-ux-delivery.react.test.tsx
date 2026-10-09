@@ -22,7 +22,7 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({
 let root: Root
 let host: HTMLDivElement
 const calls: { method: string; path: string }[] = []
-let listItems: unknown[] = []
+let listItems: ReturnType<typeof item>[] = []
 
 const response = (data: unknown, status = 200) => new Response(
   JSON.stringify(data),
@@ -50,8 +50,8 @@ beforeEach(() => {
     }
     if (url.pathname.startsWith('/api/scenarios/') && init?.method === 'PUT') {
       const id = url.pathname.split('/').pop()
-      const patch = JSON.parse(String(init.body))
-      listItems = listItems.map((row: any) => row.id === id ? { ...row, ...patch } : row)
+      const patch = JSON.parse(String(init.body)) as Partial<ReturnType<typeof item>>
+      listItems = listItems.map((row) => row.id === id ? { ...row, ...patch } : row)
       return response({ success: true, data: {} })
     }
     if (url.pathname === '/api/folders') return response({ success: true, data: [], unfiledCount: 0 })
@@ -124,8 +124,8 @@ test('読み込み中は出来上がりと同じ形の骨組みを出す', async
     }
     if (url.pathname.startsWith('/api/scenarios/') && init?.method === 'PUT') {
       const id = url.pathname.split('/').pop()
-      const patch = JSON.parse(String(init.body))
-      listItems = listItems.map((row: any) => row.id === id ? { ...row, ...patch } : row)
+      const patch = JSON.parse(String(init.body)) as Partial<ReturnType<typeof item>>
+      listItems = listItems.map((row) => row.id === id ? { ...row, ...patch } : row)
       return response({ success: true, data: {} })
     }
     if (url.pathname === '/api/folders') return response({ success: true, data: [], unfiledCount: 0 })
