@@ -22,19 +22,20 @@
   display: flex;
   width: 100%;
   /* #976 U083: 42px だった高さを入力欄・ボタンと同じ40pxへそろえる */
-  height: 40px;
+  height: 36px;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 0 13px;
-  border: 1px solid var(--color-hairline);
+  padding: 0 12px;
+  border: 1px solid var(--color-field-border);
   background: var(--color-canvas);
   color: var(--color-ink);
   font-family: inherit;
   /* #976 U079: 選択欄の文字も入力欄と同じ14px */
   font-size: var(--text-body);
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
+  box-shadow: var(--shadow-field);
 }
 
 .trigger:focus-visible,
@@ -85,7 +86,7 @@
   left: 0;
   width: 100%;
   overflow: hidden;
-  border: 1px solid var(--color-accent);
+  border: 1px solid var(--card-edge);
   border-top: 0;
   border-radius: 0 0 var(--radius-control) var(--radius-control);
   background: var(--color-canvas);
@@ -101,8 +102,8 @@
   width: 100%;
   height: 38px;
   align-items: center;
-  gap: 10px;
-  padding: 0 13px;
+  gap: 8px;
+  padding: 0 12px;
   border: 0;
   background: var(--color-canvas);
   color: var(--color-ink);
@@ -136,7 +137,7 @@
 }
 
 .selectedBackground {
-  background: var(--color-accent-soft);
+  background: var(--color-select-picked);
 }
 
 .selected {
@@ -156,8 +157,8 @@
   flex: 0 0 18px;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-icon);
+  border: 1px solid var(--color-checkbox-line);
+  border-radius: var(--radius-checkbox-mark);
   background: var(--color-canvas);
 }
 
@@ -166,9 +167,9 @@
  * `$accent`(#06c755) に白文字は 2.26:1 で読めない。枠は緑のまま。
  */
 .checked {
-  border-color: var(--color-accent-deep);
-  background: var(--color-accent-deep);
-  color: var(--color-on-accent);
+  border-color: var(--color-success);
+  background: var(--color-success);
+  color: var(--color-canvas);
 }
 
 .checkIcon {

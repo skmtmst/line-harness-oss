@@ -40,9 +40,9 @@ describe('数の帯（Pp3nS）', () => {
     )
   })
 
-  it('既定（v7）のカードの角は変えない', () => {
+  it('数のマスは角0・影なし', () => {
     const css = read('kpi-card.module.css')
-    expect(css).toMatch(/\.card \{[^}]*border-radius:\s*var\(--radius-card\)/s)
+    expect(css).toMatch(/\.card \{[^}]*border-radius:\s*0/s)
   })
 
   it('v8 の単位（件・通）は 12px', () => {

@@ -32,8 +32,11 @@ function ratio(fg: string, bg: string): number {
 function tokenMap(): Map<string, string> {
   const css = read('globals.css')
   const map = new Map<string, string>()
-  for (const match of css.matchAll(/--color-([\w-]+):\s*(#[0-9a-fA-F]{6})/g)) {
-    map.set(match[1], match[2].toLowerCase())
+  for (const match of css.matchAll(/--color-([\w-]+):\s*(#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?)/g)) {
+    const hex = match[2].slice(1)
+    const alpha = hex.length === 8 ? parseInt(hex.slice(6), 16) / 255 : 1
+    const color = [0, 2, 4].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * alpha + 255 * (1 - alpha)).toString(16).padStart(2, '0')).join('')
+    map.set(match[1], '#' + color)
   }
   return map
 }

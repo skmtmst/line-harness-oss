@@ -14,7 +14,7 @@
  * 状態で見る場所が変わる:
  *
  *   pending      コード未実装。報告するだけで落とさない
- *   implemented  CSSモジュールの**ソース**を見る（まだ画面で使われていない）
+ *   implemented  CSSモジュールの**ソース**で var() を解き写しの値と比べる（まだ画面で使われていない）
  *   active       **ビルド後のCSS**を見る。var() を解いて比べ、配信漏れも調べる
  *
  * `active` をビルド後で見るのは、部品があっても画面が使っていなければ
@@ -147,7 +147,7 @@ function collectVariables(css) {
   return vars
 }
 
-function resolveVars(value, vars, depth = 0) {
+export function resolveVars(value, vars, depth = 0) {
   if (depth > 8 || !value.includes('var(')) return value
   const next = value.replace(/var\(\s*--([a-z0-9-]+)\s*(?:,[^)]*)?\)/gi, (whole, name) =>
     name in vars ? vars[name] : whole,
@@ -552,6 +552,8 @@ export function verify() {
 
   const built = loadBuiltCss()
   const builtVars = built ? collectVariables(built) : {}
+  // 未利用の部品もトークン参照を解く。写しの値は変えず、色・丸みの直書きを要求しない。
+  const sourceVars = collectVariables(readFileSync(join(WEB, 'src/app/globals.css'), 'utf8'))
 
   let checked = 0
   let matched = 0
@@ -622,7 +624,7 @@ export function verify() {
     lines.push(head)
     for (const d of part.declarations) {
       checked++
-      const want = normalize(part.status === 'active' ? d.resolved : d.source)
+      const want = normalize(d.resolved)
       const body =
         part.status === 'implemented'
           ? ruleBody(css, d.class)
@@ -645,7 +647,7 @@ export function verify() {
         continue
       }
 
-      const got = normalize(part.status === 'active' ? resolveVars(raw, builtVars) : raw)
+      const got = normalize(resolveVars(raw, part.status === 'active' ? builtVars : sourceVars))
       const ok = got === want
       if (ok) matched++
       else

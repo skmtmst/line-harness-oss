@@ -7,8 +7,8 @@
   z-index: 60;
   width: min(380px, calc(100vw - 32px));
   overflow: hidden;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-panel);
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-card);
   background: var(--color-canvas);
   box-shadow: var(--shadow-float);
   color: var(--color-ink);
@@ -35,7 +35,7 @@
 
 .title {
   margin: 0;
-  font-size: var(--text-lead);
+  font-size: 15px;
   font-weight: 600;
 }
 
@@ -123,7 +123,7 @@
 }
 
 .unread .dot {
-  background: var(--color-status-danger);
+  background: var(--color-menu-danger);
 }
 
 .body {
@@ -135,6 +135,7 @@
   display: block;
   margin: 0;
   line-height: 1.4;
+  font-size: var(--text-micro);
 }
 
 .notificationItem {
@@ -143,7 +144,7 @@
 
 .itemTitle {
   color: var(--color-ink);
-  font-size: var(--text-label);
+  font-size: var(--text-body);
   font-weight: 600;
 }
 

@@ -5,13 +5,14 @@
   display: flex;
   min-width: 0;
   /* #976 U083: 42px だった高さを入力欄・ボタンと同じ40pxへそろえる */
-  height: 40px;
+  height: 36px;
   align-items: center;
-  gap: 10px;
-  padding: 0 14px;
-  border: 1px solid var(--color-hairline);
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--color-field-border);
   border-radius: var(--radius-control);
   background: var(--color-canvas);
+  box-shadow: var(--shadow-field);
 }
 
 .search[hidden] {
@@ -20,7 +21,7 @@
 
 .searchIcon {
   width: 17px;
-  height: 17px;
+  height: 16px;
   flex: 0 0 17px;
   color: var(--color-ink-faint);
 }

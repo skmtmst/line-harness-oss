@@ -77,7 +77,7 @@
   --color-on-accent: #ffffff;
 
   /* 操作。LINEの状態色とは分け、設定画面のリンクと主要ボタンに使う。 */
-  --color-action: #0b63ce;
+  --color-action: #2563eb;
   --color-action-hover: #0957b7;
   --color-action-soft: #eaf4ff;
   --color-on-action: #ffffff;
@@ -119,29 +119,29 @@
   /* 面。canvas がカードの地、canvas-sunken が一段沈んだ面。 */
   --color-canvas: #ffffff;
   --color-canvas-sunken: #f7f7f5;
-  --color-surface-pearl: #fafafc;
+  --color-surface-pearl: #f7f8fa;
   --color-shell: #f5f5f7;
-  --color-hairline: #dadde2;
+  --color-hairline: #1d1d1f12;
 
   /* 状態。アクセントと混ぜない。 */
   /* 2026-09-24 に #05913e → #047833。白地 4.1:1・薄緑の地 3.7:1 で文字に使えなかった。 */
-  --color-success: #047833;
-  --color-success-bg: #e8f8ee;
+  --color-success: #087a3e;
+  --color-success-bg: #16a34a1a;
   --color-warning: #94600a;
   --color-warning-bg: #faf0dc;
-  --color-danger: #b3261e;
+  --color-danger: #b91c1c;
   --color-danger-bg: #fce9e7;
   --color-info: #0a6e80;
   --color-info-bg: #e2f2f5;
 
   /* Pencilの状態バッジ。既存画面の状態色は移行時にこの語彙へ寄せる。 */
-  --color-status-info: #175cd3;
-  --color-status-info-soft: #e9f1ff;
+  --color-status-info: #1d4ed8;
+  --color-status-info-soft: #2563eb1a;
   --color-status-warn: #f5c56b;
-  --color-status-warn-soft: #fff7e6;
-  --color-status-warn-deep: #a15c00;
-  --color-status-danger: #e5484d;
-  --color-status-danger-soft: #fef0f0;
+  --color-status-warn-soft: #f973161a;
+  --color-status-warn-deep: #c2410c;
+  --color-status-danger: #b91c1c;
+  --color-status-danger-soft: #ef44441a;
   --color-step-idle: #eef0f3;
   /* ★V7 の灰色語彙 `shell-gray`（hairline と shell の間）。旧名は surface-chrome。 */
   --color-shell-gray: #ebedf1;
@@ -234,18 +234,18 @@
    * トークンが2つあることを機械で見つけられない（`radius-v6-control` が
    * 8px で別名のまま残っていたのがそれ）。
    */
-  --radius-control: 8px;
+  --radius-control: 10px;
   /* ★V7 の 12px 段（カード・ダイアログ・知らせ）。card と同値なのは意図。 */
-  --radius-panel: 12px;
-  --radius-icon: 3px;
+  --radius-panel: 16px;
+  --radius-icon: 6px;
   --radius-none: 0;
   --radius-chart-dot: 2px;
   --radius-chart-bar: 4px;
   /* Pencil `$radius-xs`(6px)。行の中の小さな札（フォルダ・連動）。 */
   --radius-mini: 6px;
   /* Pencil ★V8 印のタイル（C9CaMS・E7USZ9・A2mryd）。小22→7、中28・大32→9。 */
-  --radius-tile-sm: 7px;
-  --radius-tile: 9px;
+  --radius-tile-sm: 6px;
+  --radius-tile: 10px;
   /* Pencil ★V8 切り替えの項目（dtJVi）。器は $radius-control、中の項目は 8。 */
   --radius-segment: 8px;
   /* Pencil ★V8 の時刻の欄（提案 YCOoR）。入力欄の角丸 10。 */
@@ -287,10 +287,10 @@
    * `text-body` などを書くだけで物差しの行の高さが付く。 */
   --text-caption: 12px;
   --text-caption--line-height: 1.6;
-  --text-label: 13px;
-  --text-body: 14px;
+  --text-label: 12px;
+  --text-body: 13px;
   --text-body--line-height: 1.7;
-  --text-lead: 16px;
+  --text-lead: 15px;
   --text-lead--line-height: 1.4;
   /*
    * Pencil `$size-title`(20)/`$size-heading`(18)。
@@ -319,8 +319,8 @@
    */
   --font-weight-bold: 600;
   --font-weight-extrabold: 600;
-  --text-display: 30px;
-  --text-metric: 22px;
+  --text-display: 22px;
+  --text-metric: 28px;
   --text-micro: 11px;
   --text-micro--line-height: 1.5;
   --text-nano: 10px;
@@ -372,19 +372,19 @@
    *
    * ★V7「仕上げ」§5: 影の色は黒ではなく ink（#1d1d1f）の透明にする。
    */
-  --shadow-card: 0px 2px 3px -1px rgba(29, 29, 31, 0.08), 0px 1px 0px 0px rgba(29, 29, 31, 0.02), 0px 0px 0px 1px rgba(29, 29, 31, 0.08);
+  --shadow-card: 0 1px 1px #1d1d1f29,0 2px 4px #1d1d1f14;
   /*
    * 浮いて見える面（メニュー・ドロップダウン・知らせ・ふきだし）の影。
    * ★V7 の段2。カードより一段強い層状影で、下の内容から浮き上がる。
    * 表コンテナなど、カードより大きい面にもこちらを当てる。
    */
-  --shadow-float: 0px 4px 8px -2px rgba(29, 29, 31, 0.08), 0px 12px 24px -4px rgba(29, 29, 31, 0.14), 0px 0px 0px 1px rgba(29, 29, 31, 0.08);
+  --shadow-float: 0 8px 24px #1d1d1f1f;
   /*
    * 最前面（ダイアログ・引き出し）の影。★V7 の段3。
    * メニューより遠くに影を投げて、後ろの 40% 暗幕（--color-scrim）と
    * 一緒にいちばん上にあることを示す。
    */
-  --shadow-overlay: 0px 8px 16px -4px rgba(29, 29, 31, 0.10), 0px 24px 48px -8px rgba(29, 29, 31, 0.18), 0px 0px 0px 1px rgba(29, 29, 31, 0.08);
+  --shadow-overlay: 0 8px 24px #1d1d1f1f;
   /*
    * 選んだ丸（ラジオ）の内側の縁。地の色で3pxの輪を描き、選んだ印を
    * 中に浮かせる（M10 polish・任意影の置き換え。見た目は同一）。
@@ -413,7 +413,7 @@
    * 表の区切り線。hairline（#dadde2）より薄い #eceef1。
    * 表の行の間・数の帯の縦線など、板の中の細かい割れ目に使う。
    */
-  --color-divider: #eceef1;
+  --color-divider: #1d1d1f12;
   /* 表の見出しの行の地（★V8 表の寸法「見出し 44・地 table-head」）。 */
   --color-table-head: #fafafb;
   /* 受信箱で自分が送った吹き出しの地（★V8 受信箱の型）。 */
@@ -447,9 +447,7 @@
    * 2枚の影）。照りは緑の上に薄い白の内側線で、ボタンが平らに
    * なりすぎないようにする。
    */
-  --shadow-primary-action:
-    0 1px 2px #087a3e40,
-    inset 0 1px 0 rgb(255 255 255 / 0.15);
+  --shadow-primary-action: var(--card-shadow);
   /* トグル・オフの地（Pencil V8 トグル/オフ LxHpj の #c9ced6）。 */
   --color-toggle-off: #c9ced6;
   /* 注目の星・オン（Pencil V8 w0R1PQ）：塗りは黄、縁は濃い黄。 */
@@ -469,6 +467,34 @@
 /* B-152・仕上げ7：操作の反応 */
 /* B-152・仕上げ8：読み込み中 */
 :root {
+  --shadow-toast: 0 1px 2px #1d1d1f0f,0 8px 24px #1d1d1f14;
+
+  --color-danger-action: #b3261e;
+  --color-notice-success-bg: #e8f8ee;
+  --color-notice-warning-bg: #fff7e6;
+  --color-notice-danger-bg: #fef0f0;
+  --color-menu-danger: #e5484d;
+  --color-link: #0b63ce;
+  --color-checkbox-line: #dadde2;
+  --radius-checkbox-mark: 3px;
+  --text-callout: 14px;
+
+
+  /* V8 の決まり B-148〜B-161：共通部品が読む値。 */
+  --color-kpi-positive: #047833;
+  --color-select-picked: #fafafc;
+
+  /* V8 の決まり B-148〜B-161：共通部品が読む値。 */
+  --text-section: 15px;
+  --color-field-border: #1d1d1f1f;
+  --shadow-field: 0 1px 2px #1d1d1f0f;
+  --color-accent-edge: #06612f;
+  --radius-button-primary: 8px;
+  --color-hover: #1d1d1f0a;
+  --color-press: #1d1d1f14;
+  --focus-ring: 2px solid #2563eb;
+  --shadow-toggle-knob: 0 1px 2px #1d1d1f29;
+
   --polish-tooltip-width: 288px;
   --polish-tooltip-gap: 8px;
   --polish-tooltip-bg: #1d1d1f;
@@ -480,7 +506,7 @@
   --polish-radius-dialog: 16px;
   --polish-radius-pill: 999px;
   --polish-skeleton-bg: #1d1d1f0f;
-  --polish-skeleton-radius: 5px;
+  --polish-skeleton-radius: 6px;
   --polish-skeleton-height: 10px;
   --polish-loading-delay: 300ms;
 }
@@ -584,8 +610,8 @@
    * 数のカード・アカウント/プロジェクト/プランのカード・設定の段・表の枠など、線で囲んだ箱は全部この2つを読む。
    * 選ぶカード（ラジオ・チェック）・入力欄・ボタン・浮く面（メニュー・窓）は別の値のまま。
    */
-  --card-edge: rgba(29, 29, 31, 0.08);
-  --card-shadow: 0 1px 2px rgba(29, 29, 31, 0.12), 0 3px 8px rgba(29, 29, 31, 0.09);
+  --card-edge: #1d1d1f14;
+  --card-shadow: 0 1px 1px #1d1d1f29,0 2px 4px #1d1d1f14;
   /* --- 動き（V7）------------------------------------------------------------
    * Pencil ★V7「基礎 動き」（V7 文書 `bi8Au`）の物差し。部品の CSS は ms を
    * 直接書かず、この4段と2本の曲線だけを使う。
@@ -680,8 +706,8 @@
  */
 [data-theme="v8"] {
   /* B-149 案D：区切りは黒7%、表の行も同じ1本の線。 */
-  --color-hairline: rgba(29, 29, 31, 0.07);
-  --color-divider: var(--color-hairline);
+  --color-hairline: #1d1d1f12;
+  --color-divider: #1d1d1f12;
   /* B-71③・WQmep：対応状況の札（点・薄い地・濃い文字）。 */
   --color-support-unread: #b91c1c;
   --color-support-unread-bg: #fdecec;
@@ -760,13 +786,13 @@
   /* controls レーン：書き出しHTMLの線・成功・浮く色選びの値。 */
   --color-controls-swatch-line: #1d1d1f1f;
   --shadow-controls-primary: var(--shadow-primary-action);
-  --shadow-primary-action: 0 1px 1px rgba(29, 29, 31, 0.16), 0 2px 4px rgba(29, 29, 31, 0.08);
+  --shadow-primary-action: var(--card-shadow);
   --color-primary-border: #06612f;
   --radius-primary-action: 8px;
   --tpl-folder-create-h: 32px;
   --tpl-folder-create-pad: 0 12px;
   --tpl-folder-create-space-col-h: 45px;
-  --shadow-controls-toggle: 0 1px 2px #1d1d1f33;
+  --shadow-controls-toggle: var(--shadow-toggle-knob);
   /* 表の行の下の線を行の内側に描く（線を含めて1行の高さ。data-table）。@theme に置くと CSS Modules だけが読む値は消えるので、ここ。 */
   --shadow-row-line: inset 0 -1px 0 var(--color-hairline);
   --shadow-controls-selected: 0 0 0 #087a3e33;
@@ -774,11 +800,11 @@
   --radius-control: 10px;
   --radius-panel: 16px;
   --text-lh: 1.5;
-  --color-control-border: rgba(29, 29, 31, 0.12);
+  --color-control-border: #1d1d1f1f;
   --control-shadow: 0 1px 2px rgba(29, 29, 31, 0.06);
   --color-choice-border: #c9ced6;
   --color-toggle-locked: #dadde2;
-  --color-status-warn-soft: #fdf3e1;
+  --color-status-warn-soft: #f973161a;
   --color-track: #1d1d1f0a;
   --color-border-soft: #1d1d1f14;
   --shadow-segment-ring: inset 0 0 0 1px var(--color-border-soft);
@@ -2614,7 +2640,7 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
  * `appearance-none` は表内など矢印を意図的に描かない小型欄の明示的な例外。
  */
 select:not([multiple]):not(.appearance-none) {
-  min-height: 40px;
+  min-height: 36px;
   padding-right: 36px;
   background-color: var(--color-canvas);
   background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236e7781' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
@@ -2785,7 +2811,7 @@ select:not([multiple]):not(.appearance-none) {
   [data-theme="v8"] #main-content { margin-left: 0; border: 0; outline: 1px solid var(--color-board-line); outline-offset: -0.5px; }
 }
 
-[data-theme="v8"] { --color-status-warn-deep: #94600a; }
+[data-theme="v8"] { --color-status-warn-deep: #c2410c; }
 [data-theme="v8"] aside[aria-label="フォルダ"] { box-shadow: none; }
 
 [data-theme="v8"] { --shadow-frozen-column: 6px 0 12px #1d1d1f14; --color-scroll-thumb: #1d1d1f40; --gradient-scroll-edge: linear-gradient(-90deg, #1d1d1f00 0%, #1d1d1f14 100%); }
@@ -2871,11 +2897,11 @@ select:not([multiple]):not(.appearance-none) {
 
 /* B-152：V8の本文。数字の大きさ・数の帯は別の値を保つ。 */
 [data-theme='v8'] {
-  --text-body: var(--polish-text-body);
-  --text-label: var(--polish-text-body);
-  --text-caption: var(--polish-text-support);
-  --text-micro: var(--polish-text-note);
-  --text-lead: var(--polish-text-section);
+  --text-body: 13px;
+  --text-label: 12px;
+  --text-caption: 12px;
+  --text-micro: 11px;
+  --text-lead: 15px;
   --text-heading: var(--polish-text-section);
 }
 
@@ -2914,12 +2940,12 @@ html[data-theme='v8'] :is(button, a, input, textarea, select, [role='button'], [
 /* B-152・仕上げ9。旧テーマの角丸は維持する。 */
 [data-theme='v8'] {
   --radius-mini: var(--polish-radius-small);
-  --radius-icon: var(--polish-radius-small);
-  --radius-control: var(--polish-radius-control);
+  --radius-icon: 6px;
+  --radius-control: 10px;
   --radius-field: var(--polish-radius-control);
   --radius-segment: var(--polish-radius-control);
   --radius-card: var(--polish-radius-card);
-  --radius-panel: var(--polish-radius-dialog);
+  --radius-panel: 16px;
   --radius-large: var(--polish-radius-dialog);
   --radius-pill: var(--polish-radius-pill);
 }
@@ -2929,3 +2955,11 @@ html[data-theme='v8'] [role='table'] [role='row'] { min-height: var(--polish-tab
 html[data-theme='v8'] [role='table'] [role='row']:has([role='columnheader']) { min-height: var(--polish-table-head); height: var(--polish-table-head); background: var(--polish-table-head-bg); }
 html[data-theme='v8'] [role='table'] [role='columnheader'] { color: var(--color-ink-secondary); font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); }
 html[data-theme='v8'] [role='table'] [role='row']:not(:has([role='columnheader'])):hover { background: var(--polish-table-hover); }
+
+/* 中身のカード。数の帯・入れ子・操作欄には付けない（B-137・B-148）。 */
+.content-card {
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
+}

@@ -20,70 +20,57 @@ function token(name: string): string {
  * **増やすときは理由を書く。**
  */
 const ALLOWED_SAME_VALUE = [
-  // アクセントの淡色と、成功状態の地。globals.css の冒頭が
-  // 「アクセントを状態表示に使わない」と決めている。値を分けるかは
-  // 設計（Pencil）の判断なので、実装側で名前を畳まない。
-  '--color-accent-soft / --color-success-bg',
-  // 色の上に乗る文字（白）と、面そのもの（白）。地の色が変われば
-  // 乗る文字は黒へ変わるので、同じ名前にはできない。
+  // §6: 主操作と成功、危険の札と危険操作は役割別に名前を残す。
+  '--color-accent-deep / --color-success',
+  '--color-danger / --color-status-danger',
+  // §6 B-149: 区切り線と枠線は同じ黒7%。
+  '--color-hairline / --color-divider',
+  // 面と、その上の文字は別の役割。
   '--color-on-accent / --color-on-action / --color-canvas',
-  // ★V7 でカードと窓（ダイアログ）は同じ 12px 段に畳まれた。呼び名は
-  // 用途ごとに残す（rounded-card / rounded-panel の大規模な改名は
-  // 値の置き換え段階で行う）。
-  '--radius-card / --radius-panel',
-  // ★V7「見た目の物差し」§1: 題（カードの題16・見出し18・画面名20）の
-  // 行の高さは全部 1.4。大きさが違うので名前は別のままにする。
-  '--text-lead--line-height / --text-heading--line-height / --text-title--line-height',
-  // ★V7「見た目の物差し」§2: font-bold / font-extrabold は意図的に
-  // 600 へ畳む別名。700 が効くのは text-hero（28px の大きな数）だけで、
-  // 既存の font-bold 書き込みを全部書き換えずに済ませるための名残。
+  // 既存の字重の別名。大きな数以外は600。
   '--font-weight-bold / --font-weight-extrabold',
-  // ★V8「切り替え（3つ）」（dtJVi）：器は $radius-control（v8 で10へ）、
-  // 中の項目は 8 のまま。v7 ではたまたま同じ 8 だが、v8 では別の値に
-  // なるので名前を畳めない。
-  '--radius-control / --radius-segment',
+  // §6: 入力・操作10、印の小型6。役割別の入口を維持。
+  '--radius-control / --radius-tile / --radius-field',
+  '--radius-icon / --radius-mini / --radius-tile-sm',
+  // §6: 浮く面と最前面の面は現在同じ影。
+  '--shadow-float / --shadow-overlay',
+  // §6: 補足とラベル12、大きな数28。
+  '--text-caption / --text-label',
+  '--text-hero / --text-metric',
+  '--text-lead--line-height / --text-heading--line-height / --text-title--line-height',
 ]
 
-/**
- * Pencil の `pencil-new.pen` を実測した値。
- *
- * **画像を目で見比べても数pxの差は出ない。** 設計から数を取り出して
- * ここに固定し、実装がずれたら落ちるようにする。
- * 測り方は `Get(<nodeId>, visit, {depth: 8})` で `width` `height`
- * `fontSize` `fontWeight` `cornerRadius` を読む。
- */
+/** ★V8の写しと§6の共通値。値の変更は先にPencil・決まりを更新する。 */
 describe('設計の実測値に合わせる', () => {
   it('文字の段は設計の10段と一致する', () => {
     // Pencil: $size-nano..$size-display
     expect(token('text-nano')).toBe('10px')
     expect(token('text-micro')).toBe('11px')
     expect(token('text-caption')).toBe('12px')
-    expect(token('text-label')).toBe('13px')
-    expect(token('text-body')).toBe('14px')
-    expect(token('text-lead')).toBe('16px')
+    expect(token('text-label')).toBe('12px')
+    expect(token('text-body')).toBe('13px')
+    expect(token('text-lead')).toBe('15px')
     expect(token('text-heading')).toBe('18px')
     expect(token('text-title')).toBe('20px')
-    expect(token('text-metric')).toBe('22px')
-    expect(token('text-display')).toBe('30px')
+    expect(token('text-metric')).toBe('28px')
+    expect(token('text-display')).toBe('22px')
   })
 
   it('角丸は設計にある値だけを使う', () => {
-    // 設計の角丸は 3 / 6 / 8 / 10 / 12 / 18 / 9999 の7段しかない。
-    const design = new Set(['3px', '6px', '8px', '10px', '12px', '18px', '9999px'])
+    // カード12・窓16・操作10。印・旧部品の段も名前を分けて残す。
+    const design = new Set(['3px', '6px', '8px', '10px', '12px', '16px', '18px', '9999px'])
     for (const name of ['radius-control', 'radius-control', 'radius-card', 'radius-panel']) {
       expect(design.has(token(name)), `${name} が設計に無い値`).toBe(true)
     }
   })
 
-  it('設計の7段がすべてトークンとして存在する', () => {
+  it('役割ごとの角丸がトークンとして存在する', () => {
     // 設計: xxs3 / xs6 / sm8 / md10 / panel12 / lg18 / full9999
-    expect(token('radius-icon')).toBe('3px')
+    expect(token('radius-icon')).toBe('6px')
     expect(token('radius-mini')).toBe('6px')
-    expect(token('radius-control')).toBe('8px')
-    // ★V7「見た目の物差し」§1: カード・ダイアログ・知らせは 12px に一本化
-    // （V6 の `$radius-md` 10px は V7 の物差しに無い）
+    expect(token('radius-control')).toBe('10px')
     expect(token('radius-card')).toBe('12px')
-    expect(token('radius-panel')).toBe('12px')
+    expect(token('radius-panel')).toBe('16px')
     expect(token('radius-large')).toBe('18px') // 既存の rounded-lg へ波及させない専用名
     expect(token('radius-pill')).toBe('9999px')
   })
@@ -95,34 +82,7 @@ describe('設計の実測値に合わせる', () => {
     expect(token('radius-large')).toBe('18px')
   })
 
-  /*
-   * **共通ボタンは36pxで正しい。**
-   *
-   * 設計に38pxのボタンもあるが、それは別の部品——画面ヘッダーの操作
-   * （`PhxG6` h=38 r=$radius-md）、確認モーダルの操作（`J6x4Q` w=112 h=38
-   * r=$radius-sm 12/700）、ページ送り（`Blot6` h=38）。共通ボタンの正本は
-   * `Ai3fq`（共通 編集追従バー）で、そちらは 36 / $radius-sm / [9,13] /
-   * $size-label / 600 と、実装に一致する。
-   *
-   * 一度この2つを混同して36→38に変えかけた。**「設計に38pxがある」は
-   * 「共通ボタンが38px」ではない。** どのNodeの何を測ったかまで見る。
-   */
-  /*
-   * **同じ値のトークンを2つ持たない。**
-   *
-   * 以前は色が3系統あった——緑が2色（`--color-accent` #06c755 と
-   * `--color-v6-accent` #07c653）、赤が3色（#b3261e / #d34851 / #e5484d）、
-   * 角丸は 10px に3つ、8px に3つ、3px に2つの名前が付いていた。
-   *
-   * **同じ値に名前が2つあると、片方だけ直した画面が出る。** 実際
-   * `--color-v6-ink-faint`(#8b938d) は白地で 3.16:1 しか無く、AA に
-   * 届かないまま10画面に残っていた。共通側の `--color-ink-faint`
-   * (#6e7781) だけが直っていて、V6 名を使う画面には効かなかった。
-   *
-   * 比べるのは**同じ役割の系統の中だけ**。`--radius-card`(12px) と
-   * `--text-caption`(12px) は数が同じでも別の物差しで、片方を変えても
-   * もう片方は動かない。
-   */
+  // 役割が異なる同値トークンだけ、上の理由付き一覧で許可する。
   it('同じ系統の中に、同じ値のトークンを2つ置かない', () => {
     const theme = CSS.slice(CSS.indexOf('@theme {'), CSS.indexOf('\n}\n', CSS.indexOf('@theme {')))
     const tokens = [...theme.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/^\s*--([a-z0-9]+)-([a-z0-9-]+):\s*([^;]+);/gm)]
@@ -168,17 +128,12 @@ describe('設計の実測値に合わせる', () => {
     expect(token('color-accent')).toBe('#06c755')
   })
 
-  /*
-   * #976 U079/U083: 共通ボタンは 2026-09-20 の共通デザイン仕様で
-   * **PC標準 40px・文字14px** に改められた。上の「36pxで正しい」の経緯は
-   * 残す（Pencil V5 実測）。監査で入力欄・検索欄と高さをそろえることが
-   * 決まったため、ここもそれに合わせる。タッチ端末は44px。
-   */
-  it('共通ボタンは #976 の規定で 40px・角丸8px・14px・600 に合わせる', () => {
-    expect(BUTTON).toMatch(/\.standard\s*{[^}]*height:\s*40px/s)
-    expect(BUTTON).toMatch(/padding:\s*9px 13px/)
+  // V8ではPC36px、タッチ端末は44pxの当たりを維持する。
+  it('共通ボタンは V8 の36px・角丸10px・13px・600 に合わせる', () => {
+    expect(BUTTON).toMatch(/\.standard\s*{[^}]*height:\s*36px/s)
+    expect(BUTTON).toMatch(/padding:\s*0 16px/)
     expect(BUTTON).toMatch(/border-radius:\s*var\(--radius-control\)/)
-    expect(token('radius-control')).toBe('8px')
+    expect(token('radius-control')).toBe('10px')
     expect(BUTTON).toMatch(/font-size:\s*var\(--text-body\)/)
     expect(BUTTON).toMatch(/font-weight:\s*600/)
     // タッチ端末（pointer: coarse）は44pxの当たり判定を確保する

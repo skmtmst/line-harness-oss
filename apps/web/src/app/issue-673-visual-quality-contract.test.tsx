@@ -23,17 +23,15 @@ const GLOBALS = readFileSync(join(HERE, 'globals.css'), 'utf8')
 const GLOBALS_CODE = GLOBALS.replace(/\/\*[\s\S]*?\*\//g, '')
 
 describe('#673 A. カード・パネルの立体感', () => {
-  it('カードの影は層状影（近距離の薄い影＋下端の光＋1pxリング）', () => {
+  it('カードの影はB-148の2層の影', () => {
     const card = GLOBALS_CODE.match(/--shadow-card:\s*([^;]+);/)?.[1] ?? ''
     // 3層の影。輪郭の1pxリングが罫線の代わりになる。
-    expect(card.split(',').length).toBeGreaterThanOrEqual(3)
-    expect(card).toContain('0px 0px 0px 1px')
+    expect(card).toBe('0 1px 1px #1d1d1f29,0 2px 4px #1d1d1f14')
   })
 
-  it('浮いて見える面の影はカードより一段強い層状影', () => {
+  it('浮く面はV8の8px・24pxの影', () => {
     const float = GLOBALS_CODE.match(/--shadow-float:\s*([^;]+);/)?.[1] ?? ''
-    expect(float.split(',').length).toBeGreaterThanOrEqual(3)
-    expect(float).toContain('0px 0px 0px 1px')
+    expect(float).toBe('0 8px 24px #1d1d1f1f')
   })
 
   it('モーダル・フォルダパネル・パネル内メニューは属性入口でトークンを読む', () => {

@@ -4,8 +4,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 9px 13px;
+  gap: 8px;
+  padding: 0 16px;
   border: 1px solid;
   border-radius: var(--radius-control);
   /*
@@ -39,11 +39,11 @@
  * 「主要ボタン・入力・検索・選択はPC 40px」と決め直した。
  */
 .standard {
-  height: 40px;
+  height: 36px;
 }
 
 .field {
-  height: 40px;
+  height: 36px;
 }
 
 /*
@@ -88,9 +88,11 @@
  * （文字が乗らない用途）。
  */
 .primary {
-  border-color: var(--color-accent-deep);
+  border-color: var(--color-accent-edge);
   background: var(--color-accent-deep);
   color: var(--color-on-accent);
+  border-radius: var(--radius-button-primary);
+  box-shadow: var(--card-shadow);
 }
 
 /*
@@ -104,9 +106,10 @@
 }
 
 .secondary {
-  border-color: var(--color-hairline);
+  border-color: var(--color-field-border);
   background: var(--color-canvas);
   color: var(--color-ink);
+  box-shadow: var(--shadow-field);
 }
 
 .secondary:hover:not(:disabled) {
@@ -123,8 +126,8 @@
  * と同じ考え方。
  */
 .danger {
-  border-color: var(--color-danger);
-  background: var(--color-danger);
+  border-color: var(--color-danger-action);
+  background: var(--color-danger-action);
   color: var(--color-on-accent);
 }
 

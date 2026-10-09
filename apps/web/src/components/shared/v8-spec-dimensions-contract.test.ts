@@ -26,7 +26,7 @@ describe('V8 寸法契約（見本との突き合わせ）', () => {
     expect(cell).toMatch(/padding:\s*10px 16px/)
     expect(cell).toMatch(/gap:\s*4px/)
     // 数は 22 の段（--text-metric）のまま。見本の例の数は書かない。
-    expect(read('../../app/globals.css')).toMatch(/--text-metric:\s*22px/)
+    expect(read('../../app/globals.css')).toMatch(/--tpl-band-number-size:\s*22px/)
   })
 
   it('ボタンの高さ：V8 は 36（見本どおり・直し不要の確認）', () => {

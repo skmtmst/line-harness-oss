@@ -43,11 +43,11 @@
   gap: 8px;
   padding: 10px 12px;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-card);
   background: var(--color-canvas);
   color: var(--color-ink);
-  box-shadow: var(--shadow-float);
-  font-size: var(--text-caption);
+  box-shadow: var(--shadow-toast);
+  font-size: var(--text-body);
   font-weight: 600;
   line-height: 1.6;
 }
@@ -60,12 +60,12 @@
 
 /* うまくいった印。白地に載せる濃い緑（飾りなので読み上げない）。 */
 .iconSuccess {
-  color: var(--color-success);
+  color: var(--color-kpi-positive);
 }
 
 /* できなかった印。白地に載せる赤（飾りなので読み上げない）。 */
 .iconError {
-  color: var(--color-danger);
+  color: var(--color-danger-action);
 }
 
 .message {

@@ -12,7 +12,7 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  padding: 2px 7px;
+  padding: 2px 8px;
   border-radius: var(--radius-mini);
   font-size: var(--text-caption);
   font-weight: 600;
@@ -47,7 +47,7 @@
 [data-theme='v8'] .attentionIcon { display: none; }
 [data-theme='v8'] .up { background: var(--color-success-bg); color: var(--color-success); }
 [data-theme='v8'] .down { background: var(--color-status-danger-soft); color: var(--color-danger); }
-[data-theme='v8'] .attention { background: var(--color-status-warn-soft); color: #94600a; }
+[data-theme='v8'] .attention { background: var(--color-status-warn-soft); color: var(--color-warning); }
 [data-theme='v8'] .root svg { flex-shrink: 0; }
 
 }

@@ -4,20 +4,20 @@
   display: flex;
   flex-wrap: wrap; /* 幅320で「次へ」が右に切れていた（★V7 修正方針 §3） */
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .item {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 38px;
+  height: 32px;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-segment);
   background: var(--color-canvas);
   color: var(--color-ink);
-  font-size: var(--text-caption);
-  font-weight: 600;
+  font-size: var(--text-body);
+  font-weight: 500;
   line-height: 1;
   white-space: nowrap;
 }
@@ -72,9 +72,9 @@ button.item:disabled {
  * `$accent`(#06c755) に白文字は 2.26:1 で、13px の数字が読めない。
  */
 .current {
-  border-color: var(--color-accent-deep);
-  background: var(--color-accent-deep);
-  color: var(--color-on-accent);
+  border-color: transparent;
+  background: var(--color-ink);
+  color: var(--color-canvas);
   font-weight: 500;
 }
 

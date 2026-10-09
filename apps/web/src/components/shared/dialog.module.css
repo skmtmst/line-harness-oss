@@ -35,17 +35,17 @@
   max-height: calc(100dvh - 32px);
   flex-direction: column;
   gap: 12px;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-panel);
   background: var(--color-canvas);
   /* ★V7 の影は3段。画面の真ん中に開く窓は最前面（段3）。 */
-  box-shadow: var(--shadow-overlay);
+  box-shadow: var(--shadow-float);
   padding: 18px;
   color: var(--color-ink);
 }
 
 .standardPanel {
-  padding: 18px;
+  padding: 24px;
 }
 
 /* Pencil の確認窓。説明は帯で囲まず、見出し・本文・操作を同じ面に置く。 */
@@ -118,11 +118,11 @@
 
 .standardTitle {
   color: var(--color-ink);
-  font-size: var(--text-lead);
+  font-size: var(--text-heading);
 }
 
 .destructiveTitle {
-  font-size: var(--text-body);
+  font-size: var(--text-callout);
 }
 
 /* 見出しの左に絵を置くとき（危険な操作の確認）だけ使う行。 */
@@ -147,8 +147,8 @@
 
 .description {
   margin: 0;
-  color: var(--color-ink-faint);
-  font-size: var(--text-caption);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-body);
   line-height: 1.5;
 }
 
@@ -158,7 +158,7 @@
   gap: 8px;
   border: 1px solid var(--color-status-danger-soft);
   border-radius: var(--radius-card);
-  background: var(--color-status-danger-soft);
+  background: var(--color-notice-danger-bg);
   padding: 16px;
 }
 
@@ -235,7 +235,7 @@
   flex: 0 0 auto;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 8px;
 }
 
 /*

@@ -156,7 +156,7 @@
   border: 1.2px solid var(--color-ink-faint);
   border-radius: var(--radius-pill);
   background: var(--color-canvas);
-  font-size: var(--text-nano);
+  font-size: var(--text-micro);
   font-weight: 600;
   line-height: 1;
 }
@@ -227,8 +227,8 @@
   background: transparent;
   color: var(--color-ink-faint);
   font-family: var(--font-noto-sans-jp), system-ui, sans-serif;
-  font-size: 10px;
-  line-height: 10px;
+  font-size: var(--text-micro);
+  line-height: 11px;
 }
 }
 

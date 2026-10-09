@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 // 検証本体はNodeで直接実行する.mjs。公開型はこの回帰試験で固定する。
 // @ts-expect-error .mjs用の宣言ファイルは持たない
-import { builtRuleBody } from '../apps/web/scripts/verify-design-values.mjs'
+import { builtRuleBody, normalize, resolveVars } from '../apps/web/scripts/verify-design-values.mjs'
 
 describe('ビルド後CSSの設計照合', () => {
   it('最適化でカンマ結合された共通宣言も対象部品の宣言として読む', () => {
@@ -23,5 +23,16 @@ describe('ビルド後CSSの設計照合', () => {
       '.breadcrumb_root__B2{gap:8px}',
     ].join('')
     expect(builtRuleBody(css, 'breadcrumb', 'root')).toBe('gap:8px')
+  })
+})
+
+
+describe('未利用の部品のトークン照合', () => {
+  it('トークンへの置き換えを許すが、解いた値のずれは通さない', () => {
+    const snapshot = '1px solid #1d1d1f12'
+    const declaration = '1px solid var(--color-hairline)'
+    expect(normalize(resolveVars(declaration, { 'color-hairline': '#1d1d1f12' }))).toBe(normalize(snapshot))
+    expect(normalize(resolveVars(declaration, { 'color-hairline': '#dadde2' }))).not.toBe(normalize(snapshot))
+    expect(resolveVars('var(--undefined)', {})).toBe('var(--undefined)')
   })
 })
