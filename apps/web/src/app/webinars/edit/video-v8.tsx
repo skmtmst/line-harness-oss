@@ -322,7 +322,7 @@ export default function VideoV8({
               </Checkbox>
             </div>
           </div>
-          {periodError ? <Notice tone="error" title="公開期間を保存できませんでした">{periodError}</Notice> : null}
+          {periodError ? <Notice tone="danger" title="公開期間を保存できませんでした">{periodError}</Notice> : null}
           <div className="mt-3">
             <Button variant="secondary" disabled={!canEdit} busy={periodBusy} busyLabel="保存しています…" onClick={savePeriod}>
               公開期間を保存する
@@ -333,7 +333,7 @@ export default function VideoV8({
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card" aria-label="配信枠">
           <h2 className="text-ink text-base font-bold">{scheduled ? '開催回' : '配信枠'} {webinar.schedule.length}件</h2>
           <p className="text-ink-faint mt-1 text-xs">視聴できる時間の枠です。枠が0だと公開できません。</p>
-          {error ? <Notice tone="error" title="配信枠を保存できませんでした">{error}</Notice> : null}
+          {error ? <Notice tone="danger" title="配信枠を保存できませんでした">{error}</Notice> : null}
           {scheduled ? <table className="mt-3 w-full table-fixed">
             <colgroup><col className="w-1/4" /><col className="w-1/4" /><col className="w-1/6" /><col /><col className="w-12" /></colgroup>
             <thead><TableHeadRow><Th>日時</Th><Th help="空にすると無制限です。満員になると新しい申込は受け付けません。">定員</Th><Th align="right">申込</Th><Th>状態</Th><Th>操作</Th></TableHeadRow></thead>

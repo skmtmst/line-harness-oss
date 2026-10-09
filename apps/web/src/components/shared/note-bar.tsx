@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import Notice, { type NoticeTone } from './notice'
+import Notice from './notice'
 
 export type NoteTone = 'info' | 'success' | 'warn' | 'danger'
 
@@ -45,7 +45,7 @@ export default function NoteBar({
 }) {
   return (
     <Notice
-      tone={tone as NoticeTone}
+      tone={tone}
       action={action}
       className={className}
       help={help}

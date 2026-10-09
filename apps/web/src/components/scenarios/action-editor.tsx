@@ -816,7 +816,7 @@ export default function ActionEditor({
               ここで決めた条件に合う友だちにだけ、この動作を実行します。条件なしなら全員に実行します。
             </p>
             {conditionError && (
-              <Notice tone="validation" className="mb-4">
+              <Notice tone="warn" className="mb-4">
                 {conditionError}
               </Notice>
             )}

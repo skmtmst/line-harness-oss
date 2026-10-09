@@ -392,7 +392,7 @@ function InflowCreate() {
       )}
     >
       {pruneNotice ? <Notice tone="warn" message={pruneNotice} onClose={() => setPruneNotice(null)} /> : null}
-      {saveError ? <Notice tone="error" message={saveError} onClose={() => setSaveError(null)} /> : null}
+      {saveError ? <Notice tone="danger" message={saveError} onClose={() => setSaveError(null)} /> : null}
 
       <section className={styles.card} aria-labelledby="ir-new-where">
         <div className={styles.cardHead}>

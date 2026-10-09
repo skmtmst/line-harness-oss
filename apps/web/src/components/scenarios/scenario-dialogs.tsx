@@ -194,10 +194,10 @@ export function ConditionDialog({
         <Notice tone="danger" className="mb-4" message={error} />
       )}
       {rangeError && (
-        <Notice tone="validation" className="mb-4" message={rangeError} />
+        <Notice tone="warn" className="mb-4" message={rangeError} />
       )}
       {draftError && (
-        <Notice tone="validation" className="mb-4" message={draftError} />
+        <Notice tone="warn" className="mb-4" message={draftError} />
       )}
       <span className="sr-only">{title}{description}</span>
       <section className="bg-canvas-sunken rounded-panel mb-4 px-4 py-5">

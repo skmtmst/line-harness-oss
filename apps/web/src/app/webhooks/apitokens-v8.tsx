@@ -282,7 +282,7 @@ function ApiTokensV8Inner() {
       />
       <WebhooksV8Band cells={outgoingKpiCells({ items: band.outgoingItems, incomingCount: band.incomingCount, summary: band.summary })} />
 
-      {actionError ? <Notice tone="error">{actionError}</Notice> : null}
+      {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
 
       {issued ? (
         <section className={styles.issuedBox} aria-label="発行した鍵">

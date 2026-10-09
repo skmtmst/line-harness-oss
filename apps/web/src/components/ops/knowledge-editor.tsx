@@ -154,7 +154,7 @@ export default function KnowledgeEditor({ article: initial, ticket, onClose, onS
             </Checkbox>
           ) : null}
           {ticketBlocked ? (
-            <Notice tone="error">
+            <Notice tone="danger">
               元の問い合わせ {ticket?.label} がまだ「{ticket?.stageLabel}」です。解決にしてから承認できます。
             </Notice>
           ) : null}

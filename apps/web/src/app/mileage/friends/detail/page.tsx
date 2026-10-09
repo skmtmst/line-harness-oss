@@ -370,7 +370,7 @@ function FriendMileageInner() {
       <Card overflow="hidden">
         <CardHeader title="付与・使用・失効・調整の履歴" meta={`最新${formatNumber(displayedHistory.length)}件`} />
         {notificationRetryError ? (
-          <div className="px-4 pt-3"><Notice tone="error">{notificationRetryError}</Notice></div>
+          <div className="px-4 pt-3"><Notice tone="danger">{notificationRetryError}</Notice></div>
         ) : null}
         {displayedHistory.length === 0 ? (
           <ListState kind="empty" title="マイルの履歴はありません" description="付与や使用が記録されると、ここに理由と日時が表示されます。" />
