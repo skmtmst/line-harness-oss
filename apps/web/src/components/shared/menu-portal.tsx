@@ -3,11 +3,14 @@
 import { createPortal } from 'react-dom'
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { isImeComposing } from './ime'
+import { useV8Leave } from './overlay-utils'
 
 export type MenuPortalAlign = 'start' | 'end'
 export type MenuPortalPlacement = 'down' | 'up'
 
 export type MenuPortalProps = {
+  /** 操作メニューの閉じる時間（提案Fは80ms）。候補欄の既定は変えない。 */
+  exitDuration?: number
   /** 開いている間だけ body へ出す。閉じたら何も描かない。 */
   open: boolean
   /** 位置の基準（開くボタン）。開くたび・動くたびに測り直す。 */
@@ -23,6 +26,8 @@ export type MenuPortalProps = {
   matchWidth?: boolean | 'min'
   /** 外を押した・Esc で閉じるとき。開くボタンの押下は含まない。 */
   onClose: () => void
+  /** 位置を測り、子が見える状態になってから焦点を移す。開くごとに1回。 */
+  onReady?: () => void
   /**
    * 位置だけ別の箱に合わせるとき（ベルの小窓は上の帯の右端から 8 内側・帯の下）。
    * 外を押したかの判定は getAnchor のまま（開くボタンの押下は外にしない）。
@@ -98,12 +103,18 @@ export default function MenuPortal({
   getPositionRect,
   className,
   onEscape,
+  onReady,
   children,
+  exitDuration,
 }: MenuPortalProps) {
+  const leaving = useV8Leave(open, exitDuration)
   const [mounted, setMounted] = useState(false)
   const [geometry, setGeometry] = useState<Geometry | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
+  const readyRef = useRef(false)
+  const onReadyRef = useRef(onReady)
+  onReadyRef.current = onReady
   const closeRef = useRef(onClose)
   closeRef.current = onClose
   const escapeRef = useRef(onEscape)
@@ -173,6 +184,14 @@ export default function MenuPortal({
     }
   }, [open, mounted, align, gap, matchWidth, children])
 
+  useLayoutEffect(() => {
+    if (!open) { readyRef.current = false; return }
+    // ref が付いた時点では測定中の visibility:hidden。表示後にだけ通知する。
+    if (!mounted || !geometry || readyRef.current) return
+    readyRef.current = true
+    onReadyRef.current?.()
+  }, [open, mounted, geometry])
+
   // 下に続きがある間だけ下端の影を出す。入りきる時は影なし。
   useLayoutEffect(() => {
     if (!open || !mounted) return
@@ -234,7 +253,7 @@ export default function MenuPortal({
     }
   }, [open, mounted])
 
-  if (!open || !mounted || typeof document === 'undefined') return null
+  if ((!open && (!exitDuration || !leaving)) || !mounted || typeof document === 'undefined') return null
   return createPortal(
     <div
       ref={panelRef}
@@ -243,6 +262,9 @@ export default function MenuPortal({
       // 高さの上限と続きの影だけは器が持つ（子は自分の上限を外す）。
       className={className ? `fixed min-w-0 ${className}` : 'fixed min-w-0'}
       data-menu-portal=""
+      data-closing={leaving || undefined}
+      aria-hidden={leaving || undefined}
+      inert={leaving || undefined}
       data-placement={geometry?.placement ?? 'down'}
       // 開く動きの起点（押した角）を部品の CSS が決めるための印。
       data-align={align}

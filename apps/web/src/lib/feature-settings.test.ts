@@ -97,7 +97,7 @@ describe('機能設定とサイドメニューが同じ一覧を見る', () => {
     // multi_store_hierarchy の受け口（#860）。off でメニューから消え、直URLは API が 403 で止める。
     expect(SIDEBAR_FEATURE_BY_HREF['/pools']).toBe('multi_store_hierarchy')
     expect(DEFAULT_FEATURES.multi_store_hierarchy).toBe(false)
-    // 友だち属性3機能（#861）。/tags はタグ自体が必須なのでメニューは隠さず、
+    // タグ3機能（#861）。/tags はタグ自体が必須なのでメニューは隠さず、
     // タブと子ページでキーごとに閉じる。サーバーの既定（defaultEnabled: true）と合わせる。
     expect(DEFAULT_FEATURES.friend_fields).toBe(true)
     expect(DEFAULT_FEATURES.support_marks).toBe(true)

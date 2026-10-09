@@ -84,13 +84,13 @@ export function usePageChrome(): PageChrome {
  * **読み込み中に空文字を渡さない。** 空にするとタイトルだけ消えて画面が跳ねる。
  * まだ分からないときは `null` を渡し、既定を出したままにする。
  */
-export function usePageTitle(title: string | null | undefined) {
+export function usePageTitle(title: string | null | undefined, enabled = true) {
   const store = useContext(PageChromeContext)
   const setTitle = store?.setTitle
   const next = title && title.length > 0 ? title : null
 
   useEffect(() => {
-    if (!setTitle) return
+    if (!setTitle || !enabled) return
     setTitle(next)
     /*
      * ブラウザのタブの題も「<画面名> | musubo」にする（タブを並べて見分けられるように）。
@@ -100,7 +100,7 @@ export function usePageTitle(title: string | null | undefined) {
     if (next) setDocumentTitle(next)
     // 画面を離れたら既定へ戻す。戻さないと、次の画面に前の名前が残る。
     return () => setTitle(null)
-  }, [next, setTitle])
+  }, [next, setTitle, enabled])
 }
 
 /**
@@ -131,7 +131,7 @@ export function useFullWidthPage(enabled = true) {
  * v7 では描かれないので、渡しても v7 の見た目は変わらない。
  * 画面を離れたら既定（アカウント名）へ戻す。
  */
-export function usePageCrumbs(crumbs: PageCrumb[] | null) {
+export function usePageCrumbs(crumbs: PageCrumb[] | null, enabled = true) {
   const store = useContext(PageChromeContext)
   const setCrumbs = store?.setCrumbs
   // 呼び出し側は描き出すたびに新しい配列を作る。中身が同じなら
@@ -139,11 +139,12 @@ export function usePageCrumbs(crumbs: PageCrumb[] | null) {
   const serialized = JSON.stringify(crumbs)
 
   useEffect(() => {
-    if (!setCrumbs) return
+    // 統括などに埋め込まれた編集部品では、パンくずの登録も解除も親に任せる。
+    if (!setCrumbs || !enabled) return
     setCrumbs(crumbs)
     return () => setCrumbs(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serialized, setCrumbs])
+  }, [serialized, setCrumbs, enabled])
 }
 
 /**

@@ -10,6 +10,7 @@
  * `app/friend-add-settings/runs/runs-v8.tsx` から写した（import はしない）。動きの一覧は BEHAVIOR.md。
  */
 
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -18,7 +19,7 @@ import type {
   FriendAddEventKind,
   FriendAddEventRoutingStatus,
 } from '@line-crm/shared'
-import { ArrowLeft, Download, FileText, MessageCircle, Pause, Pencil, RotateCcw, TriangleAlert } from 'lucide-react'
+import { Download, FileText, MessageCircle, Pause, Pencil, RotateCcw, TriangleAlert } from 'lucide-react'
 import { DetailPage } from '@/components/templates'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
@@ -111,6 +112,7 @@ function FriendAddRunsInner() {
   const canManage = role === null || canManageRole(role)
   const searchParams = useSearchParams()
   const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const ruleIdFilter = searchParams.get('rule_id')
   const kindParam = searchParams.get('kind')
   const kind: KindFilter = kindParam === 'first_time' || kindParam === 'returning' ? kindParam : 'all'
@@ -200,8 +202,8 @@ function FriendAddRunsInner() {
     if (trail) params.set('pages', trail)
     else params.delete('pages')
     const next = params.toString()
-    if (next !== searchParams.toString()) router.replace(`?${next}`, { scroll: false })
-  }, [cursorStack, searchParams, router])
+    if (next !== searchParams.toString()) samePageUrl.replace(`?${next}`)
+  }, [cursorStack, searchParams, samePageUrl])
 
   const applyFilter = (patch: { kind?: KindFilter; routing?: RoutingFilter }) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -214,7 +216,7 @@ function FriendAddRunsInner() {
       else params.set('status', patch.routing)
     }
     params.delete('pages')
-    router.replace(`?${params.toString()}`, { scroll: false })
+    samePageUrl.replace(`?${params.toString()}`)
     resetCursor()
   }
 
@@ -417,7 +419,6 @@ function FriendAddRunsInner() {
     boardId: 'REIxB',
     title: '実行結果：友だち追加時の配信',
     description: 'だれが・どの経路から来て・何を送ったか、失敗した処理を見ます。',
-    identity: <Link href="/friend-add-settings" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />友だち追加時の配信へ</Link>,
   }
 
   if (!accountLoading && !loading && !selectedAccountExists) {
@@ -619,7 +620,7 @@ function FriendAddRunsInner() {
             </div>
             <div className={styles.kvRow}>
               <dt>最後に送った</dt>
-              <dd>{summary?.lastDeliveryAt ? jstTime(summary.lastDeliveryAt) : '—'}</dd>
+              <dd title={summary?.lastDeliveryAt ? formatJstDateTime(summary.lastDeliveryAt) : undefined}>{summary?.lastDeliveryAt ? jstTime(summary.lastDeliveryAt) : '—'}</dd>
             </div>
           </dl>
           <div className={styles.boxFoot}>

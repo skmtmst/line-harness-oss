@@ -1,5 +1,8 @@
 'use client'
 
+import { DragHandle } from '@/components/shared/row-actions'
+
+import StatusPill, { StatusDot, SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
 import Avatar from '@/components/shared/avatar'
 import { useCallback, useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
@@ -7,6 +10,8 @@ import { api, ApiError, type FriendUpcoming, type MileageHistoryItem, type Milea
 import { tagTextColor } from '@/lib/presentation'
 import type { FriendField, Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import TagPill from '@/components/shared/tag-pill'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import { TextArea } from '@/components/shared/text-field'
@@ -16,12 +21,11 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import InlineEdit from '@/components/shared/inline-edit'
 import { runOptimisticWithUndo } from '@/lib/undoable'
 import PrepayBadgeV8 from '@/app/booking/prepay-badge-v8'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
-import { GripVertical, X } from 'lucide-react'
+import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability'
+import { X } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import v8 from '@/v8/inbox-chat/customer-panel.module.css'
-import chatV8 from '@/v8/inbox-chat/inbox-chat.module.css'
 
 interface FriendDetail {
   id: string
@@ -230,9 +234,24 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
   const [localOperatorId, setLocalOperatorId] = useState<string | null | undefined>(undefined)
   const [localNotes, setLocalNotes] = useState<string | null | undefined>(undefined)
   const [localTags, setLocalTags] = useState<Array<{ id: string; name: string; color: string }> | undefined>(undefined)
+  const targetKey = `${accountId ?? ''}:${friendId ?? ''}:${chatId ?? ''}`
+  const targetRef = useRef({ key: targetKey, generation: 0 })
+  const operationRef = useRef(new Map<string, number>())
+  if (targetRef.current.key !== targetKey) {
+    targetRef.current = { key: targetKey, generation: targetRef.current.generation + 1 }
+    operationRef.current.clear()
+  }
+  const beginChange = useCallback((scope: string) => {
+    const generation = targetRef.current.generation
+    const operation = (operationRef.current.get(scope) ?? 0) + 1
+    operationRef.current.set(scope, operation)
+    return () => targetRef.current.generation === generation && operationRef.current.get(scope) === operation
+  }, [])
+  useEffect(() => () => { targetRef.current = { ...targetRef.current, generation: targetRef.current.generation + 1 } }, [])
   const effectiveStatus = localStatus !== undefined ? localStatus : chatStatus?.status
   const effectiveOperatorId = localOperatorId !== undefined ? localOperatorId : operatorId
   const effectiveNotes = localNotes !== undefined ? localNotes : chatStatus?.notes
+  const [tagToRemove, setTagToRemove] = useState<{ id: string; name: string; friendId: string } | null>(null)
   const effectiveTags = localTags ?? friend?.tags
   // 友だち・会話が切り替わったら持ち直しを捨てる。
   useEffect(() => {
@@ -240,7 +259,8 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     setLocalOperatorId(undefined)
     setLocalNotes(undefined)
     setLocalTags(undefined)
-  }, [friendId, chatId])
+    setTagToRemove(null)
+  }, [friendId, chatId, accountId])
   const isV8 = useAdminTheme() === 'v8'
   const [showSettings, setShowSettings] = useState(false)
   const [draggedGroupKey, setDraggedGroupKey] = useState<string | null>(null)
@@ -395,6 +415,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       return
     }
     let cancelled = false
+    setFriend(null)
     setLoading(true)
     setError(null)
     api.friends.get(friendId).then((res) => {
@@ -412,7 +433,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       if (!cancelled) setLoading(false)
     })
     return () => { cancelled = true }
-  }, [friendId, friendRetry])
+  }, [friendId, accountId, friendRetry])
 
   useEffect(() => {
     if (!friendId) {
@@ -432,7 +453,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       if (!cancelled) setMileage({ kind: 'error' })
     })
     return () => { cancelled = true }
-  }, [friendId, mileageRetry])
+  }, [friendId, accountId, mileageRetry])
 
   /*
    * INBOX-05/07: ★つき項目と、友だち情報の項目名（内部キーではなく
@@ -463,7 +484,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       if (!cancelled) setFriendFields({ kind: 'error' })
     })
     return () => { cancelled = true }
-  }, [friendId, fieldsRetry])
+  }, [friendId, accountId, fieldsRetry])
 
   // リッチメニュー — loading / error / data を区別して、null=未設定 を取得失敗と
   // 混同しないようにする。Codex review (P3) の指摘で導入。
@@ -492,7 +513,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       setRichMenu({ kind: 'error' })
     })
     return () => { cancelled = true }
-  }, [friendId, richMenuRetry])
+  }, [friendId, accountId, richMenuRetry])
 
   /*
    * IDEA-02: 次回予約と次の確定した自動配信。
@@ -524,16 +545,19 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       if (!cancelled) setUpcoming({ kind: 'error' })
     })
     return () => { cancelled = true }
-  }, [friendId, upcomingRetry])
+  }, [friendId, accountId, upcomingRetry])
 
   /*
    * A-2: 押した瞬間に画面を変えて裏で保存（lib/undoable の runOptimistic）。
    * 成功は白い知らせに「元に戻す」、失敗は戻して「もう一度」。
    * 知らせは notifyToast の白い板（黒にしない。オーナー決定 2026-10-04）。
    */
-  const canEditChat = Boolean(chatId)
+  const canEditChat = Boolean(chatId) && canEditFeature('/chats')
+  const canEditFriend = Boolean(friendId) && canEditFeature('/friends')
   const statusButtonRef = useRef<HTMLDivElement | null>(null)
   const tagSearchRef = useRef<HTMLInputElement | null>(null)
+  const [tagPickerOpen, setTagPickerOpen] = useState(false)
+  useEffect(() => { setTagPickerOpen(false) }, [friendId])
   const memoAreaRef = useRef<HTMLTextAreaElement | null>(null)
 
   /*
@@ -553,17 +577,21 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     const next = (res as { data?: { revision?: unknown } } | undefined)?.data?.revision
     if (typeof next === 'number') revisionRef.current = next
   }
+  const targetGeneration = targetRef.current.generation
   const changed = useCallback((res: unknown) => {
+    if (targetRef.current.generation !== targetGeneration) return
     noteRevision(res)
     onChatChanged?.()
-  }, [onChatChanged])
+  }, [onChatChanged, targetGeneration])
 
   const saveChatStatus = useCallback((next: NonNullable<ChatStatusInfo['status']>) => {
     if (!chatId) return
     const previous = effectiveStatus ?? null
     if (previous === next) return
     setLocalStatus(next)
+    const isCurrent = beginChange('status')
     runOptimisticWithUndo({
+      isCurrent,
       request: () => api.chats.update(chatId, { status: next }),
       revert: () => setLocalStatus(previous),
       reapply: () => setLocalStatus(next),
@@ -572,12 +600,12 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       retry: () => saveChatStatus(next),
       undoRequest: previous ? async () => {
         const res = await api.chats.update(chatId, { status: previous })
-        changed(res)
+        if (isCurrent()) changed(res)
         return res
       } : undefined,
       onSuccess: changed,
     })
-  }, [chatId, effectiveStatus, changed, isV8])
+  }, [chatId, effectiveStatus, changed, isV8, beginChange])
 
   const saveAssignee = useCallback((nextOperatorId: string | null) => {
     if (!chatId) return
@@ -585,7 +613,9 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     if (previous === nextOperatorId) return
     setLocalOperatorId(nextOperatorId)
     const nameOf = (id: string | null) => (id ? operators?.find((op) => op.id === id)?.name ?? '担当' : '未割り当て')
+    const isCurrent = beginChange('assignee')
     runOptimisticWithUndo({
+      isCurrent,
       request: () => api.chats.update(chatId, { operatorId: nextOperatorId }),
       revert: () => setLocalOperatorId(previous),
       reapply: () => setLocalOperatorId(nextOperatorId),
@@ -594,12 +624,12 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       retry: () => saveAssignee(nextOperatorId),
       undoRequest: async () => {
         const res = await api.chats.update(chatId, { operatorId: previous })
-        changed(res)
+        if (isCurrent()) changed(res)
         return res
       },
       onSuccess: changed,
     })
-  }, [chatId, effectiveOperatorId, operators, changed, isV8])
+  }, [chatId, effectiveOperatorId, operators, changed, isV8, beginChange])
 
   /*
    * メモは書くのをやめて1秒で自動保存。最後に直した日時（版）で比べる：
@@ -616,7 +646,9 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
   const queueMemoSave = useCallback((text: string) => {
     if (!chatId) return
     if (memoTimerRef.current) clearTimeout(memoTimerRef.current)
+    const isCurrent = beginChange('memo')
     memoTimerRef.current = setTimeout(() => {
+      if (!isCurrent()) return
       const previous = effectiveNotes ?? null
       const next = text.trim() || null
       if (next === previous) return
@@ -630,6 +662,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
         } catch (error) {
           if (!(error instanceof ApiError) || error.code !== 'REVISION_CONFLICT') throw error
           const latest = await api.chats.get(chatId, { limit: 1 })
+          if (!isCurrent()) return latest
           if (!latest.success) throw error
           revisionRef.current = latest.data.revision
           const theirs = latest.data.notes ?? null
@@ -639,6 +672,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       }
       memoToastRef.current = runOptimisticWithUndo({
         request: save,
+        isCurrent,
         revert: () => setLocalNotes(previous),
         reapply: () => setLocalNotes(next),
         successMessage: '',
@@ -650,7 +684,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
           // 書く欄（手で書く欄なので値を持たない）にも戻した文を入れる。
           if (memoAreaRef.current) memoAreaRef.current.value = back ?? ''
           const res = await api.chats.update(chatId, { notes: back ?? '' })
-          changed(res)
+          if (isCurrent()) changed(res)
           return res
         },
         onSuccess: (res) => {
@@ -663,7 +697,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
           : 'メモを保存しました',
       })
     }, 1000)
-  }, [chatId, effectiveNotes, changed, isV8])
+  }, [chatId, effectiveNotes, changed, isV8, beginChange])
   useEffect(() => () => {
     if (memoTimerRef.current) clearTimeout(memoTimerRef.current)
   }, [])
@@ -674,6 +708,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
   const [tagOptions, setTagOptions] = useState<Tag[]>([])
   const [tagActive, setTagActive] = useState(0)
   const [tagSaving, setTagSaving] = useState(false)
+  useEffect(() => { setTagSaving(false); setMemoSaving(false); setTagQuery('') }, [targetKey])
   useEffect(() => {
     if (!friendId) return
     let cancelled = false
@@ -682,7 +717,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       if (res.success && Array.isArray(res.data)) setTagOptions(res.data as Tag[])
     }).catch(() => {})
     return () => { cancelled = true }
-  }, [friendId])
+  }, [friendId, accountId])
   const addTagById = useCallback((tagId: string, known?: { name: string; color: string }) => {
     if (!friendId || !tagId) return
     const target = known ?? tagOptions.find((t) => t.id === tagId)
@@ -694,6 +729,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     setLocalTags((now) => [...(now ?? effectiveTags ?? []), tag])
     const drop = () => setLocalTags((now) => (now ?? effectiveTags ?? []).filter((t) => t.id !== tagId))
     runOptimisticWithUndo({
+      isCurrent: beginChange(`tag:${tagId}`),
       request: () => api.friends.addTag(friendId, tagId),
       revert: drop,
       reapply: () => setLocalTags((now) => [...(now ?? effectiveTags ?? []).filter((t) => t.id !== tagId), tag]),
@@ -715,6 +751,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     const putBack = () => setLocalTags((now) => [...(now ?? effectiveTags ?? []).filter((t) => t.id !== tagId), tag])
     setLocalTags((now) => (now ?? effectiveTags ?? []).filter((t) => t.id !== tagId))
     runOptimisticWithUndo({
+      isCurrent: beginChange(`tag:${tagId}`),
       request: () => api.friends.removeTag(friendId, tagId),
       revert: putBack,
       reapply: () => setLocalTags((now) => (now ?? effectiveTags ?? []).filter((t) => t.id !== tagId)),
@@ -726,10 +763,29 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
   }, [friendId, effectiveTags, isV8])
 
   // 購入（EC の直近3件と合計）。今ある口だけを使い、結びつきが無い人は「—」で出す。
+  const createAndAddTag = async (query: string) => {
+    const name = query.trim()
+    if (!name || !friendId) return
+    const isCurrent = beginChange('create-tag')
+    setTagSaving(true)
+    try {
+      const res = await api.tags.create({ name })
+      if (!isCurrent()) return
+      if (!res.success) throw new Error('failed')
+      const created = res.data
+      setTagOptions((prev) => [...prev, created])
+      addTagById(created.id, { name: created.name, color: created.color })
+    } catch {
+      if (isCurrent()) notifyToast(`タグ「${name}」を作れませんでした。もう一度お試しください。`, { tone: 'error' })
+    } finally {
+      if (isCurrent()) setTagSaving(false)
+    }
+  }
+
   type PurchaseState =
     | { kind: 'loading' }
     | { kind: 'empty'; reason: string }
-    | { kind: 'data'; total: number; count: number; items: Array<{ id: string; title: string; amount: number; at: string }> }
+    | { kind: 'data'; total: number; count: number; items: Array<{ id: string; title: string; amount: number | null; at: string }> }
   const [purchase, setPurchase] = useState<PurchaseState>({ kind: 'loading' })
   const [purchaseRetry, setPurchaseRetry] = useState(0)
   useEffect(() => {
@@ -741,37 +797,36 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     setPurchase({ kind: 'loading' })
     // 友だち名で EC の注文を3件まで探す（friend_id の絞り口が無いため）。
     // 名前が取れない・見つからないときは合計を出さず「—」にする（0にしない）。
-    const name = friend?.displayName ?? friend?.realName ?? ''
+    const name = friend?.id === friendId ? friend.displayName ?? friend.realName ?? '' : ''
     if (!name) {
       setPurchase({ kind: 'empty', reason: 'no-name' })
       return
     }
-    const accountId = ''
+    if (!accountId) { setPurchase({ kind: 'empty', reason: 'no-account' }); return }
     void purchaseRetry
-    api.ecCommerce.orders({ lineAccountId: accountId, query: name, limit: 3 }).then((res: { success: boolean; data?: unknown }) => {
+    api.ecCommerce.orders({ lineAccountId: accountId, query: name, limit: 3 }).then((res) => {
       if (cancelled) return
       if (!res.success || !res.data) {
         setPurchase({ kind: 'empty', reason: 'unavailable' })
         return
       }
-      const list = (res.data as unknown as { orders?: Array<{ id: string; orderNumber?: string; total?: number; createdAt?: string }> }).orders ?? []
-      if (list.length === 0) {
-        setPurchase({ kind: 'empty', reason: 'none' })
-        return
-      }
-      const items = list.slice(0, 3).map((o) => ({
-        id: o.id,
-        title: o.orderNumber ?? o.id,
-        amount: typeof o.total === 'number' ? o.total : 0,
-        at: o.createdAt ?? '',
+      const candidates = res.data.items
+      if (!Array.isArray(candidates)) { setPurchase({ kind: 'empty', reason: 'unavailable' }); return }
+      // 名前は候補検索だけ。APIの連携済み友だちIDで確かめた注文のみを出す。
+      const list = candidates.filter((order) => order.friendId === friendId)
+      if (list.length === 0) { setPurchase({ kind: 'empty', reason: candidates.length ? 'unlinked' : 'none' }); return }
+      const items = list.slice(0, 3).map((order) => ({
+        id: order.id, title: order.orderNumber ?? order.id,
+        amount: order.totalAmount, at: order.orderedAt,
       }))
-      const total = items.reduce((sum, item) => sum + item.amount, 0)
+      if (items.some((item) => item.amount === null)) { setPurchase({ kind: 'empty', reason: 'unavailable' }); return }
+      const total = items.reduce((sum, item) => sum + (item.amount ?? 0), 0)
       setPurchase({ kind: 'data', total, count: list.length, items })
     }).catch(() => {
       if (!cancelled) setPurchase({ kind: 'empty', reason: 'unavailable' })
     })
     return () => { cancelled = true }
-  }, [friendId, friend?.displayName, friend?.realName, purchaseRetry])
+  }, [friendId, accountId, friend?.displayName, friend?.realName, purchaseRetry])
 
   /*
    * キーボード T・M・S（書く欄に字があるときは効かない）。
@@ -783,20 +838,23 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) return
       if (event.metaKey || event.ctrlKey || event.altKey) return
       const key = event.key.toLowerCase()
-      if (key === 't') {
+      if (key === 't' && canEditFriend) {
         event.preventDefault()
-        ;(tagSearchRef.current ?? document.getElementById('inbox-panel-tag'))?.focus()
-      } else if (key === 'm') {
+        if (isV8) {
+          setTagPickerOpen(true)
+          requestAnimationFrame(() => document.getElementById('inbox-panel-tag')?.focus())
+        } else tagSearchRef.current?.focus()
+      } else if (key === 'm' && canEditChat) {
         event.preventDefault()
         memoAreaRef.current?.focus()
-      } else if (key === 's') {
+      } else if (key === 's' && canEditChat) {
         event.preventDefault()
         statusButtonRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
       }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [])
+  }, [isV8, canEditFriend, canEditChat])
 
   /*
    * 友だち情報（metadata）のキーを、画面に出す項目名へ写す対応表。
@@ -818,7 +876,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
   if (!friendId) return null
 
   const settingsButton = (
-    <Button variant="secondary" className={isV8 ? 'shrink-0 items-center justify-center whitespace-nowrap' : 'mr-14 v7:h-8 shrink-0 items-center justify-center whitespace-nowrap px-3 text-micro text-ink-faint'} size={isV8 ? 'compact' : undefined} type="button" ref={settingsButtonRef} onClick={() => {
+    <Button variant="secondary" className={isV8 ? 'shrink-0 items-center justify-center whitespace-nowrap' : 'mr-14 v7:h-8 shrink-0 items-center justify-center whitespace-nowrap px-3 text-micro text-ink-faint'} type="button" ref={settingsButtonRef} onClick={() => {
         if (!showSettings) updateSettingsPanelPos()
         setShowSettings(!showSettings)
       }} aria-expanded={showSettings}>
@@ -832,6 +890,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
    */
   const renderDetailSections = (friend: FriendDetail) => (
     <>
+            {!canEditChat && !canEditFriend ? <p role="note" className="text-micro text-ink-faint">閲覧のみで見ています。変更は管理者に頼んでください。</p> : null}
             {/* 前払いのみの印（友だち詳細と同じ置き場所・顔の下）。前払いの人だけ出る。 */}
             {accountId && friendId ? (
               /* ★V8：前払いでない人は中身が空。空の帯（上下12＋線）を残さない（オーナー指摘）。 */
@@ -840,25 +899,29 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               </div>
             ) : null}
 
+            {isV8 ? <div style={sectionStyle('profile')} className={`${sectionVisibility('profile')} ${v8.profileSection}`}>
+              <h4>プロフィール</h4>
+              <p>{friend.displayName}・{formatAddedDate(friend.createdAt)}</p>
+            </div> : null}
             {/*
               名前（設計 `友だち詳細` の「名前」）。
               LINEの表示名と、こちらで付けた本名は別物。取り違えると
               別人に送ってしまうので、両方を並べて出す。
             */}
-            <div style={sectionStyle('names')} className={`${sectionVisibility('names')} space-y-2 px-5 py-4`}>
+            <div style={sectionStyle('names')} className={`${sectionVisibility('names')} space-y-2 px-5 py-4 ${isV8 ? v8.basicSection : ''}`}>
               <h4 className="text-ink mb-2 text-xs font-bold">基本情報</h4>
               <div className="flex justify-between items-center gap-2">
                 <span className="text-micro text-ink-faint shrink-0">本名</span>
                 <ExpandableText value={friend.realName} className="text-xs text-ink-secondary v8:text-label" />
               </div>
-              <div className="flex justify-between items-center gap-2">
+              {(!isV8 || (friend.systemDisplayName && friend.systemDisplayName !== friend.displayName)) ? <div className="flex justify-between items-center gap-2">
                 <span className="text-micro text-ink-faint shrink-0">システム表示名</span>
                 <ExpandableText value={friend.systemDisplayName} className="text-xs text-ink-secondary v8:text-label" />
-              </div>
-              <div className="flex items-center justify-between gap-2">
+              </div> : null}
+              {!isV8 ? <div className="flex items-center justify-between gap-2">
                 <span className="shrink-0 text-micro text-ink-faint">登録日</span>
                 <span className="truncate text-xs text-ink-secondary v8:text-label">{formatDate(friend.createdAt)}</span>
-              </div>
+              </div> : null}
             </div>
 
             {/* Harness Mileage — canonical user identity across LINE accounts */}
@@ -902,7 +965,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                         <div key={item.id} className="flex items-center justify-between gap-2 text-nano">
                           <span className="text-ink-faint min-w-0 truncate">{item.reason}</span>
                           <span className={`shrink-0 font-semibold tabular-nums ${item.amount > 0 ? 'text-success' : 'text-ink-secondary'}`}>
-                            {item.amount > 0 ? '+' : ''}{formatNumber(item.amount)}
+                            {item.amount > 0 ? '+' : ''}{formatNumber(item.amount ?? 0)}
                           </span>
                         </div>
                       ))}
@@ -934,8 +997,9 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                     <Select
                       size="full"
                       aria-label="対応状況を変える"
-                      icon={<span className={chatV8.ctlDot} data-status={effectiveStatus ?? 'unread'} />}
-                      options={STATUS_OPTIONS}
+                      treatment="pill"
+                      icon={<StatusDot tone={SUPPORT_STATUS_TONES[effectiveStatus ?? 'unread']} />}
+                      options={STATUS_OPTIONS.map((option) => ({ ...option, tone: SUPPORT_STATUS_TONES[option.value], leading: <StatusDot tone={SUPPORT_STATUS_TONES[option.value]} /> }))}
                       value={effectiveStatus ?? 'unread'}
                       onChange={(next) => saveChatStatus(next as NonNullable<ChatStatusInfo['status']>)}
                     />
@@ -963,9 +1027,9 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                   </div>
                 ) : chatStatus?.status && statusLabels[chatStatus.status] ? (
                   <div className="mt-1.5">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-pill text-xs font-medium ${statusLabels[chatStatus.status].className}`}>
+                    {isV8 ? <StatusPill tone={SUPPORT_STATUS_TONES[chatStatus.status]}>{statusLabels[chatStatus.status].label}</StatusPill> : (<span className={`inline-flex items-center px-2 py-0.5 rounded-pill text-xs font-medium ${statusLabels[chatStatus.status].className}`}>
                       {statusLabels[chatStatus.status].label}
-                    </span>
+                    </span>)}
                   </div>
                 ) : (
                   <p className="text-xs text-ink-faint mt-1.5">未設定</p>
@@ -1092,15 +1156,18 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
             </div>
 
             {/* ③タグ（×で外す・＋で探して付ける・↑↓Enter・新しいタグも作れる）。 */}
-            <div style={sectionStyle('tags')} className={`${sectionVisibility('tags')} px-5 py-4`}>
+            <div style={sectionStyle('tags')} className={`${sectionVisibility('tags')} px-5 py-4 ${isV8 ? v8.tagsSection : ''}`}>
               <div className="mb-1.5 flex items-center justify-between">
                 <h4 className="text-ink text-xs font-bold">タグ（Tキー）</h4>
-                <a href={`/friends/detail?id=${friend.id}`} className="text-action text-micro hover:underline">
+                {isV8 && canEditFriend ? <Button variant="text" size="inline" aria-expanded={tagPickerOpen} aria-controls="inbox-panel-tag-picker" onClick={() => setTagPickerOpen((value) => !value)}>＋ 追加</Button> : <a href={`/friends/detail?id=${friend.id}`} className="text-action text-micro hover:underline">
                   すべて見る
-                </a>
+                </a>}
               </div>
               <div className="flex flex-wrap gap-1">
-                {(effectiveTags ?? []).map((tag) => (
+                {(effectiveTags ?? []).map((tag) => isV8 ? (
+                  <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs"
+                    onRemove={canEditFriend && friendId ? () => setTagToRemove({ id: tag.id, name: tag.name, friendId }) : undefined} />
+                ) : (
                   <span
                     key={tag.id}
                     className="inline-flex max-w-full items-center gap-1 rounded-mini px-2 py-0.5 text-nano font-medium"
@@ -1110,7 +1177,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                     }}
                   >
                     <ExpandableText value={tag.name} className="max-w-full text-inherit" />
-                    {friendId ? (
+                    {canEditFriend ? (
                       <button
                         type="button"
                         aria-label={`${tag.name}を外す`}
@@ -1126,9 +1193,9 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               {(effectiveTags ?? []).length === 0 ? (
                 <p className="text-micro text-ink-faint italic mt-1.5">タグなし</p>
               ) : null}
-              {friendId && isV8 ? (
+              {canEditFriend && isV8 ? (
                 /* ★V8 B-26：共通の候補つき入力。選ぶと付け、無ければ「＋ 新しく作る」で作って付ける。 */
-                <div className={v8.editField}>
+                <div id="inbox-panel-tag-picker" hidden={!tagPickerOpen} className={v8.editField}>
                   <Combobox
                     id="inbox-panel-tag"
                     aria-label="タグを探して付ける"
@@ -1139,24 +1206,11 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                       .map((t) => ({ value: t.id, label: t.name }))}
                     onChange={(tagId) => { if (tagId) addTagById(tagId) }}
                     createLabel={(query) => `＋「${query}」を作って付ける`}
-                    onCreate={(query) => {
-                      const name = query.trim()
-                      if (!name) return
-                      setTagSaving(true)
-                      api.tags.create({ name }).then((res) => {
-                        if (res.success && res.data) {
-                          const created = res.data as Tag
-                          setTagOptions((prev) => [...prev, created])
-                          addTagById(created.id, { name: created.name, color: created.color })
-                        }
-                      }).catch(() => {
-                        notifyToast(`タグ「${name}」を作れませんでした。もう一度お試しください。`, { tone: 'error' })
-                      }).finally(() => setTagSaving(false))
-                    }}
+                    onCreate={(query) => { void createAndAddTag(query) }}
                     loading={tagSaving}
                   />
                 </div>
-              ) : friendId ? (
+              ) : canEditFriend ? (
                 <div className="mt-2">
                   <input
                     ref={tagSearchRef}
@@ -1182,16 +1236,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                         if (picked) {
                           addTagById(picked.id)
                         } else if (tagQuery.trim()) {
-                          // 新しいタグも作れる。
-                          const name = tagQuery.trim()
-                          setTagSaving(true)
-                          api.tags.create({ name }).then((res) => {
-                            if (res.success && res.data) {
-                              const created = res.data as Tag
-                              setTagOptions((prev) => [...prev, created])
-                              addTagById(created.id)
-                            }
-                          }).catch(() => {}).finally(() => setTagSaving(false))
+                          void createAndAddTag(tagQuery)
                         }
                       }
                     }}
@@ -1355,12 +1400,15 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                       <div key={entry.key}>
                         <dt className="text-nano text-ink-faint break-words">{entry.label}</dt>
                         <dd className="text-ink-secondary mt-0.5 break-words">
-                          {friendId ? (
+                          {canEditFriend && friendId ? (
                             <InlineEdit
+                              key={`${targetKey}:${entry.key}`}
                               value={renderValue(entry.value)}
                               label={entry.label}
                               onSave={async (next) => {
+                                const isCurrent = beginChange(`metadata:${entry.key}`)
                                 const res = await api.friends.updateMetadata(friendId, { [entry.key]: next || null })
+                                if (!isCurrent()) return
                                 if (!res.success) throw new Error('failed')
                                 setFriend((prev) => prev ? { ...prev, metadata: { ...prev.metadata, [entry.key]: next } } : prev)
                               }}
@@ -1395,7 +1443,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                     {purchase.items.map((item) => (
                       <li key={item.id} className="flex items-center justify-between gap-2 text-xs">
                         <span className="text-ink-secondary min-w-0 truncate">{item.title}</span>
-                        <span className="text-ink shrink-0 font-semibold tabular-nums">{formatNumber(item.amount)}円</span>
+                        <span className="text-ink shrink-0 font-semibold tabular-nums">{formatNumber(item.amount ?? 0)}円</span>
                       </li>
                     ))}
                   </ul>
@@ -1545,15 +1593,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                     className="border-hairline rounded-control flex items-center gap-2 border px-2 py-1.5"
                   >
                     <span className="flex shrink-0 items-center">
-                      <button
-                        type="button"
-                        disabled={index === 0}
-                        onClick={() => moveGroup(group.key, -1)}
-                        aria-label={`${group.label}を上へ`}
-                        className="text-ink-faint hover:text-ink rounded-mini disabled:opacity-30"
-                      >
-                        <GripVertical aria-hidden="true" size={15} />
-                      </button>
+                      <DragHandle label={`${group.label}を並べ替える`} draggable onDragStart={() => setDraggedGroupKey(group.key)} onDragEnd={() => setDraggedGroupKey(null)} onMove={direction => moveGroup(group.key, direction)} />
                     </span>
                     <span className="text-ink min-w-0 flex-1 truncate text-xs">{group.label}</span>
                     {/* 共通の Checkbox（本物の input）。見た目だけの button にすると読み上げで「入／切」が伝わらない。 */}
@@ -1594,6 +1634,18 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
         , document.body) : null}
       </div>
 
+      <ConfirmDialog
+        open={isV8 && tagToRemove !== null && tagToRemove.friendId === friendId}
+        title={`『${tagToRemove?.name ?? ''}』を外しますか？`}
+        description="この友だちからタグを外します。タグそのものは消えません。"
+        confirmLabel="外す"
+        onCancel={() => setTagToRemove(null)}
+        onConfirm={() => {
+          if (!tagToRemove || tagToRemove.friendId !== friendId) return
+          removeTagById(tagToRemove.id)
+          setTagToRemove(null)
+        }}
+      />
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <DelayedSkeleton
@@ -1634,7 +1686,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                   <p className={v8.personSub}>{formatAddedDate(friend.createdAt)}</p>
                   {!friend.isFollowing ? <span className={v8.blocked}>ブロック済</span> : null}
                   <div className={v8.personActions}>
-                    <Button variant="secondary" size="compact" href={`/friends/detail?id=${friend.id}`}>
+                    <Button variant="secondary" href={`/friends/detail?id=${friend.id}`}>
                       友だち詳細
                     </Button>
                     {settingsButton}
@@ -1644,7 +1696,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                   <div className={v8.summaryRow}>
                     <dt>タグ</dt>
                     <dd title={(effectiveTags ?? []).map((t) => t.name).join('・')}>
-                      {(effectiveTags ?? []).length > 0 ? (effectiveTags ?? []).map((t) => t.name).join('・') : <span className={v8.empty}>なし</span>}
+                      {(effectiveTags ?? []).length > 0 ? (effectiveTags ?? []).map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs" />) : <span className={v8.empty}>なし</span>}
                     </dd>
                   </div>
                   <div className={v8.summaryRow}>
@@ -1659,9 +1711,9 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                     <dt>購入</dt>
                     <dd>
                       {purchase.kind === 'data'
-                        ? `${purchase.count}件・${formatNumber(purchase.total)}円`
+                        ? `直近${purchase.count}件・${formatNumber(purchase.total)}円`
                         : purchase.kind === 'loading' ? <span className={v8.empty}>…</span>
-                        : purchase.reason === 'none' ? <span className={v8.empty}>0件</span> : <span className={v8.empty}>—</span>}
+                        : purchase.reason === 'none' ? <span className={v8.empty}>0件</span> : <span className={v8.empty}>—{purchase.reason === 'unavailable' ? <><span role="alert">購入を読み込めませんでした</span><Button aria-label="購入をもう一度読み込む" onClick={() => setPurchaseRetry((current) => current + 1)}>もう一度</Button></> : null}</span>}
                     </dd>
                   </div>
                   <div className={v8.summaryRow}>

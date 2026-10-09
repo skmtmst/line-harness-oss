@@ -8,6 +8,8 @@ import { useAdminTheme } from '@/lib/use-admin-theme'
 import MenuPortal from './menu-portal'
 import { SELECT_MENU_ROW_STRIDE, SelectMenu, SelectMenuAction, SelectMenuOption, SelectMenuSpacer, splitOptionHeads } from './select-menu'
 import styles from './select.module.css'
+import pillStyles from './status-pill.module.css'
+import type { StatusBadgeTone } from './status-badge'
 
 export interface SelectOption {
   value: string
@@ -15,6 +17,8 @@ export interface SelectOption {
   disabled?: boolean
   /** ★V8 の開いた中身で行の先頭に出す印（対応状況の色の点など）。v7 では出さない。 */
   leading?: ReactNode
+  /** 対応状況の札の地・文字・点に使う色。treatment='pill' のときだけ適用する。 */
+  tone?: StatusBadgeTone
 }
 
 /** 「＋ 〇〇」を押した後の板に渡すもの。 */
@@ -38,6 +42,8 @@ export interface SelectProps {
   defaultOpen?: boolean
   disabled?: boolean
   error?: string
+  /** 理由を Field が描くとき、欄の赤枠だけを出す。 */
+  invalid?: boolean
   id?: string
   label?: string
   name?: string
@@ -52,9 +58,9 @@ export interface SelectProps {
   width?: number
   /**
    * 見せ方。既定 'box' は枠の箱。'text' は枠なし文字＋上下矢印
-   * （x6QsVz の並び替えどおり）。v8 だけで枠を消す。
+   * （x6QsVz の並び替えどおり）。'pill' は対応状況の丸い札。V8 にだけ適用する。
    */
-  treatment?: 'box' | 'text'
+  treatment?: 'box' | 'text' | 'pill'
   /**
    * 箱の先頭の図柄（v19Ivv のよく使う絞り込みの栞どおり）。
    * 渡さなければ出ない。
@@ -87,6 +93,7 @@ export default function Select({
   defaultOpen = false,
   disabled = false,
   error,
+  invalid = false,
   id,
   label,
   name,
@@ -108,6 +115,8 @@ export default function Select({
   const [open, setOpen] = useState(defaultOpen)
   // 'create' は「＋ 〇〇」を押した後（同じ板で名前を入れている）。閉じたら一覧へ戻す。
   const [mode, setMode] = useState<'list' | 'create'>('list')
+  // 作る板の回。閉じる・一覧へ戻る・ほかを選ぶ・作り直すで進め、古い回の遅い応答に今の選択を上書きさせない。
+  const createSessionRef = useRef(0)
   const menuRef = useRef<HTMLDivElement>(null)
   const enabledOptions = options.filter((option) => !option.disabled)
   const selectedIndex = Math.max(0, enabledOptions.findIndex((option) => option.value === value))
@@ -184,24 +193,38 @@ export default function Select({
   }, [disabled])
 
   useEffect(() => {
-    if (!open) setMode('list')
+    if (open) return
+    createSessionRef.current += 1
+    setMode('list')
   }, [open])
 
   const hasCreate = Boolean(createAction) && v8
   // キーボードで動く行の数。「＋ 〇〇」は使える候補の後ろの1行。
   const rowCount = enabledOptions.length + (hasCreate ? 1 : 0)
   const createActive = hasCreate && activeIndex === enabledOptions.length
-  const startCreate = () => setMode('create')
+  const startCreate = () => {
+    createSessionRef.current += 1
+    setMode('create')
+  }
   const backToList = () => {
+    createSessionRef.current += 1
     // 焦点を先にボタンへ戻す（入力欄が消えて焦点が迷子になり閉じるのを防ぐ）。
     triggerRef.current?.focus()
     setMode('list')
   }
-  const finishCreate = (next: string) => {
-    onChange(next)
-    triggerRef.current?.focus()
-    setOpen(false)
-  }
+  // 板に渡す受け口は、その回の番号を覚える。回が終わった後に届いた完了は選ばず・焦点も動かさず・閉じない。
+  const createContext = (session: number): SelectCreateContext => ({
+    back: () => {
+      if (session === createSessionRef.current) backToList()
+    },
+    finish: (next: string) => {
+      if (session !== createSessionRef.current) return
+      createSessionRef.current += 1
+      onChange(next)
+      triggerRef.current?.focus()
+      setOpen(false)
+    },
+  })
 
   useEffect(() => {
     setActiveIndex(selectedIndex)
@@ -209,6 +232,7 @@ export default function Select({
 
   const choose = (option: SelectOption) => {
     if (option.disabled) return
+    createSessionRef.current += 1
     onChange(option.value)
     setOpen(false)
   }
@@ -247,7 +271,7 @@ export default function Select({
         styles[size === 'page-size' ? 'pageSize' : size],
         open ? styles.open : null,
         disabled ? styles.disabled : null,
-        error ? styles.invalid : null,
+        error || invalid ? styles.invalid : null,
         className,
       ]
         .filter(Boolean)
@@ -269,12 +293,13 @@ export default function Select({
         ref={triggerRef}
         id={buttonId}
         type="button"
-        className={`${styles.trigger} ${open ? styles.openTrigger : styles.closedTrigger} ${treatment === 'text' ? styles.textTrigger : ''}`}
+        className={`${styles.trigger} ${open ? styles.openTrigger : styles.closedTrigger} ${treatment === 'text' ? styles.textTrigger : treatment === 'pill' && v8 ? `${pillStyles.pill} ${pillStyles.control}` : ''}`}
+        data-tone={treatment === 'pill' && v8 ? selected?.tone ?? 'neutral' : undefined}
         aria-label={ariaLabel}
         aria-controls={listboxId}
         aria-expanded={open}
         aria-haspopup="listbox"
-        aria-invalid={Boolean(error) || undefined}
+        aria-invalid={Boolean(error) || invalid || undefined}
         disabled={disabled}
         onClick={() => setOpen((current) => !current)}
         onKeyDown={onButtonKeyDown}
@@ -313,7 +338,7 @@ export default function Select({
             if (!next || menuRef.current?.contains(next) || rootRef.current?.contains(next)) return
             setOpen(false)
           }}
-          panel={hasCreate && mode === 'create' && createAction ? createAction.render({ back: backToList, finish: finishCreate }) : undefined}
+          panel={hasCreate && mode === 'create' && createAction ? createAction.render(createContext(createSessionRef.current)) : undefined}
           footer={hasCreate && createAction ? (
             <SelectMenuAction
               label={createAction.label}

@@ -14,7 +14,7 @@
 
 import type { Message } from '@line-crm/line-sdk';
 import {
-  collectInputs,
+  collectReachableInputs,
   formChoiceIsSelected,
   hasChoices,
   isCalendarDateString,
@@ -59,6 +59,8 @@ export interface FormGateInput {
    * 回答期限は本物と同じに見る。
    */
   isTest?: boolean;
+  /** 同じキー・本文・本人で照合できた保存済み回答の後処理再開。 */
+  resumeSavedAnswer?: boolean;
 }
 
 /**
@@ -82,18 +84,18 @@ export async function checkFormGates(input: FormGateInput): Promise<string | nul
   }
 
   // 全体の受付上限（試しは枠を消費しないので見ない）
-  if (!isTest && options.totalLimit?.enabled && typeof options.totalLimit.max === 'number') {
+  if (!isTest && !input.resumeSavedAnswer && options.totalLimit?.enabled && typeof options.totalLimit.max === 'number') {
     if (submitCount >= options.totalLimit.max) {
       return options.totalLimit.message || 'このフォームは受付を終了しました';
     }
   }
 
   // 入力そのものの検証（必須・入力制限・選択数）
-  const invalid = validateAnswers(layout, answers);
+  const invalid = input.resumeSavedAnswer ? null : validateAnswers(layout, answers);
   if (invalid) return invalid;
 
   // 1人1回（試しは本物の回答歴に数えず、試し同士でも縛らない）
-  if (!isTest && options.oncePerFriend?.enabled) {
+  if (!isTest && !input.resumeSavedAnswer && options.oncePerFriend?.enabled) {
     const already = await countFormSubmissionsByFriend(db, formId, friendId);
     if (already > 0) {
       return options.oncePerFriend.message || 'このフォームは、お一人さま1回までです';
@@ -101,7 +103,7 @@ export async function checkFormGates(input: FormGateInput): Promise<string | nul
   }
 
   // 選択肢の定員（試しは枠を消費しないので見ない）
-  if (!isTest) {
+  if (!isTest && !input.resumeSavedAnswer) {
     const full = await findFullChoice(db, formId, layout, answers);
     if (full) return `「${full}」は定員に達しました`;
   }
@@ -144,7 +146,7 @@ export function collectCapacitySlots(layout: FormLayout, answers: FormAnswers): 
     });
   }
 
-  for (const block of collectInputs(layout)) {
+  for (const block of collectReachableInputs(layout, answers)) {
     if (!hasChoices(block)) continue;
     const limited = (block.choices ?? []).filter(
       (c) => c.capacity?.enabled && typeof c.capacity.limit === 'number',
@@ -189,7 +191,7 @@ async function findFullChoice(
   layout: FormLayout,
   answers: FormAnswers,
 ): Promise<string | null> {
-  for (const block of collectInputs(layout)) {
+  for (const block of collectReachableInputs(layout, answers)) {
     if (!hasChoices(block)) continue;
     const limited = (block.choices ?? []).filter(
       (c) => c.capacity?.enabled && typeof c.capacity.limit === 'number',
@@ -296,7 +298,7 @@ export async function applyFormLayoutEffects(input: FormEffectInput): Promise<Fo
   const destinationWrites: FormDestinationWriteStats = { attempted: 0, succeeded: 0, failed: 0 };
   const failedEffects: string[] = [];
 
-  for (const block of collectInputs(layout)) {
+  for (const block of collectReachableInputs(layout, answers)) {
     const value = answers[block.name];
     if (value === undefined) continue;
 
@@ -346,7 +348,7 @@ export async function applyFormLayoutEffects(input: FormEffectInput): Promise<Fo
  */
 export function layoutEffectStepIds(layout: FormLayout, answers: FormAnswers): string[] {
   const ids: string[] = [];
-  for (const block of collectInputs(layout)) {
+  for (const block of collectReachableInputs(layout, answers)) {
     if (answers[block.name] === undefined) continue;
     ids.push(`destinations:${block.id}`);
     if (hasChoices(block)) ids.push(`choices:${block.id}`);

@@ -1,5 +1,17 @@
 import { jstNow } from './utils.js';
 import { getBookingPaymentConfig } from './booking-payments.js';
+import type {
+  BookingSalesMenu as SalesSummaryMenu,
+  BookingSalesWeekday as SalesSummaryWeekday,
+  BookingSalesTotal as SalesSummaryTotal,
+  BookingSalesSummary as SalesSummary,
+} from '@line-crm/shared/audit4-api';
+export type {
+  BookingSalesMenu as SalesSummaryMenu,
+  BookingSalesWeekday as SalesSummaryWeekday,
+  BookingSalesTotal as SalesSummaryTotal,
+  BookingSalesSummary as SalesSummary,
+} from '@line-crm/shared/audit4-api';
 
 /**
  * 予約の追加機能のデータ層。
@@ -284,49 +296,10 @@ export async function decidePrepayOnly(
   return { ...base, prepayOnly: count > settings.threshold, manual: false };
 }
 
-export interface SalesSummaryMenu {
-  menu_id: string;
-  menu_name: string;
-  bookings: number;
-  confirmed: number;
-  revenue: number;
-  cancelRate: number;
-  noshowRate: number;
-}
-
-export interface SalesSummaryWeekday {
-  weekday: number;
-  bookings: number;
-  confirmed: number;
-  revenue: number;
-}
-
-export interface SalesSummaryTotal {
-  bookings: number;
-  confirmed: number;
-  revenue: number;
-  cancelRate: number;
-  noshowRate: number;
-  cancelled: number;
-  noshow: number;
-}
-
-export interface SalesSummary {
-  from: string;
-  to: string;
-  total: SalesSummaryTotal;
-  menus: SalesSummaryMenu[];
-  weekdays: SalesSummaryWeekday[];
-  /** 直前の同じ長さの期間（「先月より」の表示用）。 */
-  previous: { revenue: number; bookings: number; cancelRate: number; noshowRate: number };
-  /** 売上の数え方。決済を入れた店は実際の入金で数える。 */
-  revenueSource: 'menu' | 'paid';
-}
-
 const CANCELLED = ['cancelled', 'rejected'];
 
 interface SalesRow {
-  menu_id: string; menu_name: string | null; status: string; price: number; weekday: number;
+  menu_id: string; menu_name: string | null; status: string; price: number; starts_at: string;
 }
 
 async function fetchSalesRows(
@@ -338,7 +311,7 @@ async function fetchSalesRows(
   const rows = await db.prepare(
     `SELECT b.menu_id, m.name AS menu_name, b.status,
             COALESCE(b.price_at_booking, m.base_price, 0) AS price,
-            CAST(strftime('%w', b.starts_at) AS INTEGER) AS weekday
+            b.starts_at
        FROM bookings b
        LEFT JOIN menus m ON m.id = b.menu_id
       WHERE b.line_account_id = ? AND b.starts_at >= ? AND b.starts_at < ?`,
@@ -349,11 +322,11 @@ async function fetchSalesRows(
 interface PaidRevenue {
   menuId: string;
   menuName: string;
-  weekday: number;
+  startsAt: string;
   amount: number;
 }
 
-/** 期間内の支払い済みの入金（決済を入れた店の売上用）。予約のメニュー・曜日に分ける。 */
+/** 期間内の支払い済み入金。売上とは別に予約のメニュー・曜日へ分ける。 */
 async function fetchPaidRevenue(
   db: D1Database,
   lineAccountId: string,
@@ -362,26 +335,27 @@ async function fetchPaidRevenue(
 ): Promise<PaidRevenue[]> {
   const rows = await db.prepare(
     `SELECT b.menu_id, m.name AS menu_name, p.amount,
-            CAST(strftime('%w', b.starts_at) AS INTEGER) AS weekday
+            b.starts_at
        FROM booking_payments p
        JOIN bookings b ON b.id = p.booking_id
        LEFT JOIN menus m ON m.id = b.menu_id
       WHERE p.line_account_id = ? AND p.status = 'paid'
         AND p.paid_at IS NOT NULL AND p.paid_at >= ? AND p.paid_at < ?`,
   ).bind(lineAccountId, from, to).all<{
-    menu_id: string; amount: number; menu_name: string | null; weekday: number;
+    menu_id: string; amount: number; menu_name: string | null; starts_at: string;
   }>();
   return (rows.results ?? []).map((row) => ({
     menuId: row.menu_id ?? '',
     menuName: row.menu_name ?? '',
-    weekday: Number(row.weekday),
+    startsAt: row.starts_at,
     amount: Number(row.amount ?? 0),
   }));
 }
 
 function summarizeRows(
   rows: SalesRow[],
-  paidRevenues?: PaidRevenue[],
+  paidRevenues: PaidRevenue[],
+  weekdayOf: (startsAt: string) => number,
 ): {
   total: SalesSummaryTotal;
   menus: SalesSummaryMenu[];
@@ -392,6 +366,7 @@ function summarizeRows(
   let bookings = 0;
   let confirmed = 0;
   let revenue = 0;
+  let paidRevenue = 0;
   let cancelled = 0;
   let noshow = 0;
   const ensureMenu = (menuId: string, menuName: string) => {
@@ -399,7 +374,7 @@ function summarizeRows(
     if (!menu) {
       menu = {
         menu_id: menuId, menu_name: menuName, bookings: 0,
-        confirmed: 0, revenue: 0, cancelRate: 0, noshowRate: 0, cancelled: 0, noshow: 0,
+        confirmed: 0, revenue: 0, paidRevenue: 0, cancelRate: 0, noshowRate: 0, cancelled: 0, noshow: 0,
       };
       byMenu.set(menuId, menu);
     }
@@ -408,7 +383,7 @@ function summarizeRows(
   const ensureDay = (weekday: number) => {
     let day = byWeekday.get(weekday);
     if (!day) {
-      day = { weekday, bookings: 0, confirmed: 0, revenue: 0 };
+      day = { weekday, bookings: 0, confirmed: 0, revenue: 0, paidRevenue: 0 };
       byWeekday.set(weekday, day);
     }
     return day;
@@ -417,7 +392,7 @@ function summarizeRows(
     const price = Number(row.price ?? 0);
     const menuId = row.menu_id ?? '';
     const menu = ensureMenu(menuId, row.menu_name ?? '');
-    const day = ensureDay(Number(row.weekday));
+    const day = ensureDay(weekdayOf(row.starts_at));
     bookings += 1;
     menu.bookings += 1;
     day.bookings += 1;
@@ -436,21 +411,15 @@ function summarizeRows(
       menu.noshow += 1;
     }
   }
-  // 決済を入れた店は、確定数×料金ではなく実際の入金で数え直す。
-  if (paidRevenues) {
-    revenue = 0;
-    for (const menu of byMenu.values()) menu.revenue = 0;
-    for (const day of byWeekday.values()) day.revenue = 0;
-    for (const paid of paidRevenues) {
-      revenue += paid.amount;
-      ensureMenu(paid.menuId, paid.menuName).revenue += paid.amount;
-      ensureDay(paid.weekday).revenue += paid.amount;
-    }
+  for (const paid of paidRevenues) {
+    paidRevenue += paid.amount;
+    ensureMenu(paid.menuId, paid.menuName).paidRevenue += paid.amount;
+    ensureDay(weekdayOf(paid.startsAt)).paidRevenue += paid.amount;
   }
   const rate = (part: number) => (bookings > 0 ? part / bookings : 0);
   return {
     total: {
-      bookings, confirmed, revenue,
+      bookings, confirmed, revenue, paidRevenue,
       cancelRate: rate(cancelled), noshowRate: rate(noshow),
       cancelled, noshow,
     },
@@ -460,6 +429,7 @@ function summarizeRows(
       bookings: menu.bookings,
       confirmed: menu.confirmed,
       revenue: menu.revenue,
+      paidRevenue: menu.paidRevenue,
       cancelRate: menu.bookings > 0 ? menu.cancelled / menu.bookings : 0,
       noshowRate: menu.bookings > 0 ? menu.noshow / menu.bookings : 0,
     })),
@@ -468,8 +438,7 @@ function summarizeRows(
 }
 
 /**
- * 予約からの売上。決済を入れていない店は予約時の料金×確定数、
- * 決済を入れた店は実際の入金で数える。
+ * 予約からの売上は両期間とも予約時の料金×確定数。入金は別で数える。
  * キャンセル率は取消・拒否の割合、来なかった率は無断の割合。
  */
 export async function getBookingSalesSummary(
@@ -483,29 +452,40 @@ export async function getBookingSalesSummary(
   const span = toMs - fromMs;
   const prevTo = new Date(fromMs).toISOString();
   const prevFrom = new Date(fromMs - span).toISOString();
-  const [rows, prevRows, paymentConfig] = await Promise.all([
+  const [rows, prevRows, paidRevenues, previousPaidRevenues, settings] = await Promise.all([
     fetchSalesRows(db, lineAccountId, from, to),
     fetchSalesRows(db, lineAccountId, prevFrom, prevTo),
-    getBookingPaymentConfig(db, lineAccountId),
+    fetchPaidRevenue(db, lineAccountId, from, to),
+    fetchPaidRevenue(db, lineAccountId, prevFrom, prevTo),
+    db.prepare('SELECT timezone FROM booking_settings WHERE line_account_id = ?')
+      .bind(lineAccountId).first<{ timezone: string }>(),
   ]);
-  const usePaid = paymentConfig.mode === 'online';
-  const paidRevenues = usePaid
-    ? await fetchPaidRevenue(db, lineAccountId, from, to)
-    : undefined;
-  const current = summarizeRows(rows, paidRevenues);
-  const previous = summarizeRows(prevRows);
+  const timeZone = settings?.timezone ?? 'Asia/Tokyo';
+  const formatter = new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short' });
+  const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const weekdayOf = (startsAt: string) => {
+    // 旧形式のオフセット無しは店舗の壁時計。UTC ISO の行は店舗時刻へ変換する。
+    if (!/(?:Z|[+-]\d{2}:?\d{2})$/i.test(startsAt)) {
+      return new Date(`${startsAt.slice(0, 10)}T00:00:00Z`).getUTCDay();
+    }
+    return weekdays.indexOf(formatter.format(new Date(startsAt)));
+  };
+  const current = summarizeRows(rows, paidRevenues, weekdayOf);
+  const previous = summarizeRows(prevRows, previousPaidRevenues, weekdayOf);
   return {
     from,
     to,
+    timeZone,
     total: current.total,
     menus: current.menus,
     weekdays: current.weekdays,
     previous: {
       revenue: previous.total.revenue,
+      paidRevenue: previous.total.paidRevenue,
       bookings: previous.total.bookings,
       cancelRate: previous.total.cancelRate,
       noshowRate: previous.total.noshowRate,
     },
-    revenueSource: usePaid ? 'paid' : 'menu',
+    revenueSource: 'menu',
   };
 }

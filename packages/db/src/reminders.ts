@@ -1,4 +1,7 @@
-import { jstNow } from './utils.js';
+import type { ReminderRunReadOptions, ReminderScheduleMetrics } from '@line-crm/shared';
+import { jstNow, nextVersionToken } from './utils.js';
+import { getPlatformSetting, setPlatformSetting } from './platform-announcements.js';
+import { accountFeatureOffExclusionSql } from './account-settings.js';
 // リマインダ配信クエリヘルパー
 
 export interface ReminderRow {
@@ -556,8 +559,8 @@ export async function saveReminderDraftVersion(
 ): Promise<ReminderVersionRow> {
   const reminder = await getReminderById(db, reminderId);
   if (!reminder) throw new Error('REMINDER_NOT_FOUND');
-  const now = jstNow();
   const existing = await getReminderDraftVersion(db, reminderId);
+  const now = nextVersionToken(existing?.updated_at ?? reminder.updated_at);
   // N-080 (#869): 開いたときの版を指定されたら照合する。別タブで先に保存・
   // 公開された下書きへ、古い画面の内容をそのまま上書きさせない。
   // R148 監査：通常保存は版IDを付け替えないため、版IDだけでは A の保存後に
@@ -574,44 +577,58 @@ export async function saveReminderDraftVersion(
   }
   const versionId = existing?.id ?? crypto.randomUUID();
 
-  if (existing) {
-    await db.batch([
-      db.prepare(
-        `UPDATE reminder_versions
-            SET settings_snapshot = ?, last_test_status = NULL, last_tested_at = NULL,
-                last_tested_by_staff_id = NULL, updated_at = ?
-          WHERE id = ? AND status = 'draft'`,
-      ).bind(JSON.stringify(settings), now, versionId),
-      db.prepare(`DELETE FROM reminder_version_steps WHERE reminder_version_id = ?`).bind(versionId),
-      ...reminderVersionStepStatements(db, versionId, settings.steps, now),
-    ]);
-  } else {
-    const next = await db.prepare(
-      `SELECT COALESCE(MAX(version_number), 0) + 1 AS version_number
-         FROM reminder_versions WHERE reminder_id = ?`,
-    ).bind(reminderId).first<{ version_number: number }>();
-    await db.batch([
-      db.prepare(
-        `INSERT INTO reminder_versions
-           (id, reminder_id, version_number, status, settings_snapshot, created_at, updated_at)
-         VALUES (?, ?, ?, 'draft', ?, ?, ?)`,
-      ).bind(
-        versionId,
-        reminderId,
-        Number(next?.version_number ?? 1),
-        JSON.stringify(settings),
-        now,
-        now,
-      ),
-      db.prepare(
-        `UPDATE reminders
-            SET current_draft_version_id = ?,
-                lifecycle_status = CASE WHEN current_published_version_id IS NULL THEN 'draft' ELSE lifecycle_status END,
-                updated_at = ?
-          WHERE id = ? AND deleted_at IS NULL`,
-      ).bind(versionId, now, reminderId),
-      ...reminderVersionStepStatements(db, versionId, settings.steps, now),
-    ]);
+  const guard = db.prepare(`SELECT json(CASE WHEN EXISTS (
+    SELECT 1 FROM reminders r WHERE r.id = ? AND r.deleted_at IS NULL
+      AND r.current_draft_version_id IS ? AND r.updated_at = ?
+      ${existing ? "AND EXISTS (SELECT 1 FROM reminder_versions v WHERE v.id = r.current_draft_version_id AND v.status = 'draft' AND v.updated_at = ?)" : ''}
+  ) THEN '{}' ELSE 'REMINDER_DRAFT_CONFLICT' END)`)
+    .bind(reminderId, reminder.current_draft_version_id, reminder.updated_at,
+      ...(existing ? [existing.updated_at] : []));
+  try {
+    if (existing) {
+      await db.batch([
+        guard,
+        db.prepare(
+          `UPDATE reminder_versions
+              SET settings_snapshot = ?, last_test_status = NULL, last_tested_at = NULL,
+                  last_tested_by_staff_id = NULL, updated_at = ?
+            WHERE id = ? AND status = 'draft' AND updated_at = ?`,
+        ).bind(JSON.stringify(settings), now, versionId, existing.updated_at),
+        db.prepare(`DELETE FROM reminder_version_steps WHERE reminder_version_id = ?`).bind(versionId),
+        ...reminderVersionStepStatements(db, versionId, settings.steps, now),
+      ]);
+    } else {
+      const next = await db.prepare(
+        `SELECT COALESCE(MAX(version_number), 0) + 1 AS version_number
+           FROM reminder_versions WHERE reminder_id = ?`,
+      ).bind(reminderId).first<{ version_number: number }>();
+      await db.batch([
+        guard,
+        db.prepare(
+          `INSERT INTO reminder_versions
+             (id, reminder_id, version_number, status, settings_snapshot, created_at, updated_at)
+           VALUES (?, ?, ?, 'draft', ?, ?, ?)`,
+        ).bind(
+          versionId,
+          reminderId,
+          Number(next?.version_number ?? 1),
+          JSON.stringify(settings),
+          now,
+          now,
+        ),
+        db.prepare(
+          `UPDATE reminders
+              SET current_draft_version_id = ?,
+                  lifecycle_status = CASE WHEN current_published_version_id IS NULL THEN 'draft' ELSE lifecycle_status END,
+                  updated_at = ?
+            WHERE id = ? AND deleted_at IS NULL`,
+        ).bind(versionId, now, reminderId),
+        ...reminderVersionStepStatements(db, versionId, settings.steps, now),
+      ]);
+    }
+  } catch (error) {
+    if (error instanceof Error && /malformed JSON/i.test(error.message)) throw new Error('REMINDER_DRAFT_CONFLICT');
+    throw error;
   }
   const saved = await getReminderVersionById(db, versionId);
   if (!saved) throw new Error('REMINDER_DRAFT_NOT_SAVED');
@@ -1734,48 +1751,60 @@ export async function getPendingReminderDeliveries(
   version_settings_snapshot: string | null;
   steps: ReminderStepRow[];
 }>> {
-  // activeなリマインダ登録を取得
-  // 配信方式（153）も一緒に引く。通ごとに引き直すと、通の数だけ問い合わせが増える。
-  const activeReminders = await db
-    .prepare(`SELECT fr.*,
-                     COALESCE(json_extract(rv.settings_snapshot, '$.deliveryMode'), r.delivery_mode) AS delivery_mode,
-                     COALESCE(json_extract(rv.settings_snapshot, '$.lineAccountId'), r.line_account_id) AS line_account_id,
-                     rv.settings_snapshot AS version_settings_snapshot
-                FROM friend_reminders fr
-                INNER JOIN reminders r ON r.id = fr.reminder_id
-                LEFT JOIN reminder_versions rv ON rv.id = fr.reminder_version_id
-               WHERE fr.status = 'active' AND r.is_active = 1 AND r.deleted_at IS NULL`)
-    .all<FriendReminderRow & {
-      delivery_mode: string;
-      line_account_id: string | null;
+  // 同じ公開版を人数分読み直さない。500人ずつIDで巡回し、失敗した読込は
+  // カーソルを進めず再試行する。未来の通知も準備する契約は保つ。
+  const cursorKey = 'reminder_delivery_scan_cursor';
+  const cursor = await getPlatformSetting(db, cursorKey) ?? '';
+  const pageSize = 500;
+  const activeReminders = (await db.prepare(`SELECT fr.*,
+    COALESCE(fr.reminder_version_id,r.current_published_version_id) AS effective_version_id,
+    COALESCE(json_extract(rv.settings_snapshot,'$.deliveryMode'),r.delivery_mode) AS delivery_mode,
+    COALESCE(json_extract(rv.settings_snapshot,'$.lineAccountId'),r.line_account_id) AS line_account_id,
+    rv.settings_snapshot AS version_settings_snapshot
+    FROM friend_reminders fr JOIN reminders r ON r.id=fr.reminder_id
+    LEFT JOIN reminder_versions rv ON rv.id=COALESCE(fr.reminder_version_id,r.current_published_version_id)
+    WHERE fr.status='active' AND r.is_active=1 AND r.deleted_at IS NULL AND fr.id>?
+      AND NOT ${accountFeatureOffExclusionSql('r.line_account_id', 'reminders')}
+    ORDER BY fr.id LIMIT ?`).bind(cursor,pageSize).all<FriendReminderRow & {
+      effective_version_id: string | null; delivery_mode: string; line_account_id: string | null;
       version_settings_snapshot: string | null;
-    }>();
-
-  const results: Array<
-    FriendReminderRow & {
-      delivery_mode: string;
-      line_account_id: string | null;
-      version_settings_snapshot: string | null;
-      steps: ReminderStepRow[];
+    }>()).results;
+  const results: Array<FriendReminderRow & {
+    delivery_mode: string; line_account_id: string | null; version_settings_snapshot: string | null;
+    steps: ReminderStepRow[];
+  }> = [];
+  if (activeReminders.length) {
+    const versionIds=[...new Set(activeReminders.flatMap(fr=>fr.effective_version_id?[fr.effective_version_id]:[]))];
+    const legacyIds=[...new Set(activeReminders.filter(fr=>!fr.effective_version_id).map(fr=>fr.reminder_id))];
+    const steps=(await db.prepare(`SELECT 'version:'||rvs.reminder_version_id AS scan_key,
+      rvs.stable_step_id AS id,rv.reminder_id,rvs.offset_minutes,rvs.message_type,rvs.message_content,
+      rvs.created_at,rvs.offset_days,rvs.send_at_time,rvs.template_id,rvs.position AS sort_order
+      FROM reminder_version_steps rvs JOIN reminder_versions rv ON rv.id=rvs.reminder_version_id
+      WHERE rvs.reminder_version_id IN (SELECT value FROM json_each(?))
+      UNION ALL SELECT 'legacy:'||reminder_id,id,reminder_id,offset_minutes,message_type,message_content,
+      created_at,offset_days,send_at_time,template_id,offset_minutes AS sort_order
+      FROM reminder_steps WHERE reminder_id IN (SELECT value FROM json_each(?))
+      ORDER BY scan_key,sort_order,id`).bind(JSON.stringify(versionIds),JSON.stringify(legacyIds))
+      .all<ReminderStepRow & {scan_key:string;sort_order:number}>()).results;
+    const delivered=(await db.prepare(`SELECT friend_reminder_id,reminder_step_id FROM friend_reminder_deliveries
+      WHERE friend_reminder_id IN (SELECT value FROM json_each(?))`).bind(JSON.stringify(activeReminders.map(fr=>fr.id)))
+      .all<{friend_reminder_id:string;reminder_step_id:string}>()).results;
+    const byVersion=new Map<string,ReminderStepRow[]>();
+    for(const {scan_key,sort_order,...step} of steps) {
+      const group=byVersion.get(scan_key)??[];group.push(step);byVersion.set(scan_key,group);
     }
-  > = [];
-  for (const fr of activeReminders.results) {
-    const steps = fr.reminder_version_id
-      ? await getReminderVersionSteps(db, fr.reminder_version_id)
-      : await getReminderSteps(db, fr.reminder_id);
-    // 配信済みステップを取得
-    const delivered = await db
-      .prepare(`SELECT reminder_step_id FROM friend_reminder_deliveries WHERE friend_reminder_id = ?`)
-      .bind(fr.id)
-      .all<{ reminder_step_id: string }>();
-    const deliveredIds = new Set(delivered.results.map((d) => d.reminder_step_id));
-
-    // 未配信で配信時刻が到来しているステップをフィルタ
-    const pending = steps.filter((step) => !deliveredIds.has(step.id));
-    if (pending.length > 0) {
-      results.push({ ...fr, steps: pending });
+    const deliveredByEnrollment=new Map<string,Set<string>>();
+    for(const row of delivered) {
+      const group=deliveredByEnrollment.get(row.friend_reminder_id)??new Set<string>();
+      group.add(row.reminder_step_id);deliveredByEnrollment.set(row.friend_reminder_id,group);
+    }
+    for(const {effective_version_id,...fr} of activeReminders) {
+      const key=effective_version_id?'version:'+effective_version_id:'legacy:'+fr.reminder_id;
+      const pending=(byVersion.get(key)??[]).filter(step=>!deliveredByEnrollment.get(fr.id)?.has(step.id));
+      if(pending.length)results.push({...fr,steps:pending});
     }
   }
+  await setPlatformSetting(db,cursorKey,activeReminders.length===pageSize?activeReminders.at(-1)!.id:null,'reminder-delivery');
   return results;
 }
 
@@ -2392,6 +2421,8 @@ export interface ReminderDeliveryRunListRow extends ReminderDeliveryRunRow {
 export async function listReminderDeliveryRuns(
   db: D1Database,
   input: {
+    order?: ReminderRunReadOptions['order'];
+    executedOnly?: boolean;
     reminderId: string;
     status?: ReminderDeliveryRunStatus;
     search?: string;
@@ -2403,6 +2434,7 @@ export async function listReminderDeliveryRuns(
 ): Promise<{ items: ReminderDeliveryRunListRow[]; total: number }> {
   const where = ['rdr.reminder_id = ?'];
   const bindings: unknown[] = [input.reminderId];
+  if (input.executedOnly) where.push("rdr.status NOT IN ('queued', 'claimed')");
   if (input.status) {
     where.push('rdr.status = ?');
     bindings.push(input.status);
@@ -2438,7 +2470,9 @@ export async function listReminderDeliveryRuns(
        LEFT JOIN line_accounts la ON la.id = rdr.line_account_id
        INNER JOIN reminder_steps current_step ON current_step.id = rdr.reminder_step_id
       WHERE ${predicate}
-      ORDER BY COALESCE(rdr.completed_at, rdr.started_at, rdr.scheduled_at) DESC, rdr.id DESC
+      ORDER BY ${input.order === 'scheduled_asc'
+        ? "julianday(CASE WHEN rdr.status = 'retry_wait' THEN COALESCE(rdr.next_retry_at, rdr.scheduled_at) ELSE rdr.scheduled_at END) ASC, rdr.id ASC"
+        : "julianday(COALESCE(rdr.completed_at, rdr.started_at, rdr.scheduled_at)) DESC, rdr.id DESC"}
       LIMIT ? OFFSET ?`,
   ).bind(...bindings, input.limit, input.offset).all<ReminderDeliveryRunListRow>();
   return { items: rows.results, total: Number(total?.count ?? 0) };
@@ -2460,7 +2494,7 @@ export async function getReminderDeliveryRunSummary(
   sentThisMonth: number;
   /** 画面の「これから送る（今後7日）」。期限切れの未送分行も残っているので含める。 */
   scheduledNext7Days: number;
-}> {
+} & ReminderScheduleMetrics> {
   const bindings: unknown[] = [reminderId];
   const scopePredicate = reminderRowScopePredicate('line_account_id', scope, bindings);
   const row = await db.prepare(
@@ -2474,9 +2508,13 @@ export async function getReminderDeliveryRunSummary(
            AND strftime('%Y-%m', completed_at, '+9 hours') = strftime('%Y-%m', 'now', '+9 hours')
          THEN 1 ELSE 0 END) AS sent_this_month,
        SUM(CASE
-         WHEN status IN ('queued', 'claimed') AND scheduled_at <= datetime('now', '+7 days') THEN 1
-         WHEN status = 'retry_wait' AND next_retry_at <= datetime('now', '+7 days') THEN 1
+         WHEN status IN ('queued', 'claimed') AND julianday(scheduled_at) <= julianday('now', '+7 days') THEN 1
+         WHEN status = 'retry_wait' AND julianday(next_retry_at) <= julianday('now', '+7 days') THEN 1
          ELSE 0 END) AS scheduled_next7_days,
+       SUM(CASE
+         WHEN status IN ('queued', 'claimed') AND julianday(scheduled_at) <= julianday('now', '+1 day') THEN 1
+         WHEN status = 'retry_wait' AND julianday(next_retry_at) <= julianday('now', '+1 day') THEN 1
+         ELSE 0 END) AS scheduled_next24_hours,
        COUNT(DISTINCT friend_reminder_id) AS target_count,
        MIN(CASE
          WHEN status = 'retry_wait' THEN next_retry_at
@@ -2490,6 +2528,7 @@ export async function getReminderDeliveryRunSummary(
     errors: number | null;
     sent_this_month: number | null;
     scheduled_next7_days: number | null;
+    scheduled_next24_hours: number | null;
     target_count: number | null;
     next_scheduled_at: string | null;
   }>();
@@ -2500,6 +2539,7 @@ export async function getReminderDeliveryRunSummary(
     errors: Number(row?.errors ?? 0),
     sentThisMonth: Number(row?.sent_this_month ?? 0),
     scheduledNext7Days: Number(row?.scheduled_next7_days ?? 0),
+    scheduledNext24Hours: Number(row?.scheduled_next24_hours ?? 0),
     targetCount: Number(row?.target_count ?? 0),
     nextScheduledAt: row?.next_scheduled_at ?? null,
   };
@@ -2583,23 +2623,109 @@ export async function getFriendsWithFieldValuePage(
   lineAccountId: string | null,
   afterFriendId: string | null,
   limit: number,
+  reminderId?: string,
 ): Promise<Array<{ friend_id: string; value: string }>> {
   if (!Number.isInteger(limit) || limit < 1) return [];
-  const rows = await db
-    .prepare(
-      `SELECT v.friend_id AS friend_id, v.value AS value
-         FROM friend_field_values v
-         JOIN friends f ON f.id = v.friend_id
-        WHERE v.field_id = ?
-          AND v.value IS NOT NULL AND v.value != ''
-          AND f.is_following = 1
-          AND (? IS NULL OR f.line_account_id = ?)
-          AND (? IS NULL OR v.friend_id > ?)
-        ORDER BY v.friend_id ASC
-        LIMIT ?`,
-    )
-    .bind(fieldId, lineAccountId, lineAccountId, afterFriendId, afterFriendId, limit)
+  const rows = await db.prepare(`SELECT f.id AS friend_id, COALESCE(v.value, '') AS value
+    FROM friends f LEFT JOIN friend_field_values v ON v.friend_id = f.id AND v.field_id = ?
+    WHERE f.is_following = 1
+      AND (? IS NULL OR f.line_account_id = ?)
+      AND (? IS NULL OR f.id > ?)
+      AND ((v.value IS NOT NULL AND v.value != '') OR EXISTS (
+        SELECT 1 FROM friend_reminders fr WHERE fr.friend_id = f.id AND fr.reminder_id = ? AND fr.status = 'active'
+      ))
+    ORDER BY f.id ASC LIMIT ?`)
+    .bind(fieldId, lineAccountId, lineAccountId, afterFriendId, afterFriendId, reminderId ?? null, limit)
     .all<{ friend_id: string; value: string }>();
+  return rows.results ?? [];
+}
+
+/** 情報欄の保存と同じ原子的 batch に入れる、未送信予定の取り消しと基準日の更新。 */
+export function friendFieldReminderTargetStatements(
+  db: D1Database,
+  changes: Array<{ friendId: string; fieldId: string; value: string | null }>,
+  now: string,
+): D1PreparedStatement[] {
+  if (!changes.length) return [];
+  const targets = changes.map(change => {
+    const day = /^(\d{4}-\d{2}-\d{2})(?:$|T)/.exec(change.value?.trim() ?? '')?.[1];
+    const date = day ? new Date(`${day}T00:00:00Z`) : null;
+    const valid = date && Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === day;
+    return { friendId: change.friendId, fieldId: change.fieldId, value: change.value, targetDate: valid ? `${day}T00:00:00+09:00` : null };
+  });
+  const cte = `WITH changed AS (
+    SELECT DISTINCT json_extract(value,'$.friendId') AS friend_id, json_extract(value,'$.fieldId') AS field_id,
+      json_extract(value,'$.targetDate') AS target_date, json_extract(value,'$.value') AS field_value FROM json_each(?)
+  ), affected AS (
+    SELECT fr.id, changed.target_date FROM friend_reminders fr
+      JOIN reminders r ON r.id = fr.reminder_id
+      JOIN friends f ON f.id = fr.friend_id AND (r.line_account_id IS NULL OR r.line_account_id = f.line_account_id)
+      LEFT JOIN reminder_versions rv ON rv.id = fr.reminder_version_id
+      JOIN changed ON changed.friend_id = fr.friend_id
+        AND changed.field_id = COALESCE(json_extract(rv.settings_snapshot,'$.triggerFieldId'),r.trigger_field_id)
+      LEFT JOIN friend_field_values actual ON actual.friend_id = fr.friend_id AND actual.field_id = changed.field_id
+    WHERE COALESCE(actual.value, '') = COALESCE(changed.field_value, '') AND fr.status = 'active'
+      AND COALESCE(json_extract(rv.settings_snapshot,'$.triggerType'),r.trigger_type) = 'friend_field'
+      AND COALESCE(json_extract(rv.settings_snapshot,'$.repeatYearly'),r.repeat_yearly) = 0
+      AND (changed.target_date IS NULL OR changed.target_date != fr.target_date)
+  )`;
+  const json = JSON.stringify(targets);
+  return [
+    // 新しい登録を作るので、A→B→A の日付変更でも旧 cancelled 行を再利用しない。
+    db.prepare(`${cte} INSERT INTO friend_reminders
+      (id,friend_id,reminder_id,reminder_version_id,template_version_snapshot,target_date,status,source_kind,source_id,timezone,created_at,updated_at)
+      SELECT 'ffr-replan:' || lower(hex(randomblob(16))),fr.friend_id,fr.reminder_id,fr.reminder_version_id,
+        fr.template_version_snapshot,a.target_date,'active','friend_field_replan',fr.id,fr.timezone,?,?
+      FROM affected a JOIN friend_reminders fr ON fr.id = a.id WHERE a.target_date IS NOT NULL`)
+      .bind(json,now,now),
+    // 送信履歴の元行はそのまま残す。新登録にも済んだ工程の印を引き継ぎ、再送を防ぐ。
+    db.prepare(`${cte} INSERT OR IGNORE INTO friend_reminder_deliveries(id,friend_reminder_id,reminder_step_id,delivered_at)
+      SELECT 'ffr-carried:' || next.id || ':' || done.reminder_step_id,next.id,done.reminder_step_id,done.delivered_at
+      FROM affected a JOIN friend_reminders next ON next.source_kind='friend_field_replan' AND next.source_id=a.id
+        AND next.target_date=a.target_date AND next.created_at=?
+      JOIN (
+        SELECT friend_reminder_id,reminder_step_id,MIN(delivered_at) AS delivered_at FROM (
+          SELECT friend_reminder_id,reminder_step_id,delivered_at FROM friend_reminder_deliveries
+          UNION ALL SELECT run.friend_reminder_id,run.reminder_step_id,COALESCE(run.completed_at,run.updated_at)
+            FROM reminder_delivery_runs run WHERE run.status='succeeded'
+              AND NOT EXISTS (SELECT 1 FROM friend_reminder_deliveries prior
+                WHERE prior.friend_reminder_id=run.friend_reminder_id AND prior.reminder_step_id=run.reminder_step_id)
+        ) GROUP BY friend_reminder_id,reminder_step_id
+      ) done ON done.friend_reminder_id=a.id`)
+      .bind(json,now),
+    db.prepare(`${cte} UPDATE reminder_delivery_runs
+      SET status = 'cancelled', completed_at = ?, updated_at = ?, next_retry_at = NULL, lease_expires_at = NULL
+      WHERE friend_reminder_id IN (SELECT id FROM affected) AND status IN ('queued','retry_wait','claimed')`)
+      .bind(json,now,now),
+    db.prepare(`${cte} UPDATE friend_reminders
+      SET status = 'cancelled',
+        cancel_reason = CASE WHEN (SELECT target_date FROM affected WHERE affected.id = friend_reminders.id) IS NULL
+          THEN 'friend_field_baseline_removed_or_invalid' ELSE 'friend_field_baseline_changed' END,
+        lock_version = lock_version + 1, updated_at = ?
+      WHERE id IN (SELECT id FROM affected)`)
+      .bind(json,now),
+  ];
+}
+
+/** 日付が消えた登録も読む。開始時に固定した公開版の欄・繰り返し方を使用する。 */
+export async function getOneTimeFriendFieldReminderRegistrants(
+  db: D1Database,
+  reminderId: string,
+  friendIds: string[],
+): Promise<Array<FriendReminderRow & { field_id: string; field_value: string | null }>> {
+  if (!friendIds.length) return [];
+  const rows = await db.prepare(`SELECT fr.*, v.value AS field_value, COALESCE(json_extract(rv.settings_snapshot, '$.triggerFieldId'), r.trigger_field_id) AS field_id
+    FROM friend_reminders fr
+    JOIN reminders r ON r.id = fr.reminder_id
+    JOIN friends f ON f.id = fr.friend_id AND (r.line_account_id IS NULL OR f.line_account_id = r.line_account_id)
+    LEFT JOIN reminder_versions rv ON rv.id = fr.reminder_version_id
+    LEFT JOIN friend_field_values v ON v.friend_id = fr.friend_id
+      AND v.field_id = COALESCE(json_extract(rv.settings_snapshot, '$.triggerFieldId'), r.trigger_field_id)
+    WHERE fr.reminder_id = ?
+      AND fr.friend_id IN (SELECT value FROM json_each(?))
+      AND COALESCE(json_extract(rv.settings_snapshot, '$.triggerType'), r.trigger_type) = 'friend_field'
+      AND COALESCE(json_extract(rv.settings_snapshot, '$.repeatYearly'), r.repeat_yearly) = 0
+    ORDER BY fr.id`).bind(reminderId, JSON.stringify(friendIds)).all<FriendReminderRow & { field_id: string; field_value: string | null }>();
   return rows.results ?? [];
 }
 
@@ -2632,13 +2758,20 @@ export async function enrollFriendsInReminderOnce(
   reminderId: string,
   candidates: Array<{ friendId: string; targetDate: string }>,
 ): Promise<number> {
+  if (candidates.length === 0) return 0;
+  const reminder = await getReminderById(db, reminderId);
+  if (!reminder || reminder.lifecycle_status !== 'published') {
+    throw new Error('REMINDER_NOT_PUBLISHED');
+  }
+  const versionId = await ensureReminderPublishedVersion(db, reminder);
+  const versionSteps = await getReminderVersionSteps(db, versionId);
   let enrolled = 0;
   const now = jstNow();
   // R346: まとめ登録も1件ずつと同じ版で送る。この束が使うテンプレートの
   // 公開版を1度だけ写し、新しい行に付ける（ある行は触らない）。
   const bulkTemplateSnapshot = await snapshotReminderTemplateVersions(
     db,
-    (await getReminderSteps(db, reminderId)).map((step) => step.template_id),
+    versionSteps.map((step) => step.template_id),
   );
 
   for (let offset = 0; offset < candidates.length; offset += FRIEND_REMINDER_INSERT_CHUNK) {
@@ -2652,13 +2785,13 @@ export async function enrollFriendsInReminderOnce(
         candidate.targetDate,
       );
     }
-    bindings.push(reminderId, bulkTemplateSnapshot, now, now);
+    bindings.push(reminderId, versionId, bulkTemplateSnapshot, now, now);
 
     const result = await db.prepare(
       `WITH candidates(id, friend_id, target_date) AS (VALUES ${values})
        INSERT OR IGNORE INTO friend_reminders
-         (id, friend_id, reminder_id, target_date, template_version_snapshot, created_at, updated_at)
-       SELECT c.id, c.friend_id, ?, c.target_date, ?, ?, ?
+         (id, friend_id, reminder_id, reminder_version_id, target_date, template_version_snapshot, created_at, updated_at)
+       SELECT c.id, c.friend_id, ?, ?, c.target_date, ?, ?, ?
          FROM candidates c
         WHERE NOT EXISTS (
           SELECT 1

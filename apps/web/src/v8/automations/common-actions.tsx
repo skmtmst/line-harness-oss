@@ -40,6 +40,7 @@ import PageSizeSelect from '@/components/ui/page-size-select'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { useFolderRowActions } from '@/components/shared/folder-row-actions'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -236,10 +237,12 @@ export default function CommonActionsV8() {
   ]
 
   /* ===== フォルダ ===== */
+  const folderActions = useFolderRowActions({ kind: 'common_action', folders, enabled: canEdit, accountId: selectedAccountId, itemLabel: '共通アクション', onChanged: loadFolders })
+
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: ready ? summary.total : null },
-    ...folders.map((folder) => ({ id: folder.id, label: folder.name, count: null, color: folder.color })),
-    { id: UNFILED, label: '未分類', count: ready ? summary.total : null },
+    { kind: 'all' as const, id: '', label: 'すべて', count: ready ? summary.total : null },
+    ...folders.map((folder, index) => ({ ...folderActions.rowActions(folder, index), kind: 'folder' as const, id: folder.id, label: folder.name, count: null, color: folder.color })),
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: ready ? summary.total : null },
   ]
   /* 閲覧のみには押せない「共通アクションを作る」を置かない（場所だけ空ける）。 */
   const createButton = canEdit
@@ -359,11 +362,6 @@ export default function CommonActionsV8() {
             </tbody>
           </DataTable>
         </div>
-        <p className={styles.footNote}>
-          {canEdit
-            ? '行の「…」から 版と使われている場所を見る・下書きの中身を編集・複製・保管。'
-            : '行の「…」から 版と使われている場所を見る。'}
-        </p>
       </>
     )
   }
@@ -383,6 +381,9 @@ export default function CommonActionsV8() {
 
   return (
     <ListPage
+      help={canEdit
+            ? '行の「…」から 版と使われている場所を見る・下書きの中身を編集・複製・保管。'
+            : '行の「…」から 版と使われている場所を見る。'}
       boardId="LnGNw"
       headingSize="regular"
       title="オートメーション"
@@ -421,6 +422,7 @@ export default function CommonActionsV8() {
       toolbar={toolbar}
       pagination={pager}
       overlays={<>
+        {folderActions.dialogs}
         {folderDialogOpen ? (
           <FolderAddDialog
             kind="common_action"

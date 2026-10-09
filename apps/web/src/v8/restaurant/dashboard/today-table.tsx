@@ -5,6 +5,7 @@
  * 列：時刻・名前・人数・卓・経路・状態・来店。予約中の行に［✓ 来店］（来店の印の口）と「…」。
  * 閲覧のみには［来店］と「…」の変える操作を置かない。
  */
+import { useRouter } from 'next/navigation'
 import { Check } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -35,6 +36,7 @@ export function TodayTable({ rows, canWrite, busyId, onVisited, onUndo }: {
   onVisited: (id: string) => void
   onUndo: (id: string) => void
 }) {
+  const router = useRouter()
   const list = (rows ?? [])
     .filter((r) => r.status !== 'cancelled')
     .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
@@ -68,7 +70,7 @@ export function TodayTable({ rows, canWrite, busyId, onVisited, onUndo }: {
               const state = visitState(r)
               const seated = r.status === 'seated' || r.status === 'visited'
               const menuItems = [
-                { id: 'open', label: '予約台帳で見る', external: true, onSelect: () => { window.location.href = `/restaurant-test/reservations?date=${r.starts_at.slice(0, 10)}` } },
+                { id: 'open', label: '予約台帳で見る', external: true, onSelect: () => { router.push(`/restaurant-test/reservations?date=${r.starts_at.slice(0, 10)}`) } },
                 ...(canWrite && seated ? [{ id: 'undo', label: '来店の印を取り消す', onSelect: () => onUndo(r.id) }] : []),
               ]
               return (

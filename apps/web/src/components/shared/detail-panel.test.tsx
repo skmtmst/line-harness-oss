@@ -92,3 +92,12 @@ describe('useDetailPanelUrl（URL に今の行を残す）', () => {
     window.history.replaceState(null, '', '/broadcasts')
   })
 })
+
+it('詳細は一覧の下へ挿入せず外側に重ね、開いた焦点で一覧をスクロールしない（B-38）', () => {
+  const focus=vi.spyOn(HTMLElement.prototype,'focus')
+  const { container }=renderPanel()
+  const dialog=screen.getByRole('dialog',{ name:'配信A' })
+  expect(container.contains(dialog)).toBe(false)
+  expect(focus).toHaveBeenCalledWith({ preventScroll:true })
+  focus.mockRestore()
+})

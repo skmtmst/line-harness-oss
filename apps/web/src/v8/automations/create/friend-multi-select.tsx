@@ -19,11 +19,13 @@ export function FriendMultiSelect({
   selectedIds,
   names,
   onChange,
+  error,
 }: {
   accountId: string | null
   selectedIds: ReadonlyArray<string>
   names: Record<string, string>
   onChange: (ids: string[], nextNames: Record<string, string>) => void
+  error?: string
 }) {
   const ids = normalizeFriendIds(selectedIds)
   const [query, setQuery] = useState('')
@@ -107,6 +109,9 @@ export function FriendMultiSelect({
       ) : null}
       <div className="relative mt-2">
         <TextField
+          id="au-friend-search"
+          invalid={Boolean(error)}
+          aria-describedby={error ? 'au-friend-error' : undefined}
           aria-label="友だちを名前で探す"
           placeholder={accountId ? '名前で探して選ぶ（例: やま）' : '先にLINEアカウントを選んでください'}
           value={query}
@@ -144,6 +149,7 @@ export function FriendMultiSelect({
           </div>
         ) : null}
       </div>
+      {error ? <p id="au-friend-error" className="mt-2 text-xs text-danger" role="alert">{error}</p> : null}
       <p className="mt-2 text-xs text-ink-secondary">
         {ids.length >= FRIEND_SELECT_LIMIT
           ? '100人まで選べます。これ以上は選べません。'

@@ -6,6 +6,7 @@ export interface Friend {
   picture_url: string | null;
   status_message: string | null;
   is_following: number;
+  is_hidden?: number;
   first_followed_at?: string | null;
   current_follow_started_at?: string | null;
   last_followed_at?: string | null;

@@ -14,7 +14,6 @@ import FriendAddSettingsPage from './page'
  * ★V8 友だち追加時の配信の一覧（Pencil `MRhef`）の契約。
  * `<html data-theme="v8">` の下でだけ新しい一覧に切り替わり、
  * 見本が決めた帯・受け皿の守り（消せない・動かせない・止められない確かめ）
- * が出ることを実DOMで固定する。v7 では従来の一覧が出ることも固定する。
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
@@ -286,13 +285,4 @@ test('v8 の閲覧のみは見出しの下に閲覧のみの帯が出る（板 L
     expect(host.querySelector('[data-design-node="LEwkJ"]')).toBeTruthy()
   })
   expect(host.textContent).toContain('閲覧のみで見ています')
-})
-
-test('v7 の下では従来の一覧が出る（新しい一覧には切り替わらない）', async () => {
-  await act(async () => root.render(<FriendAddSettingsPage />))
-  await settle()
-  await eventually(() => {
-    expect(host.textContent).toContain('店頭QRの初回案内')
-  })
-  expect(host.querySelector('[data-design-node="MRhef"]')).toBeNull()
 })

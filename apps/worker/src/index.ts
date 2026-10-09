@@ -9,6 +9,7 @@ import { broadcastMediaDirect } from './routes/broadcast-media-direct.js';
 import { hqBroadcasts } from './routes/hq-broadcasts.js';
 import { visitStamps } from './routes/visit-stamps.js';
 import { processVisitStampQueue } from './services/visit-stamps.js';
+import { processVisitStampReminders } from './services/visit-stamp-reminders.js';
 import { Hono, type Context } from 'hono';
 import { noindexHeaderMiddleware, robotsTxtHandler } from './lib/robots.js';
 import { cors } from 'hono/cors';
@@ -448,6 +449,7 @@ export const ADMIN_REQUEST_HEADERS = [
   'Content-Type',
   'Authorization',
   'X-CSRF-Token',
+  'X-Line-Account-Id',
   'x-admin-api-key',
   'X-Filename',
   'Idempotency-Key',
@@ -1413,6 +1415,8 @@ async function runFrequentHeavyJobs(
 
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const jobs: ScheduledJob[] = [
+    {name:'durable tracked click continuation',run:async()=>{const {processDueTrackedClicks}=await import('./services/tracked-click-steps.js');await processDueTrackedClicks(env);}},
+    {name:'durable banner generation',run:async()=>{const {processDueBannerGenerations}=await import('./services/banner-jobs.js');await processDueBannerGenerations(env);}},
     {name:'API draft and integration retention',run:async()=>{const now=new Date(event.scheduledTime);await purgeExpiredScenarioDrafts(env.DB,now);await purgeInstagramTransientData(env.DB,now);}},
     {name:'booking waitlist expiry and promotion',run:async()=>{const {processBookingWaitlists}=await import('./services/waitlist-tick.js');await processBookingWaitlists(env);}},
     {
@@ -2234,6 +2238,17 @@ async function scheduled(
     console.error('event-waitlist error:', e);
   }
 
+  // 来店スタンプの期限通知。配信の見張り（observeDispatch）の対応表には未登録なので、
+  // event-waitlist と同じく直接呼ぶ（対応表への追加は Codex の担当で別に行う）。
+  try {
+    await processVisitStampReminders(dbFor(env), {
+      now: new Date(event.scheduledTime), proxyBaseUrl: env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
+      proxyDispatch: request => Promise.resolve(lineProxy.fetch(request, env, ctx)),
+    });
+  } catch {
+    console.error(JSON.stringify({ event: 'visit_stamp_reminders_pending' }));
+  }
+
   // 外部Google Calendarで確定したMeet個別相談。前日・1時間前のLINE通知を
   // D1で管理し、送信は必ずLINE Harness Proxyを通す。
   try {
@@ -2372,11 +2387,11 @@ async function scheduled(
   // 失敗しても他の処理は続ける。実LINE送信はここで行うが、DB配備は別工程。
   try {
     const { processDueRichMenuSchedules } = await import('./services/rich-menu-schedule-executor.js');
+    const { assembleRichMenuGroupInput, richMenuLiveToSnapshot } = await import('./services/rich-menu-group-input.js');
     const {
       getRichMenuGroupWithPages,
       getLineAccountById,
       getStaffById,
-      getTrackedLinkById,
     } = await import('@line-crm/db');
     const { canAccessAllLineAccounts } = await import('./services/account-access.js');
     const {
@@ -2506,68 +2521,18 @@ async function scheduled(
       },
     });
     const buildGroupInput = async (snapshot: unknown, fallbackGroupId: string) => {
-      const record = snapshot as {
-        id?: string; size?: 'large' | 'compact'; chatBarText?: string;
-        isDefaultForAll?: boolean; defaultOpen?: boolean; pages?: Array<{
-          id: string; orderIndex: number; name: string;
-          imageR2Key: string | null; imageContentType: string | null;
-          lineRichmenuId: string | null;
-          areas: Array<{
-            id: string; boundsX: number; boundsY: number; boundsWidth: number; boundsHeight: number;
-            actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch';
-            actionData: Record<string, unknown>; intent: null | string;
-            label: string | null; tagIds: string[]; scoreChange: number | null;
-            templateId: string | null; formId: string | null; trackedLinkId: string | null;
-          }>;
-        }>;
-      };
+      const record = snapshot as import('./services/rich-menu-group-input.js').RichMenuGroupSnapshot;
       const groupId = typeof record.id === 'string' ? record.id : fallbackGroupId;
       const group = await getRichMenuGroupWithPages(env.DB, groupId);
       const account = group ? await getLineAccountById(env.DB, group.account_id) : null;
-      const formBaseUrl = account && (account as { liff_id?: string | null }).liff_id
-        ? `https://liff.line.me/${(account as { liff_id: string }).liff_id}`
-        : (env.LIFF_URL ?? null);
-      const trackedUrls = new Map<string, string>();
-      for (const page of record.pages ?? []) {
-        for (const area of page.areas ?? []) {
-          if (area.trackedLinkId && !trackedUrls.has(area.trackedLinkId)) {
-            const link = await getTrackedLinkById(env.DB, area.trackedLinkId);
-            if (link) trackedUrls.set(area.trackedLinkId, `${formBaseUrl ?? ''}/t/${link.short_code ?? link.id}`);
-          }
-        }
-      }
       return {
         groupIdForDb: groupId,
         account,
-        input: {
-          id: groupId,
-          size: record.size ?? 'large',
-          chatBarText: record.chatBarText ?? '',
-          isDefaultForAll: record.isDefaultForAll ?? false,
-          defaultOpen: record.defaultOpen === true,
-          formBaseUrl,
-          pages: (record.pages ?? []).map((page) => ({
-            id: page.id,
-            orderIndex: page.orderIndex,
-            name: page.name,
-            imageR2Key: page.imageR2Key,
-            imageContentType: page.imageContentType,
-            lineRichMenuId: page.lineRichmenuId,
-            areas: (page.areas ?? []).map((area) => ({
-              id: area.id,
-              bounds: { x: area.boundsX, y: area.boundsY, width: area.boundsWidth, height: area.boundsHeight },
-              actionType: area.actionType,
-              actionData: area.actionData,
-              intent: area.intent as null,
-              label: area.label,
-              tagIds: area.tagIds,
-              scoreChange: area.scoreChange,
-              templateId: area.templateId,
-              formId: area.formId,
-              trackedLinkUrl: area.trackedLinkId ? (trackedUrls.get(area.trackedLinkId) ?? null) : null,
-            })),
-          })),
-        },
+        input: await assembleRichMenuGroupInput(env.DB, record, account, {
+          fallbackGroupId: groupId,
+          workerBaseUrl: env.WORKER_URL,
+          liffUrl: env.LIFF_URL,
+        }),
       };
     };
     const result = await processDueRichMenuSchedules(env.DB, {
@@ -2619,38 +2584,16 @@ async function scheduled(
         const account = await getLineAccountById(env.DB, restoreGroup.account_id);
         if (!account) throw new Error('line account not found');
         const line = createScheduleLineClient(`Bearer ${account.channel_access_token}`);
-        const formBaseUrl = (account as { liff_id?: string | null }).liff_id
-          ? `https://liff.line.me/${(account as { liff_id: string }).liff_id}`
-          : (env.LIFF_URL ?? null);
-        const input = {
-          id: restoreGroup.id,
-          size: restoreGroup.size,
-          chatBarText: restoreGroup.chat_bar_text,
-          isDefaultForAll: restoreGroup.is_default_for_all === 1,
-          defaultOpen: restoreGroup.default_open === 1,
-          formBaseUrl,
-          pages: restoreGroup.pages.map((page) => ({
-            id: page.id,
-            orderIndex: page.order_index,
-            name: page.name,
-            imageR2Key: page.image_r2_key,
-            imageContentType: page.image_content_type,
-            lineRichMenuId: page.line_richmenu_id,
-            areas: page.areas.map((area) => ({
-              id: area.id,
-              bounds: { x: area.bounds_x, y: area.bounds_y, width: area.bounds_width, height: area.bounds_height },
-              actionType: area.action_type,
-              actionData: area.actionData,
-              intent: area.intent,
-              label: area.label,
-              tagIds: area.tagIds,
-              scoreChange: area.score_change,
-              templateId: area.template_id,
-              formId: area.form_id,
-              trackedLinkUrl: null,
-            })),
-          })),
-        };
+        const input = await assembleRichMenuGroupInput(
+          env.DB,
+          richMenuLiveToSnapshot(restoreGroup),
+          account,
+          {
+            fallbackGroupId: restoreGroup.id,
+            workerBaseUrl: env.WORKER_URL,
+            liffUrl: env.LIFF_URL,
+          },
+        );
         const { shells } = await createRichMenuShells(input as never, line, r2Adapter, heartbeat);
         const oldByPageId = new Map(
           (input.pages as Array<{ id: string; lineRichMenuId: string | null }>).map((page) => [page.id, page.lineRichMenuId]),

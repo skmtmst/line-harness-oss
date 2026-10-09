@@ -17,7 +17,7 @@
  * 反映する。キャンセル・Esc・背景を押すと下書きは捨てられる。
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type ScenarioTriggerItem } from '@/lib/api'
 import { pruneCondition, type SegmentCondition } from '@/lib/segment-condition'
 import Button from '@/components/shared/button'
@@ -86,6 +86,13 @@ export default function TriggerEditor({
   lineAccountId = null,
 }: TriggerEditorProps) {
   /** 最後にサーバーへ保存されている（されていると分かっている）一覧。 */
+  const subject = `${scenarioId}:${lineAccountId}`
+  const subjectRef = useRef({ key: subject, generation: 0 })
+  if (subjectRef.current.key !== subject) {
+    subjectRef.current = { key: subject, generation: subjectRef.current.generation + 1 }
+  }
+  const loadGeneration = useRef(0)
+  const savingRef = useRef(false)
   const [saved, setSaved] = useState<ScenarioTriggerItem[] | null>(null)
   /** 編集中の下書き。ここを見せて、保存のときだけサーバーへ送る。 */
   const [draft, setDraft] = useState<ScenarioTriggerItem[]>([])
@@ -139,29 +146,43 @@ export default function TriggerEditor({
     void recount()
   }, [recount])
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (preserveDraft = false) => {
+    const at = subjectRef.current
+    const generation = ++loadGeneration.current
+    const isCurrent = () => at === subjectRef.current && generation === loadGeneration.current
     setLoading(true)
-    const res = await api.scenarios.triggers.list(scenarioId)
-    if (res.success) {
+    try {
+      const res = await api.scenarios.triggers.list(scenarioId)
+      if (!isCurrent()) return false
+      if (!res.success) throw new Error(res.error)
       setSaved(res.data)
-      setDraft(res.data)
+      if (!preserveDraft) setDraft(res.data)
       onChanged?.(res.data.length)
-    } else {
-      setError(res.error)
+      return true
+    } catch {
+      if (!isCurrent()) return false
+      setSaved(null)
+      setError('開始条件を読み込めませんでした。もう一度お試しください。')
+      return false
+    } finally {
+      if (isCurrent()) setLoading(false)
     }
-    setLoading(false)
-    // onChanged は毎描画で作り直される可能性があるので依存に入れない。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenarioId])
+  }, [scenarioId, lineAccountId])
 
   useEffect(() => {
+    setSaved(null); setDraft([]); setError(''); setSaving(false); savingRef.current = false
     void load()
+    return () => { loadGeneration.current += 1 }
   }, [load])
 
   useEffect(() => {
+    let cancelled = false
+    setTags([])
     void scenarioReferenceData.tags(lineAccountId).then((res) => {
-      if (res.success) setTags(res.data.map((t) => ({ id: t.id, name: t.name })))
-    })
+      if (!cancelled && res.success) setTags(res.data.map((t) => ({ id: t.id, name: t.name })))
+    }).catch(() => { if (!cancelled) setError('タグを読み込めませんでした。') })
+    return () => { cancelled = true }
   }, [lineAccountId])
 
   /*
@@ -186,48 +207,36 @@ export default function TriggerEditor({
   }
 
   /** 下書きと保存済みが違うか。違っていれば「未保存」を面に出す。 */
-  const dirty =
-    saved !== null &&
-    (draft.length !== saved.length ||
-      draft.some((item) => !saved.some((s) => s.id === item.id)))
+  const sameTrigger = (a: (typeof draft)[number], b: (typeof draft)[number]) => a.kind === b.kind && a.tagId === b.tagId
+  const dirty = saved !== null &&
+    (draft.length !== saved.length || draft.some((item) => !saved.some((s) => sameTrigger(s, item))))
 
-  /*
-   * 下書きをまとめて反映する。
-   *
-   * 途中で失敗したときは一覧を読み直して実態に合わせる。半分だけ
-   * 反映された状態を「保存できた」と見せない。
-   */
   const save = async () => {
-    if (saving || saved === null) return
+    if (savingRef.current || saved === null) return
+    const at = subjectRef.current
+    savingRef.current = true
     setError('')
     setSaving(true)
-    const removed = saved.filter((s) => !draft.some((d) => d.id === s.id))
-    const added = draft.filter((d) => !saved.some((s) => s.id === d.id))
-    for (const trigger of removed) {
-      const res = await api.scenarios.triggers.remove(scenarioId, trigger.id)
-      if (!res.success) {
-        setError(res.error)
-        await load()
-        setSaving(false)
-        return
+    try {
+      const removed = saved.filter((s) => !draft.some((d) => sameTrigger(d, s)))
+      const added = draft.filter((d) => !saved.some((s) => sameTrigger(s, d)))
+      for (const trigger of removed) {
+        const res = await api.scenarios.triggers.remove(scenarioId, trigger.id)
+        if (!res.success) throw new Error(res.error)
       }
-    }
-    for (const trigger of added) {
-      const res = await api.scenarios.triggers.add(
-        scenarioId,
-        trigger.kind === 'tag_added' ? 'tag_added' : 'friend_add',
-        trigger.tagId,
-      )
-      if (!res.success) {
-        setError(res.error)
-        await load()
-        setSaving(false)
-        return
+      for (const trigger of added) {
+        const res = await api.scenarios.triggers.add(scenarioId,
+          trigger.kind === 'tag_added' ? 'tag_added' : 'friend_add', trigger.tagId)
+        if (!res.success) throw new Error(res.error)
       }
+      if (at === subjectRef.current && await load()) onClose()
+    } catch (error) {
+      if (at !== subjectRef.current) return
+      await load(true)
+      setError(error instanceof Error ? `保存できませんでした。変更は残しています。${error.message}` : '保存できませんでした。変更は残しています。もう一度保存してください。')
+    } finally {
+      if (at === subjectRef.current) { savingRef.current = false; setSaving(false) }
     }
-    await load()
-    setSaving(false)
-    onClose()
   }
 
   const hasFriendAdd = draft.some((t) => t.kind === 'friend_add')
@@ -253,6 +262,7 @@ export default function TriggerEditor({
         保存は常に見える位置へ置く。
       */}
       <div className="overflow-y-auto" style={{ maxHeight: 'calc(100dvh - 15rem)' }}>
+        {saved === null && error && <Button onClick={() => void load(true)}>もう一度読み込む</Button>}
         {dirty && (
           <Notice tone="warn" className="mb-4">
             未保存の変更があります。キャンセル・Esc・背景を押すと元に戻ります。

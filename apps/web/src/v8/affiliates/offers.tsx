@@ -396,7 +396,7 @@ export default function OffersTab() {
   const folderPanel = (
     <FolderPanel
       heading="フォルダ"
-      rows={FOLDERS.map((item) => ({ id: item.key, label: item.label, count: ready ? offers.filter(item.match).length : null, color: item.color }))}
+      rows={FOLDERS.map((item) => ({ kind: item.label === 'すべて' ? 'all' as const : item.label === '未分類' ? 'unfiled' as const : 'folder' as const, id: item.key, label: item.label, count: ready ? offers.filter(item.match).length : null, color: item.color }))}
       activeId={folder}
       onSelect={(id) => resetPage(() => { setSaved(''); setFolder(id as FolderKey) })}
       addFolderNote={<p className={styles.stateDesc}>成果が出たときの動きで分けた見え方です</p>}
@@ -549,9 +549,6 @@ export default function OffersTab() {
   ) : (
     <>
       {table}
-      <p className={styles.footNote}>
-        {readonly ? '行の「…」から 決まり（受付期間・上限・数える期間）を見る。' : '行の「…」から 編集・決まり・公開を止める・複製。'}
-      </p>
     </>
   )
 
@@ -564,6 +561,7 @@ export default function OffersTab() {
 
   return (
     <AffiliateFrame
+      help={readonly ? '行の「…」から 決まり（受付期間・上限・数える期間）を見る。' : '行の「…」から 編集・決まり・公開を止める・複製。'}
       actions={<Button onClick={exportCsv} disabled={shown.length === 0}><Download size={15} aria-hidden="true" /> CSV で書き出す</Button>}
       stats={stats}
       folderNav={{ rows: FOLDERS.map((item) => ({ id: item.key, label: item.label })), activeId: folder, onSelect: (id) => resetPage(() => { setSaved(''); setFolder(id as FolderKey) }), createAction: readonly ? undefined : createButton(false) }}

@@ -17,13 +17,14 @@ import DateField from '@/components/shared/date-field'
 import Dialog from '@/components/shared/dialog'
 import Radio from '@/components/shared/radio'
 import SegmentedControl from '@/components/shared/segmented'
-import Select from '@/components/shared/select'
+import TimeField from '@/components/shared/time-field-v8'
+import { Field, OptionalBadge } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import { ApiError, describeSaveFailure } from '@/lib/api'
 import { restaurantGoogleApi } from '@/lib/restaurant-google-api'
 import { restaurantTestApi, type RestaurantReservation, type RestaurantTable } from '@/lib/restaurant-test-api'
 import {
-  KIND_LABEL, KIND_ORDER, clock, conflictsOf, dayOfIso, dayShort, emptyInput, inputError, inputOf, overlapMessage, overlapping, sourceLabel, timeOptions,
+  KIND_LABEL, KIND_ORDER, clock, conflictsOf, dayOfIso, dayShort, emptyInput, inputError, inputOf, overlapMessage, overlapping, sourceLabel,
 } from './format'
 import styles from './closures.module.css'
 
@@ -83,6 +84,8 @@ export default function ClosureDialog({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const seq = useRef(0)
+  const formRef = useRef<HTMLDivElement>(null)
+  const [fieldErrors, setFieldErrors] = useState<{ start?: string; end?: string; time?: string; tables?: string }>({})
 
   const active = useMemo(() => tables.filter((t) => t.is_active), [tables])
   const seats = active.reduce((sum, t) => sum + t.max_capacity, 0)
@@ -95,7 +98,7 @@ export default function ClosureDialog({
     setPickTables(next.tableIds !== undefined && next.tableIds.length > 0)
     setGoogle(target.mode === 'add')
     setPreview(null)
-    setError('')
+    setError(''); setFieldErrors({})
   }, [target, storeId])
 
   const problem = inputError(input, today)
@@ -128,11 +131,19 @@ export default function ClosureDialog({
     return () => clearTimeout(timer)
   }, [open, problem, accountId, input, editing, reservations, timezone])
 
-  const set = (patch: Partial<RestaurantClosureInput>) => { setInput((current) => ({ ...current, ...patch })); setError('') }
+  const set = (patch: Partial<RestaurantClosureInput>) => { setInput((current) => ({ ...current, ...patch })); setError(''); setFieldErrors({}) }
 
   const save = async () => {
-    if (problem) { setError(problem); return }
-    if (pickTables && !partial) { setError('閉じる卓を1つ以上選んでください。'); return }
+    const errors: typeof fieldErrors = {}
+    if (!input.startDate || input.startDate < today) errors.start = problem
+    else if (!input.endDate || input.endDate < input.startDate) errors.end = problem
+    else if (problem) errors.time = problem
+    if (pickTables && !partial) errors.tables = '閉じる卓を1つ以上選んでください。'
+    setFieldErrors(errors)
+    if (Object.keys(errors).length) {
+      requestAnimationFrame(() => { const field = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]'); field?.focus(); field?.scrollIntoView?.({ block: 'center' }) })
+      return
+    }
     setBusy(true); setError('')
     try {
       const body: RestaurantClosureInput = { ...input, tableIds: pickTables ? input.tableIds : [], memo: input.memo?.trim() || null, notifyMedia: input.notifyMedia !== false }
@@ -177,7 +188,7 @@ export default function ClosureDialog({
       onConfirm={() => void save()}
       onCancel={onClose}
     >
-      <div className={styles.form}>
+      <div className={styles.form} ref={formRef}>
         <div className={styles.field}>
           <span className={styles.label} id="e10-kind">種類</span>
           <SegmentedControl<RestaurantClosureKind>
@@ -190,23 +201,24 @@ export default function ClosureDialog({
         </div>
 
         <div className={styles.dates}>
-          <label className={styles.field}>
-            <span className={styles.label}>はじめの日</span>
+          <Field label="はじめの日" htmlFor="e10-start" error={fieldErrors.start}>
             <DateField
+              id="e10-start"
+              aria-label="はじめの日"
+              invalid={Boolean(fieldErrors.start)}
               value={input.startDate}
               min={today}
               onChange={(value) => set({ startDate: value, endDate: input.endDate < value ? value : input.endDate })}
             />
-          </label>
+          </Field>
           <span className={styles.wave} aria-hidden="true">〜</span>
-          <label className={styles.field}>
-            <span className={styles.label}>おわりの日</span>
-            <DateField value={input.endDate} min={input.startDate || today} onChange={(value) => set({ endDate: value })} />
-          </label>
+          <Field label="おわりの日" htmlFor="e10-end" error={fieldErrors.end}>
+            <DateField id="e10-end" aria-label="おわりの日" invalid={Boolean(fieldErrors.end)} value={input.endDate} min={input.startDate || today} onChange={(value) => set({ endDate: value })} />
+          </Field>
         </div>
 
-        <div className={styles.field} role="radiogroup" aria-labelledby="e10-time">
-          <span className={styles.label} id="e10-time">時間</span>
+        <Field label="時間" error={fieldErrors.time}>
+          <div role="radiogroup" aria-label="時間">
           <div className={styles.choices}>
             <Radio name="e10-time" checked={input.allDay} onChange={() => set({ allDay: true, startTime: null, endTime: null })}>終日</Radio>
             <Radio name="e10-time" checked={!input.allDay} onChange={() => set({ allDay: false, startTime: input.startTime ?? '18:00', endTime: input.endTime ?? '22:00' })}>
@@ -215,15 +227,16 @@ export default function ClosureDialog({
           </div>
           {!input.allDay ? (
             <div className={styles.times}>
-              <Select aria-label="閉じる時間の始まり" width={120} value={input.startTime ?? ''} onChange={(value) => set({ startTime: value })} options={timeOptions().map((t) => ({ value: t, label: t }))} />
+              <TimeField aria-label="閉じる時間の始まり" invalid={Boolean(fieldErrors.time)} minuteStep={30} size="field" value={input.startTime ?? ''} onChange={(value) => set({ startTime: value })} />
               <span className={styles.wave} aria-hidden="true">〜</span>
-              <Select aria-label="閉じる時間の終わり" width={120} value={input.endTime ?? ''} onChange={(value) => set({ endTime: value })} options={timeOptions(true).slice(1).map((t) => ({ value: t, label: t }))} />
+              <TimeField aria-label="閉じる時間の終わり" invalid={Boolean(fieldErrors.time)} allowEndOfDay minuteStep={30} size="field" value={input.endTime ?? ''} onChange={(value) => set({ endTime: value })} />
             </div>
           ) : null}
-        </div>
+          </div>
+        </Field>
 
-        <div className={styles.field} role="radiogroup" aria-labelledby="e10-tables">
-          <span className={styles.label} id="e10-tables">閉じる卓</span>
+        <Field label="閉じる卓" error={fieldErrors.tables}>
+          <div role="radiogroup" aria-label="閉じる卓" aria-invalid={Boolean(fieldErrors.tables)} tabIndex={-1}>
           <div className={styles.choices}>
             <Radio name="e10-tables" checked={!pickTables} onChange={() => { setPickTables(false); set({ tableIds: [] }) }}>
               {`全部の卓（${active.length}卓・${seats}席）`}
@@ -243,10 +256,11 @@ export default function ClosureDialog({
               ))}
             </div>
           ) : null}
-        </div>
+          </div>
+        </Field>
 
         <label className={styles.field}>
-          <span className={styles.label}>メモ<span className={styles.optional}>任意</span></span>
+          <span className={styles.label}>メモ<OptionalBadge /></span>
           <TextField value={input.memo ?? ''} maxLength={200} placeholder="例：設備点検のため" onChange={(event) => set({ memo: event.target.value })} />
         </label>
 

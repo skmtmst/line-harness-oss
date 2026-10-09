@@ -8,16 +8,16 @@
  * → 下の線の下にキャンセル・次へ（中央）。口と決まりは今の画面（app/restaurant-test/stores/new）と同じ。
  * 動きは BEHAVIOR.md。
  */
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { cloneElement, isValidElement, useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { ArrowRight, BookOpen, Check, CircleCheck, ExternalLink } from 'lucide-react'
+import { ArrowRight, BookOpen, CircleCheck, ExternalLink } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { TERMS_DOCUMENT } from '@/content/terms/musubo-terms'
 import { MANUAL_LINKS } from '@/lib/manual-links'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { Steps } from '@/components/templates/steps'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Button from '@/components/shared/button'
@@ -237,25 +237,31 @@ export default function StoreNewV8() {
 
   return (
     <PageFrame kind="list" boardId={step === STEP.TERMS ? 'ao15G' : step === STEP.BASICS ? 'faGn4' : undefined}>
-      <PageHeading title="店舗を追加" description={`LINEへ接続し、店舗を登録します。ステップ ${step} / 5`} />
+      <PageHeading
+        title="店舗を追加"
+        description={`LINEへ接続し、店舗を登録します。ステップ ${step} / 5`}
+        steps={(
+          <Steps
+            label="店舗を追加する手順"
+            currentKey={created ? undefined : String(step)}
+            steps={STEPS.map(([title], index) => {
+              const number = index + 1
+              const complete = number === STEP.TERMS ? Boolean(termsAgreedAt) || Boolean(created) : number < step || Boolean(created)
+              return {
+                key: String(number),
+                label: title,
+                order: number,
+                state: complete ? 'done' as const : 'todo' as const,
+                /* 済んだ段を押すとその段へ戻る。①（利用規約）は同意した規約を読み直す画面へ。作った後は戻らない。 */
+                onSelect: !complete ? undefined
+                  : number === STEP.TERMS ? () => router.push('/restaurant-test/terms')
+                    : created ? undefined : () => setStep(number),
+              }
+            })}
+          />
+        )}
+      />
       <div className={styles.body}>
-        <ol className={styles.steps} aria-label="店舗を追加する手順">
-          {STEPS.map(([title], index) => {
-            const number = index + 1
-            const complete = number === STEP.TERMS ? Boolean(termsAgreedAt) || Boolean(created) : number < step || Boolean(created)
-            const current = number === step && !created
-            const inner = <>
-              <span className={`${styles.stepDot} ${complete ? styles.stepDotDone : current ? styles.stepDotCurrent : ''}`} aria-hidden="true">{complete ? <Check className={styles.icon13} /> : number}</span>
-              <span className={styles.stepLabel}>{title}</span>
-              <span className="sr-only">{complete ? '（完了）' : current ? '（いまの手順）' : ''}</span>
-            </>
-            return (
-              <li key={title} className={`${styles.step} ${current ? styles.stepCurrent : ''} ${complete ? styles.stepDone : ''}`} aria-current={current ? 'step' : undefined}>
-                {number === STEP.TERMS && complete ? <Link href="/restaurant-test/terms" className={styles.stepLink} title={agreedLabel ? `同意済み：${agreedLabel}` : undefined}>{inner}</Link> : inner}
-              </li>
-            )
-          })}
-        </ol>
         <div className={styles.split}>
           <section className={styles.card} aria-labelledby="store-new-step-title">
             <h2 id="store-new-step-title" className={styles.cardTitle}>{STEPS[step - 1][0]}</h2>

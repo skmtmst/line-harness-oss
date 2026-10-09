@@ -217,8 +217,11 @@ export function hasLinkedActions(tag: Tag): boolean {
  * 9時間ぶんがずれる（8/1 の朝に作ったタグが7月扱いになる）。
  */
 export function isThisMonth(value: string): boolean {
-  const month = (d: Date) =>
-    formatDay(d)
+  const month = (d: Date) => {
+    if (Number.isNaN(d.getTime())) return null
+    const jst = new Date(d.getTime() + 9 * 60 * 60 * 1000)
+    return `${jst.getUTCFullYear()}-${jst.getUTCMonth()}`
+  }
   return month(new Date(value)) === month(new Date())
 }
 

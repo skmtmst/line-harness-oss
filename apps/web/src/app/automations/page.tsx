@@ -277,11 +277,24 @@ const MERGED_TABS = [
 /** 一覧の1ページぶん。口は全件返すので、ここで切り出す。 */
 const AUTOMATION_PAGE_SIZE = 6
 
+/*
+ * 入口。★V8 切替（`LWQXd`・`c7dxp`）は、v7 の画面の取得（一覧・見本・共通アクション）が
+ * 始まる前にここで分ける。v7 の画面の中で分けると、v7 の取得の effect が先に登録され、
+ * V8 の画面と同じ一覧を二重に取っていた（監査 WEB-117）。フックは毎回同じ順に呼ぶ。
+ */
 export default function AutomationsPage() {
+  const tab = useMergedTab(MERGED_TABS)
+  const theme = useAdminTheme()
+  if (theme === 'v8' && tab === 'templates') return <AutomationTemplatesV8 />
+  if (theme === 'v8') return <AutomationListV8 />
+  return <AutomationsV7Page />
+}
+
+/** v7 の画面（見た目・取得・保存・権限・失敗時の扱いは前のまま）。 */
+function AutomationsV7Page() {
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const tab = useMergedTab(MERGED_TABS)
-  const theme = useAdminTheme()
   usePageTitle(tab === 'templates' ? '見本から作る' : 'オートメーション')
   const canManageAutomations = useCanManageAutomations()
   /* 監査 R128: 正本表に登録があるときだけ出す。無ければボタン自体を出さない。 */
@@ -513,13 +526,6 @@ export default function AutomationsPage() {
       )
     }
   }
-
-  /*
-   * ★V8 切替（`LWQXd`・`c7dxp`）。全部のフックの後ろで枝分けするので、
-   * フックの順番は v7 と同じ。v7 の見た目は1画素も変えない。
-   */
-  if (theme === 'v8' && tab === 'templates') return <AutomationTemplatesV8 />
-  if (theme === 'v8') return <AutomationListV8 />
 
   if (tab === 'templates') {
     const activeCount = loadStatus === 'ready' ? automations.filter((item) => item.isActive).length : null

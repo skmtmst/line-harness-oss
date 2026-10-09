@@ -286,31 +286,31 @@ describe('NEXT-11 遅い補助パネルが顧客名の表示を止めない', ()
     await render()
 
     // マイルの応答を待たずに本体が出る
-    await eventually(() => expect(host.textContent).toContain('テスト太郎'))
-    expect(host.textContent).not.toContain('読み込み中...')
+    await eventually(() => expect(document.body.textContent).toContain('テスト太郎'))
+    expect(document.body.textContent).not.toContain('読み込み中...')
     // 戻る導線（友だち一覧へのリンク）が使える
-    const back = Array.from(document.querySelectorAll('a')).find((a) => a.getAttribute('href') === '/friends')
+    const back = Array.from(document.querySelectorAll('a')).find((a) => a.getAttribute('href') === '/chats?friend=friend-1')
     expect(back).toBeTruthy()
 
     // マイルが失敗で返ってきても、顧客名は出たまま・失敗表示はマイル欄だけ
     await act(async () => {
       finishMileage({ success: false, error: 'unavailable' })
     })
-    await eventually(() => expect(host.textContent).toContain('マイルを取得できませんでした'))
-    expect(host.textContent).toContain('テスト太郎')
+    await eventually(() => expect(document.body.textContent).toContain('マイルを読み込めませんでした'))
+    expect(document.body.textContent).toContain('テスト太郎')
   })
 
   it('マイルの取り損ねには再試行口があり、再試行で値が出る', async () => {
     state.mileage = () => Promise.resolve({ success: false, error: 'unavailable' })
     await render()
-    await eventually(() => expect(host.textContent).toContain('マイルを取得できませんでした'))
+    await eventually(() => expect(document.body.textContent).toContain('マイルを読み込めませんでした'))
 
     state.mileage = () => Promise.resolve({ success: true, data: fixtures.mileageData })
     await act(async () => {
-      buttonByText('再試行').click()
+      buttonByText('もう一度試す').click()
     })
-    await eventually(() => expect(host.textContent).toContain('120'))
-    expect(host.textContent).not.toContain('マイルを取得できませんでした')
+    await eventually(() => expect(document.body.textContent).toContain('120'))
+    expect(document.body.textContent).not.toContain('マイルを読み込めませんでした')
   })
 })
 
@@ -344,7 +344,7 @@ describe('NEXT-08 「個別操作」「…」が操作メニューにつなが�
       expect(item.querySelector('svg')).toBeTruthy()
     }
     const template = menuItems().find((b) => b.textContent?.includes('テンプレートを送る'))!
-    expect(template.querySelectorAll('svg')).toHaveLength(2)
+    expect(template.querySelectorAll('svg')).toHaveLength(1)
     await act(async () => {
       buttonByText('個別操作').click()
     })
@@ -373,7 +373,7 @@ describe('NEXT-08 「個別操作」「…」が操作メニューにつなが�
 describe('NEXT-09 対象の友だちを引き継ぐ操作', () => {
   it('「シナリオに登録」は選択肢を開き、選ぶとこの友だちの登録へ届く', async () => {
     await render()
-    await eventually(() => expect(host.textContent).toContain('テスト太郎'))
+    await eventually(() => expect(document.body.textContent).toContain('テスト太郎'))
 
     await act(async () => {
       buttonByText('シナリオに登録する').click()
@@ -391,7 +391,7 @@ describe('NEXT-09 対象の友だちを引き継ぐ操作', () => {
       select.dispatchEvent(new Event('change', { bubbles: true }))
     })
     // 選択→確認→実行
-    await eventually(() => expect(host.textContent).toContain('を登録します'))
+    await eventually(() => expect(document.body.textContent).toContain('を登録します'))
     await act(async () => {
       buttonByText('このシナリオに登録する').click()
     })
@@ -400,7 +400,7 @@ describe('NEXT-09 対象の友だちを引き継ぐ操作', () => {
       expect(call).toBeTruthy()
       expect(call!.args).toEqual(['sc-1', 'friend-1'])
     })
-    await eventually(() => expect(host.textContent).toContain('に登録しました'))
+    await eventually(() => expect(document.body.textContent).toContain('に登録しました'))
   })
 
   // ★V7（2026-09-24）：この友だちに関係の無い「〜一覧を見る」は操作節に置かない（左のメニューから行ける）。
@@ -422,44 +422,44 @@ describe('NEXT-09 対象の友だちを引き継ぐ操作', () => {
 describe('NEXT-10 履歴は実際の活動履歴につながっている', () => {
   it('「すべてを見る」先の履歴タブが実データを表示する', async () => {
     await render('history')
-    await eventually(() => expect(host.textContent).toContain('メッセージを受信しました'))
-    expect(host.textContent).toContain('回答フォームへ回答しました')
+    await eventually(() => expect(document.body.textContent).toContain('メッセージを受信しました'))
+    expect(document.body.textContent).toContain('回答フォームへ回答しました')
     // いちばん古い記録として友だち追加が末尾に出る
-    expect(host.textContent).toContain('友だち追加')
-    expect(host.textContent).toContain('春のキャンペーンから追加されました')
+    expect(document.body.textContent).toContain('友だち追加')
+    expect(document.body.textContent).toContain('春のキャンペーンから追加されました')
     // 未接続の説明文はもう出ない
-    expect(host.textContent).not.toContain('全履歴を取得する仕組みがまだありません')
+    expect(document.body.textContent).not.toContain('全履歴を取得する仕組みがまだありません')
   })
 
   it('履歴0件は0件と表示し、友だち追加の記録だけが残る', async () => {
     state.timeline = () => Promise.resolve({ success: true, data: { items: [], nextCursor: null } })
     await render('history')
-    await eventually(() => expect(host.textContent).toContain('活動履歴はまだありません'))
-    expect(host.textContent).toContain('友だち追加')
+    await eventually(() => expect(document.body.textContent).toContain('活動履歴はまだありません'))
+    expect(document.body.textContent).toContain('友だち追加')
     // 0件表示は失敗表示とは違う文面
-    expect(host.textContent).not.toContain('履歴を取得できませんでした')
+    expect(document.body.textContent).not.toContain('履歴を読み込めませんでした')
   })
 
   it('履歴の取得に失敗すると「取得できませんでした」と再試行口が出る', async () => {
     state.timeline = () => Promise.resolve({ success: false, error: 'failed' })
     await render('history')
-    await eventually(() => expect(host.textContent).toContain('履歴を取得できませんでした'))
-    expect(buttonByText('もう一度読み込む')).toBeTruthy()
+    await eventually(() => expect(document.body.textContent).toContain('履歴を読み込めませんでした'))
+    expect(buttonByText('もう一度試す')).toBeTruthy()
     // 0件表示とは違う文面
-    expect(host.textContent).not.toContain('活動履歴はまだありません')
+    expect(document.body.textContent).not.toContain('活動履歴はまだありません')
   })
 
   it('名寄せ件数は固定文ではなく実際の統合情報から出す', async () => {
     await render()
-    await eventually(() => expect(host.textContent).toContain('2件のLINEアカウントで同じ人としてつながっています'))
-    expect(host.textContent).toContain('支店アカウント')
-    expect(host.textContent).not.toContain('現在は1アカウントのみ')
+    await eventually(() => expect(document.body.textContent).toContain('2件のLINEアカウントで同じ人としてつながっています'))
+    expect(document.body.textContent).toContain('支店アカウント')
+    expect(document.body.textContent).not.toContain('現在は1アカウントのみ')
   })
 
   it('つながり情報が取れないときは未取得と表示する', async () => {
     state.mileage = () => Promise.resolve({ success: false, error: 'unavailable' })
     await render()
-    await eventually(() => expect(host.textContent).toContain('つながり情報を取得できませんでした'))
+    await eventually(() => expect(document.body.textContent).toContain('つながり情報を読み込めませんでした'))
   })
 })
 
@@ -470,20 +470,22 @@ describe('概要の次の予定', () => {
       nextAutoDelivery: { kind: 'scenario', id: 'sc-2', name: '秋のご案内', scheduledAt: '2026-10-07T10:00:00+09:00' }, nextAutoDeliveryError: false,
     } })
     await render()
-    await eventually(() => expect(host.textContent).toContain('オンライン相談'))
-    expect(host.textContent).toContain('10月8日')
-    expect(host.textContent).toContain('秋のご案内')
+    await eventually(() => expect(document.querySelector('button[aria-label="次の予約の説明"]')).toBeTruthy())
+    await act(async () => { document.querySelector<HTMLButtonElement>('button[aria-label="次の予約の説明"]')!.click() })
+    expect(document.body.textContent).toContain('オンライン相談')
+    expect(document.body.textContent).toContain('10月8日')
+    expect(document.body.textContent).toContain('秋のご案内')
     expect(host.querySelector('a[href="/scenarios/detail?id=sc-2"]')).toBeTruthy()
     expect(net.calls.some((call) => call.name === 'friends.upcoming' && call.args[0] === 'friend-1')).toBe(true)
   })
   it('配信の取り損ねを予定なしで代用せず、再試行で回復する', async () => {
     state.upcoming = () => Promise.reject(new Error('offline'))
     await render()
-    await eventually(() => expect(host.textContent).toContain('配信予定を取得できませんでした'))
-    expect(host.textContent).not.toContain('確定した配信予定はありません')
+    await eventually(() => expect(document.body.textContent).toContain('配信予定を読み込めませんでした'))
+    expect(document.body.textContent).not.toContain('確定した配信予定はありません')
     state.upcoming = () => Promise.resolve({ success: true, data: { nextBooking: null, nextBookingError: false, nextAutoDelivery: null, nextAutoDeliveryError: false } })
-    const retry = [...host.querySelectorAll('button')].find((button) => button.closest('[role="alert"]')?.textContent?.includes('配信予定を取得できませんでした'))!
+    const retry = [...host.querySelectorAll('button')].find((button) => button.closest('[role="alert"]')?.textContent?.includes('配信予定を読み込めませんでした'))!
     await act(async () => { retry.click() })
-    await eventually(() => expect(host.textContent).toContain('確定した配信予定はありません'))
+    await eventually(() => expect(document.body.textContent).toContain('確定した配信予定はありません'))
   })
 })

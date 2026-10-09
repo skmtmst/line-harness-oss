@@ -11,10 +11,10 @@
  *   - 確認窓の説明が操作と通知方針ごとの実処理と一致する
  */
 import React from 'react'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const m = vi.hoisted(() => ({ account: 'A', id: 'one', get: vi.fn() }))
+const m = vi.hoisted(() => ({ account: 'A', id: 'one', get: vi.fn(), update: vi.fn() }))
 
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
 vi.mock('@/contexts/account-context', () => ({
@@ -33,7 +33,7 @@ vi.mock('@/lib/api', () => ({
     listMenus: vi.fn(async () => ({ menus: [] })),
     listMenuStaff: vi.fn(async () => ({ staff: [] })),
     getAvailability: vi.fn(async () => ({ by_staff: [] })),
-    updateBooking: vi.fn(async () => ({})),
+    updateBooking: m.update,
     retryCalendarSync: vi.fn(async () => ({ status: 'succeeded' })),
     retryNotification: vi.fn(async () => ({ status: 'succeeded' })),
     getAuditLogs: vi.fn(async () => ({ audit_logs: [] })),
@@ -241,4 +241,24 @@ describe('DEEP-20: 確認窓の説明を実処理に合わせる', () => {
       screen.getAllByText(/LINEと結びついていないため、お客様への自動連絡はありません/).length,
     ).toBeGreaterThan(1)
   })
+})
+
+it('WEB300：保存を待つ間は予約の追加編集を止め、失敗後に入力を残す', async () => {
+  let reject!: (e: Error) => void
+  m.get.mockResolvedValue({ booking: booking('A', { status: 'confirmed' }) })
+  m.update.mockImplementation(() => new Promise((_, no) => { reject = no }))
+  render(<Page />); await flush()
+  fireEvent.click(screen.getByRole('button', { name: '内容を変更する' }))
+  await flush()
+  const reason = screen.getByPlaceholderText('例: お客様の都合で時間変更') as HTMLInputElement
+  fireEvent.change(reason, { target: { value: '変更の理由' } })
+  const price = document.querySelector('input[type="number"]') as HTMLInputElement
+  fireEvent.change(price, { target: { value: '1000' } })
+  fireEvent.click(screen.getByRole('button', { name: 'この内容で変更する' }))
+  await waitFor(() => expect(m.update).toHaveBeenCalled())
+  expect(reason.matches(':disabled')).toBe(true)
+  expect(price.matches(':disabled')).toBe(true)
+  reject(new Error('down'))
+  await waitFor(() => expect(reason.matches(':disabled')).toBe(false))
+  expect(reason.value).toBe('変更の理由')
 })

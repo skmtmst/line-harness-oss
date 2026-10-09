@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { CircleAlert, CircleCheck, X } from 'lucide-react'
 import { humanizeErrorText } from './human-error-text'
 import { useV8LeaveList } from './overlay-utils'
 import styles from './toast.module.css'
+import { useStackMotion } from './use-stack-motion'
 
 /** 知らせの種類。白地に印の色で分ける（緑=うまくいった、赤=できなかった）。 */
 export type ToastTone = 'success' | 'error'
@@ -314,6 +315,8 @@ export default function ToastHost() {
   }, [])
   /* 消えるときは窓と同じ「消えかけ」で薄く消す（動きの点検 13 番）。 */
   const shown = useV8LeaveList(live)
+  const hostRef = useRef<HTMLDivElement>(null)
+  useStackMotion(hostRef, shown.map(({ item }) => item.id).join(','))
   /*
    * 読み上げの入れ物は空でも最初から置いておく（動きの点検 14 番）。
    * 入れ物ごと後から差し込むと、読み上げ側が見張り始める前に中身が入り、
@@ -321,9 +324,9 @@ export default function ToastHost() {
    * （aria-atomic=true が既定）ので、足された1件だけを読むよう false にする。
    */
   return (
-    <div className={styles.host} role="status" aria-live="polite" aria-atomic="false" aria-label="知らせ">
+    <div ref={hostRef} className={styles.host} role="status" aria-live="polite" aria-atomic="false" aria-label="知らせ">
       {shown.map(({ item, leaving }) => (
-        <Toast key={item.id} item={item} leaving={leaving} />
+        <div key={item.id} data-stack-item={item.id}><Toast item={item} leaving={leaving} /></div>
       ))}
     </div>
   )

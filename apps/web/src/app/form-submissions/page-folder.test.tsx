@@ -209,11 +209,14 @@ async function clickMenuItem(label: string) {
 
 describe('箱の作成・名前変更・移動が選んだアカウントでつながる（R25・実マウント）', () => {
   it('箱を追加すると選んだアカウント付きで作る', async () => {
+    // 管理画面は V8 だけ。共通の追加窓（role=dialog）は V8 の見た目で出る。
+    document.documentElement.dataset.theme = 'v8'
     await act(async () => {
       root.render(<FormSubmissionsPage />)
     })
     await clickFolder('フォルダを追加')
-    const nameInput = host.querySelector('input[placeholder^="例:"]') as HTMLInputElement | null
+    // 共通の追加窓は最上層へ描画される。
+    const nameInput = document.querySelector('[role="dialog"] input[placeholder^="例:"]') as HTMLInputElement | null
     expect(nameInput).toBeTruthy()
     await act(async () => {
       nameInput!.focus()
@@ -222,7 +225,7 @@ describe('箱の作成・名前変更・移動が選んだアカウントでつ�
       setter.call(nameInput, '来店・予約')
       nameInput!.dispatchEvent(new Event('input', { bubbles: true }))
     })
-    const addButton = [...host.querySelectorAll('button')].find((b) => b.textContent === '追加する')
+    const addButton = [...document.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent === '追加する')
     expect(addButton).toBeTruthy()
     await act(async () => {
       addButton!.click()

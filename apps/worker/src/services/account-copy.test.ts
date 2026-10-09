@@ -53,3 +53,20 @@ describe('copyLineAccountSettings', () => {
     expect(raw.prepare("SELECT COUNT(*) AS count FROM friends WHERE line_account_id = 'target'").get()).toEqual({ count: 0 });
   });
 });
+
+
+it('W18: 他店の公開版を参照せず、明示公開が必要な所有済み下書きとして複製する', async () => {
+  const { db, raw } = createTestD1();
+  raw.exec(`INSERT INTO scenarios(id,name,trigger_type,line_account_id,current_published_version_id,is_active)
+    VALUES('source-s','Scenario','manual','source','source-version',1);
+    INSERT INTO auto_replies(id,keyword,response_content,line_account_id,current_draft_version_id,current_published_version_id)
+    VALUES('source-r','Keyword','Reply','source','source-draft','source-published');`);
+  await copyLineAccountSettings(db, 'source', 'target', ['scenarios', 'autoReplies']);
+  expect(raw.prepare("SELECT is_active,current_published_version_id FROM scenarios WHERE line_account_id='target'").get())
+    .toEqual({ is_active: 0, current_published_version_id: null });
+  expect(raw.prepare("SELECT is_active,lifecycle_status,current_draft_version_id,current_published_version_id FROM auto_replies WHERE line_account_id='target'").get())
+    .toEqual({ is_active: 0, lifecycle_status: 'draft', current_draft_version_id: null, current_published_version_id: null });
+  expect(raw.prepare("SELECT current_published_version_id,is_active FROM scenarios WHERE id='source-s'").get())
+    .toEqual({ current_published_version_id: 'source-version', is_active: 1 });
+  raw.close();
+});

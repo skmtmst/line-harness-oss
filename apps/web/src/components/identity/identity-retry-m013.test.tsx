@@ -38,7 +38,7 @@ describe('M013 本人照合の読み込み失敗の再試行口', () => {
   })
 
   it('両画面が読み直しを結んでいる', async () => {
-    const { readFileSync } = await import('node:fs')
+    const { readUiSource: readFileSync } = await import('../../../scripts/test-ui-source.mjs')
     const { dirname, join } = await import('node:path')
     const { fileURLToPath } = await import('node:url')
     const here = dirname(fileURLToPath(import.meta.url))

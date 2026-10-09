@@ -1,12 +1,12 @@
 import { describe, it } from 'vitest'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const hqPage = readFileSync(join(here, 'page.tsx'), 'utf8')
-const hqBrowser = readFileSync(join(here, 'account-browser-v8.tsx'), 'utf8')
+const hqPage = readFileSync(join(here, '../../v8/hq/home.tsx'), 'utf8')
+const hqBrowser = hqPage
 const hqOpenPage = readFileSync(join(here, 'open', 'page.tsx'), 'utf8')
 
 describe('HQ account create entry', () => {

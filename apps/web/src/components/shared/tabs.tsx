@@ -3,12 +3,18 @@ import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode }
 import styles from './tabs.module.css'
 
 export interface TabItem {
+  /** 対応するパネルから参照するタブの ID。 */
+  id?: string
+  /** このタブが開くパネルの ID。 */
+  controls?: string
   /** タブの見出し。 */
   label: string
   /** 押したときの行き先。省くとボタンとして描く。 */
   href?: string
   /** 見出しの右に出す数。0 も出す（「0件ある」は情報なので隠さない）。 */
   count?: number
+  /** 確認待ちなど、注意して見る件数を丸い札で示す。 */
+  countTone?: 'warning'
   /** いま開いているタブ。 */
   current?: boolean
   disabled?: boolean
@@ -28,6 +34,7 @@ export function Tabs({
   className,
   label,
   size,
+  spacing,
 }: {
   items: TabItem[]
   /**
@@ -45,7 +52,9 @@ export function Tabs({
    * 段の詰め方。省くと今までどおり（v8 は文字20＋下12）。
    * 'compact' は文字の行を詰めた段（E-1 hKRRF の店のタブ：高さ 30.5）。v7 では効かない。
    */
-  size?: 'compact'
+  size?: 'compact' | 'settings' | 'short' | 'notification'
+  /** 'settings' は設定の板のタブ間・下余白。指定した板だけに適用する。 */
+  spacing?: 'compact' | 'settings'
 }) {
   /*
    * Issue #708（監査6 a11y）: タブは見た目どおり tablist/tab の役割を持つ。
@@ -77,6 +86,7 @@ export function Tabs({
   const itemsRef = useRef<HTMLSpanElement>(null)
   const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null)
   const currentKey = items.findIndex((item) => item.current)
+  const itemWidthsKey = JSON.stringify(items.map(({ label, count, countTone }) => [label, count, countTone]))
   useLayoutEffect(() => {
     const measure = () => {
       if (typeof document === 'undefined' || document.documentElement?.dataset?.theme !== 'v8') {
@@ -97,13 +107,18 @@ export function Tabs({
       ))
     }
     measure()
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
+    if (itemsRef.current) {
+      observer?.observe(itemsRef.current)
+      itemsRef.current.querySelectorAll<HTMLElement>('[role="tab"]').forEach(tab => observer?.observe(tab))
+    }
     window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
-  }, [currentKey, items.length])
+    return () => { observer?.disconnect(); window.removeEventListener('resize', measure) }
+  }, [currentKey, itemWidthsKey])
   const sliding = indicator !== null
 
   return (
-    <nav className={[styles.list, className].filter(Boolean).join(' ')} data-size={size}>
+    <nav className={[styles.list, className].filter(Boolean).join(' ')} data-size={size} data-spacing={spacing}>
       <span
         ref={itemsRef}
         className={styles.items}
@@ -135,12 +150,12 @@ export function Tabs({
   )
 }
 
-function Tab({ label, href, count, current, disabled, onClick, tabIndex }: TabItem & { tabIndex: number }) {
+function Tab({ id, controls, label, href, count, countTone, current, disabled, onClick, tabIndex }: TabItem & { tabIndex: number }) {
   const classes = [styles.tab, current && styles.current].filter(Boolean).join(' ')
   const body: ReactNode = (
     <>
       {label}
-      {count === undefined ? null : <span className={styles.count}>{count}</span>}
+      {count === undefined ? null : <span className={styles.count} data-tone={countTone}>{count}</span>}
     </>
   )
   /*
@@ -149,6 +164,8 @@ function Tab({ label, href, count, current, disabled, onClick, tabIndex }: TabIt
    * 選択の意味は role="tab" + aria-selected が持つ。
    */
   const shared = {
+    id,
+    'aria-controls': controls,
     className: classes,
     role: 'tab',
     'aria-selected': current ?? false,

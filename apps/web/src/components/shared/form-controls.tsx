@@ -25,8 +25,8 @@ import styles from './form-controls.module.css'
  * `<Field required>` を使えば自動で付く。Field を組めない場所
  * （legend や行内のラベル）ではこの部品を直接置く。
  */
-export function RequiredBadge() {
-  return <span className={styles.required}>必須</span>
+export function RequiredBadge({ appearance = 'badge' }: { appearance?: 'badge' | 'text' }) {
+  return <span className={appearance === 'text' ? styles.optional : styles.required}>必須</span>
 }
 
 /**
@@ -37,24 +37,57 @@ export function OptionalBadge() {
   return <span className={styles.optional}>任意</span>
 }
 
+/** 複合入力欄の下にも、Field と同じ誤りの文を置く（中身が無ければ何も出さない）。 */
+export function FieldError({ id, children }: { id: string; children: ReactNode }) {
+  return children ? <p id={id} className={styles.error} role="alert">{children}</p> : null
+}
+
 /** 1行の入力欄。ラベルと説明の付け方を全画面でそろえる。 */
 export function Field({
   label,
+  size,
   htmlFor,
   required,
+  requiredAppearance,
+  optional,
+  labelHidden = false,
+  labelSize = 'standard',
   note,
   error,
+  errorFrame = false,
+  spacing,
   help,
   helpLabel,
   helpHref,
   count,
+  density,
+  grow,
+  fill,
   children,
 }: {
-  label: string
+  label?: string
+  /** 小さな連携フォームのラベルと間隔。 */
+  density?: 'compact' | 'input'
+  grow?: boolean
+  /** 選ぶ欄の短いラベル（gjUz3・hiBO8）。既定の欄は変えない。 */
+  size?: 'compact'
+  /** 横に並ぶ欄を等分する。 */
+  fill?: boolean
   htmlFor?: string
   required?: boolean
+  /** 設定カードの絵で、必須を任意と同じ薄い文字で示す。 */
+  requiredAppearance?: 'badge' | 'text'
+  /** 任意の入力欄。既存の OptionalBadge をラベルの横に置く。 */
+  optional?: boolean
+  /** 探す欄など自身に読み上げ名がある欄では、視覚上のラベル行を省く。 */
+  labelHidden?: boolean
+  labelSize?: 'standard' | 'compact'
   note?: ReactNode
   error?: ReactNode
+  /** 複合入力を1つの欄として確かめる画面だけ、誤りの枠を付ける。 */
+  errorFrame?: boolean
+  /** カード内の入力と操作を、型の段の間隔で並べる。 */
+  spacing?: 'section'
   /**
    * 言葉の意味・単位・いつ時点の値か。ラベルのすぐ右の「？」へ入れる
    * （★V7・§2-1b）。必須の印・入力の直し方・失敗は入れない。
@@ -99,18 +132,25 @@ export function Field({
     <FieldContext.Provider value={{ controlId: htmlFor, describedBy, invalid: Boolean(shownError), required: Boolean(required) }}>
     <div
       className={styles.field}
+      data-label-size={labelSize}
+      data-grow={grow || undefined}
+      data-density={density}
+      data-spacing={spacing}
+      data-field-size={size}
+      data-field-fill={fill || undefined}
       data-field-quiet={quiet && error ? '' : undefined}
       onInput={error ? () => { if (!quiet) setQuiet(true) } : undefined}
       onBlur={quiet ? () => setQuiet(false) : undefined}
     >
       {/* 「？」は label の外に置く。中に入れるとラベルがボタンを指してしまい、
           入力欄との結びつき（htmlFor・読み上げ）が壊れる。 */}
-      <div className={styles.labelRow}>
+      {label && !labelHidden ? <div className={styles.labelRow}>
         <label htmlFor={htmlFor} className={styles.label}>
           {label}
           {/* 設計は「必須」と字で書いている。* だけだと、色が見えない人には
               何も伝わらない。 */}
-          {required && <RequiredBadge />}
+          {required && <RequiredBadge appearance={requiredAppearance} />}
+          {optional && !required && <OptionalBadge />}
         </label>
         {hasHelp ? (
           <HelpTip label={`${helpLabel ?? label}の説明`}>
@@ -118,8 +158,8 @@ export function Field({
             {helpHref ? <a href={helpHref} className={styles.helpLink}>くわしく</a> : null}
           </HelpTip>
         ) : null}
-      </div>
-      {children}
+      </div> : null}
+      {errorFrame ? <div className={styles.errorFrame} data-invalid={Boolean(shownError) || undefined} role="group" aria-invalid={Boolean(shownError) || undefined} aria-describedby={describedBy}>{children}</div> : children}
       {shownError ? <p id={errorId} className={styles.error} role="alert">{shownError}</p> : null}
       {showNote ? <p id={noteId} className={styles.note}>{note}</p> : null}
       {count ? (

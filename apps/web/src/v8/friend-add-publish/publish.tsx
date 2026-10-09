@@ -13,13 +13,12 @@
  * 公開したときの数をそのまま出す。`?done=1` は作る⑤（編集画面）から有効にして来たとき。
  */
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CircleAlert, CircleCheck, Power, Send, Smartphone } from 'lucide-react'
 import type { FriendAddRoutingValidation } from '@line-crm/shared'
 import { CreatePage } from '@/components/templates'
+import { Steps } from '@/components/templates/steps'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
-import Stepper from '@/components/shared/stepper'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Select from '@/components/shared/select'
@@ -35,7 +34,7 @@ import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { resendSuppressionText } from '@/v8/friend-add/text'
-import { actionSummaryText, blockedReason, canPublish, firstSendText, idempotencyKeyFor, PUBLISH_STEPS } from './flow'
+import { actionSummaryText, blockedReason, canPublish, firstSendText, idempotencyKeyFor, PUBLISH_STEPS, editStepHref } from './flow'
 import FriendAddDoneV8 from './done'
 import styles from './publish.module.css'
 
@@ -131,6 +130,8 @@ function FriendAddPublish() {
     requestRef.current = { accountId: selectedAccountId, generation }
     const isCurrent = () => alive && requestRef.current.accountId === selectedAccountId && requestRef.current.generation === generation
     setPhase('loading')
+    setBusy(false)
+    setTesting(false)
     setFailure(null)
     // アカウント固有の結果を先に捨てる。残すと、別のアカウントの数を見ながら公開することになる。
     setDetail(null)
@@ -255,9 +256,9 @@ function FriendAddPublish() {
   }
 
   /* 有効にしたあと（e0FD1J）。`?done=1` は作る⑤から有効にして来たとき（読み込んだ設定で出す）。 */
-  if (published) return <FriendAddDoneV8 {...published} />
-  if (searchParams.get('done') === '1') {
-    return <FriendAddDoneV8 ruleName={detail.rule.name} routeNames={detail.rule.routeNames} priority={detail.rule.priority} slackConnected={slackOf(detail)} />
+  if (published) return <FriendAddDoneV8 {...published} ruleId={ruleId} />
+  if (searchParams.get('done') === '1' && detail.rule.status === 'published') {
+    return <FriendAddDoneV8 ruleId={ruleId} ruleName={detail.rule.name} routeNames={detail.rule.routeNames} priority={detail.rule.priority} slackConnected={slackOf(detail)} />
   }
 
   const rule = detail.rule
@@ -350,13 +351,13 @@ function FriendAddPublish() {
     <CreatePage
       boardId="U8Xm3X"
       title="初回案内を作る"
-      identity={<Link href="/friend-add-settings" className={styles.backLink}>← 友だち追加時の配信へ</Link>}
       steps={(
-        <Stepper
+        <Steps
           label="初回案内の作る手順"
           steps={PUBLISH_STEPS.map((label, index) => ({
             label,
             state: index < PUBLISH_STEPS.length - 1 ? 'done' as const : 'current' as const,
+            onSelect: ruleId && index < PUBLISH_STEPS.length - 1 ? () => router.push(editStepHref(ruleId, index)) : undefined,
           }))}
         />
       )}

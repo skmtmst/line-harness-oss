@@ -1,17 +1,18 @@
 'use client'
 
 import { Calendar, Clock, X } from 'lucide-react'
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
+import { useId, useRef, useState, type KeyboardEvent } from 'react'
 import DateField, { formatLabel as formatDateLabel, parseDate } from './date-field'
 import MenuPortal from './menu-portal'
 import Select from './select'
 import TimeFieldV8, { type TimeFieldSize } from './time-field-v8'
 import { useAdminTheme } from '@/lib/use-admin-theme'
+import { joinDescribedBy, useFieldContext } from './field-context'
 import dateStyles from './date-field.module.css'
 import styles from './date-time-field.module.css'
 
 /**
- * 日時の選択・時刻の選択。Pencil ★V7「日付の選択」（V7 文書 `Fw065`）の仲間。
+ * 日時の選択・時刻の選択。Pencil ★V8（V8.pen）「日時の入力（15分きざみ）」。
  *
  * ブラウザ任せの `<input type="datetime-local">` / `<input type="time">` は、
  * 表示が英語の書式になり、画面ごとに見た目も違った。欄の見た目は DateField と
@@ -35,6 +36,7 @@ import styles from './date-time-field.module.css'
 export default function DateTimeField({
   value,
   defaultValue = '',
+  size = 'default',
   onChange,
   min,
   max,
@@ -53,6 +55,8 @@ export default function DateTimeField({
 }: {
   value?: string
   defaultValue?: string
+  /** 36pxの欄と並べる場合。既定は日付と同じ40px。 */
+  size?: 'default' | 'compact'
   onChange?: (value: string) => void
   min?: string
   max?: string
@@ -72,6 +76,9 @@ export default function DateTimeField({
   'aria-labelledby'?: string
   'aria-describedby'?: string
 }) {
+  const field = useFieldContext()
+  invalid = invalid || Boolean(field?.invalid)
+  ariaDescribedBy = joinDescribedBy(ariaDescribedBy, field?.describedBy)
   const theme = useAdminTheme()
   const autoId = useId()
   const fieldId = id ?? autoId
@@ -87,7 +94,7 @@ export default function DateTimeField({
 
   const parsed = parseDateTime(current)
   const datePart = parsed ? current.slice(0, 10) : ''
-  const shownTime = timeDraft ?? (parsed ? { hours: parsed.hours, minutes: parsed.minutes } : { hours: 10, minutes: 0 })
+  const shownTime = timeDraft ?? (parsed ? { hours: parsed.hours, minutes: parsed.minutes } : null)
 
   const emit = (next: string) => {
     if (value === undefined) setInner(next)
@@ -96,10 +103,6 @@ export default function DateTimeField({
 
   // 外側を押したときの扱いは MenuPortal に任せる（箱の中の日付押しで閉じない）。
 
-  useEffect(() => {
-    if (!open) return
-    popoverRef.current?.querySelector<HTMLElement>('button, select')?.focus()
-  }, [open ])
 
   const openDialog = () => {
     if (disabled) return
@@ -141,7 +144,8 @@ export default function DateTimeField({
         <input
           id={fieldId}
           readOnly
-          className={dateStyles.field}
+          className={[dateStyles.field, size === 'compact' ? styles.compactField : undefined].filter(Boolean).join(' ')}
+          data-size={size}
           data-readonly=""
           value={parsed ? formatDateTimeLabel(parsed) : ''}
           placeholder="—"
@@ -161,9 +165,11 @@ export default function DateTimeField({
         ref={triggerRef}
         id={fieldId}
         type="button"
-        className={dateStyles.field}
+        className={[dateStyles.field, size === 'compact' ? styles.compactField : undefined].filter(Boolean).join(' ')}
+        data-size={size}
         disabled={disabled}
         data-invalid={invalid || undefined}
+        aria-invalid={invalid || undefined}
         aria-required={required || undefined}
         // 狭い欄で切れても、重ねれば全文が読める（短い文字列は1行省略＋titleの決まり）。
         title={parsed ? formatDateTimeLabel(parsed) : undefined}
@@ -207,6 +213,7 @@ export default function DateTimeField({
           align="start"
           getAnchor={() => triggerRef.current}
           onClose={() => { setOpen(false); setTimeDraft(null) }}
+          onReady={() => popoverRef.current?.querySelector<HTMLElement>('button, select')?.focus({ preventScroll: true })}
         >
         <div
           ref={popoverRef}
@@ -237,8 +244,13 @@ export default function DateTimeField({
                 aria-labelledby={`${fieldId}-time-label`}
                 size="field"
                 minuteStep={minuteStep}
-                value={`${pad(shownTime.hours)}:${pad(shownTime.minutes)}`}
+                value={shownTime ? `${pad(shownTime.hours)}:${pad(shownTime.minutes)}` : ''}
                 onChange={(next) => {
+                  if (next === '') {
+                    setTimeDraft(null)
+                    emit('')
+                    return
+                  }
                   const time = parseTime(next)
                   if (time) chooseTime(time.hours, time.minutes)
                 }}
@@ -252,8 +264,8 @@ export default function DateTimeField({
               <Select
                 size="full"
                 aria-label="時"
-                value={pad(shownTime.hours)}
-                onChange={(value) => chooseTime(Number(value), shownTime.minutes)}
+                value={pad(shownTime?.hours ?? 10)}
+                onChange={(value) => chooseTime(Number(value), (shownTime?.minutes ?? 0))}
                 options={HOURS.map((hour) => ({ value: pad(hour), label: `${hour}時` }))}
               />
             </label>
@@ -262,8 +274,8 @@ export default function DateTimeField({
               <Select
                 size="full"
                 aria-label="分"
-                value={pad(shownTime.minutes)}
-                onChange={(value) => chooseTime(shownTime.hours, Number(value))}
+                value={pad(shownTime?.minutes ?? 0)}
+                onChange={(value) => chooseTime((shownTime?.hours ?? 10), Number(value))}
                 options={MINUTES.map((minute) => ({ value: pad(minute), label: `${minute}分` }))}
               />
             </label>

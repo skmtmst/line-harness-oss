@@ -18,8 +18,9 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/webhooks',
   useSearchParams: () => new URLSearchParams(search),
 }))
+let accountId = 'account-a'
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: { id: 'account-a', name: '本店' }, accounts: [{ id: 'account-a', name: '本店' }], loading: false }),
+  useAccount: () => ({ selectedAccountId: accountId, selectedAccount: { id: accountId, name: accountId === 'account-a' ? '本店' : '支店' }, accounts: [{ id: 'account-a', name: '本店' }, { id: 'account-b', name: '支店' }], loading: false }),
 }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => false }))
@@ -47,6 +48,7 @@ let host: HTMLDivElement
 let posted: Array<{ url: string; body: unknown }> = []
 
 beforeEach(() => {
+  accountId = 'account-a'
   role = 'owner'
   search = ''
   posted = []
@@ -103,6 +105,10 @@ describe('外部連携 V8', () => {
     const create = [...dialog!.querySelectorAll('button')].find((element) => element.textContent?.includes('作る') && !element.textContent.includes('受け取り口'))!
     await act(async () => { create.click() })
     expect(dialog?.textContent).toContain('名前を入力してください')
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    expect(document.activeElement?.id).toBe('wh-incoming-name')
+    expect(dialog?.querySelector('#wh-incoming-name')?.getAttribute('aria-invalid')).toBe('true')
+    expect(dialog?.querySelectorAll('[data-design-part=notice][role=alert]')).toHaveLength(0)
     expect(posted.filter((item) => item.url.includes('/api/webhooks/incoming'))).toHaveLength(0)
   })
 
@@ -148,6 +154,17 @@ describe('外部連携 V8', () => {
     expect(host.textContent).toContain('フォームが送られた')
   })
 
+  it('送り先を作る：未入力では送信せず、最初の誤りに移動し欄で知らせる', async () => {
+    await render(<WebhooksCreateV8 />)
+    await act(async () => { buttons().find((button) => button.textContent?.includes('つくって動かす'))!.click() })
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    expect(document.activeElement?.id).toBe('wh-new-name')
+    expect(host.querySelector('#wh-new-name')?.getAttribute('aria-invalid')).toBe('true')
+    expect(host.querySelector('#wh-new-url')?.getAttribute('aria-invalid')).toBe('true')
+    expect(host.querySelectorAll('[data-design-part=notice][role=alert]')).toHaveLength(0)
+    expect(posted).toHaveLength(0)
+  })
+
   it('同期の記録：同じ時刻の行を束ね、失敗で0件の行は書き出したものに数えない', () => {
     const run = (id: string, dataType: 'friends' | 'form_answers', status: 'ok' | 'partial' | 'error', rowsWritten: number, startedAt: string) => ({
       id, kind: 'scheduled' as const, dataType, status, rowsWritten, error: null, startedAt, finishedAt: startedAt,
@@ -168,5 +185,30 @@ describe('外部連携 V8', () => {
     expect(maskedUrl('https://crm.example.com/line/hook?token=x')).toBe('https://crm.example.com/••••')
     expect(eventLabel(['friend_add', 'tag_change'])).toBe('友だちになった・タグが付いた')
     expect(eventLabel(['friend_add', 'tag_change', 'booking_created'])).toBe('友だちになった・タグが付いた ほか1件')
+  })
+
+  // 監査 WEB-024：切り替えの返事が来る前にアカウントを移っても、仮の表示（止めた）を残さない。
+  it('切り替え中にアカウントを移り、失敗が返ったあと戻ると、サーバーの状態（動いている）を出す', async () => {
+    const base = globalThis.fetch
+    let rejectToggle: (reason: unknown) => void = () => {}
+    vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method && init.method !== 'GET' && String(input).includes('/api/webhooks/incoming/in-1')) {
+        return new Promise((_, reject) => { rejectToggle = reject })
+      }
+      return base(input, init)
+    })
+    await render(<WebhooksIncomingV8 />)
+    const toggle = () => host.querySelector('[role="switch"]') as HTMLElement | null
+    expect(toggle()?.getAttribute('aria-checked')).toBe('true')
+    await act(async () => { toggle()!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    expect(toggle()?.getAttribute('aria-checked')).toBe('false')
+
+    accountId = 'account-b'
+    await render(<WebhooksIncomingV8 />)
+    await act(async () => { rejectToggle(new TypeError('network')) })
+    accountId = 'account-a'
+    await render(<WebhooksIncomingV8 />)
+    await act(async () => {})
+    expect(toggle()?.getAttribute('aria-checked')).toBe('true')
   })
 })

@@ -25,6 +25,8 @@ export type KpiCardProps = {
    */
   value: number | null | undefined
   unit: string
+  /** 数字と単位を続けて出す板用。既定の間隔は変えない。 */
+  unitSpacing?: 'normal' | 'tight'
   /** 増減の数（差し引きなど）。true のとき、プラスの数に「+」を付ける（単位はそのまま出す）。 */
   signed?: boolean
   /**
@@ -73,14 +75,18 @@ export type KpiCardProps = {
   /** 対象画面にV6がある場合はv6、配信予定を強調するカードはbroadcastを使う。 */
   variant?: 'v5' | 'v6' | 'broadcast'
   /** V8 は画面の絵に合わせてカードか線で区切るマスを選ぶ。 */
-  presentation?: 'card' | 'band' | 'cell'
-  density?: 'compact' | 'comfortable'
+  presentation?: 'card' | 'band' | 'cell' | 'inline' | 'stacked'
+  density?: 'compact' | 'comfortable' | 'record' | 'mini'
+  /** 小さい数値の設定カード（22/26）。 */
+  metricSize?: 'small'
+  /** LINE通知の板の数カード。既定のカードの寸法は保つ。 */
+  appearance?: 'notification-customer' | 'notification-operator'
   className?: string
   hidden?: boolean
   id?: string
   'aria-label'?: string
   /** faint は「値を出せない」の見せ方。0 を薄くする用途には使わない。 */
-  valueTone?: 'default' | 'warning' | 'faint'
+  valueTone?: 'default' | 'warning' | 'faint' | 'danger'
 }
 
 /** 旧名。KpiCard に寄せたので、新しくは KpiCardProps を使う。 */
@@ -102,6 +108,7 @@ export default function KpiCard({
   menu,
   value,
   unit,
+  unitSpacing = 'normal',
   signed = false,
   detail,
   description,
@@ -119,7 +126,9 @@ export default function KpiCard({
   variant = 'v6',
   presentation = 'card',
   density = 'comfortable',
+  appearance,
   className,
+  metricSize,
   valueTone = 'default',
   valueText,
   ...cardProps
@@ -149,6 +158,8 @@ export default function KpiCard({
       className={classes}
       data-kpi-presentation={presentation}
       data-kpi-density={density}
+      data-kpi-metric-size={metricSize}
+      data-kpi-appearance={appearance}
       aria-busy={loading || undefined}
       data-design-version={variant}
       {...cardProps}
@@ -187,7 +198,7 @@ export default function KpiCard({
         ) : null}
       </div>
 
-      <div className={styles.valueRow}>
+      <div className={styles.valueRow} data-unit-spacing={unitSpacing}>
       {loading ? (
         <div className={styles.skeleton} aria-hidden="true" />
       ) : (
@@ -195,6 +206,7 @@ export default function KpiCard({
           className={[
             styles.value,
             valueTone === 'warning' ? styles.valueWarning : null,
+            valueTone === 'danger' ? styles.valueDanger : null,
             valueTone === 'faint' ? styles.valueFaint : null,
           ]
             .filter(Boolean)
@@ -208,7 +220,7 @@ export default function KpiCard({
       {delta ? <span className={`${styles.delta} v8-only`}>{delta}</span> : null}
       </div>
 
-      <p className={[styles.detail, detailVariantClass].filter(Boolean).join(' ')}>
+      {presentation !== 'stacked' || detail || onRetry || action ? <p className={[styles.detail, detailVariantClass].filter(Boolean).join(' ')}>
         <span className={styles.detailText} title={typeof detail === 'string' ? detail : undefined}>{detail}</span>
         {onRetry ? (
           <button type="button" className={styles.retry} onClick={onRetry}>
@@ -220,7 +232,7 @@ export default function KpiCard({
             <span>{action.label}</span><ArrowRight size={12} aria-hidden="true" />
           </Link>
         ) : null}
-      </p>
+      </p> : null}
     </div>
   )
 }

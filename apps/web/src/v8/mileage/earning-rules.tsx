@@ -13,7 +13,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowDown, ArrowUp, Bookmark, CircleDot, Clock3, Coins, Download, Gift, ListOrdered, Plus, TriangleAlert, Wallet } from 'lucide-react'
+import { ArrowDown, ArrowUp, Bookmark, CircleDot, Clock3, Coins, Download, Gift, ListOrdered, Plus, Wallet } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { adminSessionHeaders } from '@/lib/admin-session'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -535,15 +535,15 @@ export default function EarningRulesTab() {
       />
       <KpiCard
         presentation="band"
-        title="今月 付けたマイル"
+        title="直近30日 付けたマイル"
         icon={<Coins size={14} aria-hidden="true" />}
         value={ready ? grantedMiles ?? 0 : null}
         unit=""
-        detail={dash(`${formatMileageNumber(grantedCount ?? 0)}人に`)}
+        detail={dash(`${formatMileageNumber(grantedCount ?? 0)}件`)}
       />
       <KpiCard
         presentation="band"
-        title="今月 使われたマイル"
+        title="直近30日 使われたマイル"
         icon={<Gift size={14} aria-hidden="true" />}
         value={ready ? spentMiles ?? 0 : null}
         unit=""
@@ -569,10 +569,9 @@ export default function EarningRulesTab() {
   const folderPanel = (
     <FolderPanel
       heading="フォルダ"
-      rows={FOLDERS.map((item) => ({ id: item.key, label: item.label, count: folderCounts.get(item.key) ?? 0, color: item.color }))}
+      rows={FOLDERS.map((item) => ({ kind: item.label === 'すべて' ? 'all' as const : item.label === '未分類' ? 'unfiled' as const : 'folder' as const, id: item.key, label: item.label, count: folderCounts.get(item.key) ?? 0, color: item.color }))}
       activeId={folder}
       onSelect={(id) => resetPage(() => setFolder(id as FolderKey))}
-      addFolderNote="フォルダを消しても、中の経路は未分類に残ります"
     />
   )
 
@@ -865,12 +864,11 @@ export default function EarningRulesTab() {
   const body = loading ? (
     <ListState kind="loading" title="たまる決めごとを読み込んでいます" />
   ) : loadError ? (
-    <div className={styles.stateCard} role="alert">
-      <span className={`${styles.stateIcon} ${styles.stateIconError}`}><TriangleAlert size={16} aria-hidden="true" /></span>
-      <p className={styles.stateTitle}>たまる決めごとを読み込めませんでした</p>
-      <p className={styles.stateDesc}>数の帯は「—」にしています。道具はそのまま使えます。</p>
-      <Button type="button" onClick={() => void load()}>もう一度試す</Button>
-    </div>
+    <ListState kind="error"
+      title="たまる決めごとを読み込めませんでした"
+      description="数の帯は「—」にしています。道具はそのまま使えます。"
+      action={<Button type="button" onClick={() => void load()}>もう一度試す</Button>}
+    />
   ) : visible.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */
     <EmptyList
@@ -886,7 +884,6 @@ export default function EarningRulesTab() {
   ) : (
     <>
       {table}
-      <p className={styles.footNote}>行の「…」から 編集・止める・複製・この決めごとの履歴を見る。</p>
     </>
   )
 
@@ -901,6 +898,7 @@ export default function EarningRulesTab() {
 
   return (
     <MileageFrame
+      help="行の「…」から 編集・止める・複製・この決めごとの履歴を見る。"
       actions={
         <Button onClick={() => void exportCsv()} disabled={exporting || rules.length === 0}>
           <Download size={15} aria-hidden="true" /> CSV で書き出す

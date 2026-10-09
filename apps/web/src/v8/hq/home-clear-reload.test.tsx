@@ -4,7 +4,7 @@
  * - 214：「条件を外す」はフォルダの選択も外す（フォルダだけ残って空のまま、にしない）
  */
 import React from 'react'
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -21,6 +21,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       lineAccounts: { ...actual.api.lineAccounts, list: vi.fn(async () => ({ success: true, data: [account] })) },
       lineAccountFolders: {
         ...actual.api.lineAccountFolders,
+        update: vi.fn(async () => ({ success: true, data: { id: 'f1' } })),
         create: vi.fn(async () => ({ success: true, data: { id: 'f2' } })),
         list: vi.fn(async () => ({ success: true, data: { folders: [{ id: 'f1', kind: 'line_account', name: '関西', parentId: null, color: null, displayOrder: 1, accountCount: 0, createdAt: '', updatedAt: '' }], total: 1, unclassifiedCount: 1 } })),
       },
@@ -41,6 +42,7 @@ const fx = vi.hoisted(() => ({ refreshAccounts: vi.fn(async () => {}) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ setSelectedAccountId: () => {}, refreshAccounts: fx.refreshAccounts }) }))
 
 import HqHomeV8 from './home'
+import { api } from '@/lib/api'
 afterEach(cleanup)
 
 test('214：「条件を外す」でフォルダの選択も外れ、全部のアカウントに戻る', async () => {
@@ -69,4 +71,42 @@ test('215：保存のあとの読み直しが失敗したら知らせ、読み�
   const save = [...document.querySelectorAll('[role="dialog"] button, [role="alertdialog"] button')].find((b) => /追加|保存/.test(b.textContent ?? '') && !(b.textContent ?? '').includes('フォルダを追加')) as HTMLButtonElement
   await act(async () => { save.click() })
   await waitFor(() => expect(screen.getByText('保存はできましたが、一覧を読み直せませんでした。')).toBeTruthy())
+})
+
+
+test('アカウントのフォルダは名前の横から色を選び、新しいフォルダは緑から始まり、選んだ色はそのまま送る', async () => {
+  render(<HqHomeV8 />)
+  await screen.findAllByText('銀座店')
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダを追加' }))
+  const input = screen.getByRole('textbox', { name: 'フォルダの名前' })
+  const colorButton = screen.getByRole('button', { name: 'フォルダの色：緑' })
+  expect(input.closest('[data-folder-name-color]')!.contains(colorButton)).toBe(true)
+  fireEvent.change(input, { target: { value: '九州' } })
+  fireEvent.click(colorButton)
+  fireEvent.click(screen.getByRole('radio', { name: '赤' }))
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '追加する' })) })
+  expect(api.lineAccountFolders.create).toHaveBeenCalledWith({ name: '九州', color: '#ef4444' })
+  await waitFor(() => expect(document.querySelector('#hq-account-folder-name')).toBeNull())
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダを追加' }))
+  fireEvent.change(screen.getByRole('textbox', { name: 'フォルダの名前' }), { target: { value: '沖縄' } })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '追加する' })) })
+  expect(api.lineAccountFolders.create).toHaveBeenCalledWith({ name: '沖縄', color: '#16a34a' })
+})
+
+
+test('フォルダの「色を変える」から既存色を変えて保存し、一覧を読み直す', async () => {
+  render(<HqHomeV8 />)
+  await screen.findAllByText('銀座店')
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダ「関西」の操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '色を変える' }))
+  expect(screen.getByRole('textbox', { name: 'フォルダの名前' }).getAttribute('value')).toBe('関西')
+  /* 色の無いフォルダは自動の色から始まる（色なしは選べない・2026-10-09 オーナー） */
+  fireEvent.click(screen.getByRole('button', { name: /^フォルダの色：/ }))
+  expect(screen.queryByRole('radio', { name: '色なし' })).toBeNull()
+  fireEvent.click(screen.getByRole('radio', { name: '赤' }))
+  vi.mocked(api.lineAccountFolders.list).mockResolvedValue({ success: true, data: { folders: [{ id: 'f1', kind: 'line_account', name: '関西', parentId: null, color: '#ef4444', displayOrder: 1, createdAt: '', updatedAt: '' }], total: 1, unclassifiedCount: 1 } })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存する' })) })
+  expect(api.lineAccountFolders.update).toHaveBeenCalledWith('f1', { name: '関西', color: '#ef4444' })
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  expect(document.querySelector('[data-folder-dot="filed"]')?.getAttribute('style')).toContain('#ef4444')
 })

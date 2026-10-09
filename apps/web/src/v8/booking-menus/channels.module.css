@@ -20,9 +20,10 @@
   gap: var(--tpl-bm-12);
   padding: var(--tpl-bm-16);
   border-radius: var(--tpl-bm-12);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: calc(var(--tpl-bm-1) * -0.5);
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 
 .cardTitle {
@@ -55,8 +56,9 @@
   flex-direction: column;
   overflow: hidden;
   border-radius: var(--tpl-bm-12);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: calc(var(--tpl-bm-1) * -0.5);
+  box-shadow: var(--card-shadow);
 }
 
 .row {
@@ -165,4 +167,26 @@
   min-width: 0;
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+.conflictBooking {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-20);
+  overflow-wrap: anywhere;
+}
+
+.conflictReason {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-18);
+}
+
+.conflictLabel {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-13);
+  font-weight: 600;
 }

@@ -12,7 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
-import { FolderDotName } from '@/components/shared/folder-dot'
+import { FolderDot, FolderDotName } from '@/components/shared/folder-dot'
 import { brandInitial } from '@/components/layout/brand-initial'
 import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -25,13 +25,13 @@ import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
-import { TextField } from '@/components/shared/text-field'
+import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
 import { classifyApiFailure, loadFailureNotice } from '@/components/shared/api-error-message'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import AccountEditModal from '@/components/accounts/account-edit-modal'
 import PlatformNotices from '@/components/hq/platform-notices'
 import { api, fetchApi } from '@/lib/api'
-import type { Folder } from '@line-crm/shared'
+import { FOLDER_SELECT_COLORS, type Folder } from '@line-crm/shared'
 import { resolveStoreReturnPath } from '@/lib/hq-navigation'
 import { formatNumber } from '@/lib/format'
 import { useStaffRole } from '@/lib/staff-role'
@@ -40,6 +40,8 @@ import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import { AccountArchiveDialogV8, AccountRestoreDialogV8, AccountSettingsDialogV8, accountHandle } from './account-dialogs'
 import { connectionReasonLine } from './connection-reasons'
 import styles from './home.module.css'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
+import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/folder-colors'
 
 type StatusFilter = 'all' | 'ok' | 'warn' | 'archived'
 type View = 'cards' | 'table'
@@ -62,16 +64,6 @@ const SORT_OPTIONS = [
 ]
 
 const PAGE_SIZES = [10, 20, 50]
-
-/** フォルダの色（追加・色を変える窓で選ぶ）。値はテーマの色の名前。 */
-const FOLDER_COLORS = [
-  { value: '', label: 'なし' },
-  { value: '--color-status-info', label: '青' },
-  { value: '--color-accent-deep', label: '緑' },
-  { value: '--color-status-warn-deep', label: '橙' },
-  { value: '--color-status-danger', label: '赤' },
-  { value: '--color-chip-alt', label: '紫' },
-]
 
 function isArchived(account: AccountWithStats) {
   return Boolean(account.archivedAt)
@@ -131,7 +123,7 @@ export default function HqHomeV8() {
   /* フォルダの追加・名前と色を変える窓（同じ窓。editing があれば変える）。 */
   const [folderDialog, setFolderDialog] = useState<{ editing: Folder | null } | null>(null)
   const [folderName, setFolderName] = useState('')
-  const [folderColor, setFolderColor] = useState('')
+  const [folderColor, setFolderColor] = useState<string | null>(null)
   const [deleteFolder, setDeleteFolder] = useState<Folder | null>(null)
   const [folderError, setFolderError] = useState('')
   const [folderSaving, setFolderSaving] = useState(false)
@@ -278,11 +270,9 @@ export default function HqHomeV8() {
     return found ? (found.displayName || found.name) : null
   }
 
-  const colorValue = (token: string) => (token ? getComputedStyle(document.documentElement).getPropertyValue(token).trim() || null : null)
-
   const openFolderDialog = (editing: Folder | null) => {
     setFolderName(editing?.name ?? '')
-    setFolderColor(editing ? (FOLDER_COLORS.find((item) => item.value && colorValue(item.value)?.toLowerCase() === editing.color?.toLowerCase())?.value ?? '') : '')
+    setFolderColor(editing ? folderDisplayColor(editing) : DEFAULT_TAG_FOLDER_COLOR)
     setFolderError('')
     setFolderDialog({ editing })
   }
@@ -294,7 +284,7 @@ export default function HqHomeV8() {
     setFolderSaving(true)
     setFolderError('')
     try {
-      const color = colorValue(folderColor)
+      const color = folderColor
       const res = folderDialog.editing
         ? await api.lineAccountFolders.update(folderDialog.editing.id, { name, color })
         : await api.lineAccountFolders.create({ name, color })
@@ -346,18 +336,20 @@ export default function HqHomeV8() {
   }
 
   const folderRows: FolderPanelRow[] = [
-    { id: ALL, label: 'すべて', count: accounts.length, icon: <Inbox size={15} aria-hidden="true" /> },
+    { kind: 'all' as const, id: ALL, label: 'すべて', count: accounts.length, icon: <Inbox size={15} aria-hidden="true" /> },
     ...folders.map((f, index) => ({
+      kind: 'folder' as const,
       id: f.id,
       label: f.name,
       count: typeof f.itemCount === 'number' ? f.itemCount : (folderCounts.get(f.id) ?? 0),
       color: f.color,
+      icon: <FolderDot folder={{ name: f.name, color: f.color }} />,
       onEdit: canManage ? () => openFolderDialog(f) : undefined,
       onMoveUp: canManage && index > 0 ? () => void moveFolder(index, -1) : undefined,
       onMoveDown: canManage && index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
       onDelete: canManage ? () => { setFolderError(''); setDeleteFolder(f) } : undefined,
     })),
-    { id: UNFILED, label: '未分類', count: unfiledCount ?? localUnfiled },
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount ?? localUnfiled },
   ]
 
   const createAccount = canManage ? (
@@ -537,19 +529,15 @@ export default function HqHomeV8() {
                     <dd>{`${formatNumber(account.stats?.messagesThisMonth ?? 0)} 通`}</dd>
                   </div>
                 </dl>
+                <div className={styles.reasonSlot}>
+                  {warned ? (() => {
+                    const reason = connectionReasonLine(account)
+                    return <Notice tone="warn" compact title={reason.title} message={reason.text}
+                      action={canManage ? <button type="button" onClick={() => void refreshConnectionInfo()} disabled={checkingConnections} className={styles.linkButton}>更新する</button> : undefined}
+                    />
+                  })() : null}
+                </div>
                 {cardActions(account)}
-                {warned ? (() => {
-                  /* 要確認の理由を、引っかかった確認ごとの言葉で1行に。長ければ省略し title で全文。 */
-                  const reason = connectionReasonLine(account)
-                  return (
-                    <p className={styles.warnLine}>
-                      <span className={styles.warnText} title={reason.title}>{reason.text}</span>
-                      {canManage ? (
-                        <button type="button" onClick={() => void refreshConnectionInfo()} disabled={checkingConnections} className={styles.linkButton}>更新する</button>
-                      ) : null}
-                    </p>
-                  )
-                })() : null}
               </article>
             )
           })}
@@ -589,7 +577,7 @@ export default function HqHomeV8() {
         <span className={styles.range}>
           {filtered.length === 0 ? '0件' : `${formatNumber(filtered.length)}件中 ${formatNumber((current - 1) * size + 1)}〜${formatNumber((current - 1) * size + shown.length)}件`}
         </span>
-        <p className={styles.footNote}>カードの「設定」から、フォルダの移動・名前・親アカウントを変えられます。アーカイブしたアカウントは「詳細」と「戻す」だけです（戻すのはオーナー・本人確認のあと「停止中」に戻ります）。</p>
+
         {pageCount > 1 ? <Pagination page={current} pageCount={pageCount} onPageChange={setPage} ariaLabel="アカウントのページ送り" /> : null}
       </div>
     </>
@@ -599,9 +587,11 @@ export default function HqHomeV8() {
     <ListPage
       boardId="JKjsE"
       title="統括のアカウント"
+      help="カードの「設定」から、フォルダの移動・名前・親アカウントを変えられます。アーカイブしたアカウントは「詳細」と「戻す」だけです（戻すのはオーナー・本人確認のあと「停止中」に戻ります）。"
       description={`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`}
       folders={folderColumn}
       folderInset
+      folderWidth={200}
       folderNav={{ rows: folderRows, activeId: folder, onSelect: selectFolder, createAction: createAccount, label: 'フォルダ' }}
     >
       <div className={styles.body}>
@@ -649,25 +639,18 @@ export default function HqHomeV8() {
         />
       ) : null}
 
-      <Dialog
+      <FolderEditorDialog
         open={folderDialog !== null}
         title={folderDialog?.editing ? 'フォルダの名前と色を変える' : 'フォルダを追加'}
         description="アカウントは1つのフォルダに入ります。フォルダを消しても、アカウントは消えません。"
+        name={folderName} onNameChange={setFolderName} nameId="hq-account-folder-name" nameLabel="フォルダの名前"
+        color={folderColor} onColorChange={setFolderColor} colors={FOLDER_SELECT_COLORS}
+        placeholder="例: 渋谷エリア" maxLength={100}
         onCancel={() => { if (!folderSaving) setFolderDialog(null) }}
-        designNode="JKjsE"
-        busy={folderSaving}
-        error={folderError || undefined}
-        confirmLabel={folderDialog?.editing ? '保存する' : '追加する'}
-        cancelLabel="やめる"
+        designNode="JKjsE" busy={folderSaving} error={folderError || undefined}
+        confirmLabel={folderDialog?.editing ? '保存する' : '追加する'} cancelLabel="やめる"
         onConfirm={() => void saveFolder()}
-      >
-        <div className={styles.dialogFields}>
-          <label htmlFor="hq-account-folder-name" className={styles.dialogLabel}>フォルダの名前</label>
-          <TextField id="hq-account-folder-name" value={folderName} maxLength={100} disabled={folderSaving} placeholder="例: 渋谷エリア" onChange={(event) => setFolderName(event.target.value)} className={styles.full} />
-          <label htmlFor="hq-account-folder-color" className={styles.dialogLabel}>色</label>
-          <Select id="hq-account-folder-color" aria-label="フォルダの色" value={folderColor} onChange={setFolderColor} disabled={folderSaving} options={FOLDER_COLORS} />
-        </div>
-      </Dialog>
+      />
 
       {deleteFolder ? (
         <ConfirmDialog

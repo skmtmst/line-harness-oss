@@ -77,3 +77,11 @@ it('ユーザーの保存中は窓の×・キャンセル・Escで閉じられ�
   expect(screen.getByRole('dialog')).toBeTruthy()
   await act(async () => resolve({ success: true }))
 })
+
+it('WEB169：店舗編集のタイムゾーンは日本時間の表示だけ', async () => {
+  render(<OrganizationV8 />)
+  await screen.findAllByText('試験店')
+  fireEvent.click(screen.getByRole('button', { name: '編集' }))
+  expect(screen.queryByRole('textbox', { name: 'タイムゾーン' })).toBeNull()
+  expect(screen.getByRole('dialog').textContent).toContain('日本時間（Asia/Tokyo）')
+})

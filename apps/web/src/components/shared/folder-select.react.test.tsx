@@ -81,12 +81,14 @@ describe('開いた中身（dLffh）', () => {
 })
 
 describe('名前を入れる（iBuZH）', () => {
-  it('押すと同じ板が「新しいフォルダ」に替わり、名前の欄に焦点・色の見本6つ', async () => {
+  it('押すと同じ板が「新しいフォルダ」に替わり、名前の欄に焦点・横の色ボタンを押すと9色', async () => {
     await openMenu({ onCreate: vi.fn() })
     const input = await startCreate()
     expect(document.activeElement).toBe(input)
     expect(screen.queryByRole('listbox')).toBeNull()
-    expect(screen.getAllByRole('radio')).toHaveLength(6)
+    expect(screen.queryAllByRole('radio')).toHaveLength(0)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダの色：青' })) })
+    expect(screen.getAllByRole('radio')).toHaveLength(9)
     expect(screen.getByRole('button', { name: '作って選ぶ' })).toBeTruthy()
   })
 
@@ -96,7 +98,10 @@ describe('名前を入れる（iBuZH）', () => {
     const button = await openMenu({ onCreate, onChange })
     const input = await startCreate()
     await act(async () => { fireEvent.change(input, { target: { value: ' 新規 ' } }) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダの色：青' })) })
     await act(async () => { fireEvent.click(screen.getByRole('radio', { name: '赤' })) })
+    expect(screen.queryAllByRole('radio')).toHaveLength(0)
+    expect(screen.getByRole('button', { name: 'フォルダの色：赤' }).getAttribute('aria-expanded')).toBe('false')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '作って選ぶ' })) })
     expect(onCreate).toHaveBeenCalledWith('新規', '#ef4444')
     expect(onChange).toHaveBeenCalledWith('f-new')
@@ -149,6 +154,20 @@ describe('名前を入れる（iBuZH）', () => {
     expect(screen.getByRole('textbox', { name: '新しいフォルダの名前' })).toBeTruthy()
   })
 
+  it('色の小窓は矢印キーで選べ、Esc は小窓だけを閉じて色ボタンへ戻る', async () => {
+    await openMenu({ onCreate: vi.fn() })
+    const input = await startCreate()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダの色：青' })) })
+    expect(document.activeElement).toBe(screen.getByRole('radio', { name: '青' }))
+    await act(async () => { fireEvent.keyDown(document.activeElement!, { key: 'ArrowRight' }) })
+    expect(screen.getByRole('radio', { name: '緑' }).getAttribute('aria-checked')).toBe('true')
+    expect(document.activeElement).toBe(screen.getByRole('radio', { name: '緑' }))
+    await act(async () => { fireEvent.keyDown(document.activeElement!, { key: 'Escape' }) })
+    expect(screen.queryByRole('radiogroup')).toBeNull()
+    expect(screen.getByRole('textbox', { name: '新しいフォルダの名前' })).toBe(input)
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'フォルダの色：緑' }))
+  })
+
   it('名前が空なら作れない', async () => {
     const onCreate = vi.fn<FolderSelectCreate>()
     await openMenu({ onCreate })
@@ -187,6 +206,50 @@ describe('名前を入れる（iBuZH）', () => {
     await startCreate()
     await act(async () => { fireEvent.keyDown(document, { key: 'Escape', keyCode: 229 }) })
     expect(screen.getByRole('textbox', { name: '新しいフォルダの名前' })).toBeTruthy()
+  })
+
+  it('作っている途中で外を押して閉じ、開き直して別のフォルダを選んだら、遅れて届いた完了で上書きしない', async () => {
+    let resolve: (folder: FolderSelectFolder) => void = () => {}
+    const onCreate = vi.fn<FolderSelectCreate>().mockImplementation(() => new Promise((done) => { resolve = done }))
+    const onChange = vi.fn()
+    const button = await openMenu({ onCreate, onChange })
+    const input = await startCreate()
+    await act(async () => { fireEvent.change(input, { target: { value: '新規' } }) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '作って選ぶ' })) })
+    await act(async () => { fireEvent.pointerDown(document.body) })
+    expect(screen.queryByRole('listbox')).toBeNull()
+    await act(async () => { fireEvent.click(button) })
+    await act(async () => { fireEvent.click(screen.getByRole('option', { name: '予約' }).querySelector('button')!) })
+    expect(onChange).toHaveBeenLastCalledWith('f-2')
+    const other = document.createElement('input')
+    document.body.appendChild(other)
+    other.focus()
+    try {
+      await act(async () => { resolve({ value: 'f-new', label: '新規' }) })
+      expect(onChange).toHaveBeenCalledTimes(1)
+      expect(button.textContent).toContain('予約')
+      expect(document.activeElement).toBe(other)
+      // 作ったフォルダそのものは一覧に残る（選ばないだけ）。
+      await act(async () => { fireEvent.click(button) })
+      expect(screen.getAllByRole('option').map((option) => option.textContent)).toContain('新規')
+    } finally {
+      other.remove()
+    }
+  })
+
+  it('一覧へ戻って作り直した後、前の回の失敗は新しい板に理由を出さない', async () => {
+    let reject: (error: Error) => void = () => {}
+    const onCreate = vi.fn<FolderSelectCreate>().mockImplementationOnce(() => new Promise((_, fail) => { reject = fail }))
+    await openMenu({ onCreate })
+    const input = await startCreate()
+    await act(async () => { fireEvent.change(input, { target: { value: '古い' } }) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '作って選ぶ' })) })
+    await act(async () => { fireEvent.pointerDown(document.body) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '所属フォルダ' })) })
+    const fresh = await startCreate()
+    await act(async () => { reject(new Error('作れませんでした')) })
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(fresh.value).toBe('')
   })
 
   it('色を受け取らない受け口（colors={false}）は見本を出さず null を渡す', async () => {

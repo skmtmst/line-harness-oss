@@ -42,6 +42,11 @@ interface ConfirmDialogProps {
   /** ★V8：絵の窓の頭の高さ px（Dialog の designHeaderHeight と同じ）。渡さなければ今までどおり。 */
   designHeaderHeight?: number
   /** ★V8：絵の窓の幅 px（Dialog の designWidth と同じ）。 */
+  designLayout?: 'stacked'
+  footerAlign?: 'center' | 'start'
+  /** 絵で操作の間隔が指定されている窓だけに使う。 */
+  designFooterGap?: number
+  confirmFirst?: boolean
   designWidth?: number
   /** ★V8：絵の窓の上からの位置 px（Dialog の designTop と同じ）。 */
   designTop?: number
@@ -80,6 +85,10 @@ export default function ConfirmDialog({
   designHeaderPadding,
   designHeaderHeight,
   designWidth,
+  designLayout,
+  footerAlign,
+  designFooterGap,
+  confirmFirst,
   designTop,
   primaryAction = 'confirm',
   onConfirm,
@@ -117,6 +126,10 @@ export default function ConfirmDialog({
       designHeaderPadding={designHeaderPadding}
       designHeaderHeight={designHeaderHeight}
       designWidth={designWidth}
+      designLayout={designLayout}
+      footerAlign={footerAlign}
+      designFooterGap={designFooterGap}
+      confirmFirst={confirmFirst}
       designTop={designTop}
       confirmation
       compact={!children}

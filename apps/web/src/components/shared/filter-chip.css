@@ -124,3 +124,5 @@
 [data-theme='v8'] .v6-filter-chip:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
 
 [data-theme='v8'] .v6-filter-chip { border-radius: 999px; }
+
+[data-theme='v8'] .v6-filter-chip[data-size='compact'] { height: var(--tpl-msg-composer-sticker-chip-h); padding: var(--tpl-msg-composer-sticker-chip-pad); }

@@ -21,6 +21,7 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
+import LayoutPicker from '@/components/shared/layout-picker'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import LinePreview from '@/components/shared/line-preview'
@@ -31,7 +32,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import InlineActionRowsV8, { actionRowTitle } from '@/components/auto-replies/inline-action-rows-v8'
 import { useActionOptions } from '@/components/auto-replies/inline-action-list'
-import { newActionKey, toActionPayload, type InlineAction } from '@/components/auto-replies/draft-fields'
+import { newActionKey, readInlineActions, toActionPayload, type InlineAction } from '@/components/auto-replies/draft-fields'
 import { TemplateEditFrame } from './frame'
 import MediaPickerDialog from './media-picker'
 import type { TemplateEditHost } from './host'
@@ -145,6 +146,7 @@ function richInitial(host: TemplateEditHost | undefined) {
   shape.areas.forEach((area, index) => {
     const tap = taps.find((item) => item.label === area.label) ?? taps[index]
     if (tap?.actionType === 'uri' && typeof tap.uri === 'string') areas[area.label] = { kind: 'uri', uri: tap.uri, actions: [] }
+    else if (tap?.actionType === 'postback') areas[area.label] = { kind: 'actions', uri: '', actions: readInlineActions(Array.isArray(tap.actions) ? tap.actions : null) }
   })
   const imageUrl = typeof payload.imageUrl === 'string' ? payload.imageUrl : typeof payload.baseUrl === 'string' ? `${payload.baseUrl}/1040` : ''
   return { name: content.name, shape: shape.value, areas, imageUrl, uploaded: { media: content.media, payload } as TemplateImagemapUpload }
@@ -157,14 +159,15 @@ function richInitial(host: TemplateEditHost | undefined) {
 export default function TemplateRichEditor({ visual = false, host }: { visual?: boolean; host?: TemplateEditHost }) {
   const router = useRouter()
   const role = useStaffRole()
+  const hqHost = Boolean(host && !host.composer?.accountId)
   const canMutate = host ? !host.readOnly : role === null || canManageRole(role)
   const { selectedAccountId, accounts } = useAccount()
-  usePageTitle(host ? 'テンプレート' : 'リッチメッセージを作る')
+  usePageTitle(host?.composer ? null : host ? 'テンプレート' : 'リッチメッセージを作る', !host?.composer)
   const actionOptions = useActionOptions()
 
   /* 統括の編集（host.initialContent）：保存してある画像（5サイズ）・形・面の URL から始める。 */
   const [hostInitial] = useState(() => richInitial(host))
-  const [name, setName] = useState(hostInitial ? hostInitial.name : visual ? '夏のキャンペーン告知' : '')
+  const [name, setName] = useState(hostInitial ? hostInitial.name : host?.composer ? 'リッチメッセージ' : visual ? '夏のキャンペーン告知' : '')
   const [folder, setFolder] = useState('')
   const [folders, setFolders] = useState<Folder[]>([])
   const [imageUrl, setImageUrl] = useState(hostInitial?.imageUrl ?? '')
@@ -216,7 +219,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   const snapshot = useMemo(() => JSON.stringify({ name, folder, imageUrl, pickedMedia, shapeValue, areas }), [name, folder, imageUrl, pickedMedia, shapeValue, areas])
   const [clean, setClean] = useState(() => snapshot)
   const dirty = snapshot !== clean && !saved
-  const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({ dirty, busy: saving || publishing })
+  const { leaveTarget, confirmLeave, cancelLeave, disarm, guarded } = useUnsavedGuard({ dirty, busy: saving || publishing })
 
   const updateArea = (label: string, patch: Partial<AreaDraft>) =>
     setAreas((prev) => ({ ...prev, [label]: { ...(prev[label] ?? emptyAreaDraft()), ...patch } }))
@@ -269,16 +272,17 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
     }
   }
   /* 統括：中身を組み立てて呼ぶ側へ渡す（保存・配るは呼ぶ側）。 */
-  const hostSave = (distribute: boolean) => {
-    if (!host) return
+  const hostSave = async (distribute: boolean) => {
+    if (!host || busy) return
     if (!name.trim()) { setError('リッチメッセージ名を入力してください。'); return }
-    if (!uploaded) { setError('画像を選んでください。'); return }
-    const built = buildRichPayload({ imageUrl, pickedMedia: null, shape: shapeDef, areas })
+    if (hqHost && !uploaded) { setError('画像を選んでください。'); return }
+    const built = buildRichPayload({ imageUrl, pickedMedia: hqHost ? null : pickedMedia, shape: shapeDef, areas })
     if ('error' in built) { setError(built.error); return }
     const { imageMediaId: _id, imageMediaKind: _kind, ...rest } = built.payload
     void _id; void _kind
     setError('')
-    host.onSave({ kind: 'rich_message', name: name.trim(), payload: { ...uploaded.payload, ...rest }, media: uploaded.media }, distribute)
+    setSaving(true)
+    try { const inserted = await host.onSave({ kind: 'rich_message', name: name.trim(), payload: hqHost ? { ...uploaded!.payload, ...rest } : built.payload, media: uploaded?.media ?? [] }, distribute); if (inserted !== false) disarm() } finally { setSaving(false) }
   }
   const uploadImage = async (file: File) => {
     if (!host?.uploadRichImage) return
@@ -295,7 +299,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
       setUploading(false)
     }
   }
-  const openImage = () => (host ? fileInput.current?.click() : setPickerOpen(true))
+  const openImage = () => (hqHost ? fileInput.current?.click() : setPickerOpen(true))
   const onSaveDraft = async () => {
     if (host) { hostSave(false); return }
     if (await save()) notifyToast('下書きを保存しました')
@@ -334,7 +338,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
 
   /* 届き方：トークに流れる正方形の画像。面の線は見本だけ（友だちには見えない）。 */
   const phone = (
-    <LinePreview note="リッチメッセージの見え方" caption="配信日 10:00" accountName={sendName}>
+    <LinePreview title={null} note="リッチメッセージの見え方" caption="配信日 10:00" accountName={sendName}>
       <div className={styles.assetRow}>
         <span className={styles.assetAvatar} aria-hidden="true">{sendName.slice(0, 1)}</span>
         <div className={rich.phoneImage}>
@@ -375,6 +379,8 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   return (
     <>
       <TemplateEditFrame
+        composerHost={host ? { ...host, busy, onCancel: () => guarded(host.onCancel) } : undefined}
+        onComposerInsert={(alsoSave) => void hostSave(alsoSave)}
         boardId={host ? 'g8d6ai' : 'EFV8l'}
         title="リッチメッセージを作る"
         description="1枚の画像を面に分けて、押した面ごとに動く"
@@ -383,7 +389,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
             <div className={styles.previewToggle}>
               <Button type="button" onClick={() => setPreviewOpen(true)}>LINEでの見え方を見る</Button>
             </div>
-            {sideCard}
+            {host?.composer ? null : sideCard}
             <h2 className={styles.previewHead}>届き方</h2>
             <div className={styles.phone}>{phone}</div>
           </>
@@ -395,8 +401,8 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
               下書きを保存
             </Button>
             <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined} busy={publishing || Boolean(host?.busy)} busyLabel="保存中…">
-              <Send size={15} aria-hidden="true" />
-              {host ? host.primaryLabel ?? '保存して配る' : '保存して公開'}
+              {host ? null : <Send size={15} aria-hidden="true" />}
+              {host ? host.primaryLabel ?? '保存する' : '保存して公開'}
             </Button>
           </>
         )}
@@ -405,7 +411,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
         {error ? <p role="alert" className={styles.error}>{error}</p> : null}
         {saved ? <p role="status" className={styles.readonly}>保存しました。一覧へ戻ると、リッチメッセージの一覧に出ています。</p> : null}
 
-        <Card padding="none" layout="vertical" className={styles.card}>
+        {host?.composer ? null : <Card padding="none" layout="vertical" className={styles.card}>
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle}>名前とフォルダ</h2>
           </div>
@@ -422,7 +428,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                 value={host ? host.folder : folder}
                 onChange={host ? host.onFolderChange : setFolder}
                 folders={host ? host.folders : folders.map(folderByName)}
-                colors={!host}
+                colors
                 onCreate={host
                   ? hostFolderCreate(host)
                   : canMutate && selectedAccountId
@@ -431,33 +437,17 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
               />
             </div>
           </div>
-        </Card>
+        </Card>}
 
         <Card padding="none" layout="vertical" className={styles.card}>
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle}>面の分け方</h2>
             <p className={styles.cardNote}>選んだ形に合わせて、下の設定が増えます</p>
           </div>
-          <div className={rich.shapeRow} role="group" aria-label="面の分け方">
-            {RICH_SHAPES.map((candidate) => (
-              <button
-                key={candidate.value}
-                type="button"
-                className={rich.shape}
-                aria-pressed={shapeValue === candidate.value}
-                onClick={() => requestShape(candidate.value)}
-              >
-                <span className={rich.shapeGlyph} aria-hidden="true">
-                  {candidate.rows.map((row, rowIndex) => (
-                    <span key={rowIndex} className={rich.shapeGlyphRow}>
-                      {row.map((label) => <span key={label} className={rich.shapeGlyphArea} />)}
-                    </span>
-                  ))}
-                </span>
-                <span className={rich.shapeLabel}>{candidate.label}</span>
-              </button>
-            ))}
-          </div>
+          <LayoutPicker
+            value={shapeValue} onChange={requestShape} preview="message"
+            options={RICH_SHAPES.map((candidate) => ({ value: candidate.value, label: candidate.label, areas: candidate.areas }))}
+          />
         </Card>
 
         <Card padding="none" layout="vertical" className={styles.card}>
@@ -477,11 +467,11 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
             <div className={rich.imageSide}>
               <Button type="button" onClick={openImage} disabled={uploading} busy={uploading} busyLabel="画像を送っています…">
                 <ImagePlus size={15} aria-hidden="true" />
-                {host ? '画像を選ぶ' : '登録メディアから選ぶ'}
+                {hqHost ? '画像を選ぶ' : '登録メディアから選ぶ'}
               </Button>
               <p className={styles.cardNote}>面の線は画像の上に重ねて表示されます。友だちには線は見えません。</p>
               {pickedMedia ? <p className={styles.hint}>選択中：{pickedMedia.filename}</p> : null}
-              {host ? (
+              {hqHost ? (
                 /* 統括：PNG・JPEG（8MB まで）を送ると、配った先で使う5サイズを作る。URL の直書きは置かない（サイズを作れない）。 */
                 <input
                   ref={fileInput}
@@ -526,7 +516,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                     aria-label={`面 ${area.label} を押したら`}
                     value={draft.kind}
                     onChange={(value) => updateArea(area.label, { kind: value as AreaActionKind })}
-                    options={host ? HOST_AREA_KIND_OPTIONS : AREA_KIND_OPTIONS}
+                    options={hqHost ? HOST_AREA_KIND_OPTIONS : AREA_KIND_OPTIONS}
                   />
                 </div>
                 <div className={rich.areaBody}>

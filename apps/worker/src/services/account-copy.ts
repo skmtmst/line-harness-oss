@@ -78,6 +78,10 @@ export async function copyLineAccountSettings(
         ...row,
         id: crypto.randomUUID(),
         line_account_id: targetAccountId,
+        is_active: 0,
+        lifecycle_status: 'draft',
+        current_draft_version_id: null,
+        current_published_version_id: null,
       }));
     }
   }
@@ -105,6 +109,8 @@ export async function copyLineAccountSettings(
         id: targetScenarioId,
         line_account_id: targetAccountId,
         on_complete_scenario_id: mappedCompleteTarget,
+        is_active: 0,
+        current_published_version_id: null,
       }));
 
       const sourceSteps = await rows(

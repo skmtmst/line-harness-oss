@@ -6,6 +6,8 @@ const setFriendFieldReminderScanCursor = vi.fn();
 const enrollFriendsInReminderOnce = vi.fn();
 
 vi.mock('@line-crm/db', () => ({
+  getOneTimeFriendFieldReminderRegistrants: async () => [],
+  friendFieldReminderTargetStatements: () => [],
   getFriendFieldReminders: (...a: unknown[]) => getFriendFieldReminders(...a),
   getFriendsWithFieldValuePage: (...a: unknown[]) => getFriendsWithFieldValuePage(...a),
   setFriendFieldReminderScanCursor: (...a: unknown[]) => setFriendFieldReminderScanCursor(...a),
@@ -180,7 +182,7 @@ describe('processFriendFieldReminders', () => {
       expect(result.enrolled).toBe(1);
     });
 
-    it('今日でなければ立てない', async () => {
+    it('W7: 未来の基準日は当日を待たず、事前の通に間に合うよう立てる', async () => {
       getFriendFieldReminders.mockResolvedValue([reminder({ repeat_yearly: 0 })]);
       getFriendsWithFieldValuePage.mockResolvedValue([
         { friend_id: 'f-1', value: '2026-05-03' },
@@ -188,7 +190,17 @@ describe('processFriendFieldReminders', () => {
 
       const result = await processFriendFieldReminders(db, jst('2026-05-02T00:05'));
 
-      expect(result).toEqual({ enrolled: 0, skipped: 1, scanned: 1, hasMore: false });
+      expect(result).toEqual({ enrolled: 1, skipped: 0, scanned: 1, hasMore: false });
+      expect(enrollFriendsInReminderOnce).toHaveBeenCalledWith(db, 'rem-1', [{ friendId: 'f-1', targetDate: '2026-05-03T00:00:00+09:00' }]);
+    });
+
+    it('過去の日付や存在しない日付を登録しない', async () => {
+      getFriendFieldReminders.mockResolvedValue([reminder({ repeat_yearly: 0 })]);
+      getFriendsWithFieldValuePage.mockResolvedValue([
+        { friend_id: 'past', value: '2026-04-30' }, { friend_id: 'invalid', value: '2026-02-30' },
+      ]);
+      expect(await processFriendFieldReminders(db, jst('2026-05-02T00:05')))
+        .toEqual({ enrolled: 0, skipped: 2, scanned: 2, hasMore: false });
     });
   });
 
@@ -256,10 +268,10 @@ describe('分割と再開', () => {
 
     expect(result).toEqual({ enrolled: 4_000, skipped: 0, scanned: 4_000, hasMore: true });
     expect(getFriendsWithFieldValuePage).toHaveBeenNthCalledWith(
-      1, db, 'field-a', 'account-a', null, 2_000,
+      1, db, 'field-a', 'account-a', null, 2_000, 'rem-a',
     );
     expect(getFriendsWithFieldValuePage).toHaveBeenNthCalledWith(
-      2, db, 'field-b', 'account-b', null, 2_000,
+      2, db, 'field-b', 'account-b', null, 2_000, 'rem-b',
     );
   });
 
@@ -302,6 +314,7 @@ describe('分割と再開', () => {
       null,
       'f-04000',
       4_000,
+      'rem-1',
     );
     expect(cursor).toBeNull();
   });

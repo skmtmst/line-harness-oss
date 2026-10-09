@@ -31,8 +31,12 @@ import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
 import styles from './line-preview.module.css'
 
 export interface LinePreviewProps {
+  /** 狭い選択窓ではスマホを列の内側に収める。省略時は正本の幅のまま。 */
+  fit?: boolean
   /** 枠の中身。各画面の吹き出し・カードをそのまま渡す。 */
   children?: ReactNode
+  /** V8で画面が指定する題。nullなら外側の題だけを使う。 */
+  title?: string | null
   /**
    * 題の下に見える札。届く日時・件数など、その場で見せたい情報。
    * 動く内容なので ? には入れず、見えるまま残す。
@@ -48,6 +52,15 @@ export interface LinePreviewProps {
    * 文字ならその文を空の箱で出す。
    */
   empty?: boolean | string
+  /**
+   * リッチメニュー（★V8 gobhu・egdGx・K0gu1・gQabc）。渡すと、本物の LINE と同じく
+   * **トーク画面のいちばん下（入力の帯の位置）**にメニューを出し、トークはその上で縮む。
+   * 下の帯は1本だけで、文字は `chatBarText`（無ければ「メニュー」）。
+   * 渡さない画面はこれまでどおり（トーク＋「メニュー ∨」の帯）。
+   */
+  richMenu?: ReactNode
+  /** リッチメニューの下の帯の文字（トーク画面の下の文言）。`richMenu` と一緒に使う。 */
+  chatBarText?: string
 }
 
 /** 設定画面でその場でテーマを切り替えたときの合図を受ける。 */
@@ -65,11 +78,15 @@ const readIsV8 = () => document.documentElement?.getAttribute('data-theme') === 
 const readIsV8OnServer = () => false
 
 export default function LinePreview({
+  fit = false,
   children,
+  title = 'LINEでの見え方',
   caption,
   note,
   accountName,
   empty = false,
+  richMenu,
+  chatBarText,
 }: LinePreviewProps) {
   const v8 = useSyncExternalStore(subscribeTheme, readIsV8, readIsV8OnServer)
 
@@ -80,12 +97,12 @@ export default function LinePreview({
    */
   if (v8) {
     return (
-      <section aria-label="LINEでの見え方" className={styles.phoneRoot}>
-        {/* 絵（JeINq・A0pDt ほか24枚）はすべて「LINEでの見え方」。列の左に寄せ、スマホはその下の真ん中。 */}
-        <p className={styles.phoneTitle}>
-          <span>LINEでの見え方</span>
+      <section aria-label="LINEでの見え方" className={styles.phoneRoot} data-fit={fit || undefined}>
+        {/* 題は列の左、スマホはその下の真ん中。テンプレートでは「届き方」や外側の題を使う。 */}
+        {title !== null ? <p className={styles.phoneTitle}>
+          <span>{title}</span>
           {note ? <HelpTip label="LINEでの見え方の説明">{note}</HelpTip> : null}
-        </p>
+        </p> : null}
         <div className={styles.phone}>
           <div className={styles.screen}>
             <div className={styles.statusBar}>
@@ -104,8 +121,9 @@ export default function LinePreview({
               <Phone size={17} aria-hidden="true" />
               <Menu size={17} aria-hidden="true" />
             </div>
-            <div className={styles.talk}>
-              <p className={styles.dateChip}><span>{caption ?? '今日'}</span></p>
+            <div className={styles.talk} data-line-preview-part="talk">
+              {/* リッチメニューの見本（gobhu）はトークが空で、日付の札も無い。届く日時を渡したときだけ出す。 */}
+              {richMenu && caption === undefined ? null : <p className={styles.dateChip}><span>{caption ?? '今日'}</span></p>}
               {empty ? (
                 <p className={styles.emptyNote}>
                   {typeof empty === 'string' ? empty : children}
@@ -114,8 +132,9 @@ export default function LinePreview({
                 children
               )}
             </div>
-            <div className={styles.menuBar}>
-              <span>メニュー</span>
+            {richMenu ? <div className={styles.richMenu} data-line-preview-part="rich-menu">{richMenu}</div> : null}
+            <div className={styles.menuBar} data-line-preview-part="menu-bar">
+              <span>{richMenu ? (chatBarText || 'メニュー') : 'メニュー'}</span>
               <ChevronDown size={12} aria-hidden="true" />
             </div>
             <div className={styles.homeBar}><span className={styles.homeLine} aria-hidden="true" /></div>
@@ -144,15 +163,28 @@ export default function LinePreview({
       ) : (
         <div className="mt-3">{children}</div>
       )}
+      {richMenu ? (
+        <div className="mt-3 overflow-hidden rounded-control bg-canvas" data-line-preview-part="rich-menu">
+          {richMenu}
+          <p className="border-hairline flex items-center justify-center gap-1 border-t py-2 text-xs text-ink" data-line-preview-part="menu-bar">
+            {chatBarText || 'メニュー'}
+            <ChevronDown size={11} aria-hidden="true" />
+          </p>
+        </div>
+      ) : null}
     </section>
   )
 }
 
 /** cfVyj の受信メッセージ。日時・送り主・本文をそのまま渡す。 */
-export function LinePreviewMessage({ accountName, avatar, time, children }: {
-  accountName: string; avatar: ReactNode; time: string; children: ReactNode
+export function LinePreviewMessage({ accountName, avatar, time, children, direction = 'incoming', density }: {
+  accountName: string; avatar: ReactNode; time: string; children: ReactNode; direction?: 'incoming' | 'outgoing'; density?: 'compact'
 }) {
-  return <div className={styles.messageRow}>
+  if (direction === 'outgoing') return <div className={styles.outgoingRow}>
+    {time ? <span className={styles.messageTime}>{time}</span> : null}
+    <div className={styles.outgoingBubble}>{children}</div>
+  </div>
+  return <div className={styles.messageRow} data-density={density}>
     <span className={styles.senderAvatar}>{avatar}</span>
     <div className={styles.senderBody}>
       <span className={styles.senderName}>{accountName}</span>

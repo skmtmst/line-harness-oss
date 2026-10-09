@@ -6,11 +6,15 @@ import Link from 'next/link'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import LoginAudit from '@/components/staff/login-audit'
 import Button from '@/components/shared/button'
+import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
 import Checkbox from '@/components/shared/checkbox'
-import { RequiredBadge } from '@/components/shared/form-controls'
+import { Field } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
 import Select from '@/components/shared/select'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import SearchField from '@/components/shared/search-field'
+import FilterChip from '@/components/shared/filter-chip'
+import { Tabs } from '@/components/shared/tabs'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -20,7 +24,7 @@ import { notifyToast } from '@/components/shared/toast'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest as SharedStepUpRequest } from '@/components/step-up-prompt'
 import NotificationSwitch from '@/components/ui/notification-switch'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { PageFrame } from '@/components/templates/page-frame'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -574,6 +578,22 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
 
 function EditModal({ member, administrator, currentUserId, activeAdministratorCount, onClose, onSaved }: { member: StaffMember; administrator: boolean; currentUserId: string | null; activeAdministratorCount: number; onClose: () => void; onSaved: () => Promise<void> }) {
   const [name, setName] = useState(member.name), [email, setEmail] = useState(member.email ?? '')
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string }>({})
+  const nameRef = useRef<HTMLInputElement>(null)
+  const emailRef = useRef<HTMLInputElement>(null)
+  const validateFields = () => {
+    const errors: { name?: string; email?: string } = {}
+    if (administrator && !name.trim()) errors.name = '名前を入力してください'
+    if (!email.trim()) errors.email = 'メールアドレスを入力してください'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errors.email = '正しいメールアドレスを入力してください'
+    setFieldErrors(errors)
+    if (!errors.name && !errors.email) return true
+    setError('')
+    const field = errors.name ? nameRef.current : emailRef.current
+    field?.focus()
+    field?.scrollIntoView({ block: 'center' })
+    return false
+  }
   const [role, setRole] = useState<'admin' | 'staff' | 'viewer'>(member.role === 'owner' ? 'admin' : member.role)
   const [permissions, setPermissions] = useState(member.permissionKeys)
   const [notifications, setNotifications] = useState<Record<string, Channel>>(() => Object.fromEntries(NOTIFICATIONS.map(([key]) => [key, member.notificationPreferences[key] ?? { email: true, line: true }])))
@@ -607,7 +627,7 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
     return () => { active = false }
   }, [administrator, member.id])
   const toggleNotification = (key: string, channel: keyof Channel) => setNotifications((current) => ({ ...current, [key]: { ...current[key], [channel]: !current[key][channel] } }))
-  const save = async (stepUpToken?: string) => { if (!email.trim()) return setError('メールアドレスを入力してください'); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setError('正しいメールアドレスを入力してください'); if (savingRef.current) return; savingRef.current = true; saveKeyRef.current ??= crypto.randomUUID(); setSaving(true); setError(''); try { const res = await api.staff.update(member.id, { name: administrator ? name.trim() : undefined, email: email.trim(), role: administrator ? role : undefined, permissionKeys: administrator && role === 'staff' ? normalizeStaffPermissionKeys(permissions) : undefined, notificationPreferences: notifications, idempotencyKey: saveKeyRef.current, expectedPolicyVersion: member.policyVersion }, stepUpToken); await onSaved(); if (res.success && res.data.emailChangePending && res.data.pendingEmail) { saveKeyRef.current = null; setEmailNotice(`${res.data.pendingEmail} へ確認メールを送りました。届いたメールのリンクを開くと変更が完了します。`); return } saveKeyRef.current = null; onClose() } catch (caught) { if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.permissions.change', action: '権限を変更する', retry: save }); return } if (caught instanceof ApiError && caught.status === 409) { saveKeyRef.current = null; await onSaved(); setError('ほかの管理者が先に権限を変更しました。一覧を読み直したので、開き直して最新の内容を確認してください。'); return } setError(messageOf(caught)) } finally { savingRef.current = false; setSaving(false) } }
+  const save = async (stepUpToken?: string) => { if (!validateFields()) return; if (savingRef.current) return; savingRef.current = true; saveKeyRef.current ??= crypto.randomUUID(); setSaving(true); setError(''); try { const res = await api.staff.update(member.id, { name: administrator ? name.trim() : undefined, email: email.trim(), role: administrator ? role : undefined, permissionKeys: administrator && role === 'staff' ? normalizeStaffPermissionKeys(permissions) : undefined, notificationPreferences: notifications, idempotencyKey: saveKeyRef.current, expectedPolicyVersion: member.policyVersion }, stepUpToken); await onSaved(); if (res.success && res.data.emailChangePending && res.data.pendingEmail) { saveKeyRef.current = null; setEmailNotice(`${res.data.pendingEmail} へ確認メールを送りました。届いたメールのリンクを開くと変更が完了します。`); return } saveKeyRef.current = null; onClose() } catch (caught) { if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.permissions.change', action: '権限を変更する', retry: save }); return } if (caught instanceof ApiError && caught.status === 409) { saveKeyRef.current = null; await onSaved(); setError('ほかの管理者が先に権限を変更しました。一覧を読み直したので、開き直して最新の内容を確認してください。'); return } setError(messageOf(caught)) } finally { savingRef.current = false; setSaving(false) } }
   /**
    * LINE連携を外す。
    *
@@ -621,7 +641,7 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
   return <Modal onClose={onClose} wide><div data-design-node="EOTS4"><div className="flex items-start justify-between"><div><h2 className="text-xl font-bold text-ink">見せる範囲を決める</h2><p className="mt-1 text-xs text-ink-secondary">役割・表示機能・担当範囲を確認し、このユーザーに必要な範囲だけを設定します。</p></div></div>
     <div className="mt-5 rounded-control bg-canvas-sunken p-3"><p className="font-semibold text-ink">{member.name}</p><p className="text-xs text-ink-secondary">{ROLE_LABEL[member.role]}</p></div>{error && <p className="mt-4 rounded-control bg-danger-bg p-3 text-sm text-danger">{error}</p>}{emailNotice && <p role="status" className="mt-4 rounded-control bg-accent-soft p-3 text-sm text-accent-deep">{emailNotice}</p>}
     {policy.showAccountActions && <section className={`mt-5 rounded-card border p-4 ${member.isActive ? 'border-accent bg-accent-soft' : 'border-warning bg-warning-bg'}`} aria-label="ユーザーの利用状態"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-sm font-semibold text-ink">ログイン状態：{member.isActive ? '有効' : '無効'}</p><p className="mt-1 text-xs leading-5 text-ink-secondary">{member.isActive ? '無効にすると、このユーザーはログインできなくなります。' : '有効にすると、このユーザーは再びログインできます。'}</p><div className="mt-2"><LoginHistoryNote count={loginCount} loading={loginHistoryLoading} failed={loginHistoryFailed} /></div></div><Button variant="primary" className={(`min-w-48 rounded-control px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${member.isActive ? 'border border-warning bg-canvas text-warning hover:bg-warning-bg' : 'bg-accent-deep text-on-accent hover:brightness-90'}`) + ' h-auto whitespace-normal'} type="button" onClick={() => void toggleActive()} disabled={statusSaving || Boolean(policy.statusBlockedReason)}>{statusSaving ? '変更中…' : member.isActive ? 'このユーザーを無効にする' : 'このユーザーを有効にする'}</Button></div>{policy.statusBlockedReason && <p className="mt-3 rounded-control bg-canvas p-3 text-xs font-semibold text-warning">{policy.statusBlockedReason}</p>}</section>}
-    <div className="mt-5 grid gap-4 sm:grid-cols-2">{administrator && <label className="text-sm font-semibold text-ink">名前<RequiredBadge /><input value={name} onChange={(e) => setName(e.target.value)} className="mt-2 h-11 w-full rounded-control border border-hairline px-3 outline-none focus:border-accent" /></label>}<label className="text-sm font-semibold text-ink">メールアドレス<RequiredBadge /><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-2 h-11 w-full rounded-control border border-hairline px-3 outline-none focus:border-accent" /></label></div>
+    <div className="mt-5 grid gap-4 sm:grid-cols-2">{administrator && <Field label="名前" required htmlFor="staff-edit-name" error={fieldErrors.name}><TextField ref={nameRef} id="staff-edit-name" value={name} onChange={(e) => { setName(e.target.value); setFieldErrors((current) => ({ ...current, name: undefined })) }} /></Field>}<Field label="メールアドレス" required htmlFor="staff-edit-email" error={fieldErrors.email}><TextField ref={emailRef} id="staff-edit-email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); setFieldErrors((current) => ({ ...current, email: undefined })) }} /></Field></div>
     {administrator && <div className="mt-5"><p className="text-sm font-semibold text-ink">役割</p><div className="mt-2 grid grid-cols-3 gap-2">{(['admin', 'staff', 'viewer'] as const).map((value) => <Button variant="secondary" className={(`cursor-pointer rounded-control border px-3 py-3 text-sm ${role === value ? 'border-accent bg-accent-soft font-medium text-accent-deep' : 'border-hairline text-ink-secondary'}`) + ' h-auto whitespace-normal'} key={value} onClick={() => setRole(value)}>{ROLE_LABEL[value]}</Button>)}</div></div>}
     {administrator && role === 'staff' && <div className="mt-5"><p className="text-sm font-semibold text-ink">スタッフに表示する機能</p><div className="mt-2 grid gap-2 sm:grid-cols-3">{PERMISSIONS.map(([key, label]) => <Checkbox key={key} checked={permissions.includes(key)} onCheckedChange={() => setPermissions((current) => toggleStaffPermissionKey(current, key))}>{label}</Checkbox>)}</div><p className="mt-3 text-sm font-medium text-ink">成果の操作権限</p><p className="mt-1 text-xs text-ink-faint">選ぶと「成果とアフィリエイト」の表示も組で付きます。表示を外すと操作権限も外れます。</p><div className="mt-2 grid gap-2 sm:grid-cols-3"><Checkbox checked={permissions.includes(CONVERSION_APPROVAL_EDIT_KEY)} onCheckedChange={() => setPermissions((current) => toggleStaffPermissionKey(current, CONVERSION_APPROVAL_EDIT_KEY))} aria-label="成果を承認・却下する">{PERMISSION_LABELS[CONVERSION_APPROVAL_EDIT_KEY]}</Checkbox></div></div>}
     <div className="mt-5"><p className="text-sm font-semibold text-ink">LINE連携</p><div className={`mt-2 flex items-center justify-between rounded-control border p-3 ${member.lineLinked ? 'border-accent bg-accent-soft' : 'border-hairline'}`}><div><p className={`text-sm font-semibold ${member.lineLinked ? 'text-success' : 'text-ink-secondary'}`}>{member.lineLinked ? '連携済み' : '未連携'}</p><p className="text-xs text-ink-faint">{member.lineLinked ? `LINE：${member.name}` : '招待メールからLINE認証を行います'}</p></div>{member.lineLinked && <Button variant="secondary" className="px-3 py-1.5 text-xs h-auto whitespace-normal" onClick={() => { setUnlinkError(''); setUnlinkOpen(true) }}>連携解除</Button>}</div></div>
@@ -652,7 +672,7 @@ function TwoFactorModal({ member, onClose, onSaved }: { member: StaffMember; onC
   return <Modal onClose={onClose} wide><div className="flex items-start justify-between"><div><h2 className="text-xl font-bold text-ink">二段階認証を設定</h2><p className="mt-1 text-xs text-ink-secondary">認証アプリを登録して、ログインを安全にします。</p></div></div>
     <div className="mt-5 grid grid-cols-2 gap-2 text-sm"><div className="rounded-control bg-accent-soft px-4 py-3 font-medium text-accent-deep">1　QRコードを読み取る</div><div className="rounded-control bg-canvas-sunken px-4 py-3 text-ink-secondary">2　6桁コードを入力</div></div>{error && <p className="mt-4 rounded-control bg-danger-bg p-3 text-sm text-danger">{error}</p>}
     <div className={`mt-5 grid gap-5 ${styles.twoFactorGrid}`}>{qr ? <img src={qr} alt="Authenticator登録用QRコード" className={`${styles.qrImage} rounded-control border border-hairline`} /> : <DelayedSkeleton loading skeleton={<Skeleton width={220} height={220} className="block rounded-control" />} />}<div><h3 className="font-semibold text-ink">認証アプリで読み取る</h3><p className="mt-3 text-sm leading-6 text-ink-secondary">Google Authenticator、Microsoft AuthenticatorなどでQRコードを読み取ってください。</p><div className="mt-4 rounded-control bg-info-bg p-3"><p className="text-xs text-ink-secondary">読み取れない場合はキーを手動入力</p><p className="mt-1 break-all font-mono text-sm font-bold tracking-wider text-ink">{manualKey || '—'}</p></div></div></div>
-    <p id="staff-totp-label" className="mt-5 block text-sm font-medium text-ink">認証アプリに表示された6桁コード</p><div className="mt-2">{/* ★V7 共通 認証コード入力（xHzFK）。 */}<OtpInput value={code} onChange={setCode} onComplete={(entered) => void save(entered)} labelledBy="staff-totp-label" invalid={Boolean(error)} busy={saving} /></div><p className="mt-4 rounded-control bg-info-bg p-3 text-xs text-ink-secondary">登録後はLINEログインのあとに認証アプリのコード入力が必要です。</p>
+    <p id="staff-totp-label" className="mt-5 block text-sm font-medium text-ink">認証アプリに表示された6桁コード</p><div className="mt-2">{/* 共通 OTP入力（Pencil ★V8 RfHCo）。 */}<OtpInput value={code} onChange={setCode} onComplete={(entered) => void save(entered)} labelledBy="staff-totp-label" invalid={Boolean(error)} busy={saving} /></div><p className="mt-4 rounded-control bg-info-bg p-3 text-xs text-ink-secondary">登録後はLINEログインのあとに認証アプリのコード入力が必要です。</p>
     <div className="mt-6 flex justify-end gap-2"><Button variant="secondary" className="px-4 py-2 h-auto whitespace-normal" onClick={onClose}>キャンセル</Button><Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => void save()} disabled={saving || !uri}>✓ {saving ? '確認中…' : '設定を完了'}</Button></div></Modal>
 }
 
@@ -706,7 +726,7 @@ function StaffRoleGuide() {
     { role: 'administrator', body: 'すべての機能を作る・変える・送る。ログインユーザーの招待と役割' },
     { role: 'operations', body: '配信・受信箱・友だち・予約を作る・送る。設定は見るだけ' },
     { role: 'reception', body: '受信箱の返信と予約の受付だけ' },
-    { role: 'view_only', body: '全部見られるが、押せない（隠さない）' },
+    { role: 'view_only', body: '画面を見られる（操作は出ません）' },
   ]
   return (
     <section aria-label="役割でできること" className={`${styles.asideCard} ${styles.guideCard}`}>
@@ -1018,14 +1038,14 @@ function StaffPageHost() {
           <div className={styles.toolSelect}><Select aria-label="並び順" size="full" value={sort} onChange={setSort} options={LIST_SORT_OPTIONS} /></div>
         </div>
       </div>
-      <div className={styles.table} role="table" aria-label={`${sectionTitle}の一覧`}>
-        <div className={`${styles.row} ${styles.headRow}`} role="row">
-          <span className={styles.colPerson} role="columnheader">人</span>
-          <span className={styles.colScope} role="columnheader">担当のLINEアカウント</span>
-          <span className={styles.colRole} role="columnheader">役割</span>
-          <span className={styles.colLast} role="columnheader">最後に入った</span>
-          <span className={styles.colMenu} role="columnheader"><span className={styles.srOnly}>操作</span></span>
-        </div>
+      <GridTable className={styles.table} framed={false} label={`${sectionTitle}の一覧`} design={{ columns: 'var(--sett-staff-columns)', gap: 'var(--tpl-sa-staff-col-gap)', rowPadding: 'var(--tpl-sa-staff-row-pad)', rowGap: 'var(--tpl-sa-staff-card-gap)', fontSize: 'var(--text-caption)', lineHeight: 'var(--tpl-sa-staff-sub-lh)' }}>
+        <GridHeadRow>
+          <GridCell className={styles.colPerson} role="columnheader">人</GridCell>
+          <GridCell className={styles.colScope} role="columnheader" title="担当のLINEアカウント">担当のLINEアカウント</GridCell>
+          <GridCell className={styles.colRole} role="columnheader">役割</GridCell>
+          <GridCell className={styles.colLast} role="columnheader">最後に入った</GridCell>
+          <GridCell className={styles.colMenu} role="columnheader"><span className={styles.srOnly}>操作</span></GridCell>
+        </GridHeadRow>
         {loading ? <p className={styles.stateRow} role="status">ログインユーザーを読み込んでいます…</p>
           : error ? <div className={styles.stateRow} role="alert"><p>ログインユーザーを読み込めませんでした。登録した内容は消えていません。</p><Button onClick={() => void load()}>読み直す</Button></div>
           : shown.length === 0 ? <p className={styles.stateRow}>条件に合うログインユーザーはいません。条件を変えてお試しください。</p>
@@ -1033,41 +1053,37 @@ function StaffPageHost() {
             const member = memberById.get(user.id)
             const items = rowMenuItems(user)
             return (
-              <div key={user.id} className={`${styles.row} ${styles.bodyRow}`} role="row">
-                <span className={styles.colPerson} role="cell">
+              <GridRow key={user.id}>
+                <GridCell className={styles.colPerson} role="cell">
                   <span className={styles.avatar} aria-hidden="true">{Array.from(user.name)[0] ?? '?'}</span>
                   <span className={styles.personText}>
                     <button type="button" aria-label={`${user.name}の中身を見る`} data-qa-open="EOTS4" onClick={() => openPermissions(user)} className={styles.personName} title={user.name}>{user.name}</button>
                     <span className={styles.personSub} title={user.email ?? ''}>{user.email ?? 'メール未登録'}</span>
                     {tab === 'invited' && member && member.inviteStatus !== 'active' ? <span className={styles.personSub}>{`招待の期限：${formatInviteExpiry((member as StaffMemberWithInvite).inviteExpiresAt)}`}</span> : null}
                   </span>
-                </span>
-                <span className={styles.colScope} role="cell" title={accessScopeLabel(user, accountNames)}>{scopeShort(user, accountNames)}</span>
-                <span className={styles.colRole} role="cell">{user.status === 'suspended' ? <span className={styles.roleChip} data-role="view_only">止めた</span> : <RoleChip role={roleOf(user)} />}</span>
-                <span className={styles.colLast} role="cell" title={user.lastActionAt ? `最後の操作：${formatStaffDate(user.lastActionAt)}` : formatStaffDate(user.lastLoginAt ?? undefined)}>{shortWhen(user.lastLoginAt, nowMs)}</span>
-                <span className={`${styles.colMenu} ${styles.menuBox}`} role="cell">
-                  <RowMenu className={styles.menuButton} label={`${user.name}の操作`} items={items} open={openMenuId === user.id} onOpenChange={(next) => setOpenMenuId(next ? user.id : null)} />
-                </span>
-              </div>
+                </GridCell>
+                <GridCell className={styles.colScope} role="cell" title={accessScopeLabel(user, accountNames)}>{scopeShort(user, accountNames)}</GridCell>
+                <GridCell className={styles.colRole} role="cell">{user.status === 'suspended' ? <span className={styles.roleChip} data-role="view_only">止めた</span> : <RoleChip role={roleOf(user)} />}</GridCell>
+                <GridCell className={styles.colLast} role="cell" title={user.lastActionAt ? `最後の操作：${formatStaffDate(user.lastActionAt)}` : formatStaffDate(user.lastLoginAt ?? undefined)}>{shortWhen(user.lastLoginAt, nowMs)}</GridCell>
+                <GridCell className={`${styles.colMenu} ${styles.menuBox}`} role="cell">
+                  <RowMenu size="row" label={`${user.name}の操作`} items={items} open={openMenuId === user.id} onOpenChange={(next) => setOpenMenuId(next ? user.id : null)} />
+                </GridCell>
+              </GridRow>
             )
           })}
-      </div>
+      </GridTable>
     </section>
   )
   return (
     <PageFrame kind="settings" boardId={administrator ? 'nku0f' : 'A35Gh'}>
-      <header className={styles.head}>
-        <h2 className={styles.title}>ログインユーザー</h2>
-        <p className={styles.desc}>管理画面に入る人と、その人ができることを決めます（管理者の設定はここ）</p>
-        <nav className={styles.tabs} aria-label="ログインユーザーの切り替え">
-          {STAFF_TAB_KEYS.map((item) => (
-            <Link key={item.key} href={`/staff?tab=${item.key}`} aria-current={tab === item.key ? 'page' : undefined} className={tab === item.key ? `${styles.tab} ${styles.tabCurrent}` : styles.tab}>{item.label}</Link>
-          ))}
-        </nav>
-      </header>
+      <PageHeading
+        title="ログインユーザー"
+        description="管理画面に入る人と、その人ができることを決めます（管理者の設定はここ）"
+        tabs={<Tabs size="compact" label="ログインユーザーの切り替え" items={STAFF_TAB_KEYS.map((item) => ({ label: item.label, href: `/staff?tab=${item.key}`, current: tab === item.key }))} />}
+      />
       {viewer ? (
         <div className={styles.viewerBandRow}>
-          <p className={styles.viewerBand} role="note"><Eye size={16} aria-hidden="true" className={styles.viewerIcon} />閲覧のみで見ています。変える操作は管理者に頼んでください。</p>
+          <Notice tone="info" icon={<Eye size={16} aria-hidden="true" />}>閲覧のみで見ています。変える操作は管理者に頼んでください。</Notice>
         </div>
       ) : null}
       <div className={styles.body}>
@@ -1084,8 +1100,8 @@ function StaffPageHost() {
                 <SearchField aria-label="名前・メールで探す" value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="名前・メールで探す" className={styles.search} />
                 {tab === 'members' ? (
                   <div className={styles.chips} role="group" aria-label="利用状態で絞り込む">
-                    <button type="button" className={styles.chip} aria-pressed={statusFilter === 'active'} onClick={() => setStatusFilter(statusFilter === 'active' ? 'all' : 'active')}>{`有効 ${summaryReady ? activeCount : '—'}`}</button>
-                    <button type="button" className={styles.chip} aria-pressed={statusFilter === 'suspended'} onClick={() => setStatusFilter(statusFilter === 'suspended' ? 'all' : 'suspended')}>{`止めた ${summaryReady ? suspendedCount : '—'}`}</button>
+                    <FilterChip selectedIcon={false} selected={statusFilter === 'active'} onChange={(selected) => setStatusFilter(selected ? 'active' : 'all')}>{`有効 ${summaryReady ? activeCount : '—'}`}</FilterChip>
+                    <FilterChip selectedIcon={false} selected={statusFilter === 'suspended'} onChange={(selected) => setStatusFilter(selected ? 'suspended' : 'all')}>{`止めた ${summaryReady ? suspendedCount : '—'}`}</FilterChip>
                   </div>
                 ) : null}
                 <span className={styles.spacer} />
@@ -1136,7 +1152,7 @@ function StaffPageHost() {
                       <p className={styles.exampleHead}><span className={styles.exampleName} title={user.name}>{user.name}</span><StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge></p>
                       <p className={styles.exampleLine}>{`${V8_ROLE_LABEL[roleOf(user)]}・${user.jobTitle ?? '—'}`}</p>
                       <p className={styles.exampleLine} title={accessScopeLabel(user, accountNames)}>{`見せる範囲：${user.roleBundle === 'administrator' ? 'すべて' : `${accessFeatureLabel(user)}／${scopeShort(user, accountNames)}`}`}</p>
-                      <p className={styles.exampleLine}>{`最後に入った：${shortWhen(user.lastLoginAt, nowMs)}${user.lastActionAt ? `（最後の操作 ${formatStaffDate(user.lastActionAt)}）` : ''}`}</p>
+                      <p className={styles.exampleLine} title={`最後のログイン：${formatStaffDate(user.lastLoginAt ?? undefined)}${user.lastActionAt ? `／最後の操作：${formatStaffDate(user.lastActionAt)}` : ''}`}>{`最後に入った：${shortWhen(user.lastLoginAt, nowMs)}${user.lastActionAt ? `（最後の操作 ${formatStaffDate(user.lastActionAt)}）` : ''}`}</p>
                     </div>
                   )
                 })}

@@ -245,9 +245,10 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 
 .skeletonRow {
@@ -279,23 +280,17 @@
 }
 
 /* 表の下の案内。 */
-.footNote {
-  margin: 0;
-  color: var(--color-ink-faint);
-  font-size: var(--text-micro);
-  line-height: 1.6;
-}
-
 /* 空・失敗の1枚。 */
 .stateCard {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--tpl-cell-gap-half);
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
   text-align: center;
+  box-shadow: var(--card-shadow);
 }
 
 .stateIcon {
@@ -330,12 +325,25 @@
 
 /* 削除の窓：危険操作を左端、主ボタン（代わりに止める＝残す方）を中央寄せ。 */
 .deleteFooter {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--tpl-body-gap);
+  width: 100%;
+  padding: var(--tpl-body-gap) var(--tpl-preview-pad) var(--tpl-preview-pad);
+}
+.deleteFooter > :first-child {
+  justify-self: start;
+}
+.deleteFooter > :last-child {
+  justify-self: start;
+}
+.deleteAlternatives {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: var(--tpl-cell-gap-half);
-  width: 100%;
+  gap: var(--tpl-body-gap);
 }
+.reasonField { width: 100%; }
 
 /* フォルダへ移す窓の中身。 */
 .moveBody {
@@ -348,26 +356,6 @@
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
   font-weight: 600;
-}
-
-/* 止める窓の理由欄。 */
-.reasonLabel {
-  display: block;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  font-weight: 600;
-}
-
-.reasonInput {
-  width: 100%;
-  margin-top: var(--tpl-sub-gap);
-  border: 1px solid var(--color-control-border, var(--color-hairline));
-  border-radius: var(--radius-control);
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  line-height: 1.6;
-  resize: vertical;
 }
 
 /* 狭い板の畳み方は型と useNarrowViewport が担う。画面CSSの畳みは置かない。 */
@@ -386,9 +374,6 @@
 /* 絵 uE9gf 道具の段の右：並び 124・よく使う絞り込み 151（左に印）。 */
 .sortBox { width: var(--tpl-ar-sort-w); }
 .sortBox :global(*) { max-width: 100%; }
-.savedBox { position: relative; width: var(--tpl-ar-saved-w); }
-.savedBox :global(button) { width: 100%; padding-left: calc(var(--tpl-chip-row-gap) * 8); }
-.savedIcon { position: absolute; top: 50%; left: var(--tpl-rule-row-gap); z-index: 1; color: var(--color-ink-secondary); transform: translateY(-50%); pointer-events: none; }
 .miniBadgeWarn > span::before { content: ''; width: var(--tpl-badge-dot); height: var(--tpl-badge-dot); border-radius: var(--radius-pill); background: currentColor; }
 .middleCell { vertical-align: middle; }
 .rowClick > td { height: var(--tpl-ar-row-h); } /* 絵 uE9gf の行は 63〜66。札の無い行も同じ高さに */
@@ -428,13 +413,6 @@
 .narrowSearch { width: var(--tpl-kw-input-w); }
 .narrowSpacer { flex: 1 1 0; }
 
-.savedIconOnly > .savedBox { width: var(--tpl-ar-saved-icon-w); }
-.savedIconOnly > .savedBox :global(*) { max-width: 100%; }
-.savedIconOnly > .savedBox :global(button) { padding: 0; }
-.savedIconOnly > .savedBox :global(button) { color: transparent; }
-.savedIconOnly > .savedBox :global(button) * { visibility: hidden; }
-.savedIconOnly > .savedBox :global(button) > svg { display: none; }
-.savedIconOnly > .savedBox .savedIcon { left: 50%; transform: translate(-50%, -50%); }
 /* 1152 の板：右に「重なりを見る」が並ぶ狭い説明は、言葉の途中で折って2行に（絵どおり）。 */
 .kpiDetailBreak { word-break: normal; }
 /* 1152 の板：見出しの行は絵の 40 に対して表の線ぶん詰める。 */

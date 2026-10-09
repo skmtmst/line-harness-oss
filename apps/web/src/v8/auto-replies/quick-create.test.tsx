@@ -70,3 +70,14 @@ it('書きかけでアカウントを切り替えると確認まで止まる', a
   fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
   expect(change).not.toHaveBeenCalled()
 })
+it('日本語の変換を確定する Enter では言葉を札にしない（変換が終わった Enter で札にする）', () => {
+  render(<QuickCreate accountId="account-1" onClose={vi.fn()} onCreated={created} />)
+  const input = screen.getByLabelText('追加する言葉') as HTMLInputElement
+  fireEvent.change(input, { target: { value: 'えいぎょう' } })
+  fireEvent.keyDown(input, { key: 'Enter', keyCode: 229 })
+  fireEvent.keyDown(input, { key: 'Enter', isComposing: true })
+  expect(screen.queryByRole('button', { name: '「えいぎょう」を外す' })).toBeNull()
+  expect(input.value).toBe('えいぎょう')
+  fireEvent.keyDown(input, { key: 'Enter' })
+  expect(screen.getByRole('button', { name: '「えいぎょう」を外す' })).toBeTruthy()
+})

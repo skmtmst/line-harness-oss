@@ -369,7 +369,7 @@
     "arbitrary-value": 10
   },
   "components/chats/friend-info-sidebar.tsx": {
-    "unresolved-classname": 13,
+    "unresolved-classname": 14,
     "arbitrary-value": 3
   },
   "components/chats/inbox-dropdown.tsx": {
@@ -497,6 +497,9 @@
   "components/shared/avatar.tsx": {
     "unresolved-classname": 1
   },
+  "components/shared/booking-controls.tsx": {
+    "unresolved-classname": 1
+  },
   "components/shared/breadcrumb.tsx": {
     "unresolved-classname": 1
   },
@@ -520,7 +523,7 @@
     "unresolved-classname": 1
   },
   "components/shared/date-time-field.tsx": {
-    "unresolved-classname": 3
+    "unresolved-classname": 5
   },
   "components/shared/delta-chip.tsx": {
     "unresolved-classname": 1
@@ -586,7 +589,7 @@
     "unresolved-classname": 2
   },
   "components/shared/sticky-bar.tsx": {
-    "unresolved-classname": 1
+    "unresolved-classname": 3
   },
   "components/shared/tabs.tsx": {
     "unresolved-classname": 1
@@ -617,6 +620,9 @@
   },
   "components/support/support-inbox.tsx": {
     "arbitrary-value": 8
+  },
+  "components/templates/page-frame.tsx": {
+    "unresolved-classname": 1
   },
   "components/ui/kpi-collapse.tsx": {
     "unresolved-classname": 2

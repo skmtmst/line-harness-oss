@@ -9,6 +9,7 @@
  * 健康日記はお客さまがマイページで付けるので、ここに変える操作は無い（閲覧のみでも同じ画面）。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Activity, Bookmark, CalendarCheck, CalendarDays, Columns2, FileText, History, PawPrint } from 'lucide-react'
 import { ListPage } from '@/components/templates'
@@ -170,7 +171,7 @@ export default function HealthV8({
   const pending = kpis === null
   const kpiMenu = (title: string, items: ActionMenuItem[]) => <KpiMenu title={title} items={items} />
   const stats = accountId ? (
-    <KpiBand data-design="KPIs" className={styles.band} aria-label="健康日記の数の帯">
+    <KpiBand data-design="KPIs" aria-label="健康日記の数の帯">
       <KpiCard presentation="band" title="記録のあるペット" icon={<History size={13} aria-hidden="true" />} menu={kpiMenu('記録のあるペット', [{ id: 'all', label: 'すべてのペットを出す', onSelect: () => applyFilter(EMPTY_FILTERS) }])} value={pending ? null : kpis.petsWithRecords} unit="匹" loading={pending} detail={pending ? '読み込んでいます' : `登録 ${kpis.petsTotal} 匹のうち`} />
       <KpiCard presentation="band" title="気になる変化" icon={<Activity size={13} aria-hidden="true" />} menu={kpiMenu('気になる変化', [{ id: 'concern', label: '気になる変化だけ出す', onSelect: () => applyFilter({ change: 'concern', last: '' }) }])} value={pending ? null : kpis.concerning} unit="匹" loading={pending} detail="体重 ±10%（8週）など" />
       <KpiCard presentation="band" title="今週の記録" icon={<CalendarCheck size={13} aria-hidden="true" />} menu={kpiMenu('今週の記録', [{ id: 'week', label: '今週 記録のあるペットを出す', onSelect: () => applyFilter({ last: '7' }) }])} value={pending ? null : kpis.recordsThisWeek} unit="件" loading={pending} detail="直近7日に付いた記録" />
@@ -404,6 +405,7 @@ function HealthListV8({
 }
 
 function HealthRow({ row, onOpenSummary, onOpenPdf }: { row: NenHealthRow; onOpenSummary: (petId: string) => void; onOpenPdf: (petId: string) => void }) {
+  const router = useRouter()
   const kind = petAnimalTypeLabel(row.pet.animalType)
   const name = row.pet.name || row.pet.callName || '（名前なし）'
   const kindLine = row.pet.breed ? `${kind}・${row.pet.breed}` : kind
@@ -413,8 +415,8 @@ function HealthRow({ row, onOpenSummary, onOpenPdf }: { row: NenHealthRow; onOpe
     { id: 'summary', label: '30日のまとめ', onSelect: () => onOpenSummary(row.pet.id) },
     /* 1匹の PDF は「30日のまとめ」を開いてから印刷する（開いた引き出しの「印刷・PDF に保存する」）。 */
     { id: 'pdf', label: '獣医師向け PDF', onSelect: () => onOpenPdf(row.pet.id) },
-    { id: 'owner', label: '飼い主を開く', external: true, onSelect: () => { window.location.href = `/friends/detail?id=${friendId}` } },
-    { id: 'talk', label: '飼い主にトークで声をかける', external: true, onSelect: () => { window.location.href = `/chats?friend=${friendId}` } },
+    { id: 'owner', label: '飼い主を開く', external: true, onSelect: () => { router.push(`/friends/detail?id=${friendId}`) } },
+    { id: 'talk', label: '飼い主にトークで声をかける', external: true, onSelect: () => { router.push(`/chats?friend=${friendId}`) } },
   ]
   return (
     <Tr className={styles.row} data-table-layout="columns">

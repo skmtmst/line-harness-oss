@@ -50,3 +50,5 @@
 [data-theme='v8'] .help button > span[aria-hidden] { border: 0; border-radius: 999px; outline: 1px solid var(--color-ink-faint); outline-offset: -.5px; background: transparent; color: var(--color-ink-faint); }
 
 }
+
+[data-theme='v8'] .root[data-size="small"] .title { font-size: var(--text-body); font-weight: 700; line-height: var(--tpl-rt-label-lh); }

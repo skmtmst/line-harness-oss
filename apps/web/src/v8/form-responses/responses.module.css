@@ -18,28 +18,11 @@
 .tabsPlain {
   border-bottom: 0;
 }
-.layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--tpl-ev-fr-rail-w);
-  align-items: start;
-  gap: var(--tpl-ev-fr-col-gap);
-  margin-top: var(--tpl-ev-fr-pull-top);
-  margin-right: var(--tpl-ev-bk-pull-side);
-}
-.main {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-wh-check-gap);
-  min-width: 0;
-}
 .rail {
   display: flex;
   flex-direction: column;
   gap: var(--tpl-body-pad);
   min-width: 0;
-  min-height: 100%;
-  padding-left: var(--tpl-ev-fr-rail-pad);
-  border-left: 1px solid var(--color-hairline);
 }
 .card {
   display: flex;
@@ -47,9 +30,10 @@
   gap: var(--tpl-rule-row-gap);
   padding: var(--tpl-wh-card-pad);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 .cardHead {
   display: flex;
@@ -222,16 +206,6 @@
   border-collapse: collapse;
   table-layout: fixed;
 }
-.table th {
-  height: var(--tpl-ev-fr-head-h);
-  padding: 0 var(--tpl-toolbar-gap);
-  box-shadow: var(--shadow-row-line);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-wh-cell-lh);
-  text-align: left;
-}
 .colWhen {
   width: var(--tpl-ev-fr-col-when);
 }
@@ -341,9 +315,10 @@
   gap: var(--tpl-rule-row-gap);
   padding: var(--tpl-side-card-pad);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 .railCard[aria-label] {
   gap: var(--tpl-compact-gap);

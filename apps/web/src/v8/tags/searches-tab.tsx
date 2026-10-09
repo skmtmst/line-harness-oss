@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 友だち属性「保存した検索」タブ（Pencil `IWnYX`）。
+ * ★V8 タグ「保存した検索」タブ（Pencil `IWnYX`）。
  *
  * ここは管理だけ。条件を作るのは友だち一覧の絞り込みで、「この条件を保存」で増える。
  * 動き（読み込み・数の帯・絞り込み・並べ替え・削除・行の詳細パネル・名前のその場の直し・右クリック）は
@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, CalendarClock, Filter, Info, Send, Users } from 'lucide-react'
+import { AlertCircle, Bookmark, CircleDashed, Filter, Lightbulb, MousePointerClick, Send, Users } from 'lucide-react'
 import type { SavedSearch, Tag } from '@line-crm/shared'
 import { api, ApiError, type SavedSearchSummary } from '@/lib/api'
 import { ListPageBody } from '@/components/templates'
@@ -26,6 +26,7 @@ import { withViewTransition } from '@/components/shared/view-transition'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
+import StatusBadge from '@/components/shared/status-badge'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import KpiCard from '@/components/shared/kpi-card'
@@ -296,10 +297,10 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
 
   const sharedCount = items.filter((item) => item.isShared).length
   const kpiCards = [
-    { title: '保存した条件', icon: Filter, value: kpis.total, unit: '件', detail: ready ? `自分 ${items.length - sharedCount}・共有 ${sharedCount}` : '—' },
+    { title: '保存した条件', icon: Bookmark, value: kpis.total, unit: '件', detail: ready ? `自分 ${items.length - sharedCount}・共有 ${sharedCount}` : '—' },
     { title: '配信で使っている', icon: Send, value: kpis.usedInBroadcasts, unit: '件', detail: '一斉配信・自動処理' },
-    { title: '該当なし', icon: Users, value: kpis.zeroMatches, unit: '件', detail: '条件が古いかも' },
-    { title: '今月の利用', icon: CalendarClock, value: kpis.callsThisMonth, unit: '回', detail: kpis.callsThisMonth === null ? '利用の記録は未接続' : '友だち一覧で開いた回数' },
+    { title: '該当なし', icon: CircleDashed, value: kpis.zeroMatches, unit: '件', detail: '条件が古いかも' },
+    { title: '今月の利用', icon: MousePointerClick, value: kpis.callsThisMonth, unit: '回', detail: kpis.callsThisMonth === null ? '利用の記録は未接続' : '友だち一覧で開いた回数' },
   ]
 
   const filterActive = Boolean(query || usageFilter !== 'all' || matchFilter !== 'all')
@@ -372,14 +373,14 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
                   <ContextMenu label={`保存した検索「${search.name}」の操作`} items={searchContextItems(search)}>
                     <div className={styles.nameRow}>
                       {editHref ? (
-                        <Link href={editHref} className={styles.name} title={search.name} onClick={(event) => event.stopPropagation()}>
+                        <Link href={editHref} className={`${styles.name} ${styles.nameLink}`} title={search.name} onClick={(event) => event.stopPropagation()}>
                           {search.name}
                         </Link>
                       ) : (
                         <span className={styles.name} title={search.name}>{search.name}</span>
                       )}
                       {!search.lineAccountId ? (
-                        <span className={`${styles.miniBadge} ${styles.miniBadgeWarn}`}>対象アカウント未割り当て</span>
+                        <StatusBadge tone="warning" size="annotation" dot={false}>対象アカウント未割り当て</StatusBadge>
                       ) : null}
                     </div>
                     <p className={styles.sub} title={summaryText}>{summaryText}</p>
@@ -403,7 +404,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
                 <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
                   <span className={styles.menuAnchor}>
                     <RowMenu
-                      className={styles.menuButton}
+                      size="row"
                       label={`保存した検索「${search.name}」の操作`}
                       items={rowMenuItems(search)}
                       open={openMenuId === search.id}
@@ -426,9 +427,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
         </div>
       ) : null}
 
-      <p className={styles.footNote}>
-        {canEdit ? `保存は最大 ${MAX_SAVED} 件。行の「…」に：編集・複製して保存・削除` : `保存は最大 ${MAX_SAVED} 件。`}
-      </p>
+
     </DelayedSkeleton>
   )
 
@@ -450,18 +449,20 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
 
       <div className={styles.infoRow}>
         <p className={styles.readonlyBand}>
-          <Info className={styles.readonlyIcon} aria-hidden="true" />
+          <Lightbulb className={styles.readonlyIcon} aria-hidden="true" />
           友だち一覧で絞り込みを作り「この条件を保存」で保存します。配信や自動処理の宛先にも使えます。
         </p>
       </div>
 
       <ListPageBody
+        listHelp={canEdit ? `保存は最大 ${MAX_SAVED} 件。行の「…」に：編集・複製して保存・削除。` : `保存は最大 ${MAX_SAVED} 件。`}
         toolbar={<>
           <span className={styles.search}>
             <SearchField aria-label="条件名で探す" placeholder="条件名で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
           </span>
           <Select
             value={usageFilter}
+            width={170}
             onChange={(value) => setUsageFilter(value as SavedSearchUsageFilter)}
             aria-label="使っている所で絞り込む"
             options={[
@@ -472,6 +473,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
           />
           <Select
             value={matchFilter}
+            width={145}
             onChange={(value) => setMatchFilter(value as typeof matchFilter)}
             aria-label="該当人数で絞り込む"
             options={[

@@ -187,8 +187,8 @@
 [data-theme='v8'] .card {
   justify-content: flex-start; min-width: 0; min-height: 0;
   gap: var(--tpl-band-cell-gap); padding: var(--tpl-band-cell-pad-block) var(--tpl-band-cell-pad-side); border: 0; border-radius: 12px;
-  outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
-  background: var(--color-canvas); box-shadow: none;
+  outline: 1px solid var(--card-edge); outline-offset: -0.5px;
+  background: var(--color-canvas); box-shadow: var(--card-shadow);
 }
 /* 包みを使わない組み方（画面が strip＋KpiCard を直に並べる所）も、
    数の大きさ・マスの余白は帯と同じ変数で絵どおりにする。 */
@@ -238,7 +238,7 @@
 [data-theme='v8'] .detailText { min-width: 0; flex: 1; }
 [data-theme='v8'] .link { font-size: 12px; font-weight: 500; line-height: 18px; }
 [data-theme='v8'] .card[data-kpi-presentation='band'] {
-  border-radius: 0; outline-color: transparent;
+  border-radius: 0; outline-color: transparent; box-shadow: none;
 }
 [data-theme='v8'] .card[data-kpi-density='compact'] {
   padding: 10px 16px; gap: 4px;
@@ -299,6 +299,25 @@
 [data-theme='v8'] .card[data-kpi-presentation='cell'] { border-radius: 0; }
 
 /* 印なしの帯の横並びは kpi-band-v8.css（層なしCSS）に置く。 */
+[data-theme='v8'] .card[data-kpi-presentation='stacked'] {
+  gap: var(--tpl-sa-kpi-inner-gap); padding: var(--tpl-sa-kpi-pad);
+  border-radius: var(--radius-card); outline-color: transparent; box-shadow: var(--tpl-sa-ring);
+}
+[data-theme='v8'] .card[data-kpi-presentation='stacked'] .head { min-height: 0; }
+[data-theme='v8'] .card[data-kpi-presentation='stacked'] .label {
+  color: var(--color-ink-faint); font-size: var(--text-micro); font-weight: 600;
+  line-height: var(--tpl-sa-label-lh);
+}
+[data-theme='v8'] .card[data-kpi-presentation='stacked'] .value { flex-direction: column; align-items: flex-start; gap: var(--tpl-sa-kpi-inner-gap); }
+[data-theme='v8'] .card[data-kpi-presentation='stacked'] .number {
+  font-size: var(--tpl-sa-kpi-value-size); font-weight: 700;
+  line-height: var(--tpl-sa-kpi-value-lh); letter-spacing: 0;
+}
+[data-theme='v8'] .card[data-kpi-presentation='stacked'] .unit {
+  color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-sa-label-lh);
+}
+[data-theme='v8'] .card[data-kpi-presentation='stacked'] .valueWarning { color: var(--color-status-warn-deep); }
+[data-theme='v8'] .card[data-kpi-presentation='stacked'] .detail:empty { display: none; }
 /* ★V8 数のマスの下の段（Pp3nS「下」：高さ18・右に行き先）。行き先のボタンが押せる高さ32で段を押し広げない（司令塔 2026-10-05） */
 [data-theme='v8'] .detail .retry { min-height: 0; height: auto; padding: 0; line-height: 18px; margin-left: auto; }
 
@@ -309,3 +328,74 @@
  */
 [data-theme='v8'] .skeleton { height: 32px; }
 [data-theme='v8'] .card[data-kpi-presentation='band'] .skeleton { height: var(--tpl-band-number-lh); }
+
+[data-theme='v8'] .valueRow[data-unit-spacing='tight'] .value { gap: var(--tpl-kpi-unit-gap-tight); }
+/* SrmVs は帯の各マスを離して並べる。帯の既定の線・隙間0は変えない。 */
+[data-theme='v8'] .strip[data-kpi-presentation='separated'] {
+  display: flex; align-items: stretch; gap: var(--tpl-rt-section-gap); min-width: 0;
+}
+[data-theme='v8'] .strip[data-kpi-presentation='separated'] > * { flex: 1 1 0; min-width: 0; }
+
+[data-theme='v8'] .strip[data-kpi-presentation='separated'] .number { font-size: 28px; line-height: 32px; }
+/* hQQlt：箱の中の小さな件数。通常のカード・数の帯は変えない。 */
+[data-theme='v8'] .card[data-kpi-presentation='inline'] { min-height: 0; justify-content: flex-start; display: flex; flex-direction: column; gap: 4px; padding: 0; border: 0; outline-color: transparent; border-radius: var(--radius-none); background: none; box-shadow: none; }
+[data-theme='v8'] .card[data-kpi-presentation='inline'] .head { order: 2; min-height: 0; }
+[data-theme='v8'] .card[data-kpi-presentation='inline'] .label { color: var(--color-ink-secondary); font-size: 11px; font-weight: 400; line-height: 16px; }
+[data-theme='v8'] .card[data-kpi-presentation='inline'] .number, [data-theme='v8'] .card[data-kpi-presentation='inline'] .unit { font-size: 12px; font-weight: 700; line-height: 18px; }
+[data-theme='v8'] .card[data-kpi-presentation='inline'] .value { gap: 0; }
+[data-theme='v8'] .card[data-kpi-presentation='inline'] .detail { display: none; }
+[data-theme='v8'] .valueDanger { color: var(--color-danger); }
+/* 取り込み記録の小さいカードと、設定内の22/26の数。指定時だけ使う。 */
+[data-theme='v8'] .card[data-kpi-density='record'] {
+  gap: var(--tpl-sb-kpi-gap); padding: var(--tpl-sb-kpi-pad);
+}
+[data-theme='v8'] .card[data-kpi-density='record'] .head,
+[data-theme='v8'] .card[data-kpi-density='record'] .label,
+[data-theme='v8'] .card[data-kpi-density='record'] .detail {
+  min-height: 0; font-size: var(--tpl-sb-row-sub); line-height: var(--tpl-sb-row-sub-lh);
+}
+[data-theme='v8'] .card[data-kpi-density='record'] .label { font-weight: 600; }
+[data-theme='v8'] .card[data-kpi-density='record'] .number {
+  font-size: var(--tpl-sb-kpi-num); line-height: var(--tpl-sb-kpi-num-lh);
+}
+[data-theme='v8'] .card[data-kpi-metric-size='small'] .label { font-size: var(--tpl-rest3-op-kpi-title); line-height: var(--tpl-rest3-op-kpi-title-lh); }
+[data-theme='v8'] .card[data-kpi-metric-size='small'] .number { font-size: var(--tpl-rest3-op-kpi-num); line-height: var(--tpl-rest3-op-kpi-num-lh); }
+[data-theme='v8'] .card[data-kpi-metric-size='small'] .unit { line-height: var(--tpl-rest3-op-kpi-title-lh); }
+
+[data-theme='v8'] .card[data-kpi-density='mini'] {
+  padding: var(--tpl-rest3-ec-mini-pad); gap: var(--tpl-rest3-ec-mini-inner-gap);
+  border-radius: var(--tpl-rest3-ec-mini-radius); outline-color: transparent; background: var(--color-surface-pearl);
+}
+[data-theme='v8'] .card[data-kpi-density='mini'] .head { min-height: 0; }
+[data-theme='v8'] .card[data-kpi-density='mini'] .label { color: var(--color-ink-secondary); font-size: var(--tpl-rest3-ec-xs); line-height: var(--tpl-rest3-ec-note-lh); }
+[data-theme='v8'] .card[data-kpi-density='mini'] .number { font-family: var(--font-sans); font-size: var(--tpl-rest3-ec-mini-num); line-height: var(--tpl-rest3-ec-mini-num-lh); letter-spacing: 0; }
+[data-theme='v8'] .card[data-kpi-density='mini'] .detail { display: none; }
+[data-theme='v8'] .strip[data-kpi-presentation='band'][data-kpi-border='inset-top'] {
+  border-block-width: 0; box-shadow: var(--shadow-wh-kpi-top);
+}
+
+/* LINE通知の数カード。指定した利用先だけで寸法を切り替える。 */
+[data-theme='v8'] .card[data-kpi-appearance='notification-customer'] {
+  gap: var(--tpl-sb-kpi-gap); padding: var(--tpl-sb-kpi-pad);
+}
+[data-theme='v8'] .card[data-kpi-appearance='notification-operator'] {
+  gap: var(--tpl-rest3-op-kpi-gap); padding: var(--tpl-rest3-op-kpi-pad);
+}
+[data-theme='v8'] .card[data-kpi-appearance] .head,
+[data-theme='v8'] .card[data-kpi-appearance] .label,
+[data-theme='v8'] .card[data-kpi-appearance] .detail { min-height: 0; }
+[data-theme='v8'] .card[data-kpi-appearance='notification-customer'] .label,
+[data-theme='v8'] .card[data-kpi-appearance='notification-customer'] .detail {
+  font-size: var(--tpl-sb-row-sub); line-height: var(--tpl-sb-row-sub-lh);
+}
+[data-theme='v8'] .card[data-kpi-appearance='notification-operator'] .label,
+[data-theme='v8'] .card[data-kpi-appearance='notification-operator'] .detail {
+  font-size: var(--tpl-rest3-op-kpi-title); line-height: var(--tpl-rest3-op-kpi-title-lh);
+}
+[data-theme='v8'] .card[data-kpi-appearance] .label { font-weight: 600; }
+[data-theme='v8'] .card[data-kpi-appearance='notification-customer'] .number {
+  font-size: var(--tpl-sb-kpi-num); line-height: var(--tpl-sb-kpi-num-lh);
+}
+[data-theme='v8'] .card[data-kpi-appearance='notification-operator'] .number {
+  font-size: var(--tpl-rest3-op-kpi-num); line-height: var(--tpl-rest3-op-kpi-num-lh);
+}

@@ -453,7 +453,7 @@ export default function InflowListV8({
   })
   const rowMenuItems = (row: RouteRow): ActionMenuItem[] => {
     const items: ActionMenuItem[] = []
-    if (row.isActive !== false) {
+    {
       items.push({ id: 'qr', label: 'QRコードを見る', onSelect: () => { setOpenMenuRefCode(null); setQrRoute(qrFor(row)) } })
       items.push({ id: 'copy', label: 'URLをコピー', onSelect: () => { setOpenMenuRefCode(null); void onCopy(row.refCode) } })
     }
@@ -485,10 +485,13 @@ export default function InflowListV8({
 
   /* ===== フォルダ ===== */
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: accountRows.length, icon: <Inbox size={15} aria-hidden="true" /> },
+    { kind: 'all' as const, id: '', label: 'すべて', count: accountRows.length, icon: <Inbox size={15} aria-hidden="true" /> },
     ...availableGenres.map((genre) => ({
+      kind: 'folder' as const,
       id: genre.name,
       label: genre.name,
+      // entry_route_genres に color 欄がない。追加はオーナーの migration 承認待ち。
+      colorEditable: false,
       count: accountRows.filter((row) => row.genre === genre.name).length,
       // 名前の変更は選んだフォルダの「…」から（選んでいない行に「…」の箱を出すと件数が左へずれる）。
       ...(canManageFolders && !genre.id.startsWith('legacy-') && selectedGenre === genre.name
@@ -496,7 +499,7 @@ export default function InflowListV8({
         : {}),
     })),
     ...(hasUncategorized
-      ? [{ id: UNCATEGORIZED, label: '未分類', count: accountRows.filter((row) => !row.genre).length }]
+      ? [{ kind: 'unfiled' as const, id: UNCATEGORIZED, label: '未分類', count: accountRows.filter((row) => !row.genre).length }]
       : []),
   ]
   const selectGenre = (id: string) => { setSelectedGenre(id); setPage(1) }
@@ -777,14 +780,9 @@ export default function InflowListV8({
                     </Td>
                     <Td className={styles.colUrl}>
                       <div className={styles.opsBox}>
-                        {r.isActive === false ? (
-                          // 停止中の経路の URL と QR は出さない（開いても友だち追加できない URL を配らない）。
-                          <Button disabled title="停止中のためURLとQRコードは表示できません">停止中</Button>
-                        ) : (
-                          <Button onClick={() => void onCopy(r.refCode)} aria-label={`${r.name}のURLをコピー`}>
-                            {copyFailedId === r.refCode ? 'コピー失敗' : copiedId === r.refCode ? '済み' : 'コピー'}
-                          </Button>
-                        )}
+                        <Button onClick={() => void onCopy(r.refCode)} aria-label={`${r.name}のURLをコピー`}>
+                          {copyFailedId === r.refCode ? 'コピー失敗' : copiedId === r.refCode ? '済み' : 'コピー'}
+                        </Button>
                         {menuItems.length > 0 ? (
                           <RowMenu
                             label={menuLabel}
@@ -824,11 +822,7 @@ export default function InflowListV8({
             </tbody>
           </DataTable>
         </div>
-        <p className={styles.footNote}>
-          {readonly
-            ? '行の「…」から QRコードを表示・URLをコピーできます。'
-            : '行の「…」から QRコードを表示・URLをコピー・リンクを編集・止める。左のチェックで、まとめて操作できます。'}
-        </p>
+
         <BulkBar count={selectedRouteIds.size} hint="まとめて操作できるのは登録済みの経路だけです">
           <Button onClick={() => setBulkAction('pause')}>まとめて止める</Button>
           <Button onClick={() => setBulkAction('resume')}>まとめて再開する</Button>
@@ -849,6 +843,9 @@ export default function InflowListV8({
 
   return (
     <ListPage
+      help={readonly
+            ? '行の「…」から QRコードを表示・URLをコピーできます。'
+            : '行の「…」から QRコードを表示・URLをコピー・リンクを編集・止める。左のチェックで、まとめて操作できます。'}
       boardId="xbHxg"
       headingSize="regular"
       title="流入と計測"

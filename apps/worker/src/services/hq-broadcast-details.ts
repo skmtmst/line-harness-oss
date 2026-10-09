@@ -5,6 +5,7 @@ import { addTestLabel, parseBroadcastMessageParts, buildMessages, renderMessageP
 import { resolveSendCommonVars, contentNeedsFriendFields } from './interpolation-context.js';
 import { getHqBroadcastRun, mappedHqContent } from './hq-broadcasts.js';
 import type { HqBroadcastInput } from '@line-crm/shared';
+import { resolveHqBroadcastMaterials } from './hq-broadcast-materials.js';
 type Run=Awaited<ReturnType<typeof getHqBroadcastRun>>;
 async function child(db:D1Database,run:Run,accountId:string) {
   const target=await db.prepare(`SELECT t.broadcast_id FROM hq_broadcast_targets t JOIN line_accounts a ON a.id=t.line_account_id AND a.tenant_id=?
@@ -42,7 +43,7 @@ export async function testHqBroadcast(db:D1Database,run:Run,actorId:string,accou
   const friends=(await db.prepare(`SELECT id,line_user_id,display_name FROM friends WHERE line_account_id=? AND id IN (${ids.map(()=>'?').join(',')})
     AND is_following=1 AND COALESCE(is_hidden,0)=0 AND line_user_id IS NOT NULL AND line_user_id<>''`).bind(accountId,...ids).all<{id:string;line_user_id:string;display_name:string|null}>()).results;
   if(friends.length!==ids.length)throw new StampError('テスト宛先がこの店に属しているか確認してください',403);
-  const input=JSON.parse(run.input_json) as HqBroadcastInput,parts=addTestLabel(parseBroadcastMessageParts({...input,...mappedHqContent(input,account.name)}));
+  const input=await resolveHqBroadcastMaterials(db,run.tenant_id,accountId,JSON.parse(run.input_json) as HqBroadcastInput),parts=addTestLabel(parseBroadcastMessageParts({...input,...mappedHqContent(input,account.name,account.liff_id)}));
   const content=combinedMessageContent(parts),vars=await resolveSendCommonVars(db,accountId,content,{kind:'test_send',id:run.id});
   const rendered=[];
   for(const f of friends){const fields=contentNeedsFriendFields(content)?await getFriendFieldMap(db,f.id):undefined;

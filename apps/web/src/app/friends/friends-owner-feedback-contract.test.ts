@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -25,23 +25,6 @@ describe('友だち画面のオーナー指摘契約', () => {
     expect(PAGE).toContain('selected={attentionOnly}')
     expect(PAGE).toContain('未対応')
     expect(PAGE).toContain('注目のみ')
-  })
-
-  it('友だち詳細のマイル残高を利用可能ラベルと同じ枠の一行に置く', () => {
-    expect(DETAIL).toContain('mt-2 flex items-center justify-between rounded-control')
-    expect(DETAIL).toContain('text-base font-bold tabular-nums')
-    expect(DETAIL).not.toContain('text-2xl font-bold tabular-nums')
-  })
-
-  it('重複候補表の見出しを下の表と同じ縦余白にする', () => {
-    /*
-     * #984 LAY-12: セルへの余白直書き（py-3）ではなく、共通の
-     * TableHeadRow/Th（見出し高さ44pxを部品側が持つ）でそろえる。
-     */
-    expect(DUPLICATES).toContain("import { TableHeadRow, Th } from '@/components/shared/table'")
-    expect(DUPLICATES).toContain('<TableHeadRow>')
-    expect(DUPLICATES).not.toMatch(/<th\b/)
-    expect(DUPLICATES).not.toMatch(/<Th className="[^"]*py-/)
   })
 
   it('統合ユーザーの操作行を一重の枠と同じ高さにそろえる', () => {

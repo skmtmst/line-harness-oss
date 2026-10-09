@@ -19,6 +19,8 @@ export default function SegmentedControl<T extends string>({
   className,
   size = 'medium',
   disabled = false,
+  appearance = 'track',
+  equalWidth = false,
 }: {
   options: { value: T; label: string }[]
   value: T
@@ -26,6 +28,7 @@ export default function SegmentedControl<T extends string>({
   'aria-label': string
   className?: string
   /**
+   * 'timing' は連動タイミング（gSsPR）の高さ40・幅360の2択。
    * 大きさ。既定 'medium' は箱型（dtJVi：項目 6/12・文 13）。
    * 'small' は小型（d8X09 グラフ／表：器 r8・項目 3/10・文 12・
    * つまみ r6・全体の高さ 28）。'compact' は詰めた形（ベルの小窓 mV28V：
@@ -33,9 +36,13 @@ export default function SegmentedControl<T extends string>({
    * 'panel' は脇のパネル内（★BG-B `SLgY5` つくる枚数：器 余白3・r8・
    * 横いっぱい・項目 5/12・文 12/17・選択中 700・つまみ r6）。v8 だけで効く。
    */
-  size?: 'medium' | 'small' | 'compact' | 'panel'
+  size?: 'medium' | 'small' | 'compact' | 'panel' | 'timing' | 'sticker'
   /** 操作を止める（生成中など）。項目すべてを押せなくする。 */
   disabled?: boolean
+  /** 電話予約の探し方（rm92Y）：各項目が独立した丸い選択肢。 */
+  appearance?: 'track' | 'choices'
+  /** 選択肢を器の幅へ均等に並べる（統括の生成枚数）。 */
+  equalWidth?: boolean
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
@@ -72,13 +79,15 @@ export default function SegmentedControl<T extends string>({
       aria-label={ariaLabel}
       className={[styles.root, className].filter(Boolean).join(' ')}
       data-size={size}
+      data-appearance={appearance}
+      data-equal-width={equalWidth || undefined}
       onKeyDown={onKeyDown}
     >
-      <span
+      {appearance === 'track' ? <span
         className={styles.thumb}
         style={{ transform: `translateX(${thumb.left}px)`, width: thumb.width }}
         aria-hidden="true"
-      />
+      /> : null}
       {options.map((option, index) => (
         <button
           key={option.value}

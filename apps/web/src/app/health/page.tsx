@@ -1,5 +1,7 @@
 'use client'
 
+import { PageHeading } from '@/components/templates/page-frame'
+
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api'
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
@@ -249,6 +251,7 @@ export default function HealthPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="v8-only"><PageHeading title="BAN検知ダッシュボード" /></div>
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
 
       {/* Error */}

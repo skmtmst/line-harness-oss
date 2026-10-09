@@ -3,6 +3,7 @@ import { hqBroadcastApprovalState, hqBroadcastApprovalCandidates, updateHqApprov
 import { hqBroadcastRecipients, hqBroadcastActivity, testHqBroadcast } from '../services/hq-broadcast-details.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
+import { isFolderSelectColor } from '@line-crm/shared';
 import type { HqBroadcastInput, HqBroadcastDraftInput } from '@line-crm/shared';
 import { dbFor } from '../services/db-router.js';
 import { requireRole, requireIrreversibleConfirmation } from '../middleware/role-guard.js';
@@ -28,22 +29,25 @@ hqBroadcasts.get('/api/hq/broadcasts/approvals/candidates',async c=>{
 });
 hqBroadcasts.get('/api/hq/broadcasts/folders',async c=>{
  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),true);
- return c.json({success:true,data:(await db.prepare(`SELECT f.id,f.name,f.revision,
+ return c.json({success:true,data:(await db.prepare(`SELECT f.id,f.name,f.revision,f.color,
    (SELECT COUNT(*) FROM hq_broadcast_runs r WHERE r.tenant_id=f.tenant_id AND json_extract(r.input_json,'$.folderId')=f.id) AS item_count
    FROM hq_broadcast_folders f WHERE tenant_id=? AND archived_at IS NULL ORDER BY name,id`).bind(a.tenantId).all()).results});
 });
 hqBroadcasts.post('/api/hq/broadcasts/folders',async c=>{
- const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff')),b=await c.req.json<{name:string}>();
+ const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff')),b=await c.req.json<{name:string;color?:string|null}>();
  if(typeof b.name!=='string'||!b.name.trim()||b.name.length>100)throw new StampError('分類名を確認してください');
- const id=crypto.randomUUID();await db.prepare('INSERT INTO hq_broadcast_folders(id,tenant_id,name) VALUES(?,?,?)').bind(id,a.tenantId,b.name.trim()).run();
- return c.json({success:true,data:{id,name:b.name.trim(),revision:1}},201);
+ if(b.color!==undefined&&!isFolderSelectColor(b.color))return c.json({success:false,error:'フォルダの色を確認してください'},422);
+ const id=crypto.randomUUID();await db.prepare('INSERT INTO hq_broadcast_folders(id,tenant_id,name,color) VALUES(?,?,?,?)').bind(id,a.tenantId,b.name.trim(),b.color??null).run();
+ return c.json({success:true,data:{id,name:b.name.trim(),color:b.color??null,revision:1}},201);
 });
 hqBroadcasts.patch('/api/hq/broadcasts/folders/:id',async c=>{
- const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff')),b=await c.req.json<{name:string;expectedVersion:number}>();
+ const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff')),b=await c.req.json<{name:string;expectedVersion:number;color?:string|null}>();
  if(typeof b.name!=='string'||!b.name.trim()||b.name.length>100||!Number.isSafeInteger(b.expectedVersion))throw new StampError('分類名と版を確認してください');
- const r=await db.prepare(`UPDATE hq_broadcast_folders SET name=?,revision=revision+1,updated_at=datetime('now') WHERE id=? AND tenant_id=? AND revision=? AND archived_at IS NULL`)
- .bind(b.name.trim(),c.req.param('id'),a.tenantId,b.expectedVersion).run();if(!r.meta.changes)throw new StampError('分類が更新されました',409);
- return c.json({success:true,data:{id:c.req.param('id'),name:b.name.trim(),revision:b.expectedVersion+1}});
+ if(b.color!==undefined&&!isFolderSelectColor(b.color))return c.json({success:false,error:'フォルダの色を確認してください'},422);
+ const r=await db.prepare(`UPDATE hq_broadcast_folders SET name=?,color=CASE WHEN ? THEN ? ELSE color END,revision=revision+1,updated_at=datetime('now') WHERE id=? AND tenant_id=? AND revision=? AND archived_at IS NULL`)
+ .bind(b.name.trim(),b.color!==undefined?1:0,b.color??null,c.req.param('id'),a.tenantId,b.expectedVersion).run();if(!r.meta.changes)throw new StampError('分類が更新されました',409);
+ const folder=await db.prepare('SELECT id,name,revision,color FROM hq_broadcast_folders WHERE id=? AND tenant_id=?').bind(c.req.param('id'),a.tenantId).first();
+ return c.json({success:true,data:folder});
 });
 hqBroadcasts.delete('/api/hq/broadcasts/folders/:id',async c=>{
  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff')),b=await c.req.json<{expectedVersion:number}>();

@@ -52,4 +52,8 @@
   color: var(--color-ink-faint); /* fill: $ink-faint */
   flex: none;
 }
+
+/* 統括バナーの板だけ：緑の行き先と文字の区切り。既定のパンくずは保つ。 */
+.list[data-appearance='banner'] .link { color: var(--color-accent-deep); }
+.list[data-appearance='banner'] .separator { width: auto; height: auto; }
 }

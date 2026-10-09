@@ -36,6 +36,8 @@
   outline: revert;
 }
 
+[data-theme='v8'] .panel[data-design-width] { width: min(var(--drawer-design-width), 100%); }
+
 .header {
   display: flex;
   flex: 0 0 auto;
@@ -308,3 +310,28 @@
   transform: translateX(24px);
 }
 }
+
+/* 紹介者の620幅の板。外側の余白を型が持つ。 */
+[data-theme='v8'] .panel[data-layout='inset'] { padding: var(--tpl-af-dr-pad); gap: var(--tpl-af-dr-gap); box-shadow: var(--tpl-af-dr-shadow); }
+[data-theme='v8'] .panel[data-layout='inset'] .header { padding: 0; gap: var(--tpl-af-dr-gap); }
+[data-theme='v8'] .panel[data-layout='inset'] .title { font-size: var(--text-heading); font-weight: 700; line-height: normal; }
+[data-theme='v8'] .panel[data-layout='inset'] .description { margin-top: var(--tpl-af-dr-head-gap); font-size: var(--text-caption); line-height: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-theme='v8'] .panel[data-layout='inset'] .body { padding: 0; }
+[data-theme='v8'] .panel[data-layout='inset'] .footer { padding: 0; border: 0; gap: var(--tpl-toolbar-gap); }
+[data-theme='v8'] .panel[data-layout='inset'] .close { width: var(--tpl-af-dr-close); height: var(--tpl-af-dr-close); flex-basis: var(--tpl-af-dr-close); border: 1px solid var(--color-hairline); border-radius: var(--radius-control); color: var(--color-ink-secondary); }
+/* 注文の参照（nAesv）：本文と頭の間16・下の操作は左右。ほかの幅は変えない。 */
+[data-theme='v8'] .panel[data-width='order'] { width: min(var(--tpl-st2-od-w), 100%); gap: var(--tpl-st2-od-gap); }
+[data-theme='v8'] .panel[data-width='order'] .header { border: 0; padding: var(--tpl-st2-od-pad) var(--tpl-st2-od-pad) 0; }
+[data-theme='v8'] .panel[data-width='order'] .title { font-size: var(--tpl-st2-od-title); font-weight: 700; line-height: var(--tpl-st2-od-title-lh); }
+[data-theme='v8'] .panel[data-width='order'] .description { margin-top: var(--tpl-st2-od-head-text-gap); color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-st2-od-text-lh); }
+[data-theme='v8'] .panel[data-width='order'] .close { width: var(--tpl-st2-od-close); height: var(--tpl-st2-od-close); flex-basis: var(--tpl-st2-od-close); border-radius: var(--radius-control); outline: 1px solid var(--color-hairline); outline-offset: -1px; }
+[data-theme='v8'] .panel[data-width='order'] .body { display: flex; flex-direction: column; gap: var(--tpl-st2-od-gap); padding: 0 var(--tpl-st2-od-pad); }
+[data-theme='v8'] .panel[data-width='order'] .footer { display: flex; justify-content: space-between; gap: var(--tpl-st2-od-gap); border: 0; padding: 0 var(--tpl-st2-od-pad) var(--tpl-st2-od-pad); }
+/* G-9: メッセージ作成の広い引き出し。ほかの引き出しは変えない。 */
+[data-theme='v8'] .panel[data-width='composer'] { width: min(var(--tpl-msg-composer-drawer-w), 100%); border-radius: var(--radius-panel) 0 0 var(--radius-panel); }
+[data-theme='v8'] .panel[data-width='composer'] .header { padding: var(--tpl-msg-composer-drawer-head-pad); align-items: center; }
+[data-theme='v8'] .panel[data-width='composer'] .title { font-size: var(--tpl-msg-composer-drawer-title); line-height: var(--tpl-msg-composer-drawer-title-lh); font-weight: 700; }
+[data-theme='v8'] .panel[data-width='composer'] .body { padding: 0; }
+[data-theme='v8'] .panel[data-width='composer'] .footer { padding: var(--tpl-msg-composer-drawer-footer-pad); }
+
+.titleRow { display: flex; align-items: center; gap: var(--tpl-msg-composer-content-gap); flex-wrap: wrap; }

@@ -118,8 +118,23 @@ describe('V8 投稿（審査）', () => {
     const dialog = document.querySelector('[data-design-node="ujcar"]')
     expect(dialog?.textContent).toContain('この写真を見送りますか？')
     expect(dialog?.textContent).toContain('写真が暗い・ぼやけている')
-    await click([...document.querySelectorAll('[role="radio"]')].find((radio) => radio.textContent?.includes('ほかの人の顔')))
+    await click([...document.querySelectorAll('input[type="radio"]')].find((radio) => radio.parentElement?.textContent?.includes('ほかの人の顔')))
     expect(document.querySelector('[data-design-node="ujcar"]')?.textContent).toContain('人の顔や個人情報が写っている')
+  })
+
+  it('そのほかの理由が空なら送らず、補足の欄だけで知らせる', async () => {
+    await render()
+    await click(buttons('そらちゃんの写真を見送る')[0])
+    await click([...document.querySelectorAll('input[type="radio"]')].find((radio) => radio.parentElement?.textContent?.includes('自分で書く')))
+    const dialog = document.querySelector('[data-design-node="ujcar"]')!
+    const confirm = [...dialog.querySelectorAll('button')].find((button) => button.textContent?.trim() === '見送る')!
+    await click(confirm)
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 40)) })
+    const note = document.getElementById('photo-reject-note')!
+    expect(note.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(note)
+    expect(dialog.querySelectorAll('[role="alert"]')).toHaveLength(1)
+    expect(dialog.textContent).toContain('そのほかの理由を入力してください')
   })
 
   it('WEB225：見送りの保存に失敗したら、理由を開いている窓の中に出す', async () => {

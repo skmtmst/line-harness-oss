@@ -1,0 +1,2 @@
+/* 統括の友だち属性（絵 DzdC3）：探す欄の幅は店の友だち属性のタグと同じ。 */
+.tagTools.tagTools { --list-search-width: var(--tpl-tag-search-w); }

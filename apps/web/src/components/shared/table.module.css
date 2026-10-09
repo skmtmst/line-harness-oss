@@ -124,3 +124,20 @@
 [data-theme='v8'] .headRow .cell { padding-inline: var(--tpl-cell-gap-half); }
 [data-theme='v8'] .headRow .cell:first-child { padding-left: var(--tpl-thead-pad-side); }
 [data-theme='v8'] .headRow .cell:last-child { padding-right: var(--tpl-thead-pad-side); }
+
+/* カード内の表はカードが外枠を持つ。指定された行だけ、地と端の余白を揃える。 */
+[data-theme='v8'] .headRow[data-presentation='embedded'] {
+  border: 0;
+  background: transparent;
+}
+[data-theme='v8'] .headRow[data-presentation='embedded'] .cell {
+  height: var(--tpl-ev-fr-head-h);
+  padding: 0 var(--tpl-cell-gap-half);
+  font-weight: 600;
+}
+.truncated {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

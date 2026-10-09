@@ -3,7 +3,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => {},
   usePageTitle: () => {},
 }))
 vi.mock('next/link', () => ({
@@ -15,7 +15,7 @@ vi.mock('@/lib/hq-template-availability', () => ({
   HQ_TEMPLATE_DISTRIBUTION_ENABLED: false,
 }))
 vi.mock('./templates/template-console', () => ({
-  default: () => null,
+  default: ({ type }: { type: string }) => <div data-testid="v8-console">{type}</div>,
 }))
 
 import HqTemplatePage from './hq-template-page'
@@ -42,21 +42,18 @@ afterEach(() => {
 
 const CASES = [
   { type: 'form' as const, label: '回答フォーム', target: 'form-submissions' as const },
-  { type: 'tag' as const, label: '友だち属性', target: 'tags' as const },
+  { type: 'tag' as const, label: 'タグ', target: 'tags' as const },
   { type: 'rich_menu' as const, label: 'リッチメニュー', target: 'rich-menus' as const },
   { type: 'template' as const, label: 'テンプレート', target: 'templates' as const },
 ]
 
-describe('統括の未配布ページの案内表示', () => {
+describe('統括V8の直接URL', () => {
   for (const { type, label, target } of CASES) {
-    it(`${label}は「まだ使えません」と「アカウントを選ぶ」を出す`, async () => {
+    it(`${label}はV8のひな形画面を出す`, async () => {
       await act(async () => {
         root.render(<HqTemplatePage type={type} label={label} target={target} />)
       })
-      expect(host.textContent).toContain(`統括からの${label}の作成・配布はまだ使えません`)
-      const link = host.querySelector('a')
-      expect(link?.textContent).toContain('アカウントを選ぶ')
-      expect(link?.getAttribute('href')).toBe(`/hq/open?target=${target}`)
+      expect(host.querySelector('[data-testid="v8-console"]')?.textContent).toBe(type)
     })
   }
 })

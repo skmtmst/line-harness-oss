@@ -14,7 +14,7 @@ const src = (...parts: string[]) => readFileSync(join(here, '..', '..', 'app', .
 
 const contents = src('contents', 'page.tsx')
 const vars = src('contents', 'vars', 'page.tsx')
-const broadcasts = src('broadcasts', 'page.tsx')
+const broadcasts = readFileSync(join(here, '..', '..', 'v8', 'broadcasts', 'list.tsx'), 'utf8')
 
 describe('m18s FolderPanelの見出しに絞り込み件数を出さない', () => {
   it('登録メディア・共通情報・一斉配信は見出しの総数を出さない', () => {
@@ -31,7 +31,7 @@ describe('m18s FolderPanelの見出しに絞り込み件数を出さない', () 
     expect(vars).toContain('<ListRange')
     expect(vars).toContain('total={filtered.length}')
     // 一斉配信: 表の上の ListRange（タイトル・日付で絞った visibleBroadcasts）
-    expect(broadcasts).toContain('<ListRange')
-    expect(broadcasts).toContain('total={visibleBroadcasts.length}')
+    expect(broadcasts).toContain('<Pagination')
+    expect(broadcasts).toContain("resultTotal ?? visibleBroadcasts.length")
   })
 })

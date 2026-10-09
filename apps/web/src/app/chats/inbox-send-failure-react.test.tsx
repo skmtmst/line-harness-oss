@@ -132,7 +132,7 @@ describe('N-028/N-029 受信箱送信の失敗理由', () => {
       textarea.dispatchEvent(new Event('input', { bubbles: true }))
     })
     const button = Array.from(host.querySelectorAll('button'))
-      .find((b) => b.textContent === '送信' && b.className.includes('bg-accent-deep'))!
+      .find((b) => b.textContent?.trim() === '送信')!
     await act(async () => { button.click() })
   }
 

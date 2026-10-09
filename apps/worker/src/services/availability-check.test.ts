@@ -478,3 +478,17 @@ describe('explainBookingSlot', () => {
     expect(new Set(result.reasons)).toEqual(new Set<SlotBlockReason>(['other_booking', 'outside_working']));
   });
 });
+
+test('GoogleがHTTP200でも対象カレンダーの取得失敗なら予約不可を保つ', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ calendars: {
+    'cal@example.com': { errors: [{ domain: 'global', reason: 'internalError' }] },
+  } }), { status: 200 })));
+  try {
+    const data: StubData = { menu: MENU_BASIC, staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: DAY, start_time: '10:00', end_time: '13:00' }],
+      calendarConnection: { id: 'GC1', calendar_id: 'cal@example.com', auth_type: 'oauth', access_token: 'token' } };
+    expect(await actuallyBookable(data, '10:00')).toBe(false);
+    const availability = await getAvailability(stubDB(data), { lineAccountId: 'A1', menuId: 'M1', staffId: 'S1', from: DAY, to: DAY, now: NOW, minLeadTimeMinutes: 0 });
+    expect(availability).toMatchObject({calendar_sync: [expect.objectContaining({ configured: true, ok: false, error: 'unavailable' })]});
+  } finally { vi.unstubAllGlobals(); }
+});

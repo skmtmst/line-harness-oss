@@ -3,8 +3,11 @@
 import { useState, type CSSProperties, type ReactNode } from 'react'
 import ActionMenu, { type ActionMenuItem } from './action-menu'
 import Button from './button'
-import { ArrowDown, ArrowUp, Ellipsis, FolderOpen, FolderPlus, Palette, Pencil, Trash2 } from 'lucide-react'
+import HelpTip from './help-tip'
+import FolderDot from './folder-dot'
+import { ArrowDown, ArrowUp, Ellipsis, FolderOpen, FolderPlus, Inbox, Palette, Pencil, Trash2 } from 'lucide-react'
 import { useAdminTheme } from '@/lib/use-admin-theme'
+import { RowMenu } from './row-actions'
 import styles from './folder-panel.module.css'
 
 /** テンプレート一覧を正とする、全画面共通のフォルダ欄幅。 */
@@ -18,7 +21,7 @@ export const FOLDER_RAIL_STYLE = {
  *
  * Pencil V5 の `Pw4WX`（共通 フォルダレール）。
  *
- * 設計では友だち属性（タグ・友だち情報欄）がどちらもこの形をしている。
+ * 設計ではタグ（タグ・友だち情報欄）がどちらもこの形をしている。
  * 以前は一覧の上に横の帯として並べていたが、分類が増えると折り返して
  * 2段3段になり、その下の検索や表が押し下げられていた。縦なら増えても
  * 幅が変わらない。
@@ -29,6 +32,8 @@ export const FOLDER_RAIL_STYLE = {
 export interface FolderPanelRow {
   id: string
   label: string
+  /** V8 共通部品 faSbC。未指定の古い呼び方は「すべて」「未分類」の名前から判定する。 */
+  kind?: 'all' | 'unfiled' | 'folder'
   /**
    * このフォルダに属する件数。`null` は「数えていない」（#631）。
    *
@@ -41,8 +46,12 @@ export interface FolderPanelRow {
    * 未設定は null。色はフォルダに付き、属するタグに出る。
    */
   color?: string | null
-  /** V8 の分類の印。「すべて」などは呼び出し側が渡す。 */
+  /** V8 の分類の印。all・unfiled では無視し、共通部品で決める。 */
   icon?: ReactNode
+  /** フォルダ全体の選択など、行の右に置く操作。 */
+  trailing?: ReactNode
+  /** 行ごとの追加操作。今の操作の前に置き、その後に区切りを入れる。 */
+  leadingActions?: ActionMenuItem[]
   /**
    * 直せる行だけ渡す。「すべて」「未分類」は直せない。
    *
@@ -115,7 +124,9 @@ function folderMenuItems(
       onSelect: () => runAction(row.onDelete),
     })
   }
-  return items
+  const leading = row.leadingActions ?? []
+  return [...leading.map((item) => ({ ...item, onSelect: () => runAction(item.onSelect) })),
+    ...items.map((item, index) => index === 0 && leading.length ? { ...item, dividerBefore: true } : item)]
 }
 
 export default function FolderPanel({
@@ -124,6 +135,8 @@ export default function FolderPanel({
   onSelect,
   total,
   heading = 'フォルダ',
+  showHeading = true,
+  headingHelp,
   onAddFolder,
   addFolderLabel = 'フォルダを追加する',
   addFolderDisabled = false,
@@ -131,9 +144,18 @@ export default function FolderPanel({
   addFolderNote,
   children,
   createAction,
+  reserveCreateSpace = false,
+  readOnly = false,
+  disabled = false,
 }: {
   /** V8: 作る操作はフォルダ列の先頭に置く。 */
   createAction?: ReactNode
+  /** 閲覧のみで作る操作を隠すときも、フォルダの位置は変えない。V8 のみ。 */
+  reserveCreateSpace?: boolean
+  /** 選ぶ窓用。行の選択は保ち、作成・編集・並べ替えなどの操作を出さない。 */
+  readOnly?: boolean
+  /** 読み込み・確定処理の間は選択も止める。 */
+  disabled?: boolean
   rows: FolderPanelRow[]
   activeId: string
   onSelect: (id: string) => void
@@ -145,6 +167,9 @@ export default function FolderPanel({
   total?: string
   /** 予約管理の「メニュー」など、分類の呼び名が異なる画面で使う。 */
   heading?: string
+  /** 小窓で区画の見出しを外側に置くときだけ省く。 */
+  showHeading?: boolean
+  headingHelp?: ReactNode
   /** 一覧の下に置く追加操作。道具列へ重複して置かない。 */
   onAddFolder?: () => void
   addFolderLabel?: string
@@ -165,15 +190,17 @@ export default function FolderPanel({
   return (
     // **読み上げ名を持つ。** 帯が何の分類かを、見出しの外からも辿れるように。
     <aside aria-label="フォルダ" className={`${styles.panel} v7:bg-canvas v7:rounded-card v7:border-hairline v7:h-fit overflow-visible v7:border`}>
-      {createAction ? <div className={`${styles.create} v8-only`}>{createAction}</div> : null}
-      <div className={`${styles.heading} v7:border-hairline flex items-center justify-between v7:border-b v7:px-4 v7:py-3`}>
-        <p className="v7:text-ink v7:text-sm font-semibold">{heading}</p>
+      {!readOnly && createAction ? <div className={`${styles.create} v8-only`}>{createAction}</div> : !readOnly && reserveCreateSpace ? <div className={`${styles.create} ${styles.createPlaceholder} v8-only`} aria-hidden="true" /> : null}
+      {showHeading ? <div className={`${styles.heading} v7:border-hairline flex items-center justify-between v7:border-b v7:px-4 v7:py-3`}>
+        {headingHelp ? <p className="v7:text-ink v7:text-sm font-semibold">{heading}<HelpTip label={`${heading}の説明`}>{headingHelp}</HelpTip></p>
+          : <p className="v7:text-ink v7:text-sm font-semibold">{heading}</p>}
         {total === undefined ? null : <span className="text-ink-faint v7:text-xs v7:tabular-nums">{total}</span>}
-      </div>
-      <nav className={`${styles.rows} v7:p-2`}>
+      </div> : null}
+      <nav aria-label={heading} className={`${styles.rows} v7:p-2`}>
         {rows.map((row) => {
-          const hasActions = Boolean(row.onEdit || row.onMoveUp || row.onMoveDown || row.onDelete)
+          const hasActions = !readOnly && Boolean(row.leadingActions?.length || row.onEdit || row.onMoveUp || row.onMoveDown || row.onDelete)
           const isActive = activeId === row.id
+          const kind = row.kind ?? (row.label === 'すべて' ? 'all' : row.label === '未分類' ? 'unfiled' : 'folder')
 
           return (
             <div
@@ -189,7 +216,9 @@ export default function FolderPanel({
                   setOpenMenuId(null)
                   onSelect(row.id)
                 }}
+                disabled={disabled}
                 title={row.label}
+                aria-pressed={readOnly ? isActive : undefined}
                 aria-current={activeId === row.id ? 'true' : undefined}
                 className={`${styles.select} v7:rounded-control flex min-w-0 flex-1 items-center gap-2 v7:px-3 v7:py-2 text-left v7:text-sm transition-colors ${
                   activeId === row.id
@@ -220,7 +249,7 @@ export default function FolderPanel({
                     />
                   </svg>
                 )}
-                <span className={`${styles.folderIcon} v8-only`} aria-hidden="true">{row.icon ?? (row.color ? <svg width="15" height="15" viewBox="0 0 14 14"><path fill={row.color} d="M11.8125 3.9375H7.16406L5.6875 2.46094Q5.41406 2.1875 5.08594 2.1875H2.1875Q1.80469 2.1875 1.55859 2.43359T1.3125 3.0625V10.99219Q1.3125 11.32031 1.55859 11.56641T2.13281 11.8125H11.86719Q12.19531 11.8125 12.44141 11.56641T12.6875 10.99219V4.8125Q12.6875 4.42969 12.44141 4.18359T11.8125 3.9375ZM2.1875 3.0625H5.08594L5.96094 3.9375H2.1875Z" /></svg> : <FolderOpen size={15} />)}</span>
+                <span className={`${styles.folderIcon} v8-only`} aria-hidden="true">{kind === 'all' ? <Inbox size={15} style={{ color: 'var(--color-ink)' }} /> : kind === 'unfiled' ? <FolderOpen size={15} style={{ color: 'var(--color-ink-secondary)' }} /> : <FolderDot folder={{ name: row.label, color: row.color }} />}</span>
                 <span className={`${styles.label} min-w-0 flex-1 truncate`}>{row.label}</span>
                 {row.count === null ? null : <span className={`${styles.count} text-ink-faint shrink-0 v7:text-xs v7:tabular-nums`}>{row.count}</span>}
               </button>
@@ -228,7 +257,8 @@ export default function FolderPanel({
                   並べると、選択との押し間違いが増え、短い名前も狭くなる。 */}
               {/* I3L41O：選んだ行には絵どおり「…」の場所を取る。操作なしの
                   選んだ行（すべて・未分類）は空きの場所取りを置く。 */}
-              {isActive && !hasActions ? (
+              {!readOnly && row.trailing}
+              {isActive && !hasActions && !row.trailing && !readOnly ? (
                 <div className={styles.menuSlot} aria-hidden="true" />
               ) : null}
               {hasActions && (
@@ -264,7 +294,7 @@ export default function FolderPanel({
           )
         })}
       </nav>
-      {(onAddFolder || addFolderDisabled || addFolderNote || children) && (
+      {!readOnly && (onAddFolder || addFolderDisabled || addFolderNote || children) && (
         <div className={`${styles.footer} v7:border-hairline v7:space-y-2 v7:border-t v7:p-3`}>
           {(onAddFolder || addFolderDisabled) && (
             <Button
@@ -284,4 +314,10 @@ export default function FolderPanel({
       )}
     </aside>
   )
+}
+
+/** フォルダ列を畳んだときも、追加操作を同じメニューへ残す。 */
+export function CollapsedFolderActions({ row }: { row: FolderPanelRow }) {
+  const v8 = useAdminTheme() === 'v8'
+  return <RowMenu label={`フォルダ「${row.label}」の操作`} items={folderMenuItems(row, (action) => action?.(), v8)} />
 }

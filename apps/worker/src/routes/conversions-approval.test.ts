@@ -224,6 +224,7 @@ describe('PATCH /api/conversions/events/:id/approval', () => {
       'aff-1',
       '案件X',
       5000,
+      expect.stringMatching(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/),
     );
   });
 
@@ -371,11 +372,7 @@ describe('PATCH /api/conversions/events/:id/approval', () => {
       rewardAmount: 5000,
       notifyOnConversion: true,
     });
-    // 実送信の代わりに1回だけ落とす。本物の送信部は投げない契約だが、
-    // 途中で落ちた場合の欠落防止を隔離して確かめる。
-    // 注記: この「欠落なし」は通知口の投げに限る。実際の配信側の失敗
-    // （503など）は呑み込む best-effort のままで、再送の回復は未検証。
-    // R354の守りは承認の決定・台帳と送信権（CAS）の1回限り。
+    // 通知の失敗だけを1回注入し、承認の成功と通知権の解放を確認する。
     notifyAffiliateApproval.mockRejectedValueOnce(new Error('push down'));
 
     const failed = await req('PATCH', '/api/conversions/events/ev-1/approval', {
@@ -397,6 +394,7 @@ describe('PATCH /api/conversions/events/:id/approval', () => {
     });
     expect(retried.status).toBe(200);
     expect(notifyAffiliateApproval).toHaveBeenCalledTimes(2);
+    expect(notifyAffiliateApproval.mock.calls[1][5]).toBe(notifyAffiliateApproval.mock.calls[0][5]);
   });
 
   it('returns 500 when the mileage projection fails so a retry can repair it', async () => {

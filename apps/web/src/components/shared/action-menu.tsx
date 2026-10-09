@@ -3,12 +3,15 @@
 import { ArrowUpRight } from 'lucide-react'
 import React, { useEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import MenuPortal from './menu-portal'
+import { useV8Leave } from './overlay-utils'
 import styles from './action-menu.module.css'
 
 export type ActionMenuItem = {
   id: string
   label: string
   icon?: ReactNode
+  /** 先頭の主な操作を太字で示す。既存の項目の見た目は変えない。 */
+  emphasis?: boolean
   /**
    * 補足（★V7）。渡すと項目が2行・高さ52pxになる。
    * 例：「テンプレートを送る」＋「受信箱で選んで送ります」。
@@ -56,8 +59,9 @@ export type ActionMenuProps = {
   anchorRef?: RefObject<HTMLElement | null>
 }
 
-/** Pencil ★V7 `xifuV` を正本にした小型操作メニュー（V5 `hGpFq` から移行）。 */
+/** Pencil ★V8 `hnuY9`「その他操作メニュー」を正本にした小型操作メニュー。 */
 export default function ActionMenu({ open, items, note, onClose, ariaLabel = '操作', inline = false, anchorRef }: ActionMenuProps) {
+  const leaving = useV8Leave(open, 80)
   const menuRef = useRef<HTMLDivElement>(null)
   const anchorMarkRef = useRef<HTMLSpanElement>(null)
 
@@ -137,7 +141,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
     }
   }, [inline, open])
 
-  if (!open) return null
+  if (!open && !leaving) return null
 
   const moveFocus = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Tab') {
@@ -159,6 +163,9 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
     <div
       ref={menuRef}
       role="menu"
+      aria-hidden={leaving || undefined}
+      inert={leaving || undefined}
+      data-closing={leaving || undefined}
       aria-label={ariaLabel}
       className={`${styles.menu} ${inline ? styles.inline : styles.menuPortal}`}
       onKeyDown={moveFocus}
@@ -197,7 +204,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
           >
             {item.icon ? <span className={styles.icon} aria-hidden="true">{item.icon}</span> : null}
             <span className={styles.itemBody}>
-              <span className={styles.label}>{item.label}</span>
+              <span className={styles.label}>{item.emphasis ? <strong>{item.label}</strong> : item.label}</span>
               {item.description ? (
                 <span className={styles.description}>{item.description}</span>
               ) : null}
@@ -221,8 +228,8 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
   if (inline) return menu
   return (
     <>
-      <span ref={anchorMarkRef} aria-hidden="true" className={styles.anchor} />
-      <MenuPortal open={open} getAnchor={getAnchor} onClose={onClose}>
+      {anchorRef ? null : <span ref={anchorMarkRef} aria-hidden="true" className={styles.anchor} />}
+      <MenuPortal open={open} exitDuration={80} getAnchor={getAnchor} onClose={onClose}>
         {menu}
       </MenuPortal>
     </>

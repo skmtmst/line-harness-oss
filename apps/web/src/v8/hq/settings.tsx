@@ -13,10 +13,12 @@ import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { TextField } from '@/components/shared/text-field'
+import Notice from '@/components/shared/notice'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api } from '@/lib/api'
 import { useStaffRole } from '@/lib/staff-role'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
+import CompanyContactCard from './company-contact'
 import styles from './settings.module.css'
 
 const TITLE = '統括の情報'
@@ -34,7 +36,9 @@ export default function HqSettingsV8() {
   return (
     <ListPage boardId="K7HYu" title={TITLE} description={DESCRIPTION} folders={<HqSettingsNavV8 active="info" />} folderNav={settingsNav}>
       <div className={styles.body}>
+        {role && !canEdit ? <Notice tone="info">閲覧のみで見ています。統括名の変更と会社・連絡先の登録は管理者だけができます。</Notice> : null}
         <TenantNameCard canEdit={canEdit} />
+        {canEdit ? <CompanyContactCard canEdit /> : null}
       </div>
     </ListPage>
   )
@@ -47,6 +51,7 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [nameError, setNameError] = useState('')
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
@@ -68,8 +73,15 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
     event?.preventDefault()
     const trimmed = name.trim()
     setSaved(false)
-    if (!trimmed) return setError('統括名を入力してください。')
-    if (trimmed.length > 100) return setError('統括名は100文字以内で入力してください。')
+    if (!trimmed || trimmed.length > 100) {
+      setNameError(!trimmed ? '統括名を入力してください。' : '統括名は100文字以内で入力してください。')
+      setError('')
+      const input = document.getElementById(`${uid}-name`)
+      input?.focus()
+      input?.scrollIntoView?.({ block: 'center' })
+      return
+    }
+    setNameError('')
     setSaving(true)
     setError('')
     try {
@@ -109,9 +121,12 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
           value={name}
           maxLength={100}
           disabled={loading || saving}
-          onChange={(event) => { setName(event.target.value); setSaved(false) }}
+          onChange={(event) => { setName(event.target.value); setSaved(false); setNameError('') }}
+          invalid={Boolean(nameError)}
+          aria-describedby={nameError ? `${uid}-name-error` : undefined}
           className={styles.full}
         />
+        {nameError ? <p id={`${uid}-name-error`} className={styles.error} role="alert">{nameError}</p> : null}
       </div>
       <p className={styles.hint}>会社名やブランド名など、メンバーが見てわかる名前にします</p>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}

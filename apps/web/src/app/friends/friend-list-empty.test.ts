@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { emptyMessageOf, hasAnyFilter, type EmptyFilters } from './friend-list-empty'
@@ -52,7 +52,7 @@ describe('URLから来る絞り込み', () => {
     */
     expect(PAGE).toContain('|| hasScoreRange')
     expect(PAGE).toContain("|| audienceId !== ''")
-    expect(PAGE).toContain('<FriendListTable')
+    expect(PAGE).toContain('<ListState kind="empty" title={emptyMessage.title} description={emptyMessage.description}')
     expect(TABLE).toContain('<ListState kind="empty"')
   })
 

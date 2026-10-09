@@ -1,13 +1,20 @@
 'use client'
 
+import HelpTip from '@/components/shared/help-tip'
+
 /*
  * ★V8 Googleビジネス 口コミ（一覧 `j0Wcg`・返信を作る `x9HIR`・公開の確認 `xSudF`）。
  * 口（一覧・絞り込み・並び・同期・下書き作成・保存・公開）は今の画面と同じ。
  */
+import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { RefreshCw, Sparkles } from 'lucide-react'
 import { ApiError } from '@/lib/api'
+import Card from '@/components/shared/card'
+import SectionHeader from '@/components/shared/section-header'
 import Button from '@/components/shared/button'
+import { DataTable, TableHeadRow, Th, Td, Tr } from '@/components/shared/table'
+import { TextArea } from '@/components/shared/text-field'
 import Checkbox from '@/components/shared/checkbox'
 import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
@@ -133,12 +140,13 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
     <>
       <StatRow>
         <Stat size="small" label="未返信" value={`${data.summary.unrepliedCount}`} note="返信を待っている口コミ" warning={data.summary.unrepliedCount > 0} />
-        <Stat size="small" label="平均の評価" value={average === null || average === undefined ? '—' : `${Math.round(average * 10) / 10}`} note={`この30日・${reviewTotal}件`} />
+        <Stat size="small" label="平均の評価" value={average === null || average === undefined ? '—' : `${Math.round(average * 10) / 10}`} note={`総合・${reviewTotal}件`} />
         <Stat size="small" label="要確認" value={`${data.summary.attentionCount}`} note="評価2以下" />
         {/* Google経由の予約：結ぶ口がまだ無いので「—」（数を推測しない）。 */}
         <Stat size="small" label="Google経由の予約" value="—" note="この30日" help="予約の連携サービスと結ぶと数えます。いまは取れないので「—」です。" />
       </StatRow>
       <div className={styles.toolbar}>
+        <HelpTip label="一覧の操作の説明">返信文は手で書くか、AIで下書きを作れます。Googleへ送ると「反映確認中」になり、反映されると「返信済み」になります。</HelpTip>
         <span className={styles.search}>
           <SearchField placeholder="口コミを探す" aria-label="口コミを探す" value={search} onChange={setSearch} onClear={() => setSearch('')} />
         </span>
@@ -154,9 +162,9 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
         </IconButton>
         <Select aria-label="並び順" width={150} value={order} onChange={(value) => { setOrder(value as GoogleReviewOrder); setPage(1) }} options={ORDER_OPTIONS} />
       </div>
-      {connection.status === 'expired' ? <Notice tone="danger" action={<a href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で再接続</a>}>Googleとの接続を確認してください（認可切れ）。前回取得した口コミを表示しています。</Notice> : null}
-      {connection.status === 'no_permission' ? <Notice tone="danger" action={<a href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で接続を確認</a>}>この店舗を操作する権限がありません。</Notice> : null}
-      {syncError ? <Notice tone="warn" action={<button type="button" className={styles.textButton} onClick={() => void sync()}>もう一度</button>}>{syncError}</Notice> : null}
+      {connection.status === 'expired' ? <Notice tone="danger" action={<Link href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で再接続</Link>}>Googleとの接続を確認してください（認可切れ）。前回取得した口コミを表示しています。</Notice> : null}
+      {connection.status === 'no_permission' ? <Notice tone="danger" action={<Link href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で接続を確認</Link>}>この店舗を操作する権限がありません。</Notice> : null}
+      {syncError ? <Notice tone="warn" action={<Button variant="text" onClick={() => void sync()}>もう一度</Button>}>{syncError}</Notice> : null}
       {syncing && (list?.total ?? 0) === 0 ? <Notice tone="info">口コミを取得中… すべてのページを取得してから表示します。</Notice> : null}
       {listLoading && !list ? <div className={styles.stateBox}><ListState kind="loading" title="口コミを読み込んでいます" /></div> : null}
       {listError ? <div className={styles.stateBox}><ListState kind="error" title="口コミを表示できませんでした" description={listError} onRetry={() => void load()} /></div> : null}
@@ -171,43 +179,39 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
         </div>
       ) : null}
       {list && list.total > 0 ? (
-        <div role="table" aria-label="口コミ" className={styles.table}>
-          <div role="row" className={styles.headRow}>
-            <span role="columnheader" className={`${styles.cell} ${styles.colReviewer}`}>投稿者・評価</span>
-            <span role="columnheader" className={`${styles.cell} ${styles.colComment}`}>口コミ</span>
-            <span role="columnheader" className={`${styles.cell} ${styles.colReceived}`}>受信</span>
-            <span role="columnheader" className={`${styles.cell} ${styles.colState}`}>状態</span>
-            <span role="columnheader" className={`${styles.cell} ${styles.colOps}`}><span className="sr-only">操作</span></span>
-          </div>
+        <DataTable density="reviews" data-design="google-reviews"><thead>
+          <TableHeadRow>
+            <Th className={`${styles.colReviewer}`}>投稿者・評価</Th>
+            <Th className={`${styles.colComment}`}>口コミ</Th>
+            <Th className={`${styles.colReceived}`}>受信</Th>
+            <Th className={`${styles.colState}`}>状態</Th>
+            <Th className={styles.colOps}><span className="sr-only">操作</span></Th>
+          </TableHeadRow></thead><tbody>
           {list.reviews.map((review) => {
             const badge = replyBadge(review)
             const actionable = review.replyStatus === 'unreplied' || review.replyStatus === 'draft' || review.replyStatus === 'pending_confirm'
             return (
-              <div key={review.id} role="row" className={styles.row}>
-                <span role="cell" className={`${styles.cell} ${styles.colReviewer}`}>
+              <Tr key={review.id}>
+                <Td className={`${styles.colReviewer}`}>
                   <span className={styles.reviewer}>{review.reviewerDisplayName ?? '匿名'}</span>
                   <Stars rating={review.starRating} />
-                </span>
-                <span role="cell" className={`${styles.cell} ${styles.colComment}`}>
+                </Td>
+                <Td className={`${styles.colComment}`}>
                   <span className={styles.comment} title={review.comment ?? undefined}>{review.comment ?? '（本文なし・評価のみ）'}</span>
-                </span>
-                <span role="cell" className={`${styles.cell} ${styles.colReceived}`}>{formatShortStamp(reviewReceivedAt(review))}</span>
-                <span role="cell" className={`${styles.cell} ${styles.colState}`}><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></span>
-                <span role="cell" className={`${styles.cell} ${styles.colOps}`}>
+                </Td>
+                <Td className={`${styles.colReceived}`}>{formatShortStamp(reviewReceivedAt(review))}</Td>
+                <Td className={`${styles.colState}`}><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></Td>
+                <Td className={`${styles.colOps}`}>
                   <Button onClick={() => go({ tab: 'reviews', view: 'draft', id: review.id })}>{actionable ? '下書きを作る' : '返信を見る'}</Button>
-                </span>
-              </div>
+                </Td>
+              </Tr>
             )
           })}
-        </div>
+        </tbody></DataTable>
       ) : null}
       {list && pageCount > 1 ? (
-        <div className={styles.pager}>
-          <span className={styles.pagerNote}>{`${list.total}件 ・ 新着と未返信は別に管理`}</span>
-          <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
-        </div>
+        <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={`${list.total}件 ・ 新着と未返信は別に管理`} />
       ) : null}
-      <p className={styles.footNote}>返信文は手で書くか、AIで下書きを作れます。Googleへ送ると「反映確認中」になり、反映されると「返信済み」になります。</p>
     </>
   )
 }
@@ -322,8 +326,8 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
     return (
       <div className={styles.split} data-design-node="xSudF">
         <div className={styles.mainColumn}>
-          <section className={styles.card}>
-            <h2 className={styles.cardTitle}>この返信をGoogleに公開しますか？</h2>
+          <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
+            <SectionHeader size="small" title={<>この返信をGoogleに公開しますか？</>} />
             <dl className={styles.facts}>
               <div className={styles.factRow}><dt className={styles.factKey}>返信先の店舗</dt><dd className={styles.factValue}>{storeTitle}</dd></div>
               <div className={styles.factRow}><dt className={styles.factKey}>返信する口コミ</dt><dd className={styles.factValue}>{`${reviewer}（★${review.starRating}・${formatShortStamp(reviewReceivedAt(review))}）`}</dd></div>
@@ -331,16 +335,16 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
             </dl>
             <p className={styles.preText}>{text}</p>
             <p className={styles.muted}>{`元の口コミ：${review.comment ?? '（本文なし・評価のみ）'}`}</p>
-          </section>
+          </Card>
         </div>
-        <aside className={`${styles.card} ${styles.sideColumn}`} aria-label="公開前の確認">
-          <h3 className={styles.cardTitle}>公開前の確認</h3>
+        <Card appearance="outlined" layout="vertical" padding="default" gap="normal" className={styles.sideColumn} aria-label="公開前の確認">
+          <SectionHeader size="small" title="公開前の確認" />
           <Checkbox checked={checked} onCheckedChange={setChecked}>返信先・内容・個人情報の有無を確認しました</Checkbox>
           <p className={styles.checklist}>{'・予約内容や来店履歴などを追記していません\n・返信は店舗を代表して公開されます\n・通信結果が不明な場合はGoogle側を先に確認します'}</p>
           {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
           <Button onClick={() => setConfirming(false)} disabled={busy !== null} className={styles.fullButton}>修正する</Button>
           <Button variant="primary" onClick={() => void publish()} disabled={!checked || busy !== null} busy={busy === 'publish'} busyLabel="送信中…" className={styles.fullButton}>この内容で返信する</Button>
-        </aside>
+        </Card>
       </div>
     )
   }
@@ -352,8 +356,8 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
       {pendingConfirm && !done ? <Notice tone="warn">前回の送信結果を確認できていません。「この内容で返信する」を押すと、先にGoogle側の状態を照合してから送信します。</Notice> : null}
       <div className={styles.split}>
         <div className={styles.mainColumn}>
-          <section className={styles.card}>
-            <h2 className={styles.cardTitle}>返信する口コミ</h2>
+          <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
+            <SectionHeader size="small" title={<>返信する口コミ</>} />
             <p className={styles.reviewMeta}>
               <span className={styles.reviewMetaName}>{reviewer}</span>
               <Stars rating={review.starRating} small />
@@ -364,12 +368,12 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
             {alreadyReplied && (review.replyComment || done) ? (
               <p className={styles.repliedBox}>{`公開済みの返信：${done?.comment ?? review.replyComment}`}</p>
             ) : null}
-          </section>
+          </Card>
           {!alreadyReplied ? (
-            <section className={styles.card}>
-              <h2 className={styles.cardTitle}>{aiGenerated ? 'AIが作った返信の下書き' : '返信の下書き'}</h2>
-              <textarea
-                className={styles.draftInput}
+            <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
+              <SectionHeader size="small" title={<>{aiGenerated ? 'AIが作った返信の下書き' : '返信の下書き'}</>} />
+              <TextArea
+                density="compact" height="reply"
                 value={text}
                 onChange={(event) => { setText(event.target.value); setSaved('') }}
                 placeholder="返信文を入力するか、AIで下書きを作ります。"
@@ -389,13 +393,13 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
               </div>
               {saved ? <p className={styles.saved} role="status">{saved}</p> : null}
               {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
-            </section>
+            </Card>
           ) : (
-            <section className={styles.card}><p className={styles.muted}>この口コミへの返信は公開済みです。</p></section>
+            <Card appearance="outlined" layout="vertical" padding="default" gap="normal"><p className={styles.muted}>この口コミへの返信は公開済みです。</p></Card>
           )}
         </div>
-        <aside className={`${styles.card} ${styles.sideColumn}`} aria-label="公開前の確認">
-          <h3 className={styles.cardTitle}>公開前の確認</h3>
+        <Card appearance="outlined" layout="vertical" padding="default" gap="normal" className={styles.sideColumn} aria-label="公開前の確認">
+          <SectionHeader size="small" title="公開前の確認" />
           <p className={styles.checklist}>{'・返信先が合っている\n・お客さまの個人情報を書いていない\n・お店の約束（値引きなど）を書いていない'}</p>
           <p className={styles.grayNote}>
             {!data.writeEnabled
@@ -413,7 +417,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
               )}
             </>
           ) : null}
-        </aside>
+        </Card>
       </div>
       <UnsavedLeaveDialog
         open={leaveTarget !== null}

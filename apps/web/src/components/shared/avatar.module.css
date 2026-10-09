@@ -1,7 +1,7 @@
 @layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
- * 友だちの顔。Pencil ★V7「友だちの顔」（V7 文書 `KXDhj`）。
+ * 友だちの顔。Pencil ★V8「顔/小・中・大」（`MFTlt`・`pDKi6`・`zjEbn`）。
  *
  *   丸      大きさ 24・32・40・56、真円
  *   頭文字  淡い地に同じ色の濃い字（6組、どれも 4.5:1 以上）。字は大きさの 42%・太字

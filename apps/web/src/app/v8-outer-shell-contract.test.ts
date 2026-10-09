@@ -8,7 +8,7 @@
  *   - 黄色の版の帯は v8 では出さない
  *   - 全部 v8 だけに効く（v7 の見た目を動かさない）
  */
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 

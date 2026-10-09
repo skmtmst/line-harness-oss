@@ -16,6 +16,8 @@ vi.hoisted(() => {
 
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 
+// 行の「…」の移動は router.push（画面を丸ごと読み直さない）。
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }) }))
 vi.mock('next/link', () => ({
   default: ({ children, href, className, title }: { children: React.ReactNode; href: string; className?: string; title?: string }) =>
     React.createElement('a', { href, className, title }, children),
@@ -192,6 +194,8 @@ describe('V8 NEN配信の一覧', () => {
     await render(props)
     expect(host.querySelector('[data-design-node="Tj7n4"]')).not.toBeNull()
     expect(host.querySelector('tbody')?.textContent).toContain('取得不可')
+    // コラムの記事を開いた割合を、取得できないLINE開封率として流用しない。
+    expect(host.querySelectorAll('[data-kpi-number]')[2]?.textContent).toBe('—')
     await act(async () => { fireEvent.click(button('届きませんでした 1')!) })
     expect(props.onChangeDeliveryView).toHaveBeenCalledWith('failed', undefined, '')
   })

@@ -9,6 +9,7 @@
  * 続きを送るカード・右に送信者とこれまでの問い合わせ。
  * 静的書き出しのため動的セグメントは使わず `?id=` で受ける（v7 と同じ）。
  */
+import StatusPill from '@/components/shared/status-pill'
 import { ImagePlus, Paperclip, Send, X } from 'lucide-react'
 import Link from 'next/link'
 import { Suspense, useCallback, useEffect, useId, useRef, useState } from 'react'
@@ -201,7 +202,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
           ) : (
             <>
               <div className={styles.statusRow}>
-                <span className={detail.status === 'open' ? `${styles.pill} ${styles.pillInfo}` : `${styles.pill} ${styles.pillOk}`}><span className={styles.dot} aria-hidden="true" />{SUPPORT_STATUS_WORDS[detail.status]}</span>
+                <StatusPill tone={detail.status === 'open' ? 'warning' : 'success'}>{SUPPORT_STATUS_WORDS[detail.status]}</StatusPill>
                 <span className={styles.statusNote}>{statusNote(detail.status, hasSenderEmail)}</span>
               </div>
 
@@ -292,7 +293,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                       className={item.id === id ? `${styles.historyRow} ${styles.historyRowCurrent}` : styles.historyRow}
                     >
                       <span className={styles.historyName} title={item.subject}>{[item.ticketLabel, item.subject].filter(Boolean).join(' ')}</span>
-                      <span className={item.status === 'open' ? `${styles.pill} ${styles.pillInfo}` : `${styles.pill} ${styles.pillOk}`}><span className={styles.dot} aria-hidden="true" />{SUPPORT_STATUS_WORDS[item.status]}</span>
+                      <StatusPill tone={item.status === 'open' ? 'warning' : 'success'}>{SUPPORT_STATUS_WORDS[item.status]}</StatusPill>
                     </Link>
                   </li>
                 ))}

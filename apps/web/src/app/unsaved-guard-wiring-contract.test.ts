@@ -20,6 +20,8 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
+  'app/booking/bookings/detail/page.tsx',
+  'v8/automations/create/create.tsx',
   'v8/settings/pools/create.tsx',
   'v8/broadcasts/quick-send.tsx',
   'v8/auto-replies/quick-create.tsx',
@@ -158,7 +160,9 @@ const GUARDED = [
   'v8/tags/create.tsx',
   'v8/tags/field-editor.tsx',
   'v8/tags/mark-editor.tsx',
+  'v8/hq-templates/attributes.tsx',
   'v8/template-edit/rich.tsx',
+  'v8/template-edit/rich-video.tsx',
   'v8/templates/carousel.tsx',
   'v8/templates/question-new.tsx',
 ] as const
@@ -218,6 +222,8 @@ const EXEMPTIONS: Record<string, string> = {
     '編集を持たない上部の帯の部品。段を替えて戻るパンくず（onSelect）を共通の未保存確認（requestUnsavedAction）へ委ねる',
   'components/shell/app-top-bar.tsx':
     '編集を持たない上部の帯。アカウント切替と移動を共通の未保存確認へ委ねる',
+  'components/shared/command-palette.tsx':
+    '編集を持たない探す窓（⌘K）。選んだ行き先への移動を共通の未保存確認へ委ねる',
   'v8/restaurant/closures/closure-dialog.tsx': '臨時休業・貸切を足す・変える窓（提案 E-10 nVvXy）。保存の口は窓の中だけで、開くたびに押した日か記録から作り直し、閉じると入力を破棄する。',
   'v8/restaurant/front-desk/phone-drawer.tsx': '電話予約の引き出し（提案 E-2）。保存の口は引き出しの中だけで、開くたびに空から始まり、閉じると入力を破棄する（入力中は題に * が付く）。',
   'app/reminders/basics-form-v8.tsx':
@@ -358,8 +364,6 @@ const EXEMPTIONS: Record<string, string> = {
   /* 2026-10-07：src/v8 に一から書いた画面の分類。元の画面ファイルがあるものはその扱いに合わせた。 */
   'v8/account-new/register.tsx':
     'app/accounts/new/register-v8.tsx と同じ画面の★V8版。dirty 管理は無く、印はコメント中の「未保存」（R523 の照合の説明）だけ。入力は端末の下書きへ随時保存し、閉じる確認は手順内の戻る・あとで続きからで済ませる',
-  'v8/automations/create/create.tsx':
-    'app/automations/new/new-v8.tsx と同じ画面の★V8版。サーバーへ下書き保存する多段入力で、段またぎ・店ごとの退避があり、離脱の扱いは元の画面と一緒に決めるため同じ扱い',
   'v8/reminders/detail.tsx':
     'app/reminders/detail/detail-v8.tsx と同じ画面の★V8版。登録者の基準日は行内の小さな編集で「基準日を保存」で確定する。元の画面と同じ扱い',
   'v8/settings/line-notifications/screen.tsx':
@@ -450,13 +454,7 @@ const UNTRIAGED: Record<string, string> = {
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/analytics/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/auto-replies/publish/page.tsx':
-    's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/booking/bookings/detail/page.tsx':
-    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   /* 予約設定V8化でスタッフ編集窓を staff-edit-dialog.tsx へ切り出し、page.tsx から編集画面の印が無くなったので行を消した。 */
-  'app/broadcasts/page.tsx':
-    's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/chats/page.tsx':
     's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/common-actions/new/page.tsx':
@@ -469,11 +467,8 @@ const UNTRIAGED: Record<string, string> = {
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/events/bookings/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/friends/detail/page.tsx':
-    's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   /* ★V7: 書き出し項目を共通 Checkbox へ寄せたら入力の印が3未満になり、編集画面の印が無くなったので行を消した。 */
-  'app/hq/support/page.tsx':
-    'hq: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  // 統括の入口はV8の再exportだけ。v8/hq/support.tsx の番兵を上の契約で点検する。
   'app/inflow-links/_components/edit-route-modal.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'v8/inflow-links/edit-route-dialog.tsx':
@@ -490,10 +485,6 @@ const UNTRIAGED: Record<string, string> = {
     'hq: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/scenarios/detail/scenario-detail-client.tsx':
     's1: シナリオ詳細。手動保存で番兵なし。V6R-S1-d（board#1065）で付ける',
-  'app/scenarios/first-step/page.tsx':
-    's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/tags/fields/migrate/page.tsx':
-    's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/templates/page.tsx':
     's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/templates/list-v8.tsx':

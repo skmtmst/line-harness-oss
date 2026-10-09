@@ -19,16 +19,17 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
  * ここで見たいのは選んだ後の起点の判断なので、素の <select> に置き換える。
  */
 vi.mock('@/components/shared/select', () => ({
-  default: ({ 'aria-label': label, value, onChange, options }: {
+  default: ({ 'aria-label': label, value, onChange, options, error }: {
     'aria-label'?: string
+    error?: string
     value: string
     onChange: (value: string) => void
     options: Array<{ value: string; label: string }>
-  }) => React.createElement(
+  }) => React.createElement(React.Fragment, null, React.createElement(
     'select',
-    { 'aria-label': label, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    { 'aria-label': label, 'aria-invalid': error ? true : undefined, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
     options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
-  ),
+  ), error ? React.createElement('p', { role: 'alert' }, error) : null),
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.account, loading: false }),

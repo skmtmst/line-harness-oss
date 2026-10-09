@@ -128,7 +128,7 @@ export default function RankSettingsTab({
       setDirty(false)
       onSaved(accountId, res.data)
       setNotice(res.data.sync?.status === 'synced'
-        ? 'ランク設定を保存し、ECへ同期しました。友だち属性のタグも付け替えています。'
+        ? 'ランク設定を保存し、ECへ同期しました。タグも付け替えています。'
         : 'ランク設定を保存しました。ECへの同期は失敗したので、右の「もう一度同期」で送り直せます。')
     } catch (caught) {
       // M035: 生のまま出さず、共通の状態別案内へ渡す（403は権限・429は待ち案内）。
@@ -195,7 +195,7 @@ export default function RankSettingsTab({
                 <Th className="w-44">ランク名</Th>
                 <Th className="w-40">通年のしきい値</Th>
                 <Th className="w-28">マイル還元</Th>
-                <Th>友だち属性タグ</Th>
+                <Th>タグ</Th>
                 <Th className="cq-hide-below-800 w-24" align="right">会員数</Th>
                 <Th className="w-14" align="right"><span className="sr-only">操作</span></Th>
               </TableHeadRow>

@@ -71,7 +71,7 @@ type FeatureSaveResponse = {
 /*
  * オン／オフを持たない項目だけが使う、分類ごとの利用数バッジ。
  * 切り替えられる機能（keys を持つ行）は共有カタログの featureId で
- * 機械照合する features 側を見る。ここに残るのは「友だち属性」だけ。
+ * 機械照合する features 側を見る。ここに残るのは「タグ」だけ。
  */
 const USAGE_ITEM_IDS_BY_KEY: Record<string, string[]> = {
   friend_attributes: ['friend-attributes'],

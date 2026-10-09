@@ -16,12 +16,11 @@
 }
 .backLink:hover { text-decoration: underline; }
 
-/* 競合の帯（k32cn）：頭の線の下・板の幅いっぱい。型の頭の最後の段に入れて、上下の間を絵の位置に合わせる。 */
+/* 競合の帯（k32cn）：頭の線の下・板の幅いっぱい。型の帯の段（上 0・左右 24・下 8）に入れる。 */
 .conflictBand {
   display: flex;
   align-items: center;
   gap: var(--tpl-rm-band-gap);
-  margin: var(--tpl-rm-conflict-margin);
   padding: var(--tpl-rm-band-pad);
   border-radius: var(--tpl-rm-band-radius);
   outline: 1px solid var(--color-warning);
@@ -43,9 +42,10 @@
 .card {
   padding: var(--tpl-section-pad);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -0.5px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 .cardHead, .sectionHeading { display: flex; flex-direction: column; gap: var(--tpl-compact-gap); }
 .cardTitle {
@@ -134,9 +134,10 @@
   width: 100%;
   padding: var(--tpl-side-card-pad);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -0.5px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 .sideBoxTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-rm-label-size); font-weight: 700; line-height: var(--tpl-side-title-lh); }
 .sideBoxNote { margin: 0; color: var(--color-ink-secondary); font-size: var(--tpl-rm-note-size); line-height: var(--tpl-text-sm-lh); }
@@ -169,8 +170,9 @@
   gap: var(--tpl-rm-row-gap-lg);
   padding: var(--tpl-side-card-pad);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -0.5px;
+  box-shadow: var(--card-shadow);
 }
 .stepCard[data-open] { outline: var(--tpl-rm-open-outline) solid var(--color-accent-deep); outline-offset: var(--tpl-rm-open-offset); }
 .stepHead { display: flex; align-items: center; gap: var(--tpl-label-tag-gap); }
@@ -331,8 +333,9 @@
   max-width: 100%;
   padding: var(--tpl-rm-done-card-pad);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -0.5px;
+  box-shadow: var(--card-shadow);
 }
 .doneIcon {
   display: inline-flex;
@@ -374,3 +377,5 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+.fieldError { margin: var(--tpl-field-error-margin); color: var(--color-status-danger); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }

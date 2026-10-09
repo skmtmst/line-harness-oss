@@ -4,7 +4,7 @@
  * 表と下の箱は自動応答の実行結果（nWmLg）と同じ寸法なので、その変数を使う。
  */
 .backLink { display: inline-flex; align-items: center; gap: var(--tpl-label-tag-gap); font-size: var(--text-label); font-weight: 600; text-decoration: none; }
-.headActions { display: flex; align-items: center; gap: var(--tpl-rule-row-gap); position: relative; top: var(--tpl-ar-run-actions-lift); }
+.headActions { display: flex; align-items: center; gap: var(--tpl-rule-row-gap); }
 
 /* 数の帯：この絵は 余白14/16・段の間2。 */
 .kpis {
@@ -48,9 +48,10 @@
   gap: var(--tpl-rule-row-gap);
   padding: var(--tpl-section-pad);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 .afterHead { position: relative; display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-body-gap); }
 .afterHead > .menuBox { position: absolute; top: 0; right: 0; }
@@ -95,9 +96,10 @@
   flex-direction: column;
   min-width: 0;
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 .tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); padding: var(--tpl-ar-run-tools-pad); }
 .searchBox { width: var(--tpl-ar-run-search-w); }
@@ -221,9 +223,10 @@
   min-height: var(--tpl-ar-run-box-h);
   padding: var(--tpl-section-pad);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 .boxTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-ar-run-box-title-lh); }
 .kv { display: flex; flex-direction: column; gap: var(--tpl-side-card-gap); margin: 0; }

@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /*
- * ★V6 GB-8補足: 投稿の画像を端末（PC/スマホ）から直接アップロードできる。
+ * ★V8 GB-8補足: 投稿の画像を端末（PC/スマホ）から直接アップロードできる。
  *
  * 押さえる契約:
  *  1. 「端末からアップロード」ボタンと隠しファイル入力がある
@@ -53,6 +53,10 @@ vi.mock('@/lib/api', () => ({
         ? Promise.resolve({ success: false, error: '登録できませんでした' })
         : Promise.resolve({ success: true, data: { uploadSessionId: 'upload-1', status: 'verified', mediaId: 'media-new' } }),
     },
+    /* この試験は画像の添付だけを見る。Instagram は未設定にして同時投稿の区画を出さない。 */
+    instagram: {
+      connection: () => Promise.resolve({ success: true, data: { state: 'unconfigured', connection: null } }),
+    },
   },
 }))
 
@@ -69,7 +73,8 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/restaurant-test/google',
 }))
 
-const { PostEditor } = await import('./google-posts')
+const { PostEditor } = await import('@/v8/restaurant/google/posts')
+const { extractMediaMetadata, mediaAcceptForKind, putMediaFile, validateMediaFile } = await import('@/app/contents/media-direct-upload')
 
 let container: HTMLDivElement
 let root: Root
@@ -82,7 +87,12 @@ async function settle() {
 
 async function render() {
   await act(async () => {
-    root.render(<PostEditor accountId="account-2" kind="standard" postId={null} go={() => undefined} />)
+    root.render(<PostEditor accountId="account-2" kind="standard" postId={null} go={() => undefined} mediaUpload={{ accept: mediaAcceptForKind('image'), extractMetadata: extractMediaMetadata, validate: validateMediaFile, put: putMediaFile }} />)
+    await settle()
+  })
+  await act(async () => {
+    const choose = [...container.querySelectorAll('button')].find((button) => button.textContent?.includes('画像を選ぶ'))
+    choose!.click()
     await settle()
   })
 }
@@ -119,7 +129,7 @@ describe('投稿画像の端末アップロード', () => {
     await render()
     const text = container.textContent ?? ''
     expect(text).toContain('端末からアップロード')
-    expect(text).toContain('登録メディアから選ぶ')
+    expect(text).toContain('登録メディアの画像')
     const input = container.querySelector<HTMLInputElement>('input[type="file"]')
     expect(input).not.toBeNull()
     expect(input?.accept).toContain('image/png')
@@ -132,9 +142,8 @@ describe('投稿画像の端末アップロード', () => {
     expect(fixture.prepared).toHaveLength(1)
     expect(fixture.prepared[0]).toMatchObject({ filename: 'photo.png', mimeType: 'image/png' })
 
-    const img = container.querySelector('img[alt="photo.png"]') as HTMLImageElement | null
-    expect(img).not.toBeNull()
-    expect(img?.src).toBe('https://cdn.example.test/media-new.png')
+    expect(container.textContent).toContain('photo.png・4:3')
+    expect(container.textContent).toContain('画像を外す')
   })
 
   it('登録に失敗したらエラー文を出し、画像は選ばれたままにしない', async () => {
@@ -143,6 +152,6 @@ describe('投稿画像の端末アップロード', () => {
     await pickFile()
 
     expect(container.textContent).toContain('登録できませんでした')
-    expect(container.querySelector('img[alt="photo.png"]')).toBeNull()
+    expect(container.textContent).not.toContain('photo.png・4:3')
   })
 })

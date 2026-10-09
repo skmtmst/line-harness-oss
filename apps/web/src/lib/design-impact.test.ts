@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
@@ -76,8 +76,6 @@ describe('共通部品の影響範囲', () => {
       'app/accounts/migration.tsx',
       // ★V8 LINEユーザーIDの移行（Z0jHp）。判断一覧は50件ずつのページ送り。
       'app/accounts/uid-migration-v8.tsx',
-      // 2026-09-04: 自動応答の実行結果が入った。表の下にページ送りがある。
-      'app/auto-replies/runs/page.tsx',
       // ★V8 自動応答の実行結果（app/auto-replies/runs/runs-v8.tsx）は描かれなくなった。入口は src/v8/auto-replies/runs.tsx（下）。
       'app/automations/page.tsx',
       // 2026-09-27 R24: 実行記録が先頭20件に固定で21件目以降へ届かなかった。
@@ -113,9 +111,8 @@ describe('共通部品の影響範囲', () => {
       // 取れていないときに「1 / 1」と出て、1ページぶんは取れたように見えていた。
       'app/events/bookings/page.tsx',
       'app/events/page.tsx',
-      // #543: 一覧の到達不能な回答表（M2削除）と共に共通Paginationの利用を外した。
       'app/form-submissions/responses/page.tsx',
-      'app/hq/account-browser-v8.tsx',
+      // 統括の入口は src/v8/hq/home.tsx に統一した。旧一覧は利用先に数えない。
       // IDEA-18 (#1036): 経路別の注文明細が増えても画面を重くしないよう
       // サーバが数えた総数でページ送りを出すため共通へ寄せた。
       'app/inflow-links/_components/ref-orders.tsx',
@@ -141,10 +138,7 @@ describe('共通部品の影響範囲', () => {
       'app/nen/pets/pets-tab.tsx',
       // ★V8-B マイペット一覧（wTIej）の古い pets-v8.tsx は描かれなくなった。入口は src/v8/nen-pets（ページ送りは型が持つ）。
       'app/ops/audit/page.tsx',
-      // 2026-09-04: 7-1-H 実行結果。友だち×通の実行が並ぶので、表の下にページ送りが要る。
-      'app/reminders/detail/page.tsx',
-      // ★V8 リマインダの登録者（担当 b の作り直し）。表の下に共通のページ送り。
-      'app/reminders/detail/registrants-panel.tsx',
+      // mainB: リマインダ詳細・登録者の旧本体は描かれなくなった。V8本体の利用先だけを下に残す。
       // ★V8 リマインダ一覧（apLqS）。表の下にページ送りを置く。
       'app/reminders/list-v8.tsx',
       // 2026-09-23: Googleビジネスの口コミ一覧（★V6 GB-2）。20件ずつのページ送り。
@@ -157,7 +151,7 @@ describe('共通部品の影響範囲', () => {
       'app/restaurant-test/restaurant-console.tsx',
       'app/rich-menus/page.tsx',
       'app/staff/page.tsx',
-      // 友だち属性V8の4タブ（タグ・情報欄・対応マーク・保存した検索）。
+      // タグV8の4タブ（タグ・情報欄・対応マーク・保存した検索）。
       // 表の下にページ送りがあり、1ページごとの件数を選べる。
       // ★V8 統合ユーザーの一覧（ADjK8）。20件ずつのページ送り。
       'app/users/users-v8.tsx',
@@ -167,7 +161,7 @@ describe('共通部品の影響範囲', () => {
       'app/webinars/edit/participants-v8.tsx',
       'app/webinars/list-v8.tsx',
       'components/friend-fields/tags-page-v4.tsx',
-      'components/friends/friend-list-table.tsx',
+
       'components/line-notifications/notification-run-list.tsx',
       'components/ops/knowledge-list.tsx',
       'components/staff/login-audit.tsx',
@@ -184,13 +178,13 @@ describe('共通部品の影響範囲', () => {
        * シナリオ・外部連携のやり取りと送る・受信一覧の旧部品）は 2026-10-06 に外した。
        * 代わりは下の src/v8 の新しい画面。
        */
-      // ★V8 友だち属性 タグの一覧（I1E7Bt）。一から書いた画面。表の下にページ送りを置く。
+      // ★V8 タグ タグの一覧（I1E7Bt）。一から書いた画面。表の下にページ送りを置く。
       'v8/tags/tags-tab.tsx',
-      // ★V8 友だち属性 対応マーク（vKDj5）。src/v8 に一から書いた。2ページ以上のときだけページ送り。
+      // ★V8 タグ 対応マーク（vKDj5）。src/v8 に一から書いた。2ページ以上のときだけページ送り。
       'v8/tags/marks-tab.tsx',
-      // ★V8 友だち属性 保存した検索（IWnYX）。src/v8 に一から書いた。2ページ以上のときだけページ送り。
+      // ★V8 タグ 保存した検索（IWnYX）。src/v8 に一から書いた。2ページ以上のときだけページ送り。
       'v8/tags/searches-tab.tsx',
-      // ★V8 友だち属性 友だち情報欄（q5gbcM）。src/v8 に一から書いた。2ページ以上のときだけページ送り。
+      // ★V8 タグ 友だち情報欄（q5gbcM）。src/v8 に一から書いた。2ページ以上のときだけページ送り。
       'v8/tags/fields-tab.tsx',
       // ★V8 テンプレートの一覧（v19Ivv）。新しい置き場（src/v8）に一から書いた。
       'v8/templates/list.tsx',
@@ -271,6 +265,7 @@ describe('共通部品の影響範囲', () => {
       'v8/settings/staff/staff.tsx',
       // ★V8 設定のEC連携（GmVR5）・ファイルの検査（PfA4o）。src/v8/settings に一から書いた。表の下にページ送りを置く。
       'v8/settings/ec-commerce/screen.tsx',
+      'v8/settings/ec-commerce/subscriptions.tsx',
       'v8/settings/file-scan/screen.tsx',
       // ★V8 友だち（x6QsVz 一覧・ADjK8 統合ユーザー・hn6Y8 重複検出・Z0jHp UID移行）を src/v8/friends に一から書いた。
       'v8/friends/list/list.tsx',
@@ -292,6 +287,8 @@ describe('共通部品の影響範囲', () => {
       'v8/inflow-links/detail.tsx',
       'v8/inflow-links/ref-orders.tsx',
       'v8/inflow-links/ad-history.tsx',
+      // G-8 来店スタンプの記録。表の下に共通のページ送りを置く。
+      'v8/visit-stamps/visit-stamps.tsx',
     ].sort())
   })
 

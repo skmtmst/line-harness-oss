@@ -657,8 +657,9 @@ export default function BroadcastListV8() {
   const rangeLast = (page - 1) * pageSize + visibleBroadcasts.length
 
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: statusCounts?.all ?? listTotal },
+    { kind: 'all' as const, id: '', label: 'すべて', count: statusCounts?.all ?? listTotal },
     ...folders.map((f, index) => ({
+      kind: 'folder' as const,
       id: f.id,
       label: f.name,
       count: f.itemCount ?? null,
@@ -669,7 +670,7 @@ export default function BroadcastListV8() {
       onDelete: canEdit ? () => setDeletingFolder(f) : undefined,
       deleteNote: '削除しても、中の配信は未分類に残ります。',
     })),
-    { id: UNFILED, label: '未分類', count: unfiledCount },
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
   ]
 
   const folderSelectOptions = [

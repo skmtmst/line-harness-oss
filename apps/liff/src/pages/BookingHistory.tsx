@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api, type BookingHistoryItem } from '../lib/api.js';
-import { addDays, jstStartsAtIso, jstToday, formatMd, formatWeekday, utcToJstHm, utcToJstMd } from '../lib/datetime.js';
+import { addDays, slotStartsAtIso, jstToday, formatMd, formatWeekday, utcToJstHm, utcToJstMd } from '../lib/datetime.js';
 import ConfirmDialog from '../components/ui/ConfirmDialog.js';
 import { logFailure } from '../lib/user-message.js';
 import LoadErrorView from '../components/LoadErrorView.js';
@@ -19,7 +19,7 @@ const CHANGE_RANGE_DAYS = 14;
 /** 窓に並べる空きの数の上限（多すぎると選べない）。 */
 const CHANGE_SLOT_LIMIT = 24;
 
-type ChangeSlot = { date: string; start: string };
+type ChangeSlot = { date: string; start: string; startUtc?: string };
 
 /** 取消の失敗を、お客さまが次に何をすればよいかの1文にする。 */
 function cancelFailureMessage(code: string | undefined): string {
@@ -133,9 +133,9 @@ export default function BookingHistory() {
         for (const slot of bucket.slots ?? []) {
           const open = !((slot.remaining ?? 1) <= 0 || slot.state === 'full' || slot.state === 'closed');
           if (!open) continue;
-          if (new Date(jstStartsAtIso(slot.date, slot.start)).getTime() === new Date(current).getTime()) continue;
+          if (new Date(slotStartsAtIso(slot)).getTime() === new Date(current).getTime()) continue;
           if (slots.some((s) => s.date === slot.date && s.start === slot.start)) continue;
-          slots.push({ date: slot.date, start: slot.start });
+          slots.push({ date: slot.date, start: slot.start, ...(slot.startUtc ? { startUtc: slot.startUtc } : {}) });
         }
       }
       slots.sort((a, b) => (`${a.date} ${a.start}` < `${b.date} ${b.start}` ? -1 : 1));
@@ -154,7 +154,8 @@ export default function BookingHistory() {
     setBusy(true);
     try {
       await api.rescheduleMyBooking(target.booking.id, {
-        starts_at: jstStartsAtIso(target.selected.date, target.selected.start),
+        // 空き枠が返した開始の瞬間を送る（店が日本時間以外でもずれない）。
+        starts_at: slotStartsAtIso(target.selected),
         lock_version: target.booking.lock_version,
       });
       setPendingChange(null);

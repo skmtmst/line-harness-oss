@@ -184,6 +184,23 @@ afterEach(() => {
 })
 
 describe('一斉配信のテンプレート選択（IDEA-11）', () => {
+  it('動画付きImagemapをリッチビデオとして候補に出し、配信へ挿入できる', async () => {
+    const video={originalContentUrl:'https://worker.example/images/video.mp4',previewImageUrl:'https://worker.example/images/preview.jpg',area:{x:0,y:0,width:1040,height:520},externalLink:{linkUri:'https://example.com',label:'詳しく見る'}}
+    TEMPLATES.push({...TEMPLATES[0],id:'tpl-video',name:'お店紹介の動画',messageType:'imagemap',messageContent:JSON.stringify({baseUrl:'https://worker.example/images/imagemaps/v',baseSize:{width:1040,height:520},actions:[],altText:'お店の動画',video})})
+    try {
+      await renderPicker()
+      expect(templateRows().find(row=>row.textContent?.includes('お店紹介の動画'))?.textContent).toContain('リッチビデオ')
+      await clickRow('お店紹介の動画')
+      const insert=[...document.querySelectorAll<HTMLButtonElement>('button')].find(button=>button.textContent?.includes('このテンプレートを使用'))
+      expect(insert).toBeDefined()
+      await act(async()=>insert!.dispatchEvent(new MouseEvent('click',{bubbles:true})))
+      await flush()
+      expect(container.textContent).toContain('リッチビデオ')
+      expect(container.textContent).not.toContain('リッチビデオには未対応')
+      expect(container.querySelector('.broadcast-template-row')).toBeNull()
+    } finally { TEMPLATES.pop() }
+  })
+
   it('先頭3件ではなく、読み込んだ候補をすべて出す', async () => {
     await renderPicker()
 

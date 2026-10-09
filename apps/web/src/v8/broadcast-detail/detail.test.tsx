@@ -158,8 +158,10 @@ describe('V8 一斉配信の詳細', () => {
     expect(buttonText('テストを送る')).toBeTruthy()
     expect(buttonText('CSVで書き出す')).toBeTruthy()
     expect(document.querySelector('[aria-label="配信「未購入者フォロー」の操作"]')).toBeTruthy()
-    // 済んだ手順は押すとその手順へ戻る。
-    expect(linkText('2 対象者')?.getAttribute('href')).toBe('/broadcasts/new?draft=broadcast-1&step=audience')
+    // 済んだ手順は押すとその手順へ戻る（手順は型の共通部品 Steps。今の段・まだの段は押せない）。
+    expect(document.querySelector('[aria-label="メッセージに戻る"]')).toBeNull()
+    await act(async () => { (document.querySelector('[aria-label="対象者に戻る"]') as HTMLButtonElement).click() })
+    expect(push).toHaveBeenCalledWith('/broadcasts/new?draft=broadcast-1&step=audience')
     expect(host.textContent).toContain('「3 メッセージから続ける」で作るのを続けられます。')
   })
 

@@ -1,4 +1,5 @@
-import fs from 'node:fs'
+import { readUiSource } from '../../scripts/test-ui-source.mjs'
+const fs = { readFileSync: readUiSource }
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -45,6 +46,6 @@ describe('ダッシュボード点検・中の契約(#491)', () => {
   it('中7:知らない種類の通知も行き先があり、押して何も起きない tap にしない', () => {
     expect(code(NOTIFY)).toContain("return '/updates'")
     expect(code(NOTIFY)).not.toContain('return null')
-    expect(PAGE).toContain('router.push(destination)')
+    expect(PAGE).toContain('dashboardNotificationDestination')
   })
 })

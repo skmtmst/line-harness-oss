@@ -99,10 +99,19 @@ describe('Issue #702: 4画面の札・タブはトークンで書く', () => {
     expect(page).not.toMatch(/bg-(?:gray|green|amber)-100/)
   })
 
-  it('自動応答の凡例の札は成功・注意トークン（生の緑700・黄700は使わない）', () => {
-    const page = read('auto-replies/page.tsx')
-    expect(page).toContain('bg-success-bg text-success')
-    expect(page).toContain('bg-warning-bg text-warning')
+  it('自動応答V8の状態の札は薄い背景と濃い文字のトークンを使う', () => {
+    const page = read('../v8/auto-replies/list.tsx')
+    const css = read('../v8/auto-replies/list.module.css')
+    expect(page).toContain('styles.statePill')
+    for (const [name, bg, fg] of [
+      ['statePillActive', 'success-bg', 'success'],
+      ['statePillStopped', 'canvas-sunken', 'ink-faint'],
+    ]) {
+      expect(page).toContain(`styles.${name}`)
+      const rule = css.match(new RegExp(`\\.${name}\\s*\\{[^}]*\\}`))?.[0]
+      expect(rule).toContain(`background: var(--color-${bg});`)
+      expect(rule).toContain(`color: var(--color-${fg});`)
+    }
     expect(page).not.toContain('text-green-700')
     expect(page).not.toContain('bg-amber-50 text-amber-700')
   })

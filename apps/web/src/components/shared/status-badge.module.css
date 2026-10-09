@@ -100,4 +100,10 @@
 [data-theme='v8'] .success { background: var(--color-success-bg); color: var(--color-success); }
 [data-theme='v8'] .danger { background: var(--color-status-danger-soft); color: var(--color-danger); }
 
+[data-theme='v8'] .badge.micro { font-size: var(--text-nano); font-weight: 400; line-height: 14px; }
+[data-theme='v8'] .badge[data-surface='white'] { background: var(--color-canvas); }
 }
+
+/* タグ名の横の注記。板の小さい札の寸法を保つ。 */
+[data-theme='v8'] .annotation { padding: 0 var(--tpl-tag-name-gap); background: var(--color-canvas-sunken); color: var(--color-ink-faint); font-size: var(--tpl-tag-note-size); font-weight: 500; line-height: var(--tpl-row-sub-lh); }
+[data-theme='v8'] .annotation.warning { color: var(--color-warning); }

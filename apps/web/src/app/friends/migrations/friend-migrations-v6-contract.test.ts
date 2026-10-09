@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -78,22 +78,23 @@ describe('V6 機能3 UID・CSV移行', () => {
   it('事前確認と未取得値を区別する', () => {
     expect(UID_PAGE).toContain('実データはまだ変更していません')
     expect(UID_PAGE).toContain("unresolved ?? '—'")
-    expect(CSV_PAGE).toContain("job.row_count ?? job.total_count ?? '—'")
+    // 入口は V8（v8/friends/migrations/csv.tsx）。件数が無いときは 0 にせず未取得として扱う。
+    expect(CSV_PAGE).toContain('job.row_count ?? job.total_count ?? null')
   })
 
   it('R114 出ない項目は選べないことが文に残る', () => {
     expect(CSV_PAGE).toContain('まだ書き出せません')
-    expect(CSV_PAGE).toContain('今書き出せるのは基本の5列だけです')
+    expect(CSV_PAGE).toContain('登録日の5列')
   })
 
   it('R604 電話番号・メールが選べると示唆しない', () => {
     expect(CSV_PAGE).not.toContain('電話番号やメール')
-    expect(CSV_PAGE).toContain('今書き出せるのは基本の5列だけです')
+    expect(CSV_PAGE).toContain('登録日の5列')
   })
 
   it('設計Nodeと本物のAPIに接続する', () => {
     expect(UID_PAGE).toContain('data-design-node="vtBCu"')
-    expect(CSV_PAGE).toContain('data-design-node="ux7of"')
+    expect(CSV_PAGE).toContain('current="csv"')
     expect(UID_PAGE).toContain('api.friendMigrations.dryRun')
     expect(CSV_PAGE).toContain('api.friendMigrations.previewImport')
   })

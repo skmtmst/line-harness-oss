@@ -49,6 +49,7 @@ import {
 } from './display'
 import { MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
+import { mileagePaginationTotal } from './display'
 import styles from './mileage.module.css'
 
 const BAND_LABELS: Record<ActionScoreBand, string> = {
@@ -267,8 +268,8 @@ export default function ScoreTab() {
   const summary = overview?.summary
   const highMin = summary?.highMin ?? 30
   const normalMin = summary?.normalMin ?? 10
-  const total = overview?.pagination.total ?? 0
-  const pageCount = Math.max(1, Math.ceil(total / pageSize))
+  const total = mileagePaginationTotal(overview)
+  const pageCount = Math.max(1, Math.ceil((total ?? 0) / pageSize))
 
   const rangeQuery = useMemo(() => {
     if (filter !== 'high' && filter !== 'normal' && filter !== 'low') return null
@@ -695,7 +696,7 @@ export default function ScoreTab() {
     </div>
   )
 
-  const footer = ready && total > 0 ? (
+  const footer = ready && total !== null && total > 0 ? (
     <>
       <div className={styles.pagerRow}>
         <span className={styles.pagerCount}>
@@ -708,12 +709,12 @@ export default function ScoreTab() {
           {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} /> : null}
         </span>
       </div>
-      <p className={styles.footNoteFlush}>行の「…」から、点数の手直し・この人を見る。表の下の「できごとの決めごと」を開くと、できごとの編集・外す・＋ できごとを足す（30日間反応がない、も選べる）。公開中のルールを止めるときは、その題の横の「…」から。</p>
     </>
   ) : undefined
 
   return (
     <MileageFrame
+      help="行の「…」から、点数の手直し・この人を見る。表の下の「できごとの決めごと」を開くと、できごとの編集・外す・＋ できごとを足す（30日間反応がない、も選べる）。公開中のルールを止めるときは、その題の横の「…」から。"
       actions={readonly ? undefined : <div className={styles.headActions}>
         <Button href="/mileage/score-rules" title="決めごとの編集画面で1人分を試します">
           <UserRound size={15} aria-hidden="true" /> 1人で試す

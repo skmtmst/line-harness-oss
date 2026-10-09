@@ -131,6 +131,21 @@ describe('LINE通知の送信件数（JSTの今日・この30日）', () => {
     expect(body.data.period).toEqual({ today: '2026-09-27', from30d: '2026-08-29', to: '2026-09-27' });
   });
 
+  it('WEB198 counts delivery failures, not event failures or retry attempts, and clears recovered deliveries', async () => {
+    seedDelivery(testDb, 'fail', { acceptedAt: null, status: 'failed' });
+    seedDelivery(testDb, 'retry', { acceptedAt: null, status: 'pending' });
+    testDb.raw.exec("UPDATE notification_deliveries SET status='retry_wait',attempts=7 WHERE id='retry'");
+    for (const [id, audience, mode, accountId] of [
+      ['operator','operator','automatic','account-1'], ['test','customer','test','account-1'], ['foreign','customer','automatic','account-2'],
+    ] as const) seedDelivery(testDb,id,{ acceptedAt:null,status:'failed',audience,mode,accountId });
+    seedDelivery(testDb,'excluded',{acceptedAt:null,status:'pending'});
+    testDb.raw.exec("UPDATE notification_deliveries SET status='excluded' WHERE id='excluded'");
+    const get = async () => (await (await app(testDb.db).request('/api/line-notifications/send-counts?lineAccountId=account-1')).json()) as { data: { failures: { scope: string; total: number; failed: number; retryWaiting: number } } };
+    expect((await get()).data.failures).toEqual({ scope: 'all_time_unresolved', total: 2, failed: 1, retryWaiting: 1 });
+    testDb.raw.exec("UPDATE notification_deliveries SET status='provider_accepted' WHERE id='retry'");
+    expect((await get()).data.failures.total).toBe(1);
+  });
+
   it('月末をまたいでもJSTの暦日で切る', async () => {
     // 2026-10-01 00:30 JST。この30日は 09-02 以降。
     vi.setSystemTime(new Date('2026-09-30T15:30:00Z'));

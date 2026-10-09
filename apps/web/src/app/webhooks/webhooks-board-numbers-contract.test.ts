@@ -13,8 +13,11 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
+// 2026-10-09：画面独自の .card / .input は共通 Card / TextField へ移した。
 const SRC = resolve(__dirname, "..", "..");
-const CREATE_CSS = readFileSync(resolve(SRC, "v8/webhooks/create.module.css"), "utf-8");
+const CREATE = readFileSync(resolve(SRC, "v8/webhooks/create.tsx"), "utf-8");
+const CARD_CSS = readFileSync(resolve(SRC, "components/shared/card.module.css"), "utf-8");
+const TEXT_FIELD_CSS = readFileSync(resolve(SRC, "components/shared/text-field.module.css"), "utf-8");
 const GLOBALS = readFileSync(resolve(SRC, "app/globals.css"), "utf-8");
 
 /** globals.css の変数の値。見つからなければ空。 */
@@ -25,12 +28,14 @@ function token(name: string): string {
 
 describe("外部連携の板の数字", () => {
   it("作るの段カードは余白20（四方）", () => {
-    expect(CREATE_CSS).toMatch(/\.card \{[^}]*padding: var\(--tpl-wh-card-pad\);/s);
-    expect(token("--tpl-wh-card-pad")).toBe("20px");
+    expect(CREATE).toContain('<Card variant="form"');
+    expect(CARD_CSS).toMatch(/\.form \{[^}]*padding: var\(--tpl-cn-card-pad\);/s);
+    expect(token("--tpl-cn-card-pad")).toBe("20px");
   });
 
   it("作るの入力の枠は h36 (NGh7b 枠)", () => {
-    expect(CREATE_CSS).toMatch(/\.input \{[^}]*height: var\(--tpl-chip-h\)/s);
+    expect(CREATE).toContain("<TextField");
+    expect(TEXT_FIELD_CSS).toMatch(/\.single \{[^}]*height: 36px/s);
     expect(token("--tpl-chip-h")).toBe("36px");
   });
 });

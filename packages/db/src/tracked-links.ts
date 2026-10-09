@@ -314,24 +314,18 @@ export async function recordLinkClick(
   db: D1Database,
   trackedLinkId: string,
   friendId?: string | null,
+  checkpoint?:{id:string;now:string;statements:D1PreparedStatement[]},
 ): Promise<LinkClick> {
-  const id = crypto.randomUUID();
-  const now = jstNow();
+  const id = checkpoint?.id ?? crypto.randomUUID();
+  const now = checkpoint?.now ?? jstNow();
 
-  await db
-    .prepare(
-      `INSERT INTO link_clicks (id, tracked_link_id, friend_id, clicked_at)
-       VALUES (?, ?, ?, ?)`,
-    )
-    .bind(id, trackedLinkId, friendId ?? null, now)
-    .run();
-
-  await db
-    .prepare(
-      `UPDATE tracked_links SET click_count = click_count + 1, updated_at = ? WHERE id = ?`,
-    )
-    .bind(now, trackedLinkId)
-    .run();
+  await db.batch([
+    ...(checkpoint?.statements ?? []),
+    db.prepare(`INSERT INTO link_clicks (id, tracked_link_id, friend_id, clicked_at)
+       VALUES (?, ?, ?, ?)`).bind(id, trackedLinkId, friendId ?? null, now),
+    db.prepare(`UPDATE tracked_links SET click_count = click_count + 1, updated_at = ? WHERE id = ?`)
+      .bind(now, trackedLinkId),
+  ]);
 
   return (await db
     .prepare(`SELECT * FROM link_clicks WHERE id = ?`)

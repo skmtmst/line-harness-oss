@@ -173,7 +173,8 @@ test('v8 の閲覧のみ（jiNg0）は作る・編集を出さず、閲覧のみ
   expect(board?.textContent).toContain('閲覧のみで見ています')
 })
 
-/* V8「サクサク感」C①・D・E：行→詳細パネル・右クリック・つながる移り変わり。 */
+/* V8「サクサク感」C①・D・E：行→詳細パネル・右クリック・つながる移り変わり。
+ * 共通パネルは最上層へ描画されるため、パネル内の操作は文書全体から探す。 */
 function detailButton(title: string): HTMLButtonElement {
   const found = [...host.querySelectorAll('button')].find(
     (button) => button.getAttribute('aria-label') === `「${title}」の詳細を見る`,
@@ -187,13 +188,13 @@ test('v8 で行を押すと右の詳細パネルが開き↑↓で次の行へ�
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   await act(async () => { detailButton('NEN活用スタートセミナー').click() })
-  const panel = host.querySelector('[data-design-part="detail-panel"]')
+  const panel = document.querySelector('[data-design-part="detail-panel"]')
   expect(panel).not.toBeNull()
   expect(panel?.textContent).toContain('NEN活用スタートセミナー')
   const next = [...panel!.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === '次の行')
   expect(next).toBeTruthy()
   await act(async () => { (next as HTMLButtonElement).click() })
-  const moved = host.querySelector('[data-design-part="detail-panel"]')
+  const moved = document.querySelector('[data-design-part="detail-panel"]')
   expect(moved?.textContent).toContain('2つ目のセミナー')
 })
 
@@ -215,11 +216,11 @@ test('v8 で詳細パネルの名前をその場で変えると保存口へ届�
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   await act(async () => { detailButton('NEN活用スタートセミナー').click() })
-  const panel = host.querySelector('[data-design-part="detail-panel"]')
+  const panel = document.querySelector('[data-design-part="detail-panel"]')
   const edit = [...panel!.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'ウェビナー名を変更する')
   expect(edit).toBeTruthy()
   await act(async () => { (edit as HTMLButtonElement).click() })
-  const input = host.querySelector('[data-design-part="detail-panel"] input[aria-label="ウェビナー名"]') as HTMLInputElement | null
+  const input = document.querySelector('[data-design-part="detail-panel"] input[aria-label="ウェビナー名"]') as HTMLInputElement | null
   expect(input).not.toBeNull()
   await act(async () => {
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
@@ -233,17 +234,18 @@ test('v8 で詳細パネルの名前をその場で変えると保存口へ届�
   expect(host.querySelector('[data-design-node="UyUMw"]')?.textContent).toContain('改名したセミナー')
 })
 
-/* V8「サクサク感」：フォルダの追加は真ん中の窓ではなく右のパネルで。 */
-test('v8 でフォルダの追加を押すと右のパネルで名前を入れられる', async () => {
+/* フォルダの追加は名前と色を横に並べた共通の窓（FolderEditorDialog・fcolall 2026-10-09）。 */
+test('v8 でフォルダの追加を押すと共通の窓で名前と色を入れられる', async () => {
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const add = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('フォルダを追加'))
   expect(add).toBeTruthy()
   await act(async () => { (add as HTMLButtonElement).click() })
-  const panel = host.querySelector('[data-design-part="detail-panel"]')
-  expect(panel).not.toBeNull()
-  expect(panel?.textContent).toContain('フォルダを追加')
-  expect(panel?.querySelector('#webinar-v8-folder-name')).not.toBeNull()
+  const dialog = document.querySelector('[role="dialog"]')
+  expect(dialog).not.toBeNull()
+  expect(dialog?.textContent).toContain('フォルダを追加')
+  expect(dialog?.querySelector('[data-folder-name-color] input')).not.toBeNull()
+  expect(dialog?.querySelector('[data-folder-color-button]')).not.toBeNull()
 })
 
 test('v8 の読み込み中は骨組みで場所を取り「読み込み中」の文字は出さない', async () => {

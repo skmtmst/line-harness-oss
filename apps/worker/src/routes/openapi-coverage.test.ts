@@ -133,6 +133,14 @@ const ALLOWLIST_MAX = 772;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'GET /api/scenarios/{id}/question-answers',
+  'POST /api/scenarios/{id}/question-answers/{executionId}/resume',
+  'GET /api/automations/counts',
+  'GET /api/media/counts',
+  'GET /api/conversions/approvals/counts',
+  'PUT /api/booking/admin/menus/order',
+  'GET /api/tenants/me/company-contact',
+  'PATCH /api/tenants/me/company-contact',
   'GET /api/hq/templates/attribute-kind-counts',
   'GET /api/hq/templates/{id}/versions',
   'GET /api/hq/templates/{id}/versions/compare',
@@ -1297,6 +1305,7 @@ const ALLOWLIST = new Set<string>([
   'GET /api/friend-add-runs',
   'GET /api/friend-add-runs/{id}',
   'POST /api/friend-add-rules/drafts',
+  'PATCH /api/friend-add-rules/folders/{id}',
   'POST /api/friend-add-rules/folders',
   'POST /api/friend-add-rules/test',
   'POST /api/friend-add-rules/{id}/publish',

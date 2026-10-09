@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 import { ruleEventLabel } from './earning-rule-view'
 
@@ -19,7 +19,9 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     expect(PAGE).toContain('api.mileage.saveEarningRulesOrder')
     expect(PAGE).toContain('ids: ruleOrder')
     expect(PAGE).toContain('busy={savingRuleOrder} busyLabel="保存しています">並び順を保存する')
-    expect(PAGE).not.toContain('api.mileage.saveEarningRuleDraft')
+    const orderBody = readFileSync(new URL('../../v8/mileage/earning-rules.tsx', import.meta.url), 'utf8').split('const saveOrder = async')[1]?.split('const toggleRule')[0] ?? ''
+    expect(orderBody).toContain('saveEarningRulesOrder')
+    expect(orderBody).not.toContain('saveEarningRuleDraft')
   })
 
   it('利用対象条件と公開版の中身を一覧から確認できる', () => {
@@ -63,7 +65,7 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     expect(EDIT_PAGE).toContain('動いている内容は変わりません')
     // 新規作成と同じ選択肢を使う（直しが片方だけに残らないように）。
     expect(EDIT_PAGE).toContain("from '../rule-fields'")
-    expect(NEW_PAGE).toContain("from '../rule-fields'")
+    expect(NEW_PAGE).toContain("from './rule-fields'")
     // 見つからない・読み込めないを言い分ける（★V7 共通部品その2）。
     expect(EDIT_PAGE).toContain('この決めごとが見つかりません')
     expect(EDIT_PAGE).toContain('たまる決めごとを読み込めませんでした')

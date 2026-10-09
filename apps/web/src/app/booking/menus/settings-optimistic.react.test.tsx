@@ -12,6 +12,7 @@ import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 const fixture = vi.hoisted(() => ({
   tab: 'menus',
   listMenus: null as null | ((...args: unknown[]) => Promise<unknown>),
+  reorderMenus: null as null | ((...args: unknown[]) => Promise<unknown>),
   updateMenu: null as null | ((...args: unknown[]) => Promise<unknown>),
   patchMenu: null as null | ((...args: unknown[]) => Promise<unknown>),
   getSettings: null as null | ((...args: unknown[]) => Promise<unknown>),
@@ -50,6 +51,7 @@ vi.mock('@/lib/api', () => {
     },
     bookingApi: {
       listMenus: (...args: unknown[]) => fixture.listMenus!(...args),
+      reorderMenus: (...args: unknown[]) => fixture.reorderMenus!(...args),
       updateMenu: (...args: unknown[]) => fixture.updateMenu!(...args),
       patchMenu: (...args: unknown[]) => fixture.patchMenu!(...args),
       getSettings: (...args: unknown[]) => fixture.getSettings!(...args),
@@ -192,16 +194,20 @@ describe('メニューの公開・並びは先に画面を変える', () => {
     await screen.findByText('保存しました')
   })
 
-  test('上へで並びがすぐ変わり裏で保存する', async () => {
+  test('上へで並びがすぐ変わり、一括APIへ保存する', async () => {
+    let resolve!: (value: unknown) => void
+    fixture.reorderMenus = vi.fn(() => new Promise((done) => { resolve = done }))
     await openSettings()
     expect(rowOrder()[0]).toContain('カット')
     const handles = screen.getAllByRole('button', { name: /を並び替える/ })
     fireEvent.keyDown(handles[1], { key: 'ArrowUp' })
     // 先に並びが変わる。
     expect(rowOrder()[0]).toContain('カラー')
-    await waitFor(() => { expect(fixture.updateMenu).toHaveBeenCalled() })
-    expect(fixture.updateMenu).toHaveBeenCalledWith(
-      'account-a', 'menu-2', 1, expect.objectContaining({ sort_order: 0 }),
-    )
+    await waitFor(() => { expect(fixture.reorderMenus).toHaveBeenCalledTimes(1) })
+    expect(fixture.reorderMenus).toHaveBeenCalledWith('account-a', { changes: expect.arrayContaining([
+      {id: 'menu-2', expectedVersion: 1, sortOrder: 0},
+      {id: 'menu-1', expectedVersion: 1, sortOrder: 1},
+    ]) })
+    resolve({ok: true})
   })
 })

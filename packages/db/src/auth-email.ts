@@ -111,22 +111,16 @@ export async function deleteExpiredAuthEmailTokens(db: D1Database, before: Date)
 export async function bumpAuthThrottle(db: D1Database, key: string, windowMs: number, now = new Date()): Promise<number> {
   const nowText = toJstString(now);
   const windowStartCutoff = toJstString(new Date(now.getTime() - windowMs));
-  const existing = await db
-    .prepare('SELECT count, window_start FROM auth_throttles WHERE key = ?')
-    .bind(key)
-    .first<{ count: number; window_start: string }>();
-  if (!existing || existing.window_start < windowStartCutoff) {
-    await db
-      .prepare(
-        `INSERT INTO auth_throttles (key, count, window_start, updated_at) VALUES (?, 1, ?, ?)
-         ON CONFLICT(key) DO UPDATE SET count = 1, window_start = excluded.window_start, updated_at = excluded.updated_at`,
-      )
-      .bind(key, nowText, nowText)
-      .run();
-    return 1;
-  }
-  await db.prepare('UPDATE auth_throttles SET count = count + 1, updated_at = ? WHERE key = ?').bind(nowText, key).run();
-  return existing.count + 1;
+  const result = await db.prepare(`
+    INSERT INTO auth_throttles (key, count, window_start, updated_at) VALUES (?, 1, ?, ?)
+    ON CONFLICT(key) DO UPDATE SET
+      count = CASE WHEN julianday(auth_throttles.window_start) < julianday(?) THEN 1 ELSE auth_throttles.count + 1 END,
+      window_start = CASE WHEN julianday(auth_throttles.window_start) < julianday(?) THEN excluded.window_start ELSE auth_throttles.window_start END,
+      updated_at = excluded.updated_at
+    RETURNING count
+  `).bind(key, nowText, nowText, windowStartCutoff, windowStartCutoff).first<{ count: number }>();
+  if (!result) throw new Error('auth_throttle_update_failed');
+  return result.count;
 }
 
 /** window 内の回数を読むだけ（増やさない）。 */

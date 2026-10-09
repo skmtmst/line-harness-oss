@@ -456,7 +456,7 @@ export default function AssignMatrixV8() {
                 {selectedStaff && selectedMenu && selectedRow ? (
                   <div className={styles.overrideCard} data-design="Override">
                     <h3 className={styles.overrideTitle}>
-                      升を押したとき（{staffLabel(selectedStaff)} × {selectedMenu.name}）
+                      {`升を押したとき（${staffLabel(selectedStaff)} × ${selectedMenu.name}）`}
                     </h3>
                   <div className={styles.overrideFields}>
                     <label className={styles.field}>

@@ -176,6 +176,11 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   )
 }
 
+/** 外枠の外（ログイン・試験の単体描画など）では null。外枠の共通部品が使う。 */
+export function useOptionalAccount(): AccountContextValue | null {
+  return useContext(AccountContext)
+}
+
 export function useAccount(): AccountContextValue {
   const ctx = useContext(AccountContext)
   if (!ctx) throw new Error('useAccount must be used within AccountProvider')

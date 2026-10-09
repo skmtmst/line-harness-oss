@@ -8,6 +8,7 @@ import {
   ArrowUp,
   CalendarClock,
   CalendarDays,
+  Check,
   CheckCircle2,
   CircleAlert,
   Filter,
@@ -61,7 +62,7 @@ import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import { TextField } from '@/components/shared/text-field'
 import { TimeField } from '@/components/shared/date-time-field'
-import ConditionBuilder, { pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
+import ConditionBuilder, { findConditionDraftIssue, pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
 import { firstReminderStepMessage, reminderStepTimings, reminderStopSummary, reminderTriggerLabel, renderReminderBodySample } from '@/components/reminders/reminder-labels'
 import { useReminderTestRecipient } from '@/components/reminders/use-reminder-test-recipient'
 import { useReminderTestSend } from '@/components/reminders/use-reminder-test-send'
@@ -189,6 +190,9 @@ type StageFrame = {
   identity: ReactNode
   steps: ReactNode
   description: ReactNode
+  /** 頭の線の下に板の幅で置く帯（競合 k32cn）。 */
+  notice?: ReactNode
+  noticeSpacing?: 'band'
   /** 下の帯の左の文（下書きの自動保存の状態）。 */
   status?: ReactNode
 }
@@ -377,6 +381,10 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
    * 応答で上書きせず、そのまま残す（次の自動保存で追って送る）。
    */
   async function saveSettings(next: ReminderDraftSettings, { silent = false }: { silent?: boolean } = {}): Promise<boolean> {
+    if (next.targetCondition && (!pruneCondition(next.targetCondition as SegmentCondition) || findConditionDraftIssue(next.targetCondition as SegmentCondition))) {
+      if (!silent) setError('対象者の条件を完成させてください。')
+      return false
+    }
     if (!silent) {
       setBusy(true)
       setError('')
@@ -400,7 +408,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
       setDraft(response.data)
       setConflict(false)
       const untouched = settingsRef.current === sentSettings && basicsRef.current === sentBasics
-      if (!silent || untouched) {
+      if (untouched) {
         setSettings(response.data.settings)
         setBasics(basicsFromDraft(response.data.settings))
       }
@@ -501,8 +509,8 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
               : 'hjNpJ'
 
   /*
-   * 競合（k32cn）の帯は頭の線の下・本文の上、板の幅いっぱい。型の頭の説明の
-   * 段（最後の行）に入れ、帯の上下の間は自分の CSS で絵の位置に合わせる。
+   * 競合（k32cn）の帯は頭の線の下・本文の上、板の幅いっぱい。型の「帯の段」
+   * （notice・noticeSpacing='band'）に入れる。
    */
   const conflictBand = conflict ? (
     <div className={styles.conflictBand} role="alert">
@@ -532,9 +540,10 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
           : v8stage === 'done'
             ? `名前：${subjectSettings.name}`
             : `名前：${subjectSettings.name}・いまは下書きです`}
-        {conflictBand}
       </>
     ),
+    notice: conflictBand,
+    noticeSpacing: 'band',
     status: autosave.label ? <span aria-live="polite" data-autosave-status>{autosave.label}</span> : undefined,
   }
 
@@ -543,13 +552,14 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
     : null
 
   return (
-    <>
+    <fieldset disabled={busy} className="contents">
       {v8stage === 'basics' ? (
         <BasicsStageV8
           frame={frame}
           notice={stageError}
           value={basics ?? basicsFromDraft(subjectSettings)}
           onChange={setBasics}
+          onTemplate={(template) => setSettings(current => current ? {...current, steps: [{stableStepId: crypto.randomUUID(), messageType: 'text', ...template.step}]} : current)}
           stepCount={subjectSettings.steps.length}
           busy={busy}
           onSave={async (value) => {
@@ -684,7 +694,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
           )
         })()}
       </ConfirmDialog>
-    </>
+    </fieldset>
   )
 }
 
@@ -695,6 +705,7 @@ function BasicsStageV8({
   notice,
   value,
   onChange,
+  onTemplate,
   stepCount,
   busy,
   onSave,
@@ -705,6 +716,7 @@ function BasicsStageV8({
   notice: ReactNode
   value: BasicsValue
   onChange: (value: BasicsValue) => void
+  onTemplate: (template: ReminderTemplateV8) => void
   stepCount: number
   busy: boolean
   onSave: (value: BasicsValue) => void
@@ -735,13 +747,14 @@ function BasicsStageV8({
       (appliedTemplateId !== null && appliedTemplateId !== template.id) ||
       value.triggerFieldId !== '' ||
       value.triggerEventId !== '' ||
-      value.repeatYearly
+      value.repeatYearly || stepCount > 0
     if (hasInputsToReplace) setPendingTemplate(template)
     else applyTemplate(template)
   }
 
   function applyTemplate(template: ReminderTemplateV8) {
     setAppliedTemplateId(template.id)
+    onTemplate(template)
     onChange({
       ...value,
       triggerType: template.triggerType,
@@ -805,7 +818,7 @@ function BasicsStageV8({
       <ConfirmDialog
         open={pendingTemplate !== null}
         title="ひな形の内容で上書きしますか？"
-        description="いま選んでいる基準日や繰り返しの設定は、ひな形の内容に置き換わります。"
+        description="基準日・繰り返し・通知日時・本文をひな形の内容に置き換えます。いまの通知は残りません。"
         confirmLabel="このひな形を使う"
         onConfirm={() => {
           if (pendingTemplate) applyTemplate(pendingTemplate)
@@ -849,7 +862,7 @@ function TargetStageV8({
   const { selectedAccount } = useAccount()
   const stop = settings.stopConditions
   const condition = (settings.targetCondition ?? null) as SegmentCondition | null
-  const mode = pruneCondition(condition) ? 'condition' : 'all'
+  const mode = condition !== null ? 'condition' : 'all'
 
   // 保存前の条件で数え直した人数。条件が空なら保存済みの検査結果を出す。
   const [recount, setRecount] = useState<{ matched: number; excluded: number; sample: Array<{ id: string; displayName: string }> } | null>(null)
@@ -1558,13 +1571,13 @@ function ScheduleStageV8({
             ))}
           </div>
         )}
-        {preview && preview.summary.duplicateCount > 0 ? (
-          <p className={styles.infoBand}>
-            <Layers size={16} aria-hidden="true" />
-            同じ時刻に送る通知は、止めずに1通にまとめて送ります（{formatNumber(preview.summary.duplicateCount)}件）。まとめたくないときは時刻をずらしてください。
-          </p>
-        ) : null}
       </section>
+      {preview && preview.summary.duplicateCount > 0 ? (
+        <p className={styles.infoBand}>
+          <Layers size={16} aria-hidden="true" />
+          同じ時刻に送る通知は、止めずに1通にまとめて送ります（{formatNumber(preview.summary.duplicateCount)}件）。まとめたくないときは時刻をずらしてください。
+        </p>
+      ) : null}
     </CreatePage>
   )
 }
@@ -1819,7 +1832,7 @@ function DoneStageV8({
       <div className={styles.doneBody}>
         <div className={styles.doneCard}>
           <span className={styles.doneIcon}>
-            <CheckCircle2 size={24} aria-hidden="true" />
+            <Check size={24} aria-hidden="true" />
           </span>
           <h2 className={styles.doneTitle}>「{settings.name}」を有効にしました</h2>
           <p className={styles.doneNote}>
@@ -1837,7 +1850,7 @@ function DoneStageV8({
           </dl>
           <div className={styles.doneActions}>
             <Button href="/reminders"><List size={15} aria-hidden="true" />一覧へ戻る</Button>
-            <Button variant="secondary" href={`/reminders/detail?id=${encodeURIComponent(reminderId)}&status=planned`}>
+            <Button variant="secondary" href={`/reminders/detail?id=${encodeURIComponent(reminderId)}&tab=schedule&status=planned`}>
               <CalendarClock size={15} aria-hidden="true" />配信予定を見る
             </Button>
             <Button variant="primary" href={`/reminders/detail?id=${encodeURIComponent(reminderId)}`}>

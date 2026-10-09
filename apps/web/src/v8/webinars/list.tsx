@@ -43,6 +43,8 @@ import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
+import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
+import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
@@ -83,6 +85,7 @@ import {
   type WebinarLoadFailure,
 } from './helpers'
 import styles from './list.module.css'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
 
 type SortKey = 'updated' | 'created' | 'name'
 type SavedFilter = '' | 'active' | 'draft' | 'archived'
@@ -284,30 +287,15 @@ function FolderForm({
   busy: boolean
   error: string
   onCancel: () => void
-  onSave: (name: string) => void
+  onSave: (name: string, color: string | null) => void
 }) {
   const [name, setName] = useState(folder?.name ?? '')
-  return (
-    <div className={styles.folderForm}>
-      <p className={styles.dialogValue}>ウェビナーを整理する名前を入力してください。</p>
-      <label className={styles.dialogLabel} htmlFor="webinar-v8-folder-name">フォルダ名</label>
-      <input
-        id="webinar-v8-folder-name"
-        value={name}
-        onChange={(event) => setName(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' && name.trim() && !busy) onSave(name.trim())
-        }}
-        className={styles.folderInput}
-        placeholder="例: 商品説明"
-      />
-      {error ? <p className={styles.errorText}>{error}</p> : null}
-      <div className={styles.formActions}>
-        <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
-        <Button variant="primary" onClick={() => onSave(name.trim())} disabled={!name.trim() || busy} busy={busy}>保存する</Button>
-      </div>
-    </div>
-  )
+  const [color, setColor] = useState<string | null>(folder ? folderDisplayColor(folder) : FOLDER_SELECT_COLORS[0].value)
+  return <FolderEditorDialog open title={folder ? 'フォルダを直す' : 'フォルダを追加'}
+    description="ウェビナーを分けてしまう箱です。消しても、中のウェビナーは未分類に残ります。"
+    name={name} onNameChange={setName} color={color} onColorChange={setColor}
+    busy={busy} error={error || undefined} placeholder="例: 商品説明"
+    onCancel={onCancel} onConfirm={() => onSave(name.trim(), color)} confirmLabel={folder ? '保存する' : '追加する'} />
 }
 
 /** 表の見出し。骨組みと本物で同じものを使う。 */
@@ -565,13 +553,14 @@ function WebinarList() {
   useOnAccountSwitch(selectedAccountId, () => setView({ folder: '', page: '1' }))
   useListScrollMemory(!loading && !accountLoading)
 
-  const saveFolder = async (name: string) => {
+  const saveFolder = async (name: string, color: string | null) => {
     if (!selectedAccountId || !canEdit || folderBusy) return
     setFolderBusy(true)
     setFolderError('')
     try {
-      if (editingFolder) await webinarApi.updateFolder(selectedAccountId, editingFolder.id, { name })
-      else await webinarApi.createFolder(selectedAccountId, { name })
+      const result = editingFolder ? await webinarApi.updateFolder(selectedAccountId, editingFolder.id, { name, color })
+        : await webinarApi.createFolder(selectedAccountId, { name, color })
+      if (!result.success) throw new Error(result.error)
       setEditingFolder(null)
       setFolderFormOpen(false)
       await refreshFolders()
@@ -736,7 +725,7 @@ function WebinarList() {
     return w.folderName ? { name: w.folderName } : null
   }
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: panelGrand, icon: <Inbox size={15} aria-hidden="true" /> },
+    { kind: 'all' as const, id: '', label: 'すべて', count: panelGrand, icon: <Inbox size={15} aria-hidden="true" /> },
     /*
      * 絵（UyUMw）どおり「…」は選んだ行だけに出す。選んでいない行に操作を渡すと、
      * 共通のフォルダの列では「…」の箱が場所を取り、件数が左へずれる。
@@ -745,6 +734,7 @@ function WebinarList() {
     ...folders.map((folder, index) => {
       const manageable = canEdit && selectedFolder === folder.id
       return {
+        kind: 'folder' as const,
         id: folder.id,
         label: folder.name,
         count: folder.count,
@@ -756,7 +746,7 @@ function WebinarList() {
         deleteNote: '削除しても、中のウェビナーは未分類に残ります。',
       }
     }),
-    { id: UNFILED, label: '未分類', count: unfiledCount },
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
   ]
   const folderSelect = (
     <Select
@@ -953,7 +943,6 @@ function WebinarList() {
             </tbody>
           </DataTable>
         </div>
-        <p className={styles.footNote}>行の「…」から 参加者・分析・コメント演出・アーカイブ。行を押すと右に詳細が出ます（↑↓で次の行へ）。</p>
       </>
     )
   }
@@ -971,6 +960,7 @@ function WebinarList() {
 
   return (
     <ListPage
+      help="行の「…」から 参加者・分析・コメント演出・アーカイブ。行を押すと右に詳細が出ます（↑↓で次の行へ）。"
       boardId="UyUMw"
       headingSize="regular"
       title="ウェビナー"
@@ -1042,33 +1032,9 @@ function WebinarList() {
           />
         ) : null}
         {(folderFormOpen || editingFolder) ? (
-          <DetailPanel
-            open
-            title={editingFolder ? 'フォルダ名を変更' : 'フォルダを追加'}
-            description={editingFolder ? `「${editingFolder.name}」の名前を変えます。中のウェビナーはそのまま残ります。` : undefined}
-            onClose={() => {
-              if (folderBusy) return
-              withViewTransition(() => {
-                setFolderFormOpen(false)
-                setEditingFolder(null)
-                setFolderError('')
-              })
-            }}
-          >
-            <FolderForm
-              key={editingFolder?.id ?? 'new'}
-              folder={editingFolder}
-              busy={folderBusy}
-              error={folderError}
-              onCancel={() => {
-                if (folderBusy) return
-                setFolderFormOpen(false)
-                setEditingFolder(null)
-                setFolderError('')
-              }}
-              onSave={(name) => void saveFolder(name)}
-            />
-          </DetailPanel>
+          <FolderForm key={editingFolder?.id ?? 'new'} folder={editingFolder} busy={folderBusy} error={folderError}
+            onCancel={() => { if (!folderBusy) { setFolderFormOpen(false); setEditingFolder(null); setFolderError('') } }}
+            onSave={(name, color) => void saveFolder(name, color)} />
         ) : null}
         <DetailPanel
           open={active !== null}

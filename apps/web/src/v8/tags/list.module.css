@@ -1,5 +1,5 @@
 /*
- * ★V8 友だち属性 タグの一覧（Pencil I1E7Bt・1152 aPeD8・閲覧のみ fkGUR）。
+ * ★V8 タグ タグの一覧（Pencil I1E7Bt・1152 aPeD8・閲覧のみ fkGUR）。
  * 寸法は app/globals.css の [data-theme="v8"] の --tpl-tag-* と型の --tpl-*。
  */
 
@@ -138,7 +138,6 @@
   table-layout: fixed;
 }
 
-.colStar { width: var(--tpl-tag-col-star); }
 .colName { width: auto; }
 .colFolder { width: var(--tpl-tag-col-folder); }
 .colCount { width: var(--tpl-tag-col-count); }
@@ -147,54 +146,17 @@
 .colUsage { width: var(--tpl-tag-col-usage); }
 .colMenu { width: var(--tpl-tag-col-menu); text-align: right; }
 
-.headStar {
-  width: var(--tpl-tag-star-head);
-  height: var(--tpl-tag-star-head);
-  color: var(--color-ink-faint);
-  vertical-align: middle;
-}
-
 .row {
   cursor: pointer;
 }
-
-.starButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--tpl-tag-menu-btn);
-  height: var(--tpl-tag-menu-btn);
-  margin: 0 calc((var(--tpl-tag-star) - var(--tpl-tag-menu-btn)) / 2);
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-ink-secondary);
-  cursor: pointer;
-  vertical-align: middle;
-}
-
-.starButton:disabled {
-  cursor: not-allowed;
-}
-
-.starIcon {
-  width: var(--tpl-tag-star);
-  height: var(--tpl-tag-star);
-  fill: none;
-}
-
-.starButton[data-on='true'] .starIcon {
-  fill: var(--color-star-on);
-  stroke: var(--color-star-on-edge);
-}
-
-.starButton:disabled .starIcon {
-  opacity: 0.6;
+/* 1152 の板は1行61。札が28高でも行を押し広げない余白。 */
+@container v8-page (max-width: 1099px) {
+  .row > td { height: var(--tpl-tag-narrow-row-h); padding-block: 0; }
 }
 
 .nameRow {
   display: flex;
-  height: var(--tpl-row-name-lh);
+  min-height: var(--tpl-row-name-lh);
   align-items: center;
   gap: var(--tpl-tag-name-gap);
   min-width: 0;
@@ -233,26 +195,14 @@
   white-space: nowrap;
 }
 
+.nameLink { color: var(--color-action); } /* 保存した検索の条件名は青い文字（絵 IWnYX）。 */
+
 .name:hover {
   color: var(--color-action);
   text-decoration: underline;
 }
 
-.miniBadge {
-  flex-shrink: 0;
-  padding: 0 var(--tpl-tag-name-gap);
-  border-radius: var(--radius-pill);
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-faint);
-  font-size: var(--tpl-tag-note-size);
-  font-weight: 500;
-  line-height: var(--tpl-row-sub-lh);
-  white-space: nowrap;
-}
 
-.miniBadgeWarn {
-  color: var(--color-warning);
-}
 
 .sub {
   margin: var(--tpl-tag-sub-gap) 0 0;
@@ -310,26 +260,7 @@
 }
 
 /* 行の「…」（共通の RowMenu）。絵は 28 なので、共通の印ボタン（36）より強く当てる。 */
-.menuAnchor > button.menuButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--tpl-tag-menu-btn);
-  height: var(--tpl-tag-menu-btn);
-  flex: 0 0 var(--tpl-tag-menu-btn);
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  color: var(--color-ink-secondary);
-  cursor: pointer;
-}
 
-.menuAnchor > button.menuButton:hover {
-  background: var(--color-canvas-sunken);
-}
 
 .menuIcon {
   width: var(--tpl-tag-ro-icon);
@@ -390,10 +321,11 @@
   gap: var(--tpl-body-gap);
   margin: 0 var(--tpl-toolbar-pad-side) var(--tpl-toolbar-pad-side);
   padding: var(--tpl-create-content-pad-side) var(--tpl-toolbar-pad-side);
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
   text-align: center;
+  box-shadow: var(--card-shadow);
 }
 
 .stateIcon,
@@ -523,6 +455,8 @@
 
 /* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
 .viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-col-h); }
+/* 閲覧のみで隠したフォルダを追加の場所（フォルダを消しても…の注が動かない）。 */
+.viewerFolderAddSpace { display: block; height: var(--tpl-viewer-folder-add-space); }
 
 /* ★V8 対応マークのタブ（vKDj5）：案内の帯の段（上14・左右24）。帯そのものは閲覧のみの帯と同じ形。 */
 .infoRow {
@@ -642,3 +576,6 @@
   flex-basis: 100%;
   margin-bottom: var(--tpl-tg2-band-after);
 }
+
+/* 統括だけ、共通の配る操作の場所を表の列として確保する。 */
+.colDistribute { width: var(--tpl-hq-attribute-distribute-col); text-align: left; }

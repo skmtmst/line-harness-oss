@@ -11,6 +11,7 @@
  * データの口・保存の口・権限・失敗の扱いは app/friend-add-settings/list-v8.tsx と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -47,6 +48,8 @@ import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
+import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
+import { FOLDER_SELECT_COLORS, type FriendAddRuleFolder } from '@line-crm/shared'
 import FolderPanel from '@/components/shared/folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import Select from '@/components/shared/select'
@@ -64,6 +67,7 @@ import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
 import { describeFriendAddFailure } from './failure'
 import { useCursorStack } from './use-cursor-stack'
 import styles from './list.module.css'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
 
 const KIND_LABELS: Record<FriendAddRuleKind, string> = {
   first_time: 'はじめて友だち追加した人',
@@ -122,7 +126,7 @@ export function actionLine(rule: FriendAddRule) {
     parts.push(`＋シナリオ「${rule.scenarioName}」`)
   }
   for (const action of rule.definition.actions) {
-    if (action.type === 'start_scenario' && rule.scenarioName) continue
+    if (action.type === 'start_scenario' && rule.scenarioName && action.targetId === rule.definition.scenarioId) continue
     if (action.label) parts.push(`＋${actionName(action.label)}`)
   }
   return parts.join(' ')
@@ -180,6 +184,7 @@ function FriendAddList() {
   usePageTitle('友だち追加時の配信')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const narrow = useNarrowViewport()
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
   // 閲覧のみ：押せない形にする（隠さない）。
@@ -201,6 +206,9 @@ function FriendAddList() {
   const { cursor, canPrev, reset: resetCursor, goPrev, goNext } = useCursorStack()
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
+  const [folderColor, setFolderColor] = useState<string | null>(FOLDER_SELECT_COLORS[0].value)
+  const [editingFolder, setEditingFolder] = useState<FriendAddRuleFolder | null>(null)
+  const [folderError, setFolderError] = useState('')
   const [folderBusy, setFolderBusy] = useState(false)
   const folderKey = useRef(crypto.randomUUID())
   const requestSequence = useRef(0)
@@ -292,17 +300,17 @@ function FriendAddList() {
 
   /*
    * 行の名前の前の丸は、左のフォルダの列と同じフォルダを名前で引く（設定はフォルダを名前で持つ）。
-   * この口はフォルダの色を返さないので、丸は色の無いフォルダの灰になる。無ければ未分類の輪。
+   * フォルダの候補から色を引く。色なしは薄い灰、フォルダなしは未分類の輪。
    */
-  const folderDotOf = (name: string | null | undefined) => (name ? { name } : null)
+  const folderDotOf = (name: string | null | undefined) => (name ? { name, color: data?.options.folders.find((folder) => folder.name === name)?.color } : null)
 
   /* フォルダ欄の件数はサーバの全ページ合計 (folderCounts)。 */
   const folders = useMemo(() => {
     const counts = new Map<string | null, number>()
     for (const entry of data?.folderCounts ?? []) counts.set(entry.name, entry.count)
-    const rows: Array<{ key: string; name: string; count: number }> = []
+    const rows: Array<{ id?: string; key: string; name: string; count: number; color?: string | null }> = []
     for (const option of data?.options.folders ?? []) {
-      rows.push({ key: option.name, name: option.name, count: counts.get(option.name) ?? 0 })
+      rows.push({ id: option.id, key: option.name, name: option.name, color: option.color, count: counts.get(option.name) ?? 0 })
     }
     const uncategorized = counts.get(null) ?? 0
     if (uncategorized > 0 || !rows.some((row) => row.name === '未分類')) {
@@ -316,21 +324,23 @@ function FriendAddList() {
     const name = folderName.trim()
     if (!name) return
     setFolderBusy(true)
-    setActionError('')
+    setFolderError('')
     try {
-      const response = await api.friendAddRules.createFolder(selectedAccountId, name, folderKey.current)
+      const response = editingFolder
+        ? await api.friendAddRules.updateFolder(selectedAccountId, editingFolder.id, { name, color: folderColor })
+        : await api.friendAddRules.createFolder(selectedAccountId, name, folderKey.current, folderColor)
       if (!response.success) {
-        setActionError(response.error)
-        setFolderDialogOpen(false)
+        setFolderError(response.error)
         return
       }
+      if (editingFolder && folder === editingFolder.name) setFolder(name)
+      setEditingFolder(null)
       folderKey.current = crypto.randomUUID()
       setFolderName('')
       setFolderDialogOpen(false)
       await load()
     } catch (caught) {
-      setActionError(describeFriendAddFailure(caught, 'フォルダ', 'create').message)
-      setFolderDialogOpen(false)
+      setFolderError(describeFriendAddFailure(caught, 'フォルダ', 'create').message)
     } finally {
       setFolderBusy(false)
     }
@@ -432,7 +442,7 @@ function FriendAddList() {
     if (deleteBusy) return
     setDeleteTarget(null)
     setDeleteError('')
-    if (requestedDeleteId) router.replace(`/friend-add-settings?kind=${kind}`)
+    if (requestedDeleteId) samePageUrl.replace(`/friend-add-settings?kind=${kind}`)
   }
   const runDelete = async () => {
     if (!selectedAccountId || !deleteTarget || deleteBusy) return
@@ -445,7 +455,7 @@ function FriendAddList() {
         return
       }
       setDeleteTarget(null)
-      if (requestedDeleteId) router.replace(`/friend-add-settings?kind=${kind}`)
+      if (requestedDeleteId) samePageUrl.replace(`/friend-add-settings?kind=${kind}`)
       await load()
     } catch (caught) {
       setDeleteError(describeFriendAddFailure(caught, '設定', 'delete').message)
@@ -529,8 +539,9 @@ function FriendAddList() {
   /* ===== 道具 ===== */
   /* 閲覧のみの人には、作る・追加・編集・削除の操作を置かない（押せない形でも出さない。オーナー 2026-10-06）。 */
   const folderRows = [
-    { id: '', label: 'すべて', count: data?.total ?? items.length },
-    ...folders.map((entry) => ({ id: entry.key, label: entry.name, count: entry.count })),
+    { kind: 'all' as const, id: '', label: 'すべて', count: data?.total ?? items.length },
+    ...folders.map((entry) => ({ kind: entry.key === UNFILED ? 'unfiled' as const : 'folder' as const, id: entry.key, label: entry.name, color: entry.color, count: entry.count,
+      onEdit: canEdit && entry.id && entry.key !== UNFILED ? () => { setFolderName(entry.name); setFolderColor(folderDisplayColor(entry)); setEditingFolder({ id: entry.id!, name: entry.name, color: entry.color }); setFolderError(''); setFolderDialogOpen(true) } : undefined })),
   ]
   const createButton = canEdit ? (
     <Button variant="primary" href="/friend-add-settings?view=new" className={styles.createButton}>
@@ -734,8 +745,8 @@ function FriendAddList() {
                         onMove={(direction) => keyboardMove(rule.id, direction)}
                       >
                         <span aria-hidden="true" className={styles.grip}>⠿</span>
-                      </ReorderHandle> : <span aria-hidden="true" className={`${styles.grip} ${styles.gripSpace}`}>⠿</span>}
-                      <span className={styles.orderNum}>{index + 1}</span>
+                      </ReorderHandle> : <span aria-hidden="true" className={`${styles.grip} ${styles.gripSpace}`} />}
+                      <span className={styles.orderNum}>{rule.priority}</span>
                     </span>
                   </Td>
                   <Td className={styles.colName}>
@@ -780,7 +791,6 @@ function FriendAddList() {
             </tbody>
           </DataTable>
         </div>
-        <p className={styles.footNote}>{ORDER_NOTE}</p>
       </>
     )
   }
@@ -797,6 +807,7 @@ function FriendAddList() {
 
   return (
     <ListPage
+      help={ORDER_NOTE}
       boardId={canEdit ? 'MRhef' : 'LEwkJ'}
       headingSize="regular"
       title="友だち追加時の配信"
@@ -823,7 +834,7 @@ function FriendAddList() {
               current: kind === tab,
               onClick: () => {
                 resetCursor()
-                router.replace(`/friend-add-settings?kind=${tab}`)
+                samePageUrl.replace(`/friend-add-settings?kind=${tab}`)
               },
             }))}
           />
@@ -852,7 +863,7 @@ function FriendAddList() {
         <FolderPanel
           activeId={folder ?? ''}
           onSelect={(id) => selectFolder(id || null)}
-          onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}
+          onAddFolder={canEdit ? () => { setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setEditingFolder(null); setFolderError(''); setFolderDialogOpen(true) } : undefined}
           addFolderLabel="フォルダを追加"
           addFolderDisabled={folderBusy}
           rows={folderRows}
@@ -868,6 +879,12 @@ function FriendAddList() {
         <ConfirmDialog
           open={fallbackStop}
           designNode="cFo2p"
+          designLayout="stacked"
+          designWidth={600}
+          designTop={280}
+          footerAlign="start"
+          designFooterGap={84}
+          confirmFirst
           titleIcon={false}
           title="「経路が分からなかった人」は止められません"
           description="いちばん最後の受け皿なので、止めると誰にも案内が届かなくなります。届く中身を変えたいときは、この設定を編集してください。止めたいときは、先に別の受け皿を有効にしてください。"
@@ -878,10 +895,7 @@ function FriendAddList() {
           }}
           onCancel={() => setFallbackStop(false)}
         >
-          <p className={styles.warnNote}>
-            <AlertCircle size={14} aria-hidden="true" />
-            <span>直近7日では {formatNumber(sinkRule?.matchedLast7Days ?? 0)}人 がこの設定で案内を受け取っています。</span>
-          </p>
+          <Notice tone="warn" appearance="soft" message={`直近7日では ${countText(sinkRule?.matchedLast7Days, '人')} がこの設定で案内を受け取っています。`} />
         </ConfirmDialog>
         {/* 通常の設定の一時停止の確かめ。 */}
         <ConfirmDialog
@@ -911,30 +925,12 @@ function FriendAddList() {
           onConfirm={() => void runDelete()}
           onCancel={closeDelete}
         />
-        {/* フォルダを追加する窓（v7 と同じ文）。 */}
-        <ConfirmDialog
-          open={folderDialogOpen}
-          title="流入の束を追加"
-          description="設定を整理するフォルダ名を入力してください。"
-          confirmLabel="追加する"
-          busy={folderBusy}
-          onCancel={() => {
-            setFolderDialogOpen(false)
-            setFolderName('')
-          }}
-          onConfirm={folderName.trim() ? () => void createFolder() : undefined}
-        >
-          <label className={styles.folderDialogBody}>
-            <span className={styles.folderDialogLabel}>フォルダ名</span>
-            <input
-              autoFocus
-              className={styles.folderDialogInput}
-              value={folderName}
-              onChange={(event) => setFolderName(event.target.value)}
-              maxLength={50}
-            />
-          </label>
-        </ConfirmDialog>
+        <FolderEditorDialog open={folderDialogOpen} title={editingFolder ? 'フォルダを直す' : 'フォルダを追加'}
+          description="設定を分けてしまう箱です。"
+          name={folderName} onNameChange={setFolderName} color={folderColor} onColorChange={setFolderColor} maxLength={50}
+          confirmLabel={editingFolder ? '保存する' : '追加する'} busy={folderBusy} error={folderError || undefined}
+          onCancel={() => { if (!folderBusy) { setFolderDialogOpen(false); setFolderName(''); setEditingFolder(null) } }}
+          onConfirm={() => void createFolder()} />
       </>}
     >
       {listBody}

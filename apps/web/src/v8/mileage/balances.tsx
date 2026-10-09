@@ -311,7 +311,7 @@ export default function BalancesTab() {
       />
       <KpiCard
         presentation="band"
-        title="今月 増えた"
+        title="直近30日 増えた"
         icon={<TrendingUp size={14} aria-hidden="true" />}
         value={!loading && !loadError ? grantedMiles ?? 0 : null}
         unit=""
@@ -319,7 +319,7 @@ export default function BalancesTab() {
       />
       <KpiCard
         presentation="band"
-        title="今月 減った"
+        title="直近30日 減った"
         icon={<TrendingDown size={14} aria-hidden="true" />}
         value={!loading && !loadError ? decreasedMiles ?? 0 : null}
         unit=""
@@ -465,7 +465,7 @@ export default function BalancesTab() {
                 }}
               >
                 <Td className={styles.colName}>
-                  <span className={styles.rowNameInk} title={member.displayName}>{member.displayName}</span>
+                  <span className={styles.rowName} title={member.displayName}>{member.displayName}</span>
                   <span className={styles.rowSub} title={member.lineAccount.name}>{member.lineAccount.name}</span>
                 </Td>
                 <Td className={styles.colRank}><span className={styles.cellMain} title={member.rankReason}>{rankLabel(member.rank) ?? '—'}</span></Td>
@@ -522,12 +522,12 @@ export default function BalancesTab() {
   const footer = !loading && !loadError && members.length > 0 ? (
     <>
       {pager}
-      <p className={styles.footNoteFlush}>行を押すと、その人のマイルの詳細（明細・増やす／減らす）を開きます。CSV はこのページの残高を書き出します。</p>
     </>
   ) : undefined
 
   return (
     <MileageFrame
+      help="行を押すと、その人のマイルの詳細（明細・増やす／減らす）を開きます。CSV はこのページの残高を書き出します。"
       actions={<div className={styles.headActions}>
         <Button onClick={() => void reloadAll()} disabled={loading}>
           <RefreshCw size={15} aria-hidden="true" /> 残高を再読み込み

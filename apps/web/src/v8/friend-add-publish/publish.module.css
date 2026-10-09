@@ -3,12 +3,6 @@
  * 枠・頭・手順の輪・右の列・下の帯は型（CreatePage / PageHeading）が持つ。ここは段（カード）の中身だけ。
  */
 
-.backLink {
-  display: inline-flex;
-  align-items: center;
-  font-size: var(--text-label);
-}
-
 .viewerBand {
   margin: 0;
   padding: var(--tpl-ro-band-pad);
@@ -172,9 +166,10 @@
   width: min(var(--tpl-cfl-done-w), 100%);
   padding: var(--tpl-cfl-done-card-pad);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 .doneMark {
   display: inline-grid;

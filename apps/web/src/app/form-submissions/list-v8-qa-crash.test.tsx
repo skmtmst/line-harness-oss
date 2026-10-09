@@ -138,6 +138,7 @@ beforeEach(() => {
   } catch {
     /* 置き場が無いときはそのまま */
   }
+  window.localStorage.setItem('lh_staff_role', 'owner')
   document.documentElement.dataset.theme = 'v8'
   host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host)
   spy = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => { errors.push(args) })
@@ -185,7 +186,8 @@ describe('管理者確認の切り替え', () => {
   })
 })
 
-/* V8「サクサク感」C①・D・E：行→詳細パネル・右クリック・つながる移り変わり。 */
+/* V8「サクサク感」C①・D・E：行→詳細パネル・右クリック・つながる移り変わり。
+ * 共通パネルは最上層へ描画されるため、パネル内の操作は文書全体から探す。 */
 describe('行の詳細パネルと右クリック', () => {
   const detailButton = () => {
     const found = [...host.querySelectorAll('button')]
@@ -199,7 +201,7 @@ describe('行の詳細パネルと右クリック', () => {
     await flush()
     await act(async () => { fireEvent.click(detailButton()) })
     await flush()
-    const panel = host.querySelector('[data-design-part="detail-panel"]')
+    const panel = document.querySelector('[data-design-part="detail-panel"]')
     expect(panel, '詳細パネルが開く').toBeTruthy()
     expect(panel?.textContent).toContain('来店アンケート')
     expect(panel?.textContent).toContain('友だち情報')
@@ -230,13 +232,13 @@ describe('行の詳細パネルと右クリック', () => {
     await flush()
     await act(async () => { fireEvent.click(detailButton()) })
     await flush()
-    const panel = host.querySelector('[data-design-part="detail-panel"]')
+    const panel = document.querySelector('[data-design-part="detail-panel"]')
     const edit = [...panel!.querySelectorAll('button')]
       .find((b) => b.getAttribute('aria-label') === 'フォーム名を変更する')
     expect(edit, '名前の変更ボタンがある').toBeTruthy()
     await act(async () => { fireEvent.click(edit!) })
     await flush()
-    const input = host.querySelector('[data-design-part="detail-panel"] input[aria-label="フォーム名"]') as HTMLInputElement | null
+    const input = document.querySelector('[data-design-part="detail-panel"] input[aria-label="フォーム名"]') as HTMLInputElement | null
     expect(input, '入力欄が出る').toBeTruthy()
     await act(async () => {
       fireEvent.change(input!, { target: { value: '改名アンケート' } })
@@ -268,7 +270,7 @@ describe('入力の右パネル移設', () => {
     expect(moveItem, '移動の項目がある').toBeTruthy()
     await act(async () => { fireEvent.click(moveItem!) })
     await flush()
-    const panel = host.querySelector('[data-design-part="detail-panel"]')
+    const panel = document.querySelector('[data-design-part="detail-panel"]')
     expect(panel, '右のパネルが開く').toBeTruthy()
     expect(panel?.textContent).toContain('どのフォルダへ移しますか')
     expect(panel?.textContent).toContain('未分類')
@@ -289,7 +291,7 @@ describe('入力の右パネル移設', () => {
     expect(duplicateItem, '複製の項目がある').toBeTruthy()
     await act(async () => { fireEvent.click(duplicateItem!) })
     await flush()
-    const panel = host.querySelector('[data-design-part="detail-panel"]')
+    const panel = document.querySelector('[data-design-part="detail-panel"]')
     expect(panel, '右のパネルが開く').toBeTruthy()
     expect(panel?.textContent).toContain('複製しますか')
     expect(panel?.textContent).toContain('複製の名前')

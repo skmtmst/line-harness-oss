@@ -1,5 +1,7 @@
 'use client'
 
+import { PageTitle } from '@/components/templates/page-frame'
+
 import { DelayedSkeleton, SkeletonRow } from '@/components/shared/skeleton'
 import Avatar from '@/components/shared/avatar'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -24,7 +26,7 @@ import { INBOX_INFO_PANEL_MIN_WIDTH } from './inbox-layout'
 import styles from './inbox-v8.module.css'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
-import { OperatorDropdown, StatusDropdown, buildOperatorRows, type ChatStatus } from '@/components/chats/inbox-dropdown'
+import { buildOperatorRows, type ChatStatus } from '@/components/chats/inbox-dropdown'
 import { unreadLookup } from '@/components/chats/assignee-unread'
 import InboxFilterPanel from '@/components/chats/inbox-filter-panel'
 import SavedViewDialog, { type SavedViewDraft, type SavedViewSaveResult } from '@/components/chats/saved-view-dialog'
@@ -40,7 +42,6 @@ import ChatThreadWindow from '@/components/chats/chat-thread-window'
 import ChatSearchBar from '@/v8/inbox-search/chat-search-bar'
 import searchStyles from '@/v8/inbox-search/chat-search-bar.module.css'
 import { useChatSearch } from '@/v8/inbox-search/use-chat-search'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import InboxRulesPopover from '@/v8/inbox-chat/rules-popover'
 import ScheduleSendDialog from '@/v8/inbox-chat/schedule-dialog'
 import chatStyles from '@/v8/inbox-chat/inbox-chat.module.css'
@@ -68,13 +69,14 @@ import EmailThread from '@/components/support/email-thread'
 import Button from '@/components/shared/button'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
 import DateTimeField from '@/components/shared/date-time-field'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
-import { Bookmark, CheckCircle2, Clock3, Filter, ListFilter, Reply, FileText, Image as ImageIcon, Link2, NotebookPen, Bot, PanelRightClose, PanelRightOpen, Paperclip, Search, Send, Settings2, SlidersHorizontal, Star, X } from 'lucide-react'
+import { Bookmark, CheckCircle2, Clock3, ListFilter, Reply, FileText, Image as ImageIcon, Link2, NotebookPen, Bot, PanelRightClose, PanelRightOpen, Paperclip, Search, Send, Settings2, Star, X } from 'lucide-react'
 
 type Chat = ChatListItem
 
@@ -148,9 +150,7 @@ function ChannelBadge({ channel }: { channel: 'line' | 'email' }) {
     </span>
   ) : (
     <span className={`bg-canvas-sunken text-ink-secondary border-hairline inline-flex h-5 min-w-8 items-center justify-center rounded-mini border px-1.5 text-micro font-medium ${styles.channelBadge}`}>
-      {/* V8 の絵（XqSvX）は「メール」。v7 は今までの MAIL のまま。 */}
-      <span className="v7-only">MAIL</span>
-      <span className="v8-only">メール</span>
+      メール
     </span>
   )
 }
@@ -581,7 +581,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [memoError, setMemoError] = useState('')
   const [showTemplatePicker, setShowTemplatePicker] = useState(false)
   // G-4: ピッカーで「まとめて選ぶ」で選んだ本文たち。送る前に確認する。
-  const [pendingPack, setPendingPack] = useState<string[] | null>(null)
+  const [pendingPack, setPendingPack] = useState<{ texts: string[]; chatId: string; accountId: string | null; revision?: number } | null>(null)
+  useEffect(() => { setPendingPack(null); setImagePreviewOpen(false) }, [selectedChatId, selectedAccountId])
   const imageInputRef = useRef<HTMLInputElement>(null)
   const [imageError, setImageError] = useState('')
   /*
@@ -1351,9 +1352,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
    * 位置の口（messagesAt）の around は、送った人・引用・シナリオ名を持たない形で、
    * 間が空いた並びになるので使わない（BEHAVIOR.md）。
    */
-  const adminTheme = useAdminTheme()
-  const isV8 = adminTheme === 'v8'
-  const chatSearch = useChatSearch(adminTheme === 'v8' ? chatDetail?.friendId ?? null : null)
+  const chatSearch = useChatSearch((chatDetail?.friendId ?? null))
   const [chatSearchFocusSeq, setChatSearchFocusSeq] = useState(0)
   const [chatSearchFilling, setChatSearchFilling] = useState(false)
   const [chatSearchTarget, setChatSearchTarget] = useState<{ id: string; seq: number } | null>(null)
@@ -1420,7 +1419,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   }, [chatSearch.current, chatSearch.moveSeq]) // eslint-disable-line react-hooks/exhaustive-deps
   // ⌘F / Ctrl+F：会話を開いている間は、ブラウザのページ内検索の代わりに会話の中を探す。
   useEffect(() => {
-    if (adminTheme !== 'v8' || !chatDetail) return
+    if ((!chatDetail)) return
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'f') {
         event.preventDefault()
@@ -1429,7 +1428,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [adminTheme, chatDetail, openChatSearch])
+  }, [chatDetail, openChatSearch])
 
   /*
    * INBOX-12: 開いている会話を静かに取り直す。
@@ -1846,7 +1845,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   // （ラジオの決まり）。左右・先頭・末尾のキーで選ぶ。
   const statusFilterButtonRefs = useRef<(HTMLButtonElement | null)[]>([])
   const handleStatusFilterKeyDown = (event: React.KeyboardEvent) => {
-    const list = isV8 ? statusFiltersV8 : statusFilters
+    const list = statusFiltersV8
     const current = Math.max(0, list.findIndex((f) => f.key === statusFilter))
     let next: number | null = null
     if (event.key === 'ArrowRight') next = (current + 1) % list.length
@@ -2162,7 +2161,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
    * 入力欄・添付・引用とは別系統で、パック自身が完結した送信単位になる。
    * （LINEのpushは1回あたり5通まで。）
    */
-  const handleSendPack = async (texts: string[]) => {
+  const handleSendPack = async (pack: NonNullable<typeof pendingPack>) => {
+    if (pack.chatId !== selectedChatId || pack.accountId !== selectedAccountId) { setPendingPack(null); return }
+    const texts = pack.texts
     if (!selectedChatId || texts.length === 0 || sendLockRef.current) return
     const sendingChatId = selectedChatId
     const sendingAccountId = selectedAccountId
@@ -2172,7 +2173,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       const now = new Date().toISOString()
       const signature = JSON.stringify({ chatId: sendingChatId, combined: true, texts })
       const sendResult = await api.chats.sendCombined(sendingChatId,
-        { texts, revision: chatDetail?.revision },
+        { texts, revision: pack.revision },
         sendKeysRef.current.get(signature),
       )
       sendKeysRef.current.clear(signature)
@@ -2238,7 +2239,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         : `「${schedulingAttachment.name}」を準備できていません。もう一度試すか、外してから予約してください。`)
       return
     }
-    if (!content && (!isV8 || (!schedulingImage && !schedulingAttachment))) return
+    if (!content && (!schedulingImage && !schedulingAttachment)) return
     // INBOX-29: 上限を超えた本文は予約もさせない。
     if (messageContent.length > MESSAGE_MAX_LENGTH) {
       setError(`メッセージは${formatNumber(MESSAGE_MAX_LENGTH)}文字までです。`)
@@ -2248,11 +2249,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       setError('予約する日時を選んでください')
       return
     }
-    // v7 は今までどおり（画像つきは予約しない）。V8 だけ添付の予約を使う。
-    if (!isV8 && pendingImage) {
-      setError('画像つきの予約送信にはまだ対応していません')
-      return
-    }
+
     const schedulingChatId = selectedChatId
     const schedulingAccountId = selectedAccountId
     setScheduling(true)
@@ -2475,7 +2472,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [statusCounts, setStatusCounts] = useState<{ key: string; counts: Record<Exclude<StatusFilter, 'all'>, number> } | null>(null)
   const statusCountsRequestRef = useRef(0)
   useEffect(() => {
-    if (!isV8) return
+
     const requestId = ++statusCountsRequestRef.current
     const key = statusCountsKey
     const keys = ['unread', 'in_progress', 'on_hold', 'resolved'] as const
@@ -2498,7 +2495,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }).catch(() => {
       if (statusCountsRequestRef.current === requestId) setStatusCounts(null)
     })
-  }, [isV8, statusCountsKey, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, channel])
+  }, [statusCountsKey, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, channel])
   const statusCountsNow = statusCounts?.key === statusCountsKey ? statusCounts.counts : null
 
   /*
@@ -2739,7 +2736,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         className={`relative flex flex-wrap items-center gap-1.5 border-b border-hairline p-3 ${styles.headTop}`}
         aria-label="受信箱のクイック絞り込み"
       >
-        <div className={`flex w-full items-center gap-2 ${styles.titleRow}`}><h2 className="mr-auto text-lg font-semibold">受信箱</h2>
+        <div className={`flex w-full items-center gap-2 ${styles.titleRow}`}><PageTitle className="mr-auto text-lg font-semibold">受信箱</PageTitle>
         {/*
           設計 `xGLVe` は「絞り込み」と「保存した検索」を右に並べ、押すと
           右から420pxのパネルが出る（`bXyEA`）。
@@ -2749,9 +2746,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           6項目。**箱が小さいと、置ける条件の数が先に決まってしまう。**
         */}
         <Button type="button" size="compact" className={`h-8 w-8 p-0 ${styles.tool}`} aria-label="絞り込み" title="絞り込み" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
-          {/* V8 の絵（XqSvX）は list-filter の印。v7 は今までの漏斗のまま。 */}
-          <Filter aria-hidden size={16} className="v7-only" />
-          <ListFilter aria-hidden size={16} className="v8-only" />
+          <ListFilter aria-hidden size={16} />
         </Button>
         {/*
           INBOX-11: メニューは「保存した検索」ボタンではなく、画面幅いっぱいの
@@ -2859,16 +2854,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           )}
         </div>
         {/* m22c: 左の札と同じ高さ32にそろえる（行の上端を1つに保つ）。v8 では札が 36 なので同じく 36。 */}
-        {adminTheme === 'v8' ? (
+        {(
           /*
            * ★V8：絵（XqSvX）の「対応ルール」は settings-2 の印。押してもページを移らず、
            * その場で小窓を開く（オーナー指摘：別のページへ飛ぶのはおかしい）。
            */
           <InboxRulesPopover accountId={selectedAccountId ?? null} />
-        ) : (
-        <Button href="/tags?tab=marks" aria-label="対応ルール" title="対応ルール" size="compact" className={`shrink-0 h-8 w-8 p-0 ${styles.tool}`}>
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M9 4v6M15 14v6" /></svg>
-        </Button>
         )}
         </div>
         {[
@@ -2894,7 +2885,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             {filter.icon ? <filter.icon aria-hidden className={styles.chipIcon} /> : null}
             {filter.label}
             {/* 件数がまだ無い時は「—」を出さない（★V7：意味の無い記号を置かない）。 */}
-            {quickCountsNow ? <span className={`ml-1 tabular-nums ${styles.chipCount}`}>{quickCountsNow[filter.key]}</span> : null}
+            {/* ★V8（eovoG）：札に件数は出さない（要返信＝下の「未対応」と同じ数）。読み上げと検査のため文字は残す。 */}
+            {quickCountsNow ? <span className={`tabular-nums ${'sr-only'} ${styles.chipCount}`}>{quickCountsNow[filter.key]}</span> : null}
           </Button>
         ))}
         <SavedViewDialog
@@ -2952,7 +2944,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       </section>
           {/* 設計 `ListPane` の「名前で検索」。一覧が長くなると状態の絞り込みだけでは足りない。 */}
           <div className={`border-b border-hairline p-4 ${styles.searchBlock}`}>
-            {isV8 ? (
+            {(
               /* ★V8：共通の検索欄（自作の入力欄をやめる）。 */
               <SearchField
                 value={nameQuery}
@@ -2962,19 +2954,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 placeholder="名前・メールアドレス・内容で検索"
                 aria-label="名前・メールアドレス・内容で検索"
               />
-            ) : (
-            <div className="relative">
-              <svg className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-ink-faint" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-              <input
-              type="search"
-              value={nameQuery}
-              onChange={(e) => { setNameQuery(clampSearchQuery(e.target.value)); dropSavedViewParam() }}
-              maxLength={SEARCH_QUERY_MAX_LENGTH}
-              placeholder="名前・メールアドレス・内容で検索"
-              aria-label="名前・メールアドレス・内容で検索"
-              className={`w-full rounded-control border border-hairline bg-canvas py-2 pr-3 pl-9 text-xs text-ink outline-none focus:border-accent-deep focus:ring-2 focus:ring-accent-deep/15 ${styles.searchInput}`}
-              />
-            </div>
             )}
             {/*
               #670 02: 外の「担当者」と中の「担当者：すべて」が二重だった。
@@ -2988,7 +2967,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   ——一覧はページ送りされるので、2ページ目の未読が落ちる。
                   0件の担当者も選択肢に残す（契約上、0件は配列に載らないので実値0として描く）。
                 */}
-{isV8 ? (
+{(
                   /* ★V8：共通の選ぶ欄（選んだ行は ✓ だけ）。担当者ごとの未読数は名前の後ろの（）に添える（未取得は「—」）。 */
                   <Select
                     aria-label="担当者で絞り込む"
@@ -3002,16 +2981,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       return { value: row.id, label: `${row.name}（${unread === null ? '—' : unread}）` }
                     })}
                   />
-                ) : (
-                                <OperatorDropdown
-                  value={assigneeFilter}
-                  operators={operators}
-                  onChange={(next) => { setAssigneeFilter(next); dropSavedViewParam() }}
-                  label="担当者"
-                  ariaLabel="担当者で絞り込む"
-                  unreadOf={unreadLookup(assigneeUnread)}
-                  unreadUnavailable={assigneeUnreadStatus === 'error'}
-                />
                 )}
               </span>
             </label>
@@ -3033,11 +3002,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               onKeyDown={handleStatusFilterKeyDown}
               className={`bg-shell flex h-8 flex-nowrap items-stretch rounded-control p-0.5 ${styles.statusSeg}`}
             >
-              {(isV8 ? statusFiltersV8 : statusFilters).map((f, index) => {
+              {statusFiltersV8.map((f, index) => {
                 const selected = statusFilter === f.key
                 // V8：「すべて」の所が無いので、何も選んでいない（すべて）ときは先頭に Tab で入れる。
-                const focusable = selected || (isV8 && statusFilter === 'all' && index === 0)
-                const count = isV8 && statusCountsNow ? statusCountsNow[f.key as Exclude<StatusFilter, 'all'>] : null
+                const focusable = selected || ((statusFilter === 'all') && index === 0)
+                const count = statusCountsNow ? statusCountsNow[f.key as Exclude<StatusFilter, 'all'>] : null
                 return (
                   <button
                     key={f.key}
@@ -3046,8 +3015,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     role="radio"
                     aria-checked={selected}
                     tabIndex={focusable ? 0 : -1}
-                    title={isV8 && selected ? `${f.label}（もう一度押すとすべて）` : f.label}
-                    onClick={() => { setStatusFilter(isV8 && selected ? 'all' : f.key); dropSavedViewParam() }}
+                    title={selected ? `${f.label}（もう一度押すとすべて）` : f.label}
+                    onClick={() => { setStatusFilter(selected ? 'all' : f.key); dropSavedViewParam() }}
                     // #639 の素のボタンの最小高さ32pxをここだけ外す。
                     // 切り替え全体の高さ32pxの中に収めるため。
                     style={{ minHeight: 0 }}
@@ -3168,7 +3137,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       <div className={`flex items-start gap-3 ${styles.rowInner}`}>
                         <div className="relative shrink-0">
                           {/* メールの行も名前の頭文字（以前は全員「M」で、誰の会話か目で追えなかった）。 */}
-                          <Avatar name={item.customerName} size={adminTheme === 'v8' ? 34 : 40} />
+                          <Avatar name={item.customerName} size={34} />
                           {item.isUnread && (
                             <span className={`border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-pill border-2 ${styles.unreadDot}`} aria-label="未読" />
                           )}
@@ -3177,12 +3146,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           <div className="flex items-center justify-between gap-2">
                             {/* 板 `M0393`：未対応は顔の赤い点＋名前の太字。行の地は塗らない。 */}
                             <p className={`text-ink truncate text-sm ${item.isUnread ? 'font-semibold' : 'font-medium'}`}>{item.customerName}</p>
-                            {isV8 ? (
+                            {(
                               <span className={styles.rowTime} data-unread={item.isUnread || undefined}>{formatInboxListTime(item.lastIncomingAt)}</span>
-                            ) : (
-                            <span className="text-ink-faint shrink-0 text-xs tabular-nums">
-                              {formatRelative(item.lastIncomingAt)}
-                            </span>
                             )}
                           </div>
                           <div className={`mt-1 flex items-start justify-between gap-2 ${styles.rowLine}`}>
@@ -3206,13 +3171,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     ),
                   }))
                   const lineRows = (channel === 'email' ? [] : chats)
-                  .filter((chat) =>
-                    nameQuery.trim() === ''
-                      ? true
-                      : [chat.friendName, chat.lastMessageContent]
-                          .filter(Boolean)
-                          .some((value) => String(value).toLowerCase().includes(nameQuery.trim().toLowerCase())),
-                  )
                   .map((chat) => ({
                   at: chat.lastMessageAt ?? '',
                   unread: chat.isUnread,
@@ -3256,6 +3214,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     <div key={chat.id} className="border-b border-hairline">
                     <button
                       onClick={() => handleSelectChat(chat.id)}
+                      /* 名前は相手の名前だけ、未読と本文は説明に回す（読み上げで名前から入れる）。 */
+                      aria-labelledby={(`chat-row-name-${chat.id}`)}
+                      aria-describedby={(`${chat.isUnread ? `chat-row-unread-${chat.id} ` : ''}chat-row-preview-${chat.id}`)}
                       className={`w-full px-3 py-3 text-left transition-colors ${
                         isSelected
                           ? 'bg-shell'
@@ -3266,29 +3227,26 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       <div className={`flex items-start gap-3 ${styles.rowInner}`}>
                         <div className="relative shrink-0">
                           {/* ★V7 友だちの顔：画像が読めない時も色つきの頭文字。 */}
-                          <Avatar name={chat.friendName} src={chat.friendPictureUrl} size={adminTheme === 'v8' ? 34 : 32} />
+                          <Avatar name={chat.friendName} src={chat.friendPictureUrl} size={34} />
                           {chat.isUnread && (
-                            <span className={`border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-pill border-2 ${styles.unreadDot}`} aria-label="未読" />
+                            <span id={`chat-row-unread-${chat.id}`} className={`border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-pill border-2 ${styles.unreadDot}`} aria-label="未読" />
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-1.5 min-w-0 flex-1">
                               {/* 板 `M0393`：未対応は名前の太字。行の地は塗らない。 */}
-                              <p className={`text-sm text-ink truncate ${chat.isUnread ? 'font-semibold' : 'font-medium'}`}>{chat.friendName}</p>
+                              <p id={`chat-row-name-${chat.id}`} className={`text-sm text-ink truncate ${chat.isUnread ? 'font-semibold' : 'font-medium'}`}>{chat.friendName}</p>
                             </div>
-                            {isV8 ? (
+                            {(
                               /* ★V8（XqSvX）：右上は「2時間前」「昨日」「8月16日」。未読は濃い字・太字。待ち時間の札は置かない。 */
                               <span className={styles.rowTime} data-unread={chat.isUnread || undefined} title={waitingLabel ?? undefined}>{formatInboxListTime(chat.lastMessageAt)}</span>
-                            ) : waitingLabel ? (
-                              <span className="text-status-warn-deep shrink-0 text-nano font-semibold">{waitingLabel}</span>
-                            ) : (
-                              <span className="text-ink-faint shrink-0 text-xs tabular-nums">{formatRelative(chat.lastMessageAt)}</span>
                             )}
                           </div>
                           {/* 板 `M0393`：行ごとの状態の札は置かない（赤い点＋太字と上の切り替えで足りる）。 */}
                           <div className={`mt-1 flex items-start justify-between gap-2 ${styles.rowLine}`}>
                             <p
+                              id={`chat-row-preview-${chat.id}`}
                               className={`line-clamp-2 min-w-0 flex-1 text-xs leading-4 ${styles.rowPreview} ${
                                 needsAttention ? 'text-ink font-medium' : 'text-ink-faint'
                               }`}
@@ -3466,7 +3424,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 操作が同じ行にいると 390px で宛先の名前が潰れて、
                 誰への返信か読めなかった。640px 以上では従来どおり1行。
               */}
-              {isV8 ? (
+              {(
                 /*
                  * ★V8 会話の頭（XqSvX）：顔28・名前15・補足、右に ☆・担当・対応状況・探す・右の列の出し入れ。
                  * メールの会話も同じ部品（ConversationHead）を使う。動き（注目・担当・対応・探す・開閉）は同じ処理を呼ぶ。
@@ -3487,116 +3445,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   search={{ open: chatSearch.open, onToggle: () => (chatSearch.open ? chatSearch.close() : openChatSearch()) }}
                   panel={{ open: showFriendInfo, onToggle: () => setShowFriendInfo((current) => !current) }}
                 />
-              ) : (
-              <div className="flex min-h-[66px] flex-wrap items-center gap-x-2 gap-y-2 border-b border-hairline bg-canvas px-4 py-3 sm:flex-nowrap">
-                <div className="flex min-w-0 basis-full items-center gap-2 sm:basis-auto sm:flex-1">
-                  <button
-                    onClick={() => setSelectedChatId(null)}
-                    className="lg:hidden flex-shrink-0 p-1 -ml-1 text-ink-faint hover:text-ink-secondary"
-                    aria-label="戻る"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                  </button>
-                  {/*
-                    設計 `xGLVe` の見出しは、アバター・名前・「本名・種別・
-                    最終受信」の3点。**写真が無い人でも丸は出す。** 頭文字を
-                    入れておかないと、灰色の空丸が並んで誰の会話か目で追えない。
-                  */}
-                  <Avatar name={chatDetail.friendName} src={chatDetail.friendPictureUrl} size={32} />
-                  <div className="min-w-0">
-                    {/*
-                      U008: 長い表示名が狭い幅で切れても、押すと(キーボードでも)
-                      全文に広げられる。title でも全文を確認できる。
-                    */}
-                    <button
-                      type="button"
-                      title={chatDetail.friendName}
-                      aria-expanded={headerNameExpanded}
-                      onClick={() => setHeaderNameExpanded((v) => !v)}
-                      className={`block w-full text-left text-sm font-medium text-ink ${headerNameExpanded ? 'whitespace-normal break-all' : 'truncate'}`}
-                    >
-                      {chatDetail.friendName}
-                    </button>
-                    <p
-                      className="mt-0.5 truncate text-xs text-ink-faint"
-                      title={`${chatDetail.friendRealName ? `${chatDetail.friendRealName}・` : ''}LINE・最終受信 ${formatInboxDatetime(chatDetail.lastMessageAt)}`}
-                    >
-                      {chatDetail.friendRealName ? `${chatDetail.friendRealName}・` : ''}LINE・{formatRelative(chatDetail.lastMessageAt)}
-                    </p>
-                  </div>
-                </div>
-
-                {/*
-                  設計 `TalkPane` の上部。「対応」と「担当」をここで切り替える。
-                  以前は状態がバッジで出ているだけで、変えるには別の場所を
-                  探す必要があった。返信しながら状態を動かすので、
-                  同じ場所に置く。
-                */}
-                {/* 右へ寄せる。名前は左、操作は右。目で追う向きがそろう。
-                    U008/U010: 狭い幅で2行目へ落ちたときも右端で切れないよう、
-                    sm 未満では中でも折り返せるようにする（320pxでは3行目まで使う）。
-                    sm 以上では従来どおり1行・高さ40pxを保つ。 */}
-                <div className="ml-auto flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
-                  <button
-                    type="button"
-                    aria-label={chatDetail.isAttention ? '注目から外す' : '注目にする'}
-                    aria-pressed={chatDetail.isAttention}
-                    disabled={attentionSaving}
-                    onClick={() => void handleAttentionUpdate()}
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-control border disabled:cursor-wait disabled:opacity-60 ${chatDetail.isAttention ? 'border-warning bg-warning-bg text-warning' : 'border-hairline bg-canvas text-ink-faint hover:bg-canvas-sunken'}`}
-                  >
-                    <Star aria-hidden="true" size={17} fill={chatDetail.isAttention ? 'currentColor' : 'none'} />
-                  </button>
-                  {/*
-                    素の select 要素から専用のプルダウンへ替えた。
-                    **開いた中身がブラウザ任せだと画像に写らない。** 設計の
-                    2-8 / 2-9 / 2-10 は「開いた状態」なので、素のセレクトの
-                    ままでは永久に見比べられない。色の丸と札も設計どおりに出す。
-                  */}
-                  {/*
-                    設計 `xGLVe` / `H3lAOB` の並びは 担当 → 対応状況。
-                    先に「誰が」を決めてから「どうなっている」を動かす順で、
-                    一覧の行の並び（担当の札 → 対応状況の札）とも向きがそろう。
-                  */}
-                  <OperatorDropdown
-                    value={chatDetail.operatorId ?? 'unassigned'}
-                    operators={operators}
-                    onChange={(next) => {
-                      if (next === 'all') return
-                      void handleOperatorUpdate(next === 'unassigned' ? null : next)
-                    }}
-                    label="担当"
-                    ariaLabel="担当者を変える"
-                    allowAll={false}
-                    compact={showFriendInfo}
-                  />
-                  <StatusDropdown
-                    value={chatDetail.status as ChatStatus}
-                    onChange={(next) => void handleStatusUpdate(next as Chat['status'])}
-                    ariaLabel="対応状況を変える"
-                  />
-                  {/*
-                    設計 `H3lAOB` は、閉じているときも開いているときも
-                    **同じ場所に同じ1つのボタン**を置く。閉じる口が右パネルの
-                    中にしか無いと、閉じたあと戻す口を別の場所で探すことになる。
-                  */}
-                  <Button variant="secondary" className="h-9 w-9 shrink-0 p-0 text-action" type="button" data-inbox-v6="customer-info-toggle" onClick={() => setShowFriendInfo((current) => !current)} aria-expanded={showFriendInfo}>
-                    {showFriendInfo
-                      ? <PanelRightClose aria-hidden="true" size={14} />
-                      : <PanelRightOpen aria-hidden="true" size={14} />}
-                    <span className="sr-only">{showFriendInfo ? '顧客情報を閉じる' : '顧客情報を表示'}</span>
-                  </Button>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {/*
-                    「未読に戻す」「対応中にする」「対応済みにする」は
-                    上の「対応 ▾」と同じことをしていたので外した。
-                    同じ操作の入口が2つあると、どちらが正なのか分からない。
-                  */}
-                </div>
-              </div>
               )}
 
               {chatSearch.open && (
@@ -3611,7 +3459,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 見ている位置は窓分けの側で守るので、ブラウザの自動の位置合わせは切る
                 （二重に直すと飛ぶ）。行の間 8px は行の中に持つので space-y は付けない。
               */}
-              <div ref={messagesScrollRef} data-inbox-thread-scroller="" className={`flex-1 overflow-y-auto p-4 ${searchStyles.hitScope} ${isV8 ? chatStyles.thread : ''}`} style={isV8 ? { overflowAnchor: 'none' } : { backgroundColor: 'var(--color-surface-pearl)', overflowAnchor: 'none' }}>
+              <div ref={messagesScrollRef} data-inbox-thread-scroller="" className={`flex-1 overflow-y-auto p-4 ${searchStyles.hitScope} ${(chatStyles.thread)}`} style={({ overflowAnchor: 'none' })}>
                 {/*
                   古い履歴の続き。直近100件だけ読んでいる会話で出す。
                   押すと今見えている最古の1件より古い分を上に足す。
@@ -3644,6 +3492,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     total={chatDetail.total}
                     scrollToId={chatSearchTarget?.id ?? null}
                     scrollSeq={chatSearchTarget?.seq ?? 0}
+                    rowGap={'var(--tpl-inbox-thread-gap)'}
                     renderMessage={(msg, idx, list) => {
                     const prevMsg = idx > 0 ? list[idx - 1] : null
                     const isLast = idx === list.length - 1
@@ -3667,7 +3516,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       bubbleContent = <ChatImageMessage content={msg.content} />
                     } else if (msg.messageType === 'sticker') {
                       bubbleContent = <StickerMessageImage content={msg.content} />
-                    } else if (isV8 && (msg.messageType === 'video' || msg.messageType === 'file') && msg.direction === 'outgoing') {
+                    } else if ((msg.messageType === 'video' || msg.messageType === 'file') && msg.direction === 'outgoing') {
                       // B-6：送った動画・ファイルは JSON のまま出さず、再生できる枠・名前と期限の札にする。
                       bubbleContent = <AttachmentMessage messageType={msg.messageType} content={msg.content} />
                     } else {
@@ -3697,7 +3546,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       )
                     }
 
-                    if (isV8) {
+                    {
                       /*
                        * ★V8 やりとり（XqSvX「やりとり」）：日付は真ん中の小さな字、相手の吹き出しは白・薄い枠で
                        * 顔を置かない、時刻は吹き出しの横（相手は右・こちらは左）、こちらの吹き出しは薄い緑で
@@ -3771,113 +3620,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         </>
                       )
                     }
-
-                    return (
-                      <>
-                        {showDateSep && (
-                          <div className="flex justify-center mb-3" style={{ marginTop: idx === 0 ? 12 : 4 }}>
-                            {/* 板 `M0393`：日付の区切りは白い札＋濃い文字。 */}
-                            <span className="text-micro text-ink-secondary bg-canvas border border-hairline px-2.5 py-0.5 rounded-pill">
-                              {formatYmdSlash(msg.createdAt)}
-                            </span>
-                          </div>
-                        )}
-                        <div
-                          className={`flex gap-2 ${isOutgoing ? 'items-end justify-end' : 'items-start justify-start'}`}
-                        >
-                          {/* 相手のアイコン（incoming のみ） */}
-                          {!isOutgoing && (
-                            chatDetail.friendPictureUrl ? (
-                              <img src={chatDetail.friendPictureUrl} alt="" className="h-8 w-8 flex-shrink-0 rounded-pill" />
-                            ) : (
-                              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-pill bg-avatar-indigo text-xs font-medium text-on-action" aria-hidden="true">
-                                {chatDetail.friendName.charAt(0)}
-                              </div>
-                            )
-                          )}
-
-                          <div className={`flex flex-col ${isOutgoing ? 'items-end' : 'items-start'}`}>
-                            {/* メッセージバブル */}
-                            <div
-                              className={`max-w-[320px] px-3 py-2 text-sm break-words whitespace-pre-wrap ${
-                                isOutgoing
-                                  /* 板 `M0393`：自分の吹き出しは薄い緑＋濃い文字。 */
-                                  ? 'rounded-tl-card rounded-tr-mini rounded-bl-card rounded-br-card bg-accent-soft text-ink'
-                                  : 'min-w-64 rounded-tl-mini rounded-tr-card rounded-bl-card rounded-br-card border border-hairline bg-canvas text-ink'
-                              }`}
-                              /* 会話の中を探す：枠は v8/inbox-search の CSS が data-search-hit で付ける。 */
-                              data-search-hit={searchHit ?? undefined}
-                            >
-                              {/* N-025: 引用元の表示。取り消された引用元は本文を出さない。 */}
-                              {msg.quoted && (
-                                <div
-                                  data-inbox-v6="quoted-message"
-                                  className="border-accent text-ink-faint mb-1.5 rounded-mini border-l-2 py-0.5 pl-2 text-xs"
-                                >
-                                  {msg.quoted.isUnsent
-                                    ? '取り消されたメッセージ'
-                                    : msg.quoted.messageType === 'text'
-                                      ? msg.quoted.content
-                                      : `[${msg.quoted.messageType}]`}
-                                </div>
-                              )}
-                              {bubbleContent}
-                            </div>
-                            {/* 時刻と引用操作 */}
-                            <span className="mt-0.5 flex items-center gap-2 px-1">
-                              <span className="text-ink-faint text-xs">
-                                {formatTime(msg.createdAt)}
-                              </span>
-                              {!msg.isUnsent && (
-                                <button
-                                  type="button"
-                                  data-inbox-v6="quote-reply"
-                                  onClick={() => {
-                                    setQuotedMessage(msg)
-                                    textareaRef.current?.focus()
-                                  }}
-                                  className="text-caption text-ink-faint underline-offset-2 hover:text-action hover:underline"
-                                >
-                                  引用
-                                </button>
-                              )}
-                            </span>
-                          </div>
-
-                          {/*
-                            相手に見える送信元はLINE公式アカウント。管理画面では、
-                            その下に実際に返信した担当者も出して取り違えを防ぐ。
-                          */}
-                          {isOutgoing && (
-                            <div className="mb-0.5 flex w-24 shrink-0 flex-col items-center gap-1">
-                              {selectedAccount?.pictureUrl ? (
-                                <img
-                                  src={selectedAccount.pictureUrl}
-                                  alt=""
-                                  className="border-canvas h-9 w-9 rounded-pill border-2 object-cover"
-                                />
-                              ) : (
-                                <div
-                                  className="border-canvas flex h-9 w-9 items-center justify-center rounded-pill border-2 bg-accent-soft text-xs font-bold text-accent-deep"
-                                  title={selectedAccount?.displayName ?? selectedAccount?.name ?? '送信アカウント'}
-                                >
-                                  {(selectedAccount?.displayName ?? selectedAccount?.name ?? '送').charAt(0)}
-                                </div>
-                              )}
-                              <div
-                                className="border-canvas/70 bg-canvas/90 text-ink-secondary inline-flex max-w-full items-center gap-1 rounded-pill border px-2 py-0.5 text-nano font-semibold shadow-card"
-                                title={msg.sentByStaffName ?? '担当者情報なし'}
-                              >
-                                <span className="bg-action text-on-action flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-pill text-micro font-medium">
-                                  {(msg.sentByStaffName ?? '担').charAt(0)}
-                                </span>
-                                <span className="truncate">{msg.sentByStaffName ?? '担当者'}</span>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </>
-                    )
                   }}
                   />
                 )}
@@ -3914,25 +3656,25 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               */}
               <div
                 data-inbox-v4="composer"
-                className={`sticky bottom-0 z-10 border-t border-hairline bg-canvas px-4 py-3 relative ${isV8 ? chatStyles.composer : ''}`}
-                data-drop-over={isV8 && dropOver ? '' : undefined}
+                className={`sticky bottom-0 z-10 border-t border-hairline bg-canvas px-4 py-3 relative ${(chatStyles.composer)}`}
+                data-drop-over={dropOver ? '' : undefined}
                 /* ★V8 B-6：ファイルを書く欄へ落としてもクリップと同じ（形式から 画像・動画／ファイル を決める）。 */
-                onDragOver={isV8 ? (event) => {
+                onDragOver={((event) => {
                   if (!Array.from(event.dataTransfer.types).includes('Files')) return
                   event.preventDefault()
                   event.dataTransfer.dropEffect = 'copy'
                   if (!dropOver) setDropOver(true)
-                } : undefined}
-                onDragLeave={isV8 ? (event) => {
+                })}
+                onDragLeave={((event) => {
                   if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropOver(false)
-                } : undefined}
-                onDrop={isV8 ? (event) => {
+                })}
+                onDrop={((event) => {
                   if (!Array.from(event.dataTransfer.types).includes('Files')) return
                   event.preventDefault()
                   setDropOver(false)
                   const file = event.dataTransfer.files?.[0]
                   if (file) void handlePickAttachment(file)
-                } : undefined}
+                })}
               >
                 {/* INBOX-12: 定期更新が連続失敗で止まったときの理由と再試行 */}
                 {chatPollStalled && (
@@ -3958,15 +3700,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   「送信の設定」は settings-2、開いている間は緑の地と枠（段2「2.」）。
                   画像だけでなくファイル・動画も選ぶので「画像」は「添付」（paperclip）にする（オーナー指摘）。
                 */}
-                <div className={`mb-2 flex items-center gap-2 ${isV8 ? chatStyles.composerToolsRow : ''}`}>
-                  <div className={`flex min-w-0 flex-wrap items-center gap-2 ${isV8 ? chatStyles.composerTools : ''}`}>
+                <div className={`mb-2 flex items-center gap-2 ${(chatStyles.composerToolsRow)}`}>
+                  <div className={`flex min-w-0 flex-wrap items-center gap-2 ${(chatStyles.composerTools)}`}>
                     {/* 設計 2-1-1。選ぶと本文が入力欄に入る。 */}
-                    <Button variant="secondary" size={isV8 ? 'compact' : undefined} className={isV8 ? chatStyles.tool : 'h-9 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action'} type="button" onClick={() => setShowTemplatePicker(true)}>
+                    <Button variant="secondary" size={'compact'} className={(chatStyles.tool)} type="button" onClick={() => setShowTemplatePicker(true)}>
                       <FileText aria-hidden="true" size={14} />
                       テンプレートを選択
                     </Button>
-                    <Button variant="secondary" size={isV8 ? 'compact' : undefined} className={isV8 ? chatStyles.tool : 'h-9 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action'} data-active={isV8 && showComposerOptions ? '' : undefined} aria-expanded={isV8 ? showComposerOptions : undefined} type="button" onClick={() => setShowComposerOptions((v) => !v)}>
-                      {isV8 ? <Settings2 aria-hidden="true" size={14} /> : <SlidersHorizontal aria-hidden="true" size={14} />}
+                    <Button variant="secondary" size={'compact'} className={(chatStyles.tool)} data-active={showComposerOptions ? '' : undefined} aria-expanded={showComposerOptions} type="button" onClick={() => setShowComposerOptions((v) => !v)}>
+                      {(<Settings2 aria-hidden="true" size={14} />)}
                       {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
                     </Button>
 
@@ -3975,27 +3717,18 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       琥珀色に変わる。窓が上に出るので、どのボタンから出た窓
                       なのかが分かる印が要る。
                     */}
-                    <Button variant="secondary" size={isV8 ? 'compact' : undefined} className={isV8 ? chatStyles.tool : `h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border px-3 text-xs font-semibold ${
-                        showMemoEditor
-                          ? 'border-status-warn bg-status-warn-soft text-status-warn-deep'
-                          : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'
-                      }`} data-active={isV8 && showMemoEditor ? '' : undefined} type="button" data-inbox-v6="internal-memo-toggle" onClick={() => setShowMemoEditor((current) => !current)} aria-expanded={showMemoEditor}>
+                    <Button variant="secondary" size={'compact'} className={(chatStyles.tool)} data-active={showMemoEditor ? '' : undefined} type="button" data-inbox-v6="internal-memo-toggle" onClick={() => setShowMemoEditor((current) => !current)} aria-expanded={showMemoEditor}>
                       <NotebookPen aria-hidden="true" size={14} />
                       内部メモ
                     </Button>
                     {/* ★V8 B-6：［添付］の道具はやめ、入力欄の左下のクリップから選ぶ（M0393「7. 添付」）。v7 は今までの［画像］。 */}
-                    {isV8 ? null : (
-                    <Button variant="secondary" className="h-9 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action" type="button" onClick={() => imageInputRef.current?.click()} disabled={imageUploading} title="画像を選ぶ" aria-label="画像を選ぶ">
-                      <ImageIcon aria-hidden="true" size={14} />
-                      画像
-                    </Button>
-                    )}
+                    {(null)}
                   </div>
                 </div>
 
                 {/* 送信の設定は送信キーだけ。入力中ローディングと画像の投入枠は
                     ここから外した。画像は下の枠のアイコンから選ぶ。 */}
-                {showComposerOptions && isV8 && (
+                {showComposerOptions && (
                   /*
                    * ★V8（段2「2. 送信の設定（開いた）」）：見出し「送るキー」・切り替え（Enter／Shift+Enter）・
                    * 説明1行の3段。前は選ぶカードの中で文字が切れ、丸が文字に重なっていた（オーナー指摘）。
@@ -4015,27 +3748,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     </p>
                   </div>
                 )}
-                {showComposerOptions && !isV8 && (
-                  <div className="bg-canvas-sunken rounded-card mb-2 flex flex-wrap items-center gap-x-3 gap-y-2 p-3 text-xs">
-                    <span className="text-ink-faint">送信キー:</span>
-                    <RadioCardGroup legend="送信キー" className="flex flex-wrap gap-2">
-                      <RadioCard
-                        name="chat-send-mode"
-                        value="enter"
-                        checked={sendMode === 'enter'}
-                        onChange={() => setSendMode('enter')}
-                        title="Enter"
-                      />
-                      <RadioCard
-                        name="chat-send-mode"
-                        value="shift-enter"
-                        checked={sendMode === 'shift-enter'}
-                        onChange={() => setSendMode('shift-enter')}
-                        title="Shift+Enter"
-                      />
-                    </RadioCardGroup>
-                  </div>
-                )}
+
 
                 {/*
                   設計 `B7CER8` の内部メモは**画面を覆う窓ではなく、
@@ -4126,81 +3839,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 )}
 
                 {/* N-025: 送信予約パネル。日時はJSTのdatetime-localで入力する。 */}
-                {showSchedulePanel && !isV8 && (
-                  <div
-                    data-inbox-v6="schedule-panel"
-                    className="mb-2 rounded-control border border-hairline bg-canvas-sunken p-3"
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-ink-secondary flex items-center gap-1 text-sm font-semibold">
-                        <label htmlFor="schedule-at">送る日時</label>
-                        <HelpTip label="送る日時の説明">入力した日時は日本時間です。</HelpTip>
-                      </span>
-                      <DateTimeField
-                        id="schedule-at"
-                        value={scheduleInput}
-                        onChange={setScheduleInput}
-                        className="min-w-64 flex-1"
-                      />
-                      <Button
-                        variant="primary"
-                        type="button"
-                        onClick={() => void handleScheduleSend()}
-                        disabled={scheduling || messageOverLimit || !messageContent.trim() || !scheduleInput} busy={scheduling} busyLabel="予約中...">この日時で予約する
-                      </Button>
-                    </div>
-                    {scheduledSendsFailed && (
-                      <p className="mt-2 text-xs text-danger">
-                        予約の一覧を読み込めませんでした。
-                        <button
-                          type="button"
-                          data-inbox-v6="scheduled-retry"
-                          onClick={() => { if (selectedChatId) void loadScheduledSends(selectedChatId) }}
-                          className="ml-1 font-semibold underline"
-                        >
-                          再読み込み
-                        </button>
-                      </p>
-                    )}
-                    {scheduledSends.length > 0 && (
-                      <ul className="mt-2 space-y-1.5">
-                        {scheduledSends.map((row) => (
-                          <li
-                            key={row.id}
-                            data-inbox-v6="scheduled-row"
-                            className="flex items-center gap-2 rounded-control border border-hairline bg-canvas px-2.5 py-1.5 text-xs"
-                          >
-                            <span className="shrink-0 font-semibold text-ink">
-                              {/* INBOX-21: 予約時刻は日本時間で出す。端末の時間帯でずらさない。 */}
-                              {formatJstScheduledAt(row.scheduledAt)}
-                              {row.status === 'sending' && '（送信中）'}
-                            </span>
-                            <span className="min-w-0 flex-1 truncate text-ink-secondary" title={row.content}>
-                              {row.content}
-                            </span>
-                            <DateTimeField
-                              aria-label="予約時刻を変更(日本時間)"
-                              defaultValue={isoToJstDatetimeLocal(row.scheduledAt)}
-                              disabled={row.status !== 'scheduled'}
-                              onChange={(v) => {
-                                if (v) void handleReschedule(row.id, v)
-                              }}
-                              className="w-56 shrink-0"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => void handleCancelScheduled(row.id)}
-                              disabled={row.status !== 'scheduled'}
-                              className="shrink-0 text-ink-faint hover:text-danger disabled:opacity-40"
-                            >
-                              取消
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )}
+
 
                 {/*
                   INBOX-32: 送る前に何を添付したかを見せる。
@@ -4253,7 +3892,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 )}
 
                 {/* ★V8 B-6：動画・ファイルの札（名前・大きさ・×）。準備中・失敗（理由＋もう一度試す）もここで見せる。 */}
-                {isV8 && pendingAttachment ? (
+                {pendingAttachment ? (
                   <div className={chatStyles.attachChips}>
                     <AttachmentChip
                       item={pendingAttachment}
@@ -4264,7 +3903,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   </div>
                 ) : null}
 
-                <div className={isV8 ? chatStyles.inputBox : 'rounded-card border border-hairline bg-canvas p-2 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/15'}>
+                <div className={(chatStyles.inputBox)}>
                   {/* 中段 */}
                   {/*
                     INBOX-20: この入力欄に textareaRef を付ける。
@@ -4278,14 +3917,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   onKeyDown={handleKeyDown}
                   onCompositionStart={() => { isComposingRef.current = true }}
                   onCompositionEnd={() => { isComposingRef.current = false }}
-                  rows={isV8 ? 2 : 3}
+                  rows={2}
                   placeholder="メッセージを入力"
                   aria-label="メッセージを入力"
                   aria-invalid={messageOverLimit}
-                  className={isV8 ? chatStyles.textarea : 'w-full resize-none border-0 px-1 py-1 text-sm outline-none'}
+                  className={(chatStyles.textarea)}
                   />
 
-                  <p className={isV8 ? chatStyles.countRow : 'mt-1 flex items-center justify-between gap-2 text-xs'}>
+                  <p className={(chatStyles.countRow)}>
                     {/* INBOX-29: 残りを送る前に見せる。超えたら送らせない。 */}
                     <span className={messageOverLimit ? 'text-danger font-semibold' : 'text-ink-faint'}>
                       {formatNumber(messageLength)} / {formatNumber(MESSAGE_MAX_LENGTH)}
@@ -4302,13 +3941,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     「送信」が送／信に割れていた。行自体を折り返せるようにし、
                     長い画像エラーが出ても右の操作を圧迫しない。
                   */}
-                  <div className={`mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 ${isV8 ? chatStyles.bottomRow : ''}`}>
+                  <div className={`mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 ${(chatStyles.bottomRow)}`}>
                   {/*
                     画像はここから。以前は「送信の設定」の中に投入枠を出しっぱなし
                     にしていて、入力欄が縦に伸びてトークが読めなかった。
                     アイコンを押すとファイルを選ぶ窓が開く。
                   */}
-                  {isV8 ? (
+                  {(
                     /* ★V8 B-6：左下のクリップ（32角）＋「画像・動画・ファイルを添付」。選べない・大きすぎるはここに理由。 */
                     <span className={chatStyles.attachLead}>
                       <AttachMenu disabled={!selectedChatId} onPick={(file, slot) => void handlePickAttachment(file, slot)} />
@@ -4321,57 +3960,26 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         {imageError ? imageError : imageUploading ? '画像を読み込み中…' : ATTACH_NOTE}
                       </span>
                     </span>
-                  ) : (
-                  <span className="flex min-w-0 items-center gap-2">
-                    <input
-                      ref={imageInputRef}
-                      type="file"
-                      accept="image/jpeg,image/png"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        // 同じ画像をもう一度選べるように値を戻す。
-                        e.target.value = ''
-                        if (file) void handlePickImage(file)
-                      }}
-                    />
-                    {/*
-                      INBOX-31: 状態を分けて伝える。
-                      - 読み込み中 …「画像を読み込み中」(まだ何も送っていない)
-                      - 準備失敗 …「添付できませんでした。選び直してください」
-                      - 添付済み … INBOX-32 のプレビュー行で見せる
-                    */}
-                    <span
-                      className={`min-w-0 truncate text-xs ${imageError ? 'text-danger' : 'text-ink-faint'}`}
-                      title={imageError || 'JPEG / PNG・1枚 1MB まで'}
-                    >
-                      {imageError
-                        ? imageError
-                        : imageUploading
-                          ? '画像を読み込み中…'
-                          : 'JPEG / PNG・1枚 1MB まで'}
-                    </span>
-                  </span>
                   )}
                   <span className="ml-auto flex shrink-0 items-center gap-2">
                     <Button
-                      size={isV8 ? 'compact' : 'field'}
-                      className={isV8 ? chatStyles.tool : undefined}
+                      size={'compact'}
+                      className={(chatStyles.tool)}
                       data-inbox-v6="schedule-toggle"
                       onClick={() => setShowSchedulePanel((v) => !v)}
                       aria-expanded={showSchedulePanel}
-                      aria-haspopup={isV8 ? 'dialog' : undefined}
+                      aria-haspopup={'dialog'}
                     >
-                      {isV8 ? <Clock3 aria-hidden="true" size={15} /> : null}
+                      {(<Clock3 aria-hidden="true" size={15} />)}
                       予約{scheduledSends.length > 0 ? `(${scheduledSends.length})` : ''}
                     </Button>
-                    <Button variant="primary" size={isV8 ? 'compact' : undefined} className={isV8 ? chatStyles.send : 'shrink-0 whitespace-nowrap px-5 py-2 hover:bg-accent-deep/90 disabled:opacity-50 border-0 h-auto'} onClick={handleSendMessage} disabled={sending || messageOverLimit || (isV8 && pendingAttachment !== null && pendingAttachment.status !== 'ready') || (!messageContent.trim() && !pendingImage && !(isV8 && pendingAttachment?.status === 'ready'))}>
-                      {isV8 && !sending ? <Send aria-hidden="true" size={15} /> : null}
+                    <Button variant="primary" size={'compact'} className={(chatStyles.send)} onClick={handleSendMessage} disabled={sending || messageOverLimit || ((pendingAttachment !== null) && pendingAttachment.status !== 'ready') || (!messageContent.trim() && !pendingImage && !(pendingAttachment?.status === 'ready'))}>
+                      {(!sending) ? <Send aria-hidden="true" size={15} /> : null}
                       {sending ? '送っています…' : '送信'}
                     </Button>
                   </span>
 
-                  {isV8 ? (
+                  {(
                     <ScheduleSendDialog
                       open={showSchedulePanel}
                       onClose={() => setShowSchedulePanel(false)}
@@ -4395,7 +4003,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       onReschedule={(id, next) => void handleReschedule(id, next)}
                       onCancelRow={(id) => void handleCancelScheduled(id)}
                     />
-                  ) : null}
+                  )}
                   <TemplatePicker
                     open={showTemplatePicker}
                     onClose={() => setShowTemplatePicker(false)}
@@ -4404,7 +4012,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       // 入力済みの文があれば消さずに続ける。書きかけを失わせない。
                       setMessageContent((prev) => (prev.trim() ? `${prev}\n${content}` : content))
                     }
-                    onPickPack={(texts) => setPendingPack(texts)}
+                    onPickPack={(texts) => { if (selectedChatId) setPendingPack({ texts, chatId: selectedChatId, accountId: selectedAccountId, revision: chatDetail?.revision }); setShowTemplatePicker(false) }}
                   />
                   {/*
                     G-4: パック送信の最終確認。本文を全部読み合わせてから送る。
@@ -4413,15 +4021,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   <ConfirmDialog
                     open={pendingPack !== null}
                     title="テンプレートをまとめて送る"
-                    description={pendingPack ? `${pendingPack.length}通をこの順番で一度に送ります。送信すると取り消せません。` : ''}
-                    confirmLabel={pendingPack ? `まとめて送る（${pendingPack.length}通）` : 'まとめて送る'}
+                    description={pendingPack ? `${pendingPack.texts.length}通をこの順番で一度に送ります。送信すると取り消せません。` : ''}
+                    confirmLabel={pendingPack ? `まとめて送る（${pendingPack.texts.length}通）` : 'まとめて送る'}
                     onConfirm={pendingPack ? () => void handleSendPack(pendingPack) : undefined}
                     onCancel={() => setPendingPack(null)}
                     busy={sending}
                   >
                     {pendingPack ? (
                       <ol className="max-h-56 space-y-2 overflow-y-auto">
-                        {pendingPack.map((text, index) => (
+                        {pendingPack.texts.map((text, index) => (
                           <li key={index} className="rounded-control bg-canvas-sunken px-3 py-2 text-xs leading-relaxed text-ink-secondary">
                             <span className="mr-1 font-semibold text-ink">{index + 1}.</span>
                             <span className="whitespace-pre-wrap break-words">{text.length > 200 ? `${text.slice(0, 200)}…` : text}</span>
@@ -4435,36 +4043,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               </div>
 
               {/* INBOX-32: 添付画像を大きく確かめる窓。背景か Esc 相当の閉じるで戻る。 */}
-              {imagePreviewOpen && pendingImage && pendingImage.mode === 'line-image' && typeof document !== 'undefined' && createPortal(
-                <div
-                  role="dialog"
-                  aria-modal="true"
-                  aria-label="添付した画像の確認"
-                  className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/60 p-4"
-                  onClick={() => setImagePreviewOpen(false)}
-                >
-                  <div
-                    className="w-full max-w-2xl rounded-card border border-hairline bg-canvas p-4 shadow-overlay"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <img
-                      src={pendingImage.originalContentUrl}
-                      alt={pendingImageMeta?.name ?? '添付した画像'}
-                      className="mx-auto max-h-[70vh] w-auto max-w-full rounded-mini object-contain"
-                    />
-                    <div className="mt-3 flex items-center justify-between gap-3">
-                      <p className="text-ink-faint min-w-0 truncate text-xs" title={pendingImageMeta?.name}>
-                        {pendingImageMeta?.name ?? '画像'}
-                        {pendingImageMeta ? ` ・ ${formatByteSize(pendingImageMeta.size)}` : ''}
-                      </p>
-                      <Button variant="secondary" className="shrink-0 px-4 py-2 text-ink-faint h-auto whitespace-normal" type="button" onClick={() => setImagePreviewOpen(false)}>
-                        閉じる
-                      </Button>
-                    </div>
-                  </div>
-                </div>,
-                document.body,
-              )}
+              {imagePreviewOpen && pendingImage && pendingImage.mode === 'line-image' ? (
+                <Dialog open title="添付した画像の確認" onCancel={() => setImagePreviewOpen(false)} designWidth={800}>
+                  <img src={pendingImage.originalContentUrl} alt={pendingImageMeta?.name ?? '添付した画像'} className="mx-auto max-h-[70vh] w-auto max-w-full rounded-mini object-contain" />
+                  <p className="text-ink-faint mt-3 truncate text-xs" title={pendingImageMeta?.name}>{pendingImageMeta?.name ?? '画像'}{pendingImageMeta ? ` ・ ${formatByteSize(pendingImageMeta.size)}` : ''}</p>
+                </Dialog>
+              ) : null}
             </>
           ) : null}
         </div>
@@ -4507,7 +4091,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               aria-modal={wideInfoPanel ? undefined : true}
               aria-label="顧客情報"
               tabIndex={-1}
-              className={`h-full max-w-full shrink-0 overflow-hidden bg-canvas focus:outline-none ${wideInfoPanel ? `relative z-auto w-[260px] ${isV8 ? '' : 'border-l border-hairline'}` : 'fixed inset-y-0 right-0 z-[70] w-[340px] shadow-overlay'}`}
+              className={`${styles.infoPanel} h-full max-w-full shrink-0 overflow-hidden bg-canvas focus:outline-none ${wideInfoPanel ? `relative z-auto w-[260px] ${''}` : 'fixed inset-y-0 right-0 z-[70] w-[340px] shadow-overlay'}`}
             >
             {/*
               重なりの中にも閉じるボタンを置く。上部のボタンだけだと、
@@ -4519,7 +4103,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               会話の頭の「顧客情報を表示（右の列の出し入れ）」の1つだけ。重ねて出す幅では
               頭が隠れるので、×を板の右上に残す。
             */}
-            {adminTheme === 'v8' && wideInfoPanel ? null : (
+            {wideInfoPanel ? null : (
             <Button variant="secondary" className="absolute top-[17px] right-3 z-10 h-8 w-8 items-center justify-center text-ink-faint whitespace-normal v8:top-3" type="button" onClick={() => setShowFriendInfo(false)} aria-label="顧客情報を閉じる">
               <X aria-hidden="true" className="h-4 w-4" />
             </Button>

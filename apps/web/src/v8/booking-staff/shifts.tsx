@@ -12,6 +12,7 @@
  * 動き（読み込み・保存・版の競合・権限・失敗時の扱い）は今までの
  * app/booking/staff/shifts/staff-detail-v8.tsx から写した。BEHAVIOR.md を参照。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -253,7 +254,7 @@ function PageState({ node, self, title, desc, icon, actions, head }: {
  * ひも付けが無ければ板 wvGke の案内。R579：2経路とも通信失敗なら「無い」と言わず再試行の口。
  */
 function OwnShiftEntry() {
-  const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const { selectedAccountId } = useAccount()
   const [resolved, setResolved] = useState<'loading' | 'missing' | 'error'>('loading')
   const [loadError, setLoadError] = useState<unknown>(null)
@@ -277,7 +278,7 @@ function OwnShiftEntry() {
         }).then((res) => res?.staff ?? [])
       if (cancelled) return
       if (rows.length > 0) {
-        router.replace(`/booking/staff/shifts?staff_id=${rows[0].id}`)
+        samePageUrl.replace(`/booking/staff/shifts?staff_id=${rows[0].id}`)
         return
       }
       if (firstError !== null) {
@@ -288,7 +289,7 @@ function OwnShiftEntry() {
       setResolved('missing')
     })()
     return () => { cancelled = true }
-  }, [router, selectedAccountId, attempt])
+  }, [samePageUrl, selectedAccountId, attempt])
 
   const head = (
     <header className={layout.head}>
@@ -540,26 +541,24 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
     return () => { requestRef.current += 1 }
   }, [load, reloadKey])
 
-  /** 保存が効いたあとは、保存した口を読み直して予約枠も取り直す。 */
-  async function refreshAfterSave() {
+  /** 保存した欄だけ読み直す。他の欄の編集中の値は残す。 */
+  async function refreshAfterSave(section: 'rules' | 'days') {
     if (!selectedAccountId) return
     const requestId = requestRef.current
     try {
-      const [rulesRes, shiftsRes, breaksRes, breakDatesRes, exceptionsRes] = await Promise.all([
-        bookingApi.getAvailabilityRules(selectedAccountId, staffId),
-        bookingApi.getShifts(selectedAccountId, staffId),
-        bookingApi.getBreaks(selectedAccountId, staffId),
-        bookingApi.getBreakDates(selectedAccountId, staffId),
-        bookingApi.listExceptions(selectedAccountId).catch(() => null),
-      ])
-      if (requestId !== requestRef.current) return
-      applyRules(rulesRes.rules)
-      setBreakGroups(groupBreaks(breaksRes.breaks))
-      setBreaksVersion(breaksRes.version)
-      setDateRows(breakDatesRes.breaks.map((item) => ({ key: item.id, id: item.id, date: item.work_date, start: item.start_time, end: item.end_time })))
-      setBreakDatesVersion(breakDatesRes.version)
-      if (exceptionsRes) setStaffExceptions(exceptionsRes.data.items.filter((item) => item.scopeKind === 'staff' && item.scopeId === staffId))
-      applyShifts(shiftsRes.shifts)
+      if (section === 'rules') {
+        const result = await bookingApi.getAvailabilityRules(selectedAccountId, staffId)
+        if (requestId !== requestRef.current) return
+        applyRules(result.rules)
+      } else {
+        const [shiftsRes, exceptionsRes] = await Promise.all([
+          bookingApi.getShifts(selectedAccountId, staffId),
+          bookingApi.listExceptions(selectedAccountId),
+        ])
+        if (requestId !== requestRef.current) return
+        applyShifts(shiftsRes.shifts)
+        setStaffExceptions(exceptionsRes.data.items.filter((item) => item.scopeKind === 'staff' && item.scopeId === staffId))
+      }
       if (menuId) await loadAvailability(selectedAccountId, menuId, timeZone, requestId)
     } catch {
       if (requestId !== requestRef.current) return
@@ -576,6 +575,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
   }
 
   async function saveRules() {
+    const saveGeneration = requestRef.current
     if (!selectedAccountId) return
     const payload: Array<{ weekday: number; start_time: string; end_time: string }> = []
     for (const day of STAFF_DAYS) {
@@ -592,11 +592,15 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
     try {
       // 週全体を置き換えるので、古い曜日が残らない。
       await bookingApi.putAvailabilityRules(selectedAccountId, staffId, payload)
+      if (saveGeneration !== requestRef.current) return
       setRulesSavedAt(new Date().toISOString())
-      await refreshAfterSave()
+      await refreshAfterSave('rules')
+      if (saveGeneration !== requestRef.current) return
     } catch (error) {
+      if (saveGeneration !== requestRef.current) return
       setRuleError(staffErrorMessage(error, '保存'))
     } finally {
+      if (saveGeneration !== requestRef.current) return
       setSavingRules(false)
     }
   }
@@ -614,6 +618,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
   }
 
   async function saveBreaks() {
+    const saveGeneration = requestRef.current
     if (!selectedAccountId) return
     for (const group of breakGroups) {
       if (group.weekdays.length === 0) {
@@ -651,11 +656,13 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
           end_time: group.end,
         }))),
       )
+      if (saveGeneration !== requestRef.current) return
       setBreakGroups(groupBreaks(result.breaks))
       setBreaksVersion(result.version)
       setBreaksSavedAt(new Date().toISOString())
       setOpenDaysFor(null)
     } catch (error) {
+      if (saveGeneration !== requestRef.current) return
       // 409 のときだけ最新へ描き直す。それ以外は入力を消さない。
       const conflict = error instanceof ApiError && error.status === 409 ? asBreakConflict(error.data) : null
       if (conflict) {
@@ -666,6 +673,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       }
       setBreakError(staffErrorMessage(error, '保存'))
     } finally {
+      if (saveGeneration !== requestRef.current) return
       setSavingBreaks(false)
     }
   }
@@ -676,11 +684,12 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
 
   /** この日だけの休憩は、足す・消すの時点で版付きの全体置き換えを送る（下書きを持たない）。 */
   async function saveBreakDates(nextRows: Array<{ key: string; id: string | null; date: string; start: string; end: string }>) {
-    if (!selectedAccountId) return
+    const saveGeneration = requestRef.current
+    if (!selectedAccountId) return false
     for (const row of nextRows) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(row.date) || !validRange(row.start, row.end)) {
         setShiftError(`${shortDay(row.date)}の日時を正しく入れてください。入力はそのまま残しています。`)
-        return
+        return false
       }
     }
     setSavingShift(true)
@@ -692,9 +701,12 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
         breakDatesVersion,
         nextRows.map((row) => ({ ...(row.id ? { id: row.id } : {}), work_date: row.date, start_time: row.start, end_time: row.end })),
       )
+      if (saveGeneration !== requestRef.current) return false
       setDateRows(result.breaks.map((item) => ({ key: item.id, id: item.id, date: item.work_date, start: item.start_time, end: item.end_time })))
       setBreakDatesVersion(result.version)
+      return true
     } catch (error) {
+      if (saveGeneration !== requestRef.current) return false
       const conflict = error instanceof ApiError && error.status === 409 ? asBreakConflict(error.data) : null
       if (conflict) {
         setDateRows(conflict.breaks
@@ -703,7 +715,9 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
         setBreakDatesVersion(conflict.version)
       }
       setShiftError(staffErrorMessage(error, '保存'))
+      return false
     } finally {
+      if (saveGeneration !== requestRef.current) return false
       setSavingShift(false)
     }
   }
@@ -713,6 +727,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
   }
 
   async function saveShiftRow(shift: BookingShift) {
+    const saveGeneration = requestRef.current
     if (!selectedAccountId) return
     const row = shiftRows[shift.id] ?? { start: shift.start_time, end: shift.end_time }
     if (!validRange(row.start, row.end)) {
@@ -724,17 +739,22 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
     try {
       // 同じ日は上書きになるので、2回目の保存が残る。
       await bookingApi.putShifts(selectedAccountId, staffId, [{ work_date: shift.work_date, start_time: row.start, end_time: row.end }])
+      if (saveGeneration !== requestRef.current) return
       setEditingDayRow(null)
-      await refreshAfterSave()
+      await refreshAfterSave('days')
+      if (saveGeneration !== requestRef.current) return
     } catch (error) {
+      if (saveGeneration !== requestRef.current) return
       setShiftError(staffErrorMessage(error, '保存'))
     } finally {
+      if (saveGeneration !== requestRef.current) return
       setSavingShift(false)
     }
   }
 
   /** 「この日を足す」の確定。種別ごとに今までの口へ送る。 */
   async function addDayEntry() {
+    const saveGeneration = requestRef.current
     if (!selectedAccountId) return
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dayAddDate)) {
       setShiftError('日付をカレンダーから選んでください。入力はそのまま残しています。')
@@ -757,47 +777,61 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
           intervals: [],
           reason: dayAddMemo.trim() || null,
         })
+      if (saveGeneration !== requestRef.current) return
         if (!res.success) throw new Error('exception_save_failed')
         setStaffExceptions((current) => [...current, res.data])
       } else if (dayAddKind === 'shift') {
         await bookingApi.putShifts(selectedAccountId, staffId, [{ work_date: dayAddDate, start_time: dayAddStart, end_time: dayAddEnd }])
-        await refreshAfterSave()
+      if (saveGeneration !== requestRef.current) return
+        await refreshAfterSave('days')
+      if (saveGeneration !== requestRef.current) return
       } else {
-        await saveBreakDates([...dateRows, { key: `new-${Date.now()}`, id: null, date: dayAddDate, start: dayAddStart, end: dayAddEnd }])
+        const saved = await saveBreakDates([...dateRows, { key: `new-${Date.now()}`, id: null, date: dayAddDate, start: dayAddStart, end: dayAddEnd }])
+      if (saveGeneration !== requestRef.current) return
+        if (!saved) return
       }
       setDayAddOpen(false)
       setDayAddDate('')
       setDayAddMemo('')
     } catch (error) {
+      if (saveGeneration !== requestRef.current) return
       setShiftError(staffErrorMessage(error, '追加'))
     } finally {
+      if (saveGeneration !== requestRef.current) return
       setDayAddBusy(false)
     }
   }
 
   async function removeDayEntry() {
+    const saveGeneration = requestRef.current
     if (!selectedAccountId || !removeTarget) return
     setDeleting(true)
     try {
       if (removeTarget.kind === 'shift') {
         await bookingApi.deleteShift(selectedAccountId, staffId, removeTarget.item.id)
+      if (saveGeneration !== requestRef.current) return
       } else if (removeTarget.kind === 'exception') {
         const res = await bookingApi.deleteException(selectedAccountId, removeTarget.item.id, removeTarget.item.version)
+      if (saveGeneration !== requestRef.current) return
         if (!res.success) throw new Error('exception_delete_failed')
       } else {
         const target = removeTarget.item.key
-        await saveBreakDates(dateRows.filter((row) => row.key !== target))
+        if (!await saveBreakDates(dateRows.filter((row) => row.key !== target))) return
       }
       setRemoveTarget(null)
-      await refreshAfterSave()
+      await refreshAfterSave('days')
+      if (saveGeneration !== requestRef.current) return
     } catch (error) {
+      if (saveGeneration !== requestRef.current) return
       setShiftError(staffErrorMessage(error, '削除'))
     } finally {
+      if (saveGeneration !== requestRef.current) return
       setDeleting(false)
     }
   }
 
   async function generateFromRules() {
+    const saveGeneration = requestRef.current
     if (!selectedAccountId) return
     const weeks = Number.parseInt(genWeeks, 10)
     if (!/^\d{4}-\d{2}-\d{2}$/.test(genFrom) || !Number.isInteger(weeks) || weeks < 1 || weeks > 12) {
@@ -819,11 +853,15 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
     try {
       // すでにある日は残す（上書きしない）ので、直したシフトが消えない。
       const result = await bookingApi.generateShifts(selectedAccountId, staffId, { from_date: genFrom, weeks, weekly_template: template })
+      if (saveGeneration !== requestRef.current) return
       setGeneratedCount(result.inserted)
-      await refreshAfterSave()
+      await refreshAfterSave('days')
+      if (saveGeneration !== requestRef.current) return
     } catch (error) {
+      if (saveGeneration !== requestRef.current) return
       setGenError(staffErrorMessage(error, '作成'))
     } finally {
+      if (saveGeneration !== requestRef.current) return
       setGenerating(false)
     }
   }
@@ -994,7 +1032,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
           {/* 閲覧のみのときは選ぶ部品・押す口を置かず、いまの値を文字で見せる（API も 403 で断る。2026-10-06 オーナー決定）。 */}
           <fieldset className={styles.fieldset}>
             {/* いつもの勤務時間 */}
-            <section className={layout.card} aria-labelledby="bks-week" data-design="Week">
+            <section className={layout.card} aria-labelledby="bks-week" data-design="Week"><fieldset disabled={savingRules} className={styles.fieldset}>
               <div className={layout.cardHead}>
                 <h2 id="bks-week" className={layout.cardTitle}>いつもの勤務時間</h2>
                 {canEdit ? <Button onClick={() => void saveRules()} disabled={savingRules} busy={savingRules}>保存</Button> : null}
@@ -1024,10 +1062,10 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
               })}
               {rulesSavedAt ? <p className={styles.savedNote} role="status">保存しました。右の予約画面に反映されています。</p> : null}
               {ruleError ? <p className={layout.fieldError} role="alert">{ruleError}</p> : null}
-            </section>
+            </fieldset></section>
 
             {/* 休憩 */}
-            <section className={layout.card} aria-labelledby="bks-breaks" data-design="Breaks">
+            <section className={layout.card} aria-labelledby="bks-breaks" data-design="Breaks"><fieldset disabled={savingBreaks} className={styles.fieldset}>
               <div className={layout.cardHead}>
                 <h2 id="bks-breaks" className={layout.cardTitle}>休憩</h2>
                 {canEdit ? <Button onClick={() => void saveBreaks()} disabled={savingBreaks} busy={savingBreaks}>保存</Button> : null}
@@ -1086,10 +1124,10 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
               ) : null}
               {breaksSavedAt ? <p className={styles.savedNote} role="status">保存しました。</p> : null}
               {breakError ? <p className={layout.fieldError} role="alert">{breakError}</p> : null}
-            </section>
+            </fieldset></section>
 
             {/* この日だけ（休み・シフト・休憩） */}
-            <section className={layout.card} aria-labelledby="bks-days" data-design="Special">
+            <section className={layout.card} aria-labelledby="bks-days" data-design="Special"><fieldset disabled={savingShift || dayAddBusy || deleting} className={styles.fieldset}>
               <div className={layout.cardHead}><h2 id="bks-days" className={layout.cardTitle}>この日だけ（休み・シフト・休憩）</h2></div>
               <p className={layout.cardNote}>その日だけ休む・時間を変える・休憩を足すときに使います。いつもの勤務時間より優先されます。</p>
               {dayRows.length === 0 ? (
@@ -1145,7 +1183,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                         {timeBox(`${shortDay(row.date)}の休憩の始まり`, row.item.start, (v) => updateDateRow(row.item.key, { start: v }))}
                         <span className={styles.tilde}>〜</span>
                         {timeBox(`${shortDay(row.date)}の休憩の終わり`, row.item.end, (v) => updateDateRow(row.item.key, { end: v }))}
-                        {canEdit ? <Button onClick={() => { setEditingDayRow(null); void saveBreakDates(dateRows) }} disabled={savingShift} busy={savingShift}>更新する</Button> : null}
+                        {canEdit ? <Button onClick={() => { void saveBreakDates(dateRows).then((saved) => { if (saved) setEditingDayRow(null) }) }} disabled={savingShift} busy={savingShift}>更新する</Button> : null}
                       </div>
                     ) : null}
                   </div>
@@ -1184,7 +1222,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                 </div>
               ) : null}
               {shiftError ? <p className={layout.fieldError} role="alert">{shiftError}</p> : null}
-            </section>
+            </fieldset></section>
 
             {/* 何週分かのシフトを作る（作るための欄だけなので、閲覧のみには出さない） */}
             {canEdit ? <section className={layout.card} aria-labelledby="bks-gen">

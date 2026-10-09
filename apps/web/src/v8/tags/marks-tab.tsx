@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 友だち属性「対応マーク」タブ（Pencil `vKDj5`）。
+ * ★V8 タグ「対応マーク」タブ（Pencil `vKDj5`）。
  *
  * 動き（読み込み・数の帯・絞り込み・並べ替え・保管の確認・行の詳細パネル・右クリック・
  * 名前のその場の直し）は今の V8 タブ（app/tags/marks-v8.tsx）から写した。数え方・判定・
@@ -12,12 +12,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, CircleDot, Flag, GripVertical, History, Info, Loader } from 'lucide-react'
+import { AlertCircle, CircleDot, Flag, GripVertical, History, Info, Loader, Send } from 'lucide-react'
 import { api, ApiError, type ListStats, type SupportMarkArchiveImpact, type SupportMarkListItem } from '@/lib/api'
 import { createResponseGate } from '@/lib/latest-request'
 import { ListPageBody } from '@/components/templates'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
+import { RowMenu, RowQuickAction } from '@/components/shared/row-actions'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import InlineEdit from '@/components/shared/inline-edit'
@@ -39,12 +39,14 @@ import { mergeVisibleOrder, movableIds } from '@/components/friend-fields/reorde
 import { ArchiveMarkDialog, autoRuleLabel, isUsed, usageLabel } from '@/components/friend-fields/mark-list'
 import styles from './list.module.css'
 
+import type { AttributeListHost } from './attribute-host'
+
 type MarkRow = SupportMarkListItem
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
 const PAGE_SIZES = [10, 20, 50]
 
-export default function MarksTab({ accountId, canEdit }: { accountId: string | null; canEdit: boolean }) {
+export default function MarksTab({ accountId, canEdit, host }: { accountId: string | null; canEdit: boolean; host?: AttributeListHost<MarkRow> }) {
   const router = useRouter()
   const [items, setItems] = useState<MarkRow[]>([])
   const [status, setStatus] = useState<LoadStatus>('loading')
@@ -68,7 +70,7 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 行の詳細パネル。URL に ?mark=<id> を残す。 */
   const [activeMarkId, setActiveMarkId] = useDetailPanelUrl('mark')
-  const openMarkDetail = (id: string) => withViewTransition(() => setActiveMarkId(id))
+  const openMarkDetail = (id: string) => host ? (canEdit ? host.onEdit(id) : undefined) : withViewTransition(() => setActiveMarkId(id))
 
   /* アカウント切替のあとに届いた古い応答で一覧を上書きしない（ATTR-01）。 */
   const gateRef = useRef(createResponseGate())
@@ -89,6 +91,7 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
   }, [accountId])
 
   const load = useCallback(async () => {
+    if (host) { host.reload(); return }
     const account = accountId
     const token = gateRef.current.begin()
     if (!account) {
@@ -109,11 +112,13 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
       if (!gateRef.current.current(token) || accountRef.current !== account) return
       setStatus(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
     }
-  }, [accountId])
-  useEffect(() => { void load() }, [load])
+  }, [accountId, host])
+  useEffect(() => { if (!host) void load() }, [load, host])
+  useEffect(() => { if (host) { setItems(host.items); setStatus(host.status); setError(host.error ?? '') } }, [host])
 
   /* 帯の人数は受信箱の集計（/api/list-stats）から。一覧とは別の要求。 */
   useEffect(() => {
+    if (host) return
     if (!accountId) {
       setStatsStatus('error')
       return
@@ -131,14 +136,15 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
       setStatsStatus(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
     })
     return () => { cancelled = true }
-  }, [accountId])
+  }, [accountId, host])
 
   const visible = useMemo(() => items.filter((mark) => {
     if (query && !mark.name.toLocaleLowerCase('ja').includes(query.toLocaleLowerCase('ja'))) return false
-    if (usage === 'used' && !isUsed(mark)) return false
-    if (usage === 'unused' && isUsed(mark)) return false
+    if (host && usage !== 'all' && mark.friendCount == null) return false
+    if (usage === 'used' && !(host ? mark.friendCount > 0 : isUsed(mark))) return false
+    if (usage === 'unused' && (host ? mark.friendCount > 0 : isUsed(mark))) return false
     return true
-  }), [items, query, usage])
+  }), [items, query, usage, host])
 
   const pages = Math.max(1, Math.ceil(visible.length / pageSize))
   const currentPage = Math.min(page, pages)
@@ -153,6 +159,7 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
 
   /* 並び替え：/api/support-marks/reorder へ「動かせる行だけの新しい順」を1回で渡す。共有マークは位置を保つ。 */
   const applyOrder = async (next: MarkRow[]) => {
+    if (host) { await host.onOrder(next.map((item) => item.id)); return }
     if (!accountId) return
     const previous = items
     setItems(next)
@@ -177,7 +184,7 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
   }
 
   const move = async (targetId: string) => {
-    if (!accountId || !dragId || dragId === targetId) return setDragId(null)
+    if ((!accountId && !host) || !dragId || dragId === targetId) return setDragId(null)
     const dragged = items.find((mark) => mark.id === dragId)
     const target = items.find((mark) => mark.id === targetId)
     if (dragged?.isInherited || target?.isInherited) {
@@ -258,6 +265,11 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
 
   /* 行の「…」と右クリックは同じ操作。押せない理由もそのまま渡す。閲覧のみは押せない項目を出さない。 */
   const rowMenuItems = (mark: MarkRow): ActionMenuItem[] => {
+    if (host) return canEdit ? [
+      { id: 'edit', label: '編集', onSelect: () => host.onEdit(mark.id) },
+      { id: 'distribute', label: '配る', onSelect: () => host.onDistribute(mark.id) },
+      { id: 'delete', label: '削除する', tone: 'danger', dividerBefore: true, onSelect: () => host.onRemove(mark.id) },
+    ] : []
     if (!canEdit) return [{ id: 'open', label: '詳しく見る', onSelect: () => openMarkDetail(mark.id) }]
     return [
       { id: 'edit', label: '編集', external: true, onSelect: () => router.push(`/tags/marks/edit?id=${encodeURIComponent(mark.id)}`) },
@@ -332,7 +344,7 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
       <Flag className={styles.stateIcon} aria-hidden="true" />
       <p className={styles.stateTitle}>まだ対応マークはありません</p>
       <p className={styles.stateDesc}>受信箱で、対応の進み具合を見分ける印です。</p>
-      {canEdit ? <Button href="/tags/marks/new" variant="primary">マークを作る</Button> : null}
+      {canEdit ? <Button href={host ? undefined : "/tags/marks/new"} onClick={host?.onCreate} variant="primary">マークを作る</Button> : null}
     </div>
   ) : listReady && visible.length === 0 ? (
     <div className={styles.stateCard}>
@@ -351,6 +363,7 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
             <Th className={styles.markColDefault}>はじめの値</Th>
             <Th className={styles.markColAuto}>自動で変わる</Th>
             <Th className={styles.markColPlace}>出す場所</Th>
+            {host && canEdit ? <Th className={styles.colDistribute}><span className="sr-only">配る</span></Th> : null}
             <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
@@ -398,31 +411,35 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
                 </Td>
                 <Td className={styles.markColName}>
                   <ContextMenu label={`対応マーク「${mark.name}」の操作`} items={markContextItems(mark)}>
-                    <Link
-                      href={editHref}
+                    {host && !canEdit ? <span className={styles.markPill} style={{ '--mark-color': mark.color } as CSSProperties} title={mark.name}>
+                      <span className={styles.markPillDot} aria-hidden="true" />
+                      <span className={styles.truncate}>{mark.name}</span>
+                    </span> : <Link
+                      href={host ? "#" : editHref}
                       className={styles.markPill}
                       style={{ '--mark-color': mark.color } as CSSProperties}
                       title={mark.name}
-                      onClick={(event) => event.stopPropagation()}
+                      onClick={(event) => { event.stopPropagation(); if (host) { event.preventDefault(); if (canEdit) host.onEdit(mark.id) } }}
                     >
                       <span className={styles.markPillDot} aria-hidden="true" />
                       <span className={styles.truncate}>{mark.name}</span>
-                    </Link>
+                    </Link>}
                   </ContextMenu>
                 </Td>
-                <Td className={styles.markColCount}><span className={styles.cellText}>{`${mark.friendCount}人`}</span></Td>
+                <Td className={styles.markColCount}><span className={styles.cellText}>{mark.friendCount == null ? '—' : `${mark.friendCount}人`}</span></Td>
                 <Td className={styles.markColDefault}><span className={styles.cellText}>{mark.isDefault ? '新規の初期値' : '—'}</span></Td>
-                <Td className={styles.markColAuto}><span className={styles.cellText} title={autoRuleLabel(mark)}>{autoRuleLabel(mark)}</span></Td>
-                <Td className={styles.markColPlace}><span className={styles.cellText} title={usageLabel(mark)}>{usageLabel(mark)}</span></Td>
+                <Td className={styles.markColAuto}><span className={styles.cellText} title={host ? (mark.autoOnInbound ? '受信時' : '—') : autoRuleLabel(mark)}>{host ? (mark.autoOnInbound ? '受信時' : '—') : autoRuleLabel(mark)}</span></Td>
+                <Td className={styles.markColPlace}><span className={styles.cellText} title={host ? undefined : usageLabel(mark)}>{host ? '—' : usageLabel(mark)}</span></Td>
+                {host && canEdit ? <Td className={styles.colDistribute} onClick={(event) => event.stopPropagation()}><RowQuickAction label="配る" ariaLabel={`${mark.name}を配る`} icon={<Send />} disabled={host.busy} onClick={() => host.onDistribute(mark.id)} /></Td> : null}
                 <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
                   <span className={styles.menuAnchor}>
-                    <RowMenu
-                      className={styles.menuButton}
+                    {(!host || canEdit) ? <RowMenu
+                      size="row"
                       label={`対応マーク「${mark.name}」の操作`}
                       items={rowMenuItems(mark)}
                       open={openMenuId === mark.id}
                       onOpenChange={(next) => setOpenMenuId(next ? mark.id : null)}
-                    />
+                    /> : null}
                   </span>
                 </Td>
               </Tr>
@@ -450,7 +467,7 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
 
   return (
     <>
-      <KpiBand data-design="KPIs" className={styles.kpis}>
+      {host?.kpis ?? <KpiBand data-design="KPIs" className={styles.kpis}>
         {kpis.map((kpi) => (
           <KpiCard
             key={kpi.title}
@@ -462,7 +479,7 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
             detail={kpi.detail}
           />
         ))}
-      </KpiBand>
+      </KpiBand>}
 
       <div className={styles.infoRow}>
         <p className={styles.readonlyBand}>
@@ -484,6 +501,7 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
           </span>
           <Select
             aria-label="使っているかで絞り込む"
+            width={157}
             value={usage}
             onChange={(value) => setUsage(value as typeof usage)}
             options={[
@@ -512,7 +530,7 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
 
       {/* 行の詳細パネル。名前はその場で直せる。 */}
       <DetailPanel
-        open={activeMark !== null}
+        open={!host && activeMark !== null}
         title={activeMark?.name ?? ''}
         description={activeMark ? `${activeMark.friendCount}人・${autoRuleLabel(activeMark)}` : undefined}
         onClose={() => setActiveMarkId(null)}

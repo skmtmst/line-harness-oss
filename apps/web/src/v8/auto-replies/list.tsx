@@ -3,7 +3,7 @@
 
 import { RovingTbody } from '@/components/shared/row-roving'
 import { ListPage, ListPagePagination } from '@/components/templates'
-import ListToolbar from '@/components/shared/list-toolbar'
+import ListToolbar, { ListToolbarOptional } from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 /*
  * ★V8 自動応答の一覧（Pencil「★V8 画面の地図」の自動応答の行：
@@ -75,6 +75,8 @@ import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { useFolderRowActions } from '@/components/shared/folder-row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import { Field } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
 import DetailPanel from '@/components/shared/detail-panel'
@@ -82,7 +84,7 @@ import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-m
 import { withViewTransition } from '@/components/shared/view-transition'
 import Pagination from '@/components/shared/pagination'
 import ReorderHandle from '@/components/shared/reorder-handle'
-import { movePriorityUpdates } from './order'
+import { compareEvaluationOrder, movePriorityUpdates } from './order'
 import {
   LOAD_STATE_WORDS,
   NO_WRITE_PERMISSION,
@@ -471,7 +473,7 @@ export default function AutoRepliesListV8() {
         return b.createdAt.localeCompare(a.createdAt)
       default:
         // 評価順は「実際に見る順」。一覧の並びと動く順を合わせる。
-        return a.priority - b.priority || a.createdAt.localeCompare(b.createdAt)
+        return compareEvaluationOrder(a, b)
     }
   }), [inChips, sortKey])
 
@@ -582,15 +584,16 @@ export default function AutoRepliesListV8() {
     const reloadIfSameAccount = () => {
       if (selectedAccountIdRef.current === requestAccountId) void load()
     }
-    const sendToggle = (targetKind: 'stop' | 'resume', targetReasonOf: (id: string) => string | null) => {
+    const sendToggle = (targetKind: 'stop' | 'resume', targetReasonOf: (id: string) => string | null, requestKeys = new Map<string, string>()) => {
       applyOptimistic(targetKind === 'resume', targetReasonOf)
       void (async () => {
         let failed = 0
         let forbidden = false
         for (const id of ids) {
           try {
+            if (!requestKeys.has(id)) requestKeys.set(id, crypto.randomUUID())
             const result = targetKind === 'stop'
-              ? await api.autoReplies.stop(id, { reason: targetReasonOf(id) }, crypto.randomUUID())
+              ? await api.autoReplies.stop(id, { reason: targetReasonOf(id) }, requestKeys.get(id)!)
               : await api.autoReplies.update(id, { isActive: true })
             if (!result.success) failed += 1
           } catch (error) {
@@ -604,7 +607,7 @@ export default function AutoRepliesListV8() {
           notifyToast(failedMessage(targetKind, forbidden), {
             tone: 'error',
             actionLabel: 'もう一度',
-            onAction: () => sendToggle(targetKind, targetReasonOf),
+            onAction: () => sendToggle(targetKind, targetReasonOf, requestKeys),
           })
           return
         }
@@ -725,8 +728,10 @@ export default function AutoRepliesListV8() {
    * コピーは必ず「停止中」で作る（AUTOREPLY-08：動かすのは別の操作）。
    * 元ルールが残っているあいだだけ確認窓を出す（stale guard）。
    */
+  const duplicateKeyRef = useRef(crypto.randomUUID())
+  useEffect(() => { duplicateKeyRef.current = crypto.randomUUID() }, [duplicateTarget?.id])
   const runDuplicate = async () => {
-    if (!duplicateTarget) return
+    if (!duplicateTarget || duplicating) return
     setDuplicating(true)
     setDuplicateError('')
     const source = duplicateTarget
@@ -757,7 +762,7 @@ export default function AutoRepliesListV8() {
         keywordMatchMode: source.keywordMatchMode === 'all' ? 'all' : 'any',
         folderId: source.folderId,
         internalMemo: source.internalMemo,
-      })
+      }, duplicateKeyRef.current)
       if (!result.success) {
         setDuplicateError('複製できませんでした。状態を読み直してからお試しください。')
         return
@@ -844,7 +849,11 @@ export default function AutoRepliesListV8() {
     while (current !== targetIndex) {
       const step = movePriorityUpdates(working, dragId, direction as -1 | 1)
       if (!step) return
-      for (const u of step) finalUpdates.set(u.id, u.priority)
+      for (const u of step) {
+        finalUpdates.set(u.id, u.priority)
+        const position = working.findIndex(rule => rule.id === u.id)
+        working[position] = { ...working[position], priority: u.priority }
+      }
       const [moved] = working.splice(current, 1)
       working.splice(current + direction, 0, moved)
       current += direction
@@ -975,15 +984,15 @@ export default function AutoRepliesListV8() {
     return folder ? { name: folder.name, color: folder.color } : null
   }
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: rules.length, icon: <Inbox size={15} aria-hidden="true" /> },
-    ...folders.map((f, index) => ({ ...folderActions.rowActions(f, index),
+    { kind: 'all' as const, id: '', label: 'すべて', count: rules.length, icon: <Inbox size={15} aria-hidden="true" /> },
+    ...folders.map((f, index) => ({ kind: 'folder' as const, ...folderActions.rowActions(f, index),
       id: f.id,
       label: f.name,
       // フォルダ件数は API(itemCount) をそのまま出す。来ないときは null（出さない）。
       count: f.itemCount ?? null,
       color: f.color,
     })),
-    { id: UNFILED, label: '未分類', count: unfiledCount },
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
   ]
   const folderSelectOptions = [
     { value: '', label: 'フォルダ：すべて' },
@@ -1138,12 +1147,13 @@ export default function AutoRepliesListV8() {
     <EmptyList
       data-design-node="G8i4xP"
       icon={<MessageSquare aria-hidden="true" />}
-      title="まだ自動応答がありません"
-      description="届いた言葉に合わせて、決めた返事を自動で送ります。"
-      create={{ label: '最初の自動応答を作る', onClick: () => router.push('/auto-replies/edit') }}
+      title="まだ自動応答のルールはありません"
+      description="よく届く質問や営業時間外の連絡に、自動で返せます。ひな形からも作れます。"
+      create={{ label: 'ルールを作る', onClick: () => router.push('/auto-replies/edit') }}
       canCreate={canEdit}
       filtered={filterActive}
       onClearFilters={clearFilters}
+      filteredTitle="条件に合うルールはありません"
       filteredDescription="「停止中のみ」「時間帯あり」「今月0回」や検索を外すと、すべて出ます"
     />
   ) : (
@@ -1324,19 +1334,19 @@ export default function AutoRepliesListV8() {
                   </Td>
                     <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()} data-design-node={openMenuId === r.id ? 'IIesG' : undefined}>
                       {/* 横並びにして、メニューの位置の目印（空の span）が行を1段増やさないようにする。 */}
-                      <div className={styles.menuBox}>
                       <ContextMenu
                         label={`自動応答「${name}」の操作`}
                         items={rowContextItems(r)}
                       >
+                        <div className={styles.menuBox}>
                         <RowMenu
                           label={`自動応答「${name}」の操作`}
                           items={rowMenuItems(r)}
                           open={openMenuId === r.id}
                           onOpenChange={(next) => setOpenMenuId(next ? r.id : null)}
                         />
+                        </div>
                       </ContextMenu>
-                      </div>
                     </Td>
                 </Tr>
               )
@@ -1460,11 +1470,6 @@ export default function AutoRepliesListV8() {
           </Button>
         </div>
       ) : null}
-
-      <p className={styles.footNote}>
-        □ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集。「…」に 停止・複製・実行結果・削除。「重なり」の札は、同じ受信に先に当たるルールがあるという印（押すと重なりのあるルールだけを表示します）。
-      </p>
-
     </>
   )
 
@@ -1534,10 +1539,9 @@ export default function AutoRepliesListV8() {
               </div>
   )
   const savedBox = (
-              <div className={styles.savedBox}>
-              <Bookmark size={14} aria-hidden="true" className={styles.savedIcon} />
               <Select
                 aria-label="よく使う絞り込み"
+                icon={<Bookmark size={14} aria-hidden="true" />}
                 value={savedFilter}
                 onChange={(value) => {
                   if (value === 'toggle-zero') setZeroThisMonthOnly(!zeroThisMonthOnly)
@@ -1551,7 +1555,6 @@ export default function AutoRepliesListV8() {
                   ...((conflictCount ?? 0) > 0 || conflictOnly ? [{ value: 'toggle-conflict', label: conflictOnly ? '重なりの絞り込みを外す' : '重なりありで絞り込む' }] : []),
                 ]}
               />
-              </div>
   )
   const perPageBox = (
               <div data-per-page-select>
@@ -1624,7 +1627,7 @@ export default function AutoRepliesListV8() {
       <div className={styles.narrowRow}>
         {filterChips}
         {sortBox}
-        <div className={styles.savedIconOnly} title="よく使う絞り込み">{savedBox}</div>
+        <ListToolbarOptional compact label="よく使う絞り込み">{savedBox}</ListToolbarOptional>
       </div>
     </div>
   )
@@ -1632,7 +1635,7 @@ export default function AutoRepliesListV8() {
   return (
     <ListPage boardId={narrow ? 'WPrd5' : 'uE9gf'} headingSize="regular" title={<>
         自動応答
-      </>} description={<>
+      </>} help="□ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集。「…」に 停止・複製・実行結果・削除。「重なり」の札は、同じ受信に先に当たるルールがあるという印（押すと重なりのあるルールだけを表示します）。" description={<>
         届いたメッセージに、決めた言葉・曜日・時間帯で自動で返します。上のルールから順に、最初に当たった1つだけが動きます。
       </>}
       stats={<>
@@ -1669,7 +1672,7 @@ export default function AutoRepliesListV8() {
       )}
 
       {/* 止める・再開の確認窓（`i8F12`：理由つき）。単体でもまとめてでも同じ形。 */}
-      <ConfirmDialog
+      <Dialog
         open={pendingToggle !== null}
         title={
           pendingToggle === null
@@ -1690,6 +1693,12 @@ export default function AutoRepliesListV8() {
         confirmLabel={pendingToggle?.kind === 'resume' ? '再開する' : '止める'}
         confirmIcon={pendingToggle?.kind === 'stop' ? <Pause size={16} aria-hidden="true" /> : undefined}
         designNode="i8F12"
+        confirmation
+        designLayout="stacked"
+        designWidth={600}
+        designTop={280}
+        footerAlign="center"
+        titleIcon={false}
         error={toggleError}
         onCancel={() => {
           setToggleError('')
@@ -1699,22 +1708,16 @@ export default function AutoRepliesListV8() {
         onConfirm={toggleTargetStale ? undefined : () => runToggle()}
       >
         {pendingToggle?.kind === 'stop' && (
-          <div>
-            <label htmlFor="auto-reply-stop-reason" className={styles.reasonLabel}>
-              止める理由{' '}
-              <span className="bg-canvas-sunken text-ink-faint rounded-pill inline-flex items-center px-1.5 py-0.5 text-nano font-medium">
-                任意
-              </span>
-            </label>
-            <input
-              id="auto-reply-stop-reason"
-              value={toggleReason}
-              onChange={(event) => setToggleReason(event.target.value)}
-              maxLength={500}
-              placeholder="例：キャンペーンが終わったので"
-              className={styles.reasonInput}
-              style={{ padding: '8px 12px' }}
-            />
+          <div className={styles.reasonField}>
+            <Field label="止める理由" htmlFor="auto-reply-stop-reason" optional>
+              <TextField
+                id="auto-reply-stop-reason"
+                value={toggleReason}
+                onChange={(event) => setToggleReason(event.target.value)}
+                maxLength={500}
+                placeholder="例：キャンペーンが終わったので"
+              />
+            </Field>
           </div>
         )}
         {toggleTargetStale && (
@@ -1722,7 +1725,7 @@ export default function AutoRepliesListV8() {
             アカウントが切り替わりました。操作する自動応答を選び直してください。
           </p>
         )}
-      </ConfirmDialog>
+      </Dialog>
 
       {/*
         削除の確認窓（`u8sKN`）。
@@ -1736,6 +1739,10 @@ export default function AutoRepliesListV8() {
         busy={deleting}
         error={deleteError}
         designNode="u8sKN"
+        confirmation
+        designLayout="stacked"
+        designWidth={600}
+        designTop={280}
         onCancel={() => {
           if (deleting) return
           setDeleteError('')
@@ -1753,32 +1760,35 @@ export default function AutoRepliesListV8() {
             >
               削除する
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={deleting}
-              onClick={() => {
-                if (deleting) return
-                setDeleteError('')
-                setPendingDelete(null)
-              }}
-            >
-              キャンセル
-            </Button>
-            {pendingDelete?.item.isActive ? (
+            <div className={styles.deleteAlternatives}>
               <Button
                 type="button"
                 variant="secondary"
-                disabled={deleting || deleteTargetStale}
-                onClick={stopInsteadOfDelete}
+                disabled={deleting}
+                onClick={() => {
+                  if (deleting) return
+                  setDeleteError('')
+                  setPendingDelete(null)
+                }}
               >
-                代わりに止める
+                キャンセル
               </Button>
-            ) : null}
+              {pendingDelete?.item.isActive ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={deleting || deleteTargetStale}
+                  onClick={stopInsteadOfDelete}
+                >
+                  <Pause size={16} aria-hidden="true" />
+                  代わりに止める
+                </Button>
+              ) : null}
+            </div>
           </div>
         }
       >
-        <Notice tone="danger" message="削除は元に戻せません。しばらく使わないだけなら「止める」を使ってください。" />
+        <Notice tone="danger" appearance="soft" icon={<TriangleAlert size={16} aria-hidden="true" />} message="削除は元に戻せません。しばらく使わないだけなら「止める」を使ってください。" />
         {deleteTargetStale && (
           <p className="text-danger text-sm leading-relaxed" role="alert">
             アカウントが切り替わりました。削除する自動応答を選び直してください。
@@ -1882,7 +1892,7 @@ export default function AutoRepliesListV8() {
             trailing={<>
               {/* 絵 uE9gf：「並び：評価順」（合格したリマインダ一覧と同じ並びの部品）→ 印つきの「よく使う絞り込み」→ 件数。 */}
               {sortBox}
-              {savedBox}
+              <ListToolbarOptional label="よく使う絞り込み">{savedBox}</ListToolbarOptional>
               {perPageBox}
             </>}
           />

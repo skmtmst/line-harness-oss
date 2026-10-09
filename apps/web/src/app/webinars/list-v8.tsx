@@ -830,8 +830,9 @@ function WebinarListV8Inner() {
   }
 
   const folderRows = [
-    { id: '', label: 'すべて', count: panelGrand },
+    { kind: 'all' as const, id: '', label: 'すべて', count: panelGrand },
     ...folders.map((folder, index) => ({
+      kind: 'folder' as const,
       id: folder.id,
       label: folder.name,
       count: folder.count,
@@ -842,7 +843,7 @@ function WebinarListV8Inner() {
       onDelete: canEdit ? () => { setFolderError(''); setDeletingFolder(folder) } : undefined,
       deleteNote: '削除しても、中のウェビナーは未分類に残ります。',
     })),
-    { id: UNFILED, label: '未分類', count: unfiledCount },
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
   ]
 
   const [csvBusy, setCsvBusy] = useState(false)

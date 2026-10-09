@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 友だち属性「友だち情報欄」タブの一覧（Pencil `q5gbcM`、状態 `U0aKD`）。
+ * ★V8 タグ「友だち情報欄」タブの一覧（Pencil `q5gbcM`、状態 `U0aKD`）。
  *
  * 項目もフォルダを持つので、タグと同じく左にフォルダの列を出す
  * （folders.kind = 'friend_field'。こちらは共通の folders 表なので
@@ -328,8 +328,9 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
   ]
 
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: status === 'ready' ? items.length : null, color: 'var(--color-accent)' },
+    { kind: 'all' as const, id: '', label: 'すべて', count: status === 'ready' ? items.length : null, color: 'var(--color-accent)' },
     ...folders.map((f, index) => ({
+      kind: 'folder' as const,
       id: f.id,
       label: f.name,
       /* サーバーは friend_field の件数をまだ返さない（FOLDER_ITEM_COUNT_TABLES に無い）。
@@ -342,7 +343,7 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
       onDelete: canEdit ? () => setDeletingFolder(f) : undefined,
       deleteNote: '削除しても、中の項目は未分類に残ります。',
     })),
-    { id: UNFILED, label: '未分類', count: status === 'ready' ? items.filter((field) => !field.folderId).length : null, color: 'var(--color-ink-disabled)' },
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: status === 'ready' ? items.filter((field) => !field.folderId).length : null, color: 'var(--color-ink-disabled)' },
   ]
 
   const folderSelectOptions = [

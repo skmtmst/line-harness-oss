@@ -10,6 +10,7 @@
  * 確認）は v7 の /booking/menus と /booking/staff/shifts と同じ。
  * テーマが v7 のときはこのファイルは読まれず、従来の見た目が出る。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { closedOn, closedRanges, closedSpan } from './lib/closed-ranges'
 import {
   memo,
@@ -19,7 +20,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Check, Smartphone } from 'lucide-react'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -150,7 +151,7 @@ function previewRange(): { from: string; to: string } {
 export default function BookingSettingsV8({ accountId }: { accountId: string | null }) {
   usePageTitle('予約設定')
   usePageCrumbs([{ label: '予約', href: '/booking/bookings' }, { label: '予約設定' }])
-  const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const searchParams = useSearchParams()
   const rawTab = searchParams.get('tab')
   const tab: V8TabKey = V8_TAB_KEYS.has(rawTab ?? '') ? (rawTab as V8TabKey) : 'menus'
@@ -221,36 +222,37 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
     setClosedBookingCount(null)
     setPreview((current) => ({ ...current, status: 'loading' }))
 
-    const [menusResult, settingsResult, staffResult] = await Promise.allSettled([
-      bookingApi.listMenus(accountId),
-      bookingApi.getSettings(accountId),
-      bookingApi.listStaff(accountId),
+    // 一覧・設定・担当者は、それぞれの返答だけで表示する（DEEP-26）。
+    await Promise.all([
+      bookingApi.listMenus(accountId).then((response) => {
+        if (!alive()) return
+        setMenus(response.menus)
+        setMenusStatus('ready')
+      }).catch((error: unknown) => {
+        if (!alive()) return
+        setMenusStatus('error')
+        setMenusError(bookingErrorMessage(error, '読み込み'))
+      }),
+      bookingApi.getSettings(accountId).then((response) => {
+        if (!alive()) return
+        if (!response.success) throw new Error('settings_unavailable')
+        setSettings(response.data)
+        setSettingsStatus('ready')
+      }).catch((error: unknown) => {
+        if (!alive()) return
+        setSettingsStatus('error')
+        setSettingsError(bookingRulesErrorMessage(error, '読み込み'))
+      }),
+      bookingApi.listStaff(accountId).then((response) => {
+        if (!alive()) return
+        setStaff(response.staff)
+        setStaffStatus('ready')
+      }).catch((error: unknown) => {
+        if (!alive()) return
+        setStaffStatus('error')
+        setStaffError(bookingErrorMessage(error, '読み込み'))
+      }),
     ])
-    if (!alive()) return
-    if (menusResult.status === 'fulfilled') {
-      setMenus(menusResult.value.menus)
-      setMenusStatus('ready')
-    } else {
-      setMenusStatus('error')
-      setMenusError(bookingErrorMessage(menusResult.reason, '読み込み'))
-    }
-    if (settingsResult.status === 'fulfilled' && settingsResult.value.success) {
-      setSettings(settingsResult.value.data)
-      setSettingsStatus('ready')
-    } else {
-      setSettingsStatus('error')
-      setSettingsError(bookingRulesErrorMessage(
-        settingsResult.status === 'rejected' ? settingsResult.reason : null,
-        '読み込み',
-      ))
-    }
-    if (staffResult.status === 'fulfilled') {
-      setStaff(staffResult.value.staff)
-      setStaffStatus('ready')
-    } else {
-      setStaffStatus('error')
-      setStaffError(bookingErrorMessage(staffResult.reason, '読み込み'))
-    }
   }, [accountId])
 
   useEffect(() => {
@@ -431,14 +433,14 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
       setSwitchTarget(next)
       return
     }
-    router.replace(next === 'menus' ? '/booking/menus' : `/booking/menus?tab=${next}`)
+    samePageUrl.replace(next === 'menus' ? '/booking/menus' : `/booking/menus?tab=${next}`)
   }
   function confirmSwitch() {
     const next = switchTarget
     setSwitchTarget(null)
     if (!next) return
     tabEdit?.onReset()
-    router.replace(next === 'menus' ? '/booking/menus' : `/booking/menus?tab=${next}`)
+    samePageUrl.replace(next === 'menus' ? '/booking/menus' : `/booking/menus?tab=${next}`)
   }
 
   /*
@@ -607,7 +609,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
           <aside className={styles.side} data-design="Side">
             <div className={styles.sideActions}>
               <span className={styles.sidePhoneButton}>
-                <Button onClick={() => setPhoneOpen(true)}>LINEでの見え方を見る</Button>
+                <Button onClick={() => setPhoneOpen(true)}><Smartphone size={15} aria-hidden="true" />LINEでの見え方を見る</Button>
               </span>
               {previewUrl ? <Button href={previewUrl}><Smartphone size={15} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
             </div>

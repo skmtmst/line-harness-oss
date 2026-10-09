@@ -322,4 +322,14 @@ describe('V6オートメーションのきっかけ接続', () => {
     expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM automation_runs`).get())
       .toEqual({ count: 1 });
   });
+  it('W24: 優先度の高い未来100件に隠れた実行時刻の対象を見つける', async () => {
+    for (let i=0; i<100; i++) addAutomation(testDb.raw, { id: `future-${i}`, priority: 100,
+      triggerType: 'datetime', triggerConfig: { at: '2030-01-01T00:00:00Z', friendIds: ['friend-1'] } });
+    addAutomation(testDb.raw, { id: 'due-last', priority: 0, triggerType: 'datetime',
+      triggerConfig: { at: '2026-08-26T00:00:00Z', friendIds: ['friend-1'] } });
+    expect(await processScheduledAutomationTriggers(testDb.db, { now: NOW, executors }))
+      .toMatchObject({ due: 1, results: [{ automationId: 'due-last', kind: 'created' }] });
+    expect(record).toHaveBeenCalledTimes(1);
+  });
+
 });

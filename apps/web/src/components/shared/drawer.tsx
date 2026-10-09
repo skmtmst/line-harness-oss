@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useContext, useEffect, useId, useState, type ReactNode } from 'react'
+import React, { useContext, useEffect, useId, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { OverlayDepthContext, useOverlayFocus, useV8Leave } from './overlay-utils'
@@ -11,7 +11,8 @@ export type DrawerDetail = { label: string; value: ReactNode }
 export type DrawerProps = {
   open: boolean
   title: string
-  description?: string
+  titleAccessory?: ReactNode
+  description?: ReactNode
   dirty?: boolean
   busy?: boolean
   error?: string
@@ -26,7 +27,13 @@ export type DrawerProps = {
    * 'editor' は 540 の編集の引き出し（ダッシュボード編集 mcOqK：頭 16/20・閉じるは枠つき 30・
    * 中 12/20・下 14/20・開くのは 200ms）。v8 だけで効く。
    */
-  width?: 'narrow' | 'editor'
+  width?: 'narrow' | 'editor' | 'order' | 'composer'
+  /** V8 の板ごとの幅。省くと既定の幅。 */
+  designWidth?: number
+  /** 620幅の紹介者の板など、全体に同じ余白がある型。 */
+  layout?: 'inset'
+  /** 題に状態の札を添える板。閉じる操作は共通のまま。 */
+  heading?: ReactNode
   /** 頭の題の行の下に置くもの（タブ・説明の1行）。渡したときだけ頭を縦に積む。 */
   toolbar?: ReactNode
   /** 下の帯（footer）のすぐ上に置く知らせ（保存の失敗など）。中身の帯は呼び出し側の Notice。 */
@@ -37,6 +44,7 @@ export type DrawerProps = {
 export default function Drawer({
   open,
   title,
+  titleAccessory,
   description,
   dirty = false,
   busy = false,
@@ -47,6 +55,9 @@ export default function Drawer({
   footer,
   modal = true,
   width,
+  designWidth,
+  layout,
+  heading,
   toolbar,
   band,
 }: DrawerProps) {
@@ -63,7 +74,7 @@ export default function Drawer({
 
   const titleBlock = (
     <div>
-      <h2 id={titleId} className={`${styles.title} ${modal ? '' : styles.inlineTitle}`}>{title}{dirty ? ' *' : ''}</h2>
+      <div className={titleAccessory ? styles.titleRow : undefined}><h2 id={titleId} className={`${styles.title} ${modal ? '' : styles.inlineTitle}`}>{heading ?? title}{dirty ? ' *' : ''}</h2>{titleAccessory}</div>
       {description ? <p id={descriptionId} className={styles.description}>{description}</p> : null}
     </div>
   )
@@ -80,6 +91,9 @@ export default function Drawer({
       aria-busy={busy || undefined}
       data-dirty={dirty || undefined}
       data-width={width}
+      data-layout={layout}
+      data-design-width={designWidth ? '' : undefined}
+      style={designWidth ? { '--drawer-design-width': `${designWidth}px` } as CSSProperties : undefined}
       tabIndex={-1}
       data-closing={leaving || undefined}
       data-design-part="drawer"

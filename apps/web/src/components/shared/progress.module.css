@@ -1,7 +1,7 @@
 @layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
- * 処理の進み。Pencil ★V7 `xiHO8`。
+ * 処理の進み。Pencil ★V8 `tydx2`「進みの棒」。
  *
  *   見出し  14px 700 $ink（割合は $accent-deep、等幅数字）
  *   棒      高さ 8 角丸 4、地 $shell、伸び $accent-deep

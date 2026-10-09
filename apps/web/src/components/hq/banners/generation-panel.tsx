@@ -4,6 +4,7 @@ import { ChevronDown, Images, Layers, Plus, Scissors, Sparkles, Upload, X } from
 import { useId, useRef, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
 import ColorWell from '@/components/shared/color-well'
+import HelpTip from '@/components/shared/help-tip'
 import LimitState from './limit-state'
 import styles from './generation-panel.module.css'
 import Radio from '@/components/shared/radio'
@@ -69,6 +70,8 @@ export default function GenerationPanel({
   usage,
   onReloadUsage,
   usageHeading,
+  monthRemaining,
+  v8Layout = false,
 }: {
   presets: BannerPreset[]
   maxCount: number
@@ -90,6 +93,10 @@ export default function GenerationPanel({
    * 板がそう描いている V8 のプロジェクトの中だけが渡す。v7 の既定は変えない。
    */
   usageHeading?: boolean
+  /** G-6：枚数のそばに残り枚数を置く。 */
+  monthRemaining?: boolean
+  /** 統括 V8 の板だけの並び。v7 の既定は変えない。 */
+  v8Layout?: boolean
 }) {
   const uid = useId()
   const fileRef = useRef<HTMLInputElement | null>(null)
@@ -116,27 +123,28 @@ export default function GenerationPanel({
         押せる大きさに保つための最小高さだった。切替が無い今は題だけの行なので外す。
         板Δ（`S0ay0i`画像を生成 → `RJIyX`出力サイズ）49 に対し、外すと 55 → 46 になる。
       */}
-      <div className="flex flex-wrap items-center gap-2 px-4 py-2">
+      <div className={v8Layout ? 'flex flex-wrap items-center gap-2 px-4 pt-4' : 'flex flex-wrap items-center gap-2 px-4 py-2'}>
         <Sparkles aria-hidden="true" className="h-4.5 w-4.5 text-ink-faint" />
-        <h2 className="text-body font-bold text-ink">画像を生成</h2>
+        <h2 className={v8Layout ? styles.v8HeadTitle : 'text-body font-bold text-ink'}>画像を生成</h2>
       </div>
       <div className="border-t border-hairline" />
 
-      <div data-design-node="E8oZc" className="flex flex-col gap-4 p-4">
+      <div data-design-node="E8oZc" className={v8Layout ? styles.v8Body : 'flex flex-col gap-4 p-4'}>
         <OutputSize
           name={`${uid}-preset`}
           presets={presets}
           value={value.presetKey}
           disabled={disabled}
           onSelect={(key) => set('presetKey', key)}
+          v8Layout={v8Layout}
         />
 
         {/*
           参照画像（承認済み ★BG-B `L1ax1Y`）。最大 3 枚で、1 枚ずつ使い方を決める。
           使い方の意味は下の説明（★BG-B `R6MBHf`）に出し、選ぶ前から読めるようにする。
         */}
-        <Field label="参照画像" note={`任意・最大 ${BANNER_MAX_REFERENCE_IMAGES} 枚`}>
-          <div data-design-node="L1ax1Y" className="flex flex-col gap-2">
+        <Field v8Layout={v8Layout} label="参照画像" note={`任意・最大 ${BANNER_MAX_REFERENCE_IMAGES} 枚`}>
+          <div data-design-node="L1ax1Y" className={v8Layout ? "flex flex-col gap-1.5" : "flex flex-col gap-2"}>
             {value.references.map((entry, index) => {
               const image = referenceImages.find((candidate) => candidate.id === entry.imageId) ?? null
               const name = image ? referenceTitle(image) : `${index + 1}枚目`
@@ -207,13 +215,13 @@ export default function GenerationPanel({
                   />
                 </div>
                 {value.references.length === 0 ? (
-                  <p className="text-micro text-ink-faint">
+                  <p className={v8Layout ? styles.v8SmallMuted : "text-micro text-ink-faint"}>
                     {`ライブラリの画像か、手元の画像（PNG・JPEG・WebP、10MB まで）を ${BANNER_MAX_REFERENCE_IMAGES} 枚まで選べます。`}
                   </p>
                 ) : null}
               </>
             ) : (
-              <p className="text-micro text-ink-faint">
+              <p className={v8Layout ? styles.v8SmallMuted : "text-micro text-ink-faint"}>
                 {`参照画像は ${BANNER_MAX_REFERENCE_IMAGES} 枚までです。入れ替えるときは、どれかを外してください。`}
               </p>
             )}
@@ -227,7 +235,7 @@ export default function GenerationPanel({
               * `rounded-card` を使う。半端な段は新規で増やさない（#704）。
               */}
             <div data-design-node="R6MBHf" className="flex flex-col gap-2 rounded-card bg-surface-pearl p-3">
-              <p className="text-caption font-semibold text-ink">{`使い方は ${BANNER_REFERENCE_MODES.length} つから選べます`}</p>
+              <p className={v8Layout ? styles.v8Caption : "text-caption font-semibold text-ink"}>{`使い方は ${BANNER_REFERENCE_MODES.length} つから選べます`}</p>
               <ul className="flex flex-col gap-2">
                 {BANNER_REFERENCE_MODES.map((mode) => {
                   const ModeIcon = BANNER_REFERENCE_MODE_ICON[mode]
@@ -235,8 +243,8 @@ export default function GenerationPanel({
                     <li key={mode} className="flex gap-2">
                       <ModeIcon aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-secondary" />
                       <span className={styles.howToText}>
-                        <span className="text-micro font-semibold text-ink">{BANNER_REFERENCE_MODE_LABEL[mode]}</span>
-                        <span className="text-micro text-ink-faint">{BANNER_REFERENCE_MODE_DESCRIPTION[mode]}</span>
+                        <span className={v8Layout ? styles.v8SmallTitle : "text-micro font-semibold text-ink"}>{BANNER_REFERENCE_MODE_LABEL[mode]}</span>
+                        <span className={v8Layout ? styles.v8SmallMuted : "text-micro text-ink-faint"}>{BANNER_REFERENCE_MODE_DESCRIPTION[mode]}</span>
                       </span>
                     </li>
                   )
@@ -251,16 +259,17 @@ export default function GenerationPanel({
           * 入れた行だけを強調カラーで目立たせる。丸やタグの印は出さず、
           * 入っていることは地と枠と文字の色で示す。
           */}
-        <Field
+        <Field v8Layout={v8Layout}
           label="画像に入れるテキスト"
-          note={`1行に1つ・${TEXT_LINE_LENGTH_MAX}文字まで／強調したい行は「強調」`}
-          noteSpread
-          footNote="「強調」を押した行は大きく・目立つ色で描きます（1〜2行まで推奨）"
+          note={v8Layout ? `1行に1つ・${TEXT_LINE_LENGTH_MAX}文字まで` : `1行に1つ・${TEXT_LINE_LENGTH_MAX}文字まで／強調したい行は「強調」`}
+          noteSpread={!v8Layout}
+          footNote={v8Layout ? undefined : '「強調」を押した行は大きく・目立つ色で描きます（1〜2行まで推奨）'}
+          help={undefined}
         >
-          <div className="flex flex-col gap-2 rounded-control border border-hairline p-3">
+          <div className={v8Layout ? 'flex flex-col gap-1.5' : 'flex flex-col gap-2 rounded-control border border-hairline p-3'}>
             {value.textLines.map((line, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <span className="w-3 text-micro font-semibold text-ink-faint" aria-hidden="true">{i + 1}</span>
+              <div key={i} className={v8Layout ? styles.v8TextRow : "flex items-center gap-2"}>
+                <span className={v8Layout ? styles.v8LineNumber : "w-3 text-micro font-semibold text-ink-faint"} aria-hidden="true">{i + 1}</span>
                 <TextField
                   aria-label={`テキスト ${i + 1}行目`}
                   value={line}
@@ -275,6 +284,7 @@ export default function GenerationPanel({
                   className="min-w-0 flex-1"
                 />
                 <EmphasisToggle
+                  v8Layout={v8Layout}
                   index={i}
                   on={value.emphasisLines[i] === true}
                   disabled={disabled}
@@ -295,7 +305,7 @@ export default function GenerationPanel({
                         alignEmphasis(value.textLines, value.emphasisLines).filter((_, j) => j !== i),
                       )
                     }
-                    className="rounded-mini p-1 text-ink-faint hover:bg-canvas-sunken disabled:opacity-50"
+                    className={v8Layout ? styles.v8LineRemove : "rounded-mini p-1 text-ink-faint hover:bg-canvas-sunken disabled:opacity-50"}
                   >
                     <X aria-hidden="true" className="h-3.5 w-3.5" />
                   </button>
@@ -309,7 +319,7 @@ export default function GenerationPanel({
                 onClick={() =>
                   setLines([...value.textLines, ''], [...alignEmphasis(value.textLines, value.emphasisLines), false])
                 }
-                className="inline-flex items-center gap-1 self-start text-caption font-semibold text-action hover:underline disabled:opacity-50"
+                className={v8Layout ? styles.v8LineAdd : "inline-flex items-center gap-1 self-start text-caption font-semibold text-action hover:underline disabled:opacity-50"}
               >
                 <Plus aria-hidden="true" className="h-3.5 w-3.5" />
                 行を足す
@@ -318,11 +328,11 @@ export default function GenerationPanel({
           </div>
         </Field>
 
-        <ColorRoles value={value} onPick={(key, next) => set(key, next)} disabled={disabled} />
+        <ColorRoles value={value} onPick={(key, next) => set(key, next)} disabled={disabled} v8Layout={v8Layout} />
 
-        <Field
+        <Field v8Layout={v8Layout}
           label="人物"
-          note="写真に人を入れるかどうか"
+          note={v8Layout ? undefined : "写真に人を入れるかどうか"}
         >
           {/*
             * ★BG-B `z14gEG`：人物は素の2択（丸＋ラベル）を間隔 20 で左から並べる。
@@ -331,17 +341,17 @@ export default function GenerationPanel({
             */}
           <fieldset className="flex items-center gap-5" disabled={disabled}>
             <legend className="sr-only">人物</legend>
-            <Radio name={`${uid}-person`} value="without" size="small" checked={value.personOption === 'without'} onChange={() => set('personOption', 'without')}>
+            <Radio name={`${uid}-person`} value="without" size={v8Layout ? "medium" : "small"} checked={value.personOption === 'without'} onChange={() => set('personOption', 'without')}>
               入れない
             </Radio>
-            <Radio name={`${uid}-person`} value="with" size="small" checked={value.personOption === 'with'} onChange={() => set('personOption', 'with')}>
+            <Radio name={`${uid}-person`} value="with" size={v8Layout ? "medium" : "small"} checked={value.personOption === 'with'} onChange={() => set('personOption', 'with')}>
               入れる
             </Radio>
           </fieldset>
         </Field>
 
         {/* ★BG-B `dT1xq`: 任意であることと上限を同じ行に出す */}
-        <Field label="追加の指示" note={`任意・${CUSTOM_PROMPT_MAX}文字まで`} htmlFor={`${uid}-custom`}>
+        <Field v8Layout={v8Layout} label="追加の指示" note={`任意・${CUSTOM_PROMPT_MAX}文字まで`} htmlFor={`${uid}-custom`}>
           {/*
             板はこの欄を 1 行ぶんの高さで描いている。板の間隔定数（組と組の間 16px・
             組の中 6px）で板Δ（`WMhuQ`任意・600文字まで → `coo4b`つくる枚数）90 を割ると
@@ -354,7 +364,7 @@ export default function GenerationPanel({
           <TextArea
             id={`${uid}-custom`}
             rows={1}
-            style={{ minHeight: 0 }}
+            style={v8Layout ? { minHeight: 0, height: 50, padding: "8px 10px", fontSize: 12, lineHeight: "18px" } : { minHeight: 0 }}
             maxLength={CUSTOM_PROMPT_MAX}
             disabled={disabled}
             value={value.customPrompt}
@@ -369,10 +379,10 @@ export default function GenerationPanel({
           * 置き場所も絵のまま——`KCFAX`「一度に 4 枚まで」はラベル行
           * （4択の上）、`swcu2`「同じ条件で…」は4択の下。
           */}
-        <Field
+        <Field v8Layout={v8Layout}
           label="つくる枚数"
           note={`一度に ${maxCount} 枚まで`}
-          footNote="同じ条件で指定した枚数ぶん作ります（絵柄は毎回少しずつ変わります）"
+          footNote={v8Layout ? undefined : "同じ条件で指定した枚数ぶん作ります（絵柄は毎回少しずつ変わります）"}
         >
           {/*
             * ★BG-B `SLgY5`：枚数は区切りスイッチ（灰色の器に4つのチップ）。
@@ -383,17 +393,19 @@ export default function GenerationPanel({
           <SegmentedControl
             aria-label="枚数"
             size="panel"
+            equalWidth={v8Layout}
             disabled={disabled}
             options={Array.from({ length: maxCount }, (_, i) => ({
               value: String(i + 1),
-              label: `${i + 1}枚`,
+              label: v8Layout ? `${i + 1}` : `${i + 1}枚`,
             }))}
             value={String(value.count)}
             onChange={(next) => set('count', Number(next))}
           />
         </Field>
 
-        <UsageBars usage={usage ?? null} heading={usageHeading} />
+        {monthRemaining ? <p className="text-caption text-ink-secondary" aria-live="polite">{`今月の残り ${usage?.month.remaining ?? '—'}枚`}</p> : null}
+        <UsageBars usage={usage ?? null} heading={v8Layout ? false : usageHeading} v8Layout={v8Layout} />
 
         <LimitState usage={usage ?? null} onReload={onReloadUsage} compact />
 
@@ -413,7 +425,7 @@ export default function GenerationPanel({
  * `heading` を渡すと上に「利用量」を置く（★BG-B `qIp42` の `ta8eS`。棒と同時に出る）。
  * 文字は `ta8eS` 3文字 w=37・h=17 ＝ 12px・太さ600 で、同じパネルの「色の決め方」と同じ見た目。
  */
-function UsageBars({ usage, heading }: { usage: BannerUsage | null; heading?: boolean }) {
+function UsageBars({ usage, heading, v8Layout }: { usage: BannerUsage | null; heading?: boolean; v8Layout?: boolean }) {
   if (!usage) return null
   if (usage.blocked || usage.paused || usage.month.remaining <= 0 || usage.today.remaining <= 0) return null
   const rows = [
@@ -421,17 +433,17 @@ function UsageBars({ usage, heading }: { usage: BannerUsage | null; heading?: bo
     { label: '今日', bucket: usage.today },
   ]
   return (
-    <div data-design-node="iMnph-usage" className="flex flex-col gap-1.5">
-      {heading ? <p className="text-caption font-semibold text-ink">利用量</p> : null}
+    <div data-design-node="iMnph-usage" className={v8Layout ? 'flex flex-col gap-2 rounded-control bg-canvas-sunken p-3' : 'flex flex-col gap-1.5'}>
+      {heading ? <p className={v8Layout ? styles.v8Caption : "text-caption font-semibold text-ink"}>利用量</p> : null}
       {rows.map(({ label, bucket }) => {
         const pct = bucket.limit > 0 ? Math.max(0, Math.min(100, (bucket.remaining / bucket.limit) * 100)) : 0
         return (
-          <div key={label} className="flex items-center gap-2">
-            <span className="w-8 shrink-0 text-micro text-ink-secondary">{label}</span>
-            <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-pill bg-hairline">
+          <div key={label} className={v8Layout ? 'flex flex-col gap-1' : 'flex items-center gap-2'}>
+            {v8Layout ? <div className={styles.v8UsageLabels}><span>{label}</span><span>{`残り ${bucket.remaining} / ${bucket.limit} 枚`}</span></div> : <span className="w-8 shrink-0 text-micro text-ink-secondary">{label}</span>}
+            <span className={v8Layout ? 'h-1.5 w-full shrink-0 overflow-hidden rounded-pill bg-hairline' : 'h-1.5 min-w-0 flex-1 overflow-hidden rounded-pill bg-hairline'}>
               <span className="block h-full rounded-pill bg-success" style={{ width: `${pct}%` }} />
             </span>
-            <span className="shrink-0 text-micro text-ink-secondary">残り{bucket.remaining}/{bucket.limit}枚</span>
+            {v8Layout ? null : <span className="shrink-0 text-micro text-ink-secondary">残り{bucket.remaining}/{bucket.limit}枚</span>}
           </div>
         )
       })}
@@ -457,11 +469,13 @@ function referenceTitle(image: BannerImage): string {
  * 直書きの色と任意の大きさを画面側に残さないため（共通の約束 design-debt）。
  */
 function EmphasisToggle({
+  v8Layout = false,
   index,
   on,
   disabled,
   onToggle,
 }: {
+  v8Layout?: boolean
   index: number
   on: boolean
   disabled?: boolean
@@ -474,7 +488,7 @@ function EmphasisToggle({
       aria-label={`${index + 1}行目を強調`}
       disabled={disabled}
       onClick={onToggle}
-      className={`${styles.emphasis} ${on ? styles.emphasisOn : styles.emphasisOff}`}
+      className={`${styles.emphasis} ${v8Layout ? styles.v8Emphasis : ""} ${on ? styles.emphasisOn : styles.emphasisOff}`}
     >
       強調
     </button>
@@ -490,13 +504,16 @@ function EmphasisToggle({
  * 13px だと日本語ラベルが1文字あたり約1px太り、右の一言が板より5〜7px外へずれます。
  */
 function Field({
+  v8Layout = false,
   label,
   note,
   noteSpread,
   footNote,
   htmlFor,
+  help,
   children,
 }: {
+  v8Layout?: boolean
   label: string
   /**
    * ラベルの**すぐ右**に添える一言。**入れる前に読んでおく**たぐい
@@ -521,17 +538,19 @@ function Field({
    */
   footNote?: string
   htmlFor?: string
+  help?: ReactNode
   children: ReactNode
 }) {
   return (
     <div className="flex flex-col gap-1.5">
       <div className={noteSpread ? 'flex items-start justify-between gap-2' : 'flex items-center gap-1.5'}>
         {htmlFor ? (
-          <label htmlFor={htmlFor} className="shrink-0 text-caption font-semibold text-ink">{label}</label>
+          <label htmlFor={htmlFor} className={v8Layout ? styles.v8Caption : "shrink-0 text-caption font-semibold text-ink"}>{label}</label>
         ) : (
-          <span className="shrink-0 text-caption font-semibold text-ink">{label}</span>
+          <span className={v8Layout ? styles.v8Caption : "shrink-0 text-caption font-semibold text-ink"}>{label}</span>
         )}
-        {note ? <span className="min-w-0 text-micro text-ink-faint">{note}</span> : null}
+        {note ? <span className={v8Layout ? styles.v8SmallMuted : "min-w-0 text-micro text-ink-faint"}>{note}</span> : null}
+        {help ? <HelpTip label={`${label}の補足`}>{help}</HelpTip> : null}
       </div>
       {children}
       {footNote ? <p className="text-nano text-ink-faint">{footNote}</p> : null}
@@ -555,12 +574,14 @@ function OutputSize({
   value,
   disabled,
   onSelect,
+  v8Layout = false,
 }: {
   name: string
   presets: BannerPreset[]
   value: string
   disabled?: boolean
   onSelect: (key: string) => void
+  v8Layout?: boolean
 }) {
   const [opened, setOpened] = useState(false)
   const groups = groupPresets(presets)
@@ -574,7 +595,7 @@ function OutputSize({
         <span className="shrink-0 text-caption font-semibold text-ink">出力サイズ</span>
         <span className="min-w-0 text-micro text-ink-faint">LINEの規格から選ぶ</span>
       </div>
-      <RadioCardGroup legend="出力サイズ" className="grid grid-cols-2 gap-1.5">
+      <RadioCardGroup legend="出力サイズ" className={v8Layout ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-2 gap-1.5'}>
         {[...line, ...(showOthers ? others : [])].map((preset) => (
           <RadioCard
             key={preset.key}
@@ -584,6 +605,7 @@ function OutputSize({
             disabled={disabled}
             onChange={onSelect}
             variant="compact"
+            compactTypography={v8Layout ? 'banner' : 'default'}
             title={presetCardLabel(preset)}
             note={presetSizeLabel(preset)}
           />
@@ -615,18 +637,20 @@ export function ColorRoles({
   value,
   onPick,
   disabled,
+  v8Layout = false,
 }: {
   value: BannerGenerationInput
   onPick: (key: BannerColorRoleKey, next: string | null) => void
   disabled?: boolean
+  v8Layout?: boolean
 }) {
   // いま使っている色を「このデザインの色」として見せ、役割どうしで使い回せるようにする。
   const used = Array.from(new Set(COLOR_ROLES.map((role) => value[role.key]).filter((c): c is string => Boolean(c))))
   return (
-    <div className="flex flex-col gap-2">
+    <div className={v8Layout ? "flex flex-col gap-1.5" : "flex flex-col gap-2"}>
       <div className="flex items-center gap-1.5">
-        <span className="shrink-0 text-caption font-semibold text-ink">カラー</span>
-        <span className="min-w-0 text-micro text-ink-faint">4つの役割で指定します</span>
+        <span className={v8Layout ? styles.v8ColorTitle : "shrink-0 text-caption font-semibold text-ink"}>{v8Layout ? '色' : 'カラー'}</span>
+        {v8Layout ? null : <span className="min-w-0 text-micro text-ink-faint">4つの役割で指定します</span>}
       </div>
       {/*
         4つの役割の並び。縦の間隔は板から逆算する。板の上下のピッチは
@@ -637,10 +661,10 @@ export function ColorRoles({
         「4の倍数でない gap 段を増やさない」ラチェットに引っかかるので 4px を採る。
         横は板どおり 12px のままにする。
       */}
-      <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+      <div className={v8Layout ? "grid grid-cols-2 gap-x-2 gap-y-2" : "grid grid-cols-2 gap-x-3 gap-y-1"}>
         {COLOR_ROLES.map((role) => (
-          <div key={role.key} className="flex flex-col gap-1.5">
-            <span className="text-caption font-semibold text-ink">{role.label}</span>
+          <div key={role.key} className={v8Layout ? "flex flex-col gap-1" : "flex flex-col gap-1.5"}>
+            <span className={v8Layout ? styles.v8SmallMuted : "text-caption font-semibold text-ink"}>{v8Layout ? role.label.replace("カラー", "") : role.label}</span>
             <ColorWell
               block
               label={role.label}
@@ -655,10 +679,8 @@ export function ColorRoles({
       </div>
       {/* 補足（Pencil `pQlYK`）。色の役割の意味を言葉で置いておく。 */}
       <div className="rounded-mini bg-canvas-sunken p-3">
-        <p className="text-caption font-semibold text-ink">色の決め方</p>
-        <p className="mt-1 text-micro text-ink-secondary">
-          色をタップすると、好きな色を選べる画面が開きます。画面の中の色をそのまま拾うスポイトも使えます。ベースは背景、メインは主役、サブは差し色、強調は特に目立たせたい文字に使います。
-        </p>
+        <p className={v8Layout ? styles.v8SmallTitle : "text-caption font-semibold text-ink"}>色の決め方</p>
+        <p className={v8Layout ? styles.v8ColorNote : "mt-1 text-micro text-ink-secondary"}>{v8Layout ? 'ベースは背景、メインは見出しの文字、サブは飾り、強調は値段や締切など目立たせたい所に使います。' : '色をタップすると、好きな色を選べる画面が開きます。画面の中の色をそのまま拾うスポイトも使えます。ベースは背景、メインは主役、サブは差し色、強調は特に目立たせたい文字に使います。'}</p>
       </div>
     </div>
   )

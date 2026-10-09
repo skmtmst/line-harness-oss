@@ -8,7 +8,7 @@ import React, { act, useRef, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import InsertTextField, { InsertButton, type InsertTextFieldHandle } from './insert-text-field'
+import InsertTextField, { InsertButton, InsertText, type InsertTextFieldHandle } from './insert-text-field'
 import { splitInsertTokens } from './insert-tokens'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -193,5 +193,17 @@ describe('v7 の見た目は変えない', () => {
     expect((element as HTMLTextAreaElement).value).toBe('{{name}}さん')
     await act(async () => { fireEvent.change(element, { target: { value: '{{name}}' } }) })
     expect(current()).toBe('{{name}}')
+  })
+})
+
+
+describe('閲覧用の差し込み', () => {
+  it('名前と分かる差し込みは札、未知の差し込みとHTMLに見える文は文字として読む', () => {
+    const value = '<script>alert(1)</script>{{name}}さん {{field.plan}} {{unknown}}'
+    act(() => root.render(<InsertText value={value} tokenNames={{ fields: { plan: 'プラン' } }} />))
+    expect(host.querySelectorAll('[data-token]')).toHaveLength(2)
+    expect(host.textContent).toBe('<script>alert(1)</script>名前さん プラン {{unknown}}')
+    expect(host.querySelector('script')).toBeNull()
+    expect(host.querySelector('[contenteditable]')).toBeNull()
   })
 })

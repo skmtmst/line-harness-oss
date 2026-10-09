@@ -29,9 +29,10 @@
 .headTitle {
   margin: 0;
   color: var(--color-ink);
-  font-size: var(--text-metric);
-  font-weight: 700;
-  line-height: var(--tpl-rs-lh-22);
+  font-size: var(--tpl-title-size);
+  font-weight: var(--tpl-title-weight);
+  line-height: var(--tpl-title-lh);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 .headDescription {
@@ -43,9 +44,10 @@
 
 /* E 系の板の頭（休業日・貸切 UVnvR）：題 20/600・説明の行 20 */
 .headTitleCompact {
-  font-size: var(--text-title);
-  font-weight: 600;
-  line-height: var(--tpl-e10-head-title-lh);
+  font-size: var(--tpl-title-size);
+  font-weight: var(--tpl-title-weight);
+  line-height: var(--tpl-title-lh);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 .headDescriptionCompact {
@@ -171,10 +173,6 @@
   flex-direction: column;
   gap: var(--tpl-rs-stat-gap);
   min-width: 0;
-  padding: var(--tpl-rs-stat-pad);
-  border-radius: var(--radius-card);
-  background: var(--color-canvas);
-  box-shadow: var(--tpl-rs-ring);
 }
 
 .statLabel {
@@ -236,9 +234,10 @@
   border-radius: var(--radius-card);
   background: var(--color-canvas);
   /* 線は中身（表の白・帯）の上に描く。内側の影だと中身の地に隠れる。 */
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   overflow: hidden;
+  box-shadow: var(--card-shadow);
 }
 
 .panelHead {

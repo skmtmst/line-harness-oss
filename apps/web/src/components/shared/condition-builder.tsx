@@ -17,6 +17,8 @@
  */
 
 import { useEffect, useState } from 'react'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { TagToggle } from './tag-pill'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
@@ -105,6 +107,7 @@ const SCENARIO_STATES: { value: string; label: string }[] = [
 interface Option {
   id: string
   name: string
+  color?: string | null
 }
 
 export interface ConditionBuilderProps {
@@ -181,7 +184,7 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
           api.scenarios.list({ accountId: selectedAccountId }),
         ])
         if (cancelled) return
-        if (tagRes.success && Array.isArray(tagRes.data)) setTags(tagRes.data.map((t) => ({ id: t.id, name: t.name })))
+        if (tagRes.success && Array.isArray(tagRes.data)) setTags(tagRes.data.map((t) => ({ id: t.id, name: t.name, color: t.color })))
         if (fieldRes.success && Array.isArray(fieldRes.data)) setFields(fieldRes.data.map((f) => ({ id: f.id, name: f.name })))
         if (markRes.success && Array.isArray(markRes.data)) setMarks(markRes.data.map((m) => ({ id: m.id, name: m.name })))
         if (scenarioRes.success && Array.isArray(scenarioRes.data)) setScenarios(scenarioRes.data.map((s) => ({ id: s.id, name: s.name })))
@@ -446,6 +449,7 @@ function TagPicker({
   const [query, setQuery] = useState('')
   const [showAll, setShowAll] = useState(false)
 
+  const isV8 = useAdminTheme() === 'v8'
   if (tags.length === 0) {
     return <span className="text-ink-faint text-xs">タグがまだありません</span>
   }
@@ -459,7 +463,9 @@ function TagPicker({
   const collapsed = query === '' && !showAll && rest.length > LIMIT
   const shown = collapsed ? rest.slice(0, LIMIT) : rest
 
-  const chip = (tag: Option, on: boolean) => (
+  const chip = (tag: Option, on: boolean) => isV8 ? (
+    <TagToggle key={tag.id} name={tag.name} color={tag.color} selected={on} onToggle={() => onToggle(tag.id)} />
+  ) : (
     <Button variant="primary" className={(`rounded-pill v7:h-8 px-3 text-xs transition-colors ${
         on ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken border'
       }`) + ' whitespace-normal'} key={tag.id} type="button" onClick={() => onToggle(tag.id)}>

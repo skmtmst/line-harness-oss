@@ -902,7 +902,13 @@ export async function publishMileageEarningRule(
     const now = jstNow();
     const versionId = crypto.randomUUID();
     try {
-      const statements: D1PreparedStatement[] = [];
+      const statements: D1PreparedStatement[] = [db.prepare(
+        `SELECT json(CASE WHEN EXISTS (
+           SELECT 1 FROM mileage_earning_rule_drafts
+            WHERE rule_id = ? AND line_account_id = ? AND version = ?
+              AND draft_json = ? AND updated_at = ?
+         ) THEN 'null' ELSE 'stale_draft' END)`
+      ).bind(input.ruleId, input.lineAccountId, draftRow.version, draftRow.draft_json, draftRow.updated_at)];
       if (firstPublish) {
         // 初公開だけ、公開前の live を v0 として残す。公開前に受け付けた行は
         // 旧版(v0)で処理する。なおさないと公開前の行が新版で付与される。
@@ -953,6 +959,9 @@ export async function publishMileageEarningRule(
       return { ruleId: input.ruleId, versionId, versionNumber, publishedAt: now };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      if (/malformed JSON/i.test(message)) {
+        throw new MileageV6Error('version_conflict', '下書きを読み直してください', 409);
+      }
       if (/UNIQUE constraint failed/i.test(message) && message.includes('publish_idempotency_key')) {
         const raced = await db.prepare(
           `SELECT id, version_number, published_at

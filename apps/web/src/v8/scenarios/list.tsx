@@ -39,6 +39,7 @@ import type { Scenario, DeliveryMode, Folder } from '@line-crm/shared'
 import { api, type ListStats } from '@/lib/api'
 import { useOffsetServerList } from '@/lib/use-server-list'
 import { clampSearchQuery } from '@/lib/search-query'
+import { completeReorder } from '@/lib/complete-reorder'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
@@ -390,7 +391,8 @@ export default function ScenariosListV8() {
     runUndoable({
       message: '並び順を変えました',
       commit: async () => {
-        const res = await api.scenarios.reorder(ids)
+        const fullOrder = await completeReorder(ids, loadScenarioPage)
+        const res = await api.scenarios.reorder(fullOrder)
         if (!res.success) throw new Error(res.error)
       },
       undo: () => setOptimisticRows(null),
@@ -632,9 +634,7 @@ export default function ScenariosListV8() {
     ? '閲覧のみのため並び替えできません'
     : serverQuery || activeParam !== undefined || createdThisMonthOnly || folderFilter
       ? '絞り込みを外すと動かせます'
-      : scenarioList.pageCount > 1
-        ? '全件が1ページに収まる表示件数にすると動かせます'
-        : null
+      : null
   const canReorder = reorderDisabledReason === null
 
   /* 動かしている間、置き場所を入れ替えて見せ、ほかの行は滑らかに場所を空ける（フルード ②）。 */
@@ -683,14 +683,14 @@ export default function ScenariosListV8() {
       : 0
 
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: overallTotal },
-    ...folders.map((f, index) => ({ ...folderActions.rowActions(f, index),
+    { kind: 'all' as const, id: '', label: 'すべて', count: overallTotal },
+    ...folders.map((f, index) => ({ kind: 'folder' as const, ...folderActions.rowActions(f, index),
       id: f.id,
       label: f.name,
       count: f.itemCount ?? null,
       color: f.color,
     })),
-    { id: UNFILED, label: '未分類', count: unfiledCount },
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
   ]
 
   const folderSelectOptions = [
@@ -1074,11 +1074,6 @@ export default function ScenariosListV8() {
             </Button>
           </div>
         ) : null}
-
-        {/* 板 `axFrW` の表の下の使い方の文。 */}
-        <p className={styles.footNote}>
-          左の □ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集、「…」に複製・配信結果・削除
-        </p>
       </>
     )
 
@@ -1236,6 +1231,7 @@ export default function ScenariosListV8() {
       headingSize="regular"
       title="シナリオ配信"
       description="きっかけ（友だち追加・タグ・予約など）から、決めた順と日時でメッセージを送り続けます。"
+      help="左の □ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集、「…」に複製・配信結果・削除。"
       stats={<>
         {/* 板 `X0QrW0`：閲覧のみの帯。数の帯の上。 */}
         {!canEdit && (

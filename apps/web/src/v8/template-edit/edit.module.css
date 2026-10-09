@@ -42,7 +42,7 @@
 .optional { color: var(--color-ink-faint); font-size: var(--text-micro); font-weight: 400; }
 .required { color: var(--color-danger); font-size: var(--text-micro); font-weight: 600; }
 
-/* 形：小さい題＋切り替え（間12）。 */
+/* クーポンの回数・公開範囲：小さい題＋切り替え。 */
 .typeRow { display: flex; align-items: center; gap: var(--tpl-rule-row-gap); }
 
 /* 本文の箱：余白14・間8。字 13/22 の4行・間の16・差し込むの並び。 */
@@ -62,7 +62,7 @@
 }
 .bodyText[data-kind='flex'] { height: var(--tpl-te-flex-h); font-family: var(--font-mono, monospace); font-size: var(--text-caption); }
 .bodySpacer { height: var(--tpl-te-body-spacer); flex-shrink: 0; }
-.insertRow { display: flex; align-items: center; gap: var(--tpl-te-insert-gap); flex-wrap: wrap; }
+.insertRow { display: flex; align-items: center; gap: var(--tpl-rm-insert-gap); flex-wrap: wrap; }
 .insertLine { display: contents; }
 .insertLabel { color: var(--color-ink-faint); font-size: var(--text-micro); white-space: nowrap; }
 .insertChip {
@@ -105,8 +105,9 @@
   display: flex; flex-direction: column; gap: var(--tpl-side-card-gap); align-self: stretch;
   padding: var(--tpl-side-card-pad);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline); outline-offset: -1px;
+  outline: 1px solid var(--card-edge); outline-offset: -1px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 .sideTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-side-title-lh); }
 .sideText { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-side-title-lh); }
@@ -114,11 +115,9 @@
 .previewHead { align-self: stretch; margin: 0; color: var(--color-ink); font-size: var(--tpl-preview-title-size); font-weight: 600; line-height: var(--tpl-preview-title-lh); }
 /* 届き方の題はこの画面が出す。見本の部品の題（LINEでの見え方）は重ねない。 */
 .phone { align-self: stretch; margin-top: var(--tpl-te-phone-shift); }
-.phone > section > p:first-child { display: none; }
 .previewToggle { display: none; align-self: stretch; }
 .previewToggle > * { width: 100%; }
 .previewDialog { display: flex; justify-content: center; }
-.previewDialog > section > p:first-child { display: none; }
 
 
 /* 1152 の板（a1k3d）：右の列は余白16・中の幅いっぱい。スマホは窓で開く。 */
@@ -127,7 +126,7 @@
   .sideContent { width: 100%; }
   .previewToggle { display: block; }
   .phone, .previewHead { display: none; }
-  .insertLine { display: flex; align-items: center; gap: var(--tpl-te-insert-gap); width: 100%; }
+  .insertLine { display: flex; align-items: center; gap: var(--tpl-rm-insert-gap); width: 100%; }
   .insertRow { flex-direction: column; align-items: stretch; gap: var(--tpl-body-gap); }
 }
 
@@ -182,7 +181,8 @@
   display: flex; flex-direction: column; gap: var(--tpl-te-url-gap); width: 100%;
   padding: var(--tpl-body-pad);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline); outline-offset: -1px;
+  outline: 1px solid var(--card-edge); outline-offset: -1px;
+  box-shadow: var(--card-shadow);
 }
 .grip { display: inline-flex; align-items: center; padding: 0; border: 0; background: transparent; color: var(--color-ink-faint); cursor: pointer; }
 .grip:disabled { cursor: default; opacity: 0.5; }
@@ -226,3 +226,15 @@
 .dateBox > button:first-child { height: var(--tpl-chip-h); }
 /* 「消す」は切り替えから離す（絵：切り替えの右に 33）。 */
 .questionRemove { margin-left: var(--tpl-te-q-remove-shift); }
+
+.composerSplit { display: grid; grid-template-columns: minmax(0, 1fr) var(--tpl-msg-composer-drawer-side-w); min-height: var(--tpl-msg-composer-fill); }
+.composerContent { min-width: 0; padding: var(--tpl-msg-composer-drawer-content-pad); display: flex; flex-direction: column; gap: var(--tpl-msg-composer-gap); }
+.composerSide { display: flex; flex-direction: column; gap: var(--tpl-msg-composer-gap); min-width: 0; padding: var(--tpl-msg-composer-drawer-content-pad); border-left: 1px solid var(--color-hairline); }
+.composerFooter { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-msg-composer-gap); flex-wrap: wrap; }
+.composerFooterActions { display: flex; gap: var(--tpl-msg-composer-drawer-actions-gap); }
+@media (width < 1152px) { .composerSplit { grid-template-columns: minmax(0, 1fr); } .composerSide { display: none; } }
+
+.composerFooter > :first-child { flex: 1; }
+.composerFooter::after { content: ''; flex: 1; }
+
+.composerTitleAccessories { display: flex; align-items: center; gap: var(--tpl-msg-composer-gap-s); }

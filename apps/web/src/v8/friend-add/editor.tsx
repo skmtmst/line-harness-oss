@@ -12,6 +12,7 @@
  * （口・版・下書き・冪等の鍵の扱いを変えない）。違うのは見せ方と、先に保存された
  * ときの帯（違いを比べる・最新を読み込んで続ける）。BEHAVIOR.md に書き出した。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
@@ -31,6 +32,7 @@ import {
   Power,
   Route,
   Search,
+  Smartphone,
   User,
   UserPlus,
   UserRound,
@@ -39,13 +41,15 @@ import {
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
+import { Steps } from '@/components/templates/steps'
 import { CreatePreviewNote, CreateSummaryCard } from '@/components/templates/create-parts'
-import Stepper, { type StepperStep } from '@/components/shared/stepper'
+import type { StepperStep } from '@/components/shared/stepper'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import CheckCard from '@/components/shared/check-card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ConditionBuilder from '@/components/shared/condition-builder'
+import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
@@ -101,6 +105,11 @@ const STEPS: Array<{ key: Step; label: string; node: string }> = [
   { key: 'actions', label: 'あわせて行うこと', node: 'i1nThZ' },
   { key: 'preview', label: '確認', node: 'U8Xm3X' },
 ]
+
+const EMPTY_RULE: EditorRule = {
+  name: '', folderName: null, priority: 1, friendKind: 'first_time', isFallback: false,
+  status: 'draft', matchedLast7Days: null, lastTestStatus: null, version: 0,
+}
 
 const EMPTY_DEFINITION: FriendAddRuleDefinition = {
   routeIds: [],
@@ -194,6 +203,7 @@ export default function FriendAddEditorV8({ ruleId }: { ruleId?: string }) {
 
 function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const searchParams = useSearchParams()
   const narrow = useNarrowViewport()
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
@@ -205,10 +215,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   usePageTitle('初回案内を作る')
   /* 板の頭の「← 〇〇へ」は 2026-10-08 に無くした。一覧へは上の帯のパンくずで戻る。 */
   usePageCrumbs([{ label: '友だち追加時の配信', href: '/friend-add-settings' }])
-  const [rule, setRule] = useState<EditorRule>({
-    name: '', folderName: null, priority: 1, friendKind: 'first_time', isFallback: false,
-    status: 'draft', matchedLast7Days: null, lastTestStatus: null, version: 0,
-  })
+  const [rule, setRule] = useState<EditorRule>(EMPTY_RULE)
   const [definition, setDefinition] = useState<FriendAddRuleDefinition>(EMPTY_DEFINITION)
   const [options, setOptions] = useState<FriendAddRuleOptions>({ routes: [], scenarios: [], tags: [], folders: [] })
   const [routeUses, setRouteUses] = useState<Map<string, RouteUse>>(new Map())
@@ -252,6 +259,10 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       && loadRequestRef.current.ruleId === request.ruleId
       && loadRequestRef.current.generation === request.generation
     setLoading(true)
+    setLoadedAccountId(null)
+    setSaving(false); setEnabling(false); saveInFlight.current = false
+    setTestResult(null); setValidateChecks(null); setCompare(null); setCompareBusy(false)
+    if (!ruleId) { setRule(EMPTY_RULE); setDefinition(EMPTY_DEFINITION); savedSnapshot.current = null }
     setError('')
     try {
       let kind: FriendAddRuleKind = 'first_time'
@@ -288,7 +299,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
             ? conflictRes.data.rules.reduce((max, item) => (fallbackIds.has(item.id) ? max : Math.max(max, item.priority)), 0)
             : listResponse.data.items.filter((item) => !item.isFallback).length
           setRule((current) => {
-            const initialRule = { ...current, priority: Math.max(1, maxPriority + 1) }
+            const initialRule = { ...EMPTY_RULE, priority: Math.max(1, maxPriority + 1) }
             savedSnapshot.current = editorSnapshot(initialRule, EMPTY_DEFINITION)
             return initialRule
           })
@@ -338,14 +349,35 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
     const routesProblem = !rule.isFallback && definition.routeIds.length === 0
       ? '対象にする流入リンクを1つ以上選んでください。'
       : ''
-    if (target === 'basic') return ''
-    if (target === 'routes') return routesProblem
-    if (target === 'message') return scenarioProblem
-    if (target === 'actions') return ''
-    return scenarioProblem || routesProblem
+    if (target === 'routes' && routesProblem) return { step: 'routes' as const, message: routesProblem }
+    if (target === 'message' && scenarioProblem) return { step: 'message' as const, message: scenarioProblem }
+    if (target === 'preview') {
+      if (routesProblem) return { step: 'routes' as const, message: routesProblem }
+      if (scenarioProblem) return { step: 'message' as const, message: scenarioProblem }
+    }
+    return null
   }
   const [fieldError, setFieldError] = useState<{ step: Step; message: string } | null>(null)
   useEffect(() => { setFieldError(null) }, [rule, definition])
+  useEffect(() => {
+    if (!fieldError || fieldError.step !== step) return
+    const frame = requestAnimationFrame(() => {
+      const field = document.querySelector<HTMLElement>(fieldError.step === 'basic'
+        ? '#fa-name'
+        : fieldError.step === 'routes'
+          ? '[data-friend-add-routes] input[type=checkbox]'
+          : '#fa-scenario, #fa-returning-scenario')
+      field?.focus()
+      field?.scrollIntoView({ block: 'center' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [fieldError, step])
+
+  const showFieldError = (problem: { step: Step; message: string }) => {
+    setError('')
+    setFieldError(problem)
+    if (step !== problem.step) samePageUrl.replace(hrefFor(problem.step))
+  }
 
   const save = async (nextStep?: Step): Promise<string | null> => {
     if (saveInFlight.current) return null
@@ -357,15 +389,15 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       return null
     }
     if (!rule.name.trim()) {
-      const message = '設定名を入力してください。'
-      if (step === 'basic') setFieldError({ step, message })
-      else setError(message)
+      showFieldError({ step: 'basic', message: '設定名を入力してください。' })
       return null
     }
     if (nextStep && STEPS.findIndex((item) => item.key === nextStep) >= currentIndex) {
       const problem = validateStep(step)
-      if (problem) { setFieldError({ step, message: problem }); return null }
+      if (problem) { showFieldError(problem); return null }
     }
+    const request = loadRequestRef.current
+    const isCurrent = () => loadRequestRef.current === request
     setFieldError(null)
     saveInFlight.current = true
     setSaving(true)
@@ -375,6 +407,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       const response = ruleId
         ? await api.friendAddRules.saveDraft(ruleId, payload, saveIdempotencyKey.current)
         : await api.friendAddRules.createDraft(payload, saveIdempotencyKey.current)
+      if (!isCurrent()) return null
       if (!response.success) { setError(response.error); return null }
       const savedId = response.data.id
       saveIdempotencyKey.current = crypto.randomUUID()
@@ -385,9 +418,10 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       savedSnapshot.current = editorSnapshot(rule, definition)
       setConflict(false)
       setNotice('下書きを保存しました。')
-      if (!ruleId || nextStep) router.replace(`/friend-add-settings?view=edit&id=${encodeURIComponent(savedId)}&step=${nextStep ?? step}`)
+      if (!ruleId || nextStep) samePageUrl.replace(`/friend-add-settings?view=edit&id=${encodeURIComponent(savedId)}&step=${nextStep ?? step}`)
       return savedId
     } catch (caught) {
+      if (!isCurrent()) return null
       if (caught instanceof ApiError && caught.status === 409) {
         setConflict(true)
       } else {
@@ -395,8 +429,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       }
       return null
     } finally {
-      saveInFlight.current = false
-      setSaving(false)
+      if (isCurrent()) { saveInFlight.current = false; setSaving(false) }
     }
   }
 
@@ -410,10 +443,12 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   /* 競合：違いを比べる（最新の保存とあなたの直しを、項目ごとに並べる）。 */
   const openCompare = async () => {
     if (!ruleId || !selectedAccountId) return
+    const request = loadRequestRef.current
     setCompareBusy(true)
     try {
       const response = await api.friendAddRules.get(selectedAccountId, ruleId)
       if (!response.success) { setError(response.error); return }
+      if (loadRequestRef.current !== request) return
       const latest = response.data.rule
       const routeText = (ids: string[]) => ids
         .map((id) => options.routes.find((route) => route.id === id)?.name ?? id)
@@ -423,32 +458,47 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         { label: 'フォルダ', mine: rule.folderName ?? '未分類', theirs: latest.folderName ?? '未分類' },
         { label: '流入リンク', mine: routeText(definition.routeIds), theirs: routeText(latest.definition.routeIds) },
         { label: '最初に送るもの', mine: definition.messageText, theirs: latest.definition.messageText },
-        { label: 'あわせて行うこと', mine: definition.actions.map((a) => a.label).join('・') || 'なし', theirs: latest.definition.actions.map((a) => a.label).join('・') || 'なし' },
+        { label: 'あわせて行うこと', mine: JSON.stringify(definition.actions), theirs: JSON.stringify(latest.definition.actions) },
+        { label: '順番', mine: String(rule.priority), theirs: String(latest.priority) },
+        { label: '友だちの区分', mine: rule.friendKind, theirs: latest.friendKind },
+        { label: '経路不明の設定', mine: String(rule.isFallback), theirs: String(latest.isFallback) },
+        ...Object.entries({scenarioId:'シナリオ',messageType:'メッセージの種類',timing:'送るタイミング',friendCondition:'友だちの条件',activeFrom:'有効期間の開始',activeUntil:'有効期間の終了',returningMode:'以前からの友だちへの送り方',startPosition:'シナリオの開始位置',deliveryChoices:'配信する内容',resendSuppressionHours:'再送を止める時間',unknownRouteAction:'経路不明のときの動作',weekdays:'曜日',timeWindows:'時間帯',internalMemo:'メモ'}).map(([key,label]) => ({label, mine: JSON.stringify(definition[key as keyof FriendAddRuleDefinition] ?? null), theirs: JSON.stringify(latest.definition[key as keyof FriendAddRuleDefinition] ?? null)})),
       ].filter((row) => row.mine !== row.theirs)
       setCompare(rows)
     } catch (caught) {
+      if (loadRequestRef.current !== request) return
       setError(describeFriendAddFailure(caught, '設定', 'load').message)
     } finally {
-      setCompareBusy(false)
+      if (loadRequestRef.current === request) setCompareBusy(false)
     }
   }
 
   const moveToStep = (nextStep: Step) => {
     if (nextStep === step || saving || enabling) return
+    if (STEPS.findIndex((item) => item.key === nextStep) > currentIndex) {
+      if (!rule.name.trim()) {
+        showFieldError({ step: 'basic', message: '設定名を入力してください。' })
+        return
+      }
+      const problem = validateStep(step)
+      if (problem) { showFieldError(problem); return }
+    }
     if (!hasUnsavedChanges) {
-      router.replace(hrefFor(nextStep))
+      samePageUrl.replace(hrefFor(nextStep))
       return
     }
     void save(nextStep)
   }
 
   const runTest = async () => {
+    const request = loadRequestRef.current
     const activeId = ruleId ?? await save('preview')
     if (!activeId || !selectedAccountId || loadedAccountId !== selectedAccountId) return
     setSaving(true)
     setError('')
     try {
       const response = await api.friendAddRules.test(selectedAccountId, activeId, { routeId: null, expectedAt: null, friendId: null })
+      if (loadRequestRef.current !== request) return
       const testedMeta = {
         accountId: selectedAccountId,
         ruleId: activeId,
@@ -462,9 +512,10 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       setTestResult({ ...testedMeta, ...response.data })
       setNotice('テストが完了しました。本番の登録・送信・タグ・マイルは変更していません。')
     } catch {
+      if (loadRequestRef.current !== request) return
       setError('テストを実行できませんでした。')
     } finally {
-      setSaving(false)
+      if (loadRequestRef.current === request) setSaving(false)
     }
   }
 
@@ -511,19 +562,22 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   const enableRule = async () => {
     const activeId = ruleId ?? await save('preview')
     if (!activeId || !selectedAccountId || loadedAccountId !== selectedAccountId || enabling) return
+    const request = loadRequestRef.current
     setEnabling(true)
     setError('')
     try {
       const res = await api.friendAddRules.publish(selectedAccountId, activeId, saveIdempotencyKey.current)
+      if (loadRequestRef.current !== request) return
       if (!res.success) {
         setError('有効化できませんでした。状態を読み直してから、もう一度お試しください。')
         return
       }
       router.replace(`/friend-add-settings/publish?id=${encodeURIComponent(activeId)}&done=1`)
     } catch {
+      if (loadRequestRef.current !== request) return
       setError('有効化できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
-      setEnabling(false)
+      if (loadRequestRef.current === request) setEnabling(false)
     }
   }
 
@@ -599,7 +653,9 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
     <>
       <div className={styles.narrowSide}>
         <div className={styles.previewOpen}>
-          <Button type="button" onClick={() => setPreviewOpen(true)}>LINEでの見え方を見る</Button>
+          <Button type="button" className={styles.previewButton} onClick={() => setPreviewOpen(true)}>
+            <Smartphone size={14} aria-hidden="true" />LINEでの見え方を見る
+          </Button>
         </div>
         {summary}
       </div>
@@ -623,10 +679,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
     <CreatePage
       boardId={step === 'routes' && narrow ? 'xHpkS' : conflict ? 'h5rm8t' : STEPS[currentIndex].node}
       title="初回案内を作る"
-      identity={
-        <Link href="/friend-add-settings" className={styles.backLink}>← 友だち追加時の配信へ</Link>
-      }
-      steps={<Stepper label="初回案内の作る手順" steps={stepperSteps} currentKey={step} />}
+      steps={<Steps label="初回案内の作る手順" steps={stepperSteps} currentKey={step} />}
       description={<>
         {step === 'basic'
           ? 'いまは下書きとして作ります。最後の「確認」で有効にします。'
@@ -690,11 +743,11 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
           onCreateFolder={canEdit && selectedAccountId
             ? folderCreator(
               // 一覧の左の列と同じ口。やり直しで二重に作らないよう、作れるまで同じ鍵で送る。
-              (name) => api.friendAddRules.createFolder(selectedAccountId, name, folderKey.current),
+              (name, color) => api.friendAddRules.createFolder(selectedAccountId, name, folderKey.current, color),
               folderByName,
               (created) => {
                 folderKey.current = crypto.randomUUID()
-                setOptions((current) => ({ ...current, folders: [...current.folders, { id: created.id, name: created.name }] }))
+                setOptions((current) => ({ ...current, folders: [...current.folders, { id: created.id, name: created.name, color: created.color }] }))
               },
             )
             : undefined}
@@ -713,7 +766,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         />
       ) : null}
       {step === 'message' ? (
-        <MessageStep definition={definition} setDefinition={setDefinition} friendKind={rule.friendKind} scenarios={options.scenarios} canEdit={canEdit} />
+        <MessageStep definition={definition} setDefinition={setDefinition} friendKind={rule.friendKind} scenarios={options.scenarios} canEdit={canEdit} scenarioError={fieldError?.step === 'message' ? fieldError.message : undefined} />
       ) : null}
       {step === 'actions' ? (
         <ActionsStep definition={definition} setDefinition={setDefinition} options={options} canEdit={canEdit} />
@@ -813,10 +866,11 @@ function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError, onC
               maxLength={60}
               readOnly={!canEdit}
               invalid={Boolean(nameError)}
+              aria-describedby={nameError ? 'fa-name-error' : undefined}
               placeholder="例：秋フェアの初回案内"
               onChange={(event) => setRule((current) => ({ ...current, name: event.target.value }))}
             />
-            {nameError ? <span className={styles.fieldError} role="alert">{nameError}</span> : null}
+            {nameError ? <span id="fa-name-error" className={styles.fieldError} role="alert">{nameError}</span> : null}
           </div>
           <div className={styles.field}>
             <label htmlFor="fa-folder" className={styles.label}>フォルダ</label>
@@ -829,7 +883,7 @@ function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError, onC
                 onChange={(value) => setRule((current) => ({ ...current, folderName: value || null }))}
                 folders={folderOptions.map(folderByName)}
                 onCreate={onCreateFolder}
-                colors={false}
+
               />
             ) : (
               <ReadOnlyText id="fa-folder" label="フォルダ" value={rule.folderName || '未分類'} />
@@ -892,6 +946,10 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
 }) {
   const [query, setQuery] = useState('')
   const [conditionOpen, setConditionOpen] = useState(false)
+  const [conditionsDialogOpen, setConditionsDialogOpen] = useState(false)
+  const narrow = useNarrowViewport()
+  // 選択不足のときは検索で隠れた候補を戻し、最初の選択欄へ移れるようにする。
+  useEffect(() => { if (routeError) setQuery('') }, [routeError])
   const keyword = query.trim()
   /* 選んだリンクを上に。並びは選んだ順ではなく、口の並びのまま。 */
   const visibleRoutes = useMemo(() => {
@@ -903,9 +961,65 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
   const raw = definition.friendCondition ?? ''
   const parsed = parseFriendConditionJson(raw)
   const legacy = raw.trim() !== '' && parsed === null
+  const conditions = (<>
+      <p className={styles.subDesc}>空のままなら、選んだリンクから来た全員に送ります。</p>
+      <div className={styles.datePair}>
+        <div className={styles.field}>
+          <label htmlFor="fa-from" className={styles.label}>有効期間 はじめ</label>
+          <DateTimeField
+            id="fa-from"
+            value={localInputValue(definition.activeFrom)}
+            readOnly={!canEdit}
+            onChange={(next) => setDefinition((current) => ({ ...current, activeFrom: next || null }))}
+          />
+        </div>
+        <div className={styles.field}>
+          <label htmlFor="fa-until" className={styles.label}>有効期間 おわり</label>
+          <DateTimeField
+            id="fa-until"
+            value={localInputValue(definition.activeUntil)}
+            readOnly={!canEdit}
+            onChange={(next) => setDefinition((current) => ({ ...current, activeUntil: next || null }))}
+          />
+        </div>
+      </div>
+      {legacy ? (
+        <p className={styles.fieldError} role="alert">以前の形式の条件が入っているため、今は配信を止めています。下の条件を作り直してください。</p>
+      ) : null}
+      <div className={styles.conditionRow}>
+        {canEdit ? (
+          <button
+            type="button"
+            className={styles.conditionSummary}
+            aria-expanded={conditionOpen}
+            onClick={() => setConditionOpen((open) => !open)}
+          >
+            <span className={styles.conditionText}>{conditionSummary(parsed, options.tags)}</span>
+            <span aria-hidden="true" className={styles.conditionChevron}>⌄</span>
+          </button>
+        ) : (
+          // 閲覧のみ：条件を開いて変える部品は置かず、条件の中身を文字で見せる。
+          <span className={styles.conditionSummary}>
+            <span className={styles.conditionText}>{conditionSummary(parsed, options.tags)}</span>
+          </span>
+        )}
+        {canEdit ? <Button type="button" onClick={() => setConditionOpen(true)}>条件を足す</Button> : null}
+      </div>
+      {canEdit && conditionOpen ? (
+        <ConditionBuilder
+          value={parsed}
+          onChange={(next) => {
+            const pruned = pruneCondition(next)
+            setDefinition((current) => ({ ...current, friendCondition: pruned ? JSON.stringify(pruned) : '' }))
+          }}
+          label="この初回案内を使う友だち"
+          showCount={false}
+        />
+      ) : null}
+  </>)
   return (
     <>
-      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="どの流入リンクから来た人に送るか">
+      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="どの流入リンクから来た人に送るか" data-friend-add-routes>
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>どの流入リンクから来た人に送るか</h2>
           <p className={styles.cardDesc}>選んだリンクの URL・QR（どちらも同じ入口）から追加された人に動きます</p>
@@ -937,6 +1051,8 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
               key={route.id}
               className={styles.routeCard}
               checked={checked}
+              invalid={Boolean(routeError)}
+              describedBy={routeError ? 'fa-routes-error' : undefined}
               onChange={() => toggleRoute(route.id)}
               title={route.name}
               note={use && !checked ? (
@@ -956,68 +1072,21 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
               <Plus size={15} aria-hidden="true" />流入リンクを新しく発行する
             </Button>
           ) : null}
+          {narrow ? <Button type="button" variant="text" onClick={() => setConditionsDialogOpen(true)}>対象をしぼる（任意）</Button> : null}
           <span className={styles.spacer} aria-hidden="true" />
           <span className={styles.countNote}>{selectedCount > 0 ? `${selectedCount}つ選んでいます` : '選んでいません'}</span>
         </div>
-        {routeError ? <p className={styles.fieldError} role="alert">{routeError}</p> : null}
-        <div className={styles.narrowBox} aria-label="対象をしぼる（任意）" role="group">
-          <h3 className={styles.subTitle}>対象をしぼる（任意）</h3>
-          <p className={styles.subDesc}>空のままなら、選んだリンクから来た全員に送ります。</p>
-          <div className={styles.datePair}>
-            <div className={styles.field}>
-              <label htmlFor="fa-from" className={styles.label}>有効期間 はじめ</label>
-              <DateTimeField
-                id="fa-from"
-                value={localInputValue(definition.activeFrom)}
-                readOnly={!canEdit}
-                onChange={(next) => setDefinition((current) => ({ ...current, activeFrom: next || null }))}
-              />
-            </div>
-            <div className={styles.field}>
-              <label htmlFor="fa-until" className={styles.label}>有効期間 おわり</label>
-              <DateTimeField
-                id="fa-until"
-                value={localInputValue(definition.activeUntil)}
-                readOnly={!canEdit}
-                onChange={(next) => setDefinition((current) => ({ ...current, activeUntil: next || null }))}
-              />
-            </div>
+        {routeError ? <p id="fa-routes-error" className={styles.fieldError} role="alert">{routeError}</p> : null}
+        {!narrow ? (
+          <div className={styles.narrowBox} aria-label="対象をしぼる（任意）" role="group">
+            <h3 className={styles.subTitle}>対象をしぼる（任意）</h3>
+            {conditions}
           </div>
-          {legacy ? (
-            <p className={styles.fieldError} role="alert">以前の形式の条件が入っているため、今は配信を止めています。下の条件を作り直してください。</p>
-          ) : null}
-          <div className={styles.conditionRow}>
-            {canEdit ? (
-              <button
-                type="button"
-                className={styles.conditionSummary}
-                aria-expanded={conditionOpen}
-                onClick={() => setConditionOpen((open) => !open)}
-              >
-                <span className={styles.conditionText}>{conditionSummary(parsed, options.tags)}</span>
-                <span aria-hidden="true" className={styles.conditionChevron}>⌄</span>
-              </button>
-            ) : (
-              // 閲覧のみ：条件を開いて変える部品は置かず、条件の中身を文字で見せる。
-              <span className={styles.conditionSummary}>
-                <span className={styles.conditionText}>{conditionSummary(parsed, options.tags)}</span>
-              </span>
-            )}
-            {canEdit ? <Button type="button" onClick={() => setConditionOpen(true)}>条件を足す</Button> : null}
-          </div>
-          {canEdit && conditionOpen ? (
-            <ConditionBuilder
-              value={parsed}
-              onChange={(next) => {
-                const pruned = pruneCondition(next)
-                setDefinition((current) => ({ ...current, friendCondition: pruned ? JSON.stringify(pruned) : '' }))
-              }}
-              label="この初回案内を使う友だち"
-              showCount={false}
-            />
-          ) : null}
-        </div>
+        ) : null}
       </Card>
+      <Dialog open={narrow && conditionsDialogOpen} title="対象をしぼる（任意）" onCancel={() => setConditionsDialogOpen(false)}>
+        {conditions}
+      </Dialog>
       <Notice
         tone="info"
         icon={<Route size={16} aria-hidden="true" />}
@@ -1040,12 +1109,13 @@ const MESSAGE_TABS: Array<{ key: FriendAddRuleDefinition['messageType'] | 'none'
   { key: 'none', label: '送らない', icon: Ban, enabled: false, reason: '送らない設定は「以前からの友だち」のときに選びます' },
 ]
 
-function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit }: {
+function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit, scenarioError }: {
   definition: FriendAddRuleDefinition
   setDefinition: Dispatch<SetStateAction<FriendAddRuleDefinition>>
   friendKind: FriendAddRuleKind
   scenarios: FriendAddRuleOptions['scenarios']
   canEdit: boolean
+  scenarioError?: string
 }) {
   const messageRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement | null>(null)
   const insertToken = (token: string) => {
@@ -1061,7 +1131,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
     })
   }
   if (friendKind === 'returning') {
-    return <ReturningMessage definition={definition} setDefinition={setDefinition} scenarios={scenarios} canEdit={canEdit} />
+    return <ReturningMessage definition={definition} setDefinition={setDefinition} scenarios={scenarios} canEdit={canEdit} scenarioError={scenarioError} />
   }
   const scheduled = definition.timeWindows != null && definition.timeWindows.length > 0
   const suppressOn = (definition.resendSuppressionHours ?? 24) > 0
@@ -1100,7 +1170,6 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
             ref={messageRef}
             aria-label="最初に送るメッセージ"
             className={styles.bodyText}
-            rows={2}
             maxLength={MESSAGE_LIMIT}
             value={definition.messageText}
             readOnly={!canEdit}
@@ -1124,6 +1193,18 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
             <span className={styles.charCount}>{`${formatNumber(definition.messageText.length)} / ${formatNumber(MESSAGE_LIMIT)}`}</span>
           </div>
         </div>
+        {scenarioError && canEdit ? (
+          <Select
+            id="fa-scenario"
+            aria-label="実際に配信するシナリオ"
+            label="実際に配信するシナリオ"
+            size="full"
+            value={definition.scenarioId ?? ''}
+            error={scenarioError}
+            onChange={(value) => setDefinition((current) => ({ ...current, scenarioId: value || null }))}
+            options={[{ value: '', label: '選んでください' }, ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))]}
+          />
+        ) : null}
       </Card>
       <Card padding="roomy" layout="vertical" className={styles.card} aria-label="いつ送るか">
         <div className={styles.cardHead}>
@@ -1243,11 +1324,12 @@ function ReadOnlyText({ id, label, value }: { id?: string; label: string; value:
   return <TextField id={id} aria-label={label} value={value} readOnly aria-readonly="true" title={value} />
 }
 
-function ReturningMessage({ definition, setDefinition, scenarios, canEdit }: {
+function ReturningMessage({ definition, setDefinition, scenarios, canEdit, scenarioError }: {
   definition: FriendAddRuleDefinition
   setDefinition: Dispatch<SetStateAction<FriendAddRuleDefinition>>
   scenarios: FriendAddRuleOptions['scenarios']
   canEdit: boolean
+  scenarioError?: string
 }) {
   const mode = definition.returningMode ?? 'same'
   const start = definition.startPosition ?? 'beginning'
@@ -1275,7 +1357,7 @@ function ReturningMessage({ definition, setDefinition, scenarios, canEdit }: {
           ))}
         </RadioCardGroup>
         )}
-        {mode === 'other' ? (
+        {mode === 'other' || scenarioError ? (
           <div className={styles.field}>
             <label htmlFor="fa-returning-scenario" className={styles.label}>始めるシナリオ</label>
             {canEdit ? (
@@ -1283,6 +1365,7 @@ function ReturningMessage({ definition, setDefinition, scenarios, canEdit }: {
                 id="fa-returning-scenario"
                 aria-label="始めるシナリオ"
                 size="full"
+                error={scenarioError}
                 value={definition.scenarioId ?? ''}
                 onChange={(value) => setDefinition((current) => ({ ...current, scenarioId: value || null }))}
                 options={[{ value: '', label: '選んでください' }, ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))]}

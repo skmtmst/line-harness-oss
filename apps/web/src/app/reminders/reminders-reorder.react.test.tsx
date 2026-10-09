@@ -7,7 +7,7 @@
  * 次の送信順に戻り、「自分で並べた順」も次の送信順で上書きされていた。
  *
  * 決まり（リッチメニュー・自動応答と同じ）: 動かせるのは「自分で並べた順」で、
- * 絞り込みが無く、全件が1ページにあるときだけ。それ以外はつまみを出さず理由を言う。
+ * 絞り込みが無く、全件が500件以内のときだけ（ページ外も含めた全順位を送る）。それ以外はつまみを出さず理由を言う。
  * ドラッグ・上下キー・「…」の上へ／下へは同じ結果。保存に失敗したら元の位置へ戻す。
  */
 import React, { act } from 'react'
@@ -104,6 +104,7 @@ let serverOrder: string[] = []
 let reorderCalls: string[][] = []
 let failReorder = false
 let totalOverride: number | null = null
+let paged = false
 
 const NAMES: Record<string, string> = { a: 'Aのお知らせ', b: 'Bのお知らせ', c: 'Cのお知らせ' }
 /* 次の送信が近い順は、自分で並べた順と逆。 */
@@ -125,6 +126,7 @@ beforeEach(() => {
   reorderCalls = []
   failReorder = false
   totalOverride = null
+  paged = false
   toasts.length = 0
   fetchApi.mockImplementation(async (url: string, init?: { method?: string; body?: string }) => {
     if (url.startsWith('/api/folders')) return { success: true, data: [], unfiledCount: 0 }
@@ -141,8 +143,11 @@ beforeEach(() => {
       const sort = params.get('sort')
       const ids = sort === 'next' ? NEXT_ORDER : serverOrder
       const q = params.get('q')
-      const items = ids.map(reminder).filter((row) => !q || row.name.includes(q))
-      return { success: true, data: { items, total: totalOverride ?? items.length, limit: 20, sort: [] } }
+      const filtered = ids.map(reminder).filter((row) => !q || row.name.includes(q))
+      const limit = paged ? 2 : 20
+      const page = Number(params.get('page') || 1)
+      const items = paged ? filtered.slice((page - 1) * limit, page * limit) : filtered
+      return { success: true, data: { items, total: totalOverride ?? filtered.length, limit, sort: [] } }
     }
     return { success: true, data: {} }
   })
@@ -228,11 +233,11 @@ describe('リマインダ一覧の並び替え', () => {
     expect(host.querySelector('[data-reorder-disabled]')?.getAttribute('title')).toBe('閲覧のみのため並び替えできません')
   })
 
-  it('2ページ以上あるときは動かさない（ページの一部だけ番号を振り直さない）', async () => {
-    totalOverride = 30
+  it('サーバーの上限500件を超えるときはつまみを出さない', async () => {
+    totalOverride = 501
     await mount('sort=order')
     expect(handles()).toHaveLength(0)
-    expect(host.querySelector('[data-reorder-disabled]')?.getAttribute('title')).toBe('全件が1ページに収まる表示件数にすると動かせます')
+    expect(host.querySelector('[data-reorder-disabled]')?.getAttribute('title')).toBe('500件を超える一覧では並び替えできません')
   })
 
   it('上下キーで動かした順は、読み直しても残る', async () => {
@@ -286,4 +291,16 @@ describe('リマインダ一覧の並び替え', () => {
     expect(rowOrder()).toEqual(['a', 'b', 'c'])
     expect(toasts).toEqual(['並び替えを保存できませんでした。'])
   })
+})
+
+it('WEB-016：ページ外の順位も含めて同じアカウント全件を保存する', async () => {
+  paged = true
+  search = 'sort=order'
+  await act(async () => root.render(<RemindersPage />))
+  for (let i = 0; i < 4; i++) await act(async () => {})
+  const handle = host.querySelector('[data-reorder-handle]') as HTMLButtonElement
+  expect(handle).toBeTruthy()
+  await act(async () => handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })))
+  for (let i = 0; i < 6; i++) await act(async () => {})
+  expect(reorderCalls).toEqual([['b', 'a', 'c']])
 })

@@ -14,10 +14,13 @@ import { Check, Copy, PauseCircle, X } from 'lucide-react'
 import { api, type AffiliateAccountSettlementPreview, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
+import Select from '@/components/shared/select'
+import { TextField } from '@/components/shared/text-field'
 import Checkbox from '@/components/shared/checkbox'
+import { Field } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Drawer from '@/components/shared/drawer'
 import { notifyToast } from '@/components/shared/toast'
 import {
   asReportV2,
@@ -208,7 +211,6 @@ export default function AffiliateDrawer({
 
   useEffect(() => { reloadAll() }, [reloadAll])
 
-  const panelRef = useOverlayFocus(!paymentOpen, onClose)
 
   const copyLinkUrl = useCallback(async (link: AffiliateLink) => {
     const url = distributionUrl(link.ref_code, linkBaseUrl)
@@ -476,30 +478,9 @@ export default function AffiliateDrawer({
 
   return (
     <>
-      <div className={styles.backdrop} onClick={onClose} aria-hidden="true" />
-      <aside
-        ref={panelRef}
-        className={styles.drawer}
-        role="dialog"
-        aria-modal="true"
-        aria-label={`${affiliate.name}の詳細`}
-        data-design-node="tnTn9"
-        tabIndex={-1}
-      >
-        <header className={styles.head}>
-          <div className={styles.headText}>
-            <div className={styles.titleRow}>
-              <h2 className={styles.title}>{affiliate.name}</h2>
-              <StatusPill tone={affiliate.isActive ? 'active' : 'neutral'}>{affiliate.isActive ? '計測中' : '停止中'}</StatusPill>
-            </div>
-            <p className={styles.sub} title={subLine}>{subLine}</p>
-          </div>
-          <button type="button" className={styles.close} aria-label="詳細を閉じる" onClick={onClose}>
-            <X size={16} aria-hidden="true" />
-          </button>
-        </header>
-
-        <div className={styles.tabs} role="tablist" aria-label="詳細の中身">
+      <Drawer open title={`${affiliate.name}の詳細`} description={subLine} designWidth={620} layout="inset" busy={paymentOpen} onClose={onClose}
+        heading={<span className={styles.titleRow}><span>{affiliate.name}</span><StatusPill tone={affiliate.isActive ? 'active' : 'neutral'}>{affiliate.isActive ? '計測中' : '停止中'}</StatusPill></span>}
+        toolbar={(<div className={styles.tabs} role="tablist" aria-label="詳細の中身">
           {DRAWER_TABS.map((item) => (
             <button
               key={item.key}
@@ -513,16 +494,8 @@ export default function AffiliateDrawer({
               {item.label}
             </button>
           ))}
-        </div>
-
-        <div className={styles.body}>
-          {loading ? (
-            <ListState kind="loading" title="詳細を読み込んでいます" />
-          ) : tab === 'summary' ? summary : tab === 'breakdown' ? breakdown : tab === 'friends' ? friends : payment}
-        </div>
-
-        <footer className={styles.foot}>
-          {readonly ? <span /> : (
+        </div>)}
+        footer={(<>{readonly ? <span /> : (
             <button type="button" className={styles.stop} onClick={() => { onClose(); onStopRequest(affiliate.id, affiliate.name) }} disabled={!affiliate.isActive}>
               <PauseCircle size={14} aria-hidden="true" />
               紹介を止める
@@ -545,9 +518,12 @@ export default function AffiliateDrawer({
                 支払いを確定する
               </Button>
             </>
-          )}
-        </footer>
-      </aside>
+          )}</>)}
+      >
+        {loading ? (
+            <ListState kind="loading" title="詳細を読み込んでいます" />
+          ) : tab === 'summary' ? summary : tab === 'breakdown' ? breakdown : tab === 'friends' ? friends : payment}
+      </Drawer>
       {accountId ? (
         <AffiliatePaymentConfirmDialog
           target={paymentOpen ? { id: affiliate.id, name: affiliate.name } : null}
@@ -567,21 +543,42 @@ function SettlementEditor({
   affiliate,
   onSaved,
 }: {
-  affiliate: { id: string; email?: string | null; holdDays?: number | null; payoutCycle?: string | null; notifyOnConversion?: boolean }
+  affiliate: { id: string; rewardMode?: 'none' | 'fixed' | 'rate'; commissionRate: number; email?: string | null; holdDays?: number | null; payoutCycle?: string | null; notifyOnConversion?: boolean }
   onSaved: () => void
 }) {
+  const [rewardMode, setRewardMode] = useState<'none' | 'fixed' | 'rate'>(affiliate.rewardMode ?? (affiliate.commissionRate > 0 ? 'rate' : 'fixed'))
+  const [rate, setRate] = useState(String(affiliate.commissionRate))
   const [email, setEmail] = useState(affiliate.email ?? '')
   const [holdDays, setHoldDays] = useState(affiliate.holdDays == null ? '' : String(affiliate.holdDays))
   const [payoutCycle, setPayoutCycle] = useState(affiliate.payoutCycle ?? '')
   const [notify, setNotify] = useState(affiliate.notifyOnConversion ?? false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<'email' | 'hold', string>>>({})
+  const emailRef = useRef<HTMLInputElement>(null)
+  const holdRef = useRef<HTMLInputElement>(null)
 
   const save = async () => {
+    if (saving) return
+    setError(null)
+    const errors: typeof fieldErrors = {}
+    if (email.trim() && emailRef.current?.validity.typeMismatch) errors.email = 'メールアドレスを確認してください'
+    if (holdDays.trim() && (!Number.isInteger(Number(holdDays)) || Number(holdDays) < 0 || Number(holdDays) > 365)) errors.hold = '保留期間は0日から365日の整数で入力してください'
+    setFieldErrors(errors)
+    if (errors.email || errors.hold) {
+      requestAnimationFrame(() => {
+        const el = errors.email ? emailRef.current : holdRef.current
+        el?.focus()
+        el?.scrollIntoView?.({ block: 'center' })
+      })
+      return
+    }
     setSaving(true)
     setError(null)
     try {
       const res = await api.affiliates.update(affiliate.id, {
+        rewardMode,
+        commissionRate: rewardMode === 'rate' ? Number(rate) : 0,
         email: email.trim() || null,
         holdDays: holdDays.trim() === '' ? null : Number(holdDays),
         payoutCycle: payoutCycle.trim() || null,
@@ -604,18 +601,21 @@ function SettlementEditor({
     <section className={styles.card} aria-label="支払いの取り決め">
       <h3 className={styles.cardTitle}>支払いの取り決め</h3>
       <div className={styles.fields}>
-        <label className={styles.field}>
-          <span>連絡先</span>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="partner@example.com" className={styles.input} />
-        </label>
-        <label className={styles.field}>
-          <span>確定までの保留（日）</span>
-          <input type="number" min={0} max={365} value={holdDays} onChange={(e) => setHoldDays(e.target.value)} placeholder="なし" className={styles.input} />
-        </label>
-        <label className={styles.field}>
-          <span>支払いサイクル</span>
-          <input type="text" value={payoutCycle} onChange={(e) => setPayoutCycle(e.target.value)} placeholder="例: 月末締め翌月末払い" maxLength={100} className={styles.input} />
-        </label>
+        <Select aria-label="報酬の方式" value={rewardMode} onChange={(value) => setRewardMode(value as typeof rewardMode)} options={[
+          { value: 'none', label: '報酬なし（計測のみ）' },
+          { value: 'fixed', label: '成果1件ごとに定額' },
+          { value: 'rate', label: '売上に対する割合' },
+        ]} />
+        {rewardMode === 'rate' ? <TextField aria-label="報酬の割合（%）" type="number" min={0} max={100} step="0.1" value={rate} onChange={(e) => setRate(e.target.value)} /> : null}
+        <Field label="連絡先" htmlFor="af-settlement-email" error={fieldErrors.email}>
+          <TextField id="af-settlement-email" ref={emailRef} type="email" value={email} onChange={(event) => { setEmail(event.target.value); setFieldErrors((old) => ({ ...old, email: undefined })) }} placeholder="partner@example.com" />
+        </Field>
+        <Field label="確定までの保留（日）" htmlFor="af-settlement-hold" error={fieldErrors.hold}>
+          <TextField id="af-settlement-hold" ref={holdRef} type="number" min={0} max={365} value={holdDays} onChange={(event) => { setHoldDays(event.target.value); setFieldErrors((old) => ({ ...old, hold: undefined })) }} placeholder="なし" />
+        </Field>
+        <Field label="支払いサイクル" htmlFor="af-settlement-cycle">
+          <TextField id="af-settlement-cycle" value={payoutCycle} onChange={(event) => setPayoutCycle(event.target.value)} placeholder="例: 月末締め翌月末払い" maxLength={100} />
+        </Field>
       </div>
       <Checkbox checked={notify} onCheckedChange={setNotify}>成果が出たときに本人へ知らせる</Checkbox>
       <p className={styles.note}>保留日数と支払いサイクルは取り決めの記録です。報酬の計算そのものには使いません。</p>

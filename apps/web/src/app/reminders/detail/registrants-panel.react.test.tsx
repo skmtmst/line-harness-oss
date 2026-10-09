@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
+import { join as sourceJoin } from 'node:path'
 import React, { act } from 'react'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -51,7 +53,7 @@ const registrant = {
   status: 'active', reminderVersionId: 'snapshot-1', sourceKind: 'manual', createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z', cancelledAt: null, lockVersion: 4,
 }
-const detailSource = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const detailSource = fs.readFileSync(sourceJoin(__dirname, '../../../v8/reminders/detail.tsx'), 'utf8')
 /* 完全切り替え：v7 の一覧 page.tsx は捨て、V8 の list-v8.tsx を見る。 */
 const listSource = fs.readFileSync(path.join(__dirname, '..', 'list-v8.tsx'), 'utf8')
 
@@ -147,7 +149,8 @@ async function pickTargetDate(label: string, iso: string) {
 
 describe('リマインダ詳細の登録者管理 (#868)', () => {
   it('正本URLはstatic exportで再読込できるdetail?idに統一し、動的URLを作らない', () => {
-    expect(detailSource).toContain('`/reminders/detail?id=${encodeURIComponent(reminderId)}`')
+    expect(detailSource).toContain("params.set('id', reminderId)")
+    expect(detailSource).toContain('`/reminders/detail?${params.toString()}`')
     expect(listSource).toContain('`/reminders/detail?id=${encodeURIComponent(id)}`')
     expect(detailSource).not.toContain('`/reminders/${encodeURIComponent(reminderId)}`')
     expect(listSource).not.toContain('`/reminders/${encodeURIComponent(')

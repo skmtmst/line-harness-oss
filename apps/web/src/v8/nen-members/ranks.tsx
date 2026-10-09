@@ -10,6 +10,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, GitCompareArrows, Plus, RefreshCw, TriangleAlert } from 'lucide-react'
+import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import { RowActions } from '@/components/shared/row-actions'
 import Dialog from '@/components/shared/dialog'
@@ -17,6 +18,8 @@ import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
+import { FieldError } from '@/components/shared/form-controls'
+import { useFieldValidation } from '@/lib/use-field-validation'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -75,6 +78,14 @@ export default function RankSettingsV8({
   const [removeTarget, setRemoveTarget] = useState<number | null>(null)
   const [replacement, setReplacement] = useState('')
 
+  const fields = useFieldValidation(drafts.flatMap((row, index) => [
+    ...(!row.name.trim() ? [{ id: `rank-name-${index}`, message: 'ランク名を入れるか、行を消してください。' }] : []),
+    ...(!Number.isFinite(parseYen(row.threshold)) || parseYen(row.threshold) < 0
+      ? [{ id: `rank-threshold-${index}`, message: 'しきい値は0以上の金額で入れてください。' }] : []),
+    ...(!Number.isFinite(parsePercent(row.rate)) || parsePercent(row.rate) < 0
+      ? [{ id: `rank-rate-${index}`, message: 'マイル還元は0以上の数（%）で入れてください。' }] : []),
+  ]))
+
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy })
 
   useEffect(() => {
@@ -97,6 +108,7 @@ export default function RankSettingsV8({
     setDirty(true)
   }
   const cancel = () => {
+    fields.reset()
     setDirty(false)
     setError('')
     setConflict(null)
@@ -129,9 +141,8 @@ export default function RankSettingsV8({
       annualThresholdYen: parseYen(row.threshold),
       mileRatePercent: parsePercent(row.rate),
     }))
-    if (rows.some((row) => !row.name)) { setError('ランク名が空の行があります。名前を入れるか、行を消してください。'); return }
-    if (rows.some((row) => !Number.isFinite(row.annualThresholdYen) || row.annualThresholdYen < 0)) { setError('通年のしきい値は 0 以上の金額で入れてください。'); return }
-    if (rows.some((row) => !Number.isFinite(row.mileRatePercent) || row.mileRatePercent < 0)) { setError('マイル還元は 0 以上の数（%）で入れてください。'); return }
+    setError('')
+    if (!fields.submit()) return
     setBusy(true)
     setError('')
     setNotice('')
@@ -144,7 +155,7 @@ export default function RankSettingsV8({
       setComparing(false)
       onSaved(accountId, res.data)
       setNotice(res.data.sync?.status === 'synced'
-        ? 'ランク設定を保存し、ECへ同期しました。友だち属性のタグも付け替えています。'
+        ? 'ランク設定を保存し、ECへ同期しました。タグも付け替えています。'
         : 'ランク設定を保存しました。ECへの同期は失敗したので、右の「もう一度同期」で送り直せます。')
     } catch (caught) {
       /* 保存の口が版の違いを 409 で返したときも、競合の帯へ（e5yBLx）。 */
@@ -278,7 +289,7 @@ export default function RankSettingsV8({
 
       <div className={styles.rankSplit}>
         <div className={styles.rankMain}>
-          <section className={styles.card} aria-labelledby="nen-rank-rules">
+          <Card layout="vertical" padding="spacious" surface="inset" spacing="normal" aria-labelledby="nen-rank-rules">
             <div className={styles.cardHead}>
               <h2 id="nen-rank-rules" className={styles.cardTitle}>ランクの決まり</h2>
               <p className={styles.cardDesc}>通年の購入額でランクが決まります</p>
@@ -291,9 +302,9 @@ export default function RankSettingsV8({
               <RuleBox label="上がったとき" value={RULE_LABELS.applyOnReach} />
               <RuleBox label="維持する期間" value={RULE_LABELS.keepUntil} />
             </div>
-          </section>
+          </Card>
 
-          <section className={styles.card} aria-labelledby="nen-rank-list">
+          <Card layout="vertical" padding="spacious" surface="inset" spacing="normal" aria-labelledby="nen-rank-list">
             <div className={styles.cardHead}>
               <h2 id="nen-rank-list" className={styles.cardTitle}>ランク</h2>
               <p className={styles.cardDesc}>上から高い順。行の「…」から消すと、そのランクの会員を移し先のランクへ反映します</p>
@@ -308,25 +319,28 @@ export default function RankSettingsV8({
               const isBase = index === drafts.length - 1 && parseYen(row.threshold) === 0
               const label = row.name.trim() || `ランク ${index + 1}`
               return (
-                <div key={row.id ?? `new-${index}`} className={styles.rankRow} title={row.tagName ? `友だち属性タグ：${row.tagName}・会員 ${formatNumber(row.memberCount)} 人` : undefined}>
+                <div key={row.id ?? `new-${index}`} className={styles.rankRow} title={row.tagName ? `タグ：${row.tagName}・会員 ${formatNumber(row.memberCount)} 人` : undefined}>
                   <div className={styles.rankColName}>
-                    <TextField aria-label={`ランク名 ${index + 1}`} value={row.name} maxLength={20} readOnly={readonly} onChange={(event) => update(index, { name: event.target.value })} />
+                    <TextField {...fields.bind(`rank-name-${index}`)} aria-label={`ランク名 ${index + 1}`} value={row.name} maxLength={20} readOnly={readonly} onChange={(event) => update(index, { name: event.target.value })} />
+                    <FieldError id={`rank-name-${index}-error`}>{fields.error(`rank-name-${index}`)}</FieldError>
                   </div>
                   <div className={styles.rankColThreshold}>
                     {isBase ? (
                       <span className={styles.fixedBox} title="いちばん下のランクは ¥0 から（変えられません）">¥0〜（固定）</span>
                     ) : (
-                      <TextField aria-label={`しきい値 ${index + 1}`} inputMode="numeric" placeholder="¥0〜" value={row.threshold} readOnly={readonly} onChange={(event) => update(index, { threshold: event.target.value })} />
+                      <TextField {...fields.bind(`rank-threshold-${index}`)} aria-label={`しきい値 ${index + 1}`} inputMode="numeric" placeholder="¥0〜" value={row.threshold} readOnly={readonly} onChange={(event) => update(index, { threshold: event.target.value })} />
                     )}
+                    <FieldError id={`rank-threshold-${index}-error`}>{fields.error(`rank-threshold-${index}`)}</FieldError>
                   </div>
                   <div className={styles.rankColRate}>
-                    <TextField aria-label={`マイル還元 ${index + 1}`} inputMode="decimal" placeholder="0%" value={row.rate} readOnly={readonly} onChange={(event) => update(index, { rate: event.target.value })} />
+                    <TextField {...fields.bind(`rank-rate-${index}`)} aria-label={`マイル還元 ${index + 1}`} inputMode="decimal" placeholder="0%" value={row.rate} readOnly={readonly} onChange={(event) => update(index, { rate: event.target.value })} />
+                    <FieldError id={`rank-rate-${index}-error`}>{fields.error(`rank-rate-${index}`)}</FieldError>
                   </div>
                   <div className={styles.rankColAction}>
                     {/* 行の右端は「…」（タグを開く・ランクを削除する）。1つの機能の印にしない。 */}
                     <RowActions
                       subjectName={`ランク「${label}」`}
-                      menuItems={row.tagId ? [{ id: 'tag', label: '友だち属性タグを開く', external: true, onSelect: () => router.push(`/tags/edit?id=${encodeURIComponent(row.tagId ?? '')}`) }] : []}
+                      menuItems={row.tagId ? [{ id: 'tag', label: 'タグを開く', external: true, onSelect: () => router.push(`/tags/edit?id=${encodeURIComponent(row.tagId ?? '')}`) }] : []}
                       destructiveItem={readonly ? undefined : {
                         id: 'delete',
                         label: 'ランクを削除する',
@@ -346,13 +360,13 @@ export default function RankSettingsV8({
                 </Button>
               </div>
             )}
-          </section>
+          </Card>
         </div>
 
-        <section className={`${styles.card} ${styles.sideCard}`} aria-labelledby="nen-rank-sync">
+        <Card layout="vertical" padding="spacious" surface="inset" spacing="normal" className={styles.sideCard} aria-labelledby="nen-rank-sync">
           <div className={styles.cardHead}>
             <h2 id="nen-rank-sync" className={styles.cardTitle}>ECとの同期</h2>
-            <p className={styles.cardDesc}>保存すると、ランクをネットショップへ送り、友だち属性のタグも付け替えます。送れなかったときは、理由がここに出ます</p>
+            <p className={styles.cardDesc}>保存すると、ランクをネットショップへ送り、タグも付け替えます。送れなかったときは、理由がここに出ます</p>
           </div>
           <div className={styles.syncRow}>
             {rules?.syncStatus === 'synced'
@@ -371,7 +385,7 @@ export default function RankSettingsV8({
               </Button>
             </div>
           )}
-        </section>
+        </Card>
       </div>
 
       {readonly ? null : (
@@ -423,7 +437,7 @@ export default function RankSettingsV8({
               />
             </div>
             <p className={styles.removeNote}>
-              移し先のランクは、各会員のいまの有効期限まで使います。期限のあとは通常のランク判定に戻ります。ECへ反映したあと、次の購入から還元率が変わります。友だち属性のタグも付け替えます。
+              移し先のランクは、各会員のいまの有効期限まで使います。期限のあとは通常のランク判定に戻ります。ECへ反映したあと、次の購入から還元率が変わります。タグも付け替えます。
             </p>
           </>) : null}
         </div>

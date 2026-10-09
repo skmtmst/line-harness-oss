@@ -40,7 +40,7 @@ export interface MultiSelectProps {
 }
 
 /**
- * 複数選択。Pencil ★V7 `WUVcz`「候補つき入力・複数選択」§2。
+ * 複数選択。Pencil ★V8（V8.pen）「複数選ぶ（札＋N）」。
  *
  * 欄・候補の見た目と動きは Combobox（§1）と同じ。
  *

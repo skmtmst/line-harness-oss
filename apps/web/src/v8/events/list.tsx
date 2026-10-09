@@ -22,6 +22,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
+import TagPill from '@/components/shared/tag-pill'
 import Select from '@/components/shared/select'
 import ListToolbar from '@/components/shared/list-toolbar'
 import FilterChip from '@/components/shared/filter-chip'
@@ -321,9 +322,9 @@ export default function EventsListV8() {
   ) : <span className={styles.createSpace} aria-hidden="true" />
 
   const folderRows: FolderPanelRow[] = [
-    { id: '', label: 'すべて', count: loadStatus === 'ready' && !folderFilter ? listTotal : null },
-    ...folders.map((folder, index) => ({ ...folderActions.rowActions(folder, index), id: folder.id, label: folder.name, count: folder.itemCount ?? null, color: folder.color })),
-    { id: UNFILED, label: '未分類', count: unfiledCount },
+    { kind: 'all' as const, id: '', label: 'すべて', count: loadStatus === 'ready' && !folderFilter ? listTotal : null },
+    ...folders.map((folder, index) => ({ kind: 'folder' as const, ...folderActions.rowActions(folder, index), id: folder.id, label: folder.name, count: folder.itemCount ?? null, color: folder.color })),
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
   ]
 
   const folderPanel = (
@@ -370,9 +371,10 @@ export default function EventsListV8() {
         trailing={(
           <>
             <div className={styles.savedBox}>
-              <Bookmark size={14} aria-hidden="true" className={styles.savedIcon} />
               <Select
                 aria-label="よく使う絞り込み"
+                icon={<Bookmark aria-hidden="true" />}
+                size="full"
                 value={savedValue}
                 options={SAVED_OPTIONS}
                 onChange={(value) => {
@@ -546,7 +548,7 @@ export default function EventsListV8() {
                               : state === 'paused' ? <span className={`${styles.pill} ${styles.pillWarn}`}>一時停止</span>
                                 : <span className={`${styles.pill} ${styles.pillOff}`}>{STATE_LABEL[state]}</span>}
                       {e.visible_tag_id ? (
-                        <span className={styles.audience} title={e.visible_tag_name ?? '消えたタグ'}>{e.visible_tag_name ?? '消えたタグ'}</span>
+                        <TagPill name={e.visible_tag_name ?? '消えたタグ'} size="sm" />
                       ) : null}
                     </span>
                   </Td>
@@ -571,7 +573,7 @@ export default function EventsListV8() {
 
   const pager = !dataReady || items.length === 0 ? null : (
     <div className={styles.pagerBlock}>
-      <p className={styles.footNote}>行の「…」から 中身を見る・申込者を見る・日時と定員を変える・プレビュー・削除。申込中・キャンセル待ちがいるイベントは削除できません。</p>
+
       {pageCount > 1 ? (
         <Pagination
           page={current}
@@ -652,6 +654,7 @@ export default function EventsListV8() {
 
   return (
     <ListPage
+      help="行の「…」から 中身を見る・申込者を見る・日時と定員を変える・プレビュー・削除。申込中・キャンセル待ちがいるイベントは削除できません。"
       boardId="e2ekFu"
       headingSize="regular"
       title="イベント予約"
@@ -663,7 +666,7 @@ export default function EventsListV8() {
         </div>
       ) : undefined}
       stats={(
-        <KpiBand data-design="KPIs" className={styles.kpiStrip}>
+        <KpiBand data-design="KPIs">
           {kpis.map((item) => (
             <KpiCard
               key={item.key}

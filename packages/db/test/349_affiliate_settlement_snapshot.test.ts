@@ -62,6 +62,25 @@ function confirmRate(key: string, expectedAmount = 1000) {
 }
 
 describe('migration 349 承認済み報酬の版固定', () => {
+  it('WEB208 報酬なしは有料案件でも0円、方式変更後も過去の承認額を保持する', async () => {
+    sqlite.exec("UPDATE affiliates SET reward_mode = 'none' WHERE id = 'affiliate-fixed'");
+    expect((await ensureConversionRewardSnapshot(db, 'conversion-fixed-1', '2026-08-11'))?.amountMinor).toBe(3000);
+    sqlite.exec(`INSERT INTO conversion_events(id,conversion_point_id,friend_id,affiliate_id,attributed_ref_code,approval_status,value_snapshot)
+      VALUES ('no-reward','point-1','friend-1','affiliate-fixed','ref-1','pending',10000)`);
+    await setConversionApproval(db, 'no-reward', 'approved', 'staff-1');
+    expect((await ensureConversionRewardSnapshot(db, 'no-reward', '2026-08-11'))?.amountMinor).toBe(0);
+    sqlite.exec("UPDATE affiliates SET reward_mode = 'fixed' WHERE id = 'affiliate-fixed'");
+    expect((await ensureConversionRewardSnapshot(db, 'no-reward', '2026-08-12'))?.amountMinor).toBe(0);
+  });
+
+  it('WEB208 明示した定額は正の率が残っていても案件額を使う', async () => {
+    sqlite.exec(`UPDATE affiliates SET reward_mode = 'fixed', commission_rate = 20 WHERE id = 'affiliate-fixed';
+      INSERT INTO conversion_events(id,conversion_point_id,friend_id,affiliate_id,attributed_ref_code,approval_status,value_snapshot)
+      VALUES ('explicit-fixed','point-1','friend-1','affiliate-fixed','ref-1','pending',10000)`);
+    await setConversionApproval(db, 'explicit-fixed', 'approved', 'staff-1');
+    expect((await ensureConversionRewardSnapshot(db, 'explicit-fixed', '2026-08-11'))?.amountMinor).toBe(3000);
+  });
+
   it('確定時に金額と計算根拠を保存し、entryへ紐付ける', async () => {
     const created = await confirmRate('settle-rate-1');
     expect(created).toMatchObject({ kind: 'created', amount: 1000, conversionCount: 1 });

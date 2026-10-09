@@ -190,7 +190,7 @@
     "shadow": 0
   },
   "components/shared/folder-add-dialog.tsx": {
-    "color": 8,
+    "color": 16,
     "radius": 0,
     "shadow": 0
   },
@@ -331,6 +331,21 @@
   },
   "lib/presentation.ts": {
     "color": 2,
+    "radius": 0,
+    "shadow": 0
+  },
+  "v8/tags/mark-basic-fields.tsx": {
+    "color": 6,
+    "radius": 0,
+    "shadow": 0
+  },
+  "v8/hq-templates/attributes.tsx": {
+    "color": 3,
+    "radius": 0,
+    "shadow": 0
+  },
+  "v8/hq-templates/attribute-model.ts": {
+    "color": 1,
     "radius": 0,
     "shadow": 0
   },

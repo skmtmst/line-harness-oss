@@ -34,9 +34,10 @@
 .headTitle {
   margin: 0;
   color: var(--color-ink);
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.4;
+  font-size: var(--tpl-title-size);
+  font-weight: var(--tpl-title-weight);
+  line-height: var(--tpl-title-lh);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 .headDescription {
@@ -106,9 +107,10 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0;
   overflow: hidden;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 
 .kpi {
@@ -242,9 +244,10 @@
   flex-direction: column;
   gap: 12px;
   padding: 16px 20px;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 
 .sectionTitle {
@@ -264,9 +267,10 @@
 /* 表。外側の丸い枠ごと。内側だけ横に動かす。 */
 .tableWrap {
   overflow-x: auto;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 
 .table {
@@ -418,10 +422,11 @@
   align-items: center;
   gap: 8px;
   padding: 48px 24px;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
   text-align: center;
+  box-shadow: var(--card-shadow);
 }
 
 .stateIcon {
@@ -460,9 +465,10 @@
   flex-direction: column;
   gap: 1px;
   overflow: hidden;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 
 .skeletonRow {
@@ -492,78 +498,6 @@
   background: var(--color-canvas-sunken);
 }
 
-/* ===== UID移行の手順の帯（板5：緑の✓ → 数字の丸 → 線） ===== */
-.stepper {
-  display: flex;
-  align-items: flex-start;
-  gap: 0;
-  padding: 16px 20px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card);
-  background: var(--color-canvas);
-  overflow-x: auto;
-}
-
-.step {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  flex-shrink: 0;
-}
-
-.stepDot {
-  display: inline-flex;
-  width: 28px;
-  height: 28px;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--color-hairline);
-  background: var(--color-canvas);
-  color: var(--color-ink-faint);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.stepDone .stepDot {
-  border-color: var(--color-success);
-  background: var(--color-success);
-  color: var(--color-canvas);
-}
-
-.stepCurrent .stepDot {
-  border-color: var(--color-ink);
-  background: var(--color-ink);
-  color: var(--color-canvas);
-}
-
-.stepLabel {
-  color: var(--color-ink-secondary);
-  font-size: 12px;
-  font-weight: 500;
-  text-align: center;
-  white-space: nowrap;
-}
-
-.stepCurrent .stepLabel {
-  color: var(--color-ink);
-  font-weight: 700;
-}
-
-.stepLine {
-  flex: 1;
-  min-width: 24px;
-  height: 1px;
-  margin-top: 14px;
-  background: var(--color-hairline);
-}
-
-.stepLineDone {
-  background: var(--color-success);
-}
-
 /* ===== 候補確認（板2：A/Bを同じ高さで並べる） ===== */
 .comparePair {
   display: grid;
@@ -577,9 +511,10 @@
   flex-direction: column;
   gap: 10px;
   padding: 16px;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 
 .subjectHead {
@@ -697,9 +632,10 @@
   flex-direction: column;
   gap: 12px;
   padding: 20px;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 
 .duoCardTitle {
@@ -1120,10 +1056,11 @@ legend.fieldLabel {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
   padding: 14px 16px;
   background: var(--color-canvas-sunken);
+  box-shadow: var(--card-shadow);
 }
 
 /* 見出し行：題・説明・右端の札（状態バッジ等）を横に並べる。 */

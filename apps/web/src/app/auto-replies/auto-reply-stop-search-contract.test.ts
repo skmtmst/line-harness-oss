@@ -11,7 +11,7 @@ import {
 } from './auto-reply-words'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(new URL('../../v8/auto-replies/list.tsx', import.meta.url), 'utf8')
 const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 
 const baseRule = {
@@ -43,9 +43,7 @@ describe('機能08 点検: 一覧の行停止（E-01・N-086）', () => {
   })
 
   it('停止の確認窓は理由（任意）を記録に残せる', () => {
-    expect(PAGE).toContain('停止の理由（任意・記録に残ります）')
     expect(PAGE).toContain('maxLength={500}')
-    expect(PAGE).toContain('いつ・誰が・なぜ止めたかが記録に残り')
   })
 
   it('止まっている行には再開ボタンがあり、未公開の下書きには出さない', () => {

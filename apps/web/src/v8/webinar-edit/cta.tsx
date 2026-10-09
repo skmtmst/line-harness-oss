@@ -237,6 +237,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
     <CreatePage
       boardId={conflict ? 'pvimJ' : 'Q0Jrk'}
       title={chrome.title}
+      actions={chrome.actions}
       identity={chrome.identity}
       steps={chrome.steps}
       description="動画の途中や終わりに出すカードと、申込に使う回答フォームを決めます。"

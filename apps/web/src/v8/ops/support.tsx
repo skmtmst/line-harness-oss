@@ -1,5 +1,6 @@
 'use client'
 
+import StatusPill from '@/components/shared/status-pill'
 import { Building2, Check, CircleDot, LogIn, Paperclip, Plus, RefreshCw, Send, Sparkles, Star } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -106,6 +107,7 @@ export default function OpsSupportV8() {
   const [form, setForm] = useState({ tenantId: '', subject: '', body: '', kind: 'usage', priority: 'medium' as OpsSupportPriority })
   const [busy, setBusy] = useState(false)
   const [reply, setReply] = useState('')
+  const [replyStage, setReplyStage] = useState<OpsSupportStage>('new')
   const [replyFromAi, setReplyFromAi] = useState<{ generatedAt: string | null } | null>(null)
   const [aiBusy, setAiBusy] = useState(false)
   const [draftSaving, setDraftSaving] = useState(false)
@@ -176,6 +178,7 @@ export default function OpsSupportV8() {
     if (!res.success) { setError(res.error || '内容を読み込めませんでした'); setDetailFailed(true); return }
     setDetail(res.data)
     if (options?.keepReply) return
+    setReplyStage(res.data.ticket.stage)
     setReply(res.data.draft?.body ?? '')
     setReplyFromAi(res.data.draft?.aiGenerated ? { generatedAt: res.data.draft.generatedAt } : null)
     setReferences(res.data.draft?.references ?? [])
@@ -307,8 +310,8 @@ export default function OpsSupportV8() {
     if (!detail || !reply.trim()) return
     setBusy(true)
     setError('')
-    // WEB217：確かめの窓は「送って解決にする」。送るときに解決へ進めることを口へ伝える（省くと「返事待ち」になる）。
-    const res = await opsCall(api.ops.support.reply(detail.ticket.id, { body: reply, nextStage: 'resolved', aiAssisted: replyFromAi !== null }))
+    // WEB217：送信時に選んだ状態へ進める。既定は開いたときの状態。
+    const res = await opsCall(api.ops.support.reply(detail.ticket.id, { body: reply, nextStage: replyStage, aiAssisted: replyFromAi !== null }))
     setBusy(false)
     if (!res.success) { setError(res.error || '返信できませんでした'); return }
     setReply('')
@@ -392,7 +395,7 @@ export default function OpsSupportV8() {
                   <button type="button" aria-current={t.id === selectedId ? 'true' : undefined} onClick={() => pick(t.id)} className={`${styles.ticket} ${t.id === selectedId ? styles.ticketSelected : ''}`}>
                     <span className={styles.ticketTop}>
                       <span className={styles.ticketNo}>{t.ticketLabel}</span>
-                      <StatusBadge tone={STAGE_TONE[t.stage]}>{stageLabel(t.stage, t.stageLabel)}</StatusBadge>
+                      <StatusPill tone={STAGE_TONE[t.stage]}>{stageLabel(t.stage, t.stageLabel)}</StatusPill>
                     </span>
                     <span className={styles.ticketSubject}>{t.subject}</span>
                     <span className={styles.ticketMeta}>{`${t.tenantName}・優先度 ${t.priorityLabel}`}</span>
@@ -424,7 +427,7 @@ export default function OpsSupportV8() {
                 {readOnly ? null : <Button disabled={busy} onClick={() => void impersonate(ticket.tenantId, setBusy, setError)}><LogIn aria-hidden="true" />代理ログイン</Button>}
               </div>
               <div className={styles.detailMeta}>
-                <StatusBadge tone={STAGE_TONE[ticket.stage]}>{stageLabel(ticket.stage, ticket.stageLabel)}</StatusBadge>
+                <StatusPill tone={STAGE_TONE[ticket.stage]}>{stageLabel(ticket.stage, ticket.stageLabel)}</StatusPill>
                 <span>{`${ticket.tenantName}・${planLabel(ticket.tenantPlanKey)}・LINE登録${detail && detail.tenant.staffWithLine > 0 ? 'あり' : 'なし'}・${ticket.kindLabel}・優先度 ${ticket.priorityLabel}`}</span>
                 {ticket.subjectAuto ? <StatusBadge tone="neutral">自動で付けた件名</StatusBadge> : null}
               </div>
@@ -494,6 +497,7 @@ export default function OpsSupportV8() {
                     {closed ? null : <Button disabled={busy} onClick={() => void changeStage('closed')}>クローズする</Button>}
                     <span className={styles.spacer} />
                     <Button onClick={() => void saveDraft()} disabled={busy || draftSaving || closed || aiBusy} busy={draftSaving}>下書きを保存する</Button>
+                    <Select aria-label="送信後の状態" value={replyStage} onChange={value => setReplyStage(value as OpsSupportStage)} disabled={busy || closed || aiBusy} options={STAGE_CHIPS.filter(item => item.key !== 'all').map(item => ({ value: item.key, label: item.key === 'new' ? '未対応' : item.label }))} />
                     <Button variant="primary" onClick={() => { setError(''); setConfirmReply(true) }} disabled={busy || closed || aiBusy || !reply.trim()}><Send aria-hidden="true" />返信する</Button>
                   </div>
                 </>
@@ -566,14 +570,14 @@ export default function OpsSupportV8() {
               <Button variant="danger" onClick={() => void clearDraftFromConfirm()} disabled={busy}>下書きを削除</Button>
               <span className={styles.spacer} />
               <Button onClick={() => { if (!busy) setConfirmReply(false) }} disabled={busy}>戻って直す</Button>
-              <Button variant="primary" onClick={() => void send()} disabled={busy} busy={busy} busyLabel="送信中…">送って解決にする</Button>
+              <Button variant="primary" onClick={() => void send()} disabled={busy} busy={busy} busyLabel="送信中…">送信する</Button>
             </div>
           )}
         >
           <div className={parts.dialogBody}>
             <dl className={styles.facts}>
               <div className={styles.fact}><dt>宛先</dt><dd>{`${ticket.tenantName}（担当：${ticket.staffName || '—'}）・${ticket.channelLabel}`}</dd></div>
-              <div className={styles.fact}><dt>状態</dt><dd>{`${ticket.stageLabel} → 解決（送ったあと）`}</dd></div>
+              <div className={styles.fact}><dt>状態</dt><dd>{`${ticket.stageLabel} → ${STAGE_CHIPS.find(item => item.key === replyStage)?.label ?? replyStage}（送ったあと）`}</dd></div>
               <div className={styles.fact}><dt>優先度</dt><dd>{ticket.priorityLabel}</dd></div>
             </dl>
             {replyFromAi && references.length > 0 ? (

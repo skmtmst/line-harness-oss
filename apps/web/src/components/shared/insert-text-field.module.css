@@ -14,7 +14,39 @@
   cursor: text;
   text-align: left;
 }
+.editor[aria-invalid='true'] { outline: 1px solid var(--color-danger); outline-offset: -1px; }
+.editor[aria-invalid='true']:focus-visible { outline: 2px solid var(--color-danger); }
+
 .editor[aria-disabled='true'] { cursor: not-allowed; opacity: 0.6; }
+
+/* 短い本文欄の任意の口。既定の欄と差し込み札の見た目は変えない。 */
+.editorCompact {
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--tpl-nc-body-h);
+  min-height: var(--tpl-nc-body-h);
+  padding: var(--tpl-nc-body-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -0.5px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-caption);
+  line-height: var(--tpl-nc-body-lh);
+  resize: vertical;
+}
+.editorCompact:focus-visible {
+  outline: var(--tpl-nc-focus-ring) solid var(--color-action);
+}
+
+/* 本文の検証も TextField と同じく、入力中のフォーカスで赤い枠を消さない。 */
+.editor[aria-invalid='true'],
+.editor[aria-invalid='true']:focus-visible {
+  outline: 1px solid var(--color-danger);
+  outline-offset: -0.5px;
+}
 
 /* 空のときの例文（textarea の placeholder と同じ色）。高さ0の段で、カーソルは行の頭に残す。 */
 .editor[data-empty]::before {
@@ -78,3 +110,5 @@
 .insertButton:focus-visible { outline: 2px solid var(--color-action); outline-offset: 1px; }
 .insertButton[aria-expanded='true'] { outline-color: var(--color-accent); background: var(--color-accent-soft); }
 }
+
+.insertButton[data-size='compact'] { min-height: var(--tpl-msg-composer-insert-h); height: var(--tpl-msg-composer-insert-h); padding: var(--tpl-msg-composer-insert-pad); }

@@ -9,6 +9,8 @@ import { useCallback, useEffect, useId, useState } from 'react'
 import { api, type AffiliateOffer, type OfferCapStatus, type OfferVersion } from '@/lib/api'
 import Dialog from '@/components/shared/dialog'
 import HelpTip from '@/components/shared/help-tip'
+import { Field } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Progress from '@/components/shared/progress'
@@ -82,12 +84,13 @@ export interface ParsedOfferTerms {
 export function parseOfferTermsInput(values: OfferTermsFieldValues): {
   terms: ParsedOfferTerms
   error: string | null
+  field?: keyof OfferTermsFieldValues
 } {
   const terms: ParsedOfferTerms = {}
   if (values.windowDays.trim() !== '') {
     const windowDays = Number(values.windowDays)
     if (!Number.isInteger(windowDays) || windowDays < 1 || windowDays > 365) {
-      return { terms, error: '数える期間は1〜365日で入力してください' }
+      return { terms, error: '数える期間は1〜365日で入力してください', field: 'windowDays' }
     }
     terms.windowDays = windowDays
   }
@@ -101,7 +104,7 @@ export function parseOfferTermsInput(values: OfferTermsFieldValues): {
     } else {
       const cap = Number(raw)
       if (!Number.isInteger(cap) || cap <= 0) {
-        return { terms, error: `${label}は1以上の整数で入力してください。空にすると上限なしです` }
+        return { terms, error: `${label}は1以上の整数で入力してください。空にすると上限なしです`, field: key }
       }
       terms[key === 'capTotal' ? 'capTotal' : 'capMonthlyPerAffiliate'] = cap
     }
@@ -109,13 +112,13 @@ export function parseOfferTermsInput(values: OfferTermsFieldValues): {
   const from = values.receptionFrom ? fromDateInput(values.receptionFrom, false) : null
   const to = values.receptionTo ? fromDateInput(values.receptionTo, true) : null
   if (values.receptionFrom && !from) {
-    return { terms, error: '受付の始めの日付が正しくありません' }
+    return { terms, error: '受付の始めの日付が正しくありません', field: 'receptionFrom' }
   }
   if (values.receptionTo && !to) {
-    return { terms, error: '受付の終わりの日付が正しくありません' }
+    return { terms, error: '受付の終わりの日付が正しくありません', field: 'receptionTo' }
   }
   if (from && to && from > to) {
-    return { terms, error: '受付の終わりは始めより後にしてください' }
+    return { terms, error: '受付の終わりは始めより後にしてください', field: 'receptionTo' }
   }
   terms.receptionFrom = from
   terms.receptionTo = to
@@ -123,112 +126,26 @@ export function parseOfferTermsInput(values: OfferTermsFieldValues): {
 }
 
 /** 案件の作成・編集に入れる決まりの欄。補足は「？」に入れ、箱を高くしない。 */
-export function OfferTermsFields({
-  values,
-  onChange,
-  disabled = false,
-}: {
+export function OfferTermsFields({ values, onChange, disabled = false, errors = {} }: {
   values: OfferTermsFieldValues
   onChange: (next: OfferTermsFieldValues) => void
-  /** WEB207：今の決まりを読み込めるまでは触らせない（読めないまま直した値は送られない）。 */
   disabled?: boolean
+  errors?: Partial<Record<keyof OfferTermsFieldValues, string>>
 }) {
-  // R286: 読み上げの項目名。「？」は項目名の外に置き、名前を短く保つ。
   const fieldId = useId()
-  const windowDaysId = `${fieldId}-window-days`
-  const capTotalId = `${fieldId}-cap-total`
-  const capMonthlyId = `${fieldId}-cap-monthly`
-  const receptionFromId = `${fieldId}-reception-from`
-  const receptionToId = `${fieldId}-reception-to`
-  return (
-    <>
-      <div>
-        <span className="text-ink-secondary mb-1 flex items-center gap-1 text-xs font-medium">
-          <label htmlFor={windowDaysId}>数える期間（日）</label>
-          <HelpTip label="数える期間の説明">
-            リンクを開いてから数える期間です。既定は30日です。
-          </HelpTip>
-        </span>
-        <input
-          id={windowDaysId}
-          type="number"
-          min="1"
-          max="365"
-          step="1"
-          value={values.windowDays}
-          onChange={(e) => onChange({ ...values, windowDays: e.target.value })}
-          disabled={disabled}
-          placeholder="例: 30（空は今のまま）"
-          className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
-        />
-      </div>
-
-      <div>
-        <span className="text-ink-secondary mb-1 flex items-center gap-1 text-xs font-medium">
-          <label htmlFor={capTotalId}>全体の上限（件）</label>
-          <HelpTip label="全体の上限の説明">
-            この案件で付ける成果の数の上限です。上限に達したら受付を自動で止めます。
-          </HelpTip>
-        </span>
-        <input
-          id={capTotalId}
-          type="number"
-          min="1"
-          step="1"
-          value={values.capTotal}
-          onChange={(e) => onChange({ ...values, capTotal: e.target.value })}
-          disabled={disabled}
-          placeholder="例: 200（空は上限なし）"
-          className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
-        />
-      </div>
-
-      <div>
-        <span className="text-ink-secondary mb-1 flex items-center gap-1 text-xs font-medium">
-          <label htmlFor={capMonthlyId}>1人あたり月の上限（件）</label>
-          <HelpTip label="1人あたり月の上限の説明">
-            1人の紹介者に1か月で付ける数の上限です。上限に達したらその人の受付を止めます。
-          </HelpTip>
-        </span>
-        <input
-          id={capMonthlyId}
-          type="number"
-          min="1"
-          step="1"
-          value={values.capMonthly}
-          onChange={(e) => onChange({ ...values, capMonthly: e.target.value })}
-          disabled={disabled}
-          placeholder="例: 10（空は上限なし）"
-          className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label htmlFor={receptionFromId} className="text-ink-secondary mb-1 block text-xs font-medium">受付の始め</label>
-          <input
-            id={receptionFromId}
-            type="date"
-            value={values.receptionFrom}
-            onChange={(e) => onChange({ ...values, receptionFrom: e.target.value })}
-          disabled={disabled}
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
-          />
-        </div>
-        <div>
-          <label htmlFor={receptionToId} className="text-ink-secondary mb-1 block text-xs font-medium">受付の終わり</label>
-          <input
-            id={receptionToId}
-            type="date"
-            value={values.receptionTo}
-            onChange={(e) => onChange({ ...values, receptionTo: e.target.value })}
-          disabled={disabled}
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
-          />
-        </div>
-      </div>
-    </>
-  )
+  const fields = [
+    { key: 'windowDays', label: '数える期間（日）', type: 'number', min: 1, max: 365, placeholder: '例: 30（空は今のまま）', help: 'リンクを開いてから数える期間です。既定は30日です。' },
+    { key: 'capTotal', label: '全体の上限（件）', type: 'number', min: 1, placeholder: '例: 200（空は上限なし）', help: 'この案件で付ける成果の数の上限です。上限に達したら受付を自動で止めます。' },
+    { key: 'capMonthly', label: '1人あたり月の上限（件）', type: 'number', min: 1, placeholder: '例: 10（空は上限なし）', help: '1人の紹介者に1か月で付ける数の上限です。上限に達したらその人の受付を止めます。' },
+    { key: 'receptionFrom', label: '受付の始め', type: 'date' },
+    { key: 'receptionTo', label: '受付の終わり', type: 'date' },
+  ] as const
+  return <>{fields.map((field) => <Field key={field.key} label={field.label} htmlFor={`${fieldId}-${field.key}`} error={errors[field.key]} help={'help' in field ? field.help : undefined}>
+    <TextField id={`${fieldId}-${field.key}`} type={field.type} value={values[field.key]} disabled={disabled}
+      min={'min' in field ? field.min : undefined} max={'max' in field ? field.max : undefined} step={field.type === 'number' ? 1 : undefined}
+      placeholder={'placeholder' in field ? field.placeholder : undefined}
+      onChange={(event) => onChange({ ...values, [field.key]: event.target.value })} />
+  </Field>)}</>
 }
 
 export default function OfferTermsDialog({

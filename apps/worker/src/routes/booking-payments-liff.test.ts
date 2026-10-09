@@ -81,6 +81,14 @@ describe('LIFFの支払いの口', () => {
     expect(startedJson.payment.status).toBe('pending');
     expect(startedJson.checkoutUrl).toContain('checkout.stripe.com/test');
 
+    const retry = await instance.request(
+      '/api/liff/booking/payments/start?liffId=liff-1',
+      { method: 'POST', headers, body: JSON.stringify({ bookingId: 'booking-a' }) },
+      { DB: db, STRIPE_TEST_WEBHOOK_SECRET: 'whsec_test' },
+    );
+    expect(retry.status).toBe(200);
+    await expect(retry.json()).resolves.toMatchObject({ checkoutUrl: startedJson.checkoutUrl });
+
     const status = await instance.request(
       '/api/liff/booking/payments/by-booking?liffId=liff-1&bookingId=booking-a',
       { headers },

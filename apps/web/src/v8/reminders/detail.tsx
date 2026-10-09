@@ -6,6 +6,7 @@
  * 枠は型（PageFrame）。頭の中にタブを持つ形（絵の「板の頭」）は型の頭に無いので、ここで組む。
  * 読む口・操作は今の画面（app/reminders/detail/detail-v8.tsx）と同じ。BEHAVIOR.md に一覧がある。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -42,6 +43,7 @@ import { PageFrame } from '@/components/templates/page-frame'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
+import { TableHeadRow } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateTimeField from '@/components/shared/date-time-field'
@@ -54,7 +56,7 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import { Tabs } from '@/components/shared/tabs'
 import PageSizeSelect from '@/components/ui/page-size-select'
-import { reminderTriggerLabel, renderReminderBodySample } from '@/components/reminders/reminder-labels'
+import { reminderTriggerLabel, reminderStopSummary, renderReminderBodySample } from '@/components/reminders/reminder-labels'
 import SheetDialog from './sheet-dialog'
 import styles from './detail.module.css'
 
@@ -204,6 +206,7 @@ export default function ReminderDetailV8Page() {
 
 function ReminderDetailV8() {
   const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const searchParams = useSearchParams()
   const reminderId = searchParams.get('id') ?? ''
   const tab = tabFromParam(searchParams.get('tab'))
@@ -288,7 +291,7 @@ function ReminderDetailV8() {
     params.set('id', reminderId)
     params.set('tab', next)
     if (next !== 'runs') params.delete('runStatus')
-    router.replace(`/reminders/detail?${params.toString()}`, { scroll: false })
+    samePageUrl.replace(`/reminders/detail?${params.toString()}`)
   }
 
   /* ===== 状態を変える操作 ===== */
@@ -509,7 +512,7 @@ function ReminderDetailV8() {
                 params.set('id', reminderId)
                 params.set('tab', 'runs')
                 params.set('runStatus', 'permanent_failed')
-                router.replace(`/reminders/detail?${params.toString()}`, { scroll: false })
+                samePageUrl.replace(`/reminders/detail?${params.toString()}`)
               }}
               onShowAllRuns={() => selectTab('runs')}
             />
@@ -560,7 +563,7 @@ function ReminderDetailV8() {
           <CreateSummaryCard
             title="いまの状態"
             rows={[
-              { key: 'state', label: '状態', value: <span className={styles.valueState} data-tone={statusLabel === '稼働中' ? 'ok' : undefined}>{statusLabel}</span> },
+              { key: 'state', label: '状態', value: <span className={styles.valueState} title={reminderStopSummary(data.reminder.stopConditions)} data-tone={statusLabel === '稼働中' ? 'ok' : undefined}>{statusLabel}</span> },
               { key: 'registrants', label: '登録者', value: `${formatNumber(data.summary.targetCount)}人` },
               { key: 'next7', label: 'これから送る（今後7日）', value: `${formatNumber(data.summary.scheduledNext7Days ?? 0)}通` },
               { key: 'month', label: '今月送った', value: `${formatNumber(data.summary.sentThisMonth ?? 0)}通` },
@@ -591,7 +594,7 @@ function ReminderDetailV8() {
         open={confirmPause}
         designNode="RwVo5"
         title={`「${data.reminder.name}」を一時停止する`}
-        description="止めているあいだ、通知は送りません。止めているあいだに送る予定だった通知は、再開しても送りません（過去の日時になるため）"
+        description="止めているあいだ、通知は送りません。止めているあいだに送る予定だった通知は、再開しても送りません（過去の日時になるため）。登録者と送った履歴は残ります。"
         band={pauseImpact.truncated
           ? `送る予定の ${formatNumber(plannedTotal)}通が送られなくなります（今後24時間の分は数え切れませんでした）。`
           : `今後24時間で送る予定の ${formatNumber(pauseImpact.count)}通 が送られなくなります。`}
@@ -664,13 +667,13 @@ function OverviewTab({
           <p className={styles.cardNote}>LINEでは、友だち単位の既読は分かりません</p>
         </div>
         <div className={styles.table} role="table" aria-label="通知ごとの送信状況">
-          <div className={styles.headRow} role="row">
+          <TableHeadRow as="div" presentation="embedded" className={styles.headRow}>
             <span role="columnheader" className={styles.colNum}>通知</span>
             <span role="columnheader" className={styles.colFlex}>タイミング</span>
             <span role="columnheader" className={styles.colSent}>送った</span>
             <span role="columnheader" className={styles.colFail}>失敗</span>
             <span role="columnheader" className={styles.colNext}>次に送る</span>
-          </div>
+          </TableHeadRow>
           {data.steps.map((step, index) => (
             <div key={step.id} role="row" className={styles.row}>
               <span role="cell" className={styles.colNum}>{step.stepNumber}</span>
@@ -698,12 +701,12 @@ function OverviewTab({
         ) : (
           <>
             <div className={styles.table} role="table" aria-label="最近の実行">
-              <div className={styles.headRow} role="row">
+              <TableHeadRow as="div" presentation="embedded" className={styles.headRow}>
                 <span role="columnheader" className={styles.colWhen}>時刻</span>
                 <span role="columnheader" className={styles.colFlex}>友だち</span>
                 <span role="columnheader" className={styles.colStep}>通知</span>
                 <span role="columnheader" className={styles.colResult}>結果</span>
-              </div>
+              </TableHeadRow>
               {recent.map((item) => (
                 <div key={item.id} role="row" className={styles.row}>
                   <span role="cell" className={styles.colWhen}>{formatShort(item.completedAt ?? item.startedAt ?? item.scheduledAt)}</span>
@@ -774,12 +777,12 @@ function ScheduleTab({ reminderId, steps }: { reminderId: string; steps: Reminde
       ) : (
         <>
           <div className={styles.table} role="table" aria-label="配信予定">
-            <div className={styles.headRow} role="row">
+            <TableHeadRow as="div" presentation="embedded" className={styles.headRow}>
               <span role="columnheader" className={styles.colNext}>送る日時</span>
               <span role="columnheader" className={styles.colFlex}>友だち</span>
               <span role="columnheader" className={styles.colWide}>通知</span>
               <span role="columnheader" className={styles.colResult}>状態</span>
-            </div>
+            </TableHeadRow>
             {items.map((item) => (
               <div key={item.id} role="row" className={styles.row} data-warn={item.domainStatus === 'retry_wait' || undefined}>
                 <span role="cell" className={styles.colNext}>
@@ -907,14 +910,14 @@ function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string;
       ) : (
         <>
           <div className={styles.table} role="table" aria-label="実行結果">
-            <div className={styles.headRow} role="row">
+            <TableHeadRow as="div" presentation="embedded" className={styles.headRow}>
               <span role="columnheader" className={styles.colWhen}>時刻</span>
               <span role="columnheader" className={styles.colFlex}>友だち</span>
               <span role="columnheader" className={styles.colStep}>通知</span>
               <span role="columnheader" className={styles.colResult}>結果</span>
               <span role="columnheader" className={styles.colReason}>詳細</span>
               <span role="columnheader" className={styles.colOps}><span className="sr-only">操作</span></span>
-            </div>
+            </TableHeadRow>
             {items.map((item) => (
               <div key={item.id} role="row" className={styles.row}>
                 <span role="cell" className={styles.colWhen}>
@@ -1092,12 +1095,12 @@ function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canMana
         ) : (
           <>
             <div className={styles.table} role="table" aria-label="登録者">
-              <div className={styles.headRow} role="row">
+              <TableHeadRow as="div" presentation="embedded" className={styles.headRow}>
                 <span role="columnheader" className={styles.colFlex}>友だち</span>
                 <span role="columnheader" className={styles.colDate}>基準日（予約日時）</span>
                 <span role="columnheader" className={styles.colState}>状態</span>
                 <span role="columnheader" className={styles.colOps}><span className="sr-only">操作</span></span>
-              </div>
+              </TableHeadRow>
               {pageItems.map((item) => {
                 const dirty = (draftDates[item.id] ?? '') !== dateTimeLocalJst(item.targetDate)
                 const busy = actioningId === item.id

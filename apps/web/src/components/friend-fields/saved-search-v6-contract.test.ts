@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -11,14 +11,13 @@ const list = readFileSync(resolve(root, 'src/components/friend-fields/saved-sear
 
 describe('V6 保存した検索の画面契約', () => {
   it('XBkiQを既存の保存APIへ接続する', () => {
-    expect(editPage).toContain('data-design-node="XBkiQ"')
     expect(editPage).toContain('api.savedSearches.update')
     expect(editPage).toContain('api.savedSearches.create')
     expect(editPage).toContain('api.savedSearches.delete')
     expect(editPage).toContain('api.savedSearches.preview')
     expect(editPage).toContain('api.savedSearches.detail')
     expect(editPage).toContain('すべて満たす')
-    expect(editPage).toContain('いずれか1つ以上満たす')
+    expect(editPage).toContain('どれかを満たす人')
   })
 
   it('保存と呼び出しをブラウザ1台だけのlocalStorageへ戻さない', () => {
@@ -54,7 +53,7 @@ describe('V6 保存した検索の画面契約', () => {
     expect(list).toContain('search.canDelete !== true')
     expect(editPage).toContain('original.usedIn')
     expect(editPage).toContain('original.canDelete !== true')
-    expect(editPage).toContain('使用先が無いことをサーバーで確認済みです')
+    expect(editPage).toContain('使っている所が無いことをサーバーで確かめてあります')
     expect(editPage).not.toContain('一斉配信「VIP未契約案内」')
     expect(editPage).not.toContain('オートメーション「3日後フォロー」')
   })

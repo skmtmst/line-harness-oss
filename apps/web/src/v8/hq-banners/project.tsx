@@ -12,20 +12,25 @@
  * 色2つ・参照画像1枚」の古い形で、2026-10-06 のオーナーの決定（切り替えと切り抜きを置かない・出力サイズの小箱・
  * 色4つ・参照画像3枚・強調）と食い違うため、決定どおりの今のパネルを残した。参照画像を選ぶ窓（承認済み ★BG-C）も同じ。
  */
-import { Archive, ArchiveRestore, Copy, Hourglass, LoaderCircle, Pencil, Sparkles, Star, Upload } from 'lucide-react'
+import ExportSizeChip from '@/components/hq/banners/export-size-chip'
+import { Archive, ArchiveRestore, Copy, Hourglass, LoaderCircle, Pencil, Send, Sparkles, Star, Upload, X } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ListPage } from '@/components/templates'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
+import { RowMenu } from '@/components/shared/row-actions'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
 import TargetMissing from '@/components/shared/target-missing'
-import ExportSizeChip from '@/components/hq/banners/export-size-chip'
+import Checkbox from '@/components/shared/checkbox'
+import SavedDistributionDialog from '../hq-templates/saved-distribution-dialog'
+import { useDistributionFolders } from '../hq-templates/distribution-accounts'
 import GenerationPanel from '@/components/hq/banners/generation-panel'
 import ReferencePickerDialog from '@/components/hq/banners/reference-picker-dialog'
+import ReferenceFrame from './reference-frame'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import type { AccountWithStats } from '@/contexts/account-context'
 import { api, ApiError } from '@/lib/api'
@@ -39,7 +44,6 @@ import {
   packedTextLines,
   readFileAsBase64,
   usageRefusal,
-  usageStatusText,
   validateGenerationInput,
   type BannerCropPosition,
   type BannerGeneration,
@@ -84,9 +88,21 @@ function ProjectInner() {
   const [maxCount, setMaxCount] = useState(4)
   const [usage, setUsage] = useState<BannerUsage | null>(null)
   const [engineReady, setEngineReady] = useState(true)
+  const [accountsFailed, setAccountsFailed] = useState(false)
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [input, setInput] = useState<BannerGenerationInput>(EMPTY_GENERATION_INPUT)
   const [filter, setFilter] = useState<Filter>('all')
+  const [selectedImages, setSelectedImages] = useState<string[]>([])
+  const [distributionOpen, setDistributionOpen] = useState(false)
+  const [distributionAccounts, setDistributionAccounts] = useState<string[]>([])
+  const [distributionFilter, setDistributionFilter] = useState('all')
+  const [distributionSearch, setDistributionSearch] = useState('')
+  const [distributionBusy, setDistributionBusy] = useState(false)
+  const [distributionError, setDistributionError] = useState('')
+  const [distributionProgress, setDistributionProgress] = useState('')
+  const distributionLock = useRef(false)
+  const distributionFolders = useDistributionFolders(distributionOpen)
+  const distributionTargets = useMemo(() => accounts.filter((account) => !account.archivedAt).map((account) => ({ id: account.id, name: account.displayName ?? account.name })), [accounts])
   const [actionError, setActionError] = useState('')
   const [generationError, setGenerationError] = useState('')
   // 用途寸法へ整形できなかった生成があった（binding の無い環境）。R120。
@@ -134,6 +150,7 @@ function ProjectInner() {
       if (!detailRes.success) throw new Error(detailRes.error)
       setProject(detailRes.data.project)
       setImages(detailRes.data.images)
+      setSelectedImages([])
       setGenerations(detailRes.data.generations)
       if (presetRes.success) {
         setPresets(presetRes.data.presets)
@@ -154,9 +171,11 @@ function ProjectInner() {
 
   useEffect(() => {
     void api.lineAccounts.list().then((res) => {
-      if (res.success) setAccounts(res.data as AccountWithStats[])
+      if (!res.success) throw new Error(res.error)
+      setAccounts(res.data as AccountWithStats[])
     }).catch(() => {
-      // アカウントが取れなくても生成はできる。渡す先の一覧だけ空になる。
+      // 生成は使えるが、配布先の取得失敗は空の一覧と区別する。
+      setAccountsFailed(true)
     })
   }, [])
 
@@ -171,10 +190,10 @@ function ProjectInner() {
   }, [fromImageId, status])
 
   /**
-   * 1枚ずつ run を繰り返す（1回の呼び出しで1枚）。失敗したらそこで止め、理由を出す。成功分はサーバーに残る。
-   * 切り抜き位置は保存していないので、作り始めたときの値をそのまま使う（戻った続きは中央。R120）。
+   * サーバーの生成状態を読み直す。画面を閉じても、保存済みの条件で定期処理が続きを作る。
+   * 切り抜き位置は最初の生成条件と一緒に保存し、サーバーで続きを作る。
    */
-  const runLoop = useCallback(async (generation: BannerGeneration, crop: BannerCropPosition = 'center') => {
+  const runLoop = useCallback(async (generation: BannerGeneration) => {
     if (loopRef.current === generation.id) return
     loopRef.current = generation.id
     cancelRef.current = false
@@ -184,23 +203,21 @@ function ProjectInner() {
     try {
       let current = generation
       while (!cancelRef.current) {
-        const res = await api.hqBanners.generations.run(current.id, { gravity: crop })
+        const res = await api.hqBanners.generations.get(current.id)
         if (!res.success) throw new Error(res.error)
-        current = res.data.generation
+        current = res.data
         setRunning(current)
-        if (res.data.resized === false) setSizeNotice(true)
-        if (res.data.image) {
-          const image = res.data.image
-          setImages((prev) => (prev.some((i) => i.id === image.id) ? prev : [image, ...prev]))
-        }
-        if (res.data.finished) break
+        const detail = await api.hqBanners.projects.get(generation.projectId)
+        if (detail.success) setImages(detail.data.images)
+        if (!['queued', 'running'].includes(current.status)) break
+        await new Promise((resolve) => setTimeout(resolve, 1500))
       }
       void loadUsage()
     } catch (caught) {
       setGenerationError(caught instanceof Error && caught.message ? caught.message : '画像を作れませんでした。もう一度お試しください。')
       void loadUsage()
     } finally {
-      // 先に最新の状態を読み直してから止める（順を逆にすると、古い「生成中」を見た再開がもう一度 run を呼ぶ）。
+      // 先に最新の状態を読み直してから止める（順を逆にすると、古い「生成中」を見た再開がもう一度状態確認を始める）。
       const res = await api.hqBanners.projects.get(generation.projectId).catch(() => null)
       if (res?.success) {
         setProject(res.data.project)
@@ -212,7 +229,7 @@ function ProjectInner() {
     }
   }, [loadUsage])
 
-  // 画面を離れて戻ってきたとき、途中の生成があれば続きから動かす。
+  // 画面を離れて戻ってきたとき、途中の生成があれば状態確認を再開する。
   useEffect(() => {
     if (status !== 'ready' || running) return
     const pending = activeGeneration(generations)
@@ -249,7 +266,7 @@ function ProjectInner() {
       })
       if (!res.success) throw new Error(res.error)
       setGenerations((prev) => [res.data, ...prev])
-      void runLoop(res.data, input.cropPosition)
+      void runLoop(res.data)
     } catch (caught) {
       setGenerationError(caught instanceof Error && caught.message ? caught.message : '生成を始められませんでした。')
       void loadUsage()
@@ -327,11 +344,51 @@ function ProjectInner() {
       replaceImage(res.data.image)
       return true
     } catch (caught) {
-      setModalError(bannerFailureMessage(caught, 'アカウントへの受け渡し'))
+      setModalError(bannerFailureMessage(caught, 'アカウントへの配布'))
       return false
     } finally {
       setModalBusy(false)
     }
+  }
+
+  // 成功した画像は選択から外し、失敗した画像だけを同じ配り先へ送り直せる。
+  const distributeSelected = async () => {
+    if (distributionLock.current || !canManage || selectedImages.length === 0 || distributionAccounts.length === 0) return
+    const batch = images.filter((image) => selectedImages.includes(image.id))
+    const ids = [...distributionAccounts]
+    distributionLock.current = true
+    setDistributionBusy(true)
+    setDistributionError('')
+    const succeeded: string[] = []
+    const failures: string[] = []
+    try {
+      for (const [index, image] of batch.entries()) {
+        setDistributionProgress(`${batch.length}枚中 ${index + 1}枚目を配っています（${ids.length}アカウント）`)
+        try {
+          const response = await api.hqBanners.images.deliver(image.id, ids)
+          if (!response.success) throw new Error(response.error)
+          replaceImage(response.data.image)
+          succeeded.push(image.id)
+        } catch (caught) {
+          failures.push(`選んだ画像 ${index + 1}：${bannerFailureMessage(caught, 'アカウントへの配布')}`)
+        }
+      }
+      setSelectedImages((current) => current.filter((id) => !succeeded.includes(id)))
+      setDistributionProgress(`${batch.length}枚中 ${succeeded.length}枚を${ids.length}アカウントへ配りました。${failures.length > 0 ? `失敗 ${failures.length}枚。失敗した画像を選んだままにしています。` : ''}`)
+      if (failures.length > 0) setDistributionError(failures.join(' ／ '))
+    } finally {
+      distributionLock.current = false
+      setDistributionBusy(false)
+    }
+  }
+
+  const openDistribution = () => {
+    setDistributionAccounts([])
+    setDistributionFilter('all')
+    setDistributionSearch('')
+    setDistributionError('')
+    setDistributionProgress('')
+    setDistributionOpen(true)
   }
 
   const removeImage = async (image: BannerImage): Promise<boolean> => {
@@ -342,6 +399,7 @@ function ProjectInner() {
       if (!res.success) throw new Error(res.error)
       setImages((prev) => prev.filter((i) => i.id !== image.id))
       setOpenImage(null)
+      setSelectedImages((current) => current.filter((id) => id !== image.id))
       setProject((p) => (p ? { ...p, imageCount: Math.max(p.imageCount - 1, 0) } : p))
       return true
     } catch (caught) {
@@ -447,11 +505,11 @@ function ProjectInner() {
     return <TargetMissing kind="error" title="プロジェクトを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void load()} />
   }
 
-  const busy = busyAction !== null
+  const busy = busyAction !== null || distributionBusy
   const archived = Boolean(project.archivedAt)
   const limited = bannerLimitKind(usage) !== null
   const boardId = running ? 'p03ImY' : limited ? 'zOpMG' : 'iMnph'
-  const description = `${project.description ? `${project.description.replace(/。$/, '')}。` : ''}右で用途とテキストを決めて生成し、気に入った画像をアカウントへ渡します。`
+  const description = `${project.description ? `${project.description.replace(/。$/, '')}。` : ''}右で用途とテキストを決めて生成し、気に入った画像をアカウントへ配ります。`
   const favoriteCount = images.filter((i) => i.isFavorite).length
   const deliveredCount = images.filter((i) => i.deliveredAccountIds.length > 0).length
   const doneSoFar = running ? running.doneCount + running.failedCount : 0
@@ -464,6 +522,10 @@ function ProjectInner() {
    */
   const actions = canManage ? (
     <div className={styles.headActions}>
+      {images.length > 0 && !archived ? <RowMenu label={`プロジェクト「${project.name}」の操作`} triggerProps={{ disabled: busy }} items={[
+        { id: 'distribute-project', label: 'このプロジェクトの画像を配る', icon: <Send size={15} aria-hidden="true" />, emphasis: true,
+          onSelect: () => { setSelectedImages(images.map((image) => image.id)); openDistribution() } },
+      ]} /> : null}
       <Button onClick={() => fileRef.current?.click()} disabled={busy || archived || uploading} busy={uploading} busyLabel="取り込み中…">
         <Upload aria-hidden="true" className={styles.icon} />画像を取り込む
       </Button>
@@ -499,27 +561,30 @@ function ProjectInner() {
 
   return (
     <ListPage boardId={boardId} title={project.name} description={description} actions={actions}
-      crumbs={<Breadcrumb items={[{ label: 'プロジェクト一覧', href: '/hq/banners' }, { label: project.name }]} />}>
+      crumbs={<Breadcrumb appearance="banner" items={[{ label: 'プロジェクト一覧', href: '/hq/banners' }, { label: project.name }]} />}>
       <div className={styles.body}>
         {actionError ? <Notice tone="danger" message={actionError} onClose={() => setActionError('')} /> : null}
         <div className={styles.split}>
           <section className={styles.gallery} aria-labelledby={galleryHeadId}>
-            {/*
-              * 見出しの行（承認済み `qIp42` の `KWlQY`「このプロジェクトの画像」・`LWv01`「12枚」・
-              * `h4yzAO`「画像を押すと詳細・アカウントへ渡す」）。板では3つが左から続いて並び、
-              * 絞り込みの札はその下の行（`sc16B`・`TngIp`・`JlVG7`）。
-              */}
+            {/* G-6（sr0Po）：画像を押すと詳細、選ぶ操作はその下の右端。 */}
             <div className={styles.galleryHead}>
               <h3 id={galleryHeadId} className={styles.galleryTitle}>このプロジェクトの画像</h3>
               <span className={styles.hint}>{`${images.length}枚`}</span>
-              <span className={styles.hint}>画像を押すと詳細・アカウントへ渡す</span>
+              <span className={styles.hint}>画像を押すと詳細</span>
             </div>
             <div className={styles.galleryTools}>
               <div role="group" aria-label="画像の絞り込み" className={styles.chips}>
                 <FilterChip selected={filter === 'all'} icon={<Sparkles size={14} aria-hidden="true" />} onChange={() => setFilter('all')}>{`すべて ${images.length}`}</FilterChip>
                 <FilterChip selected={filter === 'favorite'} icon={<Star size={14} aria-hidden="true" />} onChange={(on) => setFilter(on ? 'favorite' : 'all')}>{`お気に入り ${favoriteCount}`}</FilterChip>
-                <FilterChip selected={filter === 'delivered'} icon={<Star size={14} aria-hidden="true" />} onChange={(on) => setFilter(on ? 'delivered' : 'all')}>{`アカウントへ渡し済み ${deliveredCount}`}</FilterChip>
+                <FilterChip selected={filter === 'delivered'} icon={<Star size={14} aria-hidden="true" />} onChange={(on) => setFilter(on ? 'delivered' : 'all')}>{`配布済み ${deliveredCount}`}</FilterChip>
               </div>
+              {canManage ? <div className={styles.selectionTools}>
+                <Checkbox checked={visible.length > 0 && visible.every((image) => selectedImages.includes(image.id))}
+                  indeterminate={visible.some((image) => selectedImages.includes(image.id)) && !visible.every((image) => selectedImages.includes(image.id))}
+                  disabled={distributionBusy || visible.length === 0}
+                  onCheckedChange={(checked) => setSelectedImages((current) => checked ? [...new Set([...current, ...visible.map((image) => image.id)])] : current.filter((id) => !visible.some((image) => image.id === id)))}>すべて選ぶ</Checkbox>
+                <span className={styles.hint}>選ぶと右下からまとめて配れます</span>
+              </div> : null}
             </div>
 
             {/*
@@ -530,7 +595,7 @@ function ProjectInner() {
             {running ? (
               <div className={styles.runningBand} role="status" aria-live="polite">
                 <LoaderCircle aria-hidden="true" className={`${styles.icon} ${styles.spin}`} />
-                <span className={styles.runningText}>{`${Math.min(doneSoFar + 1, running.requestedCount)} / ${running.requestedCount} 枚目を作っています。この画面を閉じるとここで止まります（できた枚数は残ります）`}</span>
+                <span className={styles.runningText}>{`${Math.min(doneSoFar + 1, running.requestedCount)} / ${running.requestedCount} 枚目を作っています。閉じても作り続けます`}</span>
               </div>
             ) : null}
             {generationError ? <Notice tone="danger" message={generationError} onClose={() => setGenerationError('')} /> : null}
@@ -550,14 +615,16 @@ function ProjectInner() {
                 {[...visible.filter((image) => running && image.generationId === running.id), ...(filter === 'all' ? Array.from({ length: pendingCount }, (_, i) => i) : []), ...visible.filter((image) => !(running && image.generationId === running.id))].map((item, index) => typeof item === 'number' ? (
                   <PendingTile key={`pending-${item}`} running={item === 0} label={tileLabel(presets.find((p) => p.key === running?.presetKey), { generation: running, source: 'generated' })} />
                 ) : (() => { const image = item; return (
-                  <article key={image.id} className={styles.tile}>
+                  <article key={image.id} className={styles.tile} data-selected={selectedImages.includes(image.id) || undefined}>
+                    {canManage ? <div className={styles.tileSelect}><Checkbox aria-label={`画像 ${index + 1} を選ぶ`} checked={selectedImages.includes(image.id)} disabled={distributionBusy}
+                      onCheckedChange={(checked) => setSelectedImages((current) => checked ? [...new Set([...current, image.id])] : current.filter((id) => id !== image.id))} /></div> : null}
                     <button type="button" className={styles.tileImage} onClick={() => { setModalError(''); setOpenImage(image) }} aria-label={`画像 ${index + 1} を開く`}>
                       <Thumb image={image} />
                     </button>
                     <div className={styles.tileMeta}>
                       <span className={styles.metaText}>{tileLabel(presets.find((p) => p.key === image.generation?.presetKey), image)}</span>
                       <span className={styles.spacer} />
-                      {image.deliveredAccountIds.length > 0 ? <span className={styles.pillOk}><span className={styles.dot} aria-hidden="true" />渡し済み</span> : null}
+                      {image.deliveredAccountIds.length > 0 ? <span className={styles.pillOk}><span className={styles.dot} aria-hidden="true" />配布済み</span> : null}
                       {canManage ? (
                         <button type="button" className={styles.star} onClick={() => void toggleImageFavorite(image)} aria-pressed={image.isFavorite} aria-label={image.isFavorite ? 'お気に入りから外す' : 'お気に入りにする'}>
                           <Star aria-hidden="true" className={image.isFavorite ? styles.starOn : styles.starOff} />
@@ -573,6 +640,7 @@ function ProjectInner() {
           {canManage ? (
             <div ref={panelRef} className={styles.panel}>
               <GenerationPanel
+                v8Layout
                 presets={presets}
                 maxCount={maxCount}
                 value={input}
@@ -586,43 +654,29 @@ function ProjectInner() {
                 onReloadUsage={loadUsage}
                 /* 承認済み ★BG-B `qIp42` の `ta8eS`「利用量」。この板だけが見出しを持つ。 */
                 usageHeading
+                monthRemaining
               />
             </div>
           ) : null}
         </div>
 
-        {/*
-          * 下の帯（承認済み ★BG-B `qIp42` → `X2oLn`「下部追従バー」）。
-          * 左=残り枚数 `M118zK`／中=大きさの札 `WDJak`／
-          * 右=`wCvLN`「条件をクリア」＋`abZle` 生成するボタン。
-          * 生成中は `An26R`「帯（生成中）」——`CzXI2`「生成をやめる」＋
-          * `q9hrn`「生成中（押せない）」。
-          *
-          * 2026-10-07: ここをパネルの中（全幅ボタン＋その下の行）に置いていたが、
-          * 絵と配置が違っていた（差し戻し）。v7（app/hq/banners/project/page.tsx）と
-          * 同じ並び・同じ札の部品にそろえた。生成の押し場所は帯だけにする。
-          * 変えられない人（閲覧のみ）には押せないボタンを置かないので帯ごと出さない。
-          */}
+        {blockedReason && input.presetKey && !running ? <p className={styles.warnText}>{blockedReason}</p> : null}
+
+        {/* G-6（sr0Po）：左は選んだ画像の配布、右は生成の操作。0枚なら左の帯は出さない。 */}
         {canManage ? (
           <StickyBar
-            /*
-             * 承認済み ★BG-B `qIp42` の帯 `X2oLn` は **枠線つき・高さ72・影なし**。
-             * V8 の既定（★A/M10 の浮かせ）は**別の板**なので、この画面は板どおりに戻す。
-             * 根拠は `docs/v8-design-rules.md` §1「画面ごとに、その板の絵のとおり」。
-             */
             outlined
-            status={
-              running
-                ? `${running.requestedCount}枚中 ${running.doneCount}枚できました・今月の残り ${usage?.month.remaining ?? '—'}枚`
-                : blockedReason && input.presetKey
-                  ? <span className={styles.warnText}>{blockedReason}</span>
-                  : usageStatusText(usage, input.count)
-            }
-            info={
-              exportSizeText(presets, input.presetKey) ? (
-                <ExportSizeChip text={exportSizeText(presets, input.presetKey)} />
-              ) : undefined
-            }
+            className={styles.footer}
+            split={{ trailingWidth: 'calc(var(--tpl-hb-panel-w) + var(--tpl-hb-footer-inset))', lead: selectedImages.length > 0 ? <>
+              <span className={styles.selectionCount} aria-live="polite">{`${selectedImages.length} 枚を選んでいます`}</span>
+              <Button variant="text" disabled={distributionBusy} onClick={() => setSelectedImages([])}><X aria-hidden="true" className={styles.icon} />選ぶのをやめる</Button>
+              <span className={styles.spacer} />
+              <Button variant="primary" disabled={busy || archived} onClick={openDistribution}><Send aria-hidden="true" className={styles.icon} />{`${selectedImages.length} 枚をアカウントへ配る`}</Button>
+            </> : undefined }}
+            info={<span className={styles.generationInfo}>
+              <span>{`今日の残り ${usage?.today.remaining ?? '—'}枚`}</span>
+              {exportSizeText(presets, input.presetKey) ? <ExportSizeChip text={exportSizeText(presets, input.presetKey)} /> : <span>寸法 —</span>}
+            </span>}
             actions={
               running ? (
                 <>
@@ -647,6 +701,24 @@ function ProjectInner() {
         ) : null}
       </div>
 
+      {distributionOpen ? <SavedDistributionDialog
+        title={`${selectedImages.length > 0 ? `${selectedImages.length}枚の画像を` : '画像を'}アカウントへ配る`}
+        help="選んだ画像は、アカウントの登録メディア（フォルダ「02_バナー」）に入ります。配布済みの画像は増えません。"
+        accounts={distributionTargets} folders={distributionFolders}
+        selected={distributionAccounts} onChange={setDistributionAccounts}
+        filter={distributionFilter} onFilter={setDistributionFilter} search={distributionSearch} onSearch={setDistributionSearch}
+        received={null} receivedFailed={false} busy={distributionBusy} error={accountsFailed ? 'アカウントを読み込めませんでした。ページを再読み込みしてください。' : distributionError}
+        accountState={(id) => {
+          const selected = images.filter((image) => selectedImages.includes(image.id))
+          const count = selected.filter((image) => image.deliveredAccountIds.includes(id)).length
+          return <span className={styles.hint}>{selected.length > 0 ? `${selected.length}枚中 ${count}枚を配布済み` : '—'}</span>
+        }}
+        notice={distributionProgress ? <p className={styles.distributionProgress} role="status" aria-live="polite">{distributionProgress}</p> : null}
+        canDistribute={selectedImages.length > 0}
+        onLater={() => { if (!distributionBusy) setDistributionOpen(false) }}
+        onDistribute={() => void distributeSelected()}
+      /> : null}
+
       <CreateProjectDialogV8
         open={formOpen}
         project={project}
@@ -667,7 +739,7 @@ function ProjectInner() {
       <BannerConfirmDialogV8
         open={archiveConfirm}
         title={`「${project.name}」をアーカイブしますか？`}
-        description="一覧から見えなくなります。画像は消えず、アカウントへ渡した画像もそのまま使えます。「アーカイブを見る」からいつでも復元できます。"
+        description="一覧から見えなくなります。画像は消えず、アカウントへ配った画像もそのまま使えます。「アーカイブを見る」からいつでも復元できます。"
         confirmLabel="アーカイブする"
         tone="primary"
         busy={busy}
@@ -709,6 +781,8 @@ function ProjectInner() {
       ) : null}
 
       <ReferencePickerDialog
+        frame={ReferenceFrame}
+        hqLayout
         open={pickerOpen}
         projectId={project.id}
         presets={presets}

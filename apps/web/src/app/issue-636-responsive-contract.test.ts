@@ -19,7 +19,7 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (path: string) => readFileSync(join(HERE, path), 'utf8')
 
-describe('04-C-横1: 友だち属性のタグ表は1440pxに収まる', () => {
+describe('04-C-横1: タグ表は1440pxに収まる', () => {
   const page = read('../components/friend-fields/tags-page-v4.tsx')
 
   it('表の最小幅を内容実幅（833px）以下の800pxへ下げる', () => {
@@ -78,31 +78,15 @@ describe('08-C-狭1 / 10-C-狭1: 狭幅で検索欄を実用幅に保つ', () =>
 describe('03-C-はみ1: 友だち一覧の検索行は収まらない分を折り返す', () => {
   const page = read('friends/page.tsx')
 
-  it('検索フォームに flex-wrap を付ける', () => {
-    expect(page).toContain('flex min-w-0 flex-wrap items-center gap-2.5')
+  it('V8の検索欄と道具の段は縮められる', () => {
+    const page = read('../v8/friends/list/list.tsx')
+    const css = read('../v8/friends/list/list.module.css')
+    expect(page).toContain('<SearchField')
+    expect(page).toContain('className={styles.search}')
+    expect(css).toMatch(/\.toolRow\s*\{[^}]*min-width: 0/s)
+    expect(css).toMatch(/\.search\s*\{[^}]*min-width: 0/s)
+    expect(css).not.toMatch(/min-width:\s*(?:880|1180)px/)
   })
 })
 
-describe('09-C-横1: 友だち追加時配信の表は1440pxに収まる', () => {
-  const page = read('friend-add-settings/page.tsx')
-
-  it('表の最小幅を枠の実幅（834px）以下の720pxへ下げる', () => {
-    expect(page).toContain('[data-scroll-table] table { min-width: 720px; }')
-    expect(page).not.toContain('min-width: 860px')
-  })
-
-  it('lg未満の単列トラックを明示し、一覧セクションは min-w-0 で縮める', () => {
-    expect(page).toContain('grid-cols-[minmax(0,1fr)]')
-    expect(page).toMatch(/<section data-design="Rule"[^>]*className="min-w-0"/)
-  })
-
-  it('狭くなった表で操作列が切れないよう固定幅を当てる', () => {
-    expect(page).toMatch(/<Th title="状態" className="w-24">/)
-    expect(page).toMatch(/<Th title="直近7日の友だち追加数" className="w-24">/)
-    expect(page).toMatch(/<Th title="操作" className="w-40">/)
-  })
-
-  it('行リンクは1行省略＋titleで全文を確認できる（設計ルールどおり）', () => {
-    expect(page).toContain('block truncate font-bold" title={rule.name}')
-  })
-})
+// 友だち追加時配信の V7 の720px・列幅・gridクラスは廃止。V8の表示幅は絵との照合で確かめる。

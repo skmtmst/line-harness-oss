@@ -7,6 +7,7 @@ import Button from './button'
 import IconButton from './icon-button'
 import { OverlayDepthContext, useOverlayFocus, useV8Leave } from './overlay-utils'
 import styles from './dialog.module.css'
+import { useStepMotion } from './use-step-motion'
 
 export type DialogProps = {
   open: boolean
@@ -16,6 +17,10 @@ export type DialogProps = {
    * ★V8：絵の窓の幅（px）。絵ごとに 480〜720 とばらばらなので、画面が絵の値を渡す。
    * 渡さなければ size の幅のまま。v7 では効かない。
    */
+  /** 頭・説明・本文・操作を同じ余白で積む小窓（i8F12 等）。 */
+  designLayout?: 'stacked'
+  /** 確認のボタンを先に置く板だけで指定する。 */
+  confirmFirst?: boolean
   designWidth?: number
   /** ★V8：絵の窓の上からの位置（px）。渡すと上寄せにする。渡さなければ今までどおり。v7 では効かない。 */
   designTop?: number
@@ -29,8 +34,22 @@ export type DialogProps = {
   designHeaderPadding?: string
   /** ★V8：絵の窓の頭の高さ（px）。渡すと頭の行をこの高さに固定する。渡さなければ中身なり。v7 では効かない。 */
   designHeaderHeight?: number
+  /** 指定した窓だけ本文の余白を変える（フォルダ付きの選択窓など）。 */
+  designContentPadding?: string
+  /** 指定した窓だけ下の操作段の余白を変える。 */
+  designFooterPadding?: string
+  /** 本文と操作が続く窓では区切り線を省く。既定は線あり。 */
+  footerDivider?: boolean
+  /** 左の操作で残り幅を埋めるか。既定は埋める。 */
+  footerLeadFlexible?: boolean
+  /** 題の隣の補足。ほかの窓の題の並びは変えない。 */
+  titleHelp?: ReactNode
+  /** 段の帯を使わず続ける窓（hadfk）、またはアカウントの窓の余白。既定の窓は変えない。 */
+  layout?: 'continuous' | 'account-inset'
   /** 手順の帯。本文のスクロールから独立させる。 */
   steps?: ReactNode
+  /** 手順の本文を閉じずに切り替える鍵。StepsのcurrentKeyは自動で読む。 */
+  stepKey?: string | number
   /** 操作の左に出す現在の手順など。 */
   footerLead?: ReactNode
   title: string
@@ -42,6 +61,8 @@ export type DialogProps = {
    * tone（題・ボタンの色）とは独立。渡さなければ帯なし。
    */
   descriptionBand?: 'warning' | 'danger'
+  /** 入力の誤りがある欄など、開いた窓のフォーカス先。省けば従来どおり。 */
+  initialFocusId?: string
   busy?: boolean
   /** 実行ボタンを押せない形で出す（確かめのチェックが入るまで、など）。処理中の busy とは別。 */
   confirmDisabled?: boolean
@@ -74,7 +95,9 @@ export type DialogProps = {
    */
   primaryAction?: 'confirm' | 'cancel'
   /** ★V8：下のボタンの並び。省くと今までどおり右寄せ。'center' は中央（E-3 ウォークイン PUWyq）。v7 では効かない。 */
-  footerAlign?: 'center'
+  footerAlign?: 'center' | 'start'
+  /** 絵で操作の間隔が指定されている窓だけに使う。 */
+  designFooterGap?: number
 }
 
 /** Pencil V6 `J6x4Q` と重要操作 `H2S1T4` を1つにした共通ダイアログ。 */
@@ -82,16 +105,26 @@ export default function Dialog({
   open,
   size = 'medium',
   designWidth,
+  designLayout,
+  confirmFirst,
   designTop,
   designHeaderPadding,
   designHeaderHeight,
+  designContentPadding,
+  designFooterPadding,
+  footerDivider = true,
+  footerLeadFlexible = true,
+  titleHelp,
+  layout,
   steps,
+  stepKey,
   footerLead,
   title,
   description,
   tone = 'default',
   descriptionBand,
   busy = false,
+  initialFocusId,
   error,
   confirmLabel = '保存する',
   cancelLabel = 'キャンセル',
@@ -108,11 +141,13 @@ export default function Dialog({
   compact = false,
   primaryAction = 'confirm',
   footerAlign,
+  designFooterGap,
 }: DialogProps) {
   const depth = useContext(OverlayDepthContext)
   const titleId = useId()
   const descriptionId = useId()
   const [mounted, setMounted] = useState(false)
+  const motion = useStepMotion(Boolean(steps) && open && mounted, stepKey ?? (React.isValidElement<{ currentKey?: string | number }>(steps) ? steps.props.currentKey : undefined))
   /* ★V8 仕上げ（M10）：閉じるときは逆再生してから外す（v8 のみ）。 */
   const leaving = useV8Leave(open)
   /*
@@ -128,7 +163,8 @@ export default function Dialog({
     busy,
     // 主が取消の窓は、開いた直後の標的を主のボタンへ寄せる。Enter を押しても
     // 残る方が動く向きにする（×と背景は従来どおり取消）。
-    primaryAction === 'cancel' ? () => cancelRef.current : undefined,
+    initialFocusId ? () => document.getElementById(initialFocusId)
+      : primaryAction === 'cancel' ? () => cancelRef.current : undefined,
   )
   const confirmationSizeClass = confirmation && compact
     ? tone === 'destructive'
@@ -148,14 +184,15 @@ export default function Dialog({
     <div className={styles.titleRow}>
       <span className={styles.titleIcon} aria-hidden="true">{titleIcon}</span>
       {titleNode}
+      {titleHelp}
     </div>
-  ) : titleNode}</>)
+  ) : titleHelp ? <div className={styles.titleRow}>{titleNode}{titleHelp}</div> : titleNode}</>)
   const descriptionNode = description ? <p id={descriptionId} className={styles.description}>{description}</p> : null
   const heading = (
     <>
       {/* 絵が無いときは今までどおり h2 を直接置く。囲むと既存の余白が動く。 */}
       {titlePart}
-      {descriptionNode}
+      {designLayout === 'stacked' ? null : descriptionNode}
     </>
   )
   const panel = (
@@ -170,14 +207,24 @@ export default function Dialog({
       tabIndex={-1}
       data-closing={leaving || undefined}
       data-size={size}
+      data-design-layout={designLayout}
+      data-confirm-first={confirmFirst || undefined}
+      data-layout={layout}
       data-footer-align={footerAlign}
+      data-design-footer-gap={designFooterGap !== undefined || undefined}
+      data-footer-divider={footerDivider ? undefined : 'none'}
+      data-footer-lead={footerLeadFlexible ? undefined : 'fixed'}
       data-design-width={designWidth ? '' : undefined}
       data-design-header-padding={designHeaderPadding ? '' : undefined}
       data-design-header-height={designHeaderHeight ? '' : undefined}
-      style={designWidth || designHeaderPadding || designHeaderHeight ? ({
+      data-design-content-padding={designContentPadding ? '' : undefined}
+      style={designWidth || designHeaderPadding || designHeaderHeight || designContentPadding || designFooterPadding || designFooterGap !== undefined ? ({
+        ...(designFooterGap !== undefined ? { '--dialog-footer-gap': `${designFooterGap}px` } : {}),
         ...(designWidth ? { '--dialog-design-width': `${designWidth}px` } : {}),
         ...(designHeaderPadding ? { '--dialog-design-header-padding': designHeaderPadding } : {}),
         ...(designHeaderHeight ? { '--dialog-design-header-height': `${designHeaderHeight}px` } : {}),
+        ...(designContentPadding ? { '--dialog-design-content-padding': designContentPadding } : {}),
+        ...(designFooterPadding ? { '--dialog-design-footer-padding': designFooterPadding } : {}),
       } as CSSProperties) : undefined}
       data-design-part="dialog"
       data-design-node={tone === 'destructive' ? 'H2S1T4' : 'J6x4Q'}
@@ -196,11 +243,12 @@ export default function Dialog({
           <X aria-hidden="true" size={18} />
         </IconButton>
       </div>
+      {designLayout === 'stacked' ? descriptionNode : null}
       {steps ? <div className={styles.steps}>{steps}</div> : null}
-      {children ? <div className={styles.content}>{children}</div> : null}
+      {children ? <div className={styles.content} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       <div className={styles.footer}>
-      {footer ?? (onConfirm ? (
+      {footer != null ? (layout === 'account-inset' ? <div className={styles.insetActions}>{footer}</div> : footer) : (onConfirm ? (
         /*
          * 実行・取消は共通Buttonの役割（primary/danger/secondary）をそのまま
          * 使う（#976 U077/U083/U084）。ここで赤や緑を自前で持つと、コントラストが

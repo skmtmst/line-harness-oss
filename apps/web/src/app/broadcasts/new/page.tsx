@@ -1,5 +1,6 @@
 'use client'
 
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -104,6 +105,7 @@ function audienceLabel(audience: AudienceHandoff): string {
 
 function NewBroadcastPageContent() {
   const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const staffRole = useStaffRole()
   const canManage = staffRole === null || canEditFeature('broadcast.definition.edit')
   const searchParams = useSearchParams()
@@ -138,7 +140,7 @@ function NewBroadcastPageContent() {
     const next = new URLSearchParams(searchParams.toString())
     if (step === 'basic') next.delete('step')
     else next.set('step', step)
-    router.replace(`/broadcasts/new${next.size ? `?${next.toString()}` : ''}`, { scroll: false })
+    samePageUrl.replace(`/broadcasts/new${next.size ? `?${next.toString()}` : ''}`)
   }
 
   const load = useCallback(async () => {

@@ -1,0 +1,51 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-support-hold-bg);
+  color: var(--color-support-hold);
+  font-family: inherit;
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: 18px;
+  vertical-align: middle;
+}
+.dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-ink-faint);
+}
+.dot[data-tone='info'] { background: var(--color-status-info); }
+.dot[data-tone='warning'] { background: var(--color-support-progress-dot); }
+.dot[data-tone='success'] { background: var(--color-support-resolved-dot); }
+.dot[data-tone='danger'] { background: var(--color-support-unread-dot); }
+.dot[data-tone='neutral'] { background: var(--color-support-hold-dot); }
+.pill[data-tone='info'], [data-theme='v8'] .pill.control[data-tone='info'] { background: var(--color-status-info-soft); color: var(--color-status-info); }
+.pill[data-tone='warning'], [data-theme='v8'] .pill.control[data-tone='warning'] { background: var(--color-support-progress-bg); color: var(--color-support-progress); }
+.pill[data-tone='success'], [data-theme='v8'] .pill.control[data-tone='success'] { background: var(--color-support-resolved-bg); color: var(--color-support-resolved); }
+.pill[data-tone='danger'], [data-theme='v8'] .pill.control[data-tone='danger'] { background: var(--color-support-unread-bg); color: var(--color-support-unread); }
+.pill[data-tone='neutral'], [data-theme='v8'] .pill.control[data-tone='neutral'] { background: var(--color-support-hold-bg); color: var(--color-support-hold); }
+.name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 単一選択の操作は Select に任せ、札の外形だけを共通にする。 */
+[data-theme='v8'] .pill.control {
+  height: 36px;
+  gap: 6px;
+  padding: 0 10px 0 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  outline-color: transparent;
+  box-shadow: none;
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+[data-theme='v8'] .pill.control:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
+}

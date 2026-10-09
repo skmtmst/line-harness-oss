@@ -26,7 +26,7 @@ export function RowMore({ subject, items }: { subject: string; items: ActionMenu
  * （題の段のあと 14 の間・各段 14・下の線の上 14）で置く。
  * onSubmit を渡すと中身を form にする（Enter で保存できる）。
  */
-export function RsDialog({ open, title, width, top, tone, busy, designNode, onCancel, onSubmit, actions, children }: {
+export function RsDialog({ open, title, width, top, tone, busy, designNode, onCancel, onSubmit, noValidate = false, actions, children }: {
   open: boolean
   title: string
   width: number
@@ -36,6 +36,7 @@ export function RsDialog({ open, title, width, top, tone, busy, designNode, onCa
   designNode?: string
   onCancel: () => void
   onSubmit?: () => void
+  noValidate?: boolean
   actions: ReactNode
   children: ReactNode
 }) {
@@ -59,6 +60,7 @@ export function RsDialog({ open, title, width, top, tone, busy, designNode, onCa
       {onSubmit ? (
         <form
           className={styles.dialogBody}
+          noValidate={noValidate}
           onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); onSubmit() }}
         >
           {body}

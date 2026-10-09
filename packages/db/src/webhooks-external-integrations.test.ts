@@ -101,6 +101,14 @@ describe('Webhookの論理削除 (N-368)', () => {
     db = asD1(sqlite);
   });
 
+  it('WEB232 creates inactive rows without any activation window and preserves legacy creation', async () => {
+    const outgoing = await createOutgoingWebhook(db, { lineAccountId: 'account-a', name: '下書き', url: 'https://example.com/hook', eventTypes: ['booking_created'], secret: 'a'.repeat(32), isActive: false }, ENC);
+    const incoming = await createIncomingWebhook(db, { lineAccountId: 'account-a', name: '下書き', secret: 'a'.repeat(32), isActive: false }, ENC);
+    expect(outgoing.is_active).toBe(0); expect(incoming.is_active).toBe(0);
+    expect(await getActiveOutgoingWebhooksByEvent(db, 'booking_created', 'account-a')).toEqual([]);
+    expect((await createIncomingWebhook(db, { lineAccountId: 'account-a', name: '旧呼び出し', secret: 'a'.repeat(32) }, ENC)).is_active).toBe(1);
+  });
+
   it('受け口の削除は行を残し、一覧と詳細からは見えなくなる', async () => {
     const created = await createIncomingWebhook(db, {
       lineAccountId: 'account-a',

@@ -7,7 +7,8 @@
  * 今の画面（TemplateInsertControls）と同じ。
  */
 import { useRef, useState, type RefObject } from 'react'
-import { InsertButton } from '@/components/shared/insert-text-field'
+import Button from '@/components/shared/button'
+import { UserRound, ContactRound, Braces, CalendarDays, Ellipsis } from 'lucide-react'
 import ActionMenu from '@/components/shared/action-menu'
 import Dialog from '@/components/shared/dialog'
 import DateField from '@/components/shared/date-field'
@@ -47,16 +48,20 @@ function Chip({ label, onClick, disabled, title, buttonRef, expanded, more = fal
   expanded?: boolean
   more?: boolean
 }) {
+  const Icon = more ? Ellipsis : label === '名前' ? UserRound : label === '友だち情報' ? ContactRound : label === '共通情報' ? Braces : CalendarDays
   return (
-    <InsertButton
+    <Button
       ref={buttonRef}
-      icon={more ? 'more' : 'plus'}
-      label={label}
+      variant="text"
+      size="field"
       onClick={onClick}
       disabled={disabled}
       title={title ?? `${label}を差し込む`}
-      expanded={expanded}
-    />
+      aria-haspopup={expanded === undefined ? undefined : 'menu'}
+      aria-expanded={expanded}
+    >
+      <Icon size={14} aria-hidden="true" />{label}
+    </Button>
   )
 }
 

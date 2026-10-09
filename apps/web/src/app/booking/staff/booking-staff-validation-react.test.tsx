@@ -248,8 +248,8 @@ describe('N-411 項目別権限と画面の一致（実React）', () => {
     fixture.listStaff.mockResolvedValue({ staff: [STAFF_ROW] })
     render(<BookingStaffPage />)
     await screen.findByText('佐藤')
-    const create = screen.getByRole('button', { name: '＋ スタッフを作る' }) as HTMLButtonElement
-    expect(create.disabled).toBe(true)
+    // V8 では閲覧のみの人に押せないボタンを置かず隠す（決まり §2）。
+    expect(screen.queryByRole('button', { name: '＋ スタッフを作る' })).toBeNull()
     expect(screen.queryByText('編集')).toBeNull()
     expect(screen.queryByText('削除する')).toBeNull()
     // シフトへの導線は残す（閲覧権限があれば本人・他人どちらも開ける）

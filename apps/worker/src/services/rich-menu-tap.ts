@@ -83,7 +83,7 @@ export async function handleRichMenuTap(
   lineClient: LineClient,
   friend: { id: string; line_user_id: string },
   areaId: string,
-  options: { lineAccountId?: string | null; replyToken?: string },
+  options: { lineAccountId?: string | null; replyToken?: string; sourceEventId?: string },
 ): Promise<RichMenuTapResult> {
   const target = await getRichMenuAreaTapTarget(db, areaId);
   if (!target) return { target: null, replyTokenConsumed: false };
@@ -121,6 +121,8 @@ export async function handleRichMenuTap(
         friendId: friend.id,
         scoreChange: target.scoreChange,
         reason: `リッチメニュー: ${target.label ?? 'ボタン'}`,
+        idempotencyKey: options.sourceEventId
+          ? JSON.stringify(['rich-menu-tap', options.sourceEventId, areaId]) : undefined,
       });
     } catch (err) {
       console.error('[richMenuTap] failed to add score', err);

@@ -1,5 +1,7 @@
 'use client'
 
+import { PageHeading } from '@/components/templates/page-frame'
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { MoreHorizontal } from 'lucide-react'
 import Link from 'next/link'
@@ -14,7 +16,6 @@ import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/sh
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { bookingApi, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { canEditFeature } from '@/lib/staff-capability'
 // 編集窓は V8 予約設定の担当スタッフタブ（menus/settings-v8.tsx）と共用。
@@ -64,7 +65,6 @@ export default function BookingStaffPage() {
   usePageTitle('予約設定')
   const { selectedAccountId } = useAccount()
   /* V8 のときだけ骨組み・保存中表示へ。v7 は従来の見た目のまま。 */
-  const adminTheme = useAdminTheme()
   const [items, setItems] = useState<BookingStaff[]>([])
   const [editing, setEditing] = useState<Partial<BookingStaff> | null>(null)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
@@ -149,6 +149,7 @@ export default function BookingStaffPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="v8-only"><PageHeading title="担当スタッフ" /></div>
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <nav data-design="Crumb" className="text-ink-faint text-xs" aria-label="パンくず">
@@ -162,28 +163,28 @@ export default function BookingStaffPage() {
         押せない理由はボタンの説明に出す。押せないボタンを黙って置かない。
       */}
       <div data-design="Actions" className="flex flex-wrap items-center gap-2">
-        <Button
+        {canManageStaff ? <Button
           variant="primary"
           onClick={() => setEditing(EMPTY)}
           disabled={!canManageStaff || !selectedAccountId || loadStatus !== 'ready'}
           title={canManageStaff ? undefined : '予約設定の変更権限がありません'}
         >
           ＋ スタッフを作る
-        </Button>
+        </Button> : null}
       </div>
+
+      {!canManageStaff ? <p role="status">閲覧のみで見ています。予約スタッフの変更には予約設定の変更権限が必要です。</p> : null}
 
       {!selectedAccountId ? (
         <div className="bg-canvas rounded-card border border-hairline">
           <ListState kind="empty" title="LINEアカウントを選んでください" description="共通メニューで、予約スタッフを管理するLINEアカウントを選んでください。" />
         </div>
       ) : loadStatus === 'loading' ? (
-        adminTheme === 'v8' ? (
+        (
           <div aria-busy="true">
             <span className="sr-only" role="status">予約スタッフを読み込んでいます</span>
             <DelayedSkeleton loading skeleton={<StaffTableSkeleton />} />
           </div>
-        ) : (
-          <ListState kind="loading" title="予約スタッフを読み込んでいます" />
         )
       ) : loadStatus === 'error' ? (
         <ListState
@@ -198,7 +199,7 @@ export default function BookingStaffPage() {
         />
       ) : items.length === 0 ? (
         <div className="bg-canvas rounded-card border border-hairline">
-          <ListState kind="empty" title="予約スタッフはまだいません" description="「＋ スタッフを作る」から最初のスタッフを追加してください。" />
+          <ListState kind="empty" title="予約スタッフはまだいません" description={canManageStaff ? "「＋ スタッフを作る」から最初のスタッフを追加してください。" : "スタッフが登録されると、ここに表示されます。"} />
         </div>
       ) : (
         <DataTable data-design="Table">

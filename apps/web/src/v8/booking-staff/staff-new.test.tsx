@@ -6,9 +6,9 @@
  */
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
-const fixture = vi.hoisted(() => ({ staff: [] as Array<Record<string, unknown>> }))
+const fixture = vi.hoisted(() => ({ staff: [] as Array<Record<string, unknown>>, create: vi.fn(), assign: vi.fn(), update: vi.fn() }))
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null }) }))
@@ -26,8 +26,9 @@ vi.mock('@/lib/api', async (importOriginal) => {
     bookingApi: {
       listMenus: async () => ({ menus: MENUS }),
       listStaff: async () => ({ staff: fixture.staff }),
-      createStaff: vi.fn(),
-      putStaffMenus: vi.fn(),
+      createStaff: (...args: unknown[]) => fixture.create(...args),
+      updateStaff: (...args: unknown[]) => fixture.update(...args),
+      putStaffMenus: (...args: unknown[]) => fixture.assign(...args),
     },
   }
 })
@@ -49,6 +50,9 @@ vi.stubGlobal('localStorage', memStorage)
 
 beforeEach(() => {
   memStorage.setItem('lh_staff_role', 'owner')
+  fixture.create.mockReset().mockResolvedValue({ id: 'created' })
+  fixture.update.mockReset().mockResolvedValue({ ok: true })
+  fixture.assign.mockReset()
   fixture.staff = [
     { id: 'bs-1', name: '佐々木 亮太', display_name: '佐々木', role: 'トリマー', sort_order: 1, is_designation_optional: 0, is_active: 1 },
   ]
@@ -85,3 +89,18 @@ describe('予約スタッフを登録（V8）', () => {
     expect(await within(phone).findByText('指名なし')).toBeTruthy()
   })
 })
+
+ test('WEB186：割当の再試行前に直した名前も登録済みスタッフに保存する', async () => {
+    fixture.assign.mockRejectedValueOnce(new Error('network')).mockResolvedValue({ ok: true })
+    render(<StaffNewV8 />)
+    await screen.findByRole('checkbox', { name: 'カット' })
+    fireEvent.change(screen.getByLabelText('スタッフ名（管理画面での呼び名）'), { target: { value: '田中' } })
+    fireEvent.click(screen.getByRole('checkbox', { name: 'カット' }))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'スタッフを登録する' })) })
+    await screen.findByRole('button', { name: '割当をやり直す' })
+    fireEvent.change(screen.getByLabelText('スタッフ名（管理画面での呼び名）'), { target: { value: '田中 美咲' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '割当をやり直す' })) })
+    await waitFor(() => expect(fixture.assign).toHaveBeenCalledTimes(2))
+    expect(fixture.create).toHaveBeenCalledTimes(1)
+    expect(fixture.update).toHaveBeenCalledWith('account-a', 'created', expect.objectContaining({ name: '田中 美咲' }))
+ })

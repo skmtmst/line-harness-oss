@@ -14,6 +14,9 @@ type StartViewTransition = (callback: () => Promise<void>) => { updateCallbackDo
  * DOM へ反映されるので、古い画面どうしで移り変わっていた（切り替えが動きの後に飛ぶ）。
  * いまは callback の中で React の反映を flushSync で済ませ、update が Promise を返すときは
  * その終わりまで待ってから返す。
+ * 非同期 callback の await 後に React の状態を変える場合は、その箇所を
+ * 呼び出し元の flushSync で反映してから Promise を完了させること。
+ * callback の Promise 完了だけでは React の後続描画の完了を表せない。
  *
  * 戻り値は、更新（と DOM への反映）が終わったら解決する Promise。待たなくてもよい。
  * `router.push` のような画面の移動は Next の側で後から描かれるので、この道具では待てない

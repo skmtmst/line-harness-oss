@@ -11,6 +11,14 @@ import LiffHeader from '../components/ui/LiffHeader.js';
 import LiffLookScope from '../components/LiffLookScope.js';
 import StatusView from '../components/ui/StatusView.js';
 
+/** 繰上げ案内の token だけを外した query（ほかの値は残す）。 */
+export function searchWithoutOfferToken(search: string): string {
+  const params = new URLSearchParams(search);
+  params.delete('eventWaitlistToken');
+  const rest = params.toString();
+  return rest ? `?${rest}` : '';
+}
+
 type State = 'ready' | 'submitting' | 'confirmed' | 'expired' | 'unavailable' | 'error';
 
 /**
@@ -56,7 +64,9 @@ export default function EventWaitlistOffer({ token }: { token: string }) {
   };
 
   function goMine() {
-    navigate({ pathname: '/events/me', search });
+    // 案内の token を外して移る。残すと App が案内の画面を優先し、
+    // 自分のイベントへ移れない（?liffId などほかの値は引き継ぐ）。
+    navigate({ pathname: '/events/me', search: searchWithoutOfferToken(search) });
   }
 
   return (

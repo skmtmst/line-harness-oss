@@ -3,7 +3,7 @@
  * 板: padding 20・gap 12 / KPI見出し 13px #131118 粗500 / KPI数字 22px #131118 粗600
  *     表の見出し 上下12・左右24（--tpl-thead-*） 粗600 secondary 地 table-head。
  */
-import { readFileSync } from "node:fs";
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs';
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -33,8 +33,8 @@ describe("automations 一覧の板の数字", () => {
   });
 
   it("V8表の見出しは共通Thで左右24・上下12・secondary・地table-headを使う", () => {
-    expect(LIST).toContain('<TableHeadRow>');
-    expect(LIST).toContain('<Th>ルール</Th>');
+    expect(LIST).toMatch(/<TableHeadRow\b/);
+    expect(LIST).toMatch(/<Th[^>]*>ルール<\/Th>/);
     expect(TABLE_CSS).toMatch(/\[data-theme='v8'\] \.headRow \{[^}]*background: var\(--color-table-head\)/s);
     expect(TABLE_CSS).toMatch(/\[data-theme='v8'\] \.headRow \.cell \{[^}]*padding:\s*var\(--tpl-thead-pad-block\) var\(--tpl-thead-pad-side\)[^}]*color: var\(--color-ink-secondary\)/s);
   });

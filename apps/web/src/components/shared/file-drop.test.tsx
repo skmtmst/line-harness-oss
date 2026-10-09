@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V7 添付ファイルの行・ファイルを落とす場所（NQMnx）。
+ * 添付ファイルの行・ファイルを落とす場所（Pencil ★V8「ファイルを落とす欄」）。
  * 行の 3 状態（通常／送り途中／誤りと選び直し）と、落とす場所の 4 状態
  * （ふだん／上に来た／形式違い／取り込み中）、キーボードの「ファイルを選ぶ」を見る。
  */
@@ -15,7 +15,7 @@ function dropFiles(element: Element, files: File[]) {
   fireEvent.drop(element, { dataTransfer: { files, items: [] } })
 }
 
-describe('添付ファイルの行（★V7 NQMnx）', () => {
+describe('添付ファイルの行（★V8 ファイルを落とす欄）', () => {
   it('名前は 1 行で全文は title、× は「外す」', () => {
     const onRemove = vi.fn()
     render(<AttachmentRow name="商品写真_秋.jpg" meta="JPEG・1.2MB" onRemove={onRemove} />)

@@ -6,7 +6,7 @@ import MenuPortal from './menu-portal'
 import styles from './date-field.module.css'
 
 /**
- * 日付の選択。Pencil ★V7「日付の選択」（V7 文書 `Fw065`）。
+ * 日付の選択。Pencil ★V8（V8.pen）「日付の入力（カレンダー）」。
  *
  * ブラウザ任せの `<input type="date">` は、表示が英語の書式になり、画面ごとに見た目も違った。
  * 値は今までどおり `YYYY-MM-DD` の文字列（空は ''）で受け渡すので、`type="date"` の
@@ -24,6 +24,7 @@ export default function DateField({
   max,
   disabled = false,
   invalid = false,
+  size = 'standard',
   placeholder = '日付を選ぶ',
   id,
   name,
@@ -38,6 +39,7 @@ export default function DateField({
   max?: string
   disabled?: boolean
   invalid?: boolean
+  size?: 'standard' | 'compact'
   placeholder?: string
   id?: string
   name?: string
@@ -153,6 +155,7 @@ export default function DateField({
         id={fieldId}
         type="button"
         className={styles.field}
+        data-size={size}
         disabled={disabled}
         data-invalid={invalid || undefined}
         // 狭い欄で切れても、重ねれば全文が読める（短い文字列は1行省略＋titleの決まり）。

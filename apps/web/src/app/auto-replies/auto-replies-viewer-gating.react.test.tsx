@@ -6,6 +6,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { join as sourceJoin } from 'node:path'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -49,7 +50,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', accounts: [{ id: 'account-a', name: '本店' }], loading: false }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => {},
   usePageTitle: () => {},
 }))
 
@@ -110,7 +111,7 @@ async function flush() {
 }
 
 function buttons(): string[] {
-  return [...host.querySelectorAll('button')].map((el) => el.textContent?.trim() ?? '')
+  return [...host.querySelectorAll('button')].map((el) => el.textContent?.trim().replace(/^＋\s*/, '') ?? '')
 }
 
 describe('R527 自動応答一覧の出し分け（役割×操作）', () => {
@@ -122,15 +123,16 @@ describe('R527 自動応答一覧の出し分け（役割×操作）', () => {
     await flush()
 
     const labels = buttons()
-    expect(labels).not.toContain('＋ ルールを作る')
+    expect(labels).not.toContain('ルールを作る')
     expect(labels).not.toContain('編集')
-    expect(
-      host.querySelector('button[aria-label="自動応答「旧キーワードルール」のその他操作"]'),
-    ).toBeNull()
+    const more = host.querySelector<HTMLButtonElement>('button[aria-label="自動応答「旧キーワードルール」の操作"]')!
+    await act(async () => { more.click() })
+    const menu = document.querySelector('[role="menu"]')!
+    for (const label of ['編集する', '止める', '削除', '複製する', 'フォルダへ移す']) expect(menu.textContent).not.toContain(label)
     // 順番の入れ替え（更新口）も出さない。
     expect(host.querySelector('button[aria-label="自動応答「旧キーワードルール」を1つ上へ"]')).toBeNull()
     expect(host.textContent).toContain(
-      '自動応答の作成・変更・停止・削除はオーナーと管理者だけができます',
+      '閲覧のみで見ています',
     )
   })
 
@@ -142,10 +144,10 @@ describe('R527 自動応答一覧の出し分け（役割×操作）', () => {
     await flush()
 
     const labels = buttons()
-    expect(labels).toContain('＋ ルールを作る')
-    expect(labels).toContain('編集')
+    expect(labels).toContain('ルールを作る')
+    expect(host.querySelector('a[href="/auto-replies/edit?id=ar-1"]')).not.toBeNull()
     expect(
-      host.querySelector('button[aria-label="自動応答「旧キーワードルール」のその他操作"]'),
+      host.querySelector('button[aria-label="自動応答「旧キーワードルール」の操作"]'),
     ).not.toBeNull()
   })
 })
@@ -154,8 +156,8 @@ describe('R527 自動応答一覧の出し分け（役割×操作）', () => {
  * 直しを戻すと赤くなる文字契約。実マウントの試験が本命で、
  * こちらは分岐の削除・無条件表示への戻しを見張る。
  */
-const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const HERE = __dirname
+const PAGE = readFileSync(sourceJoin(__dirname, '../../v8/auto-replies/list.tsx'), 'utf8')
 
 describe('R527 一覧の出し分け契約', () => {
   it('変更の可否は共通の出し分けで決め、手元の保存値で決めない', () => {
@@ -165,24 +167,10 @@ describe('R527 一覧の出し分け契約', () => {
     expect(PAGE).not.toContain("localStorage.getItem('lh_staff_role')")
   })
 
-  it('作成・行操作・フォルダ追加・編集窓が canManage で守られている', () => {
-    const gated = (entry: string, label: string) => {
-      const at = PAGE.indexOf(entry)
-      expect(at, `${label} が画面にありません`).toBeGreaterThan(-1)
-      expect(
-        PAGE.slice(Math.max(0, at - 2000), at),
-        `${label} が canManage で守られていません`,
-      ).toContain('canManage')
-    }
-    gated('＋ ルールを作る', '作成ボタン')
-    gated('onAddFolder={canManage ?', 'フォルダ追加')
-    // 行の操作（順番・編集・停止・再開・削除）は1つの分岐の中にあり、
-    // 見るだけには「—」が出る。形そのもので見る。
-    expect(PAGE).toContain('{canManage ? (\n                      <div className="relative inline-flex items-center justify-end gap-1.5">')
-    expect(PAGE).toContain(') : (\n                        <span className="text-ink-faint text-xs">—</span>')
-    expect(PAGE).toContain('title={canManage')
-    expect(PAGE).toContain('{editing && canManage && (')
-    expect(PAGE).toContain('{folderDialogOpen && canManage && (')
-    expect(PAGE).toContain('自動応答の作成・変更・停止・削除はオーナーと管理者だけができます')
+  it('作成・フォルダ追加・行の変更操作を権限で守る', () => {
+    expect(PAGE).toContain('canManageRole(staffRole)')
+    expect(PAGE).toContain('onAddFolder={canEdit ?')
+    expect(PAGE).toContain('canEdit && <CreateRuleButton')
+    expect(PAGE).toContain('const readonly = !canEdit')
   })
 })

@@ -703,26 +703,38 @@ export async function createFunnelVersion(
   }
   const id = crypto.randomUUID();
   const statements: D1PreparedStatement[] = [
-    // 版番号は読み取った最大値+1を明示する。間に別の保存が割り込むと
-    // UNIQUE(funnel_id, version_number) が衝突し、下のcatchで競合へ変換する。
+    // 運用状態と読み取った現在版を、実際のINSERTと同時に照合する。
+    // 停止・保管や別保存が先に確定した場合は新版を置かない。
     db.prepare(
       `INSERT INTO analytics_funnel_versions (
          id, funnel_id, line_account_id, version_number, window_days,
          steps_json, segment_json, comparison_groups_json, created_by, created_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) SELECT ?, f.id, f.line_account_id, ?, ?, ?, ?, ?, ?, ?
+           FROM funnels f
+          WHERE f.id = ? AND f.line_account_id = ? AND f.status = 'active'
+            AND COALESCE((SELECT MAX(version_number) FROM analytics_funnel_versions
+                           WHERE funnel_id = f.id AND line_account_id = f.line_account_id), 0) = ?`,
     ).bind(
-      id, input.funnelId, input.lineAccountId, currentVersionNumber + 1, input.windowDays,
+      id, currentVersionNumber + 1, input.windowDays,
       JSON.stringify(steps), JSON.stringify(segment), JSON.stringify(groups),
       input.createdBy ?? null, input.createdAt,
+      input.funnelId, input.lineAccountId, currentVersionNumber,
     ),
     ...(name === null
       ? []
       : [db.prepare(
-        `UPDATE funnels SET name = ? WHERE id = ? AND line_account_id = ?`,
-      ).bind(name, input.funnelId, input.lineAccountId)]),
+        `UPDATE funnels SET name = ? WHERE id = ? AND line_account_id = ? AND status = 'active'
+           AND EXISTS (SELECT 1 FROM analytics_funnel_versions WHERE id = ? AND funnel_id = funnels.id)`,
+      ).bind(name, input.funnelId, input.lineAccountId, id)]),
   ];
   try {
-    await db.batch(statements);
+    const results = await db.batch(statements);
+    if (Number(results[0]?.meta?.changes ?? 0) !== 1) {
+      const latest = await getFunnelById(db, input.lineAccountId, input.funnelId);
+      if (!latest) throw new Error('analytics_funnel_not_found');
+      if (latest.status !== 'active') throw new Error('analytics_funnel_not_active');
+      throw new Error('analytics_funnel_version_conflict');
+    }
   } catch (error) {
     if (error instanceof Error && error.message.includes('UNIQUE')) {
       throw new Error('analytics_funnel_version_conflict');

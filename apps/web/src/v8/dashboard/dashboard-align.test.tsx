@@ -39,9 +39,8 @@ describe('右の列を帯の1マス分にする口', () => {
     expect(css).toMatch(/\.dashboardRow\[data-aside-size='column'\] \{ display: grid; grid-template-columns: repeat\(var\(--tpl-dash-cols\), minmax\(0, 1fr\)\); \}/)
     expect(css).toMatch(/\[data-aside-size='column'\] > \.dashboardCell \{ grid-column: 1 \/ -2; \}/)
     expect(css).toMatch(/\[data-aside-size='column'\] > \.dashboardAside \{ grid-column: -2 \/ -1; width: auto; \}/)
-    // 横並びの段も等分の格子（flex の配分だと線の太さ分ずれる）。高さの下限は置かない（中身の下に空きを作らない）。
-    expect(css).toMatch(/\.dashboardColumns \{ display: grid; grid-auto-flow: column; grid-auto-columns: minmax\(0, 1fr\); \}/)
-    expect(css).not.toMatch(/\.dashboardColumns \{ min-height/)
+    // 横並びの段も等分の格子（flex の配分だと線の太さ分ずれる）。高さは絵（WQmep の下の4つ＝200）に合わせた下限だけ置く（中身が増えれば伸びる）。
+    expect(css).toMatch(/\.dashboardColumns \{ min-height: 200px; display: grid; grid-auto-flow: column; grid-auto-columns: minmax\(0, 1fr\); \}/)
   })
 
   it('狭い板（1100 未満）でも 1マス分の右の列は隠さない', () => {
@@ -86,12 +85,12 @@ describe('読めなかった項目は日本語の名前', () => {
 describe('右の列：現在の対応状況と接続状態', () => {
   it('対応状況の4行は状態の色の丸を前に置く（未対応 赤・対応中 橙・保留 灰・対応済み 緑）', () => {
     const { container } = render(<SupportStatus inbox={{ unanswered: 5, inProgress: 0, onHold: 0, resolved: 38 } as never} autoOnInbound />)
-    const dots = [...container.querySelectorAll('a > span[aria-hidden="true"]')].map((dot) => dot.className)
+    const dots = [...container.querySelectorAll('a span[aria-hidden="true"]')].map((dot) => (dot as HTMLElement).dataset.tone)
     expect(dots).toHaveLength(4)
-    expect(dots[0]).toMatch(/dot_danger/)
-    expect(dots[1]).toMatch(/dot_warning/)
-    expect(dots[2]).not.toMatch(/dot_(danger|warning|success)/)
-    expect(dots[3]).toMatch(/dot_success/)
+    expect(dots[0]).toBe('danger')
+    expect(dots[1]).toBe('warning')
+    expect(dots[2]).toBe('neutral')
+    expect(dots[3]).toBe('success')
   })
 
   it('Webhook の値は 正常／要確認（理由つき）／未確認。「確認中」で止まらない', () => {

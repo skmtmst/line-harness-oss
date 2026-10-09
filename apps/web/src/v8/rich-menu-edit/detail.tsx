@@ -12,6 +12,7 @@
  * 受け付ける指定・呼ぶ API は BEHAVIOR.md。
  */
 
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -40,6 +41,7 @@ type Group = {
 
 export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'リッチメニュー', href: '/rich-menus' }])
   const [group, setGroup] = useState<Group | null>(null)
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'missing' | 'error'>('loading')
@@ -83,7 +85,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
       const data = res.data as unknown as Group
       // 下書きは見せる物が無い。直す画面（ウィザードの手順①）へ。
       if (data.status !== 'published') {
-        router.replace(`/rich-menus/edit?id=${encodeURIComponent(groupId)}&step=shape`)
+        samePageUrl.replace(`/rich-menus/edit?id=${encodeURIComponent(groupId)}&step=shape`)
         return
       }
       setGroup(data)
@@ -91,7 +93,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
     } catch (caught) {
       setLoadState(caught instanceof ApiError && caught.status === 404 ? 'missing' : 'error')
     }
-  }, [groupId, router])
+  }, [groupId, samePageUrl])
 
   const loadProgress = useCallback(async () => {
     try {

@@ -1,7 +1,8 @@
 'use client'
 
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Copy, GitBranch, QrCode } from 'lucide-react'
 import type { EntryRoute } from '@line-crm/shared'
 import { api, type DashboardOverview } from '@/lib/api'
@@ -25,7 +26,7 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
   canManage: boolean
 }) {
   const { selectedAccount, selectedAccountId } = useAccount()
-  const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const params = useSearchParams()
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
   const [routes, setRoutes] = useState<EntryRoute[] | null>(null)
@@ -44,7 +45,7 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
     if (value === null) next.delete('qr')
     else next.set('qr', value)
     const text = next.toString()
-    router.replace(text ? `/?${text}` : '/')
+    samePageUrl.replace(text ? `/?${text}` : '/')
   }
 
   useEffect(() => {

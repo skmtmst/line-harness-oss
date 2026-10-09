@@ -92,6 +92,7 @@ beforeEach(() => {
     const url = new URL(String(input))
     const path = url.pathname
     const method = init?.method ?? 'GET'
+    if (method === 'POST' && path.endsWith('/pause')) { puts.push({ path, body: JSON.parse(String(init?.body)) }); return json({ data: { ...webinar, status: 'paused' } }) }
     if (method === 'PUT') {
       puts.push({ path, body: init?.body ? JSON.parse(String(init.body)) : null })
       if (conflictState.ctas && path.endsWith('/ctas')) return json({ success: false, error: 'ほかの人が保存しました', code: 'version_conflict' }, 409)
@@ -151,10 +152,39 @@ describe('V8 ウェビナーの編集', () => {
     expect(tabs?.textContent).toContain('参加者 124')
     expect(tabs?.querySelector('[aria-current="page"]')?.textContent).toBe('参加者 124')
     expect(host.textContent).toContain('視聴完了 71')
+    expect(host.textContent).toContain('平均離脱時間 —')
+    expect(host.textContent).not.toContain('平均 6分で離脱')
     expect(host.textContent).toContain('見ていない・見逃し案内の対象')
     const chat = host.querySelector('a[href="/chats?friend=f-1"]')
     expect(chat?.textContent).toContain('チャットを見る')
     expect(buttonText('CSV で書き出す')).toBeTruthy()
+  })
+
+  it('分析のフォーム送信はAPIの重複を除いた人数として帯と棒の両方に表示する', async () => {
+    nav.search = 'id=webinar-1&pane=analytics'
+    await render(<WebinarEditV8 />)
+    const funnel = host.querySelector('#webinar-analytics-funnel')
+    const row = [...(funnel?.querySelectorAll('li') ?? [])].find((item) => item.textContent?.includes('フォーム送信'))
+    expect(row?.textContent).toContain('9 人')
+    const stats = host.querySelector('[data-template-region="stats"]')
+    expect(stats?.textContent).toContain('フォーム送信?9人')
+    expect(stats?.textContent).not.toContain('フォーム送信?9件')
+  })
+
+  it('コメントの見え方は開始前2件で埋めず、開始後の最初のコメントも出す', async () => {
+    comments = [
+      { atSeconds: -30, authorName: 'さくら', body: '音声きこえます' },
+      { atSeconds: -60, authorName: '田中', body: 'こんばんは' },
+      { atSeconds: 45, authorName: 'まさ', body: 'わかりやすい！' },
+    ]
+    nav.search = 'id=webinar-1&pane=comments'
+    await render(<WebinarEditV8 />)
+    const preview = host.querySelector('aside[aria-labelledby="webinar-comments-preview"]')
+    expect(preview?.textContent).toContain('まさ：わかりやすい！')
+    expect(preview?.textContent).toContain('田中：こんばんは')
+    expect(preview?.textContent).not.toContain('さくら：音声きこえます')
+    // 狭い幅で開く欄にも同じ見本を渡す。
+    expect(host.querySelector('details')?.textContent).toContain('まさ：わかりやすい！')
   })
 
   it('作る手順の段（④通知）：5段の帯から別の段へ移れる', async () => {
@@ -162,7 +192,7 @@ describe('V8 ウェビナーの編集', () => {
     await render(<WebinarEditV8 />)
     expect(host.textContent).toContain('通知と視聴後のこと')
     expect(host.querySelector('[aria-current="step"]')?.textContent).toContain('通知')
-    const video = buttons().find((button) => button.textContent?.includes('動画') && button.closest('[data-part="stepper"]'))
+    const video = buttons().find((button) => button.textContent?.includes('動画') && button.closest('[data-part="steps"]'))
     expect(video).toBeTruthy()
     await act(async () => { video!.click() })
     for (let i = 0; i < 4; i += 1) await act(async () => {})
@@ -217,4 +247,18 @@ describe('V8 ウェビナーの編集', () => {
     expect(buttonText('比べてから保存')).toBeTruthy()
     expect([...host.querySelectorAll('a')].some((link) => link.textContent?.trim() === 'キャンセル')).toBe(true)
   })
+})
+
+it('WEB-166：公開中は編集の…から版を確認して停止する', async () => {
+  await render(<WebinarEditV8 />)
+  const menu = buttons().find(b => b.getAttribute('aria-label') === 'ウェビナーの操作')!
+  expect(menu).toBeTruthy()
+  await act(async () => { menu.click() })
+  const pause = document.querySelector('[role="menuitem"]') as HTMLElement
+  expect(pause.textContent).toContain('停止')
+  await act(async () => { pause.click() })
+  const confirm = buttons().find(b => b.textContent?.trim() === '停止する')!
+  expect(confirm).toBeTruthy()
+  await act(async () => { confirm.click() })
+  expect(puts.some(p => p.path.endsWith('/pause') && (p.body as { expectedVersion: number }).expectedVersion === 3)).toBe(true)
 })

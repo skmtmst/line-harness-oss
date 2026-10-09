@@ -19,7 +19,7 @@ const calls = vi.hoisted(() => ({
 }))
 
 vi.mock('@/lib/api', () => ({ api: { hqSupport: calls } }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageChrome: () => ({}) }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined, usePageChrome: () => ({}) }))
 vi.mock('@/components/tenant-access-context', () => ({ useTenantStatus: () => 'active' }))
 vi.mock('@/components/hq/notice-line-register-dialog', () => ({ default: () => <div data-line-guide /> }))
 
@@ -58,3 +58,5 @@ describe('形の違う表示用情報でもお問い合わせは落ちない', (
     expect(host.textContent).toContain('読み込めませんでした')
   })
 })
+
+vi.mock('next/navigation', () => ({ usePathname: () => window.location.pathname, useSearchParams: () => new URLSearchParams(window.location.search), useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }))

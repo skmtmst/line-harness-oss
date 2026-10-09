@@ -4,34 +4,6 @@
  * ★V8 運用者へのお知らせを作る・なおす（板 gjUz3・hiBO8）。
  * 値は globals.css の [data-theme="v8"] の --tpl-hb2-op-* と共通の --tpl-* から。
  */
-.board {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  margin: var(--tpl-hb2-board-bleed);
-}
-
-.head {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-hb2-head-gap);
-  padding: var(--tpl-hb2-head-pad);
-}
-
-.headTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--tpl-hb2-head-title);
-  font-weight: 700;
-  line-height: normal;
-}
-
-.headDescription {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: normal;
-}
 
 .body {
   display: flex;
@@ -59,100 +31,11 @@
   font-size: var(--text-label);
 }
 
-.split {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--tpl-hb2-op-gap);
-  min-width: 0;
-}
-
-.main {
-  display: flex;
-  flex: 1 1 0;
-  flex-direction: column;
-  gap: var(--tpl-hb2-op-col-gap);
-  min-width: 0;
-}
-
-.side {
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  gap: var(--tpl-hb2-op-col-gap);
-  width: var(--tpl-hb2-op-side-w);
-}
-
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-hb2-op-col-gap);
-  padding: var(--tpl-hb2-op-card-pad);
-  border-radius: var(--tpl-hb2-op-card-radius);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-}
-
-.cardHead {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-hb2-op-head-gap);
-}
-
-.cardTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--text-body);
-  font-weight: 700;
-  line-height: normal;
-}
-
 .cardNote {
   margin: 0;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
   line-height: normal;
-}
-
-.nameField,
-.field {
-  display: flex;
-  flex: 1 1 0;
-  flex-direction: column;
-  gap: var(--tpl-hb2-op-field-gap);
-  min-width: 0;
-}
-
-.nameLabel {
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 500;
-  line-height: var(--tpl-hb2-op-lh);
-}
-
-.fieldLabel {
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: normal;
-}
-
-.field :global(*) {
-  max-width: 100%;
-}
-
-.input {
-  box-sizing: border-box;
-  width: 100%;
-  height: var(--tpl-hb2-op-control-h);
-  padding: var(--tpl-hb2-op-input-pad);
-  border: 0;
-  border-radius: var(--tpl-hb2-op-control-radius);
-  outline: 1px solid var(--color-control-border);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--text-body);
 }
 
 .pair {
@@ -168,8 +51,9 @@
   gap: var(--tpl-hb2-op-col-gap);
   padding: var(--tpl-hb2-op-box-pad);
   border-radius: var(--tpl-hb2-op-card-radius);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
+  box-shadow: var(--card-shadow);
 }
 
 .staffHead {

@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 友だち属性「対応マーク」タブの一覧（Pencil `vKDj5`、状態 `U0aKD`）。
+ * ★V8 タグ「対応マーク」タブの一覧（Pencil `vKDj5`、状態 `U0aKD`）。
  *
  * フォルダを持たないタブなので、作る口は見出しの右（page 側の headAction）。
  * 数え方・並べ替え・保管の確認窓は v7（`mark-list.tsx`）と同じ関数を使う。

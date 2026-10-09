@@ -583,7 +583,7 @@ CREATE TABLE affiliates (
   friend_id       TEXT REFERENCES friends (id),
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , email TEXT, hold_days INTEGER, payout_cycle TEXT, notify_on_conversion INTEGER NOT NULL DEFAULT 0, tenant_id TEXT REFERENCES tenants(id), line_account_id TEXT REFERENCES line_accounts(id), lifecycle_status TEXT NOT NULL DEFAULT 'active'
-  CHECK (lifecycle_status IN ('active', 'paused', 'archived')), archived_at TEXT, operation_id TEXT);
+  CHECK (lifecycle_status IN ('active', 'paused', 'archived')), archived_at TEXT, operation_id TEXT, reward_mode TEXT CHECK (reward_mode IN ('none', 'fixed', 'rate')));
 
 CREATE TABLE ai_loop_slack_reports (
   work_key        TEXT PRIMARY KEY,
@@ -1290,7 +1290,8 @@ CREATE TABLE banner_generations (
   started_at       TEXT,
   finished_at      TEXT
 , reference_image_id TEXT REFERENCES banner_images(id), reference_mode TEXT
-  CHECK (reference_mode IS NULL OR reference_mode IN ('edit', 'inspire')), base_color TEXT, accent_color TEXT, reference_images TEXT, emphasis_lines TEXT);
+  CHECK (reference_mode IS NULL OR reference_mode IN ('edit', 'inspire')), base_color TEXT, accent_color TEXT, reference_images TEXT, emphasis_lines TEXT, crop_gravity TEXT NOT NULL DEFAULT 'center'
+  CHECK (crop_gravity IN ('center','top','bottom')), stop_requested_at TEXT);
 
 CREATE TABLE banner_image_deliveries (
   id               TEXT PRIMARY KEY,
@@ -2995,7 +2996,8 @@ CREATE TABLE friend_add_rule_folders (
   create_idempotency_key  TEXT NOT NULL,
   created_by_staff_id     TEXT NOT NULL,
   created_at              TEXT NOT NULL,
-  updated_at              TEXT NOT NULL,
+  updated_at              TEXT NOT NULL, color TEXT
+  CHECK (color IS NULL OR (typeof(color) = 'text' AND length(color) = 7 AND color GLOB '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]')),
   UNIQUE (line_account_id, name),
   UNIQUE (line_account_id, create_idempotency_key)
 );
@@ -3449,7 +3451,8 @@ CREATE TABLE hq_broadcast_folders (
  id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id), name TEXT NOT NULL,
  revision INTEGER NOT NULL DEFAULT 1, archived_at TEXT,
  created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+, color TEXT
+  CHECK (color IS NULL OR (typeof(color) = 'text' AND length(color) = 7 AND color GLOB '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]')));
 
 CREATE TABLE hq_broadcast_runs (
  id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id), request_id TEXT NOT NULL, actor_id TEXT NOT NULL,
@@ -3565,7 +3568,8 @@ CREATE TABLE hq_template_folders (
   revision INTEGER NOT NULL DEFAULT 1,
   archived_at TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), color TEXT
+  CHECK (color IS NULL OR (typeof(color) = 'text' AND length(color) = 7 AND color GLOB '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]')),
   UNIQUE(id, tenant_id)
 );
 
@@ -3598,7 +3602,8 @@ CREATE TABLE hq_template_preflight_resolutions (
   target_id TEXT,
   alias_name TEXT,
   expected_revision TEXT,
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), friend_attribute_mode TEXT
+  CHECK (friend_attribute_mode IS NULL OR (friend_attribute_mode='skip' AND resolution_mode='overwrite' AND NOT (target_id IS NULL))),
   PRIMARY KEY (preflight_id, tenant_id, source_id),
   CHECK (resolution_mode != 'overwrite' OR (target_id IS NOT NULL AND expected_revision IS NOT NULL)),
   CHECK (resolution_mode != 'alias' OR alias_name IS NOT NULL),
@@ -3664,7 +3669,8 @@ CREATE TABLE hq_templates (
   created_by TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  archived_at TEXT, folder_id TEXT, extended_type TEXT CHECK (extended_type IS NULL OR extended_type='scenario'),
+  archived_at TEXT, folder_id TEXT, extended_type TEXT CHECK (extended_type IS NULL OR extended_type='scenario'), friend_attribute_type TEXT
+  CHECK (friend_attribute_type IS NULL OR friend_attribute_type IN ('friend_field','mark')),
   PRIMARY KEY (id, tenant_id),
   FOREIGN KEY (current_version_id, id, tenant_id)
     REFERENCES hq_template_versions(id, template_id, tenant_id)
@@ -7447,7 +7453,7 @@ CREATE TABLE tenants (
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , feature_packs TEXT NOT NULL DEFAULT '[]', plan_key TEXT, plan_status TEXT NOT NULL DEFAULT 'exempt'
   CHECK (plan_status IN ('exempt', 'trialing', 'active', 'past_due', 'canceled')), trial_ends_at TEXT, stripe_customer_id TEXT, stripe_subscription_id TEXT, current_period_ends_at TEXT, plan_updated_at TEXT, signup_device_marker TEXT, retention_anchor_at TEXT, purge_requested_at TEXT, data_purged_at TEXT, login_display_name TEXT, logo_media_id TEXT REFERENCES media(id) ON DELETE SET NULL, logo_background_color TEXT NOT NULL DEFAULT '#ffffff', company_settings_version INTEGER NOT NULL DEFAULT 0
-  CHECK (company_settings_version >= 0));
+  CHECK (company_settings_version >= 0), legal_company_name TEXT, company_postal_code TEXT, company_address TEXT, company_building TEXT, company_phone TEXT, contact_name TEXT, contact_email TEXT, invoice_addressee TEXT);
 
 CREATE TABLE tiktok_pnl_order_lines (
   -- `<TikTok注文ID>:<行番号>`。シートのキー列（A列）にもこの値を使う。
@@ -8051,6 +8057,30 @@ CREATE TABLE webinars (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 , folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, publication_starts_at TEXT, publication_ends_at TEXT, video_asset_id TEXT REFERENCES webinar_video_assets(id) ON DELETE SET NULL, cta_version INTEGER NOT NULL DEFAULT 0, cta_updated_by TEXT, cta_updated_at TEXT, cta_write_token TEXT);
+
+CREATE TABLE workflow_steps (
+  scope_id TEXT NOT NULL,
+  process_kind TEXT NOT NULL,
+  subject_id TEXT NOT NULL,
+  step_key TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending','running','succeeded','failed','exhausted','unknown','canceled')),
+  lease_owner TEXT,
+  lease_expires_at INTEGER,
+  attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  max_attempts INTEGER NOT NULL DEFAULT 5 CHECK (max_attempts > 0),
+  next_attempt_at INTEGER,
+  retry_key TEXT NOT NULL,
+  input_json TEXT,
+  result_json TEXT,
+  error_code TEXT,
+  first_attempt_at INTEGER,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (scope_id, process_kind, subject_id, step_key),
+  CHECK ((status = 'running' AND NOT (lease_owner IS NULL) AND NOT (lease_expires_at IS NULL))
+      OR (status <> 'running' AND lease_owner IS NULL AND lease_expires_at IS NULL))
+);
 
 CREATE INDEX booking_sync_notices_account ON booking_sync_notices(line_account_id,status,target_date);
 
@@ -10155,6 +10185,8 @@ CREATE UNIQUE INDEX visit_stamp_one_paper ON visit_stamp_paper_requests(card_id,
 
 CREATE UNIQUE INDEX visit_stamp_one_visit ON visit_stamp_entries(card_id,friend_id,visit_key) WHERE kind='visit';
 
+CREATE INDEX workflow_steps_due ON workflow_steps(process_kind, status, next_attempt_at, lease_expires_at);
+
 CREATE TRIGGER analytics_projection_friend_stage_count
 AFTER INSERT ON analytics_projection_friend_stage
 BEGIN UPDATE analytics_projection_metric_stage SET unique_friend_count = unique_friend_count + 1 WHERE line_account_id = NEW.line_account_id AND cycle_id = NEW.cycle_id AND metric_date = NEW.metric_date AND event_type = NEW.event_type; END;
@@ -10255,6 +10287,18 @@ WHEN EXISTS (
 )
 BEGIN SELECT RAISE(ABORT, 'conversion point with events or usages cannot be deleted'); END;
 
+CREATE TRIGGER hq_attribute_skip_insert BEFORE INSERT ON hq_template_preflight_resolutions
+WHEN NEW.friend_attribute_mode IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM hq_templates t WHERE t.id=NEW.template_id AND t.tenant_id=NEW.tenant_id
+    AND t.friend_attribute_type=NEW.item_kind)
+BEGIN SELECT RAISE(ABORT,'HQ_ATTRIBUTE_SKIP_INVALID'); END;
+
+CREATE TRIGGER hq_attribute_skip_update BEFORE UPDATE ON hq_template_preflight_resolutions
+WHEN NEW.friend_attribute_mode IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM hq_templates t WHERE t.id=NEW.template_id AND t.tenant_id=NEW.tenant_id
+    AND t.friend_attribute_type=NEW.item_kind)
+BEGIN SELECT RAISE(ABORT,'HQ_ATTRIBUTE_SKIP_INVALID'); END;
+
 CREATE TRIGGER hq_template_binding_guard
 BEFORE UPDATE ON hq_templates
 WHEN NEW.id != OLD.id
@@ -10277,6 +10321,15 @@ BEGIN SELECT RAISE(ABORT, 'HQ_FOLDER_SCOPE_INVALID'); END;
 CREATE TRIGGER hq_template_folder_update BEFORE UPDATE OF folder_id, tenant_id ON hq_templates
 WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM hq_template_folders WHERE id=NEW.folder_id AND tenant_id=NEW.tenant_id AND archived_at IS NULL)
 BEGIN SELECT RAISE(ABORT, 'HQ_FOLDER_SCOPE_INVALID'); END;
+
+CREATE TRIGGER hq_template_friend_attribute_insert BEFORE INSERT ON hq_templates
+WHEN NEW.friend_attribute_type IS NOT NULL
+  AND (NEW.template_type!='tag' OR NEW.extended_type IS NOT NULL)
+BEGIN SELECT RAISE(ABORT,'HQ_TYPE_INVALID'); END;
+
+CREATE TRIGGER hq_template_friend_attribute_update BEFORE UPDATE OF friend_attribute_type ON hq_templates
+WHEN NEW.friend_attribute_type IS NOT OLD.friend_attribute_type
+BEGIN SELECT RAISE(ABORT,'HQ_TYPE_IMMUTABLE'); END;
 
 CREATE TRIGGER hq_template_logical_archive_only
 BEFORE DELETE ON hq_templates

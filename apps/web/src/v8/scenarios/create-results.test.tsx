@@ -2,7 +2,7 @@
 /*
  * ★V8 シナリオを作る①（create.tsx・dnzqC）と配信結果（results.tsx・X4STXS）の動きの試験。
  * BEHAVIOR.md の主な動きを守る：
- * - 作る①：はじめは「時刻で指定」を選び、見本も方式に合わせて切り替わる。既存の下書きは保存済みの方式。
+ * - 作る①：はじめは「時刻で指定」を選び、2方式の図を要約で読める。既存の下書きは保存済みの方式。
  *   閲覧のみには保存の操作を置かず帯を出す。「この方式で保存する」で作って1通目へ進む。
  * - 配信結果：購読の状態の札（途中・送れずに止まった・読み終えた）と「何通目まで」。
  *   「…」は配信中・止まっている行だけ、閲覧のみには置かない。配信失敗の行だけ「失敗を再送」。
@@ -136,14 +136,22 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('作る①（dnzqC）', () => {
-  test('はじめは「時刻で指定」を選び、見本は方式を替えると切り替わる', async () => {
+  test('はじめは「時刻で指定」を選び、図を押しても方式を替えられ、札は個別に読ませない', async () => {
     render(<ScenarioCreateV8 />)
     const absolute = screen.getByRole('radio', { name: /時刻で指定/ }) as HTMLInputElement
     expect(absolute.checked).toBe(true)
-    expect(screen.getByText('時刻で指定は、2人とも同じ時刻に届きます')).toBeTruthy()
-    fireEvent.click(screen.getByRole('radio', { name: /経過時間で指定/ }))
-    expect(screen.getByText(/経過時間で指定は、始めた時刻が2時間遅い分/)).toBeTruthy()
-    expect(screen.getByText('1通目 4/1 17:00')).toBeTruthy()
+    const diagrams = screen.getAllByRole('img')
+    expect(diagrams).toHaveLength(2)
+    expect(diagrams[0].getAttribute('aria-label')).toContain('両方に、1通目は当日15時、2通目は翌日20時')
+    expect(diagrams[1].getAttribute('aria-label')).toContain('当日17時と翌日22時')
+    for (const diagram of diagrams) expect(diagram.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true')
+    fireEvent.click(diagrams[1])
+    expect(absolute.checked).toBe(false)
+    expect((screen.getByRole('radio', { name: /経過時間で指定/ }) as HTMLInputElement).checked).toBe(true)
+    expect(diagrams[0].getAttribute('data-selected')).toBe('false')
+    expect(diagrams[1].getAttribute('data-selected')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: '配信方式の説明' }))
+    expect(screen.getByText('作ったあとは変えられません')).toBeTruthy()
   })
 
   test('既存の下書きは保存済みの方式を選び、下書きの帯を出す', async () => {

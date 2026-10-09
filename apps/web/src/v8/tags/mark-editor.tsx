@@ -13,7 +13,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Archive, Check, Pencil, Plus, Trash2, Zap } from 'lucide-react'
+import { Check, Pause, Pencil, Plus, Trash2, Zap } from 'lucide-react'
 import {
   api,
   ApiError,
@@ -28,6 +28,8 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import { TextField } from '@/components/shared/text-field'
+import { Field } from '@/components/shared/form-controls'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -39,8 +41,9 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useCanManageSupportMark } from '@/components/friend-fields/support-mark-permissions'
 import SupportMarkRulesPanel from '@/components/friend-fields/support-mark-rules-panel'
 import { EVENT_LABELS, eventLabel, inExecutionOrder } from '@/components/friend-fields/support-mark-rules-view'
-import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
+import { AttributeKindGuide, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 import { ArchiveMarkDialog } from '@/components/friend-fields/mark-list'
+import MarkBasicFields from './mark-basic-fields'
 import styles from './create.module.css'
 
 const COLORS = [
@@ -96,7 +99,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
   const { selectedAccountId } = useAccount()
   const editing = Boolean(markId)
   usePageTitle(editing ? '対応マークを編集' : '対応マークを作る')
-  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '友だち属性', href: '/tags' }, { label: '対応マーク', href: '/tags?tab=marks' }])
+  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'タグ', href: '/tags' }, { label: '対応マーク', href: '/tags?tab=marks' }])
 
   const [items, setItems] = useState<MarkRow[]>([])
   /* 一覧の読み込み具合。ready になるまで保存は押せない（R510・R511）。 */
@@ -104,6 +107,8 @@ function MarkEditorBody({ markId }: { markId?: string }) {
   const [loadMessage, setLoadMessage] = useState('')
   const [reloading, setReloading] = useState(false)
   const [name, setName] = useState('要確認')
+  const [nameError, setNameError] = useState('')
+  const nameRef = useRef<HTMLInputElement>(null)
   const [color, setColor] = useState<string>(COLORS[0].value)
   const [displayOrder, setDisplayOrder] = useState(4)
   const [isDefault, setIsDefault] = useState(false)
@@ -271,7 +276,8 @@ function MarkEditorBody({ markId }: { markId?: string }) {
   }
 
   const save = async () => {
-    if (!name.trim()) return setError('マーク名を入力してください')
+    if (!name.trim()) { setNameError('マーク名を入力してください'); setError(''); nameRef.current?.focus(); nameRef.current?.scrollIntoView({ block: 'center' }); return }
+    setNameError('')
     if (!selectedAccountId) return setError('LINE公式アカウントを選んでください')
     if (loadState !== 'ready' || roleBlocked || saveForbidden) return
     if (loadedAccountRef.current !== selectedAccountId) return
@@ -375,7 +381,6 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         : roleBlocked ? '対応マークを作る権限がありません'
           : saveForbidden ? '対応マークを保存する権限がありません'
             : loadState === 'ready' && loadedAccountRef.current !== selectedAccountId ? 'アカウントを切り替えています。一覧を読み込むまでお待ちください'
-              : !name.trim() ? 'マーク名を入力すると保存できます'
                 : editing && !selected ? '編集中のマークを読み込めませんでした'
                   : null
   const saveDisabled = saving || blockedReason !== null
@@ -407,7 +412,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
       </dl>
       {editing ? (
         <p className={styles.infoNote}>
-          <Archive className={styles.wayIcon} aria-hidden="true" />
+          <Pause className={styles.wayIcon} aria-hidden="true" />
           保管すると、新しく付けられなくなります。いま付いている人は、保管の小窓で選ぶマークへ置き換わり、履歴に残ります。
         </p>
       ) : null}
@@ -429,7 +434,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         preview={aside}
         destructive={editing && selected && !hideForm ? (
           <Button type="button" variant="danger" onClick={() => void openArchive()} disabled={archiveBlockReason !== null} title={archiveBlockReason ?? undefined}>
-            <Archive size={15} aria-hidden="true" />保管する
+            <Pause size={15} aria-hidden="true" />保管する
           </Button>
         ) : undefined}
         footerActions={hideForm ? <Button href="/tags?tab=marks">一覧へ戻る</Button> : <>
@@ -457,32 +462,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
 
         {hideForm ? null : (
           <>
-            <section className={styles.card} aria-labelledby="mark-basic">
-              <div className={styles.cardHead}><h2 className={styles.cardTitle} id="mark-basic">基本</h2></div>
-              <label className={styles.field}>
-                <span className={styles.label}>マーク名</span>
-                <input className={styles.input} value={name} onChange={(event) => setName(event.target.value)} placeholder="例：要確認" />
-                <DuplicateNameNote duplicates={nameDuplicates} kindLabel="対応マーク" />
-              </label>
-              <div className={styles.colorField} role="group" aria-labelledby="mark-color">
-                <span className={styles.labelStrong} id="mark-color">色</span>
-                <span className={styles.colorRow}>
-                  {COLORS.map((item) => (
-                    <button
-                      key={item.value}
-                      type="button"
-                      onClick={() => setColor(item.value)}
-                      aria-label={item.name}
-                      title={item.name}
-                      aria-pressed={color.toLowerCase() === item.value.toLowerCase()}
-                      className={styles.colorSwatch}
-                      style={{ backgroundColor: item.value }}
-                    />
-                  ))}
-                </span>
-                <p className={styles.keyNote}>赤・オレンジ・緑・青・紫・グレー（色と名前の両方で見分ける）</p>
-              </div>
-            </section>
+            <MarkBasicFields name={name} color={color} onName={(value) => { setName(value); setNameError('') }} onColor={setColor} nameDuplicates={nameDuplicates} disabled={saving} error={nameError} nameRef={nameRef} />
 
             <section className={styles.card} aria-labelledby="mark-rules">
               <div className={styles.cardHead}>

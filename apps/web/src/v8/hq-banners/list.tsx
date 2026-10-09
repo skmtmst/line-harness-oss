@@ -9,6 +9,7 @@
  * 頭（型 ListPage）・左の「見る」の列（型のフォルダの列＋共通 FolderPanel）・数のカード4枚・
  * 案内の帯・タブ・道具の段・カード（プロジェクト）／画像のます（ライブラリ）・件数と次へ。
  */
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { CircleDot, Folder, Gauge, Inbox, Plus, Send, Sparkles, Star, Upload } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -69,7 +70,7 @@ export default function HqBannersListV8() {
 
 function BannersInner() {
   usePageTitle('バナー生成')
-  const router = useRouter()
+  const samePageUrl = useSamePageUrl()
   const params = useSearchParams()
   const tab: Tab = params.get('tab') === 'library' ? 'library' : 'projects'
   const role = useStaffRole()
@@ -109,14 +110,14 @@ function BannersInner() {
   }, [loadSummary])
 
   // タブの切り替えは `?tab=` で、履歴を積まない（v7 と同じ）。
-  const changeTab = (next: Tab) => router.replace(next === 'library' ? '/hq/banners?tab=library' : '/hq/banners')
+  const changeTab = (next: Tab) => samePageUrl.replace(next === 'library' ? '/hq/banners?tab=library' : '/hq/banners')
 
   const kpis = (
     <div className={styles.kpis} data-design="KPIs">
       <StatCard title="プロジェクト" icon={<Folder aria-hidden="true" />} value={stats ? stats.projects.active : null} unit="件" detail={stats ? `アーカイブ ${stats.projects.archived}` : '—'} loading={summaryLoading} />
       <StatCard title="今月の生成" icon={<Sparkles aria-hidden="true" />} value={usage ? usage.month.used : null} unit="枚" detail={usage ? `今日 ${usage.today.used}枚・1日の上限 ${usage.today.limit}枚` : '—'} loading={summaryLoading} />
       <StatCard title="今月の残り" icon={<Gauge aria-hidden="true" />} value={usage ? usage.month.remaining : null} unit="枚" detail={usage ? `上限 ${usage.month.limit}枚・${nextMonthResetLabel()} に戻る` : '—'} loading={summaryLoading} />
-      <StatCard title="アカウントへ渡した画像" icon={<Send aria-hidden="true" />} value={stats ? stats.deliveredImages : null} unit="枚" detail={stats ? `${stats.deliveredAccounts}アカウント` : '—'} loading={summaryLoading} />
+      <StatCard title="アカウントへ配った画像" icon={<Send aria-hidden="true" />} value={stats ? stats.deliveredImages : null} unit="枚" detail={stats ? `${stats.deliveredAccounts}アカウント` : '—'} loading={summaryLoading} />
     </div>
   )
 
@@ -124,7 +125,7 @@ function BannersInner() {
     <>
       {kpis}
       <NoteBar tone="info">
-        作った画像は統括の登録メディアに保存されます。アカウントへ渡すと、そのアカウントの配信・リッチメニュー・回答フォームから選べるようになります。
+        作った画像は統括の登録メディアに保存されます。アカウントへ配ると、そのアカウントの配信・リッチメニュー・回答フォームから選べるようになります。
       </NoteBar>
       <div className={styles.tabs}>
         <Tabs
@@ -269,10 +270,10 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
 
   const ready = status === 'ready' && !archivedMode
   const rows: FolderPanelRow[] = [
-    { id: 'all', label: 'すべて', count: ready ? projects.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
-    { id: 'favorite', label: 'お気に入り', count: ready ? projects.filter((p) => p.isFavorite).length : null, color: 'var(--color-status-info)' },
-    { id: 'running', label: '生成中', count: ready ? projects.filter((p) => p.runningCount > 0).length : null, color: 'var(--color-accent)' },
-    { id: 'archived', label: 'アーカイブ', count: archivedCount, color: 'var(--color-status-warn)' },
+    { kind: 'all' as const, id: 'all', label: 'すべて', count: ready ? projects.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
+    { kind: 'folder' as const, id: 'favorite', label: 'お気に入り', count: ready ? projects.filter((p) => p.isFavorite).length : null, color: 'var(--color-status-info)' },
+    { kind: 'folder' as const, id: 'running', label: '生成中', count: ready ? projects.filter((p) => p.runningCount > 0).length : null, color: 'var(--color-accent)' },
+    { kind: 'folder' as const, id: 'archived', label: 'アーカイブ', count: archivedCount, color: 'var(--color-status-warn)' },
   ]
 
   const createProject = canManage ? (
@@ -311,7 +312,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
       <ListState
         kind="empty"
         title="まだプロジェクトがありません"
-        description="案件やキャンペーンごとにプロジェクトを作り、その中で画像を生成します。作った画像はアカウントへ渡せます。"
+        description="案件やキャンペーンごとにプロジェクトを作り、その中で画像を生成します。作った画像はアカウントへ配れます。"
         action={canManage ? (
           <Button variant="primary" onClick={() => setFormOpen(true)}>
             <Plus aria-hidden="true" className={styles.buttonIcon} />最初のプロジェクトを作る
@@ -342,7 +343,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
     <ListPage
       boardId="B9ZAr"
       title="バナー生成"
-      description="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ渡します。"
+      description="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ配ります。"
       folders={folders}
       folderNav={{ rows, activeId: view, onSelect: selectView, createAction: createProject, label: '見る' }}
     >
@@ -537,7 +538,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
       onChanged()
       return true
     } catch (caught) {
-      setModalError(bannerFailureMessage(caught, 'アカウントへの受け渡し'))
+      setModalError(bannerFailureMessage(caught, 'アカウントへの配布'))
       return false
     } finally {
       setModalBusy(false)
@@ -564,10 +565,10 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
 
   const ready = status === 'ready'
   const rows: FolderPanelRow[] = [
-    { id: 'all', label: 'すべて', count: ready ? counts?.all ?? images.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
-    { id: 'favorite', label: 'お気に入り', count: ready ? counts?.favorite ?? null : null, color: 'var(--color-status-info)' },
-    { id: 'delivered', label: '渡し済み', count: ready ? counts?.delivered ?? null : null, color: 'var(--color-accent)' },
-    { id: 'unused', label: '未使用', count: ready ? counts?.unused ?? null : null, color: 'var(--color-status-warn)' },
+    { kind: 'all' as const, id: 'all', label: 'すべて', count: ready ? counts?.all ?? images.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
+    { kind: 'folder' as const, id: 'favorite', label: 'お気に入り', count: ready ? counts?.favorite ?? null : null, color: 'var(--color-status-info)' },
+    { kind: 'folder' as const, id: 'delivered', label: '配布済み', count: ready ? counts?.delivered ?? null : null, color: 'var(--color-accent)' },
+    { kind: 'folder' as const, id: 'unused', label: '未使用', count: ready ? counts?.unused ?? null : null, color: 'var(--color-status-warn)' },
   ]
 
   const uploadImage = canManage ? (
@@ -620,7 +621,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
               <div className={styles.tileMeta}>
                 <span className={styles.metaText}>{image.source === 'upload' ? '取り込み' : shortPresetLabel(preset, image)}</span>
                 <span className={styles.spacer} />
-                {image.deliveredAccountIds.length > 0 ? <span className={`${styles.pill} ${styles.pillOk}`}><span className={styles.dot} aria-hidden="true" />渡し済み</span> : null}
+                {image.deliveredAccountIds.length > 0 ? <span className={`${styles.pill} ${styles.pillOk}`}><span className={styles.dot} aria-hidden="true" />配布済み</span> : null}
                 {canManage ? (
                   <button type="button" className={styles.star} onClick={() => void toggleFavorite(image)} aria-pressed={image.isFavorite} aria-label={image.isFavorite ? 'お気に入りから外す' : 'お気に入りにする'}>
                     <Star aria-hidden="true" className={image.isFavorite ? styles.starOn : styles.starOff} />
@@ -645,7 +646,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
     <ListPage
       boardId="W5Wxr"
       title="バナー生成"
-      description="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ渡します。"
+      description="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ配ります。"
       folders={folders}
       folderNav={{ rows, activeId: view, onSelect: selectView, createAction: uploadImage, label: '見る' }}
     >

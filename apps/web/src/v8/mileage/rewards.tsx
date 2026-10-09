@@ -516,10 +516,9 @@ export default function RewardsTab() {
   const folderPanel = (
     <FolderPanel
       heading="フォルダ"
-      rows={FOLDERS.map((key) => ({ id: key, label: key, count: folderCounts.get(key) ?? 0 }))}
+      rows={FOLDERS.map((key) => ({ kind: key === 'すべて' ? 'all' as const : key === '未分類' ? 'unfiled' as const : 'folder' as const, id: key, label: key, count: folderCounts.get(key) ?? 0 }))}
       activeId={folder}
       onSelect={(id) => { setPage(1); setFolder(id as Folder) }}
-      addFolderNote="フォルダを消しても、中の経路は未分類に残ります"
     />
   )
 
@@ -812,7 +811,6 @@ export default function RewardsTab() {
   ) : (
     <>
       {table}
-      <p className={styles.footNote}>行の「…」から 編集・自分で交換をテスト・出すのを止める・複製。</p>
     </>
   )
 
@@ -825,6 +823,7 @@ export default function RewardsTab() {
 
   return (
     <MileageFrame
+      help="行の「…」から 編集・自分で交換をテスト・出すのを止める・複製。"
       actions={
         <Button variant="secondary" onClick={exportCsv} disabled={!canExport}>
           <Download size={15} aria-hidden="true" /> CSV で書き出す

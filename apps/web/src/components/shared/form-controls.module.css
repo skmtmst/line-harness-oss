@@ -111,6 +111,8 @@
 [data-theme='v8'] .field { display: flex; flex-direction: column; gap: 6px; }
 [data-theme='v8'] .labelRow { margin-bottom: 0; gap: 6px; }
 [data-theme='v8'] .label { line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+[data-theme='v8'] .field[data-field-size='compact'] .label { font-size: var(--text-caption); font-weight: 600; line-height: normal; }
+[data-theme='v8'] .field[data-field-fill] { flex: 1 1 0; }
 
 /* 打ち直している間（Field の data-field-quiet）は、誤りの赤を引っ込めて普段の枠に戻す。 */
 .field[data-field-quiet] [aria-invalid='true'] {
@@ -122,7 +124,21 @@
 }
 }
 
+[data-theme='v8'] .field[data-label-size='compact'] .label { font-size: var(--text-caption); font-weight: 600; line-height: 17px; }
+
 /* v7 の複数行（TextArea の包み）は元どおり大きさ固定。正本の層の外の resize: vertical より強くするため層の外に置く。 */
 :root:not([data-theme='v8']) .legacyTextarea {
   resize: none;
 }
+
+[data-theme='v8'] .field[data-density] { display: flex; flex-direction: column; gap: var(--tpl-rt-payload-gap); }
+[data-theme='v8'] .field[data-density] .labelRow { margin: 0; }
+[data-theme='v8'] .field[data-density="compact"] .label { color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; line-height: normal; }
+[data-theme='v8'] .field[data-density="input"] .label { color: var(--color-ink); font-size: var(--text-label); font-weight: 500; line-height: var(--tpl-rt-label-lh); }
+[data-theme='v8'] .field[data-grow] { flex: 1 1 0; }
+.errorFrame { display: contents; }
+.errorFrame[data-invalid] { display: block; outline: 1px solid var(--color-danger); outline-offset: 2px; border-radius: var(--radius-control); }
+
+[data-theme='v8'] .field[data-spacing='section'] { gap: var(--tpl-section-gap); }
+[data-theme='v8'] .field[data-field-size='compact'] .label { font-size: var(--tpl-rest3-ec-small); line-height: var(--tpl-rest3-ec-label-lh); }
+[data-theme='v8'] .field[data-field-size='compact'] :is(.note, .error) { margin-top: 0; font-size: var(--tpl-rest3-ec-xs); line-height: var(--tpl-rest3-ec-note-lh); }

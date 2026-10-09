@@ -6,9 +6,6 @@ import { describe, expect, it } from 'vitest'
 const here = dirname(fileURLToPath(import.meta.url))
 const css = readFileSync(join(here, 'breadcrumb.module.css'), 'utf8')
 const tsx = readFileSync(join(here, 'breadcrumb.tsx'), 'utf8')
-const fieldEdit = readFileSync(join(here, '..', '..', 'app', 'tags', 'fields', 'edit', 'page.tsx'), 'utf8')
-const fieldNew = readFileSync(join(here, '..', '..', 'app', 'tags', 'fields', 'new', 'page.tsx'), 'utf8')
-const searchEdit = readFileSync(join(here, '..', '..', 'app', 'tags', 'searches', 'edit', 'page.tsx'), 'utf8')
 
 /*
  * R177: 長い項目名で戻るボタンが右へ押し出されていた。
@@ -26,20 +23,13 @@ describe('R177 パンくずと戻るボタンのはみ出し', () => {
     expect(tsx).toContain('title={item.label}')
   })
 
-  it('編集3画面の見出し行はパンくずを縮めボタンを残す', () => {
-    /*
-     * m22c: fields系の戻りはボタン枠から共通の行き先リンクへ変えた。
-     * 残すのは「戻り先」であって枠ではない。パンくずが縮み（min-w-0）、
-     * 戻り先が縮まず（shrink-0）残ることを見る。
-     */
-    for (const [name, page, back] of [
-      ['fields/edit', fieldEdit, '>友だち情報欄へ</Link>'],
-      ['fields/new', fieldNew, '>友だち情報欄へ</Link>'],
-      ['searches/edit', searchEdit, '>保存した検索へ</Button>'],
-    ] as const) {
-      expect(page, `${name} のパンくずが縮まない`).toContain('<div className="min-w-0 flex-1">')
-      expect(page, `${name} の戻り先が縮んで押せない`).toContain('shrink-0')
-      expect(page, `${name} の戻り先が無い`).toContain(back)
-    }
+  it('V8の情報欄はパンくずと未保存確認付きキャンセルで戻れる', () => {
+    const field = readFileSync(join(here, '../../v8/tags/field-editor.tsx'), 'utf8')
+    expect(field).toContain('usePageCrumbs(')
+    expect(field).toContain("href: host ? '/hq/friend-attributes?tab=fields' : '/tags?tab=fields'")
+    expect(field).toContain('onClick={() => guarded(onCancel)}')
+    const search = readFileSync(join(here, '../../v8/tag-edit/search-edit.tsx'), 'utf8')
+    expect(search).toContain("{ label: '保存した検索', href: '/tags?tab=searches' }")
+    expect(search).toContain('<Button href="/tags?tab=searches">キャンセル</Button>')
   })
 })

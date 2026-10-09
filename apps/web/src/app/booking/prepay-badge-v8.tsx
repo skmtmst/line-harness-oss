@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import {
@@ -42,15 +42,22 @@ export default function PrepayBadgeV8({ accountId, friendId, canEdit = true, onC
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const requestRef = useRef(0)
+  const [loadError, setLoadError] = useState(false)
   const reload = useCallback(() => {
+    const generation = ++requestRef.current
+    setLoadError(false)
     setLoaded(false)
     bookingApi.getFriendNoshow(accountId, friendId).then(
       (response) => {
+        if (generation !== requestRef.current) return
         setDecision(response.data)
         setLoaded(true)
       },
       () => {
+        if (generation !== requestRef.current) return
         setDecision(null)
+        setLoadError(true)
         setLoaded(true)
       },
     )
@@ -58,6 +65,7 @@ export default function PrepayBadgeV8({ accountId, friendId, canEdit = true, onC
 
   useEffect(() => {
     reload()
+    return () => { requestRef.current += 1 }
   }, [reload])
 
   async function clearPrepay() {
@@ -81,7 +89,9 @@ export default function PrepayBadgeV8({ accountId, friendId, canEdit = true, onC
     }
   }
 
-  if (!loaded || !decision?.prepayOnly) return null
+  if (!loaded) return <p role="status">前払い情報を読み込み中…</p>
+  if (loadError) return <div role="alert"><p>前払い情報を読み込めませんでした</p><Button onClick={reload}>もう一度読み込む</Button></div>
+  if (!decision?.prepayOnly) return null
   const dates = decision.recentDates.map(jstMonthDay).filter((text) => text !== '')
 
   return (

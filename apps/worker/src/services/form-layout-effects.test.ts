@@ -35,7 +35,7 @@ vi.mock('./friend-tag-attach.js', () => ({
   attachTagAndFireSideEffects: mocks.attachTag,
 }));
 
-import { applyFormLayoutEffects, checkFormGates } from './form-layout-effects.js';
+import { applyFormLayoutEffects, checkFormGates, collectCapacitySlots, layoutEffectStepIds } from './form-layout-effects.js';
 
 /** UPDATE 文を覚えるだけの D1 の身代わり。 */
 function fakeDb(firstResult: unknown = null) {
@@ -1058,4 +1058,25 @@ describe('N-042 型検証の接続(#702)', () => {
     });
     expect(result.destinationWrites).toEqual({ attempted: 1, succeeded: 1, failed: 0 });
   });
+});
+
+test('飛ばしたセクションの値が送られても定員・登録先・動作は使わない', async () => {
+  const skipped = input({ name: 'skipped', type: 'checkbox', required: true, choiceMode: 'action',
+    destinations: { friendFieldIds: ['ff-skipped'] }, choices: [{ id: 'a', label: 'A',
+      capacity: { enabled: true, limit: 1 }, actions: [{ kind: 'tag', op: 'add', tagIds: ['tag-skipped'] }] }] });
+  const layout = emptyLayout();
+  layout.sections = [
+    { id: 'first', name: 'First', blocks: [input({ name: 'branch', type: 'radio', choices: [{ id: 'skip', label: 'skip', jumpToSectionId: 'last' }] })] },
+    { id: 'middle', name: 'Middle', blocks: [skipped] },
+    { id: 'last', name: 'Last', blocks: [input({ name: 'final', required: true })] },
+  ];
+  const answers = { branch: 'skip', skipped: ['A'], final: 'done' };
+  const { db } = fakeDb();
+  expect(await checkFormGates({ db, formId: 'form', friendId: 'friend', submitCount: 0, layout, answers })).toBeNull();
+  expect(collectCapacitySlots(layout, answers)).toEqual([]);
+  expect(layoutEffectStepIds(layout, answers)).not.toContain(`destinations:${skipped.id}`);
+  await applyFormLayoutEffects({ db, friendId: 'friend', layout, answers });
+  expect(mocks.countChoiceUsage).not.toHaveBeenCalled();
+  expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+  expect(mocks.attachTag).not.toHaveBeenCalled();
 });

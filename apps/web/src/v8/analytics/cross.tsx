@@ -171,6 +171,8 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
         if (response.data.result) {
           setCrossResult(response.data.result)
           clearCrossRun()
+          // 待ち順の控えは消すが、保存に使う完成した結果のIDは残す。
+          setCrossResultId(response.data.id)
           setLoading(false)
           return
         }
@@ -354,7 +356,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
         </label>
         <Button variant="primary" onClick={() => void runCross()} disabled={loading || !crossStorageRestored || sameAxis || Boolean(crossRunId)} busy={loading} busyLabel="集計中" title={sameAxis ? 'たてとよこに同じ軸は選べません' : '期間や軸を変えた場合は、新しい結果として集計します'}>集計する</Button>
         <span className={styles.spacer} />
-        {crossResult && crossResultId && canManage && renderSave ? <span className={styles.saveSlot} title="条件の定義と、いま表示している結果を別々に固定して残します">{renderSave({ sourceResultId: crossResultId, defaultName: `クロス分析 ${resultAxes?.row ?? ''} × ${resultAxes?.column ?? ''}` })}</span> : null}
+        {crossResult && crossResultId && canManage && renderSave ? <span title="条件の定義と、いま表示している結果を別々に固定して残します">{renderSave({ sourceResultId: crossResultId, defaultName: `クロス分析 ${resultAxes?.row ?? ''} × ${resultAxes?.column ?? ''}` })}</span> : null}
       </div>
       {sameAxis ? <p className={styles.warnText}>たてとよこに同じ軸は選べません</p> : null}
       {error ? <p className={styles.inlineError} role="alert">{error}</p> : null}

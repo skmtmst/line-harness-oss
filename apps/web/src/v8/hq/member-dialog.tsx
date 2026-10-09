@@ -142,7 +142,13 @@ export default function MemberDialogV8({
           : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.email.trim()) ? undefined : 'メールアドレスの形が正しくありません（@ のあとに .com などが要ります）',
       }
       setFieldErrors(errors)
-      if (errors.name || errors.email) return setLocalError('')
+      if (errors.name || errors.email) {
+        setLocalError('')
+        const input = document.getElementById(`${uid}-${errors.name ? 'name' : 'email'}`)
+        input?.focus()
+        input?.scrollIntoView?.({ block: 'center' })
+        return
+      }
       if (!value.assignedLineAccountId) return setLocalError('最初に表示するアカウントを選んでください')
     }
     if (value.accountScope === 'accounts' && value.scopedLineAccountIds.length === 0) {
@@ -188,7 +194,7 @@ export default function MemberDialogV8({
         </div>
       }
     >
-      <form
+      <form noValidate
         className={`${head.head} ${styles.form}`}
         onSubmit={(event) => {
           event.preventDefault()

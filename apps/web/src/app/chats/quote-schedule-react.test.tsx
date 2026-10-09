@@ -272,7 +272,7 @@ describe('N-025 引用返信と送信予約', () => {
       document.querySelector<HTMLElement>('[data-inbox-v6="schedule-toggle"]')!.click()
     })
     await eventually(() => {
-      expect(document.querySelector('[data-inbox-v6="schedule-panel"]')).toBeTruthy()
+      expect(document.querySelector('[role="dialog"]')).toBeTruthy()
     })
 
     // 日時の選択（★V7）で 2027-09-17 09:00 を選ぶ。値は今までどおり日本時間の文字列。
@@ -298,7 +298,7 @@ describe('N-025 引用返信と送信予約', () => {
     })
 
     const scheduleButton = Array.from(document.querySelectorAll('button'))
-      .find((b) => b.textContent === 'この日時で予約する')!
+      .find((b) => /に予約$/.test(b.textContent ?? ''))!
     await act(async () => { scheduleButton.click() })
     await eventually(() => {
       expect(fixture.scheduled).toHaveLength(1)

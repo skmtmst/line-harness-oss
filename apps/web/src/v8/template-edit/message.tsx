@@ -3,7 +3,7 @@
 /*
  * ★V8「メッセージを作る／編集」（絵 u5YC6・1152 は a1k3d・競合は NCbYn）。
  *
- * 左：名前とフォルダ／中身（形・本文・差し込む）／本文の中のURL。
+ * 左：名前とフォルダ／中身（本文・差し込む）／本文の中のURL。
  * 右：送るときの名前／届き方（本物のスマホ）。1152 ではスマホを窓で開く。
  * 下の帯：キャンセル／下書きを保存／保存して公開。
  * 動き（読み込み・保存・公開・409・利用先の確認）は BEHAVIOR.md。
@@ -25,13 +25,13 @@ import Card from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
-import SegmentedControl from '@/components/shared/segmented'
+import Notice from '@/components/shared/notice'
 import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
 import { notifyToast } from '@/components/shared/toast'
 import FlexPreview from '@/components/flex-preview'
-import { buildTemplatePreview, extractMessageUrls } from '@/components/templates/message-template-editor'
+import { buildTemplatePreview, extractMessageUrls, LEGACY_MESSAGE_NOTICE } from '@/components/templates/message-template-editor'
 import {
   ACCOUNT_MISMATCH_MESSAGE,
   EMPTY_REFERENCES,
@@ -62,12 +62,6 @@ import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared
 import { referenceTokenNames } from '@/components/shared/insert-tokens'
 import { loadTemplateExamples } from '@/v8/templates/examples'
 import styles from './edit.module.css'
-
-const MESSAGE_TYPES: Array<{ value: string; label: string }> = [
-  { value: 'text', label: 'テキスト' },
-  { value: 'flex', label: 'カード型' },
-  { value: 'image', label: '画像' },
-]
 
 const snapshot = (draft: TemplateDraft) => JSON.stringify(draft)
 
@@ -454,6 +448,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   const blocked = loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : saveGuard
   const phone = (
     <LinePreview
+      title={null}
       note={messageType === 'flex' ? 'カードの見え方です。' : '差し込み後の見え方（山田 太郎さんの場合）'}
       accountName={sendName}
       caption="配信日 10:00"
@@ -538,8 +533,8 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
               busy={publishing || Boolean(host?.busy)}
               busyLabel={host ? '保存中…' : '公開中…'}
             >
-              {conflict ? <GitCompare size={15} aria-hidden="true" /> : <Send size={15} aria-hidden="true" />}
-              {conflict ? '比べてから保存' : host ? host.primaryLabel ?? '保存して配る' : '保存して公開'}
+              {conflict ? <GitCompare size={15} aria-hidden="true" /> : host ? null : <Send size={15} aria-hidden="true" />}
+              {conflict ? '比べてから保存' : host ? host.primaryLabel ?? '保存する' : '保存して公開'}
             </Button>
           </>
         )}
@@ -551,6 +546,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         ) : (
           <>
             {host?.notice}
+            {messageType === 'flex' || messageType === 'image' ? <Notice tone="warn" message={LEGACY_MESSAGE_NOTICE} /> : null}
             {error || loadFailed ? <p role="alert" className={styles.error}>{loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : error}</p> : null}
             {exampleNote && !id ? <p role="status" className={styles.error}>{exampleNote}</p> : null}
             <Card padding="none" layout="vertical" className={styles.card}>
@@ -571,7 +567,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                     value={host ? host.folder : folderId ?? ''}
                     onChange={host ? host.onFolderChange : (value) => updateDraft({ folderId: value || null })}
                     folders={host ? host.folders : folders.map(folderById)}
-                    colors={!host}
+                    colors
                     onCreate={host
                       ? hostFolderCreate(host)
                       : canMutate && editorAccountId
@@ -586,10 +582,6 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>中身</h2>
               </div>
-              <div className={styles.typeRow} title={id ? '作ったあとに種類を変えると、中身の書き方も変える必要があります。' : undefined}>
-                <span className={styles.labelSmall}>形</span>
-                <SegmentedControl aria-label="メッセージの形" options={MESSAGE_TYPES} value={messageType} onChange={(value) => updateDraft({ messageType: value })} />
-              </div>
               <div className={styles.bodyBox}>
                 <InsertTextField
                   id="te-content"
@@ -601,7 +593,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                   value={messageContent}
                   onValueChange={(next) => updateDraft({ messageContent: next })}
                   tokenNames={tokenNames}
-                  placeholder={messageType === 'flex' ? '{"type":"bubble", …}' : '例：{{name}}さん、こんにちは。'}
+                  placeholder={messageType === 'flex' ? '{"type":"bubble", …}' : '例：いつもご利用ありがとうございます。今月のおすすめをお知らせします。'}
                 />
                 <span className={styles.bodySpacer} aria-hidden="true" />
                 <InsertRow accountId={editorAccountId} state={referenceState} references={references} length={messageContent.length} onInsert={insert} />

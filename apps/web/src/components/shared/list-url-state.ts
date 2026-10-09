@@ -261,23 +261,25 @@ export function useListScrollMemory(ready: boolean, anchorRef?: RefObject<HTMLEl
   useEffect(() => {
     const path = window.location.pathname
     let frame = 0
+    let pendingTop: number | undefined
     const save = () => {
       frame = 0
       // 中身が出て位置を戻し終えるまでは覚えない（伸びきる前の途中の値で上書きしない）。
       if (!restoredRef.current || restoringRef.current) return
       try {
-        window.sessionStorage.setItem(scrollKey(path), String(Math.round(scrollerOf(anchorRef?.current ?? null).scrollTop)))
+        window.sessionStorage.setItem(scrollKey(path), String(Math.round(pendingTop ?? scrollerOf(anchorRef?.current ?? null).scrollTop)))
       } catch {
         // 覚えられないだけで一覧は動く。
       }
     }
     const onScroll = () => {
+      if (restoredRef.current && !restoringRef.current) pendingTop = scrollerOf(anchorRef?.current ?? null).scrollTop
       if (!frame) frame = requestAnimationFrame(save)
     }
     window.addEventListener('scroll', onScroll, { capture: true, passive: true })
     return () => {
       window.removeEventListener('scroll', onScroll, { capture: true })
-      if (frame) cancelAnimationFrame(frame)
+      if (frame) { cancelAnimationFrame(frame); save() }
     }
   }, [anchorRef])
 }

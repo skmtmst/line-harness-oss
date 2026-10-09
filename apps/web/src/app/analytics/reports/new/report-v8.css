@@ -39,10 +39,11 @@
 
 .report-v8-title {
   margin: 0;
-  line-height: normal;
-  font-size: var(--tpl-an-rp-title-size);
-  font-weight: var(--tpl-an-rp-bold);
+  line-height: var(--tpl-title-lh);
+  font-size: var(--tpl-title-size);
+  font-weight: var(--tpl-title-weight);
   color: var(--color-ink);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 .report-v8-lead {
@@ -90,7 +91,7 @@
 /* 本文：左は段の列（余白 24/28・段の間 16）、右は幅 380 の列（線で区切る）。 */
 .report-v8-columns { display: flex; align-items: flex-start; min-width: 0; }
 .report-v8-fields { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-an-rp-col-gap); min-width: 0; border: 0; padding: var(--tpl-an-rp-body-pad); margin: 0; }
-.report-v8-card { display: flex; flex-direction: column; gap: var(--tpl-an-rp-card-gap); outline: 1px solid var(--color-hairline); outline-offset: -1px; border-radius: var(--tpl-an-rp-card-radius); background: var(--color-canvas); padding: var(--tpl-an-rp-card-pad); min-width: 0; }
+.report-v8-card { display: flex; flex-direction: column; gap: var(--tpl-an-rp-card-gap); outline: 1px solid var(--card-edge); outline-offset: -1px; border-radius: var(--tpl-an-rp-card-radius); background: var(--color-canvas); padding: var(--tpl-an-rp-card-pad); min-width: 0; box-shadow: var(--card-shadow); }
 .report-v8-cardTitle { display: flex; align-items: center; gap: var(--tpl-an-rp-field-gap); margin: 0; color: var(--color-ink); font-size: var(--tpl-an-rp-card-title); font-weight: var(--tpl-an-rp-bold); line-height: normal; }
 .report-v8-cardHead { position: relative; min-width: 0; }
 .report-v8-cardHeadStack { display: flex; flex-direction: column; gap: var(--tpl-an-rp-stack-gap); min-width: 0; }
@@ -131,7 +132,7 @@
 
 /* 右の列（幅 380・左に線）。カードは余白 16・間 8。 */
 .report-v8-rail { flex: 0 0 var(--tpl-an-rp-rail-w); display: flex; flex-direction: column; gap: var(--tpl-an-rp-rail-gap); align-self: stretch; padding: var(--tpl-an-rp-rail-pad); border-left: 1px solid var(--color-hairline); min-width: 0; }
-.report-v8-railCard { display: flex; flex-direction: column; gap: var(--tpl-an-rp-railcard-gap); outline: 1px solid var(--color-hairline); outline-offset: -1px; border-radius: var(--tpl-an-rp-card-radius); background: var(--color-canvas); padding: var(--tpl-an-rp-railcard-pad); min-width: 0; }
+.report-v8-railCard { display: flex; flex-direction: column; gap: var(--tpl-an-rp-railcard-gap); outline: 1px solid var(--card-edge); outline-offset: -1px; border-radius: var(--tpl-an-rp-card-radius); background: var(--color-canvas); padding: var(--tpl-an-rp-railcard-pad); min-width: 0; box-shadow: var(--card-shadow); }
 .report-v8-railTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-an-rp-rail-title); font-weight: var(--tpl-an-rp-bold); line-height: normal; }
 .report-v8-railSub { margin: 0; color: var(--color-ink-faint); font-size: var(--tpl-an-rp-rail-sub); line-height: normal; }
 .report-v8-preview { display: flex; flex-direction: column; gap: var(--tpl-an-rp-preview-gap); border-radius: var(--tpl-an-rp-choice-radius); background: var(--color-surface-pearl); padding: var(--tpl-an-rp-preview-pad); }

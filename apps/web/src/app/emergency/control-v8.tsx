@@ -599,13 +599,13 @@ const EmergencyControlV8 = (
         <div className={styles.targetRow} role="group" aria-label="止めるもの">
           {(Object.keys(targetLabels) as StopTarget[]).map((key) => (
             <span key={key} className={styles.targetItem} title={`${targetLabels[key].note}・${impactText(key)}`}>
-              <Checkbox
+              {canControl ? <Checkbox
                 checked={targets[key]}
                 onCheckedChange={(checked) => setTargets((current) => ({ ...current, [key]: checked }))}
                 disabled={mutationLocked || isStopped || !canControl}
               >
                 {targetLabels[key].label}
-              </Checkbox>
+              </Checkbox> : <span>{targetLabels[key].label}</span>}
             </span>
           ))}
         </div>
@@ -636,14 +636,14 @@ const EmergencyControlV8 = (
             />
             </span>
           </div>
-          <Button
+          {canControl ? <Button
             type="button"
             variant="danger"
             onClick={openStopConfirm}
             disabled={mutationLocked || isStopped || impactFailed || !impact || !control || !canControl}
           >
             選んだものを止める
-          </Button>
+          </Button> : null}
         </div>
 
         {isStopped && control ? (
@@ -655,14 +655,14 @@ const EmergencyControlV8 = (
                 止めている　{formatStopRange(control.stoppedAt, null)}から・{control.actorId ?? '担当者不明'}・
                 {(stopIncident?.capabilities ?? selectedCapabilities).map((capability) => CAPABILITY_LABEL[capability]).join('・')}
               </p>
-              <Button
+              {canControl ? <Button
                 type="button"
                 variant="secondary"
                 onClick={openRestoreConfirm}
                 disabled={mutationLocked || !canControl}
               >
                 復旧する
-              </Button>
+              </Button> : null}
             </div>
             <p className={styles.stoppedNote}>
               復旧するとき：止める前に動いていたものだけを戻します。理由を書いて、本人確認（6桁）をしてから戻します。

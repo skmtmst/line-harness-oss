@@ -20,7 +20,7 @@ import { api, type MenuItem, type PostalCodeCandidate, type PublicForm, type Sta
 import {
   addDays,
   formatWeekday,
-  jstStartsAtIso,
+  slotStartsAtIso,
   formatJstEventAt,
   jstToday,
   utcToJstHm,
@@ -41,6 +41,7 @@ import BottomBar from '../components/ui/BottomBar.js';
 import PrivacyNote from '../components/ui/PrivacyNote.js';
 import StatusView from '../components/ui/StatusView.js';
 import Icon from '../components/ui/Icon.js';
+import { DateYmdField, AddressControls, BookingControls, FormChoiceRow, FormFileControl, FormSelectControl, FormTextControl, RatingStars } from '../components/forms/controls';
 
 /**
  * 回答フォーム（友だちが実際に入力する画面）。
@@ -93,81 +94,6 @@ function RequiredMark() {
 function submitLabelText(label: string | undefined): string {
   if (label && label !== '送信') return label;
   return '送信する';
-}
-
-/** 'YYYY-MM-DD' を [年, 月, 日] に分ける。形でない値は空3つにする。 */
-function splitYmd(value: string): [string, string, string] {
-  const m = /^(\d{1,4})-(\d{1,2})-(\d{1,2})$/.exec(value);
-  return m ? [m[1], m[2], m[3]] : ['', '', ''];
-}
-
-/**
- * 日付を「年・月・日」の3欄で入れる。
- *
- * 編集画面で「年月日を3つに分ける」を選んだ日付欄に使う。カレンダー式は
- * 選びにくい年代（生年月日など）があるための出し分け。
- * 3欄とも入るまでは形の合わない値を回答に入れ、送信時の検証で
- * 「日付を選んでください」へ流す（途中経過を正しい値と誤認しないため）。
- */
-function DateYmdField({
-  value,
-  onChange,
-  inputClass,
-}: {
-  value: string;
-  onChange: (next: string) => void;
-  inputClass: string;
-}) {
-  const [parts, setParts] = useState<[string, string, string]>(() => splitYmd(value));
-  // 自分が出した値が戻ってきたときは欄を上書きしない（途中の入力が消えるため）
-  const lastEmitted = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (value === lastEmitted.current) return;
-    setParts(splitYmd(value));
-  }, [value]);
-
-  const update = (index: number, raw: string) => {
-    const digits = raw.replace(/[^\d]/g, '').slice(0, index === 0 ? 4 : 2);
-    const next = [...parts] as [string, string, string];
-    next[index] = digits;
-    setParts(next);
-    const all = next.every((p) => p !== '');
-    const emitted = all
-      ? `${next[0].padStart(4, '0')}-${next[1].padStart(2, '0')}-${next[2].padStart(2, '0')}`
-      : next.some((p) => p !== '')
-        ? `${next[0] || '0000'}-${next[1] || '00'}-${next[2] || '00'}`
-        : '';
-    lastEmitted.current = emitted;
-    onChange(emitted);
-  };
-
-  const partClass = `${inputClass} text-center`;
-  const specs: { placeholder: string; label: string; maxLength: number }[] = [
-    { placeholder: '年', label: '年', maxLength: 4 },
-    { placeholder: '月', label: '月', maxLength: 2 },
-    { placeholder: '日', label: '日', maxLength: 2 },
-  ];
-  return (
-    <div className="flex items-center gap-2">
-      {specs.map((spec, i) => (
-        <span key={spec.label} className="flex items-center gap-1">
-          <input
-            type="text"
-            inputMode="numeric"
-            value={parts[i]}
-            maxLength={spec.maxLength}
-            placeholder={spec.placeholder}
-            aria-label={spec.label}
-            onChange={(e) => update(i, e.target.value)}
-            className={partClass}
-            style={{ width: i === 0 ? '4.5rem' : '3.25rem' }}
-          />
-          <span className="text-sm text-ink-faint">{spec.label}</span>
-        </span>
-      ))}
-    </div>
-  );
 }
 
 /** 「その他」の選択肢ラベル。無ければ空。 */
@@ -231,11 +157,14 @@ export default function Form() {
     let cancelled = false;
     void (async () => {
       setLoading(true);
+      setForm(null);
+      setError(null);
       try {
         const data = await api.getForm(id, testToken ?? undefined);
         if (cancelled) return;
+        const defaults = initialAnswers(data.layout);
         setForm(data);
-        setAnswers(initialAnswers(data.layout));
+        setAnswers(defaults);
         // タブの題は上の帯（LiffHeader）が pageTitle・フォーム名から付ける。
 
         // 前回の回答を出す設定のときだけ、サーバが中身を返す。
@@ -772,40 +701,6 @@ export default function Form() {
   );
 }
 
-/**
- * F-11：5段階評価は★5つで答える。触る場所は44px以上にする。
- * 値は 1〜5 の数で回答に入る（保存・平均の数え方と合わせる）。
- */
-function RatingStars({
-  name,
-  current,
-  onChange,
-}: {
-  name: string;
-  current: number | null;
-  onChange: (name: string, value: unknown) => void;
-}) {
-  return (
-    <div role="radiogroup" aria-label="5段階評価" className="mt-1 flex items-center gap-1">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <button
-          key={n}
-          type="button"
-          role="radio"
-          aria-checked={current === n}
-          aria-label={`星${n}つ`}
-          onClick={() => onChange(name, current === n ? '' : n)}
-          className={`flex min-h-11 min-w-11 items-center justify-center text-3xl leading-none ${
-            current != null && n <= current ? 'text-liff-star' : 'text-liff-idle'
-          }`}
-        >
-          ★
-        </button>
-      ))}
-    </div>
-  );
-}
-
 /** 回答の住所の形。空欄は空文字に寄せる（未入力判定と一致させるため）。 */
 type AddressDraft = {
   postalCode: string;
@@ -837,37 +732,55 @@ function AddressFields({
   name,
   draft,
   onChange,
-  inputClass,
+  placeholder,
 }: {
   name: string;
   draft: AddressDraft;
   onChange: (name: string, value: unknown) => void;
-  inputClass: string;
+  placeholder?: string;
 }) {
   const [candidates, setCandidates] = useState<PostalCodeCandidate[]>([]);
   const [looking, setLooking] = useState(false);
   const [lookupMessage, setLookupMessage] = useState<string | null>(null);
+  // 調べている間に書いた欄を、届いた応答で古い中身に戻さないため、
+  // いちばん新しい住所を持っておく（応答のときはこれに足す）。
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  // 調べた郵便番号の回。郵便番号を書き換えたら古い応答・候補は使わない。
+  const lookupGenRef = useRef(0);
+  useEffect(
+    () => () => {
+      lookupGenRef.current += 1;
+    },
+    [],
+  );
 
   const patch = (next: AddressDraft) => onChange(name, next);
 
   const applyCandidate = (c: PostalCodeCandidate) => {
+    const latest = draftRef.current;
     patch({
-      ...draft,
-      postalCode: draft.postalCode,
+      ...latest,
       prefecture: c.prefecture,
       city: c.city,
       // 町名は番地欄が空のときだけ入れる。書いた番地は消さない。
-      addressLine1: draft.addressLine1 || c.town,
+      addressLine1: latest.addressLine1 || c.town,
     });
     setCandidates([]);
     setLookupMessage(null);
   };
 
   const lookup = async () => {
+    const searched = draft.postalCode;
+    const gen = ++lookupGenRef.current;
     setLooking(true);
     setLookupMessage(null);
+    // 応答を使ってよいか（この回が最新で、郵便番号も調べた時のまま）。
+    const stillCurrent = () =>
+      gen === lookupGenRef.current && draftRef.current.postalCode === searched;
     try {
-      const res = await api.postalCodeSearch(draft.postalCode);
+      const res = await api.postalCodeSearch(searched);
+      if (!stillCurrent()) return;
       if (!res.success) throw new Error('postal_code_search_failed');
       const data = res.data;
       if (data.status === 'matched' && data.candidates.length === 1) {
@@ -885,34 +798,23 @@ function AddressFields({
           : 'その郵便番号の住所が見つかりません。下の欄へ直接入力してください',
       );
     } catch {
+      if (!stillCurrent()) return;
       setCandidates([]);
       setLookupMessage('住所を調べられませんでした。下の欄へ直接入力してください');
     } finally {
-      setLooking(false);
+      if (gen === lookupGenRef.current) setLooking(false);
     }
   };
 
   return (
-    <div className="mt-1 space-y-2">
-      <div className="flex gap-2">
-        <input
-          type="text"
-          inputMode="numeric"
-          value={draft.postalCode}
-          placeholder="123-4567"
-          aria-label="郵便番号"
-          onChange={(e) => patch({ ...draft, postalCode: e.target.value })}
-          className={inputClass}
-        />
-        <button
-          type="button"
-          onClick={() => void lookup()}
-          disabled={looking}
-          className="min-h-11 shrink-0 rounded-[10px] border border-liff-line-strong bg-canvas px-3 text-sm font-bold text-ink disabled:opacity-50"
-        >
-          {looking ? '調べています...' : '住所を自動入力'}
-        </button>
-      </div>
+    <AddressControls draft={draft} placeholder={placeholder} looking={looking} onLookup={() => void lookup()} onChange={(next) => {
+      if (next.postalCode !== draft.postalCode) {
+        lookupGenRef.current += 1;
+        setLooking(false);
+        setCandidates([]);
+      }
+      patch(next);
+    }}>
       {candidates.length > 0 && (
         <div className="space-y-1">
           <p className="text-xs text-ink-faint">候補が複数あります。選んでください</p>
@@ -931,44 +833,7 @@ function AddressFields({
         </div>
       )}
       {lookupMessage && <p className="text-xs text-ink-faint">{lookupMessage}</p>}
-      <select
-        value={draft.prefecture}
-        aria-label="都道府県"
-        onChange={(e) => patch({ ...draft, prefecture: e.target.value })}
-        className={inputClass}
-      >
-        <option value="">都道府県を選択</option>
-        {PREFECTURES.map((p) => (
-          <option key={p} value={p}>
-            {p}
-          </option>
-        ))}
-      </select>
-      <input
-        type="text"
-        value={draft.city}
-        placeholder="市区町村（例：千代田区）"
-        aria-label="市区町村"
-        onChange={(e) => patch({ ...draft, city: e.target.value })}
-        className={inputClass}
-      />
-      <input
-        type="text"
-        value={draft.addressLine1}
-        placeholder="番地（例：1-1）"
-        aria-label="番地"
-        onChange={(e) => patch({ ...draft, addressLine1: e.target.value })}
-        className={inputClass}
-      />
-      <input
-        type="text"
-        value={draft.addressLine2}
-        placeholder="建物名・部屋番号（任意）"
-        aria-label="建物名"
-        onChange={(e) => patch({ ...draft, addressLine2: e.target.value })}
-        className={inputClass}
-      />
-    </div>
+    </AddressControls>
   );
 }
 
@@ -996,7 +861,7 @@ export function BookingSlotPicker({
   const [menu, setMenu] = useState<MenuItem | null>(null);
   const [staffList, setStaffList] = useState<StaffItem[]>([]);
   const [staffId, setStaffId] = useState<string>(fixedStaffId ?? '');
-  const [byDate, setByDate] = useState<Record<string, Array<{ start: string; open: boolean }>>>({});
+  const [byDate, setByDate] = useState<Record<string, Array<{ start: string; open: boolean; startUtc?: string }>>>({});
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -1047,7 +912,7 @@ export function BookingSlotPicker({
     Promise.all(chunks.map(([from, to]) => api.availability(menuId, activeStaff, from, to)))
       .then((results) => {
         if (cancelled) return;
-        const merged: Record<string, Array<{ start: string; open: boolean }>> = {};
+        const merged: Record<string, Array<{ start: string; open: boolean; startUtc?: string }>> = {};
         for (const r of results) {
           for (const bucket of r.by_staff ?? []) {
             if (bucket.staff_id !== activeStaff) continue;
@@ -1055,7 +920,9 @@ export function BookingSlotPicker({
               if (s.date < today || s.date > lastDay) continue;
               const open = !((s.remaining ?? 1) <= 0 || s.state === 'full' || s.state === 'closed');
               const list = (merged[s.date] ??= []);
-              if (!list.some((t) => t.start === s.start)) list.push({ start: s.start, open });
+              if (!list.some((t) => t.start === s.start)) {
+                list.push({ start: s.start, open, ...(s.startUtc ? { startUtc: s.startUtc } : {}) });
+              }
               else if (open) list.find((t) => t.start === s.start)!.open = true;
             }
           }
@@ -1127,71 +994,19 @@ export function BookingSlotPicker({
           ))}
         </div>
       )}
-      {dates.length > 0 && (
-        <div className="grid grid-cols-5 gap-[5px]" role="group" aria-label="日付">
-          {dates.map((d) => {
-            const open = hasOpen(d);
-            const active = selectedDate === d;
-            return (
-              <button
-                key={d}
-                type="button"
-                disabled={!open}
-                onClick={() => setSelectedDate(d)}
-                aria-pressed={active}
-                aria-label={`${Number(d.slice(5, 7))}月${Number(d.slice(8, 10))}日${open ? '' : ' 空きなし'}`}
-                className={`flex flex-col items-center gap-0.5 rounded-[10px] py-2 -outline-offset-1 ${
-                  active
-                    ? 'bg-liff-soft outline-2 outline-liff-primary'
-                    : open
-                      ? 'bg-canvas outline-1 outline-liff-line'
-                      : 'bg-liff-off-bg outline-1 outline-liff-line'
-                }`}
-              >
-                <span className="text-[10px] text-liff-sub">{formatWeekday(d)}</span>
-                <span
-                  className={`liff-num text-base font-bold ${
-                    active ? 'text-liff-primary' : open ? 'text-ink' : 'text-liff-off-ink'
-                  }`}
-                >
-                  {Number(d.slice(8, 10))}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-      {!dates.some(hasOpen) && (
-        <p className="text-sm text-ink-secondary">選べる期間に空きがありません。期間を変えてください。</p>
-      )}
-      {selectedDate && (
-        <div className="grid grid-cols-3 gap-2">
-          {daySlots.map((t) => {
-            const startsAt = jstStartsAtIso(selectedDate, t.start);
-            const active = picked?.startsAt === startsAt;
-            return (
-              <button
-                key={t.start}
-                type="button"
-                disabled={!t.open}
-                onClick={() =>
-                  onChange(active ? '' : { menuId, staffId: fixedStaffId ?? staffId, startsAt })
-                }
-                aria-pressed={active}
-                className={`liff-hit liff-num h-[42px] rounded-[10px] text-sm tabular-nums -outline-offset-1 ${
-                  active
-                    ? 'bg-liff-primary font-bold text-white'
-                    : t.open
-                      ? 'bg-canvas font-medium text-ink outline-1 outline-liff-line-strong'
-                      : 'bg-liff-off-bg font-medium text-liff-off-ink'
-                }`}
-              >
-                {t.start}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      <BookingControls
+        days={dates.map((d) => ({ date: d, weekday: formatWeekday(d), day: Number(d.slice(8, 10)), open: hasOpen(d) }))}
+        selectedDate={selectedDate ?? ''}
+        onDate={setSelectedDate}
+        times={selectedDate ? daySlots.map((t) => ({ start: t.start, open: t.open, selected: picked?.startsAt === slotStartsAtIso({ date: selectedDate, start: t.start, startUtc: t.startUtc }) })) : []}
+        onTime={(start) => {
+          const t = daySlots.find((slot) => slot.start === start);
+          if (!t || !t.open || !selectedDate) return;
+          const startsAt = slotStartsAtIso({ date: selectedDate, start: t.start, startUtc: t.startUtc });
+          onChange(picked?.startsAt === startsAt ? '' : { menuId, staffId: fixedStaffId ?? staffId, startsAt });
+        }}
+      />
+      {!dates.some(hasOpen) && <p className="text-sm text-ink-secondary">選べる期間に空きがありません。期間を変えてください。</p>}
       {picked && (
         <p className="text-xs font-bold text-liff-primary">
           {formatJstEventAt(picked.startsAt)}〜 を選んでいます
@@ -1286,43 +1101,44 @@ function BlockView({
     'w-full rounded-[10px] border border-liff-line-strong bg-canvas px-3.5 py-3 text-sm text-ink placeholder:text-liff-idle focus:border-liff-primary focus:outline-none';
   /** 直しがある欄は枠を直しの色にする (お店のテーマの error)。 */
   const invalidStyle = error ? { borderColor: errorColor } : undefined;
+  // 欄名・説明・直しの文を入力と結ぶ（読み上げで欄名と直し方が分かるように）。
+  // id はブロックの id から作る（並べ替えても同じ欄を指す）。
+  const fieldId = `lf-${block.id}`;
+  const labelId = `${fieldId}-label`;
+  const descId = block.description ? `${fieldId}-desc` : undefined;
+  const errorId = error ? `${fieldId}-error` : undefined;
+  const describedBy = [descId, errorId].filter(Boolean).join(' ') || undefined;
+  // 1つの入力で答える欄は label の htmlFor で結ぶ。選択肢・★・住所などは群れにして欄名で呼ぶ。
+  const singleControl =
+    block.type === 'text' ||
+    block.type === 'textarea' ||
+    block.type === 'prefecture' ||
+    block.type === 'select' ||
+    (block.type === 'date' && block.dateStyle !== 'ymd');
+  const fieldProps = { id: fieldId, 'aria-describedby': describedBy };
 
   return (
     <div className="flex flex-col gap-2">
       {/* ★V8 (B8rCt)：欄名と必須の札を1行に並べ、選択肢まで 8 空ける。 */}
-      <label className="flex items-center gap-1.5 text-sm font-bold text-ink">
+      <label
+        id={labelId}
+        htmlFor={singleControl ? fieldId : undefined}
+        className="flex items-center gap-1.5 text-sm font-bold text-ink"
+      >
         {block.label}
         {block.required && <RequiredMark />}
       </label>
       {block.description && (
-        <p className="-mt-1 text-xs text-ink-faint">{block.description}</p>
+        <p id={descId} className="-mt-1 text-xs text-ink-faint">{block.description}</p>
       )}
 
-      <div>
-        {block.type === 'text' && (
-          <input
-            type={block.limit?.format === 'email' ? 'email' : block.limit?.format === 'tel' ? 'tel' : 'text'}
-            value={text}
-            placeholder={block.placeholder}
-            maxLength={block.limit?.max}
-            onChange={(e) => onChange(block.name, e.target.value)}
-            className={inputClass}
-            style={invalidStyle}
-            aria-invalid={!!error}
-          />
-        )}
-
-        {block.type === 'textarea' && (
-          <textarea
-            rows={3}
-            value={text}
-            placeholder={block.placeholder}
-            maxLength={block.limit?.max}
-            onChange={(e) => onChange(block.name, e.target.value)}
-            className={`${inputClass} min-h-22 resize-y`}
-            style={invalidStyle}
-            aria-invalid={!!error}
-          />
+      <div
+        {...(singleControl
+          ? {}
+          : { role: 'group', 'aria-labelledby': labelId, 'aria-describedby': describedBy })}
+      >
+        {(block.type === 'text' || block.type === 'textarea') && (
+          <FormTextControl block={block} value={text} onChange={(next) => onChange(block.name, next)} style={invalidStyle} aria-invalid={!!error} {...fieldProps} />
         )}
 
         {block.type === 'date' &&
@@ -1330,26 +1146,20 @@ function BlockView({
             <DateYmdField
               value={text}
               onChange={(next) => onChange(block.name, next)}
-              inputClass={inputClass}
+              placeholder={block.placeholder}
             />
           ) : (
-            <input
-              type="date"
-              value={text}
-              onChange={(e) => onChange(block.name, e.target.value)}
-              className={inputClass}
-              style={invalidStyle}
-              aria-invalid={!!error}
-            />
+            <FormTextControl block={block} value={text} onChange={(next) => onChange(block.name, next)} style={invalidStyle} aria-invalid={!!error} {...fieldProps} />
           ))}
 
         {block.type === 'prefecture' && (
-          <select
+          <FormSelectControl
             value={text}
             onChange={(e) => onChange(block.name, e.target.value)}
             className={inputClass}
             style={invalidStyle}
             aria-invalid={!!error}
+            {...fieldProps}
           >
             <option value="">都道府県を選択</option>
             {PREFECTURES.map((p) => (
@@ -1357,18 +1167,19 @@ function BlockView({
                 {p}
               </option>
             ))}
-          </select>
+          </FormSelectControl>
         )}
 
         {block.type === 'select' && (
           <div>
-            <select
+            <FormSelectControl
               // 「その他」を自由記入したときは、プルダウンにはその選択肢を出す
               value={isOtherFreeText(block, text) ? otherLabel(block) : text}
               onChange={(e) => onChange(block.name, e.target.value)}
               className={inputClass}
               style={invalidStyle}
               aria-invalid={!!error}
+              {...fieldProps}
             >
               <option value="">選択してください</option>
               {(block.choices ?? []).map((choice) => (
@@ -1376,7 +1187,7 @@ function BlockView({
                   {choice.label}
                 </option>
               ))}
-            </select>
+            </FormSelectControl>
             {isOtherFreeText(block, text) && (
               <OtherTextInput
                 value={text}
@@ -1397,13 +1208,7 @@ function BlockView({
                 : text === choice.label;
               return (
                 <div key={choice.id}>
-                  <label
-                    className={`flex min-h-11 items-center gap-2.5 rounded-[10px] px-3.5 py-3 text-sm text-ink -outline-offset-1 ${
-                      checkedRadio
-                        ? 'bg-liff-soft outline-2 outline-liff-primary'
-                        : 'bg-canvas outline-1 outline-liff-line-strong'
-                    }`}
-                  >
+                  <FormChoiceRow selected={checkedRadio}>
                     <input
                       type="radio"
                       name={block.name}
@@ -1412,7 +1217,7 @@ function BlockView({
                       className="h-[18px] w-[18px] shrink-0 accent-liff-primary"
                     />
                     {choice.label}
-                  </label>
+                  </FormChoiceRow>
                   {choice.isOther && checkedRadio && (
                     <OtherTextInput
                       value={isFree ? text : ''}
@@ -1435,13 +1240,7 @@ function BlockView({
                 : checked.includes(choice.label);
               return (
                 <div key={choice.id}>
-                  <label
-                    className={`flex min-h-11 items-center gap-2.5 rounded-[10px] px-3.5 py-3 text-sm text-ink -outline-offset-1 ${
-                      isChecked
-                        ? 'bg-liff-soft outline-2 outline-liff-primary'
-                        : 'bg-canvas outline-1 outline-liff-line-strong'
-                    }`}
-                  >
+                  <FormChoiceRow selected={isChecked}>
                     <input
                       type="checkbox"
                       checked={isChecked}
@@ -1463,7 +1262,7 @@ function BlockView({
                       }}
                     />
                     {choice.label}
-                  </label>
+                  </FormChoiceRow>
                   {choice.isOther && isChecked && (
                     <OtherTextInput
                       value={freeTexts[0] ?? ''}
@@ -1512,23 +1311,13 @@ function BlockView({
             name={block.name}
             draft={toAddressDraft(value)}
             onChange={onChange}
-            inputClass={inputClass}
+            placeholder={block.placeholder}
           />
         )}
 
         {block.type === 'file' && (
           <div>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif"
-              disabled={uploading}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) onUpload(block.name, file);
-              }}
-              className="w-full text-sm text-ink-secondary file:mr-3 file:rounded-lg file:border-0 file:bg-liff-primary file:px-3 file:py-2 file:text-sm file:font-medium file:text-white disabled:opacity-50"
-            />
-            {uploading && <p className="mt-1 text-xs text-ink-faint">送っています...</p>}
+            <FormFileControl label={block.label} uploading={uploading} onUpload={(file) => onUpload(block.name, file)} />
             {text && (
               <div className="mt-2">
                 <img src={text} alt="送った画像" className="max-h-40 rounded-lg" />
@@ -1541,7 +1330,6 @@ function BlockView({
                 </button>
               </div>
             )}
-            <p className="mt-1 text-xs text-ink-faint">jpg・png・gif・webp・heic、10MBまで</p>
           </div>
         )}
 
@@ -1564,7 +1352,7 @@ function BlockView({
       </div>
 
       {error && (
-        <p className="mt-1 flex items-center gap-1 text-xs font-bold" style={{ color: errorColor }}>
+        <p id={errorId} className="mt-1 flex items-center gap-1 text-xs font-bold" style={{ color: errorColor }}>
           <Icon name="info" className="h-3.5 w-3.5 shrink-0" />
           {error}
         </p>

@@ -194,6 +194,13 @@
 }
 
 /* メニューの帯 30。 */
+/* リッチメニュー：トーク画面のいちばん下（入力の帯の位置）。画面の幅いっぱい・高さは画像の比（大 2500×1686・小 2500×843）。 */
+.richMenu {
+  flex-shrink: 0;
+  width: 100%;
+  background: var(--v8-line-chrome);
+}
+
 .menuBar {
   display: flex;
   flex-shrink: 0;
@@ -267,6 +274,7 @@
 [data-theme='v8'] .phoneRoot { width: 100%; }
 [data-theme='v8'] .phoneTitle { justify-content: flex-start; font-size: var(--tpl-preview-title-size); font-weight: 600; line-height: var(--tpl-preview-title-lh); }
 [data-theme='v8'] .phone { margin-inline: auto; }
+[data-theme='v8'] .phoneRoot[data-fit] .phone { max-width: 100%; }
 
 /*
  * ★V8 cfVyj（2026-10-08 描き直し・OVCot）：テキストの吹き出しは本物の LINE と同じく文字に合わせて伸び縮み。
@@ -280,3 +288,13 @@
 [data-theme='v8'] .tail { display: none; }
 [data-theme='v8'] .bubbleBody { display: block; width: auto; min-height: 0; padding: 8px 12px; border-radius: var(--radius-mini) var(--radius-large) var(--radius-large) var(--radius-large); color: var(--color-ink); font-size: 13px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
 [data-theme='v8'] .bubbleText { display: inline; }
+
+/* 専用の受け口を使う画面だけ。トークの下で画像の高さを保つ。 */
+.richMenu { flex-shrink: 0; }
+
+/* 友だちが送った側のプレビュー。指定したメッセージだけ右・緑にする。 */
+[data-theme='v8'] .outgoingRow { display: flex; justify-content: flex-end; align-items: flex-end; gap: 4px; width: 100%; }
+[data-theme='v8'] .outgoingBubble { max-width: 186px; padding: 8px 12px; border-radius: var(--v8-line-bubble-out-radius); background: var(--v8-line-bubble-out); color: var(--color-ink); font-size: 11.5px; line-height: 18px; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+[data-theme='v8'] .messageRow[data-density='compact'] .bubble { max-width: var(--v8-line-bubble-preview-w); }
+[data-theme='v8'] .messageRow[data-density='compact'] .bubbleBody { font-size: 11.5px; line-height: 18px; }

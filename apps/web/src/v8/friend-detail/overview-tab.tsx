@@ -3,6 +3,7 @@
 /*
  * 概要タブ（JCDRm・Q5F2QE の 1.）。左に要点 320px、右に数の帯・進行中・同じ人・最近の履歴・行う操作。
  */
+import StatusPill from '@/components/shared/status-pill'
 import { useState } from 'react'
 import Link from 'next/link'
 import {
@@ -19,6 +20,7 @@ import {
 } from 'lucide-react'
 import type { FriendField } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import TagPill from '@/components/shared/tag-pill'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { formatDay, formatDateTime, formatNumber, formatRelative } from '@/lib/format'
@@ -26,7 +28,7 @@ import type { FriendDetail } from '@/lib/api'
 import type { FriendDetailState } from './use-friend-detail'
 import type { FriendDetailPermissions } from './permissions'
 import { inboxHrefForFriend, timelineSourceHref, timelineTypeLabel, timelineKey, type FriendTimelineItem } from './timeline'
-import { SUPPORT_LABELS } from './support'
+import { SUPPORT_LABELS, SUPPORT_TONES } from './support'
 import styles from './detail.module.css'
 
 function GroupHead({ title, action }: { title: string; action?: React.ReactNode }) {
@@ -117,7 +119,7 @@ export default function OverviewTab({
             action={perms.editSupport ? <button type="button" className={styles.groupLink} onClick={onEditSupport}>編集</button> : null}
           />
           <dl className={styles.kvList}>
-            <Kv label="状況">{support ? SUPPORT_LABELS[support.status] : <span className={styles.faint}>やり取りなし</span>}</Kv>
+            <Kv label="状況">{support ? <StatusPill tone={SUPPORT_TONES[support.status]}>{SUPPORT_LABELS[support.status]}</StatusPill> : <span className={styles.faint}>やり取りなし</span>}</Kv>
             <Kv label="担当">{support?.operatorName ?? <span className={styles.faint}>未割り当て</span>}</Kv>
             <Kv label="最後のやりとり">{data.historyStatus === 'ready' ? lastContactText(data.historyItems) : '—'}</Kv>
           </dl>
@@ -128,7 +130,7 @@ export default function OverviewTab({
           <GroupHead title="タグ" action={perms.editSupport ? <Link className={styles.groupLink} href={inbox}>編集</Link> : null} />
           <div className={styles.tags}>
             {friend.tags?.length
-              ? friend.tags.map((tag) => <span key={tag.id} className={styles.tag} title={tag.name}>{tag.name}</span>)
+              ? friend.tags.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs" />)
               : <span className={`${styles.memo} ${styles.faint}`}>タグはありません</span>}
             {perms.editSupport ? <Link className={`${styles.tag} ${styles.tagAdd}`} href={inbox}>＋ 追加</Link> : null}
           </div>
@@ -245,7 +247,8 @@ export default function OverviewTab({
             unit=""
             loading={upcomingStatus === 'loading' || upcomingStatus === 'idle'}
             valueText={upcoming?.nextBooking && !upcoming.nextBookingError ? formatDay(upcoming.nextBooking.startsAt).replace(/（.）$/, '') : undefined}
-            detail={bookingFailed ? '読み込めませんでした' : upcoming && !upcoming.nextBooking ? '予定なし' : ''}
+            detail={bookingFailed ? '読み込めませんでした' : upcoming?.nextBooking ? '' : upcoming ? '予定なし' : ''}
+            help={upcoming?.nextBooking && !bookingFailed ? `${upcoming.nextBooking.title}・${formatDay(upcoming.nextBooking.startsAt)}` : undefined}
             onRetry={bookingFailed ? () => void data.loadUpcoming() : undefined}
           />
         </KpiBand>

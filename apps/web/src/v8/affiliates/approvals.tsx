@@ -255,7 +255,7 @@ export default function ApprovalsTab() {
       .filter((item) => !needle || [item.friendName, item.affiliateName, item.offerName, item.conversionPointName, item.orderNumber]
         .filter(Boolean).join(' ').toLocaleLowerCase('ja-JP').includes(needle))
       .toSorted((a, b) => (status === 'pending'
-        ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        ? new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
         : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()))
   }, [scoped, flaggedOnly, query, status])
 
@@ -525,11 +525,7 @@ export default function ApprovalsTab() {
   ) : (
     <>
       {table}
-      <p className={styles.footNote}>
-        {readonly
-          ? '行の「…」から 詳細と成果の付け方を見る。'
-          : '行の「…」から 認める・認めない・詳細を見る。左のチェックで選ぶと、画面の下から一括バーが出ます。「操作を選ぶ」→ 認める／認めない → 確かめる → 結果 の順。却下の理由はまだ記録できません。'}
-      </p>
+
       {truncatedStatuses.length > 0 ? (
         <div className={styles.subSection}>
           <Notice tone="info">
@@ -573,6 +569,9 @@ export default function ApprovalsTab() {
 
   return (
     <AffiliateFrame
+      help={readonly
+          ? '行の「…」から 詳細と成果の付け方を見る。'
+          : '行の「…」から 認める・認めない・詳細を見る。左のチェックで選ぶと、画面の下から一括バーが出ます。「操作を選ぶ」→ 認める／認めない → 確かめる → 結果 の順。却下の理由はまだ記録できません。'}
       actions={<Button onClick={exportCsv} disabled={shownItems.length === 0}><Download size={15} aria-hidden="true" /> CSV で書き出す</Button>}
       stats={stats}
       toolbar={toolbar}

@@ -107,8 +107,37 @@
  * 選択中 700 ink・未選択 500 ink-secondary／つまみ r6・上下 3。
  * 小型（d8X09）と箱型（dtJVi）の合格は変えない。v8 だけ。
  */
+[data-theme='v8'] .root[data-equal-width][data-size='panel'] .item { padding: 4px 12px; }
+.root[data-equal-width] .item { flex: 1; min-width: 0; min-height: 0; }
 [data-theme='v8'] .root[data-size='panel'] { display: flex; padding: 3px; border-radius: var(--radius-segment); }
 [data-theme='v8'] .root[data-size='panel'] .item { padding: 5px 12px; font-size: var(--text-caption); line-height: 17px; }
 [data-theme='v8'] .root[data-size='panel'] .selected { font-weight: 700; }
 [data-theme='v8'] .root[data-size='panel'] .thumb { top: 3px; bottom: 3px; border-radius: var(--radius-mini); }
+/* 連動タイミング（gSsPR）。この寸法を頼んだ場所だけに効く。 */
+[data-theme='v8'] .root[data-size='timing'] {
+  width: var(--seg-timing-w);
+  max-width: 100%;
+  height: var(--seg-timing-h);
+  padding: var(--seg-timing-pad);
+  gap: var(--seg-timing-gap);
 }
+[data-theme='v8'] .root[data-size='timing'] .item {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  white-space: nowrap;
+}
+[data-theme='v8'] .root[data-size='timing'] .thumb {
+  top: var(--seg-timing-pad);
+  bottom: var(--seg-timing-pad);
+  box-shadow: var(--shadow-segment-ring);
+}
+/* rm92Y の探し方。既定の切り替えの寸法・動きは変えない。 */
+[data-theme='v8'] .root[data-appearance='choices'] { padding: 0; gap: 8px; background: transparent; }
+[data-theme='v8'] .root[data-appearance='choices'] .item { min-height: 0; padding: 6px 12px; border-radius: var(--radius-pill); outline: 1px solid var(--color-hairline); outline-offset: -0.5px; font-size: var(--text-caption); font-weight: 400; line-height: 17px; }
+[data-theme='v8'] .root[data-appearance='choices'] .selected { outline-color: transparent; background: var(--color-accent-soft); color: var(--color-accent-deep); font-weight: 600; }
+[data-theme='v8'] .root[data-appearance='choices'] .item:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
+}
+
+[data-theme='v8'] .root[data-size='sticker'] { height: var(--seg-timing-h); max-width: 100%; gap: 0; }
+[data-theme='v8'] .root[data-size='sticker'] .item { padding: var(--tpl-msg-composer-sticker-switch-pad); font-size: var(--text-label); line-height: var(--tpl-msg-composer-text-lh); white-space: nowrap; }

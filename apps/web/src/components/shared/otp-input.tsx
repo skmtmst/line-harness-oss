@@ -5,7 +5,7 @@ import { Check } from 'lucide-react'
 import styles from './otp-input.module.css'
 
 /**
- * 認証コード入力（6マス）。Pencil ★V7 `xHzFK`「★ V7 共通 認証コード入力（6マス）」、1マスは `ENP7x`。
+ * 認証コード入力（6マス）。Pencil ★V8 `RfHCo`「OTP入力」、できたときは `cMbie`。
  *
  * 2段階認証・重要操作の再確認の6桁コードを、1マス1桁で入れる。
  * 動きの手本は kobra.systems の Input OTP（コードは写していない）。

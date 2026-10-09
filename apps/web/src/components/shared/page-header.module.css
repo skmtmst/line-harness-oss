@@ -66,6 +66,11 @@
 
 [data-theme='v8'] .title {
   display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--tpl-title-size);
   font-weight: var(--tpl-title-weight);
   line-height: var(--tpl-title-lh);

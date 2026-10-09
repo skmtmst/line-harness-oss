@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import Database from 'better-sqlite3';
+import { asD1 } from './d1-test-helper.js';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -59,21 +60,6 @@ function setup(): Database.Database {
   return sqlite;
 }
 
-function asD1(sqlite: Database.Database): D1Database {
-  return {
-    prepare(query: string) {
-      const make = (params: unknown[]) => ({
-        async run() {
-          const info = sqlite.prepare(query).run(...params);
-          return { results: [], success: true, meta: { changes: info.changes } };
-        },
-        async first<T>() { return (sqlite.prepare(query).get(...params) as T) ?? null; },
-        async all<T>() { return { results: sqlite.prepare(query).all(...params) as T[], success: true, meta: {} }; },
-      });
-      return { bind: (...params: unknown[]) => make(params), ...make([]) };
-    },
-  } as unknown as D1Database;
-}
 
 describe('friend add V6 event ledger', () => {
   let sqlite: Database.Database;

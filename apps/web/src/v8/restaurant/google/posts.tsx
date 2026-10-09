@@ -6,11 +6,13 @@
  * 端末からの画像のアップロードは、入口の page.tsx が渡す道具（mediaUpload）で行う
  * （src/v8 から @/app を読まないため）。渡されないときは登録メディアから選ぶだけ。
  */
-import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ImageIcon, Plus, RefreshCw, Send } from 'lucide-react'
 import type { InstagramConnectionStatus, MediaItem } from '@line-crm/shared'
 import { api, ApiError, type MediaUploadSession } from '@/lib/api'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
+import Card from '@/components/shared/card'
+import SectionHeader from '@/components/shared/section-header'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -19,8 +21,10 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
+import Chip from '@/components/shared/chip'
+import { Field } from '@/components/shared/form-controls'
 import type { StatusBadgeTone } from '@/components/shared/status-badge'
-import { TextField } from '@/components/shared/text-field'
+import { TextArea, TextField } from '@/components/shared/text-field'
 import DateTimeField from '@/components/shared/date-time-field'
 import Toggle from '@/components/shared/toggle'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -71,7 +75,7 @@ function statusBadge(post: GooglePost): { label: string; tone: StatusBadgeTone }
 }
 
 function KindChip({ kind }: { kind: GooglePostKind }) {
-  return <span className={`${styles.kindChip} ${kind === 'offer' ? styles.kindOffer : kind === 'event' ? styles.kindEvent : styles.kindStandard}`}>{KIND_LABELS[kind]}</span>
+  return <Chip tone={kind === 'event' ? 'warn' : 'neutral'}>{KIND_LABELS[kind]}</Chip>
 }
 
 function postWhen(post: GooglePost): string {
@@ -214,8 +218,8 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
       {loading && !data ? <div className={styles.stateBox}><ListState kind="loading" title="投稿を読み込んでいます" /></div> : null}
       {loadError ? <div className={styles.stateBox}><ListState kind="error" title="投稿を表示できませんでした" description={loadError} onRetry={() => void load()} /></div> : null}
       {data ? (
-        <section className={styles.card}>
-          <h2 className={styles.cardTitle}>{`投稿 ${data.total} 件`}</h2>
+        <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
+          <SectionHeader size="small" title={<>{`投稿 ${data.total} 件`}</>} />
           {data.total === 0 && !loading ? (
             <ListState kind="empty" title={filter === 'all' ? 'まだ投稿がありません' : 'その状態の投稿はありません'} description="「投稿を作る」から最新情報・イベント・特典を作れます。" emptyPreset="readonly" />
           ) : (
@@ -230,8 +234,8 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
                     <span className={styles.postTitle} title={name}>{name}</span>
                     {post.origin === 'google' ? <span className={styles.postMeta}>Googleで作成</span> : null}
                     <span className={styles.postMeta}>{postWhen(post)}</span>
-                    <span className={`${styles.kindChip} ${badge.tone === 'success' ? styles.kindOffer : badge.tone === 'warning' ? styles.kindEvent : badge.tone === 'danger' ? styles.chipDanger : badge.tone === 'info' ? styles.chipInfo : styles.kindStandard}`}>{badge.label}</span>
-                    {igBadge ? <span className={`${styles.kindChip} ${igBadge.tone === 'success' ? styles.kindOffer : igBadge.tone === 'danger' ? styles.chipDanger : styles.kindStandard}`} title={igBadge.title}>{igBadge.label}</span> : null}
+                    <Chip tone={badge.tone === 'success' ? 'ok' : badge.tone === 'warning' ? 'warn' : badge.tone === 'danger' ? 'danger' : badge.tone === 'info' ? 'info' : 'neutral'}>{badge.label}</Chip>
+                    {igBadge ? <span title={igBadge.title}><Chip tone={igBadge.tone === 'success' ? 'ok' : igBadge.tone === 'danger' ? 'danger' : 'neutral'}>{igBadge.label}</Chip></span> : null}
                     <span className={styles.menuBox}>
                       <RowMenu label={`投稿「${name}」の操作`} items={menuItems(post)} open={menuFor === post.id} onOpenChange={(next) => setMenuFor(next ? post.id : null)} />
                     </span>
@@ -241,13 +245,10 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
             </div>
           )}
           {data.total > 0 && pageCount > 1 ? (
-            <div className={styles.pager}>
-              <span className={styles.pagerNote}>{`${data.total}件・時刻はすべて日本時間（Asia/Tokyo）`}</span>
-              <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
-            </div>
+            <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={`${data.total}件・時刻はすべて日本時間（Asia/Tokyo）`} />
           ) : null}
           <p className={styles.grayNote}>{`行の「…」から 中身を見る・Google から削除・Instagram へ再送。削除は元に戻せません（確認の小窓が出ます）。Instagram が失敗した投稿は再送でき、Google への公開はそのまま残ります。${data.writeEnabled ? '' : '検証環境では Google へは送りません。'}`}</p>
-        </section>
+        </Card>
       ) : null}
       <ConfirmDialog
         open={confirmRemove !== null}
@@ -327,16 +328,6 @@ function draftInputFrom(form: PostForm, igAvailable: boolean): GooglePostDraftIn
   }
 }
 
-/** 欄の見出し。入力欄（htmlFor あり）は 13/500/20、選ぶ欄・本文は 12/600（T1j2Sw の2種類）。 */
-function Field({ label, htmlFor, input = false, grow = false, children }: { label: string; htmlFor?: string; input?: boolean; grow?: boolean; children: ReactNode }) {
-  return (
-    <div className={`${styles.field} ${grow ? styles.grow : ''}`}>
-      {htmlFor ? <label htmlFor={htmlFor} className={input ? styles.inputLabel : styles.fieldLabel}>{label}</label> : <span className={input ? styles.inputLabel : styles.fieldLabel}>{label}</span>}
-      {children}
-    </div>
-  )
-}
-
 /** 投稿を作る・直す（T1j2Sw）。 */
 export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUpload }: { accountId: string; kind: GooglePostKind; postId: string | null; go: GoogleNav; mediaUpload?: MediaUploadHelpers }) {
   const [form, setForm] = useState<PostForm>(emptyForm(kindFromUrl))
@@ -347,6 +338,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
   const [picker, setPicker] = useState<{ open: boolean; items: MediaItem[]; loading: boolean; error: string }>({ open: false, items: [], loading: false, error: '' })
   const [busy, setBusy] = useState<'save' | 'confirm' | null>(null)
   const [actionError, setActionError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof PostForm, string>>>({})
   const [upload, setUpload] = useState<{ busy: boolean; progress: number; error: string }>({ busy: false, progress: 0, error: '' })
   const [igState, setIgState] = useState<InstagramConnectionStatus['state'] | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -419,24 +411,42 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
     }
   }
 
-  const validationError = (): string | null => {
-    if (!form.summary.trim()) return '本文を入力してください。'
-    if (form.summary.length > 1500) return '本文は1,500文字までです。'
+  const validate = () => {
+    const errors: Partial<Record<keyof PostForm, string>> = {}
+    if (!form.summary.trim()) errors.summary = '本文を入力してください。'
+    else if (form.summary.length > 1500) errors.summary = '本文は1,500文字までです。'
     if (form.kind !== 'standard') {
-      if (!form.title.trim()) return `${form.kind === 'event' ? 'イベントタイトル' : '特典タイトル'}を入力してください。`
-      if (!form.start || !form.end) return '期間のはじめ・おわりの日時を入力してください。'
-      if (form.end < form.start) return '期間のおわりは、はじめより後にしてください。'
+      if (!form.title.trim()) errors.title = `${form.kind === 'event' ? 'イベントタイトル' : '特典タイトル'}を入力してください。`
+      if (!form.start) errors.start = '期間のはじめの日時を入力してください。'
+      if (!form.end) errors.end = '期間のおわりの日時を入力してください。'
+      else if (form.start && form.end < form.start) errors.end = '期間のおわりは、はじめより後にしてください。'
     }
+    setFieldErrors(errors)
+    const first = (['title', 'start', 'end', 'summary'] as const).find((key) => errors[key])
+    if (first) {
+      const field = document.getElementById(`gb-post-${first}`)
+      field?.focus()
+      field?.scrollIntoView({ block: 'center' })
+      return false
+    }
+    // Instagram にも投稿するときの決まり（★V8-B `U1X7T2`、2026-10-07 利用者承認）。
+    // 画像は欄ではなく「選ぶ」操作なので、欄の下ではなく帯で知らせる。
     if (igAvailable && form.igEnabled) {
-      if (!form.mediaId) return 'Instagram にも投稿するときは、画像を1枚選んでください。'
-      if (form.igCaption.length > 2200) return 'Instagram 用の文章は2,200文字までです。'
+      if (!form.mediaId) {
+        setActionError('Instagram にも投稿するときは、画像を1枚選んでください。')
+        return false
+      }
+      if (form.igCaption.length > 2200) {
+        setActionError('Instagram 用の文章は2,200文字までです。')
+        return false
+      }
     }
-    return null
+    return true
   }
 
   const save = async (): Promise<string | null> => {
-    const problem = validationError()
-    if (problem) { setActionError(problem); return null }
+    setActionError('')
+    if (upload.busy || !validate()) return null
     setBusy('save')
     setActionError('')
     try {
@@ -468,14 +478,17 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
   if (loadError) return <ListState kind="error" title="投稿を表示できませんでした" description={loadError} action={<Button onClick={() => go({ tab: 'posts' })}>投稿一覧へ戻る</Button>} />
 
   const withPeriod = form.kind !== 'standard'
-  const set = (patch: Partial<PostForm>) => setForm((current) => ({ ...current, ...patch }))
+  const set = (patch: Partial<PostForm>) => {
+    setForm((current) => ({ ...current, ...patch }))
+    setFieldErrors((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !(key in patch))))
+  }
 
   return (
     <>
       {!editable ? <Notice tone="warn">この投稿はもう編集できません（送信済み、または送信手続き中です）。</Notice> : null}
-      <section className={styles.card}>
-        <h2 className={styles.cardTitle}>{postId ? '投稿を直す' : '投稿を作る'}</h2>
-        <Field label="種類">
+      <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
+        <SectionHeader size="small" title={<>{postId ? '投稿を直す' : '投稿を作る'}</>} />
+        <Field density="compact" label="種類">
           <Select
             aria-label="投稿の種類"
             size="full"
@@ -487,35 +500,35 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
         </Field>
         {withPeriod ? (
           <div className={styles.fieldGroup}>
-            <Field label="タイトル（特典・イベントのとき）" htmlFor="gb-post-title" input>
+            <Field density="input" label="タイトル（特典・イベントのとき）" htmlFor="gb-post-title" error={fieldErrors.title}>
               <TextField id="gb-post-title" value={form.title} onChange={(e) => set({ title: e.target.value })} disabled={!editable} maxLength={100} />
             </Field>
             <div className={styles.fieldPair}>
-              <Field label="期間 はじめ" htmlFor="gb-post-start" input grow>
-                <DateTimeField id="gb-post-start" value={form.start} onChange={(next) => set({ start: next })} disabled={!editable} />
+              <Field density="input" label="期間 はじめ" htmlFor="gb-post-start" error={fieldErrors.start} grow>
+                <DateTimeField size="compact" id="gb-post-start" invalid={Boolean(fieldErrors.start)} value={form.start} onChange={(next) => set({ start: next })} disabled={!editable} />
               </Field>
-              <Field label="期間 おわり" htmlFor="gb-post-end" input grow>
-                <DateTimeField id="gb-post-end" value={form.end} onChange={(next) => set({ end: next })} disabled={!editable} />
+              <Field density="input" label="期間 おわり" htmlFor="gb-post-end" error={fieldErrors.end} grow>
+                <DateTimeField size="compact" id="gb-post-end" invalid={Boolean(fieldErrors.end)} value={form.end} onChange={(next) => set({ end: next })} disabled={!editable} />
               </Field>
             </div>
           </div>
         ) : null}
-        <Field label="本文" htmlFor="gb-post-summary">
-          <textarea id="gb-post-summary" className={styles.summaryInput} value={form.summary} onChange={(e) => set({ summary: e.target.value })} disabled={!editable} maxLength={1500} aria-describedby="gb-post-summary-count" />
+        <Field density="compact" label="本文" htmlFor="gb-post-summary" error={fieldErrors.summary}>
+          <TextArea density="compact" height="post" id="gb-post-summary" value={form.summary} onChange={(e) => set({ summary: e.target.value })} disabled={!editable} maxLength={1500} aria-describedby="gb-post-summary-count" />
           <span id="gb-post-summary-count" className="sr-only">{`${form.summary.length} / 1,500 文字`}</span>
         </Field>
         <div className={styles.imageRow}>
-          <Button onClick={() => (picker.open ? setPicker({ ...picker, open: false }) : void openPicker())} disabled={!editable || picker.loading || upload.busy} aria-expanded={picker.open}>
+          <Button onClick={() => (picker.open ? setPicker({ ...picker, open: false }) : void openPicker())} disabled={!editable || busy !== null || picker.loading || upload.busy} aria-expanded={picker.open}>
             <ImageIcon aria-hidden className={styles.icon15} />{upload.busy ? `アップロード中… ${upload.progress}%` : '画像を選ぶ'}
           </Button>
           <span className={styles.imageName}>{form.mediaFilename ? `${form.mediaFilename}・4:3` : '画像なし'}</span>
-          {form.mediaId && editable ? <button type="button" className={styles.textButton} onClick={() => set({ mediaId: null, mediaFilename: null, mediaSourceUrl: null })}>画像を外す</button> : null}
+          {form.mediaId && editable ? <Button variant="text" onClick={() => set({ mediaId: null, mediaFilename: null, mediaSourceUrl: null })}>画像を外す</Button> : null}
         </div>
         {upload.error ? <Notice tone="danger">{upload.error}</Notice> : null}
         {picker.open ? (
           <div className={styles.picker} role="group" aria-label="画像を選ぶ">
             <div className={styles.pickerHead}>
-              <span className={styles.fieldLabel}>登録メディアの画像</span>
+              <SectionHeader size="small" title="登録メディアの画像" />
               <span className={styles.spacer} aria-hidden="true" />
               {mediaUpload ? (
                 <>
@@ -541,9 +554,9 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             {!picker.loading && !picker.error && picker.items.length === 0 ? <p className={styles.muted}>このLINEアカウントの登録メディアに画像がありません。先に「登録メディア」で画像を追加してください。</p> : null}
             <div className={styles.pickerGrid}>
               {picker.items.map((m) => (
-                <button key={m.id} type="button" className={styles.pickerItem} title={m.filename} aria-label={`${m.filename} を選ぶ`} onClick={() => { set({ mediaId: m.id, mediaFilename: m.filename, mediaSourceUrl: m.url }); setPicker({ ...picker, open: false }) }}>
-                  <img src={m.url} alt="" className={styles.pickerImage} />
-                </button>
+                <Button key={m.id} variant="text" size="thumbnail" title={m.filename} aria-label={`${m.filename} を選ぶ`} onClick={() => { set({ mediaId: m.id, mediaFilename: m.filename, mediaSourceUrl: m.url }); setPicker({ ...picker, open: false }) }}>
+                  <img src={m.url} alt="" />
+                </Button>
               ))}
             </div>
           </div>
@@ -552,20 +565,20 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
         {form.kind === 'offer' ? (
           <div className={styles.fieldGroup}>
             <div className={styles.fieldPair}>
-              <Field label="クーポンコード（任意）" htmlFor="gb-post-coupon" input grow>
+              <Field density="input" label="クーポンコード（任意）" htmlFor="gb-post-coupon" grow>
                 <TextField id="gb-post-coupon" value={form.couponCode} onChange={(e) => set({ couponCode: e.target.value })} disabled={!editable} maxLength={40} />
               </Field>
-              <Field label="特典の利用リンク（任意）" htmlFor="gb-post-redeem" input grow>
+              <Field density="input" label="特典の利用リンク（任意）" htmlFor="gb-post-redeem" grow>
                 <TextField id="gb-post-redeem" type="url" placeholder="https://" value={form.redeemOnlineUrl} onChange={(e) => set({ redeemOnlineUrl: e.target.value })} disabled={!editable} maxLength={200} />
               </Field>
             </div>
-            <Field label="利用条件（任意）" htmlFor="gb-post-terms" input>
+            <Field density="input" label="利用条件（任意）" htmlFor="gb-post-terms">
               <TextField id="gb-post-terms" value={form.termsConditions} onChange={(e) => set({ termsConditions: e.target.value })} disabled={!editable} maxLength={300} />
             </Field>
           </div>
         ) : null}
         <div className={styles.fieldPair}>
-          <Field label="ボタン（任意）" grow>
+          <Field density="compact" label="ボタン（任意）" grow>
             <Select
               aria-label="ボタンの種類"
               size="full"
@@ -575,11 +588,11 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
               disabled={!editable || form.kind === 'offer'}
             />
           </Field>
-          <Field label="リンク先" htmlFor="gb-post-cta-url" input grow>
+          <Field density="input" label="リンク先" htmlFor="gb-post-cta-url" grow>
             <TextField id="gb-post-cta-url" type="url" placeholder="https://" value={form.ctaUrl} onChange={(e) => set({ ctaUrl: e.target.value })} disabled={!editable || form.kind === 'offer' || !form.ctaType || form.ctaType === 'call'} maxLength={500} />
           </Field>
         </div>
-        <Field label="公開方法">
+        <Field density="compact" label="公開方法">
           <Select
             aria-label="公開方法"
             size="full"
@@ -604,7 +617,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             {form.igEnabled ? (
               <>
                 <Field label="Instagram 用の文章（書き換えたいときだけ）" htmlFor="gb-post-ig-caption">
-                  <textarea id="gb-post-ig-caption" className={styles.summaryInput} value={form.igCaption} onChange={(e) => set({ igCaption: e.target.value })} disabled={!editable} maxLength={2200} placeholder="空のままなら、上の本文をそのまま使います" aria-describedby="gb-post-ig-caption-count" />
+                  <TextArea density="compact" height="post" id="gb-post-ig-caption" value={form.igCaption} onChange={(e) => set({ igCaption: e.target.value })} disabled={!editable} maxLength={2200} placeholder="空のままなら、上の本文をそのまま使います" aria-describedby="gb-post-ig-caption-count" />
                   <span id="gb-post-ig-caption-count" className="sr-only">{`${form.igCaption.length} / 2,200 文字`}</span>
                 </Field>
                 <p className={styles.igNote}>Instagram には画像が 1 枚必要です。PNG の画像は自動で JPEG に変換されます。</p>
@@ -615,19 +628,18 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
         {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
         {editable ? (
           <>
-            <div className={styles.infoBand}>
-              <p className={styles.infoBandText}>「公開内容を確認」で、Google に出る形を確かめてから公開します。途中は「下書きを保存する」。</p>
-              <Button onClick={() => void saveDraft()} disabled={busy !== null} busy={busy === 'save'}>下書きを保存する</Button>
-            </div>
+            <Notice tone="info" density="compact" icon={null} action={<Button onClick={() => void saveDraft()} disabled={busy !== null || upload.busy} busy={busy === 'save'}>下書きを保存する</Button>}>
+              「公開内容を確認」で、Google に出る形を確かめてから公開します。途中は「下書きを保存する」。
+            </Notice>
             <div className={styles.formActions}>
-              <Button onClick={() => go({ tab: 'posts' })} disabled={busy !== null}>キャンセル</Button>
-              <Button variant="primary" onClick={() => void openConfirm()} disabled={busy !== null} busy={busy === 'confirm'} busyLabel="確認中…"><Send aria-hidden className={styles.icon15} />公開内容を確認</Button>
+              <Button onClick={() => go({ tab: 'posts' })} disabled={busy !== null || upload.busy}>キャンセル</Button>
+              <Button variant="primary" onClick={() => void openConfirm()} disabled={busy !== null || upload.busy} busy={busy === 'confirm'} busyLabel="確認中…"><Send aria-hidden className={styles.icon15} />公開内容を確認</Button>
             </div>
           </>
         ) : (
           <div className={styles.formActions}><Button onClick={() => go({ tab: 'posts' })}>投稿一覧へ戻る</Button></div>
         )}
-      </section>
+      </Card>
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </>
   )
@@ -690,8 +702,8 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
   const canPress = canPublish && writeEnabled && checked && !busy && !done && post.status !== 'cancelled'
 
   return (
-    <section className={styles.card} data-design-node="jqSak">
-      <h2 className={styles.cardTitle}>{done ? 'この投稿をGoogleに送信しました' : 'この投稿を予約しますか？'}</h2>
+    <Card appearance="outlined" layout="vertical" padding="default" gap="normal" data-design-node="jqSak">
+      <SectionHeader size="small" title={<>{done ? 'この投稿をGoogleに送信しました' : 'この投稿を予約しますか？'}</>} />
       <p className={styles.muted}>Googleに公開される内容と日時を確認してください。</p>
       {sent ? <Notice tone="success">{sent.alreadyPublished ? 'この内容はすでにGoogleに届いていました。送信はしていません。' : post.status === 'published' ? 'Googleに投稿を送信し、公開を確認しました。' : 'Googleに投稿を送信しました。反映を確認できるまで「審査中」と表示します。'}</Notice> : null}
       {post.status === 'rejected' ? <Notice tone="danger">Googleの審査で公開されませんでした。内容を見直して作り直してください。</Notice> : null}
@@ -708,7 +720,7 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
         {post.media[0] ? <div className={styles.factRow}><dt className={styles.factKey}>画像</dt><dd className={styles.factValue}>{post.media[0].filename}</dd></div> : null}
         {post.instagram ? <div className={styles.factRow}><dt className={styles.factKey}>Instagram</dt><dd className={styles.factValue}>{instagramFact(post.instagram)}</dd></div> : null}
       </dl>
-      {post.title ? <p className={styles.cardTitle}>{post.title}</p> : null}
+      {post.title ? <SectionHeader size="small" title={post.title} /> : null}
       <p className={styles.preText}>{post.summary}</p>
       {!done && post.status !== 'cancelled' ? (
         <>
@@ -722,6 +734,6 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
       ) : (
         <div className={styles.formActions}><Button variant="primary" onClick={() => go({ tab: 'posts' })}>投稿一覧へ戻る</Button></div>
       )}
-    </section>
+    </Card>
   )
 }

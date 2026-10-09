@@ -1,5 +1,8 @@
 'use client'
 
+import { DragHandle } from '@/components/shared/row-actions'
+
+import SharedToggle from '@/components/shared/toggle'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { ArrowDown, ArrowUp, Coins, Copy, Trash2, X } from 'lucide-react'
@@ -9,6 +12,8 @@ import Breadcrumb from '@/components/layout/breadcrumb'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
+import SegmentedControl from '@/components/shared/segmented'
+import HelpTip from '@/components/shared/help-tip'
 import Combobox from '@/components/shared/combobox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Drawer from '@/components/shared/drawer'
@@ -126,18 +131,7 @@ const inputClass =
   'w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink'
 
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (next: boolean) => void; label: string }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={() => onChange(!checked)}
-      className={`relative h-7 w-12 rounded-pill transition-colors ${checked ? 'bg-accent' : 'bg-hairline'}`}
-    >
-      <span className={`absolute top-1 h-5 w-5 rounded-pill bg-canvas shadow-card transition-all ${checked ? 'left-6' : 'left-1'}`} />
-    </button>
-  )
+  return <SharedToggle checked={checked} onChange={onChange} label={label} />
 }
 
 function StepTitle({ number, title, note }: { number: number; title: string; note?: string }) {
@@ -149,12 +143,12 @@ function StepTitle({ number, title, note }: { number: number; title: string; not
   )
 }
 
-export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes, onClose, onAdd, referenceState = false }: { accountId: string | null; suppliedResources?: CommonActionResources | null; allowedActionTypes?: readonly TagEditorActionLabel[]; onClose: () => void; onAdd: (action: LinkedAction) => void; referenceState?: boolean }) {
+export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes, onClose, onAdd, selectedAction, referenceState = false, hqV8 = false }: { accountId: string | null; suppliedResources?: CommonActionResources | null; allowedActionTypes?: readonly TagEditorActionLabel[]; onClose: () => void; onAdd: (action: LinkedAction, beforeId?: string) => void; selectedAction?: Pick<LinkedAction, 'id' | 'label'>; referenceState?: boolean; hqV8?: boolean }) {
   const [selected, setSelected] = useState<(typeof ACTION_TYPES)[number]>(referenceState ? ACTION_TYPES[1] : ACTION_TYPES[0])
   const [timing, setTiming] = useState<'immediate' | 'delay'>('immediate')
   const [delay, setDelay] = useState(referenceState ? '24' : '1')
   const [delayUnit, setDelayUnit] = useState<'minutes' | 'hours' | 'days'>(referenceState ? 'hours' : 'minutes')
-  // 共通Selectはvalue/onChange必須のため表示保持用の状態を持つ。元の素のselectも非制御で値はどこからも読まれていなかったので、動きは変えない。
+  // 前へ追加する位置は、呼び出し元が最後に選んだ行に結ぶ。
   const [position, setPosition] = useState('last')
   const [message, setMessage] = useState('ご登録ありがとうございます。')
   const [amount, setAmount] = useState('100')
@@ -190,11 +184,12 @@ export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes,
     const label = selected[0] === 'テキスト送信' ? message.trim()
       : selected[0] === 'マイル付与' ? `${Math.max(1, Number(amount) || 1)} mile`
         : resourceName ?? selected[0]
-    onAdd({ id: crypto.randomUUID(), type: selected[1], label, timing: timing === 'immediate' ? 'すぐに' : `${delay}${delayUnit === 'minutes' ? '分' : delayUnit === 'hours' ? '時間' : '日'}後`, definition: { id: crypto.randomUUID(), type: definition.actionType, params, onFailure: 'stop' } })
+    onAdd({ id: crypto.randomUUID(), type: selected[1], label, timing: timing === 'immediate' ? 'すぐに' : `${delay}${delayUnit === 'minutes' ? '分' : delayUnit === 'hours' ? '時間' : '日'}後`, definition: { id: crypto.randomUUID(), type: definition.actionType, params, onFailure: 'stop' } }, position === 'before' ? selectedAction?.id : undefined)
   }
 
   return (
     <Drawer
+      designWidth={hqV8 ? 640 : undefined}
       open
       title="連動アクションを追加"
       description="タグが付いた直後に実行する処理を選びます。"
@@ -210,23 +205,30 @@ export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes,
     >
           <section>
             <h3 className="mb-3 text-sm font-bold text-ink">1. アクションの種類</h3>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <div className={hqV8 ? 'grid grid-cols-2 gap-2.5 sm:grid-cols-3' : 'grid grid-cols-2 gap-2 sm:grid-cols-3'}>
               {ACTION_TYPES.map((action) => (
-                <Button variant="secondary" className={(`rounded-control border px-3 py-3 text-left text-sm font-medium ${allowedActionTypes && !allowedActionTypes.includes(action[0]) ? 'cursor-not-allowed border-hairline text-ink-faint opacity-55' : selected[0] === action[0] ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'}`) + ' h-auto whitespace-normal'} key={action[0]} type="button" disabled={Boolean(allowedActionTypes && !allowedActionTypes.includes(action[0]))} onClick={() => setSelected(action)}>
+                <Button variant="secondary" className={(`rounded-control border px-3 ${hqV8 ? 'py-2.5 text-caption' : 'py-3 text-sm'} text-left font-medium ${allowedActionTypes && !allowedActionTypes.includes(action[0]) ? 'cursor-not-allowed border-hairline text-ink-faint opacity-55' : selected[0] === action[0] ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'}`) + ' h-auto whitespace-normal'} key={action[0]} type="button" disabled={Boolean(allowedActionTypes && !allowedActionTypes.includes(action[0]))} onClick={() => setSelected(action)}>
                   {action[0]}
                 </Button>
               ))}
             </div>
+            {hqV8 ? <p className="mt-2 break-normal text-micro text-ink-faint">統括のひな形で使えるのは「テキスト送信」と「マイル付与」です。ほかは配った先の店で足します。</p> : null}
           </section>
 
-          <section className="mt-7 border-t border-hairline pt-6">
-            <h3 className="mb-3 text-sm font-bold text-ink">2. 実行するタイミング</h3>
-            <RadioCardGroup legend="実行するタイミング" className="grid gap-2 sm:grid-cols-2">
-              <RadioCard name="timing" value="immediate" checked={timing === 'immediate'} onChange={() => setTiming('immediate')} title="すぐに実行" />
-              <RadioCard name="timing" value="delay" checked={timing === 'delay'} onChange={() => setTiming('delay')} title="時間をあけて実行" />
-            </RadioCardGroup>
-              <div className={`mt-3 flex items-center gap-2 ${timing === 'immediate' ? 'opacity-55' : ''}`}>
-                <input type="number" min={1} value={delay} onChange={(event) => setDelay(event.target.value)} className={`${inputClass} max-w-28`} />
+          <section className={hqV8 ? 'mt-3 border-t border-hairline pt-3' : 'mt-7 border-t border-hairline pt-6'}>
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink">2. 実行するタイミング
+              <HelpTip label="実行するタイミングの説明">時間をあけて実行すると、その時間が経ってから実行されます。待機中にタグが外れた場合は実行されません。</HelpTip>
+            </h3>
+            <SegmentedControl
+              aria-label="実行するタイミング"
+              size="timing"
+              options={[{ value: 'immediate', label: 'すぐに実行' }, { value: 'delay', label: '時間をあけて実行' }]}
+              value={timing}
+              onChange={setTiming}
+            />
+            {timing === 'delay' ? (
+              <div className="mt-3 flex items-center gap-2">
+                <input aria-label="実行までの待ち時間" type="number" min={1} value={delay} onChange={(event) => setDelay(event.target.value)} className={`${inputClass} max-w-28`} />
                 <Select
                   aria-label="遅延の単位"
                   value={delayUnit}
@@ -238,7 +240,7 @@ export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes,
                   ]}
                 />
               </div>
-            <p className="mt-2 text-xs leading-5 text-ink-faint">待機を挟むと、その時間が経ってから実行されます。待機中にタグが外れた場合は実行されません。</p>
+            ) : null}
           </section>
 
           <section className="mt-7 border-t border-hairline pt-6">
@@ -263,7 +265,7 @@ export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes,
               onChange={setPosition}
               options={[
                 { value: 'last', label: 'いちばん最後に追加' },
-                { value: 'before', label: '選択中のアクションの前' },
+                { value: 'before', label: '選択中のアクションの前', disabled: !selectedAction },
               ]}
               size="full"
             />
@@ -280,7 +282,7 @@ export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes,
  * 確認ボタンはサーバーの計算が返ってくるまで押せない。実行時は
  * previewToken を保存APIへ渡し、サーバー側で対象の再計算と照合する。
  */
-export function RetroactiveDialog({ values, count, tagId, accountId, onCancel, onSave, referenceState = false }: { values: TagEditorValues; count: number; tagId: string | null; accountId: string | null; onCancel: () => void; onSave: (previewToken: string) => void; referenceState?: boolean }) {
+export function RetroactiveDialog({ values, count, tagId, accountId, onCancel, onSaveWithoutApplying, onSave, referenceState = false }: { values: TagEditorValues; count: number; tagId: string | null; accountId: string | null; onCancel: () => void; onSaveWithoutApplying: () => void; onSave: (previewToken: string) => void; referenceState?: boolean }) {
   const [accepted, setAccepted] = useState(referenceState)
   const [preview, setPreview] = useState<TagRetroactivePreview | null>(null)
   const [previewError, setPreviewError] = useState('')
@@ -344,7 +346,7 @@ export function RetroactiveDialog({ values, count, tagId, accountId, onCancel, o
         )}
         <Checkbox className="mt-3" checked={accepted} onCheckedChange={setAccepted}>人数と合計マイルを確認しました</Checkbox>
         <div className="mt-4 flex justify-end gap-2">
-          <Button variant="secondary" className="px-4 py-2.5 font-medium text-ink-secondary h-auto whitespace-normal" type="button" onClick={onCancel}>反映しないで保存する</Button>
+          <Button variant="secondary" className="px-4 py-2.5 font-medium text-ink-secondary h-auto whitespace-normal" type="button" onClick={onSaveWithoutApplying}>反映しないで保存する</Button>
           <Button variant="primary" className="px-4 py-2.5 font-bold border-0 h-auto whitespace-normal" type="button" disabled={!accepted || loading || Boolean(previewError)} onClick={() => onSave(preview?.previewToken ?? '')}>{loading ? '対象を計算中…' : 'さかのぼって反映して保存する'}</Button>
         </div>
         <p className="mt-3 whitespace-nowrap text-xs leading-4 text-ink-faint">新規作成のときはこのダイアログは出ません。まだ誰にもタグが付いていないため、送信やマイル付与も起きません。</p>
@@ -513,7 +515,7 @@ export default function TagEditorV4({
   return (
     <div>
       {!embedded && <div className="mb-5">
-        <Breadcrumb items={[{ label: '友だち属性', href: '/tags' }, { label: mode === 'create' ? 'タグを作る' : 'タグを編集' }]} />
+        <Breadcrumb items={[{ label: 'タグ', href: '/tags' }, { label: mode === 'create' ? 'タグを作る' : 'タグを編集' }]} />
       </div>}
 
       {error && <Notice className="mb-4" tone="danger" message={error} />}
@@ -589,7 +591,7 @@ export default function TagEditorV4({
                 </RadioCardGroup>
                 <div className="border-t border-hairline pt-3">
                   <div className="mb-2 flex items-center justify-between"><div><h3 className="text-sm font-bold text-ink">連動アクション</h3><p className="mt-0.5 text-xs text-ink-faint">上から順に実行されます。つまんで動かすか、↑↓ボタンで順番を変更できます。</p></div><button type="button" onClick={() => setDrawerOpen(true)} className="rounded-control border border-action/25 bg-action-soft px-3 py-2 text-sm font-semibold text-action">＋ アクションを追加する</button></div>
-                  {actions.length === 0 ? <p className="rounded-control border border-dashed border-hairline p-5 text-center text-sm text-ink-faint">連動アクションはまだありません</p> : <div className="overflow-x-auto pb-1"><ol className="space-y-2">{actions.map((action, index) => <li key={action.id} draggable onDragStart={() => setDragActionId(action.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => { const fromId = dragActionId; setDragActionId(null); if (!fromId || fromId === action.id) return; setActions((current) => { const from = current.findIndex((item) => item.id === fromId); if (from < 0) return current; const reordered = current.filter((item) => item.id !== fromId); reordered.splice(Math.min(index, reordered.length), 0, current[from]); return reordered }) }} onDragEnd={() => setDragActionId(null)} className={`grid grid-cols-[28px_32px_118px_minmax(0,1fr)_90px_32px_32px_32px_32px] items-center gap-2 rounded-control border border-hairline px-3 py-2 text-sm ${dragActionId === action.id ? 'opacity-50' : ''}`}><span className="cursor-grab text-ink-faint" title="ドラッグで順番を変更">⋮⋮</span><span className="flex h-6 w-6 items-center justify-center rounded-pill bg-canvas-sunken text-xs font-medium">{index + 1}</span><span className={`rounded-control border px-2 py-1 text-center text-xs ${action.type === 'タグ追加' || action.type === 'タグ解除' || action.type === 'マイル付与' ? 'border-success bg-success-bg text-success' : action.type === '友だち情報更新' || action.type === '対応マーク変更' || action.type.startsWith('リマインダ') ? 'border-warning bg-warning-bg text-warning' : action.type.startsWith('シナリオ') || action.type === 'リッチメニュー切替' ? 'border-action bg-action-soft text-action' : 'border-info bg-info-bg text-action'}`}>{action.type}</span><span className="truncate font-medium text-ink" title={action.label}>{action.label}</span><span className={`rounded-pill px-2 py-1 text-center text-xs ${action.timing === 'すぐに' ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'}`}>{action.timing === 'すぐに' ? '即時' : action.timing}</span><IconButton onClick={() => moveAction(index, -1)} disabled={index === 0} aria-label={`${index + 1}番目のアクションを上へ`} title="上へ"><ArrowUp size={15} aria-hidden /></IconButton><IconButton onClick={() => moveAction(index, 1)} disabled={index === actions.length - 1} aria-label={`${index + 1}番目のアクションを下へ`} title="下へ"><ArrowDown size={15} aria-hidden /></IconButton><IconButton onClick={() => duplicateAction(action, index)} aria-label={`${index + 1}番目のアクションを複製`}><Copy size={15} aria-hidden /></IconButton><IconButton onClick={() => setActions((current) => current.filter((item) => item.id !== action.id))} className="text-danger" aria-label={`${index + 1}番目のアクションを削除`}><Trash2 size={15} aria-hidden /></IconButton></li>)}</ol></div>}
+                  {actions.length === 0 ? <p className="rounded-control border border-dashed border-hairline p-5 text-center text-sm text-ink-faint">連動アクションはまだありません</p> : <div className="overflow-x-auto pb-1"><ol className="space-y-2">{actions.map((action, index) => <li key={action.id} draggable onDragStart={() => setDragActionId(action.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => { const fromId = dragActionId; setDragActionId(null); if (!fromId || fromId === action.id) return; setActions((current) => { const from = current.findIndex((item) => item.id === fromId); if (from < 0) return current; const reordered = current.filter((item) => item.id !== fromId); reordered.splice(Math.min(index, reordered.length), 0, current[from]); return reordered }) }} onDragEnd={() => setDragActionId(null)} className={`grid grid-cols-[28px_32px_118px_minmax(0,1fr)_90px_32px_32px_32px_32px] items-center gap-2 rounded-control border border-hairline px-3 py-2 text-sm ${dragActionId === action.id ? 'opacity-50' : ''}`}><DragHandle label={`「${action.label}」を並べ替える`} draggable onDragStart={() => setDragActionId(action.id)} onDragEnd={() => setDragActionId(null)} onMove={direction => moveAction(index, direction)} /><span className="flex h-6 w-6 items-center justify-center rounded-pill bg-canvas-sunken text-xs font-medium">{index + 1}</span><span className={`rounded-control border px-2 py-1 text-center text-xs ${action.type === 'タグ追加' || action.type === 'タグ解除' || action.type === 'マイル付与' ? 'border-success bg-success-bg text-success' : action.type === '友だち情報更新' || action.type === '対応マーク変更' || action.type.startsWith('リマインダ') ? 'border-warning bg-warning-bg text-warning' : action.type.startsWith('シナリオ') || action.type === 'リッチメニュー切替' ? 'border-action bg-action-soft text-action' : 'border-info bg-info-bg text-action'}`}>{action.type}</span><span className="truncate font-medium text-ink" title={action.label}>{action.label}</span><span className={`rounded-pill px-2 py-1 text-center text-xs ${action.timing === 'すぐに' ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'}`}>{action.timing === 'すぐに' ? '即時' : action.timing}</span><IconButton onClick={() => moveAction(index, -1)} disabled={index === 0} aria-label={`${index + 1}番目のアクションを上へ`} title="上へ"><ArrowUp size={15} aria-hidden /></IconButton><IconButton onClick={() => moveAction(index, 1)} disabled={index === actions.length - 1} aria-label={`${index + 1}番目のアクションを下へ`} title="下へ"><ArrowDown size={15} aria-hidden /></IconButton><IconButton onClick={() => duplicateAction(action, index)} aria-label={`${index + 1}番目のアクションを複製`}><Copy size={15} aria-hidden /></IconButton><IconButton onClick={() => setActions((current) => current.filter((item) => item.id !== action.id))} className="text-danger" aria-label={`${index + 1}番目のアクションを削除`}><Trash2 size={15} aria-hidden /></IconButton></li>)}</ol></div>}
                 </div>
               </div>
             )}
@@ -656,7 +658,7 @@ export default function TagEditorV4({
       />
 
       {drawerOpen && <ActionDrawer accountId={accountId} suppliedResources={resources} allowedActionTypes={allowedActionTypes} referenceState={referenceDrawerState} onClose={() => setDrawerOpen(false)} onAdd={(action) => { setActions((current) => [...current, action]); setDrawerOpen(false) }} />}
-      {retroactiveOpen && <RetroactiveDialog referenceState={referenceRetroactiveState} values={values} count={tag?.friendCount ?? 0} tagId={tag?.id ?? null} accountId={accountId} onCancel={() => { setRetroactiveOpen(false); void onSave({ ...values, applyToExisting: false }, false, false) }} onSave={(previewToken) => { setRetroactiveOpen(false); void onSave(values, false, true, previewToken) }} />}
+      {retroactiveOpen && <RetroactiveDialog referenceState={referenceRetroactiveState} values={values} count={tag?.friendCount ?? 0} tagId={tag?.id ?? null} accountId={accountId} onCancel={() => setRetroactiveOpen(false)} onSaveWithoutApplying={() => { setRetroactiveOpen(false); void onSave({ ...values, applyToExisting: false }, false, false) }} onSave={(previewToken) => { setRetroactiveOpen(false); void onSave(values, false, true, previewToken) }} />}
     </div>
   )
 }

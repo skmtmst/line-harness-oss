@@ -140,6 +140,35 @@ describe('V6オートメーション実行エンジン', () => {
     expect(executor).not.toHaveBeenCalled();
   });
 
+  it.each([false, true])('分岐後のタグ変更と待機でも同じ道を進む（旧実行計画=%s）', async (legacy) => {
+    insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1' });
+    testDb.raw.exec("INSERT INTO tags (id, name, line_account_id) VALUES ('vip', 'VIP', 'account-1'); INSERT INTO friend_tags VALUES ('friend-1', 'vip', '2026-08-26');");
+    const setup = addPublishedAutomation(testDb.raw, { actions: [{
+      id: 'branch', type: 'branch', onFailure: 'stop', params: {
+        condition: { operator: 'AND', rules: [{ type: 'tag_exists', value: 'vip' }] },
+        then: [action('remove-tag'), action('pause', 'wait', { durationMinutes: 5 }), action('after-wait')],
+        else: [action('wrong-way')],
+      },
+    }] });
+    const created = await start(testDb.db, setup);
+    if (legacy) {
+      const row = testDb.raw.prepare('SELECT execution_plan_json FROM automation_runs WHERE id = ?').get(created.runId) as { execution_plan_json: string };
+      const plan = JSON.parse(row.execution_plan_json);
+      for (const step of plan) for (const condition of step.branchConditions ?? []) delete condition.branchStepKey;
+      testDb.raw.prepare('UPDATE automation_runs SET execution_plan_json = ? WHERE id = ?').run(JSON.stringify(plan), created.runId);
+    }
+    const seen: string[] = [];
+    const executors = { record: async ({ action: current }: { action: ActionDefinition }) => {
+      seen.push(current.id);
+      if (current.id.endsWith('/remove-tag')) testDb.raw.exec("DELETE FROM friend_tags WHERE tag_id = 'vip'");
+    } };
+    expect(await processAutomationRun(testDb.db, created.runId!, { now: T0, executors })).toBe('waiting');
+    expect(await processAutomationRun(testDb.db, created.runId!, {
+      now: '2026-08-26T01:06:00.000Z', executors,
+    })).toBe('success');
+    expect(seen).toEqual(['branch/then/remove-tag', 'branch/then/after-wait']);
+  });
+
   it('条件分岐は一致した側だけを動かし、選ばなかった側を履歴へ残す', async () => {
     insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1' });
     testDb.raw.prepare(`INSERT INTO tags (id, name, line_account_id) VALUES ('vip', 'VIP', 'account-1')`).run();
@@ -169,6 +198,27 @@ describe('V6オートメーション実行エンジン', () => {
       { step_key: 'branch/else/no', status: 'skipped' },
       { step_key: 'branch/then/yes', status: 'success' },
     ]);
+  });
+
+  it('入れ子の分岐も各親の保存結果を使い、選ばなかった親の下は実行しない', async () => {
+    insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1' });
+    testDb.raw.exec("INSERT INTO tags (id, name, line_account_id) VALUES ('vip', 'VIP', 'account-1'); INSERT INTO friend_tags VALUES ('friend-1', 'vip', '2026-08-26');");
+    const condition = { operator: 'AND', rules: [{ type: 'tag_exists', value: 'vip' }] };
+    const nested = (id: string) => action(id, 'branch', { condition,
+      then: [action('remove-tag'), action('still-yes')], else: [action('wrong-inner')],
+    });
+    const setup = addPublishedAutomation(testDb.raw, { actions: [action('outer', 'branch', {
+      condition, then: [nested('inner')], else: [nested('unselected')],
+    })] });
+    const created = await start(testDb.db, setup);
+    const seen: string[] = [];
+    expect(await processAutomationRun(testDb.db, created.runId!, { now: T0, executors: {
+      record: async ({ action: current }) => {
+        seen.push(current.id);
+        testDb.raw.exec("DELETE FROM friend_tags WHERE tag_id = 'vip'");
+      },
+    } })).toBe('success');
+    expect(seen).toEqual(['outer/then/inner/then/remove-tag', 'outer/then/inner/then/still-yes']);
   });
 
   it('5分単位で待機し、期限後に同じ版の次の処理から再開する', async () => {

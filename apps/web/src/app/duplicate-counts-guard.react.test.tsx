@@ -230,10 +230,10 @@ function expectNoDuplicateCounts() {
 }
 
 const RULES = [
-  { id: 'rule-shop', name: '店頭QRの初回案内', folderName: '店頭', priority: 1, isFallback: false, status: 'published', routeNames: ['店頭QRコード'], scenarioName: '新規登録7日間フォロー', matchedLast7Days: 41, definition: { messageType: 'text', messageText: '来店クーポン' } },
-  { id: 'rule-instagram', name: '広告からの初回案内', folderName: '広告', priority: 2, isFallback: false, status: 'published', routeNames: ['Instagramプロフィール'], scenarioName: '新規登録7日間フォロー', matchedLast7Days: 24, definition: { messageType: 'text', messageText: '資料' } },
-  { id: 'rule-referral', name: '紹介キャンペーンの初回案内', folderName: '紹介', priority: 3, isFallback: false, status: 'published', routeNames: ['紹介'], scenarioName: '新規登録7日間フォロー', matchedLast7Days: 9, definition: { messageType: 'text', messageText: '特典' } },
-  { id: 'rule-fallback', name: '経路が分からなかった人', folderName: null, priority: 999999, isFallback: true, status: 'published', routeNames: [], scenarioName: '共通のあいさつ', matchedLast7Days: 12, definition: { messageType: 'text', messageText: 'ありがとう' } },
+  { id: 'rule-shop', name: '店頭QRの初回案内', folderName: '店頭', priority: 1, isFallback: false, status: 'published', routeNames: ['店頭QRコード'], scenarioName: '新規登録7日間フォロー', matchedLast7Days: 41, definition: { actions: [], messageType: 'text', messageText: '来店クーポン' } },
+  { id: 'rule-instagram', name: '広告からの初回案内', folderName: '広告', priority: 2, isFallback: false, status: 'published', routeNames: ['Instagramプロフィール'], scenarioName: '新規登録7日間フォロー', matchedLast7Days: 24, definition: { actions: [], messageType: 'text', messageText: '資料' } },
+  { id: 'rule-referral', name: '紹介キャンペーンの初回案内', folderName: '紹介', priority: 3, isFallback: false, status: 'published', routeNames: ['紹介'], scenarioName: '新規登録7日間フォロー', matchedLast7Days: 9, definition: { actions: [], messageType: 'text', messageText: '特典' } },
+  { id: 'rule-fallback', name: '経路が分からなかった人', folderName: null, priority: 999999, isFallback: true, status: 'published', routeNames: [], scenarioName: '共通のあいさつ', matchedLast7Days: 12, definition: { actions: [], messageType: 'text', messageText: 'ありがとう' } },
 ]
 
 describe('m22d 同じ件数は1画面に1か所', () => {
@@ -282,7 +282,7 @@ describe('m22d 同じ件数は1画面に1か所', () => {
     fns.friendAddRulesGet.mockResolvedValue({ success: true, data: { rule: { id: 'rule-shop', version: 1 } } })
     await renderPage(React.createElement(FriendAddRunsPage))
     expectNoDuplicateCounts()
-    expect(host.textContent).toContain('配信・処理に失敗')
+    expect(host.textContent).toContain('失敗した処理')
   })
 
   it('/ec-commerce/identity-candidates は売上カードの副文で件数を繰り返さない', async () => {
@@ -303,7 +303,8 @@ describe('m22d 同じ件数は1画面に1か所', () => {
     })
     await renderPage(React.createElement(MigrationsPage))
     expectNoDuplicateCounts()
-    expect(host.textContent).toContain('履歴 3件中 1〜3件を表示')
+    expect(host.querySelectorAll('tbody tr')).toHaveLength(3)
+    expect(host.textContent).toContain('書き出し・取り込みの履歴')
   })
 
   it('/ops/audit は一覧の件数の1か所（見出しの横に出さない）', async () => {

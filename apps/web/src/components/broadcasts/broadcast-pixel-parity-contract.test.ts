@@ -24,7 +24,8 @@ describe('一斉配信のV8構造（視覚一致は撮影で確認）', () => {
 
   it('テンプレート選択は設計の確認項目だけをダイアログへ置く', () => {
     expect(FORM).toContain('designNode="p97Tf"')
-    expect(FORM).toContain('このテンプレートの内容を確認しました')
+    expect(FORM).toContain('テンプレートの内容を確認してください')
+    expect(FORM).not.toContain('このテンプレートの内容を確認しました')
     expect(FORM).not.toContain('selectedTemplate?.messageContent}</dd>')
   })
 
@@ -63,7 +64,9 @@ describe('一斉配信のV8構造（視覚一致は撮影で確認）', () => {
       FORM.indexOf('open={preflightDialogOpen}'),
       FORM.indexOf('<div data-design-node="FpgxH">'),
     )
-    expect(dialog).toContain('対象人数を確認しました')
+    expect(dialog).toContain('対象人数をまだ取得できていません')
+    expect(dialog).toContain('人を確認してください')
+    expect(dialog).not.toContain('対象人数を確認しました')
     expect(dialog).not.toContain('quota.remaining')
   })
 

@@ -325,7 +325,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   )
 
   const phone = (
-    <LinePreview note={`${meta.title}の見え方`} caption="配信日 10:00" accountName={sendName}>
+    <LinePreview title={null} note={`${meta.title}の見え方`} caption="配信日 10:00" accountName={sendName}>
       <div className={styles.assetRow}>
         <span className={styles.assetAvatar} aria-hidden="true">{sendName.slice(0, 1)}</span>
         <div className={styles.assetCard}>
@@ -391,7 +391,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
             value={host ? host.folder : folder}
             onChange={host ? host.onFolderChange : setFolder}
             folders={host ? host.folders : folders.map(folderByName)}
-            colors={!host}
+            colors
             onCreate={host
               ? hostFolderCreate(host)
               : canMutate && selectedAccountId
@@ -426,8 +426,8 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               下書きを保存
             </Button>
             <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined} busy={publishing || Boolean(host?.busy)} busyLabel="保存中…">
-              <Send size={15} aria-hidden="true" />
-              {host ? host.primaryLabel ?? '保存して配る' : '保存して公開'}
+              {host ? null : <Send size={15} aria-hidden="true" />}
+              {host ? host.primaryLabel ?? '保存する' : '保存して公開'}
             </Button>
           </>
         )}

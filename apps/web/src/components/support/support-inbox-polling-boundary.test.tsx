@@ -13,6 +13,8 @@ import SupportInbox from './support-inbox'
  */
 
 vi.mock('next/link', () => ({ default: () => null }))
+// この試験は再取得の本数を確認する。見た目のテーマ取得は DOM の代わりに固定する。
+vi.mock('../../lib/use-admin-theme', () => ({ useAdminTheme: () => 'v7' }))
 
 vi.mock('../../lib/api', async (importOriginal: () => Promise<typeof import('../../lib/api')>) => {
   const actual = await importOriginal()

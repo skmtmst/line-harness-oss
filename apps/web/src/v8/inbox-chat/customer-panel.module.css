@@ -12,11 +12,16 @@
 }
 .personName {
   max-width: 100%;
+  /* 名前は共通のボタン（高さ32）で出る。絵は名前の行 23 */
+  height: var(--tpl-inbox-chead-name-lh);
+  min-height: 0;
+  padding: 0;
   color: var(--color-ink);
   font-size: var(--tpl-inbox-chead-name);
   font-weight: 600;
   line-height: var(--tpl-inbox-chead-name-lh);
 }
+.personName[aria-expanded='true'] { height: auto; }
 .personSub { color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-inbox-chead-sub-lh); }
 .blocked { color: var(--color-ink-faint); font-size: var(--text-micro); }
 .personActions { display: flex; align-items: center; justify-content: center; gap: var(--tpl-inbox-composer-gap); margin-top: var(--tpl-inbox-head-tools-gap); }
@@ -24,7 +29,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--tpl-inbox-summary-gap);
-  padding: var(--tpl-inbox-summary-gap) var(--tpl-inbox-summary-pad) var(--tpl-inbox-summary-pad);
+  padding: var(--tpl-inbox-summary-top) var(--tpl-inbox-summary-pad) var(--tpl-inbox-summary-pad);
 }
 .summaryRow { display: flex; min-width: 0; flex-direction: column; gap: var(--tpl-inbox-seg-gap); }
 .summaryRow dt { color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-inbox-chead-sub-lh); }
@@ -47,8 +52,9 @@
   flex-direction: column;
   margin: 0 var(--tpl-inbox-summary-pad);
   padding: var(--tpl-inbox-info-card-pad) 0 0;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
+  box-shadow: var(--card-shadow);
 }
 .infoTitle {
   position: relative;
@@ -71,3 +77,13 @@
 /* その場で直す欄（B-26）：見出しとの間を空け、共通部品の幅は欄いっぱい。 */
 .editField { margin-top: var(--tpl-inbox-head-tools-gap); }
 .editField :global(*) { max-width: 100%; }
+
+/* 札を横に並べ、折り返しで値が欠けないようにする。 */
+.summaryRow dd:has(:global([data-size])) { display: flex; flex-wrap: wrap; gap: var(--tpl-fdt-tag-gap); white-space: normal; }
+.profileSection { padding-block: var(--tpl-inbox-profile-pad); }
+.profileSection h4 { margin: 0 0 var(--tpl-inbox-profile-gap); font-size: var(--text-caption); font-weight: 700; line-height: var(--tpl-fdt-small-lh); }
+.profileSection p { margin: 0; font-size: var(--text-label); line-height: var(--tpl-inbox-profile-lh); color: var(--color-ink-secondary); }
+
+.infoSections > .basicSection { padding-bottom: var(--tpl-inbox-basic-bottom); }
+
+.infoSections > .tagsSection { padding-bottom: var(--tpl-inbox-tag-bottom); }

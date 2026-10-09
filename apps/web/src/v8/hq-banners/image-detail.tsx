@@ -3,7 +3,7 @@
 /*
  * ★V8 画像の詳細（Pencil `rI5uh`）と、そこから開く「一覧から外す」の確かめ（`B24oNg`）。
  * 共通の窓に絵の幅 860・上からの位置を渡し、中身を絵どおりに組む：
- * 左に画像とダウンロード・お気に入り、右に「アカウントへ渡す」（探す・タグの札・アカウントの一覧・渡す）、
+ * 左に画像とダウンロード・お気に入り、右に「アカウントへ配る」（探す・タグの札・アカウントの一覧・渡す）、
  * 下に「生成時の条件」（2列）、いちばん下に 一覧から外す（左）・参照画像にする・同じ設定でもう一度生成（右）。
  * 動き（渡す・外す・お気に入り・もう一度生成）は v7（components/hq/banners/image-detail-modal.tsx）と同じ。
  */
@@ -89,7 +89,7 @@ export function BannerImageDetailV8({
       <BannerConfirmDialogV8
         open
         title="この画像を一覧から外しますか？"
-        description="統括の一覧に出なくなります。すでにアカウントへ渡した画像は、そのアカウントの登録メディアに残ります。"
+        description="統括の一覧に出なくなります。すでにアカウントへ配った画像は、そのアカウントの登録メディアに残ります。"
         confirmLabel="一覧から外す"
         tone="danger"
         busy={busy}
@@ -158,12 +158,12 @@ export function BannerImageDetailV8({
             </div>
           </div>
 
-          <section className={styles.deliver} aria-label="アカウントへ渡す">
-            <h3 className={styles.sectionTitle}>アカウントへ渡す</h3>
-            <p className={styles.note}>渡したアカウントの登録メディア（フォルダ「02_バナー」）に入ります</p>
+          <section className={styles.deliver} aria-label="アカウントへ配る">
+            <h3 className={styles.sectionTitle}>アカウントへ配る</h3>
+            <p className={styles.note}>配ったアカウントの登録メディア（フォルダ「02_バナー」）に入ります</p>
             <SearchField
               placeholder="アカウント名・タグで探す"
-              aria-label="渡すアカウントをアカウント名・タグで探す"
+              aria-label="配るアカウントをアカウント名・タグで探す"
               value={query}
               onChange={setQuery}
               onClear={() => setQuery('')}
@@ -195,7 +195,7 @@ export function BannerImageDetailV8({
                         <span className={styles.accountName} title={name}>{name}</span>
                         <span className={styles.accountHandle}>{handle(account)}</span>
                       </span>
-                      {already ? <span className={styles.pillOk}><span className={styles.dot} aria-hidden="true" />渡し済み</span> : null}
+                      {already ? <span className={styles.pillOk}><span className={styles.dot} aria-hidden="true" />配布済み</span> : null}
                     </li>
                   )
                 })}
@@ -210,9 +210,9 @@ export function BannerImageDetailV8({
                   disabled={busy || selected.length === 0}
                   onClick={() => void onDeliver(selected).then((ok) => { if (ok) setSelected([]) })}
                   busy={busy}
-                  busyLabel="渡しています…"
+                  busyLabel="配っています…"
                 >
-                  <Send aria-hidden="true" className={styles.icon} />{`${selected.length}アカウントへ渡す`}
+                  <Send aria-hidden="true" className={styles.icon} />{`${selected.length}アカウントへ配る`}
                 </Button>
               </div>
             ) : null}

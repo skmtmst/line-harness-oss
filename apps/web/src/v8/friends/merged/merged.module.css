@@ -96,7 +96,6 @@ button.name:hover { text-decoration: underline; }
 }
 
 .cellText { display: block; overflow: hidden; color: var(--color-ink); text-overflow: ellipsis; white-space: nowrap; }
-.badges { display: inline-flex; flex-wrap: wrap; gap: var(--tpl-fr-tag-gap); }
 .menuBox { display: flex; justify-content: flex-end; }
 .stateCell { padding: var(--tpl-fr-state-pad); }
 

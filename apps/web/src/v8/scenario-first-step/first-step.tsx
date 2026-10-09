@@ -41,8 +41,9 @@ import { LINE_TEXT_LIMIT, isOverCharLimit } from '@/components/scenarios/char-co
 import type { SegmentCondition } from '@/components/shared/condition-builder'
 import { pruneCondition } from '@/lib/segment-condition'
 import { CreatePage } from '@/components/templates'
-import Stepper from '@/components/shared/stepper'
+import { Steps } from '@/components/templates/steps'
 import Select from '@/components/shared/select'
+import { Field } from '@/components/shared/form-controls'
 import { TimeField } from '@/components/shared/date-time-field'
 import SegmentedControl from '@/components/shared/segmented'
 import Button from '@/components/shared/button'
@@ -117,6 +118,10 @@ export default function ScenarioFirstStepV8() {
    * どれを選んでも、保存するのは scenario_steps.target_condition_json。
    */
   const [targetMode, setTargetMode] = useState<TargetMode>('all')
+  const [targetError, setTargetError] = useState('')
+  const [timeError, setTimeError] = useState('')
+  const [contentError, setContentError] = useState('')
+  const editorRef = useRef<HTMLDivElement>(null)
   const [targetTagId, setTargetTagId] = useState('')
   const [targetCondition, setTargetCondition] = useState<SegmentCondition | null>(null)
   const [conditionOpen, setConditionOpen] = useState(false)
@@ -145,6 +150,9 @@ export default function ScenarioFirstStepV8() {
     setExistingStepId(null)
     setRestoredStep(null)
     setBody('')
+    setContentError('')
+    setTimeError('')
+    setTargetError('')
     setTargetMode('all')
     setTargetTagId('')
     setTargetCondition(null)
@@ -308,31 +316,43 @@ export default function ScenarioFirstStepV8() {
   const bodyOverLimit = contentMode === 'compose' && kind === 'text' && isOverCharLimit(bodyLength, LINE_TEXT_LIMIT)
 
   /* 内容の入力を書き換えたら「保存値をそのまま保持する」はやめる。 */
-  const changeKind = (next: StepMessageKind) => { setPreserved(null); setRestoreNotice(null); setKind(next) }
-  const changeContentMode = (next: ContentMode) => { setPreserved(null); setRestoreNotice(null); setContentMode(next) }
-  const editBody = (next: string) => { setPreserved(null); setBody(next) }
-  const editImage = (next: ImageUploaderValue | null) => { setPreserved(null); setImage(next) }
-  const editQuestion = (next: ScenarioQuestion) => { setPreserved(null); setQuestion(next) }
-  const editKindState = (next: MessageKindState) => { setPreserved(null); setKindState(next) }
-  const editTemplateId = (next: string) => { setPreserved(null); setTemplateId(next) }
+  const changeKind = (next: StepMessageKind) => { setContentError(''); setPreserved(null); setRestoreNotice(null); setKind(next) }
+  const changeContentMode = (next: ContentMode) => { setContentError(''); setPreserved(null); setRestoreNotice(null); setContentMode(next) }
+  const editBody = (next: string) => { setContentError(''); setPreserved(null); setBody(next) }
+  const editImage = (next: ImageUploaderValue | null) => { setContentError(''); setPreserved(null); setImage(next) }
+  const editQuestion = (next: ScenarioQuestion) => { setContentError(''); setPreserved(null); setQuestion(next) }
+  const editKindState = (next: MessageKindState) => { setContentError(''); setPreserved(null); setKindState(next) }
+  const editTemplateId = (next: string) => { setContentError(''); setPreserved(null); setTemplateId(next) }
 
   const submit = async () => {
     // ボタンの disabled だけに頼らない。上限超え・未取得のままの保存を通さない。
     if (saving || bodyOverLimit || loadState !== 'ready' || !scenario) return
     setSaving(true)
     setError('')
+    setTargetError('')
+    setTimeError('')
+    setContentError('')
     try {
       if (targetMode === 'tag' && !targetTagId) {
-        setError('絞り込むタグを選んでください')
+        setTargetError('絞り込むタグを選んでください')
+        const field = document.querySelector<HTMLElement>('[aria-label="絞り込みに使うタグ"]')
+        field?.focus()
+        field?.scrollIntoView?.({ block: 'center' })
         return
       }
       if (targetMode === 'advanced' && !pruneCondition(targetCondition)) {
         // 条件が無いまま保存すると、画面の「未設定」と配信側の「全員」が食い違う（SCENARIO-03）。
-        setError('詳細条件がまだ設定されていません。「詳細条件で絞る」から条件を設定するか、「購読中の全員」を選び直してください。')
+        setTargetError('詳細条件がまだ設定されていません。「詳細条件で絞る」から条件を設定するか、「購読中の全員」を選び直してください。')
+        const field = document.querySelector<HTMLElement>('input[name="targetMode"]:checked')
+        field?.focus()
+        field?.scrollIntoView?.({ block: 'center' })
         return
       }
       if (mode === 'absolute_time' && !TIME_RE.test(deliveryTime)) {
-        setError('配信する時刻を選んでください')
+        setTimeError('配信する時刻を選んでください')
+        const field = document.querySelector<HTMLElement>('[aria-label="配信する時刻"]')
+        field?.focus()
+        field?.scrollIntoView?.({ block: 'center' })
         return
       }
       const hasContent =
@@ -350,7 +370,10 @@ export default function ScenarioFirstStepV8() {
                   : serializeMessageKind(kind as MessageKind, kindState) !== null)
       if (!hasContent) {
         // 書かずに進む道は「1通目はあとで書く」に寄せ、保存は空なら理由を出して止める（点検 #495 中7）。
-        setError('内容を入力してください。あとで書く場合は「1通目はあとで書く」を押してください。')
+        setContentError('内容を入力してください。あとで書く場合は「1通目はあとで書く」を押してください。')
+        const field = editorRef.current?.querySelector<HTMLElement>('[contenteditable="true"], textarea, input:not([type="file"]):not([disabled])') ?? editorRef.current?.querySelector<HTMLElement>('button:not([disabled])')
+        field?.focus()
+        field?.scrollIntoView?.({ block: 'center' })
         return
       }
       const schedule = scheduleToPayload(mode, { offsetDays, offsetHours, offsetMinutesRemainder, deliveryTime })
@@ -542,11 +565,12 @@ export default function ScenarioFirstStepV8() {
       title="1通目を設定"
       identity={<Link href="/scenarios" className={styles.backLink}>← シナリオ配信へ</Link>}
       steps={(
-        <Stepper
+        <Steps
           label="シナリオ作成の進み方"
           steps={[
-            { label: 'シナリオ情報', state: 'done' },
-            { label: '配信方式', state: 'done' },
+            /* 済みの段を押すと、同じ下書きのシナリオ情報・配信方式（/scenarios/new?id=…）へ戻る。 */
+            { label: 'シナリオ情報', state: 'done', onSelect: id ? () => router.push(`/scenarios/new?id=${encodeURIComponent(id)}`) : undefined },
+            { label: '配信方式', state: 'done', onSelect: id ? () => router.push(`/scenarios/new?id=${encodeURIComponent(id)}`) : undefined },
             { label: '1通目を設定', state: 'current' },
           ]}
         />
@@ -596,7 +620,8 @@ export default function ScenarioFirstStepV8() {
               name="targetMode"
               value={card.value}
               checked={targetMode === card.value}
-              onChange={() => setTargetMode(card.value)}
+              onChange={() => { setTargetMode(card.value); setTargetError('') }}
+              invalid={Boolean(targetError) && targetMode === card.value}
               /* 詳細条件のカードは押すたびに条件の窓を開く（選び済みでも開き直せる）。札の下に「N 個の条件」。 */
               onClick={card.value === 'advanced' ? () => setConditionOpen(true) : undefined}
               icon={card.icon}
@@ -606,12 +631,14 @@ export default function ScenarioFirstStepV8() {
             />
           ))}
         </RadioCardGroup>
+        {targetError && targetMode === 'advanced' ? <p className={styles.fieldError} role="alert">{targetError}</p> : null}
         {targetMode === 'tag' ? (
           <div className={styles.inlineField}>
             <span className={styles.inlineLabel}>絞り込むタグ</span>
             <Select
               value={targetTagId}
-              onChange={(value) => setTargetTagId(value)}
+              onChange={(value) => { setTargetTagId(value); setTargetError('') }}
+              error={targetError || undefined}
               aria-label="絞り込みに使うタグ"
               options={[{ value: '', label: '選んでください' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]}
             />
@@ -644,7 +671,9 @@ export default function ScenarioFirstStepV8() {
                 {/* ★V8 の時刻の欄（打つ＋時と分の2列・提案 YCOoR）。絵 V6xAo・U5rxyH は幅140。 */}
                 <TimeField
                   value={deliveryTime}
-                  onChange={setDeliveryTime}
+                  onChange={(value) => { setDeliveryTime(value); setTimeError('') }}
+                  invalid={Boolean(timeError)}
+                  aria-describedby={timeError ? 'first-step-time-error' : undefined}
                   aria-label="配信する時刻"
                   minuteStep={TIME_MINUTE_STEP}
                 />
@@ -678,18 +707,23 @@ export default function ScenarioFirstStepV8() {
           <p className={styles.whenExample}>{arrivalExample}</p>
         </div>
 
-        <SegmentedControl
-          aria-label="1通目の作り方"
-          value={contentMode}
-          onChange={changeContentMode}
-          options={[
-            { value: 'compose', label: 'この画面で作る' },
-            { value: 'template', label: 'テンプレートから選ぶ' },
-          ]}
-        />
+        {timeError ? <p id="first-step-time-error" className={styles.fieldError} role="alert">{timeError}</p> : null}
+        <div className={styles.modeRow}>
+          <SegmentedControl
+            aria-label="1通目の作り方"
+            value={contentMode}
+            onChange={changeContentMode}
+            options={[
+              { value: 'compose', label: 'この画面で作る' },
+              { value: 'template', label: 'テンプレートから選ぶ' },
+            ]}
+          />
+        </div>
 
         {preserved && restoreNotice ? <Notice tone="warn" message={restoreNotice} /> : null}
 
+        <div ref={editorRef}>
+        <Field label="" spacing="section" error={(contentMode === 'compose' ? contentError : '') || (bodyOverLimit ? `本文が ${formatNumber(LINE_TEXT_LIMIT)} 字を超えています。LINEが受け付けないため、この状態では保存できません。` : undefined)} errorFrame={contentMode === 'compose' && kind !== 'text'}>
         {contentMode === 'compose' ? (
           <>
             {/* 種類。作れないもの（紹介）も並べたうえで押せなくし、理由を title に出す。 */}
@@ -717,6 +751,7 @@ export default function ScenarioFirstStepV8() {
               <>
                 <InsertTextField
                   id="first-step-body"
+                  aria-invalid={Boolean(contentError) || bodyOverLimit || undefined}
                   ref={bodyRef}
                   value={body}
                   onValueChange={(next) => editBody(next)}
@@ -752,6 +787,7 @@ export default function ScenarioFirstStepV8() {
             <Select
               value={templateId}
               onChange={(value) => editTemplateId(value)}
+              error={contentError || undefined}
               aria-label="配信するテンプレート"
               size="full"
               options={[
@@ -769,11 +805,8 @@ export default function ScenarioFirstStepV8() {
             <span className={styles.cardDesc}>テンプレートを直すと、この通の中身も一緒に変わります。</span>
           </div>
         )}
-        {bodyOverLimit ? (
-          <Notice tone="danger">
-            本文が {formatNumber(LINE_TEXT_LIMIT)} 字を超えています。LINEが受け付けないため、この状態では保存できません。
-          </Notice>
-        ) : null}
+        </Field>
+        </div>
       </Card>
 
       {/* 詳細条件。中身はシナリオ編集と同じ部品。 */}

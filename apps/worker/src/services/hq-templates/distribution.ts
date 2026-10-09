@@ -1,3 +1,4 @@
+import { parseFriendFieldDefinition, parseMarkDefinition } from './friend-attributes.js';
 import { templateKind } from '@line-crm/shared';
 import { parseTextOverrides } from './text-overrides.js';
 import type { HqTemplateListDisplay } from '@line-crm/shared';
@@ -64,7 +65,7 @@ async function replayTemplateCreation(db: D1Database, authority: HqTemplateAutho
   if (!receipt) return null;
   if (receipt.request_hash !== requestHash) throw new HqTemplateError('IDEMPOTENCY_CONFLICT', 409);
   if (receipt.resource_id !== templateId) throw new HqTemplateError('CREATE_RECEIPT_UNAVAILABLE', 409);
-  const initial = await db.prepare(`SELECT COALESCE(t.extended_type,t.template_type) AS template_type,t.created_at AS template_created_at,v.id,v.created_at,v.created_by,v.definition_json FROM hq_templates t JOIN hq_template_versions v ON v.tenant_id=t.tenant_id AND v.template_id=t.id AND v.version=1 WHERE t.id=? AND t.tenant_id=?`).bind(templateId, authority.tenantId).first<{ template_type:HqTemplateType; template_created_at:string; id:string; created_at:string; created_by:string|null; definition_json:string }>();
+  const initial = await db.prepare(`SELECT COALESCE(t.friend_attribute_type,t.extended_type,t.template_type) AS template_type,t.created_at AS template_created_at,v.id,v.created_at,v.created_by,v.definition_json FROM hq_templates t JOIN hq_template_versions v ON v.tenant_id=t.tenant_id AND v.template_id=t.id AND v.version=1 WHERE t.id=? AND t.tenant_id=?`).bind(templateId, authority.tenantId).first<{ template_type:HqTemplateType; template_created_at:string; id:string; created_at:string; created_by:string|null; definition_json:string }>();
   if (!initial) throw new HqTemplateError('CREATE_RECEIPT_UNAVAILABLE', 409);
   // Return the original creation response, even if the live record was later edited/archived.
   return { template: { id: templateId, tenant_id: authority.tenantId, template_type: initial.template_type, name, description, current_version_id: initial.id, revision: 2, created_by: initial.created_by, created_at: initial.template_created_at, updated_at: initial.created_at, archived_at: null, folder_id: folderId }, definition: JSON.parse(initial.definition_json) as unknown };
@@ -73,6 +74,8 @@ function canonicalDefinition(type: HqTemplateType, value: unknown, authority: Hq
   try {
     if (type === 'scenario') return parseScenarioDefinition(value);
     if (type === 'tag') return parseTagDefinition(value);
+    if (type === 'friend_field') return parseFriendFieldDefinition(value);
+    if (type === 'mark') return parseMarkDefinition(value);
     if (type === 'template') return parseMessageTemplateDefinition(value);
     const input = { templateVersionId: 'validation', definitionJson: JSON.stringify(value) };
     if (type === 'rich_menu') return parseRichMenuTemplateDefinition(input, authority.tenantId);
@@ -107,7 +110,7 @@ export async function saveTemplate(db: D1Database, authority: HqTemplateAuthorit
   if (current) statements.push(guard(`EXISTS(SELECT 1 FROM hq_templates WHERE id=? AND tenant_id=? AND revision=? AND archived_at IS NULL)`, [id!, authority.tenantId, revision]));
   else statements.push(
     { sql: `INSERT INTO operation_request_receipts(action,actor_id,idempotency_key,request_hash,resource_id,created_at) VALUES ('hq_template.create',?,?,?,?,?)`, bindings: [`tenant:${authority.tenantId}`, requestId!, requestHash, templateId, createdAt] },
-    { sql: `INSERT INTO hq_templates(id,tenant_id,template_type,extended_type,name,description,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)`, bindings: [templateId, authority.tenantId, type === 'scenario' ? 'template' : type as HqTemplateType, type === 'scenario' ? 'scenario' : null, name, description, authority.actorId, createdAt, createdAt] });
+    { sql: `INSERT INTO hq_templates(id,tenant_id,template_type,extended_type,friend_attribute_type,name,description,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)`, bindings: [templateId, authority.tenantId, type === 'scenario' ? 'template' : type === 'friend_field' || type === 'mark' ? 'tag' : type as HqTemplateType, type === 'scenario' ? 'scenario' : null, type === 'friend_field' || type === 'mark' ? type : null, name, description, authority.actorId, createdAt, createdAt] });
   statements.push({ sql: `INSERT INTO hq_template_versions(id,tenant_id,template_id,version,definition_json,content_hash,created_by,created_at) VALUES (?,?,?,(SELECT COALESCE(MAX(version),0)+1 FROM hq_template_versions WHERE tenant_id=? AND template_id=?),?,?,?,?)`, bindings: [versionId, authority.tenantId, templateId, authority.tenantId, templateId, json, await digest(json), authority.actorId, createdAt] });
   statements.push({ sql: `UPDATE hq_templates SET name=?,description=?,current_version_id=?,revision=revision+1,updated_at=? WHERE id=? AND tenant_id=?`, bindings: [name, description, versionId, createdAt, templateId, authority.tenantId] }, audit(authority, current ? 'edited' : 'created', templateId));
   statements.push({ sql: 'UPDATE hq_templates SET folder_id=? WHERE id=? AND tenant_id=?', bindings: [folderId as string | null, templateId, authority.tenantId] });
@@ -145,6 +148,14 @@ export async function listTemplates(db: D1Database, authority: HqTemplateAuthori
             const tag=parseTagDefinition(JSON.parse(definition_json)).tag;
             return {manual_assignment_allowed:tag.manualAssignmentAllowed!==false,
               assignment_method:tag.manualAssignmentAllowed!==false?'手動・自動':'自動'};
+          }
+          if(template.template_type==='friend_field'&&definition_json) {
+            const field=parseFriendFieldDefinition(JSON.parse(definition_json)).field;
+            return {assignment_method:({manual:'手動',form:'フォーム',ec:'EC連携',automation:'自動'} as const)[field.source??'manual'],manual_assignment_allowed:!field.ecIsMaster};
+          }
+          if(template.template_type==='mark'&&definition_json) {
+            const mark=parseMarkDefinition(JSON.parse(definition_json)).mark;
+            return {assignment_method:mark.autoOnInbound?'受信時に自動':'手動',manual_assignment_allowed:true};
           }
           if(template.template_type==='rich_menu'&&definition_json) {
             const menu=parseRichMenuTemplateDefinition({templateVersionId:'list',definitionJson:definition_json},authority.tenantId).richMenu;
@@ -375,7 +386,7 @@ export async function templateVersions(db: D1Database, authority: HqTemplateAuth
   await templateDetail(db, authority, id);
   const rows = await db.prepare(`SELECT v.id,v.version,v.created_by,s.name AS creator_name,v.created_at,
       NOT EXISTS(SELECT 1 FROM hq_template_distribution_results r WHERE r.tenant_id=v.tenant_id AND r.template_id=v.template_id
-        AND r.template_version_id=v.id AND r.status='succeeded') AS is_draft,
+        AND r.template_version_id=v.id AND r.status='succeeded' AND NOT EXISTS (SELECT 1 FROM hq_template_preflight_resolutions skipped WHERE skipped.preflight_id=r.preflight_id AND skipped.tenant_id=r.tenant_id AND skipped.friend_attribute_mode='skip')) AS is_draft,
       v.id=t.current_version_id AS is_current
     FROM hq_template_versions v JOIN hq_templates t ON t.id=v.template_id AND t.tenant_id=v.tenant_id
     LEFT JOIN staff_members s ON s.id=v.created_by AND s.tenant_id=v.tenant_id
@@ -410,7 +421,7 @@ export async function templateReceivedVersions(db: D1Database, authority: HqTemp
     .bind(authority.tenantId,id,template.current_version_id).first<{version:number}>();
   const rows=await db.prepare(`WITH ranked AS (
       SELECT r.*, ROW_NUMBER() OVER (PARTITION BY target_account_id ORDER BY finished_at DESC,started_at DESC,rowid DESC) AS position
-      FROM hq_template_distribution_results r WHERE tenant_id=? AND template_id=? AND status='succeeded')
+      FROM hq_template_distribution_results r WHERE tenant_id=? AND template_id=? AND status='succeeded' AND NOT EXISTS (SELECT 1 FROM hq_template_preflight_resolutions skipped WHERE skipped.preflight_id=r.preflight_id AND skipped.tenant_id=r.tenant_id AND skipped.friend_attribute_mode='skip'))
     SELECT a.id,a.name,r.finished_at,v.version FROM ranked r
     JOIN line_accounts a ON a.id=r.target_account_id AND a.tenant_id=r.tenant_id
     JOIN hq_template_versions v ON v.id=r.template_version_id AND v.tenant_id=r.tenant_id AND v.template_id=r.template_id

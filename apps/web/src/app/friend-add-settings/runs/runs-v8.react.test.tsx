@@ -13,7 +13,6 @@ import FriendAddRunsPage from './page'
  * ★V8 友だち追加時の配信の実行結果（板 `REIxB`）の契約。
  * `<html data-theme="v8">` の下でだけ新しい実行結果に切り替わり、
  * 数の帯・失敗の帯・表・下の2枚が出ることを実DOMで固定する。
- * v7 では従来の実行結果が出ることも固定する。
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
@@ -140,13 +139,4 @@ test('v8 の実行結果は板 REIxB・数の帯・失敗の帯・表・下の2�
   expect(host.textContent).toContain('山田 太郎')
   expect(host.textContent).toContain('経路ごとの内訳')
   expect(host.textContent).toContain('二重送信を防ぐ・知らせ')
-})
-
-test('v7 の下では従来の実行結果が出る（REIxBには切り替わらない）', async () => {
-  await act(async () => root.render(<FriendAddRunsPage />))
-  await settle()
-  await eventually(() => {
-    expect(host.textContent).toContain('最近の友だち追加')
-  })
-  expect(host.querySelector('[data-design-node="REIxB"]')).toBeNull()
 })

@@ -234,36 +234,6 @@
   max-width: 100%;
 }
 
-.table {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-sa-staff-card-gap);
-  min-width: 0;
-}
-
-.row {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-sa-staff-col-gap);
-  min-width: 0;
-  padding: var(--tpl-sa-staff-row-pad);
-  box-shadow: var(--tpl-sa-line-bottom-soft);
-}
-
-.headRow {
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-sa-staff-sub-lh);
-  white-space: nowrap;
-}
-
-.bodyRow {
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-sa-staff-sub-lh);
-}
-
 .colPerson {
   display: flex;
   flex: 1;
@@ -620,3 +590,6 @@
   width: var(--tpl-sa-qr);
   height: var(--tpl-sa-qr);
 }
+
+.table { --sett-staff-columns: minmax(0, 1fr) var(--tpl-sa-staff-scope-w) var(--tpl-sa-staff-role-w) var(--tpl-sa-staff-last-w) var(--tpl-sa-staff-menu-w); }
+@media (max-width: 1279px) { .table { --sett-staff-columns: minmax(0, 1fr) var(--tpl-sa-staff-scope-w-narrow) var(--tpl-sa-staff-last-w-narrow) var(--tpl-sa-staff-role-w) var(--tpl-sa-staff-menu-w); } }

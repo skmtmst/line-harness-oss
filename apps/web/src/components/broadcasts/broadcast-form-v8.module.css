@@ -18,10 +18,15 @@
 }
 .header { display: flex; align-items: center; gap: var(--space-24); padding: var(--space-16) var(--space-24); border-bottom: 1px solid var(--color-hairline); }
 .heading { flex-shrink: 0; }
-.heading h2 { font-size: 18px; font-weight: 600; line-height: 24px; }
+.heading h2 { font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh);   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .heading p { margin-top: var(--space-2); font-size: 12px; color: var(--color-ink-faint); }
 .heading > button { height: auto; padding: 0; font-size: 12px; color: var(--color-action); }
 .stepRail { min-width: 0; flex: 1; }
+/* ★V8 手順（型の共通部品 Steps・Fa8ED / q1xNMz）：題と説明のすぐ下・左寄せ・1行。横いっぱいに広げない。 */
+.header[data-steps-below] { flex-wrap: wrap; row-gap: 0; }
+.header[data-steps-below] > .heading { flex: 1 1 auto; }
+.stepsBelow { order: 3; flex-basis: 100%; min-width: 0; margin-top: var(--space-20); }
 .header :global([data-part='stepper']) { margin: 0; border: 0; border-radius: var(--radius-none); background: transparent; padding: 0; }
 .header :global([data-part='stepper'] li) { flex: 0 1 auto; gap: var(--space-14); }
 .header :global([data-part='stepper'] ol) { gap: var(--space-14); }
@@ -139,3 +144,17 @@
 .urlDetails { margin-top: var(--space-10); font-size: 12px; }
 .urlDetails summary { cursor: pointer; color: var(--color-ink-secondary); }
 .urlDetails[open] > :not(summary) { margin-top: var(--space-8); }
+
+/* G-9: 共通 composer の段では説明の下の間も絵の寸法を使う。 */
+.root[data-step='message'] .stepsBelow { margin-top: var(--space-12); }
+.root[data-step='message'] .heading h2 { font-size: 18px; line-height: var(--space-24); }
+.root[data-step='message'] .heading p { line-height: var(--space-16); }
+
+.root[data-step='message'] .header :global([data-part='stepper'] ol), .root[data-step='message'] .header :global([data-part='stepper'] li) { gap: var(--space-8); }
+.root[data-step='message'] .header :global([data-part='stepper'] li > :last-child) { gap: var(--tpl-msg-composer-step-gap); }
+
+.root[data-step='message'] .previewHead, .root[data-step='message'] .previewSummary { padding-left: 7px; padding-right: 7px; }
+.root[data-step='message'] .previewSummary { padding-top: 17px; }
+.root[data-step='message'] .previewSummary h3 { line-height: 18px; }
+.root[data-step='message'] .previewActions { margin-top: -7px; }
+.root[data-step='message'] .deviceSwitch button { padding-left: 14px; padding-right: 14px; }

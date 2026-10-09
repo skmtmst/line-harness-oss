@@ -214,7 +214,7 @@ export function OpsHead({
     <div className={styles.head}>
       <div className={styles.headRow}>
         <div className={styles.headText}>
-          <h2 className={styles.headTitle}>{title}</h2>
+          <h2 className={styles.headTitle} title={title}>{title}</h2>
           {description ? <p className={styles.headDesc}>{description}</p> : null}
         </div>
         {actions ? <div className={styles.headActions}>{actions}</div> : null}

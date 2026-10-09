@@ -53,6 +53,12 @@
   line-height: 1.7; /* lineHeight: 1.7 */
   resize: vertical;
 }
+.multi[data-density='compact'] {
+  font-size: var(--text-label);
+  line-height: var(--tpl-compact-textarea-lh);
+  padding: var(--tpl-compact-textarea-pad);
+  min-height: var(--tpl-compact-textarea-h);
+}
 
 /* 入力が正しくないとき。枠を赤くするだけで、文字色は変えない。 */
 .invalid {
@@ -86,6 +92,9 @@
 [data-theme='v8'] .single { height: 36px; border: 0; padding: 0 12px; outline: 1px solid var(--color-toggle-off); outline-offset: -0.5px; box-shadow: var(--shadow-board); line-height: 21px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
 [data-theme='v8'] .single[aria-invalid='true'] { outline-color: var(--color-danger); }
 [data-theme='v8'] .single:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
+/* 誤りのある欄へ移したとき、青い枠で赤を消さない（2026-10-08 オーナー：入力が要る欄は周りが赤くなってそこへ移る）。 */
+[data-theme='v8'] .single[aria-invalid='true']:focus-visible { outline-color: var(--color-danger); }
+[data-theme='v8'] .multi[aria-invalid='true']:focus-visible { outline-color: var(--color-danger); border-color: var(--color-danger); }
 [data-theme='v8'] .single { gap: 0; }
 
 /*
@@ -106,3 +115,18 @@
   resize: vertical;
   max-width: 100%;
 }
+
+/* 2行の説明用。指定した欄だけを小さくする。 */
+[data-theme='v8'] .multiCompact { min-height: var(--tpl-textarea-compact-h); padding: var(--tpl-e78-pair-gap); line-height: var(--tpl-e78-name-lh); }
+[data-theme="v8"] .multi[data-density="compact"] { padding: var(--tpl-rt-gray-note-pad); border: 0; border-radius: var(--tpl-rt-inner-radius); outline: 1px solid var(--color-control-border); outline-offset: -1px; font-size: var(--text-caption); line-height: var(--tpl-rt-draft-lh); }
+[data-theme="v8"] .multi[data-density="compact"][aria-invalid="true"] { outline-color: var(--color-danger); }
+[data-theme="v8"] .multi[data-density="compact"]:focus-visible { outline-width: 2px; outline-offset: 2px; }
+[data-theme='v8'] .multi[data-height='post'] { min-height: var(--tpl-rt-summary-h); height: var(--tpl-rt-summary-h); }
+[data-theme='v8'] .multi[data-height='reply'] { min-height: var(--tpl-rt-draft-h); height: var(--tpl-rt-draft-h); }
+
+/* 見送りの補足2行（ujcar）。指定した欄だけを56pxにする。 */
+[data-theme='v8'] .multiShort { min-height: var(--tpl-nm-textarea-h); height: var(--tpl-nm-textarea-h); padding: var(--tpl-nm-textarea-pad); font-size: var(--tpl-nm-row-size); line-height: var(--tpl-nm-textarea-lh); }
+
+/* コラムの紹介文。改行を保ち、最初は1行分の高さで表示する。 */
+[data-theme='v8'] .multiSingleRow { min-height: 36px; height: 36px; border: 0; padding: 7.5px 12px; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; line-height: 21px; box-shadow: var(--shadow-board); }
+[data-theme='v8'] .multiSingleRow[aria-invalid='true'] { outline-color: var(--color-danger); }

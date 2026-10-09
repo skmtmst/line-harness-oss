@@ -8,6 +8,15 @@
  */
 
 .panel {
+  position: fixed;
+  /*
+   * 位置の値は globals.css の [data-theme='v8'] にだけある。v7 の画面（まだ v8 にしていない環境・試験）でも
+   * 値が空になって top/bottom が auto に戻り、本文の末尾（画面の外）に置かれないよう、同じ値を控えに書く。
+   */
+  z-index: var(--tpl-detail-panel-z, 70);
+  top: var(--tpl-detail-panel-top, 74px);
+  right: var(--tpl-page-pad-side, 24px);
+  bottom: var(--tpl-page-pad-block, 10px);
   display: flex;
   flex-direction: column;
   width: 360px;
@@ -95,7 +104,9 @@
 }
 
 .body {
+  /* 画面に固定した小窓なので、中身が長いときは中身だけを縮めてスクロールさせ、下の帯（保存・追加）を画面の中に残す。 */
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 16px;
 }

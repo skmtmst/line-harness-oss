@@ -1,5 +1,7 @@
 'use client'
 
+import TagPill from '@/components/shared/tag-pill'
+
 /* ① メニュー（owaS3）（settings-v8.tsx から分割。見た目・動きは変えない） */
 
 import { useMemo, useRef, useState } from 'react'
@@ -81,9 +83,8 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
   /*
    * 並び替え（共通の並び替え）。つまみのドラッグ・上下キー・「…」の上へ／下へは
    * どれも persistOrder を通る。先に並びを変えて裏で保存する。
-   * 保存は今の API のまま（メニューごとの sort_order の書き換え）。動いた範囲の
-   * メニューに、その位置にあった sort_order を振り直す。途中で失敗したら、
-   * 書き換えた分を元の sort_order へ戻し、元の位置で理由を出す。
+   * 動いた範囲を版番号付きの一括APIへ送り、途中まで順位が変わるのを防ぐ。
+   * 失敗したときは画面を元の並びへ戻して読み直す。
    */
   async function persistOrder(movedId: string, nextIds: string[], undoable = true) {
     if (reorderBusyRef.current) return
@@ -107,12 +108,10 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
     reorderBusyRef.current = true
     setReorderBusy(true)
     setReorderError(null)
-    const written: Array<{ menu: BookingMenu; version: number }> = []
     try {
-      for (const { menu, sortOrder } of changes) {
-        const res = await bookingApi.updateMenu(accountId, menu.id, menu.version as number, { ...menu, sort_order: sortOrder })
-        written.push({ menu, version: res.version })
-      }
+      await bookingApi.reorderMenus(accountId, {
+        changes: changes.map(({ menu, sortOrder }) => ({ id: menu.id, expectedVersion: menu.version as number, sortOrder })),
+      })
       setOrderOverride(null)
       onReload()
       notifyToast(`「${moved.name}」を${toIndex < fromIndex ? '上' : '下'}へ移しました。`, undoable ? {
@@ -120,25 +119,9 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
         onAction: () => { void persistOrder(movedId, previousIds, false) },
       } : undefined)
     } catch (cause) {
-      /* 書き換えた分を元の sort_order へ戻す（戻せなかった分は読み直しで本当の並びを出す）。 */
-      let partial = false
-      for (const { menu, version } of written.reverse()) {
-        try {
-          await bookingApi.updateMenu(accountId, menu.id, version, { ...menu, sort_order: menu.sort_order })
-        } catch {
-          /* 読み直しに任せる */
-          partial = true
-        }
-      }
       setOrderOverride(null)
       onReload()
-      /*
-       * WEB052：並べ替えは1件ずつの保存（一括で保存する口はまだ無い）。途中で失敗して
-       * 戻しもできなかったときは「一部だけ変わった」と知らせ、読み直した並びを見てもらう。
-       */
-      notifyToast(partial
-        ? '並びの一部だけが変わりました。読み直した並びを確かめてから、もう一度お試しください。'
-        : bookingErrorMessage(cause, '保存'), {
+      notifyToast(bookingErrorMessage(cause, '保存'), {
         actionLabel: 'もう一度',
         onAction: () => { void persistOrder(movedId, nextIds, undoable) },
       })
@@ -328,7 +311,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
                     >
                       {menu.name}
                     </button>
-                    {menu.category_label ? <span className={styles.tagChip}>{menu.category_label}</span> : null}
+                    {menu.category_label ? <TagPill name={menu.category_label} size="sm" aria-label={`分類「${menu.category_label}」`} /> : null}
                   </span>
                   {menu.description ? <span className={styles.menuDesc}>{menu.description}</span> : null}
                 </span>

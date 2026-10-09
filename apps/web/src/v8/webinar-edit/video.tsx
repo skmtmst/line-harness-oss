@@ -253,6 +253,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
     <CreatePage
       boardId={scheduled ? 'LPOe7' : 'VWNaA'}
       title={chrome.title}
+      actions={chrome.actions}
       identity={chrome.identity}
       steps={chrome.steps}
       description={scheduled

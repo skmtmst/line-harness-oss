@@ -149,7 +149,7 @@ function attributesStep(input: GettingStartedInput): StepResult {
     key: 'attributes',
     ordinal: '3',
     title: '友だちの分け方を決める',
-    sub: 'タグと友だち属性を作る',
+    sub: 'タグと友だち情報欄を作る',
     state: done ? 'done' : 'todo',
     condition: 'タグか友だち情報欄が1つ以上ある',
     next: done

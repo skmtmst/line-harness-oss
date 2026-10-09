@@ -301,25 +301,34 @@ export async function addScore(
     /** 手で動かした記録には実行者を残す。自動の出来事は渡さない。 */
     executedByStaffId?: string | null;
     executedByStaffName?: string | null;
+    /** 同じ操作の再送には同じ値を渡す。 */
+    idempotencyKey?: string;
   },
 ): Promise<void> {
-  const id = crypto.randomUUID();
+  const id = input.idempotencyKey
+    ? JSON.stringify(['score', input.friendId, input.idempotencyKey]) : crypto.randomUUID();
   const now = jstNow();
-  await db.prepare(`INSERT INTO friend_scores (id, friend_id, scoring_rule_id, score_change, reason, created_at, executed_by_staff_id, executed_by_staff_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-    .bind(
-      id,
-      input.friendId,
-      input.scoringRuleId ?? null,
-      input.scoreChange,
-      input.reason ?? null,
-      now,
-      input.executedByStaffId ?? null,
-      input.executedByStaffName ?? null,
-    ).run();
-
-  // スコアキャッシュを更新
-  await db.prepare(`UPDATE friends SET score = score + ?, updated_at = ? WHERE id = ?`)
-    .bind(input.scoreChange, now, input.friendId).run();
+  await db.batch([
+    db.prepare(`UPDATE friends SET score = score + ?, updated_at = ? WHERE id = ?
+      AND NOT EXISTS (SELECT 1 FROM friend_scores WHERE id = ?)`)
+      .bind(input.scoreChange, now, input.friendId, id),
+    db.prepare(`INSERT OR IGNORE INTO friend_scores
+      (id, friend_id, scoring_rule_id, score_change, reason, created_at, executed_by_staff_id, executed_by_staff_name)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(id, input.friendId, input.scoringRuleId ?? null, input.scoreChange, input.reason ?? null,
+        now, input.executedByStaffId ?? null, input.executedByStaffName ?? null),
+  ]);
+  if (input.idempotencyKey) {
+    const saved = await db.prepare(`SELECT friend_id, scoring_rule_id, score_change, reason,
+      executed_by_staff_id, executed_by_staff_name FROM friend_scores WHERE id = ?`)
+      .bind(id).first<FriendScoreRow>();
+    if (!saved || saved.friend_id !== input.friendId || saved.score_change !== input.scoreChange
+      || saved.scoring_rule_id !== (input.scoringRuleId ?? null) || saved.reason !== (input.reason ?? null)
+      || saved.executed_by_staff_id !== (input.executedByStaffId ?? null)
+      || saved.executed_by_staff_name !== (input.executedByStaffName ?? null)) {
+      throw new Error('score_idempotency_conflict');
+    }
+  }
 }
 
 /** 友だちの現在スコアを取得 */

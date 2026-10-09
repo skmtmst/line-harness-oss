@@ -27,7 +27,7 @@ import { CONFIDENCE_WORD, STATUS_FILTERS, STATUS_WORD, confidenceTone, slashDate
 import styles from './list.module.css'
 
 export default function DuplicatesListV8() {
-  usePageTitle('重複検出')
+  usePageTitle('友だち')
   const d = useDuplicatesData()
   /* 1152 の板（G9C4Uw）は探す欄が狭いので、案内の文を短くする（メールでも探せるのは同じ）。 */
   const narrow = useNarrowViewport()
@@ -201,8 +201,8 @@ export default function DuplicatesListV8() {
                     </div>
                   ) : (
                     <div className={styles.empty}>
+                      {/* 「もう一度見直す」は右上にあるので、ここには重ねない（2026-10-08 オーナー「下を消す」）。 */}
                       <ListState kind="empty" title="重複の候補はありません" description="同じ人が別の友だちとして登録されていそうなときに、ここに出ます。" />
-                      <Button type="button" variant="secondary" onClick={() => void d.detect()}>もう一度見直す</Button>
                     </div>
                   )}
                 </td></tr>

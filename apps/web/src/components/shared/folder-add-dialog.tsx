@@ -13,9 +13,11 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import { api } from '@/lib/api'
-import type { Folder } from '@line-crm/shared'
+import { FOLDER_SELECT_COLORS, type Folder } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import { isImeComposing } from './ime'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import FolderEditorDialog from './folder-editor-dialog'
 
 /** フォルダの色。全画面で同じ8色を使う。 */
 export const FOLDER_COLORS = [
@@ -28,6 +30,12 @@ export const FOLDER_COLORS = [
   '#06B6D4',
   '#6B7280',
 ]
+
+/** 既存の保存色を保ち、色の選択肢は名前で読み上げる。 */
+export const FOLDER_COLOR_NAMES: Record<string, string> = {
+  '#3B82F6': '青', '#10B981': '緑', '#F59E0B': '黄', '#EF4444': '赤',
+  '#8B5CF6': '紫', '#EC4899': 'ピンク', '#06B6D4': '水色', '#6B7280': 'グレー',
+}
 
 export interface FolderAddDialogProps {
   /** `folders.kind`。'broadcast' / 'scenario' など。 */
@@ -50,7 +58,7 @@ export interface FolderAddDialogProps {
   placeholder?: string
   onClose: () => void
   /** 追加できたら呼ぶ。一覧を読み直す。 */
-  onAdded: () => void
+  onAdded: (folder?: Folder) => void
 }
 
 export default function FolderAddDialog({
@@ -62,8 +70,9 @@ export default function FolderAddDialog({
   onClose,
   onAdded,
 }: FolderAddDialogProps) {
+  const theme = useAdminTheme()
   const [name, setName] = useState(folder?.name ?? '')
-  const [color, setColor] = useState(folder?.color ?? FOLDER_COLORS[0])
+  const [color, setColor] = useState<string | null>(theme === 'v8' ? (folder ? folder.color ?? null : FOLDER_SELECT_COLORS[0].value) : folder?.color ?? FOLDER_COLORS[0])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -83,7 +92,7 @@ export default function FolderAddDialog({
         setError(res.error)
         return
       }
-      onAdded()
+      onAdded(res.data)
       onClose()
     } catch {
       setError(folder ? 'フォルダを直せませんでした' : 'フォルダを追加できませんでした')
@@ -91,6 +100,14 @@ export default function FolderAddDialog({
       setSaving(false)
     }
   }
+
+  if (theme === 'v8') return <FolderEditorDialog open
+    title={folder ? 'フォルダを直す' : 'フォルダを追加'} description={note}
+    name={name} onNameChange={setName} color={color} onColorChange={setColor}
+    allowClear
+    placeholder={placeholder} busy={saving} error={error || undefined}
+    onCancel={onClose} onConfirm={() => void add()} confirmLabel={folder ? '保存する' : '追加する'}
+  />
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4">

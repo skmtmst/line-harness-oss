@@ -1,3 +1,4 @@
+import { automationTabCounts } from '../services/tab-counts.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
@@ -592,6 +593,17 @@ automations.post(
     }));
   },
 );
+
+automations.get('/api/automations/counts', requireAutomationViewPermission, async (c) => {
+  const accountId = await requireDraftAccount(c);
+  if (accountId instanceof Response) return accountId;
+  try {
+    return c.json({ success: true, data: await automationTabCounts(c.env.DB, accountId) });
+  } catch (err) {
+    console.error('GET /api/automations/counts error:', err);
+    return c.json({ success: false, error: '件数を取得できませんでした' }, 500);
+  }
+});
 
 automations.get(
   '/api/automations',

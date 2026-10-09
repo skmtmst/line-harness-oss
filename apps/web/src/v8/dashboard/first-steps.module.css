@@ -9,9 +9,10 @@
   flex-direction: column;
   gap: var(--tpl-d23-ob-gap);
   padding: var(--tpl-d23-ob-pad);
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--tpl-d23-ob-radius);
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 
 .head {
@@ -125,6 +126,12 @@
   font-size: var(--tpl-d23-ob-check-size);
   font-weight: 700;
   line-height: var(--tpl-d23-ob-check);
+}
+
+/* 済みの印は文字の ✓ ではなく線画にする（文字は書体の都合で丸の中心から右下へずれる・2026-10-08 オーナー指摘）。 */
+.checkIcon {
+  width: var(--tpl-d23-ob-check-size);
+  height: var(--tpl-d23-ob-check-size);
 }
 
 .step[data-done] .check {

@@ -1,7 +1,7 @@
 @layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
- * 複数選択。Pencil ★V7 `WUVcz` §2。欄・候補の決まりは Combobox と同じ。
+ * 複数選択。Pencil ★V8（V8.pen）「複数選ぶ（札＋N）」。欄・候補の決まりは Combobox と同じ。
  *
  *   札     地 $shell・高さ 26・角丸 13・余白 [0,6,0,8]・文字 13・太字 $ink
  *          点 8・外す印 12 $ink-faint。入り切らない分は「+N」（枠 $hairline）

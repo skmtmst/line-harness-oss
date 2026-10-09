@@ -65,6 +65,8 @@ export interface InsertTextFieldHandle extends InsertTextTarget {
 
 export interface InsertTextFieldProps
   extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'defaultValue' | 'onChange'> {
+  /** 高さ72の短い本文欄。指定しなければ従来の呼び出し側の見た目。 */
+  compact?: boolean
   value: string
   onValueChange: (next: string) => void
   /** 画面ごとに意味が違う差し込み（リマインダの {{date}}＝予約日時、統括の {店名} など）。 */
@@ -246,14 +248,14 @@ function fragmentOf(html: string): DocumentFragment {
 }
 
 const InsertTextField = forwardRef<InsertTextFieldHandle | HTMLTextAreaElement, InsertTextFieldProps>(function InsertTextField(
-  { value, onValueChange, extraTokens, tokenNames, ...rest },
+  { value, onValueChange, extraTokens, tokenNames, compact, ...rest },
   ref,
 ) {
   const theme = useAdminTheme()
   if (theme !== 'v8') {
     return <textarea ref={ref as React.Ref<HTMLTextAreaElement>} {...rest} value={value} onChange={(event) => onValueChange(event.target.value)} />
   }
-  return <ChipEditor ref={ref as React.Ref<InsertTextFieldHandle>} value={value} onValueChange={onValueChange} extraTokens={extraTokens} tokenNames={tokenNames} {...rest} />
+  return <ChipEditor ref={ref as React.Ref<InsertTextFieldHandle>} value={value} onValueChange={onValueChange} extraTokens={extraTokens} tokenNames={tokenNames} compact={compact} {...rest} />
 })
 
 export default InsertTextField
@@ -268,6 +270,7 @@ const ChipEditor = forwardRef<InsertTextFieldHandle, InsertTextFieldProps>(funct
     extraTokens = EMPTY_TOKENS,
     tokenNames = EMPTY_NAMES,
     className,
+    compact,
     style,
     placeholder,
     maxLength,
@@ -627,7 +630,7 @@ const ChipEditor = forwardRef<InsertTextFieldHandle, InsertTextFieldProps>(funct
       aria-placeholder={placeholder}
       {...({ placeholder } as Record<string, string | undefined>)}
       data-insert-field=""
-      className={`${styles.editor} ${className ?? ''}`}
+      className={`${styles.editor} ${compact ? styles.editorCompact : ''} ${className ?? ''}`}
       style={{ ...minHeight, ...style }}
       contentEditable={editable}
       suppressContentEditableWarning
@@ -664,15 +667,17 @@ export const InsertButton = forwardRef<HTMLButtonElement, {
   onClick: () => void
   icon?: 'plus' | 'more'
   disabled?: boolean
+  size?: 'compact'
   title?: string
   expanded?: boolean
   className?: string
-}>(function InsertButton({ label, onClick, icon = 'plus', disabled, title, expanded, className }, ref: Ref<HTMLButtonElement>) {
+}>(function InsertButton({ label, onClick, icon = 'plus', disabled, size, title, expanded, className }, ref: Ref<HTMLButtonElement>) {
   return (
     <button
       ref={ref}
       type="button"
       className={`${styles.insertButton} ${className ?? ''}`}
+      data-size={size}
       onClick={onClick}
       disabled={disabled}
       title={title}
@@ -684,3 +689,14 @@ export const InsertButton = forwardRef<HTMLButtonElement, {
     </button>
   )
 })
+
+
+/** 閲覧用の本文。差し込みの札は入力欄と同じ形で、元の文字列を変えずに描く。 */
+export function InsertText({ value, tokenNames = EMPTY_NAMES }: { value: string; tokenNames?: InsertTokenNames }) {
+  return <>{splitInsertTokens(value, EMPTY_TOKENS, tokenNames).map((piece, index) => piece.kind === 'text' ? piece.text : (
+    <span key={index} className={styles.chip} title={piece.spec.hint} data-token={piece.spec.token}>
+      <svg className={styles.chipIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" dangerouslySetInnerHTML={{ __html: ICON_PATHS[piece.spec.icon] }} />
+      <span className={styles.chipLabel}>{piece.spec.label}</span>
+    </span>
+  ))}</>
+}

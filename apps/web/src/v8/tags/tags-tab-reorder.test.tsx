@@ -112,3 +112,16 @@ describe('V8 タグの並び替えの保存の失敗', () => {
     expect(toasts).toEqual([])
   })
 })
+
+ it('WEB-C09：フォルダ作成は共通の窓で9色・既定は緑', async () => {
+  await act(async () => { root.render(<TagsList fixture={{ items: FRIEND_ATTRIBUTES_QA_TAGS, groups: FRIEND_ATTRIBUTES_QA_GROUPS }} />) })
+  const add = [...container.querySelectorAll('button')].find(button => button.textContent?.includes('フォルダを追加'))!
+  expect(add).toBeTruthy()
+  await act(async () => add.click())
+  const dialog = document.querySelector('[role="dialog"]')!
+  const color = dialog.querySelector('[data-folder-color-button] button') as HTMLButtonElement
+  expect(color.getAttribute('aria-label')).toBe('フォルダの色：緑')
+  await act(async () => color.click())
+  expect(document.querySelectorAll('[role="radiogroup"][aria-label="フォルダの色"] [role="radio"]')).toHaveLength(9)
+  expect(document.querySelector('[role="radio"][aria-checked="true"]')?.getAttribute('aria-label')).toContain('緑')
+ })

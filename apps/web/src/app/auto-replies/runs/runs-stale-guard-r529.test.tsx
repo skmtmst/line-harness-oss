@@ -112,9 +112,9 @@ function pauseButton(): HTMLButtonElement | null {
 /* 設定編集の行き先。古いルールのIDが残ると、違うルールを編集してしまう。 */
 function editHref(): string | null {
   const link = Array.from(container.querySelectorAll('a')).find((anchor) =>
-    (anchor.textContent ?? '').includes('自動応答の設定を編集'),
+    (anchor.textContent ?? '').includes('ルールの編集へ'),
   ) ?? null
-  return link?.getAttribute('href')
+  return link?.getAttribute('href') ?? null
 }
 
 describe('R529 対象ID切替で古いルールを残さない', () => {
@@ -125,15 +125,15 @@ describe('R529 対象ID切替で古いルールを残さない', () => {
     })
     await renderPage()
     expect(editHref()).toContain('rule-a')
-    expect(container.textContent).toContain('1番目')
+    expect(container.textContent).toContain('ルールA')
 
     currentQuery = 'id=rule-b'
     await rerenderPage()
 
     expect(container.textContent).toContain('実行結果を読み込めませんでした')
     // Aの集計（優先順位1番目）は消え、編集の行き先もAを指さない。
-    expect(container.textContent).not.toContain('1番目')
-    expect(editHref()).not.toContain('rule-a')
+    expect(container.textContent).not.toContain('ルールA')
+    expect(editHref() ?? '').not.toContain('rule-a')
     // 古いルールへの操作（停止）は押せない。
     expect(pauseButton()?.disabled).toBe(true)
   })
@@ -146,12 +146,12 @@ describe('R529 対象ID切替で古いルールを残さない', () => {
     })
     await renderPage()
     // Aはまだ返っていないので集計は出ていない。
-    expect(container.textContent).not.toContain('1番目')
+    expect(container.textContent).not.toContain('ルールA')
 
     currentQuery = 'id=rule-b'
     await rerenderPage()
     expect(editHref()).toContain('rule-b')
-    expect(container.textContent).toContain('3番目')
+    expect(container.textContent).toContain('ルールB')
 
     // 遅れて届いたAの応答は捨てられ、Bの表示へ戻らない。
     await act(async () => {
@@ -159,7 +159,7 @@ describe('R529 対象ID切替で古いルールを残さない', () => {
     })
     await flush()
     expect(editHref()).toContain('rule-b')
-    expect(container.textContent).toContain('3番目')
-    expect(container.textContent).not.toContain('1番目')
+    expect(container.textContent).toContain('ルールB')
+    expect(container.textContent).not.toContain('ルールA')
   })
 })

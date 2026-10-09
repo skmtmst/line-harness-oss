@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react';
-import { Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import LoadingView from './components/LoadingView.js';
 
 // 画面ごとに束を分ける。開いた画面のぶんだけ読む。
@@ -23,6 +23,7 @@ function Loading() {
 
 export default function App() {
   const [search] = useSearchParams();
+  const location = useLocation();
   const waitlistToken = search.get('eventWaitlistToken');
   if (waitlistToken) {
     return (
@@ -46,7 +47,7 @@ export default function App() {
         <Route path="/webinar/:slug" element={<Webinar />} />
         <Route path="/forms/:id" element={<Form />} />
         <Route path="/restaurant/reserve/:token" element={<SeatReserve />} />
-        <Route path="/" element={<Navigate to="/booking" replace />} />
+        <Route path="/" element={<Navigate to={{ pathname: '/booking', search: location.search }} replace />} />
         {/* どの住所にも当たらないとき（板 aLU3r）。 */}
         <Route path="*" element={<NotFound />} />
       </Routes>

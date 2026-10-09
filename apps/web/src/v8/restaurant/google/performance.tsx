@@ -7,7 +7,12 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Eye, MapPin, MousePointerClick, Phone } from 'lucide-react'
+import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import SectionHeader from '@/components/shared/section-header'
+import KpiBand from '@/components/shared/kpi-band'
 import { RowMenu } from '@/components/shared/row-actions'
+import SegmentedControl from '@/components/shared/segmented'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -84,7 +89,7 @@ function MetricMenu({ title, onShowTrend }: { title: string; onShowTrend: () => 
   const [open, setOpen] = useState(false)
   return (
     <span className={styles.menuBox}>
-      <RowMenu className={styles.metricMenu} label={`${title}の操作`} open={open} onOpenChange={setOpen} items={[{ id: 'trend', label: '表示数の推移を見る', onSelect: () => { setOpen(false); onShowTrend() } }]} />
+      <RowMenu appearance="plain" size="small" label={`${title}の操作`} open={open} onOpenChange={setOpen} items={[{ id: 'trend', label: '表示数の推移を見る', onSelect: () => { setOpen(false); onShowTrend() } }]} />
     </span>
   )
 }
@@ -117,22 +122,18 @@ export default function PerformanceBoard({ accountId }: { accountId: string }) {
     <>
       <div className={styles.toolbar}>
         <p className={styles.toolbarText} title={range ? `集計期間 ${range}（日本時間）` : undefined}>Google の検索・地図でどれだけ見られたか</p>
-        <div className={styles.seg} role="radiogroup" aria-label="集計期間">
-          {DAYS.map((d) => (
-            <button key={d} type="button" role="radio" aria-checked={days === d} className={styles.segButton} onClick={() => setDays(d)}>{`直近${d}日`}</button>
-          ))}
-        </div>
+        <SegmentedControl aria-label="集計期間" value={String(days)} onChange={(value) => setDays(Number(value) as GooglePerformanceDays)} options={DAYS.map((d) => ({ value: String(d), label: `直近${d}日` }))} />
       </div>
       {loading && !data ? <div className={styles.stateBox}><ListState kind="loading" title="パフォーマンスを読み込んでいます" /></div> : null}
       {loadError ? <ListState kind="error" title="パフォーマンスを表示できませんでした" description={loadError} onRetry={() => void load()} /> : null}
       {data ? (
         <>
           {data.lastMetricsSyncedAt === null ? <Notice tone="info">パフォーマンスの自動取得はまだ実行されていません。毎晩の取得のあとに数値が表示されます。</Notice> : null}
-          <div className={styles.metrics}>
+          <KpiBand presentation="separated" gridClassName="">
             {METRICS.map(({ key, title, icon: Icon }) => (
               <KpiCard
                 key={key}
-                className={styles.metric}
+                presentation="cell"
                 title={title}
                 icon={<Icon aria-hidden className={styles.icon13} />}
                 menu={<MetricMenu title={title} onShowTrend={() => setShowTrend(true)} />}
@@ -142,26 +143,26 @@ export default function PerformanceBoard({ accountId }: { accountId: string }) {
                 help={key === 'callClicks' ? '電話ボタンが押された数です。通話が成立した数ではありません。' : undefined}
               />
             ))}
-          </div>
-          <section className={styles.card}>
-            <h2 className={styles.cardTitle}>飲食店向け指標</h2>
+          </KpiBand>
+          <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
+            <SectionHeader size="small" title={<>飲食店向け指標</>} />
             <dl className={styles.facts}>
               <div className={styles.factRow}><dt className={styles.factKey}>予約ボタンのクリック</dt><dd className={styles.factValue}>{data.food.bookings === null ? '—（連携サービス未対応）' : `${data.food.bookings.toLocaleString('ja-JP')} 回`}</dd></div>
               <div className={styles.factRow}><dt className={styles.factKey}>メニューの閲覧</dt><dd className={styles.factValue}>{data.food.menuClicks === null ? '—（対象機能を使っている店舗のみ）' : `${data.food.menuClicks.toLocaleString('ja-JP')} 回`}</dd></div>
-              <div className={styles.factRow}><dt className={styles.factKey}>料理の注文</dt><dd className={styles.factValue}>{data.food.foodOrders === null ? '—（連携サービス未対応）' : `${data.food.foodOrders.toLocaleString('ja-JP')} 回`}</dd></div>
+              <div className={styles.factRow}><dt className={styles.factKey}>料理の写真の閲覧</dt><dd className={styles.factValue}>—（未取得）</dd></div>
             </dl>
             <p className={styles.grayNote}>数字は Google ビジネス プロフィールの集計です（前日までの分。2〜3日遅れることがあります）。</p>
-          </section>
+          </Card>
           {showTrend ? (
-            <section className={styles.card} aria-label="プロフィール表示の推移">
+            <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-label="プロフィール表示の推移">
               <div className={styles.cardHead}>
-                <h2 className={styles.cardTitle}>プロフィール表示の推移</h2>
+                <SectionHeader size="small" title={<>プロフィール表示の推移</>} />
                 <span className={styles.spacer} aria-hidden="true" />
                 <span className={styles.muted}>{`■ 表示数 / ${BUCKET_LABELS[data.days]}の合計・${range}`}</span>
-                <button type="button" className={styles.textButton} onClick={() => setShowTrend(false)}>閉じる</button>
+                <Button variant="text" onClick={() => setShowTrend(false)}>閉じる</Button>
               </div>
               <ImpressionsChart data={data} />
-            </section>
+            </Card>
           ) : null}
         </>
       ) : null}

@@ -1,7 +1,7 @@
 @layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
- * ファイルを落とす場所・添付ファイルの行。Pencil ★V7 `NQMnx`。
+ * ファイルを落とす場所・添付ファイルの行。Pencil ★V8（V8.pen）「ファイルを落とす欄」。
  *
  * 落とす場所
  *   ふだん  地 $canvas-sunken、縁 1.5px $hairline、角丸 12、高さ 180
@@ -214,3 +214,12 @@
   transition: transform var(--motion-base) var(--motion-ease-out);
 }
 }
+
+.zone[data-variant='video'] { min-height: var(--tpl-rvid-drop-h); border-width: 1px; border-color: var(--color-control-border); border-radius: var(--radius-control); }
+
+.zone[data-invalid] { border-color: var(--color-danger); }
+
+.zone[data-variant='composer'] { height: var(--tpl-msg-composer-media-h); min-height: var(--tpl-msg-composer-media-h); padding: 0; gap: var(--tpl-msg-composer-gap-s); }
+.zone[data-variant='composer'] .zoneTitle { font-size: var(--text-label); line-height: var(--tpl-msg-composer-text-lh); }
+.zone[data-variant='composer'] .zoneHint { font-size: var(--text-micro); line-height: var(--tpl-msg-composer-tab-lh); }
+.zone[data-variant='composer']:focus-visible { outline: 2px solid var(--color-action); }

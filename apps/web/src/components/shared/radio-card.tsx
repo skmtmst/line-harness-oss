@@ -58,6 +58,8 @@ export interface RadioCardProps {
   title: string
   /** 補足。選ぶと何が起きるか（実行を伴う選択ならその動作）を書く。 */
   note?: ReactNode
+  /** 説明の下に置く図など。省略時は既存のカードの形を保つ。 */
+  children?: ReactNode
   disabled?: boolean
   /**
    * 選べない理由。disabled のときは必ず併記する。
@@ -79,15 +81,20 @@ export interface RadioCardProps {
    * `'row'` は箱なしの行（BHEl9 の素のラジオ行：丸 18・文字 13）。
    * `'compact'` は小さい箱（★BG-B の出力サイズ o2XyUk/aCyxg：
    * 角 8・余白 8/10・題 11/600・補足 10）。狭い脇のパネルに並べる選択肢に使う。
+   * `'form'` は作る画面や操作窓の小さい箱。印を題の左に並べる（RaMf3・hadfk）。
    * 画面の絵で行で並んでいる選択肢には `'row'` を使う。箱の合格は変えない。
    */
-  variant?: 'card' | 'row' | 'compact'
+  variant?: 'card' | 'row' | 'compact' | 'form'
+  /** 統括の生成パネルの小さい箱（題12/700、補足11）。 */
+  compactTypography?: 'default' | 'banner'
   /**
    * 箱（card）の高さ。既定は絵の「選ぶカード」の 98。
    * `'short'` は高さ 90 の箱（★V8 E-3 ウォークインの卓のカード PUWyq：上に印・右上に丸・題・説明）。
    * 渡したときだけ効き、既定の見た目は変えない。
    */
   height?: 'default' | 'short'
+  /** 横並びの小さい箱（j8p3yj）。既定のカード・行・v7 の寸法は変えない。 */
+  size?: 'default' | 'small'
 }
 
 export default function RadioCard({
@@ -97,6 +104,7 @@ export default function RadioCard({
   onChange,
   title,
   note,
+  children,
   disabled = false,
   disabledReason,
   invalid = false,
@@ -104,23 +112,28 @@ export default function RadioCard({
   className,
   icon,
   variant = 'card',
+  compactTypography = 'default',
   height = 'default',
+  size = 'default',
 }: RadioCardProps) {
   return (
     <label
       className={[
         variant === 'row' ? styles.row : styles.card,
         variant === 'compact' ? styles.compact : null,
+        variant === 'form' ? styles.form : null,
         variant === 'card' && height === 'short' ? styles.short : null,
+        variant === 'card' && size === 'small' ? styles.small : null,
         checked ? styles.checked : null,
         disabled ? styles.disabled : null,
         invalid ? styles.invalid : null,
         className,
       ].filter(Boolean).join(' ')}
       data-variant={variant}
+      data-compact-typography={variant === 'compact' ? compactTypography : undefined}
       onClick={disabled ? undefined : onClick}
     >
-      {icon ? <span className={styles.topIcon} aria-hidden="true">{icon}</span> : null}
+      {icon && variant !== 'form' ? <span className={styles.topIcon} aria-hidden="true">{icon}</span> : null}
       <input
         type="radio"
         className={styles.radio}
@@ -132,10 +145,11 @@ export default function RadioCard({
         onChange={() => onChange(value)}
       />
       <span className={styles.body}>
-        <strong className={styles.title}>{title}</strong>
+        <strong className={styles.title}>{icon && variant === 'form' ? <span className={styles.inlineIcon} aria-hidden="true">{icon}</span> : null}{title}</strong>
         {note ? <small className={styles.note} title={typeof note === 'string' ? note : undefined}>{note}</small> : null}
         {disabled && disabledReason ? <small className={styles.reason}>{disabledReason}</small> : null}
       </span>
+      {children}
     </label>
   )
 }
