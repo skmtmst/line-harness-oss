@@ -221,7 +221,7 @@ function EventsCreateV8Inner() {
         boardId="d4adD4"
         title="イベントを作る"
         help="中身・回と定員・申し込みのきまりを決めます。下書きのあいだは、お客さまには見えません。"
-        footerActions={<Button href="/events">一覧へ戻る</Button>}
+        footerActions={<Button href="/events">一覧へ戻る</Button>} dirty={false}
       >
         <Notice tone="info">{permissionDeniedMessage('store')}</Notice>
       </CreatePage>
@@ -241,7 +241,7 @@ function EventsCreateV8Inner() {
           <Button disabled={saving} busy={saving} onClick={() => void save(false)}>下書きを保存</Button>
           <Button variant="primary" disabled={saving} busy={saving} onClick={() => void save(true)}><Globe size={15} aria-hidden="true" />公開する</Button>
         </>
-      )}
+      )} dirty={false}
     >
       {error ? <Notice tone="danger">{error}</Notice> : null}
 

@@ -100,7 +100,7 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
     return <ListState kind="loading" title="UID移行を読み込んでいます" description="移行履歴とアカウントを確認しています。" />
   }
   if (status === 'error') {
-    return <ListState kind="error" title="UID移行を表示できませんでした" description="登録した移行履歴は消えていません。" action={<Button onClick={() => void load()}>再読み込み</Button>} />
+    return <ListState kind="error" title="UID移行を表示できませんでした" description="登録した移行履歴は消えていません。" onRetry={() => void load()} />
   }
 
   const executeBlockedReason = me

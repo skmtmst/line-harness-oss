@@ -76,7 +76,7 @@ describe('V8 ダッシュボード編集', () => {
     fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
     expect(onReset).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: '初期状態に戻す' }))
-    fireEvent.click(screen.getByRole('button', { name: /削除して初期状態へ戻す/ }))
+    fireEvent.click(screen.getByRole('button', { name: '削除する', exact: true }))
     expect(onReset).toHaveBeenCalledTimes(1)
   })
 
@@ -87,14 +87,14 @@ describe('V8 ダッシュボード編集', () => {
     expect(onApply).toHaveBeenCalledTimes(1)
   })
 
-  it('409 は「最新の配置を読み込む」。読み込んだ配置が編集の起点になる', async () => {
+  it('409 は「最新を読み込んで続ける」。読み込んだ配置が編集の起点になる', async () => {
     const latest = prefs()
     latest.today = [...latest.today].reverse()
     const onReloadPreferences = vi.fn(async () => latest)
     const { onApply } = renderEditor({ saveError: 'ほかの人が配置を変えました。', saveConflict: true, onReloadPreferences })
     expect(screen.queryByRole('button', { name: 'もう一度保存する' })).toBeNull()
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '最新の配置を読み込む' }))
+      fireEvent.click(screen.getByRole('button', { name: '最新を読み込んで続ける' }))
     })
     expect(onReloadPreferences).toHaveBeenCalledTimes(1)
     fireEvent.click(screen.getByRole('button', { name: 'ダッシュボードに反映' }))

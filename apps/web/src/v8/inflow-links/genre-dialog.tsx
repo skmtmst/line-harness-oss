@@ -67,7 +67,7 @@ export default function GenreDialog({
       error={error || undefined}
       confirmLabel={genre ? '保存する' : 'フォルダを作る'}
       onCancel={onClose}
-      onConfirm={() => void save()}
+      onConfirm={() => save()}
     >
       <Field label="フォルダ名" htmlFor={inputId} error={nameError}>
       <TextField

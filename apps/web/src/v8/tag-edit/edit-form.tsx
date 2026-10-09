@@ -131,6 +131,9 @@ export function TagEditForm({
   }, [accountId, host])
   const nameDuplicates = useMemo(() => findDuplicateNames(siblingNames, name, tag.id), [siblingNames, name, tag.id])
 
+  const fingerprint = JSON.stringify({ name, groupId, isStarred, linked, reward, referralReward, multiplier, priority, applyToExisting, reapplyMode, actions })
+  const baseline = useRef({ version: tag.version, fingerprint })
+  if (baseline.current.version !== tag.version) baseline.current = { version: tag.version, fingerprint }
   const groupName = groups.find((group) => group.id === groupId)?.name ?? '未分類'
   const values = useMemo<TagEditorValues>(() => ({
     name: name.trim(), groupId, isStarred, linked,
@@ -235,6 +238,8 @@ export function TagEditForm({
   return (
     <div className={styles.page}>
       <CreatePage
+        dirty={!readOnly && fingerprint !== baseline.current.fingerprint}
+        busy={saving}
         boardId={host ? 'MFgPZ' : 'Qat9s'}
         footerOutlined={Boolean(host)}
         notice={<>{host?.notice}{readOnly ? <p className={styles.roBand} role="note" data-design-node="fkGUR">{host ? '閲覧のみで見ています。変える操作は統括の管理者に頼んでください。' : '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'}</p> : null}{conflictBand}</>}

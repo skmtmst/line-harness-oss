@@ -4,6 +4,7 @@
  * ★V8-B 会員一覧（AOWoJ）。今の V8 の会員一覧（app/nen/members/members-v8.tsx の MembersTabV8）を
  * 写した。検索・よく使う札・並び・件数・ページ送り・行の「…」は今と同じ口・同じ指定。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
@@ -41,15 +42,15 @@ export default function MembersListV8({
   const router = useRouter()
   const [status, setStatus] = useState<ListStatus>('loading')
   const [data, setData] = useState<NenMemberListData | null>(null)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   /** よく使う札：○○以上（上位2ランク）・ペットあり・EC未連携。 */
-  const [chipTopRanks, setChipTopRanks] = useState(false)
-  const [chipPet, setChipPet] = useState(false)
-  const [chipUnlinked, setChipUnlinked] = useState(false)
-  const [rank, setRank] = useState('')
-  const [sort, setSort] = useState<NenMemberSort>('annual_desc')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [chipTopRanks, setChipTopRanks] = useListUrlValue('chipTopRanks', false)
+  const [chipPet, setChipPet] = useListUrlValue('chipPet', false)
+  const [chipUnlinked, setChipUnlinked] = useListUrlValue('chipUnlinked', false)
+  const [rank, setRank] = useListUrlValue('rank', '')
+  const [sort, setSort] = useListUrlValue<NenMemberSort>('sort', 'annual_desc')
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 10)
   const requestRef = useRef(0)
 
   /*
@@ -253,11 +254,12 @@ function MemberRow({
         <RowActions
           subjectName={member.name || 'この会員'}
           menuItems={[
-            { id: 'detail', label: '会員の詳細', external: true, onSelect: () => onOpen(friendDetail) },
-            { id: 'friend', label: '友だちを開く', external: true, onSelect: () => onOpen(`${friendDetail}&tab=info`) },
+            { id: 'detail', label: '会員の詳細', external: true, href: friendDetail, onSelect: () => onOpen(friendDetail) },
+            { id: 'friend', label: '友だちを開く', external: true, href: `${friendDetail}&tab=info`, onSelect: () => onOpen(`${friendDetail}&tab=info`) },
             {
               id: 'ec',
               label: 'ECで開く',
+              href: '/ec-commerce',
               external: true,
               disabled: !member.customerId,
               disabledReason: 'ECと結びついていません',

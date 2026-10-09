@@ -42,7 +42,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
-import SortSelect from '@/components/ui/sort-select'
+import { ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
 import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
@@ -1030,7 +1030,7 @@ function WebinarList() {
             busy={archiving}
             error={archiveError || undefined}
             onCancel={() => { if (!archiving) setArchiveTarget(null) }}
-            onConfirm={() => void archiveSelected()}
+            onConfirm={() => archiveSelected()}
           />
         ) : null}
         {(folderFormOpen || editingFolder) ? (
@@ -1095,7 +1095,7 @@ function WebinarList() {
             setDeletingFolder(null)
             setFolderError('')
           }}
-          onConfirm={() => void removeFolder()}
+          onConfirm={() => removeFolder()}
         />
       </>}
     >

@@ -9,6 +9,7 @@
  * データの口・守り（確認の窓・本人確認・二重押し防止・閲覧のみ・切り戻し）は今の画面
  * （app/accounts/handover の page.tsx・handover-v8.tsx）と同じ。動きの一覧は BEHAVIOR.md。
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Eye, Play, RotateCcw } from 'lucide-react'
@@ -296,11 +297,7 @@ export default function AccountHandoverV8() {
     }
   }
 
-  const copyCode = async () => {
-    if (!handover?.code) return
-    await navigator.clipboard.writeText(handover.code)
-    setCopyState('copied')
-  }
+
 
   /** 段5。本実行。確認の窓と本人確認を済ませてから進める（X-3）。 */
   const executeHandover = async () => {
@@ -428,7 +425,7 @@ export default function AccountHandoverV8() {
             <span className={styles.boxLabel}>どこからどこへ</span>
             <span className={styles.boxLabel}>
               コード {handover.code}{handover.codeExpiresAt ? `（${formatDateTime(handover.codeExpiresAt)} まで）` : ''}{' '}
-              <Button type="button" variant="text" presentation="account-inline" onClick={() => void copyCode()}>{copyState === 'copied' ? 'コピーしました' : 'コピー'}</Button>
+              <CopyTextButton value={handover?.code ?? ""} aria-label="引き継ぎコードをコピー"  />
             </span>
           </p>
           <p className={styles.boxValue}>{account.name}（引継ぎ元・元データを残す）→ {destination?.name ?? emptyValue('unknown')}（引継ぎ先）</p>
@@ -483,7 +480,7 @@ export default function AccountHandoverV8() {
           const editable = canManage && (decision.bucket === 'review' || decision.bucket === 'lookalike')
           const name = decision.sourceName ?? decision.from_friend_id
           return (
-            <Tr key={decision.id}>
+            <Tr key={decision.id} data-row-id={decision.id}>
               <Td className={styles.colName}><div className={styles.nameStack}>
                 <span className={styles.name} ><TruncatedText value={String(name ?? '')} /></span>
                 <span className={styles.sub}>元の友だち</span>
@@ -588,7 +585,7 @@ export default function AccountHandoverV8() {
         confirmLabel={executing ? '実行中…' : '本実行する'}
         busy={executing}
         error={executeError}
-        onConfirm={() => void executeHandover()}
+        onConfirm={() => executeHandover()}
         onCancel={() => { if (!executing) { setConfirmOpen(false); setExecuteError('') } }}
       />
       <ConfirmDialog
@@ -598,7 +595,7 @@ export default function AccountHandoverV8() {
         confirmLabel={cancelling ? '取り消し中…' : '引き継ぎを取り消す'}
         destructive
         busy={cancelling}
-        onConfirm={() => void runCancel()}
+        onConfirm={() => runCancel()}
         onCancel={() => { if (!cancelling) setCancelOpen(false) }}
       />
       <ConfirmDialog
@@ -609,7 +606,7 @@ export default function AccountHandoverV8() {
         destructive
         busy={rollingBack}
         error={rollbackError}
-        onConfirm={() => void runRollback()}
+        onConfirm={() => runRollback()}
         onCancel={() => { if (!rollingBack) { setRollbackOpen(false); setRollbackError('') } }}
       />
     </>

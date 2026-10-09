@@ -153,14 +153,14 @@ describe('R589 フォルダだけの失敗は一覧と警告を隠さない', ()
 })
 
 describe('R590 一覧の403と503を区別する', () => {
-  it('一覧403は権限案内で再試行も作成口も出さない', async () => {
+  it('一覧403は権限案内と読み直す口を出し、作成口は出さない', async () => {
     api.varsList.mockRejectedValue(new ApiError(403, 'Forbidden'))
     render(<CommonVarsPage />)
 
     expect(await screen.findByText('共通情報を見る権限がありません')).toBeTruthy()
     expect(screen.getByText(/オーナーか管理者に頼んでください/)).toBeTruthy()
     expect(screen.queryByText('通信が切れたか')).toBeNull()
-    expect(screen.queryByRole('button', { name: 'もう一度読み込む' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
     // 読めていないのに作る口は出さない。
     expect(screen.queryByRole('link', { name: '＋ 共通情報を作る' })).toBeNull()
     expect(screen.queryByRole('button', { name: '＋ 共通情報を作る' })).toBeNull()

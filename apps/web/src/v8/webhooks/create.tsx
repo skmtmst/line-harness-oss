@@ -9,6 +9,7 @@
  * データの口は v7 と同じ（作成・本人確認・未保存の番兵）。`?event=` で見本の出来事を選んでおく。
  * 絵と今の作りが合わない所は BEHAVIOR.md に書いた（競合の口が無い・それでも送れないときの口が無い など）。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -223,7 +224,7 @@ function WebhooksCreateV8Inner() {
     if (next === 'active' && pendingStop && pendingStop.accountId === accountId) {
       // もう作れていて動いている。同じ送り先をもう1つ作らない。
       createdActiveRef.current = null
-      router.push('/webhooks')
+      router.push(createPageReturnHref('/webhooks', pendingStop.id))
       return
     }
     if (next === 'draft' && pendingStop && pendingStop.accountId === accountId) {
@@ -231,7 +232,7 @@ function WebhooksCreateV8Inner() {
         const stop = await api.webhooks.outgoing.update(pendingStop.id, accountId, { isActive: false })
         if (!stop.success) throw new Error(stop.error)
         createdActiveRef.current = null
-        router.push('/webhooks')
+        router.push(createPageReturnHref('/webhooks', pendingStop.id))
       } catch {
         setError('送り先は作れましたが、まだ止められていません（いまは動いています）。もう一度「下書きを保存」を押すと、止めるところだけやり直します。')
         setSaving(false)
@@ -283,7 +284,7 @@ function WebhooksCreateV8Inner() {
         }
         createdActiveRef.current = null
       }
-      router.push('/webhooks')
+      router.push(createPageReturnHref('/webhooks', res.data.id))
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '保存できませんでした。もう一度お試しください。')
       setSaving(false)
@@ -300,7 +301,7 @@ function WebhooksCreateV8Inner() {
         boardId="hsD8e"
         title="送り先を作る"
         help="友だちの動きを、決めたタイミングでほかのシステムへ送ります。試しに送ってから動かすと安心です。"
-        footerActions={<Button href="/webhooks">一覧へ戻る</Button>}
+        footerActions={<Button href="/webhooks">一覧へ戻る</Button>} dirty={false}
       >
         <Notice tone="info">{permissionDeniedMessage('store')}</Notice>
       </CreatePage>
@@ -347,7 +348,7 @@ function WebhooksCreateV8Inner() {
           <Button disabled={saving} onClick={() => void save('draft')} busy={saving}>下書きを保存</Button>
           <Button variant="primary" disabled={saving} onClick={() => void save('active')} busy={saving}>つくって動かす</Button>
         </>
-      )}
+      )} dirty={false}
     >
       {error ? <Notice tone="danger">{error}</Notice> : null}
 

@@ -8,6 +8,7 @@
  * データの口は今の画面（app/restaurant-test/v8/shell.tsx）と同じ
  * restaurantTestApi.snapshot。src/v8 は古い画面を import できないので写した。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError } from '@/lib/api'
@@ -178,7 +179,7 @@ export default function RestaurantShell({ boardId, title, description, query, he
     try {
       await action()
       await load()
-      setNotice({ tone: 'success', text: success })
+      notifySaved(success)
       return true
     } catch (error) {
       if (error instanceof QuietError) { setNotice(null); return false }

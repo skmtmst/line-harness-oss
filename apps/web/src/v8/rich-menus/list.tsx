@@ -9,8 +9,9 @@
  * 扱いは古い一覧と同じ（BEHAVIOR.md）。
  */
 import { formatDate as polishFormatDate } from '@/lib/format'
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
-import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
+import { useListUrlValue, useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -45,6 +46,7 @@ import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/a
 import { ListPage } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
+import DetailPanel from '@/components/shared/detail-panel'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import Select from '@/components/shared/select'
@@ -209,10 +211,11 @@ export default function RichMenusListV8() {
   const role = useStaffRole()
   const canEdit = role === null ? true : canManageRole(role)
 
-  const [showExternal, setShowExternal] = useState(false)
+  const [showExternal, setShowExternal] = useListUrlValue('showExternal', false)
   const activeAccountRef = useRef<string | null>(selectedAccount?.id ?? null)
   const importRequestGenerationRef = useRef(0)
   const externalLoadedRef = useRef(false)
+  const [detailId, setDetailId] = useState<string | null>(null)
   const [groups, setGroups] = useState<RichMenuGroupListItem[]>([])
   const [external, setExternal] = useState<{ currentDefault: string | null; lineMenus: LineMenu[] } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -859,7 +862,7 @@ export default function RichMenusListV8() {
   const sortBox = (
     <div className={styles.sortBox} title={`並び：${SORT_OPTIONS.find((o) => o.value === sortKey)?.label ?? ''}`}>
       <ArrowDownUp size={14} aria-hidden="true" className={styles.sortIcon} />
-      <Select
+      <ListToolbarSort
         aria-label="並び順"
         value={sortKey}
         onChange={(value) => setSortKey(value as SortKey)}
@@ -998,7 +1001,7 @@ export default function RichMenusListV8() {
       loadFailure?.description
         ?? '登録したメニューは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。',
       loadFailure === null || loadFailure.retryable
-        ? <Button type="button" onClick={() => void reload()}>もう一度試す</Button>
+        ? <Button type="button" onClick={() => void reload()}>もう一度読み込む</Button>
         : null,
       'error',
     )
@@ -1044,14 +1047,14 @@ export default function RichMenusListV8() {
                   className={styles.row}
                   leaving={leavingId === g.id}
                   tabIndex={0}
-                  onClick={() => router.push(`/rich-menus/edit?id=${g.id}`)}
+                  onClick={() => setDetailId(g.id)}
                   onKeyDown={(event) => {
                     if (event.target !== event.currentTarget) return
                     if (event.key === 'Enter') {
                       event.preventDefault()
-                      router.push(`/rich-menus/edit?id=${g.id}`)
+                      setDetailId(g.id)
                     }
-                  }}
+                  }} data-row-id={g.id}
                 >
                   <Td
                     className={styles.orderCell}
@@ -1093,7 +1096,7 @@ export default function RichMenusListV8() {
                         href={`/rich-menus/edit?id=${g.id}`}
 
                         className={styles.name}
-                        onClick={(event) => event.stopPropagation()}
+                        onClick={(event) => { event.stopPropagation(); if (!event.ctrlKey && !event.metaKey && !event.shiftKey) { event.preventDefault(); setDetailId(g.id) } }}
                       >
                         <TruncatedText value={String(g.name ?? '')} />
                       </Link>
@@ -1208,7 +1211,7 @@ export default function RichMenusListV8() {
       footer={<>
         <Button type="button" variant="secondary" onClick={closeDelete} disabled={deleteBusy}>閉じる</Button>
         {managedDelete.status === 'published' && canEdit ? (
-          <Button type="button" variant="secondary" onClick={() => void confirmDelete()} disabled={deleteBusy}>
+          <Button type="button" variant="secondary" onClick={() => void confirmDelete()} disabled={deleteBusy} busy={Boolean(deleteBusy)} busyLabel="処理中…">
             <CloudOff size={15} aria-hidden="true" />
             LINEから取り下げる
           </Button>
@@ -1402,7 +1405,7 @@ export default function RichMenusListV8() {
             setDuplicateTarget(null)
             setDuplicateError(null)
           }}
-          onConfirm={() => void confirmDuplicate()}
+          onConfirm={() => confirmDuplicate()}
         />
 
         <ConfirmDialog
@@ -1418,7 +1421,7 @@ export default function RichMenusListV8() {
             setImportTarget(null)
             setImportError(null)
           }}
-          onConfirm={() => void confirmImport()}
+          onConfirm={() => confirmImport()}
         >
           <div className={styles.impact}>
             <p><strong>管理画面に追加するもの：</strong>名前・画像・ボタンの設定</p>
@@ -1437,12 +1440,15 @@ export default function RichMenusListV8() {
 
         {blockedDialog}
         {deleteConfirm}
-      </>}
+        <DetailPanel open={detailId !== null} title={groups.find(group => group.id === detailId)?.name ?? 'リッチメニュー'} onClose={() => setDetailId(null)} footer={detailId ? <Button href={`/rich-menus/edit?id=${encodeURIComponent(detailId)}`}>{canEdit ? '編集する' : '詳しく見る'}</Button> : undefined}>
+        <p>このリッチメニューの中身や設定は「{canEdit ? '編集する' : '詳しく見る'}」から確認できます。</p>
+      </DetailPanel>
+    </>}
     >
       {actionError ? (
         <p className={styles.errorBand} role="alert">
           {actionError}
-          <button type="button" onClick={() => void reload()}>読み直す</button>
+          <button type="button" onClick={() => void reload()}>もう一度読み込む</button>
         </p>
       ) : null}
       {listBody}

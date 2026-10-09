@@ -294,7 +294,7 @@ export function ReminderBasicsFormV8({
                   : undefined}
               />
               {foldersLoadState === 'error' ? (
-                <Button onClick={() => setFoldersReloadToken((current) => current + 1)}>再読み込み</Button>
+                <Button onClick={() => setFoldersReloadToken((current) => current + 1)}>もう一度読み込む</Button>
               ) : null}
             </div>
           </div>
@@ -359,7 +359,7 @@ export function ReminderBasicsFormV8({
                   ...dateFields.map((field) => ({ value: field.id, label: field.name })),
                 ]}
               />
-              {fieldsLoadState === 'error' ? <Button onClick={() => setFieldsLoadState('idle')}>再読み込み</Button> : null}
+              {fieldsLoadState === 'error' ? <Button onClick={() => setFieldsLoadState('idle')}>もう一度読み込む</Button> : null}
             </div>
             {fieldsLoadState === 'ready' && dateFields.length === 0 ? (
               <p className={styles.fieldNote}>このアカウントに日付型の情報欄がまだありません。友だち情報欄から追加してください。</p>
@@ -405,7 +405,7 @@ export function ReminderBasicsFormV8({
                 />
                 {fieldError?.key === 'triggerEventId' ? <p className={styles.fieldError} role="alert">{fieldError.message}</p> : null}
               </div>
-              {eventsLoadState === 'error' ? <Button onClick={() => setEventsLoadState('idle')}>再読み込み</Button> : null}
+              {eventsLoadState === 'error' ? <Button onClick={() => setEventsLoadState('idle')}>もう一度読み込む</Button> : null}
             </div>
             <p className={styles.fieldNote}>このイベントへの予約の開始日時を起点にします</p>
           </div>

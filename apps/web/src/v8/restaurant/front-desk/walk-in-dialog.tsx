@@ -103,7 +103,7 @@ export default function WalkInDialog({ open, accountId, storeId, tables, onClose
       error={error || undefined}
       confirmLabel="入店にする"
       confirmIcon={<LogIn size={15} aria-hidden="true" />}
-      onConfirm={tableId ? () => void save() : undefined}
+      onConfirm={tableId ? () => save() : undefined}
       onCancel={onClose}
     >
       <div className={styles.walkIn}>

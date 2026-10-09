@@ -13,6 +13,7 @@
  * - 「貼りかたが分からないときは」は窓で開く（今は右の列のいちばん下の段）
  * - 閲覧のみ（owner・admin 以外）には、サイトを追加する・「…」・操作の行を出さない
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CircleHelp, Copy, Eye, Mail, MoreHorizontal, Pause, Play, Plus, RefreshCw } from 'lucide-react'
@@ -261,31 +262,10 @@ export default function SiteScriptV8() {
     }
   }
 
-  const copy = async () => {
-    if (!snippet) return
-    try {
-      await navigator.clipboard.writeText(snippet)
-      setCopied(true)
-      setCopyFailed(false)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      setCopyFailed(true)
-    }
-  }
+
 
   /** 制作会社へ送る文（コードつき）をコピーする。 */
-  const copyMessage = async () => {
-    if (!snippet) return
-    const message = `ホームページの</head>の直前に、この1行をそのまま貼ってください。ページごとに書き換える必要はありません。\n${snippet}`
-    try {
-      await navigator.clipboard.writeText(message)
-      setMessageCopied(true)
-      setCopyFailed(false)
-      setTimeout(() => setMessageCopied(false), 2000)
-    } catch {
-      setCopyFailed(true)
-    }
-  }
+
 
   const receiving = summary?.lastEventAt != null
   const lastSeen = formatShort(summary?.lastEventAt)
@@ -379,7 +359,7 @@ export default function SiteScriptV8() {
             kind="error"
             title="サイトの計測を読み込めませんでした"
             description={`${lastSeen ? `最後に受け取ったのは ${lastSeen} です。` : ''}タグが外れていないか、サイトの公開先が変わっていないかを確かめてください。`}
-            action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+            onRetry={() => void load()}
           />
         ) : <>
           <section className={styles.card} aria-labelledby="ss-sites">
@@ -407,8 +387,8 @@ export default function SiteScriptV8() {
                     <div className={styles.codeBox}><code className={styles.code}>{snippet}</code></div>
                     {copyFailed ? <p className={styles.small} role="alert">コピーできませんでした。上のコードを選んでコピーしてください。</p> : null}
                     <div className={styles.buttons}>
-                      <Button variant="primary" onClick={() => void copy()}><Copy size={15} aria-hidden="true" />{copied ? 'コピーしました' : 'コードをコピー'}</Button>
-                      <Button onClick={() => void copyMessage()}><Mail size={15} aria-hidden="true" />{messageCopied ? 'コピーしました' : '制作会社へ送る文をコピー'}</Button>
+                      <CopyTextButton value={snippet ?? ""} label="コードをコピー" aria-label="コードをコピー"  />
+                      <CopyTextButton value={`ホームページの</head>の直前に、この1行をそのまま貼ってください。ページごとに書き換える必要はありません。\n${snippet}`} label="制作会社へ送る文をコピー" aria-label="制作会社へ送る文をコピー"  />
                     </div>
                   </>
                 ) : (
@@ -519,7 +499,7 @@ export default function SiteScriptV8() {
         busy={siteBusy}
         error={siteDialog?.error ?? undefined}
         confirmLabel={siteDialog?.mode === 'edit' ? '保存する' : '追加する'}
-        onConfirm={() => void saveSite()}
+        onConfirm={() => saveSite()}
         onCancel={() => setSiteDialog(null)}
       >
         {siteDialog ? (
@@ -539,7 +519,7 @@ export default function SiteScriptV8() {
         busy={siteBusy}
         error={stopDialog?.error ?? undefined}
         confirmLabel="計測を止める"
-        onConfirm={() => void stopSite()}
+        onConfirm={() => stopSite()}
         onCancel={() => { if (!siteBusy) setStopDialog(null) }}
       >
         {stopDialog ? (
@@ -557,7 +537,7 @@ export default function SiteScriptV8() {
         description={resumeTarget ? `「${resumeTarget.label}」から届く分をまた数え始めます。止めていた間の分は数えていません。` : ''}
         confirmLabel="再開する"
         busy={siteBusy}
-        onConfirm={() => void resumeSite()}
+        onConfirm={() => resumeSite()}
         onCancel={() => { if (!siteBusy) setResumeTarget(null) }}
       />
     </DetailPage>

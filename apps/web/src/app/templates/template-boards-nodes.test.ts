@@ -31,8 +31,9 @@ describe('テンプレートの残りの板ID', () => {
 
   it('編集の競合に NCbYn の帯と比較み・読み込みが出る', () => {
     // 帯・比べる窓は共通の save-conflict に寄せた（2026-10-07）。文言・ボタンは共通部品が持つ。
-    expect(EDIT).toMatch(/role="alert" data-design-node="NCbYn"/)
-    expect(EDIT).toContain('onClick={() => void openCompare()}')
+    expect(EDIT).toContain('<SaveConflictBand')
+    expect(EDIT).toContain('designNode="NCbYn"')
+    expect(EDIT).toContain('onCompare={openCompare}')
     expect(EDIT).toContain('<Dialog')
     expect(EDIT).toContain('比べてから保存')
     expect(EDIT).toContain('describeTemplateDiff')

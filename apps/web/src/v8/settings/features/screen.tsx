@@ -8,6 +8,8 @@
  * use-feature-settings.ts（写し）に1つだけ置く。見た目だけを型（SettingsPage）と部品で組み直した。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowUpDown, Check, ChevronDown, ChevronRight, Eye, GitCompare, Lock, RefreshCw, RotateCcw, Save, TriangleAlert } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -56,7 +58,7 @@ function UsageBadge({ category, onRetry }: { category: UsageCategory; onRetry?: 
     return (
       <span className={styles.usage} title={category.inUse.reason ?? category.created.reason ?? '利用状況はまだ分かりません'}>
         利用数は未取得
-        {onRetry && <button type="button" onClick={onRetry} aria-label="利用数を読み直す">読み直す</button>}
+        {onRetry && <button type="button" onClick={onRetry} aria-label="利用数を読み直す">もう一度読み込む</button>}
       </span>
     )
   }
@@ -79,7 +81,7 @@ function FeatureUsageBadge({ usage, label, onRetry }: { usage: FeatureUsage; lab
     return (
       <span className={styles.usage} title={title}>
         利用状況は取得失敗
-        {onRetry && <button type="button" onClick={onRetry} aria-label="利用状況を読み直す">読み直す</button>}
+        {onRetry && <button type="button" onClick={onRetry} aria-label="利用状況を読み直す">もう一度読み込む</button>}
       </span>
     )
   }
@@ -312,7 +314,7 @@ export default function FeatureSettingsScreen() {
   const staffRole = useStaffRole()
   const canManage = staffRole ? canManageRole(staffRole) : true
 
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [compareOpen, setCompareOpen] = useState(false)
   const [reorderOpen, setReorderOpen] = useState(false)
   const [openGroups, setOpenGroups] = useState<Set<string> | null>(null)
@@ -387,13 +389,7 @@ export default function FeatureSettingsScreen() {
   }, [conflicted])
   const conflictBand = conflicted ? (
     <div ref={conflictRef} className={styles.conflict} role="status" data-design-node="ziYCN">
-      <TriangleAlert className={styles.conflictIcon} aria-hidden="true" />
-      <div className={styles.conflictText}>
-        <p className={styles.conflictTitle}>ほかの人が先に機能設定を保存しました</p>
-        <p className={styles.conflictDesc}>あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。</p>
-      </div>
-      <Button variant="secondary" onClick={() => setCompareOpen(true)}><GitCompare className={styles.btnIcon} aria-hidden="true" />違いを比べる</Button>
-      <Button variant="primary" onClick={() => void load()}><RefreshCw className={styles.btnIcon} aria-hidden="true" />最新を読み込んで続ける</Button>
+      <SaveConflictBand title="ほかの人が先に機能設定を保存しました" onCompare={() => setCompareOpen(true)} onReload={() => void load()} />
     </div>
   ) : null
 
@@ -417,7 +413,7 @@ export default function FeatureSettingsScreen() {
             onClick={() => { if (!validateReason()) return; if (conflicted) setCompareOpen(true); else void save() }}
             disabled={saving || !dirty}
             busy={saving}
-            done={savedTick}
+
             doneLabel="保存しました"
             title={!dirty ? '変更すると保存できます' : undefined}
           >
@@ -467,7 +463,7 @@ export default function FeatureSettingsScreen() {
         <ListState
           kind="error"
           title={error || '設定を読み込めませんでした'}
-          action={<Button type="button" variant="secondary" onClick={() => void load()}>もう一度試す</Button>}
+          onRetry={() => void load()}
         />
       ) : (
         <>
@@ -547,7 +543,7 @@ export default function FeatureSettingsScreen() {
         confirmLabel="比べてから保存"
         busy={saving}
         onCancel={() => setCompareOpen(false)}
-        onConfirm={() => { if (!validateReason()) { setCompareOpen(false); return }; setCompareOpen(false); void save() }}
+        onConfirm={() => { if (!validateReason()) { setCompareOpen(false); return }; setCompareOpen(false); return save() }}
       >
         <ul className={styles.compareList}>
           {Object.keys(features).filter((key) => features[key] !== savedFeatures[key]).map((key) => (
@@ -605,7 +601,7 @@ export default function FeatureSettingsScreen() {
           setImpactOpen(false)
           setImpactError('')
         }}
-        onConfirm={() => void confirmImpactSave()}
+        onConfirm={() => confirmImpactSave()}
       >
         <div>
           {impactGroups.map((group) => (

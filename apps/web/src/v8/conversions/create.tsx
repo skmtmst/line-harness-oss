@@ -12,6 +12,7 @@
  * - 競合（cXqlS）：同じ名前の成果地点がすでにある（入力中に見つかった／保存したら先に作られていた 409）とき、
  *   板の頭の下に帯を出し、主ボタンは「比べてから保存」になる
  */
+import { notifySaved } from '@/components/shared/toast'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -396,7 +397,7 @@ function ConversionCreate() {
       if (!res.success) throw new Error(res.error)
       if (andContinue) {
         resetForm()
-        setSavedNotice('保存しました。続けて作れます。')
+        notifySaved('保存しました。続けて作れます。')
       } else {
         router.push(`/conversions?tab=points${res.data.id ? `&highlight=${encodeURIComponent(res.data.id)}` : ''}`)
       }
@@ -495,7 +496,7 @@ function ConversionCreate() {
                   onCheckedChange={(next) => toggleUsageGroup(group.kind, next)}
                 >{group.label}</Checkbox>
                 {result.state === 'error' ? (
-                  <Button variant="text" onClick={() => requestUsageKind(group.kind, lineAccountId)} disabled={!lineAccountId}>読み直す</Button>
+                  <Button variant="text" onClick={() => requestUsageKind(group.kind, lineAccountId)} disabled={!lineAccountId}>もう一度読み込む</Button>
                 ) : (
                   <span className={styles.usageState} role={result.state === 'forbidden' ? 'status' : undefined}>{stateText}</span>
                 )}
@@ -551,7 +552,7 @@ function ConversionCreate() {
       /* 競合の帯は型の notice に渡し、入力欄と右の列の上に置く。 */
       notice={conflictBand}
       preview={viewerOnly ? undefined : previewColumn}
-      footerActions={footerActions}
+      footerActions={footerActions} dirty={false}
     >
       {viewerOnly ? (
         <div className={styles.viewerBand} role="status">閲覧のみで見ています。作る操作はオーナーか管理者に頼んでください。</div>

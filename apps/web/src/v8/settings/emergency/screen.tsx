@@ -102,7 +102,7 @@ export default function EmergencyScreen({
       {accountsFailed ? (
         <div className={styles.warnBand} role="alert">
           <p>アカウント一覧を読み込めませんでした。個別のアカウントを選べず、全体が対象になります。</p>
-          <button type="button" onClick={() => loadAccounts()} className={styles.inlineLink}>もう一度読む</button>
+          <button type="button" onClick={() => loadAccounts()} className={styles.inlineLink}>もう一度読み込む</button>
         </div>
       ) : null}
       {tab === 'health' ? (

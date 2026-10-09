@@ -9,6 +9,7 @@
  * （app/templates/list-v8.tsx）と同じ。見た目だけを型（ListPage）と部品で組み直した。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import BulkBar from '@/components/shared/bulk-bar'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import { runOptimistic } from '@/lib/undoable'
@@ -80,7 +81,6 @@ import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manag
 import StaffAssetList from './staff-asset-list'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
-import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import {
   DELETE_UNUSED_DESCRIPTION,
   blockedDeleteDescription,
@@ -454,7 +454,6 @@ export default function TemplatesListV8() {
   const normalizedTemplateQuery = useMemo(() => normalizeTemplateSearchText(templateQuery), [templateQuery])
 
   // 使われていないテンプレートは窓なしで消し、5秒は「元に戻す」で取り消せる（動きの点検 17 番）。
-  const deferredDelete = useDeferredDelete()
   const filteredTemplates = useMemo(() => templateSearchIndex.flatMap(({ template: t, normalizedSearchText }) => {
     if (normalizedTemplateQuery && !normalizedSearchText.includes(normalizedTemplateQuery)) return []
     /* フォルダで絞る。`category` の文字列ではなく `folderId` で見る。 */
@@ -469,9 +468,8 @@ export default function TemplatesListV8() {
     if (savedFilter === 'draft-changes' && !(t.hasDraft && t.publishedAt != null)) return []
     if (savedFilter === 'draft-only' && t.publishedAt != null) return []
     // 消して「元に戻す」を待っている行は出さない。
-    if (deferredDelete.isHidden(t.id)) return []
     return [t]
-  }), [normalizedTemplateQuery, selectedCategory, templateSearchIndex, chips, savedFilter, deferredDelete])
+  }), [normalizedTemplateQuery, selectedCategory, templateSearchIndex, chips, savedFilter])
 
   const filterActive = Boolean(
     normalizedTemplateQuery
@@ -632,27 +630,7 @@ export default function TemplatesListV8() {
    */
   const handleDelete = (t: Template) => {
     setDeleteError('')
-    if (t.usageCount > 0) {
-      setBlockedDelete({ item: t, accountId: selectedAccountId })
-      return
-    }
-    if (t.usageCount === 0) {
-      if (activeId === t.id) setActiveId(null)
-      setSelectedIds((current) => {
-        if (!current.has(t.id)) return current
-        const next = new Set(current)
-        next.delete(t.id)
-        return next
-      })
-      deferredDelete.schedule({
-        ids: [t.id],
-        message: `テンプレート「${t.name}」を削除しました`,
-        commit: () => api.templates.delete(t.id),
-        onCommitted: () => Promise.all([load(), loadFolders()]),
-        failureMessage: 'テンプレートを削除できませんでした。もう一度お試しください。',
-      })
-      return
-    }
+    if (t.usageCount > 0) { setBlockedDelete({ item: t, accountId: selectedAccountId }); return }
     setPendingDelete({ item: t, accountId: selectedAccountId })
   }
 
@@ -803,7 +781,7 @@ export default function TemplatesListV8() {
         id: 'usage',
         label: '使っている所を見る',
         external: true,
-        onSelect: () => withViewTransition(() => router.push(detailHref(t))),
+        href: detailHref(t), onSelect: () => withViewTransition(() => router.push(detailHref(t))),
       },
       {
         id: 'broadcast',
@@ -1092,7 +1070,7 @@ export default function TemplatesListV8() {
           : '登録したテンプレートは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。'}
       </p>
       {view === 'error' && (
-        <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+        <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
       )}
     </div>
   ) : filteredTemplates.length === 0 ? (
@@ -1249,9 +1227,7 @@ export default function TemplatesListV8() {
 
       {/* まとめての帯（選ぶと表の下に出る）：フォルダへ移す・まとめて削除。 */}
       {canMutateTemplates && selectedCount > 0 ? (
-        <div className={styles.bulkRow} role="region" aria-label="選択中のまとめ操作">
-          <span className={styles.bulkCount}>{selectedCount} 件を選択中</span>
-          <Button
+        <BulkBar count={selectedCount} total={filteredTemplates.length} onSelectAll={() => setSelectedIds(new Set(filteredTemplates.map(item => item.id)))} onClear={clearSelection}><Button
             type="button"
             variant="secondary"
             disabled={moving}
@@ -1259,8 +1235,7 @@ export default function TemplatesListV8() {
           >
             <FolderIcon size={13} aria-hidden="true" />
             フォルダへ移す
-          </Button>
-          <Button
+          </Button><Button
             type="button"
             variant="secondary"
             disabled={bulkDeleting || removableSelected.length === 0}
@@ -1276,11 +1251,9 @@ export default function TemplatesListV8() {
           >
             <Trash2 size={13} aria-hidden="true" />
             まとめて削除
-          </Button>
-          <Button type="button" variant="secondary" onClick={() => setSelectedIds(new Set())}>
+          </Button><Button type="button" variant="secondary" onClick={() => setSelectedIds(new Set())}>
             選択を外す
-          </Button>
-        </div>
+          </Button></BulkBar>
       ) : null}
     </>
   )
@@ -1408,56 +1381,20 @@ export default function TemplatesListV8() {
         削除の確認窓（`V6JFnd`：使っていないテンプレート）。
         危ないボタンは左端、キャンセルは真ん中（V8 の窓の決まり）。
       */}
-      <Dialog
+      <ConfirmDialog
         open={pendingDelete !== null}
-        title={`「${pendingDelete?.item.name ?? ''}」を削除する`}
+        title={`「${pendingDelete?.item.name ?? ''}」を削除しますか？`}
+        deleteName={pendingDelete?.item.name ?? ''}
         description={DELETE_UNUSED_DESCRIPTION}
-        busy={deleting}
-        error={deleteError}
+        destructive busy={deleting} error={deleteError}
         designNode="V6JFnd"
-        onCancel={() => {
-          if (deleting) return
-          setPendingDelete(null)
-          setDeleteError('')
-        }}
-        footer={
-          <div className={styles.dangerFooter}>
-            <span className={styles.footerLeft}>
-              <Button
-                type="button"
-                variant="danger"
-                disabled={deleting || (pendingDelete !== null && pendingDelete.accountId !== selectedAccountId)}
-                busy={deleting}
-                busyLabel="削除中…"
-                onClick={() => void confirmDelete()}
-              >
-                削除する
-              </Button>
-            </span>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={deleting}
-              onClick={() => {
-                setPendingDelete(null)
-                setDeleteError('')
-              }}
-            >
-              キャンセル
-            </Button>
-            <span className={styles.footerRight} aria-hidden="true" />
-          </div>
-        }
+        confirmDisabled={pendingDelete !== null && pendingDelete.accountId !== selectedAccountId}
+        onConfirm={() => confirmDelete()}
+        onCancel={() => { if (!deleting) { setPendingDelete(null); setDeleteError('') } }}
       >
-        <div className={styles.fullWidth}>
-          <Notice tone="danger" message="削除は元に戻せません。" />
-        </div>
-        {pendingDelete !== null && pendingDelete.accountId !== selectedAccountId ? (
-          <p className={styles.alertText} role="alert">
-            アカウントが切り替わりました。削除するテンプレートを選び直してください。
-          </p>
-        ) : null}
-      </Dialog>
+        <Notice tone="danger" message="削除は元に戻せません。" />
+        {pendingDelete !== null && pendingDelete.accountId !== selectedAccountId ? <p className={styles.alertText} role="alert">アカウントが切り替わりました。削除するテンプレートを選び直してください。</p> : null}
+      </ConfirmDialog>
 
       {/* まとめて削除の確認窓。対象は「使っていない」ものだけ。 */}
       <ConfirmDialog
@@ -1468,7 +1405,7 @@ export default function TemplatesListV8() {
         destructive
         busy={bulkDeleting}
         error={bulkDeleteError}
-        onConfirm={() => void runBulkDelete()}
+        onConfirm={() => runBulkDelete()}
         onCancel={() => {
           if (bulkDeleting) return
           setPendingBulkDelete(null)
@@ -1561,7 +1498,7 @@ export default function TemplatesListV8() {
         confirmLabel={moving ? '移動中…' : '移動する'}
         busy={moving}
         error={moveError}
-        onConfirm={() => void runMove()}
+        onConfirm={() => runMove()}
         onCancel={() => {
           if (moving) return
           setMoveIds(null)
@@ -1592,7 +1529,7 @@ export default function TemplatesListV8() {
         confirmLabel={duplicating ? '複製中…' : '複製する'}
         busy={duplicating}
         error={duplicateError}
-        onConfirm={() => void runDuplicate()}
+        onConfirm={() => runDuplicate()}
         onCancel={() => {
           if (duplicating) return
           setDuplicateTarget(null)
@@ -1635,7 +1572,7 @@ export default function TemplatesListV8() {
         busy={folderBusy}
         error={folderError || undefined}
         onCancel={() => { if (!folderBusy) { setDeletingFolder(null); setFolderError('') } }}
-        onConfirm={() => void removeFolder()}
+        onConfirm={() => removeFolder()}
       />
 
       {/* 行の詳細パネル。一覧は左に見えたまま。 */}

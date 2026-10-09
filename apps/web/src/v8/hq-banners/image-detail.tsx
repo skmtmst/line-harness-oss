@@ -87,7 +87,7 @@ export function BannerImageDetailV8({
         busy={busy}
         error={error}
         designNode="B24oNg"
-        onConfirm={() => void onRemove().then((ok) => { if (ok) setConfirmRemove(false) })}
+        onConfirm={() => onRemove().then((ok) => { if (ok) setConfirmRemove(false) })}
         onCancel={() => setConfirmRemove(false)}
       />
     )

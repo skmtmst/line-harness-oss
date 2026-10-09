@@ -497,7 +497,7 @@ function Bookings({ eventId }: { eventId: string }) {
                 <span role="cell" className={styles.rowActions}>
                   {row.source === 'booking' && row.status === 'requested' ? (
                     <>
-                      <Button onClick={() => void decide(row, 'confirm')} disabled={busy}>承認する</Button>
+                      <Button onClick={() => void decide(row, 'confirm')} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">承認する</Button>
                       <Button
                         onClick={() => {
                           setRejectReason('')
@@ -650,7 +650,7 @@ function Bookings({ eventId }: { eventId: string }) {
         confirmLabel="キャンセルする"
         busy={cancelling}
         error={cancelError}
-        onConfirm={() => void runAdminCancel()}
+        onConfirm={() => runAdminCancel()}
         onCancel={() => {
           if (cancelling) return
           setCancelError('')
@@ -703,7 +703,7 @@ function Bookings({ eventId }: { eventId: string }) {
         confirmLabel={waitlistDialog?.kind === 'reorder' ? '入れ替える' : '実行する'}
         busy={waitlistBusy}
         error={waitlistError}
-        onConfirm={() => void runWaitlistOperation()}
+        onConfirm={() => runWaitlistOperation()}
         onCancel={() => {
           if (waitlistBusy) return
           setWaitlistError('')
@@ -772,7 +772,7 @@ function Bookings({ eventId }: { eventId: string }) {
         confirmLabel="送る"
         busy={broadcastBusy}
         error={broadcastError}
-        onConfirm={() => void sendBroadcast()}
+        onConfirm={() => sendBroadcast()}
         onCancel={() => {
           if (broadcastBusy) return
           setBroadcastError('')

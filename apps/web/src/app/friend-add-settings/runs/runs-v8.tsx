@@ -358,7 +358,7 @@ function FriendAddRunsV8Inner() {
           kind={errorStatus === 403 ? 'forbidden' : 'error'}
           title="実行結果を表示できませんでした"
           description={error}
-          action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+          onRetry={() => void load()}
         />
       </div>
     )

@@ -12,6 +12,7 @@
  * 色2つ・参照画像1枚」の古い形で、2026-10-06 のオーナーの決定（切り替えと切り抜きを置かない・出力サイズの小箱・
  * 色4つ・参照画像3枚・強調）と食い違うため、決定どおりの今のパネルを残した。参照画像を選ぶ窓（承認済み ★BG-C）も同じ。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import ExportSizeChip from '@/components/hq/banners/export-size-chip'
 import { Archive, ArchiveRestore, Copy, Hourglass, LoaderCircle, Pencil, Send, Sparkles, Star, Upload, X } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
@@ -93,11 +94,11 @@ function ProjectInner() {
   const [accountsFailed, setAccountsFailed] = useState(false)
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [input, setInput] = useState<BannerGenerationInput>(EMPTY_GENERATION_INPUT)
-  const [filter, setFilter] = useState<Filter>('all')
+  const [filter, setFilter] = useListUrlValue<Filter>('filter', 'all')
   const [selectedImages, setSelectedImages] = useState<string[]>([])
   const [distributionOpen, setDistributionOpen] = useState(false)
   const [distributionAccounts, setDistributionAccounts] = useState<string[]>([])
-  const [distributionFilter, setDistributionFilter] = useState('all')
+  const [distributionFilter, setDistributionFilter] = useListUrlValue('distributionFilter', 'all')
   const [distributionSearch, setDistributionSearch] = useState('')
   const [distributionBusy, setDistributionBusy] = useState(false)
   const [distributionError, setDistributionError] = useState('')
@@ -534,7 +535,7 @@ function ProjectInner() {
       <Button onClick={() => void patchProject('お気に入り', { isFavorite: !project.isFavorite })} disabled={busy}>
         <Star aria-hidden="true" className={project.isFavorite ? styles.starOn : styles.icon} />{project.isFavorite ? 'お気に入りから外す' : 'お気に入り'}
       </Button>
-      <Button onClick={() => void duplicate()} disabled={busy}>
+      <Button onClick={() => void duplicate()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">
         <Copy aria-hidden="true" className={styles.icon} />複製
       </Button>
       <Button onClick={() => { setFormError(''); setFormOpen(true) }} disabled={busy}>
@@ -738,7 +739,7 @@ function ProjectInner() {
         busy={busy}
         designNode="I0w2e"
         onConfirm={() => {
-          void patchProject('アーカイブ', { archived: true }).then((updated) => {
+          return patchProject('アーカイブ', { archived: true }).then((updated) => {
             setArchiveConfirm(false)
             if (updated) router.push('/hq/banners')
           })

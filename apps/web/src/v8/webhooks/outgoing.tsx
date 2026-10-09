@@ -520,7 +520,7 @@ export default function WebhooksOutgoingV8() {
         kind="error"
         title="送り先を読み込めませんでした"
         description="登録内容は消えていません。通信の状態を確認して、もう一度お試しください。"
-        action={<Button onClick={() => void reload()}>もう一度読み込む</Button>}
+        onRetry={() => void reload()}
       />
     )
   } else if (visible.length === 0) {
@@ -785,7 +785,7 @@ export default function WebhooksOutgoingV8() {
           destructive
           busy={deleting}
           error={deleteError || undefined}
-          onConfirm={() => void runDelete()}
+          onConfirm={() => runDelete()}
           onCancel={() => {
             if (deleting) return
             setDeleteTarget(null)
@@ -799,7 +799,7 @@ export default function WebhooksOutgoingV8() {
           description="新しい鍵（合言葉）を設定します。保存したあとは二度と全部は表示されません。前の鍵は24時間だけ使えるので、相手側の切り替え中も送信は止まりません。"
           error={rotateError || undefined}
           onCancel={() => { setRotateTarget(null); setRotateSecret('') }}
-          onConfirm={() => void runRotate()}
+          onConfirm={() => runRotate()}
           confirmLabel="保存する"
         >
           <div className={styles.secretRow}>

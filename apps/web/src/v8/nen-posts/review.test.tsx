@@ -100,6 +100,30 @@ async function click(element: Element | undefined) {
 }
 
 describe('V8 投稿（審査）', () => {
+  it('次のページを含む全件選択でも審査対象の写真と版を保持する', async () => {
+    const rows = Array.from({ length: 201 }, (_, index) => photo(`page-${index}`, `写真${index}`, 'pending'))
+    const originalFetch = globalThis.fetch
+    const offsets: string[] = []
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input), 'http://worker.test')
+      if (url.pathname === '/api/nen-members/photos') {
+        const offset = Number(url.searchParams.get('offset') ?? '0')
+        offsets.push(String(offset))
+        return json({ success: true, data: rows.slice(offset, offset + 200) })
+      }
+      return originalFetch(input, init)
+    })
+    await render()
+    const checkbox = host.querySelector('input[type="checkbox"]')!
+    await click(checkbox)
+    expect(buttons('201件すべてを選ぶ')).toHaveLength(1)
+    await click(buttons('201件すべてを選ぶ')[0])
+    expect(host.textContent).toContain('201枚を選択中')
+    expect(offsets).toContain('200')
+    await click(buttons('まとめて採用')[0])
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('201枚をまとめて採用')
+  })
+
   it('V8 のテーマで、札の名前と件数を1つの文字で出し、数の帯と右の決まりを並べる', async () => {
     await render()
     expect(document.documentElement.dataset.theme).toBe('v8')

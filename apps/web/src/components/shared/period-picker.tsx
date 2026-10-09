@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useListUrlValue, useListUrlJsonValue } from './list-url-state'
 import SegmentedControl from './segmented'
 import DateField from './date-field'
 import { Field } from './form-controls'
@@ -16,8 +17,8 @@ export function validPeriod(range: PeriodRange): boolean {
   return [range.from, range.to].every((value) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value) && range.from <= range.to
 }
 export function useReportPeriod(initialDays = 30) {
-  const [days, updateDays] = useState(initialDays)
-  const [customRange, setRange] = useState<PeriodRange | null>(null)
+  const [days, updateDays] = useListUrlValue('days', initialDays)
+  const [customRange, setRange] = useListUrlJsonValue<PeriodRange | null>('range', null, (value): value is PeriodRange | null => value === null || (typeof value === 'object' && !Array.isArray(value) && typeof (value as PeriodRange).from === 'string' && typeof (value as PeriodRange).to === 'string' && validPeriod(value as PeriodRange)))
   const range = useMemo(() => customRange ?? pastPeriod(days), [days, customRange])
   const setDays = (value: number) => { setRange(null); updateDays(value) }
   return { days, setDays, range, customRange, setRange }

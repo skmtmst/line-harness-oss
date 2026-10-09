@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDate } from '@/lib/jst-datetime'
+
 /*
  * ★V8 共通情報の編集（板 `AYc6O`、編集（1152）`C67dE`、競合 `piWhz`）。
  *
@@ -11,6 +13,7 @@
  * データの口・影響確認・保存・予約・削除・状態切替は `app/contents/vars/edit/edit-v8.tsx` から
  * 写した（import はしない）。動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -110,8 +113,9 @@ export function historyStamp(value: string): string {
 
 /** 「いま」より前は予約できない。入れた瞬間に当たって、予約に見えない。 */
 function jstNowLocalInput(): { date: string; time: string } {
-  const jst = new Date(Date.now() + 9 * 3600_000).toISOString()
-  return { date: jst.slice(0, 10), time: jst.slice(11, 16) }
+  const now = new Date()
+  const jst = new Date(now.getTime() + 9 * 3600_000).toISOString()
+  return { date: jstDate(now), time: jst.slice(11, 16) }
 }
 
 function utcToJstLocalInput(value: string | null): string {
@@ -470,7 +474,7 @@ function EditCommonVarV8Inner() {
         else if (res.error.includes('値')) setValueFieldError(res.error)
         return
       }
-      setSaved(true)
+      setSaved(true); notifySaved()
       setChangeReason('')
       setConflict(null)
       setCompareOpen(false)
@@ -1108,7 +1112,7 @@ function EditCommonVarV8Inner() {
             )
           ) : null}
         </>
-      )}
+      )} dirty={false}
     >
       {canWrite ? null : (
         <div className={styles.roBand} role="status">
@@ -1206,7 +1210,7 @@ function EditCommonVarV8Inner() {
             )}
           </section>
 
-          {saved && <p className={styles.savedNote} role="status">保存しました。</p>}
+          {null}
         </>
       )}
 
@@ -1273,7 +1277,7 @@ function EditCommonVarV8Inner() {
           deleteAccountSwitched || deletePhase !== 'ready' || !deleteImpact?.canDelete
             || !deleteReason.trim()
             ? undefined
-            : () => void remove()
+            : () => remove()
         }
         onCancel={closeDelete}
       >
@@ -1367,7 +1371,7 @@ function EditCommonVarV8Inner() {
         destructive
         busy={clearSchedulesBusy}
         error={clearSchedulesError || undefined}
-        onConfirm={clearSchedulesBusy ? undefined : () => void clearSchedules()}
+        onConfirm={clearSchedulesBusy ? undefined : () => clearSchedules()}
         onCancel={() => { if (!clearSchedulesBusy) setClearSchedulesOpen(false) }}
       />
 

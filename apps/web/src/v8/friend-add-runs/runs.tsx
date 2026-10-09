@@ -12,6 +12,7 @@ import SegmentedControl from '@/components/shared/segmented'
  * `app/friend-add-settings/runs/runs-v8.tsx` から写した（import はしない）。動きの一覧は BEHAVIOR.md。
  */
 
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -127,12 +128,12 @@ function FriendAddRunsInner() {
   const pagesParam = searchParams.get('pages')
   const { stack: cursorStack, cursor, page: cursorPage, canPrev, reset: resetCursor, goPrev, goNext } =
     useCursorStack(pagesParam ? [null, ...pagesParam.split(',').filter(Boolean)] : undefined)
-  const [perPage, setPerPage] = useState(20)
+  const [perPage, setPerPage] = useListUrlValue('perPage', 20)
   const [data, setData] = useState<FriendAddRunList | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [errorStatus, setErrorStatus] = useState<number | null>(null)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useListUrlValue('q', '')
   const [csvBusy, setCsvBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [stopBusy, setStopBusy] = useState(false)
@@ -522,7 +523,7 @@ function FriendAddRunsInner() {
             kind={errorStatus === 403 ? 'forbidden' : 'error'}
             title="実行結果を表示できませんでした"
             description={error}
-            action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+            onRetry={() => void load()}
           />
         ) : visibleItems.length === 0 ? (
           <ListState kind="empty" title="条件に合う実行結果はありません" description="絞り込みを変えるか、次の友だち追加を待ってください。" />
@@ -547,7 +548,7 @@ function FriendAddRunsInner() {
                 const done = actionText(item)
                 const kindLabel = item.friendKind === 'first_time' ? 'はじめて' : '再追加'
                 return (
-                  <Tr key={item.id} className={styles.row} data-table-layout="columns">
+                  <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
                     <Td className={styles.colWhen}>
                       <time dateTime={item.receivedAt} title={formatJstDateTime(item.receivedAt)} className={styles.when}>{jstTime(item.receivedAt)}</time>
                     </Td>
@@ -637,7 +638,7 @@ function FriendAddRunsInner() {
         busy={stopBusy}
         error={stopError || undefined}
         onCancel={() => { if (!stopBusy) setStopOpen(false) }}
-        onConfirm={() => void stopDelivery()}
+        onConfirm={() => stopDelivery()}
       />
     </DetailPage>
   )

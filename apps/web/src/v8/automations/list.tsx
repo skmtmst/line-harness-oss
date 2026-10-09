@@ -8,6 +8,8 @@
  * 型（ListPage）に、タブ・数の帯・左のフォルダの列（上に「ルールを作る」）・案内の帯・
  * 道具の段・表（絵の列の並び）を渡す。行の右端は「編集する」と「…」。
  */
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -160,15 +162,15 @@ export default function AutomationListV8() {
   const [summary, setSummary] = useState<{ executionCount30d: number; failureCount30d: number } | null>(null)
   const [skipped, setSkipped] = useState<number | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
-  const [folderFilter, setFolderFilter] = useState('')
+  const [folderFilter, setFolderFilter] = useListUrlValue('folderFilter', '')
   /* ?search= で開くと、その言葉で探した状態から始める（動いた記録の「ルールを開く」）。 */
-  const [search, setSearch] = useState(() => searchParams.get('search') ?? '')
-  const [onlyActive, setOnlyActive] = useState(false)
-  const [onlyStopped, setOnlyStopped] = useState(false)
-  const [saved, setSaved] = useState<SavedKey>('')
-  const [sort, setSort] = useState<'updated' | 'runs' | 'name'>('updated')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [search, setSearch] = useListUrlValue('search', '')
+  const [onlyActive, setOnlyActive] = useListUrlValue('onlyActive', false)
+  const [onlyStopped, setOnlyStopped] = useListUrlValue('onlyStopped', false)
+  const [saved, setSaved] = useListUrlValue<SavedKey>('saved', '')
+  const [sort, setSort] = useListUrlValue<'updated' | 'runs' | 'name'>('sort', 'updated')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [rowBusyId, setRowBusyId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
@@ -439,7 +441,7 @@ export default function AutomationListV8() {
       <ListToolbar
         search={{ placeholder: 'ルール名・きっかけで探す', label: 'ルールを検索', width: 240, value: search, onChange: setSearch }}
         filters={filterChips}
-        trailing={<>{savedBox}<Select aria-label="並び順" width={170} value={sort} onChange={(value) => {
+        trailing={<>{savedBox}<ListToolbarSort aria-label="並び順" width={170} value={sort} onChange={(value) => {
           setSort(value as 'updated' | 'runs' | 'name')
           if (saved === 'runs' || saved === 'name') setSaved('')
         }} options={[
@@ -463,7 +465,7 @@ export default function AutomationListV8() {
         kind="error"
         title="ルールを読み込めませんでした"
         description="ルールは消えていません。通信を確かめて、もう一度お試しください。"
-        action={<Button variant="secondary" onClick={() => void load()}>もう一度試す</Button>}
+        onRetry={() => void load()}
       />
     )
   } else if (paged.length === 0) {
@@ -605,7 +607,7 @@ export default function AutomationListV8() {
           destructive={pending?.kind === 'archive'}
           busy={working}
           error={actionError}
-          onConfirm={() => void confirmPending()}
+          onConfirm={() => confirmPending()}
           onCancel={() => { if (!working) setPending(null) }}
         />
         <Dialog

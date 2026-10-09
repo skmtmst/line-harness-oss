@@ -219,6 +219,7 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
     const select = await renderNew()
 
     fireEvent.change(screen.getByLabelText('タグを検索'), { target: { value: '常連' } })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
     expect(optionLabels(select)).toEqual(['— なし —', '常連さん'])
 
     fireEvent.change(select, { target: { value: 'tag-active-2' } })
@@ -238,6 +239,7 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
     const select = await renderNew()
     fireEvent.change(select, { target: { value: 'tag-active' } })
     fireEvent.change(screen.getByLabelText('タグを検索'), { target: { value: 'ありえない語' } })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
 
     expect(screen.getByText('「ありえない語」に合うタグがありません。')).toBeTruthy()
     // 選んだタグは隠れても外れない。

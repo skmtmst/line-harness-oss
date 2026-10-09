@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDate } from '@/lib/jst-datetime'
+
 import { X } from 'lucide-react'
 import StickyBar from '@/components/shared/sticky-bar'
 
@@ -60,10 +62,6 @@ const APPROVAL_DEADLINE_OPTIONS = [
 export interface EventFormProps {
   accountId: string
   eventId: string | null
-}
-
-function jstNow(): Date {
-  return new Date(Date.now())
 }
 
 export function formatJpDateTime(iso: string): string {
@@ -1074,7 +1072,7 @@ function AddSlotDialog({
   onClose: () => void
   onSubmit: (s: { starts_at: string; ends_at: string; capacity: number | null }) => Promise<void>
 }) {
-  const todayJst = new Date(jstNow().getTime() + 9 * 3600_000).toISOString().slice(0, 10)
+  const todayJst = jstDate()
   const [date, setDate] = useState(todayJst)
   const [startTime, setStartTime] = useState('10:00')
   const [endTime, setEndTime] = useState('12:00')
@@ -1307,7 +1305,7 @@ export function BulkSlotDialog({
   onClose: () => void
   onSubmit: (input: BulkSlotInput) => Promise<void>
 }) {
-  const todayJst = new Date(jstNow().getTime() + 9 * 3600_000).toISOString().slice(0, 10)
+  const todayJst = jstDate()
   const [start, setStart] = useState(todayJst)
   const [end, setEnd] = useState(todayJst)
   const [weekdays, setWeekdays] = useState<number[]>([1, 2, 3, 4, 5])

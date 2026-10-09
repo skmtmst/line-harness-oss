@@ -6,6 +6,7 @@
  * → 定期レポート（作る・止める・また送る・しまう）→ 1回だけ送った結果。
  * 呼ぶ口・世代の守り・失敗の言い分け・CSV は今の画面（SavedAnalyticsTab）と同じ。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Bookmark, Download, FilePen, History, Mail, Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -84,7 +85,7 @@ function ScheduleMenu({ schedule }: { schedule: AnalyticsReportSchedule }) {
 
 export default function SavedV8({ accountId, onCountChange, canManage }: { accountId: string; onCountChange?: (count: number | null) => void; canManage: boolean }) {
   const [items, setItems] = useState<SavedAnalyticsSummary[]>([])
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [selectedId, setSelectedId] = useState('')
   const [snapshots, setSnapshots] = useState<SavedAnalyticsSnapshot[]>([])
   const [loading, setLoading] = useState(true)
@@ -317,8 +318,8 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
             <span role="cell" className={styles.colType} data-w="130"><span>{schedule.status === 'paused' ? emptyValue('unknown') : shortDateTime(schedule.nextRunAt).replace(/ 0(\d):/, ' $1:')}</span></span>
             <span role="cell" className={styles.colType} data-w="90"><span><StatePill tone={schedule.status === 'active' ? 'ok' : 'neutral'}>{REPORT_STATUS_LABELS[schedule.status]}</StatePill></span></span>
             <span role="cell" className={styles.colOps}>{canManage ? <span className={styles.rowActions}>
-              {schedule.status === 'active' && !schedule.isOneTime ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => void changeScheduleStatus(schedule, 'paused')}>止める</Button> : null}
-              {schedule.status === 'paused' ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => void changeScheduleStatus(schedule, 'active')}>また送る</Button> : null}
+              {schedule.status === 'active' && !schedule.isOneTime ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => void changeScheduleStatus(schedule, 'paused')} busy={Boolean(scheduleBusyId === schedule.id)} busyLabel="処理中…">止める</Button> : null}
+              {schedule.status === 'paused' ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => void changeScheduleStatus(schedule, 'active')} busy={Boolean(scheduleBusyId === schedule.id)} busyLabel="処理中…">また送る</Button> : null}
               {!schedule.isOneTime ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => setArchiveTarget(schedule)}>しまう</Button> : null}
               {!schedule.isOneTime ? <ScheduleMenu schedule={schedule} /> : null}
             </span> : null}</span>

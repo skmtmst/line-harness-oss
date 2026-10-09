@@ -18,6 +18,7 @@ import { DetailLoading } from '@/components/templates/detail-page'
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
 import { formatDate as polishFormatDate } from '@/lib/format'
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -2350,27 +2351,9 @@ export default function ScenarioDetailV8({
       {/* 競合（kz2B6）：ほかの人の保存と食い違った。板の頭のすぐ下に、幅いっぱいで出す。 */}
       {conflict && (
         <div className={styles.conflictWrap}>
-          <div className={styles.conflictBar} data-design-node="kz2B6" role="alert">
-            <CircleAlert className={styles.conflictIcon} aria-hidden />
-            <div className={styles.conflictText}>
-              <p className={styles.conflictTitle}>
-                {conflictLatest
+          <SaveConflictBand designNode="kz2B6" title={conflictLatest
                   ? `ほかの人が ${formatClock(conflictLatest.updatedAt)} にシナリオ「${conflictLatest.name}」を保存しました`
-                  : 'ほかの人がこのシナリオを保存しました'}
-              </p>
-              <p className={styles.conflictBody}>
-                あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。
-              </p>
-            </div>
-            <Button type="button" variant="secondary" onClick={() => setCompareOpen(true)} disabled={!conflictLatest}>
-              <GitCompareArrows aria-hidden />
-              違いを比べる
-            </Button>
-            <Button type="button" variant="primary" onClick={() => void acceptLatestAndContinue()}>
-              <RefreshCw aria-hidden />
-              最新を読み込んで続ける
-            </Button>
-          </div>
+                  : 'ほかの人がこのシナリオを保存しました'} description="あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。" onCompare={() => setCompareOpen(true)} compareDisabled={!conflictLatest} onReload={() => void acceptLatestAndContinue()} />
         </div>
       )}
 
@@ -2836,7 +2819,7 @@ export default function ScenarioDetailV8({
                   }}
                   disabled={saving || !editForm.name.trim()}
                   busy={saving}
-                  done={saveDone}
+
                 >
                   {conflict ? <GitCompareArrows aria-hidden /> : <Check aria-hidden />}
                   {conflict ? '比べてから保存' : '保存する'}
@@ -2964,7 +2947,7 @@ export default function ScenarioDetailV8({
         confirmLabel="この内容ではじめる"
         busy={startBusy}
         error={startError}
-        onConfirm={preflightLoading || preflightFailed ? undefined : () => void handleStart()}
+        onConfirm={preflightLoading || preflightFailed ? undefined : () => handleStart()}
         // WEB228：「内容と対象を確かめました」のチェックが入るまで「この内容ではじめる」を押せない。
         confirmDisabled={!startConfirmed}
         onCancel={() => {
@@ -3167,7 +3150,7 @@ export default function ScenarioDetailV8({
         destructive
         busy={deletingStepId !== null}
         error={deleteStepError}
-        onConfirm={() => void handleDeleteStep()}
+        onConfirm={() => handleDeleteStep()}
         onCancel={() => {
           if (deletingStepId) return
           setDeleteStepTarget(null)
@@ -3192,7 +3175,7 @@ export default function ScenarioDetailV8({
         destructive
         busy={deletingScenario}
         error={deleteScenarioError}
-        onConfirm={() => void handleDeleteScenario()}
+        onConfirm={() => handleDeleteScenario()}
         onCancel={() => {
           if (deletingScenario) return
           setDeleteScenarioOpen(false)
@@ -3214,7 +3197,7 @@ export default function ScenarioDetailV8({
         destructive
         busy={discardingDuplicate}
         error={discardDuplicateError}
-        onConfirm={() => void handleDiscardDuplicate()}
+        onConfirm={() => handleDiscardDuplicate()}
         onCancel={() => {
           if (discardingDuplicate) return
           setDiscardDuplicateOpen(false)

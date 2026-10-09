@@ -164,7 +164,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
               const pending = item.pendingPrice != null
               const allergens = safeArray(item.allergens_json)
               return (
-                <Tr key={item.id} className={styles.row}>
+                <Tr key={item.id} className={styles.row} data-row-id={item.id}>
                   <Td className={`${styles.td} ${styles.colName}`}>
                     {canEdit ? (
                       <button type="button" className={styles.name} title={item.name} onClick={() => openEdit(item)}>{item.name}</button>

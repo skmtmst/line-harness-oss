@@ -119,7 +119,7 @@ export default function ListView({ view, rows, total, tables, page, period, stat
                 const kind = sourceKind(item.source)
                 const table = item.table_id ? tableById.get(item.table_id) : null
                 return (
-                  <Tr key={item.id}>
+                  <Tr key={item.id} data-row-id={item.id}>
                     <Td>{mdhm(item.starts_at)}</Td>
                     <Td>
                       <StatusBadge dot={false} size="compact" tone={kind === 'line' ? 'success' : kind === 'phone' ? 'neutral' : item.source === 'tabelog' || item.source === 'gurunavi' ? 'warning' : item.source === 'ikyu' || item.source === 'retty' || item.source === 'reszaiko' ? 'info' : 'danger'}>{sourceName(item.source)}</StatusBadge>

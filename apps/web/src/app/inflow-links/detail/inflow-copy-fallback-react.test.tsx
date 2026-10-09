@@ -97,7 +97,7 @@ describe('流入経路のURLコピーに失敗したとき（V6R-S3-f）', () =>
     const alerts = await screen.findAllByRole('alert')
     const alert = alerts.find((node) => node.textContent?.includes('コピーできませんでした'))
     if (!alert) throw new Error('コピー失敗の知らせが出ていません')
-    const field = within(alert).getByLabelText('流入経路のURL') as HTMLInputElement
+    const field = screen.getByLabelText('URL をコピー') as HTMLInputElement
     expect(field.value).toContain('/r/shop-qr')
     expect(field.readOnly).toBe(true)
     expect(promptSpy).not.toHaveBeenCalled()
@@ -112,8 +112,8 @@ describe('流入経路のURLコピーに失敗したとき（V6R-S3-f）', () =>
     const button = await screen.findByRole('button', { name: 'URL をコピー' })
     await act(async () => { fireEvent.click(button) })
 
-    expect(await screen.findByRole('button', { name: 'コピーしました' })).toBeTruthy()
-    expect(screen.queryByLabelText('流入経路のURL')).toBeNull()
+    expect(button.textContent).toBe('コピーしました')
+    expect(screen.queryByRole('textbox', { name: 'URL をコピー' })).toBeNull()
   })
 })
 

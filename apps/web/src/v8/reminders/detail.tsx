@@ -1,5 +1,7 @@
 'use client'
 
+import { scheduledJstIso } from '@/lib/jst-datetime'
+
 /*
  * ★V8 リマインダの詳細（src/v8 に一から書いた版）。
  * 板：rbAig（概要）/ loVfW（登録者）/ RwVo5（一時停止の窓）。
@@ -7,6 +9,7 @@
  * 読む口・操作は今の画面（app/reminders/detail/detail-v8.tsx）と同じ。BEHAVIOR.md に一覧がある。
  */
 import SharedStatusPill from '@/components/shared/status-pill'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
@@ -142,18 +145,8 @@ export function dateTimeLocalJst(value: string): string {
 
 /** datetime-local の JST の壁時計時刻を、曖昧さなく UTC ISO へ変える。 */
 export function dateTimeLocalJstToUtcIso(value: string): string | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value)
-  if (!match) return null
-  const [, yearRaw, monthRaw, dayRaw, hourRaw, minuteRaw] = match
-  const year = Number(yearRaw)
-  const month = Number(monthRaw)
-  const day = Number(dayRaw)
-  const hour = Number(hourRaw)
-  const minute = Number(minuteRaw)
-  if (month < 1 || month > 12 || day < 1 || hour > 23 || minute > 59) return null
-  const utc = new Date(Date.UTC(year, month - 1, day, hour - 9, minute))
-  // 2月30日などを Date が翌月へ丸めても保存しない。
-  return dateTimeLocalJst(utc.toISOString()) === value ? utc.toISOString() : null
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})$/.exec(value)
+  return match ? scheduledJstIso(match[1], match[2]) : null
 }
 
 /** 通知の短い呼び名。日で書いた通は「1日前 18:00」、分で書いた通は「1時間前」。 */
@@ -616,7 +609,7 @@ function ReminderDetailV8() {
         destructive
         busy={deleting}
         error={deleteError}
-        onConfirm={() => void runDelete()}
+        onConfirm={() => runDelete()}
         onCancel={() => setConfirmDelete(false)}
       />
     </PageFrame>
@@ -738,7 +731,7 @@ function ScheduleTab({ reminderId, steps }: { reminderId: string; steps: Reminde
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [items, setItems] = useState<ReminderDeliveryRun[]>([])
   const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
 
   const stepNameByNumber = useMemo(() => Object.fromEntries(steps.map((step) => [step.stepNumber, stepLabel(step)])), [steps])
 
@@ -821,9 +814,9 @@ const RUN_STATUS_OPTIONS: Array<{ value: string; label: string }> = [
 
 function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string; canManage: boolean; initialStatus: '' | ReminderDeliveryRunStatus }) {
   const [status, setStatus] = useState<'' | ReminderDeliveryRunStatus>(initialStatus)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useListUrlValue('q', '')
   const [appliedSearch, setAppliedSearch] = useState('')
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [items, setItems] = useState<ReminderDeliveryRun[]>([])
   const [total, setTotal] = useState(0)
@@ -962,10 +955,10 @@ function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canMana
   const [error, setError] = useState('')
   const [actioningId, setActioningId] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
-  const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<RegistrantFilter>('all')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [search, setSearch] = useListUrlValue('q', '')
+  const [filter, setFilter] = useListUrlValue<RegistrantFilter>('filter', 'all')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
 
   const load = useCallback(async () => {
     setLoading(true)

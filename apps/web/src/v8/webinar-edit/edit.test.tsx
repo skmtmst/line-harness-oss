@@ -6,6 +6,7 @@
  * - 閲覧のみ（staff）には、押せないボタンを置かない（変える操作は隠す）
  * - コメント演出はその場で直して、秒の順に並べて保存する
  */
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -77,6 +78,7 @@ let root: Root
 let host: HTMLDivElement
 
 beforeEach(() => {
+  clearToastsForTest()
   document.documentElement.dataset.theme = 'v8'
   roleState.role = 'owner'
   puts.length = 0
@@ -124,7 +126,7 @@ afterEach(() => {
 })
 
 async function render(node: React.ReactNode) {
-  await act(async () => { root.render(node) })
+  await act(async () => { root.render(<>{node}<ToastHost /></>) })
   for (let i = 0; i < 6; i += 1) await act(async () => {})
 }
 
@@ -233,7 +235,7 @@ describe('V8 ウェビナーの編集', () => {
       { atSeconds: -60, authorName: '田中', body: 'こんばんは' },
       { atSeconds: 45, authorName: 'まさ', body: 'とてもわかりやすい' },
     ] })
-    expect(host.textContent).toContain('2 件保存しました')
+    expect(document.body.textContent).toContain('2件保存しました')
   })
   it('B-139 CTA：別のカードに足りない欄があると、そのカードを開いて見出しの欄へ移り、カードの行に赤い印を付ける', async () => {
     nav.search = 'id=webinar-1&pane=cta'
@@ -287,7 +289,7 @@ describe('V8 ウェビナーの編集', () => {
     await act(async () => { buttonText('下書きを保存')!.click() })
     for (let i = 0; i < 6; i += 1) await act(async () => {})
     const band = host.querySelector('[data-design-node="pvimJ"][role="alert"]')
-    expect(band?.textContent).toContain('このまま保存すると、ほかの人の変更が消えます')
+    expect(band?.textContent).toContain('このまま保存すると、相手の変更が消えます')
     expect(buttonText('下書きを保存')).toBeUndefined()
     expect(buttonText('比べてから保存')).toBeTruthy()
     expect([...host.querySelectorAll('a')].some((link) => link.textContent?.trim() === 'キャンセル')).toBe(true)

@@ -1,4 +1,5 @@
 'use client'
+import { jstDate } from "@/lib/jst-datetime"
 
 /* ③ 休業日（KRgTQ）（settings-v8.tsx から分割。見た目・動きは変えない） */
 
@@ -60,7 +61,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
   onSaved: (settings: BookingSettings) => void
   onReload: () => void
 }) {
-  const today = useMemo(() => new Date(Date.now() + JST_OFFSET_MS).toISOString().slice(0, 10), [])
+  const today = useMemo(() => jstDate(), [])
   const [month, setMonth] = useState(today.slice(0, 7))
   const [editing, setEditing] = useState<BookingException | 'new' | null>(null)
   const [editFrom, setEditFrom] = useState('')
@@ -174,7 +175,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
         icon={<AccountIcon />}
         title="休業日を読み込めませんでした"
         description={error ?? '通信状態を確認して、もう一度お試しください。'}
-        action={<Button onClick={onReload}>読み直す</Button>}
+        action={<Button onClick={onReload}>もう一度読み込む</Button>}
       />
     )
   }
@@ -312,13 +313,14 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
       <ConfirmDialog
         open={deleteTarget !== null}
         title="この休業日を消しますか？"
+        deleteName={deleteTarget?.reason?.trim() || `${deleteTarget?.dateFrom ?? ''}〜${deleteTarget?.dateTo ?? ''}の休業日`}
         description="削除すると、その期間は曜日の決めごとどおりの受付に戻ります。すでに入っている予約はそのまま残ります。"
         confirmLabel="休業日を削除する"
         destructive
         busy={busy}
         error={deleteError ?? undefined}
         onCancel={() => { if (!busy) { setDeleteTarget(null); setDeleteError(null) } }}
-        onConfirm={() => void remove()}
+        onConfirm={() => remove()}
       />
     </div>
   )

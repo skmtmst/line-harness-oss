@@ -289,7 +289,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
               {kind === 'hold' ? <Lock size={15} aria-hidden="true" /> : <Check size={15} aria-hidden="true" />}{kind === 'hold' ? '枠を押さえる' : '台帳に入れる'}
             </Button>
           </>
-        )}
+        )} dirty={false}
       >
         <form ref={formRef} className={styles.phoneForm} onSubmit={save} noValidate>
           <Card frame="raised" padding="spacious" layout="vertical" className={styles.phoneCard} aria-labelledby="rs-phone-kind">

@@ -23,6 +23,7 @@ describe('候補を選ぶ共通の窓', () => {
     expect(within(dialog).queryByRole('radio', { name: '商品3種' })).toBeNull()
     fireEvent.click(within(screen.getByLabelText('候補の絞り込み')).getByRole('button', { name: /テキスト/ }))
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: '春' } })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
     fireEvent.click(screen.getByRole('radio', { name: '春のお知らせ' }))
     expect(onSelect).toHaveBeenCalledWith('1')
     expect(onConfirm).not.toHaveBeenCalled()
@@ -30,6 +31,7 @@ describe('候補を選ぶ共通の窓', () => {
     fireEvent.click(screen.getByRole('button', { name: 'このテンプレートを使う' }))
     expect(onConfirm).toHaveBeenCalledWith('1')
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: '存在しない名前' } })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
     expect(screen.getByText('当てはまる候補がありません。')).toBeTruthy()
   })
 
@@ -77,6 +79,7 @@ describe('候補を選ぶ共通の窓', () => {
     fireEvent.click(screen.getByRole('button', { name: '続きを読み込む' }))
     expect(screen.getAllByRole('radio')).toHaveLength(40)
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: '候補4' } })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
     expect(screen.getAllByRole('radio')).toHaveLength(6)
   })
 })

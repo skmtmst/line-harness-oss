@@ -8,6 +8,7 @@
  * データの口（取得・絞り込み・並び・ページ送り・名前の変更・削除・フォルダ）は今の V8
  * （src/app/events/events-list-v8.tsx）と同じ。行の名前の前にフォルダの色の丸（2026-10-07 オーナー）。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -102,12 +103,12 @@ export default function EventsListV8() {
   const [listTotal, setListTotal] = useState(0)
   const [summary, setSummary] = useState<EventListSummary | null>(null)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<'all' | 'open' | 'pending' | 'full'>('all')
-  const [sort, setSort] = useState<'soon' | 'name'>('soon')
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(20)
-  const [folderFilter, setFolderFilter] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [filter, setFilter] = useListUrlValue<'all' | 'open' | 'pending' | 'full'>('filter', 'all')
+  const [sort, setSort] = useListUrlValue<'soon' | 'name'>('sort', 'soon')
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [perPage, setPerPage] = useListUrlValue('perPage', 20)
+  const [folderFilter, setFolderFilter] = useListUrlValue('folderFilter', '')
   const [folders, setFolders] = useState<Folder[]>([])
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   const [foldersError, setFoldersError] = useState(false)
@@ -467,7 +468,7 @@ export default function EventsListV8() {
       </div>
     )
   } else if (loadStatus === 'forbidden') {
-    listBody = stateCard(<TriangleAlert size={18} aria-hidden="true" />, 'イベントを見る権限がありません', '選んでいるアカウントでは見られません。管理者に権限を確かめてください。', undefined, true)
+    listBody = stateCard(<TriangleAlert size={18} aria-hidden="true" />, 'イベントを見る権限がありません', '選んでいるアカウントでは見られません。管理者に権限を確かめてください。', <Button onClick={() => refresh()}>もう一度読み込む</Button>, true)
   } else if (loadStatus === 'error') {
     listBody = stateCard(
       <TriangleAlert size={18} aria-hidden="true" />,
@@ -624,7 +625,7 @@ export default function EventsListV8() {
         confirmLabel="削除する"
         busy={deleteBusy}
         error={deleteError}
-        onConfirm={() => void confirmDeleteEvent()}
+        onConfirm={() => confirmDeleteEvent()}
         onCancel={() => {
           if (deleteBusy) return
           setDeleteError('')

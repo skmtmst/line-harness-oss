@@ -8,6 +8,8 @@
  * 選んだときの一括バーをはめる。データの口・確かめの窓は今の V8（src/app/contents/list-v8.tsx）から写した。
  * 札の名前の前にフォルダの色の丸（2026-10-07 オーナー）。札の操作は「…」へ集める。
  */
+import { collectListRows } from '@/components/shared/collect-list-rows'
+import { useListUrlSetValue, useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   Folder,
@@ -139,7 +141,7 @@ const EMPTY_KPIS: MediaKpis = {
 }
 
 export default function MediaLibraryListV8() {
-  const [view, setView] = useState<MediaView>('grid')
+  const [view, setView] = useListUrlValue<MediaView>('view', 'grid')
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const latestAccountRef = useRef(selectedAccountId)
   latestAccountRef.current = selectedAccountId
@@ -179,7 +181,7 @@ export default function MediaLibraryListV8() {
   */
   const [folderFailure, setFolderFailure] = useState<unknown>(null)
   const [folderReloading, setFolderReloading] = useState(false)
-  const [folderFilter, setFolderFilter] = useState('')
+  const [folderFilter, setFolderFilter] = useListUrlValue('folderFilter', '')
   /*
     R37: フォルダの名前・色・並べ替え・削除は共通のフォルダの列（ManagedFolderPanel）の「…」から。
     追加だけあって直し・消しが無いと、整理し直す手段が無い。
@@ -188,14 +190,12 @@ export default function MediaLibraryListV8() {
   /* 札の操作は「…」へ集める。行末にボタンは1つも置かない。 */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
 
-  const [kinds, setKinds] = useState<Set<MediaItem['kind']>>(
-    () => new Set(KINDS.map((k) => k.key)),
-  )
-  const [query, setQuery] = useState('')
-  const [showUnusedOnly, setShowUnusedOnly] = useState(false)
-  const [showNearLimitOnly, setShowNearLimitOnly] = useState(false)
+  const [kinds, setKinds] = useListUrlSetValue<MediaItem['kind']>('kinds', KINDS.map((k) => k.key))
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [showUnusedOnly, setShowUnusedOnly] = useListUrlValue('showUnusedOnly', false)
+  const [showNearLimitOnly, setShowNearLimitOnly] = useListUrlValue('showNearLimitOnly', false)
   /** 退避済みだけを見る棚。普段の一覧には出ない。 */
-  const [showArchivedOnly, setShowArchivedOnly] = useState(false)
+  const [showArchivedOnly, setShowArchivedOnly] = useListUrlValue('showArchivedOnly', false)
   /*
     退避・一覧への復帰はどちらも理由が必須（あとから「なぜ」を追えるように）。
     押し口を開いた札と向きを持ち、確定時に同じ窓で理由を聞く。
@@ -209,9 +209,9 @@ export default function MediaLibraryListV8() {
   const [moveFolderId, setMoveFolderId] = useState('')
   const [moveBusy, setMoveBusy] = useState(false)
   const [moveError, setMoveError] = useState('')
-  const [sort, setSort] = useState<MediaSort>('newest')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [sort, setSort] = useListUrlValue<MediaSort>('sort', 'newest')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
   /** 名前を直している札。null なら誰も直していない。 */
@@ -638,7 +638,7 @@ export default function MediaLibraryListV8() {
   const removeSelected = async () => {
     if (selected.size === 0 || !selectedAccountId) return
     const removableSelected = [...selected].filter((id) =>
-      items.some((item) => item.id === id && isKnownUnused(item)),
+      [...items, ...selectionItems].some((item) => item.id === id && isKnownUnused(item)),
     )
     if (removableSelected.length !== selected.size) {
       setSelected(new Set(removableSelected))
@@ -662,7 +662,7 @@ export default function MediaLibraryListV8() {
     let deleted = 0
     const failedNames: string[] = []
     for (const id of ids) {
-      const name = items.find((m) => m.id === id)?.filename ?? id
+      const name = [...items, ...selectionItems].find((m) => m.id === id)?.filename ?? id
       try {
         await api.media.delete(id, accountAtRequest)
       } catch {
@@ -966,6 +966,43 @@ export default function MediaLibraryListV8() {
   }, [page, pageCount])
 
   // まとめて削除の候補は未使用かつ一覧にいるものだけ。退避済みは選ばない。
+  const [selectionItems, setSelectionItems] = useState<MediaItem[]>([])
+  const [selectionTotal, setSelectionTotal] = useState<number | undefined>(undefined)
+  const [selectionLoading, setSelectionLoading] = useState(false)
+  const [selectionError, setSelectionError] = useState('')
+  const selectionScope = JSON.stringify([selectedAccountId, folderFilter, query, [...kinds].sort(), showNearLimitOnly, showArchivedOnly, sort])
+  const selectionScopeRef = useRef(selectionScope)
+  selectionScopeRef.current = selectionScope
+  useEffect(() => { setSelected(new Set()); setSelectionItems([]); setSelectionTotal(undefined); setSelectionLoading(false); setSelectionError('') }, [selectionScope])
+  const readSelectableMedia = useCallback(async () => {
+    const account = selectedAccountId
+    const scope = selectionScope
+    if (!account) return
+    setSelectionLoading(true)
+    setSelectionError('')
+    try {
+      const all = await collectListRows(total, async (offset, limit) => {
+        const response = await api.media.list(account, { kind: kinds.size === 1 ? [...kinds][0] : undefined, folderId: folderFilter || undefined, query: query.trim() || undefined, unusedOnly: true, nearLimitOnly: showNearLimitOnly, archived: showArchivedOnly ? 'only' : undefined, sort, limit, offset })
+        if (!response.success) throw new Error('読み込めませんでした')
+        return response.data
+      })
+      if (scope !== selectionScopeRef.current) return
+      const eligible = all.filter(item => isKnownUnused(item) && !item.archivedAt && kinds.has(item.kind))
+      setSelectionItems(eligible)
+      setSelectionTotal(eligible.length)
+    } catch {
+      if (scope === selectionScopeRef.current) setSelectionError('すべての対象を読み込めませんでした。')
+    } finally {
+      if (scope === selectionScopeRef.current) setSelectionLoading(false)
+    }
+  }, [selectedAccountId, selectionScope, total, kinds, folderFilter, query, showNearLimitOnly, showArchivedOnly, sort])
+  useEffect(() => {
+    if (selected.size > 0 && selectionTotal === undefined && !selectionLoading && !selectionError) void readSelectableMedia()
+  }, [selected.size, selectionTotal, selectionLoading, selectionError, readSelectableMedia])
+  const selectAllMedia = () => {
+    if (selectionTotal === undefined) return
+    setSelected(new Set(selectionItems.map(item => item.id)))
+  }
   const removable = items.filter((item) => isKnownUnused(item) && !item.archivedAt)
   const allSelected = removable.length > 0 && removable.every((item) => selected.has(item.id))
   /** R587: フォルダ欄の失敗は403（権限）とそれ以外（通信）で案内を分ける。 */
@@ -988,11 +1025,12 @@ export default function MediaLibraryListV8() {
   }
 
   if (detailId && (detailPhase === 'unavailable' || !detailsFor)) {
-    // R588: 403は権限案内にする。押しても直らない再試行は出さない。
+    // R588: 403は権限案内を残し、権限変更後に同じIDを読み直せる。
     if (detailFailure === 'denied') {
       return (
         <ListState
           kind="forbidden"
+          onRetry={retryDetail}
           title="メディアの詳細を見る権限がありません"
           description={permissionDeniedMessage('store')}
           action={<Button type="button" onClick={() => setDetailUrl(null)}>登録メディア一覧へ戻る</Button>}
@@ -1308,7 +1346,9 @@ export default function MediaLibraryListV8() {
           {canManageMedia ? (
             <BulkBar
               count={selected.size}
-              hint="対象を確認してから操作を選んでください"
+              total={selectionTotal}
+              onSelectAll={selectAllMedia}
+              hint={selectionLoading ? 'すべての対象を確認しています…' : selectionError ? <><span role="alert">{selectionError}</span><Button size="compact" onClick={() => void readSelectableMedia()}>もう一度読み込む</Button></> : '対象を確認してから操作を選んでください'}
             >
               <Button type="button" variant="secondary" onClick={() => setSelected(new Set())}>
                 選択を外す
@@ -1380,7 +1420,7 @@ export default function MediaLibraryListV8() {
               使われている場所を確認できませんでした。読み直してから、もう一度お試しください。
             </p>
             {/* R34: 詳細と同じように、確認時刻と読み直しを一覧でも出す。 */}
-            <Button type="button" onClick={() => { if (deleting) void openDelete(deleting) }}>読み直す</Button>
+            <Button type="button" onClick={() => { if (deleting) void openDelete(deleting) }}>もう一度読み込む</Button>
           </div>
         ) : impact ? (
           <div>
@@ -1390,7 +1430,7 @@ export default function MediaLibraryListV8() {
             </p>
             {impact.verified === false ? (
               <div>
-                <Button type="button" onClick={() => { if (deleting) void openDelete(deleting) }}>読み直す</Button>
+                <Button type="button" onClick={() => { if (deleting) void openDelete(deleting) }}>もう一度読み込む</Button>
               </div>
             ) : null}
 
@@ -1599,7 +1639,7 @@ export default function MediaLibraryListV8() {
               kind="error"
               title="表示できませんでした"
               description="再読み込みしても直らないときは、エラー報告へお知らせください。"
-              action={<Button variant="secondary" onClick={() => void load()}>もう一度読み込む</Button>}
+              onRetry={() => void load()}
             />
           ) : current.length === 0 ? (
             <div>
@@ -1769,6 +1809,7 @@ function MediaCardV8({
               value={renaming.value}
               onChange={(e) => onRenameChange(e.target.value)}
               onKeyDown={(e) => {
+                if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return
                 if (e.key === 'Enter') onRenameConfirm()
                 if (e.key === 'Escape') onRenameCancel()
               }}

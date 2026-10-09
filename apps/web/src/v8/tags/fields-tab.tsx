@@ -9,6 +9,7 @@
  * 右の上に案内の帯、表は名前の前にフォルダの色の丸（表にフォルダ列は置かない）、行の右端は必ず「…」、
  * 表の下に操作の説明。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -74,11 +75,11 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
   // 操作の失敗は読み込みの失敗とは別の状態にする（ATTR-02）。
   const [actionError, setActionError] = useState('')
   const [retryOrder, setRetryOrder] = useState<FriendField[] | null>(null)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [type, setType] = useState<'all' | FriendFieldType>('all')
-  const [folderFilter, setFolderFilter] = useState('')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [folderFilter, setFolderFilter] = useListUrlValue('folderFilter', '')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [dragId, setDragId] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<FriendField | null>(null)
   const { leavingId, leave } = useRowLeaving()
@@ -289,10 +290,10 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
     ] : []
     if (!canEdit) return [{ id: 'open', label: '詳しく見る', onSelect: () => openFieldDetail(field.id) }]
     const list: ActionMenuItem[] = [
-      { id: 'edit', label: '編集', external: true, onSelect: () => router.push(`/tags/fields/edit?id=${encodeURIComponent(field.id)}`) },
+      { id: 'edit', label: '編集', external: true, href: `/tags/fields/edit?id=${encodeURIComponent(field.id)}`, onSelect: () => router.push(`/tags/fields/edit?id=${encodeURIComponent(field.id)}`) },
     ]
     if ((knownUsageCount(field) ?? 0) > 0) {
-      list.push({ id: 'migrate', label: '移行（種類を変える）', external: true, onSelect: () => router.push(`/tags/fields/migrate?id=${encodeURIComponent(field.id)}`) })
+      list.push({ id: 'migrate', label: '移行（種類を変える）', external: true, href: `/tags/fields/migrate?id=${encodeURIComponent(field.id)}`, onSelect: () => router.push(`/tags/fields/migrate?id=${encodeURIComponent(field.id)}`) })
     }
     if (!field.isInherited) {
       const blocked = fieldDeletionBlockedReason(field)
@@ -409,7 +410,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
                     event.preventDefault()
                     openFieldDetail(field.id)
                   }
-                }}
+                }} data-row-id={field.id}
               >
                 <Td className={styles.markColGrip} onClick={(event) => event.stopPropagation()}>
                   {canEdit ? (
@@ -551,7 +552,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
             {retryOrder ? (
               <button type="button" onClick={() => { const next = retryOrder; setRetryOrder(null); if (next) void applyOrder(next) }}>再試行</button>
             ) : (
-              <button type="button" onClick={() => { setActionError(''); void load() }}>読み直す</button>
+              <button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button>
             )}
           </p>
         ) : null}
@@ -629,7 +630,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
         busy={folderBusy}
         error={folderError || undefined}
         onCancel={() => { if (!folderBusy) setDeletingFolder(null) }}
-        onConfirm={() => void removeFolder()}
+        onConfirm={() => removeFolder()}
       />
 
       <ConfirmDialog

@@ -650,7 +650,7 @@ function OutgoingV8Inner() {
           kind="error"
           title="送り先を読み込めませんでした"
           description="登録内容は消えていません。通信の状態を確認して、もう一度お試しください。"
-          action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+          onRetry={() => void load()}
         />
       )
     }

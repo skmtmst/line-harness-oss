@@ -54,3 +54,18 @@ it('保存の通信失敗は上の帯へ出し、入力した鍵は残す', asyn
   expect(secret.value).toBe(value)
   expect(secret.getAttribute('aria-invalid')).not.toBe('true')
 })
+
+it('保存が競合しても入力を残し、比べるだけでは入力を捨てない', async () => {
+  const { ApiError } = await import('@/lib/api')
+  fx.save.mockRejectedValue(new ApiError(409, 'version_conflict'))
+  render(<EcConnector accountId="account-a" />)
+  const domain = await screen.findByLabelText('ショップのアドレス') as HTMLInputElement
+  fireEvent.change(domain, { target: { value: 'mine.nen.example' } })
+  fireEvent.click(screen.getByRole('button', { name: '設定を保存する' }))
+  await screen.findByRole('button', { name: '違いを比べる' })
+  expect(domain.value).toBe('mine.nen.example')
+  expect(fx.read).toHaveBeenCalledTimes(1)
+  fireEvent.click(screen.getByRole('button', { name: '違いを比べる' }))
+  await screen.findByRole('dialog', { name: '最新の保存と比べる' })
+  expect(domain.value).toBe('mine.nen.example')
+})

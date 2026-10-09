@@ -1,5 +1,8 @@
 'use client'
 
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { jstDate } from '@/lib/jst-datetime'
 import Notice from '@/components/shared/notice'
 
 /*
@@ -75,7 +78,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
   const [rules, setRules] = useState<OperatorNotificationRule[]>([])
   const [summary, setSummary] = useState<OperatorNotificationSummary | null>(null)
   const [state, setState] = useState<LoadState>('loading')
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [busy, setBusy] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null)
   const [exportReason, setExportReason] = useState('')
@@ -180,7 +183,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
         <SearchField aria-label="お知らせを検索" placeholder="お知らせ名・きっかけで探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
       </div>
       <div className={styles.opSort}>
-        <Select aria-label="並び順" value="frequent" onChange={() => undefined} options={[{ value: 'frequent', label: 'よく届く順' }]} />
+        <ListToolbarSort aria-label="並び順" value="frequent" onChange={() => undefined} options={[{ value: 'frequent', label: 'よく届く順' }]} />
       </div>
     </div>
 
@@ -190,7 +193,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
       {!lineAccountId ? <ListState kind="empty" title="LINEアカウントを選択してください" description="選択したアカウントごとに分けて管理します。" />
         : state === 'loading' ? <ListState kind="loading" title="運用者へのお知らせを読み込んでいます" />
         : state === 'error' ? <ListState kind="error" title="運用者へのお知らせを表示できませんでした" onRetry={() => void load()} />
-        : state === 'forbidden' ? <ListState kind="forbidden" />
+        : state === 'forbidden' ? <ListState kind="forbidden" onRetry={() => void load()} />
         : rules.length === 0 ? <ListState kind="empty" title="運用者へのお知らせがまだありません" action={canManage ? <Button href="/line-notifications/operator/new" variant="primary">運用者へのお知らせを作る</Button> : undefined} />
         : visible.length === 0 ? <ListState kind="empty" emptyPreset="filtered" title="条件に合うお知らせはありません" description="検索語を変えてください。" action={<Button variant="secondary" onClick={() => setQuery('')}>検索を消す</Button>} />
         : <DataTable label="運用者へのお知らせ" grid={{ columns: 'var(--tpl-rest3-op-cols)', compactColumns: 'minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) var(--tpl-sb-ln-col-count) var(--tpl-sb-ln-col-status) var(--tpl-ml-col-ops-wide)', padding: 'var(--tpl-rest3-run-row-pad)', headPadding: 'var(--tpl-rest3-op-head-pad)' }}>
@@ -210,7 +213,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
               const published = rule.status === 'published'
               const recipients = conditionsOf(rule).recipientLabel ?? (rule.recipientCount > 0 ? `${rule.recipientCount} 人` : '受け取れる人なし')
               const schedule = conditionsOf(rule).scheduleLabel ?? 'いつでも'
-              return <Tr key={rule.id}>
+              return <Tr key={rule.id} data-row-id={rule.id}>
                 <Td className={styles.opName}>
                   {/* 名前から編集画面へ。保存したお知らせを開き直して直せる。 */}
                   <Link href={`/line-notifications/operator/new?id=${encodeURIComponent(rule.id)}`} className={styles.opNameLink} ><TruncatedText value={String(rule.name ?? '')} /></Link>
@@ -248,7 +251,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
       confirmLabel="書き出す"
       busy={busy === 'csv'}
       error={exportError || undefined}
-      onConfirm={() => void exportCsv()}
+      onConfirm={() => exportCsv()}
       onCancel={closeExport}
     >
       <Field htmlFor="operator-export-reason" label="書き出す理由" error={exportReasonError}><TextField ref={exportReasonRef} id="operator-export-reason" value={exportReason} onChange={(event) => { setExportReasonError(''); setExportReason(event.target.value) }} placeholder="例：月次の運用確認" autoFocus /></Field>

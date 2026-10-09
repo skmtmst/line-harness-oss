@@ -5,7 +5,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { PageHeading } from '@/components/templates/page-frame'
 import styles from './create-page.module.css'
+import { AutoFormLeaveGuard } from './form-leave-guard'
 import Button from '@/components/shared/button'
+import { notifySaved } from '@/components/shared/toast'
 import HelpTip from '@/components/shared/help-tip'
 import StickyBar from '@/components/shared/sticky-bar'
 import ValidationSummary from '@/components/shared/validation-summary'
@@ -182,9 +184,10 @@ export default function CreatePage({
     setNotice('')
     try {
       const id = await onSave()
+      if (!andAnother) notifySaved()
       if (andAnother) {
         onReset?.()
-        setNotice('保存しました。続けて作れます。')
+        notifySaved('保存しました。続けて作れます。')
         return
       }
       // 作った行を一覧で目立たせる。どこに増えたのか探させない。
@@ -205,7 +208,7 @@ export default function CreatePage({
     <>
       <Button href={parent[1]}>キャンセル</Button>
       {onReset && (
-        <Button onClick={() => run(true)} disabled={saving}>
+        <Button onClick={() => run(true)} disabled={saving} busy={saving}>
           保存して続けて作る
         </Button>
       )}
@@ -215,11 +218,11 @@ export default function CreatePage({
     </>
   ) : (
     <>
-      <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={() => run(false)} disabled={saving}>
-        {saving ? '保存中...' : (saveLabel ?? '保存する')}
+      <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={() => run(false)} disabled={saving} busy={saving}>
+        {saveLabel ?? '保存する'}
       </Button>
       {onReset && (
-        <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => run(true)} disabled={saving}>
+        <Button variant="secondary" className="text-ink-secondary px-4 py-2 font-medium h-auto whitespace-normal" onClick={() => run(true)} disabled={saving} busy={saving}>
           保存して続けて作る
         </Button>
       )}
@@ -249,6 +252,7 @@ export default function CreatePage({
   return (
     <VariantContext.Provider value={variant}>
     <div data-design-node={designNode} data-create-variant={variant}>
+      <AutoFormLeaveGuard busy={saving} />
       {showHeader ? (
         <div data-design="Head" className={styles.head}>
           {crumb}

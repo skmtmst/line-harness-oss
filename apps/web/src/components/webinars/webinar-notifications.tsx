@@ -197,7 +197,7 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
         kind="error"
         title="通知の設定を読み込めませんでした"
         description="通信を確認して、もう一度読み込んでください。"
-        action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+        onRetry={() => void load()}
       />
     )
   }

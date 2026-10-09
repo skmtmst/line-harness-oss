@@ -9,6 +9,7 @@
  * 試し・作成・動かす/止める・合言葉・名前・削除）。
  * 絵と今の作りが合わない所は BEHAVIOR.md に書いた。
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Copy, LayoutTemplate, Plus, RefreshCw, Trash2, FlaskConical, Inbox } from 'lucide-react'
@@ -585,7 +586,7 @@ export default function WebhooksIncomingV8() {
         </div>
       ) : null}
       {incomingStatus === 'error' ? (
-        <ListState kind="error" title="受け取り口を読み込めませんでした" action={<Button onClick={() => void reload()}>もう一度読み込む</Button>} />
+        <ListState kind="error" title="受け取り口を読み込めませんでした" onRetry={() => void reload()} />
       ) : null}
       {displayed.map((item) => {
         const isSelected = selected?.id === item.id
@@ -659,9 +660,7 @@ export default function WebhooksIncomingV8() {
               <span className={styles.fieldLabel}>受け取る URL（相手のサービスに貼る）</span>
               <span className={styles.valueBox} ><TruncatedText value={String(endpointUrl(selected.id) ?? '')} url /></span>
             </div>
-            <Button onClick={() => { void navigator.clipboard.writeText(endpointUrl(selected.id)); notifyToast('受け取る URL を写しました') }}>
-              <Copy size={15} aria-hidden="true" />写す
-            </Button>
+            <CopyTextButton value={endpointUrl(selected!.id)} aria-label="受け取るURLをコピー"  />
           </div>
           <div className={styles.fieldRow}>
             <div className={styles.field}>
@@ -709,7 +708,7 @@ export default function WebhooksIncomingV8() {
           {detailStatus === 'loading' ? (
             <p className={styles.cardNote}>保存されている処理を読み込んでいます。</p>
           ) : detailStatus === 'error' ? (
-            <ListState kind="error" title="届いた後の処理を表示できませんでした" action={<Button onClick={() => setDetailReloadKey((key) => key + 1)}>詳細を読み直す</Button>} />
+            <ListState kind="error" title="届いた後の処理を表示できませんでした" onRetry={() => setDetailReloadKey((key) => key + 1)} />
           ) : detail && detail.actions.length > 0 ? (
             detail.actions.map((action, index) => (
               <div key={`${action.refKind}-${index}`} className={styles.actionRow}>
@@ -758,7 +757,7 @@ export default function WebhooksIncomingV8() {
                 </thead>
                 <tbody>
                 {unmatched.map((item) => (
-                  <Tr key={item.id} data-table-layout="columns">
+                  <Tr key={item.id} data-table-layout="columns" data-row-id={item.id}>
                     <Td className={styles.miniWhen}>{shortDateTime(item.receivedAt)}</Td>
                     <Td className={styles.miniValue} title={item.identityAttempts.map((attempt: { kind: string; value: string }) => `${identityKindLabel(attempt.kind)}：${attempt.value}`).join('、')}>
                       {item.identityAttempts.length > 0
@@ -860,7 +859,7 @@ export default function WebhooksIncomingV8() {
           busy={creating}
           error={createFieldError.form}
           onCancel={() => { if (!creating) setShowCreate(false) }}
-          onConfirm={() => void runCreate()}
+          onConfirm={() => runCreate()}
           confirmLabel="作る"
           confirmIcon={<Plus size={15} aria-hidden="true" />}
         >
@@ -952,7 +951,7 @@ export default function WebhooksIncomingV8() {
           destructive
           busy={deleting}
           error={deleteError || undefined}
-          onConfirm={() => void runDelete()}
+          onConfirm={() => runDelete()}
           onCancel={() => { if (!deleting) { setDeleteTarget(null); setDeleteError('') } }}
         />
 
@@ -963,7 +962,7 @@ export default function WebhooksIncomingV8() {
           description="新しい合言葉を設定します。保存したあとは二度と全部は表示されません。前の合言葉は24時間だけ使えるので、相手側の切り替え中も受け取りは止まりません。"
           error={rotateError || undefined}
           onCancel={() => { setRotateTarget(null); setRotateSecret('') }}
-          onConfirm={() => void runRotate()}
+          onConfirm={() => runRotate()}
           confirmLabel="保存する"
         >
           <div className={styles.fieldRow}>
@@ -990,7 +989,7 @@ export default function WebhooksIncomingV8() {
             <span className={styles.fieldLabel}>合言葉（今回だけ表示）</span>
             <div className={styles.fieldRow}>
               <p className={`${styles.valueBox} ${styles.grow}`}>{createdSecret.secret}</p>
-              <Button onClick={() => { void navigator.clipboard.writeText(createdSecret.secret); notifyToast('合言葉を写しました') }}><Copy size={15} aria-hidden="true" />写す</Button>
+              <CopyTextButton value={createdSecret!.secret} aria-label="合言葉をコピー"  />
             </div>
           </Dialog>
         ) : null}

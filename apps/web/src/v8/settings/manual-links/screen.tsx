@@ -18,6 +18,7 @@ import ListState from '@/components/shared/list-state'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import { LINK_STATUS_LABEL, checkedLabel, urlLabel } from './manual-link-view'
 import { useManualLinks } from './use-manual-links'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './screen.module.css'
 
 const TITLE = 'マニュアルの正本表'
@@ -48,11 +49,13 @@ export default function ManualLinksScreen() {
     startEdit,
     cancelEdit,
     saveEdit,
+    guard,
   } = useManualLinks()
 
   const frame = (children: React.ReactNode) => (
     <SbSettingsScreen boardId="cIdA2" title={TITLE} help={DESCRIPTION}>
       {children}
+      <UnsavedLeaveDialog open={guard.leaveTarget !== null} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
     </SbSettingsScreen>
   )
 

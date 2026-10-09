@@ -13,7 +13,7 @@ const fx = vi.hoisted(() => ({
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fx.accountId, accounts: [{ id: 'acc-1', name: '銀座店' }, { id: 'acc-2', name: '渋谷店' }] }) }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => fx.role, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
-vi.mock('@/components/shared/toast', () => ({ notifyToast: vi.fn() }))
+vi.mock('@/components/shared/toast', () => ({ ...(() => { const notifyToast = vi.fn(); return { notifyToast, notifySaved: notifyToast } })() }))
 vi.mock('next/navigation', async () => {
   const { useSyncExternalStore } = await import('react')
   return {
@@ -38,6 +38,7 @@ vi.mock('@/lib/api', () => ({
   api: { friends: { list: fx.friendsList, get: fx.friendsGet }, staff: { list: fx.staffList }, uploads: { image: fx.uploadImage } },
   describeSaveFailure: (e: unknown) => (e instanceof Error ? e.message : '保存できませんでした。'),
 }))
+import { flushListUrlState } from '@/components/shared/list-url-state'
 import VisitStampsV8 from './visit-stamps'
 import { notifyToast } from '@/components/shared/toast'
 
@@ -51,6 +52,7 @@ const card = {
 
 beforeEach(() => {
   fx.accountId = 'acc-1'
+  flushListUrlState()
   window.history.replaceState(null, '', '/visit-stamps')
   fx.replace.mockImplementation((href: string) => {
     window.history.replaceState(null, '', href)

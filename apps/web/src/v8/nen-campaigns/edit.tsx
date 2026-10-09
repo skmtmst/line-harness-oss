@@ -11,6 +11,8 @@
  * ・右に LINE での見え方・気をつけること・この画面でできないこと・自分にテストを送る。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState } from 'react'
 import { CalendarClock, ClipboardList, Coins, Eye, Package, Save, Send } from 'lucide-react'
 import { checkNenCampaignBodyLength, NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared'
@@ -173,6 +175,25 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
     return () => { cancelled = true }
   }, [selectedAccountId])
 
+  const contextRef = useRef({ accountId: selectedAccountId, campaignKey })
+  contextRef.current = { accountId: selectedAccountId, campaignKey }
+  const latestSetting = async () => {
+    const context = contextRef.current
+    if (!context.accountId) return null
+    const response = await api.nenCampaigns.settings(context.accountId)
+    if (context !== contextRef.current && (context.accountId !== contextRef.current.accountId || context.campaignKey !== contextRef.current.campaignKey)) return null
+    return response.success ? response.data.find((item) => item.campaignKey === context.campaignKey) ?? null : null
+  }
+  const saveConflict = useSaveConflict<NenCampaignSetting>({
+    fetchLatest: latestSetting,
+    reload: async () => {
+      const latest = await latestSetting()
+      if (!latest) { setError('最新の内容を読み込めませんでした。もう一度お試しください。'); return }
+      setSetting(latest); setDraft(latest); setError(''); saveConflict.clear()
+    },
+  })
+  useEffect(() => { saveConflict.clear() }, [campaignKey, selectedAccountId, saveConflict.clear])
+
   const merged = { ...setting, ...draft } as NenCampaignSetting
   /*
    * WEB230：保存できると setting の版（updatedAt）だけが新しくなり、入力（draft）は前の版のまま。
@@ -301,20 +322,13 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
         setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
         return
       }
-      setNotice('配信内容を保存しました')
+      saveConflict.clear()
+      notifySaved('配信内容を保存しました')
       setSetting({ ...merged, updatedAt: response.data?.updatedAt ?? merged.updatedAt })
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 409 && caught.code === 'VERSION_CONFLICT') {
-        try {
-          const reloaded = await api.nenCampaigns.settings(selectedAccountId)
-          if (reloaded.success) {
-            const found = reloaded.data.find((item) => item.campaignKey === campaignKey) ?? null
-            if (found) setSetting(found)
-          }
-        } catch {
-          // 読み直しに失敗しても入力は残す。文面だけで理由を伝える。
-        }
-        setError('ほかの人が先に保存しました。最新の内容を確認してから、もう一度保存してください。入力した内容はそのまま残っています。')
+        saveConflict.mark()
+        setError('')
         return
       }
       setError(withPermissionFailure(caught, describeSaveFailure(caught), 'store'))
@@ -394,11 +408,13 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
           <Button href="/nen-campaigns">キャンセル</Button>
           <Button type="button" variant="primary" onClick={() => void save()} disabled={saving} busy={saving} busyLabel="保存しています…"><Save size={15} aria-hidden="true" />配信内容を保存する</Button>
         </>
-      ) : <Button href="/nen-campaigns">一覧へ戻る</Button>}
+      ) : <Button href="/nen-campaigns">一覧へ戻る</Button>} dirty={false}
     >
       {!canEdit ? (
         <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />} message="閲覧のみで見ています。配信を直すのは管理者に頼んでください。" />
       ) : null}
+      {saveConflict.conflict ? <SaveConflictBand title="ほかの担当者が先に保存しました" onCompare={() => void saveConflict.compare()} compareBusy={saveConflict.compareBusy} onReload={() => void saveConflict.reloadLatest()} /> : null}
+      <SaveConflictCompareDialog open={saveConflict.compareOpen} busy={saveConflict.compareBusy} error={saveConflict.compareError} onCancel={saveConflict.closeCompare} onReload={() => void saveConflict.reloadLatest()} lines={saveConflict.latest ? Object.entries(withoutVersion(merged) ?? {}).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify((saveConflict.latest as unknown as Record<string, unknown>)[key])).map(([key, value]) => ({ text: `${key === 'bodyText' ? '本文' : key === 'title' ? 'タイトル' : key === 'deliveryTime' ? '配信時刻' : '設定'}：入力 ${typeof value === 'string' ? value : JSON.stringify(value)} ／ 最新 ${JSON.stringify((saveConflict.latest as unknown as Record<string, unknown>)[key])}`, kind: 'change' as const })) : null} />
       {error ? <Notice tone="danger" message={error} /> : null}
       {notice ? <Notice tone="success" message={notice} /> : null}
 

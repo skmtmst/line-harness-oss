@@ -395,7 +395,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
         confirmLabel="やり直す"
         busy={retrying}
         error={dialogError || undefined}
-        onConfirm={() => void retry()}
+        onConfirm={() => retry()}
         onCancel={() => { if (!retrying) setRetryTarget(null) }}
       />
       <ConfirmDialog
@@ -405,7 +405,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
         confirmLabel="ずれを直す"
         busy={fixing}
         error={dialogError || undefined}
-        onConfirm={() => void fix()}
+        onConfirm={() => fix()}
         onCancel={() => { if (!fixing) setFixOpen(false) }}
       />
       <ConfirmDialog
@@ -416,7 +416,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
         destructive
         busy={unpublishing}
         error={dialogError || undefined}
-        onConfirm={() => void unpublish()}
+        onConfirm={() => unpublish()}
         onCancel={() => { if (!unpublishing) setUnpublishOpen(false) }}
       />
       <ConfirmDialog
@@ -426,7 +426,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
         confirmLabel="複製する"
         busy={duplicating}
         error={dialogError || undefined}
-        onConfirm={() => void duplicate()}
+        onConfirm={() => duplicate()}
         onCancel={() => { if (!duplicating) setDuplicateOpen(false) }}
       />
     </div>

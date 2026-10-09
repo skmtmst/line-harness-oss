@@ -11,6 +11,8 @@
  * - 受付を止める・別リンクへ送る・削除するは「その後」の段の右上の「…」から（今は段の題の右）
  * - 閲覧のみ（owner・admin 以外）には、リンクを編集・止める・することを変える・「…」を出さず、閲覧のみの帯を出す
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import CopyTextButton from '@/components/shared/copy-text-button'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useMemo, useState } from 'react'
@@ -126,7 +128,6 @@ function InflowDetailContent() {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [deleteChoice, setDeleteChoice] = useState<DeleteChoice>('stop')
-  const [deleteConfirmationName, setDeleteConfirmationName] = useState('')
   const [canPermanentlyDelete, setCanPermanentlyDelete] = useState(false)
   // 「別の流入リンクへ送る」の転送先。先頭を自動採用しない（#514 重大4）。
   const [redirectTargetId, setRedirectTargetId] = useState('')
@@ -134,11 +135,11 @@ function InflowDetailContent() {
   const [showOrders, setShowOrders] = useState(false)
   const [afterMenuOpen, setAfterMenuOpen] = useState(false)
   const [openFriendMenuId, setOpenFriendMenuId] = useState<string | null>(null)
-  const [friendSearch, setFriendSearch] = useState('')
-  const [friendChip, setFriendChip] = useState<FriendChip>('all')
-  const [friendPeriod, setFriendPeriod] = useState<FriendPeriod>('all')
-  const [friendPage, setFriendPage] = useState(1)
-  const [friendPageSize, setFriendPageSize] = useState(20)
+  const [friendSearch, setFriendSearch] = useListUrlValue('friendSearch', '')
+  const [friendChip, setFriendChip] = useListUrlValue<FriendChip>('friendChip', 'all')
+  const [friendPeriod, setFriendPeriod] = useListUrlValue<FriendPeriod>('friendPeriod', 'all')
+  const [friendPage, setFriendPage] = useListUrlValue('friendPage', 1)
+  const [friendPageSize, setFriendPageSize] = useListUrlValue('friendPageSize', 20)
   const { accounts = [] } = useAccount()
 
   usePageTitle(route?.name ?? '流入と計測')
@@ -256,17 +257,7 @@ function InflowDetailContent() {
   const url = route ? `${workerBase}/r/${encodeURIComponent(route.refCode)}` : null
 
   /** コピーできなかったとき、選んでコピーできる欄をその場に出す（ブラウザの入力窓は使わない。V6R-S3-f）。 */
-  async function copyUrl() {
-    if (!url) return
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopied(true)
-      setCopyFailed(false)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      setCopyFailed(true)
-    }
-  }
+
 
   async function applyDeleteChoice() {
     if (!route || deleting) return
@@ -293,7 +284,7 @@ function InflowDetailContent() {
         const result = deleteChoice === 'delete'
           ? await fetchApi<{ success: boolean; error?: string }>(`/api/entry-routes/${encodeURIComponent(route.id)}`, {
               method: 'DELETE',
-              body: JSON.stringify({ confirmationName: deleteConfirmationName }),
+              body: JSON.stringify({ confirmationName: route.name }),
             })
           : await api.entryRoutes.update(route.id, { isActive: false })
         if (!result.success) throw new Error(result.error)
@@ -362,7 +353,6 @@ function InflowDetailContent() {
   const openDelete = (choice: DeleteChoice) => {
     setDeleteError('')
     setDeleteChoice(choice)
-    setDeleteConfirmationName('')
     setRedirectTargetId('')
     setAfterMenuOpen(false)
     setDeleteOpen(true)
@@ -440,7 +430,7 @@ function InflowDetailContent() {
       actions={route ? (
         <div className={styles.headActions}>
           <Button onClick={() => setQrOpen(true)}><QrCode size={15} aria-hidden="true" />QR コードを表示</Button>
-          <Button onClick={() => void copyUrl()}><Copy size={15} aria-hidden="true" />{copied ? 'コピーしました' : 'URL をコピー'}</Button>
+          <CopyTextButton value={url ?? ""} label="URL をコピー" aria-label="URL をコピー"  />
           {readonly ? null : (
             <Button onClick={() => setEditingRoute(true)}><Pencil size={15} aria-hidden="true" />リンクを編集</Button>
           )}
@@ -663,7 +653,7 @@ function InflowDetailContent() {
                 {friendPageRows.map((friend) => {
                   const blocked = isBlockedFriend(friend)
                   return (
-                    <Tr key={friend.id} className={styles.row} data-table-layout="columns">
+                    <Tr key={friend.id} className={styles.row} data-table-layout="columns" data-row-id={friend.id}>
                       <Td className={styles.colWhen}>
                         <span className={styles.when}>
                           {friend.trackedAt ? friend.trackedAt.slice(5, 16).replace('T', ' ').replaceAll('-', '/').replace(/^0/, '') : '日時不明'}
@@ -776,8 +766,7 @@ function InflowDetailContent() {
           error={deleteError || undefined}
           confirmLabel={deleteChoice === 'stop' ? '受けるのをやめる' : deleteChoice === 'redirect' ? '別のリンクへ送る' : 'この経路を削除する'}
           onConfirm={() => {
-            if (deleteChoice === 'delete' && deleteConfirmationName !== route.name) return
-            void applyDeleteChoice()
+            return applyDeleteChoice()
           }}
           onCancel={() => { if (!deleting) setDeleteOpen(false) }}
         >
@@ -822,16 +811,7 @@ function InflowDetailContent() {
                 <span className={styles.note}>先頭を自動で選ぶことはしません。必ず選んでください。</span>
               </div>
             ) : null}
-            {deleteChoice === 'delete' ? (
-              <Field note={<>空白や大文字・小文字も含め、現在の経路名と同じ入力が必要です。</>} label={<><span className={styles.deleteChoiceTitle}>{`完全削除するには「${route.name}」と入力`}</span></>}><input
-                  value={deleteConfirmationName}
-                  disabled={deleting}
-                  onChange={(event) => setDeleteConfirmationName(event.target.value)}
-                  autoComplete="off"
-                  className={styles.fieldInput}
-                />
-</Field>
-            ) : null}
+
           </div>
         </Dialog>
       ) : null}

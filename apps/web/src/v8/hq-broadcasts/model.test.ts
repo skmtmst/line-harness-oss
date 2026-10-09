@@ -88,7 +88,7 @@ describe('一括配信の計算', () => {
   })
 
   it('予約の日時は日付と時刻から作る。形が違えば null', () => {
-    expect(scheduledIso('2027-01-15', '11:00')).toBe(new Date('2027-01-15T11:00:00').toISOString())
+    expect(scheduledIso('2027-01-15', '11:00')).toBe('2027-01-15T02:00:00.000Z')
     expect(scheduledIso('2027/01/15', '11:00')).toBeNull()
   })
 })

@@ -9,6 +9,9 @@
  * データの口と判断は今の一覧（app/inflow-links/page.tsx の InflowLinksPageInner）と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
@@ -39,6 +42,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import Checkbox from '@/components/shared/checkbox'
@@ -141,16 +145,16 @@ export default function InflowListV8({
   const [loading, setLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
   const [loadError, setLoadError] = useState<unknown>(null)
-  const [sort, setSort] = useState<RouteSort>('friends-desc')
-  const [filter, setFilter] = useState<RouteFilter>('all')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [sort, setSort] = useListUrlValue<RouteSort>('sort', 'friends-desc')
+  const [filter, setFilter] = useListUrlValue<RouteFilter>('filter', 'all')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   // null＝閉じている／'new'＝作る／EntryRoute＝直す／{register}＝未登録 ref を登録する
   const [editing, setEditing] = useState<EntryRoute | 'new' | { register: string } | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [copyFailedId, setCopyFailedId] = useState<string | null>(null)
-  const [selectedGenre, setSelectedGenre] = useState('')
-  const [search, setSearch] = useState('')
+  const [selectedGenre, setSelectedGenre] = useListUrlValue('selectedGenre', '')
+  const [search, setSearch] = useListUrlValue('q', '')
   const [editingGenre, setEditingGenre] = useState<EntryRouteGenre | 'new' | null>(null)
   const [qrRoute, setQrRoute] = useState<QrRoute | null>(null)
   const [openMenuRefCode, setOpenMenuRefCode] = useState<string | null>(null)
@@ -159,6 +163,8 @@ export default function InflowListV8({
   const [poolMembers, setPoolMembers] = useState<Record<string, Set<string>>>({})
   const [poolMemberNames, setPoolMemberNames] = useState<Record<string, string[]>>({})
   const [selectedRouteIds, setSelectedRouteIds] = useState<Set<string>>(() => new Set())
+  const [stopTarget, setStopTarget] = useState<{ id: string; name: string } | null>(null)
+  const toggleLocks = useRef(new Set<string>())
   const [bulkAction, setBulkAction] = useState<BulkRouteAction | null>(null)
   // 数の帯のマスの「…」。開いているマスの名前。
   const [openTileMenu, setOpenTileMenu] = useState<string | null>(null)
@@ -241,6 +247,7 @@ export default function InflowListV8({
     setQrRoute(null)
     setSelectedRouteIds(new Set())
     setBulkAction(null)
+    setStopTarget(null)
     setOpenMenuRefCode(null)
     setPresetOpen(false)
     setAdConnected(null)
@@ -337,38 +344,37 @@ export default function InflowListV8({
     return () => { cancelled = true }
   }, [selectedAccountId, visibility.status, visibility.features])
 
-  const onCopy = async (refCode: string) => {
-    try {
-      await navigator.clipboard.writeText(referralUrl(refCode))
-      setCopiedId(refCode)
-      setCopyFailedId(null)
-      setTimeout(() => setCopiedId(null), 1200)
-    } catch {
-      // 失敗に気づかず URL 未コピーのまま配布作業が進むのを防ぐ。
-      setCopyFailedId(refCode)
-      setTimeout(() => setCopyFailedId(null), 3000)
-    }
-  }
+
 
   /*
    * 行の受付・停止を切り替える（行の「…」から）。押した瞬間に札を変え、裏で保存する
    * （動きの点検・7）。失敗したら元に戻して知らせる。終わったら取り直す。
    */
   const toggleRouteActive = async (entryRouteId: string, nextActive: boolean, name: string) => {
+    if (toggleLocks.current.has(entryRouteId)) return false
+    toggleLocks.current.add(entryRouteId)
+    const accountAtRequest = selectedAccountId
+    const isCurrent = () => accountAtRequest === latestAccountRef.current
     setOpenMenuRefCode(null)
     const setActive = (active: boolean) => setRoutes((current) => current.map((route) => (route.id === entryRouteId ? { ...route, isActive: active } : route)))
     setActive(nextActive)
     try {
       const res = await api.entryRoutes.update(entryRouteId, { isActive: nextActive })
+      if (!isCurrent()) return false
       if (!res.success) throw new Error(res.error || '更新できませんでした')
       notifyToast(nextActive ? `「${name}」の受付を再開しました` : `「${name}」の受付を停止しました`)
       void load()
+      return true
     } catch (cause) {
+      if (!isCurrent()) return false
       setActive(!nextActive)
       notifyToast(
         cause instanceof ApiError && cause.status === 403 ? permissionDeniedMessage('store') : '受付を切り替えられませんでした。',
         { tone: 'error', actionLabel: 'もう一度', onAction: () => { void toggleRouteActive(entryRouteId, nextActive, name) } },
       )
+      return false
+    } finally {
+      toggleLocks.current.delete(entryRouteId)
     }
   }
 
@@ -458,7 +464,7 @@ export default function InflowListV8({
     const items: ActionMenuItem[] = []
     {
       items.push({ id: 'qr', label: 'QRコードを見る', onSelect: () => { setOpenMenuRefCode(null); setQrRoute(qrFor(row)) } })
-      items.push({ id: 'copy', label: 'URLをコピー', onSelect: () => { setOpenMenuRefCode(null); void onCopy(row.refCode) } })
+      items.push({ id: 'copy', label: 'URLをコピー', content: <CopyTextButton role="menuitem" value={referralUrl(row.refCode)} aria-label={`${row.name}のURLをコピー`} />, onSelect: () => {} })
     }
     // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。見る項目（QR・コピー）だけ残す。
     if (row.entryRouteId && !readonly) {
@@ -480,7 +486,7 @@ export default function InflowListV8({
           id: 'stop',
           label: '受付を止める',
           tone: 'danger' as const,
-          onSelect: () => void toggleRouteActive(row.entryRouteId!, false, row.name),
+          onSelect: () => { setOpenMenuRefCode(null); setStopTarget({ id: row.entryRouteId!, name: row.name }) },
         })
     }
     return items
@@ -575,7 +581,7 @@ export default function InflowListV8({
             ))}
           </div>
           <span className={styles.presetLabel}>並び順</span>
-          <Select
+          <ListToolbarSort
             aria-label="並び順"
             value={sort}
             options={SORT_OPTIONS}
@@ -707,7 +713,7 @@ export default function InflowListV8({
                   <span className={styles.nameText} ><TruncatedText value={String(r.name ?? '')} /></span>
                 )
                 return (
-                  <Tr key={r.refCode} interactive className={styles.row} data-table-layout="columns" data-row-id={r.refCode}>
+                  <Tr key={r.refCode} interactive className={styles.row} data-table-layout="columns" data-row-id={r.entryRouteId ?? r.refCode}>
                     <Td className={styles.colCheck}>
                       {r.entryRouteId && !readonly ? (
                         <Checkbox
@@ -784,9 +790,7 @@ export default function InflowListV8({
                     </Td>
                     <Td className={styles.colUrl}>
                       <div className={styles.opsBox}>
-                        <Button onClick={() => void onCopy(r.refCode)} aria-label={`${r.name}のURLをコピー`}>
-                          {copyFailedId === r.refCode ? 'コピー失敗' : copiedId === r.refCode ? '済み' : 'コピー'}
-                        </Button>
+                        <CopyTextButton value={referralUrl(r.refCode)} aria-label={`${r.name}のURLをコピー`}  />
                         {menuItems.length > 0 ? (
                           <RowMenu
                             label={menuLabel}
@@ -827,7 +831,7 @@ export default function InflowListV8({
           </DataTable>
         </div>
 
-        <BulkBar count={selectedRouteIds.size} hint="まとめて操作できるのは登録済みの経路だけです">
+        <BulkBar count={selectedRouteIds.size} total={selectableIds.length} onSelectAll={() => setSelectedRouteIds(new Set(selectableIds))} hint="まとめて操作できるのは登録済みの経路だけです">
           <Button onClick={() => setBulkAction('pause')}>まとめて止める</Button>
           <Button onClick={() => setBulkAction('resume')}>まとめて再開する</Button>
           <Button onClick={() => setBulkAction('move')}>フォルダへ移す</Button>
@@ -925,8 +929,8 @@ export default function InflowListV8({
               openId={openTileMenu}
               onOpenChange={setOpenTileMenu}
               items={[
-                { id: 'ads', label: '広告連携を開く', external: true, onSelect: () => router.push('/inflow-links?tab=ads') },
-                { id: 'connections', label: '広告とのつなぎを開く', external: true, onSelect: () => router.push('/inflow-links?tab=connections') },
+                { id: 'ads', label: '広告連携を開く', external: true, href: '/inflow-links?tab=ads', onSelect: () => router.push('/inflow-links?tab=ads') },
+                { id: 'connections', label: '広告とのつなぎを開く', external: true, href: '/inflow-links?tab=connections', onSelect: () => router.push('/inflow-links?tab=connections') },
               ]}
             />}
           />
@@ -949,6 +953,18 @@ export default function InflowListV8({
       toolbar={narrow ? narrowToolbar : wideToolbar}
       pagination={pager}
       overlays={<>
+        <ConfirmDialog
+          open={stopTarget !== null}
+          title={`「${stopTarget?.name ?? ''}」の受付を停止しますか？`}
+          description="この経路からの新しい受付が止まります。再開するまで、お客さまはこのリンクから登録できません。"
+          confirmLabel="受付を停止する"
+          destructive
+          onCancel={() => setStopTarget(null)}
+          onConfirm={async () => {
+            if (!stopTarget) return
+            if (await toggleRouteActive(stopTarget.id, false, stopTarget.name)) setStopTarget(null)
+          }}
+        />
         {editing ? (
           <EditRouteDialog
             route={editing === 'new' || (typeof editing === 'object' && 'register' in editing) ? null : editing}

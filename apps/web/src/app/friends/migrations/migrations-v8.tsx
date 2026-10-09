@@ -37,7 +37,7 @@ export default function FriendMigrationsV8() {
 
   if (m.status === 'loading') return <ListState kind="loading" title="書き出し・取り込みを読み込んでいます" />
   if (m.status === 'forbidden') return <ListState kind="forbidden" title="書き出し・取り込みを見る権限がありません" description="見るには権限が要ります。オーナーか管理者の方に確認してください。" />
-  if (m.status === 'error') return <ListState kind="error" title="書き出し・取り込みを表示できませんでした" description="履歴は消えていません。" action={<Button onClick={() => void m.load()}>もう一度試す</Button>} />
+  if (m.status === 'error') return <ListState kind="error" title="書き出し・取り込みを表示できませんでした" description="履歴は消えていません。" onRetry={() => void m.load()} />
 
   const reflectable = m.summary ? m.summary.add + m.summary.update : 0
 

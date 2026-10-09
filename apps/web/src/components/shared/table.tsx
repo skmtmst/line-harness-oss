@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import { useListUrlState } from './list-url-state'
 import type { ReactNode, ThHTMLAttributes, TdHTMLAttributes, HTMLAttributes, CSSProperties } from 'react'
 import TruncatedText from './truncated-text'
 import shell from './data-table.module.css'
@@ -183,12 +184,14 @@ export type TrProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'cl
 
 /** 標準一覧の高さ58pxの行。 */
 export function Tr({ children, className, selected, interactive, density, leaving, ...rowProps }: TrProps) {
+  const [listState] = useListUrlState({ highlight: '' })
+  const createdHighlight = Boolean(listState.highlight && listState.highlight === (rowProps as Record<string, unknown>)['data-row-id'])
   const classes = [
     shell.row,
     density === 'comfortable' && shell.rowComfortable,
     density === 'template' && shell.rowTemplate,
     interactive && shell.rowInteractive,
-    selected && shell.rowSelected,
+    (selected || createdHighlight) && shell.rowSelected,
     className,
   ]
     .filter(Boolean)
@@ -197,8 +200,17 @@ export function Tr({ children, className, selected, interactive, density, leavin
     <tr
       className={classes}
       aria-selected={selected === undefined ? undefined : selected}
+      data-created-highlight={createdHighlight || undefined}
       data-leaving={leaving || undefined}
       {...rowProps}
+      onClick={(event) => {
+        if (event.defaultPrevented || (event.target as HTMLElement).closest('a,button,input,select,textarea,[role="button"],[role="checkbox"],[role="menuitem"]')) return
+        if (rowProps.onClick) { rowProps.onClick(event); return }
+        const link = event.currentTarget.querySelector<HTMLAnchorElement>('a[data-row-link],a[href]')
+        if (!link) return
+        if (event.metaKey || event.ctrlKey || event.shiftKey) window.open(link.href, '_blank', 'noopener,noreferrer')
+        else link.click()
+      }}
     >
       {children}
     </tr>
@@ -344,9 +356,9 @@ export function TableStateRow({
         <div className={styles.stateCell} role={kind === 'error' ? 'alert' : 'status'}>
           <p className={styles.stateTitle}>{kind === 'error' ? <FailureTitle title={title ?? failure?.title ?? text.title} /> : (title ?? failure?.title ?? text.title)}</p>
           <p className={styles.stateDescription}>{description ?? failure?.description ?? text.description}</p>
-          {kind === 'error' && (failure && !failure.retryable ? undefined : onRetry) ? (
-            <button type="button" onClick={onRetry} className={styles.stateRetry}>
-              {retryLabel ?? <RetryLabel />}
+          {kind === 'error' ? (
+            <button type="button" onClick={onRetry ?? (() => window.location.reload())} className={styles.stateRetry}>
+              <RetryLabel />
             </button>
           ) : null}
         </div>

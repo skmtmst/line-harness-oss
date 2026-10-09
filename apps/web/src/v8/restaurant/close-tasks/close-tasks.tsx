@@ -9,6 +9,7 @@ import { useUrlTab } from '@/lib/use-url-tab'
  * ［閉じた］は媒体ごと（まだ閉じていない先頭の媒体。ほかの媒体は「…」から）。
  * 席が空いた枠は「もう開けてよい」。読む口・書く口は channel-close-tasks（今ある口）だけ。動きは BEHAVIOR.md。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check } from 'lucide-react'
@@ -57,7 +58,7 @@ export default function CloseTasksPage() {
   const [media, setMedia] = useState<StoreMedium[]>([])
   const [error, setError] = useState<unknown>(null)
   const [tab, setTab] = useUrlTab(['open', 'done'] as const, 'open')
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [medium, setMedium] = useState('all')
   const [busyId, setBusyId] = useState('')
 
@@ -165,7 +166,7 @@ export default function CloseTasksPage() {
                       <Button external size="compact" href={targetMedium.adminUrl}  >管理画面を開く</Button>
                     ) : null}
                     {canWrite && target ? (
-                      <Button size="compact" onClick={() => void close(target.id, target.name)} disabled={busyId === target.id} aria-label={`${target.name}の枠を閉じた`} title={`${target.name}の枠を閉じた`}>
+                      <Button size="compact" onClick={() => void close(target.id, target.name)} disabled={busyId === target.id} aria-label={`${target.name}の枠を閉じた`} title={`${target.name}の枠を閉じた`} busy={Boolean(busyId === target.id)} busyLabel="処理中…">
                         <Check size={15} aria-hidden="true" />閉じた
                       </Button>
                     ) : null}
@@ -174,7 +175,7 @@ export default function CloseTasksPage() {
                       label={`${slotTitle(group.startsAt)}の操作`}
                       items={[
                         ...(canWrite ? remaining.slice(1).map((item) => ({ id: item.id, label: `${item.name}を閉じた`, onSelect: () => void close(item.id, item.name) })) : []),
-                        { id: 'ledger', label: '予約台帳でこの日を見る', external: true, onSelect: () => { router.push(`/restaurant-test/reservations?date=${group.startsAt.slice(0, 10)}`) } },
+                        { id: 'ledger', label: '予約台帳でこの日を見る', external: true, href: `/restaurant-test/reservations?date=${group.startsAt.slice(0, 10)}`, onSelect: () => { router.push(`/restaurant-test/reservations?date=${group.startsAt.slice(0, 10)}`) } },
                       ]}
                     />
                   </span>

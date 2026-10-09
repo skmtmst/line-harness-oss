@@ -230,13 +230,13 @@ export default function SnsSettingsPage() {
               {canManage && igState !== 'unconfigured' ? (
                 <div className={styles.actions}>
                   {igState === 'connected' ? (
-                    <Button variant="secondary" onClick={() => void checkInstagram()} disabled={busy}>
-                      <RefreshCw size={16} />
+                    <Button variant="secondary" onClick={() => void checkInstagram()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">
+                      <RefreshCw size={15} />
                       接続を確かめる
                     </Button>
                   ) : (
-                    <Button variant="primary" onClick={() => void connectInstagram()} disabled={busy}>
-                      <Camera size={16} aria-hidden />
+                    <Button variant="primary" onClick={() => void connectInstagram()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">
+                      <Camera size={15} aria-hidden />
                       Instagram にログインして接続
                     </Button>
                   )}
@@ -262,7 +262,7 @@ export default function SnsSettingsPage() {
         description="解除すると、口コミの取り込みと投稿の公開が止まります。あとでもう一度つなぎ直せます。"
         confirmLabel="解除する"
         busy={busy}
-        onConfirm={() => void runDisconnect()}
+        onConfirm={() => runDisconnect()}
         onCancel={() => setConfirm(null)}
       />
       <ConfirmDialog
@@ -272,7 +272,7 @@ export default function SnsSettingsPage() {
         description="解除すると、Googleビジネスの投稿を Instagram へ同時に出せなくなります。あとでもう一度つなぎ直せます。"
         confirmLabel="解除する"
         busy={busy}
-        onConfirm={() => void runDisconnect()}
+        onConfirm={() => runDisconnect()}
         onCancel={() => setConfirm(null)}
       />
     </PageFrame>

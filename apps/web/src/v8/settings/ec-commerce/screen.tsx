@@ -10,6 +10,9 @@
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
 import { formatDate as polishFormatDate } from '@/lib/format'
+import { notifySaved } from '@/components/shared/toast'
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { CircleDot, Plug, Star } from 'lucide-react'
@@ -164,11 +167,12 @@ function actionServerFilter(status: ActionTab): { status?: 'succeeded' | 'skippe
 function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit: boolean }) {
   const [overviewSlot, setOverviewSlot] = useState<AccountBound<OverviewWithLatency | null>>(() => pendingFor(accountId, null))
   const [recordsSlot, setRecordsSlot] = useState<AccountBound<ImportRecords>>(() => pendingFor(accountId, EMPTY_RECORDS))
+  const [urlPage, setUrlPage] = useListUrlValue('page', 1)
   const [pageSlot, setPageSlot] = useState<{ accountId: string | null; page: number }>({ accountId, page: 1 })
-  const [query, setQuery] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [status, setStatus] = useState<ActionTab>('all')
-  const [sort, setSort] = useState<'newest' | 'oldest'>('newest')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [searchQuery, setSearchQuery] = useListUrlValue('q', '')
+  const [status, setStatus] = useListUrlValue<ActionTab>('status', 'all')
+  const [sort, setSort] = useListUrlValue<'newest' | 'oldest'>('sort', 'newest')
   const [retryingSlot, setRetryingSlot] = useState<{ accountId: string | null; id: string | null }>({ accountId, id: null })
   const [noticeSlot, setNoticeSlot] = useState<{ accountId: string | null; notice: { tone: 'success' | 'error'; text: string } | null }>({ accountId, notice: null })
   const [detailSlot, setDetailSlot] = useState<{ accountId: string | null; orderId: string | null }>({ accountId, orderId: null })
@@ -190,9 +194,9 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
   const actionSummary = recordsView.data.summary
   const actionTotal = recordsView.data.total
   const listState = recordsView.state
-  const page = pageSlot.accountId === accountId ? pageSlot.page : 1
+  const page = pageSlot.accountId === accountId ? urlPage : 1
   const notice = noticeSlot.accountId === accountId ? noticeSlot.notice : null
-  const setPage = useCallback((next: number) => setPageSlot({ accountId, page: next }), [accountId])
+  const setPage = useCallback((next: number) => { setPageSlot({ accountId, page: next }); setUrlPage(next) }, [accountId, setUrlPage])
   const setNotice = useCallback((next: { tone: 'success' | 'error'; text: string } | null) => {
     if (accountId !== currentAccountIdRef.current) return
     setNoticeSlot({ accountId, notice: next })
@@ -273,7 +277,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
     const timer = window.setTimeout(() => {
       setPage(1)
       setSearchQuery(query.trim())
-    }, 300)
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [query, setPage])
 
@@ -302,7 +306,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
         crypto.randomUUID(),
       )
       if (!response.success) throw new Error('retry_failed')
-      setNotice({ tone: 'success', text: '失敗した処理だけを、もう一度行う待ち行列へ戻しました。' })
+      notifySaved('失敗した処理だけを、もう一度行う待ち行列へ戻しました。')
       await loadRecords(false)
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) await loadRecords(false)
@@ -387,7 +391,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
         ))}
         <span className={styles.spacer} />
         <span className={styles.sortBox}>
-          <Select
+          <ListToolbarSort
             aria-label="取り込みの並び順"
             value={sort}
             onChange={(value) => setSort(value as typeof sort)}
@@ -445,7 +449,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
               const linked = Boolean(action.friendId ?? order?.friendId)
               const label = action.eventLabel || ecEventLabel(action.eventType, action.eventType)
               return (
-                <Tr key={action.id}>
+                <Tr key={action.id} data-row-id={action.id}>
                   <Td><span className={styles.stack}>
                     <span className={styles.main}>{dateTime(action.receivedAt)}</span>
                     <span className={styles.sub} title={action.orderNumber ? `注文 ${action.orderNumber}` : undefined}>{label}</span>

@@ -81,5 +81,5 @@ export default function HqTemplatePicker({ open, onClose, onPick, kind }: {
       : list.length === 0 ? <ListState permissionScope="hq" kind="empty" title="統括のテンプレートがまだありません。「テンプレート」で作ってください。" /> : undefined}
     preview={(item) => <TemplatePreview id={item?.id ?? null} />}
     onSelect={() => setError('')}
-    onConfirm={(id) => void pick(id)} onCancel={() => { setError(''); onClose() }} />
+    onConfirm={(id) => pick(id)} onCancel={() => { setError(''); onClose() }} />
 }

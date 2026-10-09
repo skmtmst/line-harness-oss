@@ -11,6 +11,8 @@
  * フォルダの列に割り当てる API は無いので、渡すものの種類で分けた
  * 見え方の切り替えとして持つ（保存はしない）。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, ArrowLeftRight, CircleDot, Download, FilePen, Gift, Plus, Star } from 'lucide-react'
@@ -151,7 +153,7 @@ export default function RewardsTab() {
   const [failed, setFailed] = useState<FailedRedemption[]>([])
   const [redemptionsVisible, setRedemptionsVisible] = useState(false)
   const [redemptionsLoad, setRedemptionsLoad] = useState<LoadStatus>('loading')
-  const [redemptionsPage, setRedemptionsPage] = useState(1)
+  const [redemptionsPage, setRedemptionsPage] = useListUrlValue('redemptionsPage', 1)
   const [redemptionsTotal, setRedemptionsTotal] = useState(0)
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [retryError, setRetryError] = useState('')
@@ -160,14 +162,14 @@ export default function RewardsTab() {
   const [testBusyId, setTestBusyId] = useState<string | null>(null)
   const [duplicateId, setDuplicateId] = useState<string | null>(null)
   const [menuNotice, setMenuNotice] = useState('')
-  const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
-  const [folder, setFolder] = useState<Folder>('すべて')
-  const [publishedOnly, setPublishedOnly] = useState(false)
-  const [draftOnly, setDraftOnly] = useState(false)
+  const [searchInput, setSearchInput] = useListUrlValue('q', '')
+  const [search, setSearch] = useListUrlValue('q', '')
+  const [folder, setFolder] = useListUrlValue<Folder>('folder', 'すべて')
+  const [publishedOnly, setPublishedOnly] = useListUrlValue('publishedOnly', false)
+  const [draftOnly, setDraftOnly] = useListUrlValue('draftOnly', false)
   const [preset, setPreset] = useState('default')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const requestRef = useRef(0)
 
   const load = useCallback(async () => {
@@ -252,7 +254,7 @@ export default function RewardsTab() {
     const timer = window.setTimeout(() => {
       setPage(1)
       setSearch(searchInput.trim())
-    }, 300)
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
@@ -639,7 +641,7 @@ export default function RewardsTab() {
               id: 'open',
               label: readonly ? '中身を見る' : '編集',
               external: true,
-              onSelect: () => router.push(`/mileage/rewards/edit?id=${encodeURIComponent(reward.id)}`),
+              href: `/mileage/rewards/edit?id=${encodeURIComponent(reward.id)}`, onSelect: () => router.push(`/mileage/rewards/edit?id=${encodeURIComponent(reward.id)}`),
             },
             /* 閲覧のみの人には、変える操作を出さない（押せない形で残さない）。 */
             ...(readonly ? [] : [
@@ -690,7 +692,7 @@ export default function RewardsTab() {
             const reach = reachMetrics.find((metric) => metric.rewardId === reward.id)
             const sub = benefitSub(reward)
             return (
-              <Tr key={reward.id} className={styles.row} data-table-layout="columns">
+              <Tr key={reward.id} className={styles.row} data-table-layout="columns" data-row-id={reward.id}>
                 <Td className={styles.colName}>
                   {/* 名前の前にフォルダの丸（左のフォルダの列と同じ分け方。未分類は輪）。補足は名前の頭にそろえる。 */}
                   <FolderDotName folder={null}>
@@ -760,7 +762,7 @@ export default function RewardsTab() {
           </thead>
           <tbody>
             {failed.map((item) => (
-              <Tr key={item.id} className={styles.row} data-table-layout="columns">
+              <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
                 <Td className={styles.colName}><span className={styles.cellMain} title={item.rewardName}>{item.rewardName}</span></Td>
                 <Td className={styles.colStateWide}>
                   {item.status === 'delivering' ? (

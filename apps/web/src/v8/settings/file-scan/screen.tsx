@@ -155,7 +155,7 @@ export default function FileScanScreen() {
               releaseReasonRef.current?.scrollIntoView({ block: 'center' })
               return
             }
-            void release()
+            return release()
           }}
         >
           <Field label="理由（必須）" htmlFor="file-scan-release-reason" error={releaseReasonError || undefined}>
@@ -189,7 +189,7 @@ export default function FileScanScreen() {
           busy={configBusy}
           error={stopError || undefined}
           onCancel={() => { setStopExternal(false); setStopError('') }}
-          onConfirm={() => void stopExternalConfig()}
+          onConfirm={() => stopExternalConfig()}
         />
       ) : null}
 
@@ -197,6 +197,7 @@ export default function FileScanScreen() {
         <ConfirmDialog
           open
           title="ファイルを削除する"
+          deleteName={deleteTarget.filename}
           description={`${deleteTarget.filename} を消します。中身は画面に出ません。監査の記録は残ります。`}
           confirmLabel="削除する"
           cancelLabel="キャンセル"
@@ -204,7 +205,7 @@ export default function FileScanScreen() {
           busy={deleteBusy}
           error={deleteError || undefined}
           onCancel={() => { setDeleteTarget(null); setDeleteError('') }}
-          onConfirm={() => void remove()}
+          onConfirm={() => remove()}
         />
       ) : null}
     </>

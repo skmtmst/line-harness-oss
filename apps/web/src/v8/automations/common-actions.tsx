@@ -8,6 +8,7 @@
  * 違いは見せ方だけ——型（ListPage）に、タブ・数の帯・左のフォルダの列（上に「共通アクションを作る」）・
  * 案内の帯・道具の段・表（絵の列の並び）を渡す。行の右端は「中身を見る」と「…」。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
@@ -108,16 +109,16 @@ export default function CommonActionsV8() {
 
   const [items, setItems] = useState<CommonActionSummary[]>([])
   const [summary, setSummary] = useState<Summary | null>(null)
-  const [filter, setFilter] = useState<Filter>('all')
-  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useListUrlValue<Filter>('filter', 'all')
+  const [query, setQuery] = useListUrlValue('q', '')
   const deferredQuery = useDeferredValue(query)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
   const [folders, setFolders] = useState<Folder[]>([])
-  const [folderFilter, setFolderFilter] = useState('')
+  const [folderFilter, setFolderFilter] = useListUrlValue('folderFilter', '')
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [archiving, setArchiving] = useState<{ item: CommonActionSummary; mode: 'archive' | 'unarchive' } | null>(null)
@@ -302,7 +303,7 @@ export default function CommonActionsV8() {
         kind="error"
         title="共通アクションを読み込めませんでした"
         description="登録した内容は消えていません。通信を確かめて、もう一度お試しください。"
-        action={<Button variant="secondary" onClick={() => void load()}>もう一度試す</Button>}
+        onRetry={() => void load()}
       />
     )
   } else if (items.length === 0 || (folderFilter && folderFilter !== UNFILED)) {
@@ -440,7 +441,7 @@ export default function CommonActionsV8() {
             : archiving && archiving.item.bindingCount > 0 ? '閉じる' : '保管する'}
           busy={archivingBusy}
           onCancel={() => setArchiving(null)}
-          onConfirm={() => void confirmArchive()}
+          onConfirm={() => confirmArchive()}
         >
           {archiving?.mode === 'archive' && archiving.item.bindingCount > 0 ? (
             <p className={styles.dialogWarn} role="alert">

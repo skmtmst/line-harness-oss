@@ -2,6 +2,8 @@
 
 
 import SharedStatusPill from '@/components/shared/status-pill'
+import BulkBar from '@/components/shared/bulk-bar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar, { ListToolbarOptional } from '@/components/shared/list-toolbar'
@@ -56,7 +58,6 @@ import { formatNumber } from '@/lib/format'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { notifyToast } from '@/components/shared/toast'
 import { runUndoable } from '@/lib/undoable'
-import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { useLiveReorder } from '@/lib/use-live-reorder'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
@@ -68,7 +69,7 @@ import Notice from '@/components/shared/notice'
 import KpiBand from '@/components/shared/kpi-band'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
-import SortSelect from '@/components/ui/sort-select'
+import { ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
 import FilterChip from '@/components/shared/filter-chip'
 import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -266,14 +267,14 @@ export default function AutoRepliesListV8() {
   const [folders, setFolders] = useState<Folder[]>([])
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   const [folderFilter, setFolderFilter] = useListUrlParam('folder')
-  const [sortKey, setSortKey] = useState<SortKey>('priority')
+  const [sortKey, setSortKey] = useListUrlValue<SortKey>('sortKey', 'priority')
   const [savedFilter, setSavedFilter] = useListUrlParam('view')
   const [stoppedOnly, setStoppedOnly] = useListUrlFlag('stopped')
   const [timedOnly, setTimedOnly] = useListUrlFlag('timed')
   const [zeroThisMonthOnly, setZeroThisMonthOnly] = useListUrlFlag('zero')
   /** 「重なりあり」の絞り込み。要確認の帯・行の札から入る。 */
   const [conflictOnly, setConflictOnly] = useListUrlFlag('conflict')
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [pageParam, setPageParam] = useListUrlParam('page', '1')
   const page = Math.max(1, Number.parseInt(pageParam, 10) || 1)
   const setPage = useCallback((next: number) => setPageParam(String(next)), [setPageParam])
@@ -392,33 +393,8 @@ export default function AutoRepliesListV8() {
     page,
   })
   const rules = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : items
-  /*
-   * 止まっている自動応答の削除は、どこにも影響しない（もう返信していない）。確かめの窓を出さずに
-   * 一覧から外し、5秒は「元に戻す」で取り消せる（動きの点検 17 番）。動いているものは今までどおり窓。
-   */
-  const deferredDelete = useDeferredDelete()
-  const requestDelete = (r: AutoReply) => {
-    setDeleteError('')
-    if (r.isActive) {
-      setPendingDelete({ item: r, accountId: selectedAccountId })
-      return
-    }
-    const requestAccountId = selectedAccountId
-    if (panelId === r.id) setPanelId(null)
-    setSelectedIds((current) => {
-      if (!current.has(r.id)) return current
-      const next = new Set(current)
-      next.delete(r.id)
-      return next
-    })
-    deferredDelete.schedule({
-      ids: [r.id],
-      message: `自動応答「${displayName(r)}」を削除しました`,
-      commit: () => api.autoReplies.delete(r.id),
-      onCommitted: () => (selectedAccountIdRef.current === requestAccountId ? load() : undefined),
-      failureMessage: '自動応答を削除できませんでした。状態を読み直してからお試しください。',
-    })
-  }
+  /* 削除は、利用状況にかかわらず確認してから実行する。 */
+  const requestDelete = (r: AutoReply) => { setDeleteError(''); setPendingDelete({ item: r, accountId: selectedAccountId }) }
 
   /* ===== 数の帯 ===== */
   const hitsAllKnown = rules.length > 0 && rules.every((r) => r.hits !== undefined)
@@ -437,7 +413,7 @@ export default function AutoRepliesListV8() {
   const ready = visibleLoadState === 'ready'
 
   /* ===== 絞り込み ===== */
-  const afterQuery = rules.filter((r) => !deferredDelete.isHidden(r.id) && autoReplyMatchesQuery(r, query))
+  const afterQuery = rules.filter((r) => autoReplyMatchesQuery(r, query))
   const inFolder = afterQuery.filter((r) => {
     if (folderFilter === UNFILED) return !r.folderId
     if (folderFilter) return r.folderId === folderFilter
@@ -531,15 +507,15 @@ export default function AutoRepliesListV8() {
    * 再開したなら止める。止め直すときは変える前の理由を使う）。
    * 送れなかったら戻して「もう一度」の知らせを出す。
    */
-  const runToggle = () => {
-    if (!pendingToggle) return
-    if (pendingToggle.accountId !== selectedAccountId) {
+  const runToggle = (target = pendingToggle) => {
+    if (!target) return
+    if (target.accountId !== selectedAccountId) {
       setToggleError('アカウントが切り替わりました。操作する自動応答を選び直してください。')
       return
     }
-    const requestAccountId = pendingToggle.accountId
-    const ids = pendingToggle.ids
-    const kind = pendingToggle.kind
+    const requestAccountId = target.accountId
+    const ids = target.ids
+    const kind = target.kind
     const reason = toggleReason.trim() === '' ? null : toggleReason.trim()
     const key = listContextKey
     // 逆操作のために、変える前の止めた理由を覚えておく。
@@ -603,14 +579,7 @@ export default function AutoRepliesListV8() {
         setOptimisticRows(null)
         setSelectedIds(new Set())
         reloadIfSameAccount()
-        const reverseKind = targetKind === 'stop' ? 'resume' : 'stop'
-        notifyToast(doneMessage(targetKind), {
-          actionLabel: '元に戻す',
-          onAction: () =>
-            sendToggle(reverseKind, (id) =>
-              reverseKind === 'stop' ? (beforeStopReason.get(id) ?? null) : null,
-            ),
-        })
+        notifyToast(doneMessage(targetKind))
       })()
     }
     setPendingToggle(null)
@@ -906,7 +875,7 @@ export default function AutoRepliesListV8() {
               dividerBefore: true,
               onSelect: () => {
                 setToggleError('')
-                setPendingToggle({ ids: [r.id], names: [name], kind: 'resume', accountId: selectedAccountId })
+                runToggle({ ids: [r.id], names: [name], kind: 'resume', accountId: selectedAccountId })
               },
             },
       )
@@ -956,12 +925,9 @@ export default function AutoRepliesListV8() {
     const name = displayName(r)
     setToggleError('')
     setToggleReason('')
-    setPendingToggle({
-      ids: [r.id],
-      names: [name],
-      kind: r.isActive ? 'stop' : 'resume',
-      accountId: selectedAccountId,
-    })
+    const target: PendingToggle = { ids: [r.id], names: [name], kind: r.isActive ? 'stop' : 'resume', accountId: selectedAccountId }
+    if (r.isActive) setPendingToggle(target)
+    else runToggle(target)
     setPanelId(null)
   }
 
@@ -1120,7 +1086,7 @@ export default function AutoRepliesListV8() {
             : '登録したルールは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。'}
       </p>
       {visibleLoadState === 'error' && (
-        <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+        <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
       )}
     </div>
   ) : sortedItems.length === 0 ? (
@@ -1200,7 +1166,7 @@ export default function AutoRepliesListV8() {
                       event.preventDefault()
                       setPanelId(r.id)
                     }
-                  }}
+                  }} data-row-id={r.id}
                 >
                     <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
                       {canEdit && <Checkbox
@@ -1403,9 +1369,7 @@ export default function AutoRepliesListV8() {
 
       {/* まとめての帯（選ぶと表の下に出る）：止める・再開・フォルダへ移す。 */}
       {canEdit && selectedCount > 0 ? (
-        <div className={styles.bulkRow} style={{ padding: '10px 14px' }} role="region" aria-label="選択中のまとめ操作">
-          <span className={styles.bulkCount} aria-live="polite" aria-atomic="true">{selectedCount} 件を選択中</span>
-          <Button
+        <BulkBar count={selectedCount} total={sortedItems.length} onSelectAll={() => setSelectedIds(new Set(sortedItems.map(item => item.id)))} onClear={clearSelection}><Button
             type="button"
             variant="secondary"
             disabled={stoppableIds.length === 0}
@@ -1418,32 +1382,28 @@ export default function AutoRepliesListV8() {
           >
             <Square size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
             まとめて止める
-          </Button>
-          <Button
+          </Button><Button
             type="button"
             variant="secondary"
             disabled={resumableIds.length === 0}
             title={resumableIds.length === 0 ? '停止中のルールが選ばれていません' : undefined}
             onClick={() => {
               setToggleError('')
-              setPendingToggle({ ids: resumableIds, names: [], kind: 'resume', accountId: selectedAccountId })
+              runToggle({ ids: resumableIds, names: [], kind: 'resume', accountId: selectedAccountId })
             }}
           >
             <Play size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
             まとめて再開
-          </Button>
-          <Button
+          </Button><Button
             type="button"
             variant="secondary"
             onClick={() => openMove([...selectedIds])}
           >
             <FolderIcon size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
             フォルダへ移す
-          </Button>
-          <Button type="button" variant="secondary" onClick={() => setSelectedIds(new Set())}>
+          </Button><Button type="button" variant="secondary" onClick={() => setSelectedIds(new Set())}>
             選択を外す
-          </Button>
-        </div>
+          </Button></BulkBar>
       ) : null}
     </>
   )
@@ -1799,7 +1759,7 @@ export default function AutoRepliesListV8() {
         confirmLabel={duplicating ? '複製中…' : '複製する'}
         busy={duplicating}
         error={duplicateError}
-        onConfirm={() => void runDuplicate()}
+        onConfirm={() => runDuplicate()}
         onCancel={() => {
           if (duplicating) return
           setDuplicateTarget(null)
@@ -1868,7 +1828,7 @@ export default function AutoRepliesListV8() {
         {actionError ? (
           <p className={styles.errorBand} style={{ padding: '10px 14px' }} role="alert">
             {actionError}
-            <button type="button" onClick={() => void load()}>読み直す</button>
+            <button type="button" onClick={() => void load()}>もう一度読み込む</button>
           </p>
         ) : null}
         {listBody}

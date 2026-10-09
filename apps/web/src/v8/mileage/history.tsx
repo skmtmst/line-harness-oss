@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDateOffset, jstDate } from '@/lib/jst-datetime'
+
 /*
  * ★V8 マイル「履歴」（板 `oRbJi`、状態は見本帳 `zaqP9`）。
  *
@@ -9,6 +11,7 @@
  * ほかは「友だちを見る」）＋「…」。行を押すとその友だちのマイルの詳細。
  * 種類・方法・期間の絞り込みは「よく使う絞り込み」の見方として残す。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CalendarRange, CircleDot, Download, History, Plus, TrendingDown, TrendingUp, Undo2 } from 'lucide-react'
@@ -66,14 +69,11 @@ const PRESETS: Array<{ value: string; label: string }> = [
 ]
 
 function monthStart(): string {
-  const date = new Date()
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`
+  return jstDate().slice(0, 7) + '-01'
 }
 
 function daysAgo(days: number) {
-  const date = new Date()
-  date.setDate(date.getDate() - days)
-  return date.toISOString().slice(0, 10)
+  return jstDateOffset(-days)
 }
 
 export default function HistoryTab() {
@@ -89,13 +89,13 @@ export default function HistoryTab() {
   const [pendingReason, setPendingReason] = useState('')
   const [pendingBusy, setPendingBusy] = useState(false)
   const [pendingError, setPendingError] = useState('')
-  const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
-  const [grantedOnly, setGrantedOnly] = useState(false)
-  const [spentOnly, setSpentOnly] = useState(false)
+  const [searchInput, setSearchInput] = useListUrlValue('q', '')
+  const [search, setSearch] = useListUrlValue('q', '')
+  const [grantedOnly, setGrantedOnly] = useListUrlValue('grantedOnly', false)
+  const [spentOnly, setSpentOnly] = useListUrlValue('spentOnly', false)
   const [preset, setPreset] = useState('all')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [menuId, setMenuId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -156,7 +156,7 @@ export default function HistoryTab() {
     const timer = window.setTimeout(() => {
       setPage(1)
       setSearch(searchInput.trim())
-    }, 300)
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
@@ -354,7 +354,7 @@ export default function HistoryTab() {
                 onClick={(event) => {
                   if ((event.target as HTMLElement).closest('a, button, [role="menu"]')) return
                   router.push(friendHref)
-                }}
+                }} data-row-id={item.id}
               >
                 <Td className={styles.colName}>
                   <span className={styles.rowName} title={viewName(item)}>{viewName(item)}</span>
@@ -396,7 +396,7 @@ export default function HistoryTab() {
                         onOpenChange={(next) => setMenuId(next ? item.id : null)}
                         items={[
                           ...(pending ? [{ id: 'void', label: '取り消す', onSelect: () => openPending('void', item) }] : []),
-                          { id: 'friend', label: '友だちを見る', external: true, onSelect: () => router.push(friendHref) },
+                          { id: 'friend', label: '友だちを見る', external: true, href: friendHref, onSelect: () => router.push(friendHref) },
                         ]}
                       />
                     </div>
@@ -472,7 +472,7 @@ export default function HistoryTab() {
           busy={pendingBusy}
           error={pendingError || undefined}
           onCancel={() => { if (!pendingBusy) setPendingAction(null) }}
-          onConfirm={() => void runPendingAction()}
+          onConfirm={() => runPendingAction()}
         >
           <Field label="理由" required><textarea
               className={styles.textarea}

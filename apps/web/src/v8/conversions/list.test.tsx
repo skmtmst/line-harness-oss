@@ -133,7 +133,7 @@ describe('V8 コンバージョンの一覧', () => {
     expect(screen.getByText('成果地点を読み込めませんでした')).toBeTruthy()
     expect(screen.queryByText('まだ成果地点がありません')).toBeNull()
     failed = false
-    fireEvent.click(screen.getByRole('button', { name: 'もう一度試す' }))
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
     await flush()
     expect(screen.getByText('商品を買った')).toBeTruthy()
     expect(screen.queryByText('成果地点を読み込めませんでした')).toBeNull()

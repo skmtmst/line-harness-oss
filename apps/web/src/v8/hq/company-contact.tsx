@@ -1,5 +1,6 @@
 'use client'
 
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { Check, Search } from 'lucide-react'
 import { COMPANY_CONTACT_FIELDS, parseTenantCompanyContact, type TenantCompanyContact } from '@line-crm/shared'
@@ -89,7 +90,7 @@ export default function CompanyContactCard({ canEdit }: { canEdit: boolean }) {
       valuesRef.current = data
       setValues(data)
       setRevision(next)
-      setSaved(true)
+      setSaved(true); notifySaved('会社と連絡先を保存しました。')
     } catch (caught) {
       // 通信失敗・権限不足・409でも入力と期待する版をそのまま残す。
       setError(japaneseDetailOf(caught) || describeApiFailure(caught, '会社と連絡先の保存', { scope: 'hq' }))
@@ -149,6 +150,6 @@ export default function CompanyContactCard({ canEdit }: { canEdit: boolean }) {
     {loading ? <p role="status" className={styles.hint}>読み込んでいます…</p> : null}
     {error ? <p role="alert" className={styles.error}>{error}</p> : null}
     {!loading && revision === null && canEdit ? <Button type="button" onClick={() => void load()}>もう一度読み込む</Button> : null}
-    {saved ? <p role="status" className={styles.saved}>会社と連絡先を保存しました。</p> : null}
+    {null}
   </SettingsFormCard>
 }

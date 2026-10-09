@@ -11,6 +11,7 @@
  * データの口・保存の口・権限・失敗の扱いは app/conversions/page.tsx と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -41,7 +42,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
-import SortSelect from '@/components/ui/sort-select'
+import { ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import ManagedFolderPanel, { folderDotFor, managedFolderOptions, useManagedFolders } from '@/components/shared/managed-folder-panel'
 import { useListUrlParam } from '@/components/shared/list-url-state'
@@ -275,12 +276,12 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   const [summaryReport, setSummaryReport] = useState<ConversionDefinitionReport | null>(null)
   const [listTruncated, setListTruncated] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [debouncedQuery, setDebouncedQuery] = useState('')
-  const [sort, setSort] = useState<PointSort>('cv-desc')
+  const [sort, setSort] = useListUrlValue<PointSort>('sort', 'cv-desc')
   const [status, setStatus] = useState<StatusFilter>('all')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   /* 左のフォルダの列（共通の /api/folders・種類 conversion）。'' はすべて。`?folder=` で共有できる。 */
   const [folderFilter, setFolderFilter] = useListUrlParam('folder')
   const folderState = useManagedFolders('conversion', accountId)
@@ -335,8 +336,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   const [actionNotice, setActionNotice] = useState('')
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300)
-    return () => window.clearTimeout(timer)
+    setDebouncedQuery(query.trim())
   }, [query])
 
   /* 一覧は検索・並びを口へ渡し、続く頁をすべて読む（50頁・5000件で止め、切れたら断る）。 */
@@ -786,7 +786,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
     { id: 'detail', label: '中身を見る', onSelect: () => setDetailTarget(point) },
     { id: 'usage', label: '使う場所を見る', onSelect: () => setPanelId(point.id) },
     ...(canEdit ? [
-      { id: 'add-usage', label: '使う場所を足す', external: true, onSelect: () => router.push(addUsageHref(point)) },
+      { id: 'add-usage', label: '使う場所を足す', external: true, href: addUsageHref(point), onSelect: () => router.push(addUsageHref(point)) },
       ...(point.status !== 'stopped' ? [{ id: 'edit', label: '編集する', onSelect: () => openEdit(point) }] : []),
       ...(point.state === 'draft'
         ? [{ id: 'publish', label: '公開する', disabled: publishing, onSelect: () => void publishDraft(point) }]

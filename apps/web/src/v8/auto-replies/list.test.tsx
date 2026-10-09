@@ -141,6 +141,7 @@ describe('V8 自動応答一覧（src/v8）の動き', () => {
     const search = host.querySelector('input[placeholder="ルール名・言葉で探す"]') as HTMLInputElement
     expect(search, '探す欄がありません').toBeTruthy()
     fireEvent.change(search, { target: { value: '営業時間' } })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
     await flush()
     expect(host.textContent).toContain('営業時間外の自動返信')
     expect(host.textContent).not.toContain('予約変更のお問い合わせ')
@@ -189,14 +190,14 @@ it('取得失敗を空の一覧にせず、その場で読み直すとルール�
   act(() => { root.render(<AutoRepliesListV8 />) })
   await flush()
   expect(host.textContent).not.toContain('まだ自動応答のルールはありません')
-  const retry = [...host.querySelectorAll('button')].find(button => button.textContent === 'もう一度試す')
+  const retry = [...host.querySelectorAll('button')].find(button => button.textContent === 'もう一度読み込む')
   expect(retry).toBeTruthy()
   const calls = listReplies.mock.calls.length
   act(() => { retry!.click() })
   await flush()
   expect(listReplies.mock.calls.length).toBe(calls + 1)
   expect(host.textContent).toContain('営業時間外の自動返信')
-  expect([...host.querySelectorAll('button')].some(button => button.textContent === 'もう一度試す')).toBe(false)
+  expect([...host.querySelectorAll('button')].some(button => button.textContent === 'もう一度読み込む')).toBe(false)
 })
 
 it('取得に成功して0件だったときだけ、空の一覧を出す', async () => {
@@ -204,5 +205,5 @@ it('取得に成功して0件だったときだけ、空の一覧を出す', asy
   act(() => { root.render(<AutoRepliesListV8 />) })
   await flush()
   expect(host.textContent).toContain('まだ自動応答のルールはありません')
-  expect([...host.querySelectorAll('button')].some(button => button.textContent === 'もう一度試す')).toBe(false)
+  expect([...host.querySelectorAll('button')].some(button => button.textContent === 'もう一度読み込む')).toBe(false)
 })

@@ -14,6 +14,9 @@ import StatusBadge from '@/components/shared/status-badge'
  * 行の左の □ を選ぶと表の下にまとめての帯（止める・再開・フォルダへ移す）。
  */
 import SharedStatusPill from '@/components/shared/status-pill'
+import { collectListRows } from '@/components/shared/collect-list-rows'
+import BulkBar from '@/components/shared/bulk-bar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { readListUrlParam, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state'
@@ -52,8 +55,7 @@ import { isForbidden } from '@/components/shared/api-error-message'
 import NoPermissionBoard from '@/v8/no-permission/no-permission'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
-import { runUndoable } from '@/lib/undoable'
-import { useDeferredDelete } from '@/lib/use-deferred-delete'
+import { runUndoable, runOptimistic } from '@/lib/undoable'
 import { useLiveReorder } from '@/lib/use-live-reorder'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -190,6 +192,8 @@ export default function ScenariosListV8() {
   /* 行の「…」。開いている行のID。 */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 行の詳細パネル。開いている行のID。 */
+  const [pendingStop, setPendingStop] = useState<string[] | null>(null)
+  const toggleBusyRef = useRef(false)
   const [panelId, setPanelId] = useState<string | null>(null)
   /** いま掴んでいるシナリオ。落とした先と入れ替える。 */
   const [dragId, setDragId] = useState<string | null>(null)
@@ -214,6 +218,8 @@ export default function ScenariosListV8() {
     setStats(null)
     setStatsFailed(false)
     setSelectedIds(new Set())
+    setPendingStop(null)
+    toggleBusyRef.current = false
   }, [selectedAccountId])
 
   const loadFolders = useCallback(async () => {
@@ -273,8 +279,7 @@ export default function ScenariosListV8() {
   }, [loadStats])
 
   useEffect(() => {
-    const timer = setTimeout(() => setServerQuery(clampSearchQuery(nameQuery.trim())), 300)
-    return () => clearTimeout(timer)
+    setServerQuery(clampSearchQuery(nameQuery.trim()))
   }, [nameQuery])
 
   /* 「停止中のみ」と「有効のみ」は同時に掛からない（札が勝つ）。 */
@@ -299,7 +304,7 @@ export default function ScenariosListV8() {
   }, [accountLoading, activeParam, createdThisMonthOnly, folderFilter, selectedAccountId, serverQuery])
 
   /* 板 `axFrW`：右端は「20件表示」。 */
-  const [perPage, setPerPage] = useState(20)
+  const [perPage, setPerPage] = useListUrlValue('perPage', 20)
   const scenarioList = useOffsetServerList<ScenarioRow>({
     requestKey: JSON.stringify({
       ready: !accountLoading,
@@ -329,11 +334,10 @@ export default function ScenariosListV8() {
     page: scenarioList.page,
   })
   /* 取り消し待ちの削除（5秒）の行は一覧から外して描く（動きの点検 17 番）。 */
-  const deferredDelete = useDeferredDelete()
   const shownRows = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : scenarioList.items
   const scenarios = useMemo(
-    () => (deferredDelete.hiddenCount === 0 ? shownRows : shownRows.filter((s) => !deferredDelete.isHidden(s.id))),
-    [deferredDelete, shownRows],
+    () => shownRows,
+    [shownRows],
   )
   /* 戻ってきたら前のスクロール位置へ（中身が描けてから）。 */
   useListScrollMemory(scenarioList.loaded)
@@ -411,41 +415,8 @@ export default function ScenariosListV8() {
     }
   }
 
-  /*
-   * 影響の無い削除だけ、確かめの窓を出さずに一覧から外し、5秒は「元に戻す」で取り消せる
-   * （動きの点検 17 番）。止まっていて・購読中が 0 人で・このアカウントだけのもので・
-   * ほかのシナリオの終了後の移動先になっていないもの。どれか分からないときは今までどおり窓。
-   */
-  const requestDelete = async (s: ScenarioRow) => {
-    setDeleteError('')
-    const candidate = !s.isActive && s.subscriberCount === 0 && s.lineAccountId !== null
-    let unreferenced = false
-    if (candidate) {
-      try {
-        const res = await api.scenarios.moveReferrers(s.id)
-        unreferenced = res.success && res.data.items.length === 0
-      } catch {
-        unreferenced = false
-      }
-    }
-    if (!unreferenced) {
-      setDeleteTarget(s)
-      return
-    }
-    if (panelId === s.id) setPanelId(null)
-    deferredDelete.schedule({
-      ids: [s.id],
-      message: `シナリオ「${s.name}」を削除しました`,
-      commit: () => api.scenarios.delete(s.id),
-      onCommitted: () => {
-        void loadFolders()
-        void loadOverallTotal()
-        void loadStats()
-        return loadScenarios()
-      },
-      failureMessage: 'シナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。',
-    })
-  }
+  /* 削除は、利用状況にかかわらず確認してから実行する。 */
+  const requestDelete = (s: ScenarioRow) => { setDeleteError(''); setDeleteTarget(s) }
 
   /* ===== まとめて「止める／再開」 ===== */
 
@@ -454,7 +425,14 @@ export default function ScenariosListV8() {
   /* 選んでいる間は Esc で選択を外す（動きの点検 12 番）。 */
   const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
   useEscapeToClearSelection(selectedCount > 0, clearSelection)
-  const selectedRows = scenarios.filter((s) => selectedIds.has(s.id))
+  const [selectionRows, setSelectionRows] = useState<ScenarioRow[]>([])
+  const selectedRows = [...new Map([...scenarios, ...selectionRows].map(row => [row.id, row])).values()].filter(row => selectedIds.has(row.id))
+  const selectAllScenarios = async () => {
+    const account = selectedAccountId
+    const rows = await collectListRows(scenarioList.total, (offset, limit) => loadScenarioPage({ page: Math.floor(offset / limit) + 1, limit }, new AbortController().signal))
+    if (activeAccountRef.current !== account) return
+    setSelectionRows(rows); setSelectedIds(new Set(rows.map(row => row.id)))
+  }
   const stoppableIds = selectedRows.filter((s) => s.isActive).map((s) => s.id)
   const resumableIds = selectedRows.filter((s) => !s.isActive).map((s) => s.id)
 
@@ -481,24 +459,27 @@ export default function ScenariosListV8() {
    * 「元に戻す」で送らずに戻せる。1本ずつの開始前チェックは詳細画面で行う。
    */
   const runBulkToggle = (next: boolean, ids: string[]) => {
-    if (ids.length === 0 || !canEdit) return
+    if (ids.length === 0 || !canEdit || toggleBusyRef.current) return
+    toggleBusyRef.current = true
+    const account = selectedAccountId
     const key = listContextKey
     setOptimisticRows({
       key,
       rows: scenarios.map((s) => (ids.includes(s.id) ? { ...s, isActive: next } : s)),
     })
-    runUndoable({
-      message: next ? `${ids.length} 件の配信を始めました` : `${ids.length} 件を停止しました`,
-      commit: async () => {
+    runOptimistic({
+      isCurrent: () => activeAccountRef.current === account,
+      request: async () => {
         const results = await Promise.all(
           ids.map((id) => api.scenarios.update(id, { isActive: next }).catch(() => null)),
         )
         const failed = results.filter((res) => !res || !res.success).length
         if (failed > 0) throw new Error(`${failed} 件の保存に失敗しました`)
       },
-      undo: () => setOptimisticRows(null),
+      revert: () => { toggleBusyRef.current = false; setOptimisticRows(null); void loadScenarios() },
       failureMessage: next ? '配信を始められませんでした。' : '停止できませんでした。',
-      onCommitted: () => {
+      onSuccess: () => {
+        toggleBusyRef.current = false
         setOptimisticRows(null)
         setSelectedIds(new Set())
         void loadScenarios()
@@ -872,7 +853,7 @@ export default function ScenariosListV8() {
         </span>
         <p className={styles.stateTitle}>シナリオを読み込めませんでした</p>
         <p className={styles.stateDesc}>作ったシナリオは消えていません。通信を確かめて、もう一度試してください。</p>
-        <Button type="button" onClick={() => void loadScenarios()}>もう一度試す</Button>
+        <Button type="button" onClick={() => void loadScenarios()}>もう一度読み込む</Button>
       </div>
     ) : scenarios.length === 0 ? (
       /* 修正案 D-2（2026-10-07 採用）：空の一覧は次の一歩へ導く。 */
@@ -941,7 +922,7 @@ export default function ScenariosListV8() {
                         event.preventDefault()
                         setPanelId(s.id)
                       }
-                    }}
+                    }} data-row-id={s.id}
                   >
                     <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
                       {canEdit && <Checkbox
@@ -1026,19 +1007,16 @@ export default function ScenariosListV8() {
 
         {/* まとめての帯（選ぶと表の下に出る）：止める・再開・フォルダへ移す。 */}
         {canEdit && selectedCount > 0 ? (
-          <div className={styles.bulkRow} role="region" aria-label="選択中のまとめ操作">
-            <span className={styles.bulkCount} aria-live="polite" aria-atomic="true">{selectedCount} 件を選択中</span>
-            <Button
+          <BulkBar count={selectedCount} total={scenarioList.total} onSelectAll={selectAllScenarios} onClear={clearSelection}><Button
               type="button"
               variant="secondary"
               disabled={stoppableIds.length === 0}
               title={stoppableIds.length === 0 ? '有効のシナリオが選ばれていません' : undefined}
-              onClick={() => runBulkToggle(false, stoppableIds)}
+              onClick={() => setPendingStop(stoppableIds)}
             >
               <Square size={13} aria-hidden="true" />
               止める
-            </Button>
-            <Button
+            </Button><Button
               type="button"
               variant="secondary"
               disabled={resumableIds.length === 0}
@@ -1047,19 +1025,16 @@ export default function ScenariosListV8() {
             >
               <Play size={13} aria-hidden="true" />
               再開
-            </Button>
-            <Button
+            </Button><Button
               type="button"
               variant="secondary"
               onClick={() => openMove([...selectedIds])}
             >
               <FolderIcon size={13} aria-hidden="true" />
               フォルダへ移す
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => setSelectedIds(new Set())}>
+            </Button><Button type="button" variant="secondary" onClick={() => setSelectedIds(new Set())}>
               選択を外す
-            </Button>
-          </div>
+            </Button></BulkBar>
         ) : null}
       </>
     )
@@ -1341,7 +1316,7 @@ export default function ScenariosListV8() {
           destructive
           busy={deleting}
           error={deleteError}
-          onConfirm={targetStillListed ? () => void runDelete() : undefined}
+          onConfirm={targetStillListed ? () => runDelete() : undefined}
           onCancel={() => {
             if (deleting) return
             setDeleteTarget(null)
@@ -1380,7 +1355,7 @@ export default function ScenariosListV8() {
           confirmIcon={<Copy size={14} aria-hidden="true" />}
           busy={duplicating}
           error={duplicateError}
-          onConfirm={() => void runDuplicate()}
+          onConfirm={() => runDuplicate()}
           onCancel={() => {
             if (duplicating) return
             setDuplicateTarget(null)
@@ -1411,7 +1386,8 @@ export default function ScenariosListV8() {
         </Dialog>
       </>}
       folders={<>
-        {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ。2026-10-06 オーナー決定） */}
+        <ConfirmDialog open={pendingStop !== null} title="選んだシナリオを停止しますか？" description="これから送る予定のシナリオ配信が止まります。" confirmLabel="停止する" onCancel={() => setPendingStop(null)} onConfirm={() => { const ids = pendingStop; setPendingStop(null); if (ids) runBulkToggle(false, ids) }} />
+      {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ。2026-10-06 オーナー決定） */}
         {createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
         {folderPanel}
       </>}

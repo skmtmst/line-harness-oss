@@ -117,6 +117,6 @@ describe('V7vn3 LINEアカウント一覧', () => {
   })
 
   it('失敗したときに、運用者ができることを置く', () => {
-    expect(PAGE).toContain('再読み込み')
+    expect(PAGE).toContain('onRetry=')
   })
 })

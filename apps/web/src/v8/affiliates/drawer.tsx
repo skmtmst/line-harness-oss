@@ -12,6 +12,8 @@ import { useUrlTab } from '@/lib/use-url-tab'
  * （断る・認める）と「支払いを確定する」は、成果承認・支払いのタブと同じ口を使う。
  * 世代番号で、別の人へ開き直した途中に届いた古い応答を捨てる。
  */
+import { notifySaved } from '@/components/shared/toast'
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Copy, PauseCircle } from 'lucide-react'
 import { api, type AffiliateAccountSettlementPreview, type ConversionApprovalItem } from '@/lib/api'
@@ -218,15 +220,8 @@ export default function AffiliateDrawer({
 
   useEffect(() => { reloadAll() }, [reloadAll])
 
-  const copyLinkUrl = useCallback(async (link: AffiliateLink) => {
-    const url = distributionUrl(link.ref_code, linkBaseUrl)
-    if (!url) return
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopiedLinkId(link.id)
-      window.setTimeout(() => setCopiedLinkId((current) => (current === link.id ? null : current)), 2000)
-    } catch { /* 書けないときはURLが表示のまま */ }
-  }, [linkBaseUrl])
+
+
 
   const decide = useCallback(async (item: ConversionApprovalItem, status: 'approved' | 'rejected') => {
     setDeciding(item.eventId)
@@ -292,9 +287,7 @@ export default function AffiliateDrawer({
                     <span className={styles.listName}>{link.offer_name ?? link.label ?? link.ref_code}{link.is_active ? '' : '（止めている）'}</span>
                     <span className={styles.listSub} title={url}>{`${shown}・${count}`}</span>
                   </span>
-                  <Button type="button" onClick={() => { void copyLinkUrl(link) }}>
-                    <Copy size={14} aria-hidden="true" /> {copiedLinkId === link.id ? 'コピーしました' : 'コピー'}
-                  </Button>
+                  <CopyTextButton value={distributionUrl(link.ref_code, linkBaseUrl) ?? ""} aria-label="紹介リンクをコピー"  />
                 </div>
               )
             })}
@@ -351,7 +344,7 @@ export default function AffiliateDrawer({
       kind="error"
       title="この期間の集計を読み込めませんでした"
       description="選んだ期間にこの人の成果が1件も無いか、集計が読めませんでした。リンクと成果の記録は消えていません。"
-      action={<Button type="button" onClick={reloadAll}>もう一度試す</Button>}
+      onRetry={reloadAll}
     />
   ) : (
     <>
@@ -401,7 +394,7 @@ export default function AffiliateDrawer({
       kind="error"
       title="紹介で増えた友だちを読み込めませんでした"
       description="記録は消えていません。"
-      action={<Button type="button" onClick={() => { void loadJourneys(affiliate.id, genRef.current) }}>もう一度試す</Button>}
+      onRetry={() => { void loadJourneys(affiliate.id, genRef.current) }}
     />
   ) : journeys.length === 0 ? (
     <p className={styles.empty}>この人の紹介で増えた友だちはまだいません。</p>
@@ -566,7 +559,7 @@ function SettlementEditor({
         setError(res.error)
         return
       }
-      notifyToast('支払いの取り決めを保存しました。')
+      notifySaved('支払いの取り決めを保存しました。')
       onSaved()
     } catch (e) {
       setError(e instanceof Error ? e.message : '保存できませんでした。通信を確かめて、もう一度お試しください。')

@@ -243,7 +243,7 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
       error={formError ?? undefined}
       confirmLabel={isEdit ? '更新' : '作成'}
       cancelLabel="キャンセル"
-      onConfirm={() => { void handleSubmit() }}
+      onConfirm={() => { return handleSubmit() }}
       onCancel={onClose}
     >
       <div className="space-y-4" ref={formRef} onInput={() => setFieldErrors({})}>
@@ -263,7 +263,7 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
         {isEdit && termsFailed ? (
           <p className="text-ink-secondary text-xs" role="status">
             数える期間・上限・受付の期間を読み込めませんでした。このまま保存しても、これらは変わりません。{' '}
-            <button type="button" className="font-semibold underline" onClick={() => setTermsAttempt((n) => n + 1)}>読み直す</button>
+            <button type="button" className="font-semibold underline" onClick={() => setTermsAttempt((n) => n + 1)}>もう一度読み込む</button>
           </p>
         ) : null}
         <OfferTermsFields errors={fieldErrors} values={terms} onChange={setTerms} disabled={isEdit && !termsLoaded} />

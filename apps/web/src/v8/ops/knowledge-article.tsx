@@ -106,7 +106,7 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved 
           <>
             <Button onClick={close} disabled={busy}><ArrowLeft aria-hidden="true" />ナレッジ一覧へ</Button>
             {editing ? (
-              <Button variant="primary" onClick={() => void save()} disabled={busy}>承認待ちで保存する</Button>
+              <Button variant="primary" onClick={() => void save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">承認待ちで保存する</Button>
             ) : (
               <Button variant="primary" disabled={busy || !canApprove} onClick={() => { setError(''); setApproving(true) }}><Check aria-hidden="true" />保存して承認</Button>
             )}
@@ -164,12 +164,12 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved 
             {editing ? (
               <>
                 <Button onClick={close} disabled={busy}>保存せず閉じる</Button>
-                <Button variant="danger" onClick={() => void review('disable')} disabled={busy}>無効にする</Button>
+                <Button variant="danger" onClick={() => void review('disable')} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">無効にする</Button>
               </>
             ) : (
               <>
-                {article.reviewState !== 'dismissed' ? <Button onClick={() => void review('dismiss')} disabled={busy}>見送る</Button> : null}
-                <Button onClick={() => void save()} disabled={busy}>下書きを保存</Button>
+                {article.reviewState !== 'dismissed' ? <Button onClick={() => void review('dismiss')} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">見送る</Button> : null}
+                <Button onClick={() => void save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きを保存</Button>
               </>
             )}
           </div>
@@ -186,7 +186,7 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved 
           onCancel={() => { if (!busy) setApproving(false) }}
           footer={(
             <div className={styles.dialogActions}>
-              <Button onClick={() => void save()} disabled={busy}>下書きで保存</Button>
+              <Button onClick={() => void save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きで保存</Button>
               <Button variant="primary" disabled={busy || !canApprove || !readChecked} busy={busy} busyLabel="処理中…" onClick={() => void save(true)}>保存して承認</Button>
             </div>
           )}

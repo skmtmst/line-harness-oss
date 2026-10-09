@@ -53,7 +53,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 })
 vi.mock('@/components/shared/toast', async (importOriginal: () => Promise<Record<string, unknown>>) => ({
   ...(await importOriginal()),
-  notifyToast: (message: string, options?: { actionLabel?: string }) => { toasts.push({ message, actionLabel: options?.actionLabel }) },
+  notifyToast: (message: string, options?: { actionLabel?: string }) => { toasts.push({ message, actionLabel: options?.actionLabel }) }, notifySaved: (message: string, options?: { actionLabel?: string }) => { toasts.push({ message, actionLabel: options?.actionLabel }) }
 }))
 
 import { FRIEND_ATTRIBUTES_QA_GROUPS, FRIEND_ATTRIBUTES_QA_TAGS } from '@/components/friend-fields/tags-page-v4'

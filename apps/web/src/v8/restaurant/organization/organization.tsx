@@ -10,6 +10,7 @@
  * 閲覧のみ（変える権限が無い人）には、作る・編集・停止・発行のボタンを置かない。動きは BEHAVIOR.md。
  */
 import { Field as SharedField } from '@/components/shared/form-controls'
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
 import { Copy, Eye, MailPlus, Plus } from 'lucide-react'
@@ -177,16 +178,7 @@ function IntakeAddressPanel({ accountId, store, readOnly }: { accountId: string;
     }
   }
 
-  const copy = async (item: RestaurantIntakeAddress) => {
-    setActionError('')
-    try {
-      await navigator.clipboard.writeText(item.address)
-      setCopiedId(item.id)
-      window.setTimeout(() => setCopiedId((current) => current === item.id ? '' : current), 1500)
-    } catch {
-      setActionError('コピーできませんでした。アドレスを選択して手動でコピーしてください。')
-    }
-  }
+
 
   return (
     <Panel title="予約メール取り込みアドレス" description="予約媒体から届く通知メールの転送先として設定します。">
@@ -212,7 +204,7 @@ function IntakeAddressPanel({ accountId, store, readOnly }: { accountId: string;
             </div>
             <div className={styles.intakeRow}>
               <TextField aria-label={`${store.name}の取り込みアドレス`} readOnly value={item.address} className={styles.intakeAddress} />
-              <Button onClick={() => void copy(item)}><Copy aria-hidden className={styles.buttonIcon} />{copiedId === item.id ? 'コピー済み' : 'コピー'}</Button>
+              <CopyTextButton value={item.address} aria-label="メールアドレスをコピー"  />
             </div>
             <p className={styles.intakeMeta}>{`発行日時：${formatStamp(item.createdAt)}`}</p>
           </div>
@@ -233,7 +225,7 @@ function IntakeAddressPanel({ accountId, store, readOnly }: { accountId: string;
         confirmLabel="発行する"
         busy={issuing}
         onCancel={() => setReissueOpen(false)}
-        onConfirm={() => void issue()}
+        onConfirm={() => issue()}
       />
       </div>
     </Panel>

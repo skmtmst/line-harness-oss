@@ -2,6 +2,7 @@
 
 /* ④ 予約のルール（x1OZS6）。絵に無い設定は「ほかの設定」で開く。 */
 
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
@@ -213,7 +214,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
       setDraft(response.data)
       setCutoffEmpty(false)
       setCancelEmpty(false)
-      notifyToast('予約のルールを保存しました。')
+      notifySaved('予約のルールを保存しました。')
       onSaved(response.data)
       if (noAssign !== null && noAssign !== initialNoAssign) onReload()
     } catch (cause) {
@@ -231,7 +232,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
         icon={<AccountIcon />}
         title="予約のルールを読み込めませんでした"
         description={error ?? '通信状態を確認して、もう一度お試しください。'}
-        action={<Button onClick={onReload}>読み直す</Button>}
+        action={<Button onClick={onReload}>もう一度読み込む</Button>}
       />
     )
   }

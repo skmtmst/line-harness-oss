@@ -9,11 +9,13 @@
  * 口・保存の決まり（全部外すときの確認・止めるのは保存してから効く・離れるときの確認・競合の読み直し）は
  * 今の部品（app/ec-commerce/connector-panel.tsx）と同じ。
  */
+import { notifySaved } from '@/components/shared/toast'
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { EC_EVENT_LABELS, type EcEventType } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -130,6 +132,17 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
 
   useEffect(() => { void load() }, [load])
 
+  const saveConflict = useSaveConflict<EcConnectorOverview>({
+    fetchLatest: async () => {
+      if (!accountId) return null
+      const account = accountId
+      const response = await api.ecCommerce.connector(account)
+      return accountRef.current === account && response.success ? response.data : null
+    },
+    reload: async () => { await load(); saveConflict.clear() },
+  })
+  useEffect(() => { saveConflict.clear() }, [accountId, saveConflict.clear])
+
   const toggle = (field: 'eventTypes' | 'identityRules', value: string) => {
     setForm((current) => {
       const values = current[field] as string[]
@@ -148,12 +161,12 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
       if (accountRef.current !== accountAtSave) return
       if (!response.success) throw new Error('save_failed')
       setForm((current) => ({ ...current, inboundSecret: '', expectedVersion: response.data.version }))
-      setNotice({ tone: 'success', text: 'つなぎ先の設定を保存しました。' })
+      notifySaved('つなぎ先の設定を保存しました。')
       await load()
     } catch (error) {
       if (accountRef.current !== accountAtSave) return
-      if (error instanceof ApiError && error.status === 409) await load()
-      setNotice({ tone: 'error', text: error instanceof ApiError && error.status === 409 ? 'ほかの担当者が先に変更しました。最新の内容を読み直しました。' : '設定を保存できませんでした。通信の状態を確認して、もう一度お試しください。' })
+      if (error instanceof ApiError && error.status === 409) { saveConflict.mark(); return }
+      setNotice({ tone: 'error', text: '設定を保存できませんでした。通信の状態を確認して、もう一度お試しください。' })
     } finally {
       setSaving(false)
     }
@@ -208,6 +221,12 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
 
   return (
     <div className={styles.board} data-design-node="iLJmw">
+      {saveConflict.conflict ? <SaveConflictBand title="ほかの人が先につなぎ先の設定を保存しました" compareBusy={saveConflict.compareBusy} onCompare={() => void saveConflict.compare()} onReload={() => void saveConflict.reloadLatest()} /> : null}
+      <SaveConflictCompareDialog open={saveConflict.compareOpen} busy={saveConflict.compareBusy} error={saveConflict.compareError} lines={saveConflict.latest ? [
+        { text: `ショップのアドレス：あなた ${form.shopDomain} ／ 最新 ${saveConflict.latest.connector?.shopDomain ?? '未設定'}` },
+        { text: `取り込みの状態：あなた ${form.status === 'paused' ? '停止' : '接続'} ／ 最新 ${saveConflict.latest.connector?.status === 'paused' ? '停止' : '接続'}` },
+        { text: '鍵は比較に表示しません。入力した鍵は読み直すまで残ります。' },
+      ] : null} onReload={() => void saveConflict.reloadLatest()} onCancel={saveConflict.closeCompare} />
       {!canEdit ? <NoteBar tone="info">{READONLY_REASON}いまの設定はこのまま見られます。</NoteBar> : null}
       {notice ? <p className={notice.tone === 'success' ? styles.noticeGood : styles.noticeBad} role={notice.tone === 'success' ? 'status' : 'alert'}>{notice.text}</p> : null}
 
@@ -316,7 +335,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
         confirmLabel="止めて保存する"
         destructive
         busy={saving}
-        onConfirm={() => { setEmptyConfirm(null); void save() }}
+        onConfirm={() => { setEmptyConfirm(null); return save() }}
         onCancel={() => { if (!saving) setEmptyConfirm(null) }}
       />
       <UnsavedLeaveDialog

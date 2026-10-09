@@ -3,6 +3,7 @@
 /* ⑤ 担当スタッフ（VLEaj）（settings-v8.tsx から分割。見た目・動きは変えない） */
 
 import SharedStatusPill from '@/components/shared/status-pill'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useState } from 'react'
 import Link from 'next/link'
 import { ListChecks, Plus } from 'lucide-react'
@@ -54,7 +55,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
   const [pauseTarget, setPauseTarget] = useState<BookingStaff | null>(null)
   const [pausing, setPausing] = useState(false)
   const [pauseError, setPauseError] = useState<string | null>(null)
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
 
   const pageCount = Math.max(1, Math.ceil(staff.length / STAFF_PAGE_SIZE))
   const safePage = Math.min(page, pageCount)
@@ -119,7 +120,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
         icon={<AccountIcon />}
         title="スタッフを読み込めませんでした"
         description={error ?? '通信状態を確認して、もう一度お試しください。'}
-        action={<Button onClick={onReload}>読み直す</Button>}
+        action={<Button onClick={onReload}>もう一度読み込む</Button>}
       />
     )
   }
@@ -161,7 +162,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
             id: 'shifts',
             label: '勤務とシフト',
             external: true,
-            onSelect: () => router.push(`/booking/staff/shifts?staff_id=${person.id}`),
+            href: `/booking/staff/shifts?staff_id=${person.id}`, onSelect: () => router.push(`/booking/staff/shifts?staff_id=${person.id}`),
           },
           ...(canEdit ? [
             { id: 'edit', label: '中身を編集', onSelect: () => setEditing(person) },
@@ -280,7 +281,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
         busy={removing}
         error={removeError || undefined}
         onCancel={() => { if (!removing) setRemoveTarget(null) }}
-        onConfirm={() => void remove()}
+        onConfirm={() => remove()}
       />
 
     </div>

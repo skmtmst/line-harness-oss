@@ -437,7 +437,7 @@ export default function WebhooksSheetsV8() {
         kind="error"
         title="連携の状態を読み込めませんでした"
         description="連携の内容は変わっていません。上で選んでいるLINEアカウントが合っているか確かめてください。"
-        action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+        onRetry={() => void load()}
       />
     )
   } else {
@@ -528,7 +528,7 @@ export default function WebhooksSheetsV8() {
           designTop={280}
           busy={busy === 'disconnect'}
           confirmLabel="接続を解除する"
-          onConfirm={() => void handleDisconnect()}
+          onConfirm={() => handleDisconnect()}
           onCancel={() => { if (busy !== 'disconnect') setDisconnectFor(null) }}
         />
       )}

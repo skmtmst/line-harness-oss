@@ -23,7 +23,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a', selectedAccount: null }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('./lib/edit-permission', () => ({ useBookingEdit: () => true }))
-vi.mock('@/components/shared/toast', () => ({ notifyToast: vi.fn() }))
+vi.mock('@/components/shared/toast', () => ({ notifyToast: vi.fn(), notifySaved: vi.fn() }))
 vi.mock('./menu-version-history', () => ({ default: () => null }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
@@ -83,7 +83,7 @@ describe('予約メニューを作る・直す（WEB062/063/064）', () => {
     expect(net.createMenu).toHaveBeenCalledTimes(1)
     expect(net.updateMenu).not.toHaveBeenCalled()
     expect(net.putStaffMenus).toHaveBeenCalledTimes(2)
-    await waitFor(() => expect(nav.push).toHaveBeenCalledWith('/booking/menus'))
+    await waitFor(() => expect(nav.push).toHaveBeenCalledWith('/booking/menus?highlight=new-1'))
   })
 
   it('063：直すときに設備を全部外したら、空の設備を保存する', async () => {

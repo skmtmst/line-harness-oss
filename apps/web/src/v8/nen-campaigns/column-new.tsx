@@ -12,6 +12,7 @@
  *   開いたとき・知らせが要るときだけ場所を取る。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -113,7 +114,7 @@ export default function ColumnNew() {
         boardId="yRDwW"
         title="コラムを書く"
         help="外部サイトの記事へつなぐ下書きを作ります。記事本文は外部サイトで管理します。"
-        footerActions={<Button href="/nen-campaigns?tab=columns">一覧へ戻る</Button>}
+        footerActions={<Button href="/nen-campaigns?tab=columns">一覧へ戻る</Button>} dirty={false}
       >
         <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />} message="閲覧のみで見ています。コラムを書くのは管理者に頼んでください。" />
       </CreatePage>
@@ -141,7 +142,7 @@ export default function ColumnNew() {
     try {
       const res = await api.nenCampaigns.createColumn(selectedAccountId, toCreateInput(draft))
       if (!res.success) throw new Error('failed')
-      router.push('/nen-campaigns?tab=columns')
+      router.push(createPageReturnHref('/nen-campaigns?tab=columns', res.data.id))
     } catch (e) {
       const status = e instanceof ApiError ? e.status : undefined
       const code = e instanceof ApiError ? e.code : undefined
@@ -192,7 +193,7 @@ export default function ColumnNew() {
             <Save size={15} aria-hidden="true" />下書きを保存
           </Button>
         </>
-      )}
+      )} dirty={false}
     >
       {failure ? <Notice tone="danger" message={failure.message} data-failure-kind={failure.kind} /> : null}
       {tagPruneNotice ? <Notice tone="warn" message={tagPruneNotice} onClose={() => setTagPruneNotice(null)} /> : null}

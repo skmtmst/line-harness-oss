@@ -144,7 +144,7 @@ export default function AdConnectionsV8() {
         kind="error"
         title="対応表を読み込めませんでした"
         description="対応は消えていません。読み直して、もう一度お試しください。"
-        action={<Button onClick={() => void loadMappings()}>対応表を読み直す</Button>}
+        onRetry={() => void loadMappings()}
       />
     )
   } else if (mapping.rows.length === 0) {
@@ -201,7 +201,7 @@ export default function AdConnectionsV8() {
             kind="error"
             title="広告への送信の数を表示できませんでした"
             description="送信の記録は消えていません。読み直して、もう一度お試しください。"
-            action={<Button onClick={() => void model.reload()}>数を読み直す</Button>}
+            onRetry={() => void model.reload()}
           />
         ) : (
           <KpiBand aria-label="広告への送信の概要">

@@ -173,7 +173,7 @@ describe('V6 アフィリエイターを作る（xqT1Z）', () => {
 
   it('URLのコピーは、コードが決まっているときだけ押せる', () => {
     expect(NEW_PAGE).toContain('{issuedUrl ? <div>')
-    expect(NEW_PAGE).toContain('navigator.clipboard?.writeText(issuedUrl)')
+    expect(NEW_PAGE).toContain('<CopyTextButton value={issuedUrl}')
   })
 
   it('基本情報の作成後に追加情報だけ失敗しても、再押下で同じ人を増やさない', () => {

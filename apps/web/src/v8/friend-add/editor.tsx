@@ -12,6 +12,7 @@
  * （口・版・下書き・冪等の鍵の扱いを変えない）。違うのは見せ方と、先に保存された
  * ときの帯（違いを比べる・最新を読み込んで続ける）。BEHAVIOR.md に書き出した。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -423,7 +424,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       }
       savedSnapshot.current = editorSnapshot(rule, definition)
       setConflict(false)
-      setNotice('下書きを保存しました。')
+      notifySaved('下書きを保存しました。')
       if (!ruleId || nextStep) samePageUrl.replace(`/friend-add-settings?view=edit&id=${encodeURIComponent(savedId)}&step=${nextStep ?? step}`)
       return savedId
     } catch (caught) {
@@ -721,7 +722,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
               <Power size={14} aria-hidden="true" />有効にする
             </Button>
           ) : (
-            <Button type="button" variant="primary" disabled={saving || enabling} onClick={() => moveToStep(nextStep.key)}>
+            <Button type="button" variant="primary" disabled={saving || enabling} onClick={() => moveToStep(nextStep.key)} busy={Boolean(saving)} busyLabel="処理中…">
               次へ：{nextStep.label}
               <ArrowRight size={15} aria-hidden="true" />
             </Button>
@@ -730,7 +731,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       ) : (
         /* 閲覧のみ：変える操作（保存・次へ・有効にする）は置かない。 */
         <Button href="/friend-add-settings">一覧へ戻る</Button>
-      )}
+      )} dirty={false}
     >
       {!canEdit ? (
         <p className={styles.viewerBand} role="status">閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>
@@ -807,7 +808,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         title="最新の保存とあなたの直しの違い"
         description={compare && compare.length === 0 ? '項目の違いはありません。最新を読み込んで続けてください。' : '左があなたの直し、右が先に保存された内容です。'}
         confirmLabel="最新を読み込んで続ける"
-        onConfirm={() => void reloadAfterConflict()}
+        onConfirm={() => reloadAfterConflict()}
         onCancel={() => setCompare(null)}
       >
         {compare && compare.length > 0 ? (
@@ -1560,7 +1561,7 @@ function PreviewStep({ rule, definition, routeNames, runTest, testing, testOk, o
               {canEdit ? (
                 check.href
                   ? <Link className={styles.textLink} href={check.href}>見直す</Link>
-                  : <Button type="button" variant="text" disabled={testing} onClick={runTest}>直す</Button>
+                  : <Button type="button" variant="text" disabled={testing} onClick={runTest} busy={testing} busyLabel="処理中…">直す</Button>
               ) : null}
             </li>
           ))}

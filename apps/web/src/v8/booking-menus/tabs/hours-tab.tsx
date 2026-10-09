@@ -2,6 +2,7 @@
 
 /* ② 受付枠（yRPxl）（settings-v8.tsx から分割。見た目・動きは変えない） */
 
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Search } from 'lucide-react'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -124,7 +125,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
         businessHours: draft,
       })
       if (!response.success) throw new Error('booking_business_hours_save_failed')
-      notifyToast('受付時間を保存しました。')
+      notifySaved('受付時間を保存しました。')
       onSaved(response.data)
     } catch (error) {
       setSaveError(businessHoursSaveError(error))
@@ -141,7 +142,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
         icon={<AccountIcon />}
         title="受付枠を読み込めませんでした"
         description={settingsError ?? '通信状態を確認して、もう一度お試しください。'}
-        action={<Button onClick={onReload}>読み直す</Button>}
+        action={<Button onClick={onReload}>もう一度読み込む</Button>}
       />
     )
   }
@@ -273,7 +274,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
             icon={<AccountIcon />}
             title="設備を読み込めませんでした"
             description={resourcesError ?? 'もう一度お試しください。'}
-            action={<Button onClick={onResourcesRetry}>読み直す</Button>}
+            action={<Button onClick={onResourcesRetry}>もう一度読み込む</Button>}
           />
         ) : null}
         {resourcesStatus === 'ready' && resources ? (
@@ -419,7 +420,7 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
         busy={busy}
         error={error ?? undefined}
         onCancel={() => { if (!busy) setConfirmDelete(false) }}
-        onConfirm={() => void remove()}
+        onConfirm={() => remove()}
       />
     </div>
   )

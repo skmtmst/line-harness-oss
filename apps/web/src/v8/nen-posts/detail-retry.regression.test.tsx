@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { PhotoReviewDetail } from './detail'
 afterEach(cleanup)
-it('B-12: 写真詳細の通信失敗はその場で読み直せ、権限不足では再試行を出さない', () => {
+it('B-12: 写真詳細の通信失敗はその場で読み直せ、権限不足でも権限変更後に読み直せる', () => {
   const retry = vi.fn(), noop = () => {}
   const props = {
     photo: null, position: 0, total: 1, loading: false, reviewing: false,
@@ -17,5 +17,6 @@ it('B-12: 写真詳細の通信失敗はその場で読み直せ、権限不足�
   fireEvent.click(screen.getByRole('button', { name: /もう一度/ }))
   expect(retry).toHaveBeenCalledOnce()
   view.rerender(<PhotoReviewDetail {...props} loadKind="forbidden" />)
-  expect(screen.queryByRole('button', { name: /もう一度/ })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: /もう一度/ }))
+  expect(retry).toHaveBeenCalledTimes(2)
 })

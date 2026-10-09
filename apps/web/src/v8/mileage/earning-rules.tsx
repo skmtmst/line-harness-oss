@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDateOffset } from '@/lib/jst-datetime'
+
 /*
  * ★V8 マイル「たまる決めごと」（板 `OC0gy`・1152 `ZJIyl`・閲覧のみ `E2Any`、
  * 状態は見本帳 `zaqP9`）。
@@ -11,6 +13,8 @@
  * フォルダの列に割り当てる API は無いので、きっかけの種類で分けた
  * 見え方の切り替えとして持つ（保存はしない）。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowDown, ArrowUp, Bookmark, CircleDot, Clock3, Coins, Download, Gift, ListOrdered, Plus, Wallet } from 'lucide-react'
@@ -129,9 +133,7 @@ function isOverview(value: unknown): value is MileageEarningRulesV6Overview {
 }
 
 function dateOnlyDaysAgo(days: number) {
-  const date = new Date()
-  date.setDate(date.getDate() - days)
-  return date.toISOString().slice(0, 10)
+  return jstDateOffset(-days)
 }
 
 function grantedMiles30d(rule: MileageEarningRuleV6) {
@@ -178,15 +180,15 @@ export default function EarningRulesTab() {
   const [friendTotal, setFriendTotal] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
-  const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
-  const [folder, setFolder] = useState<FolderKey>('all')
-  const [activeOnly, setActiveOnly] = useState(false)
-  const [pendingOnly, setPendingOnly] = useState(false)
-  const [stoppedOnly, setStoppedOnly] = useState(false)
-  const [sort, setSort] = useState<SortKey>('order')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [searchInput, setSearchInput] = useListUrlValue('q', '')
+  const [search, setSearch] = useListUrlValue('q', '')
+  const [folder, setFolder] = useListUrlValue<FolderKey>('folder', 'all')
+  const [activeOnly, setActiveOnly] = useListUrlValue('activeOnly', false)
+  const [pendingOnly, setPendingOnly] = useListUrlValue('pendingOnly', false)
+  const [stoppedOnly, setStoppedOnly] = useListUrlValue('stoppedOnly', false)
+  const [sort, setSort] = useListUrlValue<SortKey>('sort', 'order')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [menuId, setMenuId] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
@@ -275,7 +277,7 @@ export default function EarningRulesTab() {
     const timer = window.setTimeout(() => {
       setPage(1)
       setSearch(searchInput.trim())
-    }, 300)
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
@@ -738,7 +740,7 @@ export default function EarningRulesTab() {
                 id: 'edit',
                 label: '編集',
                 external: true,
-                onSelect: () => router.push(`/mileage/earning-rules/edit?id=${encodeURIComponent(rule.id)}`),
+                href: `/mileage/earning-rules/edit?id=${encodeURIComponent(rule.id)}`, onSelect: () => router.push(`/mileage/earning-rules/edit?id=${encodeURIComponent(rule.id)}`),
               },
               {
                 id: 'test',
@@ -809,7 +811,7 @@ export default function EarningRulesTab() {
             const active = rule.published.status === 'published'
             const orderIndex = ruleOrder.indexOf(rule.id)
             return (
-              <Tr key={rule.id} className={styles.row} data-table-layout="columns">
+              <Tr key={rule.id} className={styles.row} data-table-layout="columns" data-row-id={rule.id}>
                 <Td className={styles.colName}>
                   <div className={styles.rowNameLine}>
                     <FolderDotName folder={null}>
@@ -873,7 +875,7 @@ export default function EarningRulesTab() {
     <ListState kind="error"
       title="たまる決めごとを読み込めませんでした"
       description="数の帯は「—」にしています。道具はそのまま使えます。"
-      action={<Button type="button" onClick={() => void load()}>もう一度試す</Button>}
+      onRetry={() => void load()}
     />
   ) : visible.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */

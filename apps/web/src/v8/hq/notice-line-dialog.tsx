@@ -68,7 +68,7 @@ export default function NoticeLineDialogV8({ open, onClose }: { open: boolean; o
         {failed ? (
           <p className={styles.faint}>
             案内を読み込めませんでした。{' '}
-            <button type="button" className="font-semibold underline" onClick={() => setAttempt((n) => n + 1)}>読み直す</button>
+            <button type="button" className="font-semibold underline" onClick={() => setAttempt((n) => n + 1)}>もう一度読み込む</button>
           </p>
         ) : !info ? (
           <p className={styles.faint}>読み込んでいます…</p>

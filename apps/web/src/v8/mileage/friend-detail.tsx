@@ -8,6 +8,7 @@
  * 表「日時・内容・きっかけ・使い道・種類・担当・増減・…」・ページ送り）、下に「たまったきっかけ・
  * 交換した使い道」の2枚。確定待ちの確定・取消・通知の再送は行末の「…」から。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -114,12 +115,12 @@ function FriendDetailInner() {
   const [pendingError, setPendingError] = useState('')
   const [notificationRetryId, setNotificationRetryId] = useState<string | null>(null)
   const [notificationRetryError, setNotificationRetryError] = useState('')
-  const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
-  const [kindFilter, setKindFilter] = useState<'all' | Kind>('all')
-  const [period, setPeriod] = useState('all')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [searchInput, setSearchInput] = useListUrlValue('q', '')
+  const [search, setSearch] = useListUrlValue('q', '')
+  const [kindFilter, setKindFilter] = useListUrlValue<'all' | Kind>('kindFilter', 'all')
+  const [period, setPeriod] = useListUrlValue('period', 'all')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [menuId, setMenuId] = useState<string | null>(null)
   usePageTitle(friend?.displayName ? `${friend.displayName}のマイル明細` : null)
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'マイル', href: '/mileage?tab=balances' }])
@@ -190,7 +191,7 @@ function FriendDetailInner() {
     const timer = window.setTimeout(() => {
       setPage(1)
       setSearch(searchInput.trim())
-    }, 300)
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
@@ -462,7 +463,7 @@ function FriendDetailInner() {
                 const menu = rowMenuOf(item)
                 const note = mileageSourceNoteText({ sourceReferenceId: item.sourceReferenceId, hasSourceEvent: mileageDetailHasSourceEvent(item) })
                 return (
-                  <Tr key={item.id} className={styles.row} data-table-layout="columns">
+                  <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
                     <Td className={styles.colWhen}>
                       <time className={styles.cellSub} dateTime={item.occurredAt}>{formatMileageShortDateTime(item.occurredAt)}</time>
                     </Td>
@@ -580,7 +581,7 @@ function FriendDetailInner() {
         error={pendingError}
         confirmLabel={pendingAction?.kind === 'void' ? 'この理由で取消す' : 'この理由で確定する'}
         cancelLabel="キャンセル"
-        onConfirm={() => void runPendingAction()}
+        onConfirm={() => runPendingAction()}
         onCancel={() => { if (!pendingBusy) { setPendingAction(null); setPendingReason(''); setPendingError('') } }}
       >
         <div className={styles.dlgBody}>

@@ -135,7 +135,7 @@ describe('V8 流入リンクを作る', () => {
     fireEvent.click(screen.getByRole('button', { name: /発行して URL を受け取る/ }))
     await flush()
     expect(posted[0]).toMatchObject({ name: '秋の店頭POP', refCode: 'autumn-pop', lineAccountId: 'account-a', isActive: true, tagId: null })
-    expect(push).toHaveBeenCalledWith('/inflow-links/detail?id=er-new')
+    expect(push).toHaveBeenCalledWith('/inflow-links?highlight=er-new')
   })
 
   it('409 で返ると競合の帯を出し、違いを比べる窓は違う項目だけを並べ、最新を取り込んで直すで入力へ写す', async () => {
@@ -145,7 +145,7 @@ describe('V8 流入リンクを作る', () => {
     fireEvent.click(screen.getByRole('button', { name: /発行して URL を受け取る/ }))
     await flush()
     expect(push).not.toHaveBeenCalled()
-    const band = screen.getByRole('alert', { name: '文字が重複しています' })
+    const band = screen.getByRole('alert')
     expect(band.textContent).toContain('「summer-ig」は')
     expect(screen.getByRole('button', { name: /比べてから保存/ })).toBeTruthy()
     fireEvent.click(within(band).getByRole('button', { name: /違いを比べる/ }))

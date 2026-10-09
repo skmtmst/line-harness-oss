@@ -8,9 +8,12 @@
  * 下の帯：キャンセル／下書きを保存／保存して公開。
  * 動き（読み込み・保存・公開・409・利用先の確認）は BEHAVIOR.md。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { CircleAlert, GitCompare, Link2, RotateCcw, Send } from 'lucide-react'
 import { validateFlexContent, type Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
@@ -331,9 +334,8 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     save: async () => (await saveNow({ silent: true })) !== null,
   })
 
-  const leave = () => {
-    disarm()
-    router.push('/templates')
+  const leave = (savedId: string) => {
+    if (!id) { disarm(); router.push(createPageReturnHref('/templates', savedId)) }
   }
 
   const publishNow = async (templateId: string): Promise<boolean> => {
@@ -374,8 +376,8 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     const savedId = await saveNow()
     if (savedId) autosave.markSaved()
     if (savedId) {
-      notifyToast('下書きを保存しました')
-      leave()
+      notifySaved('下書きを保存しました')
+      leave(savedId)
     }
   }
 
@@ -398,7 +400,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
       }
       if (await publishNow(savedId)) {
         notifyToast('公開しました')
-        leave()
+        leave(savedId)
       }
     } finally {
       setPublishing(false)
@@ -494,25 +496,9 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         title={title}
         description={description}
         band={conflict ? (
-          <div className={styles.band} role="alert" data-design-node="NCbYn">
-            <CircleAlert size={18} aria-hidden="true" className={styles.bandIcon} />
-            <div className={styles.bandText}>
-              <p className={styles.bandTitle} title={conflict.name}>
-                {`ほかの人が${conflict.at ? ` ${conflict.at} に` : '先に'}テンプレート「${conflict.name}」を保存しました`}
-              </p>
-              <p className={styles.bandDesc}>あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。</p>
-            </div>
-            <div className={styles.bandActions}>
-              <Button type="button" onClick={() => void openCompare()} disabled={compareBusy}>
-                <GitCompare size={15} aria-hidden="true" />
-                違いを比べる
-              </Button>
-              <Button type="button" variant="primary" onClick={reloadLatest}>
-                <RotateCcw size={15} aria-hidden="true" />
-                最新を読み込んで続ける
-              </Button>
-            </div>
-          </div>
+          <SaveConflictBand designNode="NCbYn"
+            title={`ほかの人が${conflict.at ? ` ${conflict.at} に` : '先に'}テンプレート「${conflict.name}」を保存しました`}
+            compareBusy={compareBusy} onCompare={openCompare} onReload={reloadLatest} />
         ) : undefined}
         side={(
           <>
@@ -693,7 +679,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
             if (await publishNow(publishCheck.id)) {
               setPublishCheck(null)
               notifyToast('公開しました')
-              leave()
+              leave(publishCheck.id)
             }
           } finally {
             setPublishing(false)

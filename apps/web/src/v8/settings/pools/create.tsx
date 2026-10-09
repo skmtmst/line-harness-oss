@@ -195,7 +195,7 @@ export default function PoolCreateV8() {
             {accountsError ? (
               <p role="alert" className={styles.error}>
                 {accountsError}{' '}
-                <button type="button" className={styles.retry} onClick={() => void loadAccounts()}>再読み込み</button>
+                <button type="button" className={styles.retry} onClick={() => void loadAccounts()}>もう一度読み込む</button>
               </p>
             ) : null}
           </section>

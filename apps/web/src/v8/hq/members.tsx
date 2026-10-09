@@ -311,7 +311,7 @@ function MembersInner() {
           onConfirm={() => {
             const pending = confirmChange
             setConfirmChange(null)
-            void submitDialog(pending.value)
+            return submitDialog(pending.value)
           }}
         />
       ) : null}

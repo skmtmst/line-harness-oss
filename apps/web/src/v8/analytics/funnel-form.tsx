@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDateOffset } from '@/lib/jst-datetime'
+
 /*
  * ★V8-B 分析「ファネルを作る」（板 `VDPz5`）と「ファネルを直す」（同じ形）。
  *
@@ -11,7 +13,9 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, X } from 'lucide-react'
-import { api } from '@/lib/api'
+import { ApiError, api } from '@/lib/api'
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
+import { notifySaved } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
@@ -98,8 +102,7 @@ const TARGET_LABEL: Record<Target['kind'], string> = { conversion: '成果', tag
 const EMPTY_LABEL: Record<Target['kind'], string> = { conversion: '成果（成果地点を選ぶ）', tag: 'タグ（タグを選ぶ）', form: 'フォーム（フォームを選ぶ）' }
 
 function isoDay(offsetDays: number): string {
-  const d = new Date(Date.now() + offsetDays * 86400000)
-  return d.toISOString().slice(0, 10)
+  return jstDateOffset(offsetDays)
 }
 
 export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, presetConversion }: {
@@ -119,6 +122,8 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
     ],
   )
   const [targets, setTargets] = useState<Target[]>([])
+  const [expectedVersion, setExpectedVersion] = useState(edit?.expectedVersionNumber ?? 0)
+  const [versionContext, setVersionContext] = useState({ segment: edit?.segment, comparisonGroups: edit?.comparisonGroups })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -210,6 +215,32 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
     update(index, { kind, value: id, other: false, matchBase: undefined })
   }
 
+  type Definition = Awaited<ReturnType<typeof api.analytics.v6Funnels.get>> & { success: true }
+  const fetchLatest = async () => {
+    if (!edit) return null
+    const response = await api.analytics.v6Funnels.get(accountId, edit.funnelId)
+    return response.success ? response.data : null
+  }
+  const conflict = useSaveConflict<Definition['data']>({
+    contextKey: `${accountId}:${edit?.funnelId ?? 'new'}`,
+    fetchLatest,
+    reload: async () => {
+      const latest = await fetchLatest()
+      if (!latest?.currentVersion) throw new Error('最新の内容を読み込めませんでした')
+      setName(latest.name)
+      setWindowDays(String(latest.currentVersion.windowDays))
+      setSteps(latest.currentVersion.steps.map(step => ({
+        label: step.label, kind: step.kind,
+        value: step.match[funnelStepPrimaryKey(step.kind) ?? ''] ?? '',
+        matchBase: step.match, other: false,
+      })))
+      setExpectedVersion(latest.currentVersion.versionNumber)
+      setVersionContext({ segment: latest.currentVersion.segment, comparisonGroups: latest.currentVersion.comparisonGroups })
+      setFieldErrors({}); setError(''); conflict.clear()
+    },
+  })
+  const isConflict = (code: string | undefined) => code === 'analytics_funnel_version_conflict' || code === 'analytics_funnel_status_conflict'
+
   const save = async () => {
     const errors: Record<string, string> = {}
     if (!name.trim()) errors['fn-v8-name'] = '名前を入力してください'
@@ -238,18 +269,27 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
           name: name.trim(),
           windowDays: Number(windowDays),
           steps: payloadSteps,
-          segment: edit.segment,
-          comparisonGroups: edit.comparisonGroups,
-          expectedVersionNumber: edit.expectedVersionNumber,
+          segment: versionContext.segment,
+          comparisonGroups: versionContext.comparisonGroups,
+          expectedVersionNumber: expectedVersion,
         })
-        if (!res.success) return setError(explainSaveError(res.error, res.error))
+        if (!res.success) {
+          if (isConflict(res.error)) conflict.mark()
+          else setError(explainSaveError(res.error, res.error))
+          return
+        }
+        setExpectedVersion(res.data.versionNumber)
+        conflict.clear()
+        notifySaved()
         onCreated(edit.funnelId, res.data.usageWarnings)
       } else {
         const res = await api.analytics.v6Funnels.create(accountId, { name: name.trim(), windowDays: Number(windowDays), steps: payloadSteps })
         if (!res.success) return setError(res.error)
+        notifySaved()
         onCreated(res.data.funnelId, res.data.usageWarnings)
       }
-    } catch {
+    } catch (caught) {
+      if (caught instanceof ApiError && (caught.status === 409 || isConflict(caught.code))) { conflict.mark(); return }
       setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSaving(false)
@@ -276,6 +316,11 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
       )}
     >
       <div className={styles.form} ref={formRef}>
+        {conflict.conflict ? <SaveConflictBand title="ほかの人が先にこのファネルを保存しました" compareBusy={conflict.compareBusy} onCompare={conflict.compare} onReload={conflict.reloadLatest} /> : null}
+        <SaveConflictCompareDialog open={conflict.compareOpen} onCancel={conflict.closeCompare} onReload={conflict.reloadLatest} error={conflict.compareError} lines={conflict.latest ? [
+          { text: `あなたの入力：${name}／${windowDays}日／${JSON.stringify(steps)}` },
+          { text: `最新の内容：${conflict.latest.name}／${conflict.latest.currentVersion?.windowDays}日／${JSON.stringify(conflict.latest.currentVersion?.steps)}` },
+        ] : null} />
         {presetConversion && !edit ? (
           <Notice tone="info">
             成果地点「{presetConversion.name}」を2段目に入れています。このまま段を組んで作成すると、その成果地点を使う分析として登録されます。

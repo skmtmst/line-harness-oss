@@ -182,7 +182,7 @@ describe('V8 一斉配信の詳細', () => {
     const alert = document.querySelector('[role="alert"]')
     expect(alert?.textContent).toContain('ほかの人が配信「未購入者フォロー」を更新しました')
     expect(alert?.textContent).toContain('この画面では書き換えません')
-    await act(async () => { buttonText('読み直す')!.click() })
+    await act(async () => { buttonText('最新を読み込んで続ける')!.click() })
     expect(onConflictReload).toHaveBeenCalledTimes(1)
   })
 

@@ -11,6 +11,8 @@
  * 開け閉めの段で残す（絵の表の下の案内どおり、操作を落とさない）。
  * 決めごとの編集の器（試す・保存・公開の手順）は /mileage/score-rules の画面。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Activity, Bookmark, ChevronDown, ChevronUp, CircleMinus, CirclePlus, Download, Minus, Plus, Send, Settings2, Star, TrendingDown, Upload, UserRound } from 'lucide-react'
@@ -149,12 +151,12 @@ export default function ScoreTab() {
     latestAccountRef.current = accountId
   }, [accountId])
   const [overview, setOverview] = useState<ActionScoreOverview | null>(null)
-  const [filter, setFilter] = useState<ActionScoreFilter>('all')
-  const [sort, setSort] = useState<ActionScoreSort>('score_desc')
-  const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [filter, setFilter] = useListUrlValue<ActionScoreFilter>('filter', 'all')
+  const [sort, setSort] = useListUrlValue<ActionScoreSort>('sort', 'score_desc')
+  const [searchInput, setSearchInput] = useListUrlValue('q', '')
+  const [search, setSearch] = useListUrlValue('q', '')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [menuId, setMenuId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
@@ -164,10 +166,10 @@ export default function ScoreTab() {
   const [config, setConfig] = useState<ActionScoreRuleConfiguration | null>(null)
   const [rulesLoading, setRulesLoading] = useState(true)
   const [rulesError, setRulesError] = useState(false)
-  const [ruleSearchInput, setRuleSearchInput] = useState('')
-  const [ruleSearch, setRuleSearch] = useState('')
-  const [gainOnly, setGainOnly] = useState(false)
-  const [loseOnly, setLoseOnly] = useState(false)
+  const [ruleSearchInput, setRuleSearchInput] = useListUrlValue('ruleSearch', '')
+  const [ruleSearch, setRuleSearch] = useListUrlValue('ruleSearch', '')
+  const [gainOnly, setGainOnly] = useListUrlValue('gainOnly', false)
+  const [loseOnly, setLoseOnly] = useListUrlValue('loseOnly', false)
   const [ruleMenuId, setRuleMenuId] = useState<string | null>(null)
   const [rulesActionError, setRulesActionError] = useState('')
   const [rulesBusy, setRulesBusy] = useState(false)
@@ -265,12 +267,12 @@ export default function ScoreTab() {
     const timer = window.setTimeout(() => {
       setPage(1)
       setSearch(searchInput.trim())
-    }, 300)
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setRuleSearch(ruleSearchInput.trim()), 300)
+    const timer = window.setTimeout(() => setRuleSearch(ruleSearchInput.trim()), 0)
     return () => window.clearTimeout(timer)
   }, [ruleSearchInput])
 
@@ -481,7 +483,7 @@ export default function ScoreTab() {
       }}
       chips={chips}
       trailing={<>
-        <Button onClick={() => void openPreview()} disabled={!editable}>
+        <Button onClick={() => void openPreview()} disabled={!editable} busy={Boolean(previewBusy)} busyLabel="処理中…">
           <Bookmark size={15} aria-hidden="true" /> この分けかただと何人入るか
         </Button>
         <PerPageSelect value={pageSize} onChange={(next) => { setPage(1); setPageSize(next) }} />
@@ -516,7 +518,7 @@ export default function ScoreTab() {
             const day = formatMileageMonthDay(item.lastChangedAt)
             const reason = actionScoreReasonLabel(item.lastReason)
             return (
-              <Tr key={item.friendId} className={styles.row} data-table-layout="columns">
+              <Tr key={item.friendId} className={styles.row} data-table-layout="columns" data-row-id={item.friendId}>
                 <Td className={styles.colName}><span className={styles.rowName} title={item.displayName}>{item.displayName}</span></Td>
                 <Td className={styles.colScore}><span className={styles.scoreNum}>{formatMileageNumber(item.currentScore)}</span></Td>
                 <Td className={styles.colBand}>
@@ -548,7 +550,7 @@ export default function ScoreTab() {
                             id: 'friend',
                             label: 'この人を見る',
                             external: true,
-                            onSelect: () => router.push(`/friends/detail?id=${encodeURIComponent(item.friendId)}`),
+                            href: `/friends/detail?id=${encodeURIComponent(item.friendId)}`, onSelect: () => router.push(`/friends/detail?id=${encodeURIComponent(item.friendId)}`),
                           },
                         ]}
                       />
@@ -619,7 +621,7 @@ export default function ScoreTab() {
                 open={ruleMenuId === '__head'}
                 onOpenChange={(next) => setRuleMenuId(next ? '__head' : null)}
                 items={[
-                  { id: 'edit', label: '決めごとの編集画面を開く', external: true, onSelect: () => router.push('/mileage/score-rules') },
+                  { id: 'edit', label: '決めごとの編集画面を開く', external: true, href: '/mileage/score-rules', onSelect: () => router.push('/mileage/score-rules') },
                   {
                     id: 'stop',
                     label: '公開中のルールを止める',
@@ -655,7 +657,7 @@ export default function ScoreTab() {
                 const changed = ruleChanged(rule, publishedRules.get(rule.id))
                 const stopped = !rule.enabled
                 return (
-                  <Tr key={rule.id} className={styles.row} data-table-layout="columns">
+                  <Tr key={rule.id} className={styles.row} data-table-layout="columns" data-row-id={rule.id}>
                     <Td className={styles.colName}>
                       <span className={styles.rowNameInk} ><TruncatedText value={String(rule.name ?? '')} /></span>
                       <span className={styles.rowSub}>{frequencyText(rule)}</span>
@@ -675,7 +677,7 @@ export default function ScoreTab() {
                             open={ruleMenuId === rule.id}
                             onOpenChange={(next) => setRuleMenuId(next ? rule.id : null)}
                             items={[
-                              { id: 'edit', label: '編集', external: true, onSelect: () => router.push('/mileage/score-rules') },
+                              { id: 'edit', label: '編集', external: true, href: '/mileage/score-rules', onSelect: () => router.push('/mileage/score-rules') },
                               {
                                 id: 'remove',
                                 label: '外す',
@@ -776,7 +778,7 @@ export default function ScoreTab() {
           busy={rulesBusy}
           error={rulesActionError || undefined}
           onCancel={() => { if (!rulesBusy) setPublishConfirm(false) }}
-          onConfirm={() => void publishDraft()}
+          onConfirm={() => publishDraft()}
         />
         <ConfirmDialog
           open={stopConfirm}
@@ -787,7 +789,7 @@ export default function ScoreTab() {
           busy={rulesBusy}
           error={rulesActionError || undefined}
           onCancel={() => { if (!rulesBusy) setStopConfirm(false) }}
-          onConfirm={() => void stopPublished()}
+          onConfirm={() => stopPublished()}
         />
         <ConfirmDialog
           open={removeTarget !== null}
@@ -916,7 +918,7 @@ export function ScoreAdjustDialog({
       cancelLabel="キャンセル"
       busy={busy}
       error={error || undefined}
-      onConfirm={() => void submit()}
+      onConfirm={() => submit()}
       onCancel={() => { if (!busy) onCancel() }}
     >
       {/* 絵 Nv7An：縦に間 14 の1列。ラベルと入れ物の間は 6。 */}

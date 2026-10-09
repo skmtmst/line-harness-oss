@@ -12,6 +12,8 @@
  * - 違いを比べる（E14GFm）：違う項目だけを並べた窓。「最新を取り込んで直す」で保存されている値を入力へ写す
  */
 import { formatDate as polishFormatDate } from '@/lib/format'
+import { createPageReturnHref } from '@/components/shared/create-page'
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ArrowLeftRight, Link2, RefreshCw, TriangleAlert } from 'lucide-react'
@@ -197,7 +199,7 @@ function InflowCreate() {
         lineAccountId: selectedAccountId,
       })
       if (!res.success) throw new Error(res.error)
-      router.push(`/inflow-links/detail?id=${res.data.id}`)
+      router.push(createPageReturnHref('/inflow-links', res.data.id))
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
         /* 見分けるための文字が使用中。同じ文字の発行済みリンクを探して比べられるようにする。 */
@@ -306,15 +308,7 @@ function InflowCreate() {
   const conflictSavedAt = conflict ? formatSavedAt(conflict.updatedAt) : ''
 
   const conflictBand = conflict ? (
-    <div className={styles.conflictBand} role="alert" aria-label="文字が重複しています">
-      <TriangleAlert size={16} aria-hidden="true" className={styles.conflictIcon} />
-      <div className={styles.conflictText}>
-        <p className={styles.conflictTitle}>{`「${conflict.refCode}」は${conflictSavedAt ? ` ${conflictSavedAt} に` : ''}「${conflict.name}」で保存されています`}</p>
-        <p className={styles.conflictNote}>同じ文字のまま発行はできません。文字を変えるか、違いを比べてください</p>
-      </div>
-      <Button onClick={() => setShowCompare(true)} aria-expanded={showCompare}><ArrowLeftRight size={15} aria-hidden="true" />違いを比べる</Button>
-      <Button onClick={loadLatestAndContinue}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
-    </div>
+    <SaveConflictBand title={`「${conflict.refCode}」は${conflictSavedAt ? ` ${conflictSavedAt} に` : ''}「${conflict.name}」で保存されています`} description="同じ文字のまま発行はできません。文字を変えるか、違いを比べてください" onCompare={() => setShowCompare(true)} onReload={loadLatestAndContinue} />
   ) : null
 
   const step4 = introTemplate
@@ -387,7 +381,7 @@ function InflowCreate() {
             </Button>
           )}
         </>
-      )}
+      )} dirty={false}
     >
       {pruneNotice ? <Notice tone="warn" message={pruneNotice} onClose={() => setPruneNotice(null)} /> : null}
       {saveError ? <Notice tone="danger" message={saveError} onClose={() => setSaveError(null)} /> : null}

@@ -8,6 +8,7 @@
  * 試行の履歴・受信箱で連絡・再試行・対応済みは、お知らせの名前を押して開く「記録の詳細」に置く（行は1段のまま）。
  * 読み込み・再試行・対応済みの口と世代の守りは今の部品（components/line-notifications/notification-run-list）の関数を使う。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Ban, CircleX, Mail, RotateCw } from 'lucide-react'
 import {
@@ -82,7 +83,7 @@ function reasonWords(item: RunItem): string {
 }
 
 export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string | null; mode: 'history' | 'failures' }) {
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
   const currentScopeKey = `${lineAccountId ?? 'none'}:${mode}`
   const [scope, setScope] = useState<NotificationRunScope>(() => ({ key: currentScopeKey, generation: 0 }))
   /* 世代はレンダー中に進める（今の部品と同じ。古い応答を新しい画面へ漏らさない）。 */
@@ -92,10 +93,10 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
   const generation = scope.generation
 
   const [loaded, setLoaded] = useState<ScopedLoadState>({ generation: -1, state: 'loading', result: null, total: 0 })
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<RunFilter>('all')
-  const [recipientFilter, setRecipientFilter] = useState<RecipientFilter>('all')
-  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [filter, setFilter] = useListUrlValue<RunFilter>('filter', 'all')
+  const [recipientFilter, setRecipientFilter] = useListUrlValue<RecipientFilter>('recipientFilter', 'all')
+  const [periodFilter, setPeriodFilter] = useListUrlValue<PeriodFilter>('periodFilter', 'all')
   const [retrying, setRetrying] = useState<ScopedRetrying>({ generation: -1, id: null })
   const [notice, setNotice] = useState<ScopedNotice>({ generation: -1, notice: null })
   const [detailId, setDetailId] = useState<string | null>(null)
@@ -210,8 +211,8 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
     <section className={styles.table} data-design-node={mode === 'failures' ? 'DrwMm-table' : 'PZBVb-table'} data-list-state={listState} aria-label={title}>
       {!lineAccountId ? <ListState kind="empty" title="LINEアカウントを選択してください" description="上のアカウント切り替えから、確認するLINEアカウントを選んでください。" />
         : visibleState === 'loading' ? <ListState kind="loading" title={`${title}を読み込んでいます`} />
-        : visibleState === 'error' ? <ListState kind="error" title={`${title}を表示できませんでした`} description="登録済みの記録は消えていません。時間をおいて読み直してください。" action={<Button onClick={() => void load()}><RotateCw size={15} aria-hidden="true" />記録を再読み込み</Button>} />
-        : visibleState === 'forbidden' ? <ListState kind="forbidden" />
+        : visibleState === 'error' ? <ListState kind="error" title={`${title}を表示できませんでした`} description="登録済みの記録は消えていません。時間をおいて読み直してください。" onRetry={() => void load()} />
+        : visibleState === 'forbidden' ? <ListState kind="forbidden" onRetry={() => void load()} />
         : items.length === 0 ? <ListState kind="empty" title={mode === 'failures' ? '送れなかったお知らせはありません' : 'お知らせの記録はまだありません'} description={mode === 'failures' ? '現在の表示範囲には、確認が必要な失敗はありません。' : 'ECからのお知らせを処理すると、ここに記録が残ります。'} />
         : visibleItems.length === 0 ? <ListState kind="empty" emptyPreset="filtered" title="条件に合う記録はありません" description="検索語か絞り込みを変えてください。" />
         : <DataTable label="お知らせの記録" grid={{ columns: 'var(--tpl-rest3-run-cols)', compactColumns: 'minmax(0, .8fr) minmax(0, 1fr) minmax(0, .8fr) var(--tpl-an-col-130) minmax(0, 1.5fr) var(--tpl-an-col-88)', padding: 'var(--tpl-rest3-run-row-pad)', headPadding: 'var(--tpl-rest3-op-head-pad)' }}>
@@ -230,7 +231,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
               const status = STATUS[item.status]
               const who = item.recipientType === 'customer' ? `顧客${item.orderNumber ? `・${item.orderNumber}` : ''}` : '運用者'
               const reason = reasonWords(item)
-              return <Tr key={item.id}>
+              return <Tr key={item.id} data-row-id={item.id}>
                 <Td className={`${styles.cell} ${styles.runWhen}`}><span className={styles.runWhen}>{shortJst(item.receivedAt)}</span></Td>
                 <Td className={styles.cell}>
                   <button type="button" className={styles.runOpen} onClick={() => setDetailId(item.id)} title={`${item.notificationName}の記録の詳細を開く`} >{item.notificationName}</button>

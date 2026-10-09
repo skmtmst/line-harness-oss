@@ -13,6 +13,9 @@
  * （編集・止める／再開する・削除する）。右クリックでも同じものが出る。
  */
 import SharedStatusPill from '@/components/shared/status-pill'
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -181,36 +184,7 @@ function stateBadge(item: CommonVar): { label: string; tone: 'success' | 'info' 
 
 /** 差し込み名の右のコピーの印（絵：キーの横の小さな印）。押すと印が「✓」に変わる。 */
 function CopyKeyButton({ value, label }: { value: string; label: string }) {
-  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle')
-  const timerRef = useRef<number | null>(null)
-  useEffect(() => () => {
-    if (timerRef.current !== null) window.clearTimeout(timerRef.current)
-  }, [])
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(value)
-      setState('copied')
-    } catch {
-      setState('failed')
-    }
-    if (timerRef.current !== null) window.clearTimeout(timerRef.current)
-    timerRef.current = window.setTimeout(() => setState('idle'), 1500)
-  }
-  return (
-    <button
-      type="button"
-      className={styles.copyKey}
-      data-state={state}
-      aria-label={label}
-      title={state === 'copied' ? 'コピーしました' : state === 'failed' ? 'コピーできませんでした。文字を選んでコピーしてください' : 'コピー'}
-      onClick={(event) => {
-        event.stopPropagation()
-        void copy()
-      }}
-    >
-      {state === 'copied' ? <Check size={12} aria-hidden="true" /> : <Copy size={12} aria-hidden="true" />}
-    </button>
-  )
+  return <CopyTextButton value={value} aria-label={label} />
 }
 
 function CommonVarsListInner() {
@@ -247,11 +221,11 @@ function CommonVarsListInner() {
   const [folderReloading, setFolderReloading] = useState(false)
   const [listLimited, setListLimited] = useState(false)
 
-  const [query, setQuery] = useState('')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [chip, setChip] = useState<VarsChip>('all')
-  const [order, setOrder] = useState<CommonVarOrder>('usage_desc')
+  const [order, setOrder] = useListUrlValue<CommonVarOrder>('order', 'usage_desc')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [orderMenuOpen, setOrderMenuOpen] = useState(false)
@@ -1003,37 +977,7 @@ function CommonVarsListInner() {
   )
   /* 並び替え：絵に無いが今の機能。場所を取らないよう印だけのボタン＋メニュー。 */
   const orderLabel = ORDER_OPTIONS.find((option) => option.value === order)?.label ?? ''
-  const orderBox = (
-    <>
-      <IconButton
-        title={`並び替え：${orderLabel}`}
-        aria-label={`並び替え：${orderLabel}`}
-        aria-haspopup="menu"
-        aria-expanded={orderMenuOpen}
-        onClick={(event) => {
-          orderAnchorRef.current = event.currentTarget
-          setOrderMenuOpen((open) => !open)
-        }}
-      >
-        <ArrowUpDown size={15} aria-hidden="true" />
-      </IconButton>
-      <ActionMenu
-        open={orderMenuOpen}
-        onClose={() => setOrderMenuOpen(false)}
-        anchorRef={orderAnchorRef}
-        ariaLabel="並び替え"
-        items={ORDER_OPTIONS.map((option) => ({
-          id: option.value,
-          label: option.value === order ? `${option.label}（いまの並び）` : option.label,
-          onSelect: () => {
-            setOrderMenuOpen(false)
-            setOrder(option.value)
-            setPage(1)
-          },
-        }))}
-      />
-    </>
-  )
+  const orderBox = <ListToolbarSort value={order} onChange={(value) => { setOrder(value as typeof order); setPage(1) }} options={ORDER_OPTIONS} />
   const perPageBox = (
     <div className={styles.perPageBox}>
       <Select
@@ -1189,6 +1133,7 @@ function CommonVarsListInner() {
         <span className={styles.stateIcon}><Lock size={18} aria-hidden="true" /></span>
         <p className={styles.stateTitle}>共通情報を見る権限がありません</p>
         <p className={styles.stateDesc}>オーナーか管理者に、共通情報を見られるよう頼んでください。</p>
+        <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
         <Button href="/staff" variant="secondary">できることを確かめる</Button>
       </div>
     ) : (
@@ -1196,7 +1141,7 @@ function CommonVarsListInner() {
         <span className={`${styles.stateIcon} ${styles.stateIconError}`}><TriangleAlert size={18} aria-hidden="true" /></span>
         <p className={styles.stateTitle}>共通情報を読み込めませんでした</p>
         <p className={styles.stateDesc}>{error || '読み込みに失敗しました。接続を確かめて、もう一度お試しください。'}</p>
-        <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+        <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
       </div>
     )
   ) : filtered.length === 0 ? (
@@ -1358,7 +1303,7 @@ function CommonVarsListInner() {
       </ContextMenu>
 
       {/* まとめての帯（選ぶと表の下に出る）。 */}
-      {canWrite ? <BulkBar count={selected.size} hint="対象を確認してから操作を選んでください" onClear={() => setSelected(new Set())}>
+      {canWrite ? <BulkBar count={selected.size} total={filtered.length} onSelectAll={() => setSelected(new Set(filtered.map(item => item.id)))} hint="対象を確認してから操作を選んでください" onClear={() => setSelected(new Set())}>
         <Button type="button" variant="secondary" onClick={() => setSelected(new Set())}>選択を外す</Button>
         <Button type="button" variant="danger" onClick={() => void prepareRemoveSelected()}>選択した共通情報を削除</Button>
       </BulkBar> : null}
@@ -1740,7 +1685,7 @@ function CommonVarsListInner() {
         destructive
         busy={deleting}
         error={deleteBatchError || undefined}
-        onConfirm={() => void removeSelected()}
+        onConfirm={() => removeSelected()}
         onCancel={() => {
           if (deleting) return
           batchRequestRef.current = {

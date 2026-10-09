@@ -15,6 +15,7 @@ import LiffPhoneFrame from '@/components/shared/liff-phone-frame'
  * 選ぶ中身が無いときは空き枠の代わりにその旨を出す。
  */
 import { formatDate as polishFormatDate } from '@/lib/format'
+import { jstDate } from '@/lib/jst-datetime'
 import type { BookingAvailabilitySlot, BookingMenu, BookingStaff } from '@/lib/api'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import styles from './settings.module.css'
@@ -232,7 +233,7 @@ export function LiffPhoneDatetimeStep({
   }
   const openDates = [...byDate.keys()].sort()
   // 見本は「空きのある先頭の日」から5日（LIFF で日を選んで戻ってきたときと同じ並び）。無ければ今日から。
-  const anchor = openDates[0] ?? new Date().toISOString().slice(0, 10)
+  const anchor = openDates[0] ?? jstDate()
   const days = daysFrom(anchor)
   const closed = new Set(closedDates)
   const closedDow = new Set(closedWeekdays)

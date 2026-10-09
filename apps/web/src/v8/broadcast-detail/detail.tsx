@@ -13,6 +13,7 @@
  * ここは見せ方と、この画面だけの操作（テスト送信・削除・予約の取り消し）を持つ。
  * 宛先・記録のタブの中身は入口から差し込む（古い画面の部品を import しないため）。
  */
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { useState, type ReactNode, type RefObject } from 'react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -176,6 +177,14 @@ export default function BroadcastDetail({
   const [cancelError, setCancelError] = useState('')
   const [testing, setTesting] = useState(false)
 
+  const collision = useSaveConflict<ApiBroadcast>({
+    contextKey: broadcast.id,
+    fetchLatest: async () => {
+      const response = await api.broadcasts.get(broadcast.id)
+      return response.success ? response.data : null
+    },
+    reload: () => onConflictReload?.(),
+  })
   const editHref = `/broadcasts/new?draft=${encodeURIComponent(broadcast.id)}`
   const duplicateHref = `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`
   /* 下書きの現在地＝ `draft_step`（止まった手順）。なければ1つ目。 */
@@ -234,7 +243,7 @@ export default function BroadcastDetail({
       label: '複製して作る',
       icon: <Copy size={14} aria-hidden="true" />,
       external: true,
-      onSelect: () => router.push(duplicateHref),
+      href: duplicateHref, onSelect: () => router.push(duplicateHref),
     },
   ]
   if (isScheduled) {
@@ -305,20 +314,15 @@ export default function BroadcastDetail({
 
       {conflict ? (
         <div className={styles.conflictWrap} data-design-node="Q28Gb">
-          <div className={styles.conflict} role="alert">
-            <CircleAlert className={styles.conflictIcon} aria-hidden="true" />
-            <div className={styles.conflictText}>
-              {/* だれが・いつ更新したかは口（配信の詳細）に無いので出さない。 */}
-              <p className={styles.conflictTitle}>{`ほかの人が配信「${broadcast.title}」を更新しました`}</p>
-              <p className={styles.conflictDesc}>
-                この画面は古い内容です。読み直すと最新の設定と見本が出ます（この画面では書き換えません）。
-              </p>
-            </div>
-            <Button size="field" variant="primary" onClick={onConflictReload}>
-              <RefreshCw aria-hidden="true" />
-              読み直す
-            </Button>
-          </div>
+          <SaveConflictBand title={`ほかの人が配信「${broadcast.title}」を更新しました`}
+            description="この画面は古い内容です。読み直すと最新の設定と見本が出ます（この画面では書き換えません）。"
+            compareBusy={collision.compareBusy} onCompare={collision.compare} onReload={collision.reloadLatest} />
+          <SaveConflictCompareDialog open={collision.compareOpen} busy={collision.compareBusy} error={collision.compareError} onCancel={collision.closeCompare} onReload={collision.reloadLatest}
+            lines={collision.latest ? [
+              { text: `題：表示 ${broadcast.title} ／ 最新 ${collision.latest.title}` },
+              { text: `状態：表示 ${broadcast.status} ／ 最新 ${collision.latest.status}` },
+              { text: `予約時刻：表示 ${broadcast.scheduledAt ?? '未設定'} ／ 最新 ${collision.latest.scheduledAt ?? '未設定'}` },
+            ] : null} />
         </div>
       ) : null}
 
@@ -397,7 +401,7 @@ export default function BroadcastDetail({
         destructive
         busy={deleting}
         error={deleteError || undefined}
-        onConfirm={() => void deleteBroadcast()}
+        onConfirm={() => deleteBroadcast()}
         onCancel={() => { if (!deleting) setDeleteOpen(false) }}
       />
       <CancelReservationDialog
@@ -408,7 +412,7 @@ export default function BroadcastDetail({
           : '予約が取り消され、この配信は送られなくなります。書いた内容は下書きとして残るので、作り直しにはなりません。'}
         busy={cancelling}
         error={cancelError}
-        onConfirm={() => void cancelReservation()}
+        onConfirm={() => cancelReservation()}
         onClose={() => { if (!cancelling) setCancelOpen(false) }}
       />
     </PageFrame>

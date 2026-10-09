@@ -7,6 +7,7 @@
  * 見せ方：頭（← 友だちへ・タブ・表示中をCSVで書き出す）→ 案内の帯 → 数4つ →
  * 探す・状態の札・見直した時刻・もう一度見直す → 重複の候補（比べて決める）→ アカウントごとの重なり。
  */
+import { jstDate } from '@/lib/jst-datetime'
 import Link from 'next/link'
 import { Download, Info, RotateCw } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
@@ -213,7 +214,7 @@ export default function DuplicatesListV8() {
                 const accounts = [candidate.left.lineAccountName, candidate.right.lineAccountName].filter(Boolean).join(' ／ ') || emptyValue('unknown')
                 const evidence = candidate.evidenceSummary.length ? candidate.evidenceSummary.join('・') : '根拠を確認'
                 return (
-                  <Tr key={candidate.id} className={styles.row}>
+                  <Tr key={candidate.id} className={styles.row} data-row-id={candidate.id}>
                     <Td className={styles.td}>
                       <Link href={href} className={styles.pair} title={`${candidate.left.label} ↔ ${candidate.right.label}`}>
                         {`${candidate.left.label} ↔ ${candidate.right.label}`}

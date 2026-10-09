@@ -11,6 +11,7 @@ import SegmentedControl from '@/components/shared/segmented'
  * から写した（import はしない）。動きの一覧は BEHAVIOR.md の「実行結果」。
  */
 
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -158,16 +159,16 @@ export default function AutoReplyRunsV8() {
   const requestedRuleId = searchParams.get('id') ?? ''
   const staffRole = useStaffRole()
   const canManage = staffRole === null || canManageRole(staffRole)
-  const [period, setPeriod] = useState<PeriodKey>('month')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
-  const [pageSize, setPageSize] = useState(20)
+  const [period, setPeriod] = useListUrlValue<PeriodKey>('period', 'month')
+  const [dateFrom, setDateFrom] = useListUrlValue('dateFrom', '')
+  const [dateTo, setDateTo] = useListUrlValue('dateTo', '')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [data, setData] = useState<AutoReplyRunsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [page, setPage] = useState(1)
-  const [filter, setFilter] = useState<RunFilter>('all')
-  const [search, setSearch] = useState('')
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [filter, setFilter] = useListUrlValue<RunFilter>('filter', 'all')
+  const [search, setSearch] = useListUrlValue('q', '')
   const [actionMessage, setActionMessage] = useState('')
   const [stopOpen, setStopOpen] = useState(false)
   const [stopReason, setStopReason] = useState('')
@@ -388,7 +389,7 @@ export default function AutoReplyRunsV8() {
         label: 'トークを開く',
         icon: <MessageCircle size={14} aria-hidden="true" />,
         external: true,
-        onSelect: () => { router.push(`/chats?friend=${encodeURIComponent(item.friendId)}`) },
+        href: `/chats?friend=${encodeURIComponent(item.friendId)}`, onSelect: () => { router.push(`/chats?friend=${encodeURIComponent(item.friendId)}`) },
       })
     }
     if (canManage && item.canRetry) {
@@ -509,7 +510,7 @@ export default function AutoReplyRunsV8() {
         {loading ? (
           <ListState kind="loading" />
         ) : error ? (
-          <ListState kind="error" description={error} action={<Button onClick={() => void load()}>再読み込み</Button>} />
+          <ListState kind="error" description={error} onRetry={() => void load()} />
         ) : items.length === 0 ? (
           <ListState kind="empty" title="実行結果はまだありません" description="自動応答が動くと、ここに結果が残ります。" />
         ) : visibleItems.length === 0 ? (
@@ -535,7 +536,7 @@ export default function AutoReplyRunsV8() {
                 const name = item.friendName ?? '削除済みの友だち'
                 const menuItems = rowMenuItems(item)
                 return (
-                  <Tr key={item.id} className={styles.row} data-table-layout="columns">
+                  <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
                     <Td className={styles.colWhen}>
                       <time dateTime={item.occurredAt} title={polishFormatListDateTime(item.occurredAt)} className={styles.when}>{formatTime(item.occurredAt)}</time>
                     </Td>
@@ -637,7 +638,7 @@ export default function AutoReplyRunsV8() {
         destructive
         busy={stopping}
         designNode="i8F12"
-        onConfirm={() => void stopRule()}
+        onConfirm={() => stopRule()}
         onCancel={() => { if (!stopping) { setStopOpen(false); setStopReason('') } }}
       >
         <input

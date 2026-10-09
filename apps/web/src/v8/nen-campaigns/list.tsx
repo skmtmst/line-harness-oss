@@ -9,6 +9,8 @@
  * 表は「見出し 36・行 56」の同じ物差しで並べる（タブを替えても表の頭が動かない）。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { jstDate } from '@/lib/jst-datetime'
 import { useRouter } from 'next/navigation'
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
@@ -310,11 +312,11 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
   const router = useRouter()
   const { autoSettings, sentByKey, pausedOnly, canEdit, kpis } = props
   const tabError = props.tabError ?? ''
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<AutoFilter>('')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [filter, setFilter] = useListUrlValue<AutoFilter>('filter', '')
   const [saved, setSaved] = useState('')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 10)
   const [savedOpen, setSavedOpen] = useState(false)
   const savedRef = useRef<HTMLSpanElement | null>(null)
 
@@ -351,7 +353,7 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
 
   const menuFor = (setting: NenCampaignSetting): ActionMenuItem[] => {
     const items: ActionMenuItem[] = []
-    if (canEdit) items.push({ id: 'edit', label: '編集', external: true, onSelect: () => { router.push(`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`) } })
+    if (canEdit) items.push({ id: 'edit', label: '編集', external: true, href: `/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`, onSelect: () => { router.push(`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`) } })
     items.push({ id: 'preview', label: '中身を見る', onSelect: () => props.onPreviewCampaign(setting.campaignKey) })
     if (canEdit) {
       items.push({ id: 'test', label: 'テスト送信', disabled: props.testing !== null, onSelect: () => props.onTestSend(setting) })
@@ -434,7 +436,7 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
                 const timing = formatCampaignTiming(setting)
                 const audience = formatCampaignAudience(setting)
                 return (
-                  <Tr key={setting.campaignKey} className={styles.row} data-table-layout="columns">
+                  <Tr key={setting.campaignKey} className={styles.row} data-table-layout="columns" data-row-id={setting.campaignKey}>
                     <Td className={styles.colName}>
                       {canEdit ? (
                         <Link href={`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`} className={styles.name} ><TruncatedText value={String(setting.label ?? '')} /></Link>
@@ -614,11 +616,11 @@ function columnBadge(column: NenColumn, sent: number | null) {
 function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
   const { columns, columnMetrics, canEdit } = props
   const tabError = props.tabError ?? ''
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<ColumnFilter>('')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [filter, setFilter] = useListUrlValue<ColumnFilter>('filter', '')
   const [category, setCategory] = useState('')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 10)
   const [savedOpen, setSavedOpen] = useState(false)
   const savedRef = useRef<HTMLSpanElement | null>(null)
 
@@ -729,7 +731,7 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
                 const views = metric?.articleOpened.value
                 const draft = column.publishedAt == null
                 return (
-                  <Tr key={column.id} className={styles.row} data-table-layout="columns" selected={props.selectedColumnId === column.id}>
+                  <Tr key={column.id} className={styles.row} data-table-layout="columns" selected={props.selectedColumnId === column.id} data-row-id={column.id}>
                     <Td className={styles.colName}>
                       <span className={styles.nameStack}>
                         <button type="button" className={styles.name} title={column.title}  onClick={() => props.onSelectColumn(column.id)}>{column.title}</button>
@@ -868,8 +870,8 @@ function historyStatus(filter: HistoryFilter): string | undefined {
 function HistoryTab(props: NenCampaignsListProps & { canEdit: boolean }) {
   const { deliveryList, deliveryDetail, canEdit } = props
   const tabError = props.tabError ?? ''
-  const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<HistoryFilter>('all')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [filter, setFilter] = useListUrlValue<HistoryFilter>('filter', 'all')
   const [reasons, setReasons] = useState<Record<string, string>>({})
   const [retryFocusId, setRetryFocusId] = useState<string | null>(null)
   const shown = deliveryList?.deliveries ?? []

@@ -9,6 +9,7 @@
  * プール一覧・LINEアカウント一覧・プールごとの所属アカウント・追加・外す・削除。
  * 「新規プール」は V8 の作る画面（/pools/new・`D0AOyx`）へ移る。
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Copy, Info, Plus } from 'lucide-react'
 import type { LineAccount, PoolAccount, TrafficPool } from '@line-crm/shared'
@@ -156,16 +157,7 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
-  const onCopy = async () => {
-    try {
-      setCopyError('')
-      await navigator.clipboard.writeText(publicUrl)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1200)
-    } catch {
-      setCopyError('コピーできませんでした。公開URLを選んでコピーしてください。')
-    }
-  }
+
 
   const onDelete = async () => {
     // 押している間は受け付けない（二度押しの2回目は404になり、消えているのに失敗と出る）。
@@ -205,9 +197,7 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
       </div>
       <div className={styles.urlRow}>
         <span className={styles.url} ><TruncatedText value={String(publicUrl ?? '')} url /></span>
-        <Button variant="secondary" onClick={() => void onCopy()}>
-          <Copy size={15} aria-hidden="true" />{copied ? 'コピー済' : '公開 URL コピー'}
-        </Button>
+        <CopyTextButton value={publicUrl} aria-label="公開URLをコピー"  />
       </div>
       {copyError ? <p role="alert" className={styles.inlineError}>{copyError}</p> : null}
       <PoolMembers poolId={pool.id} accounts={accounts} canManage={canManage} onChange={onChange} />
@@ -220,7 +210,7 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
         destructive
         busy={deleting}
         error={deleteError}
-        onConfirm={() => void onDelete()}
+        onConfirm={() => onDelete()}
         onCancel={() => {
           if (deleting) return
           setConfirmOpen(false)
@@ -319,7 +309,7 @@ function PoolMembers({ poolId, accounts, canManage, onChange }: {
       {listError ? (
         <p role="alert" className={styles.inlineError}>
           {listError}{' '}
-          <button type="button" className={styles.textButton} onClick={() => void reload()}>読み直す</button>
+          <button type="button" className={styles.textButton} onClick={() => void reload()}>もう一度読み込む</button>
         </p>
       ) : null}
       {canManage && candidates.length > 0 ? (
@@ -351,7 +341,7 @@ function PoolMembers({ poolId, accounts, canManage, onChange }: {
         confirmLabel="外す"
         busy={removing}
         error={removeError}
-        onConfirm={() => void onRemove()}
+        onConfirm={() => onRemove()}
         onCancel={() => {
           if (removing) return
           setRemoveTarget(null)

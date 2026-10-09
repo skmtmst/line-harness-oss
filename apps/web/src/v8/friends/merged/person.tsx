@@ -78,7 +78,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
           {m.saveError ? (
             <p className={styles.error} role="alert">
               {m.saveError}
-              <button type="button" className={styles.link} onClick={m.reload}>読み直す</button>
+              <button type="button" className={styles.link} onClick={m.reload}>もう一度読み込む</button>
             </p>
           ) : null}
 
@@ -109,7 +109,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
               </thead>
               <tbody>
                 {deliveryRows.map(({ friend, active }) => (
-                  <Tr key={friend.friendId} className={styles.row}>
+                  <Tr key={friend.friendId} className={styles.row} data-row-id={friend.friendId}>
                     <Td className={styles.td}>{friend.lineAccountName}</Td>
                     <Td className={styles.td}>{friend.displayName}</Td>
                     <Td className={styles.td}><span className={friend.isFollowing ? `${styles.pill} ${styles.pillOk}` : `${styles.pill} ${styles.pillMuted}`}>{friend.isFollowing ? '友だち' : 'ブロック・削除'}</span></Td>
@@ -146,7 +146,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
               </thead>
               <tbody>
                 {person.linkedFriends.map((friend) => (
-                  <Tr key={friend.friendId} className={`${styles.row} ${styles.rowTall}`}>
+                  <Tr key={friend.friendId} className={`${styles.row} ${styles.rowTall}`} data-row-id={friend.friendId}>
                     <Td className={styles.td}>{friend.lineAccountName}</Td>
                     <Td className={styles.td}>{friend.displayName}</Td>
                     <Td className={styles.td}>{shortDate(friend.linkedAt)}</Td>

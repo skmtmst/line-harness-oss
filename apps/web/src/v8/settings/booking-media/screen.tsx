@@ -10,6 +10,8 @@
  * 保存した URL は「今日のお店」の右の列と「枠を閉じる知らせ」の［管理画面を開く ↗］に使われる。
  * 動きは BEHAVIOR.md。
  */
+import { notifySaved } from '@/components/shared/toast'
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Copy, MessageCircle, Plus } from 'lucide-react'
 import { PageFrame, PageHeading, PageFooter } from '@/components/templates/page-frame'
@@ -355,7 +357,7 @@ export default function BookingMediaPage() {
           setNotice(next); setNoticeSaved(next)
         }
       }
-      notifyToast('予約サイト・グルメ媒体の設定を保存しました')
+      notifySaved('予約サイト・グルメ媒体の設定を保存しました')
       await Promise.all([load(), loadNotice()])
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 409) setConflict(true)
@@ -367,10 +369,7 @@ export default function BookingMediaPage() {
   }
 
   const askLink = () => setLinkAsked(true)
-  const copyText = async (text: string, what: string) => {
-    if (!link?.available) { askLink(); return }
-    try { await navigator.clipboard.writeText(text); notifyToast(`${what}をコピーしました`) } catch { notifyToast(`${what}をコピーできませんでした`) }
-  }
+
 
   let table
   if (loadError && !saved) table = <ListState kind="error" error={loadError} onRetry={() => void load()} />
@@ -417,8 +416,8 @@ export default function BookingMediaPage() {
                           icon: row.closeOnBooking ? <Check size={14} aria-hidden="true" /> : undefined,
                           onSelect: () => setRow(row.code, { closeOnBooking: !row.closeOnBooking }),
                         }] : []),
-                        ...(row.pageUrl ? [{ id: 'open-page', label: '店舗ページを開く', external: true, onSelect: () => { window.open(row.pageUrl!, '_blank', 'noopener,noreferrer') } }] : []),
-                        ...(row.loginUrl ? [{ id: 'open-login', label: '管理画面を開く', external: true, onSelect: () => { window.open(row.loginUrl!, '_blank', 'noopener,noreferrer') } }] : []),
+                        ...(row.pageUrl ? [{ id: 'open-page', label: '店舗ページを開く', external: true, href: row.pageUrl!, onSelect: () => { window.open(row.pageUrl!, '_blank', 'noopener,noreferrer') } }] : []),
+                        ...(row.loginUrl ? [{ id: 'open-login', label: '管理画面を開く', external: true, href: row.loginUrl!, onSelect: () => { window.open(row.loginUrl!, '_blank', 'noopener,noreferrer') } }] : []),
                       ]}
                     />
                   ) : null}
@@ -453,7 +452,7 @@ export default function BookingMediaPage() {
         />
         <div className={styles.body}>
           {conflict ? (
-            <Notice tone="warn" role="alert" action={<Button size="compact" onClick={() => void load()}>読み直す</Button>}>
+            <Notice tone="warn" role="alert" action={<Button size="compact" onClick={() => void load()}>もう一度読み込む</Button>}>
               ほかの人が先にこの店の媒体の設定を変えました。読み直してから、もう一度変えてください。
             </Notice>
           ) : null}
@@ -481,7 +480,7 @@ export default function BookingMediaPage() {
                 {canManage ? (
                   <div className={styles.urlRow}>
                     <span className={styles.urlBox} title={link?.url}>{link?.url ?? (linkError || '読み込んでいます…')}</span>
-                    <Button onClick={() => void copyText(link?.url ?? '', '予約ページの URL')} disabled={!link}><Copy size={15} aria-hidden="true" />コピー</Button>
+                    <CopyTextButton value={link?.url ?? ""} aria-label="予約ページのURLをコピー" disabled={!link} />
                   </div>
                 ) : (
                   <p className={styles.cardText}>予約ページの URL は、管理者が確かめられます。</p>
@@ -500,7 +499,7 @@ export default function BookingMediaPage() {
                   <>
                     <code className={styles.code} title={link?.html}>{link?.html ?? (linkError || '読み込んでいます…')}</code>
                     <span className={styles.copyRow}>
-                      <Button onClick={() => void copyText(link?.html ?? '', '貼り付けるコード')} disabled={!link}><Copy size={15} aria-hidden="true" />コードをコピー</Button>
+                      <CopyTextButton value={link?.html ?? ""} aria-label="コードをコピー" disabled={!link} />
                     </span>
                   </>
                 ) : null}
@@ -651,7 +650,7 @@ export default function BookingMediaPage() {
         description="予約を受けないグルメ媒体（口コミ・紹介のサイトなど）を足します。予約メールは取り込みません。足したら行の「…」から URL を入れます。"
         confirmLabel="足す"
         busy={addBusy}
-        onConfirm={() => void addMedium()}
+        onConfirm={() => addMedium()}
         onCancel={() => setAdding(false)}
         error={addError || undefined}
       >

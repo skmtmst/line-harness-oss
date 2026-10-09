@@ -9,6 +9,7 @@
  * 数の帯は共通の帯（板の端から端）、案内は青い帯、道具の段の右端に表示件数、
  * 表は板の端から端（行の右端は必ず「…」）、表の下に安全確認の段。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -58,10 +59,10 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
   const [retryOrder, setRetryOrder] = useState<MarkRow[] | null>(null)
   const [stats, setStats] = useState<ListStats | null>(null)
   const [statsStatus, setStatsStatus] = useState<LoadStatus>('loading')
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [usage, setUsage] = useState<'all' | 'used' | 'unused'>('all')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [dragId, setDragId] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<MarkRow | null>(null)
   const [archiveImpact, setArchiveImpact] = useState<SupportMarkArchiveImpact | null>(null)
@@ -274,7 +275,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
     ] : []
     if (!canEdit) return [{ id: 'open', label: '詳しく見る', onSelect: () => openMarkDetail(mark.id) }]
     return [
-      { id: 'edit', label: '編集', external: true, onSelect: () => router.push(`/tags/marks/edit?id=${encodeURIComponent(mark.id)}`) },
+      { id: 'edit', label: '編集', external: true, href: `/tags/marks/edit?id=${encodeURIComponent(mark.id)}`, onSelect: () => router.push(`/tags/marks/edit?id=${encodeURIComponent(mark.id)}`) },
       {
         id: 'archive',
         label: '保管する',
@@ -339,7 +340,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
       <AlertCircle className={styles.stateIconError} aria-hidden="true" />
       <p className={styles.stateTitle}>対応マークを読み込めませんでした</p>
       <p className={styles.stateDesc}>{error || '再読み込みしても直らない場合はエラー報告へ。'}</p>
-      <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+      <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
     </div>
   ) : listReady && items.length === 0 ? (
     <div className={styles.stateCard}>
@@ -390,7 +391,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
                     event.preventDefault()
                     openMarkDetail(mark.id)
                   }
-                }}
+                }} data-row-id={mark.id}
               >
                 <Td className={styles.markColGrip} onClick={(event) => event.stopPropagation()}>
                   {canEdit ? (
@@ -523,7 +524,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
             {retryOrder ? (
               <button type="button" onClick={() => { const next = retryOrder; setRetryOrder(null); if (next) void applyOrder(next) }}>再試行</button>
             ) : (
-              <button type="button" onClick={() => { setActionError(''); void load() }}>読み直す</button>
+              <button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button>
             )}
           </p>
         ) : null}
@@ -588,7 +589,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
           error={deleteError}
           onReplacement={setReplacementMarkId}
           onCancel={() => { if (!deleting) { setPendingDelete(null); setArchiveImpact(null) } }}
-          onConfirm={() => void confirmRemove(pendingDelete)}
+          onConfirm={() => confirmRemove(pendingDelete)}
         />
       ) : null}
     </>

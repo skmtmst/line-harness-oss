@@ -8,7 +8,7 @@
  * min-width に留める。
  */
 import React from 'react'
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Button from './button'
 
@@ -79,4 +79,19 @@ describe('ボタンの6状態（★V7 z97zZN §2）', () => {
     const link = screen.getByRole('link')
     expect(link.textContent).toBe('設定へ戻る')
   })
+})
+
+it('busyを省略した非同期ボタンも処理中は二重実行せず、失敗後に押し直せる', async () => {
+  let reject!: (reason: Error) => void
+  const save = vi.fn(() => new Promise<void>((_resolve, fail) => { reject = fail }))
+  render(<Button onClick={save}>保存する</Button>)
+  const button = screen.getByRole('button') as HTMLButtonElement
+  fireEvent.click(button)
+  expect(button.disabled).toBe(true)
+  expect(button.getAttribute('aria-busy')).toBe('true')
+  fireEvent.click(button)
+  expect(save).toHaveBeenCalledTimes(1)
+  await act(async () => { reject(new Error('offline')); await Promise.resolve() })
+  expect(button.disabled).toBe(false)
+  expect(screen.getByRole('alert').textContent).toContain('処理できませんでした')
 })

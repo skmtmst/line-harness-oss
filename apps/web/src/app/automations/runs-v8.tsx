@@ -419,7 +419,7 @@ export function V8RunsTab({
         kind="error"
         title="動いた記録を読み込めませんでした"
         description="記録は消えていません。再読み込みしてください。"
-        action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+        onRetry={() => void load()}
       />
     )
   }

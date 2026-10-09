@@ -8,6 +8,8 @@
  * （型のフォルダの列。板が狭いときは型が「設定：〇〇」の選ぶ欄に畳む）・統括名のカード。
  * 絵の「運営による操作」は契約先には出さない（2026-10-06 利用者指定。v7 と同じ）。
  */
+import { notifySaved } from '@/components/shared/toast'
+import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 import { useEffect, useId, useState, type FormEvent } from 'react'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
@@ -50,6 +52,7 @@ export default function HqSettingsV8() {
 function TenantNameCard({ canEdit }: { canEdit: boolean }) {
   const uid = useId()
   const [name, setName] = useState('')
+  const [baseline, setBaseline] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -60,7 +63,7 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
     let cancelled = false
     void api.tenants.me()
       .then((response) => {
-        if (!cancelled && response.success) setName(response.data.name ?? '')
+        if (!cancelled && response.success) { setName(response.data.name ?? ''); setBaseline(response.data.name ?? '') }
       })
       .catch(() => {
         if (!cancelled) setError('統括名を読み込めませんでした。時間をおいてもう一度お試しください。')
@@ -90,7 +93,8 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
       const response = await api.tenants.updateName(trimmed)
       if (!response.success) throw new Error(response.error)
       setName(response.data.name ?? trimmed)
-      setSaved(true)
+      setBaseline(response.data.name ?? trimmed)
+      setSaved(true); notifySaved()
     } catch (caught) {
       // M026：再試行の言葉がない代替文にしない。共通の状態別案内へ渡す。
       setError(japaneseDetailOf(caught) || describeApiFailure(caught, '統括名の保存', {
@@ -116,6 +120,7 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
 
   return (
     <form onSubmit={save} className={styles.card}>
+      <FormLeaveGuard dirty={name !== baseline} busy={saving} />
       <div className={styles.field}><Field label="統括名" htmlFor={`${uid}-name`}><TextField
           id={`${uid}-name`}
           value={name}
@@ -129,7 +134,7 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
 {nameError ? <p id={`${uid}-name-error`} className={styles.error} role="alert">{nameError}</p> : null}</Field></div>
       <p className={styles.hint}>会社名やブランド名など、メンバーが見てわかる名前にします</p>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
-      {saved ? <p className={styles.saved} role="status">保存しました。</p> : null}
+      {null}
       <div className={styles.actions}>
         <Button variant="primary" type="submit" disabled={loading || saving} busy={saving}>統括名を保存する</Button>
       </div>

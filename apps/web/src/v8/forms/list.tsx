@@ -8,6 +8,9 @@
  * （app/form-submissions/list-v8.tsx）と同じ。見た目だけを型（ListPage）と部品で組み直した。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useState, useEffect, useCallback, useMemo, useRef, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { useListScrollMemory } from '@/components/shared/list-url-state'
@@ -34,7 +37,6 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import { runUndoable } from '@/lib/undoable'
-import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
@@ -145,7 +147,7 @@ export default function FormsListV8() {
   const [formTotal, setFormTotal] = useState(0)
   /** フォルダ欄の「すべて」件数。絞り込み前の件数（all_total）。 */
   const [folderTotal, setFolderTotal] = useState(0)
-  const [activeFolderId, setActiveFolderId] = useState('all')
+  const [activeFolderId, setActiveFolderId] = useListUrlValue('activeFolderId', 'all')
   const [loading, setLoading] = useState(true)
   /* 戻ってきたら前のスクロール位置へ（絞り込みは前から URL に置いている）。 */
   useListScrollMemory(!loading)
@@ -361,8 +363,7 @@ export default function FormsListV8() {
 
   // 検索語のサーバー取得は少し遅らせ、1打鍵ごとの往復を避ける。
   useEffect(() => {
-    const timer = window.setTimeout(() => setFetchQuery(query), 300)
-    return () => window.clearTimeout(timer)
+    setFetchQuery(query)
   }, [query])
 
   const listState = { query, filter: formFilter, sort: formSort, pageSize, page }
@@ -416,7 +417,6 @@ export default function FormsListV8() {
   }, [formFilter, query, formSort, forms])
 
   /* 取り消し待ちの削除（5秒）の行は一覧から外して描く（動きの点検 17 番）。 */
-  const deferredDelete = useDeferredDelete()
   const listTotal = reviewMode ? clientFilteredForms.length : formTotal
   const pageCount = Math.max(1, Math.ceil(listTotal / pageSize))
   const visiblePage = Math.min(page, pageCount)
@@ -424,7 +424,7 @@ export default function FormsListV8() {
   const pageForms = reviewMode
     ? clientFilteredForms.slice(pageStart, pageStart + pageSize)
     : forms
-  const visibleForms = deferredDelete.hiddenCount === 0 ? pageForms : pageForms.filter((form) => !deferredDelete.isHidden(form.id))
+  const visibleForms = pageForms
   /* 行の名前の前の丸は、左のフォルダの列と同じフォルダ（同じ色）を引く。無ければ未分類の輪。 */
   const folderDotOf = (folderId: string | null | undefined) => {
     const folder = folderId ? folders.find((f) => f.id === folderId) : undefined
@@ -499,52 +499,8 @@ export default function FormsListV8() {
     }
   }
 
-  /*
-   * 「削除」：影響を先に読み、消しても何も失われないフォーム（未公開・回答 0・利用先 0 で、
-   * 完全削除ができるもの）だけ、確かめの窓を出さずに一覧から外し、5秒は「元に戻す」で
-   * 取り消せる（動きの点検 17 番）。そうでなければ今までどおり窓（アーカイブを勧める）。
-   */
-  const requestDelete = async (form: Form) => {
-    const accountId = selectedAccountId
-    if (!accountId) {
-      void openDelete(form)
-      return
-    }
-    let impact: FormDeleteImpact | null = null
-    try {
-      const result = await api.forms.deleteImpact(form.id, accountId)
-      if (result.success) impact = result.data
-    } catch {
-      impact = null
-    }
-    const harmless = impact !== null && impact.canDelete && impact.submissionCount === 0 && impact.referenceCount === 0 && !impact.form.isActive
-    if (!impact || !harmless) {
-      void openDelete(form)
-      return
-    }
-    const revision = impact.revision
-    closeDetail()
-    deferredDelete.schedule({
-      ids: [form.id],
-      message: `回答フォーム「${displayFormName(form.name)}」を削除しました`,
-      commit: async () => {
-        try {
-          const result = await api.forms.remove(form.id, accountId, revision)
-          if (!result.success) throw new Error('delete_failed')
-        } catch (reason) {
-          // 応答が失われても、もう消えていれば成功（窓の扱いと同じ）。
-          try {
-            await api.forms.get(form.id, accountId)
-          } catch (checkError) {
-            if (checkError instanceof ApiError && checkError.status === 404) return
-          }
-          throw reason
-        }
-      },
-      onCommitted: () => Promise.all([loadForms(), loadStats()]),
-      failureMessage: 'この回答フォームを削除できませんでした。状態を読み直してから、もう一度お試しください。',
-    })
-  }
+  /* 削除は、利用状況にかかわらず確認してから実行する。 */
+  const requestDelete = (form: Form) => { void openDelete(form) }
 
   const closeDelete = () => {
     if (deleting) return
@@ -817,19 +773,7 @@ export default function FormsListV8() {
     }
   }
 
-  const copyAnswerUrl = async (form: Form) => {
-    const url = formAnswerUrl(selectedAccount?.liffId, form.id)
-    if (!url) {
-      notifyToast('このアカウントの公開URLをまだ作れません。', { tone: 'error' })
-      return
-    }
-    try {
-      await navigator.clipboard.writeText(url)
-      notifyToast('回答フォームのURLをコピーしました')
-    } catch {
-      notifyToast('URLをコピーできませんでした。', { tone: 'error' })
-    }
-  }
+
 
   /* 名前のその場の書き換え（詳細パネル）。影響口で読んだ版を付けて同じ更新口へ送る。 */
   const renameForm = async (target: Form, next: string) => {
@@ -899,7 +843,7 @@ export default function FormsListV8() {
   /* ===== 行の「…」（編集・名前を変更・集まった回答・複製・受付を止める・フォルダへ移す・アーカイブ・削除） ===== */
   const rowMenuItems = (form: Form): ActionMenuItem[] => !canEditForms ? [{
     id: 'responses', label: '集まった回答', external: true,
-    onSelect: () => router.push(`/form-submissions/responses?id=${encodeURIComponent(form.id)}`),
+    href: `/form-submissions/responses?id=${encodeURIComponent(form.id)}`, onSelect: () => router.push(`/form-submissions/responses?id=${encodeURIComponent(form.id)}`),
   }] : [
     {
       id: 'edit',
@@ -911,7 +855,7 @@ export default function FormsListV8() {
       id: 'responses',
       label: '集まった回答',
       external: true,
-      onSelect: () => router.push(`/form-submissions/responses?id=${encodeURIComponent(form.id)}`),
+      href: `/form-submissions/responses?id=${encodeURIComponent(form.id)}`, onSelect: () => router.push(`/form-submissions/responses?id=${encodeURIComponent(form.id)}`),
     },
     { id: 'duplicate', label: '複製', onSelect: () => openDuplicate(form) },
     ...(form.isActive
@@ -1021,7 +965,7 @@ export default function FormsListV8() {
   )
   const sortBox = (
     <div className={styles.sortBox}>
-      <Select
+      <ListToolbarSort
         aria-label="並び順"
         label="並び"
         value={formSort}
@@ -1273,17 +1217,7 @@ export default function FormsListV8() {
                     <span className={styles.answerSub} title={answerSub}>{answerSub}</span>
                   </Td>
                   <Td>
-                    <button
-                      type="button"
-                      className={styles.urlButton}
-                      disabled={!answerUrl}
-                      title={answerUrl ? '配っているURLをコピー' : 'このアカウントは公開URLをまだ作れません'}
-                      aria-label={`${name}のURLをコピー`}
-                      onClick={() => void copyAnswerUrl(form)}
-                    >
-                      <Link2 size={15} aria-hidden="true" />
-                      URL
-                    </button>
+                    <CopyTextButton value={answerUrl ?? ''} aria-label={`${name}のURLをコピー`} disabled={!answerUrl} />
                   </Td>
                   {!reviewMode ? (
                     /* 管理者確認は読み取り専用。編集・削除・回答の口は担当アカウント経由しか受けない。 */
@@ -1389,7 +1323,7 @@ export default function FormsListV8() {
         destructive
         busy={folderBusy}
         error={folderError || undefined}
-        onConfirm={() => void removeFolder()}
+        onConfirm={() => removeFolder()}
         onCancel={() => {
           if (folderBusy) return
           setDeletingFolder(null)
@@ -1471,6 +1405,7 @@ export default function FormsListV8() {
               value={duplicateName}
               onChange={(event) => setDuplicateName(event.target.value)}
               onKeyDown={(event) => {
+                if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return
                 if (event.key === 'Enter') void duplicateForm()
               }}
               className={styles.panelInput}
@@ -1536,7 +1471,7 @@ export default function FormsListV8() {
               <Button type="button" variant="secondary" onClick={() => { closeDetail(); openMove(active) }}>フォルダへ移す</Button>
               <Button type="button" variant="secondary" onClick={() => { closeDetail(); void openDelete(active) }}>アーカイブ・削除</Button>
               </> : null}
-              <Button type="button" variant="secondary" onClick={() => void copyAnswerUrl(active)}>URLをコピー</Button>
+              <CopyTextButton value={formAnswerUrl(selectedAccount?.liffId, active.id) ?? ''} aria-label="回答フォームのURLをコピー" disabled={!formAnswerUrl(selectedAccount?.liffId, active.id)} />
             </div>
           </div>
         ) : null}
@@ -1551,7 +1486,7 @@ export default function FormsListV8() {
         destructive
         busy={stopping || stopImpactLoading}
         error={stopError || undefined}
-        onConfirm={stopError || stopRevision !== null ? () => void stopAccepting() : undefined}
+        onConfirm={stopError || stopRevision !== null ? () => stopAccepting() : undefined}
         onCancel={() => {
           if (stopping) return
           setStopTarget(null)
@@ -1585,7 +1520,7 @@ export default function FormsListV8() {
                 variant="danger"
                 disabled={deleting || deleteImpactLoading || !deleteImpact?.canDelete}
                 title={deleteImpact && !deleteImpact.canDelete ? '未公開・回答なし・利用先なしのフォームだけ削除できます' : undefined}
-                onClick={() => void removeForm(true)}
+                onClick={() => void removeForm(true)} busy={Boolean(deleting)} busyLabel="処理中…"
               >
                 削除する
               </Button>

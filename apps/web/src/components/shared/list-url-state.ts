@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 
 /*
  * 一覧の絞り込み・検索語・並び順・ページを URL に置く口（動きの点検 5 番）。
@@ -77,6 +77,9 @@ if (typeof window !== 'undefined') {
   // 別の画面へ移る・戻るときは、書きかけを先に書いてから。
   window.addEventListener('popstate', () => { pending = null })
   window.addEventListener('pagehide', flushListUrlState)
+  document.addEventListener('click', event => {
+    if (event.target instanceof Element && event.target.closest('a[href]')) flushListUrlState()
+  }, true)
 }
 const readServerSearch = () => ''
 
@@ -101,6 +104,14 @@ export function nextListUrl<T extends Record<string, string>>(
     if (value === undefined) continue
     if (value === '' || value === defaults[key]) params.delete(key)
     else params.set(key, value)
+  }
+  const isPagination = (key: string) => /(?:page|cursors?|offset)$/i.test(key)
+  const changedFilter = Object.entries(patch).some(([key, value]) => !isPagination(key) && !['highlight', 'id'].includes(key) && value !== undefined && value !== (new URLSearchParams(location.search).get(key) ?? defaults[key] ?? ''))
+  if (changedFilter && patch.page === undefined) params.delete('page')
+  if (changedFilter && patch.cursor === undefined) params.delete('cursor')
+  if (changedFilter && patch.offset === undefined) params.delete('offset')
+  if (changedFilter && !Object.keys(patch).every(key => key === 'tab')) for (const key of Array.from(params.keys())) {
+    if (isPagination(key) && patch[key] === undefined) params.delete(key)
   }
   const query = params.toString()
   return `${location.pathname}${query ? `?${query}` : ''}${location.hash}`
@@ -300,4 +311,53 @@ export function useOnAccountSwitch(accountId: string | null | undefined, onSwitc
     previousRef.current = accountId
     if (previous && accountId && previous !== accountId) onSwitchRef.current()
   }, [accountId])
+}
+
+/** 一覧の文字・数・入切を URL に保存する。useState と同じ更新関数を受け取る。 */
+export function useListUrlValue<T>(key: string, initial: T | (() => T)): [T, (next: T | ((current: T) => T)) => void] {
+  const [fallback] = useState(initial)
+  const zeroBasedPage = key === 'page' && fallback === 0
+  const encode = (value: T) => value === null ? '' : String(zeroBasedPage ? Number(value) + 1 : value)
+  const decode = (raw: string): T => {
+    if (typeof fallback === 'number') return (Number.isFinite(Number(raw)) && raw !== '' ? Math.max(key === 'page' ? (zeroBasedPage ? 0 : 1) : -Infinity, Number(raw) - (zeroBasedPage ? 1 : 0)) : fallback) as T
+    if (typeof fallback === 'boolean') return (raw === 'true') as T
+    return (raw === '' && fallback === null ? null : raw) as T
+  }
+  const [raw, setRaw] = useListUrlParam(key, encode(fallback))
+  const value = decode(raw)
+  const setValue = useCallback((next: T | ((current: T) => T)) => setRaw(encode(typeof next === 'function' ? (next as (current: T) => T)(decode(readListUrlParam(key, encode(fallback)))) : next)), [key, fallback, setRaw])
+  return [value, setValue]
+}
+
+/** 複数の条件・選択した条件の組をURLへ残す。壊れた値は初期値で開く。 */
+export function useListUrlJsonValue<T>(key: string, initial: T, validate?: (value: unknown) => value is T): [T, (next: T | ((current: T) => T)) => void] {
+  const [fallback] = useState(initial)
+  const decode = useCallback((raw: string): T => {
+    try {
+      const value: unknown = JSON.parse(raw)
+      if (validate) return validate(value) ? value : fallback
+      if (Array.isArray(fallback)) return (Array.isArray(value) && value.every((item) => typeof item === 'string') ? value : fallback) as T
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return fallback
+      const valid = Object.entries(fallback as object).every(([field, expected]) => expected === null || expected === undefined || (Array.isArray(expected) ? Array.isArray((value as Record<string, unknown>)[field]) : typeof (value as Record<string, unknown>)[field] === typeof expected))
+      return valid ? value as T : fallback
+    } catch { return fallback }
+  }, [fallback, validate])
+  const initialRaw = JSON.stringify(fallback)
+  const [raw, setRaw] = useListUrlParam(key, initialRaw)
+  const setValue = useCallback((next: T | ((current: T) => T)) => {
+    const previous = decode(readListUrlParam(key, initialRaw))
+    setRaw(JSON.stringify(typeof next === 'function' ? (next as (current: T) => T)(previous) : next))
+  }, [decode, initialRaw, key, setRaw])
+  const value = useMemo(() => decode(raw), [decode, raw])
+  return [value, setValue]
+}
+
+/** 種類など複数選択の絞り込み。関数による変更もURLの最新の組に重ねる。 */
+export function useListUrlSetValue<T extends string>(key: string, initial: T[]): [Set<T>, (next: Set<T> | ((current: Set<T>) => Set<T>)) => void] {
+  const [values, setValues] = useListUrlJsonValue<T[]>(key, initial)
+  const set = useCallback((next: Set<T> | ((current: Set<T>) => Set<T>)) => {
+    setValues(previous => Array.from(typeof next === 'function' ? next(new Set(previous)) : next))
+  }, [setValues])
+  const value = useMemo(() => new Set(values), [values])
+  return [value, set]
 }

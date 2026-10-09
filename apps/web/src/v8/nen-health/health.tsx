@@ -9,6 +9,8 @@
  * 健康日記はお客さまがマイページで付けるので、ここに変える操作は無い（閲覧のみでも同じ画面）。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useListUrlJsonValue } from '@/components/shared/list-url-state'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Activity, Bookmark, CalendarCheck, CalendarDays, Columns2, FileText, History, PawPrint } from 'lucide-react'
@@ -60,7 +62,7 @@ export default function HealthV8({
 }) {
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const [kpis, setKpis] = useState<NenHealthKpis | null>(null)
-  const [filters, setFilters] = useState<HealthFilters>(EMPTY_FILTERS)
+  const [filters, setFilters] = useListUrlJsonValue<HealthFilters>('filters', EMPTY_FILTERS)
 
   /*
    * 「30日のまとめ」は対象スナップショットとして持つ（今の画面の DEEP-23 と同じ）。
@@ -235,8 +237,8 @@ function HealthListV8({
   const [status, setStatus] = useState<ListStatus>('loading')
   const [data, setData] = useState<NenHealthListData | null>(null)
   const [draft, setDraft] = useState(filters.q)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 10)
   const [savedOpen, setSavedOpen] = useState(false)
   const savedRef = useRef<HTMLSpanElement | null>(null)
   const requestRef = useRef(0)
@@ -271,11 +273,6 @@ function HealthListV8({
   }, [filters.q])
 
   // 探す欄は打ち終わってから（0.3秒）取り直す。
-  useEffect(() => {
-    if (draft.trim() === filters.q) return
-    const timer = window.setTimeout(() => { onFiltersChange({ ...filters, q: draft.trim() }); setPage(1) }, 300)
-    return () => window.clearTimeout(timer)
-  }, [draft, filters, onFiltersChange])
 
   const set = (patch: Partial<HealthFilters>) => { onFiltersChange({ ...filters, ...patch }); setPage(1) }
   const filtering = filters.q !== '' || (!concernOnly && filters.change !== '') || filters.last !== ''
@@ -306,7 +303,7 @@ function HealthListV8({
 
       <div className={styles.toolsRow} data-design="ListControls">
         <span className={styles.searchBox}>
-          <SearchField aria-label="ペットを探す" placeholder="ペットを探す" value={draft} onChange={setDraft} onClear={() => setDraft('')} />
+          <SearchField aria-label="ペットを探す" placeholder="ペットを探す" value={draft} onChange={(value: string) => { setDraft(value); onFiltersChange({ ...filters, q: value.trim() }); setPage(1) }} onClear={() => { setDraft(''); onFiltersChange({ ...filters, q: '' }); setPage(1) }} />
         </span>
         {concernOnly ? null : (
           <span className={styles.chips} role="group" aria-label="よく使う札">
@@ -398,8 +395,8 @@ function HealthRow({ row, onOpenSummary, onOpenPdf }: { row: NenHealthRow; onOpe
     { id: 'summary', label: '30日のまとめ', onSelect: () => onOpenSummary(row.pet.id) },
     /* 1匹の PDF は「30日のまとめ」を開いてから印刷する（開いた引き出しの「印刷・PDF に保存する」）。 */
     { id: 'pdf', label: '獣医師向け PDF', onSelect: () => onOpenPdf(row.pet.id) },
-    { id: 'owner', label: '飼い主を開く', external: true, onSelect: () => { router.push(`/friends/detail?id=${friendId}`) } },
-    { id: 'talk', label: '飼い主にトークで声をかける', external: true, onSelect: () => { router.push(`/chats?friend=${friendId}`) } },
+    { id: 'owner', label: '飼い主を開く', external: true, href: `/friends/detail?id=${friendId}`, onSelect: () => { router.push(`/friends/detail?id=${friendId}`) } },
+    { id: 'talk', label: '飼い主にトークで声をかける', external: true, href: `/chats?friend=${friendId}`, onSelect: () => { router.push(`/chats?friend=${friendId}`) } },
   ]
   return (
     <Tr className={styles.row} data-table-layout="columns">

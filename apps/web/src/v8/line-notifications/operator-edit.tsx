@@ -11,6 +11,8 @@
  * データの口・下書き保存・公開・テスト送信・版の守り・未保存の番兵は、今の画面
  * （app/line-notifications/operator/new/operator-new-v8.tsx）から写した。動きは BEHAVIOR.md。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
+import { notifySaved } from '@/components/shared/toast'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useRef, useState } from 'react'
@@ -297,7 +299,7 @@ function OperatorEditInner() {
   fields.define('name', 'お知らせの名前', () => (name.trim() ? null : 'お知らせの名前を入力してください。'))
   /* 受け取るスタッフは、宛先のチームの欄（operator-recipient-team）が赤くなって理由を出す（列車9 の形のまま）。 */
 
-  const saveDraft = async (): Promise<string | null> => {
+  const saveDraft = async (quiet = false): Promise<string | null> => {
     // 読み込み中に保存すると、未復元の項目が初期値で上書きされる。
     if (saving || ruleLoading) return null
     if (!selectedAccountId) {
@@ -359,8 +361,10 @@ function OperatorEditInner() {
         : await api.lineNotifications.operatorRules.create({ lineAccountId: selectedAccountId, ...payload })
       if (!result.success) throw new Error('save failed')
       setSavedRuleId(result.data.id)
-      if (typeof result.data.version === 'number') setRuleVersion(result.data.version)
+      if (typeof result.data.version === 'number') setRuleVersion(result.data.version ?? null)
       setError('')
+      setBaseline(signature)
+      if (!quiet) { notifySaved('下書きを保存しました'); if (!editId) router.push(createPageReturnHref('/line-notifications?tab=operator', result.data.id)) }
       return result.data.id
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 403) {
@@ -384,7 +388,7 @@ function OperatorEditInner() {
     /* 押した「公開」のボタンに手応え（押せない形＋輪）を出す。先に下書きを保存している間も。 */
     setPreparingPublish(true)
     try {
-      const ruleId = await saveDraft()
+      const ruleId = await saveDraft(true)
       if (!ruleId) return
       setConfirmOpen(true)
     } finally {
@@ -399,8 +403,13 @@ function OperatorEditInner() {
     setPublishing(true)
     setError('')
     try {
-      await api.lineNotifications.operatorRules.publish(ruleId, selectedAccountId)
-      router.push(`/line-notifications?tab=operator&highlight=${encodeURIComponent(ruleId)}`)
+      const result = await api.lineNotifications.operatorRules.publish(ruleId, selectedAccountId)
+      if (!result.success) throw new Error('公開できませんでした')
+      setRuleVersion(result.data.version ?? null)
+      setBaseline(signature)
+      setConfirmOpen(false)
+      notifySaved('公開しました')
+      if (!editId) router.push(createPageReturnHref('/line-notifications?tab=operator', ruleId))
     } catch (caught) {
       setError(describeApiFailure(caught, '公開', {
         scope: 'store',
@@ -412,7 +421,7 @@ function OperatorEditInner() {
 
   const testSend = async () => {
     if (!selectedAccountId || saving || ruleLoading) return
-    const ruleId = await saveDraft()
+    const ruleId = await saveDraft(true)
     if (!ruleId) return
     setSaving(true); setError(''); setNotice('')
     try {
@@ -470,7 +479,7 @@ function OperatorEditInner() {
                   </div>
                 </div>
                 {canWrite ? (
-                  <Button type="button" variant="secondary" className={styles.wideButton} onClick={() => void testSend()} disabled={saveDisabled}>
+                  <Button type="button" variant="secondary" className={styles.wideButton} onClick={() => void testSend()} disabled={saveDisabled} busy={Boolean(saving)} busyLabel="処理中…">
                     <Send size={15} aria-hidden="true" />自分にテストを送る
                   </Button>
                 ) : null}
@@ -617,7 +626,7 @@ function OperatorEditInner() {
                   {canWrite && teamFormOpen ? (
                     <div className={styles.teamForm}>
                       <TextField aria-label="チーム名" placeholder="チーム名" value={teamName} maxLength={100} disabled={teamBusy} onChange={event => setTeamName(event.target.value)} />
-                      <Button variant="secondary" disabled={teamBusy} onClick={() => void saveTeam()}>{teamId ? 'チームを更新する' : 'チームを作る'}</Button>
+                      <Button variant="secondary" disabled={teamBusy} onClick={() => void saveTeam()} busy={Boolean(teamBusy)} busyLabel="処理中…">{teamId ? 'チームを更新する' : 'チームを作る'}</Button>
                     </div>
                   ) : null}
                   {teamError ? (

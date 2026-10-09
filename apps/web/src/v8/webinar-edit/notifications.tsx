@@ -7,6 +7,7 @@
  * 口・保存の順（通知の設定 → 版のある設定）・テスト送信は app/webinars/edit/notifications-v8.tsx と
  * components/webinars/webinar-notifications.tsx と同じ（BEHAVIOR.md）。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Plus, Send } from 'lucide-react'
@@ -175,7 +176,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
           const res = await webinarApi.saveNotifications(webinarId, input)
           setSettings(res.data.settings)
           setBaseline(res.data.settings)
-          notifyToast(`保存しました。${res.data.queued} 件を予定に入れ、${res.data.cancelled} 件を取り消しました。`)
+          notifySaved(`保存しました。${res.data.queued}件を予定に入れ、${res.data.cancelled}件を取り消しました。`)
         } catch {
           setError('通知の設定を保存できませんでした。入力を残しました。もう一度お試しください。')
           return false
@@ -265,7 +266,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
 
   let notificationBody: ReactNode
   if (loadState === 'loading') notificationBody = <ListState kind="loading" />
-  else if (loadState === 'error') notificationBody = <ListState kind="error" title="通知の設定を読み込めませんでした" description="通信を確認して、もう一度読み込んでください。" action={<Button onClick={() => void load()}>もう一度読み込む</Button>} />
+  else if (loadState === 'error') notificationBody = <ListState kind="error" title="通知の設定を読み込めませんでした" description="通信を確認して、もう一度読み込んでください。" onRetry={() => void load()} />
   else if (!settings) {
     notificationBody = <ListState kind="empty" title="通知の設定がまだありません" description="届けるものを決めて保存すると、申込・前日・開始前の通知が届くようになります。最初は全部オフから始めます。" action={readOnly ? undefined : <Button onClick={() => { const initial = emptySettings(webinarId); setSettings(initial); setBaseline(initial) }}>通知の設定を入力する</Button>} />
   } else {
@@ -370,7 +371,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {testResult ? <p role="status" className={form.previewNote}>{testResult}</p> : null}
 
-      <ConfirmDialog open={testOpen} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" busy={testing} onCancel={() => { if (!testing) setTestOpen(false) }} onConfirm={() => void runTest()}>
+      <ConfirmDialog open={testOpen} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" busy={testing} onCancel={() => { if (!testing) setTestOpen(false) }} onConfirm={() => runTest()}>
         <p className={form.cardNote}>{dirty ? '保存していない設定を保存してから送ります。' : ''}{`対象：「${webinar.title}」の入っている通知。本文は設定済みのものを送ります。`}</p>
       </ConfirmDialog>
       {actionsOpen && actions ? (
@@ -413,7 +414,7 @@ function ActionsDialog({ webinarId, initialTrigger, actions, onClose, onSaved }:
     }
   }
   return (
-    <Dialog open title="視聴後の動きを変える" description="見終わった・CTA を押した・見ていない、の場合ごとに動きを決めます。" confirmLabel="保存する" busy={saving} error={error || undefined} onConfirm={() => void save()} onCancel={() => { if (!saving) onClose() }}>
+    <Dialog open title="視聴後の動きを変える" description="見終わった・CTA を押した・見ていない、の場合ごとに動きを決めます。" confirmLabel="保存する" busy={saving} error={error || undefined} onConfirm={() => save()} onCancel={() => { if (!saving) onClose() }}>
       <div className={styles.dialogBody}>
         <Select aria-label="どの場合か" size="full" value={trigger} onChange={(value) => setTrigger(value as WebinarAction['trigger'])} options={TRIGGERS.map((item) => ({ value: item.key, label: item.label }))} />
         {visible.length === 0 ? <p className={form.cardNote}>この場合の動きはまだありません。</p> : visible.map((action, index) => {

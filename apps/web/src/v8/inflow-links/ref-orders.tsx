@@ -16,6 +16,7 @@
  *   入らない）。その件数は一覧側の説明に出す。
  */
 
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchApi } from '@/lib/api'
@@ -92,7 +93,7 @@ export default function RefOrdersPanel({
 }) {
   const [state, setState] = useState<LoadState>('loading')
   const [data, setData] = useState<RefOrdersResponse | null>(null)
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
   const requestRef = useRef(0)
 
   const load = useCallback(async () => {

@@ -443,7 +443,7 @@ describe('A01-02 初期状態に戻すは確認なしに実行しない', () => 
     await render()
     await openEditor()
     await act(async () => { button('初期状態に戻す').click() })
-    await act(async () => { button('削除して初期状態へ戻す').click() })
+    await act(async () => { button('削除する').click() })
     expect(net.deletes).toBe(1)
   })
 })

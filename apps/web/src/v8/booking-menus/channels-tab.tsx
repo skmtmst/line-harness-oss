@@ -144,7 +144,7 @@ function ConnectDialog({
       cancelLabel="やめる"
       busy={busy}
       error={error || undefined}
-      onConfirm={() => void save()}
+      onConfirm={() => save()}
       onCancel={onClose}
     >
       <TextField aria-label="カレンダーの ID" value={calendarId} onChange={(e) => setCalendarId(e.target.value)} placeholder="例：shop@example.com" />
@@ -204,7 +204,7 @@ export function ConflictDialog({
         cancelLabel="あとで"
         busy={busy}
         error={error || undefined}
-        onConfirm={canEdit ? () => void move() : undefined}
+        onConfirm={canEdit ? () => move() : undefined}
         onCancel={onClose}
       >
         {conflict.bookings?.length ? (
@@ -335,7 +335,7 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
 
   if (status === 'loading') return <ListState kind="loading" />
   if (status === 'error' || !data) {
-    return <ListState kind="error" title="予約経路を読み込めませんでした" description={error} action={<Button onClick={() => void load()}>もう一度読む</Button>} />
+    return <ListState kind="error" title="予約経路を読み込めませんでした" description={error} onRetry={() => void load()} />
   }
 
   return (

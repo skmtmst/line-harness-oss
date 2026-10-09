@@ -30,7 +30,6 @@ import {
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError, type ListStats } from '@/lib/api'
 import { useRowLeaving } from '@/lib/use-row-leaving'
-import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { ListPageBody } from '@/components/templates'
 import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from './folder-colors'
@@ -228,7 +227,6 @@ export default function TagsTab({
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null)
   const { leavingId, leave } = useRowLeaving()
   // 使っている所が0のタグは窓なしで保管し、5秒は「元に戻す」で取り消せる（動きの点検 17 番・旧い一覧と同じ）。
-  const deferredDelete = useDeferredDelete()
   const [folderDialog, setFolderDialog] = useState<'new' | TagGroup | null>(null)
   const [deletingGroup, setDeletingGroup] = useState<TagGroup | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
@@ -295,7 +293,6 @@ export default function TagsTab({
 
   const filtered = useMemo(() => items.filter((tag) => {
     // 保管して「元に戻す」を待っている行は出さない。
-    if (deferredDelete.isHidden(tag.id)) return false
     if (query && !tag.name.toLowerCase().includes(query.toLowerCase())) return false
     if (folder === UNGROUPED && tag.groupId) return false
     if (folder && folder !== UNGROUPED && tag.groupId !== folder) return false
@@ -311,7 +308,7 @@ export default function TagsTab({
       if (key === 'linked' && !linked) return false
     }
     return true
-  }), [items, query, folder, usageFilter, sourceFilter, quick, deferredDelete])
+  }), [items, query, folder, usageFilter, sourceFilter, quick])
   const pages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const currentPage = Math.min(page, pages)
   const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
@@ -477,8 +474,8 @@ export default function TagsTab({
       ]
     }
     const list: ActionMenuItem[] = [
-      { id: 'edit', label: '編集', external: true, onSelect: () => router.push(`/tags/edit?id=${tag.id}`) },
-      { id: 'copy', label: '複製して作る', external: true, onSelect: () => router.push(`/tags/new?copy=${tag.id}`) },
+      { id: 'edit', label: '編集', external: true, href: `/tags/edit?id=${tag.id}`, onSelect: () => router.push(`/tags/edit?id=${tag.id}`) },
+      { id: 'copy', label: '複製して作る', external: true, href: `/tags/new?copy=${tag.id}`, onSelect: () => router.push(`/tags/new?copy=${tag.id}`) },
       { id: 'move', label: 'フォルダへ移す', onSelect: () => setMenuMoveFor(tag.id) },
     ]
     /* アーカイブに戻す口は無いため、同じ確認を繰り返さない（v7 R190）。 */
@@ -494,25 +491,8 @@ export default function TagsTab({
     return list
   }
 
-  /*
-   * 保管の入口。使っている所が0（友だち0人・どこからも使われていない）と分かっているタグは、
-   * 確かめの窓を出さずに一覧から外し、5秒は「元に戻す」で取り消せる。送る直前に影響を読み直し、
-   * その間に使われ始めていたら保管せずに行を戻す。それ以外は今までどおり確かめの窓。
-   */
-  const requestArchive = (tag: Tag) => {
-    if (!isUnused(tag) || !accountId) {
-      setDeleteTarget(tag)
-      return
-    }
-    if (activeTagId === tag.id) setActiveTagId(null)
-    deferredDelete.schedule({
-      ids: [tag.id],
-      message: `タグ「${tag.name}」を保管しました`,
-      commit: () => archiveIfStillUnused(tag.id, accountId),
-      onCommitted: () => load(),
-      failureMessage: 'タグを保管できませんでした。使われ始めていないか確かめて、もう一度お試しください。',
-    })
-  }
+  /* 削除は、利用状況にかかわらず確認してから実行する。 */
+  const requestArchive = (tag: Tag) => { setDeleteTarget(tag) }
 
   /* 右クリックのメニュー。行の「…」と同じ操作。移し先はそのまま並べる。 */
   const tagContextItems = (tag: Tag): ContextMenuItem[] => {
@@ -663,7 +643,7 @@ export default function TagsTab({
       <AlertCircle className={styles.stateIconError} aria-hidden="true" />
       <p className={styles.stateTitle}>タグを読み込めませんでした</p>
       <p className={styles.stateDesc}>再読み込みしても直らない場合はエラー報告へ。</p>
-      <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+      <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
     </div>
   ) : ready && visible.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */
@@ -715,7 +695,7 @@ export default function TagsTab({
                     event.preventDefault()
                     openTagDetail(tag.id)
                   }
-                }}
+                }} data-row-id={tag.id}
               >
                 <Td className={styles.colName}>
                   <ContextMenu label={`タグ「${tag.name}」の操作`} items={tagContextItems(tag)}>
@@ -857,7 +837,7 @@ export default function TagsTab({
           <p role="alert" className={styles.errorBand}>
             <AlertCircle className={styles.errorIcon} aria-hidden="true" />
             {actionError}
-            <button type="button" onClick={() => { setActionError(''); void load() }}>読み直す</button>
+            <button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button>
           </p>
         ) : null}
         {table}
@@ -921,7 +901,7 @@ export default function TagsTab({
         busy={folderBusy}
         error={folderError || undefined}
         onCancel={() => { if (!folderBusy) setDeletingGroup(null) }}
-        onConfirm={() => void removeGroup()}
+        onConfirm={() => removeGroup()}
       />
 
       {deleteTarget && (

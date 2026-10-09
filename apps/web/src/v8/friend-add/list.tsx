@@ -12,6 +12,7 @@
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
 import SharedStatusPill from '@/components/shared/status-pill'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -199,11 +200,11 @@ function FriendAddList() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [errorStatus, setErrorStatus] = useState<number | null>(null)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useListUrlValue('q', '')
   const [appliedSearch, setAppliedSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<FriendAddRuleStatus | ''>('')
-  const [folder, setFolder] = useState<string | null>(null)
-  const [perPage, setPerPage] = useState(20)
+  const [statusFilter, setStatusFilter] = useListUrlValue<FriendAddRuleStatus | ''>('statusFilter', '')
+  const [folder, setFolder] = useListUrlValue<string | null>('folder', null)
+  const [perPage, setPerPage] = useListUrlValue('perPage', 20)
   const { cursor, canPrev, reset: resetCursor, goPrev, goNext } = useCursorStack()
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
@@ -275,7 +276,7 @@ function FriendAddList() {
     const timer = setTimeout(() => {
       setAppliedSearch(search)
       resetCursor()
-    }, 300)
+    }, 0)
     return () => clearTimeout(timer)
   }, [search, resetCursor])
 
@@ -597,7 +598,7 @@ function FriendAddList() {
   const errorBand = actionError ? (
     <p className={styles.errorBand} role="alert">
       {actionError}
-      <Button onClick={() => void load()}>読み直す</Button>
+      <Button onClick={() => void load()}>もう一度読み込む</Button>
     </p>
   ) : null
   /* 1152 の板（P20kYU）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「状態の札」。 */
@@ -689,7 +690,7 @@ function FriendAddList() {
         <p className={styles.stateDesc}>
           {errorStatus === 403 ? error : '数の帯は「—」、道具はそのまま使えます。条件を変えてから試し直せます。'}
         </p>
-        <Button onClick={() => void load()}>もう一度試す</Button>
+        <Button onClick={() => void load()}>もう一度読み込む</Button>
       </div>
     )
   } else if (items.length === 0) {
@@ -906,7 +907,7 @@ function FriendAddList() {
           confirmLabel="止める"
           busy={stopBusy}
           error={stopError}
-          onConfirm={() => void runStop()}
+          onConfirm={() => runStop()}
           onCancel={() => {
             if (stopBusy) return
             setStopTarget(null)
@@ -923,7 +924,7 @@ function FriendAddList() {
           destructive
           busy={deleteBusy}
           error={deleteError}
-          onConfirm={() => void runDelete()}
+          onConfirm={() => runDelete()}
           onCancel={closeDelete}
         />
         <FolderEditorDialog open={folderDialogOpen} title={editingFolder ? 'フォルダを直す' : 'フォルダを追加'}
@@ -931,7 +932,7 @@ function FriendAddList() {
           name={folderName} onNameChange={setFolderName} color={folderColor} onColorChange={setFolderColor} maxLength={50}
           confirmLabel={editingFolder ? '保存する' : '追加する'} busy={folderBusy} error={folderError || undefined}
           onCancel={() => { if (!folderBusy) { setFolderDialogOpen(false); setFolderName(''); setEditingFolder(null) } }}
-          onConfirm={() => void createFolder()} />
+          onConfirm={() => createFolder()} />
       </>}
     >
       {listBody}

@@ -480,7 +480,7 @@ describe('UID移行の空と履歴のカード表示', () => {
     expect(document.body.textContent).toContain('登録した移行履歴は消えていません')
     // 再読み込みで直る。
     net.failList = null
-    fireEvent.click(buttonByText('再読み込み'))
+    fireEvent.click(buttonByText('もう一度読み込む'))
     await flush()
     expect(document.body.textContent).toContain('テスト移行はまだありません')
   })

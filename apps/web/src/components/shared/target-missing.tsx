@@ -94,10 +94,11 @@ export default function TargetMissing({
    */
   const shownTitle = v8 && kind === 'error' ? title.replace(/表示できませんでした$/, '読み込めませんでした') : title
   const showBack = (kind === 'unspecified' || kind === 'not-found') && backHref && backLabel
-  // 403 は押しても直らないので、再試行の口は出さない。
+  // 権限の案内を残し、権限変更後にも同じ口から読み直せる。
   // 文言は画面の指定どおり（出し分け文言が要るときは ListState の `error` を使う）。
   const failure = kind === 'error' && error !== undefined ? loadFailureCopy(error, 'この画面', permissionScope) : null
-  const showRetry = kind === 'error' && (failure && !failure.retryable ? undefined : onRetry)
+  const retry = onRetry ?? (() => window.location.reload())
+  const showRetry = kind === 'error'
   const accountLine =
     kind === 'not-found' && accountName ? `いまの LINE アカウントは「${accountName}」です。` : null
 
@@ -114,8 +115,8 @@ export default function TargetMissing({
     /* RqO7O：v8 の絵は「もう一度試す」。v7（x5cgUH）は読み込むのまま。 */
     /* 読み上げ名は見えている文字と同じにする（別の名前を付けると、声で操作する人が呼べない）。 */
     action = (
-      <Button type="button" variant="secondary" onClick={onRetry} disabled={retrying} busy={retrying} busyLabel="読み込んでいます">
-        <RotateCw aria-hidden="true" size={16} />{v8 ? 'もう一度試す' : 'もう一度読み込む'}
+      <Button type="button" variant="secondary" onClick={retry} disabled={retrying} busy={retrying} busyLabel="読み込んでいます">
+        <RotateCw aria-hidden="true" size={16} />もう一度読み込む
       </Button>
     )
   }

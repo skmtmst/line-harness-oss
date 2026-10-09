@@ -3,6 +3,7 @@
 import React from 'react'
 import type { ReactNode } from 'react'
 import { Inbox, Loader, Lock } from 'lucide-react'
+import Button from './button'
 import TargetMissing from './target-missing'
 import { loadFailureCopy, permissionDeniedMessage, type PermissionScope } from './api-error-message'
 import styles from './list-state.module.css'
@@ -99,7 +100,7 @@ export default function ListState({
   permissionReason?: string
   /** 作成導線つきの空状態（設計 `fRgeK`）。押せる操作が画面の他所にあるなら渡さない。 */
   action?: ReactNode
-  /** もう一度読み込む。`error` のときだけ押し口を出す。 */
+  /** もう一度読み込む。`error`・`forbidden` で押し口を出す。 */
   onRetry?: () => void
   /** 読み直している間。二度押しを止める。 */
   retrying?: boolean
@@ -110,7 +111,7 @@ export default function ListState({
   'data-design'?: string
   /**
    * 捕まえた読み込み失敗（m23m）。`error` のときだけ見る。
-   * 403 は権限の案内にし、押しても直らない再試行の口は出さない。
+   * 403 は権限の案内を残し、権限変更後にも読み直せるようにする。
    * 429 は待ち秒数（`Retry-After` があれば使う）を添える。
    * 画面は `title`・`description` で上書きできる。
    */
@@ -132,7 +133,7 @@ export default function ListState({
           kind="error"
           title={title ?? failure?.title ?? preset.title}
           description={failure && !failure.retryable ? failure.description : description ?? failure?.description ?? preset.description}
-          onRetry={failure && !failure.retryable ? undefined : onRetry}
+          onRetry={onRetry ?? (() => window.location.reload())}
           retrying={retrying}
         />
         {action}
@@ -161,7 +162,7 @@ export default function ListState({
       <span className={styles.iconWrap} aria-hidden="true">{icon ?? <Icon aria-hidden="true" size={24} className={iconClass} />}</span>
       <p className={styles.title}>{title ?? preset.title}</p>
       <p className={styles.description}>{kind === 'forbidden' ? `${permissionReason ? `${permissionReason} ` : ''}${permissionDeniedMessage(permissionScope)}` : description ?? preset.description}</p>
-      {action ? <div className={styles.action}>{action}</div> : null}
+      {kind === 'forbidden' ? <div className={styles.action}><Button busy={retrying} onClick={onRetry ?? (() => window.location.reload())}>{retrying ? '読み込んでいます' : 'もう一度読み込む'}</Button>{action}</div> : action ? <div className={styles.action}>{action}</div> : null}
     </div>
   )
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { ValueBarChart } from '@/components/shared/charts'
+import { jstDate, jstDateOffset } from '@/lib/jst-datetime'
 
 /*
  * ★V8 分析「成果地点ごとのレポート」（Pencil `AzrZq`・`/analytics?view=conversion-report`）。
@@ -26,10 +27,8 @@ import { emptyValue } from '@/components/shared/empty-value'
 type Point = ConversionDefinitionReport['byDefinition'][number]
 
 function rangeOf(days: number) {
-  const to = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' })
-  const from = new Date(`${to}T00:00:00+09:00`)
-  from.setUTCDate(from.getUTCDate() - days + 1)
-  return { from: from.toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }), to }
+  const now = new Date()
+  return { from: jstDateOffset(1 - days, now), to: jstDate(now) }
 }
 
 function RowMenu({ point, onShowDaily }: { point: Point; onShowDaily: () => void }) {
@@ -82,7 +81,7 @@ export default function ConversionReportV8({ accountId }: { accountId: string })
     {() => <div className={styles.reportStack}>
       {exportError ? <p role="alert" className={styles.caption}>{exportError}</p> : null}
       {loading ? <ListState kind="loading" title="成果レポートを読み込んでいます" />
-        : error ? <ListState kind="error" title={error} action={<Button variant="secondary" onClick={() => setAttempt((value) => value + 1)}>もう一度読む</Button>} />
+        : error ? <ListState kind="error" title={error} onRetry={() => setAttempt((value) => value + 1)} />
         : report ? <>
           <section className={styles.reportCard} aria-labelledby="conversion-daily-title">
             <div className={styles.reportHead}>

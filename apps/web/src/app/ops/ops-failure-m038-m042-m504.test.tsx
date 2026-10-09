@@ -117,7 +117,7 @@ const retryButton = () =>
   Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('もう一度読み込む'))
 
 describe('M038 お知らせの403（動作）', () => {
-  it('403では権限の案内を出し、再試行の口は出さない', async () => {
+  it('403では権限の案内を出し、再読み込みの口を出す', async () => {
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
       if (url.endsWith('/api/ops/announcements/preview')) {
@@ -133,12 +133,12 @@ describe('M038 お知らせの403（動作）', () => {
 
     expect(host.querySelector('[data-list-state="error"]')).not.toBeNull()
     expect(host.textContent).toContain('権限')
-    expect(retryButton()).toBeUndefined()
+    expect(retryButton()).toBeTruthy()
   })
 })
 
 describe('M042 契約先の403（動作）', () => {
-  it('403では権限の案内を出し、再試行の口は出さない', async () => {
+  it('403では権限の案内を出し、再読み込みの口を出す', async () => {
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input)
       if (url.includes('/api/ops/tenants')) {
@@ -151,12 +151,12 @@ describe('M042 契約先の403（動作）', () => {
 
     expect(host.querySelector('[data-list-state="error"]')).not.toBeNull()
     expect(host.textContent).toContain('権限')
-    expect(retryButton()).toBeUndefined()
+    expect(retryButton()).toBeTruthy()
   })
 })
 
 describe('M040 ナレッジの403（動作）', () => {
-  it('403では権限の案内を出し、再試行の口は出さない', async () => {
+  it('403では権限の案内を出し、再読み込みの口を出す', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => {
       return new Response(JSON.stringify({ success: false, error: 'forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
     }))
@@ -167,7 +167,7 @@ describe('M040 ナレッジの403（動作）', () => {
 
     expect(host.querySelector('[data-list-state="error"]')).not.toBeNull()
     expect(host.textContent).toContain('権限')
-    expect(retryButton()).toBeUndefined()
+    expect(retryButton()).toBeTruthy()
   })
 })
 

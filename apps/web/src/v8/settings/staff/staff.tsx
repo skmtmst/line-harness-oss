@@ -2,6 +2,8 @@
 
 import { formatDate as polishFormatDate } from '@/lib/format'
 import SegmentedControl from '@/components/shared/segmented'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { notifySaved } from '@/components/shared/toast'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Eye, UserPlus, X } from 'lucide-react'
 import Link from 'next/link'
@@ -239,7 +241,7 @@ function SessionsCard() {
       description="他の端末はすべてログイン画面へ戻ります。この端末のログインは続きます。"
       confirmLabel="すべて終了する"
       busy={revokingId === 'others'}
-      onConfirm={() => void revokeOthers()}
+      onConfirm={() => revokeOthers()}
       onCancel={() => { if (revokingId === 'others') return; setConfirmOthers(false) }}
     />
   </section>
@@ -573,7 +575,7 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
       confirmLabel="保存する"
       busy={saving}
       error={saveConfirmError}
-      onConfirm={() => void save()}
+      onConfirm={() => save()}
       onCancel={() => { if (saving) return; setSaveConfirmOpen(false); setSaveConfirmError('') }}
     />
     {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
@@ -644,13 +646,13 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
   const toggleActive = async (stepUpToken?: string) => { if (policy.statusBlockedReason) return; setStatusSaving(true); setError(''); try { await api.staff.update(member.id, { isActive: !member.isActive }, stepUpToken); await onSaved(); notifyToast(member.isActive ? '無効にしました。「利用状態」で「無効のみ」を選ぶと、この人を一覧に戻せます。' : '有効にしました。対象者はもう一度ログインが必要です。'); onClose() } catch (caught) { if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.permissions.change', action: '権限を変更する', retry: toggleActive }); return } setError(messageOf(caught)) } finally { setStatusSaving(false) } }
   return <Modal title="見せる範囲を決める" onClose={onClose} wide><div data-design-node="EOTS4"><div className="flex items-start justify-between"><div><p className="mt-1 text-xs text-ink-secondary">役割・表示機能・担当範囲を確認し、このユーザーに必要な範囲だけを設定します。</p></div></div>
     <div className="mt-5 rounded-control bg-canvas-sunken p-3"><p className="font-semibold text-ink">{member.name}</p><p className="text-xs text-ink-secondary">{ROLE_LABEL[member.role]}</p></div>{error && <p className="mt-4 rounded-control bg-danger-bg p-3 text-sm text-danger">{error}</p>}{emailNotice && <p role="status" className="mt-4 rounded-control bg-accent-soft p-3 text-sm text-accent-deep">{emailNotice}</p>}
-    {policy.showAccountActions && <section className={`mt-5 rounded-card border p-4 ${member.isActive ? 'border-accent bg-accent-soft' : 'border-warning bg-warning-bg'}`} aria-label="ユーザーの利用状態"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-sm font-semibold text-ink">ログイン状態：{member.isActive ? '有効' : '無効'}</p><p className="mt-1 text-xs leading-5 text-ink-secondary">{member.isActive ? '無効にすると、このユーザーはログインできなくなります。' : '有効にすると、このユーザーは再びログインできます。'}</p><div className="mt-2"><LoginHistoryNote count={loginCount} loading={loginHistoryLoading} failed={loginHistoryFailed} /></div></div><Button variant="primary" className={(`min-w-48 rounded-control px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${member.isActive ? 'border border-warning bg-canvas text-warning hover:bg-warning-bg' : 'bg-accent-deep text-on-accent hover:brightness-90'}`) + ' h-auto whitespace-normal'} type="button" onClick={() => void toggleActive()} disabled={statusSaving || Boolean(policy.statusBlockedReason)}>{statusSaving ? '変更中…' : member.isActive ? 'このユーザーを無効にする' : 'このユーザーを有効にする'}</Button></div>{policy.statusBlockedReason && <p className="mt-3 rounded-control bg-canvas p-3 text-xs font-semibold text-warning">{policy.statusBlockedReason}</p>}</section>}
+    {policy.showAccountActions && <section className={`mt-5 rounded-card border p-4 ${member.isActive ? 'border-accent bg-accent-soft' : 'border-warning bg-warning-bg'}`} aria-label="ユーザーの利用状態"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-sm font-semibold text-ink">ログイン状態：{member.isActive ? '有効' : '無効'}</p><p className="mt-1 text-xs leading-5 text-ink-secondary">{member.isActive ? '無効にすると、このユーザーはログインできなくなります。' : '有効にすると、このユーザーは再びログインできます。'}</p><div className="mt-2"><LoginHistoryNote count={loginCount} loading={loginHistoryLoading} failed={loginHistoryFailed} /></div></div><Button variant="primary" className={(`min-w-48 rounded-control px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${member.isActive ? 'border border-warning bg-canvas text-warning hover:bg-warning-bg' : 'bg-accent-deep text-on-accent hover:brightness-90'}`) + ' h-auto whitespace-normal'} type="button" onClick={() => void toggleActive()} disabled={statusSaving || Boolean(policy.statusBlockedReason)} busy={Boolean(statusSaving)} busyLabel="処理中…">{statusSaving ? '変更中…' : member.isActive ? 'このユーザーを無効にする' : 'このユーザーを有効にする'}</Button></div>{policy.statusBlockedReason && <p className="mt-3 rounded-control bg-canvas p-3 text-xs font-semibold text-warning">{policy.statusBlockedReason}</p>}</section>}
     <div className="mt-5 grid gap-4 sm:grid-cols-2">{administrator && <Field label="名前" required htmlFor="staff-edit-name" error={fieldErrors.name}><TextField ref={nameRef} id="staff-edit-name" value={name} onChange={(e) => { setName(e.target.value); setFieldErrors((current) => ({ ...current, name: undefined })) }} /></Field>}<Field label="メールアドレス" required htmlFor="staff-edit-email" error={fieldErrors.email}><TextField ref={emailRef} id="staff-edit-email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); setFieldErrors((current) => ({ ...current, email: undefined })) }} /></Field></div>
     {administrator && <div className="mt-5"><p className="text-sm font-semibold text-ink">役割</p><div className="mt-2 grid grid-cols-3 gap-2">{(['admin', 'staff', 'viewer'] as const).map((value) => <Button variant="secondary" className={(`cursor-pointer rounded-control border px-3 py-3 text-sm ${role === value ? 'border-accent bg-accent-soft font-medium text-accent-deep' : 'border-hairline text-ink-secondary'}`) + ' h-auto whitespace-normal'} key={value} onClick={() => setRole(value)}>{ROLE_LABEL[value]}</Button>)}</div></div>}
     {administrator && role === 'staff' && <div className="mt-5"><p className="text-sm font-semibold text-ink">スタッフに表示する機能</p><div className="mt-2 grid gap-2 sm:grid-cols-3">{PERMISSIONS.map(([key, label]) => <Checkbox key={key} checked={permissions.includes(key)} onCheckedChange={() => setPermissions((current) => toggleStaffPermissionKey(current, key))}>{label}</Checkbox>)}</div><p className="mt-3 text-sm font-medium text-ink">成果の操作権限</p><p className="mt-1 text-xs text-ink-faint">選ぶと「成果とアフィリエイト」の表示も組で付きます。表示を外すと操作権限も外れます。</p><div className="mt-2 grid gap-2 sm:grid-cols-3"><Checkbox checked={permissions.includes(CONVERSION_APPROVAL_EDIT_KEY)} onCheckedChange={() => setPermissions((current) => toggleStaffPermissionKey(current, CONVERSION_APPROVAL_EDIT_KEY))} aria-label="成果を承認・却下する">{PERMISSION_LABELS[CONVERSION_APPROVAL_EDIT_KEY]}</Checkbox></div></div>}
     <div className="mt-5"><p className="text-sm font-semibold text-ink">LINE連携</p><div className={`mt-2 flex items-center justify-between rounded-control border p-3 ${member.lineLinked ? 'border-accent bg-accent-soft' : 'border-hairline'}`}><div><p className={`text-sm font-semibold ${member.lineLinked ? 'text-success' : 'text-ink-secondary'}`}>{member.lineLinked ? '連携済み' : '未連携'}</p><p className="text-xs text-ink-faint">{member.lineLinked ? `LINE：${member.name}` : '招待メールからLINE認証を行います'}</p></div>{member.lineLinked && <Button variant="secondary" className="px-3 py-1.5 text-xs h-auto whitespace-normal" onClick={() => { setUnlinkError(''); setUnlinkOpen(true) }}>連携解除</Button>}</div></div>
     <div className="mt-5"><p className="text-sm font-semibold text-ink">通知設定</p><div className="mt-2 divide-y divide-hairline overflow-hidden rounded-card border border-hairline">{NOTIFICATIONS.map(([key, label, note]) => <div key={key} className={`${styles.notifyRow} items-center gap-4 p-3`}><div><p className="text-sm text-ink">{label}</p><p className="text-xs text-ink-faint">{note}</p></div><div className="flex items-center gap-2 text-xs">メール<NotificationSwitch checked={notifications[key].email} onChange={() => toggleNotification(key, 'email')} label={`${label}メール`} /></div><div className="flex items-center gap-2 text-xs">LINE<NotificationSwitch checked={notifications[key].line} onChange={() => toggleNotification(key, 'line')} label={`${label}LINE`} /></div></div>)}</div></div>
-    <div className="mt-6 flex justify-end gap-2"><Button variant="secondary" className="px-4 py-2 h-auto whitespace-normal" onClick={onClose}>キャンセル</Button><Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => void save()} disabled={saving}>✓ {saving ? '保存中…' : '保存する'}</Button></div>
+    <div className="mt-6 flex justify-end gap-2"><Button variant="secondary" className="px-4 py-2 h-auto whitespace-normal" onClick={onClose}>キャンセル</Button><Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => void save()} disabled={saving} busy={Boolean(saving)} busyLabel="処理中…">保存する</Button></div>
     {/* 連携はあとから張り直せる。赤は本当に戻せない操作に取っておく。 */}
     <ConfirmDialog
       open={unlinkOpen}
@@ -659,7 +661,7 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
       confirmLabel="解除する"
       busy={unlinking}
       error={unlinkError}
-      onConfirm={() => void unlinkLine()}
+      onConfirm={() => unlinkLine()}
       onCancel={() => { if (unlinking) return; setUnlinkOpen(false); setUnlinkError('') }}
     >
       <p className="text-ink-secondary text-sm">通知設定でLINEを選んでいるお知らせは、解除したあと届かなくなります。メールを選んでいるぶんはそのまま届きます。</p>
@@ -677,7 +679,7 @@ function TwoFactorModal({ member, onClose, onSaved }: { member: StaffMember; onC
     <div className="mt-5 grid grid-cols-2 gap-2 text-sm"><div className="rounded-control bg-accent-soft px-4 py-3 font-medium text-accent-deep">1　QRコードを読み取る</div><div className="rounded-control bg-canvas-sunken px-4 py-3 text-ink-secondary">2　6桁コードを入力</div></div>{error && <p className="mt-4 rounded-control bg-danger-bg p-3 text-sm text-danger">{error}</p>}
     <div className={`mt-5 grid gap-5 ${styles.twoFactorGrid}`}>{qr ? <img src={qr} alt="Authenticator登録用QRコード" className={`${styles.qrImage} rounded-control border border-hairline`} /> : <DelayedSkeleton loading skeleton={<Skeleton width={220} height={220} className="block rounded-control" />} />}<div><h3 className="font-semibold text-ink">認証アプリで読み取る</h3><p className="mt-3 text-sm leading-6 text-ink-secondary">Google Authenticator、Microsoft AuthenticatorなどでQRコードを読み取ってください。</p><div className="mt-4 rounded-control bg-info-bg p-3"><p className="text-xs text-ink-secondary">読み取れない場合はキーを手動入力</p><p className="mt-1 break-all font-mono text-sm font-bold tracking-wider text-ink">{manualKey || emptyValue('unknown')}</p></div></div></div>
     <p id="staff-totp-label" className="mt-5 block text-sm font-medium text-ink">認証アプリに表示された6桁コード</p><div className="mt-2">{/* 共通 OTP入力（Pencil ★V8 RfHCo）。 */}<OtpInput value={code} onChange={setCode} onComplete={(entered) => void save(entered)} labelledBy="staff-totp-label" invalid={Boolean(error)} busy={saving} /></div><p className="mt-4 rounded-control bg-info-bg p-3 text-xs text-ink-secondary">登録後はLINEログインのあとに認証アプリのコード入力が必要です。</p>
-    <div className="mt-6 flex justify-end gap-2"><Button variant="secondary" className="px-4 py-2 h-auto whitespace-normal" onClick={onClose}>キャンセル</Button><Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => void save()} disabled={saving || !uri}>✓ {saving ? '確認中…' : '設定を完了'}</Button></div></Modal>
+    <div className="mt-6 flex justify-end gap-2"><Button variant="secondary" className="px-4 py-2 h-auto whitespace-normal" onClick={onClose}>キャンセル</Button><Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => void save()} disabled={saving || !uri} busy={Boolean(saving)} busyLabel="処理中…">✓ {saving ? '確認中…' : '設定を完了'}</Button></div></Modal>
 }
 
 /*
@@ -757,16 +759,16 @@ function StaffPageHost() {
   const [accountNames, setAccountNames] = useState<Record<string, string>>({})
   const [me, setMe] = useState<StaffMember | null>(null)
   const [audits, setAudits] = useState<AuditEventItem[]>([])
-  const [query, setQuery] = useState('')
-  const [roleFilter, setRoleFilter] = useState<AccessRoleBundle | 'all'>('all')
-  const [statusFilter, setStatusFilter] = useState<'active' | 'suspended' | 'all'>('active')
-  const [sort, setSort] = useState('recent')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [roleFilter, setRoleFilter] = useListUrlValue<AccessRoleBundle | 'all'>('roleFilter', 'all')
+  const [statusFilter, setStatusFilter] = useListUrlValue<'active' | 'suspended' | 'all'>('statusFilter', 'active')
+  const [sort, setSort] = useListUrlValue('sort', 'recent')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   // ★V7 `x63W5x`：集計が取れていない間、KPI に 0 を出さない。「—」と出す。
   const [summaryReady, setSummaryReady] = useState(false)
   const [editing, setEditing] = useState<StaffMember | null>(null), [settingTwoFactor, setSettingTwoFactor] = useState<StaffMember | null>(null), [permissionTarget, setPermissionTarget] = useState<AccessUserItem | null>(null)
-  const [userPage, setUserPage] = useState(1)
+  const [userPage, setUserPage] = useListUrlValue('userPage', 1)
   const USER_PAGE_SIZE = 6
   /* ブラウザの `confirm()` をやめて、共通の確認窓へ移した（理由は EditModal と同じ）。 */
   const [disablingTarget, setDisablingTarget] = useState<StaffMember | null>(null), [disablingTwoFactor, setDisablingTwoFactor] = useState(false), [disableError, setDisableError] = useState('')
@@ -861,7 +863,7 @@ function StaffPageHost() {
   const openPermissions = (user: AccessUserItem) => { setPermissionTarget(user) }
   const finishPermissionSave = async () => {
     await load()
-    notifyToast('見せる範囲を保存しました。対象者のすべてのログインを終了したため、新しい権限で使うにはもう一度ログインが必要です。')
+    notifySaved('見せる範囲を保存しました。対象者のすべてのログインを終了したため、新しい権限で使うにはもう一度ログインが必要です。')
   }
   // R499: 他者が先に変えていたら上書きせず、一覧の最新へ戻して知らせる。
   const handlePermissionConflict = async () => {
@@ -1048,7 +1050,7 @@ function StaffPageHost() {
           <GridCell className={styles.colMenu} role="columnheader"><span className={styles.srOnly}>操作</span></GridCell>
         </GridHeadRow>
         {loading ? <p className={styles.stateRow} role="status">ログインユーザーを読み込んでいます…</p>
-          : error ? <div className={styles.stateRow} role="alert"><p>ログインユーザーを読み込めませんでした。登録した内容は消えていません。</p><Button onClick={() => void load()}>読み直す</Button></div>
+          : error ? <div className={styles.stateRow} role="alert"><p>ログインユーザーを読み込めませんでした。登録した内容は消えていません。</p><Button onClick={() => void load()}>もう一度読み込む</Button></div>
           : shown.length === 0 ? <p className={styles.stateRow}>条件に合うログインユーザーはいません。条件を変えてお試しください。</p>
           : shown.map((user) => {
             const member = memberById.get(user.id)
@@ -1189,7 +1191,7 @@ function StaffPageHost() {
         confirmLabel="解除する"
         busy={disablingTwoFactor}
         error={disableError}
-        onConfirm={() => void runDisableTwoFactor()}
+        onConfirm={() => runDisableTwoFactor()}
         onCancel={() => { if (disablingTwoFactor) return; setDisablingTarget(null); setDisableError('') }}
       >
         <p className={styles.dialogNote}>解除しても、権限・担当範囲・ログインの記録は変わりません。</p>
@@ -1201,7 +1203,7 @@ function StaffPageHost() {
         confirmLabel="外す"
         busy={removing}
         error={removeError}
-        onConfirm={() => void runRemove()}
+        onConfirm={() => runRemove()}
         onCancel={() => { if (removing) return; setRemovingTarget(null); setRemoveError('') }}
       >
         <p className={styles.dialogNote}>これまでの設定と操作記録は残ります。</p>

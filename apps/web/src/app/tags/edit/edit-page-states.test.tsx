@@ -88,7 +88,7 @@ vi.mock('@/v8/tag-edit/edit-form', () => ({
   },
 }))
 vi.mock('@/components/shared/toast', () => ({
-  notifyToast: vi.fn(),
+  ...(() => { const notifyToast = vi.fn(); return { notifyToast, notifySaved: notifyToast } })()
 }))
 
 import { notifyToast } from '@/components/shared/toast'

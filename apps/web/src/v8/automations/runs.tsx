@@ -9,6 +9,7 @@
  * 型（ListPage）に、タブ・数の帯・案内の帯・道具の段・表（絵の列の並び）を渡す。
  * 中身は右の詳細パネルで開く。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -179,8 +180,8 @@ export default function AutomationRunsV8() {
   })
   const [saved, setSaved] = useState<SavedKey>('')
   const includeTest = saved === 'include-test'
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [selectedRun, setSelectedRun] = useState<AutomationRunRow | null>(null)
   const [selectedDetail, setSelectedDetail] = useState<AutomationRunDetail | null>(null)
@@ -484,7 +485,7 @@ export default function AutomationRunsV8() {
         kind="error"
         title="動いた記録を読み込めませんでした"
         description="記録は消えていません。通信を確かめて、もう一度お試しください。"
-        action={<Button variant="secondary" onClick={() => void load()}>もう一度試す</Button>}
+        onRetry={() => void load()}
       />
     )
   } else if (!data || data.items.length === 0) {
@@ -592,7 +593,7 @@ export default function AutomationRunsV8() {
         {deepLinkMessage ? (
           <DetailPanel open title="実行記録の中身" onClose={() => setDeepLinkRunId(null)}>
             <p className={styles.panelText}>{deepLinkMessage}</p>
-            {deepLinkError === 'error' ? <Button onClick={() => setDeepLinkReloadKey((key) => key + 1)}>もう一度読む</Button> : null}
+            {deepLinkError === 'error' ? <Button onClick={() => setDeepLinkReloadKey((key) => key + 1)}>もう一度読み込む</Button> : null}
           </DetailPanel>
         ) : null}
         <DetailPanel
@@ -640,7 +641,7 @@ export default function AutomationRunsV8() {
               ) : detailError === 'error' ? (
                 <div className={styles.panelActions}>
                   <p className={styles.panelText}>詳細を読み込めませんでした。記録は消えていません。</p>
-                  <Button onClick={() => setDetailReloadKey((key) => key + 1)}>もう一度読む</Button>
+                  <Button onClick={() => setDetailReloadKey((key) => key + 1)}>もう一度読み込む</Button>
                 </div>
               ) : runDetail && runDetail.steps.length > 0 ? (
                 <ul className={styles.steps}>

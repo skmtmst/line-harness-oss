@@ -14,6 +14,9 @@
  * 409 は板 v5L19Z の帯を出し、「違いを比べる」「最新を読み込んで続ける」
  * 「比べてから保存」で扱う（いきなり上書きしない）。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
+import { notifySaved } from '@/components/shared/toast'
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
@@ -697,8 +700,14 @@ export default function MenuFormV8() {
         throw new Error('メニューは保存されましたが、一部の担当・設備を保存できませんでした。もう一度押すと残りだけをやり直します。')
       }
       setCreatedMenuNeedingFollowUp(null)
-      notifyToast(editTarget ? 'メニューを保存しました' : publish ? 'メニューを公開しました' : '下書きを保存しました')
-      router.push('/booking/menus')
+      notifySaved(editTarget ? 'メニューを保存しました' : publish ? 'メニューを公開しました' : '下書きを保存しました')
+      if (editTarget) {
+        const fresh = await bookingApi.listMenus(selectedAccountId)
+        const updated = fresh.menus.find((menu) => menu.id === menuId)
+        if (updated) setEditTarget(updated)
+        else setEditTarget({ ...editTarget, version })
+        baselineRef.current = currentSignature
+      } else { router.push(createPageReturnHref('/booking/menus', menuId)) }
     } catch (e) {
       if (e instanceof ApiError && e.code === 'tag_not_found') {
         setSaveError('選んだタグは削除されたため保存できませんでした。タグを選び直してください。')
@@ -791,19 +800,7 @@ export default function MenuFormV8() {
 
       {conflict && (
         <div ref={conflictRef} className={styles.conflictRow} data-design="Bar" data-design-node="v5L19Z">
-          <div className={styles.conflictBand} role="alert">
-            <TriangleAlert size={18} className={styles.conflictIcon} aria-hidden="true" />
-            <div className={styles.conflictText}>
-              <strong>
-                {`${conflict.author ? `${conflict.author}さんが` : 'ほかの人が'}${conflict.at ? ` ${conflictTime(conflict.at)} に` : ''}メニュー「${conflict.name}」を保存しました`}
-              </strong>
-              <p>
-                {`あなたが直した所はまだ保存されていません。このまま保存すると、${conflict.author ? `${conflict.author}さん` : 'ほかの人'}の変更が消えます。`}
-              </p>
-            </div>
-            <Button onClick={() => setComparing(true)}><GitCompare size={15} aria-hidden="true" />違いを比べる</Button>
-            <Button variant="primary" onClick={() => void reloadLatest()}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
-          </div>
+          <SaveConflictBand title={`${conflict.author ? `${conflict.author}さんが` : 'ほかの人が'}${conflict.at ? ` ${conflictTime(conflict.at)} に` : ''}メニュー「${conflict.name}」を保存しました`} onCompare={() => setComparing(true)} onReload={() => void reloadLatest()} />
         </div>
       )}
 

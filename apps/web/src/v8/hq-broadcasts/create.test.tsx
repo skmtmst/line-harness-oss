@@ -83,7 +83,7 @@ beforeEach(() => {
   hq.send.mockResolvedValue({ data: {} })
   hq.cancel.mockResolvedValue({ data: {} })
 })
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers() })
 
 async function selectAccounts(...names: string[]) {
   fireEvent.click(await screen.findByRole('button', { name: /^送るアカウント：(選ぶ|変える)$/ }))
@@ -106,6 +106,15 @@ async function fillToConfirm(body = '{店名}より：1月の限定メニュー'
 }
 
 describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送るアカウント）', () => {
+  it('日本で日付が変わった直後でも、予約の初期日は日本の明日になる', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-09T15:00:00Z'))
+    params.value = new URLSearchParams('step=schedule')
+    render(<HqBroadcastCreate />)
+    const date = await screen.findByRole('button', { name: '送る日' })
+    expect(date.textContent).toContain('2026年10月11日')
+  })
+
   it('B-139：本文の無い吹き出しは帯にせず、吹き出しの下に理由と頭に赤い丸を出し、そこへ移る', async () => {
     render(<HqBroadcastCreate />)
     await toMessage()

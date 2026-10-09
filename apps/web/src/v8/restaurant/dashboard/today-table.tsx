@@ -71,11 +71,11 @@ export function TodayTable({ rows, canWrite, busyId, onVisited, onUndo }: {
               const state = visitState(r)
               const seated = r.status === 'seated' || r.status === 'visited'
               const menuItems = [
-                { id: 'open', label: '予約台帳で見る', external: true, onSelect: () => { router.push(`/restaurant-test/reservations?date=${r.starts_at.slice(0, 10)}`) } },
+                { id: 'open', label: '予約台帳で見る', external: true, href: `/restaurant-test/reservations?date=${r.starts_at.slice(0, 10)}`, onSelect: () => { router.push(`/restaurant-test/reservations?date=${r.starts_at.slice(0, 10)}`) } },
                 ...(canWrite && seated ? [{ id: 'undo', label: '来店の印を取り消す', onSelect: () => onUndo(r.id) }] : []),
               ]
               return (
-                <Tr key={r.id} className={styles.row} data-table-layout="columns">
+                <Tr key={r.id} className={styles.row} data-table-layout="columns" data-row-id={r.id}>
                   <Td className={styles.colTime}><span className={styles.time}>{hm(r.starts_at)}</span></Td>
                   <Td className={styles.colName}><span className={styles.name} ><TruncatedText value={String(r.customer_name ?? '')} /></span></Td>
                   <Td className={styles.colGuests}>{`${r.guest_count}名`}</Td>

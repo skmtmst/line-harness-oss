@@ -1,5 +1,7 @@
 'use client'
 
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { jstDate } from '@/lib/jst-datetime'
 import { CircleDot, Download, Star } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsAuditRow } from '@/lib/api'
@@ -60,10 +62,10 @@ function shortDateTime(value: string | null | undefined): string {
 export default function OpsAuditV8() {
   const [rows, setRows] = useState<OpsAuditRow[]>([])
   const [total, setTotal] = useState(0)
-  const [filter, setFilter] = useState('')
+  const [filter, setFilter] = useListUrlValue('filter', '')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [exporting, setExporting] = useState(false)

@@ -221,7 +221,7 @@ describe('共通情報: 更新スケジュールの操作で入力中の内容�
 
     // 確認すると全件消して一覧を取り直す。入力中の値は残る。
     await setValue(byId('cv-name'), '入力中の名前')
-    await click(byExactText('button', 'すべて削除する'))
+    await click(byExactText('button', '削除する'))
     await settle()
     expect(api.deleteSchedule).toHaveBeenCalledWith('var-1', 's-1', 'account-1')
     expect((byId('cv-name') as HTMLInputElement).value).toBe('入力中の名前')

@@ -1,8 +1,9 @@
 'use client'
 
 import { LoaderCircle, Search, X } from 'lucide-react'
-import React, { forwardRef, useRef } from 'react'
+import React, { forwardRef, useEffect, useRef, useState } from 'react'
 import type { InputHTMLAttributes } from 'react'
+import { guardCompositionEnter } from './composition-enter'
 import styles from './search-field.module.css'
 
 export interface SearchFieldProps
@@ -22,10 +23,19 @@ export interface SearchFieldProps
 
 /** Pencil V5 `phlR1` を正本にした検索欄。 */
 const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(function SearchField(
-  { className, disabled, hidden, loading = false, onChange, onClear, shortcut: _shortcut, value, ...props },
+  { className, disabled, hidden, loading = false, onChange, onClear, shortcut: _shortcut, value, onKeyDown, ...props },
   ref,
 ) {
-  const hasValue = String(value ?? '').length > 0
+  const [draft, setDraft] = useState(String(value ?? ''))
+  const callback = useRef(onChange)
+  callback.current = onChange
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const composing = useRef(false)
+  const cancel = () => { if (timer.current) clearTimeout(timer.current); timer.current = null }
+  const schedule = (next: string) => { cancel(); timer.current = setTimeout(() => { timer.current = null; callback.current(next) }, 300) }
+  useEffect(() => { cancel(); setDraft(String(value ?? '')) }, [value])
+  useEffect(() => cancel, [])
+  const hasValue = draft.length > 0
   const innerRef = useRef<HTMLInputElement>(null)
   const setRefs = (node: HTMLInputElement | null) => {
     innerRef.current = node
@@ -45,16 +55,19 @@ const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(function Sear
       <input
         ref={setRefs}
         type="search"
-        value={value}
+        value={draft}
         disabled={disabled}
         className={styles.input}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => { const next = event.target.value; setDraft(next); if (!composing.current && !(event.nativeEvent as InputEvent).isComposing) schedule(next) }}
         {...props}
+        onKeyDown={guardCompositionEnter(onKeyDown)}
+        onCompositionStart={(event) => { composing.current = true; cancel(); props.onCompositionStart?.(event) }}
+        onCompositionEnd={(event) => { composing.current = false; schedule(event.currentTarget.value); props.onCompositionEnd?.(event) }}
       />
       {loading ? (
         <LoaderCircle className={styles.loadingIcon} aria-label="検索中" />
       ) : hasValue && onClear ? (
-        <button type="button" className={styles.clear} onClick={onClear} aria-label="検索語を消す">
+        <button type="button" className={styles.clear} onClick={() => { cancel(); setDraft(''); onClear?.() }} aria-label="検索語を消す">
           <X aria-hidden="true" />
         </button>
       ) : null}

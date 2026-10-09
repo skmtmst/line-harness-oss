@@ -240,7 +240,7 @@ function RecipientsTab({ run }: { run: HqBroadcastRun }) {
           </thead>
           <tbody>
             {rows.map((row) => (
-              <Tr key={row.friendId} className={styles.row}>
+              <Tr key={row.friendId} className={styles.row} data-row-id={row.friendId}>
                 <Td className={styles.colStore}><span className={styles.store} title={row.displayName ?? undefined}>{row.displayName ?? emptyValue('unconfigured')}</span></Td>
                 <Td className={styles.colState}><StatusBadge tone={row.state === 'sent' ? 'success' : row.state === 'failed' ? 'danger' : 'neutral'} title={row.errorCode ?? undefined}>{stateLabel(row.state)}</StatusBadge></Td>
                 <Td className={styles.colState}><span className={styles.faint}>{row.sentAt ? jpDateTime(row.sentAt) : emptyValue('unknown')}</span></Td>
@@ -288,7 +288,7 @@ function ActivityTab({ run, names }: { run: HqBroadcastRun; names: Map<string, s
           </thead>
           <tbody>
             {rows.map((row) => (
-              <Tr key={row.id} className={styles.row}>
+              <Tr key={row.id} className={styles.row} data-row-id={row.id}>
                 <Td className={styles.colState}><span className={styles.faint}>{jpDateTime(row.createdAt)}</span></Td>
                 <Td className={styles.colStore}><span className={styles.store}>{ACTIVITY_LABEL[row.action] ?? '操作'}</span></Td>
                 <Td className={styles.colState}><span className={styles.faint} title={account(row.accountId)}>{account(row.accountId)}</span></Td>
@@ -621,7 +621,7 @@ export default function HqBroadcastDetail() {
           destructive={ask.kind === 'cancel' || ask.kind === 'stop'}
           warning={ask.kind === 'send'}
           busy={busy}
-          onConfirm={ask.kind !== 'send' || gate !== 'single' || (approval.state && Number(confirmCount) === approval.state.gate.recipientCount) ? () => void act() : undefined}
+          onConfirm={ask.kind !== 'send' || gate !== 'single' || (approval.state && Number(confirmCount) === approval.state.gate.recipientCount) ? () => act() : undefined}
           onCancel={() => setAsk(null)}
         >
           {ask.kind === 'send' && gate === 'single' && approval.state ? <SingleOperatorFields recipientCount={approval.state.gate.recipientCount} value={confirmCount} onChange={setConfirmCount} /> : null}

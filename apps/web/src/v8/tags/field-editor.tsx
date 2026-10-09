@@ -100,6 +100,7 @@ export default function FieldEditor({
   backHref,
   onCancel,
   onSubmit,
+  onDraftChange,
 }: {
   host?: { title: string; notice?: ReactNode; footer: (submit: () => void, cancel: () => void) => ReactNode }
   mode: 'create' | 'edit'
@@ -122,6 +123,7 @@ export default function FieldEditor({
   backHref: string
   onCancel: () => void
   /** 作成は第2引数に冪等キーが入る（R515）。編集では使わない。 */
+  onDraftChange?: (values: FieldEditorValues) => void
   onSubmit: (values: FieldEditorValues, requestKey: string) => void
 }) {
   usePageTitle(host?.title ?? (mode === 'create' ? '項目を作る' : '項目を編集'))
@@ -188,6 +190,26 @@ export default function FieldEditor({
   }, [name, fieldKey, type, folderId, options, defaultValue, defaultOptions, isPersonal, isStarred, ecIsMaster, ecFieldPath])
 
   const effectiveType = mode === 'edit' && field ? field.type : type
+  const draftValues = useMemo<FieldEditorValues>(() => ({
+      name: name.trim(),
+      fieldKey: fieldKey.trim(),
+      type: effectiveType,
+      folderId,
+      options: NEEDS_OPTIONS.has(effectiveType) ? optionList : null,
+      ...(host && NEEDS_OPTIONS.has(effectiveType) ? { optionIds: options.flatMap((value, index) => value.trim() ? [field?.optionDefinitions?.filter((option) => !('status' in option) || option.status !== 'archived')[index]?.id] : []) } : {}),
+      defaultValue: FILE_TYPES.has(effectiveType)
+        ? null
+        : effectiveType === 'multi_select'
+          ? (defaultOptions.length > 0 ? defaultOptions : null)
+          : effectiveType === 'select'
+            ? (defaultValue || null)
+            : defaultValue.trim() || null,
+      isPersonal,
+      isStarred,
+      ecIsMaster,
+      ecFieldPath: ecIsMaster ? ecFieldPath.trim() : '',
+    }), [name, fieldKey, effectiveType, folderId, optionList, host, options, field?.optionDefinitions, defaultOptions, defaultValue, isPersonal, isStarred, ecIsMaster, ecFieldPath])
+  useEffect(() => { onDraftChange?.(draftValues) }, [draftValues, onDraftChange])
   const typeLocked = mode === 'edit' || locked
   const optionsActive = NEEDS_OPTIONS.has(effectiveType) && !locked
   const destination = folders.find((folder) => folder.id === folderId)?.name ?? '未分類'
@@ -223,25 +245,7 @@ export default function FieldEditor({
     if (mode === 'create' && !/^[a-z][a-z0-9_]{0,31}$/.test(fieldKey.trim())) return failField('key', '差し込みの名前は英小文字で始まる英数字と _ の32文字以内にしてください')
     if (keyOwners.length) return failField('key', 'この差し込みの名前はすでに使われています')
     setValidationTarget(''); setValidationError('')
-    onSubmit({
-      name: name.trim(),
-      fieldKey: fieldKey.trim(),
-      type: effectiveType,
-      folderId,
-      options: NEEDS_OPTIONS.has(effectiveType) ? optionList : null,
-      ...(host && NEEDS_OPTIONS.has(effectiveType) ? { optionIds: options.flatMap((value, index) => value.trim() ? [field?.optionDefinitions?.filter((option) => !('status' in option) || option.status !== 'archived')[index]?.id] : []) } : {}),
-      defaultValue: FILE_TYPES.has(effectiveType)
-        ? null
-        : effectiveType === 'multi_select'
-          ? (defaultOptions.length > 0 ? defaultOptions : null)
-          : effectiveType === 'select'
-            ? (defaultValue || null)
-            : defaultValue.trim() || null,
-      isPersonal,
-      isStarred,
-      ecIsMaster,
-      ecFieldPath: ecIsMaster ? ecFieldPath.trim() : '',
-    }, idempotencyKeyRef.current)
+    onSubmit(draftValues, idempotencyKeyRef.current)
   }
 
   const optionRows = options.length >= MIN_OPTION_ROWS ? options : [...options, ...Array(MIN_OPTION_ROWS - options.length).fill('')]
@@ -380,7 +384,7 @@ export default function FieldEditor({
             <Check size={15} aria-hidden="true" />
             {mode === 'create' ? '項目を作る' : '保存する'}
           </Button>
-        </>}
+        </>} dirty={false}
       >
         {notices}
         {error ? <Notice tone="danger" message={error} /> : null}

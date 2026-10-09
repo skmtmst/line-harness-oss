@@ -9,6 +9,8 @@
  * 頭（型 ListPage）・左の「見る」の列（型のフォルダの列＋共通 FolderPanel）・数のカード4枚・
  * 案内の帯・タブ・道具の段・カード（プロジェクト）／画像のます（ライブラリ）・件数と次へ。
  */
+import { useListUrlValue, useListUrlJsonValue } from '@/components/shared/list-url-state'
+import { createPageReturnHref } from '@/components/shared/create-page'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { CircleDot, Folder, Gauge, Plus, Send, Sparkles, Star, Upload } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -62,6 +64,10 @@ const PROJECT_SORTS: Array<{ value: ProjectSort; label: string }> = [
 
 /** 画像ライブラリは 12 枚ずつ（絵 W5Wxr の「1–12 件 / 23 件」「次の 12 件」）。 */
 const LIBRARY_PAGE = 12
+
+function isCursorHistory(value: unknown): value is Array<string | null> {
+  return Array.isArray(value) && value.length > 0 && value[0] === null && value.every(item => item === null || typeof item === 'string')
+}
 
 export default function HqBannersListV8() {
   return (
@@ -160,9 +166,9 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
   const [projects, setProjects] = useState<BannerProject[]>([])
   const [thumbnails, setThumbnails] = useState<Record<string, BannerImage[]>>({})
   const [status, setStatus] = useState<LoadStatus>('loading')
-  const [view, setView] = useState<ProjectView>('all')
-  const [query, setQuery] = useState('')
-  const [sort, setSort] = useState<ProjectSort>('updated')
+  const [view, setView] = useListUrlValue<ProjectView>('view', 'all')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [sort, setSort] = useListUrlValue<ProjectSort>('sort', 'updated')
   const [actionError, setActionError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
@@ -211,7 +217,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
       if (!res.success) throw new Error(res.error)
       setFormOpen(false)
       onChanged()
-      router.push(`/hq/banners/project?id=${encodeURIComponent(res.data.id)}`)
+      router.push(createPageReturnHref('/hq/banners', res.data.id))
     } catch (caught) {
       // M022：原文のまま出さず、共通の状態別案内へ渡す。窓は開いたまま送り直せる。
       setFormError(bannerFailureMessage(caught, 'プロジェクトの作成'))
@@ -464,11 +470,11 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
   const [counts, setCounts] = useState<import('@line-crm/shared').HqBannerImageCounts | null>(null)
   const [projects, setProjects] = useState<Record<string, BannerProject>>({})
   const [status, setStatus] = useState<LoadStatus>('loading')
-  const [view, setView] = useState<LibraryView>('all')
-  const [shape, setShape] = useState<ShapeFilter | null>(null)
-  const [query, setQuery] = useState('')
+  const [view, setView] = useListUrlValue<LibraryView>('view', 'all')
+  const [shape, setShape] = useListUrlValue<ShapeFilter | null>('shape', null)
+  const [query, setQuery] = useListUrlValue('q', '')
   /** ページごとの「この日時より前」。1ページ目は null。 */
-  const [cursors, setCursors] = useState<Array<string | null>>([null])
+  const [cursors, setCursors] = useListUrlJsonValue<Array<string | null>>('libraryCursors', [null], isCursorHistory)
   const [nextBefore, setNextBefore] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [openImage, setOpenImage] = useState<BannerImage | null>(null)

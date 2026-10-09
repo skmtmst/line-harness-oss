@@ -3,6 +3,7 @@
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { flushListUrlState } from '@/components/shared/list-url-state'
 import TemplatesPage from './page'
 
 const mockState = vi.hoisted(() => ({
@@ -73,6 +74,8 @@ vi.mock('@/lib/api', () => ({
 }))
 
 beforeEach(() => {
+  flushListUrlState()
+  window.history.replaceState(null, '', '/templates')
   // N-144: 変更操作は owner/admin だけに出す。操作を試す試験は owner で立てる。
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => (key === 'lh_staff_role' ? 'owner' : null),
@@ -88,7 +91,9 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  flushListUrlState()
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
 
 /*
@@ -118,6 +123,7 @@ async function search(input: HTMLElement, query: string) {
   await act(async () => {
     fireEvent.change(input, { target: { value: query } })
   })
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
 }
 
 describe('テンプレート一覧の検索', () => {
@@ -175,7 +181,8 @@ describe('テンプレート一覧の検索', () => {
     expect(callsAfterFirstQuery - callsAfterIndexBuild).toBe(1)
     expect(callsAfterSecondQuery - callsAfterFirstQuery).toBe(1)
     expect(mockState.listCalls).toEqual(['account-a'])
-  }, 30_000)
+  // 1000件×約5万字と正規化回数の契約は保ち、混雑時の構築時間で後続試験を壊さない。
+  }, 90_000)
 
   test('検索・種類・フォルダをAND条件で絞る', async () => {
     mockState.folders = [{

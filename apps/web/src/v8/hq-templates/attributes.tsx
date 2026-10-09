@@ -184,7 +184,7 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
     onEditFolder: (id) => { const folder = folders.find((row) => row.id === id); if (folder) { setFolderName(folder.name); setFolderColor(folderDisplayColor(folder)); setFolderError(''); setFolderDialog(folder) } },
     onRemoveFolder: (id) => setDeletingFolder(folders.find((row) => row.id === id) ?? null),
   }
-  const notices = <>{role !== null && !canEdit ? <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /> : null}{error ? <Notice tone="danger" message={error} action={editor && editor !== 'new' ? <Button disabled={busy} onClick={() => open(editor.template.id)}>最新の内容を読み込む</Button> : undefined} /> : null}</>
+  const notices = <>{role !== null && !canEdit ? <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /> : null}{error ? <Notice tone="danger" message={error} action={editor && editor !== 'new' ? <Button disabled={busy} onClick={() => open(editor.template.id)} busy={Boolean(busy)} busyLabel="処理中…">最新の内容を読み込む</Button> : undefined} /> : null}</>
   if (distribution && !distribution.saved) return <AttributeDistribution key={distribution.detail.template.id} detail={distribution.detail} canEdit={canEdit} onClose={() => { setDistribution(null); void load() }} />
   if (editor && canEdit) {
     const current = editor === 'new' ? null : editor
@@ -207,12 +207,12 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
     actions={type === 'mark' && canEdit ? <Button variant="primary" disabled={busy || status !== 'ready'} onClick={hostBase.onCreate}><Plus size={15} aria-hidden="true" />マークを作る</Button> : undefined}
     tabs={<AttributeTabs tab={tab} onSelect={onTab} />} overlays={<>
       {distribution?.saved ? <AttributeDistribution key={distribution.detail.template.id} detail={distribution.detail} canEdit={canEdit} saved onClose={() => { setDistribution(null); void load() }} /> : null}
-      <ConfirmDialog open={!!deleting} title="ひな形を削除" description={`「${deleting?.row.name ?? ''}」を削除します。配布済みのアカウントの情報と履歴は残ります。`} destructive confirmLabel="削除する" busy={busy} error={error || undefined} onCancel={() => { if (!busy) setDeleting(null) }} onConfirm={() => void perform(async () => { if (!deleting) return; await api.remove(deleting.row.id, deleting.row.revision); setDeleting(null); await load() })} />
+      <ConfirmDialog open={!!deleting} title="ひな形を削除" deleteName={deleting?.row.name ?? ''} description={`「${deleting?.row.name ?? ''}」を削除します。配布済みのアカウントの情報と履歴は残ります。`} destructive confirmLabel="削除する" busy={busy} error={error || undefined} onCancel={() => { if (!busy) setDeleting(null) }} onConfirm={() => perform(async () => { if (!deleting) return; await api.remove(deleting.row.id, deleting.row.revision); setDeleting(null); await load() })} />
       <FolderEditorDialog open={folderDialog !== null} title={folderDialog === 'new' ? 'フォルダを追加' : 'フォルダを直す'}
         name={folderName} onNameChange={setFolderName} color={folderColor} onColorChange={setFolderColor}
         busy={busy} error={folderError || undefined} confirmLabel={folderDialog === 'new' ? '追加する' : '保存する'}
-        onCancel={() => { if (!busy) setFolderDialog(null) }} onConfirm={() => void saveFolder()} />
-      <ConfirmDialog open={!!deletingFolder} title="フォルダを削除" description="中のひな形は未分類に残ります。" destructive confirmLabel="削除する" busy={busy} error={error || undefined} onCancel={() => { if (!busy) setDeletingFolder(null) }} onConfirm={() => void perform(async () => { if (!deletingFolder) return; await api.folders.remove(deletingFolder.id, deletingFolder.revision); setDeletingFolder(null); await loadFolders(); await load() })} />
+        onCancel={() => { if (!busy) setFolderDialog(null) }} onConfirm={() => saveFolder()} />
+      <ConfirmDialog open={!!deletingFolder} title="フォルダを削除" deleteName={deletingFolder?.name ?? ''} description="中のひな形は未分類に残ります。" destructive confirmLabel="削除する" busy={busy} error={error || undefined} onCancel={() => { if (!busy) setDeletingFolder(null) }} onConfirm={() => perform(async () => { if (!deletingFolder) return; await api.folders.remove(deletingFolder.id, deletingFolder.revision); setDeletingFolder(null); await loadFolders(); await load() })} />
     </>}>
     {notices}
     {type === 'friend_field' ? <FieldsTab accountId={null} canEdit={canEdit && !busy} host={{ ...hostBase, items: fieldRows }} /> : <MarksTab accountId={null} canEdit={canEdit && !busy} host={{ ...hostBase, items: markRows }} />}
@@ -231,7 +231,7 @@ function HqMarkEditor({ definition, busy, locked, notices, footer, onCancel, onS
     if (!name.trim()) { setError('マーク名を入力してください'); requestAnimationFrame(() => { const input = document.querySelector<HTMLElement>('[aria-labelledby="mark-basic"] input'); input?.focus(); input?.scrollIntoView({ block: 'center' }) }); return }
     onSave({ ...definition, mark: { ...definition.mark, name: name.trim(), color, isDefault, autoOnInbound } })
   }
-  return <><CreatePage title="対応マークのひな形" notice={notices} footerActions={footer(submit, () => guarded(onCancel))}>
+  return <><CreatePage title="対応マークのひな形" notice={notices} footerActions={footer(submit, () => guarded(onCancel))} dirty={false}>
     <MarkBasicFields name={name} color={color} onName={setName} onColor={setColor} disabled={busy || locked} error={error || undefined} />
     <section className={createStyles.card}><h2 className={createStyles.cardTitle}>自動で変えるきまり</h2><Checkbox checked={autoOnInbound} onCheckedChange={setAutoOnInbound} disabled={busy || locked}>新しいメッセージが来たらこのマークに変える</Checkbox><Checkbox checked={isDefault} onCheckedChange={setIsDefault} disabled={busy || locked}>新しい友だちに最初から付ける</Checkbox></section>
   </CreatePage><UnsavedLeaveDialog open={leaveTarget !== null} subject="マークへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} /></>

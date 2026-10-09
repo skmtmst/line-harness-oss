@@ -8,6 +8,8 @@
  * アカウント切替の見張り）は同じ。運用者へのお知らせの一覧は今の部品を入口（page.tsx）から差し込む。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { notifySaved } from '@/components/shared/toast'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import MediaSlot from '@/components/shared/media-slot'
 import { uploadImageFile } from '@/components/shared/media-library-upload'
 import Link from 'next/link'
@@ -715,7 +717,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
   // send-countsだけ取れなかった・形が違ったときの印。一覧全体は表示を続ける。
   const [sendCountsFailed, setSendCountsFailed] = useState(false)
   const [quota, setQuota] = useState<LineNotificationQuota | null>(null)
-  const [filter, setFilter] = useState<CustomerFilter>('all')
+  const [filter, setFilter] = useListUrlValue<CustomerFilter>('filter', 'all')
   const [expanded, setExpanded] = useState<string | null>(null)
   const [loadState, setLoadState] = useState<CustomerLoadState>('loading')
   const [busy, setBusy] = useState<string | null>(null)
@@ -902,7 +904,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
       setExpanded((current) => withDrafts.some((setting) => setting.eventType === current) ? current : null)
       if (restoredEvents.length > 0) {
         setDirtyEvents(restoredEvents)
-        setNotice({ tone: 'success', text: `未保存の編集を${restoredEvents.length} 件復元しました。確認して保存してください。` })
+        notifySaved(`未保存の編集を${restoredEvents.length}件復元しました。確認して保存してください。`)
       }
       setLoadState('ready')
       setCustomerLoadError(null)
@@ -1209,16 +1211,14 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
   >
     {expandedSetting === null ? <Tabs label="LINE通知の中の切り替え" size="notification" items={tabsWithCounts.map(item => ({ label: item.label, href: tabHref[item.key], current: tab === item.key }))} /> : null}
     {/*
-      * #634・M031：運用者タブの件数だけが取れなかったとき、その場所に小さく1行だけ。403 は押しても直らないので再試行の口は出さない。
+      * #634・M031：運用者タブの件数だけが取れなかったとき、その場所に小さく1行だけ。403 は権限変更後に読み直せるようにする。
       */}
     {expandedSetting === null && (operatorState === 'error' || operatorState === 'forbidden') ? (
       <p role="alert" className={styles.minor}>
         {isForbiddenOrRateLimited(operatorCountError)
           ? loadFailureNotice(operatorCountError, '運用者へのお知らせ')
           : '運用者へのお知らせの件数を読み込めませんでした。'}
-        {isForbidden(operatorCountError) ? null : (
-          <button type="button" className={styles.inlineLink} onClick={() => void load()}>もう一度</button>
-        )}
+        <button type="button" className={styles.inlineLink} onClick={() => void load()}>もう一度読み込む</button>
       </p>
     ) : null}
     {!canManage && expandedSetting === null ? <p className={styles.viewerBand} role="status">閲覧のみで見ています。お知らせを出す・止める・文面を直すのは、オーナーか管理者に頼んでください。</p> : null}
@@ -1296,7 +1296,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
       title={pendingToggle?.isEnabled ? `「${pendingToggle.label}」のお知らせを止めますか？` : `「${pendingToggle?.label ?? ''}」のお知らせを出しますか？`}
       description={pendingToggle?.isEnabled ? '止めると、この出来事が起きてもお客さまへLINEが送られなくなります。あとからまた出せます。' : '出すと、この出来事が起きたお客さまへLINEが送られ始めます。'}
       confirmLabel={pendingToggle?.isEnabled ? 'お知らせを止める' : 'お知らせを出す'}
-      onConfirm={pendingToggle ? () => { const s = pendingToggle; setPendingToggle(null); void save(s, !s.isEnabled) } : undefined}
+      onConfirm={pendingToggle ? () => { const s = pendingToggle; setPendingToggle(null); return save(s, !s.isEnabled) } : undefined}
       onCancel={() => setPendingToggle(null)}
     />
     {tab === 'customer' && !expandedSetting ? <>
@@ -1338,7 +1338,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
           />
         </div>
       )
-        : loadState === 'forbidden' ? <ListState kind="forbidden" />
+        : loadState === 'forbidden' ? <ListState kind="forbidden" onRetry={() => void load()} />
         : loadState === 'error' ? <ListState kind="error" title="顧客へのお知らせを表示できませんでした" error={customerLoadError ?? undefined} onRetry={() => void load()} />
         : settings.length === 0 ? <ListState kind="empty" title="顧客へのお知らせはまだありません" description="EC連携の取引イベントを接続すると、ここで種類ごとに管理できます。" />
         : visible.length === 0 ? <ListState kind="empty" emptyPreset="filtered" title="条件に合うものはありません" description="札や検索を外すと、すべて出ます" action={<Button variant="secondary" onClick={() => setFilter('all')}>条件を外す</Button>} />

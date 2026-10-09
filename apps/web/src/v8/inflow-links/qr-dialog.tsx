@@ -9,6 +9,7 @@
  * - 印刷用 PDF はサーバーで作る（`api.entryRoutes.qrPdf`）。ID の無い未登録 ref では出さない
  * - PNG は `/api/qr?size=320x320&data=<URL>&download=1`
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useState } from 'react'
 import { Copy, Download, FileText } from 'lucide-react'
 import { api } from '@/lib/api'
@@ -39,16 +40,7 @@ export default function QrDialog({ route, onClose }: { route: QrRoute; onClose: 
   const qrBase = `${WORKER_BASE.replace(/\/$/, '')}/api/qr?size=320x320&data=${encodeURIComponent(url)}`
   const downloadUrl = `${qrBase}&download=1&filename=${encodeURIComponent(`referral-${route.refCode}`)}`
 
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopyState('copied')
-    } catch {
-      // 失敗に気づかず URL 未コピーのまま配布作業が進むのを防ぐ。
-      setCopyState('failed')
-    }
-    setTimeout(() => setCopyState('idle'), 1500)
-  }
+
 
   const downloadPdf = async () => {
     if (!route.id) return
@@ -105,10 +97,7 @@ export default function QrDialog({ route, onClose }: { route: QrRoute; onClose: 
           </div>
           <div className={styles.urlRow}>
             <span className={styles.url} ><TruncatedText value={String(url ?? '')} url /></span>
-            <Button variant="text" onClick={() => void copy()} aria-label={`${route.name}のURLをコピー`}>
-              <Copy size={15} aria-hidden="true" />
-              {copyState === 'copied' ? 'コピーしました' : copyState === 'failed' ? 'コピー失敗' : 'コピー'}
-            </Button>
+            <CopyTextButton value={url} aria-label="URLをコピー"  />
           </div>
           <p className={styles.note}>
             印刷するときは「印刷用 PDF」がきれいです。チラシ・POP では 3cm 以上の大きさにしてください。

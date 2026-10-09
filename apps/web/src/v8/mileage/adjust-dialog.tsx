@@ -475,7 +475,7 @@ export default function MileageAdjustDialog({
                   onChange={(event) => setPolicyThresholdText(event.target.value.replace(/[^0-9]/g, ''))}
                   aria-label="別のオーナー承認が必要になるマイル数"
                 />
-                <Button onClick={() => void configurePolicy()} disabled={busy}>承認境界を保存する</Button>
+                <Button onClick={() => void configurePolicy()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">承認境界を保存する</Button>
               </div>
             </section>
           ) : null}

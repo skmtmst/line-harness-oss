@@ -6,7 +6,7 @@ import type { BookingConflict } from '@line-crm/shared'
 
 const net = vi.hoisted(() => ({ reassign: vi.fn() }))
 vi.mock('./lib/booking-channels', () => ({ bookingChannelsApi: net }))
-vi.mock('@/components/shared/toast', () => ({ notifyToast: vi.fn() }))
+vi.mock('@/components/shared/toast', () => ({ ...(() => { const notifyToast = vi.fn(); return { notifyToast, notifySaved: notifyToast } })() }))
 import { ConflictDialog } from './channels-tab'
 
 const conflict: BookingConflict = {

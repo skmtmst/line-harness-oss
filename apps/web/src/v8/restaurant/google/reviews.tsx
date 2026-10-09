@@ -1,5 +1,8 @@
 'use client'
 
+import { notifySaved } from '@/components/shared/toast'
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import HelpTip from '@/components/shared/help-tip'
 import KpiCard from '@/components/shared/kpi-card'
 
@@ -80,12 +83,12 @@ export function replyBadge(review: GoogleReview): { label: string; tone: StatusB
 }
 
 export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: string; data: GoogleConnectionData; go: GoogleNav; onSynced: () => void }) {
-  const [filter, setFilter] = useState<GoogleReviewFilter>('all')
+  const [filter, setFilter] = useListUrlValue<GoogleReviewFilter>('filter', 'all')
   const [rating, setRating] = useState('')
-  const [order, setOrder] = useState<GoogleReviewOrder>('newest')
-  const [search, setSearch] = useState('')
+  const [order, setOrder] = useListUrlValue<GoogleReviewOrder>('order', 'newest')
+  const [search, setSearch] = useListUrlValue('q', '')
   const [appliedSearch, setAppliedSearch] = useState('')
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [list, setList] = useState<GoogleReviewListData | null>(null)
   const [listLoading, setListLoading] = useState(true)
   const [listError, setListError] = useState('')
@@ -110,8 +113,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
 
   useEffect(() => { void load() }, [load])
   useEffect(() => {
-    const timer = setTimeout(() => { setAppliedSearch(search); setPage(1) }, 300)
-    return () => clearTimeout(timer)
+     setAppliedSearch(search); setPage(1)
   }, [search])
 
   const sync = useCallback(async () => {
@@ -164,7 +166,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
         >
           <RefreshCw aria-hidden className={`${styles.icon16} ${syncing ? styles.spin : ''}`} />
         </IconButton>
-        <Select aria-label="並び順" width={150} value={order} onChange={(value) => { setOrder(value as GoogleReviewOrder); setPage(1) }} options={ORDER_OPTIONS} />
+        <ListToolbarSort aria-label="並び順" width={150} value={order} onChange={(value) => { setOrder(value as GoogleReviewOrder); setPage(1) }} options={ORDER_OPTIONS} />
       </div>
       {connection.status === 'expired' ? <Notice tone="danger" action={<Link href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で再接続</Link>}>Googleとの接続を確認してください（認可切れ）。前回取得した口コミを表示しています。</Notice> : null}
       {connection.status === 'no_permission' ? <Notice tone="danger" action={<Link href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で接続を確認</Link>}>この店舗を操作する権限がありません。</Notice> : null}
@@ -195,7 +197,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
             const badge = replyBadge(review)
             const actionable = review.replyStatus === 'unreplied' || review.replyStatus === 'draft' || review.replyStatus === 'pending_confirm'
             return (
-              <Tr key={review.id}>
+              <Tr key={review.id} data-row-id={review.id}>
                 <Td className={`${styles.colReviewer}`}>
                   <span className={styles.reviewer}>{review.reviewerDisplayName ?? '匿名'}</span>
                   <Stars rating={review.starRating} />
@@ -279,7 +281,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
       const response = await restaurantGoogleApi.saveDraft(accountId, reviewId, text)
       setReview(response.review)
       setAiGenerated(false)
-      setSaved('下書きを保存しました。まだGoogleには送信していません。')
+      notifySaved('下書きを保存しました。まだGoogleには送信していません。')
     } catch (err) {
       setActionError(errorMessage(err, '下書きを保存できませんでした。'))
     } finally {
@@ -388,8 +390,8 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
                 {data.aiAvailable ? (
                   <>
                     <Button onClick={() => void generate('new')} disabled={busy !== null} busy={busy === 'generate'} busyLabel="作成中…"><Sparkles aria-hidden className={styles.icon15} />AIで下書きを作る</Button>
-                    <Button onClick={() => void generate('shorter')} disabled={busy !== null || !text}>短くする</Button>
-                    <Button onClick={() => void generate('polite')} disabled={busy !== null || !text}>丁寧にする</Button>
+                    <Button onClick={() => void generate('shorter')} disabled={busy !== null || !text} busy={Boolean(busy !== null)} busyLabel="処理中…">短くする</Button>
+                    <Button onClick={() => void generate('polite')} disabled={busy !== null || !text} busy={Boolean(busy !== null)} busyLabel="処理中…">丁寧にする</Button>
                   </>
                 ) : <span className={styles.muted}>この環境ではAI下書きは使えません。</span>}
                 <span className={styles.spacer} aria-hidden="true" />

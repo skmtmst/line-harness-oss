@@ -1214,11 +1214,7 @@ function ConversionsPageInner({ accountId, v8 }: { accountId: string | null; v8:
           kind="error"
           title="成果地点を読み込めませんでした"
           description="再読み込みしても直らない場合は、エラー報告へ連絡してください。"
-          action={
-            <Button variant="secondary" onClick={() => void load()}>
-              成果地点を再読み込み
-            </Button>
-          }
+          onRetry={() => void load()}
         />
       ) : shown.length === 0 ? (
         <ListState

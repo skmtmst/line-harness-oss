@@ -30,6 +30,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /* ------------------------------------------------------------------ 差し替え */
 
+const notifySaved = vi.hoisted(() => vi.fn())
+vi.mock('@/components/shared/toast', async original => ({ ...await original<typeof import('@/components/shared/toast')>(), notifySaved }))
+
 const friendsList = vi.hoisted(() => vi.fn())
 const affiliatesCreate = vi.hoisted(() => vi.fn())
 const affiliatesUpdate = vi.hoisted(() => vi.fn())
@@ -430,7 +433,8 @@ describe('案件登録の実操作（#686）', () => {
     })
     expect(typeof offersCreate.mock.calls[0][0].operationId).toBe('string')
     expect(offersUpdate).not.toHaveBeenCalled()
-    expect(hasText('下書きに保存しました。続けて作れます。')).toBe(true)
+    expect(notifySaved).toHaveBeenCalledOnce()
+    expect(notifySaved).toHaveBeenCalledWith('下書きに保存しました。続けて作れます。')
   })
 
   it('作成応答が読めなくても、押し直しは同じ操作UUIDで案件を増やさない', async () => {
@@ -453,7 +457,8 @@ describe('案件登録の実操作（#686）', () => {
     expect(offersCreate.mock.calls[1][0].operationId)
       .toBe(offersCreate.mock.calls[0][0].operationId)
     expect(offersCreate.mock.calls[1][0]).toMatchObject({ isActive: false })
-    expect(hasText('下書きに保存しました。続けて作れます。')).toBe(true)
+    expect(notifySaved).toHaveBeenCalledOnce()
+    expect(notifySaved).toHaveBeenCalledWith('下書きに保存しました。続けて作れます。')
   })
 
   it('再送で回収した行の公開状態が画面と違うときは、明示した状態へ1回だけ直す', async () => {
@@ -470,7 +475,8 @@ describe('案件登録の実操作（#686）', () => {
     expect(offersUpdate).toHaveBeenCalledTimes(1)
     expect(offersUpdate.mock.calls[0][0]).toBe('offer-1')
     expect(offersUpdate.mock.calls[0][1]).toEqual({ isActive: false })
-    expect(hasText('下書きに保存しました。続けて作れます。')).toBe(true)
+    expect(notifySaved).toHaveBeenCalledOnce()
+    expect(notifySaved).toHaveBeenCalledWith('下書きに保存しました。続けて作れます。')
   })
 
   it('作成だけ済んだ状態でLINEアカウントを切り替えたら、前の店の案件を更新しない', async () => {

@@ -127,6 +127,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     doneLabel = '保存しました',
     disabled,
     ref,
+    onClick,
     ...buttonProps
   } = props
 
@@ -136,8 +137,11 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
    * 幅はぶれないよう、平常時に測った幅を `min-width` に留めておき、
    * 「保存中…」「保存しました」の間もその幅を下回らない。
    */
-  const stateful = busy !== undefined || done !== undefined
-  const busyNow = busy === true
+  const [automaticBusy, setAutomaticBusy] = useState(false)
+  const [automaticError, setAutomaticError] = useState('')
+  const automaticLock = useRef(false)
+  const stateful = busy !== undefined || done !== undefined || automaticBusy
+  const busyNow = busy === true || (busy === undefined && automaticBusy)
 
   /* done が true になったら 1.2 秒だけ ✓ を出して元の文字へ戻す。 */
   const [doneFlashing, setDoneFlashing] = useState(false)
@@ -184,8 +188,22 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     else if (ref) ref.current = el
   }
 
+  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (busyNow || disabled || automaticLock.current) return
+    setAutomaticError('')
+    const pending = onClick?.(event) as unknown
+    if (busy !== undefined || !pending || typeof (pending as PromiseLike<unknown>).then !== 'function') return
+    automaticLock.current = true
+    setAutomaticBusy(true)
+    void Promise.resolve(pending).catch(() => {
+      setAutomaticError('処理できませんでした。もう一度お試しください。')
+    }).finally(() => {
+      automaticLock.current = false
+      setAutomaticBusy(false)
+    })
+  }
   const shownDone = doneFlashing && !busyNow
-  return (
+  return (<>
     <button
       type={type}
       className={classes}
@@ -196,10 +214,12 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
       aria-busy={busyNow ? true : undefined}
       {...buttonProps}
       aria-label={iconButtonLabel(props)}
+      onClick={handleClick}
     >
       {busyNow ? <LoaderCircle className={styles.spin} size={15} aria-hidden="true" /> : null}
       {shownDone ? <Check size={15} aria-hidden="true" /> : null}
       {busyNow ? busyLabel : shownDone ? doneLabel : children}
     </button>
-  )
+    {automaticError ? <span role="alert" data-button-error>{automaticError}</span> : null}
+  </>)
 }

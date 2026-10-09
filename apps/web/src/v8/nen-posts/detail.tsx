@@ -342,7 +342,7 @@ export function PhotoReviewDetail({
         if (!downloadReady) { setDownloadError(stepUpMethod === 'password' ? 'パスワードを入力してください。' : '6桁の再認証コードを入力してください。'); return }
         setDownloadBusy(true)
         setDownloadError('')
-        void onDownloadOriginal(downloadCode)
+        return onDownloadOriginal(downloadCode)
           .then(() => setDownloadOpen(false))
           .catch((error: unknown) => setDownloadError(error instanceof Error ? error.message : '原本を保存できませんでした。'))
           .finally(() => setDownloadBusy(false))

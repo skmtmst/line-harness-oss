@@ -888,10 +888,10 @@ export default function SavedSearchEditV8() {
         footerActions={(
           <>
             <Button href="/tags?tab=searches">キャンセル</Button>
-            <Button type="button" disabled={saving} onClick={() => void duplicate()}><Copy size={14} aria-hidden="true" />複製して保存する</Button>
+            <Button type="button" disabled={saving} onClick={() => void duplicate()} busy={Boolean(saving)} busyLabel="処理中…"><Copy size={14} aria-hidden="true" />複製して保存する</Button>
             <Button type="button" variant="primary" disabled={saving || !dirty} onClick={() => void save()} busy={saving}><Check size={14} aria-hidden="true" />保存する</Button>
           </>
-        )}
+        )} dirty={false}
       >
         {error ? <Notice tone="danger" message={error} /> : null}
         <section className={styles.card} aria-label="名前と共有">
@@ -976,7 +976,7 @@ export default function SavedSearchEditV8() {
         {/* IDEA-04：印ならタグ・値なら情報欄・条件の保存は保存した検索、という違いを編集の場所でも確かめられる。 */}
         <AttributeKindGuide current="search" />
       </CreatePage>
-      <ConfirmDialog open={deleteOpen && original.canDelete === true} title={`「${name}」を削除しますか？`} description="使っている所が無いことをサーバーで確かめてあります。保存した条件だけを削除し、友だちは削除しません。" confirmLabel="削除する" destructive onCancel={() => setDeleteOpen(false)} onConfirm={() => { setDeleteOpen(false); void remove() }} />
+      <ConfirmDialog open={deleteOpen && original.canDelete === true} title={`「${name}」を削除しますか？`} description="使っている所が無いことをサーバーで確かめてあります。保存した条件だけを削除し、友だちは削除しません。" confirmLabel="削除する" destructive onCancel={() => setDeleteOpen(false)} onConfirm={() => { setDeleteOpen(false); return remove() }} />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="検索条件への変更" busy={saving} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )

@@ -219,7 +219,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                   </thead>
                   <tbody>
                     {active.items?.map((item) => (
-                      <Tr key={item.id} className={`${styles.row} ${styles.rowTall}`}>
+                      <Tr key={item.id} className={`${styles.row} ${styles.rowTall}`} data-row-id={item.id}>
                         <Td className={styles.td}>
                           <button type="button" className={`${styles.mono} ${styles.uidButton}`} title={`${item.oldUid}（詳細を見る）`}  onClick={() => { m.setDetailError(null); m.setDetailItem(item) }}>
                             {shortUid(item.oldUid)}
@@ -323,7 +323,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                 {m.runs.map((run) => {
                   const badge = historyBadge(run)
                   return (
-                    <Tr key={run.id} className={`${styles.row} ${styles.rowRun}`} selected={active?.id === run.id || undefined}>
+                    <Tr key={run.id} className={`${styles.row} ${styles.rowRun}`} selected={active?.id === run.id || undefined} data-row-id={run.id}>
                       <Td className={styles.td}>{slashDateTime(run.createdAt)}</Td>
                       <Td className={styles.td}>
                         <button type="button" className={styles.runButton} aria-current={active?.id === run.id ? 'true' : undefined} title={`${run.purpose} ・ ${formatNumber(run.counts.total)}件`}  onClick={() => m.selectRun(run.id)}>
@@ -394,15 +394,15 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
       <div className={styles.body}>{body}</div>
 
       <MigrationItemDialog detailItem={m.detailItem} active={active} me={m.me} busy={m.busy} detailError={m.detailError} onClose={() => { m.setDetailItem(null); m.setDetailError(null) }} decide={(item, decision) => void m.decide(item, decision)} />
-      <ExecuteConfirmDialog active={active} accounts={m.accounts} me={m.me} busy={m.busy} open={m.confirmExecute} error={m.executeError} canRun={m.canRunExecute} onConfirm={() => void m.execute()} onCancel={() => { if (!m.busy) m.setConfirmExecute(false) }} />
-      <RollbackConfirmDialog active={active} me={m.me} busy={m.busy} open={m.confirmRollback} error={m.rollbackError} conflicts={m.rollbackConflicts} canRun={m.canRunRollback} onConfirm={() => void m.rollback()} onCancel={() => { if (!m.busy) { m.setConfirmRollback(false); m.setRollbackConflicts([]) } }} />
+      <ExecuteConfirmDialog active={active} accounts={m.accounts} me={m.me} busy={m.busy} open={m.confirmExecute} error={m.executeError} canRun={m.canRunExecute} onConfirm={() => m.execute()} onCancel={() => { if (!m.busy) m.setConfirmExecute(false) }} />
+      <RollbackConfirmDialog active={active} me={m.me} busy={m.busy} open={m.confirmRollback} error={m.rollbackError} conflicts={m.rollbackConflicts} canRun={m.canRunRollback} onConfirm={() => m.rollback()} onCancel={() => { if (!m.busy) { m.setConfirmRollback(false); m.setRollbackConflicts([]) } }} />
       <ConfirmDialog
         open={bulkOpen}
         title="要確認をまとめて結び付けます"
         description={`このページの要確認・未判断で移行先のある ${formatNumber(bulkTargets.length)} 行を「結び付ける」にします。1行ずつ保存します。本移行まで実データは変わりません。`}
         confirmLabel="結び付ける"
         busy={m.busy}
-        onConfirm={() => void runBulkLink()}
+        onConfirm={() => runBulkLink()}
         onCancel={() => { if (!m.busy) setBulkOpen(false) }}
       />
     </PageFrame>

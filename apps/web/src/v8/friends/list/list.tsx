@@ -9,6 +9,10 @@
  * 道具2段（探す・絞り込み4つ・詳細条件・保存した検索／未対応・注目のみ・件数・
  * 表示項目・件数・並び）→ 表（□・☆・友だち・対応/担当・シナリオ・最新・タグ・流入元・最終接触・…）→ ページ送り。
  */
+import { collectListRows } from '@/components/shared/collect-list-rows'
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
+import { useListUrlJsonValue, useListUrlValue } from '@/components/shared/list-url-state'
+import { jstDate } from '@/lib/jst-datetime'
 import StatusPill, { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -110,6 +114,14 @@ function isPageSize(value: number): value is PageSize {
   return (PAGE_SIZE_OPTIONS as readonly number[]).includes(value)
 }
 
+function validAdvancedSearch(value: unknown): value is AdvancedSearchResult | null {
+  if (value === null) return true
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const result = value as Partial<AdvancedSearchResult>
+  return !!result.params && typeof result.params === 'object' && !Array.isArray(result.params)
+    && Array.isArray(result.summary) && result.summary.every(item => typeof item === 'string')
+}
+
 export default function FriendsListV8() {
   usePageTitle('友だち')
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -147,21 +159,22 @@ export default function FriendsListV8() {
   const [marks, setMarks] = useState<SupportMarkListItem[]>([])
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [savedOpen, setSavedOpen] = useState(false)
-  const [advanced, setAdvanced] = useState<AdvancedSearchResult | null>(null)
+  const [advanced, setAdvanced] = useListUrlJsonValue<AdvancedSearchResult | null>('advanced', null, validAdvancedSearch)
   const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState<PageSize>(20)
-  const [selectedTagId, setSelectedTagId] = useState(directTagId)
-  const [searchInput, setSearchInput] = useState(directQuery)
-  const [searchSubmitted, setSearchSubmitted] = useState(directQuery)
-  const [sortMode, setSortMode] = useState<SortMode>('recent')
-  const [responseFilter, setResponseFilter] = useState<ResponseFilter>('all')
-  const [operatorId, setOperatorId] = useState('')
-  const [scenarioId, setScenarioId] = useState('')
-  const [attentionOnly, setAttentionOnly] = useState(false)
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useListUrlValue<PageSize>('pageSize', 20)
+  const [selectedTagId, setSelectedTagId] = useListUrlValue('tag', '')
+  const [searchInput, setSearchInput] = useListUrlValue('q', '')
+  const [searchSubmitted, setSearchSubmitted] = useListUrlValue('q', '')
+  const [sortMode, setSortMode] = useListUrlValue<SortMode>('sortMode', 'recent')
+  const [responseFilter, setResponseFilter] = useListUrlValue<ResponseFilter>('responseFilter', 'all')
+  const [operatorId, setOperatorId] = useListUrlValue('operatorId', '')
+  const [scenarioId, setScenarioId] = useListUrlValue('scenarioId', '')
+  const [attentionOnly, setAttentionOnly] = useListUrlValue('attentionOnly', false)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [refreshing, setRefreshing] = useState(false)
   const [optionsFailed, setOptionsFailed] = useState(false)
+  const [selectionFriends, setSelectionFriends] = useState<FriendListItem[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
   const [bulkOpen, setBulkOpen] = useState(false)
@@ -222,7 +235,7 @@ export default function FriendsListV8() {
   const restoredRef = useRef<string | null>(null)
   const [restoredAccount, setRestoredAccount] = useState<string | null>(null)
   const restored = !accountLoading && Boolean(selectedAccountId) && restoredAccount === selectedAccountId
-  const hasExplicitUrlFilters = hasScoreRange || audienceId !== '' || Boolean(directSavedSearchId) || directTagId !== '' || directQuery !== ''
+  const hasExplicitUrlFilters = ['advanced', 'q', 'tag', 'sortMode', 'responseFilter', 'operatorId', 'scenarioId', 'attentionOnly', 'page', 'pageSize'].some((key) => searchParams.has(key)) || hasScoreRange || audienceId !== '' || Boolean(directSavedSearchId) || directTagId !== '' || directQuery !== ''
   useEffect(() => {
     if (accountLoading || !selectedAccountId || restoredRef.current === selectedAccountId) return
     restoredRef.current = selectedAccountId
@@ -263,8 +276,7 @@ export default function FriendsListV8() {
     if (!restored) return
     const next = searchInput.trim()
     if (next === searchSubmitted) return
-    const timer = window.setTimeout(() => { setSearchSubmitted(next); setPage(1) }, 300)
-    return () => window.clearTimeout(timer)
+     setSearchSubmitted(next); setPage(1)
   }, [restored, searchInput, searchSubmitted])
 
   /* 絞り込みは上の控えが戻す。スクロール位置も、戻ったときだけ同じ所へ戻す（動きの点検 5 番）。 */
@@ -327,6 +339,35 @@ export default function FriendsListV8() {
       setOptionsFailed(true)
     }
   }, [selectedAccountId, marksEnabled])
+
+  const selectAllFriends = async () => {
+    const request = loadRequestRef.current
+    const all = await collectListRows(total, async (offset, limit) => {
+      const response = await api.friends.list({
+        ...(advanced?.params ?? {}),
+        offset: String(offset),
+        limit,
+        tagId: selectedTagId || undefined,
+        accountId: selectedAccountId || undefined,
+        audienceId: audienceId || undefined,
+        search: searchSubmitted || undefined,
+        includeChatStatus: true,
+        sort: sortMode,
+        handled: responseFilter === 'unhandled' ? 'unhandled' : undefined,
+        operatorId: operatorId || undefined,
+        scenarioId: scenarioId || undefined,
+        metadata: attentionOnly ? { __attention: '1' } : undefined,
+        scoreMin,
+        scoreMax,
+        scoredOnly: scoredOnly || undefined,
+      })
+      if (!response.success) throw new Error('読み込めませんでした')
+      return response.data
+    })
+    if (request !== loadRequestRef.current) return
+    setSelectionFriends(all)
+    setSelectedIds(new Set(all.map(friend => friend.id)))
+  }
 
   const loadFriends = useCallback(async () => {
     const requestId = ++loadRequestRef.current
@@ -676,7 +717,7 @@ export default function FriendsListV8() {
           onChange={(value) => resetPageWith(() => setPageSize(Number(value) as PageSize))}
           options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size} 件表示` }))}
         />
-        <Select
+        <ListToolbarSort
           aria-label="並び順"
           treatment="text"
           width={171}
@@ -706,7 +747,7 @@ export default function FriendsListV8() {
       {optionsFailed ? (
         <p className={styles.optionsFailed}>
           絞り込みの選択肢を読み込めませんでした。タグが空なのは、取れなかっただけかもしれません。
-          <button type="button" onClick={() => { void loadOptions(); void loadMarks() }} className={styles.linkButton}>再読み込み</button>
+          <button type="button" onClick={() => { void loadOptions(); void loadMarks() }} className={styles.linkButton}>もう一度読み込む</button>
         </p>
       ) : null}
     </div>
@@ -788,7 +829,7 @@ export default function FriendsListV8() {
             const attention = String(friend.metadata?.__attention ?? '') === '1'
             const tags = splitTags(friend.tags)
             return (
-              <Tr key={friend.id} interactive selected={selectedIds.has(friend.id) || undefined} className={styles.row} data-friend-row>
+              <Tr key={friend.id} interactive selected={selectedIds.has(friend.id) || undefined} className={styles.row} data-friend-row data-row-id={friend.id}>
                 <Td className={styles.tdCheck} onClick={(event) => event.stopPropagation()}>
                   <Checkbox checked={selectedIds.has(friend.id)} onCheckedChange={() => toggleSelect(friend.id)} aria-label={`${friend.displayName}を選ぶ`} />
                 </Td>
@@ -911,7 +952,7 @@ export default function FriendsListV8() {
       overlays={(
         <>
           <span className={styles.bulkWrap} data-design="V8BulkBar">
-            <BulkBar count={selectedIds.size} unit="人" hint="対象を確認してから操作を選んでください" onClear={clearSelection}>
+            <BulkBar total={total} onSelectAll={selectAllFriends} count={selectedIds.size} unit="人" hint="対象を確認してから操作を選んでください" onClear={clearSelection}>
               {selectedIds.size > 1 && canRunBulk(staffRole) ? (
                 <Button variant="secondary" data-qa-open="IAf7j" onClick={() => setBulkOpen(true)}>操作を選ぶ</Button>
               ) : null}
@@ -923,7 +964,7 @@ export default function FriendsListV8() {
           <BulkRunDialog
             open={bulkOpen}
             friendIds={[...selectedIds]}
-            selectedFriends={friends.filter((friend) => selectedIds.has(friend.id))}
+            selectedFriends={[...new Map([...selectionFriends, ...friends].map(friend => [friend.id, friend])).values()].filter(friend => selectedIds.has(friend.id))}
             tags={allTags}
             accountId={selectedAccountId}
             supportMarksEnabled={marksEnabled}

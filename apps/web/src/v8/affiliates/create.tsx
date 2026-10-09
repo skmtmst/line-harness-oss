@@ -12,6 +12,8 @@
  *   「すぐに計測を始める」（今の画面にある）を同じ形で置く。
  * - Gqve5 の同時編集の比較・再読込はAPIが無いため出さない。紹介コードの重複は欄で知らせる。
  */
+import { notifySaved } from '@/components/shared/toast'
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Link as LinkIcon } from 'lucide-react'
@@ -95,7 +97,6 @@ export default function CreateAffiliateV8() {
   const [friendReload, setFriendReload] = useState(0)
   const [friendPickerOpen, setFriendPickerOpen] = useState(false)
   const [linkBaseUrl, setLinkBaseUrl] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
   const [issuedUrl, setIssuedUrl] = useState<string | null>(null)
   const [createdId, setCreatedId] = useState<string | null>(null)
   const [partialSave, setPartialSave] = useState(false)
@@ -206,7 +207,6 @@ export default function CreateAffiliateV8() {
     setSelectedFriend(null)
     setNotifyOnConversion(true)
     setStartTracking(true)
-    setCopied(false)
     setCreatedId(null)
     setIssuedUrl(null)
     setPartialSave(false)
@@ -284,7 +284,7 @@ export default function CreateAffiliateV8() {
         router.push(`${LIST_PATH}?affiliate=${encodeURIComponent(affiliateId)}&highlight=${encodeURIComponent(affiliateId)}`)
       } else {
         reset()
-        setSaveNote('保存しました。続けて作れます。')
+        notifySaved('保存しました。続けて作れます。')
       }
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : '保存できませんでした'
@@ -321,7 +321,7 @@ export default function CreateAffiliateV8() {
           { label: '締め', value: payoutCycle.trim() || emptyValue('unknown') },
         ]}
       >
-        {issuedUrl ? <div><Button type="button" onClick={() => { void navigator.clipboard?.writeText(issuedUrl).then(() => setCopied(true), () => setCopied(false)) }}>{copied ? 'コピーしました' : 'リンクをコピー'}</Button></div> : null}
+        {issuedUrl ? <div><CopyTextButton value={issuedUrl} label="リンクをコピー" aria-label="リンクをコピー" /></div> : null}
       </CreateSummaryCard>
       <CreateSummaryCard title="気をつけること" variant="link" rows={[]}>
         <p className={styles.sideList}>・紹介コードはあとから変えられません（配ったリンクが動かなくなるため）<br />・報酬を払う人は、振込先の登録が要ります</p>
@@ -344,7 +344,7 @@ export default function CreateAffiliateV8() {
         <Button variant="primary" disabled={saving} busy={saving} busyLabel="登録しています" onClick={() => void runSave('finish')}>
           <Check size={15} aria-hidden="true" /> 登録して紹介リンクを発行する
         </Button>
-      </>}
+      </>} dirty={false}
     >
 
       {partialSave && createdId ? (

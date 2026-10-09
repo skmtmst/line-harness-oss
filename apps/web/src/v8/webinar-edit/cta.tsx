@@ -7,6 +7,7 @@
  * 口・保存前の確かめ・同時編集（409）の扱いは app/webinars/edit/cta-v8.tsx と同じ（BEHAVIOR.md）。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { GitCompare, Play, Plus, RefreshCw, TriangleAlert } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
@@ -275,15 +276,9 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
       status={chrome.status}
       /* 競合の帯は左右の列の上に横いっぱい（絵 pvimJ）。 */
       notice={conflict ? (
-        <div className={styles.conflict} role="alert" data-design-node="pvimJ">
-          <TriangleAlert size={16} aria-hidden="true" className={styles.conflictIcon} />
-          <div className={styles.conflictText}>
-            <p className={styles.conflictTitle}>{latest?.editor.updatedAt ? `ほかの人が ${polishFormatTime(new Date(latest.editor.updatedAt))} にこのウェビナーを保存しました` : 'ほかの人がこのウェビナーを保存しました'}</p>
-            <p className={styles.conflictNote}>このまま保存すると、ほかの人の変更が消えます</p>
-          </div>
-          <Button disabled={busy} busy={reading} onClick={() => void readLatest()}><GitCompare size={15} aria-hidden="true" />違いを比べる</Button>
-          <Button disabled={busy} onClick={() => setReplaceConfirm(true)}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
-        </div>
+        <SaveConflictBand designNode="pvimJ"
+          title={latest?.editor.updatedAt ? `ほかの人が ${polishFormatTime(new Date(latest.editor.updatedAt))} にこのウェビナーを保存しました` : 'ほかの人がこのウェビナーを保存しました'}
+          compareBusy={busy || reading} onCompare={readLatest} onReload={() => setReplaceConfirm(true)} />
       ) : undefined}
       preview={<>
         <h2 className={form.previewTitle}>カードの見え方</h2>
@@ -304,7 +299,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
         {message ? <Notice tone="danger">{message}</Notice> : null}
         <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
         {loadFailed ? (
-          <ListState kind="error" title="CTA カードを読み込めませんでした" description="読み込めるまで保存はできません。" action={<Button onClick={() => void loadCtas()}>もう一度読み込む</Button>} />
+          <ListState kind="error" title="CTA カードを読み込めませんでした" description="読み込めるまで保存はできません。" onRetry={() => void loadCtas()} />
         ) : ctas === null ? <ListState kind="loading" /> : <>
           {ctas.map((card, index) => (
             <div key={index} className={form.listRow} data-selected={index === currentIndex || undefined}>
@@ -394,9 +389,9 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
         {registrationError ? <p className={form.fieldError} role="alert">{registrationError}</p> : null}
       </section>
 
-      <ConfirmDialog open={replaceConfirm} title="最新を読み込んで続けますか？" description="保存されている最新の CTA カードと申込フォームに置き換えます。この画面で直したところは消えます。" confirmLabel="最新を読み込んで続ける" onCancel={() => setReplaceConfirm(false)} onConfirm={() => void acceptLatest()} />
+      <ConfirmDialog open={replaceConfirm} title="最新を読み込んで続けますか？" description="保存されている最新の CTA カードと申込フォームに置き換えます。この画面で直したところは消えます。" confirmLabel="最新を読み込んで続ける" onCancel={() => setReplaceConfirm(false)} onConfirm={() => acceptLatest()} />
       {compareOpen && latest ? (
-        <Dialog open title="違いを比べる" description="左がこの画面の入力、右が保存されている最新です。" confirmLabel="最新を読み込んで続ける" onConfirm={() => void acceptLatest()} onCancel={() => setCompareOpen(false)}>
+        <Dialog open title="違いを比べる" description="左がこの画面の入力、右が保存されている最新です。" confirmLabel="最新を読み込んで続ける" onConfirm={() => acceptLatest()} onCancel={() => setCompareOpen(false)}>
           <DataTable className={styles.compare}>
             <thead><TableHeadRow><Th>項目</Th><Th>この画面</Th><Th>最新</Th></TableHeadRow></thead>
             <tbody>

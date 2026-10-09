@@ -9,6 +9,8 @@
  * 行の右端は「認める」と「…」（認める・認めない・付帯動作をやり直す・詳細を見る）。
  * 左のチェックで選ぶと下から一括バー →「操作を選ぶ」（hadfk）→ 確かめる → 結果。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Ban, Check, CircleCheck, CircleHelp, Download, Hourglass, ListChecks, ShieldAlert, X } from 'lucide-react'
 import { api, type ConversionApprovalItem } from '@/lib/api'
@@ -84,17 +86,17 @@ export default function ApprovalsTab() {
   const { readonly, narrow, setCount, focusAffiliateId, accountId } = useAffiliateShell()
 
   const [status, setStatus] = useState<ApprovalStatus>('pending')
-  const [affiliateFilter, setAffiliateFilter] = useState<string | null>(focusAffiliateId)
+  const [affiliateFilter, setAffiliateFilter] = useListUrlValue<string | null>('affiliateFilter', focusAffiliateId)
   const [items, setItems] = useState<ConversionApprovalItem[]>([])
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [holdDays, setHoldDays] = useState<number | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [actioning, setActioning] = useState<string | null>(null)
-  const [query, setQuery] = useState('')
-  const [flaggedOnly, setFlaggedOnly] = useState(false)
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [flaggedOnly, setFlaggedOnly] = useListUrlValue('flaggedOnly', false)
   const [saved, setSaved] = useState('')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [detailItem, setDetailItem] = useState<ConversionApprovalItem | null>(null)
   const [truncatedStatuses, setTruncatedStatuses] = useState<ApprovalStatus[]>([])
@@ -556,7 +558,7 @@ export default function ApprovalsTab() {
           </div>
         </div>
       ) : null}
-      <BulkBar count={canSelect ? selected.size : 0} hint="対象を確認してから操作を選んでください">
+      <BulkBar count={canSelect ? selected.size : 0} total={shownItems.filter(item => item.approvalStatus === 'pending' && approvalReviewReasons(item).length === 0).length} onSelectAll={() => setSelected(new Set(shownItems.filter(item => item.approvalStatus === 'pending' && approvalReviewReasons(item).length === 0).map(item => item.eventId)))} hint="対象を確認してから操作を選んでください">
         <Button type="button" onClick={openBulkWizard}><ListChecks size={15} aria-hidden="true" /> 操作を選ぶ</Button>
       </BulkBar>
     </>
@@ -617,7 +619,7 @@ export default function ApprovalsTab() {
             confirmLabel={bulkConfirm.action === 'approved' ? '認める' : '認めない（却下）'}
             destructive={bulkConfirm.action === 'rejected'}
             busy={actioning !== null}
-            onConfirm={() => { void runBulkDecide(bulkConfirm.action, bulkConfirm.items) }}
+            onConfirm={() => { return runBulkDecide(bulkConfirm.action, bulkConfirm.items) }}
             onCancel={() => setBulkConfirm(null)}
           >
             <ul className={styles.resultList}>

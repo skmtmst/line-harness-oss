@@ -478,7 +478,7 @@ export default function ActionScoreRulesPage() {
       ) : forbidden ? (
         <ListState kind="forbidden" />
       ) : loadError ? (
-        <ListState kind="error" title="スコアのルールを表示できませんでした" description="再読み込みしても直らない場合はエラー報告へ。" action={<Button onClick={() => void load()}>スコアのルールを再読み込み</Button>} />
+        <ListState kind="error" title="スコアのルールを表示できませんでした" description="再読み込みしても直らない場合はエラー報告へ。" onRetry={() => void load()} />
       ) : bundle && configuration ? <>
         <div className="grid gap-3 2xl:grid-cols-4">
           <div className="grid content-start gap-3 2xl:col-span-3">

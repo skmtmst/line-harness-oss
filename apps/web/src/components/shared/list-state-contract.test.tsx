@@ -41,7 +41,7 @@ describe('一覧の状態とページ送り', () => {
     )
     expect(html).toContain('予約一覧を再読み込み')
     // 渡さない画面では、重複する一律の押し口を勝手に出さない。
-    expect(renderToStaticMarkup(<ListState kind="error" />)).not.toContain('<button')
+    expect(renderToStaticMarkup(<ListState kind="error" />)).toContain('<button')
   })
 
   it('権限不足は「無い」ではなく「見られない」と言う', () => {

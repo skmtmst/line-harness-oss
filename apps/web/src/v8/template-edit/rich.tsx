@@ -9,6 +9,8 @@
  * 形・面の座標・動きの組み立ては template-asset-editor.tsx から写した（src/v8 は @/app を読めない）。
  * 外枠・名前とフォルダの箱・右の列はクーポン・リサーチ（asset.tsx）と同じ。動きは BEHAVIOR.md。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CircleSlash, Send } from 'lucide-react'
@@ -282,7 +284,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
     }, { reveal: () => setSelectedLabel(area.label), group: `area-${area.label}` })
   })
 
-  const save = async (): Promise<boolean> => {
+  const save = async (): Promise<string | false> => {
     if (!selectedAccountId) { setError('上のバーでLINE公式アカウントを選んでください。'); return false }
     if (fields.submit().length > 0) { setError(''); return false }
     const built = buildRichPayload({ imageUrl, pickedMedia, shape: shapeDef, areas, liffId })
@@ -302,7 +304,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
       }
       setSaved(true)
       setClean(snapshot)
-      return true
+      return result.data.id
     } catch {
       setError('保存できませんでした。通信状態を確認して、もう一度お試しください。')
       return false
@@ -339,15 +341,17 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   }
   const onSaveDraft = async () => {
     if (host) { hostSave(false); return }
-    if (await save()) notifyToast('下書きを保存しました')
+    const savedId = await save()
+    if (savedId) { notifySaved('下書きを保存しました'); disarm(); router.push(createPageReturnHref('/templates', savedId)) }
   }
   const onPublish = async () => {
     if (host) { hostSave(true); return }
     setPublishing(true)
     try {
-      if (await save()) {
+      const savedId = await save()
+      if (savedId) {
         disarm()
-        router.push('/templates')
+        router.push(createPageReturnHref('/templates', savedId))
       }
     } finally {
       setPublishing(false)
@@ -450,7 +454,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
       >
         {host?.notice}
         {error ? <p role="alert" className={styles.error}>{error}</p> : null}
-        {saved ? <p role="status" className={styles.readonly}>保存しました。一覧へ戻ると、リッチメッセージの一覧に出ています。</p> : null}
+        {null}
 
         {host?.composer ? null : <Card padding="none" layout="vertical" className={styles.card}>
           <div className={styles.cardHead}>

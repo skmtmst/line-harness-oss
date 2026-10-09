@@ -60,6 +60,7 @@ vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('
 })
 
 import HqBannersListV8 from './list'
+import { flushListUrlState } from '@/components/shared/list-url-state'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -78,6 +79,8 @@ const image = (n: number) => ({
 })
 
 beforeEach(() => {
+  flushListUrlState()
+  window.history.replaceState(null, '', '/hq/banners')
   document.documentElement.dataset.theme = 'v8'
   nav.query = ''
   roleBox.role = 'owner'
@@ -136,7 +139,7 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
     act(() => { submit.click() })
     await flush()
     expect(createProject).toHaveBeenCalledWith({ name: '新しい案件', description: null })
-    expect(push).toHaveBeenCalledWith('/hq/banners/project?id=p9')
+    expect(push).toHaveBeenCalledWith('/hq/banners?highlight=p9')
   })
 
   it('星を押すとお気に入りを切り替える', async () => {

@@ -4,6 +4,7 @@
  * - 読み込み中はカードの形の骨組みが出て「読み込み中…」の文字は無い
  * - 保存ボタンは「保存中 → ✓ 保存しました」でボタンの中だけ変わる
  */
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -47,6 +48,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  clearToastsForTest()
   fixture.accountId = 'account-a'
   fixture.hang = false
   fixture.conflict = false
@@ -115,7 +117,7 @@ describe('V8 設定のサクサク感', () => {
     vi.useFakeTimers()
     try {
       await act(async () => {
-        root.render(<SettingsPage />)
+        root.render(<><SettingsPage /><ToastHost /></>)
       })
       await act(async () => {
         vi.advanceTimersByTime(350)
@@ -128,10 +130,10 @@ describe('V8 設定のサクサク感', () => {
     }
   })
 
-  it('保存ボタンは保存後に「保存しました」になる', async () => {
+  it('保存した後はトーストを1つ出す', async () => {
     document.documentElement.dataset.theme = 'v8'
     await act(async () => {
-      root.render(<SettingsPage />)
+      root.render(<><SettingsPage /><ToastHost /></>)
     })
     await flush()
     // スイッチを1つ切って未保存にする。
@@ -147,10 +149,10 @@ describe('V8 設定のサクサク感', () => {
     ) as HTMLButtonElement
     await act(async () => { saveButton.click() })
     await flush()
-    expect(host.textContent).toContain('保存しました')
+    expect(document.body.querySelector('[role="status"]')?.textContent).toContain('保存しました')
   })
   it('先にほかの人が保存した時は編集を保ち、比べた後だけ再保存する', async () => {
-    await act(async () => { root.render(<SettingsPage />) })
+    await act(async () => { root.render(<><SettingsPage /><ToastHost /></>) })
     await flush()
     const firstSwitch = host.querySelector('[type="checkbox"]') as HTMLElement
     await act(async () => { firstSwitch.click() })

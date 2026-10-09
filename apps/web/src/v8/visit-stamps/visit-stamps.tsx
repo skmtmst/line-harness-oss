@@ -8,6 +8,9 @@
  * ①② は下書きで、下の帯の［保存する］でまとめて保存する。③・店で手入力・④の取り消しは、その場で口を呼ぶ。
  * 呼ぶ口は visit-stamps-api（Codex の API-7）だけ。動き・権限は BEHAVIOR.md。
  */
+import { flushListUrlState, useListUrlValue } from '@/components/shared/list-url-state'
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
+import { notifySaved } from '@/components/shared/toast'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Gift, ImageIcon, Minus, Plus, Stamp } from 'lucide-react'
@@ -123,6 +126,7 @@ function VisitStampsScreen() {
   const rawTab = params.get('tab')
   const tab = STAMP_TABS.find(t => t.key === rawTab)?.key ?? (params.get('friend') && !rawTab ? 'history' : 'settings')
   const selectTab = (key: typeof STAMP_TABS[number]['key']) => {
+    flushListUrlState()
     const url = new URL(window.location.href)
     url.searchParams.set('tab', key)
     router.replace(`${url.pathname}${url.search}${url.hash}`, { scroll: false })
@@ -188,6 +192,21 @@ function VisitStampsScreen() {
     samePage: destination => destination.pathname === '/visit-stamps',
   })
 
+  const saveConflict = useSaveConflict<VisitStampCard>({
+    contextKey: JSON.stringify([selectedAccountId, card?.id]),
+    fetchLatest: async () => {
+      if (!card) return null
+      const response = await visitStampsApi.cards()
+      return response.data.find(next => next.id === card.id) ?? null
+    },
+    reload: async () => {
+      const response = await visitStampsApi.cards()
+      setCards(response.data)
+      resetDraft(response.data.find(next => next.id === card?.id) ?? null)
+      saveConflict.clear()
+    },
+  })
+
   const save = async () => {
     const problem = settingsIssue(name, settings) ?? (settings.completion === 'next_card' && !nextCards.some(c => c.id === settings.nextCardId) ? { field: 'nextCardId' as const, message: '同じ店舗の有効な次のカードを選んでください。' } : null)
     if (problem) { setIssue(problem); return }
@@ -198,11 +217,13 @@ function VisitStampsScreen() {
       const body = { name: name.trim(), accountIds, settings, active: card?.active ?? true, expectedVersion: card?.version ?? 0 }
       if (card) await visitStampsApi.save(card.id, body)
       else await visitStampsApi.create(body)
-      notifyToast('来店スタンプの設定を保存しました。')
+      saveConflict.clear()
+      notifySaved('来店スタンプの設定を保存しました。')
       await loadCards()
     } catch (caught) {
       const conflict = (caught as { status?: number })?.status === 409
-      notifyToast(conflict ? 'ほかの人が先に保存しました。読み直してから、もう一度変えてください。' : message(caught, '保存できませんでした。'), { tone: 'error' })
+      if (conflict) saveConflict.mark()
+      else notifyToast(message(caught, '保存できませんでした。'), { tone: 'error' })
     } finally { setSaving(false) }
   }
 
@@ -249,8 +270,8 @@ function VisitStampsScreen() {
   /* ④ 店全体の押した・使った記録（期間・友だち・種類で絞れる口。ここは新しい順に全部）。 */
   const [log, setLog] = useState<VisitStampEntryPage | null>(null)
   const [logError, setLogError] = useState<unknown>(null)
-  const [logPage, setLogPage] = useState(1)
-  const [logPageSize, setLogPageSize] = useState(20)
+  const [logPage, setLogPage] = useListUrlValue('logPage', 1)
+  const [logPageSize, setLogPageSize] = useListUrlValue('logPageSize', 20)
   const logRequest = useRef(0)
   const loadLog = useCallback(async () => {
     const request = ++logRequest.current
@@ -368,7 +389,7 @@ function VisitStampsScreen() {
     setPinBusy(true); setDialogError('')
     try {
       await visitStampsApi.setPin(staffId, selectedAccountId, pin)
-      notifyToast(`${staffName(staffId) ?? '店員'}さんの暗証番号を保存しました。`)
+      notifySaved(`${staffName(staffId) ?? '店員'}さんの暗証番号を保存しました。`)
       setPinOpen(false)
     } catch (caught) { setDialogError(message(caught, '暗証番号を保存できませんでした。')) } finally { setPinBusy(false) }
   }
@@ -620,7 +641,7 @@ function VisitStampsScreen() {
                             const f = friendById(row.friend_id)
                             const names = f ? friendNames(f) : { name: '友だち', line: null }
                             return (
-                              <Tr key={row.id} className={`${styles.row} ${styles.paperLine}`}>
+                              <Tr key={row.id} className={`${styles.row} ${styles.paperLine}`} data-row-id={row.id}>
                                 <Td className={styles.colPhoto}>
                                   <button type="button" className={styles.thumb} onClick={() => setPhoto(row)} aria-label={`${names.name}さんの写真を大きく見る`}>
                                     <PaperThumb accountId={selectedAccountId} url={row.photo_url} />
@@ -643,12 +664,12 @@ function VisitStampsScreen() {
                                     {row.status === 'pending' && canStamp ? (
                                       <>
                                         <Button size="compact" disabled={!!busy} onClick={() => { setDialogError(''); setRejecting(row) }}>却下</Button>
-                                        <Button size="compact" disabled={!!busy} onClick={() => void review(row, 'approve', '紙のカードの写真を確認しました')} aria-label={`${names.name}さんの ${row.stamps} 個を承認`}><Check size={15} aria-hidden="true" />承認</Button>
+                                        <Button size="compact" disabled={!!busy} onClick={() => void review(row, 'approve', '紙のカードの写真を確認しました')} aria-label={`${names.name}さんの ${row.stamps}個を承認`} busy={Boolean(busy)} busyLabel="処理中…"><Check size={15} aria-hidden="true" />承認</Button>
                                       </>
                                     ) : null}
                                     <RowActions subjectName={`${names.name}さんの申請`} menuItems={[
                                       { id: 'photo', label: '写真を大きく見る', onSelect: () => setPhoto(row) },
-                                      { id: 'friend', label: '友だちの詳細を開く', external: true, onSelect: () => { router.push(`/friends/detail?id=${encodeURIComponent(row.friend_id)}`) } },
+                                      { id: 'friend', label: '友だちの詳細を開く', external: true, href: `/friends/detail?id=${encodeURIComponent(row.friend_id)}`, onSelect: () => { router.push(`/friends/detail?id=${encodeURIComponent(row.friend_id)}`) } },
                                     ]} />
                                   </span>
                                 </Td>
@@ -685,7 +706,7 @@ function VisitStampsScreen() {
                             </thead>
                             <tbody>
                               {rows.map((row) => (
-                                <Tr key={row.id} className={styles.row}>
+                                <Tr key={row.id} className={styles.row} data-row-id={row.id}>
                                   <Td className={styles.colWhen}><span className={styles.plain}>{shortDateTime(row.at)}</span></Td>
                                   <Td><span className={styles.name} title={friendById(row.friendId) ? friendNames(friendById(row.friendId)!).name : undefined}>{friendById(row.friendId) ? friendNames(friendById(row.friendId)!).name : '友だち'}</span></Td>
                                   <Td className={styles.colCount}><span className={`${styles.countText} ${row.reversed ? styles.countReversed : ''}`} title={row.count}>{row.count}</span></Td>
@@ -693,7 +714,7 @@ function VisitStampsScreen() {
                                   <Td className={styles.colActor}><span className={styles.muted} title={row.actor}>{row.actor}</span></Td>
                                   <Td className={styles.colMenu}>
                                     <RowActions subjectName={`${shortDateTime(row.at)} の記録`}
-                                      menuItems={[{ id: 'friend', label: '友だちの詳細を開く', external: true, onSelect: () => { router.push(`/friends/detail?id=${encodeURIComponent(row.friendId)}`) } }]}
+                                      menuItems={[{ id: 'friend', label: '友だちの詳細を開く', external: true, href: `/friends/detail?id=${encodeURIComponent(row.friendId)}`, onSelect: () => { router.push(`/friends/detail?id=${encodeURIComponent(row.friendId)}`) } }]}
                                       destructiveItem={canManage && row.reversible ? { id: 'reverse', label: 'この記録を取り消す', onSelect: () => { setDialogError(''); setReversing(row.id) } } : undefined} />
                                   </Td>
                                 </Tr>
@@ -735,7 +756,7 @@ function VisitStampsScreen() {
                       </div>
                       <Field label="メモ"><TextField value={memo} onChange={(e) => setMemo(e.target.value)} maxLength={200} placeholder="例：レシートを確認済み" /></Field>
                       <span className={styles.addLine}>
-                        <Button disabled={!friendId || busy === 'grant'} onClick={() => void grant()} title={friendId ? undefined : '先に友だちを選んでください'}><Stamp size={15} aria-hidden="true" />押印を足す</Button>
+                        <Button disabled={!friendId || busy === 'grant'} onClick={() => void grant()} title={friendId ? undefined : '先に友だちを選んでください'} busy={Boolean(busy === 'grant')} busyLabel="処理中…"><Stamp size={15} aria-hidden="true" />押印を足す</Button>
                       </span>
                     </>
               ) : null}
@@ -752,7 +773,7 @@ function VisitStampsScreen() {
             actions={(
               <>
                 <Button disabled={!dirty || saving || imageBusy} onClick={() => resetDraft(card)}>キャンセル</Button>
-                <Button variant="primary" disabled={!dirty || saving || imageBusy} onClick={() => void save()}><Check size={15} aria-hidden="true" />保存する</Button>
+                <Button variant="primary" disabled={!dirty || saving || imageBusy} onClick={() => void save()} busy={Boolean(saving)} busyLabel="処理中…"><Check size={15} aria-hidden="true" />保存する</Button>
               </>
             )}
           />
@@ -771,6 +792,8 @@ function VisitStampsScreen() {
         onClose={() => setRejecting(null)} onConfirm={(why) => { if (rejecting) void review(rejecting, 'reject', why) }} />
       <ReasonDialog open={!!reversing} title="記録を取り消す" description="スタンプの数を元に戻します。取り消したことも記録に残ります。" confirmLabel="取り消す" busy={!!busy} error={dialogError || undefined}
         onClose={() => setReversing(null)} onConfirm={(why) => { if (reversing) void reverse(reversing, why) }} />
+      {saveConflict.conflict ? <SaveConflictBand title="ほかの人が来店スタンプを先に保存しました" compareBusy={saveConflict.compareBusy} onCompare={saveConflict.compare} onReload={saveConflict.reloadLatest} /> : null}
+      <SaveConflictCompareDialog open={saveConflict.compareOpen} busy={saveConflict.compareBusy} error={saveConflict.compareError} onCancel={saveConflict.closeCompare} onReload={saveConflict.reloadLatest} lines={saveConflict.latest ? [{ text: `名前：入力 ${name} ／ 最新 ${saveConflict.latest.name}` }, { text: `設定：入力 ${JSON.stringify(settings)} ／ 最新 ${JSON.stringify(saveConflict.latest.settings)}` }, { text: `店舗：入力 ${accountIds.join('・')} ／ 最新 ${saveConflict.latest.accountIds.join('・')}` }] : null} />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="保存していないカードの設定" onConfirm={confirmLeave} onCancel={cancelLeave} />
       <PhotoDialog url={photoUrl} name={photo ? friendNames(friendById(photo.friend_id) ?? { displayName: '友だち' }).name : ''} onClose={() => setPhoto(null)} />
     </PageFrame>

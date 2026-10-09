@@ -1,5 +1,6 @@
 'use client'
 
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useEffect, useRef, useState } from 'react'
 import type { HqFriendAttributeDetail, HqTemplateReceivedVersion } from '@line-crm/shared'
 import { hqFriendAttributesApi as api, type HqAttributePreflight, type HqAttributeDistributionResult, type HqAttributeResolution } from '@/lib/hq-friend-attributes-api'
@@ -26,8 +27,8 @@ export default function AttributeDistribution({ detail, saved = false, canEdit =
   const [stage, setStage] = useState<'saved' | 'accounts' | 'confirm' | 'result'>(saved ? 'saved' : 'accounts')
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }> | null>(null)
   const [selected, setSelected] = useState<string[]>([])
-  const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState('all')
+  const [search, setSearch] = useListUrlValue('q', '')
+  const [filter, setFilter] = useListUrlValue('filter', 'all')
   const folders = useDistributionFolders(true)
   const [received, setReceived] = useState<HqTemplateReceivedVersion[] | null>(null)
   const [receivedFailed, setReceivedFailed] = useState(false)
@@ -107,7 +108,7 @@ export default function AttributeDistribution({ detail, saved = false, canEdit =
       collapsedFolders={<Select aria-label="アカウントのフォルダ" value={filter} onChange={setFilter} options={folderRows.map((row) => ({ value: row.id, label: row.label }))} />}
       toolbar={<><input aria-label="アカウント名で探す" className={styles.input} value={search} onChange={(event) => setSearch(event.target.value)} /><span>{`選んだ ${selected.length} アカウント`}</span></>}>
       <DataTable><thead><TableHeadRow><Th>選択</Th><Th>アカウント</Th><Th>配布方法・結果</Th></TableHeadRow></thead><tbody>
-        {visible.map((account) => <Tr key={account.id}>
+        {visible.map((account) => <Tr key={account.id} data-row-id={account.id}>
           <Td><Checkbox aria-label={account.name} disabled={busy || stage !== 'accounts'} checked={selected.includes(account.id)} onCheckedChange={(on) => setSelected((current) => on ? [...new Set([...current, account.id])] : current.filter((id) => id !== account.id))} /></Td>
           <Td><FolderDotName folder={folders.membership?.get(account.id)?.folder}>{account.name}</FolderDotName></Td>
           <Td>{stage === 'confirm' ? preflight?.stores.find((store) => store.accountId === account.id)?.items.map((item) => <div key={item.sourceId}>
@@ -121,9 +122,9 @@ export default function AttributeDistribution({ detail, saved = false, canEdit =
     {stage === 'result' ? <Notice tone={failures.length ? 'warn' : 'info'} message={result ? `配布の進み具合：${result.stores.filter((store) => store.status === 'succeeded' || failures.includes(store)).length} / ${result.stores.length}。成功 ${result.stores.filter((store) => store.status === 'succeeded').length}・失敗 ${failures.length}` : '配った結果を確認しています。確認できるまで再配布しません。'} /> : null}
     <div className={styles.footer}>
       <Button disabled={busy} onClick={close}>{done ? '一覧へ' : 'キャンセル'}</Button>
-      {stage === 'accounts' ? <Button variant="primary" disabled={busy || !accounts || !selected.length} onClick={() => void check(selected)}>選んだアカウントを確かめる</Button> : null}
-      {stage === 'confirm' ? <><Button disabled={busy} onClick={() => setStage('accounts')}>戻る</Button>{expired ? <Button disabled={busy} onClick={() => void check(selected)}>現在版を再確認</Button> : null}<Button variant="primary" disabled={busy || expired || !valid || !!pendingRun} onClick={() => void run()}>{`この内容で${selected.length}アカウントへ配る`}</Button></> : null}
-      {stage === 'result' ? <><Button disabled={busy} onClick={() => void refresh()}>結果を再確認</Button>{done && failures.length ? <Button disabled={busy} onClick={() => void check(failures.map((store) => store.accountId))}>失敗したアカウントだけ再確認</Button> : null}</> : null}
+      {stage === 'accounts' ? <Button variant="primary" disabled={busy || !accounts || !selected.length} onClick={() => void check(selected)} busy={Boolean(busy)} busyLabel="処理中…">選んだアカウントを確かめる</Button> : null}
+      {stage === 'confirm' ? <><Button disabled={busy} onClick={() => setStage('accounts')}>戻る</Button>{expired ? <Button disabled={busy} onClick={() => void check(selected)} busy={Boolean(busy)} busyLabel="処理中…">現在版を再確認</Button> : null}<Button variant="primary" disabled={busy || expired || !valid || !!pendingRun} onClick={() => void run()} busy={Boolean(busy)} busyLabel="処理中…">{`この内容で${selected.length}アカウントへ配る`}</Button></> : null}
+      {stage === 'result' ? <><Button disabled={busy} onClick={() => void refresh()} busy={Boolean(busy)} busyLabel="処理中…">結果を再確認</Button>{done && failures.length ? <Button disabled={busy} onClick={() => void check(failures.map((store) => store.accountId))} busy={Boolean(busy)} busyLabel="処理中…">失敗したアカウントだけ再確認</Button> : null}</> : null}
     </div>
   </PageFrame>
 }

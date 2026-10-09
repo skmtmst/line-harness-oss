@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDateOffset } from '@/lib/jst-datetime'
+
 /*
  * ★V8 マイル「友だちの残高」（板 `CJlf4`、状態は見本帳 `zaqP9`）。
  *
@@ -10,6 +12,8 @@
  * 口に残高あり・確定待ちの絞り込みは無い。札を押したときは全件を読み切ってから
  * 絞る（読んだ頁の中だけで絞ると 21 件目以降が検索に出ない）。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, CircleDot, Clock3, Download, RefreshCw, TrendingDown, TrendingUp, Undo2, Users, Wallet } from 'lucide-react'
@@ -48,9 +52,7 @@ import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 
 function dateOnlyDaysAgo(days: number) {
-  const date = new Date()
-  date.setDate(date.getDate() - days)
-  return date.toISOString().slice(0, 10)
+  return jstDateOffset(-days)
 }
 
 function expiringText(member: MileageFriendV6): string {
@@ -86,12 +88,12 @@ export default function BalancesTab() {
   const [decreasedMiles, setDecreasedMiles] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
-  const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
-  const [offset, setOffset] = useState(0)
-  const [pageSize, setPageSize] = useState(20)
-  const [withBalanceOnly, setWithBalanceOnly] = useState(false)
-  const [pendingOnly, setPendingOnly] = useState(false)
+  const [searchInput, setSearchInput] = useListUrlValue('q', '')
+  const [search, setSearch] = useListUrlValue('q', '')
+  const [offset, setOffset] = useListUrlValue('offset', 0)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [withBalanceOnly, setWithBalanceOnly] = useListUrlValue('withBalanceOnly', false)
+  const [pendingOnly, setPendingOnly] = useListUrlValue('pendingOnly', false)
   const [approvalRequests, setApprovalRequests] = useState<MileageAdjustmentApprovalRequest[] | null>(null)
   const [approvalFailed, setApprovalFailed] = useState(false)
   const [approvalBusyId, setApprovalBusyId] = useState<string | null>(null)
@@ -176,7 +178,7 @@ export default function BalancesTab() {
     const timer = window.setTimeout(() => {
       setOffset(0)
       setSearch(searchInput.trim())
-    }, 300)
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
@@ -466,7 +468,7 @@ export default function BalancesTab() {
                   /* 行の中のボタン・リンクを押したときは、そちらに任せる。 */
                   if ((event.target as HTMLElement).closest('a, button')) return
                   router.push(href)
-                }}
+                }} data-row-id={member.friendId}
               >
                 <Td className={styles.colName}>
                   <span className={styles.rowName} title={member.displayName}>{member.displayName}</span>

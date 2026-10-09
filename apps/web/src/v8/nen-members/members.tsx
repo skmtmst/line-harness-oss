@@ -9,6 +9,7 @@
  * データの口（settings・members・saveRanks・saveMilestones・deleteRank・resync）は今の画面と同じ。
  * 動きの一覧は BEHAVIOR.md。
  */
+import { jstDate } from '@/lib/jst-datetime'
 import { useState, type ReactNode } from 'react'
 import { Download, Eye, History, CircleHelp, Undo2 } from 'lucide-react'
 import { ListPage } from '@/components/templates'
@@ -194,7 +195,7 @@ function CsvExportButton({ accountId }: { accountId: string }) {
   const { exportCsv, busy, error } = useMembersCsv(accountId)
   return (
     <span className={styles.csvWrap}>
-      <Button variant="secondary" onClick={() => void exportCsv()} disabled={busy}>
+      <Button variant="secondary" onClick={() => void exportCsv()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">
         <Download size={15} aria-hidden="true" />
         {busy ? '書き出しています…' : 'CSVで書き出す'}
       </Button>

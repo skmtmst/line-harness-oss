@@ -1419,6 +1419,7 @@ export function CreateAffiliateModal({
     <Dialog
       open
       title="アフィリエイター新規作成"
+      dirty={issuedUrl ? false : undefined}
       busy={submitting}
       onCancel={onClose}
       footer={issuedUrl ? (

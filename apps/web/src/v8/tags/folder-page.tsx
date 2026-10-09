@@ -183,7 +183,7 @@ function TagFolderPage() {
         title={title}
         name={name} nameError={nameError} nameRef={nameRef} onNameChange={(next) => { setName(next); setNameError('') }} color={color} onColorChange={(next) => setColor(next ?? DEFAULT_COLOR)}
         colors={TAG_FOLDER_COLORS} maxLength={60} disabled={loadState !== 'ready'}
-        onConfirm={() => void save()}
+        onConfirm={() => save()}
         busy={saving}
         error={error || undefined}
         onCancel={close}
@@ -210,7 +210,7 @@ function TagFolderPage() {
           {loadState === 'error' ? (
             <div className={styles.inlineRetry}>
               <p className={styles.fieldError}>読み込めませんでした</p>
-              <Button type="button" variant="text" onClick={loadFolder}>再読み込み</Button>
+              <Button type="button" variant="text" onClick={loadFolder}>もう一度読み込む</Button>
             </div>
           ) : null}
         </>
@@ -223,7 +223,7 @@ function TagFolderPage() {
         destructive
         busy={saving}
         onCancel={() => { if (!saving) setDeleteOpen(false) }}
-        onConfirm={() => void remove()}
+        onConfirm={() => remove()}
       />
     </>
   )

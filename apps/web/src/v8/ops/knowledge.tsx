@@ -166,7 +166,7 @@ export default function OpsKnowledgeV8() {
                   <span className={`${parts.num} ${styles.colShort}`} role="cell">{article.helpfulCount ? article.helpfulCount : emptyValue('unknown')}</span>
                   <span className={`${parts.fixed} ${styles.colShort}`} role="cell">{shortDate(article.updatedAt)}</span>
                   <span className={`${parts.fixed} ${styles.colShort}`} role="cell">
-                    <Button disabled={busy} onClick={() => void open(article)} aria-label={`「${article.title}」を開く`}>開く</Button>
+                    <Button disabled={busy} onClick={() => void open(article)} aria-label={`「${article.title}」を開く`} busy={Boolean(busy)} busyLabel="処理中…">開く</Button>
                   </span>
                 </div>
               )

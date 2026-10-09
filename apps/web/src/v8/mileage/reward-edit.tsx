@@ -10,6 +10,8 @@
  * 最後の「そのほか（任意）」の段にまとめ、欄の説明は「？」へ入れる。
  */
 import { Field as SharedField } from '@/components/shared/form-controls'
+import { notifySaved } from '@/components/shared/toast'
+import { createPageReturnHref } from '@/components/shared/create-page'
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Check, FlaskConical, Plus } from 'lucide-react'
@@ -256,7 +258,7 @@ function RewardEditorInner() {
     if (!saved.success) throw new Error('failed')
     setReward(saved.data)
     setBaseline(JSON.stringify(form))
-    if (!rewardId) router.replace(`/mileage/rewards/edit?id=${encodeURIComponent(saved.data.id)}`)
+
     return saved.data
   }
 
@@ -274,9 +276,11 @@ function RewardEditorInner() {
           saved.currentVersion?.revision,
         )
         if (!published.success) throw new Error('failed')
+        setReward(published.data)
       }
       setPublishOpen(false)
-      router.push('/mileage?tab=rewards')
+      notifySaved(thenPublish ? '公開しました' : '下書きを保存しました')
+      if (!editing) router.push(createPageReturnHref('/mileage?tab=rewards', saved.id))
     } catch (err) {
       setFailure(
         err instanceof ApiError && err.message && !/^API error/.test(err.message)
@@ -327,7 +331,7 @@ function RewardEditorInner() {
   if (state === 'error') {
     return (
       <div data-design-node="L2Bzp">
-        <ListState kind="error" title="使い道を表示できませんでした" description="再読み込みしても直らない場合はエラー報告へ。" action={<Button onClick={() => void load()}>使い道を再読み込み</Button>} />
+        <ListState kind="error" title="使い道を表示できませんでした" description="再読み込みしても直らない場合はエラー報告へ。" onRetry={() => void load()} />
       </div>
     )
   }
@@ -379,7 +383,7 @@ function RewardEditorInner() {
         <Button variant="primary" onClick={requestPublish} disabled={saving || testing}>
           <Check size={15} aria-hidden="true" /> 保存して出す
         </Button>
-      </>}
+      </>} dirty={false}
     >
       {failure ? <Notice tone="danger" message={failure} /> : null}
       {testResult ? (
@@ -533,7 +537,7 @@ function RewardEditorInner() {
         busy={saving}
         error={failure || undefined}
         onCancel={() => setPublishOpen(false)}
-        onConfirm={() => void save(true)}
+        onConfirm={() => save(true)}
       />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した使い道" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage>

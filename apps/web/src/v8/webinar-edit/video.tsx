@@ -1,11 +1,14 @@
 'use client'
 
+import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
+
 /*
  * ★V8 ウェビナーの ②動画と公開期間（Pencil：オンデマンド VWNaA・日時指定と開催回 LPOe7）。
  * 動画（差し替える・準備の段）→ 公開期間（オンデマンド）／開催回（日時指定）→ 配信枠 → 視聴の数え方。
  * 右は公開ページでの見え方。
  * 口・保存の決まりは app/webinars/edit/video-v8.tsx・video-stages.tsx・scheduled-session-row.tsx と同じ（BEHAVIOR.md）。
  */
+import DateField from '@/components/shared/date-field'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { CalendarPlus, Check, Monitor, Play, Plus, Smartphone, Upload } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
@@ -54,7 +57,7 @@ function localJst(value: string | null | undefined): string {
   return Number.isNaN(time) ? '' : new Date(time + 9 * 60 * 60 * 1000).toISOString().slice(0, 16)
 }
 function toJstIso(local: string): string {
-  return `${local}:00+09:00`
+  return datetimeLocalJstToUtcIso(local)
 }
 
 function ruleView(rule: WebinarScheduleRule): { kind: string; tone: 'success' | 'neutral' | 'warn'; detail: string } {
@@ -513,14 +516,11 @@ function AddRuleDialog({ mode, busy, error, onCancel, onAdd }: { mode: 'one' | '
             ))}
           </div>
         ) : null}
-        {mode === 'one' && kind === 'once' ? <div className={form.field}><Field label="日付" htmlFor="wd-rule-date"><input id="wd-rule-date" type="date" className={styles.dateInput} value={date} aria-invalid={dateErrors.date ? true : undefined} aria-describedby={dateErrors.date ? 'wd-rule-date-error' : undefined} onChange={(event) => { setDate(event.target.value); setDateErrors({}) }} />
-<FieldError id="wd-rule-date-error">{dateErrors.date}</FieldError></Field></div> : null}
+        {mode === 'one' && kind === 'once' ? <div className={form.field}><Field label="日付" htmlFor="wd-rule-date"><DateField id="wd-rule-date" value={date} invalid={Boolean(dateErrors.date)} aria-describedby={dateErrors.date ? 'wd-rule-date-error' : undefined} onChange={(value) => { setDate(value); setDateErrors({}) }} /><FieldError id="wd-rule-date-error">{dateErrors.date}</FieldError></Field></div> : null}
         {mode === 'bulk' ? (
           <div className={form.pair}>
-            <div className={form.field}><Field label="始まり" htmlFor="wd-rule-from"><input id="wd-rule-from" type="date" className={styles.dateInput} value={from} aria-invalid={dateErrors.from ? true : undefined} aria-describedby={dateErrors.from ? 'wd-rule-from-error' : undefined} onChange={(event) => { setFrom(event.target.value); setDateErrors({}) }} />
-<FieldError id="wd-rule-from-error">{dateErrors.from}</FieldError></Field></div>
-            <div className={form.field}><Field label="終わり" htmlFor="wd-rule-to"><input id="wd-rule-to" type="date" className={styles.dateInput} value={to} aria-invalid={dateErrors.to ? true : undefined} aria-describedby={dateErrors.to ? 'wd-rule-to-error' : undefined} onChange={(event) => { setTo(event.target.value); setDateErrors({}) }} />
-<FieldError id="wd-rule-to-error">{dateErrors.to}</FieldError></Field></div>
+            <div className={form.field}><Field label="始まり" htmlFor="wd-rule-from"><DateField id="wd-rule-from" value={from} invalid={Boolean(dateErrors.from)} aria-describedby={dateErrors.from ? 'wd-rule-from-error' : undefined} onChange={(value) => { setFrom(value); setDateErrors({}) }} /><FieldError id="wd-rule-from-error">{dateErrors.from}</FieldError></Field></div>
+            <div className={form.field}><Field label="終わり" htmlFor="wd-rule-to"><DateField id="wd-rule-to" value={to} invalid={Boolean(dateErrors.to)} aria-describedby={dateErrors.to ? 'wd-rule-to-error' : undefined} onChange={(value) => { setTo(value); setDateErrors({}) }} /><FieldError id="wd-rule-to-error">{dateErrors.to}</FieldError></Field></div>
           </div>
         ) : null}
         <div className={form.field}><span className={form.labelSmall} id="webinar-schedule-time-label">時刻</span><TimeField aria-labelledby="webinar-schedule-time-label" value={time} onChange={setTime} /></div>
@@ -583,7 +583,7 @@ function ReplaceVideoDialog({ ctx, asset, onAsset, onClose }: { ctx: EditContext
   }
   const nexts = asset === null ? (['uploaded'] as WebinarVideoAsset['stage'][]) : asset ? NEXT_STAGE[asset.stage] ?? [] : []
   return (
-    <Dialog open title="動画を差し替える" description="登録メディアの動画から選びます。保存しても、公開中の内容は「確認」で公開し直すまで変わりません。" confirmLabel="保存する" busy={busy} error={error || undefined} onConfirm={() => void save()} onCancel={() => { if (!busy) onClose() }}>
+    <Dialog open title="動画を差し替える" description="登録メディアの動画から選びます。保存しても、公開中の内容は「確認」で公開し直すまで変わりません。" confirmLabel="保存する" busy={busy} error={error || undefined} onConfirm={() => save()} onCancel={() => { if (!busy) onClose() }}>
       <div className={styles.dialogBody}>
         {mediaError ? <Notice tone="info">登録メディアの動画を読み込めませんでした。</Notice> : null}
         <Select label="動画" aria-label="動画" size="full" value={choice} disabled={media === null && !mediaError} onChange={setChoice} options={[
@@ -597,7 +597,7 @@ function ReplaceVideoDialog({ ctx, asset, onAsset, onClose }: { ctx: EditContext
         {nexts.length > 0 ? (
           <div className={form.field}>
             <span className={form.labelSmall}>動画の準備（検査・変換・配信の形・表紙を通した動画だけ公開できます）</span>
-            <div className={form.buttons}>{nexts.map((next) => <Button key={next} disabled={busy} onClick={() => void advance(next)}>{NEXT_LABEL[next] ?? next}</Button>)}</div>
+            <div className={form.buttons}>{nexts.map((next) => <Button key={next} disabled={busy} onClick={() => void advance(next)} busy={Boolean(busy)} busyLabel="処理中…">{NEXT_LABEL[next] ?? next}</Button>)}</div>
           </div>
         ) : null}
       </div>

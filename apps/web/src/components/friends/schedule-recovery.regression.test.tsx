@@ -43,6 +43,8 @@ it('予約失敗後はキャンセル・Escが再び使える', async () => {
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: /に予約$/ })) })
   await waitFor(() => { expect((screen.getByRole('button', { name: 'キャンセル' }) as HTMLButtonElement).disabled).toBe(false) })
   fireEvent.keyDown(document, { key: 'Escape' })
+  expect(onClose).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: '破棄する' }))
   expect(onClose).toHaveBeenCalledTimes(1)
   fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
   expect(onClose).toHaveBeenCalledTimes(2)

@@ -150,6 +150,6 @@ describe('メニュー作成（V8）の読み込みと保存ボタン', () => {
 
     await act(async () => { gate.resolve({ id: 'menu-new', version: 1 }) })
     await waitFor(() => { expect(fixture.createMenu).toHaveBeenCalled() })
-    await waitFor(() => { expect(fixture.push).toHaveBeenCalledWith('/booking/menus') })
+    await waitFor(() => { expect(fixture.push).toHaveBeenCalledWith('/booking/menus?highlight=menu-new') })
   })
 })

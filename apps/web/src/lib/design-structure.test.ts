@@ -88,9 +88,10 @@ const V8_COPY: Record<string, Record<string, string>> = {
     '最初の1つを作ると、集まった回答もここから見られます。': '答えは友だち情報に保存できます。',
   },
 }
-// mainB: V8へ移った9画面には旧JSONの節・語を要求しない。
+// V8へ移った画面には旧JSONの節・語を要求しない。
 // 見た目は★V8との画像照合、動きは各V8本体の試験が守る。ここは入口と描く本体の接続を守る。
 const MAINB_V8_SCREENS = [
+  ['/contents/vars/new', '@/v8/common-vars-edit/new', 'v8/common-vars-edit/new.tsx', '<CreatePage'],
   ['/broadcasts', '@/v8/broadcasts/list', 'v8/broadcasts/list.tsx', '<ListPage'],
   ['/broadcasts/detail', '@/v8/broadcast-detail/detail', 'v8/broadcast-detail/detail.tsx', '<PageFrame'],
   ['/scenarios/detail', '@/v8/scenario-detail/detail', 'v8/scenario-detail/detail.tsx', '<PageFrame'],

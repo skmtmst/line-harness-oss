@@ -82,6 +82,7 @@ const typeSearch = async (value: string) => {
     setter.call(input, value)
     input.dispatchEvent(new Event('input', { bubbles: true }))
   })
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
 }
 const count = (predicate: (url: string) => boolean) => calls.filter(predicate).length
 const isQuota = (url: string) => url.includes('/api/media/quota')

@@ -7,6 +7,9 @@ import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { OverlayDepthContext, useOverlayFocus, useV8Leave } from './overlay-utils'
 import styles from './drawer.module.css'
+import Dialog from './dialog'
+import { useFormInputDirty } from './form-input-dirty'
+import { useOverlayDiscard } from './overlay-discard'
 
 export type DrawerDetail = { label: string; value: ReactNode }
 
@@ -48,7 +51,7 @@ export default function Drawer({
   title,
   titleAccessory,
   description,
-  dirty = false,
+  dirty,
   busy = false,
   error,
   onClose,
@@ -63,11 +66,14 @@ export default function Drawer({
   toolbar,
   band,
 }: DrawerProps) {
+  const formInput = useFormInputDirty(open)
+  const isDirty = dirty ?? formInput.dirty
+  const discard = useOverlayDiscard(open, isDirty, busy, onClose)
   const depth = useContext(OverlayDepthContext)
   const titleId = useId()
   const descriptionId = useId()
   const [mounted, setMounted] = useState(false)
-  const panelRef = useOverlayFocus(open && modal, onClose, busy)
+  const panelRef = useOverlayFocus<HTMLElement>(open && modal, discard.requestClose, busy)
   /* ★V8 仕上げ（M10）：閉じるときは逆再生してから外す（v8 のみ）。 */
   const leaving = useV8Leave(open)
 
@@ -76,22 +82,25 @@ export default function Drawer({
 
   const titleBlock = (
     <div>
-      <div className={titleAccessory ? styles.titleRow : undefined}><h2 id={titleId} className={`${styles.title} ${modal ? '' : styles.inlineTitle}`}>{heading ?? title}{dirty ? ' *' : ''}</h2>{titleAccessory}</div>
+      <div className={titleAccessory ? styles.titleRow : undefined}><h2 id={titleId} className={`${styles.title} ${modal ? '' : styles.inlineTitle}`}>{heading ?? title}{isDirty ? ' *' : ''}</h2>{titleAccessory}</div>
       {description ? <p id={descriptionId} className={styles.description}>{description}</p> : null}
     </div>
   )
-  const closeButton = <button type="button" className={styles.close} onClick={onClose} disabled={busy} aria-label="閉じる"><X aria-hidden="true" size={18} /></button>
+  const closeButton = <button type="button" className={styles.close} onClick={discard.requestClose} disabled={busy} aria-label="閉じる"><X aria-hidden="true" size={18} /></button>
 
   const panel = (
     <aside
-      ref={panelRef}
+      ref={(element) => { panelRef.current = element; formInput.ref.current = element }}
+      onChangeCapture={formInput.onChangeCapture}
+      onInputCapture={formInput.onChangeCapture}
+      onClickCapture={formInput.onClickCapture}
       className={`${styles.panel} ${modal ? '' : styles.inline}`}
       role="dialog"
       aria-modal={modal || undefined}
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
       aria-busy={busy || undefined}
-      data-dirty={dirty || undefined}
+      data-dirty={isDirty || undefined}
       data-width={width}
       data-layout={layout}
       data-design-width=""
@@ -120,12 +129,18 @@ export default function Drawer({
       </div>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       {band ? <div className={styles.band}>{band}</div> : null}
-      {footer ? <footer className={styles.footer}>{footer}</footer> : null}
+      {footer ? <footer className={styles.footer} onClickCapture={(event) => {
+        const button = (event.target as Element).closest?.('button')
+        if (isDirty && button && /^(閉じる|キャンセル)$/.test(button.textContent?.trim() ?? '')) {
+          event.preventDefault(); event.stopPropagation(); discard.requestClose()
+        }
+      }}>{footer}</footer> : null}
     </aside>
   )
-  if (!modal) return <OverlayDepthContext.Provider value={depth + 1}>{panel}</OverlayDepthContext.Provider>
+  const discardDialog = discard.confirming ? <Dialog open title="入力を破棄しますか？" description="保存していない入力が消えます。" primaryAction="cancel" cancelLabel="編集を続ける" confirmLabel="破棄する" onCancel={discard.continueEditing} onConfirm={discard.discard} busy={busy} confirmation compact /> : null
+  if (!modal) return <OverlayDepthContext.Provider value={depth + 1}>{panel}{discardDialog}</OverlayDepthContext.Provider>
   const overlay = <div className={styles.overlay} role="presentation" data-closing={leaving || undefined} onMouseDown={(event) => {
-    if (!busy && event.target === event.currentTarget) onClose()
+    if (!busy && event.target === event.currentTarget) discard.requestClose()
   }}>{panel}</div>
-  return <OverlayDepthContext.Provider value={depth + 1}>{mounted && typeof document !== 'undefined' ? createPortal(overlay, document.body) : overlay}</OverlayDepthContext.Provider>
+  return <OverlayDepthContext.Provider value={depth + 1}>{discardDialog}{mounted && typeof document !== 'undefined' ? createPortal(overlay, document.body) : overlay}</OverlayDepthContext.Provider>
 }

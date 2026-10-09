@@ -258,7 +258,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
               <Button external href={firstMedium.loginUrl}  >{`${firstMedium.name}の管理画面を開く`}</Button>
             ) : null}
             {canWrite ? (
-              <Button onClick={() => void closeOne(firstItem)} disabled={busy === firstItem.id} aria-label={`${nameOf(firstItem.channel)}の枠を閉じた`}>
+              <Button onClick={() => void closeOne(firstItem)} disabled={busy === firstItem.id} aria-label={`${nameOf(firstItem.channel)}の枠を閉じた`} busy={Boolean(busy === firstItem.id)} busyLabel="処理中…">
                 <Check size={15} aria-hidden="true" />閉じた
               </Button>
             ) : null}
@@ -393,7 +393,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
               {madeGoogle.includes(googleTarget.id) ? (
                 <TextLink href="/restaurant-test/google">Google ビジネスで確かめる</TextLink>
               ) : canGoogle ? (
-                <Button className={styles.sideButton} onClick={() => void proposeGoogle(googleTarget)} disabled={busy === `google-${googleTarget.id}`}>
+                <Button className={styles.sideButton} onClick={() => void proposeGoogle(googleTarget)} disabled={busy === `google-${googleTarget.id}`} busy={Boolean(busy === `google-${googleTarget.id}`)} busyLabel="処理中…">
                   {`Google にも${KIND_LABEL[googleTarget.kind]}を入れる案を作る`}
                 </Button>
               ) : null}
@@ -429,7 +429,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
         confirmLabel="消して開ける"
         busy={removing !== null && busy === `remove-${removing.id}`}
         error={removeError || undefined}
-        onConfirm={() => void remove()}
+        onConfirm={() => remove()}
         onCancel={() => setRemoving(null)}
       />
     </>

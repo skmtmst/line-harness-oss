@@ -7,6 +7,7 @@
  * 見せ方：頭（← 友だちへ・タブ）→ 案内 → 書き出す／取り込むの2枚 → 確認の結果 → 履歴。
  * 確認の結果は、確認する前も場所と5つの区分を出しておく（数は「—」）。
  */
+import { jstDate } from '@/lib/jst-datetime'
 import { Download, FileSearch, Info } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 import { usePageTitle } from '@/components/shell/page-chrome'

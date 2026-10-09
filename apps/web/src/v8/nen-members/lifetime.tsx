@@ -7,6 +7,7 @@
  * （節目（累計）・称号・特典・到達した人・到達時の LINE 通知・行の「…」）。
  * 行の中身は「…」の「編集する」で開く窓で直し、下の中央の「保存して EC へ同期する」でまとめて保存する。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useState } from 'react'
 import { Check } from 'lucide-react'
 import Card from '@/components/shared/card'
@@ -114,7 +115,8 @@ export default function LifetimeV8({
       if (!res.success) throw new Error(res.error)
       setDirty(false)
       onSaved(accountId, res.data)
-      setNotice(res.data.sync?.status === 'synced' ? '節目を保存し、ECへ同期しました。' : '節目を保存しました。ECへの同期は失敗したので、ランク設定の「もう一度同期」で送り直せます。')
+      notifySaved(res.data.sync?.status === 'synced' ? '節目を保存し、ECへ同期しました。' : '節目を保存しました。')
+      if (res.data.sync?.status !== 'synced') setError('ECへの同期は失敗したので、ランク設定の「もう一度同期」で送り直せます。')
     } catch (caught) {
       setError(describeApiFailure(caught, '節目の保存', {
         scope: 'store',
@@ -200,7 +202,7 @@ export default function LifetimeV8({
       {readonly ? null : (
         <div className={styles.saveRow}>
           <Button variant="secondary" onClick={() => { setDirty(false); setError(''); if (settings) setDrafts(fromSettings(settings)) }} disabled={busy || !dirty}>キャンセル</Button>
-          <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty}>
+          <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty} busy={Boolean(busy)} busyLabel="処理中…">
             <Check size={15} aria-hidden="true" />保存して EC へ同期する
           </Button>
         </div>

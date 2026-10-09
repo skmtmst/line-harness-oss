@@ -5,6 +5,7 @@
  * 頭（戻る・題・説明・CSV）→ タブ → 数の帯 → 案内の帯 → 道具の段 → 表 → ページ送り。
  * 口・権限・失敗の扱いは app/webinars/edit/participants-v8.tsx と同じ（BEHAVIOR.md）。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Bookmark, CircleCheck, CircleSlash, Download, History, LogOut, Undo2 } from 'lucide-react'
@@ -66,14 +67,14 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   const [loadingMore, setLoadingMore] = useState(false)
   const [moreError, setMoreError] = useState('')
   const [attempt, setAttempt] = useState(0)
-  const [filter, setFilter] = useState<'' | WebinarParticipantClassification>('')
+  const [filter, setFilter] = useListUrlValue<'' | WebinarParticipantClassification>('filter', '')
   const [rule, setRule] = useState<WebinarParticipantPage['rule'] | null>(null)
   const [measurement, setMeasurement] = useState<WebinarParticipantPage['measurement'] | null>(null)
   const [csvBusy, setCsvBusy] = useState(false)
   const [csvError, setCsvError] = useState('')
-  const [query, setQuery] = useState('')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const generation = useRef(0)
   const csvLock = useRef(false)
   const moreLock = useRef(false)
@@ -177,7 +178,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   } else if (state === 'loading') {
     body = <p className={styles.state} role="status">読み込み中...</p>
   } else if (state === 'error') {
-    body = <ListState kind="error" title="参加者の一覧を読み込めませんでした" description="通信を確認して、もう一度読み込んでください。" action={<Button onClick={() => setAttempt((count) => count + 1)}>もう一度読み込む</Button>} />
+    body = <ListState kind="error" title="参加者の一覧を読み込めませんでした" description="通信を確認して、もう一度読み込んでください。" onRetry={() => setAttempt((count) => count + 1)} />
   } else if (pageItems.length === 0) {
     body = <ListState kind="empty" title={filter || query.trim() !== '' ? 'この条件に当てはまる人はいません' : 'まだ参加者はいません'} />
   } else {
@@ -198,7 +199,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
             const rate = Math.min(100, Math.round((participant.maxWatchedSeconds / Math.max(1, webinar.durationSeconds)) * 100))
             const badge = actionBadge(participant)
             return (
-              <Tr key={participant.friendId} className={styles.row} data-table-layout="columns">
+              <Tr key={participant.friendId} className={styles.row} data-table-layout="columns" data-row-id={participant.friendId}>
                 <Td className={styles.colName}>
                   <Link href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`}  className={styles.name}><TruncatedText value={String(name ?? '')} /></Link>
                   <span className={styles.sub}>{`${joinNote(participant)}${joinKindLabel(participant)}`}</span>

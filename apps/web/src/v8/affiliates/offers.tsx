@@ -10,6 +10,9 @@
  * フォルダの列：案件をフォルダへ入れる口は無いので、成果が出たときの動き
  * （タグ・シナリオ・マイル）で分けた見え方の切り替えとして持つ（保存しない）。
  */
+import { useListUrlJsonValue } from '@/components/shared/list-url-state'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Banknote, CircleDot, Coins, Download, FilePen, Plus, Trophy, Briefcase } from 'lucide-react'
 import type { LineAccount, Scenario, Tag } from '@line-crm/shared'
@@ -99,13 +102,13 @@ export default function OffersTab() {
   const [monthly, setMonthly] = useState<{ count: number; delta: number | null } | null>(null)
   const [monthlyState, setMonthlyState] = useState<LoadState>('loading')
 
-  const [query, setQuery] = useState('')
-  const [filters, setFilters] = useState<FilterKey[]>([])
-  const [folder, setFolder] = useState<FolderKey>('all')
-  const [sort, setSort] = useState<'newest' | 'name' | 'reward'>('newest')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [filters, setFilters] = useListUrlJsonValue<FilterKey[]>('filters', [])
+  const [folder, setFolder] = useListUrlValue<FolderKey>('folder', 'all')
+  const [sort, setSort] = useListUrlValue<'newest' | 'name' | 'reward'>('sort', 'newest')
   const [saved, setSaved] = useState('')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
 
   const [formOpen, setFormOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<AffiliateOffer | null>(null)
@@ -477,7 +480,7 @@ export default function OffersTab() {
           {paged.map((offer) => {
             const stat = offerStats.get(offer.id)
             return (
-              <Tr key={offer.id} className={styles.row} data-table-layout="columns">
+              <Tr key={offer.id} className={styles.row} data-table-layout="columns" data-row-id={offer.id}>
                 <Td className={styles.colName}>
                   <span className={narrow ? styles.stack : `${styles.stack} ${styles.dotStack}`}>
                     <FolderDotName folder={null} dot={!narrow}>

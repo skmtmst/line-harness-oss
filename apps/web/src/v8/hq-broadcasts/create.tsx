@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDateOffset, scheduledJstIso } from '@/lib/jst-datetime'
+
 /*
  * ★V8 統括 一括配信を作る（B-37・絵 V8.pen の BBRDb：① lmWCZ・② AL5vR・③ lLyFR・④ ZU4Ae・⑤ H9eG3n）。
  *
@@ -11,6 +13,7 @@
  * 読み書きは統括の一括配信の口（API-7 の hq-broadcasts）。店の口（承認・テスト送信・分散・配信後のアクション・
  * 除くタグ・詳細条件）は統括の口に無いので出さない（BEHAVIOR.md の「今の口で出せないもの」）。
  */
+import { notifySaved } from '@/components/shared/toast'
 import BroadcastAccountPicker, { type BroadcastAccount } from './account-picker'
 import { EntityPickerField, EntityPickerSummary } from '@/components/shared/entity-picker'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
@@ -120,15 +123,9 @@ function runKinds(run: HqBroadcastRun): string {
   return [...new Set(bubblesFromInput(run.input ?? { messageContent: '' }).map((b) => HQ_KIND_LABEL[b.kind]))].join('＋')
 }
 
-function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
 /** 日付（YYYY-MM-DD）と時刻（HH:MM）を日本時間として ISO にする（店の一斉配信と同じ「日本時間」の欄）。 */
 function jstIso(date: string, time: string): string | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return null
-  const d = new Date(`${date}T${time}:00+09:00`)
-  return Number.isNaN(d.getTime()) ? null : d.toISOString()
+  return scheduledJstIso(date, time)
 }
 
 /** 下書きの日時（ISO）を、日本時間の日付と時刻の欄に戻す。 */
@@ -269,7 +266,7 @@ export default function HqBroadcastCreate() {
   const [previewDevice, setPreviewDevice] = useState<'phone' | 'pc'>('phone')
 
   const [when, setWhen] = useState<'now' | 'later'>('later')
-  const [date, setDate] = useState(() => { const d = new Date(); d.setDate(d.getDate() + 1); return ymd(d) })
+  const [date, setDate] = useState(() => jstDateOffset(1))
   const [time, setTime] = useState('11:00')
 
   const [run, setRun] = useState<HqBroadcastRun | null>(null)
@@ -577,7 +574,7 @@ export default function HqBroadcastCreate() {
 
   const saveDraft = async () => {
     const result = await check()
-    if (result) notifyToast('下書きに保存しました')
+    if (result) notifySaved('下書きに保存しました')
   }
 
   /*
@@ -729,7 +726,7 @@ export default function HqBroadcastCreate() {
       await hqTemplatesApi.create({ type: 'template', name, definition }, crypto.randomUUID())
       setSaveTplOpen(false)
       setCarousels(null)
-      notifyToast(`テンプレート「${name}」に保存しました`)
+      notifySaved(`テンプレート「${name}」に保存しました`)
     } catch (caught) {
       setSaveTplError(errorText(caught, 'テンプレートに保存できませんでした。もう一度お試しください。'))
     } finally {
@@ -1167,7 +1164,7 @@ export default function HqBroadcastCreate() {
         confirmLabel={when === 'now' ? '送る' : '予約する'}
         busy={sending}
         warning
-        onConfirm={gate !== 'single' || (approval.state && Number(confirmCount) === approval.state.gate.recipientCount) ? () => void send() : undefined}
+        onConfirm={gate !== 'single' || (approval.state && Number(confirmCount) === approval.state.gate.recipientCount) ? () => send() : undefined}
         onCancel={() => setConfirmOpen(false)}
       >
         {gate === 'single' && approval.state ? <SingleOperatorFields recipientCount={approval.state.gate.recipientCount} value={confirmCount} onChange={setConfirmCount} /> : null}
@@ -1200,7 +1197,7 @@ export default function HqBroadcastCreate() {
         cancelLabel="やめる"
         busy={saveTplBusy}
         error={saveTplError || undefined}
-        onConfirm={() => void saveAsTemplate()}
+        onConfirm={() => saveAsTemplate()}
         onCancel={() => setSaveTplOpen(false)}
       >
         <Field label="テンプレートの名前" required><input value={saveTplName} onChange={(event) => setSaveTplName(event.target.value)} className={formStyles.textInput} aria-label="テンプレートの名前" maxLength={100} /></Field>

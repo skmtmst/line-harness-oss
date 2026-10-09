@@ -5,7 +5,7 @@
  * 使っていない（0か所）ものは窓なしで外して5秒は元に戻せる・数が分からないものは削除の確認（V6JFnd）、使っているものは削除できない窓（Z0g3si）。
  */
 import React, { act } from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const listTemplates = vi.hoisted(() => vi.fn())
@@ -137,29 +137,21 @@ describe('V8 テンプレートの一覧', () => {
     expect(screen.queryByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeNull()
   })
 
-  it('使っていない（0か所と分かっている）ものは窓を出さずに一覧から外し、5秒たってから消す', async () => {
+  it('決まり2：未使用の削除も確認してから実行する', async () => {
     await renderList()
-    render(<ToastHost />)
-    vi.useFakeTimers()
     openMenuAndDelete('秋の新商品（画像）')
-    expect(screen.queryByRole('dialog')).toBeNull()
-    expect(screen.queryByText('秋の新商品（画像）')).toBeNull()
-    expect(screen.getByText('テンプレート「秋の新商品（画像）」を削除しました')).toBeTruthy()
-    await act(async () => { await vi.advanceTimersByTimeAsync(4999) })
+    expect(screen.getByRole('alertdialog')).toBeTruthy()
+    expect(screen.getByText('秋の新商品（画像）')).toBeTruthy()
     expect(removeTemplate).not.toHaveBeenCalled()
-    await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+    await act(async () => { fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '削除する' })) })
     expect(removeTemplate).toHaveBeenCalledWith('t-unused')
   })
 
-  it('窓なしで外したものは「元に戻す」で行が戻り、消さない', async () => {
+  it('決まり2：確認をキャンセルしたら削除しない', async () => {
     await renderList()
-    render(<ToastHost />)
-    vi.useFakeTimers()
     openMenuAndDelete('秋の新商品（画像）')
-    expect(screen.queryByText('秋の新商品（画像）')).toBeNull()
-    act(() => { screen.getByRole('button', { name: '元に戻す' }).click() })
+    await act(async () => { fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'キャンセル' })) })
     expect(screen.getByText('秋の新商品（画像）')).toBeTruthy()
-    await act(async () => { await vi.advanceTimersByTimeAsync(6000) })
     expect(removeTemplate).not.toHaveBeenCalled()
   })
 
@@ -167,9 +159,9 @@ describe('V8 テンプレートの一覧', () => {
     listTemplates.mockResolvedValue({ success: true, data: [used, { ...unused, usageCount: undefined }] })
     await renderList()
     openMenuAndDelete('秋の新商品（画像）')
-    expect(screen.getByText('「秋の新商品（画像）」を削除する')).toBeTruthy()
+    expect(screen.getByText('「秋の新商品（画像）」を削除しますか？')).toBeTruthy()
     expect(screen.getByText('削除は元に戻せません。')).toBeTruthy()
-    const dialog = screen.getByRole('dialog')
+    const dialog = screen.getByRole('alertdialog')
     const confirm = [...dialog.querySelectorAll('button')].find((b) => b.textContent === '削除する') as HTMLButtonElement
     await act(async () => {
       fireEvent.click(confirm)

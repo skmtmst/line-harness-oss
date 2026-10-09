@@ -1,5 +1,6 @@
 'use client'
 
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -489,7 +490,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
     )
   }
   if (!subjectDraft || !subjectSettings) {
-    return <ListState kind="error" title="下書きを表示できませんでした" description={error || '下書きを読み込めませんでした。'} action={<Button onClick={() => void loadDraft()}>再読み込み</Button>} />
+    return <ListState kind="error" title="下書きを表示できませんでした" description={error || '下書きを読み込めませんでした。'} onRetry={() => void loadDraft()} />
   }
 
   const testIssue = testSend.phase.kind === 'failed' || testSend.phase.kind === 'unknown' ? testSend.phase.message : ''
@@ -513,19 +514,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
    * （notice・noticeSpacing='band'）に入れる。
    */
   const conflictBand = conflict ? (
-    <div className={styles.conflictBand} role="alert">
-      <TriangleAlert size={18} aria-hidden="true" className={styles.conflictIcon} />
-      <div className={styles.conflictText}>
-        <p className={styles.conflictTitle}>ほかの人が先にリマインダ「{subjectSettings.name}」を保存しました</p>
-        <p className={styles.conflictNote}>あなたが直した所はまだ保存されていません。このまま保存すると、相手の変更が消えます。</p>
-      </div>
-      <Button type="button" variant="secondary" onClick={() => void openCompare()} disabled={compareBusy}>
-        <GitCompare size={15} aria-hidden="true" />{compareBusy ? '比べています…' : '違いを比べる'}
-      </Button>
-      <Button type="button" variant="primary" onClick={() => void reloadAfterConflict()}>
-        <RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける
-      </Button>
-    </div>
+    <SaveConflictBand title={<>ほかの人が先にリマインダ「{subjectSettings.name}」を保存しました</>} description="あなたが直した所はまだ保存されていません。このまま保存すると、相手の変更が消えます。" onCompare={() => void openCompare()} compareDisabled={compareBusy} onReload={() => void reloadAfterConflict()} />
   ) : null
 
   const frame: StageFrame = {
@@ -663,7 +652,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
         cancelLabel="閉じる"
         busy={sendBusy}
         error={testIssue}
-        onConfirm={() => void sendTest()}
+        onConfirm={() => sendTest()}
         onCancel={() => setTestConfirm(false)}
       />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="この手順への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
@@ -674,7 +663,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
         confirmLabel="最新を読み込んで続ける"
         busy={compareBusy}
         error={compareError || undefined}
-        onConfirm={() => void reloadAfterConflict()}
+        onConfirm={() => reloadAfterConflict()}
         onCancel={() => {
           setCompareTarget(null)
           setCompareError('')
@@ -802,7 +791,7 @@ function BasicsStageV8({
           onNext={() => onSave(value)}
           nextDisabled={candidatesPending || busy || !value.name.trim()}
         />
-      )}
+      )} dirty={false}
     >
       {notice}
       <ReminderBasicsFormV8
@@ -967,7 +956,7 @@ function TargetStageV8({
           onNext={onNext}
           nextDisabled={busy}
         />
-      )}
+      )} dirty={false}
     >
       {notice}
       <section className={styles.card} aria-labelledby="rm-target-title">
@@ -1232,7 +1221,7 @@ function MessagesStageV8({
             onNext={onNext}
             nextDisabled={busy || !allStepsHaveContent}
           />
-        )}
+        )} dirty={false}
       >
         {notice}
         <section className={styles.card} aria-labelledby="rm-steps-title">
@@ -1517,7 +1506,7 @@ function ScheduleStageV8({
           onNext={onNext}
           nextDisabled={busy || settings.steps.length === 0}
         />
-      )}
+      )} dirty={false}
     >
       {notice}
       <section className={styles.card} aria-labelledby="rm-schedule-title">
@@ -1715,7 +1704,7 @@ function ConfirmStageV8({
           nextDisabled={busy || !publishReady}
           nextBusy={busy}
         />
-      )}
+      )} dirty={false}
     >
       {notice}
       <section className={styles.card} aria-labelledby="rm-confirm-title">

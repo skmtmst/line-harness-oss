@@ -193,7 +193,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
         </dl>
       </section>
 
-      <ConfirmDialog open={notifyConfirm} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" busy={testing === 'notify'} onCancel={() => { if (testing === false) setNotifyConfirm(false) }} onConfirm={() => void testNotify()} />
+      <ConfirmDialog open={notifyConfirm} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" busy={testing === 'notify'} onCancel={() => { if (testing === false) setNotifyConfirm(false) }} onConfirm={() => testNotify()} />
     </CreatePage>
   )
 }

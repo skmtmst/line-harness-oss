@@ -7,6 +7,7 @@ import TruncatedText from '@/components/shared/truncated-text'
  * 数の帯 → 道具の段（探す・状態・期間・CSV）→ URLごとの表 → 数え方の注。
  * 呼ぶ口（検索語は API へ・200件まで）・状態の絞り込み・ページ送り・CSV は今の画面（UrlClicksOverviewTab）と同じ。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useEffect, useMemo, useState } from 'react'
 import { Download, Link2, MousePointerClick, Unlink, Users } from 'lucide-react'
 import KpiBand from '@/components/shared/kpi-band'
@@ -44,16 +45,15 @@ function sourceOf(item: Link): { kind: string; name: string; all: string } {
 
 
 export default function UrlClicksV8({ accountId }: { accountId: string }) {
-  const [pageSize, setPageSize] = useState(10)
-  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 10)
+  const [page, setPage] = useListUrlValue('page', 0)
   const { days, setDays, range, customRange, setRange } = useReportPeriod()
-  const [query, setQuery] = useState('')
-  const [status, setStatus] = useState('all')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [status, setStatus] = useListUrlValue('status', 'all')
   // 検索語は API へ渡し、200件を超えた URL にも届くようにする。
   const [debouncedQuery, setDebouncedQuery] = useState('')
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300)
-    return () => window.clearTimeout(timer)
+    setDebouncedQuery(query.trim())
   }, [query])
   const state = useOverview<AnalyticsUrlClicksOverview>(
     () => api.analytics.urlClicksOverview(accountId, { ...range, limit: 200, query: debouncedQuery || undefined }),
