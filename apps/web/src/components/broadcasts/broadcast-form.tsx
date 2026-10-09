@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import type { Folder, Tag } from '@line-crm/shared'
-import { AlertTriangle, ArrowUp, ArrowDown, ArrowRight, CheckCircle2, Eye, Plus, Save, Send, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowUp, ArrowDown, ArrowRight, CheckCircle2, Eye, FileText, Plus, Save, Send, Trash2 } from 'lucide-react'
 import {
   ApiError,
   api,
@@ -23,6 +23,10 @@ import StickyBar from '@/components/shared/sticky-bar'
 import LinePreview from '@/components/shared/line-preview'
 import BroadcastTextBubble from './broadcast-text-bubble'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import TapActionField from '@/components/shared/tap-action-field'
+import { useTapActionSources } from '@/components/shared/use-tap-action-sources'
+import { TextField } from '@/components/shared/text-field'
+import { tapActionFromSavedUri, tapActionLiffUrl, tapActionNeedsLiff, type TapActionKind, type TapActionValue } from '@/lib/tap-actions'
 import {
   MAX_BUBBLES,
   MAX_TEXT_LENGTH,
@@ -537,11 +541,37 @@ function TextBubbleEditor({ bubble, index, total, trackLinks, embedded = false, 
  * ボタンの置き場は配信に1つ（1通目の下に付く）なので、編集欄も1つにして
  * 適用範囲を文で明示する。
  */
-function MessageButtonsSection({ buttons, error, onChange }: {
+/*
+ * ボタンの押したら（共通の欄 TapActionField・YPzmo・B-129）。送る形（label・type: url/pdf・value）は今のまま。
+ * 予約・回答フォーム・予約履歴・来店スタンプは type 'url' のまま、value にアカウントの LIFF の URL を入れる
+ * （LIFF ID がまだ分からないときは一斉配信で置き換わる {{liff_id}}）。テキストを送るは、このボタンの形
+ * （URL・PDF）が持てないので出さない。
+ */
+const BROADCAST_TAP_KINDS: readonly TapActionKind[] = ['uri', 'booking', 'form', 'booking_history', 'visit_stamp']
+const PDF_KIND = [{ value: 'pdf', label: 'PDFを開く', description: 'https:// で始まる PDF のアドレスを開く', icon: FileText }] as const
+
+function buttonTapValue(button: BroadcastMessageButton): TapActionValue {
+  if (button.type === 'pdf') return { kind: 'pdf', uri: button.value, text: '', refId: '' }
+  return tapActionFromSavedUri(button.value)
+}
+
+function MessageButtonsSection({ buttons, error, onChange, liffId, accountId }: {
   buttons: BroadcastMessageButton[]
   error: string
   onChange: (buttons: BroadcastMessageButton[]) => void
+  liffId: string | null
+  accountId: string | null
 }) {
+  const sources = useTapActionSources(accountId)
+  const patchButton = (index: number, patch: Partial<TapActionValue>) => onChange(buttons.map((item, i) => {
+    if (i !== index) return item
+    const current = buttonTapValue(item)
+    const kind = patch.kind ?? current.kind
+    if (kind === 'pdf') return { ...item, type: 'pdf' as const, value: patch.uri ?? item.value }
+    if (kind === 'uri') return { ...item, type: 'url' as const, value: patch.uri ?? (patch.kind !== undefined && current.kind !== 'pdf' ? '' : item.value) }
+    if (tapActionNeedsLiff(kind)) return { ...item, type: 'url' as const, value: tapActionLiffUrl(liffId || '{{liff_id}}', kind, patch.refId ?? (patch.kind !== undefined ? '' : current.refId)) }
+    return item
+  }))
   return (
     <section className="border-hairline mt-4 rounded-card border bg-canvas p-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -555,16 +585,22 @@ function MessageButtonsSection({ buttons, error, onChange }: {
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
       <div className="mt-3 space-y-2">
         {buttons.map((button, buttonIndex) => (
-          <div key={buttonIndex} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_2rem] items-center gap-2 rounded-control bg-canvas-sunken p-2">
+          <div key={buttonIndex} className="grid grid-cols-[minmax(0,1fr)_minmax(0,2.4fr)_2rem] items-center gap-2 rounded-control bg-canvas-sunken p-2">
             <input aria-label={`ボタン${buttonIndex + 1}の名前`} value={button.label} onChange={(event) => onChange(buttons.map((item, i) => i === buttonIndex ? { ...item, label: event.target.value } : item))} placeholder="ボタン名" className="min-w-0 rounded-control border border-hairline bg-canvas px-2 py-1.5 text-xs" />
-            {/*
-              共通の選び欄（幅176px）に合わせて種類の列を広げる。
-              開いた候補が切れないよう overflow-hidden は外す。
-            */}
-            <div className="grid min-w-0 grid-cols-[11rem_minmax(0,1fr)] rounded-control border border-hairline bg-canvas">
-              <Select aria-label={`ボタン${buttonIndex + 1}の種類`} value={button.type} onChange={(value) => onChange(buttons.map((item, i) => i === buttonIndex ? { ...item, type: value as 'url' | 'pdf' } : item))} options={[{ value: 'url', label: 'URLを開く' }, { value: 'pdf', label: 'PDFを開く' }]} />
-              <input aria-label={`ボタン${buttonIndex + 1}のURL`} value={button.value} onChange={(event) => onChange(buttons.map((item, i) => i === buttonIndex ? { ...item, value: event.target.value } : item))} placeholder="https://example.com" className="min-w-0 px-2 py-1.5 text-xs" />
-            </div>
+            <TapActionField
+              name={`ボタン${buttonIndex + 1}`}
+              kindLabel={`ボタン${buttonIndex + 1}の種類`}
+              value={buttonTapValue(button)}
+              onChange={(patch) => patchButton(buttonIndex, patch)}
+              kinds={BROADCAST_TAP_KINDS}
+              extraKinds={PDF_KIND}
+              hasLiff={Boolean(liffId)}
+              liffSettingsHref={accountId ? `/accounts/detail?id=${encodeURIComponent(accountId)}` : '/accounts'}
+              sources={sources}
+              renderBody={(kind) => kind !== 'pdf' ? undefined : (
+                <TextField type="url" aria-label={`ボタン${buttonIndex + 1}のURL`} value={button.value} placeholder="https://example.com/guide.pdf" onChange={(event) => patchButton(buttonIndex, { uri: event.target.value })} />
+              )}
+            />
             <button type="button" aria-label={`ボタン${buttonIndex + 1}を削除`} onClick={() => onChange(buttons.filter((_, i) => i !== buttonIndex))} className="flex justify-center text-danger"><Trash2 size={16} aria-hidden /></button>
           </div>
         ))}
@@ -1350,7 +1386,7 @@ export default function BroadcastForm({
     if (bubbleProblem) return bubbleProblem
     // 監査 R206: ボタンの不備は「保存できませんでした」で済ませない。
     // 何番の何が足りないかを言い、直したら保存できる。
-    const buttonProblem = messageButtonsError(messageButtons)
+    const buttonProblem = messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })
     if (buttonProblem) return buttonProblem
     if (currentStep && sendMode === 'scheduled' && (!scheduledDate || !scheduledTime)) return '予約する日付と時刻を入力してください'
     return ''
@@ -1366,7 +1402,7 @@ export default function BroadcastForm({
   const validationStep = (): 'basic' | 'audience' | 'message' | null => {
     if (!title.trim() || title.trim().length > TITLE_MAX) return 'basic'
     if (audienceError(targetMode, { scenarioId, tagId, condition })) return 'audience'
-    if (bubblesError(bubbles) || messageButtonsError(messageButtons)) return 'message'
+    if (bubblesError(bubbles) || messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })) return 'message'
     return null
   }
   /**
@@ -1998,7 +2034,7 @@ export default function BroadcastForm({
   const progressSteps = broadcastSteps({
     basicDone: title.trim().length > 0 && title.trim().length <= TITLE_MAX,
     audienceDone: !audienceError(targetMode, { scenarioId, tagId, condition }),
-    messageDone: !bubblesError(bubbles) && !messageButtonsError(messageButtons),
+    messageDone: !bubblesError(bubbles) && !messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) }),
     scheduleDone: sendMode === 'now' || (sendMode === 'scheduled' && Boolean(scheduledDate) && Boolean(scheduledTime)),
   })
   const stepOrder: BroadcastStepKey[] = ['basic', 'audience', 'message', 'schedule', 'confirm']
@@ -2468,8 +2504,10 @@ export default function BroadcastForm({
             ) : <BubbleEditor bubble={bubble} index={index} total={bubbles.length} assets={assets} assetsStatus={templateCandidatesStatus} accountId={selectedAccountId} onChange={(next) => updateBubble(bubble.id, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />}
           {index === 0 && <MessageButtonsSection
             buttons={messageButtons}
-            error={messageButtonsError(messageButtons)}
+            error={messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })}
             onChange={setMessageButtons}
+            liffId={selectedAccount?.liffId ?? null}
+            accountId={selectedAccountId ?? null}
           />}
           </details>
         ))}

@@ -81,7 +81,7 @@ export function tapActionFromUri(uri: string): { kind: TapActionKind; refId: str
   if (!match) return { kind: 'uri', refId: '' }
   const query = new URLSearchParams(match[1])
   const page = query.get('page')
-  if (page === 'form' && query.get('id')) return { kind: 'form', refId: query.get('id') ?? '' }
+  if (page === 'form') return { kind: 'form', refId: query.get('id') ?? '' }
   if (page === 'salon-book') {
     if (query.get('view') === 'history') return { kind: 'booking_history', refId: '' }
     return { kind: 'booking', refId: query.get('menu') ?? '' }

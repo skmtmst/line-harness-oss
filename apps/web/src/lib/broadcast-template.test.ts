@@ -271,3 +271,16 @@ describe('イメージマップのAPIと編集用データの往復',()=>{
     expect(JSON.parse(bubbleLegacyMessage(loaded).messageContent)).toMatchObject(payload)
   })
 })
+
+describe('一斉配信のボタンの押したら（YPzmo）：LIFF のページ', () => {
+  const liff = (query: string) => ({ label: '予約', type: 'url' as const, value: `https://liff.line.me/{{liff_id}}/?${query}` })
+  it('LIFF の無いアカウントでは予約などを送らない', () => {
+    expect(messageButtonsError([liff('page=salon-book')], { hasLiff: false })).toBe('ボタン1：このアカウントに LIFF が設定されていないため、「予約」は開けません')
+    expect(messageButtonsError([liff('page=salon-book')], { hasLiff: true })).toBe('')
+    expect(messageButtonsError([{ label: '外', type: 'url', value: 'https://example.com' }], { hasLiff: false })).toBe('')
+  })
+  it('回答フォームは選ぶまで送らない', () => {
+    expect(messageButtonsError([liff('page=form&id=')], { hasLiff: true })).toBe('ボタン1の回答フォームを選んでください')
+    expect(messageButtonsError([liff('page=form&id=f1')], { hasLiff: true })).toBe('')
+  })
+})
