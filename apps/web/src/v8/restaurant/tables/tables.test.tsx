@@ -81,9 +81,9 @@ describe('BERxg 座席・卓管理', () => {
     await screen.findByText('フロアマップ')
     fireEvent.click(screen.getByRole('button', { name: 'T3・窓側4人卓を停止' }))
     fireEvent.click(screen.getByRole('button', { name: '予約を移して止める' }))
-    await screen.findByText('予約を移せませんでした。')
+    await screen.findByText('予約の移動・卓の停止に失敗しました。')
     expect(fixture.updateTable).not.toHaveBeenCalled()
-    expect(within(screen.getByRole('dialog')).getByRole('alert').textContent).toContain('予約を移せませんでした。')
+    expect(within(screen.getByRole('dialog')).getByRole('alert').textContent).toContain('予約の移動・卓の停止に失敗しました。')
     expect(document.querySelector('[data-design-node="eY9F3"]')).not.toBeNull()
   })
 

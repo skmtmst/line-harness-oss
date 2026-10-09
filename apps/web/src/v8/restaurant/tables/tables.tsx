@@ -9,6 +9,7 @@
  * 止めるときは、この卓に入っている先の予約を見せ、別の卓へ移すか未配席に戻してから止める。
  * データの口・送る形は今の画面（app/restaurant-test/v8/tables.tsx）と同じ。動きは BEHAVIOR.md。
  */
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { useMemo, useRef, useState } from 'react'
 import { Check, Plus } from 'lucide-react'
 import SeatTile from '@/components/shared/seat-tile'
@@ -168,7 +169,7 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
         await restaurantTestApi.updateTable(selectedAccountId, table.id, { isActive: false })
         return { moved, unassigned }
       } catch (error) {
-        setStopError(error instanceof Error ? error.message : '予約の移動・卓の停止に失敗しました。')
+        setStopError(japaneseDetailOf(error) || '予約の移動・卓の停止に失敗しました。')
         throw new QuietError()
       }
     }, reservations.length === 0
