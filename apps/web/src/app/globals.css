@@ -356,7 +356,7 @@
   --mobile-header-height: 68px;
 
   /*
-   * カードの影。**1つだけ持つ。**
+   * 旧カードの影（現在は浮く面・操作部品の互換用）。
    *
    * 以前は `--shadow-v6-card`(#1d1d1f21) が `@theme` の中に、
    * `--shadow-card`(#1920261a) が外の `:root` に、と2つ並んでいた。
@@ -368,10 +368,12 @@
    *
    * #673 で「Beautiful shadows」の sm へ差し替えた。近距離の薄い影・
    * 下端の光・輪郭の1pxリングの3層で、1px罫線だけの硬さを残さない。
-   * 指標カード・フォルダパネル・右レール・各種カードはすべてここを読む。
+   * カードは 2026-10-09 案A の --card-shadow へ移行。浮く面の旧値は保つ。
    *
    * ★V7「仕上げ」§5: 影の色は黒ではなく ink（#1d1d1f）の透明にする。
    */
+  /* カード用のクラスは共通の --card-shadow を読む。旧値は浮く面・操作部品用に残す。 */
+  --shadow-card-surface: var(--card-shadow);
   --shadow-card: 0px 2px 3px -1px rgba(29, 29, 31, 0.08), 0px 1px 0px 0px rgba(29, 29, 31, 0.02), 0px 0px 0px 1px rgba(29, 29, 31, 0.08);
   /*
    * 浮いて見える面（メニュー・ドロップダウン・知らせ・ふきだし）の影。
@@ -1394,7 +1396,7 @@
   --tpl-narrow-folder-w: 150px; /* 1152 の一覧の道具の段のフォルダ選び（Iffil） */
   --tpl-row-name-size: 13px; --tpl-row-name-lh: 19px; --tpl-row-sub-gap: 3px; --tpl-row-sub-size: 11px; --tpl-row-sub-lh: 16px;
   /* 作っていない画面の一式（運営 ログイン2段目 tOPeY ほか）。 */
-  --tpl-ms-otp-page-pad: 32px 16px; --tpl-ms-otp-card-w: 420px; --tpl-ms-otp-card-pad: 28px; --tpl-ms-otp-card-gap: 14px; --tpl-ms-otp-card-radius: 16px; --tpl-ms-otp-card-shadow: 0 4px 16px rgb(29 29 31 / 8%);
+  --tpl-ms-otp-page-pad: 32px 16px; --tpl-ms-otp-card-w: 420px; --tpl-ms-otp-card-pad: 28px; --tpl-ms-otp-card-gap: 14px; --tpl-ms-otp-card-radius: 16px; --tpl-ms-otp-card-shadow: var(--card-shadow);
   --tpl-ms-otp-title-size: 20px; --tpl-ms-otp-title-lh: 29px; --tpl-ms-otp-desc-size: 12px; --tpl-ms-otp-desc-lh: 19px; --tpl-ms-otp-label-size: 13px; --tpl-ms-otp-label-lh: 20px; --tpl-ms-otp-field-gap: 6px;
   --tpl-ms-otp-btn-h: 36px; --tpl-ms-otp-icon: 15px; --tpl-ms-otp-foot-size: 11px; --tpl-ms-otp-foot-lh: 16px;
   --tpl-ms-key-gap: 14px; --tpl-ms-key-box-pad: 10px 12px; --tpl-ms-key-box-radius: 8px; --tpl-ms-key-row-gap: 8px; --tpl-ms-key-note-lh: 17px; --tpl-ms-key-token-size: 12px; --tpl-ms-key-btn-h: 36px;
@@ -2217,7 +2219,7 @@ aside[aria-label="フォルダ"] .shadow-lg {
  * メニューの影（float）へ寄せ、他のドロップダウンと揃える。
  */
 aside[aria-label="フォルダ"] {
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--card-shadow);
 }
 
 aside[aria-label="フォルダ"] .shadow-lg {

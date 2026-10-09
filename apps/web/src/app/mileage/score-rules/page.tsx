@@ -482,7 +482,7 @@ export default function ActionScoreRulesPage() {
       ) : bundle && configuration ? <>
         <div className="grid gap-3 2xl:grid-cols-4">
           <div className="grid content-start gap-3 2xl:col-span-3">
-            <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
+            <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card-surface">
               <div className="mb-3">
                 <p className="text-sm font-semibold text-ink">点をつける・引くこと</p>
                 <p className="mt-1 text-xs text-ink-faint">上から順にあてはめます。同じことが2回起きたら、2回ぶん動きます。</p>
@@ -534,7 +534,7 @@ export default function ActionScoreRulesPage() {
               {canEdit ? <Button className="mt-3" onClick={addRule}><Plus className="h-4 w-4" aria-hidden="true" />できごとを足す</Button> : null}
             </section>
 
-            <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
+            <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card-surface">
               <p className="text-sm font-semibold text-ink">帯の分けかた</p>
               <p className="mt-1 text-xs text-ink-faint">この分けかたで、配信の相手を選べます。</p>
               <div className="mt-4 grid max-w-2xl grid-cols-3 gap-3">
@@ -567,7 +567,7 @@ export default function ActionScoreRulesPage() {
               </div>
             </Notice>
 
-            <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
+            <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card-surface">
               <p className="text-sm font-semibold text-ink">つながる先</p>
               <div className="mt-3 grid gap-2 text-xs">
                 <Link href="/broadcasts/new" className="text-action hover:underline">一斉配信 <span className="text-ink-faint">— 帯で相手を選ぶ</span></Link>

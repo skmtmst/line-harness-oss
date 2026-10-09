@@ -27,6 +27,7 @@ describe('#673 A. カード・パネルの立体感', () => {
     const card = GLOBALS_CODE.match(/--card-shadow:\s*([^;]+);/)?.[1] ?? ''
     expect(card).toBe('0 1px 1px rgba(29, 29, 31, 0.16), 0 2px 4px rgba(29, 29, 31, 0.08)')
     expect(GLOBALS_CODE).toMatch(/--card-edge:\s*rgba\(29, 29, 31, 0\.08\);/)
+    expect(GLOBALS_CODE).toMatch(/--shadow-card-surface:\s*var\(--card-shadow\);/)
   })
 
   it('浮いて見える面の影はカードより一段強い層状影', () => {
@@ -39,7 +40,7 @@ describe('#673 A. カード・パネルの立体感', () => {
     // components/shared/ は変更できないため、globals.css の属性規定で上書きする。
     // ★V7: ダイアログは最前面（段3）の影 `--shadow-overlay`。
     expect(GLOBALS_CODE).toMatch(/\[data-design-part="dialog"\]\[data-design-node\]\s*\{[^}]*var\(--shadow-overlay\)/)
-    expect(GLOBALS_CODE).toMatch(/aside\[aria-label="フォルダ"\]\s*\{[^}]*var\(--shadow-card\)/)
+    expect(GLOBALS_CODE).toMatch(/aside\[aria-label="フォルダ"\]\s*\{[^}]*var\(--card-shadow\)/)
     expect(GLOBALS_CODE).toMatch(/aside\[aria-label="フォルダ"\] \.shadow-lg\s*\{[^}]*var\(--shadow-float\)/)
   })
 
@@ -49,7 +50,7 @@ describe('#673 A. カード・パネルの立体感', () => {
       ['components/dashboard/qr-dialog.tsx', 'shadow-float'],
       ['components/dashboard/dashboard-editor.tsx', 'shadow-card'],
       ['app/chats/page.tsx', 'shadow-card'],
-      ['app/duplicates/page.tsx', 'shadow-card'],
+      ['app/duplicates/page.tsx', 'shadow-card-surface'],
     ] as const
     for (const [file, token] of migrated) {
       const source = readFileSync(join(SRC, file), 'utf8')

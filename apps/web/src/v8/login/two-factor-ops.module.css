@@ -19,7 +19,7 @@
   padding: var(--tpl-ms-otp-card-pad);
   border-radius: var(--tpl-ms-otp-card-radius);
   background: var(--color-canvas);
-  box-shadow: var(--tpl-ms-otp-card-shadow);
+  box-shadow: var(--card-shadow);
 }
 
 .card > * {

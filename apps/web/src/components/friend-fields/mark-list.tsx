@@ -438,7 +438,7 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
         </Notice>
       ) : null}
 
-      <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
+      <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card-surface">
         <div>
           {/* 960px以上は表。それ未満は縦に重ねたカード（#1014 ATTR-14）。 */}
           <table className="hidden w-full table-fixed text-sm md:table">
@@ -561,7 +561,7 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
         </div>
       </div>
 
-      <section className="mt-4 rounded-card border border-hairline bg-canvas px-5 py-4 shadow-card">
+      <section className="mt-4 rounded-card border border-hairline bg-canvas px-5 py-4 shadow-card-surface">
         <h2 className="text-sm font-bold text-ink">受信時自動変更・保管・初期値の安全確認</h2>
         <p className="mt-1 text-xs leading-relaxed text-ink-faint">「受信時に変更」の設定は追加・編集画面で確認できます。保管時は影響人数と置き換え先を表示し、初期値は保管できません。</p>
       </section>

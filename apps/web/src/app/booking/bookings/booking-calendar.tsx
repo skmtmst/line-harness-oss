@@ -106,7 +106,7 @@ function money(value: number): string {
 
 function Kpi({ title, value, detail }: { title: string; value: string; detail: string }) {
   return (
-    <div className="rounded-card border-hairline bg-canvas border px-4 py-3 shadow-card">
+    <div className="rounded-card border-hairline bg-canvas border px-4 py-3 shadow-card-surface">
       <p className="text-ink-secondary text-xs font-medium">{title}</p>
       <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{value}</p>
       <p className="text-ink-faint mt-1 text-xs">{detail}</p>
@@ -214,7 +214,7 @@ function CalendarFrame({
   children: React.ReactNode
 }) {
   return (
-    <section className="rounded-card border-hairline bg-canvas min-w-0 overflow-hidden border shadow-card">
+    <section className="rounded-card border-hairline bg-canvas min-w-0 overflow-hidden border shadow-card-surface">
       <div className="border-hairline flex min-h-12 flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
         <div className="flex items-center gap-2">
           <Button variant="secondary" onClick={onPrevious} aria-label="前の期間" className="v7:h-8 w-8">‹</Button>
