@@ -103,8 +103,8 @@ describe('N-211 案件作成の選択肢は選択accountで絞る', () => {
 
     const optionLabels = async (buttonId: string) => {
       const switchName = buttonId === 'of-tag' ? 'タグを付ける' : 'シナリオ配信を始める'
-  const toggle = host.querySelector<HTMLButtonElement>(`[role=switch][aria-label="${switchName}"]`)
-  if (toggle?.getAttribute('aria-checked') === 'false') await act(async () => { toggle.click() })
+  const toggle = host.querySelector<HTMLInputElement>(`input[type=checkbox][aria-label="${switchName}"]`)
+  if (toggle && !toggle.checked) await act(async () => { toggle.click() })
   // タグは選ぶ窓（dJZ7Q）。欄の［選ぶ］で開き、窓の候補（radio）の名前を読む。
   const button = host.querySelector<HTMLButtonElement>(`#${buttonId} button[aria-haspopup="dialog"]`)
       expect(button).toBeTruthy()
@@ -123,8 +123,8 @@ describe('N-211 案件作成の選択肢は選択accountで絞る', () => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     })
     // シナリオは選ぶ窓。欄の［選ぶ］で開き、窓の候補（radio）の名前を読む。
-    const scenarioToggle = host.querySelector<HTMLButtonElement>('[role=switch][aria-label="シナリオ配信を始める"]')
-    if (scenarioToggle?.getAttribute('aria-checked') === 'false') await act(async () => { scenarioToggle.click() })
+    const scenarioToggle = host.querySelector<HTMLInputElement>('input[type=checkbox][aria-label="シナリオ配信を始める"]')
+    if (scenarioToggle && !scenarioToggle.checked) await act(async () => { scenarioToggle.click() })
     const scenarioOpen = host.querySelector<HTMLButtonElement>('button[aria-label="開始するシナリオ：選ぶ"]')
     expect(scenarioOpen).toBeTruthy()
     await act(async () => { scenarioOpen!.click() })

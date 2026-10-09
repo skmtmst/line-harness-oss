@@ -99,7 +99,7 @@ async function settle() {
 }
 
 function switches(): number {
-  return host.querySelectorAll('[role="switch"]').length
+  return host.querySelectorAll('[type="checkbox"]').length
 }
 
 function retryButton(): HTMLButtonElement | undefined {

@@ -89,8 +89,8 @@ export default function Checkbox({
 }
 
 /** 保存や送信で反映する二択。即時反映のスイッチと同じデータ契約で移行できる。 */
-export function SettingCheckbox({ checked, label, onChange, disabled, locked, className }: {
- checked: boolean; label: string; onChange?: (checked:boolean)=>void; disabled?:boolean; locked?:boolean; className?:string
+export function SettingCheckbox({ checked, label, onChange, disabled, locked }: {
+ checked: boolean; label: string; onChange?: (checked:boolean)=>void; disabled?:boolean; locked?:boolean
 }) {
- return <span data-setting-checkbox><Checkbox checked={Boolean(locked || checked)} aria-label={label} disabled={locked || disabled} onCheckedChange={onChange ?? (()=>{})} className={className} /></span>
+ return <span data-setting-checkbox><Checkbox checked={Boolean(locked || checked)} aria-label={label} disabled={locked || disabled} onCheckedChange={onChange ?? (()=>{})} /></span>
 }
