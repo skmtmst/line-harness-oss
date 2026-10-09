@@ -15,6 +15,7 @@ import { useAccount } from '@/contexts/account-context'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { scenarioReferenceData } from './scenario-reference-data'
 import Button from '@/components/shared/button'
 
@@ -478,26 +479,25 @@ export default function QuestionEditor({
                           { value: 'stop', label: '購読を止める' },
                         ]}
                       />
-                      <Select
-                        aria-label={`選択肢${index + 1}の移動先シナリオ`}
-                        value={choice.scenario?.scenarioId ?? ''}
-                        onChange={(next) =>
-                          setChoice(index, {
-                            scenario: {
-                              op: choice.scenario?.op ?? 'start',
-                              ...choice.scenario,
-                              scenarioId: next,
-                            },
-                          })
-                        }
-                        options={[
-                          {
-                            value: '',
-                            label: choice.scenario?.op === 'stop' ? 'このシナリオ' : 'シナリオを選ぶ',
-                          },
-                          ...scenarios.map((s) => ({ value: s.id, label: s.name })),
-                        ]}
-                      />
+                      <div className="min-w-0 flex-1">
+                        <EntityKindField
+                          kind="scenario"
+                          label={`選択肢${index + 1}の移動先シナリオ`}
+                          value={choice.scenario?.scenarioId ?? ''}
+                          clearable
+                          placeholder={choice.scenario?.op === 'stop' ? '（このシナリオ）' : '（シナリオを選ぶ）'}
+                          onChange={(next) =>
+                            setChoice(index, {
+                              scenario: {
+                                op: choice.scenario?.op ?? 'start',
+                                ...choice.scenario,
+                                scenarioId: next,
+                              },
+                            })
+                          }
+                          options={scenarios}
+                        />
+                      </div>
                     </div>
                     {(choice.scenario?.op ?? 'start') === 'start' && (
                       <>
@@ -735,37 +735,21 @@ function TagPicker({
     id,
     name: tags.find((tag) => tag.id === id)?.name ?? '選択済みのタグ',
   }))
-  const availableTags = tags.filter((tag) => !selected.includes(tag.id))
 
   return (
     <div>
       <span className="text-ink-secondary text-xs font-medium">{label}</span>
-      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-        {selectedTags.map((tag) => (
-          <button
-            key={tag.id}
-            type="button"
-            onClick={() => onChange(selected.filter((id) => id !== tag.id))}
-            aria-label={`${tag.name}を選択から外す`}
-            className="bg-accent-soft text-accent-deep rounded-pill h-8 px-3 text-xs font-medium"
-          >
-            {tag.name} ×
-          </button>
-        ))}
-        {tags.length > 0 ? (
-          /* #973 U022: タグの選択は全幅の独立行にする。長いタグ名でも
-             カードを広げず、選んだタグの行と重ならない。 */
-          <Select
-            aria-label={label}
-            value=""
-            onChange={(next) => {
-              if (next) onChange([...selected, next])
-            }}
-            options={[
-              { value: '', label: selected.length > 0 ? 'ほかのタグを選ぶ' : 'タグを選ぶ' },
-              ...availableTags.map((tag) => ({ value: tag.id, label: tag.name })),
-            ]}
-            size="full"
+      <div className="mt-1.5">
+        {tags.length > 0 || selected.length > 0 ? (
+          /* #973 U022: タグの選択は全幅の独立行にする。選ぶ窓でまとめて選び、外すのも窓で行う。
+             候補から消えたタグも窓で外せるよう、選択済みの行を残す。 */
+          <EntityKindField
+            kind="tag"
+            multiple
+            label={label}
+            value={selected}
+            onChange={onChange}
+            options={[...tags, ...selectedTags.filter((tag) => !tags.some((item) => item.id === tag.id))]}
           />
         ) : (
           <span className="text-ink-faint text-xs">{status === 'loading' ? '読み込んでいます' : status === 'error' ? '候補を読み込めませんでした' : 'タグがまだありません'}</span>

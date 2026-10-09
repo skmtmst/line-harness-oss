@@ -24,7 +24,7 @@ import LinePreview, { LinePreviewMessage } from '@/components/shared/line-previe
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import RadioCard from '@/components/shared/radio-card'
-import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { TextField } from '@/components/shared/text-field'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -48,11 +48,6 @@ import {
   type Failure,
 } from './column-form'
 import styles from './form.module.css'
-
-/** 配信対象の選ぶ欄の値。全員は 'all'、タグは 'tag:<id>'。 */
-function targetValue(draft: ColumnDraft): string {
-  return draft.targetMode === 'tag' ? `tag:${draft.targetTagId}` : 'all'
-}
 
 export default function ColumnNew() {
   const router = useRouter()
@@ -261,18 +256,19 @@ export default function ColumnNew() {
               <span className={styles.labelSmall}>配信対象</span>
               <span className={styles.labelNote}>{audienceCount == null ? '' : `${formatNumber(audienceCount)}人に届きます`}</span>
             </span>
-            <Select
-              aria-label="配信対象"
-              size="full"
-              value={targetValue(draft)}
-              error={errorFor('targetTagId')}
-              options={[
-                { value: 'all', label: '友だち全員' },
-                ...(draft.targetMode === 'tag' && !draft.targetTagId ? [{ value: 'tag:', label: 'タグで絞る：タグを選んでください' }] : []),
-                ...accountTags.map((tag) => ({ value: `tag:${tag.id}`, label: `タグで絞る：${tag.name}` })),
-              ]}
-              onChange={(value) => set(value === 'all' ? { targetMode: 'all', targetTagId: '' } : { targetMode: 'tag', targetTagId: value.slice(4) })}
+            {/* 1つの欄で選ぶ。空＝友だち全員、タグを選ぶ＝そのタグで絞る（「外す」で全員へ戻す）。 */}
+            <EntityKindField
+              kind="tag"
+              label="配信対象"
+              value={draft.targetMode === 'tag' ? draft.targetTagId : ''}
+              clearable
+              invalid={Boolean(errorFor('targetTagId'))}
+              placeholder={draft.targetMode === 'tag' ? '（タグで絞る：タグを選んでください）' : '（友だち全員）'}
+              options={accountTags}
+              meta={() => 'タグで絞る'}
+              onChange={(value) => set(value ? { targetMode: 'tag', targetTagId: value } : { targetMode: 'all', targetTagId: '' })}
             />
+            {errorFor('targetTagId') ? <span className={styles.error} role="alert">{errorFor('targetTagId')}</span> : null}
           </div>
         </div>
         {publishOpen ? (
@@ -296,11 +292,13 @@ export default function ColumnNew() {
           </label>
           <div className={styles.field}>
             <span className={styles.labelSmall}>読了後に付けるタグ</span>
-            <Select
-              aria-label="読了後に付けるタグ"
-              size="full"
+            <EntityKindField
+              kind="tag"
+              label="読了後に付けるタグ"
               value={draft.completionTagId}
-              options={[{ value: '', label: '付けない' }, ...accountTags.map((tag) => ({ value: tag.id, label: tag.name }))]}
+              clearable
+              placeholder="（付けない）"
+              options={accountTags}
               onChange={(value) => set({ completionTagId: value })}
             />
           </div>

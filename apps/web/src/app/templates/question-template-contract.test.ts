@@ -29,12 +29,12 @@ describe('V6 質問テンプレート', () => {
   })
 
   it('タグは全件を展開せず、閉じた選択欄と選択済みの札だけを表示する', () => {
-    // 選び欄は共通 Select（閉じた選択欄）。素の <select> は置かない。
-    expect(editor).toContain('<Select')
+    // タグは選ぶ窓（まとめて選ぶ欄）。欄は選んだ件数と名前の1行で、全件は窓の中にだけ並ぶ。素の <select> は置かない。
+    expect(editor).toContain('kind="tag"')
+    expect(editor).toContain('multiple')
     expect(editor).not.toContain('<select')
-    expect(editor).toContain('aria-label={label}')
-    expect(editor).toContain("'タグを選ぶ'")
-    expect(editor).toContain('selectedTags.map')
+    expect(editor).toContain('label={label}')
+    expect(editor).toContain('selectedTags.filter')
     expect(editor).not.toContain('tags.map((tag) => {')
     expect(editor).toContain('(choiceColumns || openChoice === index)')
     expect(editor).toContain('タグ・記録などの詳しい設定')

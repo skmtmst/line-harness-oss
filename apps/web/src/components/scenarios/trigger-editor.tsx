@@ -23,7 +23,7 @@ import { pruneCondition, type SegmentCondition } from '@/lib/segment-condition'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
-import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { describeCondition } from './scenario-dialogs'
 import { scenarioReferenceData } from './scenario-reference-data'
 import { formatNumber } from '@/lib/format'
@@ -356,17 +356,13 @@ export default function TriggerEditor({
               ＋ 友だち追加時
             </Button>
             <div className="min-w-0 flex-1">
-              <Select
-                aria-label="きっかけにするタグ"
-                size="full"
+              <EntityKindField
+                kind="tag"
+                label="きっかけにするタグ"
                 value={addingTagId}
+                clearable
                 onChange={(value) => setAddingTagId(value)}
-                options={[
-                  { value: '', label: 'タグを選ぶ' },
-                  ...tags
-                    .filter((tag) => !usedTagIds.has(tag.id))
-                    .map((tag) => ({ value: tag.id, label: tag.name })),
-                ]}
+                options={tags.filter((tag) => !usedTagIds.has(tag.id))}
               />
             </div>
             <Button

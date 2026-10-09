@@ -168,13 +168,15 @@ test('シナリオが未選択なら選べる赤い欄へ移り、選ぶと誤�
   await eventually(() => expect(host.querySelector('[aria-label="最初に送るメッセージ"]')).toBeTruthy())
   const next = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('次へ：あわせて行うこと'))!
   await act(async () => next.click())
-  await eventually(() => expect(document.activeElement?.id).toBe('fa-scenario'))
-  const select = host.querySelector<HTMLButtonElement>('#fa-scenario')!
-  expect(select.getAttribute('aria-invalid')).toBe('true')
+  const field = () => host.querySelector<HTMLElement>('#fa-scenario')!
+  const open = () => host.querySelector<HTMLButtonElement>('button[aria-label="実際に配信するシナリオ：選ぶ"]')!
+  await eventually(() => expect(document.activeElement).toBe(open()))
+  expect(field().getAttribute('data-invalid')).toBe('true')
   expect(host.querySelectorAll('[role="alert"]')).toHaveLength(1)
-  await act(async () => select.click())
-  const option = [...document.querySelectorAll('[role="option"]')].find((item) => item.textContent === '新規登録7日間フォロー')!
-  await act(async () => option.querySelector<HTMLButtonElement>('button')!.click())
+  await act(async () => open().click())
+  await act(async () => document.querySelector<HTMLInputElement>('input[type="radio"][aria-label="新規登録7日間フォロー"]')!.click())
+  const confirm = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((button) => button.textContent === '選ぶ')!
+  await act(async () => confirm.click())
   expect(host.querySelector('[role="alert"]')).toBeNull()
 })
 
