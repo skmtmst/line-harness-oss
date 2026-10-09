@@ -16,6 +16,10 @@ const crossPostRoute = readFileSync(
   new URL('../apps/worker/src/routes/restaurant-google-posts.ts', import.meta.url),
   'utf8',
 );
+const workflow = readFileSync(
+  new URL('../.github/workflows/migrate-d1.yml', import.meta.url),
+  'utf8',
+);
 
 const target = { accountId: 'account', databaseId: 'database', workerUrl: 'https://stg-api.musubo.jp' };
 
@@ -61,6 +65,22 @@ describe('staging Instagram cross-post verification safety', () => {
     expect(() => readVerificationTarget(
       `${stagingConfig}\n[triggers]\ncrons = ["* * * * *"]`,
     )).toThrow('must not have cron triggers');
+  });
+
+  test('runs only from the staging workflow entry, so no secret is needed on a laptop', () => {
+    // 手元に秘密値を置かずに走らせる唯一の入口。staging と codex/development に限る。
+    expect(workflow).toContain("inputs.operation == 'verify-instagram-cross-post'");
+    expect(workflow).toContain('scripts/verify-staging-instagram-cross-post.ts');
+    expect(workflow).toContain("inputs.environment == 'staging'");
+    expect(workflow).toContain("github.repository == 'skmtmst/line-harness-oss'");
+    expect(workflow).toContain("github.ref == 'refs/heads/codex/development'");
+    expect(workflow).toContain('VERIFY_ENVIRONMENT: staging');
+    expect(workflow).toContain('group: verify-staging-instagram-cross-post');
+    expect(workflow).toContain('set -o pipefail');
+    expect(workflow).not.toMatch(/\bset\s+-x\b/);
+    // 集計だけを出す。秘密値や個別の識別子をサマリーへ流さない。
+    expect(workflow).toContain('tail -n 1 "$RUNNER_TEMP/instagram-verification.json"');
+    expect(workflow).not.toMatch(/CLOUDFLARE_API_TOKEN[^\n]*GITHUB_STEP_SUMMARY/);
   });
 
   test('calls only the read-only endpoints with an expiring session, never a write verb', async () => {

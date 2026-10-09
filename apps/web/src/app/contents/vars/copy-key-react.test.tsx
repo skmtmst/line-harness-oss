@@ -96,14 +96,36 @@ describe('共通情報の一覧: 差し込みキーのコピー（#665）', () =
 
     render(<CommonVarsPage />)
 
-    const button = await screen.findByRole('button', {
+    await screen.findByRole('button', {
       name: '監査用の共通情報の差し込みキーをコピー',
     })
-    await act(async () => { fireEvent.click(button) })
 
-    // 表示は省略されるが、コピーされるのは差し込み用の全文。
-    expect(writeText).toHaveBeenCalledTimes(1)
-    expect(writeText).toHaveBeenCalledWith('{{var.audit_user_name_for_long_key}}')
-    expect(button.textContent).toBe('コピーしました')
+    // この画面は一覧と引き出しを別々に読み込み、どちらも終わってから表の形が
+    // 決まる。一覧だけ反映された時点で押すと、残りの読み込みが届いたときに
+    // ボタンが作り直され、コピー済みの表示が捨てられてしまう。
+    // 待ち時間ではなく処理の順番で待つので、混み合った機械でも結果は変わらない。
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)) })
+    const button = screen.getByRole('button', {
+      name: '監査用の共通情報の差し込みキーをコピー',
+    })
+
+    // 「コピー済み」は 1.5 秒で「コピー」へ戻る一時表示なので、
+    // 本物の時計のままだと混み合った機械で戻り切ってから確かめてしまう。
+    // 部品側の試験（components/ui/copy-text-button.test.tsx）と同じ形で時計を止める。
+    vi.useFakeTimers()
+    try {
+      await act(async () => { fireEvent.click(button) })
+
+      // 表示は省略されるが、コピーされるのは差し込み用の全文。
+      expect(writeText).toHaveBeenCalledTimes(1)
+      expect(writeText).toHaveBeenCalledWith('{{var.audit_user_name_for_long_key}}')
+      expect(button.textContent).toBe('コピーしました')
+
+      // 一時表示であること自体も、止めた時計を進めて確かめる。
+      await act(async () => { vi.advanceTimersByTime(1600) })
+      expect(button.textContent).toBe('コピー')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
