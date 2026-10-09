@@ -86,7 +86,7 @@ function renderPage() {
   })
 }
 
-test('再開は押した瞬間に稼働中になり、元に戻すで送らずに戻る', async () => {
+test('再開は押した瞬間に稼働中になり、すぐ保存して元に戻すを出さない', async () => {
   renderPage()
   await eventually(() => {
     if (!host.textContent?.includes('止まっている方')) throw new Error('no rows yet')
@@ -103,16 +103,9 @@ test('再開は押した瞬間に稼働中になり、元に戻すで送らず�
     const pills = [...host.querySelectorAll('span')].filter((s) => s.textContent === '稼働中')
     if (pills.length < 2) throw new Error('not yet optimistic')
   })
-  // 知らせの「元に戻す」で送らずに戻せる。
-  const undo = [...host.querySelectorAll('button')].find((b) => b.textContent === '元に戻す') as HTMLElement
-  expect(undo).toBeTruthy()
-  await act(async () => { undo.click() })
   await settle()
-  expect(calls.some((c) => c.path.startsWith('/api/scenarios/') && c.method !== 'GET')).toBe(false)
-  await eventually(() => {
-    const stopped = [...host.querySelectorAll('span')].filter((s) => s.textContent === '停止中')
-    if (stopped.length < 1) throw new Error('not yet reverted')
-  })
+  expect(calls.some((c) => c.path.startsWith('/api/scenarios/') && c.method !== 'GET')).toBe(true)
+  expect([...host.querySelectorAll('button')].some((b) => b.textContent === '元に戻す')).toBe(false)
 })
 
 test('読み込み中は出来上がりと同じ形の骨組みを出す', async () => {
