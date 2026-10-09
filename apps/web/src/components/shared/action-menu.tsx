@@ -10,6 +10,8 @@ export type ActionMenuItem = {
   id: string
   label: string
   icon?: ReactNode
+  /** 自分で結果を表示する共通操作（コピーなど）。 */
+  content?: ReactNode
   /** 先頭の主な操作を太字で示す。既存の項目の見た目は変えない。 */
   emphasis?: boolean
   /**
@@ -178,7 +180,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
       data-design-part="action-menu"
       data-design-node="xifuV"
     >
-      {items.map((item) => (
+      {items.map((item) => item.content ?? (
         <div key={item.id}>
           {item.dividerBefore ? <hr className={styles.divider} /> : null}
           {item.sectionBefore ? (

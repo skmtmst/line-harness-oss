@@ -9,6 +9,7 @@
  * api.lineAccountTags、api.lineAccounts.list・api.staff.list）。違いは見せ方だけ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import {
   ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, CircleCheck, CircleDashed, CircleX,
@@ -736,17 +737,8 @@ function ResultRow({ label, value, state }: { label: string; value: string; stat
 
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false)
-  const copy = async () => {
-    if (value === '—') return
-    try {
-      await navigator.clipboard.writeText(value)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1200)
-    } catch { /* 表示値を選択してコピーできる。 */ }
-  }
+
   return (
-    <Button type="button" onClick={() => void copy()} disabled={value === '—'}>
-      <Copy size={15} aria-hidden="true" />{copied ? 'コピー済み' : 'コピー'}
-    </Button>
+    <CopyTextButton value={value} aria-label="値をコピー" disabled={value === '—'} />
   )
 }

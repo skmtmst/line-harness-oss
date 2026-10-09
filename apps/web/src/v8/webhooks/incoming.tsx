@@ -9,6 +9,7 @@
  * 試し・作成・動かす/止める・合言葉・名前・削除）。
  * 絵と今の作りが合わない所は BEHAVIOR.md に書いた。
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Copy, LayoutTemplate, Plus, RefreshCw, Trash2, FlaskConical, Inbox } from 'lucide-react'
@@ -629,9 +630,7 @@ export default function WebhooksIncomingV8() {
               <span className={styles.fieldLabel}>受け取る URL（相手のサービスに貼る）</span>
               <span className={styles.valueBox} title={endpointUrl(selected.id)}>{endpointUrl(selected.id)}</span>
             </div>
-            <Button onClick={() => { void navigator.clipboard.writeText(endpointUrl(selected.id)); notifyToast('受け取る URL を写しました') }}>
-              <Copy size={15} aria-hidden="true" />写す
-            </Button>
+            <CopyTextButton value={endpointUrl(selected!.id)} aria-label="受け取るURLをコピー"  />
           </div>
           <div className={styles.fieldRow}>
             <div className={styles.field}>
@@ -963,7 +962,7 @@ export default function WebhooksIncomingV8() {
             <span className={styles.fieldLabel}>合言葉（今回だけ表示）</span>
             <div className={styles.fieldRow}>
               <p className={`${styles.valueBox} ${styles.grow}`}>{createdSecret.secret}</p>
-              <Button onClick={() => { void navigator.clipboard.writeText(createdSecret.secret); notifyToast('合言葉を写しました') }}><Copy size={15} aria-hidden="true" />写す</Button>
+              <CopyTextButton value={createdSecret!.secret} aria-label="合言葉をコピー"  />
             </div>
           </Dialog>
         ) : null}

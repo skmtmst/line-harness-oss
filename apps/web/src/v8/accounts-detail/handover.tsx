@@ -9,6 +9,7 @@
  * データの口・守り（確認の窓・本人確認・二重押し防止・閲覧のみ・切り戻し）は今の画面
  * （app/accounts/handover の page.tsx・handover-v8.tsx）と同じ。動きの一覧は BEHAVIOR.md。
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Eye, Play, RotateCcw } from 'lucide-react'
@@ -291,11 +292,7 @@ export default function AccountHandoverV8() {
     }
   }
 
-  const copyCode = async () => {
-    if (!handover?.code) return
-    await navigator.clipboard.writeText(handover.code)
-    setCopyState('copied')
-  }
+
 
   /** 段5。本実行。確認の窓と本人確認を済ませてから進める（X-3）。 */
   const executeHandover = async () => {
@@ -423,7 +420,7 @@ export default function AccountHandoverV8() {
             <span className={styles.boxLabel}>どこからどこへ</span>
             <span className={styles.boxLabel}>
               コード {handover.code}{handover.codeExpiresAt ? `（${formatDateTime(handover.codeExpiresAt)} まで）` : ''}{' '}
-              <Button type="button" variant="text" presentation="account-inline" onClick={() => void copyCode()}>{copyState === 'copied' ? 'コピーしました' : 'コピー'}</Button>
+              <CopyTextButton value={handover?.code ?? ""} aria-label="引き継ぎコードをコピー"  />
             </span>
           </p>
           <p className={styles.boxValue}>{account.name}（引継ぎ元・元データを残す）→ {destination?.name ?? '—'}（引継ぎ先）</p>

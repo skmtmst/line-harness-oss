@@ -9,6 +9,7 @@
  * （断る・認める）と「支払いを確定する」は、成果承認・支払いのタブと同じ口を使う。
  * 世代番号で、別の人へ開き直した途中に届いた古い応答を捨てる。
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Copy, PauseCircle, X } from 'lucide-react'
 import { api, type AffiliateAccountSettlementPreview, type ConversionApprovalItem } from '@/lib/api'
@@ -212,15 +213,7 @@ export default function AffiliateDrawer({
   useEffect(() => { reloadAll() }, [reloadAll])
 
 
-  const copyLinkUrl = useCallback(async (link: AffiliateLink) => {
-    const url = distributionUrl(link.ref_code, linkBaseUrl)
-    if (!url) return
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopiedLinkId(link.id)
-      window.setTimeout(() => setCopiedLinkId((current) => (current === link.id ? null : current)), 2000)
-    } catch { /* 書けないときはURLが表示のまま */ }
-  }, [linkBaseUrl])
+
 
   const decide = useCallback(async (item: ConversionApprovalItem, status: 'approved' | 'rejected') => {
     setDeciding(item.eventId)
@@ -300,9 +293,7 @@ export default function AffiliateDrawer({
                     <span className={styles.listName}>{link.offer_name ?? link.label ?? link.ref_code}{link.is_active ? '' : '（止めている）'}</span>
                     <span className={styles.listSub} title={url}>{`${shown}・${count}`}</span>
                   </span>
-                  <Button type="button" onClick={() => { void copyLinkUrl(link) }}>
-                    <Copy size={14} aria-hidden="true" /> {copiedLinkId === link.id ? 'コピーしました' : 'コピー'}
-                  </Button>
+                  <CopyTextButton value={distributionUrl(link.ref_code, linkBaseUrl) ?? ""} aria-label="紹介リンクをコピー"  />
                 </div>
               )
             })}

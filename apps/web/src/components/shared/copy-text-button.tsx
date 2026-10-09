@@ -18,14 +18,23 @@ import { useAdminTheme } from '@/lib/use-admin-theme'
  * 選んでコピーできるようにする（ブラウザの入力窓は使わない）。
  */
 export default function CopyTextButton({
-  value,
+  value = '',
+  getValue,
+  role,
+  label = 'コピー',
   'aria-label': ariaLabel,
+  disabled = false,
 }: {
   /** クリップボードへ書き込む全文。表示用文字列ではなく取り出したい値。 */
-  value: string
+  value?: string
+  getValue?: () => Promise<string>
+  label?: string
+  role?: 'button' | 'menuitem'
+  disabled?: boolean
   /** 何をコピーするボタンか。一覧では行の名前を含めて特定できるようにする。 */
   'aria-label': string
 }) {
+  const [copiedValue, setCopiedValue] = useState(getValue ? '' : value)
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle')
   const timerRef = useRef<number | null>(null)
   const pendingRef = useRef(false)
@@ -37,6 +46,7 @@ export default function CopyTextButton({
       generationRef.current += 1
       pendingRef.current = false
       setState('idle')
+      setCopiedValue(getValue ? '' : value)
       if (timerRef.current !== null) window.clearTimeout(timerRef.current)
       return () => {
         generationRef.current += 1
@@ -51,11 +61,13 @@ export default function CopyTextButton({
     pendingRef.current = true
     const generation = generationRef.current
     try {
-      await navigator.clipboard.writeText(value)
+      const text = getValue ? await getValue() : value
+      await navigator.clipboard.writeText(text)
+      setCopiedValue(text)
       if (generation !== generationRef.current) return
       setState('copied')
       if (timerRef.current !== null) window.clearTimeout(timerRef.current)
-      timerRef.current = window.setTimeout(() => setState('idle'), v8 ? 1600 : 1500)
+      timerRef.current = window.setTimeout(() => setState('idle'), 1500)
     } catch {
       if (generation === generationRef.current) setState('failed')
     } finally {
@@ -72,7 +84,7 @@ export default function CopyTextButton({
       <span className="block min-w-0">
         <input
           readOnly
-          value={value}
+          value={copiedValue}
           onFocus={(event) => event.currentTarget.select()}
           aria-label={ariaLabel}
           className="border-hairline bg-canvas-sunken text-ink w-full rounded-mini border px-2 py-1 text-xs"
@@ -92,9 +104,11 @@ export default function CopyTextButton({
   return (
     <button
       type="button"
-      onClick={() => void copy()}
+      role={role}
+      disabled={disabled}
+      onClick={(event) => { event.stopPropagation(); void copy() }}
       aria-label={ariaLabel}
-      title={state === 'copied' ? 'コピーしました' : 'コピー'}
+      title={state === 'copied' ? 'コピーしました' : label}
       style={v8 ? { width: 'calc(7em + 20px)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4 } : undefined}
       className={`${styles.button} w-16 shrink-0 cursor-pointer px-1 py-0.5 text-center text-xs ${
         state === 'copied'
@@ -103,7 +117,7 @@ export default function CopyTextButton({
       }`}
     >
       {state === 'copied' && v8 ? <Check size={14} aria-hidden /> : null}
-      {state === 'copied' ? (v8 ? 'コピーしました' : 'コピー済み') : 'コピー'}
+      {state === 'copied' ? 'コピーしました' : label}
     </button>
   )
 }

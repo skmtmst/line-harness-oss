@@ -13,6 +13,7 @@
  * - 「貼りかたが分からないときは」は窓で開く（今は右の列のいちばん下の段）
  * - 閲覧のみ（owner・admin 以外）には、サイトを追加する・「…」・操作の行を出さない
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CircleHelp, Copy, Eye, Mail, MoreHorizontal, Pause, Play, Plus, RefreshCw } from 'lucide-react'
@@ -264,31 +265,10 @@ export default function SiteScriptV8() {
     }
   }
 
-  const copy = async () => {
-    if (!snippet) return
-    try {
-      await navigator.clipboard.writeText(snippet)
-      setCopied(true)
-      setCopyFailed(false)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      setCopyFailed(true)
-    }
-  }
+
 
   /** 制作会社へ送る文（コードつき）をコピーする。 */
-  const copyMessage = async () => {
-    if (!snippet) return
-    const message = `ホームページの</head>の直前に、この1行をそのまま貼ってください。ページごとに書き換える必要はありません。\n${snippet}`
-    try {
-      await navigator.clipboard.writeText(message)
-      setMessageCopied(true)
-      setCopyFailed(false)
-      setTimeout(() => setMessageCopied(false), 2000)
-    } catch {
-      setCopyFailed(true)
-    }
-  }
+
 
   const receiving = summary?.lastEventAt != null
   const lastSeen = formatShort(summary?.lastEventAt)
@@ -410,8 +390,8 @@ export default function SiteScriptV8() {
                     <div className={styles.codeBox}><code className={styles.code}>{snippet}</code></div>
                     {copyFailed ? <p className={styles.small} role="alert">コピーできませんでした。上のコードを選んでコピーしてください。</p> : null}
                     <div className={styles.buttons}>
-                      <Button variant="primary" onClick={() => void copy()}><Copy size={15} aria-hidden="true" />{copied ? 'コピーしました' : 'コードをコピー'}</Button>
-                      <Button onClick={() => void copyMessage()}><Mail size={15} aria-hidden="true" />{messageCopied ? 'コピーしました' : '制作会社へ送る文をコピー'}</Button>
+                      <CopyTextButton value={snippet ?? ""} aria-label="コードをコピー"  />
+                      <CopyTextButton value={`ホームページの</head>の直前に、この1行をそのまま貼ってください。ページごとに書き換える必要はありません。\n${snippet}`} aria-label="制作会社へ送る文をコピー"  />
                     </div>
                   </>
                 ) : (

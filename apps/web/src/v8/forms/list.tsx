@@ -8,6 +8,7 @@
  * （app/form-submissions/list-v8.tsx）と同じ。見た目だけを型（ListPage）と部品で組み直した。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useState, useEffect, useCallback, useMemo, useRef, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { useListScrollMemory } from '@/components/shared/list-url-state'
@@ -767,19 +768,7 @@ export default function FormsListV8() {
     }
   }
 
-  const copyAnswerUrl = async (form: Form) => {
-    const url = formAnswerUrl(selectedAccount?.liffId, form.id)
-    if (!url) {
-      notifyToast('このアカウントの公開URLをまだ作れません。', { tone: 'error' })
-      return
-    }
-    try {
-      await navigator.clipboard.writeText(url)
-      notifyToast('回答フォームのURLをコピーしました')
-    } catch {
-      notifyToast('URLをコピーできませんでした。', { tone: 'error' })
-    }
-  }
+
 
   /* 名前のその場の書き換え（詳細パネル）。影響口で読んだ版を付けて同じ更新口へ送る。 */
   const renameForm = async (target: Form, next: string) => {
@@ -1223,17 +1212,7 @@ export default function FormsListV8() {
                     <span className={styles.answerSub} title={answerSub}>{answerSub}</span>
                   </Td>
                   <Td>
-                    <button
-                      type="button"
-                      className={styles.urlButton}
-                      disabled={!answerUrl}
-                      title={answerUrl ? '配っているURLをコピー' : 'このアカウントは公開URLをまだ作れません'}
-                      aria-label={`${name}のURLをコピー`}
-                      onClick={() => void copyAnswerUrl(form)}
-                    >
-                      <Link2 size={15} aria-hidden="true" />
-                      URL
-                    </button>
+                    <CopyTextButton value={answerUrl ?? ''} aria-label={`${name}のURLをコピー`} disabled={!answerUrl} />
                   </Td>
                   {!reviewMode ? (
                     /* 管理者確認は読み取り専用。編集・削除・回答の口は担当アカウント経由しか受けない。 */
@@ -1490,7 +1469,7 @@ export default function FormsListV8() {
               <Button type="button" variant="secondary" onClick={() => { closeDetail(); openMove(active) }}>フォルダへ移す</Button>
               <Button type="button" variant="secondary" onClick={() => { closeDetail(); void openDelete(active) }}>アーカイブ・削除</Button>
               </> : null}
-              <Button type="button" variant="secondary" onClick={() => void copyAnswerUrl(active)}>URLをコピー</Button>
+              <CopyTextButton value={formAnswerUrl(selectedAccount?.liffId, active.id) ?? ''} aria-label="回答フォームのURLをコピー" disabled={!formAnswerUrl(selectedAccount?.liffId, active.id)} />
             </div>
           </div>
         ) : null}

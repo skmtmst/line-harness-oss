@@ -9,6 +9,7 @@
  * データの口と判断は今の一覧（app/inflow-links/page.tsx の InflowLinksPageInner）と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
@@ -334,18 +335,7 @@ export default function InflowListV8({
     return () => { cancelled = true }
   }, [selectedAccountId, visibility.status, visibility.features])
 
-  const onCopy = async (refCode: string) => {
-    try {
-      await navigator.clipboard.writeText(referralUrl(refCode))
-      setCopiedId(refCode)
-      setCopyFailedId(null)
-      setTimeout(() => setCopiedId(null), 1200)
-    } catch {
-      // 失敗に気づかず URL 未コピーのまま配布作業が進むのを防ぐ。
-      setCopyFailedId(refCode)
-      setTimeout(() => setCopyFailedId(null), 3000)
-    }
-  }
+
 
   /*
    * 行の受付・停止を切り替える（行の「…」から）。押した瞬間に札を変え、裏で保存する
@@ -455,7 +445,7 @@ export default function InflowListV8({
     const items: ActionMenuItem[] = []
     {
       items.push({ id: 'qr', label: 'QRコードを見る', onSelect: () => { setOpenMenuRefCode(null); setQrRoute(qrFor(row)) } })
-      items.push({ id: 'copy', label: 'URLをコピー', onSelect: () => { setOpenMenuRefCode(null); void onCopy(row.refCode) } })
+      items.push({ id: 'copy', label: 'URLをコピー', content: <CopyTextButton role="menuitem" value={referralUrl(row.refCode)} aria-label={`${row.name}のURLをコピー`} />, onSelect: () => {} })
     }
     // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。見る項目（QR・コピー）だけ残す。
     if (row.entryRouteId && !readonly) {
@@ -781,9 +771,7 @@ export default function InflowListV8({
                     </Td>
                     <Td className={styles.colUrl}>
                       <div className={styles.opsBox}>
-                        <Button onClick={() => void onCopy(r.refCode)} aria-label={`${r.name}のURLをコピー`}>
-                          {copyFailedId === r.refCode ? 'コピー失敗' : copiedId === r.refCode ? '済み' : 'コピー'}
-                        </Button>
+                        <CopyTextButton value={referralUrl(r.refCode)} aria-label={`${r.name}のURLをコピー`}  />
                         {menuItems.length > 0 ? (
                           <RowMenu
                             label={menuLabel}

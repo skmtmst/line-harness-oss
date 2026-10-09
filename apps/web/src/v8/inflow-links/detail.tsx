@@ -11,6 +11,7 @@
  * - 受付を止める・別リンクへ送る・削除するは「その後」の段の右上の「…」から（今は段の題の右）
  * - 閲覧のみ（owner・admin 以外）には、リンクを編集・止める・することを変える・「…」を出さず、閲覧のみの帯を出す
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useMemo, useState } from 'react'
@@ -252,17 +253,7 @@ function InflowDetailContent() {
   const url = route ? `${workerBase}/r/${encodeURIComponent(route.refCode)}` : null
 
   /** コピーできなかったとき、選んでコピーできる欄をその場に出す（ブラウザの入力窓は使わない。V6R-S3-f）。 */
-  async function copyUrl() {
-    if (!url) return
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopied(true)
-      setCopyFailed(false)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      setCopyFailed(true)
-    }
-  }
+
 
   async function applyDeleteChoice() {
     if (!route || deleting) return
@@ -436,7 +427,7 @@ function InflowDetailContent() {
       actions={route ? (
         <div className={styles.headActions}>
           <Button onClick={() => setQrOpen(true)}><QrCode size={15} aria-hidden="true" />QR コードを表示</Button>
-          <Button onClick={() => void copyUrl()}><Copy size={15} aria-hidden="true" />{copied ? 'コピーしました' : 'URL をコピー'}</Button>
+          <CopyTextButton value={url ?? ""} aria-label="URLをコピー"  />
           {readonly ? null : (
             <Button onClick={() => setEditingRoute(true)}><Pencil size={15} aria-hidden="true" />リンクを編集</Button>
           )}

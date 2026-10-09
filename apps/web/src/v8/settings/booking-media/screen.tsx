@@ -10,6 +10,7 @@
  * 保存した URL は「今日のお店」の右の列と「枠を閉じる知らせ」の［管理画面を開く ↗］に使われる。
  * 動きは BEHAVIOR.md。
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Copy, MessageCircle, Plus } from 'lucide-react'
 import { PageFrame, PageHeading, PageFooter } from '@/components/templates/page-frame'
@@ -362,10 +363,7 @@ export default function BookingMediaPage() {
   }
 
   const askLink = () => setLinkAsked(true)
-  const copyText = async (text: string, what: string) => {
-    if (!link?.available) { askLink(); return }
-    try { await navigator.clipboard.writeText(text); notifyToast(`${what}をコピーしました`) } catch { notifyToast(`${what}をコピーできませんでした`) }
-  }
+
 
   let table
   if (loadError && !saved) table = <ListState kind="error" error={loadError} onRetry={() => void load()} />
@@ -476,7 +474,7 @@ export default function BookingMediaPage() {
                 {canManage ? (
                   <div className={styles.urlRow}>
                     <span className={styles.urlBox} title={link?.url}>{link?.url ?? (linkError || '読み込んでいます…')}</span>
-                    <Button onClick={() => void copyText(link?.url ?? '', '予約ページの URL')} disabled={!link}><Copy size={15} aria-hidden="true" />コピー</Button>
+                    <CopyTextButton value={link?.url ?? ""} aria-label="予約ページのURLをコピー" disabled={!link} />
                   </div>
                 ) : (
                   <p className={styles.cardText}>予約ページの URL は、管理者が確かめられます。</p>
@@ -495,7 +493,7 @@ export default function BookingMediaPage() {
                   <>
                     <code className={styles.code} title={link?.html}>{link?.html ?? (linkError || '読み込んでいます…')}</code>
                     <span className={styles.copyRow}>
-                      <Button onClick={() => void copyText(link?.html ?? '', '貼り付けるコード')} disabled={!link}><Copy size={15} aria-hidden="true" />コードをコピー</Button>
+                      <CopyTextButton value={link?.html ?? ""} aria-label="コードをコピー" disabled={!link} />
                     </span>
                   </>
                 ) : null}

@@ -12,6 +12,7 @@
  * 空のまま使われているときの黄色の帯は表の列の上、行の右端は「…」
  * （編集・止める／再開する・削除する）。右クリックでも同じものが出る。
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -177,36 +178,7 @@ function stateBadge(item: CommonVar): { label: string; tone: 'success' | 'info' 
 
 /** 差し込み名の右のコピーの印（絵：キーの横の小さな印）。押すと印が「✓」に変わる。 */
 function CopyKeyButton({ value, label }: { value: string; label: string }) {
-  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle')
-  const timerRef = useRef<number | null>(null)
-  useEffect(() => () => {
-    if (timerRef.current !== null) window.clearTimeout(timerRef.current)
-  }, [])
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(value)
-      setState('copied')
-    } catch {
-      setState('failed')
-    }
-    if (timerRef.current !== null) window.clearTimeout(timerRef.current)
-    timerRef.current = window.setTimeout(() => setState('idle'), 1500)
-  }
-  return (
-    <button
-      type="button"
-      className={styles.copyKey}
-      data-state={state}
-      aria-label={label}
-      title={state === 'copied' ? 'コピーしました' : state === 'failed' ? 'コピーできませんでした。文字を選んでコピーしてください' : 'コピー'}
-      onClick={(event) => {
-        event.stopPropagation()
-        void copy()
-      }}
-    >
-      {state === 'copied' ? <Check size={12} aria-hidden="true" /> : <Copy size={12} aria-hidden="true" />}
-    </button>
-  )
+  return <CopyTextButton value={value} aria-label={label} />
 }
 
 function CommonVarsListInner() {

@@ -10,6 +10,7 @@
  * - 止めた鍵は一覧の口が返さないので、「止めている」行と「動かす」は出ない（動かす口も無い）。
  * - 発行・入れ替え・停止は統括だけ（R32）。閲覧のみの人には押せないボタンを置かず、場所だけ空ける。
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, Copy, KeyRound, LayoutTemplate, Plus, RefreshCw } from 'lucide-react'
 import { api, ApiError, type IntegrationApiTokenInfo } from '@/lib/api'
@@ -312,15 +313,7 @@ export default function WebhooksApiTokensV8() {
     }
   }
 
-  const copyIssued = async () => {
-    if (!issued) return
-    try {
-      await navigator.clipboard.writeText(issued.token)
-      setCopied(true)
-    } catch {
-      // 手で選んで写せるので、失敗しても文は出さない。
-    }
-  }
+
 
   return (
     <ListPage
@@ -403,9 +396,7 @@ export default function WebhooksApiTokensV8() {
               <p className={styles.issuedNote}>この鍵は今だけ表示されます。閉じると二度と見られません。安全な場所に写してください。</p>
               <div className={styles.issuedTokenRow}>
                 <code className={styles.issuedToken}>{issued.token}</code>
-                <Button onClick={() => void copyIssued()}>
-                  <Copy size={15} aria-hidden="true" />{copied ? '写しました' : '鍵を写す'}
-                </Button>
+                <CopyTextButton value={issued!.token} aria-label="発行した鍵をコピー"  />
               </div>
               <p className={styles.issuedMeta} title={issued.name}>
                 {`接続の名前：${issued.name}${issued.scopes.length ? ` ・ できること：${issued.scopes.map(scopeLabel).join('・')}` : ''}`}

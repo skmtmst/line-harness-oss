@@ -9,6 +9,7 @@
  * データの口・入力検査・秘密値の守り・下書き保存は `app/contents/vars/new/new-v8.tsx`
  * から写した（import はしない）。動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -385,17 +386,7 @@ export default function NewCommonVarV8() {
   const saveDisabled = saving || !canWrite
   const previewName = name.trim() || '共通情報'
 
-  const copyKey = async () => {
-    const key = varKey.trim()
-    if (!key) return
-    try {
-      await navigator.clipboard.writeText(`{{var.${key}}}`)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1500)
-    } catch {
-      setError('コピーできませんでした。差し込み名の欄の文字を選んでコピーしてください。')
-    }
-  }
+
 
   const preview = (
     <>
@@ -541,10 +532,7 @@ export default function NewCommonVarV8() {
               />
               <span className={styles.keyMark} aria-hidden="true">{'}}'}</span>
             </span>
-            <Button variant="text" type="button" onClick={() => void copyKey()} disabled={!varKey.trim()} aria-label="差し込み名をコピー">
-              <Copy size={14} aria-hidden="true" />
-              {copied ? 'コピー済み' : 'コピー'}
-            </Button>
+            <CopyTextButton value={`{{var.${varKey.trim()}}}`} aria-label="差し込み名をコピー" disabled={!varKey.trim()} />
           </div>
           <VarFieldError message={keyFieldError} />
           <p className={styles.fieldHint}>

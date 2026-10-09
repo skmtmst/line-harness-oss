@@ -8,6 +8,7 @@
  * 口：/api/restaurant-test/intake-addresses・channels・inbound-emails（・/:id/manual-import）。
  * 検証環境は受信専用。媒体へは書き戻さない。
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useRef, useState } from 'react'
 import { BookOpen, Copy, FlaskConical } from 'lucide-react'
 import Notice from '@/components/shared/notice'
@@ -119,15 +120,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
   }, [accountId, storeId, canEdit, reload])
 
   const address = addresses?.[0]?.address ?? null
-  const copy = async () => {
-    if (!address) return
-    try {
-      await navigator.clipboard.writeText(address)
-      setCopied(true)
-    } catch {
-      setCopied(false)
-    }
-  }
+
 
   const issue = () => {
     setBusy(true)
@@ -179,7 +172,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
           <div className={styles.addressBox}>
             <span className={styles.addressText} title={address ?? undefined}>{address ?? (canEdit ? 'まだ発行されていません' : '管理者だけが見られます')}</span>
             {address ? (
-              <Button onClick={() => void copy()}><Copy size={15} aria-hidden="true" />{copied ? '写しました' : 'コピー'}</Button>
+              <CopyTextButton value={address ?? ""} aria-label="メールアドレスをコピー"  />
             ) : canEdit ? (
               <Button variant="primary" disabled={busy} onClick={issue}>発行する</Button>
             ) : null}

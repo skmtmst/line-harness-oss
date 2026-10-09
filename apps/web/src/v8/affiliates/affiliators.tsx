@@ -11,6 +11,7 @@
  * フォルダの列：アフィリエイターを分けて保存する口は無いので、報酬の決め方で
  * 分けた見え方の切り替えとして持つ（保存しない）。
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Banknote, CircleDot, CircleHelp, Download, Plus, Trophy, Users } from 'lucide-react'
@@ -316,19 +317,13 @@ export default function AffiliatorsTab() {
       const links = res.data as unknown as AffiliateLink[]
       const link = links.find((item) => Boolean(item.is_active)) ?? links[0]
       if (!link) {
-        notifyToast('この人には紹介リンクがまだありません。詳細から発行できます。')
-        return
+        throw new Error('この人には紹介リンクがまだありません。')
       }
       const url = distributionUrl(link.ref_code, linkBaseUrl)
-      if (!url) return
-      try {
-        await navigator.clipboard.writeText(url)
-        notifyToast('紹介リンクをコピーしました。')
-      } catch {
-        openDrawer(row.id, false)
-      }
+      if (!url) throw new Error('URLを読み込めませんでした')
+      return url
     } catch {
-      notifyToast('紹介リンクを読み込めませんでした。もう一度お試しください。')
+      throw new Error('紹介リンクを読み込めませんでした。')
     }
   }, [linkBaseUrl, openDrawer])
 
@@ -556,7 +551,7 @@ export default function AffiliatorsTab() {
                   <RowMenu
                     label={`${row.name}の操作`}
                     items={[
-                      { id: 'copy', label: '紹介リンクをコピー', onSelect: () => { void copyFirstLink(row) } },
+                      { id: 'copy', label: '紹介リンクをコピー', content: <CopyTextButton role="menuitem" label="紹介リンクをコピー" value={row.id} getValue={() => copyFirstLink(row)} aria-label="紹介リンクをコピー" />, onSelect: () => {} },
                       ...(readonly ? [] : [
                         { id: 'edit', label: '編集', onSelect: () => openDrawer(row.id, true) },
                         ...(row.isActive ? [{ id: 'archive', label: '紹介を止める', tone: 'danger' as const, dividerBefore: true, onSelect: () => setArchiveTarget({ id: row.id, name: row.name }) }] : []),

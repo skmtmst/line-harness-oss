@@ -1,5 +1,6 @@
 'use client'
 
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -68,15 +69,7 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
   const route = (routes ?? []).find((entry) => entry.id === routeId)
   const link = route ? `${base}/r/${route.refCode}` : baseLink
 
-  const onCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(link)
-      setCopyState('copied')
-      window.setTimeout(() => setCopyState('idle'), 1200)
-    } catch {
-      setCopyState('failed')
-    }
-  }
+
 
   return (
     <>
@@ -111,9 +104,7 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
           aria-label="友だち追加リンク"
           className={styles.urlField}
         />
-        <Button type="button" onClick={onCopy}>
-          <Copy size={15} aria-hidden="true" />{copyState === 'copied' ? 'コピーしました' : 'コピー'}
-        </Button>
+        <CopyTextButton value={link} aria-label="友だち追加URLをコピー"  />
         <Button type="button" onClick={() => writeQr(routeId || 'base')}>
           <QrCode size={15} aria-hidden="true" />QRを表示
         </Button>
