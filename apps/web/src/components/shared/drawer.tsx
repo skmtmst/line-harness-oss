@@ -11,6 +11,7 @@ export type DrawerDetail = { label: string; value: ReactNode }
 export type DrawerProps = {
   open: boolean
   title: string
+  titleAccessory?: ReactNode
   description?: string
   dirty?: boolean
   busy?: boolean
@@ -26,7 +27,7 @@ export type DrawerProps = {
    * 'editor' は 540 の編集の引き出し（ダッシュボード編集 mcOqK：頭 16/20・閉じるは枠つき 30・
    * 中 12/20・下 14/20・開くのは 200ms）。v8 だけで効く。
    */
-  width?: 'narrow' | 'editor'
+  width?: 'narrow' | 'editor' | 'composer'
   /** V8 の板ごとの幅。省くと既定の幅。 */
   designWidth?: number
   /** 頭の題の行の下に置くもの（タブ・説明の1行）。渡したときだけ頭を縦に積む。 */
@@ -39,6 +40,7 @@ export type DrawerProps = {
 export default function Drawer({
   open,
   title,
+  titleAccessory,
   description,
   dirty = false,
   busy = false,
@@ -66,7 +68,7 @@ export default function Drawer({
 
   const titleBlock = (
     <div>
-      <h2 id={titleId} className={`${styles.title} ${modal ? '' : styles.inlineTitle}`}>{title}{dirty ? ' *' : ''}</h2>
+      <div className={titleAccessory ? styles.titleRow : undefined}><h2 id={titleId} className={`${styles.title} ${modal ? '' : styles.inlineTitle}`}>{title}{dirty ? ' *' : ''}</h2>{titleAccessory}</div>
       {description ? <p id={descriptionId} className={styles.description}>{description}</p> : null}
     </div>
   )

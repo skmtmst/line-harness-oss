@@ -23,12 +23,14 @@ export function Steps({
   label,
   steps,
   currentKey,
+  connectorSize,
 }: {
   /** 何の進みか（例：「リッチメニューを作る手順」）。nav の読み上げ名。 */
   label: string
   steps: ReadonlyArray<StepperStep>
   /** いまいる段の key（例：URL の `?step=`）。渡さないときは state が current の最初の段。 */
   currentKey?: string
+  connectorSize?: 'short'
 }) {
   const items = steps.map((raw, index) => ({ ...raw, key: raw.key ?? raw.label, order: raw.order ?? index + 1 }))
   const currentIndex = currentKey !== undefined
@@ -72,7 +74,7 @@ export function Steps({
   }, [compact, labelsKey])
 
   return (
-    <nav ref={navRef} aria-label={label} data-part="steps" data-compact={compact || undefined} className={styles.root}>
+    <nav ref={navRef} aria-label={label} data-part="steps" data-connector-size={connectorSize} data-compact={compact || undefined} className={styles.root}>
       <ol ref={listRef} className={styles.list} data-design="Steps">
         {items.map((step, index) => {
           const state = stateOf(index)

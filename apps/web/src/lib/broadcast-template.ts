@@ -12,6 +12,7 @@ import {
 } from '@line-crm/shared'
 import {
   serializeMessageKind,
+  emptyMessageKindState,
   type MessageKind,
   type MessageKindState,
 } from '@/components/scenarios/message-kind-fields'
@@ -26,6 +27,9 @@ export interface BroadcastTemplateOption {
   folderId?: string | null
   /** 持ち主のLINEアカウント。アカウント切替で持ち主を追跡するために残す。 */
   accountId?: string | null
+  carouselTapLimitMode?: string
+  carouselTapLimitText?: string | null
+  carouselActions?: unknown | null
   usageCount?: number
   updatedAt?: string
 }
@@ -65,6 +69,24 @@ export function messageTemplateToBubble(template: BroadcastTemplateOption): Broa
     }
   }
 
+
+  if (template.messageType === 'carousel') {
+    try {
+      const columns = JSON.parse(template.messageContent)
+      if (!Array.isArray(columns) || !columns.length) return null
+      return { id: bubbleId(), type: 'carousel', content: { columnsJson: template.messageContent, templateId: template.id, templateName: template.name, carouselActions: template.carouselActions, tapLimitMode: template.carouselTapLimitMode ?? 'none', tapLimitText: template.carouselTapLimitText ?? '' } }
+    } catch { return null }
+  }
+  if (['audio', 'sticker', 'location'].includes(template.messageType)) {
+    try {
+      const content = JSON.parse(template.messageContent)
+      const state = emptyMessageKindState()
+      if (template.messageType === 'audio') state.audio = { originalContentUrl: String(content.originalContentUrl ?? ''), duration: String(Number(content.duration) / 1000) }
+      if (template.messageType === 'sticker') state.sticker = { packageId: String(content.packageId ?? ''), stickerId: String(content.stickerId ?? '') }
+      if (template.messageType === 'location') state.location = { title: String(content.title ?? ''), address: String(content.address ?? ''), latitude: String(content.latitude ?? ''), longitude: String(content.longitude ?? '') }
+      return { id: bubbleId(), type: template.messageType as BroadcastBubbleType, content: { state, templateId: template.id, templateName: template.name } }
+    } catch { return null }
+  }
 
   if (template.messageType === 'imagemap') {
     try {

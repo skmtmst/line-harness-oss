@@ -119,9 +119,7 @@ function buttonByText(label: string): HTMLButtonElement | undefined {
 }
 
 function headings(): string[] {
-  return [...container.querySelectorAll('h4')]
-    .map((h) => h.textContent ?? '')
-    .filter((text) => text.includes('通目'))
+  return [...container.querySelectorAll('[aria-label$="通目の吹き出し"]')].map(card => `${card.getAttribute('aria-label')?.replace('の吹き出し','')}・${card.querySelector('[role=tab][aria-selected=true]')?.textContent}`)
 }
 
 describe('一斉配信のボタンとテキスト操作（R206・R208・R209）', () => {
@@ -159,7 +157,7 @@ describe('一斉配信のボタンとテキスト操作（R206・R208・R209）'
       expect(textareas().map((t) => t.value)).toEqual(['あ', 'い'])
 
       // 1通目を下へ動かすと、本文を保ったまま入れ替わる。
-      const downButtons = [...container.querySelectorAll('button[aria-label="下へ移動"]')]
+      const downButtons = [...container.querySelectorAll('button[aria-label$="通目を下へ移動"]')]
       expect(downButtons).toHaveLength(2)
       await act(async () => {
         downButtons[0].dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -170,7 +168,7 @@ describe('一斉配信のボタンとテキスト操作（R206・R208・R209）'
 
       // 2通目をテキストのまま削除できる（画像へ切り替える裏技は要らない）。
       const deleteButtons = [...container.querySelectorAll('button')].filter(
-        (button) => button.textContent === '削除する' && !button.disabled,
+        (button) => Boolean(button.getAttribute('aria-label')?.endsWith('通目を削除する')) && !button.disabled,
       )
       expect(deleteButtons).toHaveLength(2)
       await act(async () => {

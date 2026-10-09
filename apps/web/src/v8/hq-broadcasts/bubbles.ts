@@ -204,7 +204,7 @@ export function bubbleFromTemplate(templateId: string, definition: MessageTempla
 /** 店の作る部品（カルーセル・リッチメッセージ。template-edit/host の口）がその場で組み立てた中身を、吹き出しにする。 */
 export function bubbleFromHostContent(content: TemplateHostContent): HqBubble | null {
   const base = newHqBubble('text')
-  if (content.kind === 'carousel') return { ...base, kind: 'carousel', content: { templateId: '', templateName: content.name, columnsJson: content.messageContent } }
+  if (content.kind === 'carousel') return { ...base, kind: 'carousel', content: { templateId: '', templateName: content.name, columnsJson: content.messageContent }, media: content.media }
   if (content.kind === 'rich_message') {
     return { ...base, kind: 'rich', content: { assetId: `hq-inline-${base.id}`, assetName: content.name, ...content.payload }, media: [...content.media] }
   }
@@ -217,7 +217,7 @@ export function bubbleFromHostContent(content: TemplateHostContent): HqBubble | 
 export function hostContentOfBubble(item: HqBubble): TemplateHostContent | undefined {
   const name = String(item.content.templateName ?? item.content.assetName ?? '')
   if (item.kind === 'carousel' && !item.cardAsset && item.content.columnsJson) {
-    return { kind: 'carousel', name, messageContent: String(item.content.columnsJson), tapLimitMode: 'none', tapLimitText: null }
+    return { kind: 'carousel', name, messageContent: String(item.content.columnsJson), tapLimitMode: 'none', tapLimitText: null, media: item.media }
   }
   if (item.kind === 'rich' && item.media?.length) {
     const { assetId: _id, assetName: _name, ...payload } = item.content
@@ -237,7 +237,7 @@ export function templateContentOfBubble(item: HqBubble, name: string): { content
     return item.content.originalContentUrl ? { content: { kind: 'message', name, messageType: 'image', messageContent: JSON.stringify(item.content) } } : { error: '画像をアップロードしてから保存してください' }
   }
   if (item.kind === 'flex' && item.content.flexJson) return { content: { kind: 'message', name, messageType: 'flex', messageContent: String(item.content.flexJson) } }
-  if (item.kind === 'carousel' && !item.cardAsset && item.content.columnsJson) return { content: { kind: 'carousel', name, messageContent: String(item.content.columnsJson), tapLimitMode: 'none', tapLimitText: null } }
+  if (item.kind === 'carousel' && !item.cardAsset && item.content.columnsJson) return { content: { kind: 'carousel', name, messageContent: String(item.content.columnsJson), tapLimitMode: 'none', tapLimitText: null, media: item.media } }
   if (item.kind === 'coupon' && item.content.assetId) {
     const { assetId: _id, assetName: _name, ...payload } = item.content
     void _id; void _name

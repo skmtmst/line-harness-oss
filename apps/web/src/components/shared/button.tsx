@@ -21,7 +21,7 @@ type CommonProps = {
    * そろえるときだけ使う（★V7：行内の操作は32）。本文の操作は
    * `standard` のままにする。
    */
-  size?: 'standard' | 'field' | 'compact' | 'inline' | 'slot' | 'thumbnail'
+  size?: 'standard' | 'field' | 'compact' | 'inline' | 'slot' | 'thumbnail' | 'composer' | 'composer-small'
   align?: 'start'
   /** 行内の時刻など、リンク色にしない文字操作。 */
   textTone?: 'action' | 'ink'

@@ -144,3 +144,17 @@
 .urlDetails { margin-top: var(--space-10); font-size: 12px; }
 .urlDetails summary { cursor: pointer; color: var(--color-ink-secondary); }
 .urlDetails[open] > :not(summary) { margin-top: var(--space-8); }
+
+/* G-9: 共通 composer の段では説明の下の間も絵の寸法を使う。 */
+.root[data-step='message'] .stepsBelow { margin-top: var(--space-12); }
+.root[data-step='message'] .heading h2 { font-size: 18px; line-height: var(--space-24); }
+.root[data-step='message'] .heading p { line-height: var(--space-16); }
+
+.root[data-step='message'] .header :global([data-part='stepper'] ol), .root[data-step='message'] .header :global([data-part='stepper'] li) { gap: var(--space-8); }
+.root[data-step='message'] .header :global([data-part='stepper'] li > :last-child) { gap: var(--tpl-msg-composer-step-gap); }
+
+.root[data-step='message'] .previewHead, .root[data-step='message'] .previewSummary { padding-left: 7px; padding-right: 7px; }
+.root[data-step='message'] .previewSummary { padding-top: 17px; }
+.root[data-step='message'] .previewSummary h3 { line-height: 18px; }
+.root[data-step='message'] .previewActions { margin-top: -7px; }
+.root[data-step='message'] .deviceSwitch button { padding-left: 14px; padding-right: 14px; }

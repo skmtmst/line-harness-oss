@@ -16,13 +16,12 @@ import { Steps } from '@/components/templates/steps'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { AlertTriangle, ArrowDown, ArrowRight, ArrowUp, CheckCircle2, Eye, Plus, Save, Send, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowRight, CheckCircle2, Eye, Send } from 'lucide-react'
 import type { Folder, HqBroadcastInput, HqBroadcastPreflight, HqBroadcastRun, LineAccount, MessageTemplateDefinition, SegmentCondition } from '@line-crm/shared'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import Dialog from '@/components/shared/dialog'
 import { SingleOperatorFields } from '@/components/broadcasts/broadcast-approval'
-import { BubblePreview, MediaUpload } from '@/components/broadcasts/broadcast-form'
-import MessageKindFields, { emptyMessageKindState, type MessageKind, type MessageKindState } from '@/components/scenarios/message-kind-fields'
+import { BubblePreview } from '@/components/broadcasts/broadcast-form'
 import { TARGET_MODES } from '@/lib/broadcast-audience'
 import { pruneCondition } from '@/lib/segment-condition'
 import { HqApprovalBlock, HqTestSendDialog, approvalGate, useHqApproval } from './approval'
@@ -36,8 +35,7 @@ import { TimeField } from '@/components/shared/date-time-field'
 import FilterChip from '@/components/shared/filter-chip'
 import { FolderDot, FolderDotName } from '@/components/shared/folder-dot'
 import HelpTip from '@/components/shared/help-tip'
-import SearchField from '@/components/shared/search-field'
-import InsertTextField, { InsertButton, type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import { InsertButton, type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -63,7 +61,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import RowMenu from './row-menu'
 import { ASSET_KIND, STORE_INSERTS, STORE_INSERT_CHIPS, type HqKind, fromApiContent, jpDateTime, preflightBadge, previewText, sendTotals, splitPreflightRows, toApiContent } from './model'
-import { HQ_KIND_LABEL, HQ_KIND_TABS, HQ_NOT_YET, bubbleFromTemplate, carouselColumns, emptyContent, fromApiBubble, hqBubbleProblem, previewBubbleOf, bubbleFromHostContent, hostContentOfBubble, templateContentOfBubble, hqBubbleSummary, newHqBubble, notYetText, toApiBubble, type HqBubble } from './bubbles'
+import { HQ_KIND_LABEL, bubbleFromTemplate, emptyContent, fromApiBubble, hqBubbleProblem, previewBubbleOf, bubbleFromHostContent, hostContentOfBubble, templateContentOfBubble, hqBubbleSummary, newHqBubble, notYetText, toApiBubble, type HqBubble } from './bubbles'
 import HqTemplatePicker from './template-picker'
 import HqBroadcastSourcePicker, { broadcastPickerItem } from './source-picker'
 import { SourcePickerSelection, type SourcePickerItem, type SourcePickerFolder } from '@/components/shared/source-picker-dialog'
@@ -73,6 +71,7 @@ import type { TemplateEditHost } from '@/v8/template-edit/host'
 import { hostDefinition } from '@/v8/hq-templates/console'
 import { freshDefinition } from '@/lib/hq-template-authoring'
 import styles from './create.module.css'
+import MessageComposer, { MessageComposerPage } from '@/components/shared/message-composer'
 
 type Store = Pick<LineAccount, 'id' | 'name' | 'tags'> & { friendCount: number; folderId: string | null; folder: Folder | null }
 /** 配信対象（店の一斉配信と同じ4つ。名前は店の口と同じ：詳細条件は advanced）。 */
@@ -108,13 +107,6 @@ function errorText(caught: unknown, fallback: string): string {
   }
   // 「API error: 500」のような内部の文は出さない。
   return japaneseDetailOf(caught) || fallback
-}
-
-/** 「9/20」。 */
-function shortDate(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? '—' : `${d.getMonth() + 1}/${d.getDate()}`
 }
 
 /** 送った人数（外したアカウントを除く）。 */
@@ -175,10 +167,11 @@ function audienceFromInput(saved: HqBroadcastInput): { audience: Audience; tagNa
 
 export default function HqBroadcastCreate() {
   /* ③ でカルーセル・リッチメッセージをその場で作っている間は、店の作る部品（template-edit/host の口）を画面いっぱいに出す。 */
+  const [composerBusy, setComposerBusy] = useState(false)
   const [composer, setComposer] = useState<null | 'carousel' | 'rich'>(null)
   /* 部品も画面名を付けるので、親（この画面）の名前で上書きする（部品より後に走る）。閉じたら一括配信を作るに戻す。 */
-  usePageTitle(composer === 'carousel' ? 'カルーセルを作る' : composer === 'rich' ? 'リッチメッセージを作る' : '一括配信を作る')
-  usePageCrumbs(composer ? [{ label: '一括配信', href: '/hq/broadcasts' }, { label: '一括配信を作る', href: '/hq/broadcasts/new' }] : [{ label: '一括配信', href: '/hq/broadcasts' }])
+  usePageTitle('一括配信を作る')
+  usePageCrumbs([{ label: '一括配信', href: '/hq/broadcasts' }])
   const router = useRouter()
   const samePageUrl = useSamePageUrl()
   const params = useSearchParams()
@@ -259,7 +252,8 @@ export default function HqBroadcastCreate() {
   const [carousels, setCarousels] = useState<HqTemplateListItem[] | null>(null)
   const [carouselError, setCarouselError] = useState('')
   const [pickerOpen, setPickerOpen] = useState(false)
-  /* ［保存してテンプレート化する］（開いている吹き出しを統括のひな形に保存する）。 */
+  const [pickerKind, setPickerKind] = useState<string | undefined>()
+  /* ［保存してテンプレートにする］（開いている吹き出しを統括のひな形に保存する）。 */
   const [saveTplOpen, setSaveTplOpen] = useState(false)
   const [saveTplName, setSaveTplName] = useState('')
   const [saveTplBusy, setSaveTplBusy] = useState(false)
@@ -691,7 +685,7 @@ export default function HqBroadcastCreate() {
   const sendWhenLabel = when === 'now' ? '今すぐ' : scheduledAt ? jpDateTime(scheduledAt) : '未設定'
   const { shown, rest } = splitPreflightRows(checks ?? [], showAll ? Infinity : ROWS_SHOWN)
   const exampleStore = (checks ?? []).find((p) => !p.excluded && !p.blockedReasons.length)?.accountName ?? chosen[0]?.name ?? '店の名前'
-  const previewBubbles = bubbles.map((item) => previewBubbleOf(item, previewText(item.body, exampleStore)))
+  const previewBubbles = bubbles.map((item) => step === 'message' && item.kind === 'carousel' && !item.cardAsset ? toApiBubble(item, item.id) : previewBubbleOf(item, previewText(item.body, exampleStore)) ?? toApiBubble(item, item.id))
   const steps = broadcastSteps({
     basicDone: Boolean(title.trim()) && title.trim().length <= TITLE_MAX,
     audienceDone: chosen.length > 0 && (audience === 'all' || audience === 'scenario' || (audience === 'tag' && Boolean(tagName)) || (audience === 'advanced' && (Boolean(pruneCondition(condition)) || Boolean(savedName)))),
@@ -701,7 +695,7 @@ export default function HqBroadcastCreate() {
   const stepIndex = STEP_ORDER.indexOf(step)
   const draftLabel = savedAt ? `下書き保存済み・${formatRelative(savedAt)}` : draftState === 'ready' ? '保存済みの下書きを開いています' : '下書き・未保存'
 
-  /** ［保存してテンプレート化する］：開いている吹き出しを統括のひな形（メッセージ）として保存する。 */
+  /** ［保存してテンプレートにする］：開いている吹き出しを統括のひな形（メッセージ）として保存する。 */
   const saveAsTemplate = async () => {
     const name = saveTplName.trim()
     if (!name) { setSaveTplError('テンプレートの名前を入れてください'); return }
@@ -721,27 +715,36 @@ export default function HqBroadcastCreate() {
     }
   }
 
-  if (composer && canManage) {
+  const inlineEditor = composer && canManage ? (() => {
     /* 店のカルーセル・リッチメッセージの作る部品をそのまま使う（統括のテンプレートと同じ host の口）。保存は吹き出しに入れるだけ。 */
     const host: TemplateEditHost = {
+      composer: { index: openBubble, accountId: null },
       backHref: '/hq/broadcasts',
       description: '作った中身は、この一括配信のメッセージに入ります（テンプレートには残りません）',
       folders: [],
       folder: '',
       onFolderChange: () => {},
-      busy: false,
-      primaryLabel: 'メッセージに入れる',
+      busy: composerBusy,
+      primaryLabel: 'この吹き出しに入れる',
       initialContent: hostContentOfBubble(active),
-      onSave: (content) => {
+      onSave: async (content, alsoSave) => {
+        if (alsoSave) {
+          setComposerBusy(true)
+          try { await hqTemplatesApi.create({ type: 'template', name: content.name, definition: hostDefinition(freshDefinition('template') as MessageTemplateDefinition, content) }, crypto.randomUUID()) } catch (caught) { setCarouselError(errorText(caught, 'テンプレートに保存できませんでした。')); return false } finally { setComposerBusy(false) }
+        }
         const next = bubbleFromHostContent(content)
-        if (next) { replaceActive(next); setCarouselError('') }
+        if (next) { replaceActive({ ...next, content: { ...next.content, inline: true } }); setCarouselError('') }
+        if (!next) return false
         setComposer(null)
+        return true
       },
       onCancel: () => setComposer(null),
+      notice: carouselError ? <Notice tone="danger">{carouselError}</Notice> : undefined,
+      uploadCarouselImage: (file) => hqTemplatesApi.uploadImage(file, 'message'),
       uploadRichImage: (file) => hqTemplatesApi.uploadRichMessageImage(file),
     }
     return composer === 'carousel' ? <CarouselV8 host={host} /> : <TemplateRichEditor host={host} />
-  }
+  })() : null
 
   if (!canManage) {
     return (
@@ -763,14 +766,14 @@ export default function HqBroadcastCreate() {
 
   return (
     <>
-      <div className={formStyles.root} data-step={step} data-hq-broadcast-create="">
+      <MessageComposerPage active={step === 'message'}><div className={formStyles.root} data-step={step} data-hq-broadcast-create="">
         <header className={formStyles.header} data-steps-below="">
           <div className={formStyles.heading}>
             <h2>一括配信を作る</h2>
             <p aria-live="polite">{draftLabel}</p>
           </div>
           {/* 手順は題と説明のすぐ下・左寄せ・1行（型の共通部品 Steps・Fa8ED / q1xNMz）。 */}
-          <div className={formStyles.stepsBelow}><Steps label="配信作成の進み" steps={steps.map((item) => ({ ...item, onSelect: () => changeStep(item.key) }))} currentKey={step} /></div>
+          <div className={formStyles.stepsBelow}><Steps connectorSize={step === 'message' ? 'short' : undefined} label="配信作成の進み" steps={steps.map((item) => ({ ...item, onSelect: () => changeStep(item.key) }))} currentKey={step} /></div>
           <Button aria-expanded={previewOpen} aria-controls="hq-broadcast-line-preview" className={formStyles.previewToggle} onClick={() => setPreviewOpen(true)}><Eye size={14} aria-hidden /> LINEの見え方</Button>
         </header>
         {error ? (
@@ -982,127 +985,22 @@ export default function HqBroadcastCreate() {
             {/* ③ メッセージを作成（lLyFR） */}
             {shows('message') ? (
               <section id="broadcast-step-message" className={formStyles.section}>
-                <div className={styles.messageHead}>
-                  <h3>{`メッセージ（${Math.min(openBubble, bubbles.length - 1) + 1} / ${bubbles.length}）`}</h3>
-                  {/* 絵 lLyFR：見出しの右に［テンプレートから選ぶ］［保存してテンプレート化する］（開いている吹き出しを統括のひな形に保存）。 */}
-                  <span className={styles.messageHeadActions}>
-                    <Button size="compact" onClick={() => setPickerOpen(true)}>テンプレートから選ぶ</Button>
-                    <Button size="compact" onClick={() => { setSaveTplName(String(active.content.templateName ?? active.content.assetName ?? '') || title.trim()); setSaveTplError(''); setSaveTplOpen(true) }}><Save size={14} aria-hidden /> 保存してテンプレート化する</Button>
-                  </span>
-                </div>
-                {/* 店の一斉配信と同じく吹き出しは5つまで。開いているのは1つで、ほかは1行の要約（API-18 の複数の吹き出し）。 */}
-                {bubbles.map((item, index) => (
-                  <details key={item.id} className={formStyles.bubbleFrame} data-embedded open={index === Math.min(openBubble, bubbles.length - 1)}>
-                    <summary onClick={(event) => { event.preventDefault(); setOpenBubble(index) }}>
-                      <span className={formStyles.bubbleNumber}>{index + 1}</span>
-                      <span title={bubbleSummary(item)}>{index === Math.min(openBubble, bubbles.length - 1) ? KIND_LABEL[item.kind] : bubbleSummary(item)}</span>
-                      <span className={formStyles.bubbleControls} onClick={(event) => { event.preventDefault(); event.stopPropagation() }}>
-                        <Button size="compact" aria-label={`${index + 1}通目を上へ移動`} disabled={index === 0} onClick={() => { setBubbles((items) => { const next = [...items]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; return next }); setOpenBubble(index - 1) }}><ArrowUp size={12} aria-hidden /></Button>
-                        <Button size="compact" aria-label={`${index + 1}通目を下へ移動`} disabled={index === bubbles.length - 1} onClick={() => { setBubbles((items) => { const next = [...items]; [next[index + 1], next[index]] = [next[index], next[index + 1]]; return next }); setOpenBubble(index + 1) }}><ArrowDown size={12} aria-hidden /></Button>
-                        <Button size="compact" aria-label={`${index + 1}通目を削除する`} disabled={bubbles.length === 1} onClick={() => { setBubbles((items) => items.filter((_, i) => i !== index)); setOpenBubble(0) }}><Trash2 size={12} aria-hidden /></Button>
-                      </span>
-                    </summary>
-                    {index === Math.min(openBubble, bubbles.length - 1) ? (
-                      <>
-                        <div className="flex flex-wrap gap-2" role="tablist" aria-label={bubbles.length > 1 ? `${index + 1}通目のメッセージの形式` : 'メッセージの形式'}>
-                          {HQ_KIND_TABS.map(([value, label]) => (
-                            <button key={value} type="button" role="tab" aria-selected={kind === value} tabIndex={kind === value ? 0 : -1} className="broadcast-message-type" data-active={kind === value || undefined}
-                              title={HQ_NOT_YET.has(value) ? notYetText(value) : value === 'coupon' ? 'クーポン' : undefined}
-                              onClick={() => { if (kind !== value) setKind(value) }}>{label}</button>
-                          ))}
-                        </div>
-                        {kind === 'text' ? (
-                          <section>
-                            <InsertTextField
-                              ref={bodyRef}
-                              aria-label="本文"
-                              rows={6}
-                              maxLength={BODY_MAX}
-                              value={body}
-                              onValueChange={setBody}
-                              extraTokens={STORE_INSERT_CHIPS}
-                              placeholder="{店名}より：…"
-                              className="border-hairline rounded-control w-full resize-none border p-3 text-sm focus:border-accent focus:outline-none"
-                            />
-                            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-                              <span className={styles.inserts}>
-                                <span className="text-ink-faint">差し込む：</span>
-                                {STORE_INSERTS.map((item) => (
-                                  <InsertButton key={item.label} label={item.label.slice(1, -1)} title={item.help} onClick={() => insert(item.label)} />
-                                ))}
-                              </span>
-                              <span className="text-ink-faint">{`${formatNumber(body.length)} / ${formatNumber(BODY_MAX)}`}</span>
-                            </div>
-                            <p className="mt-2 text-xs text-ink-faint">{'{店名}・{店の電話番号}・{予約ページ} は、送るアカウントの名前と共通情報に置き換わります。共通情報が無いアカウントは最終確認で外します。'}</p>
-                          </section>
-                        ) : HQ_NOT_YET.has(kind) ? (
-                          <p className={styles.notYet} role="note">{notYetText(kind)}</p>
-                        ) : kind === 'image' || kind === 'video' ? (
-                          /* 店の一斉配信と同じアップロード欄。置き場はどの店にも属さない（統括）ので、どのアカウントからも同じ URL で届く。 */
-                          <MediaUpload bubble={{ id: active.id, type: kind, content: active.content }} lineAccountId={null} onChange={(next) => setContent(next)} />
-                        ) : kind === 'audio' || kind === 'sticker' || kind === 'location' ? (
-                          <MessageKindFields
-                            kind={kind as MessageKind}
-                            value={(active.content.state as MessageKindState | undefined) ?? emptyMessageKindState()}
-                            onChange={(next) => setContent({ state: next })}
-                          />
-                        ) : kind === 'flex' ? (
-                          /* 統括のメッセージのひな形（画像・ボタンつきのカード）。中身はひな形のまま送る。直すときは統括のテンプレートで。 */
-                          <section>
-                            <p className="text-xs text-ink-secondary">{`テンプレート「${String(active.content.templateName ?? '')}」のカードをそのまま送ります。中身を直すときは統括の「テンプレート」で直してから選び直してください。`}</p>
-                            {hqBubbleProblem(active) ? <p className="mt-2 text-xs text-warning" role="alert">{hqBubbleProblem(active)}</p> : null}
-                          </section>
-                        ) : kind === 'carousel' ? (
-                          <section>
-                            {/* 統括のカルーセルのひな形（コンテンツ ＞ テンプレート ＞ カルーセル）から選ぶ。中身そのものを控えるので、ひな形を消しても送れる。 */}
-                            {carousels === null ? <p className="text-xs text-ink-faint">読み込んでいます…</p> : carousels.length === 0 ? (
-                              <p className="text-xs text-ink-faint">統括のカルーセルのテンプレートがありません。「テンプレート」でカルーセルを作ってください。</p>
-                            ) : (
-                              <Select
-                                aria-label="カルーセルを選ぶ"
-                                value={String(active.content.hqTemplateId ?? active.content.assetId ?? '')}
-                                onChange={(id) => void chooseCarousel(id)}
-                                size="full"
-                                options={[{ value: '', label: '選んでください' }, ...carousels.map((t) => ({ value: t.id, label: t.name }))]}
-                              />
-                            )}
-                            <div className={styles.composeRow}>
-                              {active.content.templateName || active.content.assetName ? <span>{`カード${carouselColumns(active).length}枚`}</span> : <span>ひな形が無ければ、ここで作れます</span>}
-                              <Button size="compact" onClick={() => setComposer('carousel')}><Plus size={14} aria-hidden /> {hostContentOfBubble(active) ? 'このカルーセルを直す' : 'カルーセルをその場で作る'}</Button>
-                            </div>
-                            {carouselError ? <p className="mt-2 text-xs text-warning" role="alert">{carouselError}</p> : (active.content.templateName || active.content.assetName) && hqBubbleProblem(active) ? <p className="mt-2 text-xs text-warning" role="alert">{hqBubbleProblem(active)}</p> : null}
-                          </section>
-                        ) : (
-                          <section>
-                            {kind === 'coupon' ? <p className="mb-2 text-xs text-ink-faint">その他の種類：クーポン</p> : null}
-                            {assets === null ? <p className="text-xs text-ink-faint">読み込んでいます…</p> : kindAssets.length === 0 ? (
-                              <p className="text-xs text-ink-faint">{`統括で使える${KIND_LABEL[kind]}がありません。「コンテンツ ＞ テンプレート」で、どの店にも属さない素材として作ってください。`}</p>
-                            ) : (
-                              <Select
-                                aria-label={`${KIND_LABEL[kind]}を選ぶ`}
-                                value={assetId}
-                                onChange={setAssetId}
-                                size="full"
-                                options={[{ value: '', label: '選んでください' }, ...kindAssets.map((a) => ({ value: a.id, label: a.name }))]}
-                              />
-                            )}
-                            {kind === 'rich' ? (
-                              <div className={styles.composeRow}>
-                                <span>{active.media?.length ? `その場で作ったリッチメッセージ：${String(active.content.assetName ?? '')}` : '素材が無ければ、ここで作れます'}</span>
-                                <Button size="compact" onClick={() => setComposer('rich')}><Plus size={14} aria-hidden /> {active.media?.length ? 'このリッチメッセージを直す' : 'リッチメッセージをその場で作る'}</Button>
-                              </div>
-                            ) : null}
-                            {assetId && hqBubbleProblem(active) ? <p className="mt-2 text-xs text-warning" role="alert">{hqBubbleProblem(active)}</p> : null}
-                          </section>
-                        )}
-                      </>
-                    ) : null}
-                  </details>
-                ))}
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button type="button" disabled={bubbles.length >= MAX_BUBBLES} onClick={() => { setBubbles((items) => [...items, newBubble('text')]); setOpenBubble(bubbles.length) }}><Plus size={15} aria-hidden /> メッセージを追加する</Button>
-                  <span className="text-xs text-ink-faint">{bubbles.length >= MAX_BUBBLES ? '5つまでです' : `あと${MAX_BUBBLES - bubbles.length}つ`}</span>
-                </div>
+                <MessageComposer
+                  bubbles={bubbles.map((item) => item.kind === 'text' ? { id: item.id, type: 'text', content: { text: item.body } } : toApiBubble(item, item.id) ?? { id: item.id, type: 'research', content: item.content })}
+                  accountId={null}
+                  busy={composerBusy} onBusyChange={setComposerBusy}
+                  extraTokens={STORE_INSERT_CHIPS}
+                  inserts={(ref, value, change) => <><span>差し込む：</span>{STORE_INSERTS.map((item) => <InsertButton size="compact" key={item.label} label={item.label.slice(1, -1)} title={item.help} onClick={() => { const field = ref.current; const start = field?.selectionStart ?? value.length; const end = field?.selectionEnd ?? start; change((value.slice(0, start) + item.label + value.slice(end)).slice(0, BODY_MAX)); requestAnimationFrame(() => { field?.focus(); field?.setSelectionRange(start + item.label.length, start + item.label.length) }) }} />)}</>}
+                  unavailable={{ research: notYetText('question'), intro: notYetText('intro'), rich_video: '統括からリッチビデオはまだ送れません。' }}
+                  onChange={(index, next) => { const item = fromApiBubble(next); if (item) setBubbles((items) => items.map((current, i) => i === index ? { ...current, ...item, id: current.id, ...(current.kind === item.kind ? { media: current.media, previewCard: current.previewCard } : {}) } : current)) }}
+                  onMove={(index, direction) => { setBubbles((items) => { const next = [...items]; [next[index], next[index + direction]] = [next[index + direction], next[index]]; return next }); setOpenBubble(index + direction) }}
+                  onDelete={(index) => { setBubbles((items) => items.filter((_, i) => i !== index)); setOpenBubble(0) }}
+                  onAdd={() => { setBubbles((items) => [...items, newBubble('text')]); setOpenBubble(bubbles.length) }}
+                  onPickTemplate={(index, kind) => { setPickerKind(kind); setOpenBubble(index); setPickerOpen(true) }}
+                  onSaveTemplate={(index) => { setOpenBubble(index); setSaveTplName(String(bubbles[index].content.templateName ?? bubbles[index].content.assetName ?? '') || title.trim()); setSaveTplError(''); setSaveTplOpen(true) }}
+                  onCompose={(index, kind) => { setOpenBubble(index); setCarouselError(''); setComposer(kind === 'carousel' ? 'carousel' : 'rich') }}
+                  extraFields={(index, item) => item.type === 'coupon' ? <Select aria-label="クーポンを選ぶ" value={String(item.content.assetId ?? '')} onChange={(id) => { const asset = (assets ?? []).find((a) => a.id === id); setBubbles((items) => items.map((current, i) => i === index ? { ...current, content: asset ? assetContent(asset) : {} } : current)) }} options={[{ value: '', label: '選んでください' }, ...(assets ?? []).filter((a) => a.kind === 'coupon').map((a) => ({ value: a.id, label: a.name }))]} size="full" /> : item.type === 'flex' ? <p>選んだテンプレートのカードをそのまま送ります。</p> : null}
+                />
               </section>
             ) : null}
 
@@ -1252,15 +1150,16 @@ export default function HqBroadcastCreate() {
               <LinePreview accountName={exampleStore} caption={when === 'now' ? '今日' : sendWhenLabel} note={`${exampleStore}の例です。差し込みはアカウントごとに変わります（{予約ページ}は省いて見せています）。`}
                 empty={previewBubbles.every((item) => !item) ? 'メッセージは「メッセージを作成」で作ります' : false}>
                 <div className="flex flex-col gap-3 text-ink">
-                  {previewBubbles.map((item, index) => (item ? <BubblePreview key={bubbles[index].id} bubble={item} accountName={exampleStore} /> : null))}
+                  {previewBubbles.map((item, index) => (item ? <BubblePreview key={bubbles[index].id} bubble={item} accountName={exampleStore} composer={step === 'message'} /> : null))}
                 </div>
               </LinePreview>
             </div>
             <p className={formStyles.previewCaption}>{'{店名} は例のアカウントの名前で見せています'}</p>
             <div className={formStyles.previewSummary}><h3>設定内容</h3><dl>{[
-              ['送るアカウント', chosen.length ? `${accountsLabel}（${formatNumber(chosen.length)}）` : '未選択'],
+              ...(step === 'message' ? [] : [['送るアカウント', chosen.length ? `${accountsLabel}（${formatNumber(chosen.length)}）` : '未選択']]),
               ['送る相手', `${audienceFull}（${peopleLabel}）`],
               ['送る日時', sendWhenLabel],
+              ...(step === 'message' ? [['配信後のアクション', '—']] : []),
             ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}</dl></div>
             <div className={formStyles.previewActions}>
               <Button type="button" disabled={checking || chosen.length === 0} title={chosen.length === 0 ? '先に送るアカウントを選んでください' : undefined} onClick={() => setTestOpen(true)}><Send size={14} aria-hidden /> テストを送る</Button>
@@ -1273,9 +1172,9 @@ export default function HqBroadcastCreate() {
         <StickyBar className={formStyles.footer} actions={(
           <>
             {step === 'confirm' ? <Button type="button" onClick={() => changeStep('schedule')}>戻って修正</Button> : null}
-            <Button variant="secondary" className={formStyles.textButton} type="button" disabled={checking || sending} busy={checking && step !== 'confirm'} onClick={() => void saveDraft()}>下書きを保存する</Button>
+            <Button variant="secondary" className={formStyles.textButton} type="button" disabled={checking || sending || composerBusy} busy={checking && step !== 'confirm'} onClick={() => void saveDraft()}>下書きを保存する</Button>
             {step !== 'confirm' ? (
-              <Button variant="primary" onClick={() => changeStep(STEP_ORDER[Math.min(stepIndex + 1, STEP_ORDER.length - 1)])}>
+              <Button variant="primary" disabled={composerBusy} onClick={() => changeStep(STEP_ORDER[Math.min(stepIndex + 1, STEP_ORDER.length - 1)])}>
                 {step === 'message' ? <><span>{nextLabel}</span><ArrowRight size={15} aria-hidden /></> : nextLabel}
               </Button>
             ) : (
@@ -1285,7 +1184,8 @@ export default function HqBroadcastCreate() {
             )}
           </>
         )} />
-      </div>
+        {inlineEditor}
+    </div></MessageComposerPage>
 
       <UnsavedLeaveDialog
         open={leaveTarget !== null}
@@ -1324,11 +1224,11 @@ export default function HqBroadcastCreate() {
           return bubble ? <BubblePreview key={item.id} bubble={bubble} /> : null
         })}
         onClose={() => { setBasicPicker(null); requestAnimationFrame(() => basicPickerTrigger.current?.focus()) }} /> : null}
-      <HqTemplatePicker open={pickerOpen} onClose={() => setPickerOpen(false)} onPick={pickTemplate} />
+      <HqTemplatePicker kind={pickerKind} open={pickerOpen} onClose={() => setPickerOpen(false)} onPick={pickTemplate} />
       <Dialog
         open={saveTplOpen}
         title="テンプレートとして保存する"
-        description="開いているメッセージを、統括のテンプレートに保存します。保存したテンプレートはアカウントへ配ることもできます。"
+        description={`${openBubble + 1}通目の吹き出しを保存します。ほかの吹き出しは含みません。保存したテンプレートはアカウントへ配れます。`}
         confirmLabel="保存する"
         cancelLabel="やめる"
         busy={saveTplBusy}

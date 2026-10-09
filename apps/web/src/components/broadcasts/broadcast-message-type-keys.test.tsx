@@ -10,10 +10,10 @@
  *   5. 実フォーム側は role="tablist" に onKeyDown、各タブに
  *      ロービング tabIndex が付いている。
  */
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { describe, expect, it, vi } from 'vitest'
+import React from 'react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import Composer from '../shared/message-composer'
 
 /*
  * api.ts はモジュール初期化で NEXT_PUBLIC_API_URL を要求する。
@@ -26,10 +26,8 @@ vi.mock('@/lib/api', () => ({
 
 import { moveMessageTypeTabFocus } from './broadcast-form'
 
-const FORM = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), 'broadcast-form.tsx'),
-  'utf8',
-)
+const tablists: HTMLElement[] = []
+afterEach(() => { cleanup(); tablists.splice(0).forEach(element => element.remove()) })
 
 function buildTablist(labels: string[]): { tablist: HTMLElement; tabs: HTMLElement[] } {
   const tablist = document.createElement('div')
@@ -42,6 +40,7 @@ function buildTablist(labels: string[]): { tablist: HTMLElement; tabs: HTMLEleme
     return tab
   })
   document.body.appendChild(tablist)
+  tablists.push(tablist)
   return { tablist, tabs }
 }
 
@@ -93,9 +92,14 @@ describe('メッセージ形式タブの矢印キー操作', () => {
 })
 
 describe('メッセージ形式タブの実フォームへの接続', () => {
-  it('tablist にキーハンドラ、タブにロービング tabindex を付ける', () => {
-    expect(FORM).toContain('role="tablist"')
-    expect(FORM).toContain('moveMessageTypeTabFocus(event, document.activeElement)')
-    expect(FORM).toContain('tabIndex={focusable ? 0 : -1}')
+  it('既存のFlexを開いてもキーボードでタブに入り、本文を変えずに形式を選べる', () => {
+    const changed = vi.fn()
+    render(<Composer accountId="a" bubbles={[{ id: 'old-flex', type: 'flex', content: { flexJson: '{}' } }]} onChange={changed} onMove={() => {}} onDelete={() => {}} onAdd={() => {}} onPickTemplate={() => {}} onSaveTemplate={() => {}} onCompose={() => {}} />)
+    const tabs = within(screen.getByRole('tablist')).getAllByRole('tab')
+    expect(tabs.filter(tab => tab.tabIndex === 0)).toHaveLength(1)
+    const selected = screen.getByRole('tab', { selected: true })
+    selected.focus();fireEvent.keyDown(selected, { key: 'ArrowRight' })
+    expect(document.activeElement).toBe(tabs[0]);expect(changed).not.toHaveBeenCalled()
+    fireEvent.click(tabs[0]);expect(changed).toHaveBeenCalledWith(0, expect.objectContaining({ id: 'old-flex', type: 'text' }))
   })
 })

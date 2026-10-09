@@ -331,3 +331,7 @@
   color: var(--color-ink);
   font-size: var(--tpl-tg2-swipe-size);
 }
+
+.chip[data-composer] { max-width: var(--tpl-msg-composer-carousel-chip-w); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.colBody[data-composer] { font-size: var(--text-caption); line-height: var(--tpl-msg-composer-tab-lh); }

@@ -16,7 +16,8 @@ const KIND_NAME: Record<string, string> = {
   message: 'メッセージ', carousel: 'カルーセル', rich_message: 'リッチメッセージ', question: '質問', coupon: 'クーポン', research: 'リサーチ',
 }
 
-export default function HqTemplatePicker({ open, onClose, onPick }: {
+export default function HqTemplatePicker({ open, onClose, onPick, kind }: {
+  kind?: string
   open: boolean
   onClose: () => void
   /** 読み込めたら null、読み込めない理由があれば文。 */
@@ -38,7 +39,7 @@ export default function HqTemplatePicker({ open, onClose, onPick }: {
   }, [open, list, reload])
 
   const q = query.trim().toLowerCase()
-  const rows = (list ?? []).filter((t) => !q || t.name.toLowerCase().includes(q) || (t.content_summary ?? '').toLowerCase().includes(q))
+  const rows = (list ?? []).filter((t) => (!kind || t.kind === kind) && (!q || t.name.toLowerCase().includes(q) || (t.content_summary ?? '').toLowerCase().includes(q)))
 
   const pick = async (id: string) => {
     setBusy(id); setError('')

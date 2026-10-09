@@ -17,11 +17,14 @@ export type TemplateHostContent =
   /** 質問：店の質問テンプレートと同じ形（質問文・選択肢）。本文は前文か質問文。 */
   | { kind: 'question'; name: string; question: Record<string, unknown>; messageContent: string }
   /** カルーセル：店のカルーセルと同じ形の本文（LINE のカルーセルの列）。押したら動く選択肢は使わない。 */
-  | { kind: 'carousel'; name: string; messageContent: string; tapLimitMode: 'none' | 'once'; tapLimitText: string | null; media?: MessageTemplateMediaDefinition[] }
+  | { kind: 'carousel'; name: string; messageContent: string; tapLimitMode: 'none' | 'once'; tapLimitText: string | null; templateId?: string; carouselActions?: Record<string, Record<string, unknown[]>>; media?: MessageTemplateMediaDefinition[] }
   /** リッチメッセージ（g8d6ai）：統括の口で作った5サイズの画像（media）と、店と同じ形の payload（面と URL）。 */
   | { kind: 'rich_message'; name: string; payload: Record<string, unknown>; media: TemplateImagemapUpload['media'] }
 
 export interface TemplateEditHost {
+  /** G-9: テンプレートの同じ編集部品を吹き出しへ入れる引き出しで使う。 */
+  composer?: { index: number; accountId: string | null; canSaveTemplate?: boolean }
+
   /** @deprecated 板の頭の「← テンプレートへ」は 2026-10-08 に無くした（戻るのは上の帯のパンくずと［キャンセル］）。使わない。 */
   backHref?: string
   /** 板の頭の説明（統括：保存して配ると…）。 */
@@ -40,7 +43,7 @@ export interface TemplateEditHost {
   /** 頭の下に出す知らせ（保存の失敗・結果不明など）。 */
   notice?: ReactNode
   /** 下書きを保存（distribute=false）・保存して配る（distribute=true）。 */
-  onSave: (content: TemplateHostContent, distribute: boolean) => void
+  onSave: (content: TemplateHostContent, distribute: boolean) => void | boolean | Promise<void | boolean>
   onCancel: () => void
   /** 主ボタンの言葉（既定「保存して配る」）。 */
   primaryLabel?: string

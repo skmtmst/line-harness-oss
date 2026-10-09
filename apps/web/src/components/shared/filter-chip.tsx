@@ -19,9 +19,13 @@ export default function FilterChip({
   disabled,
   title,
   icon,
+  size,
+  showCheck = true,
   children,
 }: {
   icon?: ReactNode
+  size?: 'compact'
+  showCheck?: boolean
   selected: boolean
   onChange: (selected: boolean) => void
   /** 文字の後ろに小さく出す件数。取れていないときは出さない（「—」は置かない）。 */
@@ -38,9 +42,9 @@ export default function FilterChip({
       disabled={disabled}
       title={title}
       onClick={() => onChange(!selected)}
-      className="v6-filter-chip"
+      className="v6-filter-chip" data-size={size}
     >
-      {icon ? <span className="v6-filter-chip__icon">{icon}</span> : selected ? <Check aria-hidden="true" className="v6-filter-chip__icon" /> : null}
+      {icon ? <span className="v6-filter-chip__icon">{icon}</span> : selected && showCheck ? <Check aria-hidden="true" className="v6-filter-chip__icon" /> : null}
       {children}
       {count === undefined || count === '' ? null : (
         <>{' '}

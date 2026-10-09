@@ -552,6 +552,64 @@
  *     器の内側1pxの縁と、白いつまみの薄い影（同上）
  */
 [data-theme="v8"] {
+  /* G-9 共通メッセージ作成 */
+  --tpl-msg-composer-fill: 100%;
+  --tpl-msg-composer-image-max-h: none;
+  --tpl-msg-composer-drawer-w: 1160px;
+  --tpl-msg-composer-drawer-head-pad: 18px 24px;
+  --tpl-msg-composer-drawer-title: 20px;
+  --tpl-msg-composer-drawer-title-lh: 30px;
+  --tpl-msg-composer-drawer-footer-pad: 14px 24px;
+  --tpl-msg-composer-drawer-content-pad: 20px 24px;
+  --tpl-msg-composer-drawer-side-w: 380px;
+  --tpl-msg-composer-sticker-h: 72px;
+  --tpl-msg-composer-image-opacity: .2;
+  --tpl-msg-composer-carousel-chip-w: 94px;
+  --tpl-msg-composer-gap: 16px;
+  --tpl-msg-composer-gap-s: 6px;
+  --tpl-msg-composer-title: 15px;
+  --tpl-msg-composer-title-lh: 23px;
+  --tpl-msg-composer-head-pad: 10px 16px;
+  --tpl-msg-composer-head-h: 48px;
+  --tpl-msg-composer-heading-gap: 11px;
+  --tpl-msg-composer-head-gap: 10px;
+  --tpl-msg-composer-step-gap: 7px;
+  --tpl-msg-composer-step-line-w: 10px;
+  --tpl-msg-composer-sticker-switch-pad: 0 16px;
+  --tpl-msg-composer-sticker-chip-h: 26px;
+  --tpl-msg-composer-sticker-chip-pad: 0 12px;
+  --tpl-msg-composer-number: 22px;
+  --tpl-msg-composer-number-inset: 2px;
+  --tpl-msg-composer-kind-pad: 3px 10px;
+  --tpl-msg-composer-tab-gap: 15px;
+  --tpl-msg-composer-tab-pad: 0 20px;
+  --tpl-msg-composer-tab-button-pad: 12px 0 10px;
+  --tpl-msg-composer-insert-h: 24px;
+  --tpl-msg-composer-insert-pad: 2px 8px;
+  --tpl-msg-composer-tab-lh: 18px;
+  --tpl-msg-composer-content-pad: 20px;
+  --tpl-msg-composer-content-gap: 12px;
+  --tpl-msg-composer-text-h: 96px;
+  --tpl-msg-composer-text-pad: 12px;
+  --tpl-msg-composer-text-lh: 20px;
+  --tpl-msg-composer-choice-pad: 16px;
+  --tpl-msg-composer-choice-action-gap: 6px;
+  --tpl-msg-composer-choice-lh: 18px;
+  --tpl-msg-composer-made-gap: 20px;
+  --tpl-msg-composer-made-pad: 7px 16px 16px;
+  --tpl-msg-composer-thumbnail-w: 220px;
+  --tpl-msg-composer-thumbnail-h: 44px;
+  --tpl-msg-composer-add-pad: 5px 20px;
+  --tpl-msg-composer-media-h: 96px;
+  --tpl-msg-composer-audio-h: 36px;
+  --tpl-msg-composer-audio-icon-w: 32px;
+  --tpl-msg-composer-small-button-h: 28px;
+  --tpl-msg-composer-drawer-actions-gap: 28px;
+  --tpl-msg-composer-preview-card-w: 128px;
+  --tpl-msg-composer-preview-image-h: 62px;
+  --tpl-msg-composer-preview-action-h: 28px;
+  --tpl-msg-composer-media-preview: 160px;
+
   /* 面の分け方（案A・JeINq／EFV8l）。タイルと見本の選択色。 */
   --color-layout-picker-sample: #f1f2f4;
   --color-layout-picker-sample-selected: #cfe9d8;
