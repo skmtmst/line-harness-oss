@@ -38,7 +38,7 @@ export default function HqAccountList({
   selectLabel?: string
 }) {
   return (
-    <section data-design="List" data-design-node="vLMQ5" className="min-w-0 overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
+    <section data-design="List" data-design-node="vLMQ5" className="min-w-0 overflow-hidden rounded-card border border-hairline bg-canvas shadow-card-surface">
       {/*
         U042: 768px 未満では表の右端にある操作（ログイン・設定）へ
         横スクロールしないと届かなかった。スマホでは名前＋状態＋操作が
