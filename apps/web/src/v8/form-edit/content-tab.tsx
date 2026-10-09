@@ -76,7 +76,7 @@ export function ContentTab(props: Props) {
             destructiveItem={layout.sections.length > 1 ? {
               id: 'remove',
               label: 'このページを消す',
-              onSelect: () => ((section?.blocks.length ?? 0) === 0 ? props.onRemovePage(page) : setRemoving(true)),
+              onSelect: () => setRemoving(true),
             } : undefined}
           />
         </div>
@@ -129,7 +129,7 @@ export function ContentTab(props: Props) {
       <Dialog
         open={removing}
         title="このページを消す"
-        description={`「${section?.name ?? ''}」と、その中のブロック${section?.blocks.length ?? 0}個を消します。保存するまでは元に戻せます。`}
+        description={`「${section?.name ?? ''}」と、その中のブロック${section?.blocks.length ?? 0}個を消します。この操作は元に戻せません。`}
         confirmLabel="消す"
         onConfirm={() => {
           setRemoving(false)
