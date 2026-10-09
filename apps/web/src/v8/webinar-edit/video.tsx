@@ -6,7 +6,7 @@
  * 右は公開ページでの見え方。
  * 口・保存の決まりは app/webinars/edit/video-v8.tsx・video-stages.tsx・scheduled-session-row.tsx と同じ（BEHAVIOR.md）。
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { CalendarPlus, Check, Monitor, Play, Plus, Smartphone, Upload } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -29,6 +29,8 @@ import {
 } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { fmtJaDuration } from './helpers'
+import { FieldError } from '@/components/shared/form-controls'
+import { focusFieldById } from '@/lib/use-form-errors'
 import { ReadValue } from './parts'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import form from './form.module.css'
@@ -423,11 +425,15 @@ function SessionRow({ webinarId, at, readOnly, editing, onEdit, menu }: {
   const [input, setInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [capError, setCapError] = useState('')
+  const capId = `wd-cap-${useId().replace(/:/g, '')}`
   const lock = useRef(false)
   const save = async () => {
     if (readOnly || lock.current) return
     const capacity = input.trim() === '' ? null : Number(input)
-    if (capacity !== null && (!Number.isSafeInteger(capacity) || capacity < 1)) { setError('定員は1人以上の整数で入れてください。空にすると無制限です。'); return }
+    /* 定員の誤りは、その欄を赤くして移る（B-139）。 */
+    if (capacity !== null && (!Number.isSafeInteger(capacity) || capacity < 1)) { setCapError('定員は1人以上の整数で入れてください。空にすると無制限です。'); setError(''); focusFieldById(capId); return }
+    setCapError('')
     lock.current = true
     setSaving(true)
     setError('')
@@ -449,7 +455,7 @@ function SessionRow({ webinarId, at, readOnly, editing, onEdit, menu }: {
       <span className={styles.colCap}>
         {editing ? (
           <span className={styles.capEdit}>
-            <TextField aria-label={`${when}の定員（人）`} inputMode="numeric" value={input} disabled={saving} placeholder="無制限" onChange={(event) => setInput(event.target.value)} />
+            <TextField id={capId} aria-label={`${when}の定員（人）`} inputMode="numeric" value={input} disabled={saving} placeholder="無制限" invalid={Boolean(capError)} aria-describedby={capError ? `${capId}-error` : undefined} onChange={(event) => { setInput(event.target.value); setCapError('') }} />
             <IconButton aria-label="定員を保存" title="定員を保存" disabled={saving} onClick={() => void save()}><Check size={15} aria-hidden="true" /></IconButton>
           </span>
         ) : <span className={styles.cell}>{session === undefined ? '—' : session?.capacity == null ? '無制限' : `${formatNumber(session.capacity)} 人`}</span>}
@@ -458,9 +464,9 @@ function SessionRow({ webinarId, at, readOnly, editing, onEdit, menu }: {
       <span className={styles.colState}>
         <span className={form.pill} data-tone={session?.state === 'full' ? 'warn' : session?.state === 'open' ? 'info' : undefined}><span className={form.pillDot} aria-hidden="true" />{sessionText(session, failed)}</span>
       </span>
-      {menu(() => { setInput(session?.capacity == null ? '' : String(session.capacity)); setError(''); onEdit(true) })}
-      {editing ? <Button size="compact" disabled={saving} onClick={() => { onEdit(false); setError('') }}>やめる</Button> : null}
-      {error ? <span className={styles.rowError} role="alert">{error}</span> : null}
+      {menu(() => { setInput(session?.capacity == null ? '' : String(session.capacity)); setError(''); setCapError(''); onEdit(true) })}
+      {editing ? <Button size="compact" disabled={saving} onClick={() => { onEdit(false); setError(''); setCapError('') }}>やめる</Button> : null}
+      {capError ? <span id={`${capId}-error`} className={styles.rowError} role="alert">{capError}</span> : error ? <span className={styles.rowError} role="alert">{error}</span> : null}
       {failed ? <Button size="compact" onClick={reload}>もう一度読み込む</Button> : null}
     </div>
   )
@@ -475,10 +481,19 @@ function AddRuleDialog({ mode, busy, error, onCancel, onAdd }: { mode: 'one' | '
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [localError, setLocalError] = useState('')
+  /* 日付の誤りは、その欄の真下に出して移る（B-139）。 */
+  const [dateErrors, setDateErrors] = useState<{ date?: string; from?: string; to?: string }>({})
+  const failDate = (key: 'date' | 'from' | 'to', message: string) => {
+    setDateErrors({ [key]: message })
+    focusFieldById(`wd-rule-${key}`)
+  }
   const submit = () => {
     setLocalError('')
+    setDateErrors({})
     if (mode === 'bulk') {
-      if (!from || !to || from > to) { setLocalError('始まりと終わりの日付を正しく入れてください。'); return }
+      if (!from) { failDate('from', '始まりの日付を入れてください。'); return }
+      if (!to) { failDate('to', '終わりの日付を入れてください。'); return }
+      if (from > to) { failDate('to', '終わりは始まりと同じか後の日付にしてください。'); return }
       const rules: WebinarScheduleRule[] = []
       const cursor = new Date(`${from}T00:00:00+09:00`)
       const end = new Date(`${to}T00:00:00+09:00`)
@@ -495,7 +510,7 @@ function AddRuleDialog({ mode, busy, error, onCancel, onAdd }: { mode: 'one' | '
       : kind === 'weekly'
         ? { type: 'weekly', days: [...days].sort(), time }
         : date ? { type: 'once', at: toJstIso(`${date}T${time}`) } : null
-    if (!rule) { setLocalError('単発の枠は日付を入れてください。'); return }
+    if (!rule) { failDate('date', '単発の枠は日付を入れてください。'); return }
     void onAdd([rule])
   }
   return (
@@ -509,11 +524,11 @@ function AddRuleDialog({ mode, busy, error, onCancel, onAdd }: { mode: 'one' | '
             ))}
           </div>
         ) : null}
-        {mode === 'one' && kind === 'once' ? <label className={form.field}><span className={form.labelSmall}>日付</span><input type="date" className={styles.dateInput} value={date} onChange={(event) => setDate(event.target.value)} /></label> : null}
+        {mode === 'one' && kind === 'once' ? <div className={form.field}><label htmlFor="wd-rule-date" className={form.labelSmall}>日付</label><input id="wd-rule-date" type="date" className={styles.dateInput} value={date} aria-invalid={dateErrors.date ? true : undefined} aria-describedby={dateErrors.date ? 'wd-rule-date-error' : undefined} onChange={(event) => { setDate(event.target.value); setDateErrors({}) }} /><FieldError id="wd-rule-date-error">{dateErrors.date}</FieldError></div> : null}
         {mode === 'bulk' ? (
           <div className={form.pair}>
-            <label className={form.field}><span className={form.labelSmall}>始まり</span><input type="date" className={styles.dateInput} value={from} onChange={(event) => setFrom(event.target.value)} /></label>
-            <label className={form.field}><span className={form.labelSmall}>終わり</span><input type="date" className={styles.dateInput} value={to} onChange={(event) => setTo(event.target.value)} /></label>
+            <div className={form.field}><label htmlFor="wd-rule-from" className={form.labelSmall}>始まり</label><input id="wd-rule-from" type="date" className={styles.dateInput} value={from} aria-invalid={dateErrors.from ? true : undefined} aria-describedby={dateErrors.from ? 'wd-rule-from-error' : undefined} onChange={(event) => { setFrom(event.target.value); setDateErrors({}) }} /><FieldError id="wd-rule-from-error">{dateErrors.from}</FieldError></div>
+            <div className={form.field}><label htmlFor="wd-rule-to" className={form.labelSmall}>終わり</label><input id="wd-rule-to" type="date" className={styles.dateInput} value={to} aria-invalid={dateErrors.to ? true : undefined} aria-describedby={dateErrors.to ? 'wd-rule-to-error' : undefined} onChange={(event) => { setTo(event.target.value); setDateErrors({}) }} /><FieldError id="wd-rule-to-error">{dateErrors.to}</FieldError></div>
           </div>
         ) : null}
         <div className={form.field}><span className={form.labelSmall} id="webinar-schedule-time-label">時刻</span><TimeField aria-labelledby="webinar-schedule-time-label" value={time} onChange={setTime} /></div>
@@ -532,6 +547,7 @@ function ReplaceVideoDialog({ ctx, asset, onAsset, onClose }: { ctx: EditContext
   const [minutes, setMinutes] = useState(String(Math.round(webinar.durationSeconds / 60)))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [minutesError, setMinutesError] = useState('')
   useEffect(() => {
     if (!webinar.accountId) return
     let active = true
@@ -544,7 +560,8 @@ function ReplaceVideoDialog({ ctx, asset, onAsset, onClose }: { ctx: EditContext
   }, [webinar.accountId])
   const save = async () => {
     const duration = Number(minutes)
-    if (!Number.isFinite(duration) || duration <= 0) { setError('動画の長さ（分）を入れてください。'); return }
+    if (!Number.isFinite(duration) || duration <= 0) { setMinutesError('動画の長さ（分）を入れてください。'); setError(''); focusFieldById('wd-minutes'); return }
+    setMinutesError('')
     setBusy(true)
     setError('')
     try {
@@ -583,7 +600,7 @@ function ReplaceVideoDialog({ ctx, asset, onAsset, onClose }: { ctx: EditContext
           ...(media ?? []).map((item) => ({ value: item.id, label: item.filename })),
           ...(choice && choice !== EXTERNAL && media && !media.some((item) => item.id === choice) ? [{ value: choice, label: '今の動画' }] : []),
         ]} />
-        <label className={form.field}><span className={form.labelSmall}>動画の長さ（分）</span><TextField inputMode="numeric" value={minutes} onChange={(event) => setMinutes(event.target.value)} /></label>
+        <div className={form.field}><label htmlFor="wd-minutes" className={form.labelSmall}>動画の長さ（分）</label><TextField id="wd-minutes" inputMode="numeric" value={minutes} invalid={Boolean(minutesError)} aria-describedby={minutesError ? 'wd-minutes-error' : undefined} onChange={(event) => { setMinutes(event.target.value); setMinutesError('') }} /><FieldError id="wd-minutes-error">{minutesError}</FieldError></div>
         {nexts.length > 0 ? (
           <div className={form.field}>
             <span className={form.labelSmall}>動画の準備（検査・変換・配信の形・表紙を通した動画だけ公開できます）</span>

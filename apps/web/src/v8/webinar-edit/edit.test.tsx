@@ -260,6 +260,24 @@ describe('V8 ウェビナーの編集', () => {
     expect(host.querySelector('#cta-title')?.getAttribute('aria-invalid')).toBeNull()
   })
 
+  it('B-139 動画：差し替えの長さが空なら保存せず、長さの欄に理由を出して移る', async () => {
+    nav.search = 'id=webinar-1&pane=video'
+    await render(<WebinarEditV8 />)
+    const before = puts.length
+    await act(async () => { buttonText('差し替える')!.click() })
+    const minutes = host.ownerDocument.getElementById('wd-minutes') as HTMLInputElement
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(minutes, '')
+      minutes.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => { [...document.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent?.trim() === '保存する')!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    expect(puts.length).toBe(before)
+    expect(document.getElementById('wd-minutes-error')?.textContent).toBe('動画の長さ（分）を入れてください。')
+    expect(minutes.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(minutes)
+  })
+
   it('CTA（pvimJ）：保存が競合したら帯を左右の列の上に出し、下書きの保存を「比べてから保存」に替える', async () => {
     conflictState.ctas = true
     nav.search = 'id=webinar-1&pane=cta'
