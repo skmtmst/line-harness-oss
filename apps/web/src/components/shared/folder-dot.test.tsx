@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { FolderDot, FolderDotName } from './folder-dot'
+import { FolderDot, FolderDotName, folderDisplayColor } from './folder-dot'
+import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 
 /*
  * 一覧の行の名前の前の「フォルダの色の丸」（2026-10-07 オーナー決定）。
@@ -45,5 +46,16 @@ describe('フォルダの色の丸', () => {
     expect(globals).toMatch(/--tpl-folder-dot-size: 8px; --tpl-folder-dot-gap: 8px; --tpl-folder-dot-indent: 16px;/)
     expect(css).toContain('width: var(--tpl-folder-dot-size)')
     expect(css).toContain('gap: var(--tpl-folder-dot-gap)')
+  })
+
+  it('色が空のフォルダも9色のどれかで塗る。同じ名前なら左の列と表で同じ色（2026-10-09 オーナー）', () => {
+    const palette = FOLDER_SELECT_COLORS.map((color) => color.value as string)
+    const auto = folderDisplayColor({ name: 'テスト', color: null })
+    expect(palette).toContain(auto)
+    expect(folderDisplayColor({ name: 'テスト' })).toBe(auto)
+    expect(folderDisplayColor({ name: 'テスト', color: '#ef4444' })).toBe('#ef4444')
+    expect(renderToStaticMarkup(<FolderDot folder={{ name: 'テスト', color: null }} />)).toContain(`background-color:${auto}`)
+    const names = ['テスト', 'テスト1', '会員', 'VIP', '購入', '休眠']
+    expect(new Set(names.map((name) => folderDisplayColor({ name }))).size).toBeGreaterThan(1)
   })
 })

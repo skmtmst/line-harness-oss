@@ -45,6 +45,7 @@ import { AttributeTabs, OtherTabPanel, assignmentMethods, cleanupTagCount, match
 import storeStyles from '../templates/list.module.css'
 import hqStyles from './store-list.module.css'
 import attributeStyles from './attribute-tabs.module.css'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
 
 /** 店のテンプレートと同じ6種類（上のタブ）。 */
 export const KIND_TABS: { kind: TemplateKind; label: string; icon: typeof MessageSquare }[] = [
@@ -246,7 +247,7 @@ export default function HqStoreList(props: HqStoreListProps) {
       count: ready ? countIn(folder.id) : null,
       leadingActions: leadingActions(folder.id, folder.name),
       ...(canEdit ? {
-        onEdit: () => { setFolderError(''); setFolderName(folder.name); setFolderColor(folder.color ?? null); setFolderDialog({ editing: folder }) },
+        onEdit: () => { setFolderError(''); setFolderName(folder.name); setFolderColor(folderDisplayColor(folder)); setFolderDialog({ editing: folder }) },
         onDelete: () => { setFolderError(''); setDeletingFolder(folder) },
       } : {}),
     })),
@@ -448,8 +449,8 @@ export default function HqStoreList(props: HqStoreListProps) {
                     <div className={storeStyles.dotLine}>
                       {type === 'tag' ? (
                         canEdit ? <button type="button" className={`${storeStyles.cellTitle} ${hqStyles.hqNameButton}`} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}>
-                          <TagPill name={row.name} color={folder?.color} size="sm" />
-                        </button> : <TagPill name={row.name} color={folder?.color} size="sm" />
+                          <TagPill name={row.name} color={folder ? folderDisplayColor(folder) : null} size="sm" />
+                        </button> : <TagPill name={row.name} color={folder ? folderDisplayColor(folder) : null} size="sm" />
                       ) : <FolderDotName folder={folder ? { name: folder.name, color: folder.color } : null}>
                         {canEdit ? (
                           <button type="button" className={`${storeStyles.cellTitle} ${hqStyles.hqNameButton}`} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}>{row.name}</button>
@@ -513,7 +514,7 @@ export default function HqStoreList(props: HqStoreListProps) {
         <>
           {overlays}
           <FolderEditorDialog
-            name={folderName} onNameChange={setFolderName} color={folderColor} onColorChange={setFolderColor} allowClear
+            name={folderName} onNameChange={setFolderName} color={folderColor} onColorChange={setFolderColor}
             open={folderDialog !== null}
             title={folderDialog?.editing ? 'フォルダを直す' : 'フォルダを追加'}
             description={`${words.item}のひな形を分けてしまう箱です。消しても、中のひな形は未分類に残ります。`}
