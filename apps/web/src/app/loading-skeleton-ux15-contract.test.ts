@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -14,8 +14,9 @@ const read = (file: string) => readFileSync(join(SRC, file), 'utf8')
 describe('初回の読み込みの骨組み', () => {
   it('タグ：空・該当なしの案内は読み終えてから（status が ready のときだけ）', () => {
     const source = read('app/tags/tags-tab-v8.tsx')
-    expect(source).toMatch(/status === 'ready' && !staleAccount && items\.length === 0 \?/)
-    expect(source).toMatch(/status === 'ready' && !staleAccount && visible\.length === 0 \?/)
+    expect(source).toContain("const ready = status === 'ready' && !staleAccount")
+    expect(source).toContain('filtered={items.length > 0}')
+    expect(source).toMatch(/ready && visible\.length === 0 \?/)
     expect(source).not.toMatch(/\) : items\.length === 0 \?/)
   })
 

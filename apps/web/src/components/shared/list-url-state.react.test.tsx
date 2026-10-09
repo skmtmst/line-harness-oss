@@ -204,3 +204,16 @@ describe('アカウントを替えたときだけ戻す', () => {
     expect(onSwitch).toHaveBeenCalledTimes(1)
   })
 })
+
+it('B-12: スクロール直後に詳細へ移っても最後の位置を覚える', () => {
+  vi.useFakeTimers()
+  window.history.replaceState(null, '', '/scenarios')
+  const view = render(<ScrollProbe ready />)
+  act(() => vi.advanceTimersByTime(40))
+  const scroller = document.scrollingElement as HTMLElement
+  scroller.scrollTop = 615
+  window.dispatchEvent(new Event('scroll'))
+  view.unmount()
+  expect(window.sessionStorage.getItem('lh:list-scroll:/scenarios')).toBe('615')
+  vi.useRealTimers()
+})

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -221,13 +221,13 @@ describe('V8 登録メディア一覧（O7hUt7）の切り替え', () => {
 describe('V8 登録メディア一覧（O7hUt7）の作り', () => {
 
   test('数の帯・道具の段・表示範囲とページ送りを持つ', () => {
-    expect(LIST_V8).toContain('data-design-node="O7hUt7"')
+    expect(LIST_V8).toContain('boardId="O7hUt7"')
     expect(LIST_V8).toContain('登録メディアの集計')
     expect(LIST_V8).toContain('使っている容量')
     expect(LIST_V8).toContain('アーカイブ')
-    expect(LIST_V8).toContain('ファイル名で検索')
+    expect(LIST_V8).toContain('ファイル名')
     expect(LIST_V8).toContain('aria-label="並べ方"')
-    expect(LIST_V8).toContain('aria-label="並び順"')
+    expect(LIST_V8).toContain('...SORT_OPTIONS.map')
     expect(LIST_V8).toContain('aria-label="表示件数"')
     expect(LIST_V8).toContain('10件表示')
     expect(LIST_V8).toContain('50件表示')
@@ -252,12 +252,12 @@ describe('V8 登録メディア一覧（O7hUt7）の作り', () => {
     // 列（札の中身）。
     expect(LIST_V8).toContain('formatMediaDetails(item)')
     expect(LIST_V8).toContain('どこでも使っていない')
-    expect(LIST_V8).toContain('か所で使用中')
-    expect(LIST_V8).toContain('使用先を確認できません')
+    expect(LIST_V8).toContain('使用先：')
+    expect(LIST_V8).toContain('使用先を確認できない')
     // 絞り込み。
     expect(LIST_V8).toContain('selected={showUnusedOnly}')
-    expect(LIST_V8).toContain('selected={showNearLimitOnly}')
-    expect(LIST_V8).toContain('selected={showArchivedOnly}')
+    expect(LIST_V8).toContain("{ value: 'near-limit', label: '上限に近いものだけ' }")
+    expect(LIST_V8).toContain("showArchivedOnly ? 'archived'")
     expect(LIST_V8).toContain('使われている順')
     expect(LIST_V8).toContain('<FolderPanel')
     // 操作。

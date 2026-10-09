@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -51,7 +51,8 @@ describe('UXタグ A 共通の骨組み', () => {
   it('4タブの一覧が共通の骨組みを使っている', () => {
     for (const src of [TAB, MARKS, SEARCHES, FIELDS]) {
       expect(src).toContain('DelayedSkeleton')
-      expect(src).toContain('TagRowsSkeleton')
+      expect(src).toContain('skeleton=')
+      expect(src).toContain('aria-busy="true"')
     }
   })
 })

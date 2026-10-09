@@ -38,6 +38,7 @@ import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from './folder-colors'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import StatusBadge from '@/components/shared/status-badge'
 import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
@@ -713,7 +714,7 @@ export default function TagsTab({
       filteredDescription="検索語・フォルダ・絞り込みを外すと、すべて出ます"
     />
   ) : (
-    <DelayedSkeleton loading={!ready} skeleton={<div className={styles.skeleton} data-design-node="U0aKD" aria-busy="true" />}>
+    <DelayedSkeleton loading={!ready} skeleton={<div className={styles.skeleton} aria-busy="true" data-design-node="U0aKD" />}>
       <DataTable className={styles.table} data-design="TagTable">
         <thead>
           <TableHeadRow>
@@ -801,9 +802,9 @@ export default function TagsTab({
                         )}
                       </span>
                       <TagPill name={tag.name} color={group?.color} size="sm" compactAtNarrow href={editHref} />
-                      {tag.status === 'archived' ? <span className={styles.miniBadge}>保管済み</span> : null}
+                      {tag.status === 'archived' ? <StatusBadge size="annotation" dot={false}>保管済み</StatusBadge> : null}
                       {tag.cleanupReasons?.includes('duplicate_name') ? (
-                        <span className={`${styles.miniBadge} ${styles.miniBadgeWarn}`} title="正規化した名前がほかのタグと重なっています。整理候補です。">名前が重なっている</span>
+                        <StatusBadge size="annotation" tone="warning" dot={false} title="正規化した名前がほかのタグと重なっています。整理候補です。">名前が重なっている</StatusBadge>
                       ) : null}
                     </div>
                     <p className={styles.sub}>{`${formatDate(tag.createdAt)}登録`}</p>
@@ -834,7 +835,7 @@ export default function TagsTab({
                   {/* 閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す） */}
                   {canEdit ? <span className={styles.menuAnchor}>
                     <RowMenu
-                      className={styles.menuButton}
+                      size="row"
                       label={`タグ「${tag.name}」の操作`}
                       items={rowMenuItems(tag)}
                       open={openMenuId === tag.id}

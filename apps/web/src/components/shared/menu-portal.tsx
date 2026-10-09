@@ -3,11 +3,14 @@
 import { createPortal } from 'react-dom'
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { isImeComposing } from './ime'
+import { useV8Leave } from './overlay-utils'
 
 export type MenuPortalAlign = 'start' | 'end'
 export type MenuPortalPlacement = 'down' | 'up'
 
 export type MenuPortalProps = {
+  /** 操作メニューの閉じる時間（提案Fは80ms）。候補欄の既定は変えない。 */
+  exitDuration?: number
   /** 開いている間だけ body へ出す。閉じたら何も描かない。 */
   open: boolean
   /** 位置の基準（開くボタン）。開くたび・動くたびに測り直す。 */
@@ -102,7 +105,9 @@ export default function MenuPortal({
   onEscape,
   onReady,
   children,
+  exitDuration,
 }: MenuPortalProps) {
+  const leaving = useV8Leave(open, exitDuration)
   const [mounted, setMounted] = useState(false)
   const [geometry, setGeometry] = useState<Geometry | null>(null)
   const [hasMore, setHasMore] = useState(false)
@@ -248,7 +253,7 @@ export default function MenuPortal({
     }
   }, [open, mounted])
 
-  if (!open || !mounted || typeof document === 'undefined') return null
+  if ((!open && (!exitDuration || !leaving)) || !mounted || typeof document === 'undefined') return null
   return createPortal(
     <div
       ref={panelRef}
@@ -257,6 +262,9 @@ export default function MenuPortal({
       // 高さの上限と続きの影だけは器が持つ（子は自分の上限を外す）。
       className={className ? `fixed min-w-0 ${className}` : 'fixed min-w-0'}
       data-menu-portal=""
+      data-closing={leaving || undefined}
+      aria-hidden={leaving || undefined}
+      inert={leaving || undefined}
       data-placement={geometry?.placement ?? 'down'}
       // 開く動きの起点（押した角）を部品の CSS が決めるための印。
       data-align={align}

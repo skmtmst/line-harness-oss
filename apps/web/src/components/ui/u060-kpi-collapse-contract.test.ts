@@ -51,8 +51,8 @@ describe('V8の数の帯とメンバー一覧', () => {
 
   it('写真審査は集計4件を狭い板で2列にする', () => {
     const page = read('app/nen-members/photo-review-v8.tsx')
-    expect(page.match(/<KpiCellV8\b/g)).toHaveLength(4)
-    expect(read('app/nen-members/photo-review-v8.module.css')).toMatch(/@container \(max-width: 600px\)[^}]*\.kpiBand[^}]*repeat\(2, minmax\(0, 1fr\)\)/s)
+    expect(page.match(/<KpiCard\b/g)).toHaveLength(4)
+    expect(read('components/shared/kpi-card.module.css')).toMatch(/@media \(max-width: 639px\)[\s\S]*?grid-template-columns: minmax\(0, 1fr\)/)
   })
 
   it('LINE通知の数の帯は小さい幅で1列、640px以上で2列にする', () => {

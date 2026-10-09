@@ -96,6 +96,7 @@ function CardRow({ item, definition, canMoveUp, canMoveDown, disabled, onMove, o
       {!disabled ? <ReorderHandle
         {...attributes}
         {...listeners}
+        locked={disabled}
         label={definition.label}
         ariaLabel={`${definition.label}をドラッグして並べ替え`}
         className={styles.grip}
@@ -252,6 +253,7 @@ export default function DashboardEditorV8({ open, preferences, saving = false, s
 
   const handleDragEnd = (group: DashboardGroup, event: DragEndEvent) => {
     setKeyboardDrag(false)
+    if (saving) return
     const { active, over } = event
     if (saving || !over || active.id === over.id) return
     setDraft((current) => ({

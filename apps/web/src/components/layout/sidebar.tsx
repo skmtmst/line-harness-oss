@@ -100,9 +100,9 @@ const HQ_UNAVAILABLE_DISTRIBUTION_HREFS = new Set([
  * ここに別で並べていた頃は、メニューにしか無い項目・機能設定にしか無い
  * 項目が双方にできて、切り替えても消えない項目があった。
  */
-function NavIcon({ d }: { d: string }) {
+function NavIcon({ d, className }: { d: string; className?: string }) {
   return (
-    <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className={className ?? "h-[18px] w-[18px]"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={d} />
     </svg>
   )
@@ -832,7 +832,7 @@ export default function Sidebar({
                 >
                   <span className="shrink-0">{(() => {
                     const V8Icon = isV8 && !isHq ? V8_NAV_ICONS[item.id] : undefined
-                    return V8Icon ? <V8Icon className={styles.v8NavIcon} aria-hidden="true" /> : <NavIcon d={isV8 && item.iconV8 ? item.iconV8 : item.icon} />
+                    return V8Icon ? <V8Icon className={styles.v8NavIcon} aria-hidden="true" /> : <NavIcon className={isV8 ? styles.v8NavIcon : undefined} d={isV8 && item.iconV8 ? item.iconV8 : item.icon} />
                   })()}</span>
                   <span className={`${styles.itemLabel} min-w-0 flex-1 truncate`}>{visibleLabel}</span>
                   {badgeCount(item) > 0 && (

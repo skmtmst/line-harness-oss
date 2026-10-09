@@ -20,7 +20,7 @@ import Checkbox from '@/components/shared/checkbox'
 import { Field } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Drawer from '@/components/shared/drawer'
 import { notifyToast } from '@/components/shared/toast'
 import {
   asReportV2,
@@ -211,7 +211,6 @@ export default function AffiliateDrawer({
 
   useEffect(() => { reloadAll() }, [reloadAll])
 
-  const panelRef = useOverlayFocus(!paymentOpen, onClose)
 
   const copyLinkUrl = useCallback(async (link: AffiliateLink) => {
     const url = distributionUrl(link.ref_code, linkBaseUrl)
@@ -479,30 +478,9 @@ export default function AffiliateDrawer({
 
   return (
     <>
-      <div className={styles.backdrop} onClick={onClose} aria-hidden="true" />
-      <aside
-        ref={panelRef}
-        className={styles.drawer}
-        role="dialog"
-        aria-modal="true"
-        aria-label={`${affiliate.name}の詳細`}
-        data-design-node="tnTn9"
-        tabIndex={-1}
-      >
-        <header className={styles.head}>
-          <div className={styles.headText}>
-            <div className={styles.titleRow}>
-              <h2 className={styles.title}>{affiliate.name}</h2>
-              <StatusPill tone={affiliate.isActive ? 'active' : 'neutral'}>{affiliate.isActive ? '計測中' : '停止中'}</StatusPill>
-            </div>
-            <p className={styles.sub} title={subLine}>{subLine}</p>
-          </div>
-          <button type="button" className={styles.close} aria-label="詳細を閉じる" onClick={onClose}>
-            <X size={16} aria-hidden="true" />
-          </button>
-        </header>
-
-        <div className={styles.tabs} role="tablist" aria-label="詳細の中身">
+      <Drawer open title={`${affiliate.name}の詳細`} description={subLine} designWidth={620} layout="inset" busy={paymentOpen} onClose={onClose}
+        heading={<span className={styles.titleRow}><span>{affiliate.name}</span><StatusPill tone={affiliate.isActive ? 'active' : 'neutral'}>{affiliate.isActive ? '計測中' : '停止中'}</StatusPill></span>}
+        toolbar={(<div className={styles.tabs} role="tablist" aria-label="詳細の中身">
           {DRAWER_TABS.map((item) => (
             <button
               key={item.key}
@@ -516,16 +494,8 @@ export default function AffiliateDrawer({
               {item.label}
             </button>
           ))}
-        </div>
-
-        <div className={styles.body}>
-          {loading ? (
-            <ListState kind="loading" title="詳細を読み込んでいます" />
-          ) : tab === 'summary' ? summary : tab === 'breakdown' ? breakdown : tab === 'friends' ? friends : payment}
-        </div>
-
-        <footer className={styles.foot}>
-          {readonly ? <span /> : (
+        </div>)}
+        footer={(<>{readonly ? <span /> : (
             <button type="button" className={styles.stop} onClick={() => { onClose(); onStopRequest(affiliate.id, affiliate.name) }} disabled={!affiliate.isActive}>
               <PauseCircle size={14} aria-hidden="true" />
               紹介を止める
@@ -548,9 +518,12 @@ export default function AffiliateDrawer({
                 支払いを確定する
               </Button>
             </>
-          )}
-        </footer>
-      </aside>
+          )}</>)}
+      >
+        {loading ? (
+            <ListState kind="loading" title="詳細を読み込んでいます" />
+          ) : tab === 'summary' ? summary : tab === 'breakdown' ? breakdown : tab === 'friends' ? friends : payment}
+      </Drawer>
       {accountId ? (
         <AffiliatePaymentConfirmDialog
           target={paymentOpen ? { id: affiliate.id, name: affiliate.name } : null}

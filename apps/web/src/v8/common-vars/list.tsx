@@ -66,6 +66,7 @@ import Pagination from '@/components/shared/pagination'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import BulkBar from '@/components/shared/bulk-bar'
 import { RowMenu } from '@/components/shared/row-actions'
 import { withViewTransition } from '@/components/shared/view-transition'
 import Select from '@/components/shared/select'
@@ -1379,15 +1380,10 @@ function CommonVarsListInner() {
       </ContextMenu>
 
       {/* まとめての帯（選ぶと表の下に出る）。 */}
-      {canWrite && selected.size > 0 ? (
-        <div className={styles.bulkRow} role="region" aria-label="選択中のまとめ操作">
-          <span className={styles.bulkCount}>{selected.size}件を選択中</span>
-          <span className={styles.bulkHint}>対象を確認してから操作を選んでください</span>
-          <span className={styles.spacer} aria-hidden="true" />
-          <Button type="button" variant="secondary" onClick={() => setSelected(new Set())}>選択を外す</Button>
-          <Button type="button" variant="danger" onClick={() => void prepareRemoveSelected()}>選択した共通情報を削除</Button>
-        </div>
-      ) : null}
+      {canWrite ? <BulkBar count={selected.size} hint="対象を確認してから操作を選んでください" onClear={() => setSelected(new Set())}>
+        <Button type="button" variant="secondary" onClick={() => setSelected(new Set())}>選択を外す</Button>
+        <Button type="button" variant="danger" onClick={() => void prepareRemoveSelected()}>選択した共通情報を削除</Button>
+      </BulkBar> : null}
     </>
   )
 

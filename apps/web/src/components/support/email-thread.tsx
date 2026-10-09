@@ -805,9 +805,9 @@ export default function EmailThread({
               <div className="px-5 py-4">
                 <label htmlFor="email-internal-memo" className="text-xs font-semibold text-ink-faint">メモ内容</label>
                 <textarea
-                  disabled={memoSaving}
                   id="email-internal-memo"
                   value={memoDraft}
+                  disabled={memoSaving}
                   onChange={(event) => setMemoDraft(event.target.value)}
                   rows={7}
                   autoFocus

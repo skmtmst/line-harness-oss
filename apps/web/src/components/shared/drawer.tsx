@@ -29,6 +29,10 @@ export type DrawerProps = {
   width?: 'narrow' | 'editor'
   /** V8 の板ごとの幅。省くと既定の幅。 */
   designWidth?: number
+  /** 620幅の紹介者の板など、全体に同じ余白がある型。 */
+  layout?: 'inset'
+  /** 題に状態の札を添える板。閉じる操作は共通のまま。 */
+  heading?: ReactNode
   /** 頭の題の行の下に置くもの（タブ・説明の1行）。渡したときだけ頭を縦に積む。 */
   toolbar?: ReactNode
   /** 下の帯（footer）のすぐ上に置く知らせ（保存の失敗など）。中身の帯は呼び出し側の Notice。 */
@@ -50,6 +54,8 @@ export default function Drawer({
   modal = true,
   width,
   designWidth,
+  layout,
+  heading,
   toolbar,
   band,
 }: DrawerProps) {
@@ -66,7 +72,7 @@ export default function Drawer({
 
   const titleBlock = (
     <div>
-      <h2 id={titleId} className={`${styles.title} ${modal ? '' : styles.inlineTitle}`}>{title}{dirty ? ' *' : ''}</h2>
+      <h2 id={titleId} className={`${styles.title} ${modal ? '' : styles.inlineTitle}`}>{heading ?? title}{dirty ? ' *' : ''}</h2>
       {description ? <p id={descriptionId} className={styles.description}>{description}</p> : null}
     </div>
   )
@@ -83,6 +89,7 @@ export default function Drawer({
       aria-busy={busy || undefined}
       data-dirty={dirty || undefined}
       data-width={width}
+      data-layout={layout}
       data-design-width={designWidth ? '' : undefined}
       style={designWidth ? { '--drawer-design-width': `${designWidth}px` } as CSSProperties : undefined}
       tabIndex={-1}

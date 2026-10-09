@@ -49,6 +49,7 @@ import {
 } from './display'
 import { MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
+import { mileagePaginationTotal } from './display'
 import styles from './mileage.module.css'
 
 const BAND_LABELS: Record<ActionScoreBand, string> = {
@@ -267,8 +268,8 @@ export default function ScoreTab() {
   const summary = overview?.summary
   const highMin = summary?.highMin ?? 30
   const normalMin = summary?.normalMin ?? 10
-  const total = overview?.pagination.total ?? 0
-  const pageCount = Math.max(1, Math.ceil(total / pageSize))
+  const total = mileagePaginationTotal(overview)
+  const pageCount = Math.max(1, Math.ceil((total ?? 0) / pageSize))
 
   const rangeQuery = useMemo(() => {
     if (filter !== 'high' && filter !== 'normal' && filter !== 'low') return null
@@ -695,7 +696,7 @@ export default function ScoreTab() {
     </div>
   )
 
-  const footer = ready && total > 0 ? (
+  const footer = ready && total !== null && total > 0 ? (
     <>
       <div className={styles.pagerRow}>
         <span className={styles.pagerCount}>

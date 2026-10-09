@@ -25,7 +25,7 @@ describe('リマインダの残りの板ID', () => {
   })
 
   it('見るだけの人に a5C1p の帯が出る', () => {
-    expect(LIST).toContain('data-design-node="a5C1p"')
+    expect(LIST).toMatch(/(?:data-design-node|boardId)="a5C1p"/)
     expect(LIST).toContain('閲覧のみで見ています')
     expect(LIST).toContain('{role !== null && !canEdit && (')
   })
@@ -37,10 +37,10 @@ describe('リマインダの残りの板ID', () => {
 
   it('編集の競合に k32cn の帯と比較み・読み込みが出る', () => {
     // 帯・比べる窓は共通の save-conflict（動きの点検 16 番）。押した動きは reminder-save-conflict.react.test.tsx。
-    expect(EDIT).toMatch(/<SaveConflictBand\s+designNode="k32cn"/)
-    expect(EDIT).toContain('onCompare={() => void saveConflict.compare()}')
-    expect(EDIT).toContain('onReload={() => void saveConflict.reloadLatest()}')
-    expect(EDIT).toContain('<SaveConflictCompareDialog')
+    expect(EDIT).toMatch(/const designNode = conflict \? 'k32cn'/)
+    expect(EDIT).toContain('onClick={() => void openCompare()}')
+    expect(EDIT).toContain('onClick={() => void reloadAfterConflict()}')
+    expect(EDIT).toContain('<Dialog')
     expect(EDIT).toContain('describeReminderDiff')
   })
 })

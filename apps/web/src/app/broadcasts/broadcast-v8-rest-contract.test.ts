@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -20,12 +20,19 @@ const DETAIL_PAGE = readFileSync(new URL('./detail/page.tsx', import.meta.url), 
  */
 describe('一斉配信の残り2枚（FU2aU・Q28Gb）', () => {
   it('作る流れはV8の板FU2aUへ完全に切り替える', () => {
-    expect(FORM).toContain('data-design-node="FU2aU"')
+    expect(FORM).toMatch(/(?:data-design-node|boardId)="FU2aU"/)
     expect(FORM).not.toContain("theme === 'v8'")
   })
 
+  it('詳細の競合の帯は板 Q28Gb を持ち、読み直しだけ出す', () => {
+    expect(DETAIL_V8).toMatch(/(?:data-design-node|boardId)="Q28Gb"/)
+    expect(DETAIL_V8).toContain('ほかの人が配信「')
+    expect(DETAIL_V8).toContain('この画面では書き換えません')
+    expect(DETAIL_V8).toContain('読み直す')
+  })
+
   it('競合の帯は競合のときだけ出す（ふだんは出さない）', () => {
-    expect(DETAIL_V8).toContain('{conflict && (')
+    expect(DETAIL_V8).toContain('{conflict ? (')
   })
 
   it('版のずれは戻ってきたときに確かめる', () => {

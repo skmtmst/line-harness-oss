@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../../../scripts/test-ui-source.mjs'
 import { join } from 'node:path'
 
 import { optionalInteger, validateReward, type FormState } from './reward-form'

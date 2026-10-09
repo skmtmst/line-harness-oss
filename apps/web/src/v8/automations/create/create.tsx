@@ -57,6 +57,8 @@ import {
 import { WeekdaySelect } from './weekday-select'
 import { FriendMultiSelect } from './friend-multi-select'
 import { formatNumber, formatTime } from '@/lib/format'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
 /**
  * ルールを作る。Pencil ★V6 `Rv8Jv`（25-1-A つくる）。
@@ -1554,6 +1556,12 @@ export function NewAutomationV8({
     triggerConfig,
     actions,
   })
+  const initialFingerprint = useRef(currentFingerprint)
+  const leaveBusy = saving || testing || preparingTest
+  const { leaveTarget, confirmLeave, cancelLeave, guarded, disarm } = useUnsavedGuard({
+    dirty: currentFingerprint !== (savedFingerprint ?? initialFingerprint.current),
+    busy: leaveBusy,
+  })
   const dirtySinceSave = savedFingerprint !== null && savedFingerprint !== currentFingerprint
   const saveStatusText = saving
     ? '保存しています'
@@ -1730,6 +1738,7 @@ export function NewAutomationV8({
     if (saveOutcome === 'published' && publishedRuleId && savedFingerprint === fingerprint) {
       setError('この内容はすでに公開済みです。一覧で確認してください。')
       setNotice('')
+      disarm()
       router.push(`/automations?highlight=${publishedRuleId}`)
       return
     }
@@ -1853,6 +1862,7 @@ export function NewAutomationV8({
       bindAccountDraft(accountId, null)
       if (selectedAccountRef.current === accountId
         && saveTicketRef.current[accountId] === saveTicket) {
+        disarm()
         router.push(`/automations?highlight=${draft.id}`)
       } else {
         /*
@@ -1917,6 +1927,7 @@ export function NewAutomationV8({
               setResumeTarget(null)
               syncResumeUrl(null)
               setNotice('すでに公開されています。一覧で確認できます。')
+              disarm()
               router.push(`/automations?highlight=${draft.id}`)
             }
             saveRunningRef.current = false
@@ -2180,13 +2191,15 @@ export function NewAutomationV8({
    */
   const openStoredDraft = () => {
     if (!storedDraftHint || !selectedAccountId) return
-    // 再開は「明示した下書き番号」。URLへ載せて読み込みに行く。
-    if (chrome === 'draft') {
-      router.push(`${resumeBase}?id=${encodeURIComponent(storedDraftHint.id)}`)
-    } else {
-      router.push(`${resumeBase}?draft=${encodeURIComponent(storedDraftHint.id)}`)
-    }
-    setResumeTarget(storedDraftHint.id)
+    guarded(() => {
+      // 再開は「明示した下書き番号」。URLへ載せて読み込みに行く。
+      if (chrome === 'draft') {
+        router.push(`${resumeBase}?id=${encodeURIComponent(storedDraftHint.id)}`)
+      } else {
+        router.push(`${resumeBase}?draft=${encodeURIComponent(storedDraftHint.id)}`)
+      }
+      setResumeTarget(storedDraftHint.id)
+    })
   }
 
   /*
@@ -2409,7 +2422,7 @@ export function NewAutomationV8({
           <div className={styles.subBox} aria-label="1人テストの実行">
             <p className={styles.subTitle}>試した実行：{testRunStatusLabel(testRun.status)}</p>
             <div className={styles.buttonRow}>
-              <Button onClick={() => router.push(`/automations/runs?run=${encodeURIComponent(testRun.runId)}`)}>実行の結果を見る</Button>
+              <Button onClick={() => guarded(() => router.push(`/automations/runs?run=${encodeURIComponent(testRun.runId)}`))}>実行の結果を見る</Button>
               <Button disabled={testing} onClick={() => void refreshTestRun(testRun, testRun.accountId)}>結果を読み直す</Button>
             </div>
           </div>
@@ -2418,7 +2431,7 @@ export function NewAutomationV8({
           <div className={styles.subBox} aria-label="公開済みの案内">
             <p className={styles.subTitle}>この内容はすでに公開済みです</p>
             <div className={styles.buttonRow}>
-              <Button onClick={() => router.push(`/automations?highlight=${publishedRuleId}`)}>公開したルールを見る</Button>
+              <Button onClick={() => guarded(() => router.push(`/automations?highlight=${publishedRuleId}`))}>公開したルールを見る</Button>
             </div>
           </div>
         ) : null}
@@ -2907,6 +2920,7 @@ export function NewAutomationV8({
           </div>
         ) : null}
       </Dialog>
+      <UnsavedLeaveDialog open={leaveTarget !== null} busy={leaveBusy} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage>
   )
 }

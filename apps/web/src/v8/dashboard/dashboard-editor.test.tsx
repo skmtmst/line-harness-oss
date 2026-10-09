@@ -21,6 +21,12 @@ function renderEditor(props: Partial<Parameters<typeof DashboardEditorV8>[0]> = 
 }
 
 describe('V8 ダッシュボード編集', () => {
+  it('WEB246: 保存中は配置と表示を編集できない', () => {
+    renderEditor({ saving: true })
+    expect(screen.getByRole('button', { name: '写真審査を1つ上へ移動' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('switch', { name: '写真審査を表示' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.queryByRole('button', { name: '写真審査をドラッグして並べ替え' })).toBeNull()
+  })
   it('上下ボタンで順番が変わり、反映で同じ形の配置を渡す。結果は日本語で読み上げる', () => {
     const { onApply } = renderEditor()
     fireEvent.click(screen.getByRole('button', { name: '写真審査を1つ上へ移動' }))

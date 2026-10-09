@@ -178,7 +178,7 @@ export default function AccountDetailV8() {
 
   const frame = (children: ReactNode, title = 'LINEアカウント') => (
     <div className={styles.screen}>
-      <SettingsPage boardId="ihjfd" title={title} navigation={<SettingsInnerNav inline />}>{children}</SettingsPage>
+      <SettingsPage layout="account-detail" boardId="ihjfd" title={title} navigation={<SettingsInnerNav inline />}>{children}</SettingsPage>
     </div>
   )
 
@@ -252,7 +252,7 @@ export default function AccountDetailV8() {
 
   return (
     <div className={styles.screen}>
-      <SettingsPage
+      <SettingsPage layout="account-detail"
         boardId="ihjfd"
         title={account.name}
         description={summaryLine(account, parent?.name ?? null)}

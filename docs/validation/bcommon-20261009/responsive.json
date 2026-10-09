@@ -1,0 +1,4403 @@
+[
+  {
+    "id": "WQmep",
+    "width": 1440,
+    "geometry": {
+      "width": 1440,
+      "documentWidth": 1440
+    },
+    "overflows": [
+      {
+        "path": "div.app-shell_side__CuY3O > div.hidden.xl:block > header.top-bar_root__l_DJi > div.top-bar_actions__mqwcc",
+        "clientWidth": 244,
+        "scrollWidth": 248
+      },
+      {
+        "path": "div.hidden.xl:block > header.top-bar_root__l_DJi > div.top-bar_actions__mqwcc > button.top-bar_iconButton__ryDrW.v8-only",
+        "clientWidth": 36,
+        "scrollWidth": 40
+      },
+      {
+        "path": "div.page-templates_dashboardCell__74r9n > div.dashboard_head__8c1E3 > div.section-header_root__aGd_D > span.help-tip_wrap__THqcy.section-header_help__imSWS",
+        "clientWidth": 16,
+        "scrollWidth": 22
+      },
+      {
+        "path": "div.dashboard_asideBlock__cZplX > div.dashboard_head__8c1E3 > div.section-header_root__aGd_D > span.help-tip_wrap__THqcy.section-header_help__imSWS",
+        "clientWidth": 16,
+        "scrollWidth": 22
+      },
+      {
+        "path": "div.dashboard_asideBlock__cZplX > div.dashboard_head__8c1E3 > div.section-header_root__aGd_D > span.help-tip_wrap__THqcy.section-header_help__imSWS",
+        "clientWidth": 16,
+        "scrollWidth": 22
+      },
+      {
+        "path": "div.page-templates_dashboardCell__74r9n > div.dashboard_head__8c1E3 > div.section-header_root__aGd_D > span.help-tip_wrap__THqcy.section-header_help__imSWS",
+        "clientWidth": 16,
+        "scrollWidth": 22
+      },
+      {
+        "path": "div.page-templates_dashboardCell__74r9n > div.dashboard_head__8c1E3 > div.section-header_root__aGd_D > span.help-tip_wrap__THqcy.section-header_help__imSWS",
+        "clientWidth": 16,
+        "scrollWidth": 22
+      },
+      {
+        "path": "div.page-templates_dashboardCell__74r9n > div.dashboard_head__8c1E3 > div.section-header_root__aGd_D > span.help-tip_wrap__THqcy.section-header_help__imSWS",
+        "clientWidth": 16,
+        "scrollWidth": 22
+      }
+    ],
+    "viewportOverflows": [],
+    "midWordBreaks": [],
+    "tableMisalignments": [],
+    "fontIssues": [],
+    "keys": [
+      {
+        "tag": "button",
+        "text": "メイン",
+        "rect": {
+          "x": 12,
+          "y": 72,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "配信",
+        "rect": {
+          "x": 12,
+          "y": 253,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "コンテンツ",
+        "rect": {
+          "x": 12,
+          "y": 471,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "成果と分析",
+        "rect": {
+          "x": 12,
+          "y": 689,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "自動化",
+        "rect": {
+          "x": 12,
+          "y": 722,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "予約",
+        "rect": {
+          "x": 12,
+          "y": 755,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "専用機能",
+        "rect": {
+          "x": 12,
+          "y": 936,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "設定",
+        "rect": {
+          "x": 12,
+          "y": 969,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "飲食店向け（テスト）",
+        "rect": {
+          "x": 12,
+          "y": 1002,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "KKenta Kawanoオーナー",
+        "rect": {
+          "x": 12,
+          "y": 936,
+          "w": 216,
+          "h": 48
+        }
+      },
+      {
+        "tag": "h1",
+        "text": "ダッシュボード",
+        "rect": {
+          "x": 375,
+          "y": 20,
+          "w": 91,
+          "h": 20
+        }
+      },
+      {
+        "tag": "button",
+        "text": "3",
+        "rect": {
+          "x": 1384,
+          "y": 12,
+          "w": 36,
+          "h": 36
+        }
+      },
+      {
+        "tag": "h2",
+        "text": "おはようございます、Kenta さん",
+        "rect": {
+          "x": 264,
+          "y": 80,
+          "w": 330,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "今日",
+        "rect": {
+          "x": 896,
+          "y": 91,
+          "w": 50,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "過去7日",
+        "rect": {
+          "x": 948,
+          "y": 91,
+          "w": 70,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "過去28日",
+        "rect": {
+          "x": 1020,
+          "y": 91,
+          "w": 78,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "ダッシュボード編集",
+        "rect": {
+          "x": 1112,
+          "y": 89,
+          "w": 166,
+          "h": 36
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "友だち数の推移",
+        "rect": {
+          "x": 264,
+          "y": 292,
+          "w": 105,
+          "h": 23
+        }
+      },
+      {
+        "tag": "button",
+        "text": "?",
+        "rect": {
+          "x": 542,
+          "y": 290,
+          "w": 28,
+          "h": 28
+        }
+      },
+      {
+        "tag": "button",
+        "text": "グラフ",
+        "rect": {
+          "x": 266,
+          "y": 329,
+          "w": 56,
+          "h": 24
+        }
+      },
+      {
+        "tag": "button",
+        "text": "表",
+        "rect": {
+          "x": 324,
+          "y": 329,
+          "w": 32,
+          "h": 24
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "今月の送信枠",
+        "rect": {
+          "x": 1152,
+          "y": 292,
+          "w": 90,
+          "h": 23
+        }
+      },
+      {
+        "tag": "button",
+        "text": "?",
+        "rect": {
+          "x": 1242,
+          "y": 290,
+          "w": 28,
+          "h": 28
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "運用アラート",
+        "rect": {
+          "x": 1152,
+          "y": 435,
+          "w": 90,
+          "h": 23
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "対応が必要な受信（全アカウント）",
+        "rect": {
+          "x": 264,
+          "y": 592,
+          "w": 240,
+          "h": 23
+        }
+      },
+      {
+        "tag": "span",
+        "text": "お名前",
+        "rect": {
+          "x": 276,
+          "y": 635,
+          "w": 260,
+          "h": 18
+        }
+      },
+      {
+        "tag": "span",
+        "text": "内容",
+        "rect": {
+          "x": 552,
+          "y": 635,
+          "w": 321,
+          "h": 18
+        }
+      },
+      {
+        "tag": "span",
+        "text": "待ち時間",
+        "rect": {
+          "x": 889,
+          "y": 635,
+          "w": 100,
+          "h": 18
+        }
+      },
+      {
+        "tag": "span",
+        "text": "状態",
+        "rect": {
+          "x": 1005,
+          "y": 635,
+          "w": 90,
+          "h": 18
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "現在の対応状況",
+        "rect": {
+          "x": 1152,
+          "y": 592,
+          "w": 105,
+          "h": 23
+        }
+      },
+      {
+        "tag": "button",
+        "text": "?",
+        "rect": {
+          "x": 1257,
+          "y": 590,
+          "w": 28,
+          "h": 28
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "接続状態",
+        "rect": {
+          "x": 1152,
+          "y": 810,
+          "w": 60,
+          "h": 23
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "友だち追加リンク",
+        "rect": {
+          "x": 264,
+          "y": 948,
+          "w": 120,
+          "h": 23
+        }
+      },
+      {
+        "tag": "button",
+        "text": "?",
+        "rect": {
+          "x": 384,
+          "y": 945,
+          "w": 28,
+          "h": 28
+        }
+      },
+      {
+        "tag": "button",
+        "text": "基本の追加URL",
+        "rect": {
+          "x": 308,
+          "y": 983,
+          "w": 220,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "コピー",
+        "rect": {
+          "x": 904,
+          "y": 1031,
+          "w": 88,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "QRを表示",
+        "rect": {
+          "x": 1000,
+          "y": 1031,
+          "w": 107,
+          "h": 36
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "友だちの状態",
+        "rect": {
+          "x": 1152,
+          "y": 948,
+          "w": 90,
+          "h": 23
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "今後の予定",
+        "rect": {
+          "x": 260,
+          "y": 1120,
+          "w": 75,
+          "h": 23
+        }
+      },
+      {
+        "tag": "button",
+        "text": "?",
+        "rect": {
+          "x": 335,
+          "y": 1117,
+          "w": 28,
+          "h": 28
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "今日の配信の失敗",
+        "rect": {
+          "x": 558,
+          "y": 1120,
+          "w": 120,
+          "h": 23
+        }
+      },
+      {
+        "tag": "button",
+        "text": "?",
+        "rect": {
+          "x": 678,
+          "y": 1117,
+          "w": 28,
+          "h": 28
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "今月の配信",
+        "rect": {
+          "x": 855,
+          "y": 1120,
+          "w": 75,
+          "h": 23
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "最近の成果",
+        "rect": {
+          "x": 1152,
+          "y": 1120,
+          "w": 75,
+          "h": 23
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "最近の動き",
+        "rect": {
+          "x": 264,
+          "y": 1320,
+          "w": 75,
+          "h": 23
+        }
+      }
+    ]
+  },
+  {
+    "id": "x6QsVz",
+    "width": 1440,
+    "geometry": {
+      "width": 1440,
+      "documentWidth": 1440
+    },
+    "overflows": [
+      {
+        "path": "div.app-shell_side__CuY3O > div.hidden.xl:block > header.top-bar_root__l_DJi > div.top-bar_actions__mqwcc",
+        "clientWidth": 244,
+        "scrollWidth": 248
+      },
+      {
+        "path": "div.hidden.xl:block > header.top-bar_root__l_DJi > div.top-bar_actions__mqwcc > button.top-bar_iconButton__ryDrW.v8-only",
+        "clientWidth": 36,
+        "scrollWidth": 40
+      },
+      {
+        "path": "thead > tr.table_headRow__rGJh4 > th.table_cell__mr_sW.list_thCheck__mV6Ze > span.checkbox_root__A8IAz",
+        "clientWidth": 18,
+        "scrollWidth": 21
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdCheck__fPOke > span.checkbox_root__A8IAz",
+        "clientWidth": 18,
+        "scrollWidth": 21
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdCheck__fPOke > span.checkbox_root__A8IAz",
+        "clientWidth": 18,
+        "scrollWidth": 21
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdCheck__fPOke > span.checkbox_root__A8IAz",
+        "clientWidth": 18,
+        "scrollWidth": 21
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdCheck__fPOke > span.checkbox_root__A8IAz",
+        "clientWidth": 18,
+        "scrollWidth": 21
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdCheck__fPOke > span.checkbox_root__A8IAz",
+        "clientWidth": 18,
+        "scrollWidth": 21
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdCheck__fPOke > span.checkbox_root__A8IAz",
+        "clientWidth": 18,
+        "scrollWidth": 21
+      }
+    ],
+    "viewportOverflows": [],
+    "midWordBreaks": [
+      {
+        "path": "td.data-table_bodyCell__n186Z.list_td__XroIf > div.list_tags___3smp > span.tag-pill_pill__l_oNS > span.tag-pill_name__cQK2e",
+        "text": "LINEログイン連携済み",
+        "lines": 2
+      },
+      {
+        "path": "td.data-table_bodyCell__n186Z.list_td__XroIf > div.list_tags___3smp > span.tag-pill_pill__l_oNS > span.tag-pill_name__cQK2e",
+        "text": "VIP",
+        "lines": 2
+      },
+      {
+        "path": "td.data-table_bodyCell__n186Z.list_td__XroIf > div.list_tags___3smp > span.tag-pill_pill__l_oNS > span.tag-pill_name__cQK2e",
+        "text": "定期便",
+        "lines": 2
+      }
+    ],
+    "tableMisalignments": [
+      {
+        "path": "div.page-templates_content__l99j2 > div.list_tableWrap__XL7_l > div.data-table_frame__XicuE.list_table__3KLe_ > table.data-table_table__PLnGp",
+        "rows": 7,
+        "bad": [
+          {
+            "column": 2,
+            "spread": 252
+          },
+          {
+            "column": 3,
+            "spread": 146
+          },
+          {
+            "column": 4,
+            "spread": 88
+          },
+          {
+            "column": 5,
+            "spread": 206
+          },
+          {
+            "column": 6,
+            "spread": 176
+          },
+          {
+            "column": 7,
+            "spread": 88
+          },
+          {
+            "column": 8,
+            "spread": 96
+          }
+        ]
+      }
+    ],
+    "fontIssues": [
+      {
+        "path": "div.page-templates_pagination__JSy2E > div.list_pager__yydkp > nav.pagination_pagination__GoEpN > button.pagination_item__zJkBy.pagination_control__ees8u",
+        "text": "前へ‹",
+        "font": "Inter, \"Inter Fallback\", Inter, sans-serif"
+      },
+      {
+        "path": "div.page-templates_pagination__JSy2E > div.list_pager__yydkp > nav.pagination_pagination__GoEpN > button.pagination_item__zJkBy.pagination_control__ees8u",
+        "text": "次へ›",
+        "font": "Inter, \"Inter Fallback\", Inter, sans-serif"
+      }
+    ],
+    "keys": [
+      {
+        "tag": "button",
+        "text": "メイン",
+        "rect": {
+          "x": 12,
+          "y": 72,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "配信",
+        "rect": {
+          "x": 12,
+          "y": 253,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "コンテンツ",
+        "rect": {
+          "x": 12,
+          "y": 471,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "成果と分析",
+        "rect": {
+          "x": 12,
+          "y": 689,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "自動化",
+        "rect": {
+          "x": 12,
+          "y": 722,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "予約",
+        "rect": {
+          "x": 12,
+          "y": 755,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "専用機能",
+        "rect": {
+          "x": 12,
+          "y": 936,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "設定",
+        "rect": {
+          "x": 12,
+          "y": 969,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "飲食店向け（テスト）",
+        "rect": {
+          "x": 12,
+          "y": 1002,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "KKenta Kawanoオーナー",
+        "rect": {
+          "x": 12,
+          "y": 936,
+          "w": 216,
+          "h": 48
+        }
+      },
+      {
+        "tag": "h1",
+        "text": "友だち",
+        "rect": {
+          "x": 375,
+          "y": 20,
+          "w": 39,
+          "h": 20
+        }
+      },
+      {
+        "tag": "button",
+        "text": "3",
+        "rect": {
+          "x": 1384,
+          "y": 12,
+          "w": 36,
+          "h": 36
+        }
+      },
+      {
+        "tag": "h2",
+        "text": "友だち",
+        "rect": {
+          "x": 264,
+          "y": 80,
+          "w": 66,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "表示中をCSVで書き出す",
+        "rect": {
+          "x": 1054,
+          "y": 89,
+          "w": 190,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "タグ：すべて",
+        "rect": {
+          "x": 552,
+          "y": 338,
+          "w": 119,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "対応：すべて",
+        "rect": {
+          "x": 679,
+          "y": 338,
+          "w": 119,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "担当者：すべて",
+        "rect": {
+          "x": 806,
+          "y": 338,
+          "w": 132,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "シナリオ：すべて",
+        "rect": {
+          "x": 946,
+          "y": 338,
+          "w": 147,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "詳細条件",
+        "rect": {
+          "x": 1101,
+          "y": 340,
+          "w": 102,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "保存した検索",
+        "rect": {
+          "x": 1277,
+          "y": 338,
+          "w": 127,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "未対応",
+        "rect": {
+          "x": 264,
+          "y": 384,
+          "w": 74,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "注目のみ",
+        "rect": {
+          "x": 346,
+          "y": 384,
+          "w": 86,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "表示項目を編集",
+        "rect": {
+          "x": 978,
+          "y": 386,
+          "w": 141,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "20件表示",
+        "rect": {
+          "x": 1127,
+          "y": 384,
+          "w": 98,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "友だち追加の新しい順",
+        "rect": {
+          "x": 1233,
+          "y": 386,
+          "w": 171,
+          "h": 32
+        }
+      },
+      {
+        "tag": "th",
+        "text": "友だち",
+        "rect": {
+          "x": 292,
+          "y": 434,
+          "w": 288,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "対応・担当",
+        "rect": {
+          "x": 580,
+          "y": 434,
+          "w": 146,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "シナリオ",
+        "rect": {
+          "x": 726,
+          "y": 434,
+          "w": 88,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "最新のメッセージ",
+        "rect": {
+          "x": 814,
+          "y": 434,
+          "w": 206,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "タグ",
+        "rect": {
+          "x": 1020,
+          "y": 434,
+          "w": 176,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "流入元",
+        "rect": {
+          "x": 1196,
+          "y": 434,
+          "w": 88,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "最終接触",
+        "rect": {
+          "x": 1284,
+          "y": 434,
+          "w": 96,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "操作",
+        "rect": {
+          "x": 1380,
+          "y": 434,
+          "w": 48,
+          "h": 40
+        }
+      },
+      {
+        "tag": "button",
+        "text": "前へ‹",
+        "rect": {
+          "x": 1148,
+          "y": 838,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "1",
+        "rect": {
+          "x": 1186,
+          "y": 838,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "2",
+        "rect": {
+          "x": 1224,
+          "y": 838,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "3",
+        "rect": {
+          "x": 1262,
+          "y": 838,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "12",
+        "rect": {
+          "x": 1338,
+          "y": 838,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "次へ›",
+        "rect": {
+          "x": 1376,
+          "y": 838,
+          "w": 32,
+          "h": 32
+        }
+      }
+    ]
+  },
+  {
+    "id": "I1E7Bt",
+    "width": 1440,
+    "geometry": {
+      "width": 1440,
+      "documentWidth": 1440
+    },
+    "overflows": [
+      {
+        "path": "div.app-shell_side__CuY3O > div.hidden.xl:block > header.top-bar_root__l_DJi > div.top-bar_actions__mqwcc",
+        "clientWidth": 244,
+        "scrollWidth": 248
+      },
+      {
+        "path": "div.hidden.xl:block > header.top-bar_root__l_DJi > div.top-bar_actions__mqwcc > button.top-bar_iconButton__ryDrW.v8-only",
+        "clientWidth": 36,
+        "scrollWidth": 40
+      },
+      {
+        "path": "div.app-shell_side__CuY3O > main.app-shell_main__sP2aK > div.app-shell_content__vZNpX. > div",
+        "clientWidth": 1140,
+        "scrollWidth": 1164
+      },
+      {
+        "path": "aside.folder-panel_panel__LmVMy.v7:bg-canvas > nav.folder-panel_rows__FRItI.v7:p-2 > div.folder-panel_row__tJM4J.group > div.folder-panel_menu__C5m5m.v7:relative",
+        "clientWidth": 14,
+        "scrollWidth": 23
+      },
+      {
+        "path": "aside.folder-panel_panel__LmVMy.v7:bg-canvas > nav.folder-panel_rows__FRItI.v7:p-2 > div.folder-panel_row__tJM4J.group > div.folder-panel_menu__C5m5m.v7:relative",
+        "clientWidth": 14,
+        "scrollWidth": 23
+      },
+      {
+        "path": "aside.folder-panel_panel__LmVMy.v7:bg-canvas > nav.folder-panel_rows__FRItI.v7:p-2 > div.folder-panel_row__tJM4J.group > div.folder-panel_menu__C5m5m.v7:relative",
+        "clientWidth": 14,
+        "scrollWidth": 23
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      }
+    ],
+    "viewportOverflows": [],
+    "midWordBreaks": [
+      {
+        "path": "aside.page-templates_folders__H6w5u > aside.folder-panel_panel__LmVMy.v7:bg-canvas > div.folder-panel_footer__TMdMS.v7:border-hairline > p.list_folderNote__uUhJ3",
+        "text": "フォルダを消しても、中のタグは未分類に残ります",
+        "lines": 2
+      }
+    ],
+    "tableMisalignments": [],
+    "fontIssues": [
+      {
+        "path": "div.page-templates_content__l99j2 > div.list_pager__lRTx_ > nav.pagination_pagination__GoEpN > button.pagination_item__zJkBy.pagination_control__ees8u",
+        "text": "前へ‹",
+        "font": "Inter, \"Inter Fallback\", Inter, sans-serif"
+      },
+      {
+        "path": "div.page-templates_content__l99j2 > div.list_pager__lRTx_ > nav.pagination_pagination__GoEpN > button.pagination_item__zJkBy.pagination_control__ees8u",
+        "text": "次へ›",
+        "font": "Inter, \"Inter Fallback\", Inter, sans-serif"
+      }
+    ],
+    "keys": [
+      {
+        "tag": "button",
+        "text": "メイン",
+        "rect": {
+          "x": 12,
+          "y": 72,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "配信",
+        "rect": {
+          "x": 12,
+          "y": 253,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "コンテンツ",
+        "rect": {
+          "x": 12,
+          "y": 471,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "成果と分析",
+        "rect": {
+          "x": 12,
+          "y": 689,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "自動化",
+        "rect": {
+          "x": 12,
+          "y": 722,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "予約",
+        "rect": {
+          "x": 12,
+          "y": 755,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "専用機能",
+        "rect": {
+          "x": 12,
+          "y": 936,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "設定",
+        "rect": {
+          "x": 12,
+          "y": 969,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "飲食店向け（テスト）",
+        "rect": {
+          "x": 12,
+          "y": 1002,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "KKenta Kawanoオーナー",
+        "rect": {
+          "x": 12,
+          "y": 936,
+          "w": 216,
+          "h": 48
+        }
+      },
+      {
+        "tag": "h1",
+        "text": "タグ",
+        "rect": {
+          "x": 375,
+          "y": 20,
+          "w": 26,
+          "h": 20
+        }
+      },
+      {
+        "tag": "button",
+        "text": "3",
+        "rect": {
+          "x": 1384,
+          "y": 12,
+          "w": 36,
+          "h": 36
+        }
+      },
+      {
+        "tag": "h2",
+        "text": "タグ",
+        "rect": {
+          "x": 264,
+          "y": 80,
+          "w": 44,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "CSVで一括登録する",
+        "rect": {
+          "x": 1240,
+          "y": 90,
+          "w": 164,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "タグ",
+        "rect": {
+          "x": 264,
+          "y": 147,
+          "w": 26,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "友だち情報欄",
+        "rect": {
+          "x": 314,
+          "y": 147,
+          "w": 78,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "対応マーク",
+        "rect": {
+          "x": 416,
+          "y": 147,
+          "w": 65,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "保存した検索",
+        "rect": {
+          "x": 505,
+          "y": 147,
+          "w": 78,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "すべて101",
+        "rect": {
+          "x": 262,
+          "y": 400,
+          "w": 133,
+          "h": 19
+        }
+      },
+      {
+        "tag": "button",
+        "text": "VIP14",
+        "rect": {
+          "x": 262,
+          "y": 435,
+          "w": 155,
+          "h": 19
+        }
+      },
+      {
+        "tag": "button",
+        "text": "…",
+        "rect": {
+          "x": 394,
+          "y": 429,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "ペット12",
+        "rect": {
+          "x": 262,
+          "y": 470,
+          "w": 155,
+          "h": 19
+        }
+      },
+      {
+        "tag": "button",
+        "text": "…",
+        "rect": {
+          "x": 394,
+          "y": 464,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "会員18",
+        "rect": {
+          "x": 262,
+          "y": 505,
+          "w": 155,
+          "h": 19
+        }
+      },
+      {
+        "tag": "button",
+        "text": "…",
+        "rect": {
+          "x": 394,
+          "y": 499,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "未分類20",
+        "rect": {
+          "x": 262,
+          "y": 540,
+          "w": 155,
+          "h": 19
+        }
+      },
+      {
+        "tag": "button",
+        "text": "フォルダを追加",
+        "rect": {
+          "x": 252,
+          "y": 580,
+          "w": 132,
+          "h": 31
+        }
+      },
+      {
+        "tag": "button",
+        "text": "使用状態：すべて",
+        "rect": {
+          "x": 712,
+          "y": 310,
+          "w": 145,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "付け方：すべて",
+        "rect": {
+          "x": 865,
+          "y": 310,
+          "w": 132,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "よく使う絞り込み",
+        "rect": {
+          "x": 1147,
+          "y": 310,
+          "w": 153,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "20件表示",
+        "rect": {
+          "x": 1308,
+          "y": 310,
+          "w": 96,
+          "h": 36
+        }
+      },
+      {
+        "tag": "th",
+        "text": "一覧に出す",
+        "rect": {
+          "x": 440,
+          "y": 360,
+          "w": 56,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "タグ",
+        "rect": {
+          "x": 496,
+          "y": 360,
+          "w": 428,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "人数",
+        "rect": {
+          "x": 924,
+          "y": 360,
+          "w": 76,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "付け方",
+        "rect": {
+          "x": 1000,
+          "y": 360,
+          "w": 106,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "連動",
+        "rect": {
+          "x": 1106,
+          "y": 360,
+          "w": 126,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "使っている所",
+        "rect": {
+          "x": 1232,
+          "y": 360,
+          "w": 136,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "操作",
+        "rect": {
+          "x": 1368,
+          "y": 360,
+          "w": 60,
+          "h": 40
+        }
+      },
+      {
+        "tag": "button",
+        "text": "前へ‹",
+        "rect": {
+          "x": 1128,
+          "y": 1811,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "1",
+        "rect": {
+          "x": 1166,
+          "y": 1811,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "2",
+        "rect": {
+          "x": 1204,
+          "y": 1811,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "3",
+        "rect": {
+          "x": 1242,
+          "y": 1811,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "6",
+        "rect": {
+          "x": 1318,
+          "y": 1811,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "次へ›",
+        "rect": {
+          "x": 1356,
+          "y": 1811,
+          "w": 32,
+          "h": 32
+        }
+      }
+    ]
+  },
+  {
+    "id": "LRc93",
+    "width": 1440,
+    "geometry": {
+      "width": 1440,
+      "documentWidth": 1440
+    },
+    "overflows": [
+      {
+        "path": "div.app-shell_side__CuY3O > div.hidden.xl:block > header.top-bar_root__l_DJi > div.top-bar_actions__mqwcc",
+        "clientWidth": 244,
+        "scrollWidth": 248
+      },
+      {
+        "path": "div.hidden.xl:block > header.top-bar_root__l_DJi > div.top-bar_actions__mqwcc > button.top-bar_iconButton__ryDrW.v8-only",
+        "clientWidth": 36,
+        "scrollWidth": 40
+      },
+      {
+        "path": "aside.folder-panel_panel__LmVMy.v7:bg-canvas > nav.folder-panel_rows__FRItI.v7:p-2 > div.folder-panel_row__tJM4J.group > div.folder-panel_menu__C5m5m.v7:relative",
+        "clientWidth": 14,
+        "scrollWidth": 23
+      },
+      {
+        "path": "aside.folder-panel_panel__LmVMy.v7:bg-canvas > nav.folder-panel_rows__FRItI.v7:p-2 > div.folder-panel_row__tJM4J.group > div.folder-panel_menu__C5m5m.v7:relative",
+        "clientWidth": 14,
+        "scrollWidth": 23
+      },
+      {
+        "path": "aside.folder-panel_panel__LmVMy.v7:bg-canvas > nav.folder-panel_rows__FRItI.v7:p-2 > div.folder-panel_row__tJM4J.group > div.folder-panel_menu__C5m5m.v7:relative",
+        "clientWidth": 14,
+        "scrollWidth": 23
+      },
+      {
+        "path": "aside.folder-panel_panel__LmVMy.v7:bg-canvas > nav.folder-panel_rows__FRItI.v7:p-2 > div.folder-panel_row__tJM4J.group > div.folder-panel_menu__C5m5m.v7:relative",
+        "clientWidth": 14,
+        "scrollWidth": 23
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowTemplate__WLjL2 > td.data-table_bodyCell__n186Z.list_menuCell__XKEhn > div.list_menuBox__L3Awz.list_hqActions__qixBy",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowTemplate__WLjL2 > td.data-table_bodyCell__n186Z.list_menuCell__XKEhn > div.list_menuBox__L3Awz.list_hqActions__qixBy > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowTemplate__WLjL2 > td.data-table_bodyCell__n186Z.list_menuCell__XKEhn > div.list_menuBox__L3Awz.list_hqActions__qixBy",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowTemplate__WLjL2 > td.data-table_bodyCell__n186Z.list_menuCell__XKEhn > div.list_menuBox__L3Awz.list_hqActions__qixBy > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowTemplate__WLjL2 > td.data-table_bodyCell__n186Z.list_menuCell__XKEhn > div.list_menuBox__L3Awz.list_hqActions__qixBy",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowTemplate__WLjL2 > td.data-table_bodyCell__n186Z.list_menuCell__XKEhn > div.list_menuBox__L3Awz.list_hqActions__qixBy > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowTemplate__WLjL2 > td.data-table_bodyCell__n186Z.list_menuCell__XKEhn > div.list_menuBox__L3Awz.list_hqActions__qixBy",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowTemplate__WLjL2 > td.data-table_bodyCell__n186Z.list_menuCell__XKEhn > div.list_menuBox__L3Awz.list_hqActions__qixBy > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      }
+    ],
+    "viewportOverflows": [],
+    "midWordBreaks": [
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowTemplate__WLjL2 > td.data-table_bodyCell__n186Z > span.list_hqDest__m0vkR > span.list_cellSub__cvaeI",
+        "text": "本店・渋谷店・イベント",
+        "lines": 2
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowTemplate__WLjL2 > td.data-table_bodyCell__n186Z > span.list_hqDest__m0vkR > span.list_cellSub__cvaeI",
+        "text": "本店・渋谷店・イベント",
+        "lines": 2
+      }
+    ],
+    "tableMisalignments": [],
+    "fontIssues": [],
+    "keys": [
+      {
+        "tag": "button",
+        "text": "統括",
+        "rect": {
+          "x": 12,
+          "y": 72,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "KKenta Kawanoオーナー",
+        "rect": {
+          "x": 12,
+          "y": 936,
+          "w": 216,
+          "h": 48
+        }
+      },
+      {
+        "tag": "h1",
+        "text": "テンプレート",
+        "rect": {
+          "x": 375,
+          "y": 20,
+          "w": 78,
+          "h": 20
+        }
+      },
+      {
+        "tag": "button",
+        "text": "3",
+        "rect": {
+          "x": 1384,
+          "y": 12,
+          "w": 36,
+          "h": 36
+        }
+      },
+      {
+        "tag": "h2",
+        "text": "テンプレート",
+        "rect": {
+          "x": 264,
+          "y": 80,
+          "w": 131,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "メッセージ4",
+        "rect": {
+          "x": 264,
+          "y": 147,
+          "w": 78,
+          "h": 30
+        }
+      },
+      {
+        "tag": "button",
+        "text": "カルーセル1",
+        "rect": {
+          "x": 366,
+          "y": 147,
+          "w": 78,
+          "h": 28
+        }
+      },
+      {
+        "tag": "button",
+        "text": "リッチメッセージ0",
+        "rect": {
+          "x": 468,
+          "y": 147,
+          "w": 117,
+          "h": 28
+        }
+      },
+      {
+        "tag": "button",
+        "text": "質問1",
+        "rect": {
+          "x": 608,
+          "y": 147,
+          "w": 39,
+          "h": 28
+        }
+      },
+      {
+        "tag": "button",
+        "text": "クーポン0",
+        "rect": {
+          "x": 671,
+          "y": 147,
+          "w": 65,
+          "h": 28
+        }
+      },
+      {
+        "tag": "button",
+        "text": "リサーチ0",
+        "rect": {
+          "x": 760,
+          "y": 147,
+          "w": 65,
+          "h": 28
+        }
+      },
+      {
+        "tag": "button",
+        "text": "テンプレートを作る",
+        "rect": {
+          "x": 252,
+          "y": 312,
+          "w": 175,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "すべて4",
+        "rect": {
+          "x": 262,
+          "y": 400,
+          "w": 133,
+          "h": 19
+        }
+      },
+      {
+        "tag": "button",
+        "text": "お問い合わせ1",
+        "rect": {
+          "x": 262,
+          "y": 435,
+          "w": 155,
+          "h": 19
+        }
+      },
+      {
+        "tag": "button",
+        "text": "…",
+        "rect": {
+          "x": 394,
+          "y": 429,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "予約1",
+        "rect": {
+          "x": 262,
+          "y": 470,
+          "w": 155,
+          "h": 19
+        }
+      },
+      {
+        "tag": "button",
+        "text": "…",
+        "rect": {
+          "x": 394,
+          "y": 464,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "EC0",
+        "rect": {
+          "x": 262,
+          "y": 505,
+          "w": 155,
+          "h": 19
+        }
+      },
+      {
+        "tag": "button",
+        "text": "…",
+        "rect": {
+          "x": 394,
+          "y": 499,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "未分類2",
+        "rect": {
+          "x": 262,
+          "y": 540,
+          "w": 155,
+          "h": 19
+        }
+      },
+      {
+        "tag": "button",
+        "text": "…",
+        "rect": {
+          "x": 394,
+          "y": 534,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "フォルダを追加",
+        "rect": {
+          "x": 252,
+          "y": 580,
+          "w": 132,
+          "h": 31
+        }
+      },
+      {
+        "tag": "button",
+        "text": "未配布",
+        "rect": {
+          "x": 692,
+          "y": 310,
+          "w": 74,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "20件表示",
+        "rect": {
+          "x": 1308,
+          "y": 310,
+          "w": 96,
+          "h": 36
+        }
+      },
+      {
+        "tag": "th",
+        "text": "テンプレート",
+        "rect": {
+          "x": 440,
+          "y": 360,
+          "w": 324,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "種類",
+        "rect": {
+          "x": 764,
+          "y": 360,
+          "w": 88,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "公開",
+        "rect": {
+          "x": 852,
+          "y": 360,
+          "w": 128,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "配布先",
+        "rect": {
+          "x": 980,
+          "y": 360,
+          "w": 112,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "今月送った数",
+        "rect": {
+          "x": 1092,
+          "y": 360,
+          "w": 104,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "更新",
+        "rect": {
+          "x": 1196,
+          "y": 360,
+          "w": 88,
+          "h": 40
+        }
+      },
+      {
+        "tag": "button",
+        "text": "秋の新商品のお知らせ",
+        "rect": {
+          "x": 480,
+          "y": 412,
+          "w": 130,
+          "h": 19
+        }
+      },
+      {
+        "tag": "button",
+        "text": "配る",
+        "rect": {
+          "x": 1292,
+          "y": 417,
+          "w": 60,
+          "h": 28
+        }
+      },
+      {
+        "tag": "button",
+        "text": "来店のお礼",
+        "rect": {
+          "x": 480,
+          "y": 473,
+          "w": 65,
+          "h": 19
+        }
+      },
+      {
+        "tag": "button",
+        "text": "配る",
+        "rect": {
+          "x": 1292,
+          "y": 478,
+          "w": 60,
+          "h": 28
+        }
+      },
+      {
+        "tag": "button",
+        "text": "予約の受付",
+        "rect": {
+          "x": 480,
+          "y": 534,
+          "w": 65,
+          "h": 19
+        }
+      },
+      {
+        "tag": "button",
+        "text": "配る",
+        "rect": {
+          "x": 1292,
+          "y": 539,
+          "w": 60,
+          "h": 28
+        }
+      },
+      {
+        "tag": "button",
+        "text": "定休日のご案内",
+        "rect": {
+          "x": 480,
+          "y": 595,
+          "w": 91,
+          "h": 19
+        }
+      },
+      {
+        "tag": "button",
+        "text": "配る",
+        "rect": {
+          "x": 1292,
+          "y": 600,
+          "w": 60,
+          "h": 28
+        }
+      }
+    ]
+  },
+  {
+    "id": "WQmep",
+    "width": 1152,
+    "geometry": {
+      "width": 1152,
+      "documentWidth": 1152
+    },
+    "overflows": [
+      {
+        "path": "div.app-shell_side__CuY3O > div.hidden.xl:block > header.top-bar_root__l_DJi > div.top-bar_actions__mqwcc",
+        "clientWidth": 244,
+        "scrollWidth": 248
+      },
+      {
+        "path": "div.hidden.xl:block > header.top-bar_root__l_DJi > div.top-bar_actions__mqwcc > button.top-bar_iconButton__ryDrW.v8-only",
+        "clientWidth": 36,
+        "scrollWidth": 40
+      },
+      {
+        "path": "div.page-templates_dashboardCell__74r9n > div.dashboard_head__8c1E3 > div.section-header_root__aGd_D > span.help-tip_wrap__THqcy.section-header_help__imSWS",
+        "clientWidth": 16,
+        "scrollWidth": 22
+      },
+      {
+        "path": "div.dashboard_asideBlock__cZplX > div.dashboard_head__8c1E3 > div.section-header_root__aGd_D > span.help-tip_wrap__THqcy.section-header_help__imSWS",
+        "clientWidth": 16,
+        "scrollWidth": 22
+      },
+      {
+        "path": "div.dashboard_asideBlock__cZplX > div.dashboard_head__8c1E3 > div.section-header_root__aGd_D > span.help-tip_wrap__THqcy.section-header_help__imSWS",
+        "clientWidth": 16,
+        "scrollWidth": 22
+      },
+      {
+        "path": "div.page-templates_dashboardCell__74r9n > div.dashboard_head__8c1E3 > div.section-header_root__aGd_D > span.help-tip_wrap__THqcy.section-header_help__imSWS",
+        "clientWidth": 16,
+        "scrollWidth": 22
+      },
+      {
+        "path": "div.page-templates_dashboardCell__74r9n > div.dashboard_head__8c1E3 > div.section-header_root__aGd_D > span.help-tip_wrap__THqcy.section-header_help__imSWS",
+        "clientWidth": 16,
+        "scrollWidth": 22
+      },
+      {
+        "path": "div.page-templates_dashboardCell__74r9n > div.dashboard_head__8c1E3 > div.section-header_root__aGd_D > span.help-tip_wrap__THqcy.section-header_help__imSWS",
+        "clientWidth": 16,
+        "scrollWidth": 22
+      }
+    ],
+    "viewportOverflows": [],
+    "midWordBreaks": [
+      {
+        "path": "div.kpi-card_strip__jHggO.grid > div.kpi-card_card____aUb.kpi-card_cardV6__sokTg > p.kpi-card_detail__NCGPv.kpi-card_detailV6__gbyRP > span.kpi-card_detailText__mHtws",
+        "text": "次の予定はありません",
+        "lines": 2
+      },
+      {
+        "path": "div.kpi-card_card____aUb.kpi-card_cardV6__sokTg > div.kpi-card_head__aLKRT > p.kpi-card_label__lucfs.kpi-card_labelV6__7tITg > span.kpi-card_labelText__Jhg1b",
+        "text": "出荷予定（今日・明日）",
+        "lines": 2
+      },
+      {
+        "path": "div.page-templates_dashboardRow__trBFj > aside.page-templates_dashboardAside__50Pub > div.dashboard_kv__iLyRY > span.dashboard_kvKey__IETAp",
+        "text": "ブロック・非表示",
+        "lines": 2
+      },
+      {
+        "path": "div.page-templates_dashboardCell__74r9n > div.dashboard_plan__yAwbP > span.dashboard_planText__iIqCS > a.dashboard_planTitle__TRMZf",
+        "text": "来店前日（あおい）",
+        "lines": 2
+      },
+      {
+        "path": "div.page-templates_dashboardCell__74r9n > div.dashboard_plan__yAwbP > span.dashboard_planText__iIqCS > a.dashboard_planTitle__TRMZf",
+        "text": "相談30分（あおい）",
+        "lines": 2
+      }
+    ],
+    "tableMisalignments": [],
+    "fontIssues": [],
+    "keys": [
+      {
+        "tag": "button",
+        "text": "メイン",
+        "rect": {
+          "x": 12,
+          "y": 72,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "配信",
+        "rect": {
+          "x": 12,
+          "y": 253,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "コンテンツ",
+        "rect": {
+          "x": 12,
+          "y": 471,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "成果と分析",
+        "rect": {
+          "x": 12,
+          "y": 689,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "自動化",
+        "rect": {
+          "x": 12,
+          "y": 722,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "予約",
+        "rect": {
+          "x": 12,
+          "y": 755,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "専用機能",
+        "rect": {
+          "x": 12,
+          "y": 936,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "設定",
+        "rect": {
+          "x": 12,
+          "y": 969,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "飲食店向け（テスト）",
+        "rect": {
+          "x": 12,
+          "y": 1002,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "KKenta Kawanoオーナー",
+        "rect": {
+          "x": 12,
+          "y": 936,
+          "w": 216,
+          "h": 48
+        }
+      },
+      {
+        "tag": "h1",
+        "text": "ダッシュボード",
+        "rect": {
+          "x": 375,
+          "y": 20,
+          "w": 91,
+          "h": 20
+        }
+      },
+      {
+        "tag": "button",
+        "text": "3",
+        "rect": {
+          "x": 1096,
+          "y": 12,
+          "w": 36,
+          "h": 36
+        }
+      },
+      {
+        "tag": "h2",
+        "text": "おはようございます、Kenta さん",
+        "rect": {
+          "x": 264,
+          "y": 80,
+          "w": 330,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "今日",
+        "rect": {
+          "x": 608,
+          "y": 91,
+          "w": 50,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "過去7日",
+        "rect": {
+          "x": 660,
+          "y": 91,
+          "w": 70,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "過去28日",
+        "rect": {
+          "x": 732,
+          "y": 91,
+          "w": 78,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "ダッシュボード編集",
+        "rect": {
+          "x": 824,
+          "y": 89,
+          "w": 166,
+          "h": 36
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "友だち数の推移",
+        "rect": {
+          "x": 264,
+          "y": 292,
+          "w": 105,
+          "h": 23
+        }
+      },
+      {
+        "tag": "button",
+        "text": "?",
+        "rect": {
+          "x": 542,
+          "y": 290,
+          "w": 28,
+          "h": 28
+        }
+      },
+      {
+        "tag": "button",
+        "text": "グラフ",
+        "rect": {
+          "x": 266,
+          "y": 329,
+          "w": 56,
+          "h": 24
+        }
+      },
+      {
+        "tag": "button",
+        "text": "表",
+        "rect": {
+          "x": 324,
+          "y": 329,
+          "w": 32,
+          "h": 24
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "今月の送信枠",
+        "rect": {
+          "x": 932,
+          "y": 292,
+          "w": 90,
+          "h": 23
+        }
+      },
+      {
+        "tag": "button",
+        "text": "?",
+        "rect": {
+          "x": 1022,
+          "y": 290,
+          "w": 28,
+          "h": 28
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "運用アラート",
+        "rect": {
+          "x": 932,
+          "y": 455,
+          "w": 90,
+          "h": 23
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "対応が必要な受信（全アカウント）",
+        "rect": {
+          "x": 264,
+          "y": 625,
+          "w": 240,
+          "h": 23
+        }
+      },
+      {
+        "tag": "span",
+        "text": "お名前",
+        "rect": {
+          "x": 276,
+          "y": 668,
+          "w": 260,
+          "h": 18
+        }
+      },
+      {
+        "tag": "span",
+        "text": "内容",
+        "rect": {
+          "x": 552,
+          "y": 668,
+          "w": 105,
+          "h": 18
+        }
+      },
+      {
+        "tag": "span",
+        "text": "待ち時間",
+        "rect": {
+          "x": 673,
+          "y": 668,
+          "w": 100,
+          "h": 18
+        }
+      },
+      {
+        "tag": "span",
+        "text": "状態",
+        "rect": {
+          "x": 789,
+          "y": 668,
+          "w": 90,
+          "h": 18
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "現在の対応状況",
+        "rect": {
+          "x": 932,
+          "y": 625,
+          "w": 105,
+          "h": 23
+        }
+      },
+      {
+        "tag": "button",
+        "text": "?",
+        "rect": {
+          "x": 1037,
+          "y": 623,
+          "w": 28,
+          "h": 28
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "接続状態",
+        "rect": {
+          "x": 932,
+          "y": 863,
+          "w": 60,
+          "h": 23
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "友だち追加リンク",
+        "rect": {
+          "x": 264,
+          "y": 1001,
+          "w": 120,
+          "h": 23
+        }
+      },
+      {
+        "tag": "button",
+        "text": "?",
+        "rect": {
+          "x": 384,
+          "y": 998,
+          "w": 28,
+          "h": 28
+        }
+      },
+      {
+        "tag": "button",
+        "text": "基本の追加URL",
+        "rect": {
+          "x": 308,
+          "y": 1036,
+          "w": 220,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "コピー",
+        "rect": {
+          "x": 688,
+          "y": 1084,
+          "w": 88,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "QRを表示",
+        "rect": {
+          "x": 784,
+          "y": 1084,
+          "w": 107,
+          "h": 36
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "友だちの状態",
+        "rect": {
+          "x": 936,
+          "y": 1001,
+          "w": 90,
+          "h": 23
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "今後の予定",
+        "rect": {
+          "x": 260,
+          "y": 1190,
+          "w": 75,
+          "h": 23
+        }
+      },
+      {
+        "tag": "button",
+        "text": "?",
+        "rect": {
+          "x": 335,
+          "y": 1187,
+          "w": 28,
+          "h": 28
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "今日の配信の失敗",
+        "rect": {
+          "x": 486,
+          "y": 1190,
+          "w": 120,
+          "h": 23
+        }
+      },
+      {
+        "tag": "button",
+        "text": "?",
+        "rect": {
+          "x": 606,
+          "y": 1187,
+          "w": 28,
+          "h": 28
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "今月の配信",
+        "rect": {
+          "x": 711,
+          "y": 1190,
+          "w": 75,
+          "h": 23
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "最近の成果",
+        "rect": {
+          "x": 936,
+          "y": 1190,
+          "w": 75,
+          "h": 23
+        }
+      },
+      {
+        "tag": "h3",
+        "text": "最近の動き",
+        "rect": {
+          "x": 264,
+          "y": 1390,
+          "w": 75,
+          "h": 23
+        }
+      }
+    ]
+  },
+  {
+    "id": "x6QsVz",
+    "width": 1152,
+    "geometry": {
+      "width": 1152,
+      "documentWidth": 1152
+    },
+    "overflows": [
+      {
+        "path": "div.app-shell_side__CuY3O > div.hidden.xl:block > header.top-bar_root__l_DJi > div.top-bar_actions__mqwcc",
+        "clientWidth": 244,
+        "scrollWidth": 248
+      },
+      {
+        "path": "div.hidden.xl:block > header.top-bar_root__l_DJi > div.top-bar_actions__mqwcc > button.top-bar_iconButton__ryDrW.v8-only",
+        "clientWidth": 36,
+        "scrollWidth": 40
+      },
+      {
+        "path": "div.page-templates_main__elS6j > div.page-templates_content__l99j2 > div.list_tableWrap__XL7_l > div.data-table_frame__XicuE.list_table__3KLe_",
+        "clientWidth": 900,
+        "scrollWidth": 936
+      },
+      {
+        "path": "thead > tr.table_headRow__rGJh4 > th.table_cell__mr_sW.list_thCheck__mV6Ze > span.checkbox_root__A8IAz",
+        "clientWidth": 18,
+        "scrollWidth": 21
+      },
+      {
+        "path": "table.data-table_table__PLnGp > thead > tr.table_headRow__rGJh4 > th.table_cell__mr_sW.list_thFriend__4QfG1",
+        "clientWidth": 36,
+        "scrollWidth": 66
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdCheck__fPOke > span.checkbox_root__A8IAz",
+        "clientWidth": 18,
+        "scrollWidth": 21
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdCheck__fPOke > span.checkbox_root__A8IAz",
+        "clientWidth": 18,
+        "scrollWidth": 21
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdCheck__fPOke > span.checkbox_root__A8IAz",
+        "clientWidth": 18,
+        "scrollWidth": 21
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdCheck__fPOke > span.checkbox_root__A8IAz",
+        "clientWidth": 18,
+        "scrollWidth": 21
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdCheck__fPOke > span.checkbox_root__A8IAz",
+        "clientWidth": 18,
+        "scrollWidth": 21
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdCheck__fPOke > span.checkbox_root__A8IAz",
+        "clientWidth": 18,
+        "scrollWidth": 21
+      }
+    ],
+    "viewportOverflows": [
+      {
+        "path": "div.page-templates_content__l99j2 > div.list_tableWrap__XL7_l > div.data-table_frame__XicuE.list_table__3KLe_ > table.data-table_table__PLnGp",
+        "right": 1176,
+        "width": 1152
+      },
+      {
+        "path": "div.list_tableWrap__XL7_l > div.data-table_frame__XicuE.list_table__3KLe_ > table.data-table_table__PLnGp > colgroup",
+        "right": 1176,
+        "width": 1152
+      },
+      {
+        "path": "div.data-table_frame__XicuE.list_table__3KLe_ > table.data-table_table__PLnGp > colgroup > col.list_colMenu__jpI58",
+        "right": 1176,
+        "width": 1152
+      },
+      {
+        "path": "div.list_tableWrap__XL7_l > div.data-table_frame__XicuE.list_table__3KLe_ > table.data-table_table__PLnGp > thead",
+        "right": 1176,
+        "width": 1152
+      },
+      {
+        "path": "div.data-table_frame__XicuE.list_table__3KLe_ > table.data-table_table__PLnGp > thead > tr.table_headRow__rGJh4",
+        "right": 1176,
+        "width": 1152
+      },
+      {
+        "path": "table.data-table_table__PLnGp > thead > tr.table_headRow__rGJh4 > th.table_cell__mr_sW.list_thMenu__j3qYW",
+        "right": 1176,
+        "width": 1152
+      },
+      {
+        "path": "div.list_tableWrap__XL7_l > div.data-table_frame__XicuE.list_table__3KLe_ > table.data-table_table__PLnGp > tbody",
+        "right": 1176,
+        "width": 1152
+      },
+      {
+        "path": "div.data-table_frame__XicuE.list_table__3KLe_ > table.data-table_table__PLnGp > tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71",
+        "right": 1176,
+        "width": 1152
+      },
+      {
+        "path": "table.data-table_table__PLnGp > tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdMenu__wITBi",
+        "right": 1176,
+        "width": 1152
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdMenu__wITBi > div.list_menuBox__a3h8c",
+        "right": 1156,
+        "width": 1152
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdMenu__wITBi > div.list_menuBox__a3h8c > span",
+        "right": 1156,
+        "width": 1152
+      },
+      {
+        "path": "td.data-table_bodyCell__n186Z.list_tdMenu__wITBi > div.list_menuBox__a3h8c > span > button.button_button__ZmqfD.button_secondary__BzmRt",
+        "right": 1156,
+        "width": 1152
+      },
+      {
+        "path": "div.data-table_frame__XicuE.list_table__3KLe_ > table.data-table_table__PLnGp > tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71",
+        "right": 1176,
+        "width": 1152
+      },
+      {
+        "path": "table.data-table_table__PLnGp > tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdMenu__wITBi",
+        "right": 1176,
+        "width": 1152
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdMenu__wITBi > div.list_menuBox__a3h8c",
+        "right": 1156,
+        "width": 1152
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdMenu__wITBi > div.list_menuBox__a3h8c > span",
+        "right": 1156,
+        "width": 1152
+      },
+      {
+        "path": "td.data-table_bodyCell__n186Z.list_tdMenu__wITBi > div.list_menuBox__a3h8c > span > button.button_button__ZmqfD.button_secondary__BzmRt",
+        "right": 1156,
+        "width": 1152
+      },
+      {
+        "path": "div.data-table_frame__XicuE.list_table__3KLe_ > table.data-table_table__PLnGp > tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71",
+        "right": 1176,
+        "width": 1152
+      },
+      {
+        "path": "table.data-table_table__PLnGp > tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdMenu__wITBi",
+        "right": 1176,
+        "width": 1152
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdMenu__wITBi > div.list_menuBox__a3h8c",
+        "right": 1156,
+        "width": 1152
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdMenu__wITBi > div.list_menuBox__a3h8c > span",
+        "right": 1156,
+        "width": 1152
+      },
+      {
+        "path": "td.data-table_bodyCell__n186Z.list_tdMenu__wITBi > div.list_menuBox__a3h8c > span > button.button_button__ZmqfD.button_secondary__BzmRt",
+        "right": 1156,
+        "width": 1152
+      },
+      {
+        "path": "div.data-table_frame__XicuE.list_table__3KLe_ > table.data-table_table__PLnGp > tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71",
+        "right": 1176,
+        "width": 1152
+      },
+      {
+        "path": "table.data-table_table__PLnGp > tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdMenu__wITBi",
+        "right": 1176,
+        "width": 1152
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdMenu__wITBi > div.list_menuBox__a3h8c",
+        "right": 1156,
+        "width": 1152
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdMenu__wITBi > div.list_menuBox__a3h8c > span",
+        "right": 1156,
+        "width": 1152
+      },
+      {
+        "path": "td.data-table_bodyCell__n186Z.list_tdMenu__wITBi > div.list_menuBox__a3h8c > span > button.button_button__ZmqfD.button_secondary__BzmRt",
+        "right": 1156,
+        "width": 1152
+      },
+      {
+        "path": "div.data-table_frame__XicuE.list_table__3KLe_ > table.data-table_table__PLnGp > tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71",
+        "right": 1176,
+        "width": 1152
+      },
+      {
+        "path": "table.data-table_table__PLnGp > tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdMenu__wITBi",
+        "right": 1176,
+        "width": 1152
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdMenu__wITBi > div.list_menuBox__a3h8c",
+        "right": 1156,
+        "width": 1152
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdMenu__wITBi > div.list_menuBox__a3h8c > span",
+        "right": 1156,
+        "width": 1152
+      },
+      {
+        "path": "td.data-table_bodyCell__n186Z.list_tdMenu__wITBi > div.list_menuBox__a3h8c > span > button.button_button__ZmqfD.button_secondary__BzmRt",
+        "right": 1156,
+        "width": 1152
+      },
+      {
+        "path": "div.data-table_frame__XicuE.list_table__3KLe_ > table.data-table_table__PLnGp > tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71",
+        "right": 1176,
+        "width": 1152
+      },
+      {
+        "path": "table.data-table_table__PLnGp > tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdMenu__wITBi",
+        "right": 1176,
+        "width": 1152
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdMenu__wITBi > div.list_menuBox__a3h8c",
+        "right": 1156,
+        "width": 1152
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_tdMenu__wITBi > div.list_menuBox__a3h8c > span",
+        "right": 1156,
+        "width": 1152
+      },
+      {
+        "path": "td.data-table_bodyCell__n186Z.list_tdMenu__wITBi > div.list_menuBox__a3h8c > span > button.button_button__ZmqfD.button_secondary__BzmRt",
+        "right": 1156,
+        "width": 1152
+      }
+    ],
+    "midWordBreaks": [
+      {
+        "path": "td.data-table_bodyCell__n186Z.list_td__XroIf > div.list_tags___3smp > span.tag-pill_pill__l_oNS > span.tag-pill_name__cQK2e",
+        "text": "LINEログイン連携済み",
+        "lines": 2
+      },
+      {
+        "path": "td.data-table_bodyCell__n186Z.list_td__XroIf > div.list_tags___3smp > span.tag-pill_pill__l_oNS > span.tag-pill_name__cQK2e",
+        "text": "VIP",
+        "lines": 2
+      },
+      {
+        "path": "td.data-table_bodyCell__n186Z.list_td__XroIf > div.list_tags___3smp > span.tag-pill_pill__l_oNS > span.tag-pill_name__cQK2e",
+        "text": "定期便",
+        "lines": 2
+      }
+    ],
+    "tableMisalignments": [
+      {
+        "path": "div.page-templates_content__l99j2 > div.list_tableWrap__XL7_l > div.data-table_frame__XicuE.list_table__3KLe_ > table.data-table_table__PLnGp",
+        "rows": 7,
+        "bad": [
+          {
+            "column": 3,
+            "spread": 146
+          },
+          {
+            "column": 4,
+            "spread": 88
+          },
+          {
+            "column": 5,
+            "spread": 206
+          },
+          {
+            "column": 6,
+            "spread": 176
+          },
+          {
+            "column": 7,
+            "spread": 88
+          },
+          {
+            "column": 8,
+            "spread": 96
+          }
+        ]
+      }
+    ],
+    "fontIssues": [
+      {
+        "path": "div.page-templates_pagination__JSy2E > div.list_pager__yydkp > nav.pagination_pagination__GoEpN > button.pagination_item__zJkBy.pagination_control__ees8u",
+        "text": "前へ‹",
+        "font": "Inter, \"Inter Fallback\", Inter, sans-serif"
+      },
+      {
+        "path": "div.page-templates_pagination__JSy2E > div.list_pager__yydkp > nav.pagination_pagination__GoEpN > button.pagination_item__zJkBy.pagination_control__ees8u",
+        "text": "次へ›",
+        "font": "Inter, \"Inter Fallback\", Inter, sans-serif"
+      }
+    ],
+    "keys": [
+      {
+        "tag": "button",
+        "text": "メイン",
+        "rect": {
+          "x": 12,
+          "y": 72,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "配信",
+        "rect": {
+          "x": 12,
+          "y": 253,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "コンテンツ",
+        "rect": {
+          "x": 12,
+          "y": 471,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "成果と分析",
+        "rect": {
+          "x": 12,
+          "y": 689,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "自動化",
+        "rect": {
+          "x": 12,
+          "y": 722,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "予約",
+        "rect": {
+          "x": 12,
+          "y": 755,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "専用機能",
+        "rect": {
+          "x": 12,
+          "y": 936,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "設定",
+        "rect": {
+          "x": 12,
+          "y": 969,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "飲食店向け（テスト）",
+        "rect": {
+          "x": 12,
+          "y": 1002,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "KKenta Kawanoオーナー",
+        "rect": {
+          "x": 12,
+          "y": 936,
+          "w": 216,
+          "h": 48
+        }
+      },
+      {
+        "tag": "h1",
+        "text": "友だち",
+        "rect": {
+          "x": 375,
+          "y": 20,
+          "w": 39,
+          "h": 20
+        }
+      },
+      {
+        "tag": "button",
+        "text": "3",
+        "rect": {
+          "x": 1096,
+          "y": 12,
+          "w": 36,
+          "h": 36
+        }
+      },
+      {
+        "tag": "h2",
+        "text": "友だち",
+        "rect": {
+          "x": 264,
+          "y": 80,
+          "w": 66,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "表示中をCSVで書き出す",
+        "rect": {
+          "x": 766,
+          "y": 89,
+          "w": 190,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "タグ：すべて",
+        "rect": {
+          "x": 322,
+          "y": 338,
+          "w": 119,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "対応：すべて",
+        "rect": {
+          "x": 449,
+          "y": 338,
+          "w": 119,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "担当者：すべて",
+        "rect": {
+          "x": 576,
+          "y": 338,
+          "w": 132,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "シナリオ：すべて",
+        "rect": {
+          "x": 716,
+          "y": 338,
+          "w": 147,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "詳細条件",
+        "rect": {
+          "x": 871,
+          "y": 340,
+          "w": 102,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "保存した検索",
+        "rect": {
+          "x": 989,
+          "y": 338,
+          "w": 127,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "未対応",
+        "rect": {
+          "x": 264,
+          "y": 384,
+          "w": 74,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "注目のみ",
+        "rect": {
+          "x": 346,
+          "y": 384,
+          "w": 86,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "表示項目を編集",
+        "rect": {
+          "x": 690,
+          "y": 386,
+          "w": 141,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "20件表示",
+        "rect": {
+          "x": 839,
+          "y": 384,
+          "w": 98,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "友だち追加の新しい順",
+        "rect": {
+          "x": 945,
+          "y": 386,
+          "w": 171,
+          "h": 32
+        }
+      },
+      {
+        "tag": "th",
+        "text": "友だち",
+        "rect": {
+          "x": 292,
+          "y": 434,
+          "w": 36,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "対応・担当",
+        "rect": {
+          "x": 328,
+          "y": 434,
+          "w": 146,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "シナリオ",
+        "rect": {
+          "x": 474,
+          "y": 434,
+          "w": 88,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "最新のメッセージ",
+        "rect": {
+          "x": 562,
+          "y": 434,
+          "w": 206,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "タグ",
+        "rect": {
+          "x": 768,
+          "y": 434,
+          "w": 176,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "流入元",
+        "rect": {
+          "x": 944,
+          "y": 434,
+          "w": 88,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "最終接触",
+        "rect": {
+          "x": 1032,
+          "y": 434,
+          "w": 96,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "操作",
+        "rect": {
+          "x": 1128,
+          "y": 434,
+          "w": 48,
+          "h": 40
+        }
+      },
+      {
+        "tag": "button",
+        "text": "前へ‹",
+        "rect": {
+          "x": 860,
+          "y": 838,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "1",
+        "rect": {
+          "x": 898,
+          "y": 838,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "2",
+        "rect": {
+          "x": 936,
+          "y": 838,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "3",
+        "rect": {
+          "x": 974,
+          "y": 838,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "12",
+        "rect": {
+          "x": 1050,
+          "y": 838,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "次へ›",
+        "rect": {
+          "x": 1088,
+          "y": 838,
+          "w": 32,
+          "h": 32
+        }
+      }
+    ]
+  },
+  {
+    "id": "I1E7Bt",
+    "width": 1152,
+    "geometry": {
+      "width": 1152,
+      "documentWidth": 1152
+    },
+    "overflows": [
+      {
+        "path": "div.app-shell_side__CuY3O > div.hidden.xl:block > header.top-bar_root__l_DJi > div.top-bar_actions__mqwcc",
+        "clientWidth": 244,
+        "scrollWidth": 248
+      },
+      {
+        "path": "div.hidden.xl:block > header.top-bar_root__l_DJi > div.top-bar_actions__mqwcc > button.top-bar_iconButton__ryDrW.v8-only",
+        "clientWidth": 36,
+        "scrollWidth": 40
+      },
+      {
+        "path": "div.app-shell_side__CuY3O > main.app-shell_main__sP2aK > div.app-shell_content__vZNpX. > div",
+        "clientWidth": 852,
+        "scrollWidth": 876
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowInteractive__EJG71 > td.data-table_bodyCell__n186Z.list_colMenu__jR_IX > span.list_menuAnchor__sIQXG > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      }
+    ],
+    "viewportOverflows": [],
+    "midWordBreaks": [
+      {
+        "path": "div.kpi-card_strip__jHggO.grid > div.kpi-card_card____aUb.kpi-card_cardV6__sokTg > p.kpi-card_detail__NCGPv.kpi-card_detailV6__gbyRP > span.kpi-card_detailText__mHtws",
+        "text": "友だち0人・どこにも使っていない",
+        "lines": 2
+      }
+    ],
+    "tableMisalignments": [],
+    "fontIssues": [
+      {
+        "path": "div.page-templates_content__l99j2 > div.list_pager__lRTx_ > nav.pagination_pagination__GoEpN > button.pagination_item__zJkBy.pagination_control__ees8u",
+        "text": "前へ‹",
+        "font": "Inter, \"Inter Fallback\", Inter, sans-serif"
+      },
+      {
+        "path": "div.page-templates_content__l99j2 > div.list_pager__lRTx_ > nav.pagination_pagination__GoEpN > button.pagination_item__zJkBy.pagination_control__ees8u",
+        "text": "次へ›",
+        "font": "Inter, \"Inter Fallback\", Inter, sans-serif"
+      }
+    ],
+    "keys": [
+      {
+        "tag": "button",
+        "text": "メイン",
+        "rect": {
+          "x": 12,
+          "y": 72,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "配信",
+        "rect": {
+          "x": 12,
+          "y": 253,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "コンテンツ",
+        "rect": {
+          "x": 12,
+          "y": 471,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "成果と分析",
+        "rect": {
+          "x": 12,
+          "y": 689,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "自動化",
+        "rect": {
+          "x": 12,
+          "y": 722,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "予約",
+        "rect": {
+          "x": 12,
+          "y": 755,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "専用機能",
+        "rect": {
+          "x": 12,
+          "y": 936,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "設定",
+        "rect": {
+          "x": 12,
+          "y": 969,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "飲食店向け（テスト）",
+        "rect": {
+          "x": 12,
+          "y": 1002,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "KKenta Kawanoオーナー",
+        "rect": {
+          "x": 12,
+          "y": 936,
+          "w": 216,
+          "h": 48
+        }
+      },
+      {
+        "tag": "h1",
+        "text": "タグ",
+        "rect": {
+          "x": 375,
+          "y": 20,
+          "w": 26,
+          "h": 20
+        }
+      },
+      {
+        "tag": "button",
+        "text": "3",
+        "rect": {
+          "x": 1096,
+          "y": 12,
+          "w": 36,
+          "h": 36
+        }
+      },
+      {
+        "tag": "h2",
+        "text": "タグ",
+        "rect": {
+          "x": 264,
+          "y": 80,
+          "w": 44,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "CSVで一括登録する",
+        "rect": {
+          "x": 952,
+          "y": 90,
+          "w": 164,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "タグ",
+        "rect": {
+          "x": 264,
+          "y": 147,
+          "w": 26,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "友だち情報欄",
+        "rect": {
+          "x": 314,
+          "y": 147,
+          "w": 78,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "対応マーク",
+        "rect": {
+          "x": 416,
+          "y": 147,
+          "w": 65,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "保存した検索",
+        "rect": {
+          "x": 505,
+          "y": 147,
+          "w": 78,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "フォルダ：すべて",
+        "rect": {
+          "x": 386,
+          "y": 328,
+          "w": 150,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "使用状態：すべて",
+        "rect": {
+          "x": 752,
+          "y": 328,
+          "w": 145,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "付け方：すべて",
+        "rect": {
+          "x": 264,
+          "y": 372,
+          "w": 132,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "20件表示",
+        "rect": {
+          "x": 1020,
+          "y": 372,
+          "w": 96,
+          "h": 36
+        }
+      },
+      {
+        "tag": "th",
+        "text": "一覧に出す",
+        "rect": {
+          "x": 240,
+          "y": 422,
+          "w": 56,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "タグ",
+        "rect": {
+          "x": 296,
+          "y": 422,
+          "w": 390,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "フォルダ",
+        "rect": {
+          "x": 686,
+          "y": 422,
+          "w": 86,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "人数",
+        "rect": {
+          "x": 772,
+          "y": 422,
+          "w": 76,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "付け方",
+        "rect": {
+          "x": 848,
+          "y": 422,
+          "w": 106,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "連動",
+        "rect": {
+          "x": 954,
+          "y": 422,
+          "w": 126,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "操作",
+        "rect": {
+          "x": 1080,
+          "y": 422,
+          "w": 60,
+          "h": 40
+        }
+      },
+      {
+        "tag": "button",
+        "text": "前へ‹",
+        "rect": {
+          "x": 840,
+          "y": 1873,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "1",
+        "rect": {
+          "x": 878,
+          "y": 1873,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "2",
+        "rect": {
+          "x": 916,
+          "y": 1873,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "3",
+        "rect": {
+          "x": 954,
+          "y": 1873,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "6",
+        "rect": {
+          "x": 1030,
+          "y": 1873,
+          "w": 32,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "次へ›",
+        "rect": {
+          "x": 1068,
+          "y": 1873,
+          "w": 32,
+          "h": 32
+        }
+      }
+    ]
+  },
+  {
+    "id": "LRc93",
+    "width": 1152,
+    "geometry": {
+      "width": 1152,
+      "documentWidth": 1152
+    },
+    "overflows": [
+      {
+        "path": "div.app-shell_side__CuY3O > div.hidden.xl:block > header.top-bar_root__l_DJi > div.top-bar_actions__mqwcc",
+        "clientWidth": 244,
+        "scrollWidth": 248
+      },
+      {
+        "path": "div.hidden.xl:block > header.top-bar_root__l_DJi > div.top-bar_actions__mqwcc > button.top-bar_iconButton__ryDrW.v8-only",
+        "clientWidth": 36,
+        "scrollWidth": 40
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowTemplate__WLjL2 > td.data-table_bodyCell__n186Z.list_menuCell__XKEhn > div.list_menuBox__L3Awz.list_hqActions__qixBy",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowTemplate__WLjL2 > td.data-table_bodyCell__n186Z.list_menuCell__XKEhn > div.list_menuBox__L3Awz.list_hqActions__qixBy > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowTemplate__WLjL2 > td.data-table_bodyCell__n186Z.list_menuCell__XKEhn > div.list_menuBox__L3Awz.list_hqActions__qixBy",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowTemplate__WLjL2 > td.data-table_bodyCell__n186Z.list_menuCell__XKEhn > div.list_menuBox__L3Awz.list_hqActions__qixBy > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowTemplate__WLjL2 > td.data-table_bodyCell__n186Z.list_menuCell__XKEhn > div.list_menuBox__L3Awz.list_hqActions__qixBy",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowTemplate__WLjL2 > td.data-table_bodyCell__n186Z.list_menuCell__XKEhn > div.list_menuBox__L3Awz.list_hqActions__qixBy > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tbody > tr.data-table_row__Tr2dO.data-table_rowTemplate__WLjL2 > td.data-table_bodyCell__n186Z.list_menuCell__XKEhn > div.list_menuBox__L3Awz.list_hqActions__qixBy",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowTemplate__WLjL2 > td.data-table_bodyCell__n186Z.list_menuCell__XKEhn > div.list_menuBox__L3Awz.list_hqActions__qixBy > button.icon-button_button__qkWwQ",
+        "clientWidth": 28,
+        "scrollWidth": 32
+      }
+    ],
+    "viewportOverflows": [],
+    "midWordBreaks": [
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowTemplate__WLjL2 > td.data-table_bodyCell__n186Z > span.list_hqDest__m0vkR > span.list_cellSub__cvaeI",
+        "text": "本店・渋谷店・イベント",
+        "lines": 2
+      },
+      {
+        "path": "tr.data-table_row__Tr2dO.data-table_rowTemplate__WLjL2 > td.data-table_bodyCell__n186Z > span.list_hqDest__m0vkR > span.list_cellSub__cvaeI",
+        "text": "本店・渋谷店・イベント",
+        "lines": 2
+      }
+    ],
+    "tableMisalignments": [],
+    "fontIssues": [],
+    "keys": [
+      {
+        "tag": "button",
+        "text": "統括",
+        "rect": {
+          "x": 12,
+          "y": 72,
+          "w": 216,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "KKenta Kawanoオーナー",
+        "rect": {
+          "x": 12,
+          "y": 936,
+          "w": 216,
+          "h": 48
+        }
+      },
+      {
+        "tag": "h1",
+        "text": "テンプレート",
+        "rect": {
+          "x": 375,
+          "y": 20,
+          "w": 78,
+          "h": 20
+        }
+      },
+      {
+        "tag": "button",
+        "text": "3",
+        "rect": {
+          "x": 1096,
+          "y": 12,
+          "w": 36,
+          "h": 36
+        }
+      },
+      {
+        "tag": "h2",
+        "text": "テンプレート",
+        "rect": {
+          "x": 264,
+          "y": 80,
+          "w": 131,
+          "h": 32
+        }
+      },
+      {
+        "tag": "button",
+        "text": "メッセージ4",
+        "rect": {
+          "x": 264,
+          "y": 147,
+          "w": 78,
+          "h": 30
+        }
+      },
+      {
+        "tag": "button",
+        "text": "カルーセル1",
+        "rect": {
+          "x": 366,
+          "y": 147,
+          "w": 78,
+          "h": 28
+        }
+      },
+      {
+        "tag": "button",
+        "text": "リッチメッセージ0",
+        "rect": {
+          "x": 468,
+          "y": 147,
+          "w": 117,
+          "h": 28
+        }
+      },
+      {
+        "tag": "button",
+        "text": "質問1",
+        "rect": {
+          "x": 608,
+          "y": 147,
+          "w": 39,
+          "h": 28
+        }
+      },
+      {
+        "tag": "button",
+        "text": "クーポン0",
+        "rect": {
+          "x": 671,
+          "y": 147,
+          "w": 65,
+          "h": 28
+        }
+      },
+      {
+        "tag": "button",
+        "text": "リサーチ0",
+        "rect": {
+          "x": 760,
+          "y": 147,
+          "w": 65,
+          "h": 28
+        }
+      },
+      {
+        "tag": "button",
+        "text": "テンプレートを作る",
+        "rect": {
+          "x": 264,
+          "y": 310,
+          "w": 166,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "フォルダ：すべて",
+        "rect": {
+          "x": 438,
+          "y": 310,
+          "w": 150,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "未配布",
+        "rect": {
+          "x": 492,
+          "y": 354,
+          "w": 74,
+          "h": 36
+        }
+      },
+      {
+        "tag": "button",
+        "text": "20件表示",
+        "rect": {
+          "x": 1020,
+          "y": 354,
+          "w": 96,
+          "h": 36
+        }
+      },
+      {
+        "tag": "th",
+        "text": "テンプレート",
+        "rect": {
+          "x": 240,
+          "y": 404,
+          "w": 236,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "種類",
+        "rect": {
+          "x": 476,
+          "y": 404,
+          "w": 88,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "公開",
+        "rect": {
+          "x": 564,
+          "y": 404,
+          "w": 128,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "配布先",
+        "rect": {
+          "x": 692,
+          "y": 404,
+          "w": 112,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "今月送った数",
+        "rect": {
+          "x": 804,
+          "y": 404,
+          "w": 104,
+          "h": 40
+        }
+      },
+      {
+        "tag": "th",
+        "text": "更新",
+        "rect": {
+          "x": 908,
+          "y": 404,
+          "w": 88,
+          "h": 40
+        }
+      },
+      {
+        "tag": "button",
+        "text": "秋の新商品のお知らせ",
+        "rect": {
+          "x": 280,
+          "y": 456,
+          "w": 130,
+          "h": 19
+        }
+      },
+      {
+        "tag": "button",
+        "text": "配る",
+        "rect": {
+          "x": 1004,
+          "y": 461,
+          "w": 60,
+          "h": 28
+        }
+      },
+      {
+        "tag": "button",
+        "text": "来店のお礼",
+        "rect": {
+          "x": 280,
+          "y": 517,
+          "w": 65,
+          "h": 19
+        }
+      },
+      {
+        "tag": "button",
+        "text": "配る",
+        "rect": {
+          "x": 1004,
+          "y": 522,
+          "w": 60,
+          "h": 28
+        }
+      },
+      {
+        "tag": "button",
+        "text": "予約の受付",
+        "rect": {
+          "x": 280,
+          "y": 578,
+          "w": 65,
+          "h": 19
+        }
+      },
+      {
+        "tag": "button",
+        "text": "配る",
+        "rect": {
+          "x": 1004,
+          "y": 583,
+          "w": 60,
+          "h": 28
+        }
+      },
+      {
+        "tag": "button",
+        "text": "定休日のご案内",
+        "rect": {
+          "x": 280,
+          "y": 639,
+          "w": 91,
+          "h": 19
+        }
+      },
+      {
+        "tag": "button",
+        "text": "配る",
+        "rect": {
+          "x": 1004,
+          "y": 644,
+          "w": 60,
+          "h": 28
+        }
+      }
+    ]
+  }
+]

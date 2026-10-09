@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -100,7 +100,8 @@ describe('V8 権限なし（O5tUeE）の受け口', () => {
     expect(BOARD).not.toContain('取得できません')
     // 役割の仕組みは作らない。表示名を受け取るだけ。
     expect(BOARD).toContain('roleLabel?: string | null')
-    expect(VARS_V8).toContain('<NoPermissionV8')
-    expect(VARS_V8).toContain('featureName="共通情報"')
+    expect(VARS_V8).toContain('isForbidden(listFailure) ? (')
+    expect(VARS_V8).toContain('共通情報を見る権限がありません')
+    expect(VARS_V8).toContain('オーナーか管理者に、共通情報を見られるよう頼んでください。')
   })
 })

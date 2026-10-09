@@ -22,6 +22,7 @@ import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-pan
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
+import ListState from '@/components/shared/list-state'
 import { RowMenu, RowQuickAction } from '@/components/shared/row-actions'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
@@ -362,31 +363,13 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
   )
 
   const table = status === 'forbidden' ? (
-    <div className={styles.stateCard}>
-      <AlertCircle className={styles.stateIconError} aria-hidden="true" />
-      <p className={styles.stateTitle}>友だち情報欄を見る権限がありません</p>
-      <p className={styles.stateDesc}>オーナーか管理者に確認してください。</p>
-    </div>
+    <ListState kind="forbidden" title="友だち情報欄を見る権限がありません" />
   ) : status === 'error' ? (
-    <div className={styles.stateCard}>
-      <AlertCircle className={styles.stateIconError} aria-hidden="true" />
-      <p className={styles.stateTitle}>友だち情報欄を読み込めませんでした</p>
-      <p className={styles.stateDesc}>{error || '再読み込みしても直らない場合はエラー報告へ。'}</p>
-      <Button type="button" onClick={() => void load()}>もう一度試す</Button>
-    </div>
+    <ListState kind="error" title="友だち情報欄を読み込めませんでした" description={error || undefined} onRetry={() => void load()} />
   ) : status === 'ready' && items.length === 0 ? (
-    <div className={styles.stateCard}>
-      <ClipboardList className={styles.stateIcon} aria-hidden="true" />
-      <p className={styles.stateTitle}>まだ項目はありません</p>
-      <p className={styles.stateDesc}>友だちに入力してもらう項目（誕生日・住まいなど）を作れます。</p>
-      {createButton(false)}
-    </div>
+    <ListState kind="empty" title="まだ項目はありません" description="友だちに入力してもらう項目（誕生日・住まいなど）を作れます。" action={createButton(false)} />
   ) : status === 'ready' && visible.length === 0 ? (
-    <div className={styles.stateCard}>
-      <p className={styles.stateTitle}>条件に合うものはありません</p>
-      <p className={styles.stateDesc}>検索や絞り込みを外すと、すべて出ます</p>
-      {filterActive ? <Button type="button" onClick={() => { setQuery(''); setType('all'); setFolderFilter('') }}>条件を外す</Button> : null}
-    </div>
+    <ListState kind="empty" emptyPreset="filtered" title="条件に合うものはありません" action={filterActive ? <Button type="button" onClick={() => { setQuery(''); setType('all'); setFolderFilter('') }}>条件を外す</Button> : undefined} />
   ) : (
     <DelayedSkeleton loading={status !== 'ready'} skeleton={<div className={styles.skeleton} aria-busy="true" />}>
       <DataTable className={styles.table}>
@@ -469,7 +452,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
                 <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
                   <span className={styles.menuAnchor}>
                     {(!host || canEdit) ? <RowMenu
-                      className={styles.menuButton}
+                      size="row"
                       label={`項目「${field.name}」の操作`}
                       items={rowMenuItems(field)}
                       open={openMenuId === field.id}

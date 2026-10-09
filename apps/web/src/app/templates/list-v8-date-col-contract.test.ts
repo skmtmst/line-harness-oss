@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -14,7 +14,9 @@ const CSS = readFileSync(new URL('list-v8.module.css', import.meta.url), 'utf8')
  */
 describe('テンプレート一覧の更新列', () => {
   it('更新列は日付1行が収まる幅を持つ', () => {
-    expect(LIST).toContain('<col style={{ width: 120 }} />')
+    expect(LIST).toContain('<col className={styles.colUpdated} />')
+    const currentCss = readFileSync(join(HERE, '../../v8/templates/list.module.css'), 'utf8')
+    expect(currentCss).toMatch(/\.colUpdated\s*\{[^}]*width: var\(--tpl-tl-col-updated\)/s)
   })
 
   it('更新の日付は1行のまま（縦割れさせない）', () => {

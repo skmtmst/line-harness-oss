@@ -7,6 +7,7 @@ import Button from './button'
 import IconButton from './icon-button'
 import { OverlayDepthContext, useOverlayFocus, useV8Leave } from './overlay-utils'
 import styles from './dialog.module.css'
+import { useStepMotion } from './use-step-motion'
 
 export type DialogProps = {
   open: boolean
@@ -43,6 +44,8 @@ export type DialogProps = {
   layout?: 'continuous'
   /** 手順の帯。本文のスクロールから独立させる。 */
   steps?: ReactNode
+  /** 手順の本文を閉じずに切り替える鍵。StepsのcurrentKeyは自動で読む。 */
+  stepKey?: string | number
   /** 操作の左に出す現在の手順など。 */
   footerLead?: ReactNode
   title: string
@@ -108,6 +111,7 @@ export default function Dialog({
   titleHelp,
   layout,
   steps,
+  stepKey,
   footerLead,
   title,
   description,
@@ -137,6 +141,7 @@ export default function Dialog({
   const titleId = useId()
   const descriptionId = useId()
   const [mounted, setMounted] = useState(false)
+  const motion = useStepMotion(Boolean(steps) && open && mounted, stepKey ?? (React.isValidElement<{ currentKey?: string | number }>(steps) ? steps.props.currentKey : undefined))
   /* ★V8 仕上げ（M10）：閉じるときは逆再生してから外す（v8 のみ）。 */
   const leaving = useV8Leave(open)
   /*
@@ -233,7 +238,7 @@ export default function Dialog({
       </div>
       {designLayout === 'stacked' ? descriptionNode : null}
       {steps ? <div className={styles.steps}>{steps}</div> : null}
-      {children ? <div className={styles.content}>{children}</div> : null}
+      {children ? <div className={styles.content} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       <div className={styles.footer}>
       {footer ?? (onConfirm ? (

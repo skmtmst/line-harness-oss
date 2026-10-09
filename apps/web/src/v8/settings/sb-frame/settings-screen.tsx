@@ -44,6 +44,7 @@ export function SbSettingsScreen({
 }) {
   return (
     <SettingsPage
+      layout={layout}
       boardId={boardId}
       title={title}
       description={description}

@@ -172,6 +172,7 @@ export function useUnsavedGuard(options: {
    * そのまま実行し、dirty なら操作を保留して確認対話を出す。
    */
   const guarded = useCallback((action: () => void) => {
+    if (busy) return
     if (disarmedRef.current || !dirtyRef.current) {
       action()
       return
