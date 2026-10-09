@@ -3,16 +3,10 @@
  * 外枠・箱・名前とフォルダ・右の列は edit.module.css（クーポン・リサーチと同じ）。
  */
 
-/* 画像：160角の枠（押すと登録メディア）・右に選ぶボタンと注記（間12・右の中は間8）。 */
+/* 画像：160角の画像を入れる所・右に注記と URL（間12・右の中は間8）。 */
 .imageRow { display: flex; align-items: flex-start; gap: var(--tpl-wa-rich-img-gap); width: 100%; }
-.imageBox {
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden;
-  width: var(--tpl-wa-rich-img); height: var(--tpl-wa-rich-img);
-  padding: 0; border: 0; border-radius: var(--radius-control);
-  background: var(--tpl-te-coupon-bg); color: var(--color-ink); cursor: pointer;
-}
-.imageBox img { width: 100%; height: 100%; object-fit: cover; }
-.imageBox:focus-visible { outline: var(--tpl-te-focus) solid var(--color-action); outline-offset: var(--tpl-te-focus); }
+/* 画像を入れる所（MediaSlot・Z7vd2）の小さい形を 160 角で置く。 */
+.imageBox { flex-shrink: 0; width: var(--tpl-wa-rich-img); }
 .imageSide { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-wa-rich-side-gap); flex: 1 1 0; min-width: 0; }
 .imageSide > :last-child { align-self: stretch; }
 

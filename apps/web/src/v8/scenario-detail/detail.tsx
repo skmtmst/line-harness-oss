@@ -1908,6 +1908,7 @@ export default function ScenarioDetailV8({
             ) : isStructuredKind(stepForm.messageType) ? (
               <MessageKindFields
                 kind={stepForm.messageType as MessageKind}
+                mediaAccountId={folderAccountId}
                 value={kindState}
                 onChange={(next) => {
                   setKindState(next)

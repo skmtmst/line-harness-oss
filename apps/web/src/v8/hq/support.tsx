@@ -8,11 +8,12 @@
  * （型のフォルダの列）・問い合わせのカード・これまでの問い合わせの表。
  */
 import StatusPill from '@/components/shared/status-pill'
-import { CheckCircle2, ImagePlus, Plus, X } from 'lucide-react'
+import { CheckCircle2, Plus, X } from 'lucide-react'
 import Link from 'next/link'
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import MediaSlot from '@/components/shared/media-slot'
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import Dialog from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
@@ -50,7 +51,6 @@ export default function HqSupportV8() {
   const tenantStatus = useTenantStatus()
   const tenantUnavailable = tenantStatus === 'suspended' || tenantStatus === 'archived'
   const uid = useId()
-  const fileRef = useRef<HTMLInputElement>(null)
   const [kinds, setKinds] = useState<Array<{ key: HqSupportKind; label: string }>>([])
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([])
   const [sender, setSender] = useState({ tenantName: '', name: '', email: null as string | null, planLabel: '—' })
@@ -120,7 +120,6 @@ export default function HqSupportV8() {
     } catch {
       setError('画像を読み取れませんでした')
     } finally {
-      if (fileRef.current) fileRef.current.value = ''
     }
   }
 
@@ -264,16 +263,6 @@ export default function HqSupportV8() {
             />
           </Field>
 
-          {/* 本物の file input は出さない。開くのは下の「画像を添える」から。 */}
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/png,image/jpeg"
-            className={styles.hiddenInput}
-            tabIndex={-1}
-            aria-hidden="true"
-            onChange={(event) => void addFile(event.target.files?.[0])}
-          />
           {attachments.length > 0 ? (
             <ul className={styles.thumbs}>
               {attachments.map((a, i) => (
@@ -288,10 +277,16 @@ export default function HqSupportV8() {
             </ul>
           ) : null}
           {attachments.length < SUPPORT_ATTACHMENT_MAX ? (
-            <button type="button" className={styles.attach} disabled={sending} onClick={() => fileRef.current?.click()}>
-              <ImagePlus aria-hidden="true" className={styles.attachIcon} />
-              {`画像を添える（PNG・JPEG、1枚 5MB まで）`}
-            </button>
+            <div className={styles.attachSlot}>
+              <MediaSlot
+                size="compact"
+                title="画像を添える"
+                accept="image/png,image/jpeg"
+                limitText={`PNG・JPEG、1枚 5MB まで（${SUPPORT_ATTACHMENT_MAX}枚まで）`}
+                disabled={sending}
+                onFile={(file) => void addFile(file)}
+              />
+            </div>
           ) : null}
 
           <div className={styles.sender}>

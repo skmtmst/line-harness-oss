@@ -27,6 +27,8 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import RadioCard from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
+import MediaSlot from '@/components/shared/media-slot'
+import { uploadImageFile } from '@/components/shared/media-library-upload'
 import { TextField } from '@/components/shared/text-field'
 import { FieldError } from '@/components/shared/form-controls'
 import { focusFormField } from '@/lib/use-field-validation'
@@ -234,11 +236,21 @@ export default function ColumnNew() {
           <TextField id="nen-col-articleUrl" aria-describedby={errorFor('articleUrl') ? 'nen-col-articleUrl-error' : undefined} aria-label="記事の URL" value={draft.articleUrl} placeholder="https://example.com/columns/..." invalid={Boolean(errorFor('articleUrl'))} onChange={(event) => set({ articleUrl: event.target.value })} />
           <FieldError id="nen-col-articleUrl-error">{errorFor('articleUrl')}</FieldError>
         </label>
-        <label className={styles.field}>
-          <span className={styles.label}>画像の URL</span>
-          <TextField id="nen-col-imageUrl" aria-describedby={errorFor('imageUrl') ? 'nen-col-imageUrl-error' : undefined} aria-label="画像の URL" value={draft.imageUrl} placeholder="https://cdn.example.com/..." invalid={Boolean(errorFor('imageUrl'))} onChange={(event) => set({ imageUrl: event.target.value })} />
-          <FieldError id="nen-col-imageUrl-error">{errorFor('imageUrl')}</FieldError>
-        </label>
+        <div className={styles.field} id="nen-col-imageUrl" tabIndex={-1}>
+          <span className={styles.label}>画像</span>
+          <MediaSlot
+            title="画像を追加"
+            previewAlt="コラムの画像"
+            value={draft.imageUrl || null}
+            accept="image/jpeg,image/png"
+            limitText="1ファイル10メガバイト以内・JPEG・PNG"
+            maxBytes={10 * 1024 * 1024}
+            error={errorFor('imageUrl') || undefined}
+            upload={uploadImageFile}
+            onChange={(url) => set({ imageUrl: url ?? '' })}
+            urlEntry={{ value: draft.imageUrl, onChange: (url) => set({ imageUrl: url }), label: '画像の URL', placeholder: 'https://cdn.example.com/...' }}
+          />
+        </div>
       </Card>
 
       <Card layout="vertical" padding="spacious" surface="inset" spacing="roomy" aria-labelledby="nen-col-kind">

@@ -17,6 +17,8 @@ import {
   type BroadcastPreflight,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import MediaSlot from '@/components/shared/media-slot'
+import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import HelpTip from '@/components/shared/help-tip'
 import styles from './broadcast-form-v8.module.css'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -270,40 +272,80 @@ export function videoPreviewProblem(value: unknown): string | null {
  * 画像・動画のアップロード欄。統括の一括配信（v8/hq-broadcasts）も同じ欄を使う。
  * lineAccountId を渡すと動画の置き場をそのアカウントにする（null＝どの店にも属さない。統括）。省けば今選んでいる店。
  */
-export function MediaUpload({ bubble, onChange, lineAccountId }: { bubble: BroadcastBubble; onChange: (content: Record<string, unknown>) => void; lineAccountId?: string | null }) {
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const latest = useRef({ bubble, onChange, lineAccountId })
-  latest.current = { bubble, onChange, lineAccountId }
-  const uploadSeq = useRef(0)
-  useEffect(() => { setBusy(false); setError(''); return () => { uploadSeq.current++ } }, [bubble.id, bubble.type, lineAccountId])
+export function MediaUpload({ bubble, onChange, lineAccountId, mediaAccountId = null }: { bubble: BroadcastBubble; onChange: (content: Record<string, unknown>) => void; lineAccountId?: string | null; /** 渡すと「登録メディアから選ぶ」を出す（そのアカウントの登録メディア）。 */ mediaAccountId?: string | null }) {
+  const latest = useRef({ bubble, onChange })
+  latest.current = { bubble, onChange }
+  // 登録メディアから選ぶ先。統括（null）はどの店にも属さないので出さない。
+  const pickFrom = mediaAccountId
+  const [picking, setPicking] = useState<'main' | 'preview' | null>(null)
   const isVideo = bubble.type === 'video' || bubble.type === 'rich_video'
-  const upload = async (file: File) => {
-    const allowed = isVideo ? ['video/mp4'] : ['image/jpeg', 'image/png']
-    const max = isVideo ? 200 * 1024 * 1024 : 10 * 1024 * 1024
-    if (!allowed.includes(file.type)) { setError(isVideo ? 'MP4のみ対応しています' : 'JPEG・PNGのみ対応しています'); return }
-    if (file.size > max) { setError(mediaTooLargeMessage(isVideo, file.size)); return }
-    const seq = ++uploadSeq.current
-    const subject = { id: bubble.id, type: bubble.type, lineAccountId }
-    const isCurrent = () => uploadSeq.current === seq && latest.current.bubble.id === subject.id && latest.current.bubble.type === subject.type && latest.current.lineAccountId === subject.lineAccountId
-    setBusy(true); setError('')
-    try {
-      const res = await api.broadcastMessageAssets.upload(file, lineAccountId)
-      if (!isCurrent()) return
-      if (!res.success) { setError(res.error); return }
-      latest.current.onChange({ ...latest.current.bubble.content, originalContentUrl: res.data.url, previewImageUrl: isVideo ? (latest.current.bubble.content.previewImageUrl ?? '') : res.data.url })
-    } catch { if (isCurrent()) setError('アップロードに失敗しました。通信を確かめて、もう一度お試しください。') } finally { if (isCurrent()) setBusy(false) }
+  const noun = isVideo ? '動画' : '画像'
+  const scope = `${bubble.id}-${bubble.type}-${lineAccountId ?? ''}`
+  const content = bubble.content
+  const original = typeof content.originalContentUrl === 'string' ? content.originalContentUrl : ''
+  const preview = typeof content.previewImageUrl === 'string' ? content.previewImageUrl : ''
+  const sendFile = async (file: File) => {
+    const res = await api.broadcastMessageAssets.upload(file, lineAccountId)
+    if (!res.success) throw new Error(res.error)
+    return res.data.url
   }
+  const setMain = (url: string) => {
+    const now = latest.current.bubble.content
+    latest.current.onChange({ ...now, originalContentUrl: url, previewImageUrl: isVideo ? (now.previewImageUrl ?? '') : url })
+  }
+  const setPreview = (url: string) => latest.current.onChange({ ...latest.current.bubble.content, previewImageUrl: url })
+  const main = (
+    <MediaSlot
+      kind={isVideo ? 'video' : 'image'}
+      title={`${noun}を追加`}
+      value={original || null}
+      accept={isVideo ? 'video/mp4' : 'image/jpeg,image/png'}
+      limitText={isVideo ? '1ファイル200メガバイト以内・MP4' : '1ファイル10メガバイト以内・JPEG・PNG'}
+      validate={(file) => {
+        const allowed = isVideo ? ['video/mp4'] : ['image/jpeg', 'image/png']
+        const max = isVideo ? 200 * 1024 * 1024 : 10 * 1024 * 1024
+        if (!allowed.includes(file.type)) return isVideo ? 'MP4のみ対応しています' : 'JPEG・PNGのみ対応しています'
+        if (file.size > max) return mediaTooLargeMessage(isVideo, file.size)
+        return ''
+      }}
+      upload={sendFile}
+      scope={scope}
+      onChange={(url) => setMain(url ?? '')}
+      onMediaPick={pickFrom ? () => setPicking('main') : undefined}
+    />
+  )
   return <div className="space-y-3">
-    <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-card border-2 border-dashed border-hairline bg-canvas-sunken text-sm text-ink-faint hover:border-accent">
-      <span className="font-semibold text-ink">{busy ? 'アップロード中…' : `${isVideo ? 'MP4動画' : 'JPEG / PNG画像'}を選択`}</span>
-      <span className="mt-1 text-xs">上限 {isVideo ? '200MB' : '10MB'}</span>
-      <input type="file" className="hidden" disabled={busy} accept={isVideo ? 'video/mp4' : 'image/jpeg,image/png'} onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f) }} />
-    </label>
-    {typeof bubble.content.originalContentUrl === 'string' && bubble.content.originalContentUrl && <p className="truncate text-xs text-accent-deep">アップロード済み：{bubble.content.originalContentUrl}</p>}
-    {isVideo && <input value={String(bubble.content.previewImageUrl ?? '')} onChange={(e) => onChange({ ...bubble.content, previewImageUrl: e.target.value })} placeholder="プレビュー画像のURL（必須・https・JPEG/PNG・1MBまで）" aria-label="動画のプレビュー画像のURL" className="w-full rounded-control border border-hairline px-3 py-2 text-sm" />}
-    {bubble.type === 'rich_video' && <input value={String(bubble.content.actionUrl ?? '')} onChange={(e) => onChange({ ...bubble.content, actionUrl: e.target.value })} placeholder="再生終了後に開くURL" className="w-full rounded-control border border-hairline px-3 py-2 text-sm" />}
-    {error && <p className="text-xs text-danger">{error}</p>}
+    {isVideo ? (
+      <div className={styles.mediaRow}>
+        {main}
+        <MediaSlot
+          size="compact"
+          title="プレビュー画像を追加"
+          previewAlt="動画のプレビュー画像"
+          value={preview || null}
+          accept="image/jpeg,image/png"
+          maxBytes={1024 * 1024}
+          upload={sendFile}
+          scope={scope}
+          onChange={(url) => setPreview(url ?? '')}
+          onMediaPick={pickFrom ? () => setPicking('preview') : undefined}
+          urlEntry={{ value: preview, onChange: setPreview, label: '動画のプレビュー画像のURL', placeholder: 'https://…（JPEG/PNG・1MBまで）' }}
+        />
+      </div>
+    ) : main}
+    {isVideo ? <p className="text-xs text-ink-faint">プレビュー画像は LINE 側で必須です（https・JPEG/PNG・1MBまで）。</p> : null}
+    {bubble.type === 'rich_video' && <input value={String(content.actionUrl ?? '')} onChange={(e) => onChange({ ...content, actionUrl: e.target.value })} placeholder="再生終了後に開くURL" className="w-full rounded-control border border-hairline px-3 py-2 text-sm" />}
+    <MediaPickerDialog
+      open={picking !== null}
+      accountId={pickFrom}
+      kind={picking === 'main' && isVideo ? 'video' : 'image'}
+      onClose={() => setPicking(null)}
+      onSelect={(item) => {
+        if (picking === 'preview') setPreview(item.url)
+        else setMain(item.url)
+        setPicking(null)
+      }}
+    />
   </div>
 }
 

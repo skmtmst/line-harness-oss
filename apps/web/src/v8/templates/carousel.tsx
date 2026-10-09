@@ -39,7 +39,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { TemplateEditFrame } from '../template-edit/frame'
 import type { TemplateEditHost } from '../template-edit/host'
-import MediaPickerDialog from '../template-edit/media-picker'
+import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import CarouselImage from '../template-edit/carousel-image'
 import { uploadCarouselImage } from '../template-edit/carousel-image-upload'
 import te from '../template-edit/edit.module.css'
@@ -502,7 +502,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
               <section className={styles.card} aria-labelledby="cr-panel">
                 <h2 className={styles.cardTitle} id="cr-panel">{`カード ${selectedIndex + 1} の中身`}</h2>
                 <div className={own.panelRow}>
-                  <CarouselImage layout={inline ? 'composer' : undefined}
+                  <CarouselImage
                     url={panel.thumbnailImageUrl} disabled={busy || loading || loadFailed || (!host && !folderAccountId)} maxMB={hqHost ? 8 : 10}
                     scope={`${host ? 'hq' : folderAccountId}-${id ?? 'new'}-${selectedIndex}`}
                     onBusyChange={(value) => { uploadLock.current = value; setUploading(value) }}

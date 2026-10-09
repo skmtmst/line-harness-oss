@@ -8,7 +8,7 @@
  * 保存済みの画像・カルーセルは、形を切り替えずに共通の MessageTemplateEditor で編集する。
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { ImageIcon, Plus, X } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import type { HqMessageCard, HqMessageReference, HqTemplateFolder } from '@line-crm/shared'
 import { hqTemplatesApi, type MessageTemplateDefinition } from '@/lib/hq-templates-api'
 import { withMessageCard, withUploadedImage } from '@/lib/hq-template-authoring'
@@ -16,6 +16,7 @@ import { EMPTY_TEMPLATE_REFERENCES, LEGACY_MESSAGE_NOTICE, MessageTemplateEditor
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import MediaSlot from '@/components/shared/media-slot'
 import Select from '@/components/shared/select'
 import FolderSelect from '@/components/shared/folder-select'
 import { decodeImageSize, type TemplateMedia } from './definition'
@@ -103,12 +104,15 @@ export default function MessageForm({
           {card.format === 'flex' && (
             <div className={styles.field}>
               <span className={styles.smallLabel}>画像 <small className={styles.optional}>PNG・JPEG、1件8 MiB以下</small></span>
-              <div className={styles.imageBox}>
-                {image?.publicUrl ? <span className={styles.thumb} role="img" aria-label={image.filename} style={{ backgroundImage: `url(${JSON.stringify(image.publicUrl)})` }} /> : <span className={styles.thumb} aria-hidden="true" />}
-                <span className={styles.imageName}>{image ? `${image.filename} ・ ${image.width ?? '—'}×${image.height ?? '—'}` : 'まだ画像がありません'}</span>
-                {card.imageMediaId ? <Button size="compact" variant="text" disabled={disabled} onClick={() => { const { imageMediaId: _removed, ...next } = card; updateCard(next) }}><X size={14} aria-hidden="true" />画像を外す</Button> : null}
-                <ImagePick disabled={disabled} onBusyChange={onBusyChange} onReceipt={onReceipt} onUploaded={(media) => { const next = withUploadedImage(value, media); onChange(withMessageCard(next, { ...card, imageMediaId: media.id })) }} />
-              </div>
+              <ImagePick
+                value={image?.publicUrl ?? null}
+                disabled={disabled}
+                onBusyChange={onBusyChange}
+                onReceipt={onReceipt}
+                onRemove={card.imageMediaId ? () => { const { imageMediaId: _removed, ...next } = card; updateCard(next) } : undefined}
+                onUploaded={(media) => { const next = withUploadedImage(value, media); onChange(withMessageCard(next, { ...card, imageMediaId: media.id })) }}
+              />
+              {image ? <span className={styles.imageName}>{`${image.filename} ・ ${image.width ?? '—'}×${image.height ?? '—'}`}</span> : null}
             </div>
           )}
           <label className={styles.field}>
@@ -219,10 +223,9 @@ export default function MessageForm({
 }
 
 /** 画像を選んで送る。R568：今の大きさで採用できない画像は送る前に止め、受け取りを先に残す。 */
-function ImagePick({ disabled, onUploaded, onBusyChange, onReceipt }: { disabled: boolean; onUploaded: (media: TemplateMedia) => void; onBusyChange?: (busy: boolean) => void; onReceipt?: (media: TemplateMedia) => void }) {
+function ImagePick({ value = null, disabled, onUploaded, onBusyChange, onReceipt, onRemove }: { value?: string | null; disabled: boolean; onUploaded: (media: TemplateMedia) => void; onBusyChange?: (busy: boolean) => void; onReceipt?: (media: TemplateMedia) => void; onRemove?: () => void }) {
   const [error, setError] = useState('')
   const [uploading, setUploading] = useState(false)
-  const input = useRef<HTMLInputElement>(null)
   const alive = useRef(true)
   const locked = useRef(false)
   useEffect(() => { alive.current = true; return () => { alive.current = false; onBusyChange?.(false) } }, [onBusyChange])
@@ -241,10 +244,16 @@ function ImagePick({ disabled, onUploaded, onBusyChange, onReceipt }: { disabled
     }
   }
   return (
-    <span className={styles.imagePick}>
-      <input ref={input} className={styles.fileInput} aria-label="メッセージ画像を選ぶ" type="file" accept="image/png,image/jpeg" disabled={disabled || uploading} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; void upload(file) }} />
-      <Button disabled={disabled || uploading} busy={uploading} busyLabel="画像を登録しています…" onClick={() => input.current?.click()}><ImageIcon size={15} aria-hidden="true" />メッセージ画像を選ぶ</Button>
-      {error && <span role="alert" className={styles.fieldError}>{error}</span>}
-    </span>
+    <MediaSlot
+      title="画像を追加"
+      value={value}
+      accept="image/png,image/jpeg"
+      limitText="1ファイル8MiB以内・PNG・JPEG"
+      busy={uploading}
+      error={error}
+      disabled={disabled}
+      onFile={(file) => void upload(file)}
+      onRemove={onRemove}
+    />
   )
 }

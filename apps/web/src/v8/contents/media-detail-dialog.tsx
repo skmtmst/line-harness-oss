@@ -7,6 +7,7 @@ import type { MediaDeleteImpactReference, MediaItem } from '@line-crm/shared'
 import { ApiError, api, type MediaVersionBlocker, type MediaVersionPreview } from '@/lib/api'
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
+import MediaSlot from '@/components/shared/media-slot'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { formatMediaSize } from './media-usage-display'
@@ -461,28 +462,18 @@ export default function MediaDetailDialog({
               </div>
               <span className="bg-accent-soft text-accent-deep rounded-pill px-2 py-1 text-xs font-semibold">安全確認して追加</span>
             </div>
-            <label
-              htmlFor={fileInputId}
-              className="border-info text-info rounded-control mt-4 flex min-h-24 cursor-pointer items-center justify-center border border-dashed p-4 text-center"
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                event.preventDefault()
-                chooseVersionFile(event.dataTransfer.files[0] ?? null)
-              }}
-            >
-              <div>
-                <p className="text-sm font-bold">ここにファイルをドラッグ、または押して選ぶ</p>
-                <p className="text-ink-faint mt-1 text-xs">いまのメディアと同じ種類を選びます。</p>
-                {versionFile ? <p className="text-ink mt-2 text-xs font-medium">{versionFile.name}</p> : null}
-              </div>
-            </label>
-            <input id={fileInputId} type="file" className="sr-only" accept={mediaAcceptForKind(item.kind)} onChange={(event) => chooseVersionFile(event.target.files?.[0] ?? null)} />
-            {versionPhase === 'uploading' ? (
-              <div className="mt-3" aria-live="polite">
-                <div className="flex justify-between text-xs"><span>保存先へ直接送信しています</span><span>{versionProgress}%</span></div>
-                <progress className="mt-1 h-1 w-full" max={100} value={versionProgress} aria-label="差し替えファイルの送信進捗" />
-              </div>
-            ) : null}
+            <div className="mt-4">
+              <MediaSlot
+                kind={item.kind}
+                title={`新しい${item.kind === 'image' ? '画像' : item.kind === 'video' ? '動画' : item.kind === 'audio' ? '音声' : 'ファイル'}を追加`}
+                accept={mediaAcceptForKind(item.kind)}
+                limitText="いまのメディアと同じ種類"
+                busy={versionPhase === 'uploading'}
+                progress={versionPhase === 'uploading' ? versionProgress : undefined}
+                onFile={(file) => chooseVersionFile(file)}
+              />
+              {versionFile ? <p className="text-ink mt-2 truncate text-xs font-medium" title={versionFile.name}>{`選んだファイル：${versionFile.name}`}</p> : null}
+            </div>
             {versionPreview ? (
               <div className={versionPreview.canReplace ? 'bg-accent-soft text-accent-deep mt-3 rounded-control p-3 text-xs' : 'bg-danger-bg text-danger mt-3 rounded-control p-3 text-xs'}>
                 {versionPreview.canReplace

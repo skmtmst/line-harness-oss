@@ -457,6 +457,37 @@
   --color-star-on-edge: #f59e0b;
 }
 
+/*
+ * 画像・動画・ファイルを入れる所（components/shared/media-slot）。Pencil ★V8 採用案 Z7vd2（B-128）。
+ * 店の画面・統括・v7 の画面のどれでも同じ形にするため :root に置く。
+ */
+:root {
+  --color-slot-bg: #f7f8fa;           /* 薄い灰の地（#f7f8fa） */
+  --tpl-slot-h: 260px;                /* ふだんの高さ（絵の 380×260） */
+  --tpl-slot-h-compact: 140px;        /* 小さい所（カルーセルのカード 180×140） */
+  --tpl-slot-w-compact: 180px;        /* 小さい所を横に並べるときの幅 */
+  --tpl-slot-row-gap: 12px;           /* 枠を横に並べるときの間 */
+  --tpl-slot-pad: 20px;               /* 枠の内側 */
+  --tpl-slot-pad-compact: 10px;
+  --tpl-slot-gap: 4px;                /* 題・説明・制限の間 */
+  --tpl-slot-icon: 34px;              /* ファイルの印 */
+  --tpl-slot-icon-compact: 22px;
+  --tpl-slot-icon-gap: 10px;          /* 印と題の間 */
+  --tpl-slot-title: 16px;             /* 太字の題 */
+  --tpl-slot-title-compact: 13px;
+  --tpl-slot-desc: 12px;              /* 説明・制限 */
+  --tpl-slot-desc-compact: 11px;
+  --tpl-slot-lh: 1.6;
+  --tpl-slot-pill-h: 26px;            /* 入ったときの［差し替える］［消す］ */
+  --tpl-slot-pill-pad: 0 10px;
+  --tpl-slot-pill-inset: 10px;        /* 右上からの距離 */
+  --tpl-slot-pill-gap: 6px;
+  --tpl-slot-links-gap: 14px;         /* 文字リンクの間 */
+  --tpl-slot-pill-shadow: 0 1px 2px rgb(15 23 32 / 0.12); /* ［差し替える］［消す］の薄い影 */
+  --tpl-slot-disabled-opacity: 0.6;
+  --tpl-slot-spin: 1s;                /* 取り込み中の印が1回まわる時間 */
+}
+
 :root {
   /*
    * カード（線で囲んだ箱）の線と影（2026-10-09 オーナー採用 B-137「線なし＋影のカード、境目は薄い線とくっきりした影で」）。

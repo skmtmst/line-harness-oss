@@ -11,6 +11,7 @@
  * 未保存の離脱確認、権限が無いときの案内、読み込み失敗の言い分け）は
  * 今までの app/booking/staff/new（v7・staff-new-v8）から写した。BEHAVIOR.md を参照。
  */
+import ImageUploader from '@/components/shared/image-uploader'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, ChevronDown, Smartphone } from 'lucide-react'
@@ -355,8 +356,15 @@ export default function StaffNewV8() {
                 <input id="bs-role" type="text" value={role} onChange={(e) => setRole(e.target.value)} maxLength={BOOKING_STAFF_LIMITS.role} placeholder="トリミング担当" className={layout.input} />
               </div>
               <div className={layout.field}>
-                <label htmlFor="bs-image" className={layout.label}>顔写真（正方形・1MB まで）</label>
-                <input id="bs-image" type="url" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} maxLength={BOOKING_STAFF_LIMITS.profileImageUrl} placeholder="https://…/misaki.jpg" className={layout.input} />
+                <ImageUploader
+                  mode="url"
+                  size="compact"
+                  label="顔写真（正方形・1MB まで）"
+                  title="顔写真を追加"
+                  maxMB={1}
+                  value={imageUrl ? { mode: 'url', url: imageUrl } : null}
+                  onChange={(next) => setImageUrl(next?.mode === 'url' ? next.url.slice(0, BOOKING_STAFF_LIMITS.profileImageUrl) : '')}
+                />
               </div>
             </div>
             <div className={layout.field}>

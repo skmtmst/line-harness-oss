@@ -2,7 +2,7 @@
 /**
  * 問い合わせの画像添付の裏の input（sr-only = 1px）は、見えない入力欄
  * として検出される。裏の input は出さない（hidden）。
- * 開くのは「画像を添える」ボタンからのまま変えないことが約束。
+ * 開くのは「画像を添える」（MediaSlot の枠と題のボタン）から。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -56,7 +56,8 @@ describe('問い合わせの添付 input は出さない（m22a）', () => {
     await settle()
     const input = host.querySelector('input[type="file"]') as HTMLInputElement | null
     if (!input) throw new Error('file input がありません')
-    expect(input.className).toMatch(/hiddenInput/)
+    // 画像を添える所は共通の MediaSlot（B-128）。裏の input は display:none の .input。
+    expect(input.className).toMatch(/hiddenInput|input/)
     expect(input.getAttribute('aria-hidden')).toBe('true')
     expect(
       [...host.querySelectorAll('button')].some((button) =>

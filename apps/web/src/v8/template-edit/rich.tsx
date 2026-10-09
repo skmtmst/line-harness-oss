@@ -9,9 +9,9 @@
  * 形・面の座標・動きの組み立ては template-asset-editor.tsx から写した（src/v8 は @/app を読めない）。
  * 外枠・名前とフォルダの箱・右の列はクーポン・リサーチ（asset.tsx）と同じ。動きは BEHAVIOR.md。
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronDown, ImagePlus, Send } from 'lucide-react'
+import { ChevronDown, Send } from 'lucide-react'
 import type { Folder, MediaItem, TemplateImagemapUpload } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -35,7 +35,9 @@ import InlineActionRowsV8, { actionRowTitle } from '@/components/auto-replies/in
 import { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { newActionKey, readInlineActions, toActionPayload, type InlineAction } from '@/components/auto-replies/draft-fields'
 import { TemplateEditFrame } from './frame'
-import MediaPickerDialog from './media-picker'
+import MediaPickerDialog from '@/components/shared/media-picker-dialog'
+import MediaSlot from '@/components/shared/media-slot'
+import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
 import type { TemplateEditHost } from './host'
 import styles from './edit.module.css'
 import rich from './rich.module.css'
@@ -188,7 +190,6 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   /* 統括：送った画像（5サイズ）と、その payload（baseUrl・baseSize など）。 */
   const [uploaded, setUploaded] = useState<TemplateImagemapUpload | null>(hostInitial?.uploaded ?? null)
   const [uploading, setUploading] = useState(false)
-  const fileInput = useRef<HTMLInputElement>(null)
 
   const shapeDef = RICH_SHAPES.find((candidate) => candidate.value === shapeValue) ?? RICH_SHAPES[3]
   const pendingShapeDef = pendingShape ? RICH_SHAPES.find((candidate) => candidate.value === pendingShape) : undefined
@@ -302,7 +303,6 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
       setUploading(false)
     }
   }
-  const openImage = () => (hqHost ? fileInput.current?.click() : setPickerOpen(true))
   const onSaveDraft = async () => {
     if (host) { hostSave(false); return }
     if (await save()) notifyToast('下書きを保存しました')
@@ -466,35 +466,34 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
             <p className={styles.cardNote}>1040 × 1040px（正方形）がおすすめ</p>
           </div>
           <div className={rich.imageRow}>
-            <button type="button" className={rich.imageBox} onClick={openImage} disabled={uploading} aria-label="リッチメッセージの画像を選ぶ">
-              {imageSet ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={imageUrl.trim()} alt="" />
-              ) : (
-                <span className={styles.couponImageEmpty}><ImagePlus size={18} aria-hidden="true" />画像を選ぶ</span>
-              )}
-            </button>
+            <div className={rich.imageBox}>
+              <MediaSlot
+                size="compact"
+                aspectRatio="1 / 1"
+                title="画像を追加"
+                previewAlt="リッチメッセージの画像"
+                value={imageSet ? imageUrl.trim() : null}
+                accept="image/png,image/jpeg"
+                limitText={hqHost ? '8MB 以内' : '10MB 以内'}
+                busy={hqHost ? uploading : undefined}
+                onBusyChange={hqHost ? undefined : setUploading}
+                disabled={busy && !uploading}
+                upload={hqHost ? undefined : selectedAccountId ? async (file, progress) => {
+                  const result = await uploadToMediaLibrary(file, selectedAccountId, 'image', progress)
+                  setPickedMedia(result.item)
+                  return result.url
+                } : undefined}
+                onFile={hqHost ? (file) => void uploadImage(file) : undefined}
+                onChange={(url) => { setImageUrl(url ?? ''); if (url === null) { setPickedMedia(null); setUploaded(null) } }}
+                onMediaPick={hqHost ? undefined : () => setPickerOpen(true)}
+              />
+            </div>
             <div className={rich.imageSide}>
-              <Button type="button" onClick={openImage} disabled={uploading} busy={uploading} busyLabel="画像を送っています…">
-                <ImagePlus size={15} aria-hidden="true" />
-                {hqHost ? '画像を選ぶ' : '登録メディアから選ぶ'}
-              </Button>
               <p className={styles.cardNote}>面の線は画像の上に重ねて表示されます。友だちには線は見えません。</p>
               {pickedMedia ? <p className={styles.hint}>選択中：{pickedMedia.filename}</p> : null}
               {hqHost ? (
                 /* 統括：PNG・JPEG（8MB まで）を送ると、配った先で使う5サイズを作る。URL の直書きは置かない（サイズを作れない）。 */
-                <input
-                  ref={fileInput}
-                  type="file"
-                  accept="image/png,image/jpeg"
-                  hidden
-                  aria-label="リッチメッセージの画像のファイル"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0]
-                    event.target.value = ''
-                    if (file) void uploadImage(file)
-                  }}
-                />
+                null
               ) : (
               <TextField
                 value={imageUrl}

@@ -109,7 +109,6 @@ shared-button-importer app/common-actions/page.tsx
 shared-button-importer app/common-actions/versions/page.tsx
 shared-button-importer app/contents/list-v8.tsx
 shared-button-importer app/contents/media-detail-dialog.tsx
-shared-button-importer app/contents/media-picker-dialog.tsx
 shared-button-importer app/contents/media-replacement-dialog.tsx
 shared-button-importer app/contents/media-upload-dialog.tsx
 shared-button-importer app/contents/page.tsx
@@ -416,6 +415,7 @@ shared-button-importer components/shared/empty-list.tsx
 shared-button-importer components/shared/file-drop.tsx
 shared-button-importer components/shared/folder-add-dialog.tsx
 shared-button-importer components/shared/folder-panel.tsx
+shared-button-importer components/shared/media-picker-dialog.tsx
 shared-button-importer components/shared/not-connected.tsx
 shared-button-importer components/shared/progress.tsx
 shared-button-importer components/shared/row-actions.tsx
@@ -460,7 +460,6 @@ shared-button-importer v8/form-edit/after-tab.tsx
 shared-button-importer v8/form-edit/appearance-tab.tsx
 shared-button-importer v8/form-edit/content-tab.tsx
 shared-button-importer v8/form-edit/edit.tsx
-shared-button-importer v8/form-edit/media-picker.tsx
 shared-button-importer v8/rich-menus/list.tsx
 shared-button-importer v8/rich-menus/external-import.tsx
 shared-button-importer v8/rich-menus/connections.tsx
@@ -488,7 +487,6 @@ shared-button-importer v8/webhooks/interactions.tsx
 shared-button-importer v8/webhooks/outgoing.tsx
 shared-button-importer v8/template-edit/asset.tsx
 shared-button-importer v8/template-edit/carousel-image.tsx
-shared-button-importer v8/template-edit/media-picker.tsx
 shared-button-importer v8/template-edit/insert-row.tsx
 shared-button-importer v8/template-edit/message.tsx
 shared-button-importer v8/template-edit/rich.tsx
