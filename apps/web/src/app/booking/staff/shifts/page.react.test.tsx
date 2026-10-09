@@ -567,7 +567,7 @@ describe('予約設備の編集', () => {
     await renderEditor()
     switchAccount('account-b')
     await screen.findByText('受付時間と休業日を表示できませんでした')
-    fireEvent.click(screen.getByRole('button', { name: '受付時間と休業日を再読み込み' }))
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
     await waitFor(() => expect(fixture.listResources.mock.calls.filter(([id]) => id === 'account-b')).toHaveLength(2))
     await screen.findByText('設備は登録されていません')
   })

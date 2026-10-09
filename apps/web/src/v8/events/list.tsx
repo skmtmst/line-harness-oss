@@ -465,7 +465,7 @@ export default function EventsListV8() {
       </div>
     )
   } else if (loadStatus === 'forbidden') {
-    listBody = stateCard(<TriangleAlert size={18} aria-hidden="true" />, 'イベントを見る権限がありません', '選んでいるアカウントでは見られません。管理者に権限を確かめてください。', undefined, true)
+    listBody = stateCard(<TriangleAlert size={18} aria-hidden="true" />, 'イベントを見る権限がありません', '選んでいるアカウントでは見られません。管理者に権限を確かめてください。', <Button onClick={() => refresh()}>もう一度読み込む</Button>, true)
   } else if (loadStatus === 'error') {
     listBody = stateCard(
       <TriangleAlert size={18} aria-hidden="true" />,

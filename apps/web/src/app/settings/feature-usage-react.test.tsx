@@ -200,7 +200,7 @@ describe('N-448 全任意機能の利用状況バッジ', () => {
     // 集計に失敗した機能は取得失敗＋読み直し。
     const forms = rows.find((row) => rowText(row).includes('フォーム'))
     expect(forms && rowText(forms)).toContain('取得失敗')
-    expect(forms && rowText(forms)).toContain('読み直す')
+    expect(forms && rowText(forms)).toContain('もう一度読み込む')
   })
 
   it('利用状況の応答が遅れても、設定の切替は先に触れる', async () => {

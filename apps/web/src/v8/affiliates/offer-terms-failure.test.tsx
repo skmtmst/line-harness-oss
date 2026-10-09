@@ -84,7 +84,7 @@ test('207：読み直して読めたら、決まりの欄を触れる', async ()
   net.capStatus.mockRejectedValueOnce(new Error('down')).mockResolvedValue({ success: true, data: { version: { windowDays: 14, capTotal: 5, capMonthlyPerAffiliate: null, receptionFrom: null, receptionTo: null } } })
   render(<OfferFormModal initial={offer as never} accounts={[]} tags={[]} scenarios={[]} onClose={() => undefined} onSaved={() => undefined} />)
   await screen.findByText(/読み込めませんでした。このまま保存しても/)
-  const again = [...document.querySelectorAll('button')].find((b) => b.textContent === '読み直す') as HTMLButtonElement
+  const again = [...document.querySelectorAll('button')].find((b) => b.textContent === 'もう一度読み込む') as HTMLButtonElement
   await act(async () => { again.click() })
   await waitFor(() => expect((screen.getByLabelText('数える期間（日）') as HTMLInputElement).value).toBe('14'))
   expect((screen.getByLabelText('数える期間（日）') as HTMLInputElement).disabled).toBe(false)

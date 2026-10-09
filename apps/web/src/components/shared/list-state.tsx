@@ -1,6 +1,7 @@
 import React from 'react'
 import type { ReactNode } from 'react'
 import { Inbox, Loader, Lock } from 'lucide-react'
+import Button from './button'
 import TargetMissing from './target-missing'
 import { loadFailureCopy } from './api-error-message'
 import styles from './list-state.module.css'
@@ -88,7 +89,7 @@ export default function ListState({
   description?: string
   /** 作成導線つきの空状態（設計 `fRgeK`）。押せる操作が画面の他所にあるなら渡さない。 */
   action?: ReactNode
-  /** もう一度読み込む。`error` のときだけ押し口を出す。 */
+  /** もう一度読み込む。`error`・`forbidden` で押し口を出す。 */
   onRetry?: () => void
   /** 読み直している間。二度押しを止める。 */
   retrying?: boolean
@@ -147,7 +148,7 @@ export default function ListState({
       <span className={styles.iconWrap} aria-hidden="true">{icon ?? <Icon aria-hidden="true" size={24} className={iconClass} />}</span>
       <p className={styles.title}>{title ?? preset.title}</p>
       <p className={styles.description}>{description ?? preset.description}</p>
-      {action ? <div className={styles.action}>{action}</div> : null}
+      {kind === 'forbidden' ? <div className={styles.action}><Button busy={retrying} onClick={onRetry ?? (() => window.location.reload())}>{retrying ? '読み込んでいます' : 'もう一度読み込む'}</Button>{action}</div> : action ? <div className={styles.action}>{action}</div> : null}
     </div>
   )
 }

@@ -307,7 +307,7 @@ describe('NEXT-11 遅い補助パネルが顧客名の表示を止めない', ()
 
     state.mileage = () => Promise.resolve({ success: true, data: fixtures.mileageData })
     await act(async () => {
-      buttonByText('もう一度試す').click()
+      buttonByText('もう一度読み込む').click()
     })
     await eventually(() => expect(document.body.textContent).toContain('120'))
     expect(document.body.textContent).not.toContain('マイルを読み込めませんでした')
@@ -448,7 +448,7 @@ describe('NEXT-10 履歴は実際の活動履歴につながっている', () =>
     state.timeline = () => Promise.resolve({ success: false, error: 'failed' })
     await render('history')
     await eventually(() => expect(document.body.textContent).toContain('履歴を読み込めませんでした'))
-    expect(buttonByText('もう一度試す')).toBeTruthy()
+    expect(buttonByText('もう一度読み込む')).toBeTruthy()
     // 0件表示とは違う文面
     expect(document.body.textContent).not.toContain('活動履歴はまだありません')
   })
