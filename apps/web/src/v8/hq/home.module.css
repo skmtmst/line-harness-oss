@@ -41,9 +41,10 @@
   min-width: 0;
   padding: var(--tpl-hq-home-card-pad);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 
 .statLabel {
@@ -117,9 +118,10 @@
   min-height: var(--tpl-hql-home-card-h);
   padding: var(--tpl-hq-home-account-pad);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 
 .cardWarn { outline-color: var(--color-status-warn-deep); }
@@ -254,8 +256,9 @@
   flex-direction: column;
   overflow: hidden;
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
+  box-shadow: var(--card-shadow);
 }
 
 .head,

@@ -89,9 +89,10 @@
   gap: var(--tpl-hb2-op-col-gap);
   padding: var(--tpl-hb2-op-card-pad);
   border-radius: var(--tpl-hb2-op-card-radius);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 
 .cardHead {
@@ -169,8 +170,9 @@
   gap: var(--tpl-hb2-op-col-gap);
   padding: var(--tpl-hb2-op-box-pad);
   border-radius: var(--tpl-hb2-op-card-radius);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
+  box-shadow: var(--card-shadow);
 }
 
 .staffHead {
