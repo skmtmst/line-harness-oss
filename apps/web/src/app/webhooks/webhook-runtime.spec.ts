@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page, type Route, test } from '@playwright/test'
+import { expect, type Page, type Route, test } from '@playwright/test'
 
 const BASE = process.env.WEBHOOK_RUNTIME_BASE ?? 'http://127.0.0.1:3101'
 
@@ -47,7 +47,7 @@ async function provideSecondAccount(page: Page) {
         ...body,
         data: [
           first,
-          { ...first, id: 'visual-qa-account-2', channelId: '0000000001', name: '画面確認アカウント2' },
+          { ...first, id: 'visual-qa-account-2', channelId: '0000000001', name: '画面確認アカウント2', displayName: '画面確認アカウント2' },
         ],
       },
     })
@@ -77,29 +77,27 @@ async function holdOutgoingUpdates(page: Page): Promise<PendingUpdate[]> {
   return pending
 }
 
-async function toggleRow(page: Page, name: string) {
+async function openRowMenu(page: Page, name: string) {
   const row = page.getByRole('row').filter({ hasText: name })
-  await row.getByRole('button', { name: '設定', exact: true }).click()
-  /*
-    N-385(#941) で設定メニューは role=menu の項目へ変わった。
-    「止める」は role=menuitem で探す（getByRole('button') には出ない）。
-  */
-  await row.getByRole('menuitem', { name: '止める', exact: true }).click()
+  // V8 の狭い幅では「…」、広い幅では「設定」。メニューは portal で行の外に出る。
+  await row.getByRole('button', { name: new RegExp(`「${name}」の(設定|操作)`) }).click()
+  return page.getByRole('menu', { name: new RegExp(`「${name}」の(設定|操作)`) })
 }
 
-/*
-  行の中でのボタンの箱(#707)。
-
-  上下は行を基準にする。2回目の押下に返す案内が一覧の上へ増えると、表ごと
-  下がるので絶対座標では比べられない。**押下位置の見張りで見たいのは
-  「行の中でボタンが動いたか」**で、表ごと下がったかどうかではない。
-*/
-async function boxInRow(row: Locator, target: Locator) {
-  const rowBox = await row.boundingBox()
-  const box = await target.boundingBox()
-  if (!rowBox || !box) throw new Error('ボタンの箱を取れませんでした')
-  return { x: box.x, y: box.y - rowBox.y, width: box.width, height: box.height }
+async function toggleRow(page: Page, name: string) {
+  const menu = await openRowMenu(page, name)
+  await menu.getByRole('menuitem', { name: '止める', exact: true }).click()
 }
+
+async function switchAccount(page: Page) {
+  await page.getByRole('button', { name: 'アカウントを切り替える', exact: true }).click()
+  await page.getByRole('menu', { name: 'LINEアカウントの切り替え', exact: true })
+    .getByRole('menuitemradio', { name: '画面確認アカウント2', exact: true }).click()
+  await expect(page.getByRole('banner')).toContainText('画面確認アカウント2')
+}
+
+const failureNotice = (page: Page) => page.getByRole('status', { name: '知らせ', exact: true })
+  .locator('[data-toast]').filter({ hasText: 'Googleスプレッドシート ／ 顧客台帳' })
 
 function updateById(pending: PendingUpdate[], id: string): PendingUpdate {
   const update = pending.find((item) => item.id === id)
@@ -107,67 +105,52 @@ function updateById(pending: PendingUpdate[], id: string): PendingUpdate {
   return update
 }
 
-test('見本リンクの選択を初回読込後も保ち、実アカウント切替時だけ閉じる', async ({ page }) => {
+test('見本リンクの選択を初回読込後も保ち、実アカウント切替時だけ消す', async ({ page }) => {
   await provideSecondAccount(page)
   await openWebhooks(page, '/webhooks?tab=incoming&source=booking')
+  const dialog = page.getByRole('dialog', { name: '受け取る設定を追加', exact: true })
+  await expect(dialog.getByRole('button', { name: 'どこから来るか', exact: true })).toContainText('予約サービス')
+  await dialog.getByRole('textbox', { name: '名前', exact: true }).fill('切替前の下書き')
+  await dialog.getByRole('textbox', { name: 'シークレット', exact: true }).fill('a'.repeat(32))
 
-  await expect(page.getByRole('heading', { name: '受け取る設定を追加' })).toBeVisible()
-  /*
-   * 「受信元の種類」は共通 Select（button＋listbox）になったので、
-   * 素の `<select>` 専用の `toHaveValue` は使えない。開く前の釦に
-   * 選ばれている候補の名前が出る（`?source=booking` なら「予約サービス」）。
-   */
-  await expect(page.getByLabel('受信元の種類')).toContainText('予約サービス')
-
-  await page.getByLabel('LINEアカウント').selectOption('visual-qa-account-2')
-  await expect(page.getByLabel('LINEアカウント')).toHaveValue('visual-qa-account-2')
-  await expect(page.getByRole('heading', { name: '受け取る設定を追加' })).toHaveCount(0)
+  // V8 はモーダルなので、背面のヘッダーを操作する前に窓を閉じる。
+  // 開いたままの実アカウント切替は webhooks.test.tsx でも守る。
+  await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click()
+  await switchAccount(page)
+  await expect(dialog).toBeHidden()
+  await page.getByRole('button', { name: '受け取り口を作る', exact: true }).click()
+  await expect(dialog.getByRole('button', { name: 'どこから来るか', exact: true })).toContainText('LINE公式アカウント')
+  await expect(dialog.getByRole('textbox', { name: '名前', exact: true })).toHaveValue('')
+  // V8 はアカウント切替後に窓を開くと新しい鍵を作る。前の店の鍵を引き継がない。
+  const secret = dialog.getByRole('textbox', { name: 'シークレット', exact: true })
+  await expect(secret).not.toHaveValue('a'.repeat(32))
+  await expect(secret).toHaveValue(/^[a-f0-9]{32,}$/)
 })
 
-test('同じ行を素早く二重押ししても更新は1回だけ送る', async ({ page }) => {
+test('同じ行を続けて操作しても更新は1回だけ送る', async ({ page }) => {
   const pending = await holdOutgoingUpdates(page)
   await openWebhooks(page)
-  const row = page.getByRole('row').filter({ hasText: 'Googleスプレッドシート ／ 顧客台帳' })
-  await row.getByRole('button', { name: '設定', exact: true }).click()
-  // 設定メニューの項目は role=menuitem（N-385）。button では拾えない。
-  const toggle = row.getByRole('menuitem', { name: '止める', exact: true })
-  /*
-    押す前の箱を控える(#707)。`dblclick` は2発とも**同じ座標**へ落ちるので、
-    1発目のあとにボタンが動くのは危ない。動きをゼロにしてあるかを下で見る。
-
-    いまの吹き出しは `right-full` で右端が固定なので、仮に伸びても押した点は
-    箱の中に残り、2発目は当たる（幅の固定を外した逆変異で確認済み）。
-    **当たっているのは向きに助けられているだけ**なので、向きや並び順を変えた
-    ときに黙って外れないよう、箱が動かないこと自体をここで固定する。
-  */
-  const boxBeforePress = await boxInRow(row, toggle)
-  await toggle.dblclick()
-
+  const name = 'Googleスプレッドシート ／ 顧客台帳'
+  await toggleRow(page, name)
   await expect.poll(() => pending.length).toBe(1)
-  await page.waitForTimeout(100)
-  expect(pending).toHaveLength(1)
+  await expect(page.getByRole('row').filter({ hasText: name })).toContainText('切り替え中')
 
-  /*
-    ここから下は、上の「1回だけ」が**正しい理由で**緑になっていることの見張り(#707)。
-
-    送信中に `止める` を押せなくしたり、押した瞬間に吹き出しを閉じたりすると、
-    二重押しが起こせなくなる。そうなると二重押し防止(page.tsx の togglingIdsRef)を
-    外しても上の表明は緑のままになる。当て先を残すために、
-    「送信中でも押せる」「箱が動かない」「2回目の押下に返事が出る」を固定する。
-  */
-  const pendingToggle = row.locator('[data-webhook-toggle-pending="outgoing:owh-sheets"]')
-  await expect(pendingToggle).toHaveText('止めています…')
-  await expect(pendingToggle).toHaveAttribute('aria-busy', 'true')
-  await expect(pendingToggle).toBeEnabled()
-  expect(await boxInRow(row, pendingToggle)).toEqual(boxBeforePress)
-  await expect(page.locator('[data-webhook-toggle-busy="outgoing:owh-sheets"]'))
+  // V8 は押すとメニューを閉じる。再度開いて操作し、二重送信防止を実際に通す。
+  // 押せなくして1要求になっただけでは合格にしない。
+  const menu = await openRowMenu(page, name)
+  const toggle = menu.getByRole('menuitem', { name: '動かす', exact: true })
+  await expect(toggle).toBeEnabled()
+  await toggle.click()
+  await expect(page.getByRole('status', { name: '知らせ', exact: true }))
     .toContainText('返事が来るまでお待ちください')
+  expect(pending).toHaveLength(1)
 
   const reloaded = page.waitForResponse((response) =>
     response.request().method() === 'GET' && new URL(response.url()).pathname === '/api/webhooks/outgoing',
   )
   pending[0].respond({ success: true, data: {} })
   await reloaded
+  await expect(page.getByRole('row').filter({ hasText: name })).not.toContainText('切り替え中')
 })
 
 for (const order of ['failure-first', 'success-first'] as const) {
@@ -180,7 +163,7 @@ for (const order of ['failure-first', 'success-first'] as const) {
 
     const failed = updateById(pending, 'owh-sheets')
     const succeeded = updateById(pending, 'owh-slack-order')
-    const failureAlert = page.locator('[data-webhook-toggle-error="outgoing:owh-sheets"]')
+    const failureAlert = failureNotice(page)
 
     if (order === 'failure-first') {
       failed.respond({ success: false, error: 'テスト用の失敗' })
@@ -208,9 +191,53 @@ test('アカウント切替前の遅い失敗応答を切替後の画面へ出�
   await toggleRow(page, 'Googleスプレッドシート ／ 顧客台帳')
   await expect.poll(() => pending.length).toBe(1)
 
-  await page.getByLabel('LINEアカウント').selectOption('visual-qa-account-2')
-  await expect(page.getByLabel('LINEアカウント')).toHaveValue('visual-qa-account-2')
+  await switchAccount(page)
+  const replied = page.waitForResponse((response) => response.request().method() === 'PUT')
   pending[0].respond({ success: false, error: '切替前の遅い失敗' })
+  await replied
   await page.waitForTimeout(100)
-  await expect(page.locator('[data-webhook-toggle-error]')).toHaveCount(0)
+  await expect(failureNotice(page)).toHaveCount(0)
+  await expect(page.getByRole('row').filter({ hasText: 'Googleスプレッドシート ／ 顧客台帳' })).not.toContainText('切り替え中')
+})
+
+for (const role of ['admin', 'staff'] as const) {
+  test(`${role} は送り先の変更を操作できず、許可された試し送信だけ使える`, async ({ page }) => {
+    await page.route('**/api/staff/me', (route) => route.fulfill({ json: { success: true, data: { id: 'staff-test', role } } }))
+    await openWebhooks(page)
+    await expect(page.getByText(/閲覧のみで見ています/)).toBeVisible()
+    await expect(page.getByRole('link', { name: '送り先を作る', exact: true })).toHaveCount(0)
+    const name = 'Googleスプレッドシート ／ 顧客台帳'
+    if (role === 'admin') {
+      const menu = await openRowMenu(page, name)
+      await expect(menu.getByRole('menuitem', { name: '試しに送る', exact: true })).toBeEnabled()
+      for (const action of ['止める', '動かす', '直す', '鍵を作り直す', '削除する']) {
+        await expect(menu.getByRole('menuitem', { name: action, exact: true })).toHaveCount(0)
+      }
+    } else {
+      // 狭い幅では閲覧の「中身を見る」がメニューに入る。
+      const row = page.getByRole('row').filter({ hasText: name })
+      const trigger = row.getByRole('button', { name: `「${name}」の操作`, exact: true })
+      if (await trigger.count()) {
+        const menu = await openRowMenu(page, name)
+        await expect(menu.getByRole('menuitem', { name: '中身を見る', exact: true })).toBeVisible()
+        await expect(menu.getByRole('menuitem', { name: '止める', exact: true })).toHaveCount(0)
+        await expect(menu.getByRole('menuitem', { name: '試しに送る', exact: true })).toHaveCount(0)
+      } else {
+        await expect(row.getByRole('button', { name: `「${name}」の設定`, exact: true })).toHaveCount(0)
+      }
+    }
+  })
+}
+
+test('権限不足で切替が断られたら、元の状態と理由を出す', async ({ page }) => {
+  await page.route('**/api/webhooks/outgoing/*', async (route) => {
+    if (route.request().method() !== 'PUT') return route.continue()
+    await route.fulfill({ status: 403, json: { success: false, error: 'Forbidden' } })
+  })
+  await openWebhooks(page)
+  const name = 'Googleスプレッドシート ／ 顧客台帳'
+  await toggleRow(page, name)
+  await expect(failureNotice(page)).toContainText('統括だけが切り替えできます')
+  await expect(page.getByRole('row').filter({ hasText: name })).toContainText('動いている')
+  await expect(page.getByRole('row').filter({ hasText: name })).not.toContainText('切り替え中')
 })

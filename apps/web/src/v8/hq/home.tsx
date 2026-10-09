@@ -11,12 +11,13 @@ import { CircleDot, Inbox, LogIn, Plus, RotateCcw, Settings, Star, MessageCircle
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ListPage } from '@/components/templates'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
 import { FolderDot, FolderDotName } from '@/components/shared/folder-dot'
 import { brandInitial } from '@/components/layout/brand-initial'
 import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import ListState from '@/components/shared/list-state'
@@ -437,12 +438,12 @@ export default function HqHomeV8() {
     />
   ) : (
     <>
-      <div className={styles.cards} data-design="KPIs">
-        <StatCard label="アカウント" value={formatNumber(accounts.length)} unit="件" />
-        <StatCard label="友だち合計" value={formatNumber(totals.friends)} unit="人" title="全アカウントの合計" />
-        <StatCard label="今月の配信" value={formatNumber(totals.messages)} unit="通" />
-        <StatCard label="接続に問題" value={formatNumber(totals.warnings)} unit="件" warn />
-      </div>
+      <KpiBand data-design="KPIs">
+        <KpiCard title="アカウント" value={accounts.length} unit="件" detail={null} />
+        <KpiCard title="友だち合計" value={totals.friends} unit="人" detail={null} help="全アカウントの合計" />
+        <KpiCard title="今月の配信" value={totals.messages} unit="通" detail={null} />
+        <KpiCard title="接続に問題" value={totals.warnings} unit="件" detail={null} valueTone="warning" />
+      </KpiBand>
 
       <div className={styles.tools}>
         <div className={styles.searchBox}>
@@ -667,18 +668,5 @@ export default function HqHomeV8() {
         />
       ) : null}
     </ListPage>
-  )
-}
-
-/** 数のカード（統括は角丸のカード4枚。題と、数の横に単位の2段。B-33）。 */
-function StatCard({ label, value, unit, title, warn = false }: { label: string; value: string; unit: string; title?: string; warn?: boolean }) {
-  return (
-    <div className={styles.stat4} title={title}>
-      <span className={styles.statLabel}>{label}</span>
-      <span className={styles.statLine}>
-        <span className={warn ? `${styles.statValue} ${styles.statWarn}` : styles.statValue}>{value}</span>
-        <span className={styles.statSub}>{unit}</span>
-      </span>
-    </div>
   )
 }

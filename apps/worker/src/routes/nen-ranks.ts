@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
   NenRankValidationError,
@@ -54,7 +55,7 @@ function accountIdFrom(c: Context<Env>, body?: Record<string, unknown> | null): 
 }
 
 async function requireAccount(c: Context<Env>, accountId: string): Promise<Response | null> {
-  if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
@@ -201,7 +202,7 @@ nenRanks.delete('/api/nen/rank-settings/:id', requireRole('owner', 'admin'), asy
       message: ecSyncResult.status === 'synced' ? '会員のランクをECへ反映しました'
         : ecSyncResult.status === 'failed' ? 'ECへの反映に失敗した会員がいます。結果を確認してやり直してください' : data.message } });
   } catch (error) {
-    if (error instanceof NenRankDeleteError) return c.json({ success: false, error: error.message }, error.status);
+    if (error instanceof NenRankDeleteError) return inputError(c, { success: false, error: error.message }, error.status, []);
     return c.json({ success: false, error: 'ランクを削除できませんでした。読み直してからもう一度お試しください' }, 500);
   }
 });
@@ -220,7 +221,7 @@ nenRanks.get('/api/nen/rank-settings/member-sync/:operationId', requireRole('own
   return c.json({ success: true, data });
 });
 
-nenRanks.post('/api/nen/rank-settings/member-sync/:operationId/retry', requireRole('owner', 'admin'), async (c) => {
+nenRanks.post('/api/nen/rank-settings/member-sync/:operationId/retry', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"]}), async (c) => {
   const body = await c.req.json<{ accountId?: string }>().catch(() => null);
   const accountId = accountIdFrom(c, body);
   const denied = await requireAccount(c, accountId);
@@ -234,12 +235,12 @@ nenRanks.post('/api/nen/rank-settings/member-sync/:operationId/retry', requireRo
 
 type RankBody = { accountId?: string; ranks?: Array<{ id?: string | null; name?: unknown; annualThresholdYen?: unknown; mileRatePercent?: unknown }> };
 
-nenRanks.put('/api/nen/rank-settings', requireRole('owner', 'admin'), async (c) => {
+nenRanks.put('/api/nen/rank-settings', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"ranks":["array"]}), async (c) => {
   const body = await c.req.json<RankBody>().catch(() => null);
   const accountId = accountIdFrom(c, body);
   const denied = await requireAccount(c, accountId);
   if (denied) return denied;
-  if (!body || !Array.isArray(body.ranks)) return c.json({ success: false, error: 'ranks is required' }, 400);
+  if (!body || !Array.isArray(body.ranks)) return inputError(c, { success: false, error: 'ranks is required' }, 400, ["ranks"]);
   const now = jstNow();
   try {
     await ensureNenRankDefaults(c.env.DB, accountId, now);
@@ -247,7 +248,7 @@ nenRanks.put('/api/nen/rank-settings', requireRole('owner', 'admin'), async (c) 
       name: String(rank.name ?? ''), annualThresholdYen: Number(rank.annualThresholdYen), mileRatePercent: Number(rank.mileRatePercent) })));
     const existing = await getNenRankSettings(c.env.DB, accountId);
     if (existing.some((rank) => !body.ranks!.some((input) => input.id === rank.id))) {
-      return c.json({ success: false, error: 'ランクの削除は、版と移す先を指定して削除操作から行ってください' }, 400);
+      return inputError(c, { success: false, error: 'ランクの削除は、版と移す先を指定して削除操作から行ってください' }, 400, ["ranks","accountId","ranks"]);
     }
     const saved = await saveNenRankSettings(c.env.DB, accountId, body.ranks.map((rank) => ({
       id: typeof rank.id === 'string' ? rank.id : null,
@@ -257,7 +258,7 @@ nenRanks.put('/api/nen/rank-settings', requireRole('owner', 'admin'), async (c) 
     })), now);
     await ensureRankTags(c.env.DB, saved, now);
   } catch (error) {
-    if (error instanceof NenRankValidationError) return c.json({ success: false, error: error.message }, 400);
+    if (error instanceof NenRankValidationError) return inputError(c, { success: false, error: error.message }, 400, ['ranks']);
     throw error;
   }
   const sync = await syncToEc(c, accountId);
@@ -268,12 +269,12 @@ nenRanks.put('/api/nen/rank-settings', requireRole('owner', 'admin'), async (c) 
 
 type MilestoneBody = { accountId?: string; milestones?: Array<{ id?: string | null; thresholdYen?: unknown; title?: unknown; notifyOnReach?: unknown }> };
 
-nenRanks.put('/api/nen/lifetime-milestones', requireRole('owner', 'admin'), async (c) => {
+nenRanks.put('/api/nen/lifetime-milestones', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"milestones":["array"]}), async (c) => {
   const body = await c.req.json<MilestoneBody>().catch(() => null);
   const accountId = accountIdFrom(c, body);
   const denied = await requireAccount(c, accountId);
   if (denied) return denied;
-  if (!body || !Array.isArray(body.milestones)) return c.json({ success: false, error: 'milestones is required' }, 400);
+  if (!body || !Array.isArray(body.milestones)) return inputError(c, { success: false, error: 'milestones is required' }, 400, ["milestones"]);
   const now = jstNow();
   try {
     await ensureNenRankDefaults(c.env.DB, accountId, now);
@@ -284,14 +285,14 @@ nenRanks.put('/api/nen/lifetime-milestones', requireRole('owner', 'admin'), asyn
       notifyOnReach: milestone.notifyOnReach !== false,
     })), now);
   } catch (error) {
-    if (error instanceof NenRankValidationError) return c.json({ success: false, error: error.message }, 400);
+    if (error instanceof NenRankValidationError) return inputError(c, { success: false, error: error.message }, 400, ['milestones']);
     throw error;
   }
   const sync = await syncToEc(c, accountId);
   return c.json({ success: true, data: { ...(await settingsResponse(c, accountId)), sync } });
 });
 
-nenRanks.post('/api/nen/rank-settings/resync', requireRole('owner', 'admin'), async (c) => {
+nenRanks.post('/api/nen/rank-settings/resync', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"]}), async (c) => {
   const body = await c.req.json<{ accountId?: string }>().catch(() => null);
   const accountId = accountIdFrom(c, body);
   const denied = await requireAccount(c, accountId);
@@ -329,12 +330,12 @@ nenRanks.get('/api/nen/feeding-products', async (c) => {
   return c.json({ success: true, data: feedingProductsResponse(products, petCount, treatLimitPercent) });
 });
 
-nenRanks.put('/api/nen/feeding-products', requireRole('owner', 'admin'), async (c) => {
+nenRanks.put('/api/nen/feeding-products', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"]}), async (c) => {
   const body = await c.req.json<{ accountId?: string; products?: unknown; treatLimitPercent?: unknown }>().catch(() => null);
   const accountId = accountIdFrom(c, body);
   const denied = await requireAccount(c, accountId);
   if (denied) return denied;
-  if (!body || !Array.isArray(body.products)) return c.json({ success: false, error: 'products is required' }, 400);
+  if (!body || !Array.isArray(body.products)) return inputError(c, { success: false, error: 'products is required' }, 400, ["products"]);
   const now = jstNow();
   let products;
   let treatLimitPercent: number;
@@ -343,7 +344,7 @@ nenRanks.put('/api/nen/feeding-products', requireRole('owner', 'admin'), async (
     products = await saveFeedingProducts(c.env.DB, accountId, body.products, now);
     await saveTreatLimitPercent(c.env.DB, accountId, treatLimitPercent, now);
   } catch (error) {
-    if (error instanceof NenFeedingValidationError) return c.json({ success: false, error: error.message }, 400);
+    if (error instanceof NenFeedingValidationError) return inputError(c, { success: false, error: error.message }, 400, ['products']);
     throw error;
   }
   // 表や上限を変えたら、登録済みのペットの目安も直す（表示は毎回計算するが、保存値も揃えておく）。

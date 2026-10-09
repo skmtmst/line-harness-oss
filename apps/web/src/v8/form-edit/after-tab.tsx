@@ -29,6 +29,7 @@ const ADDER_ICON: Record<FormAction['kind'], typeof Tag> = {
 }
 
 type Props = {
+  readOnly?: boolean
   options: FormOptions
   refs: FormRefs
   onSubmitTagId: string
@@ -36,7 +37,7 @@ type Props = {
   onChangeSubmitTag: (id: string) => void
 }
 
-export function AfterTab({ options, refs, onSubmitTagId, onChangeOptions, onChangeSubmitTag }: Props) {
+export function AfterTab({ readOnly, options, refs, onSubmitTagId, onChangeOptions, onChangeSubmitTag }: Props) {
   const actions = options.afterActions ?? []
   /** 直している間の一覧（窓の中だけ。「この内容にする」で戻す）。 */
   const [editing, setEditing] = useState<FormAction[] | null>(null)
@@ -55,6 +56,22 @@ export function AfterTab({ options, refs, onSubmitTagId, onChangeOptions, onChan
     idOf: (slot) => slot,
     onReorder: ({ ids }) => setActions(ids.map((slot) => actions[Number(slot)])),
   })
+
+  if (readOnly) return <>
+    <section className={styles.card}>
+      <h2 className={styles.cardTitle}>答え終わったときの画面</h2>
+      <p>お礼の文：{options.thanksText || 'ご回答ありがとうございました。'}</p>
+      <p>終わったあと：{options.thanksUrl || 'お礼を出す'}</p>
+    </section>
+    <section className={styles.card}>
+      <h2 className={styles.cardTitle}>答え終わったら行うこと</h2>
+      {actions.length ? actions.map((action, index) => <p key={index}>{describeAfterAction(action, refs)}</p>) : <p>行うことはまだありません。</p>}
+    </section>
+    <section className={styles.card}>
+      <h2 className={styles.cardTitle}>回答したときに付けるタグ</h2>
+      <p>{refs.tags.find((tag) => tag.id === onSubmitTagId)?.name || (onSubmitTagId ? '登録済みのタグ' : '付けない')}</p>
+    </section>
+  </>
 
   return (
     <>

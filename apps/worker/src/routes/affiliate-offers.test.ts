@@ -26,7 +26,10 @@ const dbMocks = {
   listOfferVersions: vi.fn(),
   getOfferCapStatus: vi.fn(),
 };
-vi.mock('@line-crm/db', () => dbMocks);
+vi.mock('@line-crm/db', async (original) => {
+  const { readFolderAssignment, FolderAssignmentError } = await original<typeof import('@line-crm/db')>();
+  return { ...dbMocks, readFolderAssignment, FolderAssignmentError };
+});
 
 const worker = (await import('../index.js')).default;
 

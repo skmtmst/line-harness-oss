@@ -33,6 +33,7 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePa
 vi.mock('@/components/auto-replies/inline-action-list', () => ({ useActionOptions: () => ({ tags: [], scenarios: [], templates: [], forms: [], reminders: [], richMenus: [] }) }))
 
 import HqTemplatesV8 from './console'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
 
 const message = {
   schemaVersion: 1,
@@ -519,11 +520,13 @@ describe('フォルダの「…」からまとめて配る（G-7）', () => {
 
 
 describe('統括タグの札は詳細から配布結果まで同じ色を保つ', () => {
-  it('一覧→詳細→配布の確認→配った結果でタグ札を出し、配布の操作も保つ', async () => {
+  it.each([null, '#8b5cf6'])('一覧→詳細→配布の確認→配った結果でタグ札の色 %s を保ち、配布の操作も保つ', async (color) => {
+    window.history.replaceState(null, '', '/hq/templates')
+    const expectedColor = folderDisplayColor({ name: '予約', color })
     const tagRow = { ...listRow, name: 'VIP', template_type: 'tag', folder_id: 'f-1' }
     calls.list.mockResolvedValue([tagRow])
-    calls.folderList.mockResolvedValue([{ id: 'f-1', name: '予約', revision: 1, color: '#8b5cf6' }])
-    calls.get.mockResolvedValue({ template: tagRow, definition: { schemaVersion: 1, tag: { name: 'VIP', folderId: 'f-1' }, folders: [{ id: 'f-1', name: '予約', color: '#8b5cf6' }] } })
+    calls.folderList.mockResolvedValue([{ id: 'f-1', name: '予約', revision: 1, color }])
+    calls.get.mockResolvedValue({ template: tagRow, definition: { schemaVersion: 1, tag: { name: 'VIP', folderId: 'f-1' }, folders: [{ id: 'f-1', name: '予約', color }] } })
     calls.preflight.mockResolvedValue({ preflightId: 'tag-run', expiresAt: new Date(Date.now() + 60000).toISOString(), stores: [{ accountId: 'a-1', accountName: '然 -NEN- 本店', items: [{ sourceId: 't-1', itemKind: 'tag', name: 'VIP', duplicate: false, allowedModes: ['create'] }] }] })
     calls.distribute.mockResolvedValue({ runId: 'tag-run', status: 'completed', stores: [{ accountId: 'a-1', accountName: '然 -NEN- 本店', status: 'succeeded', counts: { created: 1, overwritten: 0, aliased: 0 } }] })
     render(<HqTemplatesV8 type="tag" />)
@@ -531,19 +534,19 @@ describe('統括タグの札は詳細から配布結果まで同じ色を保つ'
     fireEvent.click(await screen.findByRole('menuitem', { name: 'このフォルダを配る' }))
     const folderDialog = await screen.findByRole('dialog', { name: 'フォルダ「予約」の 1 件を配る' })
     expect((within(folderDialog).getByRole('checkbox', { name: 'タグ「VIP」' }) as HTMLInputElement).checked).toBe(true)
-    expect(within(folderDialog).getByRole('group', { name: 'タグ「VIP」' }).querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain('#8b5cf6')
+    expect(within(folderDialog).getByRole('group', { name: 'タグ「VIP」' }).querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain(expectedColor)
     fireEvent.click(within(folderDialog).getByRole('button', { name: 'キャンセル' }))
     fireEvent.click(await screen.findByRole('button', { name: 'タグ「VIP」', exact: true }))
     const body = await screen.findByRole('region', { name: '本文' })
     const pill = within(body).getByRole('group', { name: 'タグ「VIP」' })
-    expect(pill.querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain('#8b5cf6')
+    expect(pill.querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain(expectedColor)
     fireEvent.click(screen.getByRole('button', { name: 'VIPを配る' }))
     expect(screen.getByRole('heading', { name: /アカウントへ配る：/ }).querySelector('[role="group"]')).toBeTruthy()
     fireEvent.click(screen.getByRole('checkbox', { name: '然 -NEN- 本店', exact: true }))
     fireEvent.click(screen.getByRole('button', { name: '1アカウントの重複を確認' }))
     fireEvent.click(await screen.findByRole('button', { name: 'この内容で1アカウントへ配る' }))
     const result = await screen.findByRole('dialog', { name: '配った結果：VIP' })
-    expect(within(result).getByRole('group', { name: 'タグ「VIP」' }).querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain('#8b5cf6')
+    expect(within(result).getByRole('group', { name: 'タグ「VIP」' }).querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain(expectedColor)
     expect(calls.distribute).toHaveBeenCalledOnce()
     expect(within(result).getByText('成功')).toBeTruthy()
   })

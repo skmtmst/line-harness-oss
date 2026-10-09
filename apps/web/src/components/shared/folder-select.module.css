@@ -1,19 +1,9 @@
 @layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 /*
  * ★V8 フォルダを選ぶ欄（dLffh・iBuZH）。値は globals.css の [data-theme="v8"] の --select-menu-*。
- * 板（白い地・角丸・影）は select-menu が持つ。ここは点と「新しいフォルダ」の中身だけ。
+ * 板（白い地・角丸・影）は select-menu が持つ。点は FolderDot、ここは「新しいフォルダ」の中身だけ。
  */
 @layer components {
-
-/* 行の前のフォルダの色の点（8・角丸）。色の無いフォルダ・未分類は灰。 */
-.dot {
-  display: inline-block;
-  flex: none;
-  width: var(--select-menu-dot);
-  height: var(--select-menu-dot);
-  border-radius: var(--radius-pill);
-  background: var(--color-ink-faint);
-}
 
 .panel {
   display: flex;
@@ -119,4 +109,8 @@
   cursor: not-allowed;
   opacity: 0.5;
 }
+}
+
+@layer components {
+[data-theme='v8'] .field { box-shadow: var(--control-shadow); }
 }

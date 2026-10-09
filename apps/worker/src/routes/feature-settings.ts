@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
@@ -1036,10 +1037,10 @@ featureSettings.get('/api/settings/features', requireRole('owner', 'admin'), asy
  * 返す。止まる仕事があるときだけ確認トークンを発行し、保存時に求める。
  * 影響がなければトークンは要らない(通常保存)。
  */
-featureSettings.post('/api/settings/features/impact', requireRole('owner', 'admin'), async (c) => {
+featureSettings.post('/api/settings/features/impact', requireRole('owner', 'admin'), inputJsonBoundary({"features":["object"]}), async (c) => {
   try {
     const accountId = getAccountId(c);
-    if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+    if (!accountId) return inputError(c, { success: false, error: 'account_id が必要です' }, 400, ["accountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
@@ -1050,29 +1051,26 @@ featureSettings.post('/api/settings/features/impact', requireRole('owner', 'admi
     }>();
 
     if (body.features !== undefined && (typeof body.features !== 'object' || body.features === null || Array.isArray(body.features))) {
-      return c.json({ success: false, error: 'features はオブジェクトで指定してください' }, 400);
+      return inputError(c, { success: false, error: 'features はオブジェクトで指定してください' }, 400, ["features"]);
     }
     const unknownKeys = Object.keys(body.features ?? {}).filter((k) => !isToggleable(k));
     if (unknownKeys.length > 0) {
-      return c.json(
-        { success: false, error: `知らない機能です: ${unknownKeys.join(', ')}` },
-        400,
-      );
+      return inputError(c, { success: false, error: `知らない機能です: ${unknownKeys.join(', ')}` }, 400, ["features"]);
     }
     const invalidFeature = Object.entries(body.features ?? {})
       .find(([, value]) => typeof value !== 'boolean');
     if (invalidFeature) {
-      return c.json({
+      return inputError(c, {
         success: false,
         error: `${invalidFeature[0]} はtrueまたはfalseで指定してください`,
-      }, 400);
+      }, 400, ["features"]);
     }
     if (body.expectedVersion !== undefined
       && (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 0)) {
-      return c.json({
+      return inputError(c, {
         success: false,
         error: 'expectedVersion は0以上の整数で指定してください',
-      }, 400);
+      }, 400, ["expectedVersion"]);
     }
 
     const restaurantEnabled = await restaurantEffectivelyEnabledForTenant(c);
@@ -1129,10 +1127,10 @@ featureSettings.post('/api/settings/features/impact', requireRole('owner', 'admi
   }
 });
 
-featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), async (c) => {
+featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), inputJsonBoundary({"features":["object"]}), async (c) => {
   try {
     const accountId = getAccountId(c);
-    if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+    if (!accountId) return inputError(c, { success: false, error: 'account_id が必要です' }, 400, ["accountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
@@ -1157,11 +1155,11 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
         return c.json({ success: false, error: 'この操作には運営権限が必要です' }, 403);
       }
       if (!Array.isArray(body.catalog)) {
-        return c.json({ success: false, error: 'catalog は配列で指定してください' }, 400);
+        return inputError(c, { success: false, error: 'catalog は配列で指定してください' }, 400, ["catalog"]);
       }
       if (body.catalog.some((key) => typeof key !== 'string'
         || !NEN_SPECIALIZED_FEATURES.includes(key as ToggleableFeature))) {
-        return c.json({ success: false, error: 'catalog に知らない専用機能が含まれています' }, 400);
+        return inputError(c, { success: false, error: 'catalog に知らない専用機能が含まれています' }, 400, ["catalog"]);
       }
       catalog = body.catalog.filter(
         (key): key is ToggleableFeature => typeof key === 'string'
@@ -1171,28 +1169,25 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
 
     const unknownKeys = Object.keys(body.features ?? {}).filter((k) => !isToggleable(k));
     if (unknownKeys.length > 0) {
-      return c.json(
-        { success: false, error: `知らない機能です: ${unknownKeys.join(', ')}` },
-        400,
-      );
+      return inputError(c, { success: false, error: `知らない機能です: ${unknownKeys.join(', ')}` }, 400, ["features"]);
     }
     const invalidFeature = Object.entries(body.features ?? {})
       .find(([, value]) => typeof value !== 'boolean');
     if (invalidFeature) {
-      return c.json({
+      return inputError(c, {
         success: false,
         error: `${invalidFeature[0]} はtrueまたはfalseで指定してください`,
-      }, 400);
+      }, 400, ["features"]);
     }
 
     let sidebarOrder: string[] | null | undefined;
     if (body.sidebarOrder !== undefined) {
       sidebarOrder = cleanSidebarOrderStrict(body.sidebarOrder);
       if (!sidebarOrder) {
-        return c.json({
+        return inputError(c, {
           success: false,
           error: 'sidebarOrder はすべての区分を過不足なく並べた配列で指定してください',
-        }, 400);
+        }, 400, ["sidebarOrder"]);
       }
     }
 
@@ -1211,10 +1206,10 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
           ));
       sidebarItemOrder = cleanItemOrderStrict(body.sidebarItemOrder, specializedKeys);
       if (!sidebarItemOrder) {
-        return c.json({
+        return inputError(c, {
           success: false,
           error: 'sidebarItemOrder は各区分の項目を過不足なく並べたオブジェクトで指定してください',
-        }, 400);
+        }, 400, ["sidebarItemOrder"]);
       }
     }
 
@@ -1228,11 +1223,11 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
      */
     const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
     if ((hasBundleUpdate || catalog !== undefined) && reason.length === 0) {
-      return c.json({
+      return inputError(c, {
         success: false,
         error: '変更理由を入力してください',
         code: 'FEATURE_SETTINGS_REASON_REQUIRED',
-      }, 400);
+      }, 400, ["features","sidebarOrder","sidebarItemOrder","reason"]);
     }
     /*
      * 機能・順序の保存は版なしでは受け付けない(#643)。版なし逐次保存は
@@ -1248,25 +1243,25 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
         accountId,
         restaurantEnabled,
       );
-      return c.json({
+      return inputError(c, {
         success: false,
         error: 'expectedVersion が必要です。最新の設定を読み直してください。',
         code: 'EXPECTED_VERSION_REQUIRED',
         data: { currentVersion: current.version },
-      }, 400);
+      }, 400, ["features","sidebarOrder","sidebarItemOrder","expectedVersion"]);
     }
     if (body.expectedVersion !== undefined
       && (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 0)) {
-      return c.json({
+      return inputError(c, {
         success: false,
         error: 'expectedVersion は0以上の整数で指定してください',
-      }, 400);
+      }, 400, ["expectedVersion"]);
     }
     if (body.impactToken !== undefined && typeof body.impactToken !== 'string') {
-      return c.json({
+      return inputError(c, {
         success: false,
         error: 'impactToken は文字列で指定してください',
-      }, 400);
+      }, 400, ["impactToken"]);
     }
 
     /**

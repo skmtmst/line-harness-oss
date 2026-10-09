@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type {
@@ -142,9 +143,24 @@ async function safeBody(c: { req: { json<T>(): Promise<T> } }): Promise<unknown>
   }
 }
 
+function mergedPersonErrorFields(c: Context<Env>, code: string): string[] {
+  const map: Record<string, string[]> = {
+    EXPECTED_REVISION_REQUIRED: ['expectedRevision'], INVALID_PERSON_STATUS: ['status'],
+    INVALID_DISPLAY_NAME: ['primaryDisplayName'], INVALID_TEXT: ['primaryDisplayName'],
+    PROFILE_CANDIDATE_REQUIRED: ['profileSelections'], INVALID_PROFILE_CANDIDATE: ['selections'],
+    PROFILE_SELECTION_DUPLICATE: ['selections'], PROFILE_SELECTIONS_REQUIRED: ['selections'],
+    INVALID_PROFILE_FIELD: ['selections'], INVALID_PROFILE_SOURCE: ['selections'],
+    INVALID_PROFILE_VALUE: ['selections'], PROFILE_SOURCE_NOT_LINKED: ['selections'],
+    INVALID_DELIVERY_PRIORITY: ['priorities'], DUPLICATE_DELIVERY_PRIORITY: ['priorities'],
+    DELIVERY_FRIEND_NOT_LINKED: ['priorities'],
+    INVALID_BODY: ['expectedRevision', c.req.path.endsWith('/profile-values') ? 'selections' : 'priorities'],
+  };
+  return map[code] ?? [];
+}
+
 function errorResponse(c: Context<Env>, error: unknown): Response {
   if (error instanceof MergedPersonError) {
-    return c.json({ success: false, error: error.message, code: error.code }, error.status);
+    return inputError(c, { success: false, error: error.message, code: error.code }, error.status, mergedPersonErrorFields(c, error.code));
   }
   console.error(JSON.stringify({
     message: 'merged person request failed',
@@ -208,7 +224,7 @@ mergedPeople.get('/api/friends/people/:id', requireRole('owner', 'admin', 'staff
   }
 });
 
-mergedPeople.patch('/api/friends/people/:id', requireRole('owner', 'admin'), async (c) => {
+mergedPeople.patch('/api/friends/people/:id', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     if (!await canAccessPerson(c, c.req.param('id'))) {
       return c.json({ success: false, error: 'この統合ユーザーを変更する権限がありません', code: 'FORBIDDEN' }, 403);
@@ -226,7 +242,7 @@ mergedPeople.patch('/api/friends/people/:id', requireRole('owner', 'admin'), asy
   }
 });
 
-mergedPeople.patch('/api/friends/people/:id/profile-values', requireRole('owner', 'admin'), async (c) => {
+mergedPeople.patch('/api/friends/people/:id/profile-values', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     if (!await canAccessPerson(c, id)) {
@@ -272,7 +288,7 @@ mergedPeople.patch('/api/friends/people/:id/profile-values', requireRole('owner'
 mergedPeople.patch(
   '/api/friends/people/:id/delivery-priorities',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       if (!await canAccessPerson(c, c.req.param('id'))) {
         return c.json({ success: false, error: 'この統合ユーザーを変更する権限がありません', code: 'FORBIDDEN' }, 403);

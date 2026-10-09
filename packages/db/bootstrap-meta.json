@@ -559,7 +559,10 @@
     "614_tenant_company_contact.sql",
     "615_workflow_steps.sql",
     "616_affiliate_reward_mode.sql",
-    "617_restaurant_delivery_orders.sql"
+    "617_store_common_folders.sql",
+    "618_hq_banner_folders.sql",
+    "619_hq_folder_display_order.sql",
+    "620_restaurant_delivery_orders.sql"
   ],
-  "migrationCount": 560
+  "migrationCount": 563
 }

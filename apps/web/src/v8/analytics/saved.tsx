@@ -19,7 +19,7 @@ import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
 import { api, type AnalyticsReportRun, type AnalyticsReportSchedule, type RecentOneTimeReport, type SavedAnalyticsSnapshot, type SavedAnalyticsSummary } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
-import { KpiMenu, StatePill, shortDateTime, shortDay } from './common'
+import { StatePill, shortDateTime, shortDay } from './common'
 import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
 
@@ -217,16 +217,15 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
   }
   const exportDisabled = visibleItems.length === 0
   useRegisterExport(exportSaved, exportDisabled)
-  const menu = (title: string) => <KpiMenu title={title} onExport={exportSaved} disabled={exportDisabled} />
   const failed = error ? '読み込めませんでした' : null
   const crossCount = items.filter((item) => item.kind === 'cross').length
 
   return <>
     <KpiBand className={styles.band}>
-      <KpiCard presentation="band" title="保存した分析" icon={<Bookmark size={13} aria-hidden="true" />} menu={menu('保存した分析')} value={error ? null : items.length} unit="件" detail={failed ?? `クロス分析 ${crossCount}・ファネル ${items.length - crossCount}`} loading={loading} />
-      <KpiCard presentation="band" title="保存結果数" icon={<History size={13} aria-hidden="true" />} menu={menu('保存結果数')} value={error ? null : items.reduce((sum, item) => sum + item.snapshotCount, 0)} unit="件" detail={failed ?? '時点ごとに固定した結果'} loading={loading} />
-      <KpiCard presentation="band" title="定期レポート" icon={<Mail size={13} aria-hidden="true" />} menu={menu('定期レポート')} value={error || schedulesError ? null : schedules.length} unit="件" detail={error || schedulesError ? '読み込めませんでした' : `動いている ${schedules.filter((item) => item.status === 'active').length}・止めている ${schedules.filter((item) => item.status === 'paused').length}`} loading={loading || schedulesLoading} />
-      <KpiCard presentation="band" title="定義が古いもの" icon={<AlertTriangle size={13} aria-hidden="true" />} menu={menu('定義が古いもの')} value={error ? null : staleCount} unit="件" detail={failed ?? '更新後まだ集計していない'} loading={loading} />
+      <KpiCard presentation="band" title="保存した分析" icon={<Bookmark size={13} aria-hidden="true" />} value={error ? null : items.length} unit="件" detail={failed ?? `クロス分析 ${crossCount}・ファネル ${items.length - crossCount}`} loading={loading} />
+      <KpiCard presentation="band" title="保存結果数" icon={<History size={13} aria-hidden="true" />} value={error ? null : items.reduce((sum, item) => sum + item.snapshotCount, 0)} unit="件" detail={failed ?? '時点ごとに固定した結果'} loading={loading} />
+      <KpiCard presentation="band" title="定期レポート" icon={<Mail size={13} aria-hidden="true" />} value={error || schedulesError ? null : schedules.length} unit="件" detail={error || schedulesError ? '読み込めませんでした' : `動いている ${schedules.filter((item) => item.status === 'active').length}・止めている ${schedules.filter((item) => item.status === 'paused').length}`} loading={loading || schedulesLoading} />
+      <KpiCard presentation="band" title="定義が古いもの" icon={<AlertTriangle size={13} aria-hidden="true" />} value={error ? null : staleCount} unit="件" detail={failed ?? '更新後まだ集計していない'} loading={loading} />
     </KpiBand>
     <div className={styles.body} data-gap="tab">
       <div className={styles.toolbar}>

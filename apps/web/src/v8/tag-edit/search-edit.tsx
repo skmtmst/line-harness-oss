@@ -36,6 +36,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import Button from '@/components/shared/button'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
@@ -476,6 +477,7 @@ function ConditionRow({
 }
 
 export default function SavedSearchEditV8() {
+  const staffRole = useStaffRole()
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
@@ -869,6 +871,8 @@ export default function SavedSearchEditV8() {
       </p>
     </div>
   )
+
+  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
 
   return (
     <div className={styles.page}>

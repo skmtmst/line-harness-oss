@@ -96,7 +96,7 @@ export async function saveTemplate(db: D1Database, authority: HqTemplateAuthorit
   const type = current?.template.template_type ?? body.type;
   if (!HQ_TEMPLATE_TYPES.includes(type as HqTemplateType) || (body.type !== undefined && body.type !== type)) throw new HqTemplateError('INVALID_TYPE');
   const definition = canonicalDefinition(type as HqTemplateType, body.definition, authority), json = JSON.stringify(definition);
-  const name = boundedText(body.name), description = body.description == null || body.description === '' ? null : boundedText(body.description, 2000);
+  const name = boundedText(body.name, 200, 'name'), description = body.description == null || body.description === '' ? null : boundedText(body.description, 2000, 'description');
   const templateId = id ?? `hqt_${await digest(JSON.stringify([authority.tenantId, requestId]))}`;
   const versionId = crypto.randomUUID(), revision = current?.template.revision ?? 0, createdAt = new Date().toISOString();
   if (requestId) {
@@ -229,6 +229,7 @@ function resultReason(status: string): string | null {
 }
 function rethrowR2(error: unknown): never {
   if (!(error instanceof HqR2RuntimeError)) throw error;
+  if (error.code === 'LIFF_UNAVAILABLE') throw new HqTemplateError('LIFF_UNAVAILABLE', 409);
   if (error.code === 'CARD_REFERENCE_UNAVAILABLE') throw new HqTemplateError('CARD_REFERENCE_UNAVAILABLE', 409);
   if (error.code === 'FORBIDDEN') throw new HqTemplateError('FORBIDDEN', 403);
   if (error.code === 'VERSION_CONFLICT' || error.code.includes('UNAVAILABLE') || error.code.startsWith('AMBIGUOUS_')) throw new HqTemplateError('VERSION_CONFLICT', 409);

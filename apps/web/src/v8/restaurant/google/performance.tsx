@@ -3,7 +3,7 @@
 /*
  * ★V8 Googleビジネス パフォーマンス（`SrmVs`）。
  * 数4（共通の KpiCard）→ 飲食店向け指標 → 注。期間は 7／28／90 日（今の画面と同じ口・既定28日）。
- * 表示数の推移（今の画面の棒グラフ）は、数のマスの「…」→「表示数の推移を見る」で下に開く。
+ * 表示数の推移（今の画面の棒グラフ）は、帯の下の「表示数の推移を見る」で開閉する。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Eye, MapPin, MousePointerClick, Phone } from 'lucide-react'
@@ -11,7 +11,6 @@ import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import SectionHeader from '@/components/shared/section-header'
 import KpiBand from '@/components/shared/kpi-band'
-import { RowMenu } from '@/components/shared/row-actions'
 import SegmentedControl from '@/components/shared/segmented'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -85,15 +84,6 @@ function ImpressionsChart({ data }: { data: GooglePerformanceData }) {
   )
 }
 
-function MetricMenu({ title, onShowTrend }: { title: string; onShowTrend: () => void }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <span className={styles.menuBox}>
-      <RowMenu appearance="plain" size="small" label={`${title}の操作`} open={open} onOpenChange={setOpen} items={[{ id: 'trend', label: '表示数の推移を見る', onSelect: () => { setOpen(false); onShowTrend() } }]} />
-    </span>
-  )
-}
-
 export default function PerformanceBoard({ accountId }: { accountId: string }) {
   const [days, setDays] = useState<GooglePerformanceDays>(28)
   const [data, setData] = useState<GooglePerformanceData | null>(null)
@@ -129,14 +119,13 @@ export default function PerformanceBoard({ accountId }: { accountId: string }) {
       {data ? (
         <>
           {data.lastMetricsSyncedAt === null ? <Notice tone="info">パフォーマンスの自動取得はまだ実行されていません。毎晩の取得のあとに数値が表示されます。</Notice> : null}
-          <KpiBand presentation="separated" gridClassName="">
+          <KpiBand presentation="band" gridClassName="">
             {METRICS.map(({ key, title, icon: Icon }) => (
               <KpiCard
                 key={key}
-                presentation="cell"
+                presentation="band"
                 title={title}
                 icon={<Icon aria-hidden className={styles.icon13} />}
-                menu={<MetricMenu title={title} onShowTrend={() => setShowTrend(true)} />}
                 value={data.totals[key]}
                 unit="回"
                 detail={compareText(data.days, data.totals[key], data.previousTotals[key])}
@@ -144,6 +133,7 @@ export default function PerformanceBoard({ accountId }: { accountId: string }) {
               />
             ))}
           </KpiBand>
+          <Button onClick={() => setShowTrend((current) => !current)} aria-expanded={showTrend}>表示数の推移を見る</Button>
           <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
             <SectionHeader size="small" title={<>飲食店向け指標</>} />
             <dl className={styles.facts}>

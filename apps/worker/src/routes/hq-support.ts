@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
@@ -204,23 +205,23 @@ hqSupport.get('/api/hq/support/kinds', (c) => {
   });
 });
 
-hqSupport.post('/api/hq/support/requests', requireRole('owner', 'admin', 'staff'), async (c) => {
+hqSupport.post('/api/hq/support/requests', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   try {
     const tenantId = tenantOf(c);
     const staff = c.get('staff');
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-    if (!body) return c.json({ success: false, error: '送信内容を読み取れませんでした' }, 400);
+    if (!body) return inputError(c, { success: false, error: '送信内容を読み取れませんでした' }, 400, []);
 
     const kind = typeof body.kind === 'string' ? body.kind : '';
     if (!(HQ_SUPPORT_KINDS as readonly string[]).includes(kind)) {
-      return c.json({ success: false, error: '種類を選んでください' }, 400);
+      return inputError(c, { success: false, error: '種類を選んでください' }, 400, ["kind"]);
     }
     const subject = typeof body.subject === 'string' ? body.subject.trim() : '';
-    if (!subject) return c.json({ success: false, error: '件名を入力してください' }, 400);
-    if (subject.length > SUBJECT_MAX) return c.json({ success: false, error: `件名は${SUBJECT_MAX}文字以内で入力してください` }, 400);
+    if (!subject) return inputError(c, { success: false, error: '件名を入力してください' }, 400, ["subject"]);
+    if (subject.length > SUBJECT_MAX) return inputError(c, { success: false, error: `件名は${SUBJECT_MAX}文字以内で入力してください` }, 400, ["subject"]);
     const text = typeof body.body === 'string' ? body.body.trim() : '';
-    if (!text) return c.json({ success: false, error: '本文を入力してください' }, 400);
-    if (text.length > BODY_MAX) return c.json({ success: false, error: `本文は${BODY_MAX}文字以内で入力してください` }, 400);
+    if (!text) return inputError(c, { success: false, error: '本文を入力してください' }, 400, ["body"]);
+    if (text.length > BODY_MAX) return inputError(c, { success: false, error: `本文は${BODY_MAX}文字以内で入力してください` }, 400, ["body"]);
 
     let lineAccountId: string | null = null;
     let lineAccountName: string | null = null;
@@ -266,7 +267,7 @@ hqSupport.post('/api/hq/support/requests', requireRole('owner', 'admin', 'staff'
     }
 
     const parsed = parseAttachments(body.attachments);
-    if ('error' in parsed) return c.json({ success: false, error: parsed.error }, parsed.status);
+    if ('error' in parsed) return inputError(c, { success: false, error: parsed.error }, parsed.status, []);
     const uploads = parsed.uploads;
     for (const upload of uploads) {
       await c.env.IMAGES.put(upload.key, upload.bytes, { httpMetadata: { contentType: upload.mimeType } });
@@ -374,19 +375,19 @@ function safeKeysOf(raw: string): string[] {
 }
 
 /** 36-3-A：続きを送る。運営のチケットは対応中へ戻り、運営へ通知メール、送信者に控えを送る。 */
-hqSupport.post('/api/hq/support/requests/:id/messages', requireRole('owner', 'admin', 'staff'), async (c) => {
+hqSupport.post('/api/hq/support/requests/:id/messages', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   try {
     const tenantId = tenantOf(c);
     const staff = c.get('staff');
     const row = await getHqSupportRequest(c.env.DB, c.req.param('id'), tenantId);
     if (!row) return c.json({ success: false, error: 'お問い合わせが見つかりません' }, 404);
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-    if (!body) return c.json({ success: false, error: '送信内容を読み取れませんでした' }, 400);
+    if (!body) return inputError(c, { success: false, error: '送信内容を読み取れませんでした' }, 400, []);
     const text = typeof body.body === 'string' ? body.body.trim() : '';
-    if (!text) return c.json({ success: false, error: '本文を入力してください' }, 400);
-    if (text.length > BODY_MAX) return c.json({ success: false, error: `本文は${BODY_MAX}文字以内で入力してください` }, 400);
+    if (!text) return inputError(c, { success: false, error: '本文を入力してください' }, 400, ["body"]);
+    if (text.length > BODY_MAX) return inputError(c, { success: false, error: `本文は${BODY_MAX}文字以内で入力してください` }, 400, ["body"]);
     const parsed = parseAttachments(body.attachments);
-    if ('error' in parsed) return c.json({ success: false, error: parsed.error }, parsed.status);
+    if ('error' in parsed) return inputError(c, { success: false, error: parsed.error }, parsed.status, []);
     for (const upload of parsed.uploads) {
       await c.env.IMAGES.put(upload.key, upload.bytes, { httpMetadata: { contentType: upload.mimeType } });
     }

@@ -198,7 +198,7 @@ describe('staff×menu 割り当て保存の原子性', () => {
       { staff_id: 'staff-a1', menus: [] },
     ]);
     expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toMatchObject({ error: 'duplicate_staff_id' });
+    await expect(res.json()).resolves.toMatchObject({ code: 'duplicate_staff_id' , fields: expect.any(Object), error: expect.any(String) });
   });
 
   test('一括口もstaffロールでは403', async () => {

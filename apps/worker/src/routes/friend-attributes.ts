@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
   getSupportMarksWithUsage,
@@ -38,6 +39,7 @@ import {
   createFolder,
   updateFolder,
   swapFolderOrder,
+  FolderConflictError,
   deleteFolder,
   isFolderKind,
   getWebinarFolderCounts,
@@ -142,7 +144,7 @@ function sameMarkImpact(
 async function supportMarkAccess(c: Context<Env>): Promise<SupportMarkScope | Response> {
   const lineAccountId = c.req.query('lineAccountId');
   if (!lineAccountId) {
-    return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+    return inputError(c, { success: false, error: 'LINE公式アカウントを選んでください' }, 400, ["lineAccountId"]);
   }
   const staff = c.get('staff');
   if (!staff.tenantId) {
@@ -201,7 +203,7 @@ async function savedSearchAccess(
 ): Promise<SavedSearchAccess | Response> {
   const lineAccountId = requestedLineAccountId ?? c.req.query('lineAccountId');
   if (!lineAccountId) {
-    return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+    return inputError(c, { success: false, error: 'LINE公式アカウントを選んでください' }, 400, ["lineAccountId"]);
   }
   const accountScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   if (!accountScope.allowedAccountIds.includes(lineAccountId)) {
@@ -304,7 +306,7 @@ const MANAGED_CONDITION_FORMATS = ['search_v1', 'segment_v1'] as const;
 function requestedConditionFormat(c: Context<Env>): SavedSearchConditionFormat | Response {
   const raw = c.req.query('format') ?? 'search_v1';
   if (!(MANAGED_CONDITION_FORMATS as readonly string[]).includes(raw)) {
-    return c.json({ success: false, error: '保存した条件の形式が正しくありません' }, 400);
+    return inputError(c, { success: false, error: '保存した条件の形式が正しくありません' }, 400, ["format"]);
   }
   return raw as SavedSearchConditionFormat;
 }
@@ -335,6 +337,7 @@ function serializeFolder(row: Folder, count?: number, itemCount?: number) {
     name: row.name,
     parentId: row.parent_id,
     displayOrder: row.display_order,
+    revision: row.revision,
     color: row.color ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -425,7 +428,7 @@ friendAttributes.get('/api/support-marks', async (c) => {
   }
 });
 
-friendAttributes.post('/api/support-marks', requireRole('owner', 'admin'), async (c) => {
+friendAttributes.post('/api/support-marks', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const scope = await supportMarkAccess(c);
     if (scope instanceof Response) return scope;
@@ -436,37 +439,37 @@ friendAttributes.post('/api/support-marks', requireRole('owner', 'admin'), async
      */
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim() ?? '';
     if (!idempotencyKey || idempotencyKey.length > 128) {
-      return c.json({ success: false, error: 'Idempotency-Keyを指定してください' }, 400);
+      return inputError(c, { success: false, error: 'Idempotency-Keyを指定してください' }, 400, []);
     }
     const body = await c.req.json<Record<string, unknown>>();
     const name = typeof body.name === 'string' ? body.name.trim() : '';
-    if (!name) return c.json({ success: false, error: 'マークの名前を入力してください' }, 400);
+    if (!name) return inputError(c, { success: false, error: 'マークの名前を入力してください' }, 400, ["name"]);
     // D030: 長さの上限が無く、長い名前が一覧や配信設定の表示を壊す。作成と編集で同じ上限にする。
     if (name.length > SUPPORT_MARK_NAME_MAX) {
-      return c.json({ success: false, error: `マークの名前は${SUPPORT_MARK_NAME_MAX}文字以内で入力してください` }, 400);
+      return inputError(c, { success: false, error: `マークの名前は${SUPPORT_MARK_NAME_MAX}文字以内で入力してください` }, 400, ["name"]);
     }
     if (body.color !== undefined && !COLOR_PATTERN.test(String(body.color))) {
-      return c.json({ success: false, error: '色は #RRGGBB の形で指定してください' }, 400);
+      return inputError(c, { success: false, error: '色は #RRGGBB の形で指定してください' }, 400, ["color"]);
     }
     const displayOrder = Number(body.displayOrder ?? 0);
     if (!Number.isInteger(displayOrder) || displayOrder < 0 || displayOrder > 10_000) {
-      return c.json({ success: false, error: '並び順は0〜10000の整数で指定してください' }, 400);
+      return inputError(c, { success: false, error: '並び順は0〜10000の整数で指定してください' }, 400, ["displayOrder"]);
     }
     const automationValues = body.automationRules ?? [];
     if (!Array.isArray(automationValues) || automationValues.length > 20) {
-      return c.json({ success: false, error: '自動変更ルールは20件以内で指定してください' }, 400);
+      return inputError(c, { success: false, error: '自動変更ルールは20件以内で指定してください' }, 400, ["automationRules"]);
     }
     const automationRules = automationValues.map((value) =>
       value && typeof value === 'object' && !Array.isArray(value)
         ? supportMarkRuleInput(value as Record<string, unknown>)
         : null);
     if (automationRules.some((rule) => rule === null)) {
-      return c.json({ success: false, error: '自動変更ルールの入力が正しくありません' }, 400);
+      return inputError(c, { success: false, error: '自動変更ルールの入力が正しくありません' }, 400, ["automationRules"]);
     }
     try {
       for (const rule of automationRules) validateSupportMarkAutomationRuleInput(rule!);
     } catch {
-      return c.json({ success: false, error: '自動変更ルールの入力が正しくありません' }, 422);
+      return inputError(c, { success: false, error: '自動変更ルールの入力が正しくありません' }, 422, ["automationRules"]);
     }
     const { mark, replayed } = await createSupportMarkIdempotent(c.env.DB, scope, {
       name,
@@ -504,19 +507,19 @@ friendAttributes.post('/api/support-marks', requireRole('owner', 'admin'), async
  * 複製＋付け替えが走るため、行ごとの PATCH に混ぜると「並び替えただけで
  * 共有マークが複製される」事故になる。ここでは動かせる行だけを入れ替える。
  */
-friendAttributes.patch('/api/support-marks/reorder', requireRole('owner', 'admin'), async (c) => {
+friendAttributes.patch('/api/support-marks/reorder', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const scope = await supportMarkAccess(c);
     if (scope instanceof Response) return scope;
     const body = await c.req.json<{ ids?: unknown }>();
     if (!Array.isArray(body.ids) || body.ids.some((id) => typeof id !== 'string')) {
-      return c.json({ success: false, error: 'ids must be an array of mark ids' }, 400);
+      return inputError(c, { success: false, error: 'ids must be an array of mark ids' }, 400, ["ids"]);
     }
     if (body.ids.length > 500) {
-      return c.json({ success: false, error: 'too many ids' }, 400);
+      return inputError(c, { success: false, error: 'too many ids' }, 400, ["ids"]);
     }
     if (new Set(body.ids).size !== body.ids.length) {
-      return c.json({ success: false, error: 'ids must not contain duplicates' }, 400);
+      return inputError(c, { success: false, error: 'ids must not contain duplicates' }, 400, ["ids"]);
     }
     await reorderSupportMarks(c.env.DB, scope, body.ids as string[]);
     return c.json({ success: true, data: { updated: body.ids.length } });
@@ -526,7 +529,7 @@ friendAttributes.patch('/api/support-marks/reorder', requireRole('owner', 'admin
   }
 });
 
-friendAttributes.patch('/api/support-marks/:id', requireRole('owner', 'admin'), async (c) => {
+friendAttributes.patch('/api/support-marks/:id', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const scope = await supportMarkAccess(c);
     if (scope instanceof Response) return scope;
@@ -536,7 +539,7 @@ friendAttributes.patch('/api/support-marks/:id', requireRole('owner', 'admin'), 
 
     const body = await c.req.json<Record<string, unknown>>();
     if (body.color !== undefined && !COLOR_PATTERN.test(String(body.color))) {
-      return c.json({ success: false, error: '色は #RRGGBB の形で指定してください' }, 400);
+      return inputError(c, { success: false, error: '色は #RRGGBB の形で指定してください' }, 400, ["color"]);
     }
     /*
      * D032: 作成（POST）と同じ検査を編集でもする。空名・長い名前・
@@ -545,19 +548,19 @@ friendAttributes.patch('/api/support-marks/:id', requireRole('owner', 'admin'), 
     let name: string | undefined;
     if (body.name !== undefined) {
       if (typeof body.name !== 'string') {
-        return c.json({ success: false, error: 'マークの名前を入力してください' }, 400);
+        return inputError(c, { success: false, error: 'マークの名前を入力してください' }, 400, ["name"]);
       }
       name = body.name.trim();
-      if (!name) return c.json({ success: false, error: 'マークの名前を入力してください' }, 400);
+      if (!name) return inputError(c, { success: false, error: 'マークの名前を入力してください' }, 400, ["name"]);
       if (name.length > SUPPORT_MARK_NAME_MAX) {
-        return c.json({ success: false, error: `マークの名前は${SUPPORT_MARK_NAME_MAX}文字以内で入力してください` }, 400);
+        return inputError(c, { success: false, error: `マークの名前は${SUPPORT_MARK_NAME_MAX}文字以内で入力してください` }, 400, ["name"]);
       }
     }
     let displayOrder: number | undefined;
     if (body.displayOrder !== undefined) {
       const order = Number(body.displayOrder);
       if (!Number.isInteger(order) || order < 0 || order > 10_000) {
-        return c.json({ success: false, error: '並び順は0〜10000の整数で指定してください' }, 400);
+        return inputError(c, { success: false, error: '並び順は0〜10000の整数で指定してください' }, 400, ["displayOrder"]);
       }
       displayOrder = order;
     }
@@ -569,7 +572,7 @@ friendAttributes.patch('/api/support-marks/:id', requireRole('owner', 'admin'), 
     if (body.expectedVersion !== undefined) {
       expectedVersion = Number(body.expectedVersion);
       if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
-        return c.json({ success: false, error: '最新の版を指定してください' }, 400);
+        return inputError(c, { success: false, error: '最新の版を指定してください' }, 400, ["expectedVersion"]);
       }
     }
     // 既定を外す操作は止める。既定が1つも無いと、新しい友だちに何も付かない。
@@ -643,7 +646,7 @@ friendAttributes.get(
 friendAttributes.post(
   '/api/support-marks/:id/automation-rules',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const scope = await supportMarkAccess(c);
       if (scope instanceof Response) return scope;
@@ -654,10 +657,10 @@ friendAttributes.post(
        */
       const idempotencyKey = c.req.header('Idempotency-Key')?.trim() ?? '';
       if (!idempotencyKey || idempotencyKey.length > 128) {
-        return c.json({ success: false, error: 'Idempotency-Keyを指定してください' }, 400);
+        return inputError(c, { success: false, error: 'Idempotency-Keyを指定してください' }, 400, []);
       }
       const input = supportMarkRuleInput(await c.req.json<Record<string, unknown>>());
-      if (!input) return c.json({ success: false, error: '自動変更ルールの入力が正しくありません' }, 400);
+      if (!input) return inputError(c, { success: false, error: '自動変更ルールの入力が正しくありません' }, 400, ["event","priority","manualProtectionMinutes","name","condition","isActive"]);
       const created = await createSupportMarkAutomationRuleIdempotent(
         c.env.DB, scope, c.req.param('id'), c.get('staff').id, input, idempotencyKey,
       );
@@ -670,7 +673,7 @@ friendAttributes.post(
       }
       const reason = err instanceof Error ? err.message : '';
       if (reason.startsWith('rule_') || reason === 'manual_protection_invalid') {
-        return c.json({ success: false, error: '自動変更ルールの入力が正しくありません' }, 422);
+        return inputError(c, { success: false, error: '自動変更ルールの入力が正しくありません' }, 422, ["event","priority","manualProtectionMinutes","name","condition","isActive"]);
       }
       console.error('POST /api/support-marks/:id/automation-rules error:', err);
       return c.json({ success: false, error: '自動変更ルールを保存できませんでした' }, 500);
@@ -681,7 +684,7 @@ friendAttributes.post(
 friendAttributes.patch(
   '/api/support-mark-rules/:ruleId',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const scope = await supportMarkAccess(c);
       if (scope instanceof Response) return scope;
@@ -689,7 +692,7 @@ friendAttributes.patch(
       const input = supportMarkRuleInput(body);
       const expectedVersion = Number(body.expectedVersion);
       if (!input || !Number.isInteger(expectedVersion) || expectedVersion < 1) {
-        return c.json({ success: false, error: '最新の版を指定してください' }, 400);
+        return inputError(c, { success: false, error: '最新の版を指定してください' }, 400, ["event","priority","manualProtectionMinutes","name","condition","isActive","expectedVersion"]);
       }
       const result = await updateSupportMarkAutomationRule(
         c.env.DB, scope, c.req.param('ruleId'), c.get('staff').id, expectedVersion, input,
@@ -704,7 +707,7 @@ friendAttributes.patch(
     } catch (err) {
       const reason = err instanceof Error ? err.message : '';
       if (reason.startsWith('rule_') || reason === 'manual_protection_invalid') {
-        return c.json({ success: false, error: '自動変更ルールの入力が正しくありません' }, 422);
+        return inputError(c, { success: false, error: '自動変更ルールの入力が正しくありません' }, 422, ["event","priority","manualProtectionMinutes","name","condition","isActive"]);
       }
       console.error('PATCH /api/support-mark-rules/:ruleId error:', err);
       return c.json({ success: false, error: '自動変更ルールを保存できませんでした' }, 500);
@@ -785,13 +788,13 @@ friendAttributes.get(
 friendAttributes.post(
   '/api/support-marks/:id/archive',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const scope = await supportMarkAccess(c);
       if (scope instanceof Response) return scope;
       const idempotencyKey = c.req.header('Idempotency-Key')?.trim() ?? '';
       if (!idempotencyKey || idempotencyKey.length > 128) {
-        return c.json({ success: false, error: 'Idempotency-Keyを指定してください' }, 400);
+        return inputError(c, { success: false, error: 'Idempotency-Keyを指定してください' }, 400, []);
       }
       const body = await c.req.json<Record<string, unknown>>();
       const replacementRaw = typeof body.replacementMarkId === 'string'
@@ -809,7 +812,7 @@ friendAttributes.post(
       const expectedVersion = Number(body.expectedVersion);
       if (!impactRevision
         || !Number.isInteger(expectedVersion) || expectedVersion < 1) {
-        return c.json({ success: false, error: '確認版・現在版を指定してください' }, 400);
+        return inputError(c, { success: false, error: '確認版・現在版を指定してください' }, 400, ["impactRevision","expectedVersion"]);
       }
       const result = await archiveSupportMarkWithReplacement(c.env.DB, scope, {
         markId: c.req.param('id'),
@@ -832,7 +835,7 @@ friendAttributes.post(
     } catch (err) {
       if (err instanceof SupportMarkArchiveError) {
         const status = err.code === 'not_found' ? 404 : 409;
-        return c.json({ success: false, code: err.code, error: err.message }, status);
+        return inputError(c, { success: false, code: err.code, error: err.message }, status, []);
       }
       console.error('POST /api/support-marks/:id/archive error:', err);
       return c.json({ success: false, error: '対応マークを保管できませんでした' }, 500);
@@ -951,7 +954,7 @@ friendAttributes.delete('/api/support-marks/:id', requireRole('owner', 'admin'),
 friendAttributes.patch(
   '/api/friends/:id/support-mark',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const scope = await supportMarkAccess(c);
       if (scope instanceof Response) return scope;
@@ -962,7 +965,7 @@ friendAttributes.patch(
           : String(body.markId);
       if (markId) {
         const mark = await getSupportMarkById(c.env.DB, markId, scope);
-        if (!mark) return c.json({ success: false, error: 'マークが見つかりません' }, 400);
+        if (!mark) return inputError(c, { success: false, error: 'マークが見つかりません' }, 400, ["markId"]);
       }
       const updated = await setFriendSupportMark(
         c.env.DB,
@@ -983,24 +986,24 @@ friendAttributes.patch(
 friendAttributes.post(
   '/api/friends/support-mark/bulk',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const scope = await supportMarkAccess(c);
       if (scope instanceof Response) return scope;
       const body = await c.req.json<{ friendIds?: unknown; markId?: unknown }>();
       const friendIds = Array.isArray(body.friendIds) ? body.friendIds.map(String) : [];
       if (friendIds.length === 0) {
-        return c.json({ success: false, error: '対象の友だちが選ばれていません' }, 400);
+        return inputError(c, { success: false, error: '対象の友だちが選ばれていません' }, 400, ["friendIds"]);
       }
       if (friendIds.length > 1000) {
-        return c.json({ success: false, error: '一度に変更できるのは1000人までです' }, 422);
+        return inputError(c, { success: false, error: '一度に変更できるのは1000人までです' }, 422, ["friendIds"]);
       }
       const markId =
         body.markId === null || body.markId === '' || body.markId === undefined
           ? null
           : String(body.markId);
       if (markId && !(await getSupportMarkById(c.env.DB, markId, scope))) {
-        return c.json({ success: false, error: 'マークが見つかりません' }, 400);
+        return inputError(c, { success: false, error: 'マークが見つかりません' }, 400, ["markId"]);
       }
       const updated = await setFriendSupportMarkBulk(c.env.DB, friendIds, markId, scope);
       return c.json({ success: true, data: { updated } });
@@ -1136,7 +1139,7 @@ friendAttributes.get(
 friendAttributes.post(
   '/api/saved-searches/preview',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const body = await c.req.json<Record<string, unknown>>();
       const requestedAccount = typeof body.lineAccountId === 'string'
@@ -1156,7 +1159,7 @@ friendAttributes.post(
       const currentRevision = row ? Number(row.revision ?? 1) : 0;
       if (body.revision !== undefined
         && (!Number.isInteger(Number(body.revision)) || Number(body.revision) < 1)) {
-        return c.json({ success: false, error: '確認する版が正しくありません' }, 400);
+        return inputError(c, { success: false, error: '確認する版が正しくありません' }, 400, ["revision"]);
       }
       if (row && body.revision !== undefined && Number(body.revision) !== currentRevision) {
         return c.json({
@@ -1171,11 +1174,11 @@ friendAttributes.post(
         try {
           rawConditions = JSON.parse(row.conditions_json);
         } catch {
-          return c.json({ success: false, error: '保存した検索の条件が壊れています' }, 422);
+          return inputError(c, { success: false, error: '保存した検索の条件が壊れています' }, 422, ["conditions","savedSearchId","lineAccountId"]);
         }
       }
       const conditions = validateSearchConditions(rawConditions);
-      if (!conditions.ok) return c.json({ success: false, error: conditions.error }, 422);
+      if (!conditions.ok) return inputError(c, { success: false, error: conditions.error }, 422, ["conditions"]);
       const [match, references, callCounts, referenceCallCounts] = await Promise.all([
         getSavedSearchMatchPreview(c.env.DB, conditions.value, access.lineAccountId),
         row ? getSavedSearchReferences(c.env.DB, [row.id], access.lineAccountId) : Promise.resolve([]),
@@ -1220,12 +1223,12 @@ friendAttributes.post(
   },
 );
 
-friendAttributes.post('/api/saved-searches', requireRole('owner', 'admin', 'staff'), async (c) => {
+friendAttributes.post('/api/saved-searches', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   try {
     const staff = c.get('staff');
     const body = await c.req.json<Record<string, unknown>>();
     const name = typeof body.name === 'string' ? body.name.trim() : '';
-    if (!name) return c.json({ success: false, error: '名前を入力してください' }, 400);
+    if (!name) return inputError(c, { success: false, error: '名前を入力してください' }, 400, ["name"]);
     const format = requestedConditionFormat(c);
     if (format instanceof Response) return format;
 
@@ -1239,20 +1242,17 @@ friendAttributes.post('/api/saved-searches', requireRole('owner', 'admin', 'staf
       lineAccountId: access.lineAccountId,
     });
     if (count >= SAVED_SEARCH_LIMIT) {
-      return c.json(
-        {
+      return inputError(c, {
           success: false,
           error: `保存できる検索は ${SAVED_SEARCH_LIMIT} 件までです。使っていないものを削除してください。`,
-        },
-        422,
-      );
+        }, 422, []);
     }
 
     const conditions = validateConditionsForFormat(format, body.conditions);
-    if (!conditions.ok) return c.json({ success: false, error: conditions.error }, 422);
+    if (!conditions.ok) return inputError(c, { success: false, error: conditions.error }, 422, ["conditions"]);
 
     if (body.scope !== undefined && body.scope !== 'friends') {
-      return c.json({ success: false, error: '保存した条件の種類が一致しません' }, 400);
+      return inputError(c, { success: false, error: '保存した条件の種類が一致しません' }, 400, ["scope"]);
     }
     if (body.isShared === true && staff.role === 'staff') {
       return c.json({ success: false, error: '共有の検索を作る権限がありません' }, 403);
@@ -1291,19 +1291,19 @@ friendAttributes.post('/api/saved-searches', requireRole('owner', 'admin', 'staf
 friendAttributes.patch(
   '/api/saved-searches/reorder',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const access = await savedSearchAccess(c);
       if (access instanceof Response) return access;
       const body = await c.req.json<{ ids?: unknown }>();
       if (!Array.isArray(body.ids) || body.ids.some((id) => typeof id !== 'string')) {
-        return c.json({ success: false, error: 'ids must be an array of search ids' }, 400);
+        return inputError(c, { success: false, error: 'ids must be an array of search ids' }, 400, ["ids"]);
       }
       if (body.ids.length > 500) {
-        return c.json({ success: false, error: 'too many ids' }, 400);
+        return inputError(c, { success: false, error: 'too many ids' }, 400, ["ids"]);
       }
       if (new Set(body.ids).size !== body.ids.length) {
-        return c.json({ success: false, error: 'ids must not contain duplicates' }, 400);
+        return inputError(c, { success: false, error: 'ids must not contain duplicates' }, 400, ["ids"]);
       }
       await reorderSavedSearches(c.env.DB, access, body.ids as string[]);
       return c.json({ success: true, data: { updated: body.ids.length } });
@@ -1317,7 +1317,7 @@ friendAttributes.patch(
 friendAttributes.patch(
   '/api/saved-searches/:id',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const id = c.req.param('id');
       const format = requestedConditionFormat(c);
@@ -1337,17 +1337,17 @@ friendAttributes.patch(
         body.expectedRevision ?? body.revision ?? existing.revision ?? 1,
       );
       if (!Number.isInteger(expectedRevision) || expectedRevision < 1) {
-        return c.json({ success: false, error: '最新の版を指定してください' }, 400);
+        return inputError(c, { success: false, error: '最新の版を指定してください' }, 400, ["expectedRevision","revision"]);
       }
       const patch: Parameters<typeof updateSavedSearchWithRevision>[4] = {};
       if (body.name !== undefined) {
         const name = String(body.name).trim();
-        if (!name) return c.json({ success: false, error: '名前を入力してください' }, 400);
+        if (!name) return inputError(c, { success: false, error: '名前を入力してください' }, 400, ["name"]);
         patch.name = name;
       }
       if (body.conditions !== undefined) {
         const conditions = validateConditionsForFormat(format, body.conditions);
-        if (!conditions.ok) return c.json({ success: false, error: conditions.error }, 422);
+        if (!conditions.ok) return inputError(c, { success: false, error: conditions.error }, 422, ["conditions"]);
         patch.conditions = conditions.value;
       }
       if (body.isShared !== undefined) {
@@ -1580,16 +1580,16 @@ friendAttributes.get('/api/folders', async (c) => {
   }
 });
 
-friendAttributes.post('/api/folders', requireRole('owner', 'admin'), async (c) => {
+friendAttributes.post('/api/folders', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>();
     if (!isFolderKind(body.kind)) {
-      return c.json({ success: false, error: '知らないフォルダの種類です' }, 400);
+      return inputError(c, { success: false, error: '知らないフォルダの種類です' }, 400, ["kind"]);
     }
     const name = typeof body.name === 'string' ? body.name.trim() : '';
-    if (!name) return c.json({ success: false, error: 'フォルダ名を入力してください' }, 400);
+    if (!name) return inputError(c, { success: false, error: 'フォルダ名を入力してください' }, 400, ["name"]);
 
-    const integrationKind = ['automation', 'common_action', 'webhook', 'conversion'].includes(body.kind);
+    const integrationKind = ['automation', 'common_action', 'webhook', 'conversion', 'affiliate', 'affiliate_offer', 'mileage_reward', 'friend_add_rule'].includes(body.kind);
     const accountId = integrationKind || body.kind === 'webinar' || body.kind === 'tag' || body.kind === 'template' || body.kind === 'form'
       ? (typeof body.accountId === 'string' ? body.accountId.trim() : '')
       : '';
@@ -1598,10 +1598,10 @@ friendAttributes.post('/api/folders', requireRole('owner', 'admin'), async (c) =
     // アカウントを送る。回答フォームの箱（R25）も同じく選択中のアカウントに付ける。
     if ((body.kind === 'tag' || body.kind === 'template' || body.kind === 'form') && !accountId) {
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-      if (!scope.canSeeUnassigned) return c.json({ success: false, error: 'account_id_required' }, 400);
+      if (!scope.canSeeUnassigned) return inputError(c, { success: false, error: 'account_id_required' }, 400, ["accountId"]);
     }
     if (integrationKind || body.kind === 'webinar' || accountId) {
-      if (!accountId) return c.json({ success: false, error: 'account_id_required' }, 400);
+      if (!accountId) return inputError(c, { success: false, error: 'account_id_required' }, 400, ["kind","accountId"]);
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
       if (!scope.allowedAccountIds.includes(accountId)) {
         return c.json({ success: false, error: 'Not found' }, 404);
@@ -1611,15 +1611,15 @@ friendAttributes.post('/api/folders', requireRole('owner', 'admin'), async (c) =
     // 入れ子は1段まで。深くすると画面が組み立てられなくなる。
     if (body.parentId) {
       const parent = await getFolderById(c.env.DB, String(body.parentId));
-      if (!parent) return c.json({ success: false, error: '親フォルダが見つかりません' }, 400);
+      if (!parent) return inputError(c, { success: false, error: '親フォルダが見つかりません' }, 400, ["parentId"]);
       if (parent.parent_id) {
-        return c.json({ success: false, error: 'フォルダは2段までです' }, 422);
+        return inputError(c, { success: false, error: 'フォルダは2段までです' }, 422, ["parentId"]);
       }
       if (parent.kind !== body.kind) {
-        return c.json({ success: false, error: '別の種類のフォルダには入れられません' }, 422);
+        return inputError(c, { success: false, error: '別の種類のフォルダには入れられません' }, 422, ["parentId","kind"]);
       }
       if ((parent.account_id ?? null) !== (accountId || null)) {
-        return c.json({ success: false, error: '親フォルダが見つかりません' }, 400);
+        return inputError(c, { success: false, error: '親フォルダが見つかりません' }, 400, ["parentId","kind","accountId"]);
       }
     }
 
@@ -1628,7 +1628,7 @@ friendAttributes.post('/api/folders', requireRole('owner', 'admin'), async (c) =
     if (body.color !== undefined && body.color !== null && body.color !== '') {
       const raw = String(body.color);
       if (!COLOR_PATTERN.test(raw)) {
-        return c.json({ success: false, error: '色は #RRGGBB の形で指定してください' }, 400);
+        return inputError(c, { success: false, error: '色は #RRGGBB の形で指定してください' }, 400, ["color"]);
       }
       color = raw;
     }
@@ -1643,12 +1643,13 @@ friendAttributes.post('/api/folders', requireRole('owner', 'admin'), async (c) =
     });
     return c.json({ success: true, data: serializeFolder(folder) }, 201);
   } catch (err) {
+    if (err instanceof FolderConflictError) return c.json({success:false,error:'同じ名前のフォルダがあります'},409);
     console.error('POST /api/folders error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
 
-friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), async (c) => {
+friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const existing = await getFolderById(c.env.DB, id);
@@ -1660,33 +1661,37 @@ friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), async 
     let webinarAccountId = '';
     if (existing.kind === 'webinar') {
       webinarAccountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
-      if (!webinarAccountId) return c.json({ success: false, error: 'account_id_required' }, 400);
+      if (!webinarAccountId) return inputError(c, { success: false, error: 'account_id_required' }, 400, ["accountId"]);
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
       if (!scope.allowedAccountIds.includes(webinarAccountId) || existing.account_id !== webinarAccountId) {
         return c.json({ success: false, error: 'Not found' }, 404);
       }
     }
     const patch: Parameters<typeof updateFolder>[2] = {};
+    if (body.expectedRevision !== undefined) {
+      if (!Number.isSafeInteger(body.expectedRevision) || Number(body.expectedRevision)<1) return inputError(c, {success:false,error:'版を確認してください'},422,['expectedRevision']);
+      patch.expectedRevision = Number(body.expectedRevision);
+    }
     if (body.name !== undefined) {
       const name = String(body.name).trim();
-      if (!name) return c.json({ success: false, error: 'フォルダ名を入力してください' }, 400);
+      if (!name) return inputError(c, { success: false, error: 'フォルダ名を入力してください' }, 400, ["name"]);
       patch.name = name;
     }
     if ('parentId' in body) {
       const parentId = body.parentId ? String(body.parentId) : null;
       // 自分を自分の親にはできない。一覧の描画が無限に回る。
       if (parentId === id) {
-        return c.json({ success: false, error: '自分自身を親にはできません' }, 422);
+        return inputError(c, { success: false, error: '自分自身を親にはできません' }, 422, ["parentId"]);
       }
       patch.parentId = parentId;
       if (parentId) {
         const parent = await getFolderById(c.env.DB, parentId);
         if (!parent || parent.kind !== existing.kind
           || (parent.account_id ?? null) !== (existing.account_id ?? null)) {
-          return c.json({ success: false, error: '親フォルダが見つかりません' }, 400);
+          return inputError(c, { success: false, error: '親フォルダが見つかりません' }, 400, ["parentId"]);
         }
         if (parent.parent_id) {
-          return c.json({ success: false, error: 'フォルダは2段までです' }, 422);
+          return inputError(c, { success: false, error: 'フォルダは2段までです' }, 422, ["parentId"]);
         }
       }
     }
@@ -1698,7 +1703,7 @@ friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), async 
       } else {
         const value = String(raw);
         if (!COLOR_PATTERN.test(value)) {
-          return c.json({ success: false, error: '色は #RRGGBB の形で指定してください' }, 400);
+          return inputError(c, { success: false, error: '色は #RRGGBB の形で指定してください' }, 400, ["color"]);
         }
         patch.color = value;
       }
@@ -1707,6 +1712,7 @@ friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), async 
     const folder = await updateFolder(c.env.DB, id, patch);
     return c.json({ success: true, data: serializeFolder(folder!) });
   } catch (err) {
+    if (err instanceof FolderConflictError) return c.json({success:false,error:'フォルダが更新されました'},409);
     console.error('PATCH /api/folders/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
@@ -1719,13 +1725,13 @@ friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), async 
  * 2つ残り、番号が同じ2つは入れ替えても並びが変わらなかった。
  * 同じ種類・同じアカウント・同じ親のフォルダ同士だけを受け付ける。
  */
-friendAttributes.post('/api/folders/:id/swap-order', requireRole('owner', 'admin'), async (c) => {
+friendAttributes.post('/api/folders/:id/swap-order', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
     const withId = typeof body.withId === 'string' ? body.withId.trim() : '';
     if (!withId || withId === id) {
-      return c.json({ success: false, error: '入れ替える相手のフォルダを指定してください' }, 400);
+      return inputError(c, { success: false, error: '入れ替える相手のフォルダを指定してください' }, 400, ["withId"]);
     }
     const [a, b] = await Promise.all([getFolderById(c.env.DB, id), getFolderById(c.env.DB, withId)]);
     if (!a || !b) return c.json({ success: false, error: 'Not found' }, 404);
@@ -1736,17 +1742,21 @@ friendAttributes.post('/api/folders/:id/swap-order', requireRole('owner', 'admin
     }
     if (a.kind === 'webinar') {
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-      if (!requested) return c.json({ success: false, error: 'account_id_required' }, 400);
+      if (!requested) return inputError(c, { success: false, error: 'account_id_required' }, 400, ["accountId","account_id"]);
       if (!scope.allowedAccountIds.includes(requested) || a.account_id !== requested) {
         return c.json({ success: false, error: 'Not found' }, 404);
       }
     }
     if (a.kind !== b.kind || (a.account_id ?? null) !== (b.account_id ?? null) || (a.parent_id ?? null) !== (b.parent_id ?? null)) {
-      return c.json({ success: false, error: '同じ場所のフォルダだけ並べ替えられます' }, 400);
+      return inputError(c, { success: false, error: '同じ場所のフォルダだけ並べ替えられます' }, 400, ["a","kind","account_id","parent_id"]);
+    }
+    for (const [folder, revision] of [[a,body.expectedRevision],[b,body.withExpectedRevision]] as const) {
+      if (revision !== undefined && revision !== folder.revision) return c.json({success:false,error:'フォルダが更新されました'},409);
     }
     await swapFolderOrder(c.env.DB, a, b);
     return c.json({ success: true, data: { swapped: [id, withId] } });
   } catch (err) {
+    if (err instanceof FolderConflictError) return c.json({success:false,error:'フォルダが更新されました'},409);
     console.error('POST /api/folders/:id/swap-order error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
@@ -1768,11 +1778,14 @@ friendAttributes.delete('/api/folders/:id', requireRole('owner', 'admin'), async
     }
     const denied = await folderBoundary(c, existing, c.req.query('account_id')?.trim());
     if (denied) return denied;
-    if (!(await deleteFolder(c.env.DB, id))) {
+    const revision = c.req.query('expectedRevision');
+    if (revision !== undefined && (!Number.isSafeInteger(Number(revision)) || Number(revision)<1)) return c.json({success:false,error:'版を確認してください'},422);
+    if (!(await deleteFolder(c.env.DB, id, revision === undefined ? undefined : Number(revision)))) {
       return c.json({ success: false, error: 'フォルダの店舗境界を確認してください' }, 409);
     }
     return c.json({ success: true, data: null });
   } catch (err) {
+    if (err instanceof FolderConflictError) return c.json({success:false,error:'フォルダが更新されました'},409);
     console.error('DELETE /api/folders/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }

@@ -99,7 +99,7 @@ describe('W17 rich menu group input (real SQL and actual LINE payload builder)',
         const payload = await payloadFor(snapshot, 'https://worker.example.test/');
         expect(payload.areas.map((area) => area.action)).toEqual([
           { type: 'uri', uri: `${branded ? 'https://go.example.test' : 'https://worker.example.test'}/t/w17-short` },
-          { type: 'uri', uri: 'https://liff.line.me/w17-liff?form=w17-form' },
+          { type: 'uri', uri: 'https://liff.line.me/w17-liff/?page=form&id=w17-form' },
           { type: 'uri', uri: 'https://plain.example.test/original' },
         ]);
         expect(payload.selected).toBe(true);
@@ -153,10 +153,10 @@ describe('W17 rich menu group input (real SQL and actual LINE payload builder)',
     const { group } = await source();
     const payload = await payloadFor(richMenuLiveToSnapshot(group));
     expect(payload.areas[0].action.uri).toBe('https://destination.example.test/page');
-    expect(payload.areas[1].action.uri).toBe('https://liff.line.me/w17-liff?form=w17-form');
+    expect(payload.areas[1].action.uri).toBe('https://liff.line.me/w17-liff/?page=form&id=w17-form');
   });
 
-  it('uses the LIFF fallback only for form actions, with link ID fallback for old tracked rows', async () => {
+  it('does not publish through another account LIFF fallback, retaining old tracking link ID', async () => {
     testDb.raw.exec(`UPDATE line_accounts SET liff_id = NULL WHERE id = 'w17-account';
       UPDATE tracked_links SET short_code = NULL WHERE id = 'w17-tracked';`);
     const { group, account } = await source();
@@ -166,9 +166,9 @@ describe('W17 rich menu group input (real SQL and actual LINE payload builder)',
       liffUrl: 'https://liff.line.me/fallback',
     });
     const line = lineFixture();
-    await createRichMenuShells(input, line, r2);
-    const payload = vi.mocked(line.createRichMenu).mock.calls[0][0] as { areas: Array<{ action: { uri: string } }> };
-    expect(payload.areas[0].action.uri).toBe('https://worker.example.test/t/w17-tracked');
-    expect(payload.areas[1].action.uri).toBe('https://liff.line.me/fallback?form=w17-form');
+    expect(input.formBaseUrl).toBeNull();
+    expect(input.pages[0].areas[0].trackedLinkUrl).toBe('https://worker.example.test/t/w17-tracked');
+    await expect(createRichMenuShells(input, line, r2)).rejects.toThrow('LIFF');
+    expect(line.createRichMenu).not.toHaveBeenCalled();
   });
 });

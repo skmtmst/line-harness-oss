@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { prepareRichVideoTemplate } from '../services/rich-video-template.js';
 import {
@@ -543,7 +544,7 @@ function isBlankText(value: unknown): boolean {
   return typeof value !== 'string' || !value.trim();
 }
 
-templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
+templates.post('/api/templates', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"name":["string"],"category":["string"],"messageType":["string"],"messageContent":["string"],"questionStatus":["string"],"folderId":["null","string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       accountId?: string;
@@ -556,32 +557,32 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
       folderId?: string | null;
     }>();
     if (!body.accountId) {
-      return c.json({ success: false, error: 'account_id_required' }, 400);
+      return inputError(c, { success: false, error: 'account_id_required' }, 400, ["accountId"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
       return c.json({ success: false, error: 'Template not found' }, 404);
     }
     // N-146: 空白だけの値も「無い」と同じに扱う。
     if (isBlankText(body.name) || isBlankText(body.messageType) || isBlankText(body.messageContent)) {
-      return c.json({ success: false, error: 'name, messageType, messageContent are required' }, 400);
+      return inputError(c, { success: false, error: 'name, messageType, messageContent are required' }, 400, ["name","messageType","messageContent"]);
     }
     try { body.messageContent = await prepareRichVideoTemplate(c.env, body.messageType, body.messageContent, body.accountId, c.env.WORKER_URL || new URL(c.req.url).origin); }
-    catch (err) { return c.json({success:false,error:err instanceof Error ? err.message : '動画を準備できませんでした'},422); }
+    catch (err) { return inputError(c, {success:false,error:err instanceof Error ? err.message : '動画を準備できませんでした'}, 422, ["messageContent"]); }
     const message = validateTemplateMessage(body.messageType, body.messageContent, false);
     if (!message.ok) {
       const { ok: _ok, ...failure } = message;
-      return c.json({ success: false, ...failure }, 422);
+      return inputError(c, { success: false, ...failure }, 422, ["messageContent"]);
     }
     const carousel = checkCarousel(body.messageType, body.messageContent);
-    if (!carousel.ok) return c.json({ success: false, error: carousel.error }, 422);
+    if (!carousel.ok) return inputError(c, { success: false, error: carousel.error }, 422, ["messageContent"]);
     const image = checkImageTemplate(body.messageType, body.messageContent);
-    if (!image.ok) return c.json({ success: false, error: image.error }, 422);
+    if (!image.ok) return inputError(c, { success: false, error: image.error }, 422, ["messageContent"]);
     const structured = checkStructuredSize(body.messageType, body.messageContent);
-    if (!structured.ok) return c.json({ success: false, error: structured.error }, 422);
+    if (!structured.ok) return inputError(c, { success: false, error: structured.error }, 422, ["messageContent"]);
     const options = readCarouselOptions(body as unknown as Record<string, unknown>);
-    if (!options.ok) return c.json({ success: false, error: options.error }, 400);
+    if (!options.ok) return inputError(c, { success: false, error: options.error }, 400, ["carouselActions","carouselTapLimitMode","carouselTapLimitText"]);
     const question = readQuestionPayload(body as unknown as Record<string, unknown>);
-    if (!question.ok) return c.json({ success: false, error: question.error }, 422);
+    if (!question.ok) return inputError(c, { success: false, error: question.error }, 422, ["messageContent"]);
     /*
      * R249: カード型はバブルかカルーセルのJSONでないと保存しない。
      * 通常文・壊れたJSON・型なしJSONのまま保存できると「作れた」と
@@ -590,14 +591,14 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
      */
     if (!question.question) {
       const flexError = validateFlexContent(body.messageType, body.messageContent);
-      if (flexError) return c.json({ success: false, error: flexError }, 422);
+      if (flexError) return inputError(c, { success: false, error: flexError }, 422, ["messageContent"]);
     }
     if (body.questionStatus && body.questionStatus !== 'draft' && body.questionStatus !== 'published') {
-      return c.json({ success: false, error: '質問の保存状態を確認してください' }, 400);
+      return inputError(c, { success: false, error: '質問の保存状態を確認してください' }, 400, ["questionStatus"]);
     }
     const folderScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const folder = await readFolderId(c.env.DB, body as unknown as Record<string, unknown>, body.accountId, folderScope.canSeeUnassigned);
-    if (!folder.ok) return c.json({ success: false, error: folder.error }, 422);
+    if (!folder.ok) return inputError(c, { success: false, error: folder.error }, 422, ["folderId"]);
     const item = await createTemplate(c.env.DB, {
       ...body,
       folderId: folder.folderId ?? null,
@@ -615,14 +616,14 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
     return c.json({ success: true, data: { id: item.id, name: item.name, category: item.category, messageType: item.message_type, messageContent: item.message_content, question: questionValue(item.question_json), questionStatus: item.question_status, folderId: item.folder_id ?? null, hasDraft: true, publishedVersion: 0, publishedAt: null, draftRevision: 1, createdAt: item.created_at, updatedAt: item.updated_at } }, 201);
   } catch (err) {
     if (err instanceof MediaReferenceAccountError) {
-      return c.json({ success: false, error: '別のLINEアカウントのメディアは使用できません' }, 422);
+      return inputError(c, { success: false, error: '別のLINEアカウントのメディアは使用できません' }, 422, ["messageContent"]);
     }
     console.error('POST /api/templates error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
 
-templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => {
+templates.put('/api/templates/:id', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"category":["string"],"messageType":["string"],"messageContent":["string"],"questionStatus":["string"],"folderId":["null","string"]}), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<{
@@ -646,13 +647,13 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
      * 口を直接叩かれたときに空の名前・空の本文へ書き換わるのを防ぐ。
      */
     if (body.name !== undefined && isBlankText(body.name)) {
-      return c.json({ success: false, error: '名前を入力してください' }, 400);
+      return inputError(c, { success: false, error: '名前を入力してください' }, 400, ["name"]);
     }
     if (body.messageType !== undefined && isBlankText(body.messageType)) {
-      return c.json({ success: false, error: 'テンプレートの種別を確認してください' }, 400);
+      return inputError(c, { success: false, error: 'テンプレートの種別を確認してください' }, 400, ["messageType"]);
     }
     if (body.messageContent !== undefined && isBlankText(body.messageContent)) {
-      return c.json({ success: false, error: '本文を入力してください' }, 400);
+      return inputError(c, { success: false, error: '本文を入力してください' }, 400, ["messageContent"]);
     }
     /*
      * 347: 保存は2系統。名前・置き場の整理は live 列へ即時反映し、
@@ -675,36 +676,36 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
       ?? existing.message_content;
     if (changesMessage) {
       try { baseMessageContent = await prepareRichVideoTemplate(c.env, baseMessageType, baseMessageContent, existing.line_account_id, c.env.WORKER_URL || new URL(c.req.url).origin); }
-      catch (err) { return c.json({success:false,error:err instanceof Error ? err.message : '動画を準備できませんでした'},422); }
+      catch (err) { return inputError(c, {success:false,error:err instanceof Error ? err.message : '動画を準備できませんでした'}, 422, ["messageContent"]); }
     }
     const message = changesMessage
       ? validateTemplateMessage(baseMessageType, baseMessageContent, false)
       : { ok: true as const };
     if (!message.ok) {
       const { ok: _ok, ...failure } = message;
-      return c.json({ success: false, ...failure }, 422);
+      return inputError(c, { success: false, ...failure }, 422, ["messageContent"]);
     }
     const carousel = checkCarousel(baseMessageType, baseMessageContent);
-    if (!carousel.ok) return c.json({ success: false, error: carousel.error }, 422);
+    if (!carousel.ok) return inputError(c, { success: false, error: carousel.error }, 422, ["messageContent"]);
     const image = checkImageTemplate(baseMessageType, baseMessageContent);
-    if (!image.ok) return c.json({ success: false, error: image.error }, 422);
+    if (!image.ok) return inputError(c, { success: false, error: image.error }, 422, ["messageContent"]);
     const structured = checkStructuredSize(baseMessageType, baseMessageContent);
-    if (!structured.ok) return c.json({ success: false, error: structured.error }, 422);
+    if (!structured.ok) return inputError(c, { success: false, error: structured.error }, 422, ["messageContent"]);
     const options = readCarouselOptions(body as unknown as Record<string, unknown>);
-    if (!options.ok) return c.json({ success: false, error: options.error }, 400);
+    if (!options.ok) return inputError(c, { success: false, error: options.error }, 400, ["carouselActions","carouselTapLimitMode","carouselTapLimitText"]);
     const question = readQuestionPayload(body as unknown as Record<string, unknown>);
-    if (!question.ok) return c.json({ success: false, error: question.error }, 422);
+    if (!question.ok) return inputError(c, { success: false, error: question.error }, 422, ["messageContent"]);
     // R249: 作成口と同じく、質問で上書きしないカード型だけ中身を見る。
     if (changesMessage && !question.question) {
       const flexError = validateFlexContent(baseMessageType, baseMessageContent);
-      if (flexError) return c.json({ success: false, error: flexError }, 422);
+      if (flexError) return inputError(c, { success: false, error: flexError }, 422, ["messageContent"]);
     }
     if (body.questionStatus && body.questionStatus !== 'draft' && body.questionStatus !== 'published') {
-      return c.json({ success: false, error: '質問の保存状態を確認してください' }, 400);
+      return inputError(c, { success: false, error: '質問の保存状態を確認してください' }, 400, ["questionStatus"]);
     }
     const folderScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const folder = await readFolderId(c.env.DB, body as unknown as Record<string, unknown>, existing.line_account_id, folderScope.canSeeUnassigned);
-    if (!folder.ok) return c.json({ success: false, error: folder.error }, 422);
+    if (!folder.ok) return inputError(c, { success: false, error: folder.error }, 422, ["folderId"]);
     const metadataUpdates: {
       name?: string;
       category?: string;
@@ -757,7 +758,7 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
     });
   } catch (err) {
     if (err instanceof MediaReferenceAccountError) {
-      return c.json({ success: false, error: '別のLINEアカウントのメディアは使用できません' }, 422);
+      return inputError(c, { success: false, error: '別のLINEアカウントのメディアは使用できません' }, 422, ["messageContent"]);
     }
     if (err instanceof Error && err.message === 'TEMPLATE_DRAFT_CONFLICT') {
       return c.json({ success: false, error: '編集中に公開状態が変わりました。読み直してください' }, 409);
@@ -777,12 +778,12 @@ function validPublishKey(value: string | null | undefined): value is string {
  * 別の下書きを公開しない。公開版・下書き版の両方を確認できる(自動応答の
  * POST /api/auto-replies/:id/publish より厳しい約束)。
  */
-templates.post('/api/templates/:id/publish', requireRole('owner', 'admin'), async (c) => {
+templates.post('/api/templates/:id/publish', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const requestKey = c.req.header('Idempotency-Key');
     if (!validPublishKey(requestKey)) {
-      return c.json({ success: false, error: '公開操作の確認キーが必要です' }, 400);
+      return inputError(c, { success: false, error: '公開操作の確認キーが必要です' }, 400, []);
     }
     const existing = await getTemplateById(c.env.DB, id);
     if (!existing || !await canAccessAllLineAccounts(
@@ -798,19 +799,19 @@ templates.post('/api/templates/:id/publish', requireRole('owner', 'admin'), asyn
       ? undefined
       : Number(body.expectedVersion);
     if (expectedVersion === undefined || !Number.isInteger(expectedVersion)) {
-      return c.json({ success: false, error: '版の番号を確認してください' }, 400);
+      return inputError(c, { success: false, error: '版の番号を確認してください' }, 400, ["expectedVersion"]);
     }
     const expectedDraftRevision = body.expectedDraftRevision === undefined || body.expectedDraftRevision === null
       ? undefined
       : Number(body.expectedDraftRevision);
     if (expectedDraftRevision === undefined || !Number.isInteger(expectedDraftRevision)) {
-      return c.json({ success: false, error: '下書きの版を確認してください' }, 400);
+      return inputError(c, { success: false, error: '下書きの版を確認してください' }, 400, ["expectedDraftRevision"]);
     }
     // 466: 使い始めの日時は持てるだけ（予約の札で見せる）。来たら日付か確かめる。
     let effectiveFrom: string | undefined;
     if (body.effectiveFrom !== undefined && body.effectiveFrom !== null) {
       if (typeof body.effectiveFrom !== 'string' || !Number.isFinite(Date.parse(body.effectiveFrom))) {
-        return c.json({ success: false, error: '使い始めの日時を確認してください' }, 400);
+        return inputError(c, { success: false, error: '使い始めの日時を確認してください' }, 400, ["effectiveFrom"]);
       }
       effectiveFrom = body.effectiveFrom;
     }
@@ -822,17 +823,17 @@ templates.post('/api/templates/:id/publish', requireRole('owner', 'admin'), asyn
       const message = validateTemplateMessage(draftType, draftContent, false);
       if (!message.ok) {
         const { ok: _ok, ...failure } = message;
-        return c.json({ success: false, ...failure }, 422);
+        return inputError(c, { success: false, ...failure }, 422, ["messageContent"]);
       }
       const carousel = checkCarousel(draftType, draftContent);
-      if (!carousel.ok) return c.json({ success: false, error: carousel.error }, 422);
+      if (!carousel.ok) return inputError(c, { success: false, error: carousel.error }, 422, ["messageContent"]);
       const image = checkImageTemplate(draftType, draftContent);
-      if (!image.ok) return c.json({ success: false, error: image.error }, 422);
+      if (!image.ok) return inputError(c, { success: false, error: image.error }, 422, ["messageContent"]);
       // R249: 検査基準が変わる前に残った壊れたカードの下書きを出さない。
       const flexError = validateFlexContent(draftType, draftContent);
-      if (flexError) return c.json({ success: false, error: flexError }, 422);
+      if (flexError) return inputError(c, { success: false, error: flexError }, 422, ["messageContent"]);
       const structured = checkStructuredSize(draftType, draftContent);
-      if (!structured.ok) return c.json({ success: false, error: structured.error }, 422);
+      if (!structured.ok) return inputError(c, { success: false, error: structured.error }, 422, ["messageContent"]);
     }
     const staff = c.get('staff') as unknown as { id?: string };
     const result = await publishTemplate(c.env.DB, id, {
@@ -870,7 +871,7 @@ templates.post('/api/templates/:id/publish', requireRole('owner', 'admin'), asyn
       return c.json({ success: false, error: '同じ確認キーが別の公開操作で使われています' }, 409);
     }
     if (err instanceof MediaReferenceAccountError) {
-      return c.json({ success: false, error: '別のLINEアカウントのメディアは使用できません' }, 422);
+      return inputError(c, { success: false, error: '別のLINEアカウントのメディアは使用できません' }, 422, ["messageContent"]);
     }
     console.error('POST /api/templates/:id/publish error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -912,12 +913,12 @@ templates.get('/api/templates/:id/versions', async (c) => {
  * 466: この版に戻す。過去の版は変えず、その中身で新しい版を作る
  * （下書きへ写して公開する）。公開口と同じ確認キーと版確認を使う。
  */
-templates.post('/api/templates/:id/revert', requireRole('owner', 'admin'), async (c) => {
+templates.post('/api/templates/:id/revert', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const requestKey = c.req.header('Idempotency-Key');
     if (!validPublishKey(requestKey)) {
-      return c.json({ success: false, error: '公開操作の確認キーが必要です' }, 400);
+      return inputError(c, { success: false, error: '公開操作の確認キーが必要です' }, 400, []);
     }
     const existing = await getTemplateById(c.env.DB, id);
     if (!existing || !await canAccessAllLineAccounts(
@@ -931,13 +932,13 @@ templates.post('/api/templates/:id/revert', requireRole('owner', 'admin'), async
       ? undefined
       : Number(body.versionNumber);
     if (versionNumber === undefined || !Number.isInteger(versionNumber) || versionNumber < 1) {
-      return c.json({ success: false, error: '戻す版を確認してください' }, 400);
+      return inputError(c, { success: false, error: '戻す版を確認してください' }, 400, ["versionNumber"]);
     }
     const expectedVersion = body.expectedVersion === undefined || body.expectedVersion === null
       ? undefined
       : Number(body.expectedVersion);
     if (expectedVersion === undefined || !Number.isInteger(expectedVersion)) {
-      return c.json({ success: false, error: '版の番号を確認してください' }, 400);
+      return inputError(c, { success: false, error: '版の番号を確認してください' }, 400, ["expectedVersion"]);
     }
     const staff = c.get('staff') as unknown as { id?: string };
     const result = await revertTemplateToVersion(c.env.DB, id, versionNumber, {

@@ -11,6 +11,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import type { FriendField, Folder } from '@line-crm/shared'
 import { api, describeSaveFailure } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import { notifyToast } from '@/components/shared/toast'
 import { folderById, folderCreator } from '@/components/shared/folder-select'
@@ -100,6 +101,8 @@ export default function FieldNew() {
       setSaving(false)
     }
   }
+
+  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
 
   return (
     <FieldEditor

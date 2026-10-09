@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
@@ -140,14 +141,14 @@ opsAnnouncements.get('/api/ops/notice-line-account', async (c) => {
   });
 });
 
-opsAnnouncements.put('/api/ops/notice-line-account', requirePlatformAdminWrite(), async (c) => {
+opsAnnouncements.put('/api/ops/notice-line-account', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const db = dbFor(c.env);
   const body = await c.req.json<{ lineAccountId?: unknown }>().catch(() => null);
   const id = typeof body?.lineAccountId === 'string' && body.lineAccountId ? body.lineAccountId : null;
   if (id) {
     const account = (await getLineAccounts(db)).find((a) => a.id === id);
     if (!account || (account.tenant_id ?? DEFAULT_TENANT_ID) !== DEFAULT_TENANT_ID || account.archived_at) {
-      return c.json({ success: false, error: '運営会社に登録されたアカウントから選んでください' }, 400);
+      return inputError(c, { success: false, error: '運営会社に登録されたアカウントから選んでください' }, 400, ["lineAccountId"]);
     }
   }
   const before = await getPlatformSetting(db, NOTICE_LINE_ACCOUNT_KEY);
@@ -168,7 +169,7 @@ opsAnnouncements.get('/api/ops/announcements', async (c) => {
   return c.json({ success: true, data, linked, noticeLineConfigured: (await getPlatformSetting(db, NOTICE_LINE_ACCOUNT_KEY)) !== null });
 });
 
-opsAnnouncements.post('/api/ops/announcements/preview', async (c) => {
+opsAnnouncements.post('/api/ops/announcements/preview', inputJsonBoundary(), async (c) => {
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
   const audienceKind = typeof body.audienceKind === 'string' && (ANNOUNCEMENT_AUDIENCES as readonly string[]).includes(body.audienceKind) ? (body.audienceKind as AnnouncementAudience) : 'all';
   const plans = Array.isArray(body.audiencePlans) ? body.audiencePlans.filter((p): p is string => typeof p === 'string') : [];
@@ -194,21 +195,21 @@ function sameAnnouncementRequest(existing: PlatformAnnouncement, input: Announce
     && JSON.stringify(parseJsonArray(existing.channels)) === JSON.stringify(input.channels);
 }
 
-opsAnnouncements.post('/api/ops/announcements', requirePlatformAdminWrite(), async (c) => {
+opsAnnouncements.post('/api/ops/announcements', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const db = dbFor(c.env);
   const staff = c.get('staff');
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-  if (!body) return c.json({ success: false, error: '内容を読み取れませんでした' }, 400);
+  if (!body) return inputError(c, { success: false, error: '内容を読み取れませんでした' }, 400, []);
   const parsed = parseInput(body);
-  if ('error' in parsed) return c.json({ success: false, error: parsed.error }, 400);
+  if ('error' in parsed) return inputError(c, { success: false, error: parsed.error }, 400, ["subject","body","audienceKind","audiencePlans","audienceTenantIds","channels","publishAt"]);
   const mode = body.mode === 'schedule' ? 'schedule' : body.mode === 'send' ? 'send' : 'draft';
-  if (mode === 'schedule' && !parsed.input.publishAt) return c.json({ success: false, error: '配信を予約するには公開日時を入れてください' }, 400);
+  if (mode === 'schedule' && !parsed.input.publishAt) return inputError(c, { success: false, error: '配信を予約するには公開日時を入れてください' }, 400, ["mode","subject","body","audienceKind","audiencePlans","audienceTenantIds","channels","publishAt"]);
   if (parsed.input.channels.includes('line') && mode !== 'draft' && !(await loadNoticeLineAccount(c.env))) {
     return c.json({ success: false, error: '契約者専用LINEのアカウントが未設定です。メンバー管理の「運営の情報」で指定してください' }, 409);
   }
   const rawKey = c.req.header('Idempotency-Key')?.trim() || null;
   if (rawKey !== null && !isValidIdempotencyKey(rawKey)) {
-    return c.json({ success: false, error: '再実行キーの形式が正しくありません' }, 400);
+    return inputError(c, { success: false, error: '再実行キーの形式が正しくありません' }, 400, []);
   }
   const status = mode === 'schedule' ? 'scheduled' : 'draft';
   if (rawKey) {
@@ -246,17 +247,17 @@ opsAnnouncements.post('/api/ops/announcements', requirePlatformAdminWrite(), asy
   return c.json({ success: true, data: await serialize(db, (await getPlatformAnnouncement(db, created.id))!) }, 201);
 });
 
-opsAnnouncements.put('/api/ops/announcements/:id', requirePlatformAdminWrite(), async (c) => {
+opsAnnouncements.put('/api/ops/announcements/:id', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const db = dbFor(c.env);
   const existing = await getPlatformAnnouncement(db, c.req.param('id'));
   if (!existing) return c.json({ success: false, error: 'お知らせが見つかりません' }, 404);
   if (existing.status !== 'draft' && existing.status !== 'scheduled') return c.json({ success: false, error: '配信済みのお知らせは変えられません' }, 409);
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-  if (!body) return c.json({ success: false, error: '内容を読み取れませんでした' }, 400);
+  if (!body) return inputError(c, { success: false, error: '内容を読み取れませんでした' }, 400, []);
   const parsed = parseInput(body);
-  if ('error' in parsed) return c.json({ success: false, error: parsed.error }, 400);
+  if ('error' in parsed) return inputError(c, { success: false, error: parsed.error }, 400, ["subject","body","audienceKind","audiencePlans","audienceTenantIds","channels","publishAt"]);
   const mode = body.mode === 'schedule' ? 'schedule' : body.mode === 'send' ? 'send' : 'draft';
-  if (mode === 'schedule' && !parsed.input.publishAt) return c.json({ success: false, error: '配信を予約するには公開日時を入れてください' }, 400);
+  if (mode === 'schedule' && !parsed.input.publishAt) return inputError(c, { success: false, error: '配信を予約するには公開日時を入れてください' }, 400, ["mode","subject","body","audienceKind","audiencePlans","audienceTenantIds","channels","publishAt"]);
   if (parsed.input.channels.includes('line') && mode !== 'draft' && !(await loadNoticeLineAccount(c.env))) {
     return c.json({ success: false, error: '契約者専用LINEのアカウントが未設定です。メンバー管理の「運営の情報」で指定してください' }, 409);
   }

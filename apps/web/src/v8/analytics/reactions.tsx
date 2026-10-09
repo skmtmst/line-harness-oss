@@ -14,7 +14,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { api, type AnalyticsMetric, type AnalyticsReactionsOverview } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
-import { KpiMenu, RangePickerV8, dataRangeCaption, shortDateTime } from './common'
+import { RangePickerV8, dataRangeCaption, shortDateTime } from './common'
 import { METRIC_STATE_TEXT, downloadCsv, metricText, rangeFor, shownValue, useOverview, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
 
@@ -68,14 +68,13 @@ export default function ReactionsV8({ accountId }: { accountId: string }) {
   const unavailable = overview.metrics.unavailableCampaigns
   const maxHourly = Math.max(1, ...overview.trackedClickHours.map((item) => item.clicks))
   const topHours = [...overview.trackedClickHours].sort((a, b) => b.clicks - a.clicks).slice(0, 3).filter((item) => item.clicks > 0).map((item) => item.hour)
-  const menu = (title: string) => <KpiMenu title={title} onExport={exportCampaigns} disabled={exportDisabled} />
 
   return <>
     <KpiBand className={styles.band}>
-      <KpiCard presentation="band" title="配信" icon={<Send size={13} aria-hidden="true" />} menu={menu('配信')} value={overview.campaigns.length} unit="件" detail={`一斉配信 ${broadcastShown}・シナリオ ${scenarioShown}`} />
-      <KpiCard presentation="band" title="届いた人" icon={<Users size={13} aria-hidden="true" />} menu={menu('届いた人')} value={delivered} unit="人" detail={delivered === null ? (METRIC_STATE_TEXT[overview.metrics.delivered.state] || '未取得') : `対象 ${formatNumber(targets)} 人のうち`} />
-      <KpiCard presentation="band" title="押された割合" icon={<MousePointerClick size={13} aria-hidden="true" />} menu={menu('押された割合')} value={clickRate} unit="%" detail="LINEクリック ÷ 届いた人" />
-      <KpiCard presentation="band" title="取得できない配信" icon={<CircleHelp size={13} aria-hidden="true" />} menu={menu('取得できない配信')} value={shownValue(unavailable)} unit="件" detail={shownValue(unavailable) === null ? (METRIC_STATE_TEXT[unavailable.state] || '未取得') : '20人未満で数が出ない'} />
+      <KpiCard presentation="band" title="配信" icon={<Send size={13} aria-hidden="true" />} value={overview.campaigns.length} unit="件" detail={`一斉配信 ${broadcastShown}・シナリオ ${scenarioShown}`} />
+      <KpiCard presentation="band" title="届いた人" icon={<Users size={13} aria-hidden="true" />} value={delivered} unit="人" detail={delivered === null ? (METRIC_STATE_TEXT[overview.metrics.delivered.state] || '未取得') : `対象 ${formatNumber(targets)} 人のうち`} />
+      <KpiCard presentation="band" title="押された割合" icon={<MousePointerClick size={13} aria-hidden="true" />} value={clickRate} unit="%" detail="LINEクリック ÷ 届いた人" />
+      <KpiCard presentation="band" title="取得できない配信" icon={<CircleHelp size={13} aria-hidden="true" />} value={shownValue(unavailable)} unit="件" detail={shownValue(unavailable) === null ? (METRIC_STATE_TEXT[unavailable.state] || '未取得') : '20人未満で数が出ない'} />
     </KpiBand>
     <div className={styles.body} data-gap="tab">
       <div className={styles.toolbar}>

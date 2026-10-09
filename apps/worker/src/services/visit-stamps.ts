@@ -7,7 +7,11 @@ import { dbFor } from './db-router.js';
 import { safeRestaurantHttpsUrl } from './restaurant-media-links.js';
 
 export class StampError extends Error {
-  constructor(message: string, public status: 400|401|403|404|409|429 = 400) { super(message); }
+  readonly fields: Record<string, string>;
+  constructor(message: string, public status: 400|401|403|404|409|422|429 = 400, keys: readonly string[] = []) {
+    super(message);
+    this.fields = Object.fromEntries(keys.map(key => [key, message]));
+  }
 }
 export function stampId(value: unknown): string {
   if (typeof value !== 'string' || !/^[\w:-]{1,160}$/.test(value)) throw new StampError('識別番号を確認してください');
@@ -20,19 +24,19 @@ export function validateStampSettings(s: VisitStampSettings): void {
     || (s.expiryMonths!==null && (!Number.isSafeInteger(s.expiryMonths)||s.expiryMonths<1||s.expiryMonths>120))
     || typeof s.timezone!=='string'||!s.timezone||s.timezone.length>100
     || !Array.isArray(s.multipliers)||s.multipliers.length>20 || !Array.isArray(s.rankMultipliers)||s.rankMultipliers.length>20
-    || !Array.isArray(s.rewards)||!s.rewards.length||s.rewards.length>20) throw new StampError('スタンプの設定を確認してください');
-  if((s.slotCount!==undefined&&(!Number.isSafeInteger(s.slotCount)||s.slotCount<1||s.slotCount>10000))||(s.maxStackedStamps!==undefined&&(!Number.isSafeInteger(s.maxStackedStamps)||s.maxStackedStamps<1||s.maxStackedStamps>10000))||(s.stackingOrder!==undefined&&!['bonus_then_multipliers','multipliers_then_bonus'].includes(s.stackingOrder)))throw new StampError('マスの数・重ねた上限・順序を確認してください');
-  if (s.backgroundColor !== undefined && !/^#[0-9a-f]{6}$/i.test(s.backgroundColor)) throw new StampError('カードの色を確認してください');
-  if (s.backgroundImageUrl != null && (!safeRestaurantHttpsUrl(s.backgroundImageUrl) || s.backgroundImageUrl.length > 2000)) throw new StampError('背景画像を確認してください');
-  if (s.expiryBasis !== undefined && !['last_visit','first_visit','none'].includes(s.expiryBasis)) throw new StampError('期限の起点を確認してください');
-  if (s.expiryBasis && s.expiryBasis !== 'none' && s.expiryMonths === null) throw new StampError('期限の長さを選んでください');
-  if (s.expiryReminder !== undefined && !['none','day_before','three_days_before','week_before','two_weeks_before','month_before'].includes(s.expiryReminder)) throw new StampError('期限のお知らせを確認してください');
-  if (s.completion !== undefined && !['repeat','next_card'].includes(s.completion)) throw new StampError('ゴール後のカードを確認してください');
+    || !Array.isArray(s.rewards)||!s.rewards.length||s.rewards.length>20) throw new StampError('スタンプの設定を確認してください', 400, ["settings"]);
+  if((s.slotCount!==undefined&&(!Number.isSafeInteger(s.slotCount)||s.slotCount<1||s.slotCount>10000))||(s.maxStackedStamps!==undefined&&(!Number.isSafeInteger(s.maxStackedStamps)||s.maxStackedStamps<1||s.maxStackedStamps>10000))||(s.stackingOrder!==undefined&&!['bonus_then_multipliers','multipliers_then_bonus'].includes(s.stackingOrder)))throw new StampError('マスの数・重ねた上限・順序を確認してください', 400, ["settings"]);
+  if (s.backgroundColor !== undefined && !/^#[0-9a-f]{6}$/i.test(s.backgroundColor)) throw new StampError('カードの色を確認してください', 400, ["settings"]);
+  if (s.backgroundImageUrl != null && (!safeRestaurantHttpsUrl(s.backgroundImageUrl) || s.backgroundImageUrl.length > 2000)) throw new StampError('背景画像を確認してください', 400, ["settings"]);
+  if (s.expiryBasis !== undefined && !['last_visit','first_visit','none'].includes(s.expiryBasis)) throw new StampError('期限の起点を確認してください', 400, ["settings"]);
+  if (s.expiryBasis && s.expiryBasis !== 'none' && s.expiryMonths === null) throw new StampError('期限の長さを選んでください', 400, ["settings"]);
+  if (s.expiryReminder !== undefined && !['none','day_before','three_days_before','week_before','two_weeks_before','month_before'].includes(s.expiryReminder)) throw new StampError('期限のお知らせを確認してください', 400, ["settings"]);
+  if (s.completion !== undefined && !['repeat','next_card'].includes(s.completion)) throw new StampError('ゴール後のカードを確認してください', 400, ["settings"]);
   if (s.completion === 'next_card') stampId(s.nextCardId);
-  if (s.instructions !== undefined && (typeof s.instructions !== 'string' || [...s.instructions].length > 500)) throw new StampError('使い方の説明は500字までです');
-  if (s.receiptBonus !== undefined && (!Number.isSafeInteger(s.receiptBonus) || s.receiptBonus < 0 || s.receiptBonus > 50)) throw new StampError('受け取りボーナスは0〜50個です');
+  if (s.instructions !== undefined && (typeof s.instructions !== 'string' || [...s.instructions].length > 500)) throw new StampError('使い方の説明は500字までです', 400, ["settings"]);
+  if (s.receiptBonus !== undefined && (!Number.isSafeInteger(s.receiptBonus) || s.receiptBonus < 0 || s.receiptBonus > 50)) throw new StampError('受け取りボーナスは0〜50個です', 400, ["settings"]);
   if (s.stampInterval !== undefined && (!s.stampInterval || !['none','same_day','hours'].includes(s.stampInterval.mode)
-    || (s.stampInterval.mode === 'hours' && (!Number.isInteger(s.stampInterval.hours) || s.stampInterval.hours! < 1 || s.stampInterval.hours! > 23)))) throw new StampError('押印の間隔は1〜23時間です');
+    || (s.stampInterval.mode === 'hours' && (!Number.isInteger(s.stampInterval.hours) || s.stampInterval.hours! < 1 || s.stampInterval.hours! > 23)))) throw new StampError('押印の間隔は1〜23時間です', 400, ["settings"]);
   try { new Intl.DateTimeFormat('en',{timeZone:s.timezone}).format(); } catch { throw new StampError('時間帯を確認してください'); }
   const ids=new Set<string>();
   for(const r of s.rewards) {
@@ -106,15 +110,15 @@ export async function readStampCard(db:D1Database,r:CardRow):Promise<VisitStampC
 }
 export async function saveStampCard(db:D1Database,tenantId:string,input:VisitStampCardInput,id?:string):Promise<VisitStampCard> {
   if(!input||typeof input.name!=='string'||!input.name.trim()||input.name.length>100||typeof input.active!=='boolean'||!Number.isSafeInteger(input.expectedVersion)
-    ||!Array.isArray(input.accountIds)||!input.accountIds.length||input.accountIds.length>100||new Set(input.accountIds).size!==input.accountIds.length)throw new StampError('カードと店舗の設定を確認してください');
+    ||!Array.isArray(input.accountIds)||!input.accountIds.length||input.accountIds.length>100||new Set(input.accountIds).size!==input.accountIds.length)throw new StampError('カードと店舗の設定を確認してください', 400, ["name","active","expectedVersion","accountIds"]);
   validateStampSettings(input.settings);
   for(const a of input.accountIds){stampId(a);if(!await db.prepare('SELECT id FROM line_accounts WHERE id=? AND tenant_id=? AND archived_at IS NULL').bind(a,tenantId).first())throw new StampError('指定した店舗は使えません',403);}
-  const cardId=id?stampId(id):crypto.randomUUID();if(id)await stampCard(db,id,tenantId);else if(input.expectedVersion!==0)throw new StampError('新しいカードの版は0です');
+  const cardId=id?stampId(id):crypto.randomUUID();if(id)await stampCard(db,id,tenantId);else if(input.expectedVersion!==0)throw new StampError('新しいカードの版は0です', 400, ["expectedVersion"]);
   if (input.settings.completion === 'next_card') {
     const next = await stampCard(db, input.settings.nextCardId!, tenantId);
     if (next.id === cardId || !next.active) throw new StampError('次のカードには別の有効なカードを選んでください');
     const allowed = (await readStampCard(db, next)).accountIds;
-    if (input.accountIds.some(a => !allowed.includes(a))) throw new StampError('次のカードは同じ店舗で使えるカードを選んでください');
+    if (input.accountIds.some(a => !allowed.includes(a))) throw new StampError('次のカードは同じ店舗で使えるカードを選んでください', 400, ["accountIds"]);
     const seen=new Set([cardId]);let cursor:CardRow|undefined=next;
     while(cursor){if(seen.has(cursor.id))throw new StampError('次のカードが循環しています');seen.add(cursor.id);
       const s=JSON.parse(cursor.settings_json) as VisitStampSettings;cursor=s.completion==='next_card'&&s.nextCardId?await stampCard(db,s.nextCardId,tenantId):undefined;}
@@ -184,7 +188,7 @@ export async function readStampWallet(db:D1Database,cardId:string,friendId:strin
 }
 export async function grantStamps(db:D1Database,input:{cardId:string;friendId:string;accountId:string;count:number;reason:string;actorId:string|null;requestId:string;kind:'manual'|'paper'|'visit';at?:string;visitKey?:string}):Promise<VisitStampWallet> {
   const c=await stampCard(db,input.cardId);if(!c.active)throw new StampError('カードは停止中です',409);
-  if(!Number.isSafeInteger(input.count)||input.count<1||input.count>10000||typeof input.reason!=='string'||!input.reason.trim()||input.reason.length>500)throw new StampError('押印数と理由を確認してください');
+  if(!Number.isSafeInteger(input.count)||input.count<1||input.count>10000||typeof input.reason!=='string'||!input.reason.trim()||input.reason.length>500)throw new StampError('押印数と理由を確認してください', 400, ["count","reason"]);
   stampId(input.requestId);input.friendId=(await stampWallet(db,input.cardId,input.friendId,input.accountId)).friendId;
   const at=input.at??new Date().toISOString(),settings=JSON.parse(c.settings_json) as VisitStampSettings;
   if(!Number.isFinite(Date.parse(at)))throw new StampError('押印日時を確認してください');
@@ -194,7 +198,7 @@ export async function grantStamps(db:D1Database,input:{cardId:string;friendId:st
     .bind(crypto.randomUUID(),input.accountId,input.kind,input.count,input.actorId,input.reason.trim(),input.requestId,input.visitKey??null,...expiry.args,at,input.cardId,input.friendId,...interval.args).run();
   const receipt=await db.prepare('SELECT delta,reason,kind,line_account_id FROM visit_stamp_entries WHERE card_id=? AND friend_id=? AND idempotency_key=?').bind(input.cardId,input.friendId,input.requestId).first<{delta:number;reason:string;kind:string;line_account_id:string}>();
   if(!receipt)throw new StampError(settings.stampInterval?.mode==='same_day'?'同じ日は1回までです。日本時間の0時以降に押せます':`前の押印から${settings.stampInterval?.hours??0}時間あけてください`,409);
-  if(receipt.delta!==input.count||receipt.reason!==input.reason.trim()||receipt.kind!==input.kind||receipt.line_account_id!==input.accountId)throw new StampError('同じ押印の依頼で内容が変わっています',409);
+  if(receipt.delta!==input.count||receipt.reason!==input.reason.trim()||receipt.kind!==input.kind||receipt.line_account_id!==input.accountId)throw new StampError('同じ押印の依頼で内容が変わっています', 409, ["count","reason","kind","accountId"]);
   return readStampWallet(db,input.cardId,input.friendId);
 }
 export async function stampEntries(db:D1Database,cardId:string,friendId:string):Promise<VisitStampEntry[]> {

@@ -19,7 +19,7 @@ import Notice from '@/components/shared/notice'
 import { api, type AnalyticsMetric, type AnalyticsUsageOverview } from '@/lib/api'
 import { DEFAULT_FEATURES, SPECIALIZED_FEATURE_KEYS, itemIsEnabled, visibleFeatureGroups } from '@/lib/feature-settings'
 import { formatNumber } from '@/lib/format'
-import { KpiMenu, RangePickerV8, shortWhen } from './common'
+import { RangePickerV8, shortWhen } from './common'
 import { MetricText } from './reactions'
 import { METRIC_STATE_TEXT, downloadCsv, metricCardState, metricText, periodCaption, rangeFor, shownValue, useOverview, useRegisterExport, formatAnalyticsDateTime } from './parts'
 import styles from './analytics.module.css'
@@ -97,14 +97,13 @@ export default function UsageV8({ accountId }: { accountId: string }) {
   const hours = overview.summary.estimatedHoursSaved
   const hoursValue = hours.state === 'available' || hours.state === 'partial' ? hours.value : null
   const observations = overview.categories.filter((item) => usageObservation(item).tone !== 'normal').slice(0, 3)
-  const menu = (title: string) => <KpiMenu title={title} onExport={exportUsage} disabled={exportDisabled} />
 
   return <>
     <KpiBand className={styles.band}>
-      <KpiCard presentation="band" title="使っている機能" icon={<LayoutGrid size={13} aria-hidden="true" />} menu={menu('使っている機能')} value={menuFeatures?.enabled ?? null} unit={menuFeatures ? `/ ${menuFeatures.total}` : ''} detail={menuFeaturesError || 'メニューに出している機能のうち'} />
-      <KpiCard presentation="band" title="自動で動いた回数" icon={<Zap size={13} aria-hidden="true" />} menu={menu('自動で動いた回数')} value={shownValue(overview.summary.automaticRuns)} unit="回" {...metricCardState(overview.summary.automaticRuns, { detail: `この${days}日・手で送ったのは${formatNumber(overview.summary.manualSends.value)}回` }, state.retry)} />
-      <KpiCard presentation="band" title="手作業が減った時間" icon={<Clock size={13} aria-hidden="true" />} menu={menu('手作業が減った時間')} value={hoursValue} unit="時間" detail={hours.reason ? (METRIC_STATE_TEXT[hours.state] || '未取得') : '1件30秒として試算'} description={hours.reason ?? undefined} onRetry={hours.state === 'failed' ? state.retry : undefined} />
-      <KpiCard presentation="band" title="作ったのに使っていない" icon={<Boxes size={13} aria-hidden="true" />} menu={menu('作ったのに使っていない')} value={shownValue(overview.summary.unusedItems)} unit="個" {...metricCardState(overview.summary.unusedItems, { detail: `参照切れ ${metricText(overview.summary.brokenReferences)} 件` }, state.retry)} />
+      <KpiCard presentation="band" title="使っている機能" icon={<LayoutGrid size={13} aria-hidden="true" />} value={menuFeatures?.enabled ?? null} unit={menuFeatures ? `/ ${menuFeatures.total}` : ''} detail={menuFeaturesError || 'メニューに出している機能のうち'} />
+      <KpiCard presentation="band" title="自動で動いた回数" icon={<Zap size={13} aria-hidden="true" />} value={shownValue(overview.summary.automaticRuns)} unit="回" {...metricCardState(overview.summary.automaticRuns, { detail: `この${days}日・手で送ったのは${formatNumber(overview.summary.manualSends.value)}回` }, state.retry)} />
+      <KpiCard presentation="band" title="手作業が減った時間" icon={<Clock size={13} aria-hidden="true" />} value={hoursValue} unit="時間" detail={hours.reason ? (METRIC_STATE_TEXT[hours.state] || '未取得') : '1件30秒として試算'} description={hours.reason ?? undefined} onRetry={hours.state === 'failed' ? state.retry : undefined} />
+      <KpiCard presentation="band" title="作ったのに使っていない" icon={<Boxes size={13} aria-hidden="true" />} value={shownValue(overview.summary.unusedItems)} unit="個" {...metricCardState(overview.summary.unusedItems, { detail: `参照切れ ${metricText(overview.summary.brokenReferences)} 件` }, state.retry)} />
     </KpiBand>
     <div className={styles.body} data-gap="tab">
       {overview.stateReason

@@ -5,15 +5,11 @@
  * 予約・回答フォーム・予約履歴・来店スタンプは、そのアカウントの LIFF のページを開く URL になる
  * （LINE には uri のボタンとして送る。保存する値の形は今までと同じ「URL の文字」）。
  *
- * 種類の定数・「動き→LIFF の URL」・「URL→動き（読み戻し）」はこのファイルだけに置く。
+ * 種類の定数はここに置き、URL の作成と読み戻しは packages/shared の共通関数を使う。
  * 画面と部品（components/shared/tap-action-field.tsx）はここを読む。
- *
- * ★差し替える所：Codex が packages/shared に同じ関数（回答フォームの URL の形を1通りにそろえる・
- * 来店スタンプの入口を足す）を作っている。できたら `tapActionLiffUrl` と `tapActionFromUri` の
- * 中身だけをその関数の呼び出しに替える（ほかの所は替えなくてよい）。
- * 今の形：予約 `?page=salon-book`（メニュー指定は仮に `&menu=ID`）・予約履歴 `?page=salon-book&view=history`・
- * 回答フォーム `?page=form&id=ID`・来店スタンプ `?page=visit-stamps`（カード指定は仮に `&card=ID`）。
  */
+
+import { liffActionUrl, liffActionFromUrl, type LiffAction } from '@line-crm/shared'
 
 export type TapActionKind = 'uri' | 'message' | 'booking' | 'form' | 'booking_history' | 'visit_stamp'
 
@@ -57,37 +53,25 @@ export function tapActionNeedsLiff(kind: string): kind is LiffTapActionKind {
   return Boolean(tapActionDef(kind)?.needsLiff)
 }
 
-const LIFF_ORIGIN = 'https://liff.line.me/'
-
-/**
- * 動き→LIFF の URL。refId は回答フォーム・予約メニュー・スタンプカードの ID（任意のものは空でよい）。
- * ★Codex の packages/shared の関数ができたら中身を差し替える（上の説明）。
- */
+/** 動き→LIFF の URL。保存する先は共通の受け取り側とそろえる。 */
 export function tapActionLiffUrl(liffId: string, kind: LiffTapActionKind, refId = ''): string {
-  const base = `${LIFF_ORIGIN}${liffId}/`
   const id = refId.trim()
-  if (kind === 'form') return `${base}?page=form&id=${encodeURIComponent(id)}`
-  if (kind === 'booking_history') return `${base}?page=salon-book&view=history`
-  if (kind === 'visit_stamp') return `${base}?page=visit-stamps${id ? `&card=${encodeURIComponent(id)}` : ''}`
-  return `${base}?page=salon-book${id ? `&menu=${encodeURIComponent(id)}` : ''}`
+  const action: LiffAction = kind === 'form' ? { kind, formId: id }
+    : kind === 'booking' ? { kind, menuId: id }
+      : kind === 'visit_stamp' ? { kind, cardId: id } : { kind }
+  // 未設定の店の編集用の仮URLは残す。保存前の検査では送信を止める。
+  const placeholder = liffId === '{{liff_id}}'
+  const url = liffActionUrl({ liffId: placeholder ? 'unconfigured' : liffId, allowEmptyForm: true, ...action })
+  return placeholder ? url.replace('/unconfigured/', '/{{liff_id}}/') : url
 }
 
-/**
- * URL→動き（保存してある URL を読み戻す）。LIFF のページに当たらなければ 'uri'。
- * ★Codex の packages/shared の関数ができたら中身を差し替える（上の説明）。
- */
+/** URL→動き（保存してある URL を読み戻す）。LIFF のページに当たらなければ 'uri'。 */
 export function tapActionFromUri(uri: string): { kind: TapActionKind; refId: string } {
-  const match = /^https:\/\/liff\.line\.me\/[^/?#]+\/?\?([^#]*)$/.exec(uri.trim())
-  if (!match) return { kind: 'uri', refId: '' }
-  const query = new URLSearchParams(match[1])
-  const page = query.get('page')
-  if (page === 'form') return { kind: 'form', refId: query.get('id') ?? '' }
-  if (page === 'salon-book') {
-    if (query.get('view') === 'history') return { kind: 'booking_history', refId: '' }
-    return { kind: 'booking', refId: query.get('menu') ?? '' }
-  }
-  if (page === 'visit-stamps') return { kind: 'visit_stamp', refId: query.get('card') ?? '' }
-  return { kind: 'uri', refId: '' }
+  const action = liffActionFromUrl(uri.replace('/{{liff_id}}/', '/unconfigured/'), { allowEmptyForm: true })
+  if (!action) return { kind: 'uri', refId: '' }
+  return { kind: action.kind, refId: action.kind === 'form' ? action.formId
+    : action.kind === 'booking' ? action.menuId ?? ''
+      : action.kind === 'visit_stamp' ? action.cardId ?? '' : '' }
 }
 
 /** 押したら1つぶんの値（画面の間で持ち回る形）。保存の形は画面ごとに今のまま組み立てる。 */

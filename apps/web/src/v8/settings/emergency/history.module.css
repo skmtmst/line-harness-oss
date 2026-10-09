@@ -10,90 +10,6 @@
   container-type: inline-size;
 }
 
-.kpis {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--tpl-rest3-em-kpi-gap);
-}
-
-.kpi {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-rest3-em-kpi-inner-gap);
-  min-width: 0;
-  padding: var(--tpl-rest3-em-kpi-pad);
-  border-radius: var(--tpl-rest3-em-radius);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
-}
-
-.kpiHead {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-rest3-em-kpi-inner-gap);
-  min-width: 0;
-}
-
-.kpiTile {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: var(--tpl-rest3-em-tile);
-  height: var(--tpl-rest3-em-tile);
-  border-radius: var(--tpl-rest3-em-tile-radius);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  color: var(--color-ink-secondary);
-}
-
-.kpiLabel {
-  overflow: hidden;
-  color: var(--color-ink);
-  font-size: var(--tpl-rest3-em-small);
-  font-weight: 600;
-  line-height: var(--tpl-rest3-em-small-lh);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.kpiValue {
-  display: flex;
-  align-items: baseline;
-  height: var(--tpl-rest3-em-num-lh);
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--tpl-rest3-em-num);
-  font-family: var(--font-inter), Inter, sans-serif;
-  font-weight: 600;
-  line-height: var(--tpl-rest3-em-num-lh);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.kpiValueDanger {
-  color: var(--color-danger);
-}
-
-.kpiUnit {
-  margin-left: var(--tpl-rest3-em-unit-gap);
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-rest3-em-small);
-  font-weight: 400;
-}
-
-.kpiDetail {
-  margin: 0;
-  overflow: hidden;
-  color: var(--color-ink-faint);
-  font-size: var(--tpl-rest3-em-small);
-  line-height: var(--tpl-rest3-em-small-lh);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .cell {
   min-width: 0;
   overflow: hidden;
@@ -129,9 +45,6 @@
 }
 
 @container (max-width: 760px) {
-  .kpis {
-    grid-template-columns: minmax(0, 1fr);
-  }
 
   .table { --sett-history-columns: var(--tpl-rest3-uh-cols-narrow); }
 }

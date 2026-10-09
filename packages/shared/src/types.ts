@@ -1,3 +1,5 @@
+import type { ApiFieldErrors } from './api-field-errors.js';
+
 // =============================================================================
 // LINE OSS CRM - 共有型定義
 // Cloudflare D1 の挙動:
@@ -267,6 +269,7 @@ export interface FriendFieldListSummary {
 
 /** 汎用フォルダ */
 export interface Folder {
+  revision?: number;
   id: string;
   kind: string;
   name: string;
@@ -1395,6 +1398,7 @@ export interface ConversionEvent {
 // -----------------------------------------------------------------------------
 
 export interface Affiliate {
+  folderId?: string | null;
   /** 主キー (UUIDv4) */
   id: string;
   /** 所属テナント */
@@ -1938,6 +1942,8 @@ export type ApiResponse<T> =
   | {
       success: false;
       error: string;
+      /** 入力欄の名前と、人に表示する理由。旧APIでは省略される。 */
+      fields?: ApiFieldErrors;
       /** バリデーションエラー等の詳細 (任意) */
       details?: Record<string, string[]>;
     };
@@ -2598,13 +2604,14 @@ export interface AutoReplyRunsResponse {
 }
 
 export interface HqBannerImageQuery {
+  folderId?: string | null;
   projectId?: string; favorite?: boolean; delivered?: boolean; preset?: string;
   shape?: 'square' | 'landscape' | 'portrait' | 'rich_menu';
   q?: string; before?: string; limit?: number; withCounts?: boolean;
 }
 export interface HqBannerImageCounts { all: number; favorite: number; delivered: number; unused: number }
 
-export interface HqTemplateFolder { id: string; name: string; revision: number; color?: string | null }
+export interface HqTemplateFolder { id: string; name: string; revision: number; displayOrder?: number; color?: string | null }
 
 export interface HqScenarioDefinition {
   schemaVersion: 1
@@ -2820,3 +2827,6 @@ export interface AdConversionRetryResult {
   /** 送信済みの結果を返した場合はtrue。 */
   replayed: boolean;
 }
+
+export type HqBannerFolderKind = 'project' | 'image';
+export interface HqBannerFolder { id: string; kind: HqBannerFolderKind; name: string; color: string | null; displayOrder: number; revision: number; itemCount: number; createdAt: string; updatedAt: string }

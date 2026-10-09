@@ -8,6 +8,7 @@
  * コース・注意事項・状態・操作）→ ページ送り（一覧だけ）。
  */
 import { Inbox, Plus } from 'lucide-react'
+import KpiCard from '@/components/shared/kpi-card'
 import Card from '@/components/shared/card'
 import { Field } from '@/components/shared/form-controls'
 import Button from '@/components/shared/button'
@@ -17,7 +18,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
-import { Panel, Stat, StatRow, Status } from '../booking-kit/shell'
+import { Panel, StatRow, Status } from '../booking-kit/shell'
 import { INACTIVE_STATUSES, type LedgerView, isHold, maskPhone, mdhm, sourceKind, sourceName } from './format'
 import styles from './reservations.module.css'
 
@@ -63,11 +64,11 @@ export default function ListView({ view, rows, total, tables, page, period, stat
   return (
     <>
       <StatRow>
-        <Stat label="予約" value={`${total}件`} note={`表示中 ${rows.length}件`} />
-        <Stat label="ご来店人数" value={`${guests}名`} note={`表示中の${rows.length}件${cancelledGuests > 0 ? `・取消 ${cancelledGuests} 名を除く` : ''}`} />
-        <Stat label="LINE予約" value={`${lineCount}`} note="自社導線" />
-        <Stat label="媒体予約" value={`${mediaCount}`} note="受信した予約" />
-        <Stat label="未配席" value={`${unseated}`} note="卓の割当が必要" warning={unseated > 0} />
+        <KpiCard title="予約" valueText={`${total}件`} detail={`表示中 ${rows.length}件`} icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="ご来店人数" valueText={`${guests}名`} detail={`表示中の${rows.length}件${cancelledGuests > 0 ? `・取消 ${cancelledGuests} 名を除く` : ''}`} icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="LINE予約" valueText={`${lineCount}`} detail="自社導線" icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="媒体予約" valueText={`${mediaCount}`} detail="受信した予約" icon={null} presentation="band" value={null} unit="" />
+        <KpiCard title="未配席" valueText={`${unseated}`} detail="卓の割当が必要" valueTone={unseated > 0 ? 'warning' : 'default'} icon={null} presentation="band" value={null} unit="" />
       </StatRow>
       <div className={styles.filterRow}>
         {view === 'list' ? (

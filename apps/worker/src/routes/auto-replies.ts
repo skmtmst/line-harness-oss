@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
@@ -80,7 +81,7 @@ async function validateAutoReplyFolder(
  */
 function requireCommonRuleOwner(
   staff: AuthenticatedStaff | undefined,
-): { ok: true } | { ok: false; error: string } {
+): { ok: true } | { ok: false; error: string; field?: string } {
   if (staff?.role === 'owner') return { ok: true };
   return { ok: false, error: '全アカウント共通の自動応答は統括だけが作成・変更できます' };
 }
@@ -339,45 +340,45 @@ function readExtras(body: Record<string, unknown>):
       replyDelaySeconds?: number | null;
       unmatchedAction?: Record<string, unknown> | null;
     } }
-  | { ok: false; error: string } {
+  | { ok: false; error: string; field?: string } {
   const value: Record<string, unknown> = {};
 
   if ('actions' in body) {
     const parsed = readActions(body.actions);
-    if (!parsed.ok) return { ok: false, error: 'actions must be an array' };
+    if (!parsed.ok) return { ok: false, error: 'actions must be an array' , field: "actions" };
     value.actions = parsed.value;
   }
   if ('responseWeekdays' in body) {
     const parsed = readWeekdays(body.responseWeekdays);
-    if (!parsed.ok) return { ok: false, error: 'responseWeekdays must be integers from 0 (Sun) to 6 (Sat)' };
+    if (!parsed.ok) return { ok: false, error: 'responseWeekdays must be integers from 0 (Sun) to 6 (Sat)' , field: "responseWeekdays" };
     value.responseWeekdays = parsed.value;
   }
   if ('responseHolidayRule' in body) {
     const parsed = readHolidayRule(body.responseHolidayRule);
-    if (!parsed.ok) return { ok: false, error: `responseHolidayRule must be one of ${HOLIDAY_RULES.join(', ')}` };
+    if (!parsed.ok) return { ok: false, error: `responseHolidayRule must be one of ${HOLIDAY_RULES.join(', ')}` , field: "responseHolidayRule" };
     value.responseHolidayRule = parsed.value;
   }
   if ('oncePerFriend' in body) {
     if (typeof body.oncePerFriend !== 'boolean') {
-      return { ok: false, error: 'oncePerFriend must be boolean' };
+      return { ok: false, error: 'oncePerFriend must be boolean' , field: "oncePerFriend" };
     }
     value.oncePerFriend = body.oncePerFriend;
   }
   if ('keywords' in body) {
     const parsed = readKeywords(body.keywords);
     if (!parsed.ok) {
-      return { ok: false, error: `keywords must be an array of { keyword, matchType?, minLength?, caseSensitive? } (at most ${AUTO_REPLY_KEYWORDS_MAX} items, ${AUTO_REPLY_KEYWORD_MAX} characters each)` };
+      return { ok: false, error: `keywords must be an array of { keyword, matchType?, minLength?, caseSensitive? } (at most ${AUTO_REPLY_KEYWORDS_MAX} items, ${AUTO_REPLY_KEYWORD_MAX} characters each)` , field: "keywords" };
     }
     value.keywords = parsed.value;
   }
   if ('friendConditions' in body) {
     const parsed = readFriendConditions(body.friendConditions);
-    if (!parsed.ok) return { ok: false, error: 'friendConditions must be valid JSON' };
+    if (!parsed.ok) return { ok: false, error: 'friendConditions must be valid JSON' , field: "friendConditions" };
     value.friendConditions = parsed.value;
   }
   if ('respondToAll' in body) {
     if (typeof body.respondToAll !== 'boolean') {
-      return { ok: false, error: 'respondToAll must be boolean' };
+      return { ok: false, error: 'respondToAll must be boolean' , field: "respondToAll" };
     }
     value.respondToAll = body.respondToAll;
   }
@@ -385,18 +386,18 @@ function readExtras(body: Record<string, unknown>):
     if (body.folderId === null || body.folderId === '') {
       value.folderId = null;
     } else if (typeof body.folderId !== 'string') {
-      return { ok: false, error: 'folderId must be a string' };
+      return { ok: false, error: 'folderId must be a string' , field: "folderId" };
     } else {
       value.folderId = body.folderId;
     }
   }
   if ('normalizeKeywords' in body) {
-    if (typeof body.normalizeKeywords !== 'boolean') return {ok:false,error:'キーワードをそろえる設定はtrueまたはfalseで指定してください'};
+    if (typeof body.normalizeKeywords !== 'boolean') return {ok:false,error:'キーワードをそろえる設定はtrueまたはfalseで指定してください', field: "normalizeKeywords" };
     value.normalizeKeywords = body.normalizeKeywords;
   }
   if ('keywordMatchMode' in body) {
     if (body.keywordMatchMode !== 'any' && body.keywordMatchMode !== 'all') {
-      return { ok: false, error: "keywordMatchMode must be 'any' or 'all'" };
+      return { ok: false, error: "keywordMatchMode must be 'any' or 'all'" , field: "keywordMatchMode" };
     }
     value.keywordMatchMode = body.keywordMatchMode;
   }
@@ -404,9 +405,9 @@ function readExtras(body: Record<string, unknown>):
     if (body.name === null || body.name === '') {
       value.name = null;
     } else if (typeof body.name !== 'string') {
-      return { ok: false, error: 'name must be a string' };
+      return { ok: false, error: 'name must be a string' , field: "name" };
     } else if ([...body.name].length > 250) {
-      return { ok: false, error: 'name must be 250 characters or fewer' };
+      return { ok: false, error: 'name must be 250 characters or fewer' , field: "name" };
     } else {
       value.name = body.name;
     }
@@ -415,9 +416,9 @@ function readExtras(body: Record<string, unknown>):
     if (body.internalMemo === null || body.internalMemo === '') {
       value.internalMemo = null;
     } else if (typeof body.internalMemo !== 'string') {
-      return { ok: false, error: 'internalMemo must be a string' };
+      return { ok: false, error: 'internalMemo must be a string' , field: "internalMemo" };
     } else if ([...body.internalMemo].length > 1_000) {
-      return { ok: false, error: 'internalMemo must be 1000 characters or fewer' };
+      return { ok: false, error: 'internalMemo must be 1000 characters or fewer' , field: "internalMemo" };
     } else {
       value.internalMemo = body.internalMemo;
     }
@@ -428,7 +429,7 @@ function readExtras(body: Record<string, unknown>):
     } else if (!Number.isInteger(body.replyDelaySeconds)
       || Number(body.replyDelaySeconds) < 0
       || Number(body.replyDelaySeconds) > 86_400) {
-      return { ok: false, error: 'replyDelaySeconds must be an integer from 0 to 86400' };
+      return { ok: false, error: 'replyDelaySeconds must be an integer from 0 to 86400' , field: "replyDelaySeconds" };
     } else {
       value.replyDelaySeconds = Number(body.replyDelaySeconds);
     }
@@ -438,7 +439,7 @@ function readExtras(body: Record<string, unknown>):
       value.unmatchedAction = null;
     } else if (!body.unmatchedAction || typeof body.unmatchedAction !== 'object'
       || Array.isArray(body.unmatchedAction)) {
-      return { ok: false, error: 'unmatchedAction must be an object' };
+      return { ok: false, error: 'unmatchedAction must be an object' , field: "unmatchedAction" };
     } else {
       value.unmatchedAction = body.unmatchedAction as Record<string, unknown>;
     }
@@ -584,7 +585,7 @@ function draftVersionResponse(version: AutoReplyVersionRow): AutoReplyDraftVersi
 type DraftReadResult =
   // m26c R563: テンプレートの所属も返す。呼び出し側が閲覧権限を検査する。
   | { ok: true; value: AutoReplyDraftSettings; templateLineAccountId: string | null }
-  | { ok: false; error: string };
+  | { ok: false; error: string; field?: string };
 
 /** 既存の作成・更新と同じ制約で、公開前の定義だけを読む。 */
 async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftReadResult> {
@@ -595,54 +596,54 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
   const respondToAll = body.respondToAll === true;
   const keyword = typeof body.keyword === 'string' ? body.keyword.trim() : '';
   if (!respondToAll && !keyword) {
-    return { ok: false, error: '応答する言葉を入力してください' };
+    return { ok: false, error: '応答する言葉を入力してください' , field: "keyword" };
   }
   if ([...keyword].length > AUTO_REPLY_KEYWORD_MAX) {
-    return { ok: false, error: `応答する言葉は${AUTO_REPLY_KEYWORD_MAX}文字までです` };
+    return { ok: false, error: `応答する言葉は${AUTO_REPLY_KEYWORD_MAX}文字までです` , field: "keyword" };
   }
   if (body.matchType !== 'exact' && body.matchType !== 'contains') {
-    return { ok: false, error: '言葉の一致方法を選んでください' };
+    return { ok: false, error: '言葉の一致方法を選んでください' , field: "matchType" };
   }
   if (typeof body.lineAccountId !== 'string' || !body.lineAccountId) {
-    return { ok: false, error: '対象のLINEアカウントを選んでください' };
+    return { ok: false, error: '対象のLINEアカウントを選んでください' , field: "lineAccountId" };
   }
   const activeFrom = parseHhmm(body.activeFrom);
   const activeUntil = parseHhmm(body.activeUntil);
   if (!activeFrom.ok || !activeUntil.ok) {
-    return { ok: false, error: '応答する時間を24時間表記で入力してください' };
+    return { ok: false, error: '応答する時間を24時間表記で入力してください' , field: "activeFrom" };
   }
   const cooldown = parseCooldown(body.cooldownMinutes);
-  if (!cooldown.ok) return { ok: false, error: COOLDOWN_RANGE_ERROR };
+  if (!cooldown.ok) return { ok: false, error: COOLDOWN_RANGE_ERROR , field: "cooldownMinutes" };
   const priority = readPriority(body.priority ?? 0);
-  if (!priority.ok) return { ok: false, error: '優先順位が正しくありません' };
+  if (!priority.ok) return { ok: false, error: '優先順位が正しくありません' , field: "priority" };
   const messageKinds = readMessageKinds(body.messageKinds);
-  if (!messageKinds.ok) return { ok: false, error: '対象にするメッセージの種類が正しくありません' };
+  if (!messageKinds.ok) return { ok: false, error: '対象にするメッセージの種類が正しくありません' , field: "messageKinds" };
   const receiveSources = Array.isArray(body.receiveSources)
     ? [...new Set(body.receiveSources)]
     : ['line'];
   if (receiveSources.length === 0
     || receiveSources.some((source) => source !== 'line' && source !== 'email')) {
-    return { ok: false, error: '受信元はLINEまたはメールを1つ以上選んでください' };
+    return { ok: false, error: '受信元はLINEまたはメールを1つ以上選んでください' , field: "receiveSources" };
   }
   const extras = readExtras(body);
-  if (!extras.ok) return { ok: false, error: extras.error };
+  if (!extras.ok) return { ok: false, error: extras.error , field: extras.field };
   // 絞り込みと後続処理は小さな設定のはず。際限なく大きいとDB肥大と描画肥大を招く。
   for (const [key, label] of [['friendConditions', '絞り込み条件'], ['actions', '応答したあとの処理']] as const) {
     const raw = extras.value[key];
     if (raw !== undefined && raw !== null && JSON.stringify(raw).length > 20000) {
-      return { ok: false, error: `${label}が大きすぎます` };
+      return { ok: false, error: `${label}が大きすぎます` , field: key };
     }
   }
   const folderError = await validateAutoReplyFolder(db, extras.value.folderId);
-  if (folderError) return { ok: false, error: folderError };
+  if (folderError) return { ok: false, error: folderError , field: "folderId" };
   if (extras.value.actions) {
     const parsedActions = parseAutoReplyActions(JSON.stringify(extras.value.actions));
     if (parsedActions.length !== extras.value.actions.length) {
-      return { ok: false, error: '応答したあとにすることの設定を確認してください' };
+      return { ok: false, error: '応答したあとにすることの設定を確認してください' , field: "actions" };
     }
     for (const action of parsedActions) {
       const error = await validateAutoReplyOperatorAction(db,action,body.lineAccountId as string,false);
-      if (error) return {ok:false,error};
+      if (error) return {ok:false,error, field: "actions" };
     }
     // 失敗したら止めるか続けるかは stop/continue のどちらかだけ受け付ける。
     // 読めない値は実行側が続けるに倒すが、保存時には書き直しを促す。
@@ -650,7 +651,7 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
       const raw = (item as Record<string, unknown> | null)?.onFailure
         ?? (item as Record<string, unknown> | null)?.on_failure;
       if (raw !== undefined && raw !== 'stop' && raw !== 'continue') {
-        return { ok: false, error: `${index + 1}つ目の失敗したときの設定を確認してください` };
+        return { ok: false, error: `${index + 1}つ目の失敗したときの設定を確認してください` , field: "actions" };
       }
     }
   }
@@ -661,17 +662,17 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
   let templateLineAccountId: string | null = null;
   if (templateId) {
     const template = await getTemplateById(db, templateId);
-    if (!template) return { ok: false, error: '選んだテンプレートを確認できません' };
+    if (!template) return { ok: false, error: '選んだテンプレートを確認できません' , field: "templateId" };
     templateLineAccountId = template.line_account_id ?? null;
     if (!responseType) responseType = template.message_type;
     if (!responseContent) responseContent = template.message_content;
   }
   if (responseType !== 'silent' && !templateId && !responseContent) {
-    return { ok: false, error: '返信する内容を入力してください' };
+    return { ok: false, error: '返信する内容を入力してください' , field: "responseContent" };
   }
   // LINEのテキスト上限と同じ基準。試し文の2000字より緩いが、保存文の上限として見る。
   if ([...responseContent].length > AUTO_REPLY_RESPONSE_MAX) {
-    return { ok: false, error: `返信する内容は${AUTO_REPLY_RESPONSE_MAX.toLocaleString('ja-JP')}文字までです` };
+    return { ok: false, error: `返信する内容は${AUTO_REPLY_RESPONSE_MAX.toLocaleString('ja-JP')}文字までです` , field: "responseContent" };
   }
   /*
    * R201: カードはJSONとして読めるだけでは足りない。`{}` のような構造のない
@@ -680,7 +681,7 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
    */
   if (!templateId) {
     const flexError = validateFlexContent(responseType, responseContent);
-    if (flexError) return { ok: false, error: flexError };
+    if (flexError) return { ok: false, error: flexError , field: "responseContent" };
   }
 
   return {
@@ -1262,10 +1263,10 @@ autoReplies.get('/api/auto-replies/conflicts', async (c) => {
 });
 
 /** V6: 新規設定は下書きだけを作り、この時点では返信を始めない。 */
-autoReplies.post('/api/auto-replies/drafts', requireRole('owner', 'admin'), async (c) => {
+autoReplies.post('/api/auto-replies/drafts', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const parsed = await readDraftSettings(c.env.DB, await c.req.json());
-    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+    if (!parsed.ok) return inputError(c, { success: false, error: parsed.error, field: parsed.field }, 400, []);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [parsed.value.lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
@@ -1287,7 +1288,7 @@ autoReplies.post('/api/auto-replies/drafts', requireRole('owner', 'admin'), asyn
       return c.json({ success: true, data: draftVersionResponse(created.version) }, 201);
     } catch (err) {
       const mapped = idempotencyErrorResponse(err);
-      if (mapped) return c.json({ success: false, error: mapped.error }, mapped.status);
+      if (mapped) return inputError(c, { success: false, error: mapped.error }, mapped.status, ["triggerConfig"]);
       throw err;
     }
   } catch (err) {
@@ -1342,11 +1343,11 @@ autoReplies.get('/api/auto-replies/:id/draft', async (c) => {
   }
 });
 
-autoReplies.put('/api/auto-replies/:id/draft', requireRole('owner', 'admin'), async (c) => {
+autoReplies.put('/api/auto-replies/:id/draft', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>();
     if (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 1) {
-      return c.json({ success: false, error: 'expectedVersion を指定してください' }, 400);
+      return inputError(c, { success: false, error: 'expectedVersion を指定してください' }, 400, ["expectedVersion"]);
     }
     const current = await getAutoReplyDraftVersion(c.env.DB, c.req.param('id'))
       ?? await getAutoReplyPublishedVersion(c.env.DB, c.req.param('id'));
@@ -1360,7 +1361,7 @@ autoReplies.put('/api/auto-replies/:id/draft', requireRole('owner', 'admin'), as
       }, 409);
     }
     const parsed = await readDraftSettings(c.env.DB, body);
-    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+    if (!parsed.ok) return inputError(c, { success: false, error: parsed.error, field: parsed.field }, 400, []);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [parsed.value.lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
@@ -1414,7 +1415,7 @@ autoReplies.put('/api/auto-replies/:id/draft', requireRole('owner', 'admin'), as
 // validate と conflicts は公開判断に使う管理操作なので、下書きを書ける人だけ。
 // test は本番状態を変えない試運転で、実施結果と担当者だけを監査用に記録する。
 // staff にはこの test だけを許可し、作成・更新・公開の権限は広げない。
-autoReplies.post('/api/auto-replies/:id/validate', requireRole('owner', 'admin'), async (c) => {
+autoReplies.post('/api/auto-replies/:id/validate', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const version = await getAutoReplyDraftVersion(c.env.DB, c.req.param('id'));
     if (!version) return c.json({ success: false, error: '公開する下書きがありません' }, 404);
@@ -1447,7 +1448,7 @@ autoReplies.get('/api/auto-replies/:id/conflicts', requireRole('owner', 'admin')
   }
 });
 
-autoReplies.post('/api/auto-replies/:id/test', requireRole('owner', 'admin', 'staff'), async (c) => {
+autoReplies.post('/api/auto-replies/:id/test', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   let version: AutoReplyVersionRow | null = null;
   try {
     const id = c.req.param('id');
@@ -1461,21 +1462,21 @@ autoReplies.post('/api/auto-replies/:id/test', requireRole('owner', 'admin', 'st
       occurredAt?: unknown;
     }>();
     if (typeof body.friendId !== 'string' || !body.friendId) {
-      return c.json({ success: false, error: '試す友だちを選んでください' }, 400);
+      return inputError(c, { success: false, error: '試す友だちを選んでください' }, 400, ["friendId"]);
     }
     if (typeof body.incomingText !== 'string' || !body.incomingText.trim()) {
-      return c.json({ success: false, error: '試すメッセージを入力してください' }, 400);
+      return inputError(c, { success: false, error: '試すメッセージを入力してください' }, 400, ["incomingText"]);
     }
     if ([...body.incomingText].length > 2_000) {
-      return c.json({ success: false, error: '試すメッセージは2000文字以内にしてください' }, 400);
+      return inputError(c, { success: false, error: '試すメッセージは2000文字以内にしてください' }, 400, ["incomingText"]);
     }
     const messageKind = body.messageKind ?? 'text';
     if (typeof messageKind !== 'string' || !MESSAGE_KINDS.includes(messageKind)) {
-      return c.json({ success: false, error: 'メッセージの種類が正しくありません' }, 400);
+      return inputError(c, { success: false, error: 'メッセージの種類が正しくありません' }, 400, ["messageKind"]);
     }
     const occurredAt = body.occurredAt === undefined ? new Date() : new Date(String(body.occurredAt));
     if (Number.isNaN(occurredAt.getTime())) {
-      return c.json({ success: false, error: '試す日時が正しくありません' }, 400);
+      return inputError(c, { success: false, error: '試す日時が正しくありません' }, 400, ["occurredAt"]);
     }
     const friend = await getFriendById(c.env.DB, body.friendId);
     if (!friend || friend.line_account_id !== settings.lineAccountId) {
@@ -1552,12 +1553,12 @@ autoReplies.post('/api/auto-replies/:id/test', requireRole('owner', 'admin', 'st
   }
 });
 
-autoReplies.post('/api/auto-replies/:id/publish', requireRole('owner', 'admin'), async (c) => {
+autoReplies.post('/api/auto-replies/:id/publish', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const requestKey = c.req.header('Idempotency-Key');
     if (!validIdempotencyKey(requestKey)) {
-      return c.json({ success: false, error: '公開操作の確認キーが必要です' }, 400);
+      return inputError(c, { success: false, error: '公開操作の確認キーが必要です' }, 400, []);
     }
     const version = await getAutoReplyDraftVersion(c.env.DB, id);
     // m26c R553/R554: 公開前チェック時の内容と、読取時の停止状態を掴む。
@@ -1582,10 +1583,10 @@ autoReplies.post('/api/auto-replies/:id/publish', requireRole('owner', 'admin'),
     }
     const validation = await validateDraft(c.env.DB, version);
     if (!validation.valid) {
-      return c.json({ success: false, error: '公開前チェックに未完了があります', data: validation }, 422);
+      return inputError(c, { success: false, error: '公開前チェックに未完了があります', data: validation }, 422, []);
     }
     if (version.last_test_status !== 'succeeded') {
-      return c.json({ success: false, error: 'この下書きを実際の相手と文面で試してください', data: validation }, 422);
+      return inputError(c, { success: false, error: 'この下書きを実際の相手と文面で試してください', data: validation }, 422, []);
     }
     const body: { acknowledgedConflictIds?: unknown } = await c.req
       .json<{ acknowledgedConflictIds?: unknown }>()
@@ -1641,7 +1642,7 @@ autoReplies.post('/api/auto-replies/:id/publish', requireRole('owner', 'admin'),
       return c.json({ success: false, error: 'この下書きはすでに公開されています' }, 409);
     }
     if (code === 'AUTO_REPLY_DRAFT_NOT_TESTED') {
-      return c.json({ success: false, error: 'この下書きを実際の相手と文面で試してください' }, 422);
+      return inputError(c, { success: false, error: 'この下書きを実際の相手と文面で試してください' }, 422, []);
     }
     console.error('POST /api/auto-replies/:id/publish error:', err);
     return c.json({ success: false, error: '自動応答を有効化できませんでした' }, 500);
@@ -1662,7 +1663,7 @@ autoReplies.post('/api/auto-replies/:id/publish', requireRole('owner', 'admin'),
 // F7: isActive: true の指定があっても、作る前に既存の有効ルールと当てる。
 // 当たれば有効化せず停止中で作り、理由を社内メモへ残す（応答にも返す）。
 // 当たらなければ要求どおりすぐ有効にする。
-autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) => {
+autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), inputJsonBoundary({"keyword":["string"],"matchType":["string"],"responseType":["string"],"responseContent":["string"],"templateId":["null","string"],"lineAccountId":["null","string"],"respondToAll":["boolean"],"name":["null","string"],"keywordMatchMode":["string"],"normalizeKeywords":["boolean"],"folderId":["null","string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       keyword: string;
@@ -1688,16 +1689,16 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
     // 一律で応答するルール（157）はキーワードを見ないので、空でも作れる。
     // ただし列は NOT NULL なので、空文字を入れておく。
     if (body.isActive !== undefined && typeof body.isActive !== 'boolean') {
-      return c.json({ success: false, error: 'isActive must be a boolean' }, 400);
+      return inputError(c, { success: false, error: 'isActive must be a boolean' }, 400, ["isActive"]);
     }
     if (!body.keyword && body.respondToAll !== true) {
-      return c.json({ success: false, error: 'keyword is required' }, 400);
+      return inputError(c, { success: false, error: 'keyword is required' }, 400, ["keyword","respondToAll"]);
     }
     if (typeof body.keyword === 'string' && [...body.keyword].length > AUTO_REPLY_KEYWORD_MAX) {
-      return c.json({ success: false, error: `keyword must be ${AUTO_REPLY_KEYWORD_MAX} characters or fewer` }, 400);
+      return inputError(c, { success: false, error: `keyword must be ${AUTO_REPLY_KEYWORD_MAX} characters or fewer` }, 400, ["keyword"]);
     }
     if (typeof body.responseContent === 'string' && [...body.responseContent].length > AUTO_REPLY_RESPONSE_MAX) {
-      return c.json({ success: false, error: `responseContent must be ${AUTO_REPLY_RESPONSE_MAX} characters or fewer` }, 400);
+      return inputError(c, { success: false, error: `responseContent must be ${AUTO_REPLY_RESPONSE_MAX} characters or fewer` }, 400, ["responseContent"]);
     }
     if (body.lineAccountId !== null && body.lineAccountId !== undefined
       && (!body.lineAccountId
@@ -1714,28 +1715,25 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
     // template_id があれば content は空でも OK (template から resolve される)。
     // silent も content 不要。それ以外は inline content 必須。
     if (!body.templateId && !body.responseContent && body.responseType !== 'silent') {
-      return c.json({ success: false, error: 'templateId or responseContent required (unless responseType=silent)' }, 400);
+      return inputError(c, { success: false, error: 'templateId or responseContent required (unless responseType=silent)' }, 400, ["templateId","responseContent","responseType"]);
     }
 
     const activeFrom = parseHhmm(body.activeFrom);
     const activeUntil = parseHhmm(body.activeUntil);
     const cooldown = parseCooldown(body.cooldownMinutes);
     if (!activeFrom.ok || !activeUntil.ok) {
-      return c.json({ success: false, error: 'activeFrom/activeUntil must be HH:MM' }, 400);
+      return inputError(c, { success: false, error: 'activeFrom/activeUntil must be HH:MM' }, 400, ["activeFrom","activeUntil"]);
     }
     if (!cooldown.ok) {
-      return c.json({ success: false, error: COOLDOWN_RANGE_ERROR }, 400);
+      return inputError(c, { success: false, error: COOLDOWN_RANGE_ERROR }, 400, ["cooldownMinutes"]);
     }
     const priority = body.priority === undefined ? { ok: true as const, value: 0 } : readPriority(body.priority);
     if (!priority.ok) {
-      return c.json({ success: false, error: 'priority must be an integer between -9999 and 9999' }, 400);
+      return inputError(c, { success: false, error: 'priority must be an integer between -9999 and 9999' }, 400, ["priority"]);
     }
     const messageKinds = readMessageKinds(body.messageKinds);
     if (!messageKinds.ok) {
-      return c.json(
-        { success: false, error: `messageKinds must be an array of ${MESSAGE_KINDS.join(', ')}` },
-        400,
-      );
+      return inputError(c, { success: false, error: `messageKinds must be an array of ${MESSAGE_KINDS.join(', ')}` }, 400, ["messageKinds"]);
     }
 
     // template_id が来てて content/type が空の場合、template の現在値を inline
@@ -1764,16 +1762,16 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
     }
 
     const extras = readExtras(body as Record<string, unknown>);
-    if (!extras.ok) return c.json({ success: false, error: extras.error }, 400);
+    if (!extras.ok) return inputError(c, { success: false, error: extras.error, field: extras.field }, 400, []);
     const folderError = await validateAutoReplyFolder(c.env.DB, extras.value.folderId);
-    if (folderError) return c.json({ success: false, error: folderError }, 422);
+    if (folderError) return inputError(c, { success: false, error: folderError }, 422, ["folderId"]);
     /*
      * R201: 直接入力のカードは構造まで見る。テンプレートから写した中身
      * （content を送らず templateId だけ送った場合）は対象外にする。
      */
     if (body.responseContent) {
       const flexError = validateFlexContent(resolvedResponseType, resolvedResponseContent);
-      if (flexError) return c.json({ success: false, error: flexError }, 400);
+      if (flexError) return inputError(c, { success: false, error: flexError }, 400, ["responseType","responseContent"]);
     }
 
     // F7: 有効で作る要求があれば、作る前に既存の有効ルールと当てる。
@@ -1854,7 +1852,7 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
       item = created.rule;
     } catch (err) {
       const mapped = idempotencyErrorResponse(err);
-      if (mapped) return c.json({ success: false, error: mapped.error }, mapped.status);
+      if (mapped) return inputError(c, { success: false, error: mapped.error }, mapped.status, ["triggerConfig"]);
       throw err;
     }
 
@@ -1879,7 +1877,7 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
 });
 
 // PUT /api/auto-replies/:id — update
-autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c) => {
+autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), inputJsonBoundary({"keyword":["string"],"matchType":["string"],"responseType":["string"],"responseContent":["string"],"templateId":["null","string"],"lineAccountId":["null","string"],"isActive":["boolean"]}), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<{
@@ -1901,7 +1899,7 @@ autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c
     const input: Record<string, unknown> = {};
     if (body.keyword !== undefined) {
       if (typeof body.keyword === 'string' && [...body.keyword].length > AUTO_REPLY_KEYWORD_MAX) {
-        return c.json({ success: false, error: `keyword must be ${AUTO_REPLY_KEYWORD_MAX} characters or fewer` }, 400);
+        return inputError(c, { success: false, error: `keyword must be ${AUTO_REPLY_KEYWORD_MAX} characters or fewer` }, 400, ["keyword"]);
       }
       input.keyword = body.keyword;
     }
@@ -1909,7 +1907,7 @@ autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c
     if (body.responseType !== undefined) input.responseType = body.responseType;
     if (body.responseContent !== undefined) {
       if (typeof body.responseContent === 'string' && [...body.responseContent].length > AUTO_REPLY_RESPONSE_MAX) {
-        return c.json({ success: false, error: `responseContent must be ${AUTO_REPLY_RESPONSE_MAX} characters or fewer` }, 400);
+        return inputError(c, { success: false, error: `responseContent must be ${AUTO_REPLY_RESPONSE_MAX} characters or fewer` }, 400, ["responseContent"]);
       }
       /*
        * R201: カード種別を名指しで送ってきた中身は構造まで見る。
@@ -1918,7 +1916,7 @@ autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c
        */
       if (typeof body.responseContent === 'string' && body.responseType === 'flex') {
         const flexError = validateFlexContent(body.responseType, body.responseContent);
-        if (flexError) return c.json({ success: false, error: flexError }, 400);
+        if (flexError) return inputError(c, { success: false, error: flexError }, 400, ["responseType","responseContent"]);
       }
       input.responseContent = body.responseContent;
     }
@@ -1935,18 +1933,18 @@ autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c
     if (body.isActive !== undefined) input.isActive = body.isActive;
     if ('activeFrom' in body) {
       const parsed = parseHhmm(body.activeFrom);
-      if (!parsed.ok) return c.json({ success: false, error: 'activeFrom must be HH:MM' }, 400);
+      if (!parsed.ok) return inputError(c, { success: false, error: 'activeFrom must be HH:MM' }, 400, ["activeFrom"]);
       input.activeFrom = parsed.value;
     }
     if ('activeUntil' in body) {
       const parsed = parseHhmm(body.activeUntil);
-      if (!parsed.ok) return c.json({ success: false, error: 'activeUntil must be HH:MM' }, 400);
+      if (!parsed.ok) return inputError(c, { success: false, error: 'activeUntil must be HH:MM' }, 400, ["activeUntil"]);
       input.activeUntil = parsed.value;
     }
     if ('cooldownMinutes' in body) {
       const parsed = parseCooldown(body.cooldownMinutes);
       if (!parsed.ok) {
-        return c.json({ success: false, error: COOLDOWN_RANGE_ERROR }, 400);
+        return inputError(c, { success: false, error: COOLDOWN_RANGE_ERROR }, 400, ["cooldownMinutes"]);
       }
       input.cooldownMinutes = parsed.value;
     }
@@ -1956,17 +1954,14 @@ autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c
     if ('priority' in body) {
       const parsed = readPriority(body.priority);
       if (!parsed.ok) {
-        return c.json({ success: false, error: 'priority must be an integer between -9999 and 9999' }, 400);
+        return inputError(c, { success: false, error: 'priority must be an integer between -9999 and 9999' }, 400, ["priority"]);
       }
       input.priority = parsed.value;
     }
     if ('messageKinds' in body) {
       const parsed = readMessageKinds(body.messageKinds);
       if (!parsed.ok) {
-        return c.json(
-          { success: false, error: `messageKinds must be an array of ${MESSAGE_KINDS.join(', ')}` },
-          400,
-        );
+        return inputError(c, { success: false, error: `messageKinds must be an array of ${MESSAGE_KINDS.join(', ')}` }, 400, ["messageKinds"]);
       }
       input.messageKinds = parsed.value;
     }
@@ -1983,9 +1978,9 @@ autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c
     }
 
     const extras = readExtras(body as Record<string, unknown>);
-    if (!extras.ok) return c.json({ success: false, error: extras.error }, 400);
+    if (!extras.ok) return inputError(c, { success: false, error: extras.error, field: extras.field }, 400, []);
     const folderError = await validateAutoReplyFolder(c.env.DB, extras.value.folderId);
-    if (folderError) return c.json({ success: false, error: folderError }, 422);
+    if (folderError) return inputError(c, { success: false, error: folderError }, 422, ["folderId"]);
     Object.assign(input, extras.value);
 
     // m26c R562/R569: 分岐のために既存行を読む。可視性は middleware が見ている。
@@ -2032,7 +2027,7 @@ autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c
         ...draftInputFromSettings(base),
         ...input,
       });
-      if (!reparsed.ok) return c.json({ success: false, error: reparsed.error }, 400);
+      if (!reparsed.ok) return inputError(c, { success: false, error: reparsed.error, field: reparsed.field }, 400, []);
       const templateRedirectError = await assertTemplateVisible(
         c.env.DB,
         c.get('staff'),
@@ -2095,11 +2090,11 @@ const AUTO_REPLY_STOP_REASON_MAX = 500;
  * 停止は運用の判断なので、理由（任意）・担当者・日時を記録する。
  * 確認キー（Idempotency-Key）必須。同じキーの再送は新しい停止として残さない。
  */
-autoReplies.post('/api/auto-replies/:id/stop', requireRole('owner', 'admin'), async (c) => {
+autoReplies.post('/api/auto-replies/:id/stop', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const requestKey = c.req.header('Idempotency-Key');
     if (!validIdempotencyKey(requestKey)) {
-      return c.json({ success: false, error: '停止操作の確認キーが必要です' }, 400);
+      return inputError(c, { success: false, error: '停止操作の確認キーが必要です' }, 400, []);
     }
     const body: { reason?: unknown } = await c.req
       .json<{ reason?: unknown }>()
@@ -2107,14 +2102,14 @@ autoReplies.post('/api/auto-replies/:id/stop', requireRole('owner', 'admin'), as
     let reason: string | null = null;
     if (body.reason !== undefined && body.reason !== null) {
       if (typeof body.reason !== 'string') {
-        return c.json({ success: false, error: '停止の理由は文字列で入力してください' }, 400);
+        return inputError(c, { success: false, error: '停止の理由は文字列で入力してください' }, 400, ["reason"]);
       }
       const trimmed = body.reason.trim();
       if ([...trimmed].length > AUTO_REPLY_STOP_REASON_MAX) {
-        return c.json({
+        return inputError(c, {
           success: false,
           error: `停止の理由は${AUTO_REPLY_STOP_REASON_MAX}文字以内で入力してください`,
-        }, 400);
+        }, 400, ["reason"]);
       }
       reason = trimmed === '' ? null : trimmed;
     }
@@ -2162,7 +2157,7 @@ autoReplies.delete('/api/auto-replies/:id', requireRole('owner', 'admin'), async
  * （is_active = 0）で送り出さない。再開は画面の再開操作で行う。
  * 消していない行・無い行は 404。
  */
-autoReplies.post('/api/auto-replies/:id/restore', requireRole('owner', 'admin'), async (c) => {
+autoReplies.post('/api/auto-replies/:id/restore', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const restored = await restoreAutoReply(c.env.DB, c.req.param('id'));
     if (!restored) {

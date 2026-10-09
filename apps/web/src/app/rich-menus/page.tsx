@@ -836,7 +836,7 @@ function RichMenusPageV7() {
                 />
               )
             ) : (
-              <section className="border-hairline bg-canvas rounded-card overflow-hidden border shadow-card">
+              <section className="border-hairline bg-canvas rounded-card overflow-hidden border shadow-card-surface">
                 {/* #641: 操作列が広くなった分は表だけが横に流れる */}
                 <div className="overflow-x-auto">
                 <table className="w-full min-w-[760px] table-fixed text-left text-sm">

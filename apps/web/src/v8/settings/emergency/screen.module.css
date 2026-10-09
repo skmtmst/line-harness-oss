@@ -300,32 +300,6 @@
 .status[data-tone='muted'] { background: var(--color-shell); color: var(--color-ink-secondary); }
 .status[data-tone='info'] { background: var(--color-status-info-soft); color: var(--color-action); }
 
-/* 下の3枚（共通の KpiBand・KpiCard、間 12・余白 14）。 */
-.kpis {
-  gap: var(--tpl-sb-group-gap);
-}
-
-:global([data-theme='v8']) .kpis > [data-design-version] {
-  gap: var(--tpl-sb-kpi-gap);
-  padding: var(--tpl-sb-kpi-pad);
-}
-
-:global([data-theme='v8']) .kpis > [data-design-version] > :first-child,
-:global([data-theme='v8']) .kpis > [data-design-version] > :first-child > p,
-:global([data-theme='v8']) .kpis > [data-design-version] > :last-child {
-  min-height: 0;
-  font-size: var(--tpl-sb-row-sub);
-  line-height: var(--tpl-sb-row-sub-lh);
-}
-
-:global([data-theme='v8']) .kpis > [data-design-version] > :first-child > p {
-  font-weight: 600;
-}
-
-:global([data-theme='v8']) .kpis [data-kpi-number] {
-  font-size: var(--tpl-sb-kpi-num);
-  line-height: var(--tpl-sb-kpi-num-lh);
-}
 
 .srOnly {
   position: absolute;

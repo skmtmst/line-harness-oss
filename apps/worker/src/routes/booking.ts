@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { reorderBookingMenus } from '@line-crm/db';
 import type { BookingMenuReorderRequest } from '@line-crm/shared';
 import { getBookingSyncRules, saveBookingSyncRules, validateBookingSyncRules, listBookingSyncNotices } from '@line-crm/db';
@@ -534,7 +535,7 @@ function requireOwnBookingStaffOrAdmin(): MiddlewareHandler<Env> {
     if (!me) return c.json({ error: 'Unauthorized' }, 401);
     if (me.role === 'owner' || me.role === 'admin') return next();
     const accountId = await resolveAccountIdAdmin(c);
-    if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+    if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
     const row = await c.env.DB
       .prepare(
         `SELECT staff_member_id FROM staff
@@ -879,11 +880,11 @@ async function runAutoConfirmedSideEffects(
   );
 }
 
-booking.post('/api/liff/booking/requests', async (c) => {
+booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string"],"staff_id":["string"],"starts_at":["string"],"customer_note":["string"],"waitlist_id":["string"]}), async (c) => {
   const accountId = await resolveAccountIdFromLiff(c);
   if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
   const idemKey = c.req.header('Idempotency-Key');
-  if (!idemKey) return c.json({ error: 'missing_idempotency_key' }, 400);
+  if (!idemKey) return inputError(c, { error: 'missing_idempotency_key' }, 400, []);
 
   // 認証済み caller の LINE userId を Authorization: Bearer <id_token> から取得。
   const callerLineUserId = await verifyCallerLineUserId(c);
@@ -897,9 +898,9 @@ booking.post('/api/liff/booking/requests', async (c) => {
     party_size?: unknown;
     waitlist_id?: string;
   }>();
-  if (body.party_size !== undefined && body.party_size !== 1) return c.json({ error: 'unsupported_party_size' }, 422);
+  if (body.party_size !== undefined && body.party_size !== 1) return inputError(c, { error: 'unsupported_party_size' }, 422, ["party_size"]);
   if (!body.menu_id || !body.starts_at) {
-    return c.json({ error: 'missing_params' }, 400);
+    return inputError(c, { error: 'missing_params' }, 400, ["menu_id","starts_at"]);
   }
   const friendId = await resolveFriendId(c, callerLineUserId, accountId);
   if (!friendId) return c.json({ error: 'friend_not_found' }, 404);
@@ -977,15 +978,15 @@ booking.post('/api/liff/booking/requests', async (c) => {
     .bind(body.menu_id, body.staff_id, accountId)
     .first<{ name: string; duration_minutes: number; buffer_after_minutes: number; auto_tag_id: string | null; concurrent_capacity: number; dur: number; price: number; price_mode: string; version: number; is_offered: number | null }>();
   if (!menuRow || menuRow.is_offered !== 1) {
-    return c.json({ error: 'menu_not_offered' }, 422);
+    return inputError(c, { error: 'menu_not_offered' }, 422, ["menu_id","staff_id"]);
   }
 
   const startsAt = new Date(body.starts_at);
   if (Number.isNaN(startsAt.getTime())) {
-    return c.json({ error: 'invalid_starts_at' }, 422);
+    return inputError(c, { error: 'invalid_starts_at' }, 422, ["starts_at"]);
   }
   if (startsAt < new Date()) {
-    return c.json({ error: 'past_datetime' }, 422);
+    return inputError(c, { error: 'past_datetime' }, 422, ["starts_at"]);
   }
   const endsAt = new Date(startsAt.getTime() + menuRow.dur * 60_000);
   const blockEndsAt = new Date(endsAt.getTime() + menuRow.buffer_after_minutes * 60_000);
@@ -1008,7 +1009,7 @@ booking.post('/api/liff/booking/requests', async (c) => {
     applyStoreRules: true,
     excludeWaitlistId:body.waitlist_id,waitlistOffer:!!body.waitlist_id,
   });
-  if (!slotMatched) return c.json({ error: 'slot_not_available' }, 422);
+  if (!slotMatched) return inputError(c, { error: 'slot_not_available' }, 422, ["menu_id","staff_id","waitlist_id"]);
 
   const bookingId = crypto.randomUUID();
   const nowIso = new Date().toISOString();
@@ -1448,18 +1449,18 @@ async function syncSelfBookingMeet(
   }
 }
 
-booking.post('/api/liff/booking/:id/reschedule', async (c) => {
+booking.post('/api/liff/booking/:id/reschedule', inputJsonBoundary(), async (c) => {
   const caller = await resolveSelfBookingCaller(c);
-  if (!caller.ok) return c.json({ error: caller.error }, caller.status);
+  if (!caller.ok) return inputError(c, { error: caller.error }, caller.status, []);
   const bookingId = c.req.param('id');
   const body = await c.req.json<{
     starts_at?: unknown;
     lock_version?: unknown;
     reason?: unknown;
   }>().catch(() => null);
-  if (!body) return c.json({ error: 'invalid_json' }, 400);
+  if (!body) return inputError(c, { error: 'invalid_json' }, 400, []);
   if (!Number.isInteger(body.lock_version) || Number(body.lock_version) < 0) {
-    return c.json({ error: 'missing_lock_version' }, 400);
+    return inputError(c, { error: 'missing_lock_version' }, 400, ["lock_version"]);
   }
   const self: SelfBookingChange = {
     accountId: caller.accountId,
@@ -1492,14 +1493,14 @@ booking.post('/api/liff/booking/:id/reschedule', async (c) => {
   return c.json({ ...out, meet_sync: meetSync });
 });
 
-booking.post('/api/liff/booking/:id/cancel', async (c) => {
+booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
   const caller = await resolveSelfBookingCaller(c);
-  if (!caller.ok) return c.json({ error: caller.error }, caller.status);
+  if (!caller.ok) return inputError(c, { error: caller.error }, caller.status, []);
   const accountId = caller.accountId;
   const bookingId = c.req.param('id');
   const body = await c.req.json<{ lock_version?: unknown }>().catch(() => null);
   if (!body || !Number.isInteger(body.lock_version) || Number(body.lock_version) < 0) {
-    return c.json({ error: 'missing_lock_version' }, 400);
+    return inputError(c, { error: 'missing_lock_version' }, 400, ["lock_version"]);
   }
   const expectedVersion = Number(body.lock_version);
   const row = await c.env.DB
@@ -1858,9 +1859,9 @@ booking.get('/api/booking/admin/customers/:id', async (c) => {
 booking.post(
   '/api/booking/admin/customers',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary({"display_name":["string"],"phone":["string"],"pet_name":["null","string"],"email":["null","string"]}), async (c) => {
     const accountId = await resolveAccountIdAdmin(c);
-    if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+    if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
     /*
      * R559: 応答消失後の再送で同じ電話客を2件作らない。呼び出し側が
      * 確定操作ごとに付ける一意キーで作成済み応答を返す。検証で落ちた
@@ -1903,7 +1904,7 @@ booking.post(
       email?: string | null;
     }>();
     if (!body.display_name || !body.phone) {
-      return c.json({ error: 'missing_customer_fields' }, 400);
+      return inputError(c, { error: 'missing_customer_fields' }, 400, ["display_name","phone"]);
     }
     /*
      * R559残差: 同じキーで同時に届いた2件がどちらも未保存と判断し、
@@ -2016,7 +2017,7 @@ booking.post(
       }
       const code = error instanceof Error ? error.message : '';
       if (code.startsWith('booking_customer_') && code.endsWith('_invalid')) {
-        return c.json({ error: code }, 422);
+        return inputError(c, { error: code }, 422, [code.slice('booking_customer_'.length, -'_invalid'.length)]);
       }
       console.error('POST /api/booking/admin/customers error:', error instanceof Error ? error.name : 'unknown');
       return c.json({ error: 'customer_data_unavailable' }, 503);
@@ -2390,11 +2391,11 @@ booking.get('/api/booking/admin/channels', async (c) => {
   return c.json({ success: true, data: await getBookingChannels(c.env.DB, accountId, googleCredentials(c.env)) });
 });
 
-booking.put('/api/booking/admin/channels/settings', requirePermission(BOOKING_SETTINGS_KEY), async (c) => {
+booking.put('/api/booking/admin/channels/settings', requirePermission(BOOKING_SETTINGS_KEY), inputJsonBoundary(), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const body = await c.req.json<{ autoAssign?: unknown }>().catch(() => null);
-  if (!body || typeof body.autoAssign !== 'boolean') return c.json({ error: 'invalid_auto_assign' }, 400);
+  if (!body || typeof body.autoAssign !== 'boolean') return inputError(c, { error: 'invalid_auto_assign' }, 400, ["autoAssign"]);
   await saveBookingAutoAssign(c.env.DB, accountId, body.autoAssign);
   return c.json({ success: true, data: { autoAssign: body.autoAssign } });
 });
@@ -2411,10 +2412,10 @@ booking.get('/api/booking/admin/sync-rules',async c=>{
   c.header('Cache-Control','no-store');
   return c.json({success:true,data:await getBookingSyncRules(c.env.DB,accountId)});
 });
-booking.put('/api/booking/admin/sync-rules',requirePermission(BOOKING_SETTINGS_KEY),async c=>{
-  const accountId=await resolveAccountIdAdmin(c);if(!accountId)return c.json({error:'missing_account_id'},400);
+booking.put('/api/booking/admin/sync-rules',requirePermission(BOOKING_SETTINGS_KEY),inputJsonBoundary(), async c=>{
+  const accountId=await resolveAccountIdAdmin(c);if(!accountId)return inputError(c, {error:'missing_account_id'}, 400, ["account_id"]);
   const body=await c.req.json().catch(()=>null);
-  if(!validateBookingSyncRules(body))return c.json({success:false,error:'ルールと読み込んだ版を確認してください'},400);
+  if(!validateBookingSyncRules(body))return inputError(c, {success:false,error:'ルールと読み込んだ版を確認してください'}, 400, ['autoAssign', 'notifyConflicts', 'notifyCalendarDisconnected', 'notifyDailyLimit', 'excludeCalendarBusy', 'writeLineBookingsToCalendar', 'dailyLimit', 'nearLimitRemaining', 'expectedVersion']);
   if(!await saveBookingSyncRules(c.env.DB,accountId,body))return c.json({success:false,error:'ほかの担当者が先に保存しました',currentVersion:(await getBookingSyncRules(c.env.DB,accountId)).version},409);
   return c.json({success:true,data:await getBookingSyncRules(c.env.DB,accountId)});
 });
@@ -2423,8 +2424,8 @@ booking.get('/api/booking/admin/sync-notices',async c=>{
   c.header('Cache-Control','no-store');
   return c.json({success:true,data:await listBookingSyncNotices(c.env.DB,accountId)});
 });
-booking.post('/api/booking/admin/sync-notices/:id/done',requireRole('owner','admin','staff'),async c=>{
-  const accountId=await resolveAccountIdAdmin(c);if(!accountId)return c.json({error:'missing_account_id'},400);
+booking.post('/api/booking/admin/sync-notices/:id/done',requireRole('owner','admin','staff'),inputJsonBoundary(), async c=>{
+  const accountId=await resolveAccountIdAdmin(c);if(!accountId)return inputError(c, {error:'missing_account_id'}, 400, ["account_id"]);
   const notice=await c.env.DB.prepare('SELECT status FROM booking_sync_notices WHERE id=? AND line_account_id=?').bind(c.req.param('id'),accountId).first<{status:string}>();
   if(!notice)return c.json({success:false,error:'知らせがありません'},404);
   if(notice.status==='resolved')return c.json({success:false,error:'すでに条件が解消した知らせです'},409);
@@ -2445,14 +2446,14 @@ booking.get('/api/booking/admin/settings', async (c) => {
   }
 });
 
-booking.put('/api/booking/admin/settings', requirePermission(BOOKING_SETTINGS_KEY), async (c) => {
+booking.put('/api/booking/admin/settings', requirePermission(BOOKING_SETTINGS_KEY), inputJsonBoundary(), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ success: false, error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'missing_account_id' }, 400, ["account_id"]);
   try {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-    if (!body) return c.json({ success: false, error: 'invalid_json' }, 400);
+    if (!body) return inputError(c, { success: false, error: 'invalid_json' }, 400, []);
     const parsed = readBookingAdminSettings(body);
-    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+    if (!parsed.ok) return inputError(c, { success: false, error: parsed.error }, 400, ["expectedVersion","timeZone","bookingWindowDays","cutoffMinutesBefore","cancelDeadlineMinutesBefore","maxActiveBookingsPerFriend","approvalMode","holdMinutes","waitlistHoldMinutes","slotGranularityMinutes","businessHours","reminderDayBeforeTime","reminderHoursBefore","liffDateView"]);
     /*
      * 同時編集の見分けは「最後に直した日時で比べる」。
      * expectedUpdatedAt が送られてきたときだけ、保存前の値と照合する。
@@ -2507,14 +2508,14 @@ booking.get('/api/booking/admin/resources', async (c) => {
   }
 });
 
-booking.post('/api/booking/admin/resources', requirePermission(BOOKING_SETTINGS_KEY), async (c) => {
+booking.post('/api/booking/admin/resources', requirePermission(BOOKING_SETTINGS_KEY), inputJsonBoundary(), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ success: false, error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'missing_account_id' }, 400, ["account_id"]);
   try {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-    if (!body) return c.json({ success: false, error: 'invalid_json' }, 400);
+    if (!body) return inputError(c, { success: false, error: 'invalid_json' }, 400, []);
     const parsed = readBookingResourceInput(body);
-    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+    if (!parsed.ok) return inputError(c, { success: false, error: parsed.error }, 400, ["name","type","capacity","isActive"]);
     const created = await createBookingResource(c.env.DB, { lineAccountId: accountId, ...parsed.value });
     const item = {
       ...created,
@@ -2529,20 +2530,20 @@ booking.post('/api/booking/admin/resources', requirePermission(BOOKING_SETTINGS_
   }
 });
 
-booking.patch('/api/booking/admin/resources/:id', requirePermission(BOOKING_SETTINGS_KEY), async (c) => {
+booking.patch('/api/booking/admin/resources/:id', requirePermission(BOOKING_SETTINGS_KEY), inputJsonBoundary(), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ success: false, error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'missing_account_id' }, 400, ["account_id"]);
   try {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const expectedVersion = body?.expectedVersion;
     if (!body || !Number.isInteger(expectedVersion) || Number(expectedVersion) < 1) {
-      return c.json({ success: false, error: 'expectedVersionは1以上の整数で指定してください' }, 400);
+      return inputError(c, { success: false, error: 'expectedVersionは1以上の整数で指定してください' }, 400, ["expectedVersion"]);
     }
     const current = (await listBookingAdminResources(c.env.DB, accountId))
       .find((resource) => resource.id === c.req.param('id'));
     if (!current) return c.json({ success: false, error: 'not_found' }, 404);
     const parsed = readBookingResourceInput(body, current, 'update');
-    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+    if (!parsed.ok) return inputError(c, { success: false, error: parsed.error }, 400, ["name","type","capacity","isActive"]);
     const result = await updateBookingResourceSafely(c.env.DB, {
       lineAccountId: accountId,
       resourceId: current.id,
@@ -2631,19 +2632,19 @@ booking.get('/api/booking/admin/exceptions', async (c) => {
   }
 });
 
-booking.post('/api/booking/admin/exceptions', requirePermission(BOOKING_SETTINGS_KEY), async (c) => {
+booking.post('/api/booking/admin/exceptions', requirePermission(BOOKING_SETTINGS_KEY), inputJsonBoundary(), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ success: false, error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'missing_account_id' }, 400, ["account_id"]);
   try {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-    if (!body) return c.json({ success: false, error: 'invalid_json' }, 400);
+    if (!body) return inputError(c, { success: false, error: 'invalid_json' }, 400, []);
     const parsed = readBookingException(body);
-    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+    if (!parsed.ok) return inputError(c, { success: false, error: parsed.error }, 400, ["scopeKind","kind","dateFrom","dateTo","scopeId","reason","intervals"]);
     const item = await createBookingAvailabilityException(c.env.DB, {
       lineAccountId: accountId,
       ...parsed.value,
     });
-    if (!item) return c.json({ success: false, error: 'scope_not_found' }, 422);
+    if (!item) return inputError(c, { success: false, error: 'scope_not_found' }, 422, ["scopeKind","kind","dateFrom","dateTo","scopeId","reason","intervals"]);
     return c.json({ success: true, data: item }, 201);
   } catch {
     console.error(JSON.stringify({ event: 'booking_exception_create_failed' }));
@@ -2651,14 +2652,14 @@ booking.post('/api/booking/admin/exceptions', requirePermission(BOOKING_SETTINGS
   }
 });
 
-booking.patch('/api/booking/admin/exceptions/:id', requirePermission(BOOKING_SETTINGS_KEY), async (c) => {
+booking.patch('/api/booking/admin/exceptions/:id', requirePermission(BOOKING_SETTINGS_KEY), inputJsonBoundary(), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ success: false, error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'missing_account_id' }, 400, ["account_id"]);
   try {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const expectedVersion = Number(body?.expectedVersion);
     if (!body || !Number.isInteger(expectedVersion) || expectedVersion < 1) {
-      return c.json({ success: false, error: 'expectedVersionは1以上の整数で指定してください' }, 400);
+      return inputError(c, { success: false, error: 'expectedVersionは1以上の整数で指定してください' }, 400, ["expectedVersion"]);
     }
     const current = await getBookingAvailabilityException(c.env.DB, c.req.param('id'), accountId);
     if (!current) return c.json({ success: false, error: 'not_found' }, 404);
@@ -2671,7 +2672,7 @@ booking.patch('/api/booking/admin/exceptions/:id', requirePermission(BOOKING_SET
       intervals: body.intervals ?? current.intervals,
       reason: Object.prototype.hasOwnProperty.call(body, 'reason') ? body.reason : current.reason,
     });
-    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+    if (!parsed.ok) return inputError(c, { success: false, error: parsed.error }, 400, ["scopeKind","scopeId","dateFrom","dateTo","kind","intervals","reason"]);
     const result = await updateBookingAvailabilityException(c.env.DB, {
       id: current.id,
       lineAccountId: accountId,
@@ -2680,7 +2681,7 @@ booking.patch('/api/booking/admin/exceptions/:id', requirePermission(BOOKING_SET
     });
     if (result.status === 'not_found') return c.json({ success: false, error: 'not_found' }, 404);
     if (result.status === 'scope_not_found') {
-      return c.json({ success: false, error: 'scope_not_found' }, 422);
+      return inputError(c, { success: false, error: 'scope_not_found' }, 422, ["scopeKind","scopeId","dateFrom","dateTo","kind","intervals","reason"]);
     }
     if (result.status === 'conflict') {
       return c.json({
@@ -2959,14 +2960,14 @@ booking.get('/api/booking/admin/menus', async (c) => {
   }
 });
 
-booking.put('/api/booking/admin/menus/:id/resources', requirePermission(BOOKING_MENUS_KEY), async (c) => {
+booking.put('/api/booking/admin/menus/:id/resources', requirePermission(BOOKING_MENUS_KEY), inputJsonBoundary(), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ success: false, error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'missing_account_id' }, 400, ["account_id"]);
   try {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-    if (!body) return c.json({ success: false, error: 'invalid_json' }, 400);
+    if (!body) return inputError(c, { success: false, error: 'invalid_json' }, 400, []);
     const parsed = readBookingMenuResources(body);
-    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+    if (!parsed.ok) return inputError(c, { success: false, error: parsed.error }, 400, ["expectedVersion","resources"]);
     const result = await replaceBookingMenuResources(c.env.DB, {
       menuId: c.req.param('id'), lineAccountId: accountId,
       expectedVersion: parsed.expectedVersion, resources: parsed.resources,
@@ -2981,10 +2982,10 @@ booking.put('/api/booking/admin/menus/:id/resources', requirePermission(BOOKING_
       }, 409);
     }
     if (result.status === 'invalid_resource') {
-      return c.json({
+      return inputError(c, {
         success: false, code: 'invalid_resource',
         error: '選択した設備を利用できません。設備の状態と必要数を確認してください',
-      }, 400);
+      }, 400, ["expectedVersion","resources"]);
     }
     return c.json({
       success: true,
@@ -3052,15 +3053,15 @@ booking.get('/api/booking/admin/menus/:id/versions/:version', async (c) => {
   });
 });
 
-booking.post('/api/booking/admin/menus/:id/versions/:version/revert', requirePermission(BOOKING_MENUS_KEY), async (c) => {
+booking.post('/api/booking/admin/menus/:id/versions/:version/revert', requirePermission(BOOKING_MENUS_KEY), inputJsonBoundary(), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const versionNumber = Number(c.req.param('version'));
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
   const expectedVersion = Number(body?.expectedVersion);
   if (!Number.isInteger(versionNumber) || versionNumber < 1
     || !Number.isInteger(expectedVersion) || expectedVersion < 1) {
-    return c.json({ error: 'expectedVersionは1以上の整数で指定してください' }, 400);
+    return inputError(c, { error: 'expectedVersionは1以上の整数で指定してください' }, 400, ["expectedVersion"]);
   }
   const result = await revertMenuToVersion(c.env.DB, {
     menuId: c.req.param('id'),
@@ -3157,9 +3158,9 @@ async function isAssignableAutoTag(
   return row != null;
 }
 
-booking.post('/api/booking/admin/menus', requirePermission(BOOKING_MENUS_KEY), async (c) => {
+booking.post('/api/booking/admin/menus', requirePermission(BOOKING_MENUS_KEY), inputJsonBoundary({"name":["string"],"category_label":["null","string"],"description":["null","string"],"duration_minutes":["number"],"buffer_after_minutes":["number"],"base_price":["number"],"price_mode":["string"],"sort_order":["number"],"is_active":["number","boolean"]}), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   /*
    * R535: 応答消失後の再送で同じメニューを2件作らない。呼び出し側が
    * 作成試行ごとに付ける一意キーで作成済み応答を返す。検証で落ちた
@@ -3194,19 +3195,19 @@ booking.post('/api/booking/admin/menus', requirePermission(BOOKING_MENUS_KEY), a
     is_active?: boolean | number;
   } & MenuBookingRuleBody>();
   const base = readMenuBase(b);
-  if (!base.ok) return c.json({ error: base.error }, 400);
+  if (!base.ok) return inputError(c, { error: base.error }, 400, ["name","duration_minutes","buffer_after_minutes","sort_order"]);
   const rules = readMenuBookingRules(b);
-  if (!rules.ok) return c.json({ error: rules.error }, 400);
+  if (!rules.ok) return inputError(c, { error: rules.error }, 400, ["intake_question"]);
   const hasPriceMode = Object.prototype.hasOwnProperty.call(b, 'price_mode');
   const price = readPriceModeAndAmount(hasPriceMode ? b : {
     price_mode: 'fixed', base_price: b.base_price,
   });
-  if (!price.ok) return c.json({ error: price.error }, 400);
+  if (!price.ok) return inputError(c, { error: price.error }, 400, ["base_price"]);
   const autoTag = readAutoTagId(b as unknown as Record<string, unknown>);
-  if (!autoTag.ok) return c.json({ error: autoTag.error }, 400);
+  if (!autoTag.ok) return inputError(c, { error: autoTag.error }, 400, ["auto_tag_id"]);
   const autoTagId = autoTag.value;
   if (autoTagId && !(await isAssignableAutoTag(c.env.DB, autoTagId, accountId))) {
-    return c.json({ error: 'tag_not_found' }, 400);
+    return inputError(c, { error: 'tag_not_found' }, 400, ["auto_tag_id"]);
   }
   const id = crypto.randomUUID();
   const ruleColumns = Object.keys(rules.value);
@@ -3251,16 +3252,16 @@ booking.post('/api/booking/admin/menus', requirePermission(BOOKING_MENUS_KEY), a
   return c.json({ id, version: 1 }, 201);
 });
 
-booking.put('/api/booking/admin/menus/order', requirePermission(BOOKING_MENUS_KEY), async (c) => {
+booking.put('/api/booking/admin/menus/order', requirePermission(BOOKING_MENUS_KEY), inputJsonBoundary({"changes":["array"]}), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const body = await c.req.json<BookingMenuReorderRequest>().catch(() => null);
   const changes = body?.changes;
   if (!Array.isArray(changes) || changes.length < 1 || changes.length > 1000 ||
       changes.some((item) => !item || typeof item.id !== 'string' || !item.id ||
         !Number.isInteger(item.expectedVersion) || item.expectedVersion < 1 || !Number.isSafeInteger(item.sortOrder)) ||
       new Set(changes.map((item) => item.id)).size !== changes.length) {
-    return c.json({ error: 'invalid_menu_order' }, 400);
+    return inputError(c, { error: 'invalid_menu_order' }, 400, ["changes"]);
   }
   if (!await reorderBookingMenus(c.env.DB, accountId, changes, c.get('staff')?.id ?? null)) {
     return c.json({ success: false, code: 'version_conflict', error: '予約メニューが更新されています。読み直してください' }, 409);
@@ -3268,9 +3269,9 @@ booking.put('/api/booking/admin/menus/order', requirePermission(BOOKING_MENUS_KE
   return c.json({ ok: true, versions: changes.map((item) => ({ id: item.id, version: item.expectedVersion + 1 })) });
 });
 
-booking.put('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KEY), async (c) => {
+booking.put('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KEY), inputJsonBoundary({"name":["string"],"category_label":["null","string"],"description":["null","string"],"duration_minutes":["number"],"buffer_after_minutes":["number"],"base_price":["number"],"price_mode":["string"],"sort_order":["number"],"is_active":["number","boolean"],"expectedVersion":["number"]}), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const id = c.req.param('id');
   const b = await c.req.json<{
     name: string;
@@ -3291,29 +3292,29 @@ booking.put('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KEY)
   // 同時編集の後勝ちを黙って起こすので、必須にして拒否する。
   const expectedVersion = Number(b.expectedVersion);
   if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
-    return c.json({ error: 'expectedVersionは1以上の整数で指定してください' }, 400);
+    return inputError(c, { error: 'expectedVersionは1以上の整数で指定してください' }, 400, ["expectedVersion"]);
   }
 
   const base = readMenuBase(b);
-  if (!base.ok) return c.json({ error: base.error }, 400);
+  if (!base.ok) return inputError(c, { error: base.error }, 400, ["name","duration_minutes","buffer_after_minutes","sort_order"]);
 
   const rules = readMenuBookingRules(b);
-  if (!rules.ok) return c.json({ error: rules.error }, 400);
+  if (!rules.ok) return inputError(c, { error: rules.error }, 400, ["intake_question"]);
   const hasPriceMode = Object.prototype.hasOwnProperty.call(b, 'price_mode');
   const price = readPriceModeAndAmount(hasPriceMode ? b : {
     price_mode: 'fixed', base_price: b.base_price,
   });
-  if (!price.ok) return c.json({ error: price.error }, 400);
+  if (!price.ok) return inputError(c, { error: price.error }, 400, ["base_price"]);
 
   // 古いクライアントは新しい項目を送らない。`undefined` を null として
   // 書き込むと既存設定を消してしまうので、明示的に送られたものだけ更新する。
   // auto_tag_id が以前からこの扱いで、受付条件も同じにそろえた。
   const autoTag = readAutoTagId(b as unknown as Record<string, unknown>);
-  if (!autoTag.ok) return c.json({ error: autoTag.error }, 400);
+  if (!autoTag.ok) return inputError(c, { error: autoTag.error }, 400, ["auto_tag_id"]);
   const hasAutoTagId = autoTag.present;
   const autoTagId = autoTag.value;
   if (hasAutoTagId && autoTagId && !(await isAssignableAutoTag(c.env.DB, autoTagId, accountId))) {
-    return c.json({ error: 'tag_not_found' }, 400);
+    return inputError(c, { error: 'tag_not_found' }, 400, ["auto_tag_id"]);
   }
 
   // 常に書き込む項目（PUT なので、送られなければ既定値で上書きする）
@@ -3399,14 +3400,14 @@ booking.put('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KEY)
   }, 409);
 });
 
-booking.patch('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KEY), async (c) => {
+booking.patch('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KEY), inputJsonBoundary(), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ success: false, error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'missing_account_id' }, 400, ["account_id"]);
   try {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const expectedVersion = Number(body?.expectedVersion);
     if (!body || !Number.isInteger(expectedVersion) || expectedVersion < 1) {
-      return c.json({ success: false, error: 'expectedVersionは1以上の整数で指定してください' }, 400);
+      return inputError(c, { success: false, error: 'expectedVersionは1以上の整数で指定してください' }, 400, ["expectedVersion"]);
     }
     const hasPriceMode = Object.prototype.hasOwnProperty.call(body, 'price_mode');
     const hasBasePrice = Object.prototype.hasOwnProperty.call(body, 'base_price');
@@ -3415,7 +3416,7 @@ booking.patch('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KE
     if (hasPriceMode) {
       const rawMode = String(body.price_mode) as BookingPriceMode;
       if (!BOOKING_PRICE_MODES.has(rawMode)) {
-        return c.json({ success: false, error: 'price_mode must be fixed, free, or inquiry' }, 400);
+        return inputError(c, { success: false, error: 'price_mode must be fixed, free, or inquiry' }, 400, ["price_mode"]);
       }
       priceMode = rawMode;
       if (rawMode !== 'fixed') basePrice = 0;
@@ -3423,12 +3424,12 @@ booking.patch('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KE
     if (hasBasePrice && priceMode !== 'free' && priceMode !== 'inquiry') {
       const amount = Number(body.base_price);
       if (!Number.isInteger(amount) || amount < 0 || amount > 100_000_000) {
-        return c.json({ success: false, error: 'base_price must be an integer between 0 and 100000000' }, 400);
+        return inputError(c, { success: false, error: 'base_price must be an integer between 0 and 100000000' }, 400, ["base_price"]);
       }
       basePrice = amount;
     }
     const rules = readMenuBookingRules(body);
-    if (!rules.ok) return c.json({ success: false, error: rules.error }, 400);
+    if (!rules.ok) return inputError(c, { success: false, error: rules.error }, 400, ["intake_question"]);
     // 公開切替だけの更新(一覧の「止める・出す」)も版付きで受ける。
     // 数値 1/0 と真偽値のどちらも受け、止める側(0/false)に倒す。
     let isActive: boolean | undefined;
@@ -3437,7 +3438,7 @@ booking.patch('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KE
       if (rawActive === true || rawActive === 1) isActive = true;
       else if (rawActive === false || rawActive === 0) isActive = false;
       else {
-        return c.json({ success: false, error: 'is_active は true/false または 1/0 で指定してください' }, 400);
+        return inputError(c, { success: false, error: 'is_active は true/false または 1/0 で指定してください' }, 400, ["is_active"]);
       }
     }
     const result = await updateBookingMenuSettings(c.env.DB, {
@@ -3453,7 +3454,7 @@ booking.patch('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KE
       cancelDeadlineHoursBefore: rules.value.cancel_deadline_hours_before as number | null | undefined,
     });
     if (result.status === 'no_changes') {
-      return c.json({ success: false, error: '更新する項目を指定してください' }, 400);
+      return inputError(c, { success: false, error: '更新する項目を指定してください' }, 400, ["intake_question"]);
     }
     if (result.status === 'not_found') return c.json({ success: false, error: 'not_found' }, 404);
     if (result.status === 'conflict') {
@@ -3694,11 +3695,11 @@ const WAITLIST_ERROR_STATUS: Record<string, number> = {
   registration_closed:409,waitlist_limit:409,slot_not_full:409,
 };
 
-booking.post('/api/booking/admin/waitlist', requireRole('owner', 'admin', 'staff'), async (c) => {
+booking.post('/api/booking/admin/waitlist', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-  if (!body) return c.json({ error: 'invalid_json' }, 400);
+  if (!body) return inputError(c, { error: 'invalid_json' }, 400, []);
   const result = await insertWaitlistEntry(c.env.DB, {
     lineAccountId: accountId,
     staffId: typeof body.staff_id === 'string' ? body.staff_id : '',
@@ -3709,7 +3710,7 @@ booking.post('/api/booking/admin/waitlist', requireRole('owner', 'admin', 'staff
       ? (body.booking_customer_id as string).trim()
       : null,
   });
-  if (!result.ok) return c.json({ error: result.error }, WAITLIST_ERROR_STATUS[result.error] as 400 | 404 | 409);
+  if (!result.ok) return inputError(c, { error: result.error }, WAITLIST_ERROR_STATUS[result.error] as 400 | 404 | 409, []);
   const entry = await c.env.DB
     .prepare(`SELECT * FROM booking_waitlist WHERE id = ?`)
     .bind(result.id)
@@ -3799,13 +3800,13 @@ booking.delete('/api/booking/admin/waitlist/:id', requireRole('owner', 'admin', 
  * 招待ずみの人が予約を取ったとき、待ちを「予約になった」へ進める。
  * 同じ枠・同じ人の予約だけ受け付ける。
  */
-booking.post('/api/booking/admin/waitlist/:id/convert', requireRole('owner', 'admin', 'staff'), async (c) => {
+booking.post('/api/booking/admin/waitlist/:id/convert', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const id = c.req.param('id');
   const body = await c.req.json<{ booking_id?: unknown }>().catch(() => null);
   const bookingId = typeof body?.booking_id === 'string' ? body.booking_id : '';
-  if (!bookingId) return c.json({ error: 'missing_booking_id' }, 400);
+  if (!bookingId) return inputError(c, { error: 'missing_booking_id' }, 400, ["booking_id"]);
   const entry = await c.env.DB
     .prepare(`SELECT * FROM booking_waitlist WHERE id = ? AND line_account_id = ?`)
     .bind(id, accountId)
@@ -3847,13 +3848,13 @@ interface WaitlistEntryLike {
   status: string;
 }
 
-booking.post('/api/liff/booking/waitlist', async (c) => {
+booking.post('/api/liff/booking/waitlist', inputJsonBoundary(), async (c) => {
   const caller = await resolveSelfBookingCaller(c);
-  if (!caller.ok) return c.json({ error: caller.error }, caller.status);
+  if (!caller.ok) return inputError(c, { error: caller.error }, caller.status, []);
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-  if (!body) return c.json({ error: 'invalid_json' }, 400);
+  if (!body) return inputError(c, { error: 'invalid_json' }, 400, []);
   const start=typeof body.starts_at==='string'?new Date(body.starts_at):new Date(NaN);
-  if(!Number.isFinite(start.getTime()))return c.json({error:'invalid_starts_at'},400);
+  if(!Number.isFinite(start.getTime()))return inputError(c, {error:'invalid_starts_at'}, 400, ["starts_at"]);
   if(start.getTime()<=Date.now()+60*60_000)return c.json({error:'registration_closed'},409);
   const tz=await getAccountTimeZone(c.env.DB,caller.accountId),date=tzDateStr(tz,start);
   const check=await explainBookingSlot(c.env.DB,{lineAccountId:caller.accountId,menuId:String(body.menu_id??''),staffId:String(body.staff_id??''),date,time:tzHHMM(tz,start),now:new Date(),minLeadTimeMinutes:0,waitlistOffer:true,applyStoreRules:true,googleCredentials:googleCredentials(c.env)});
@@ -3868,13 +3869,13 @@ booking.post('/api/liff/booking/waitlist', async (c) => {
     friendId: caller.friendId,
     bookingCustomerId: null,
   });
-  if (!result.ok) return c.json({ error: result.error }, WAITLIST_ERROR_STATUS[result.error] as 400 | 404 | 409);
+  if (!result.ok) return inputError(c, { error: result.error }, WAITLIST_ERROR_STATUS[result.error] as 400 | 404 | 409, []);
   return c.json({ id: result.id }, 201);
 });
 
 booking.delete('/api/liff/booking/waitlist/:id', async (c) => {
   const caller = await resolveSelfBookingCaller(c);
-  if (!caller.ok) return c.json({ error: caller.error }, caller.status);
+  if (!caller.ok) return inputError(c, { error: caller.error }, caller.status, []);
   const id = c.req.param('id');
   const entry = await c.env.DB
     .prepare(`SELECT staff_id, starts_at, status FROM booking_waitlist
@@ -3913,7 +3914,7 @@ booking.delete('/api/liff/booking/waitlist/:id', async (c) => {
  */
 booking.get('/api/liff/booking/waitlist', async (c) => {
   const caller = await resolveSelfBookingCaller(c);
-  if (!caller.ok) return c.json({ error: caller.error }, caller.status);
+  if (!caller.ok) return inputError(c, { error: caller.error }, caller.status, []);
   await finishExpiredWaitlists(c.env.DB,caller.accountId);
   const rows = await c.env.DB
     .prepare(
@@ -3934,44 +3935,44 @@ booking.get('/api/liff/booking/waitlist', async (c) => {
 
 
 booking.get('/api/liff/booking/seat-waitlist',async(c)=>{
- const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return c.json({error:caller.error},caller.status);
+ const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return inputError(c, {error:caller.error}, caller.status, []);
  if(!restaurantTestEnabled(c.env))return c.json({error:'not_found'},404);
  await finishExpiredWaitlists(c.env.DB,caller.accountId);
  const rows=await c.env.DB.prepare(`SELECT w.id,w.store_id,w.starts_at,w.ends_at,w.guest_count,w.status,w.hold_minutes,w.hold_expires_at,w.created_at,s.name store_name FROM rt_seat_waitlist w JOIN rt_stores s ON s.id=w.store_id WHERE s.line_account_id=? AND w.line_uid=? AND (? IS NULL OR w.id=?) ORDER BY w.starts_at DESC,w.created_at LIMIT 100`).bind(caller.accountId,caller.lineUserId,c.req.query('id')??null,c.req.query('id')??null).all();
  return c.json({waitlist:rows.results});
 });
-booking.post('/api/liff/booking/seat-waitlist',async(c)=>{
- const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return c.json({error:caller.error},caller.status);
+booking.post('/api/liff/booking/seat-waitlist',inputJsonBoundary({"store_id":["string"],"starts_at":["string"],"guest_count":["number"]}), async(c)=>{
+ const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return inputError(c, {error:caller.error}, caller.status, []);
  if(!restaurantTestEnabled(c.env))return c.json({error:'not_found'},404);
- const body=await c.req.json<{store_id?:string;starts_at?:string;guest_count?:number}>().catch(()=>null);if(!body)return c.json({error:'invalid_json'},400);
+ const body=await c.req.json<{store_id?:string;starts_at?:string;guest_count?:number}>().catch(()=>null);if(!body)return inputError(c, {error:'invalid_json'}, 400, []);
  const store=await c.env.DB.prepare(`SELECT id FROM rt_stores WHERE id=? AND line_account_id=? AND status='active'`).bind(body.store_id??'',caller.accountId).first<{id:string}>();
  if(!store)return c.json({error:'not_found'},404);
  const starts=typeof body.starts_at==='string'?Date.parse(body.starts_at):NaN;
- if(!Number.isFinite(starts))return c.json({error:'invalid_starts_at'},400);
+ if(!Number.isFinite(starts))return inputError(c, {error:'invalid_starts_at'}, 400, ["starts_at"]);
  if(starts<=Date.now()+60*60_000)return c.json({error:'registration_closed'},409);
- const count=body.guest_count;if(!Number.isInteger(count)||!count||count<1||count>100)return c.json({error:'invalid_party'},400);
+ const count=body.guest_count;if(!Number.isInteger(count)||!count||count<1||count>100)return inputError(c, {error:'invalid_party'}, 400, ["guest_count"]);
  const end=new Date(starts+120*60_000).toISOString(),start=new Date(starts).toISOString();
  const fitting=await openSeatTables(c.env.DB,store.id,start,end,count,true);
  if(!fitting.length){
   if((await closuresForRange(c.env.DB,store.id,start,end)).length)return c.json({error:'closure_conflict',reason:'臨時休業・貸切のため受付できません'},409);
-  return c.json({error:'invalid_slot'},400);
+  return inputError(c, {error:'invalid_slot'}, 400, ["store_id","starts_at","guest_count"]);
  }
  // 閉じていない卓だけで満席を判定する。一部貸切の空卓を「予約できる」と数えない。
  if((await openSeatTables(c.env.DB,store.id,start,end,count)).length)return c.json({error:'slot_not_full'},409);
  const friend=await c.env.DB.prepare('SELECT display_name FROM friends WHERE id=? AND line_account_id=?').bind(caller.friendId,caller.accountId).first<{display_name:string|null}>();
  const result=await insertSeatWaitlistEntry(c.env.DB,{storeId:store.id,startsAt:start,endsAt:end,guestCount:count,customerName:friend?.display_name||'LINEのお客さま',customerPhone:null,lineUid:caller.lineUserId});
- return result.ok?c.json({id:result.id},201):c.json({error:result.error},result.error==='already_waiting'||result.error==='registration_closed'||result.error==='waitlist_limit'||result.error==='closure_conflict'?409:400);
+ return result.ok?c.json({id:result.id},201):inputError(c, {error:result.error}, result.error==='already_waiting'||result.error==='registration_closed'||result.error==='waitlist_limit'||result.error==='closure_conflict'?409:400, []);
 });
 booking.delete('/api/liff/booking/seat-waitlist/:id',async(c)=>{
- const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return c.json({error:caller.error},caller.status);
+ const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return inputError(c, {error:caller.error}, caller.status, []);
  if(!restaurantTestEnabled(c.env))return c.json({error:'not_found'},404);
  const result=await c.env.DB.prepare(`UPDATE rt_seat_waitlist SET status='cancelled',updated_at=? WHERE id=? AND line_uid=? AND store_id IN (SELECT id FROM rt_stores WHERE line_account_id=?) AND status IN ('waiting','invited')`).bind(new Date().toISOString(),c.req.param('id'),caller.lineUserId,caller.accountId).run();
  return result.meta.changes?c.json({status:'cancelled'}):c.json({error:'not_found'},404);
 });
-booking.post('/api/liff/booking/seat-waitlist/:id/accept',async(c)=>{
- const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return c.json({error:caller.error},caller.status);
+booking.post('/api/liff/booking/seat-waitlist/:id/accept',inputJsonBoundary(), async(c)=>{
+ const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return inputError(c, {error:caller.error}, caller.status, []);
  if(!restaurantTestEnabled(c.env))return c.json({error:'not_found'},404);
- const key=c.req.header('Idempotency-Key');if(!key)return c.json({error:'missing_idempotency_key'},400);
+ const key=c.req.header('Idempotency-Key');if(!key)return inputError(c, {error:'missing_idempotency_key'},400, []);
  const id=c.req.param('id');
  const entry=await c.env.DB.prepare(`SELECT w.* FROM rt_seat_waitlist w JOIN rt_stores s ON s.id=w.store_id WHERE w.id=? AND w.line_uid=? AND s.line_account_id=? AND s.status='active'`).bind(id,caller.lineUserId,caller.accountId).first<{store_id:string;table_id:string;starts_at:string;ends_at:string;guest_count:number;customer_name:string;status:string;hold_expires_at:string}>();
  if(!entry)return c.json({error:'not_found'},404);
@@ -3979,7 +3980,7 @@ booking.post('/api/liff/booking/seat-waitlist/:id/accept',async(c)=>{
  if(existing)return c.json({reservation_id:existing.id,status:existing.status});
  if(entry.status!=='invited'||Date.parse(entry.hold_expires_at)<=Date.now())return c.json({error:'offer_expired'},409);
  const checked=validateInboundReservation({externalId:`waitlist:${id}`,customerName:entry.customer_name,lineUid:caller.lineUserId,guestCount:entry.guest_count,startsAt:entry.starts_at,endsAt:entry.ends_at,status:'confirmed'});
- if(!checked.ok)return c.json({error:checked.error},400);
+ if(!checked.ok)return inputError(c, {error:checked.error}, 400, []);
  const table=await c.env.DB.prepare('SELECT id FROM rt_tables WHERE id=? AND store_id=? AND is_active=1 AND min_capacity<=? AND max_capacity>=?').bind(entry.table_id,entry.store_id,entry.guest_count,entry.guest_count).first();
  if(!table)return c.json({error:'slot_conflict'},409);
  const closed=await closuresForRange(c.env.DB,entry.store_id,entry.starts_at,entry.ends_at);
@@ -4002,7 +4003,7 @@ booking.post('/api/liff/booking/seat-waitlist/:id/accept',async(c)=>{
  */
 booking.get('/api/liff/booking/last-booking', async (c) => {
   const caller = await resolveSelfBookingCaller(c);
-  if (!caller.ok) return c.json({ error: caller.error }, caller.status);
+  if (!caller.ok) return inputError(c, { error: caller.error }, caller.status, []);
   const row = await c.env.DB
     .prepare(
       `SELECT b.id, b.starts_at, b.status,
@@ -4064,7 +4065,7 @@ booking.get('/api/liff/booking/last-booking', async (c) => {
  */
 booking.get('/api/liff/booking/waitlist/mine', async (c) => {
   const caller = await resolveSelfBookingCaller(c);
-  if (!caller.ok) return c.json({ error: caller.error }, caller.status);
+  if (!caller.ok) return inputError(c, { error: caller.error }, caller.status, []);
   const staffId = c.req.query('staff_id')?.trim() || '';
   const menuId = c.req.query('menu_id')?.trim() || '';
   const startsAtRaw = c.req.query('starts_at')?.trim() || '';
@@ -4364,24 +4365,24 @@ type VisitKind = (typeof VISIT_KINDS)[number];
  * 今日の予約に印を付ける。「来店した」→完了、「来なかった」→無断、
  * 「遅れる」→状態は変えず遅れ分数だけ残す。だれがいつ付けたか残す。
  */
-booking.post('/api/booking/admin/bookings/:id/visit', requireRole('owner', 'admin', 'staff'), async (c) => {
+booking.post('/api/booking/admin/bookings/:id/visit', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const id = c.req.param('id');
   const body = await c.req.json<{ kind?: unknown; late_minutes?: unknown }>().catch(() => null);
   const kind = typeof body?.kind === 'string' && (VISIT_KINDS as readonly string[]).includes(body.kind)
     ? (body.kind as VisitKind)
     : null;
-  if (!kind) return c.json({ error: 'invalid_kind' }, 400);
+  if (!kind) return inputError(c, { error: 'invalid_kind' }, 400, ["kind"]);
   const lateMinutes = body?.late_minutes === undefined || body?.late_minutes === null
     ? null
     : Number(body.late_minutes);
   if (kind === 'late') {
     if (!Number.isInteger(lateMinutes) || (lateMinutes as number) < 1 || (lateMinutes as number) > 1440) {
-      return c.json({ error: 'invalid_late_minutes' }, 400);
+      return inputError(c, { error: 'invalid_late_minutes' }, 400, ["late_minutes"]);
     }
   } else if (lateMinutes !== null) {
-    return c.json({ error: 'late_minutes_not_needed' }, 400);
+    return inputError(c, { error: 'late_minutes_not_needed' }, 400, ["late_minutes"]);
   }
   const row = await c.env.DB
     .prepare(`SELECT id, status FROM bookings WHERE id = ? AND line_account_id = ?`)
@@ -4639,12 +4640,12 @@ type SelfBookingChange = {
 
 async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch, self?: SelfBookingChange) {
   const accountId = self?.accountId ?? await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const bookingId = c.req.param('id')!;
   const body = override ?? await c.req.json<AdminBookingPatch>().catch(() => null);
-  if (!body) return c.json({ error: 'invalid_json' }, 400);
+  if (!body) return inputError(c, { error: 'invalid_json' }, 400, []);
   if (!Number.isInteger(body.lock_version) || Number(body.lock_version) < 0) {
-    return c.json({ error: 'missing_lock_version' }, 400);
+    return inputError(c, { error: 'missing_lock_version' }, 400, ["lock_version"]);
   }
   const expectedVersion = Number(body.lock_version);
   const row = await c.env.DB
@@ -4684,9 +4685,9 @@ async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch,
     if (row.friend_id !== self.friendId) return c.json({ error: 'booking_not_found' }, 404);
     const selfForbidden = ['menu_id', 'staff_id', 'price', 'customer_note', 'internal_note', 'notification_policy', 'send_change_notification'];
     if (selfForbidden.some((key) => Object.hasOwn(body, key))) {
-      return c.json({ error: 'invalid_params' }, 400);
+      return inputError(c, { error: 'invalid_params' }, 400, selfForbidden.filter((key) => Object.hasOwn(body, key)));
     }
-    if (body.starts_at === undefined) return c.json({ error: 'missing_starts_at' }, 400);
+    if (body.starts_at === undefined) return inputError(c, { error: 'missing_starts_at' }, 400, ["starts_at"]);
     const rules = await readSelfBookingRules(c.env.DB, accountId, row.menu_id);
     if (Date.now() > new Date(row.starts_at).getTime() - rules.cancelDeadlineMinutesBefore * 60_000) {
       return c.json({ error: 'self_deadline_passed' }, 403);
@@ -4694,7 +4695,7 @@ async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch,
   }
   const editable = ['menu_id', 'staff_id', 'starts_at', 'price', 'customer_note', 'internal_note', 'notification_policy'];
   if (!editable.some((key) => Object.hasOwn(body, key))) {
-    return c.json({ error: 'nothing_to_update' }, 400);
+    return inputError(c, { error: 'nothing_to_update' }, 400, []);
   }
 
   const newStaffId = typeof body.staff_id === 'string' && body.staff_id.trim()
@@ -4728,18 +4729,18 @@ async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch,
       is_offered: number | null;
     }>();
   if (!menuRow || menuRow.is_offered !== 1) {
-    return c.json({ error: 'menu_not_offered' }, 422);
+    return inputError(c, { error: 'menu_not_offered' }, 422, ["menu_id","staff_id"]);
   }
 
   const newStartsAt = body.starts_at !== undefined ? new Date(String(body.starts_at)) : new Date(row.starts_at);
   if (Number.isNaN(newStartsAt.getTime())) {
-    return c.json({ error: 'invalid_starts_at' }, 422);
+    return inputError(c, { error: 'invalid_starts_at' }, 422, ["starts_at"]);
   }
   if (self) {
     // 受付締切 (menu→store)。過ぎた新日時は受け付けない。
     const rules = await readSelfBookingRules(c.env.DB, accountId, row.menu_id);
     if (newStartsAt.getTime() - Date.now() < rules.cutoffMinutesBefore * 60_000) {
-      return c.json({ error: 'past_cutoff' }, 422);
+      return inputError(c, { error: 'past_cutoff' }, 422, ["starts_at"]);
     }
     // 同じ日時の再送は成功のまま返す (二重更新しない)。
     // 未完の副作用は同じ版・同じ冪等キーで回復する (二重予定・通知を作らない)。
@@ -4770,7 +4771,7 @@ async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch,
   const startsAtMoved = body.starts_at !== undefined
     && newStartsAt.toISOString() !== row.starts_at;
   if (startsAtMoved && newStartsAt.getTime() < Date.now()) {
-    return c.json({ error: 'past_datetime' }, 422);
+    return inputError(c, { error: 'past_datetime' }, 422, ["starts_at"]);
   }
   const timingChanged = newStartsAt.toISOString() !== row.starts_at
     || newStaffId !== row.staff_id
@@ -4791,7 +4792,7 @@ async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch,
   let newPrice = Number(row.price_at_booking);
   if (body.price !== undefined) {
     if (!Number.isInteger(body.price) || Number(body.price) < 0 || Number(body.price) > 100_000_000) {
-      return c.json({ error: 'invalid_price' }, 422);
+      return inputError(c, { error: 'invalid_price' }, 422, ["price"]);
     }
     newPrice = Number(body.price);
   } else if (newMenuId !== row.menu_id) {
@@ -4811,7 +4812,7 @@ async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch,
   let policyPatch: Partial<BookingNotificationPolicy> = {};
   if (body.notification_policy !== undefined) {
     const parsed = readNotificationPolicyPatch(body.notification_policy);
-    if (!parsed.ok) return c.json({ error: 'invalid_notification_policy' }, 422);
+    if (!parsed.ok) return inputError(c, { error: 'invalid_notification_policy' }, 422, ["notification_policy"]);
     policyPatch = parsed.value;
   }
   const newPolicy: BookingNotificationPolicy = {
@@ -4825,7 +4826,7 @@ async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch,
     if (policyPatch.send_line_confirmation === true
       || policyPatch.day_before === true
       || policyPatch.hours_before === true) {
-      return c.json({ error: 'line_notification_unavailable' }, 422);
+      return inputError(c, { error: 'line_notification_unavailable' }, 422, ["notification_policy"]);
     }
     newPolicy.send_line_confirmation = false;
     newPolicy.day_before = false;
@@ -5191,13 +5192,13 @@ async function updateAdminBooking(c: Context<Env>, override?: AdminBookingPatch,
   });
 }
 
-booking.patch('/api/booking/admin/bookings/:id', requireRole('owner', 'admin', 'staff'), (c) => updateAdminBooking(c));
+booking.patch('/api/booking/admin/bookings/:id', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), (c) => updateAdminBooking(c));
 
-booking.post('/api/booking/admin/bookings/:id/reassign', requireRole('owner', 'admin', 'staff'), requirePermission('/booking/bookings'), async (c) => {
+booking.post('/api/booking/admin/bookings/:id/reassign', requireRole('owner', 'admin', 'staff'), requirePermission('/booking/bookings'), inputJsonBoundary(), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const body = await c.req.json<{ staffId?: unknown; notifyCustomer?: unknown }>().catch(() => null);
-  if (!body || typeof body.staffId !== 'string' || !body.staffId.trim() || typeof body.notifyCustomer !== 'boolean') return c.json({ error: 'invalid_reassign' }, 400);
+  if (!body || typeof body.staffId !== 'string' || !body.staffId.trim() || typeof body.notifyCustomer !== 'boolean') return inputError(c, { error: 'invalid_reassign' }, 400, ["staffId","notifyCustomer"]);
   const row = await c.env.DB.prepare('SELECT lock_version,starts_at,staff_id,friend_id FROM bookings WHERE id=? AND line_account_id=?').bind(c.req.param('id'),accountId).first<{ lock_version: number; starts_at: string; staff_id: string; friend_id: string | null }>();
   if (!row) return c.json({ error: 'booking_not_found' }, 404);
   // 移動APIでは必ず今の空き判定を通す。過去の実績修正は通常の変更口へ。
@@ -5222,9 +5223,9 @@ booking.post('/api/booking/admin/bookings/:id/reassign', requireRole('owner', 'a
  * 行は触らず 409、実行中 (queued) は二重実行を避けて 409。
  * confirmed は delete+create の再同期、cancelled/expired は削除の再実行。
  */
-booking.post('/api/booking/admin/bookings/:id/sync/retry', requireRole('owner', 'admin', 'staff'), async (c) => {
+booking.post('/api/booking/admin/bookings/:id/sync/retry', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const bookingId = c.req.param('id');
   const row = await c.env.DB
     .prepare(`SELECT id, status FROM bookings WHERE id = ? AND line_account_id = ?`)
@@ -5290,9 +5291,9 @@ booking.post('/api/booking/admin/bookings/:id/sync/retry', requireRole('owner', 
 booking.post(
   '/api/booking/admin/bookings/:id/notifications/:runId/retry',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const accountId = await resolveAccountIdAdmin(c);
-    if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+    if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
     const bookingId = c.req.param('id');
     const runId = c.req.param('runId');
     const bookingRow = await c.env.DB
@@ -5300,7 +5301,7 @@ booking.post(
       .bind(bookingId, accountId)
       .first<{ id: string; status: BookingStatus; friend_id: string | null }>();
     if (!bookingRow) return c.json({ error: 'booking_not_found' }, 404);
-    if (!bookingRow.friend_id) return c.json({ error: 'line_notification_unavailable' }, 422);
+    if (!bookingRow.friend_id) return inputError(c, { error: 'line_notification_unavailable' }, 422, ["notification_policy"]);
     const op = await c.env.DB
       .prepare(
         `SELECT id, kind, status, result_json FROM booking_operation_runs
@@ -5641,11 +5642,11 @@ async function ensureProxyBookingSideEffects(
 // friend, straight from the iOS chat screen. Same shift/slot/conflict
 // validation as the LIFF flow, but NO min-lead-time check (the operator
 // may book a slot starting sooner than customers are allowed to).
-booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff'), async (c) => {
+booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff'), inputJsonBoundary({"friend_id":["string"],"booking_customer_id":["string"],"menu_id":["string"],"staff_id":["string"],"starts_at":["string"],"customer_note":["string"],"send_line_confirmation":["boolean"]}), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const idemKey = c.req.header('Idempotency-Key')?.trim();
-  if (!idemKey) return c.json({ error: 'missing_idempotency_key' }, 400);
+  if (!idemKey) return inputError(c, { error: 'missing_idempotency_key' }, 400, []);
   const body = await c.req.json<{
     friend_id?: string;
     booking_customer_id?: string;
@@ -5658,7 +5659,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     notification_policy?: unknown;
     party_size?: unknown;
   }>();
-  if (body.party_size !== undefined && body.party_size !== 1) return c.json({ error: 'unsupported_party_size' }, 422);
+  if (body.party_size !== undefined && body.party_size !== 1) return inputError(c, { error: 'unsupported_party_size' }, 422, ["party_size"]);
   const friendInput = body.friend_id?.trim() || null;
   const customerInput = body.booking_customer_id?.trim() || null;
   if (
@@ -5667,7 +5668,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     || !body.menu_id
     || !body.starts_at
   ) {
-    return c.json({ error: 'missing_params' }, 400);
+    return inputError(c, { error: 'missing_params' }, 400, ["friend_id","booking_customer_id","menu_id","starts_at"]);
   }
 
   let friendId: string | null = null;
@@ -5704,7 +5705,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
   let policyPatch: Partial<BookingNotificationPolicy> = {};
   if (body.notification_policy !== undefined) {
     const parsed = readNotificationPolicyPatch(body.notification_policy);
-    if (!parsed.ok) return c.json({ error: 'invalid_notification_policy' }, 422);
+    if (!parsed.ok) return inputError(c, { error: 'invalid_notification_policy' }, 422, ["notification_policy"]);
     policyPatch = parsed.value;
   }
   if (!friendId) {
@@ -5713,7 +5714,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
       || policyPatch.day_before === true
       || policyPatch.hours_before === true;
     if (wantsNotification) {
-      return c.json({ error: 'line_notification_unavailable' }, 422);
+      return inputError(c, { error: 'line_notification_unavailable' }, 422, ["send_line_confirmation"]);
     }
   }
   const sendLineConfirmation = Boolean(friendId)
@@ -5816,15 +5817,15 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     .bind(body.menu_id, body.staff_id, accountId)
     .first<{ name: string; duration_minutes: number; buffer_after_minutes: number; concurrent_capacity: number; dur: number; price: number; price_mode: string; version: number; is_offered: number | null }>();
   if (!menuRow || menuRow.is_offered !== 1) {
-    return c.json({ error: 'menu_not_offered' }, 422);
+    return inputError(c, { error: 'menu_not_offered' }, 422, ["menu_id","staff_id"]);
   }
 
   const startsAt = new Date(body.starts_at);
   if (Number.isNaN(startsAt.getTime())) {
-    return c.json({ error: 'invalid_starts_at' }, 422);
+    return inputError(c, { error: 'invalid_starts_at' }, 422, ["starts_at"]);
   }
   if (startsAt < new Date()) {
-    return c.json({ error: 'past_datetime' }, 422);
+    return inputError(c, { error: 'past_datetime' }, 422, ["starts_at"]);
   }
   const endsAt = new Date(startsAt.getTime() + menuRow.dur * 60_000);
   const blockEndsAt = new Date(endsAt.getTime() + menuRow.buffer_after_minutes * 60_000);
@@ -6280,18 +6281,18 @@ booking.get('/api/booking/admin/staff/me', async (c) => {
   return c.json({ staff: rows.results });
 });
 
-booking.post('/api/booking/admin/staff', requirePermission(BOOKING_SETTINGS_KEY), async (c) => {
+booking.post('/api/booking/admin/staff', requirePermission(BOOKING_SETTINGS_KEY), inputJsonBoundary(), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const raw = await c.req.json<unknown>().catch(() => null);
-  if (raw === null) return c.json({ error: 'invalid_json' }, 400);
+  if (raw === null) return inputError(c, { error: 'invalid_json' }, 400, []);
   const parsed = parseBookingStaffInput(raw, 'create');
   if (!parsed.ok) {
-    return c.json({
+    return inputError(c, {
       code: 'booking_staff_validation_failed',
       error: parsed.error,
       field: parsed.field,
-    }, 422);
+    }, 422, []);
   }
   const b = parsed.value;
   if (b.staff_member_id) {
@@ -6300,11 +6301,11 @@ booking.post('/api/booking/admin/staff', requirePermission(BOOKING_SETTINGS_KEY)
       .bind(b.staff_member_id)
       .first<{ ok: number }>();
     if (!member) {
-      return c.json({
+      return inputError(c, {
         code: 'booking_staff_validation_failed',
         error: '紐づけるログインユーザーが見つかりません',
         field: 'staff_member_id',
-      }, 422);
+      }, 422, ["staff_member_id"]);
     }
   }
   const id = crypto.randomUUID();
@@ -6332,19 +6333,19 @@ booking.post('/api/booking/admin/staff', requirePermission(BOOKING_SETTINGS_KEY)
   return c.json({ id }, 201);
 });
 
-booking.put('/api/booking/admin/staff/:id', requirePermission(BOOKING_SETTINGS_KEY), async (c) => {
+booking.put('/api/booking/admin/staff/:id', requirePermission(BOOKING_SETTINGS_KEY), inputJsonBoundary(), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const id = c.req.param('id');
   const raw = await c.req.json<unknown>().catch(() => null);
-  if (raw === null) return c.json({ error: 'invalid_json' }, 400);
+  if (raw === null) return inputError(c, { error: 'invalid_json' }, 400, []);
   const parsed = parseBookingStaffInput(raw, 'update');
   if (!parsed.ok) {
-    return c.json({
+    return inputError(c, {
       code: 'booking_staff_validation_failed',
       error: parsed.error,
       field: parsed.field,
-    }, 422);
+    }, 422, []);
   }
   const updates: string[] = [];
   const values: Array<string | number | null> = [];
@@ -6370,11 +6371,11 @@ booking.put('/api/booking/admin/staff/:id', requirePermission(BOOKING_SETTINGS_K
       .bind(parsed.value.staff_member_id)
       .first<{ ok: number }>();
     if (!member) {
-      return c.json({
+      return inputError(c, {
         code: 'booking_staff_validation_failed',
         error: '紐づけるログインユーザーが見つかりません',
         field: 'staff_member_id',
-      }, 422);
+      }, 422, []);
     }
   }
   const result = await c.env.DB.prepare(
@@ -6427,9 +6428,9 @@ booking.get('/api/booking/admin/staff/:id/menus', async (c) => {
   return c.json({ matrix: rows.results });
 });
 
-booking.put('/api/booking/admin/staff/:id/menus', requirePermission(BOOKING_MENUS_KEY), async (c) => {
+booking.put('/api/booking/admin/staff/:id/menus', requirePermission(BOOKING_MENUS_KEY), inputJsonBoundary({"menus":["array"]}), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const staffId = c.req.param('id');
   if (!(await assertStaffInAccount(c.env.DB, staffId, accountId))) {
     return c.json({ error: 'staff_not_found_in_account' }, 404);
@@ -6451,7 +6452,7 @@ booking.put('/api/booking/admin/staff/:id/menus', requirePermission(BOOKING_MENU
         .all<{ id: string }>()
     ).results.map((r) => r.id),
   );
-  if (!Array.isArray(b.menus)) return c.json({ error: 'invalid_menus' }, 400);
+  if (!Array.isArray(b.menus)) return inputError(c, { error: 'invalid_menus' }, 400, ["menus"]);
   const filtered = b.menus.filter((m) => validMenuIds.has(m.menu_id));
   // DELETE と INSERT を同一 batch に入れて原子化する。分けると INSERT 側の
   // 失敗で割り当てが全消えする。
@@ -6561,19 +6562,19 @@ function staffMenusReplaceStatements(
 // 画面の一括保存を1要求で受ける口。全担当者分を1 batch で適用する。
 // staff_id / menu_id が1件でも別account・不存在なら全体を拒否する
 // （単独PUTと違い、menu_id の黙っての取りこぼしはしない）。
-booking.put('/api/booking/admin/staff-menus', requirePermission(BOOKING_MENUS_KEY), async (c) => {
+booking.put('/api/booking/admin/staff-menus', requirePermission(BOOKING_MENUS_KEY), inputJsonBoundary({"staff":["array"]}), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const b = await c.req.json<{
     staff: Array<{ staff_id: string; menus: StaffMenuAssignment[] }>;
   }>();
-  if (!Array.isArray(b.staff)) return c.json({ error: 'invalid_staff' }, 400);
+  if (!Array.isArray(b.staff)) return inputError(c, { error: 'invalid_staff' }, 400, ["staff"]);
   const seen = new Set<string>();
   for (const entry of b.staff) {
     if (typeof entry.staff_id !== 'string' || !Array.isArray(entry.menus)) {
-      return c.json({ error: 'invalid_staff' }, 400);
+      return inputError(c, { error: 'invalid_staff' }, 400, ["staff"]);
     }
-    if (seen.has(entry.staff_id)) return c.json({ error: 'duplicate_staff_id' }, 422);
+    if (seen.has(entry.staff_id)) return inputError(c, { error: 'duplicate_staff_id' }, 422, ["staff"]);
     seen.add(entry.staff_id);
   }
   if (b.staff.length === 0) return c.json({ ok: true });
@@ -6630,9 +6631,9 @@ booking.get('/api/booking/admin/staff/:id/availability-rules', requireOwnBooking
   return c.json({ rules: rows.results });
 });
 
-booking.put('/api/booking/admin/staff/:id/availability-rules', requireOwnBookingStaffOrAdmin(), async (c) => {
+booking.put('/api/booking/admin/staff/:id/availability-rules', requireOwnBookingStaffOrAdmin(), inputJsonBoundary({"rules":["array"]}), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const staffId = c.req.param('id');
   if (!(await assertStaffInAccount(c.env.DB, staffId, accountId))) {
     return c.json({ error: 'staff_not_found_in_account' }, 404);
@@ -6640,17 +6641,17 @@ booking.put('/api/booking/admin/staff/:id/availability-rules', requireOwnBooking
   const body = await c.req.json<{
     rules: Array<{ weekday: number; start_time: string; end_time: string }>;
   }>();
-  if (!Array.isArray(body.rules)) return c.json({ error: 'invalid_rules' }, 400);
+  if (!Array.isArray(body.rules)) return inputError(c, { error: 'invalid_rules' }, 400, ["rules"]);
   const hhmm = /^([01]\d|2[0-3]):[0-5]\d$/;
   const weekdays = new Set<number>();
   for (const rule of body.rules) {
     if (!Number.isInteger(rule.weekday) || rule.weekday < 0 || rule.weekday > 6) {
-      return c.json({ error: 'invalid_weekday' }, 422);
+      return inputError(c, { error: 'invalid_weekday' }, 422, ["rules"]);
     }
-    if (weekdays.has(rule.weekday)) return c.json({ error: 'duplicate_weekday' }, 422);
+    if (weekdays.has(rule.weekday)) return inputError(c, { error: 'duplicate_weekday' }, 422, ["rules"]);
     weekdays.add(rule.weekday);
     if (!hhmm.test(rule.start_time) || !hhmm.test(rule.end_time) || rule.start_time >= rule.end_time) {
-      return c.json({ error: 'invalid_time_range' }, 422);
+      return inputError(c, { error: 'invalid_time_range' }, 422, ["rules"]);
     }
   }
   const statements: D1PreparedStatement[] = [
@@ -6803,9 +6804,9 @@ booking.get('/api/booking/admin/staff/:id/breaks', requireOwnBookingStaffOrAdmin
   });
 });
 
-booking.put('/api/booking/admin/staff/:id/breaks', requireOwnBookingStaffOrAdmin(), async (c) => {
+booking.put('/api/booking/admin/staff/:id/breaks', requireOwnBookingStaffOrAdmin(), inputJsonBoundary({"breaks":["array"]}), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const staffId = c.req.param('id');
   if (!(await assertStaffInAccount(c.env.DB, staffId, accountId))) {
     return c.json({ error: 'staff_not_found_in_account' }, 404);
@@ -6814,17 +6815,17 @@ booking.put('/api/booking/admin/staff/:id/breaks', requireOwnBookingStaffOrAdmin
     breaks?: Array<{ id?: string; weekday: number; start_time: string; end_time: string }>;
     expectedVersion?: unknown;
   }>().catch(() => null);
-  if (!body || !Array.isArray(body.breaks)) return c.json({ error: 'invalid_breaks' }, 400);
-  if (body.breaks.length > BREAK_WEEKLY_LIMIT) return c.json({ error: 'too_many_breaks' }, 400);
+  if (!body || !Array.isArray(body.breaks)) return inputError(c, { error: 'invalid_breaks' }, 400, ["breaks"]);
+  if (body.breaks.length > BREAK_WEEKLY_LIMIT) return inputError(c, { error: 'too_many_breaks' }, 400, ["breaks"]);
   if (typeof body.expectedVersion !== 'string' || body.expectedVersion.length === 0) {
-    return c.json({ error: 'invalid_version' }, 400);
+    return inputError(c, { error: 'invalid_version' }, 400, ["expectedVersion"]);
   }
   for (const item of body.breaks) {
     if (!Number.isInteger(item.weekday) || item.weekday < 0 || item.weekday > 6) {
-      return c.json({ error: 'invalid_weekday' }, 422);
+      return inputError(c, { error: 'invalid_weekday' }, 422, ["breaks"]);
     }
     if (!isValidTimeRange(item.start_time, item.end_time)) {
-      return c.json({ error: 'invalid_time_range' }, 422);
+      return inputError(c, { error: 'invalid_time_range' }, 422, ["breaks"]);
     }
   }
   const current = await c.env.DB
@@ -6852,7 +6853,7 @@ booking.put('/api/booking/admin/staff/:id/breaks', requireOwnBookingStaffOrAdmin
     byWeekday.set(item.weekday, list);
   });
   for (const list of byWeekday.values()) {
-    if (findBreakOverlap(list)) return c.json({ error: 'break_overlap' }, 422);
+    if (findBreakOverlap(list)) return inputError(c, { error: 'break_overlap' }, 422, ["breaks"]);
   }
   const rules = await c.env.DB
     .prepare(`SELECT weekday, start_time, end_time FROM staff_availability_rules WHERE staff_id = ? AND is_active = 1`)
@@ -6861,7 +6862,7 @@ booking.put('/api/booking/admin/staff/:id/breaks', requireOwnBookingStaffOrAdmin
   for (const item of body.breaks) {
     const rule = rules.results.find((entry) => entry.weekday === item.weekday);
     if (!rule || rule.start_time > item.start_time || item.end_time > rule.end_time) {
-      return c.json({ error: 'break_outside_working_hours' }, 422);
+      return inputError(c, { error: 'break_outside_working_hours' }, 422, ["breaks"]);
     }
   }
   const timeZone = await staffStoreTimeZone(c.env.DB, accountId);
@@ -6935,9 +6936,9 @@ booking.get('/api/booking/admin/staff/:id/break-dates', requireOwnBookingStaffOr
   });
 });
 
-booking.put('/api/booking/admin/staff/:id/break-dates', requireOwnBookingStaffOrAdmin(), async (c) => {
+booking.put('/api/booking/admin/staff/:id/break-dates', requireOwnBookingStaffOrAdmin(), inputJsonBoundary({"breaks":["array"]}), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const staffId = c.req.param('id');
   if (!(await assertStaffInAccount(c.env.DB, staffId, accountId))) {
     return c.json({ error: 'staff_not_found_in_account' }, 404);
@@ -6946,17 +6947,17 @@ booking.put('/api/booking/admin/staff/:id/break-dates', requireOwnBookingStaffOr
     breaks?: Array<{ id?: string; work_date: string; start_time: string; end_time: string }>;
     expectedVersion?: unknown;
   }>().catch(() => null);
-  if (!body || !Array.isArray(body.breaks)) return c.json({ error: 'invalid_breaks' }, 400);
-  if (body.breaks.length > BREAK_DATE_LIMIT) return c.json({ error: 'too_many_break_dates' }, 400);
+  if (!body || !Array.isArray(body.breaks)) return inputError(c, { error: 'invalid_breaks' }, 400, ["breaks"]);
+  if (body.breaks.length > BREAK_DATE_LIMIT) return inputError(c, { error: 'too_many_break_dates' }, 400, ["breaks"]);
   if (typeof body.expectedVersion !== 'string' || body.expectedVersion.length === 0) {
-    return c.json({ error: 'invalid_version' }, 400);
+    return inputError(c, { error: 'invalid_version' }, 400, ["expectedVersion"]);
   }
   for (const item of body.breaks) {
     if (!isValidShiftDate(item.work_date)) {
-      return c.json({ error: 'invalid_date' }, 422);
+      return inputError(c, { error: 'invalid_date' }, 422, ["breaks"]);
     }
     if (!isValidTimeRange(item.start_time, item.end_time)) {
-      return c.json({ error: 'invalid_time_range' }, 422);
+      return inputError(c, { error: 'invalid_time_range' }, 422, ["breaks"]);
     }
   }
   const current = await c.env.DB
@@ -6984,14 +6985,14 @@ booking.put('/api/booking/admin/staff/:id/break-dates', requireOwnBookingStaffOr
     byDate.set(item.work_date, list);
   });
   for (const list of byDate.values()) {
-    if (findBreakOverlap(list)) return c.json({ error: 'break_overlap' }, 422);
+    if (findBreakOverlap(list)) return inputError(c, { error: 'break_overlap' }, 422, ["breaks"]);
   }
   const timeZone = await staffStoreTimeZone(c.env.DB, accountId);
   const resolved = new Map<string, { startOffset: string; endOffset: string }>();
   for (const item of body.breaks) {
     const start = resolveWallTime(item.work_date, item.start_time, timeZone);
     const end = resolveWallTime(item.work_date, item.end_time, timeZone);
-    if (!start || !end) return c.json({ error: 'dst_gap' }, 422);
+    if (!start || !end) return inputError(c, { error: 'dst_gap' }, 422, ["breaks"]);
     resolved.set(`${item.work_date}|${item.start_time}|${item.end_time}`, {
       startOffset: formatUtcOffset(start.offsetMinutes),
       endOffset: formatUtcOffset(end.offsetMinutes),
@@ -7012,7 +7013,7 @@ booking.put('/api/booking/admin/staff/:id/break-dates', requireOwnBookingStaffOr
       (entry) => entry.weekday === new Date(`${item.work_date}T00:00:00Z`).getUTCDay(),
     );
     if (!working || working.start_time > item.start_time || item.end_time > working.end_time) {
-      return c.json({ error: 'break_outside_working_hours' }, 422);
+      return inputError(c, { error: 'break_outside_working_hours' }, 422, ["breaks"]);
     }
   }
   const now = new Date().toISOString();
@@ -7093,9 +7094,9 @@ booking.get('/api/booking/admin/staff/:id/google-calendar', requireOwnBookingSta
   });
 });
 
-booking.put('/api/booking/admin/staff/:id/google-calendar', requireOwnBookingStaffOrAdmin(), async (c) => {
+booking.put('/api/booking/admin/staff/:id/google-calendar', requireOwnBookingStaffOrAdmin(), inputJsonBoundary({"calendar_id":["string"]}), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const staffId = c.req.param('id');
   if (!(await assertStaffInAccount(c.env.DB, staffId, accountId))) {
     return c.json({ error: 'staff_not_found_in_account' }, 404);
@@ -7103,7 +7104,7 @@ booking.put('/api/booking/admin/staff/:id/google-calendar', requireOwnBookingSta
   const body = await c.req.json<{ calendar_id?: string }>();
   const calendarId = body.calendar_id?.trim();
   if (!calendarId || calendarId.length > 1024 || /[\r\n]/.test(calendarId)) {
-    return c.json({ error: 'invalid_calendar_id' }, 422);
+    return inputError(c, { error: 'invalid_calendar_id' }, 422, ["calendar_id"]);
   }
   const existing = await c.env.DB
     .prepare(
@@ -7124,7 +7125,7 @@ booking.put('/api/booking/admin/staff/:id/google-calendar', requireOwnBookingSta
     console.error('Google Calendar verification failed:', error);
     const message = error instanceof Error ? error.message : String(error);
     const status = message === 'google_service_account_not_configured' ? 503 : 422;
-    return c.json({ error: status === 503 ? 'service_account_not_configured' : 'calendar_not_accessible' }, status);
+    return inputError(c, { error: status === 503 ? 'service_account_not_configured' : 'calendar_not_accessible' }, status, []);
   }
   const now = new Date().toISOString();
   if (existing) {
@@ -7192,9 +7193,9 @@ booking.get('/api/booking/admin/staff/:id/shifts', requireOwnBookingStaffOrAdmin
   return c.json({ shifts: rows.results });
 });
 
-booking.put('/api/booking/admin/staff/:id/shifts', requireOwnBookingStaffOrAdmin(), async (c) => {
+booking.put('/api/booking/admin/staff/:id/shifts', requireOwnBookingStaffOrAdmin(), inputJsonBoundary({"shifts":["array"]}), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const staffId = c.req.param('id');
   if (!(await assertStaffInAccount(c.env.DB, staffId, accountId))) {
     return c.json({ error: 'staff_not_found_in_account' }, 404);
@@ -7202,15 +7203,15 @@ booking.put('/api/booking/admin/staff/:id/shifts', requireOwnBookingStaffOrAdmin
   const b = await c.req.json<{
     shifts?: Array<{ work_date: string; start_time: string; end_time: string; is_responsible?: boolean }>;
   }>().catch(() => null);
-  if (!b || !Array.isArray(b.shifts)) return c.json({ error: 'shifts_must_be_an_array' }, 400);
-  if(b.shifts.some(s=>s.is_responsible!==undefined&&typeof s.is_responsible!=='boolean'))return c.json({error:'責任者の指定を確認してください'},400);
+  if (!b || !Array.isArray(b.shifts)) return inputError(c, { error: 'shifts_must_be_an_array' }, 400, ["shifts"]);
+  if(b.shifts.some(s=>s.is_responsible!==undefined&&typeof s.is_responsible!=='boolean'))return inputError(c, {error:'責任者の指定を確認してください'}, 400, ["shifts"]);
   if(b.shifts.some(s=>s.is_responsible!==undefined)&&!['owner','admin'].includes(c.get('staff')?.role??''))return c.json({error:'責任者を指定できるのは管理者です'},403);
-  if (b.shifts.length > 366) return c.json({ error: 'too_many_shifts' }, 400);
+  if (b.shifts.length > 366) return inputError(c, { error: 'too_many_shifts' }, 400, ["shifts"]);
   const invalid = b.shifts.find((shift) => (
     !isValidShiftDate(shift.work_date)
     || !isValidTimeRange(shift.start_time, shift.end_time)
   ));
-  if (invalid) return c.json({ error: 'invalid_shift_date_or_time' }, 400);
+  if (invalid) return inputError(c, { error: 'invalid_shift_date_or_time' }, 400, ["shifts"]);
 
   const statements = b.shifts.map((s) => (
     c.env.DB.prepare(
@@ -7243,9 +7244,9 @@ booking.delete('/api/booking/admin/staff/:id/shifts/:shiftId', requireOwnBooking
   return c.json({ ok: true });
 });
 
-booking.post('/api/booking/admin/staff/:id/shifts/generate', requireOwnBookingStaffOrAdmin(), async (c) => {
+booking.post('/api/booking/admin/staff/:id/shifts/generate', requireOwnBookingStaffOrAdmin(), inputJsonBoundary({"weekly_template":["object"]}), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const staffId = c.req.param('id');
   if (!(await assertStaffInAccount(c.env.DB, staffId, accountId))) {
     return c.json({ error: 'staff_not_found_in_account' }, 404);
@@ -7261,7 +7262,7 @@ booking.post('/api/booking/admin/staff/:id/shifts/generate', requireOwnBookingSt
   if (!b || !isValidShiftDate(b.from_date) || !Number.isInteger(b.weeks)
     || Number(b.weeks) < 1 || Number(b.weeks) > 12 || !b.weekly_template
     || typeof b.weekly_template !== 'object' || Array.isArray(b.weekly_template)) {
-    return c.json({ error: 'missing_params' }, 400);
+    return inputError(c, { error: 'missing_params' }, 400, ["from_date","weeks","weekly_template"]);
   }
   const weeklyTemplate = b.weekly_template;
   const dayKeys: Array<keyof typeof weeklyTemplate> = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
@@ -7270,7 +7271,7 @@ booking.post('/api/booking/admin/staff/:id/shifts/generate', requireOwnBookingSt
     if (template !== null && template !== undefined
       && (!template || typeof template !== 'object'
         || !isValidTimeRange(template.start, template.end))) {
-      return c.json({ error: 'invalid_weekly_template' }, 400);
+      return inputError(c, { error: 'invalid_weekly_template' }, 400, ["weekly_template"]);
     }
   }
   const start = new Date(`${b.from_date}T00:00:00Z`);
@@ -7586,9 +7587,9 @@ async function cancelObsoleteConfirmationRuns(
     .run();
 }
 
-booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
+booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', 'staff'), inputJsonBoundary({"action":["string"]}), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const id = c.req.param('id');
   const b = await c.req.json<{ action: BookingAction }>();
   const row = await c.env.DB
@@ -7903,7 +7904,7 @@ booking.get('/api/booking/admin/pending-count', async (c) => {
 
 /** 本人確認済みのLINE/LIFFで使う席の空き。休業・貸切のメモは公開しない。 */
 booking.get('/api/liff/booking/seat-availability',async c=>{
- const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return c.json({error:caller.error},caller.status);
+ const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return inputError(c, {error:caller.error}, caller.status, []);
  if(!restaurantTestEnabled(c.env))return c.json({error:'not_found'},404);
  const storeId=c.req.query('store_id')||'',startsAt=c.req.query('starts_at')||'',endsAt=c.req.query('ends_at')||'',guestCount=Number(c.req.query('guest_count'));
  const store=await c.env.DB.prepare("SELECT id FROM rt_stores WHERE id=? AND line_account_id=? AND status='active'").bind(storeId,caller.accountId).first();

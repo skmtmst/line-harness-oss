@@ -221,6 +221,7 @@ export function buildBannerPrompt(input: BannerPromptInput): string {
 
 export interface BannerRequestValidation {
   ok: boolean;
+  field?: string;
   error?: string;
   value?: {
     mode: BannerMode;
@@ -247,11 +248,11 @@ export function validateBannerRequest(body: Record<string, unknown> | null): Ban
 
   const mode: BannerMode = body.mode === 'free' ? 'free' : 'banner';
   const preset = findBannerPreset(typeof body.presetKey === 'string' ? body.presetKey : undefined);
-  if (!preset) return { ok: false, error: '用途を選んでください' };
+  if (!preset) return { ok: false, error: '用途を選んでください' , field: "presetKey" };
 
   const countRaw = Number(body.count ?? 1);
   if (!Number.isInteger(countRaw) || countRaw < 1 || countRaw > BANNER_MAX_COUNT) {
-    return { ok: false, error: `枚数は1〜${BANNER_MAX_COUNT}枚で指定してください` };
+    return { ok: false, error: `枚数は1〜${BANNER_MAX_COUNT}枚で指定してください` , field: "count" };
   }
 
   /*
@@ -269,11 +270,11 @@ export function validateBannerRequest(body: Record<string, unknown> | null): Ban
   const textLines = keptLines.map((entry) => entry.line);
   const emphasisLines = keptLines.map((entry) => entry.emphasis);
   if (textLines.length > BANNER_MAX_TEXT_LINES) {
-    return { ok: false, error: `テキストは${BANNER_MAX_TEXT_LINES}行までにしてください` };
+    return { ok: false, error: `テキストは${BANNER_MAX_TEXT_LINES}行までにしてください` , field: "textLines" };
   }
   const tooLong = textLines.find((line) => line.length > BANNER_MAX_TEXT_LINE_LENGTH);
   if (tooLong) {
-    return { ok: false, error: `1行は${BANNER_MAX_TEXT_LINE_LENGTH}文字までにしてください（「${tooLong.slice(0, 12)}…」）` };
+    return { ok: false, error: `1行は${BANNER_MAX_TEXT_LINE_LENGTH}文字までにしてください（「${tooLong.slice(0, 12)}…」）` , field: "textLines" };
   }
 
   // 色の4つの役割（★BG-B `KkTNS`）。空文字は「指定なし」として扱う。
@@ -293,7 +294,7 @@ export function validateBannerRequest(body: Record<string, unknown> | null): Ban
     const raw = body[role.key];
     if (raw == null || raw === '') continue;
     if (!isHexColor(raw)) {
-      return { ok: false, error: `${role.label}は #RRGGBB の形式で指定してください` };
+      return { ok: false, error: `${role.label}は #RRGGBB の形式で指定してください` , field: role.key };
     }
     colors[role.key] = raw;
   }
@@ -301,11 +302,11 @@ export function validateBannerRequest(body: Record<string, unknown> | null): Ban
   const personOption: BannerPersonOption = body.personOption === 'with' ? 'with' : 'without';
   const customPrompt = typeof body.customPrompt === 'string' ? body.customPrompt.trim() : '';
   if (customPrompt.length > BANNER_MAX_CUSTOM_PROMPT_LENGTH) {
-    return { ok: false, error: `追加の指示は${BANNER_MAX_CUSTOM_PROMPT_LENGTH}文字までにしてください` };
+    return { ok: false, error: `追加の指示は${BANNER_MAX_CUSTOM_PROMPT_LENGTH}文字までにしてください` , field: "customPrompt" };
   }
   const freePrompt = typeof body.freePrompt === 'string' ? body.freePrompt.trim() : '';
   if (freePrompt.length > BANNER_MAX_FREE_PROMPT_LENGTH) {
-    return { ok: false, error: `プロンプトは${BANNER_MAX_FREE_PROMPT_LENGTH}文字までにしてください` };
+    return { ok: false, error: `プロンプトは${BANNER_MAX_FREE_PROMPT_LENGTH}文字までにしてください` , field: "freePrompt" };
   }
 
   // 参照画像（★BG-C `cOgWE`）。最大3枚で、画像ごとに使い方を1つ選ぶ。
@@ -316,34 +317,34 @@ export function validateBannerRequest(body: Record<string, unknown> | null): Ban
       ? [{ imageId: body.referenceImageId, mode: body.referenceMode }]
       : [];
   if (referencesRaw.length > BANNER_MAX_REFERENCE_IMAGES) {
-    return { ok: false, error: `参照画像は${BANNER_MAX_REFERENCE_IMAGES}枚までにしてください` };
+    return { ok: false, error: `参照画像は${BANNER_MAX_REFERENCE_IMAGES}枚までにしてください` , field: "references" };
   }
   const references: BannerReference[] = [];
   for (const entry of referencesRaw) {
     if (!entry || typeof entry !== 'object') {
-      return { ok: false, error: '参照画像の指定が正しくありません' };
+      return { ok: false, error: '参照画像の指定が正しくありません' , field: "references" };
     }
     const raw = entry as { imageId?: unknown; mode?: unknown };
     const imageId = typeof raw.imageId === 'string' ? raw.imageId.trim() : '';
     if (!imageId) {
-      return { ok: false, error: '参照画像の指定が正しくありません' };
+      return { ok: false, error: '参照画像の指定が正しくありません' , field: "references" };
     }
     if (references.some((reference) => reference.imageId === imageId)) {
-      return { ok: false, error: '同じ画像を2回選べません' };
+      return { ok: false, error: '同じ画像を2回選べません' , field: "references" };
     }
     if (!isBannerReferenceMode(raw.mode)) {
-      return { ok: false, error: '参照画像の使い方（土台にする／素材を一部使う／雰囲気を参考にする）を選んでください' };
+      return { ok: false, error: '参照画像の使い方（土台にする／素材を一部使う／雰囲気を参考にする）を選んでください' , field: "references" };
     }
     references.push({ imageId, mode: raw.mode });
   }
 
   if (mode === 'free' && !freePrompt) {
-    return { ok: false, error: '作りたい画像の説明を入力してください' };
+    return { ok: false, error: '作りたい画像の説明を入力してください' , field: "freePrompt" };
   }
   // 「土台にする」は指示だけで成り立つ（文字を入れない差し替えもある）。
   const hasEditReference = references.some((reference) => reference.mode === 'edit');
   if (mode === 'banner' && textLines.length === 0 && !customPrompt && !hasEditReference) {
-    return { ok: false, error: 'バナーに入れるテキストか、追加の指示を入力してください' };
+    return { ok: false, error: 'バナーに入れるテキストか、追加の指示を入力してください' , field: "textLines" };
   }
 
   return {

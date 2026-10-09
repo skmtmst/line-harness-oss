@@ -10,6 +10,7 @@
  * 閲覧のみ（変える権限が無い人）には「下書きを保存する」を置かない。動きは BEHAVIOR.md。
  */
 import { useRef, useState } from 'react'
+import KpiCard from '@/components/shared/kpi-card'
 import { Eye, Utensils } from 'lucide-react'
 import Button from '@/components/shared/button'
 import StatusBadge from '@/components/shared/status-badge'
@@ -18,7 +19,7 @@ import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { restaurantTestApi, type RestaurantLineFlow, type RestaurantStore } from '@/lib/restaurant-test-api'
 import RestaurantFrame, { type RestaurantContext } from '../common-a/frame'
-import { Panel, Stat, StatRow } from '../common-a/parts'
+import { Panel, StatRow } from '../common-a/parts'
 import styles from './line-followup.module.css'
 
 /** 数の並びに出す4種（本物の flow_type）と、カードの頭の名前。 */
@@ -122,11 +123,11 @@ function LineFollowupBoard({ ctx }: { ctx: RestaurantContext }) {
         <div className={styles.readOnly} role="note"><Eye aria-hidden className={styles.cautionIcon} /><span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span></div>
       ) : null}
       <StatRow>
-        <Stat size="small" label="フロー" value={`${flows.length}`} note="カードテンプレート" />
+        <KpiCard density="compact" title="フロー" valueText={`${flows.length}`} detail="カードテンプレート" icon={null} presentation="band" value={null} unit="" />
         {Object.entries(FLOW_KINDS).map(([type, kind]) => (
-          <Stat key={type} size="small" label={kind.stat} value={has(type) ? '確認用' : '未作成'} note={kind.note} />
+          <KpiCard key={type} density="compact" title={kind.stat} valueText={has(type) ? '確認用' : '未作成'} detail={kind.note} icon={null} presentation="band" value={null} unit="" />
         ))}
-        <Stat size="small" label="本送信" value="停止中" note="プレビューのみ" warning />
+        <KpiCard density="compact" title="本送信" valueText="停止中" detail="プレビューのみ" valueTone={true ? 'warning' : 'default'} icon={null} presentation="band" value={null} unit="" />
       </StatRow>
       <div className={styles.flowGrid}>
         {flows.map((flow) => <FlowCard key={flow.id} flow={flow} store={store} ctx={ctx} readOnly={readOnly} />)}

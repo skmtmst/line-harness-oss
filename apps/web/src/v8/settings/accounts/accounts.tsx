@@ -182,11 +182,11 @@ export default function AccountsV8() {
           <Notice tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} onClose={() => setNotice(null)} />
         ) : null}
 
-        <KpiBand presentation="cards" gridClassName={styles.kpis} data-design="KPIs">
-          <Kpi label="つないでいる" value={kpis?.connected} unit="アカウント" />
-          <Kpi label="稼働中" value={kpis?.active} unit="件" />
-          <Kpi label="接続に問題" value={kpis?.problem} unit="件" warn />
-          <Kpi label="友だちの合計" value={kpis?.friends} unit="人" />
+        <KpiBand data-design="KPIs">
+          <KpiCard title="つないでいる" value={kpis?.connected} unit="アカウント" detail={null} />
+          <KpiCard title="稼働中" value={kpis?.active} unit="件" detail={null} />
+          <KpiCard title="接続に問題" value={kpis?.problem} unit="件" detail={null} valueTone={(kpis?.problem ?? 0) > 0 ? 'warning' : 'default'} />
+          <KpiCard title="友だちの合計" value={kpis?.friends} unit="人" detail={null} />
         </KpiBand>
 
         <div className={styles.toolbar}>
@@ -318,12 +318,6 @@ export default function AccountsV8() {
       {stepUp ? <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} /> : null}
     </>
   )
-}
-
-/** 数の1枚：見出し・数・単位。 */
-function Kpi({ label, value, unit, warn = false }: { label: string; value: number | null | undefined; unit: string; warn?: boolean }) {
-  return <KpiCard title={label} value={value} unit={unit} detail={null} icon={null}
-    presentation="stacked" valueTone={warn && (value ?? 0) > 0 ? 'warning' : 'default'} />
 }
 
 /** アーカイブできない理由（API の blockers）を、運用者の言葉で。 */

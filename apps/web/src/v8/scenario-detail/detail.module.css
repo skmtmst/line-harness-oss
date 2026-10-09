@@ -368,68 +368,6 @@
 }
 
 /* ── 数の帯 ─────────────────────────────── */
-.kpis {
-  display: flex;
-  border-radius: var(--tpl-sd-card-radius);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
-  box-shadow: var(--card-shadow);
-}
-
-.kpi {
-  display: flex;
-  flex: 1 1 0;
-  flex-direction: column;
-  gap: var(--tpl-sd-kpi-gap);
-  min-width: 0;
-  padding: var(--tpl-sd-kpi-pad);
-}
-
-.kpiLabel {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-sd-kpi-label-size);
-  line-height: var(--tpl-sd-kpi-label-lh);
-}
-
-.kpiValue {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--tpl-sd-kpi-unit-gap);
-  margin: 0;
-}
-
-.kpiNum,
-.kpiNumWide {
-  color: var(--color-ink);
-  font-size: var(--tpl-sd-kpi-num-size);
-  font-weight: 700;
-  line-height: var(--tpl-sd-kpi-num-lh);
-}
-
-.kpiNum {
-  /* 数字は絵と同じ Inter（日本語の書体だと字の箱が高くなり、下の説明がずれる）。 */
-  font-family: var(--font-inter), Inter, sans-serif;
-  /* 管理画面の等幅数字を継承しない（絵は比例幅）。 */
-  font-variant-numeric: normal;
-}
-
-.kpiNumWide {
-  line-height: var(--tpl-sd-kpi-wide-lh);
-}
-
-.kpiUnit {
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-sd-kpi-label-size);
-  line-height: var(--tpl-sd-kpi-label-lh);
-}
-
-.kpiDetail {
-  margin: 0;
-  color: var(--color-ink-faint);
-  font-size: var(--tpl-sd-note-size);
-  line-height: var(--tpl-sd-note-lh);
-}
 
 /* ── 最後の1通の後 ─────────────────────────── */
 .onComplete {

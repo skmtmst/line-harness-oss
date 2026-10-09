@@ -36,7 +36,7 @@ describe('一覧の型の寸法（LIST-TEMPLATE-SPEC）', () => {
     const kpi = shared('kpi-card.module.css')
     const strip = kpi.match(/\[data-theme='v8'\] \.strip\[data-kpi-presentation='band'\] \{[^}]*\}/s)
     expect(strip, '帯の指定がありません').toBeTruthy()
-    expect(strip![0]).toMatch(/border-block:\s*1px solid var\(--color-hairline\)/)
+    expect(strip![0]).toMatch(/border-block:\s*1px solid var\(--tpl-band-line\)/)
     expect(strip![0]).not.toMatch(/border:\s*1px solid/)
     expect(kpi).toMatch(/\[data-theme='v8'\] \.strip\[data-kpi-presentation='band'\] \.number \{[^}]*font-size:\s*var\(--tpl-band-number-size\)/s)
   })
@@ -79,7 +79,7 @@ describe('一覧の型の寸法（LIST-TEMPLATE-SPEC）', () => {
     expect(globals).toMatch(/--tpl-toolbar-pad-block:\s*14px/)
     expect(globals).toMatch(/--tpl-toolbar-pad-side:\s*24px/)
     expect(globals).toMatch(/--tpl-band-cell-pad-block:\s*16px/)
-    expect(globals).toMatch(/--tpl-band-cell-pad-side:\s*20px/)
+    expect(globals).toMatch(/--tpl-band-cell-pad-side:\s*24px/)
     expect(globals).toMatch(/--tpl-band-number-lh:\s*26px/)
   })
 

@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
   getAccountHealthLogs,
@@ -113,11 +114,11 @@ health.get('/api/accounts/migrations', async (c) => {
   }
 });
 
-health.post('/api/accounts/:id/migrate', requireRole('owner'), async (c) => {
+health.post('/api/accounts/:id/migrate', requireRole('owner'), inputJsonBoundary({"toAccountId":["string"]}), async (c) => {
   try {
     const fromAccountId = c.req.param('id');
     const body = await c.req.json<{ toAccountId: string }>();
-    if (!body.toAccountId) return c.json({ success: false, error: 'toAccountId is required' }, 400);
+    if (!body.toAccountId) return inputError(c, { success: false, error: 'toAccountId is required' }, 400, ["toAccountId"]);
 
     const db = c.env.DB;
 

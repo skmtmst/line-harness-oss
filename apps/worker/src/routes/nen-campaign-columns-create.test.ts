@@ -188,7 +188,7 @@ describe('POST /api/nen-campaigns/columns', () => {
       createRequest({ ...VALID, body: '保存してはいけない本文' }),
     );
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ success: false, error: 'request_invalid' });
+    expect(await response.json()).toMatchObject({ success: false, code: 'request_invalid' , fields: expect.any(Object), error: expect.any(String) });
     expect(state.preparedSql).toEqual([]);
   });
 

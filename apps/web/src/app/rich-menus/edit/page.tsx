@@ -1295,7 +1295,7 @@ function Editor({
               </p>
             )}
           {/* メニュー設定 */}
-          <section className="bg-canvas border border-hairline rounded-control shadow-card p-5 space-y-4">
+          <section className="bg-canvas border border-hairline rounded-control shadow-card-surface p-5 space-y-4">
             <h2 className="text-ink text-sm font-semibold">基本設定</h2>
             <p className="text-ink-faint text-xs">
               サイズ {SIZE_LABEL[group.size]} ・{' '}
@@ -1333,7 +1333,7 @@ function Editor({
 
           {/* ページ設定 (画像 upload 含む、常時表示) */}
           {activePage && (
-            <section className="bg-canvas border border-hairline rounded-control shadow-card p-5 space-y-4">
+            <section className="bg-canvas border border-hairline rounded-control shadow-card-surface p-5 space-y-4">
               <h2 className="text-ink text-sm font-semibold">タブ（メニューの切り替え）</h2>
               <p className="text-ink-faint text-xs leading-relaxed">
                 1つのメニューの中でタブを分けられます。タブのボタンを押すと別の面に切り替わります。タブは2〜3つまでを推奨します。多いと押されなくなります。
@@ -1398,7 +1398,7 @@ function Editor({
           )}
 
           {/* 誰に出すか（149） */}
-          <section className="bg-canvas border border-hairline rounded-control shadow-card p-5 space-y-4">
+          <section className="bg-canvas border border-hairline rounded-control shadow-card-surface p-5 space-y-4">
             <div>
               <h2 className="text-ink text-sm font-semibold">誰に出すか</h2>
               <p className="text-ink-faint mt-0.5 text-xs leading-relaxed">
@@ -1458,7 +1458,7 @@ function Editor({
 
           {/* 選択中エリア (area が選択されている時のみ追加表示) */}
           {selectedArea && activePage && (
-            <section className="bg-canvas border border-hairline rounded-control shadow-card p-5">
+            <section className="bg-canvas border border-hairline rounded-control shadow-card-surface p-5">
               <AreaProperties
                 area={selectedArea}
                 pages={pagesForSelect}
@@ -1486,7 +1486,7 @@ function Editor({
 
       {/* N-154: 複製は消える操作ではないので、危険な操作とは分けて置く。 */}
       {canOperate ? (
-        <section className="mt-10 bg-canvas border border-hairline rounded-control shadow-card p-5">
+        <section className="mt-10 bg-canvas border border-hairline rounded-control shadow-card-surface p-5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <div className="text-sm font-medium text-ink">このメニューを複製</div>
@@ -1510,7 +1510,7 @@ function Editor({
       ) : null}
 
       {/* ─────────── 危険な操作 (画面最下部に分離) ─────────── */}
-      <section className="mt-10 bg-danger-bg border border-status-danger-border rounded-control shadow-card p-5">
+      <section className="mt-10 bg-danger-bg border border-status-danger-border rounded-control shadow-card-surface p-5">
         <h2 className="text-sm font-semibold text-danger mb-1">危険な操作</h2>
         <p className="text-xs text-danger mb-4">
           以下の操作は元に戻せません。誤操作を避けるため、別セクションにまとめています。
@@ -1891,7 +1891,7 @@ function TargetingStep({
       {saveError ? <Notice tone="danger" message={saveError} className="mb-4" /> : null}
 
       <div className="grid gap-5 xl:grid-cols-3">
-        <section className="border-hairline bg-canvas rounded-card border p-6 shadow-card xl:col-span-2">
+        <section className="border-hairline bg-canvas rounded-card border p-6 shadow-card-surface xl:col-span-2">
           <h2 className="text-ink text-base font-bold">このメニューを出す相手</h2>
           <div className="mt-4">
             <RadioCardGroup legend="出す相手の選択" className="grid gap-3 sm:grid-cols-2">
@@ -2124,7 +2124,7 @@ function PublishStep({
       {saveNotice ? <Notice tone="success" message={saveNotice} className="mb-4" /> : null}
       {saveError ? <Notice tone="danger" message={saveError} className="mb-4" /> : null}
       <div className="grid gap-5 xl:grid-cols-3">
-        <section className="border-hairline bg-canvas rounded-card border p-6 shadow-card xl:col-span-2">
+        <section className="border-hairline bg-canvas rounded-card border p-6 shadow-card-surface xl:col-span-2">
           <h2 className="text-ink text-base font-bold">いつ出すか</h2>
           <div className="mt-4">
             <RadioCardGroup legend="公開時期の選択" className="grid gap-3">

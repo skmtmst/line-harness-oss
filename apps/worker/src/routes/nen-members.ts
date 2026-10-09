@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { getPublicationThirtyDayViews } from '@line-crm/db';
 import { Hono, type Context } from 'hono';
 import type { Message } from '@line-crm/line-sdk';
@@ -809,7 +810,7 @@ nenMembers.get('/api/public/nen/gallery-preview', async (c) => {
   }
 });
 
-nenMembers.post('/api/liff/nen/pets', async (c) => {
+nenMembers.post('/api/liff/nen/pets', inputJsonBoundary(), async (c) => {
   const friend = await currentFriend(c);
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
@@ -827,7 +828,7 @@ nenMembers.post('/api/liff/nen/pets', async (c) => {
   const gender = petGender(body?.gender);
   // 性別は必須（呼び名「くん」「ちゃん」を決めるため。★V6 37-2-A-2）
   if (!name || name.length > 80 || !animalType || !breed || !birthday || !Number.isFinite(weightKg) || weightKg < 0.2 || weightKg > 150 || gender === 'unknown') {
-    return c.json({ success: false, error: '入力内容を確認してください' }, 400);
+    return inputError(c, { success: false, error: '入力内容を確認してください' }, 400, ["name","animalType","breed","birthday","weightKg","gender"]);
   }
   const guide = feedingGuide(animalType, weightKg);
   const catalog = await accountFeedingProducts(c, friend);
@@ -836,7 +837,7 @@ nenMembers.post('/api/liff/nen/pets', async (c) => {
   const id = crypto.randomUUID();
   const now = jstNow();
   const photoBytes = body?.photoData ? decodeJpegData(body.photoData) : null;
-  if (body?.photoData && !photoBytes) return c.json({ success: false, error: 'ペット写真を確認してください' }, 400);
+  if (body?.photoData && !photoBytes) return inputError(c, { success: false, error: 'ペット写真を確認してください' }, 400, ["photoData"]);
   const photoKey = photoBytes ? `nen-pet-profiles/${friend.id}/${id}.jpg` : null;
   const imageUrl = photoKey ? `${c.env.WORKER_PUBLIC_URL || new URL(c.req.url).origin}/images/${photoKey}` : null;
   if (photoBytes && photoKey) await c.env.IMAGES.put(photoKey, photoBytes, { httpMetadata: { contentType: 'image/jpeg' }, customMetadata: { friendId: friend.id, petId: id } });
@@ -874,26 +875,26 @@ nenMembers.post('/api/liff/nen/pets', async (c) => {
  * ペットの変更（★V6 37-2 マイペット「編集」）。体重・避妊去勢・活動量・主食・お悩みなど、
  * 送られてきた項目だけを変える。目安（daily_kcal / recommended_*）はそのたびに計算し直す。
  */
-nenMembers.put('/api/liff/nen/pets/:id', async (c) => {
+nenMembers.put('/api/liff/nen/pets/:id', inputJsonBoundary(), async (c) => {
   const friend = await currentFriend(c);
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const petId = c.req.param('id');
   const current = await c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE id = ? AND friend_id = ?`).bind(petId, friend.id).first<Record<string, unknown>>();
   if (!current) return c.json({ success: false, error: 'Pet not found' }, 404);
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-  if (!body || typeof body !== 'object') return c.json({ success: false, error: '入力内容を確認してください' }, 400);
+  if (!body || typeof body !== 'object') return inputError(c, { success: false, error: '入力内容を確認してください' }, 400, []);
 
   const sets: string[] = [];
   const values: unknown[] = [];
   let weightChanged = false;
   if (body.name !== undefined) {
     const name = typeof body.name === 'string' ? body.name.trim() : '';
-    if (!name || name.length > 80) return c.json({ success: false, error: '名前は1〜80文字で入力してください' }, 400);
+    if (!name || name.length > 80) return inputError(c, { success: false, error: '名前は1〜80文字で入力してください' }, 400, ["name"]);
     sets.push('name = ?'); values.push(name);
   }
   if (body.breed !== undefined) {
     const breed = typeof body.breed === 'string' ? body.breed.trim().slice(0, 80) : '';
-    if (!breed) return c.json({ success: false, error: '品種を入力してください' }, 400);
+    if (!breed) return inputError(c, { success: false, error: '品種を入力してください' }, 400, ["breed"]);
     sets.push('breed = ?'); values.push(breed);
   }
   if (body.gender !== undefined) {
@@ -902,12 +903,12 @@ nenMembers.put('/api/liff/nen/pets/:id', async (c) => {
   if (body.birthday !== undefined) {
     // 月日だけ（MM-DD）も受け付ける。年が分からない子も誕生日配信へ載せる。
     const birthday = normalizeNenPetBirthday(body.birthday);
-    if (birthday === 'invalid') return c.json({ success: false, error: '誕生日を確認してください' }, 400);
+    if (birthday === 'invalid') return inputError(c, { success: false, error: '誕生日を確認してください' }, 400, ["birthday"]);
     sets.push('birthday = ?'); values.push(birthday);
   }
   if (body.weightKg !== undefined) {
     const weightKg = Number(body.weightKg);
-    if (!Number.isFinite(weightKg) || weightKg < 0.2 || weightKg > 150) return c.json({ success: false, error: '体重は 0.2〜150kg で入力してください' }, 400);
+    if (!Number.isFinite(weightKg) || weightKg < 0.2 || weightKg > 150) return inputError(c, { success: false, error: '体重は 0.2〜150kg で入力してください' }, 400, ["weightKg"]);
     sets.push('weight_kg = ?'); values.push(Math.round(weightKg * 10) / 10);
     // 監査 R57: 体重が変わったときだけ「体重の更新」を動かす。同じ値の再送や
     // 名前だけの編集では日付を維持する。
@@ -924,18 +925,18 @@ nenMembers.put('/api/liff/nen/pets/:id', async (c) => {
   const products = catalog.products;
   const feeding = petFeedingInput(body, products);
   if (body.neutered !== undefined) {
-    if (feeding.neutered === undefined) return c.json({ success: false, error: '避妊去勢の選択を確認してください' }, 400);
+    if (feeding.neutered === undefined) return inputError(c, { success: false, error: '避妊去勢の選択を確認してください' }, 400, ["neutered","activityLevel","feedingProductId"]);
     sets.push('neutered = ?'); values.push(feeding.neutered === null ? null : feeding.neutered ? 1 : 0);
   }
   if (body.activityLevel !== undefined) {
-    if (!feeding.activityLevel) return c.json({ success: false, error: '活動量の選択を確認してください' }, 400);
+    if (!feeding.activityLevel) return inputError(c, { success: false, error: '活動量の選択を確認してください' }, 400, ["neutered","activityLevel","feedingProductId"]);
     sets.push('activity_level = ?'); values.push(feeding.activityLevel);
   }
   if (body.feedingProductId !== undefined) {
-    if (feeding.feedingProductId === undefined) return c.json({ success: false, error: '主食の選択を確認してください' }, 400);
+    if (feeding.feedingProductId === undefined) return inputError(c, { success: false, error: '主食の選択を確認してください' }, 400, ["neutered","activityLevel","feedingProductId"]);
     sets.push('feeding_product_id = ?'); values.push(feeding.feedingProductId);
   }
-  if (sets.length === 0) return c.json({ success: false, error: '変更する項目がありません' }, 400);
+  if (sets.length === 0) return inputError(c, { success: false, error: '変更する項目がありません' }, 400, []);
 
   const now = jstNow();
   sets.push('updated_at = ?'); values.push(now);
@@ -966,7 +967,7 @@ nenMembers.put('/api/liff/nen/pets/:id', async (c) => {
   return c.json({ success: true, data: mapPet(saved || updated, products, catalog.treatLimitPercent) });
 });
 
-nenMembers.post('/api/liff/nen/pets/:id/photo', async (c) => {
+nenMembers.post('/api/liff/nen/pets/:id/photo', inputJsonBoundary({"data":["string"]}), async (c) => {
   const friend = await currentFriend(c);
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const pet = await c.env.DB.prepare(`SELECT id, image_r2_key FROM nen_pet_profiles WHERE id=? AND friend_id=?`)
@@ -974,7 +975,7 @@ nenMembers.post('/api/liff/nen/pets/:id/photo', async (c) => {
   if (!pet) return c.json({ success: false, error: 'Pet not found' }, 404);
   const body = await c.req.json<{ data?: string }>().catch(() => null);
   const bytes = decodeJpegData(body?.data);
-  if (!bytes) return c.json({ success: false, error: 'ペット写真を確認してください' }, 400);
+  if (!bytes) return inputError(c, { success: false, error: 'ペット写真を確認してください' }, 400, ["data"]);
   const key = `nen-pet-profiles/${friend.id}/${pet.id}-${crypto.randomUUID()}.jpg`;
   // 公開配信される画像なので、撮影場所などの付帯メタデータは外して保存する（#931 N-310）。
   await c.env.IMAGES.put(key, stripImageMetadata(bytes, 'image/jpeg'), { httpMetadata: { contentType: 'image/jpeg' }, customMetadata: { friendId: friend.id, petId: pet.id } });
@@ -986,7 +987,7 @@ nenMembers.post('/api/liff/nen/pets/:id/photo', async (c) => {
   return c.json({ success: true, data: { imageUrl } });
 });
 
-nenMembers.post('/api/liff/nen/health-logs', async (c) => {
+nenMembers.post('/api/liff/nen/health-logs', inputJsonBoundary(), async (c) => {
   const friend = await currentFriend(c);
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
@@ -1002,7 +1003,7 @@ nenMembers.post('/api/liff/nen/health-logs', async (c) => {
   const invalidVitals = (weightKg != null && (!Number.isFinite(weightKg) || weightKg < 0.2 || weightKg > 150))
     || (heartRateBpm != null && (!Number.isInteger(heartRateBpm) || heartRateBpm < 20 || heartRateBpm > 300))
     || (respiratoryRateBpm != null && (!Number.isInteger(respiratoryRateBpm) || respiratoryRateBpm < 5 || respiratoryRateBpm > 150));
-  if (!pet || !stool || !appetite || invalidVitals) return c.json({ success: false, error: '入力内容を確認してください' }, 400);
+  if (!pet || !stool || !appetite || invalidVitals) return inputError(c, { success: false, error: '入力内容を確認してください' }, 400, ["petId","stoolStatus","appetite","weightKg","heartRateBpm","respiratoryRateBpm"]);
   const id = crypto.randomUUID();
   await c.env.DB.prepare(
     `INSERT INTO nen_health_logs (id, pet_id, friend_id, logged_on, weight_kg, heart_rate_bpm, respiratory_rate_bpm, stool_status, appetite, skin_status, tear_stain_status, note, care_flag, created_at)
@@ -1095,19 +1096,19 @@ nenMembers.get('/api/liff/nen/health-logs/summary', async (c) => {
   } });
 });
 
-nenMembers.post('/api/liff/nen/photos', async (c) => {
+nenMembers.post('/api/liff/nen/photos', inputJsonBoundary({"petId":["string"],"data":["string"],"mimeType":["string"],"caption":["string"]}), async (c) => {
   const friend = await currentFriend(c);
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const body = await c.req.json<{ petId?: string; data?: string; mimeType?: string; caption?: string }>().catch(() => null);
   const pet = await c.env.DB.prepare(`SELECT id FROM nen_pet_profiles WHERE id = ? AND friend_id = ?`).bind(body?.petId || '', friend.id).first();
-  if (!pet || !body?.data || !body.mimeType || !IMAGE_TYPES[body.mimeType]) return c.json({ success: false, error: '画像またはペットを確認してください' }, 400);
+  if (!pet || !body?.data || !body.mimeType || !IMAGE_TYPES[body.mimeType]) return inputError(c, { success: false, error: '画像またはペットを確認してください' }, 400, ["petId","data","mimeType"]);
   const raw = body.data.replace(/^data:[^;]+;base64,/, '');
-  if (raw.length > 11_200_000) return c.json({ success: false, error: '画像は8MB以下にしてください' }, 400);
+  if (raw.length > 11_200_000) return inputError(c, { success: false, error: '画像は8MB以下にしてください' }, 400, ["data"]);
   let bytes: Uint8Array;
-  try { bytes = Uint8Array.from(atob(raw), (ch) => ch.charCodeAt(0)); } catch { return c.json({ success: false, error: '画像を読み込めません' }, 400); }
-  if (bytes.byteLength > 8 * 1024 * 1024) return c.json({ success: false, error: '画像は8MB以下にしてください' }, 400);
+  try { bytes = Uint8Array.from(atob(raw), (ch) => ch.charCodeAt(0)); } catch { return inputError(c, { success: false, error: '画像を読み込めません' }, 400, []); }
+  if (bytes.byteLength > 8 * 1024 * 1024) return inputError(c, { success: false, error: '画像は8MB以下にしてください' }, 400, []);
   if (detectedImageMime(bytes) !== body.mimeType) {
-    return c.json({ success: false, error: '画像の内容と形式が一致しません' }, 400);
+    return inputError(c, { success: false, error: '画像の内容と形式が一致しません' }, 400, ["mimeType"]);
   }
   /*
    * 実寸法をヘッダから測る（#931 N-310）。申告の mimeType と実体の一致までは
@@ -1116,10 +1117,10 @@ nenMembers.post('/api/liff/nen/photos', async (c) => {
    */
   const dimensions = imageDimensions(bytes, body.mimeType);
   if (!dimensions) {
-    return c.json({ success: false, error: '画像の寸法を確認できませんでした' }, 400);
+    return inputError(c, { success: false, error: '画像の寸法を確認できませんでした' }, 400, ["mimeType"]);
   }
   if (dimensions.width > 20000 || dimensions.height > 20000) {
-    return c.json({ success: false, error: '画像の寸法が大きすぎます（20000px以内にしてください）' }, 400);
+    return inputError(c, { success: false, error: '画像の寸法が大きすぎます（20000px以内にしてください）' }, 400, ["mimeType"]);
   }
   const id = crypto.randomUUID();
   /*
@@ -1185,7 +1186,7 @@ nenMembers.post('/api/liff/nen/photos', async (c) => {
   return c.json({ success: true, data: { id, imageUrl: reviewImageUrl, status: 'pending' } }, 201);
 });
 
-nenMembers.put('/api/liff/nen/photos/:id/publication-consent', async (c) => {
+nenMembers.put('/api/liff/nen/photos/:id/publication-consent', inputJsonBoundary({"consent":["boolean"],"consentVersion":["string"],"showPetName":["boolean"]}), async (c) => {
   const friend = await currentFriend(c);
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const body = await c.req.json<{
@@ -1197,7 +1198,7 @@ nenMembers.put('/api/liff/nen/photos/:id/publication-consent', async (c) => {
     ? body.consentVersion.trim().slice(0, 80)
     : '';
   if (typeof body?.consent !== 'boolean' || (body.consent && !consentVersion)) {
-    return c.json({ success: false, error: '公開同意の内容を確認してください' }, 400);
+    return inputError(c, { success: false, error: '公開同意の内容を確認してください' }, 400, ["consent","consentVersion"]);
   }
   const photo = await c.env.DB.prepare(
     `SELECT id, status FROM nen_photo_submissions WHERE id = ? AND friend_id = ? AND line_account_id = ?`,
@@ -1292,17 +1293,17 @@ async function assignConsultationTags(c: Context<Env>, friendId: string, animalT
   return names;
 }
 
-nenMembers.post('/api/liff/nen/consultations', async (c) => {
+nenMembers.post('/api/liff/nen/consultations', inputJsonBoundary({"animalType":["string"],"petId":["string"],"question":["string"]}), async (c) => {
   const friend = await currentFriend(c);
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const body = await c.req.json<{ animalType?: string; petId?: string; question?: string }>().catch(() => null);
   const question = String(body?.question || '').replace(/\s+/g, ' ').trim();
   const animalType = body?.animalType === 'cat' ? 'cat' : body?.animalType === 'dog' ? 'dog' : null;
-  if (!animalType || question.length < 8 || question.length > 1000) return c.json({ success: false, error: '8〜1000文字で相談内容を入力してください' }, 400);
+  if (!animalType || question.length < 8 || question.length > 1000) return inputError(c, { success: false, error: '8〜1000文字で相談内容を入力してください' }, 400, ["animalType","question"]);
   if (body?.petId) {
     const owned = await c.env.DB.prepare(`SELECT id, animal_type FROM nen_pet_profiles WHERE id = ? AND friend_id = ?`).bind(body.petId, friend.id).first<{ id: string; animal_type: string }>();
     if (!owned) return c.json({ success: false, error: 'Pet not found' }, 404);
-    if (owned.animal_type !== animalType) return c.json({ success: false, error: '選択したペットの種別をご確認ください' }, 400);
+    if (owned.animal_type !== animalType) return inputError(c, { success: false, error: '選択したペットの種別をご確認ください' }, 400, ["petId","animalType"]);
   }
 
   const detected: string[] = CONSULTATION_TAG_RULES.filter((rule) => rule.pattern.test(question)).map((rule) => rule.key);
@@ -1385,9 +1386,9 @@ nenMembers.get('/api/nen-members/care-flags', async (c) => {
   return c.json({ success: true, data: rows.results });
 });
 
-nenMembers.put('/api/nen-members/care-flags/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
+nenMembers.put('/api/nen-members/care-flags/:id', requireRole('owner', 'admin', 'staff'), inputJsonBoundary({"status":["string"],"adviceReady":["boolean"],"expectedUpdatedAt":["string"]}), async (c) => {
   const body = await c.req.json<{ status?: string; adviceReady?: boolean; expectedUpdatedAt?: string }>().catch(() => null);
-  if (!body || !['active', 'resolved'].includes(String(body.status))) return c.json({ success: false, error: 'Invalid status' }, 400);
+  if (!body || !['active', 'resolved'].includes(String(body.status))) return inputError(c, { success: false, error: 'Invalid status' }, 400, ["status"]);
   const flag = await c.env.DB.prepare(`SELECT cf.friend_id, cf.status, cf.advice_ready, cf.updated_at, f.line_account_id FROM nen_care_flags cf JOIN friends f ON f.id=cf.friend_id WHERE cf.id=?`)
     .bind(c.req.param('id')).first<{ friend_id: string; status: string; advice_ready: number; updated_at: string; line_account_id: string | null }>();
   if (!flag || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [flag.line_account_id])) return c.json({ success: false, error: 'Not found' }, 404);
@@ -1624,7 +1625,7 @@ nenMembers.get('/api/nen-members/photos/publications/order', requirePhotoPermiss
   return c.json({ success: true, data: { items: rows.results } });
 });
 
-nenMembers.put('/api/nen-members/photos/publications/order', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.publication.manage'), async (c) => {
+nenMembers.put('/api/nen-members/photos/publications/order', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.publication.manage'), inputJsonBoundary({"accountId":["string"],"items":["array"]}), async (c) => {
   if (c.get('staff').readOnly) return c.json({ success: false, error: '閲覧のみの権限です' }, 403);
   const body = await c.req.json<import('@line-crm/shared').PhotoPublicationOrderInput>().catch(() => null);
   if (!body || typeof body.accountId !== 'string' || !body.accountId.trim()
@@ -1632,7 +1633,7 @@ nenMembers.put('/api/nen-members/photos/publications/order', requireRole('owner'
     || body.items.some(item => !item || typeof item.id !== 'string' || !item.id.trim()
       || !Number.isInteger(item.expectedVersion) || item.expectedVersion < 1)
     || new Set(body.items.map(item => item.id)).size !== body.items.length) {
-    return c.json({ success: false, error: '掲載IDと確認した版を重複なく指定してください' }, 400);
+    return inputError(c, { success: false, error: '掲載IDと確認した版を重複なく指定してください' }, 400, ["accountId","items"]);
   }
   body.accountId = body.accountId.trim();
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
@@ -1644,33 +1645,33 @@ nenMembers.put('/api/nen-members/photos/publications/order', requireRole('owner'
   return c.json({ success: true, data: { items: body.items.map((item, sortOrder) => ({ id: item.id, version: item.expectedVersion+1, sortOrder })) } });
 });
 
-nenMembers.post('/api/nen-members/photos/:id/publish', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.publication.manage'), async (c) => {
+nenMembers.post('/api/nen-members/photos/:id/publish', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.publication.manage'), inputJsonBoundary(), async (c) => {
   if (c.get('staff').readOnly) return c.json({ success: false, error: '閲覧のみの権限です' }, 403);
   const body = await c.req.json<{accountId?: unknown; expectedVersion?: unknown}>().catch(() => null);
   const key = c.req.header('Idempotency-Key')?.trim();
   if (!body || typeof body.accountId !== 'string' || !body.accountId.trim()
     || typeof body.expectedVersion !== 'number' || !Number.isInteger(body.expectedVersion) || body.expectedVersion < 0
     || !key || key.length < 8 || key.length > 100) {
-    return c.json({ success: false, error: 'accountId、expectedVersion、Idempotency-Keyを確認してください' }, 400);
+    return inputError(c, { success: false, error: 'accountId、expectedVersion、Idempotency-Keyを確認してください' }, 400, ["accountId","expectedVersion","placements"]);
   }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId.trim()])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
   const result = await publishPhoto(c.env.DB, { photoId: c.req.param('id'), accountId: body.accountId.trim(), expectedVersion: body.expectedVersion, idempotencyKey: key });
   if (result.kind === 'missing') return c.json({ success: false, error: '写真が見つかりません' }, 404);
-  if (result.kind === 'ineligible') return c.json({ success: false, error: '採用・現在の公開同意・公開用画像を確認してください' }, 422);
+  if (result.kind === 'ineligible') return inputError(c, { success: false, error: '採用・現在の公開同意・公開用画像を確認してください' }, 422, ["accountId","expectedVersion"]);
   if (result.kind === 'conflict') return c.json({ success: false, error: '掲載状態が変わりました。読み直してください' }, 409);
   return c.json({ success: true, data: { id: result.id, version: result.version, status: 'published' as const } });
 });
 
 // 公開の撤回・掲載先の変更は、審査とは別の上位権限だけでできるようにする（#931 N-311）。
 // 「審査できる人なら公開範囲も変えられる」状態を止め、掲載管理の権限を明示的に分ける。
-nenMembers.put('/api/nen-members/photos/publications/:id/withdraw', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.publication.manage'), async (c) => {
+nenMembers.put('/api/nen-members/photos/publications/:id/withdraw', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.publication.manage'), inputJsonBoundary({"accountId":["string"],"expectedVersion":["number"]}), async (c) => {
   const body = await c.req.json<{ accountId?: string; expectedVersion?: number }>().catch(() => null);
   const accountId = body?.accountId?.trim();
   const idempotencyKey = c.req.header('Idempotency-Key')?.trim().slice(0, 120);
   if (!accountId || !Number.isInteger(body?.expectedVersion) || !idempotencyKey) {
-    return c.json({ success: false, error: 'accountId、expectedVersion、Idempotency-Key は必須です' }, 400);
+    return inputError(c, { success: false, error: 'accountId、expectedVersion、Idempotency-Key は必須です' }, 400, ["accountId","expectedVersion","placements"]);
   }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
@@ -1712,7 +1713,7 @@ nenMembers.put('/api/nen-members/photos/publications/:id/withdraw', requireRole(
   return c.json({ success: true, data: { status: 'withdrawn', version: publication.version + 1 } });
 });
 
-nenMembers.put('/api/nen-members/photos/publications/:id/placements', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.publication.manage'), async (c) => {
+nenMembers.put('/api/nen-members/photos/publications/:id/placements', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.publication.manage'), inputJsonBoundary({"accountId":["string"],"expectedVersion":["number"],"placements":["array"]}), async (c) => {
   const body = await c.req.json<{
     accountId?: string;
     expectedVersion?: number;
@@ -1726,10 +1727,10 @@ nenMembers.put('/api/nen-members/photos/publications/:id/placements', requireRol
   }));
   if (!accountId || !Number.isInteger(body?.expectedVersion) || !idempotencyKey
       || placements.length > 20 || placements.some((placement) => !allowed.has(placement.type) || !placement.label)) {
-    return c.json({ success: false, error: '掲載先、accountId、expectedVersion、Idempotency-Key を確認してください' }, 400);
+    return inputError(c, { success: false, error: '掲載先、accountId、expectedVersion、Idempotency-Key を確認してください' }, 400, ["accountId","expectedVersion","placements"]);
   }
   if (new Set(placements.map((placement) => `${placement.type}:${placement.label}`)).size !== placements.length) {
-    return c.json({ success: false, error: '同じ掲載先が重複しています' }, 400);
+    return inputError(c, { success: false, error: '同じ掲載先が重複しています' }, 400, ["placements"]);
   }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
@@ -1915,7 +1916,7 @@ function reviewDuplicateResponse(
   });
 }
 
-nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.submission.review'), async (c) => {
+nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.submission.review'), inputJsonBoundary({"accountId":["string"],"status":["string"],"reasonCode":["string"],"reasonNote":["string"],"expectedVersion":["number"],"resubmitInvite":["boolean"],"watchSubmitter":["boolean"],"withoutReward":["boolean"]}), async (c) => {
   const body = await c.req.json<{
     accountId?: string;
     status?: string;
@@ -1932,21 +1933,21 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
   // 化けないよう、一括審査や派生画像処理と同じく必須にする（#931 N-313）。
   const key = c.req.header('Idempotency-Key')?.trim() ?? '';
   if (!accountId || key.length < 8 || key.length > 200) {
-    return c.json({ success: false, error: '対象アカウントと再実行キーを確認してください' }, 400);
+    return inputError(c, { success: false, error: '対象アカウントと再実行キーを確認してください' }, 400, ["accountId"]);
   }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
   const status = String(body?.status || '');
-  if (!['adopted', 'rejected'].includes(status)) return c.json({ success: false, error: 'Invalid review' }, 400);
-  if (!Number.isInteger(body?.expectedVersion)) return c.json({ success: false, error: 'expectedVersion is required' }, 400);
+  if (!['adopted', 'rejected'].includes(status)) return inputError(c, { success: false, error: 'Invalid review' }, 400, ["status"]);
+  if (!Number.isInteger(body?.expectedVersion)) return inputError(c, { success: false, error: 'expectedVersion is required' }, 400, ["expectedVersion"]);
   const reasonCode = status === 'rejected' ? String(body?.reasonCode || '') : '';
   const reasonNote = String(body?.reasonNote || '').trim().slice(0, 500);
   if (status === 'rejected' && !Object.prototype.hasOwnProperty.call(PHOTO_REVIEW_REASON_LABELS, reasonCode)) {
-    return c.json({ success: false, error: '見送る理由を選んでください' }, 400);
+    return inputError(c, { success: false, error: '見送る理由を選んでください' }, 400, ["status","reasonCode"]);
   }
   if (status === 'rejected' && reasonCode === 'other' && !reasonNote) {
-    return c.json({ success: false, error: 'そのほかの理由を入力してください' }, 400);
+    return inputError(c, { success: false, error: 'そのほかの理由を入力してください' }, 400, ["status","reasonCode","reasonNote"]);
   }
   // 「もう一度送ってもらえるようお願いする」（#931 N-312）。採用には関係しない。
   const resubmitInvite = status !== 'rejected' || body?.resubmitInvite !== false;
@@ -2180,7 +2181,7 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
 async function handlePhotoRewardAction(c: Context<Env>, action: 'retry' | 'reconcile') {
   const body = await c.req.json<{ accountId?: string }>().catch(() => null);
   const accountId = body?.accountId?.trim();
-  if (!accountId) return c.json({ success: false, error: '対象アカウントを指定してください' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: '対象アカウントを指定してください' }, 400, ["accountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
@@ -2192,10 +2193,10 @@ async function handlePhotoRewardAction(c: Context<Env>, action: 'retry' | 'recon
   ).bind(c.req.param('id'), accountId).first<{ id: string; status: string; customer_id: string | null }>();
   if (!photo) return c.json({ success: false, error: '写真が見つかりません' }, 404);
   if (photo.status !== 'adopted') {
-    return c.json({ success: false, error: '採用した写真だけがポイント付与の対象です' }, 400);
+    return inputError(c, { success: false, error: '採用した写真だけがポイント付与の対象です' }, 400, ["accountId"]);
   }
   if (!photo.customer_id) {
-    return c.json({ success: false, error: 'EC会員とつながっていないためポイントを付けられません' }, 400);
+    return inputError(c, { success: false, error: 'EC会員とつながっていないためポイントを付けられません' }, 400, ["accountId"]);
   }
   const client = ecPhotoPointClient(c);
   if (!client) {
@@ -2247,13 +2248,13 @@ nenMembers.post(
   '/api/nen-members/photos/:id/point-retry',
   requireRole('owner', 'admin', 'staff'),
   requirePhotoPermission('photo.reward.reconcile'),
-  (c) => handlePhotoRewardAction(c, 'retry'),
+  inputJsonBoundary(), (c) => handlePhotoRewardAction(c, 'retry'),
 );
 nenMembers.post(
   '/api/nen-members/photos/:id/point-reconcile',
   requireRole('owner', 'admin', 'staff'),
   requirePhotoPermission('photo.reward.reconcile'),
-  (c) => handlePhotoRewardAction(c, 'reconcile'),
+  inputJsonBoundary(), (c) => handlePhotoRewardAction(c, 'reconcile'),
 );
 
 /*
@@ -2262,7 +2263,7 @@ nenMembers.post(
  * 版（expectedVersion）を要求するのは、審査と同じく並行する直しと
  * 通しの順序ずれを「別の担当者が更新しました」として気づけるようにするため。
  */
-nenMembers.put('/api/nen-members/photos/:id/rotation', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.submission.review'), async (c) => {
+nenMembers.put('/api/nen-members/photos/:id/rotation', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.submission.review'), inputJsonBoundary({"accountId":["string"],"rotation":["number"],"expectedVersion":["number"]}), async (c) => {
   const body = await c.req.json<{
     accountId?: string;
     rotation?: number;
@@ -2271,17 +2272,17 @@ nenMembers.put('/api/nen-members/photos/:id/rotation', requireRole('owner', 'adm
   const accountId = body?.accountId?.trim();
   const key = c.req.header('Idempotency-Key')?.trim() ?? '';
   if (!accountId || key.length < 8 || key.length > 200) {
-    return c.json({ success: false, error: '対象アカウントと再実行キーを確認してください' }, 400);
+    return inputError(c, { success: false, error: '対象アカウントと再実行キーを確認してください' }, 400, ["accountId"]);
   }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
   const rotation = Number(body?.rotation);
   if (![0, 90, 180, 270].includes(rotation)) {
-    return c.json({ success: false, error: '向きは0・90・180・270のいずれかです' }, 400);
+    return inputError(c, { success: false, error: '向きは0・90・180・270のいずれかです' }, 400, ["rotation"]);
   }
   if (!Number.isInteger(body?.expectedVersion)) {
-    return c.json({ success: false, error: 'expectedVersion is required' }, 400);
+    return inputError(c, { success: false, error: 'expectedVersion is required' }, 400, ["expectedVersion"]);
   }
   const photo = await c.env.DB.prepare(
     `SELECT id, status, review_version, display_rotation, rotation_idempotency_key
@@ -2321,14 +2322,14 @@ nenMembers.put('/api/nen-members/photos/:id/rotation', requireRole('owner', 'adm
   });
 });
 
-nenMembers.post('/api/nen-members/photos/:id/notification/retry', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.submission.review'), async (c) => {
+nenMembers.post('/api/nen-members/photos/:id/notification/retry', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.submission.review'), inputJsonBoundary({"accountId":["string"]}), async (c) => {
   const body = await c.req.json<{ accountId?: string }>().catch(() => null);
   const accountId = body?.accountId?.trim();
   // 再実行キー（#931 N-313）。送達が確定した再送を、同じキーのやり直しが
   // もう一度送らないよう、使ったキーを写真へ記録する。
   const key = c.req.header('Idempotency-Key')?.trim() ?? '';
   if (!accountId || key.length < 8 || key.length > 200) {
-    return c.json({ success: false, error: '対象アカウントと再実行キーを確認してください' }, 400);
+    return inputError(c, { success: false, error: '対象アカウントと再実行キーを確認してください' }, 400, ["accountId"]);
   }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
@@ -2412,7 +2413,7 @@ nenMembers.post('/api/nen-members/photos/:id/notification/retry', requireRole('o
   return c.json({ success: false, error: delivery.notificationError }, 502);
 });
 
-nenMembers.post('/api/nen-members/tags/resync', requireRole('owner', 'admin'), async (c) => {
+nenMembers.post('/api/nen-members/tags/resync', requireRole('owner', 'admin'), inputJsonBoundary({"limit":["number"]}), async (c) => {
   const body: { limit?: number } = await c.req.json<{ limit?: number }>().catch(() => ({}));
   const limit = Number.isFinite(body.limit) ? Number(body.limit) : 500;
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
@@ -2482,9 +2483,9 @@ nenMembers.get('/api/nen-members/consultations', async (c) => {
   return c.json({ success: true, data: rows.results });
 });
 
-nenMembers.post('/api/nen-members/rich-menu/install', requireRole('owner', 'admin'), async (c) => {
+nenMembers.post('/api/nen-members/rich-menu/install', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"]}), async (c) => {
   const body = await c.req.json<{ accountId?: string }>().catch(() => null);
-  if (!body?.accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+  if (!body?.accountId) return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }

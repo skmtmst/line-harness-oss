@@ -1,22 +1,26 @@
 /**
- * 管理画面の見た目テーマの「環境の既定」。
+ * 管理画面の見た目は常に V8（2026-10-09 オーナー決定「全画面を V8 に固定」）。
  *
- * app/layout.tsx（`<html data-theme>` の初期値）と lib/use-admin-theme.ts
- * （React の初期状態）が同じ値を使うためにここへ置く。片方だけ v8 にすると、
- * HTML は V8 なのに React は最初に v7 の旧画面を選び、描き直しでちらつく。
+ * 環境変数（NEXT_PUBLIC_ADMIN_THEME）・このブラウザに保存した選択（lh-admin-theme）・
+ * 設定画面の「画面の見た目」は、もう見た目を変えない。本番・検証・開発の画面は v8 だけ。
  *
- * `process.env.NEXT_PUBLIC_ADMIN_THEME` は書き出し時に文字へ置き換わるので、
- * サーバの描画とブラウザの最初の描画で必ず同じ値になる（hydration を壊さない）。
- * 試験で環境を差し替えられるよう、定数ではなく関数で読む。
+ * 例外は試験（vitest）の中だけ。古い v7 の画面のコードは機能ごとに書き換えるまで
+ * 使われないまま残してあり、その試験が v7 を描けるように、試験の中でだけ
+ * 「環境変数 NEXT_PUBLIC_ADMIN_THEME」と「<html data-theme>」での選択を残す。
+ * `process.env.NODE_ENV` は書き出し時に 'production'（next dev では 'development'）へ
+ * 置き換わるので、ブラウザに届く画面からこの口は開かない。
  */
+export function adminThemeTestOnlyChoice(): boolean {
+  return process.env.NODE_ENV === 'test'
+}
+
+/** 最初の描画の見た目。試験の外では layout.tsx の `<html data-theme="v8">` と必ず一致する。 */
 export function adminThemeDefault(): 'v7' | 'v8' {
+  if (!adminThemeTestOnlyChoice()) return 'v8'
   return process.env.NEXT_PUBLIC_ADMIN_THEME === 'v8' ? 'v8' : 'v7'
 }
 
-/**
- * 既定が v8 の環境（検証環境）は V8 だけにする（2026-10-07 オーナー）。
- * そのブラウザで前に v7 を選んでいても読まない。本番（変数なし）は false。
- */
+/** V8 固定か。試験の中で既定を v7 にしたときだけ false（<html data-theme> の選択を読む）。 */
 export function adminThemeLocked(): boolean {
   return adminThemeDefault() === 'v8'
 }

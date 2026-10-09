@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type {
@@ -134,7 +135,7 @@ async function safeBody(c: { req: { json<T>(): Promise<T> } }): Promise<unknown>
 
 function errorResponse(c: Context<Env>, error: unknown): Response {
   if (error instanceof IdentityCandidateError) {
-    return c.json({ success: false, error: error.message, code: error.code }, error.status);
+    return inputError(c, { success: false, error: error.message, code: error.code }, error.status, []);
   }
   console.error('identity candidates error:', error);
   return c.json(
@@ -181,15 +182,15 @@ identityCandidates.get('/api/identity-candidates', requireRole('owner', 'admin',
   }
 });
 
-identityCandidates.post('/api/identity-candidates/detect', requireRole('owner', 'admin'), async (c) => {
+identityCandidates.post('/api/identity-candidates/detect', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const kind = c.req.query('kind') as IdentityCandidateKind | undefined;
     if (kind !== 'friend_duplicate') {
-      return c.json({
+      return inputError(c, {
         success: false,
         error: '検出する候補の種類が正しくありません',
         code: 'INVALID_DETECTION_KIND',
-      }, 400);
+      }, 400, ["kind"]);
     }
     if (!canUseKind(c, kind)) {
       return c.json({ success: false, error: '候補を検出する権限がありません', code: 'FORBIDDEN' }, 403);
@@ -223,7 +224,7 @@ identityCandidates.get('/api/identity-candidates/:id', requireRole('owner', 'adm
   }
 });
 
-identityCandidates.post('/api/identity-candidates/:id/decide', requireRole('owner', 'admin'), async (c) => {
+identityCandidates.post('/api/identity-candidates/:id/decide', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const current = await getIdentityCandidate(c.env.DB, tenantId(c), c.req.param('id'));
     if (!canUseKind(c, current.kind)) {
@@ -246,7 +247,7 @@ identityCandidates.post('/api/identity-candidates/:id/decide', requireRole('owne
   }
 });
 
-identityCandidates.post('/api/identity-candidates/:id/undo', requireRole('owner', 'admin'), async (c) => {
+identityCandidates.post('/api/identity-candidates/:id/undo', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const current = await getIdentityCandidate(c.env.DB, tenantId(c), c.req.param('id'));
     if (!canUseKind(c, current.kind)) {
@@ -284,7 +285,7 @@ identityCandidates.get(
 identityCandidates.patch(
   '/api/friends/duplicates/:id',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const current = await friendDuplicateDetail(c, c.req.param('id'));
       const staff = getStaff(c)!;

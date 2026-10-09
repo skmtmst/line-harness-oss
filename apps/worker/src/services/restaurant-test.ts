@@ -50,7 +50,7 @@ export function isRestaurantReservationSource(value: unknown): value is Restaura
 
 export function validateInboundReservation(value: unknown):
   | { ok: true; value: InboundReservation }
-  | { ok: false; error: string } {
+  | { ok: false; error: string; field?: string } {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return { ok: false, error: 'reservation が必要です' };
   }
@@ -60,15 +60,15 @@ export function validateInboundReservation(value: unknown):
   const guestCount = Number(row.guestCount);
   const startsAt = typeof row.startsAt === 'string' ? row.startsAt : '';
   const endsAt = typeof row.endsAt === 'string' ? row.endsAt : '';
-  if (!externalId) return { ok: false, error: 'externalId が必要です' };
-  if (!customerName) return { ok: false, error: 'customerName が必要です' };
+  if (!externalId) return { ok: false, error: 'externalId が必要です', field: 'externalId' };
+  if (!customerName) return { ok: false, error: 'customerName が必要です', field: 'customerName' };
   if (!Number.isInteger(guestCount) || guestCount < 1 || guestCount > 100) {
-    return { ok: false, error: 'guestCount は1〜100の整数で指定してください' };
+    return { ok: false, error: 'guestCount は1〜100の整数で指定してください', field: 'guestCount' };
   }
   const start = Date.parse(startsAt);
   const end = Date.parse(endsAt);
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
-    return { ok: false, error: 'startsAt / endsAt の日時が正しくありません' };
+    return { ok: false, error: 'startsAt / endsAt の日時が正しくありません', field: !Number.isFinite(start) ? 'startsAt' : 'endsAt' };
   }
   const allowedStatuses = new Set(['pending', 'confirmed', 'seated', 'visited', 'cancelled', 'no_show']);
   const status = typeof row.status === 'string' && allowedStatuses.has(row.status)

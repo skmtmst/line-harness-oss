@@ -59,7 +59,7 @@ describe.each(kinds)('$path の色（実HTTP・SQL）', ({ path, version }) => {
     }
   });
   it('パレット外の値や型を拒み、閲覧のみから作らせない', async () => {
-    for (const color of ['#123456', '#123', 'red', 1, {}, false]) expect((await call(path, 'POST', { accountId: 'shop', name: '不可', color })).status).toBe(422);
+    for (const color of ['#123456', '#123', 'red', 1, {}, false]) expect((await call(path, 'POST', { accountId: 'shop', name: '不可', color })).status).toBe(typeof color === 'string' ? 422 : 400);
     const plain = await call(path, 'POST', { accountId: 'shop', name: '色なし' });
     expect(plain.status).toBe(201); expect(plain.body.data.color).toBeNull();
     expect((await call(`${path}/${plain.body.data.id}`, 'PATCH', { accountId: 'shop', name: '改名', color: '#123456', ...(version ? { [version]: 1 } : {}) })).status).toBe(422);

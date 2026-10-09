@@ -2160,7 +2160,7 @@ describe('共通情報', () => {
     const res = await req('/api/common-vars/cv-1/impact-preview', 'POST', body);
 
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ success: false, error });
+    expect(await res.json()).toMatchObject({ success: false, error , fields: expect.any(Object) });
     expect(mocks.getCommonVarUsageImpact).not.toHaveBeenCalled();
   });
 
