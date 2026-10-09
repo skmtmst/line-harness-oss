@@ -31,7 +31,7 @@ it('空の形：題・説明・制限・文字リンク。［ファイルを選�
 
 it('枠のどこを押してもファイルを選ぶ窓が開く。文字リンクは窓を開かない', () => {
   const onUrl = vi.fn()
-  const { container } = render(<MediaSlot title="メイン画像を追加" onUrl={onUrl} />)
+  const { container } = render(<MediaSlot title="メイン画像を追加" onUrl={onUrl} onFile={() => {}} />)
   const click = vi.spyOn(inputOf(container), 'click')
   fireEvent.click(frameOf())
   expect(click).toHaveBeenCalledTimes(1)
@@ -78,7 +78,7 @@ it('形式が違うものは送らない', async () => {
 
 it('入った形：画像を出し、［差し替える］［消す］。消すと null', () => {
   const onChange = vi.fn()
-  const { container } = render(<MediaSlot title="メイン画像を追加" value="https://cdn.test/x.png" onChange={onChange} />)
+  const { container } = render(<MediaSlot title="メイン画像を追加" value="https://cdn.test/x.png" onChange={onChange} onFile={() => {}} />)
   expect(frameOf().dataset.state).toBe('filled')
   expect(container.querySelector('img')?.getAttribute('src')).toBe('https://cdn.test/x.png')
   const click = vi.spyOn(inputOf(container), 'click')
@@ -116,7 +116,7 @@ it('場所が変わったあとに返った画像は反映しない', async () =
 })
 
 it('ドラッグ中は青い形', () => {
-  render(<MediaSlot title="メイン画像を追加" accept="image/png" />)
+  render(<MediaSlot title="メイン画像を追加" accept="image/png" onFile={() => {}} />)
   const file = png()
   fireEvent.dragEnter(frameOf(), { dataTransfer: { items: [{ kind: 'file', type: 'image/png', getAsFile: () => file }], files: [file] } })
   expect(frameOf().dataset.state).toBe('drag')
@@ -139,4 +139,22 @@ it('小さい所は文字を減らす', () => {
 it('形式の名前', () => {
   expect(formatNamesOf('image/jpeg,image/png')).toBe('JPEG・PNG')
   expect(formatNamesOf('video/mp4')).toBe('MP4')
+})
+
+it('「URL で入れる」で枠の下に URL の欄を開く', () => {
+  const onChange = vi.fn()
+  render(<MediaSlot title="音声を追加" kind="audio" onFile={() => {}} urlEntry={{ value: '', onChange, label: '音声の URL' }} />)
+  expect(screen.queryByRole('textbox', { name: '音声の URL' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'URL で入れる' }))
+  fireEvent.change(screen.getByRole('textbox', { name: '音声の URL' }), { target: { value: 'https://cdn.test/a.m4a' } })
+  expect(onChange).toHaveBeenCalledWith('https://cdn.test/a.m4a')
+})
+
+it('ファイルを受け取る口が無いときは、枠を押しても窓を開かず URL だけ出す', () => {
+  const { container } = render(<MediaSlot title="音声を追加" kind="audio" urlEntry={{ value: '', onChange: () => {}, label: '音声の URL' }} />)
+  const click = vi.spyOn(inputOf(container), 'click')
+  fireEvent.click(screen.getByRole('group', { name: '音声を追加' }))
+  expect(click).not.toHaveBeenCalled()
+  expect(screen.queryByText(/ドラッグ＆ドロップ/)).toBeNull()
+  expect(screen.getByRole('button', { name: 'URL で入れる' })).toBeTruthy()
 })

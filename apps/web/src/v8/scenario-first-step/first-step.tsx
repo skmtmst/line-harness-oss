@@ -776,7 +776,7 @@ export default function ScenarioFirstStepV8() {
             ) : null}
             {kind === 'question' ? <QuestionEditor value={question} onChange={editQuestion} /> : null}
             {kind === 'location' || kind === 'video' || kind === 'audio' || kind === 'sticker' ? (
-              <MessageKindFields kind={kind} value={kindState} onChange={editKindState} />
+              <MessageKindFields kind={kind} value={kindState} onChange={editKindState} mediaAccountId={scenario?.lineAccountId ?? selectedAccountId} />
             ) : null}
             {/* カルーセルはテンプレートを指す形で持つ。この画面では組み立てない。 */}
             {kind === 'carousel' ? <CarouselPicker value={templateId} onChange={editTemplateId} /> : null}

@@ -345,7 +345,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     const file = new File(['x'], 'a.png', { type: 'image/png' })
     fireEvent.change(document.querySelector('input[type="file"]') as HTMLInputElement, { target: { files: [file] } })
     await waitFor(() => expect(upload).toHaveBeenCalledWith(file, null))
-    await screen.findByText(/アップロード済み/)
+    await waitFor(() => expect(screen.getByRole('group', { name: '画像を追加' }).querySelector('img')?.getAttribute('src')).toBe('https://cdn.example/a.png'))
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     await waitFor(() => expect(hq.create).toHaveBeenCalled())
     const input = hq.create.mock.calls[0][0]

@@ -13,6 +13,7 @@ import {
   type ReactNode,
 } from 'react'
 import styles from './media-slot.module.css'
+import { TextField } from './text-field'
 
 /**
  * 画像・動画・ファイルを入れる所。Pencil ★V8 の採用案 Z7vd2（B-128「画像を追加する所」）。
@@ -123,8 +124,13 @@ export interface MediaSlotProps {
   onFile?: (file: File) => void
   /** 消す。渡さなければ `onChange(null)`。 */
   onRemove?: () => void
-  /** 渡すと「URL で入れる」を出す。 */
+  /** 渡すと「URL で入れる」を出す（押したときの動きは呼ぶ側）。 */
   onUrl?: () => void
+  /**
+   * 渡すと「URL で入れる」を出し、押すと枠の下に URL の欄を開く（部品が持つ）。
+   * `open` を渡すと最初から開く（URL だけが入っているときなど）。
+   */
+  urlEntry?: { value: string; onChange: (url: string) => void; label: string; placeholder?: string; open?: boolean }
   /** 渡すと「登録メディアから選ぶ」を出す。 */
   onMediaPick?: () => void
   /** 呼ぶ側が持つ取り込み中（`onFile` のとき）。 */
@@ -167,6 +173,7 @@ export default function MediaSlot({
   onFile,
   onRemove,
   onUrl,
+  urlEntry,
   onMediaPick,
   busy: busyProp,
   progress: progressProp,
@@ -193,6 +200,9 @@ export default function MediaSlot({
   const [ownBusy, setOwnBusy] = useState(false)
   const [ownProgress, setOwnProgress] = useState<number | null>(null)
   const [ownError, setOwnError] = useState('')
+  const [urlOpen, setUrlOpen] = useState(Boolean(urlEntry?.open))
+  /** ファイルを受け取る口があるか。無ければ URL・登録メディアだけの形。 */
+  const canFile = Boolean(upload || onFile)
 
   useEffect(() => {
     alive.current = true
@@ -227,7 +237,7 @@ export default function MediaSlot({
   const busy = Boolean(busyProp) || ownBusy
   const progress = progressProp ?? ownProgress
   const error = errorProp || ownError
-  const interactive = !readOnly && !disabled && !busy
+  const interactive = !readOnly && !disabled && !busy && canFile
   const compact = size === 'compact'
   const noun = NOUN[kind]
   const formats = formatNamesOf(accept)
@@ -372,10 +382,16 @@ export default function MediaSlot({
   }
 
   const links =
-    !readOnly && !busy && (onUrl || onMediaPick) ? (
+    !readOnly && !busy && (onUrl || urlEntry || onMediaPick) ? (
       <span className={styles.links}>
-        {onUrl ? (
-          <button type="button" className={styles.link} disabled={disabled} onClick={(event) => { stop(event); onUrl() }}>
+        {onUrl || urlEntry ? (
+          <button
+            type="button"
+            className={styles.link}
+            disabled={disabled}
+            aria-expanded={urlEntry ? urlOpen : undefined}
+            onClick={(event) => { stop(event); if (onUrl) onUrl(); else setUrlOpen((open) => !open) }}
+          >
             URL で入れる
           </button>
         ) : null}
@@ -412,9 +428,11 @@ export default function MediaSlot({
         )}
         {readOnly ? null : (
           <span className={styles.actions}>
-            <button type="button" className={styles.pill} disabled={disabled} onClick={(event) => { stop(event); openPicker() }}>
-              差し替える
-            </button>
+            {canFile ? (
+              <button type="button" className={styles.pill} disabled={disabled} onClick={(event) => { stop(event); openPicker() }}>
+                差し替える
+              </button>
+            ) : null}
             <button type="button" className={styles.pill} disabled={disabled} onClick={(event) => { stop(event); clear() }}>
               消す
             </button>
@@ -435,6 +453,8 @@ export default function MediaSlot({
             <span className={styles.reason} role="alert">{error}</span>
             {limit ? <span className={styles.desc}>{limit}</span> : null}
           </>
+        ) : !canFile ? (
+          limit ? <span className={styles.desc}>{compact ? limit : `（${limit}）`}</span> : null
         ) : (
           <>
             <span className={styles.desc}>
@@ -449,7 +469,7 @@ export default function MediaSlot({
     )
     body = (
       <span className={styles.center}>
-        {readOnly ? (
+        {readOnly || !canFile ? (
           inner
         ) : (
           <button type="button" className={styles.hit} disabled={!interactive} onClick={(event) => { stop(event); openPicker() }} onKeyDown={onKey}>
@@ -480,6 +500,7 @@ export default function MediaSlot({
         onClick={() => {
           if (!filled) openPicker()
         }}
+        data-file={canFile || undefined}
         onDragEnter={checkDrag}
         onDragOver={checkDrag}
         onDragLeave={leaveDrag}
@@ -504,6 +525,16 @@ export default function MediaSlot({
           }}
         />
       </div>
+      {urlEntry && urlOpen && !readOnly ? (
+        <TextField
+          type="url"
+          aria-label={urlEntry.label}
+          value={urlEntry.value}
+          disabled={disabled}
+          placeholder={urlEntry.placeholder ?? 'https://…'}
+          onChange={(event) => urlEntry.onChange(event.target.value)}
+        />
+      ) : null}
       {children}
     </div>
   )

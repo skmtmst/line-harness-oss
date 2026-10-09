@@ -1009,16 +1009,18 @@ export default function HqBroadcastCreate() {
                             </div>
                           </section>
                         ) : HQ_NOT_YET.has(kind) ? (
-                          <p className={styles.notYet} role="note">{notYetText(kind)}</p>
+                          <section><p className={styles.notYet} role="note">{notYetText(kind)}</p></section>
                         ) : kind === 'image' || kind === 'video' ? (
                           /* 店の一斉配信と同じアップロード欄。置き場はどの店にも属さない（統括）ので、どのアカウントからも同じ URL で届く。 */
-                          <MediaUpload bubble={{ id: active.id, type: kind, content: active.content }} lineAccountId={null} onChange={(next) => setContent(next)} />
+                          <section><MediaUpload bubble={{ id: active.id, type: kind, content: active.content }} lineAccountId={null} onChange={(next) => setContent(next)} /></section>
                         ) : kind === 'audio' || kind === 'sticker' || kind === 'location' ? (
-                          <MessageKindFields
-                            kind={kind as MessageKind}
-                            value={(active.content.state as MessageKindState | undefined) ?? emptyMessageKindState()}
-                            onChange={(next) => setContent({ state: next })}
-                          />
+                          <section>
+                            <MessageKindFields
+                              kind={kind as MessageKind}
+                              value={(active.content.state as MessageKindState | undefined) ?? emptyMessageKindState()}
+                              onChange={(next) => setContent({ state: next })}
+                            />
+                          </section>
                         ) : kind === 'flex' ? (
                           /* 統括のメッセージのひな形（画像・ボタンつきのカード）。中身はひな形のまま送る。直すときは統括のテンプレートで。 */
                           <section>

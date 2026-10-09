@@ -465,6 +465,8 @@
   --color-slot-bg: #f7f8fa;           /* 薄い灰の地（#f7f8fa） */
   --tpl-slot-h: 260px;                /* ふだんの高さ（絵の 380×260） */
   --tpl-slot-h-compact: 140px;        /* 小さい所（カルーセルのカード 180×140） */
+  --tpl-slot-w-compact: 180px;        /* 小さい所を横に並べるときの幅 */
+  --tpl-slot-row-gap: 12px;           /* 枠を横に並べるときの間 */
   --tpl-slot-pad: 20px;               /* 枠の内側 */
   --tpl-slot-pad-compact: 10px;
   --tpl-slot-gap: 4px;                /* 題・説明・制限の間 */

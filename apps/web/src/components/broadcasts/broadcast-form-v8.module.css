@@ -144,3 +144,5 @@
 .urlDetails { margin-top: var(--space-10); font-size: 12px; }
 .urlDetails summary { cursor: pointer; color: var(--color-ink-secondary); }
 .urlDetails[open] > :not(summary) { margin-top: var(--space-8); }
+/* 動画の枠とプレビュー画像の小さい枠を横に並べる（MediaSlot・Z7vd2）。 */
+.mediaRow { display: grid; grid-template-columns: minmax(0, 1fr) var(--tpl-slot-w-compact); gap: var(--tpl-slot-row-gap); align-items: start; }

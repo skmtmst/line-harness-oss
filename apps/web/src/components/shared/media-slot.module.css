@@ -56,6 +56,7 @@
   cursor: default;
 }
 
+.frame:not([data-file]),
 .frame[data-state='busy'],
 .frame[data-readonly],
 .frame[data-disabled] {
