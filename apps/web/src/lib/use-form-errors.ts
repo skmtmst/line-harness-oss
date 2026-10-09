@@ -93,6 +93,11 @@ export function useFormErrors() {
   const touchedRef = useRef(new Set<string>())
   /** 欄の定義（描画順＝まとめの並び順） */
   const defsRef = useRef(new Map<string, { label: string; check: () => string | null } & FormFieldOptions>())
+  /*
+   * 描画のたびに定義を作り直す（このあと同じ描画の中で define が全欄ぶん呼ばれる）。
+   * 作り直さないと、消したカード・行の欄（card-2-text など）が古い値のまま残り、保存をずっと止める。
+   */
+  defsRef.current = new Map()
   /** 欄の要素（1つ目へフォーカスを移すため） */
   const elsRef = useRef(new Map<string, HTMLElement>())
   /** サーバーが返した欄の誤り。打ち直すか次の送信で消える。 */

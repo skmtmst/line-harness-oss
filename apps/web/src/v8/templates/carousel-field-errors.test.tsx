@@ -72,4 +72,18 @@ describe('カルーセルの欄ごとの誤り（B-139）', () => {
     await waitFor(() => expect(document.activeElement).toBe(name))
     expect(calls.create).not.toHaveBeenCalled()
   })
+
+  it('落ちたカードを消せば、消したカードの誤りは残らず保存できる（欄の定義は描くたびに作り直す）', async () => {
+    render(<Carousel />)
+    fillFirst()
+    fireEvent.click(screen.getByRole('button', { name: 'カードを足す' }))
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    await waitFor(() => expect(document.getElementById('cr-text-error')?.textContent).toBe('本文を入力してください'))
+    fireEvent.click(screen.getByRole('button', { name: 'このカードを消す' }))
+    const confirm = screen.queryByRole('alertdialog') ?? screen.queryByRole('dialog')
+    if (confirm) fireEvent.click(within(confirm).getAllByRole('button').find((button) => /消す/.test(button.textContent ?? ''))!)
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^2 / })).toBeNull())
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    await waitFor(() => expect(calls.create).toHaveBeenCalled())
+  })
 })

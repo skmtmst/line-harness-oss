@@ -22,6 +22,8 @@ import type { TapActionKind, TapActionValue } from '@/lib/tap-actions'
 import { EntityPickerField } from '@/components/shared/entity-picker'
 import { ENTITY_KINDS } from '@/components/shared/entity-picker-sources'
 import FolderSelect from '@/components/shared/folder-select'
+import { FieldError } from '@/components/shared/form-controls'
+import type { FormErrors } from '@/lib/use-form-errors'
 import { decodeImageSize, type TemplateMedia } from './definition'
 import styles from './console.module.css'
 
@@ -62,11 +64,26 @@ export interface MessageFormProps {
   onReceipt?: (media: TemplateMedia) => void
   /** 下に出す「前回の保存を再確認」などの知らせ。 */
   notice?: ReactNode
+  /** 保存で落ちた欄（B-139）。呼ぶ側の useFormErrors を渡すと、名前・本文・ボタンを欄ごとに検査して知らせる。 */
+  fields?: FormErrors
+}
+
+/** カードのボタン1つの誤り（packages/shared の parseHqMessageCard と同じ決まり）。欄の真下に出す。 */
+function cardButtonProblem(button: HqMessageCard['buttons'][number]): string | null {
+  if (!button.label.trim()) return 'ボタンの文字を入力してください'
+  if (!button.value.trim()) return button.action === 'form' ? '回答フォームを選んでください' : button.action === 'scenario' ? 'シナリオを選んでください' : button.action === 'message' ? '送る文を入力してください' : 'URLを入力してください'
+  if (button.action === 'url') {
+    try {
+      const url = new URL(button.value)
+      if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) return 'http か https の URL を入力してください'
+    } catch { return '正しい URL を入力してください' }
+  }
+  return null
 }
 
 export default function MessageForm({
   name, onNameChange, value, onChange, folders, folderId, onFolderChange, onCreateFolder, folderLoadFailed,
-  disabled, catalogFailed, onReloadCatalog, onBusyChange, onReceipt, notice,
+  disabled, catalogFailed, onReloadCatalog, onBusyChange, onReceipt, notice, fields,
 }: MessageFormProps) {
   const current = value.template
   const [targetDate, setTargetDate] = useState('')
@@ -87,6 +104,11 @@ export default function MessageForm({
     return () => { alive = false }
   }, [])
 
+  fields?.define('name', 'ひな形の名前', () => (name.trim() ? null : 'ひな形の名前を入力してください'))
+  fields?.define('body', '配信する本文', () => ((usesCard ? card.body : current.messageContent).trim() ? null : '配信する本文を入力してください'))
+  if (usesCard && card.format === 'flex') card.buttons.forEach((button, index) => fields?.define(`button-${button.id}`, `ボタン${index + 1}`, () => cardButtonProblem(button)))
+  const bindField = (key: string, id: string) => (fields ? { ...fields.bind(key), 'aria-invalid': fields.invalid(key) || undefined, 'aria-describedby': fields.invalid(key) ? `${id}-error` : undefined } : {})
+
   const updateCard = (next: HqMessageCard) => onChange(withMessageCard(value, next))
   const updateButton = (id: string, patch: Partial<HqMessageCard['buttons'][number]>) => updateCard({ ...card, buttons: card.buttons.map((button) => button.id === id ? { ...button, ...patch } : button) })
   const image = value.media.find((item) => item.id === card.imageMediaId) ?? value.media[0]
@@ -102,7 +124,8 @@ export default function MessageForm({
         <div className={styles.twoCol}>
           <label className={styles.field}>
             <span className={styles.label}>ひな形の名前</span>
-            <input aria-label="ひな形の名前" className={styles.input} value={name} maxLength={200} disabled={disabled} onChange={(event) => onNameChange(event.target.value)} />
+            <input aria-label="ひな形の名前" {...bindField('name', 'hq-msg-name')} className={styles.input} value={name} maxLength={200} disabled={disabled} onChange={(event) => onNameChange(event.target.value)} />
+            <FieldError id="hq-msg-name-error">{fields?.error('name')}</FieldError>
           </label>
           <label className={styles.field}>
             <span className={styles.label}>分類 <small className={styles.optional}>任意</small></span>
@@ -136,14 +159,15 @@ export default function MessageForm({
           </label>
           <label className={styles.field}>
             <span className={styles.smallLabel}>本文</span>
-            <textarea className={styles.textarea} aria-label="配信する本文" maxLength={card.format === 'flex' ? 2000 : 5000} value={card.body} disabled={disabled} onChange={(event) => updateCard({ ...card, body: event.target.value })} />
+            <textarea className={styles.textarea} aria-label="配信する本文" {...bindField('body', 'hq-msg-body')} maxLength={card.format === 'flex' ? 2000 : 5000} value={card.body} disabled={disabled} onChange={(event) => updateCard({ ...card, body: event.target.value })} />
+            <FieldError id="hq-msg-body-error">{fields?.error('body')}</FieldError>
           </label>
           {card.format === 'flex' && (
             <div className={styles.buttonsBox}>
               <span className={styles.smallLabel}>ボタン <small className={styles.optional}>最大 3 つ</small></span>
               {referenceError && <Notice tone="warn" message={referenceError} action={<Button disabled={disabled} onClick={() => void loadReferences()}>参照先を再読み込み</Button>} />}
               {card.buttons.map((button, index) => (
-                <div key={button.id} className={styles.buttonEdit}>
+                <div key={button.id} className={styles.buttonEdit} {...(fields ? fields.bind(`button-${button.id}`) : {})} aria-describedby={fields?.invalid(`button-${button.id}`) ? `hq-msg-button-${button.id}-error` : undefined}>
                   <label className={styles.field}>
                     <span className={styles.labelRow}>
                       <span className={styles.label}>ボタンの文字</span>
@@ -183,6 +207,7 @@ export default function MessageForm({
                       )}
                     />
                   </div>
+                  <FieldError id={`hq-msg-button-${button.id}-error`}>{fields?.error(`button-${button.id}`)}</FieldError>
                 </div>
               ))}
               <span className={styles.addButtonRow}>
@@ -193,6 +218,7 @@ export default function MessageForm({
             </div>
           )}
         </> : (
+          <div {...(fields ? fields.bind('body') : {})}>
           <MessageTemplateEditor
             value={{ messageType: current.messageType, messageContent: current.messageContent }}
             onChange={(next) => onChange({ ...value, template: { ...current, messageType: next.messageType as MessageTemplateDefinition['template']['messageType'], messageContent: next.messageContent } })}
@@ -211,6 +237,8 @@ export default function MessageForm({
               </>
             )}
           />
+          <FieldError id="hq-msg-body-error">{fields?.error('body')}</FieldError>
+          </div>
         )}
         {notice}
       </section>
