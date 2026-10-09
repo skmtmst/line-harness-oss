@@ -1,5 +1,6 @@
-import { PageHeading } from '@/components/templates/page-frame'
 'use client'
+
+import { PageHeading } from '@/components/templates/page-frame'
 
 /*
  * ★V8 友だちの段の頭。
