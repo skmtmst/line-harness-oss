@@ -10,7 +10,7 @@
  * 世代番号で、別の人へ開き直した途中に届いた古い応答を捨てる。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Copy, PauseCircle, X } from 'lucide-react'
+import { Check, Copy, PauseCircle } from 'lucide-react'
 import { api, type AffiliateAccountSettlementPreview, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
@@ -18,6 +18,8 @@ import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 import Checkbox from '@/components/shared/checkbox'
 import { Field } from '@/components/shared/form-controls'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Drawer from '@/components/shared/drawer'
@@ -211,7 +213,6 @@ export default function AffiliateDrawer({
 
   useEffect(() => { reloadAll() }, [reloadAll])
 
-
   const copyLinkUrl = useCallback(async (link: AffiliateLink) => {
     const url = distributionUrl(link.ref_code, linkBaseUrl)
     if (!url) return
@@ -262,25 +263,11 @@ export default function AffiliateDrawer({
 
   const summary = (
     <>
-      <div className={styles.kpis}>
-        <div className={styles.kpi}>
-          <span className={styles.kpiLabel}>今月の成果</span>
-          <span className={styles.kpiValue}>{report ? `${formatNumber(report.conversions)} 件` : '—'}</span>
-          <span className={styles.kpiSub}>{report ? `認めた ${formatNumber(report.conversionsApproved)}・待っている ${formatNumber(report.conversionsPending)}` : '読み込めませんでした'}</span>
-        </div>
-        <div className={styles.kpi}>
-          <span className={styles.kpiLabel}>今月の報酬</span>
-          <span className={styles.kpiValue}>{monthReward == null ? '—' : formatYen(monthReward)}</span>
-          <span className={styles.kpiSub}>{rewardDetail}</span>
-        </div>
-        <div className={styles.kpi}>
-          <span className={styles.kpiLabel}>支払いを確定していない報酬</span>
-          <span className={styles.kpiValue}>{settlementState === 'ready' ? formatYen(settlement?.amount ?? 0) : '—'}</span>
-          <span className={styles.kpiSub}>
-            {settlementState === 'ready' ? `認めた ${formatNumber(settlement?.conversionCount ?? 0)} 件分` : settlementState === 'loading' ? '読み込んでいます' : '読み込めませんでした'}
-          </span>
-        </div>
-      </div>
+      <KpiBand density="compact">
+        <KpiCard icon={null} title="今月の成果" value={report?.conversions} unit="件" detail={report ? `認めた ${formatNumber(report.conversionsApproved)}・待っている ${formatNumber(report.conversionsPending)}` : '読み込めませんでした'} />
+        <KpiCard icon={null} title="今月の報酬" value={null} valueText={monthReward == null ? '—' : formatYen(monthReward)} unit="" detail={rewardDetail} />
+        <KpiCard icon={null} title="支払いを確定していない報酬" value={null} valueText={settlementState === 'ready' ? formatYen(settlement?.amount ?? 0) : '—'} unit="" detail={settlementState === 'ready' ? `認めた ${formatNumber(settlement?.conversionCount ?? 0)} 件分` : settlementState === 'loading' ? '読み込んでいます' : '読み込めませんでした'} />
+      </KpiBand>
 
       <section className={styles.section} aria-label="発行ずみの紹介リンク">
         <div className={styles.sectionHead}>
@@ -448,11 +435,11 @@ export default function AffiliateDrawer({
         ) : settlementState === 'error' ? (
           <p className={styles.empty}>今回の締めを読み込めませんでした。</p>
         ) : settlement ? (
-          <div className={styles.kpis}>
-            <div className={styles.kpi}><span className={styles.kpiLabel}>今回の金額</span><span className={styles.kpiValue}>{formatYen(settlement.amount)}</span></div>
-            <div className={styles.kpi}><span className={styles.kpiLabel}>成果</span><span className={styles.kpiValue}>{`${formatNumber(settlement.conversionCount)} 件`}</span></div>
-            <div className={styles.kpi}><span className={styles.kpiLabel}>振込先</span><span className={styles.kpiValue}>{settlement.bankProfileRegistered ? '登録済み' : '未登録'}</span></div>
-          </div>
+          <KpiBand density="compact">
+            <KpiCard icon={null} title="今回の金額" value={null} valueText={formatYen(settlement.amount)} unit="" detail={null} />
+            <KpiCard icon={null} title="成果" value={settlement.conversionCount} unit="件" detail={null} />
+            <KpiCard icon={null} title="振込先" value={null} valueText={settlement.bankProfileRegistered ? '登録済み' : '未登録'} unit="" detail={null} />
+          </KpiBand>
         ) : (
           <p className={styles.empty}>この人には、今回締められる報酬がありません。</p>
         )}

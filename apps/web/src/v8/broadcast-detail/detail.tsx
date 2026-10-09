@@ -14,6 +14,8 @@
  * 宛先・記録のタブの中身は入口から差し込む（古い画面の部品を import しないため）。
  */
 import { useState, type ReactNode, type RefObject } from 'react'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -676,29 +678,28 @@ function Overview({
           countText={`${formatNumber(broadcast.successCount)} / ${formatNumber(total)} 件`}
         />
       ) : null}
-      <div className={styles.stats}>
+      <KpiBand density="compact">
         {isSent ? (
           <>
-            <Stat label="届いた" value={delivered} unit="人" detail={`送信成功 ${rateText(total > 0 ? delivered / total : null)}`} />
-            <Stat label="開いた" value={insightReady ? opened : null} unit="人" detail={waiting ?? `開封 ${rateText(openRate)}`} />
-            <Stat label="押した" value={insightReady ? insight?.uniqueClick ?? null : null} unit="人" detail={waiting ?? `クリック ${rateText(insight?.clickRate)}`} />
+            <KpiCard title="届いた" value={delivered} unit="人" detail={`送信成功 ${rateText(total > 0 ? delivered / total : null)}`} icon={null} presentation="band" />
+            <KpiCard title="開いた" value={insightReady ? opened : null} unit="人" detail={waiting ?? `開封 ${rateText(openRate)}`} icon={null} presentation="band" />
+            <KpiCard title="押した" value={insightReady ? insight?.uniqueClick ?? null : null} unit="人" detail={waiting ?? `クリック ${rateText(insight?.clickRate)}`} icon={null} presentation="band" />
             {/* ブロックは単独では取れない。届かなかった数（送信失敗を含む）を出し、内訳は下の「エラー」に書く。 */}
-            <Stat label="ブロック" value={failedCount} unit="人" detail={rateText(total > 0 ? failedCount / total : null)} />
+            <KpiCard title="ブロック" value={failedCount} unit="人" detail={rateText(total > 0 ? failedCount / total : null)} icon={null} presentation="band" />
           </>
         ) : (
           <>
-            <Stat
-              label="送信"
+            <KpiCard title="送信"
               value={broadcast.successCount}
               unit="件"
-              detail={scheduledLabel ? `${scheduledLabel} に送り始めます` : 'まだ送っていません'}
+              detail={scheduledLabel ? `${scheduledLabel} に送り始めます` : 'まだ送っていません'} icon={null} presentation="band"
             />
-            <Stat label="届いた" value={broadcast.successCount} unit="人" detail="送る前のため、まだありません" />
-            <Stat label="開いた" value={null} unit="" detail={insightState === 'error' ? '読み込めませんでした' : '—'} />
-            <Stat label="押した" value={null} unit="" detail={insightState === 'error' ? '読み込めませんでした' : '—'} />
+            <KpiCard title="届いた" value={broadcast.successCount} unit="人" detail="送る前のため、まだありません" icon={null} presentation="band" />
+            <KpiCard title="開いた" value={null} unit="" detail={insightState === 'error' ? '読み込めませんでした' : '—'} icon={null} presentation="band" />
+            <KpiCard title="押した" value={null} unit="" detail={insightState === 'error' ? '読み込めませんでした' : '—'} icon={null} presentation="band" />
           </>
         )}
-      </div>
+      </KpiBand>
       {isSent ? (
         <p className={styles.note}>
           配信から 14 日間の数。開いた・押したは人数（同じ人は 1 人）。20 人に満たないときは「—」で出します（少なすぎる数は出さない）。率は届いた人数で割った値。
@@ -882,20 +883,6 @@ function ApprovalBox({
         </>
       ) : null}
     </section>
-  )
-}
-
-function Stat({ label, value, unit, detail }: { label: string; value: number | null; unit: string; detail: string }) {
-  return (
-    <div className={styles.stat}>
-      <p className={styles.statLabel}>{label}</p>
-      <p className={styles.statValue}>
-        <span className={styles.statNum}>{value == null ? '—' : formatNumber(value)}</span>
-        {unit ? <span className={styles.statUnit}>{unit}</span> : null}
-      </p>
-      {/* 数字だけの補足は絵どおり欧文の書体（Inter）。 */}
-      <p className={styles.statDetail} data-numeric={/^[\d.,%—-]+$/.test(detail) || undefined}>{detail}</p>
-    </div>
   )
 }
 

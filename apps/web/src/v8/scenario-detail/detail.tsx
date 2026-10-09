@@ -1,5 +1,8 @@
 'use client'
 
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+
 /*
  * ★V8 シナリオ配信の編集（src/v8 に一から組み直した版）。
  * 板：稼働中 `PMLkX`・始めた直後 `nMSiE`・停止中 `ARuZ4`・競合 `kz2B6`、
@@ -14,7 +17,6 @@
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
 import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
-
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -138,7 +140,7 @@ import {
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
-import { formatDateTime, formatNumber } from '@/lib/format'
+import { formatNumber } from '@/lib/format'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
@@ -2528,47 +2530,12 @@ export default function ScenarioDetailV8({
           </div>
 
           {/* 数の帯：購読中・読み終えた・始まる見込み・離脱が多い所。 */}
-          <div className={styles.kpis} data-design="KPIs">
-            <div className={styles.kpi}>
-              <p className={styles.kpiLabel}>購読中</p>
-              <p className={styles.kpiValue}>
-                <span className={styles.kpiNum}>{stats ? formatNumber(stats.activeNow) : '—'}</span>
-                <span className={styles.kpiUnit}>人</span>
-              </p>
-              <p className={styles.kpiDetail}>いま途中にいる人</p>
-            </div>
-            <div className={styles.kpi}>
-              <p className={styles.kpiLabel}>読み終えた</p>
-              <p className={styles.kpiValue}>
-                <span className={styles.kpiNum}>{stats ? formatNumber(stats.completed) : '—'}</span>
-                <span className={styles.kpiUnit}>人</span>
-              </p>
-              <p className={styles.kpiDetail}>最後の1通まで届いた人</p>
-            </div>
-            <div className={styles.kpi}>
-              <p className={styles.kpiLabel}>始まる見込み（試算）</p>
-              <p className={styles.kpiValue}>
-                <span className={styles.kpiNum}>
-                  {simulation ? formatNumber(simulation.audience.newStartPlanned) : '—'}
-                </span>
-                <span className={styles.kpiUnit}>人</span>
-              </p>
-              <p className={styles.kpiDetail}>きっかけが来たら始まる見込み。確定ではない</p>
-            </div>
-            <div className={styles.kpi}>
-              <p className={styles.kpiLabel}>離脱が多い所</p>
-              <p className={styles.kpiValue}>
-                <span className={styles.kpiNumWide}>
-                  {biggestDrop ? `${biggestDrop.fromOrder}→${biggestDrop.toOrder}通目` : '—'}
-                </span>
-              </p>
-              <p className={styles.kpiDetail}>
-                {biggestDrop
-                  ? `${biggestDrop.fromOrder}通目で ${formatNumber(biggestDrop.lost)}人（${Math.round(biggestDrop.rate * 100)}%）が離れています`
-                  : '大きく離れている所はまだありません'}
-              </p>
-            </div>
-          </div>
+          <KpiBand data-design="KPIs">
+            <KpiCard icon={null} title="購読中" value={stats?.activeNow} unit="人" detail="いま途中にいる人" />
+            <KpiCard icon={null} title="読み終えた" value={stats?.completed} unit="人" detail="最後の1通まで届いた人" />
+            <KpiCard icon={null} title="始まる見込み（試算）" value={simulation?.audience.newStartPlanned} unit="人" detail="きっかけが来たら始まる見込み。確定ではない" />
+            <KpiCard icon={null} title="離脱が多い所" value={null} valueText={biggestDrop ? `${biggestDrop.fromOrder}→${biggestDrop.toOrder}通目` : '—'} unit="" detail={biggestDrop ? `${biggestDrop.fromOrder}通目で ${formatNumber(biggestDrop.lost)}人（${Math.round(biggestDrop.rate * 100)}%）が離れています` : '大きく離れている所はまだありません'} />
+          </KpiBand>
 
           {/* 最後の1通の後（行）。変える入口はこの行の右。 */}
           <div className={styles.onComplete}>

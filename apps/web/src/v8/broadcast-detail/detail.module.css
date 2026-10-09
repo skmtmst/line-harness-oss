@@ -447,64 +447,6 @@ a.railStep:hover .railLabel {
 }
 
 /* 数の帯：枠1つ・4つの升を縦の線で分ける（絵「数の帯」）。 */
-.stats {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  border-radius: var(--radius-card);
-  box-shadow: var(--tpl-bd-ring);
-}
-
-.stat {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-bd-stat-gap);
-  min-width: 0;
-  padding: var(--tpl-bd-stat-pad);
-}
-
-.stat + .stat {
-  box-shadow: var(--tpl-bd-line-l);
-}
-
-.statLabel {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-bd-stat-label-size);
-  line-height: var(--tpl-bd-stat-label-lh);
-}
-
-.statValue {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--tpl-bd-stat-unit-gap);
-  margin: 0;
-}
-
-.statNum,
-.statDetail[data-numeric] {
-  font-family: var(--font-inter), Inter, system-ui, sans-serif;
-}
-
-.statNum {
-  color: var(--color-ink);
-  font-size: var(--tpl-bd-stat-num-size);
-  font-weight: 700;
-  line-height: var(--tpl-bd-stat-num-lh);
-  font-variant-numeric: tabular-nums;
-}
-
-.statUnit {
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-bd-stat-unit-size);
-  line-height: var(--tpl-bd-stat-unit-lh);
-}
-
-.statDetail {
-  margin: 0;
-  color: var(--color-ink-faint);
-  font-size: var(--tpl-bd-stat-detail-size);
-  line-height: var(--tpl-bd-stat-detail-lh);
-}
 
 /* 反応：リンクごとの行（枠1つ・行の間は線）。 */
 .linkList {
