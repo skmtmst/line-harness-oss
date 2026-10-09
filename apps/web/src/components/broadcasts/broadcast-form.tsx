@@ -230,7 +230,7 @@ function formatScheduleTime(iso: string): string {
 const TITLE_MAX = 60
 
 const STANDARD_CONDITION_AXES = [
-  '名前', '個別メモ', 'ステータスメッセージ', '友だち登録日', 'タグ',
+  '名前', 'メモ', 'ステータスメッセージ', '友だち登録日', 'タグ',
   '友だち情報', 'シナリオ', 'イベント予約', 'カレンダー予約', '共通情報',
   'リマインダ', '回答フォーム', '最終反応日', 'その他', '対応マーク',
 ] as const

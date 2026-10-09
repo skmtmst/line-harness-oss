@@ -54,7 +54,7 @@ export type { FieldOperator, SegmentCondition, SegmentRule } from '@/lib/segment
  */
 const RULE_KINDS: { type: string; label: string; group: string; feature?: 'support_marks' | 'friend_fields'; make: () => SegmentRule }[] = [
   { type: 'name', label: '名前', group: '友だちの情報', make: () => ({ type: 'name', value: { text: '', targets: ['display', 'real', 'system'] } }) },
-  { type: 'private_memo', label: '個別メモ', group: '友だちの情報', make: () => ({ type: 'private_memo', value: '' }) },
+  { type: 'private_memo', label: 'メモ', group: '友だちの情報', make: () => ({ type: 'private_memo', value: '' }) },
   { type: 'status_message', label: 'ステータスメッセージ', group: '友だちの情報', make: () => ({ type: 'status_message', value: '' }) },
   { type: 'registered_at', label: '友だち登録日', group: '友だちの情報', make: () => ({ type: 'registered_at', value: { from: '', to: '' } }) },
   { type: 'support_mark', label: '対応マーク', group: 'タグ・記入欄', feature: 'support_marks' as const, make: () => ({ type: 'support_mark', value: { markIds: [], exclude: false } }) },
@@ -626,12 +626,12 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
       return (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-ink text-sm font-semibold">
-            {rule.type === 'private_memo' ? '個別メモ' : 'ステータスメッセージ'}
+            {rule.type === 'private_memo' ? 'メモ' : 'ステータスメッセージ'}
           </span>
           <input
             value={String(rule.value ?? '')}
             onChange={(e) => onChange({ type: rule.type, value: e.target.value })}
-            aria-label={rule.type === 'private_memo' ? '個別メモに含む文字' : 'ステータスメッセージに含む文字'}
+            aria-label={rule.type === 'private_memo' ? 'メモに含む文字' : 'ステータスメッセージに含む文字'}
             className={inputClass}
           />
         </div>

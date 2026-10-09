@@ -53,7 +53,7 @@ const RULE_LABELS: Record<string, string> = {
   tag_not_exists: 'タグの除外',
   tag_not_all: 'タグの除外',
   name: '名前',
-  private_memo: '個別メモ',
+  private_memo: 'メモ',
   status_message: 'ステータスメッセージ',
   registered_at: '友だち登録日',
   support_mark: '対応マーク',

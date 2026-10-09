@@ -115,8 +115,8 @@ describe('IDEA-04（issue #1022）タグの分類説明・重複候補・変更�
       .toBe('ステータスメッセージに「連絡」を含む')
     // 存在確認の否定形は「無い」。「ある」で出すと逆の意味になる。
     expect(describeSavedCondition({ kind: 'event_booking', op: 'not_exists' })).toBe('イベント予約がない')
-    expect(describeSavedCondition({ kind: 'memo', op: 'not_exists' })).toBe('個別メモがない')
-    expect(describeSavedCondition({ kind: 'memo', op: 'eq', value: '要対応' })).toBe('個別メモが「要対応」')
+    expect(describeSavedCondition({ kind: 'memo', op: 'not_exists' })).toBe('メモがない')
+    expect(describeSavedCondition({ kind: 'memo', op: 'eq', value: '要対応' })).toBe('メモが「要対応」')
     expect(describeSavedCondition({ kind: 'assignee', op: 'ne', value: 's1' }))
       .toBe('担当者が「選択済みの担当者」以外')
   })

@@ -70,7 +70,7 @@ const EDITABLE_KINDS: Array<{ value: SavedSearchConditionKind; label: string }> 
   { value: 'purchase', label: '購入履歴' },
   { value: 'last_activity', label: '最終反応日' },
   { value: 'reminder', label: 'リマインダ' },
-  { value: 'memo', label: '個別メモ' },
+  { value: 'memo', label: 'メモ' },
   { value: 'common_event', label: 'その他のイベント' },
   { value: 'chat_status', label: '対応状況' },
   { value: 'following', label: '友だち状態' },
@@ -423,7 +423,7 @@ function ConditionControls({
       ) : condition.kind === 'memo' ? (
         <>
           <Select
-            aria-label="個別メモの比較"
+            aria-label="メモの比較"
             value={['exists', 'has', 'not_exists', 'not_has', 'eq', 'contains'].includes(condition.op) ? condition.op : 'exists'}
             onChange={(op) => onChange({ ...condition, op, value: isSavedSearchValueOptionalOp(op) ? '' : condition.value })}
             options={[

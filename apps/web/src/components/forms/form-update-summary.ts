@@ -51,7 +51,7 @@ export function describeInputUpdates(
   }
   if (dest?.realName) targets.push('本名')
   if (dest?.displayName) targets.push('システム表示名')
-  if (dest?.note) targets.push('個別メモ')
+  if (dest?.note) targets.push('メモ')
   if (targets.length > 0) {
     lines.push(`回答を ${targets.join('・')} に登録（未回答なら更新しない）`)
   }

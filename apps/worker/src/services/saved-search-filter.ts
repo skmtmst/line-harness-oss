@@ -215,10 +215,10 @@ function compileCondition(condition: SavedSearchCondition): CompiledCondition | 
     case 'memo':
       if (condition.op === 'exists') return { sql: "COALESCE(TRIM((SELECT memo_chat.notes FROM chats memo_chat WHERE memo_chat.friend_id = f.id)), '') != ''", binds: [] };
       if (condition.op === 'not_exists') return { sql: "COALESCE(TRIM((SELECT memo_chat.notes FROM chats memo_chat WHERE memo_chat.friend_id = f.id)), '') = ''", binds: [] };
-      if (!value) return '個別メモの条件に値がありません';
+      if (!value) return 'メモの条件に値がありません';
       if (condition.op === 'eq') return { sql: '(SELECT memo_chat.notes FROM chats memo_chat WHERE memo_chat.friend_id = f.id) = ?', binds: [value] };
       if (condition.op === 'contains') return { sql: '(SELECT memo_chat.notes FROM chats memo_chat WHERE memo_chat.friend_id = f.id) LIKE ?', binds: [`%${value}%`] };
-      return '個別メモで使えない比較方法が指定されています';
+      return 'メモで使えない比較方法が指定されています';
 
     case 'created_at': {
       return dateCondition(condition, 'f.created_at', '友だち追加日');

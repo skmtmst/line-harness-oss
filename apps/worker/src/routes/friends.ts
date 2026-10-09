@@ -1223,7 +1223,7 @@ friends.get('/api/friends/:id', requireVisibleFriend, async (c) => {
       includeSubmissions ? getFormSubmissionsByFriend(db, id, 10) : Promise.resolve([]),
       countFriendFormSubmissions(db, id).catch(() => null),
       /*
-       * 対応の状況（対応マーク・担当者・個別メモ）。
+       * 対応の状況（対応マーク・担当者・メモ）。
        *
        * 詳細画面はこれを出す設計だが、これまで返していなかったので
        * 「受信箱で扱っています」という案内文しか置けなかった。同じ人の
