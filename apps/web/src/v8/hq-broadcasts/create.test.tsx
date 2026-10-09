@@ -85,10 +85,10 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 async function selectAccounts(...names: string[]) {
-  fireEvent.click(await screen.findByRole('button', { name: 'アカウントを選ぶ' }))
-  const dialog = await screen.findByRole('dialog', { name: 'アカウントを選ぶ' })
+  fireEvent.click(await screen.findByRole('button', { name: /^送るアカウント：(選ぶ|変える)$/ }))
+  const dialog = await screen.findByRole('dialog', { name: '送るアカウントを選ぶ' })
   for (const name of names) fireEvent.click(within(dialog).getByRole('checkbox', { name, exact: true }))
-  fireEvent.click(within(dialog).getByRole('button', { name: `${names.length} アカウントにする` }))
+  fireEvent.click(within(dialog).getByRole('button', { name: `この ${names.length} アカウントにする` }))
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 }
 
@@ -109,10 +109,11 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     const view = render(<HqBroadcastCreate />)
     fireEvent.change(screen.getByLabelText('配信名'), { target: { value: '宛先の下書き' } })
     fireEvent.click(screen.getByRole('button', { name: '対象設定へ' }))
-    expect(await screen.findByText('まだ選んでいません')).toBeTruthy()
+    expect(await screen.findByText('（送るアカウントを選んでください）')).toBeTruthy()
     expect(screen.queryByRole('checkbox', { name: '銀座店' })).toBeNull()
     await selectAccounts('銀座店', '新宿店', '梅田店')
-    expect(screen.getByText('3 アカウント：銀座店・新宿店 ほか1')).toBeTruthy()
+    expect(screen.getByText('3 アカウント')).toBeTruthy()
+    expect(screen.getByText('銀座店・新宿店 ほか1')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'メッセージ設定へ' }))
     fireEvent.change(screen.getByLabelText('本文'), { target: { value: 'ご案内です' } })
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
@@ -123,9 +124,9 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     params.value = new URLSearchParams('id=run-1&step=audience')
     hq.get.mockResolvedValue({ data: { id: 'run-1', status: 'prepared', version: 1, input } })
     render(<HqBroadcastCreate />)
-    await screen.findByText('3 アカウント：銀座店・新宿店 ほか1')
-    fireEvent.click(screen.getByRole('button', { name: '選び直す' }))
-    const dialog = await screen.findByRole('dialog', { name: 'アカウントを選ぶ' })
+    await screen.findByText('銀座店・新宿店 ほか1')
+    fireEvent.click(screen.getByRole('button', { name: '送るアカウント：変える' }))
+    const dialog = await screen.findByRole('dialog', { name: '送るアカウントを選ぶ' })
     for (const name of ['銀座店', '新宿店', '梅田店']) expect((within(dialog).getByRole('checkbox', { name }) as HTMLInputElement).checked).toBe(true)
   })
 
@@ -162,7 +163,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     render(<HqBroadcastCreate />)
     fireEvent.change(screen.getByLabelText('配信名'), { target: { value: '1月の限定メニュー' } })
     fireEvent.click(screen.getByRole('button', { name: '対象設定へ' }))
-    await screen.findByRole('button', { name: 'アカウントを選ぶ' })
+    await screen.findByRole('button', { name: '送るアカウント：選ぶ' })
     const steps = screen.getByRole('navigation', { name: '配信作成の進み' })
     /* 今の段（配信対象）とまだの段は押せない。 */
     expect(steps.querySelector('[aria-current="step"]')?.textContent).toContain('配信対象')
@@ -468,7 +469,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     expect((screen.getByLabelText('配信名') as HTMLInputElement).value).toBe('9月キャンペーンのお知らせ（コピー）')
     expect(within(screen.getByRole('complementary', { name: 'LINEの見え方' })).getByText('9月のご案内です')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '対象設定へ' }))
-    expect(await screen.findByText('まだ選んでいません')).toBeTruthy()
+    expect(await screen.findByText('（送るアカウントを選んでください）')).toBeTruthy()
     expect((screen.getByRole('radio', { name: /友だち全員に配信する/ }) as HTMLInputElement).checked).toBe(true)
   })
 

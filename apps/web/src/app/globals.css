@@ -2631,5 +2631,6 @@ select:not([multiple]):not(.appearance-none) {
   --tpl-picker-preview-pad: 16px 14px;
   --tpl-picker-field-h: 36px;
   --tpl-picker-field-pad: 0 6px 0 12px;
+  --tpl-picker-embed-h: 420px;
 }
 [data-theme="v8"] { --tpl-hq-attribute-distribute-col: 76px; }

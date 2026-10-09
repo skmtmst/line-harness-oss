@@ -12,12 +12,13 @@
  * 除くタグ・詳細条件）は統括の口に無いので出さない（BEHAVIOR.md の「今の口で出せないもの」）。
  */
 import BroadcastAccountPicker, { type BroadcastAccount } from './account-picker'
+import { EntityPickerSummary } from '@/components/shared/entity-picker'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Steps } from '@/components/templates/steps'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { AlertTriangle, ArrowDown, ArrowRight, ArrowUp, CheckCircle2, Eye, Plus, Save, Send, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowRight, ArrowUp, Building2, CheckCircle2, Eye, Plus, Save, Send, Trash2 } from 'lucide-react'
 import type { Folder, HqBroadcastInput, HqBroadcastPreflight, HqBroadcastRun, MessageTemplateDefinition, SegmentCondition } from '@line-crm/shared'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import Dialog from '@/components/shared/dialog'
@@ -675,7 +676,7 @@ export default function HqBroadcastCreate() {
 
   const sendableChosen = chosen.filter((s) => !excluded.includes(s.id))
   const friendTotal = sendableChosen.some((s) => s.friendCount == null) ? null : sendableChosen.reduce((sum, s) => sum + (s.friendCount ?? 0), 0)
-  const accountSummary = chosen.length === 0 ? 'まだ選んでいません' : `${formatNumber(chosen.length)} アカウント：${chosen.slice(0, 2).map((account) => account.name).join('・')}${chosen.length > 2 ? ` ほか${chosen.length - 2}` : ''}`
+  const accountSummary = `${chosen.slice(0, 2).map((account) => account.name).join('・')}${chosen.length > 2 ? ` ほか${chosen.length - 2}` : ''}`
   const closeAccountPicker = () => { setAccountPickerOpen(false); requestAnimationFrame(() => accountPickerTrigger.current?.focus()) }
   const totals = checks && !stale ? sendTotals(checks) : null
   const peopleLabel = totals ? `${formatNumber(totals.sendPeople)}人` : audience === 'all' && chosen.length > 0 && friendTotal != null ? `${formatNumber(friendTotal)}人` : '—人'
@@ -845,9 +846,9 @@ export default function HqBroadcastCreate() {
                 <div className={styles.accounts} data-design-node="J5DH6o">
                   <h3>送るアカウント</h3>
                   {loadError && !stores ? <ListState kind="error" error={loadError} onRetry={() => window.location.reload()} /> : !stores ? <ListState kind="loading" /> : (
-                    <div className={styles.accountSelection}>
-                      <p className={styles.accountSummary} title={accountSummary} aria-live="polite">{accountSummary}</p>
-                      {canManage ? <Button ref={accountPickerTrigger} onClick={() => setAccountPickerOpen(true)}>{chosen.length ? '選び直す' : 'アカウントを選ぶ'}</Button> : null}
+                    <div className={styles.accountSelection} aria-live="polite">
+                      <EntityPickerSummary label="送るアカウント" noun="送るアカウント" icon={Building2} name={chosen.length ? `${formatNumber(chosen.length)} アカウント` : ''} meta={accountSummary}
+                        readOnly={!canManage} buttonRef={accountPickerTrigger} onOpen={() => setAccountPickerOpen(true)} />
                     </div>
                   )}
                 </div>

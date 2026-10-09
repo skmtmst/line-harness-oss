@@ -16,19 +16,20 @@ const props = { accounts, folders, foldersFailed: false, initialIds: [], onConfi
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 describe('送るアカウントの選択窓', () => {
-  it('フォルダ全体の選択と横棒、検索後のすべて選ぶが隠れた選択を保ち、確定時だけ返す', async () => {
+  it('フォルダ全体の選択と横棒、検索で絞っても隠れた選択を保ち、確定時だけ返す', async () => {
     const confirm = vi.fn()
     render(<BroadcastAccountPicker {...props} onConfirm={confirm} />)
-    const dialog = await screen.findByRole('dialog', { name: 'アカウントを選ぶ' })
+    const dialog = await screen.findByRole('dialog', { name: '送るアカウントを選ぶ' })
     fireEvent.click(within(dialog).getByRole('checkbox', { name: '銀座店' }))
     expect((within(dialog).getByRole('checkbox', { name: '東日本をまとめて選ぶ' }) as HTMLInputElement).indeterminate).toBe(true)
     fireEvent.click(within(dialog).getByRole('checkbox', { name: '東日本をまとめて選ぶ' }))
     expect((screen.getByRole('checkbox', { name: '新宿店' }) as HTMLInputElement).checked).toBe(true)
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: '梅田' } })
-    fireEvent.click(screen.getByRole('checkbox', { name: 'すべて選ぶ' }))
-    expect(screen.getByText('選んだ 3 アカウント')).toBeTruthy()
+    expect(screen.queryByRole('checkbox', { name: '銀座店' })).toBeNull()
+    fireEvent.click(screen.getByRole('checkbox', { name: '梅田店' }))
+    expect(screen.getByText(/3 アカウントを選んでいます/)).toBeTruthy()
     expect(confirm).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: '3 アカウントにする' }))
+    fireEvent.click(screen.getByRole('button', { name: 'この 3 アカウントにする' }))
     expect(confirm).toHaveBeenCalledWith(['a', 'b', 'c'])
   })
 
@@ -37,7 +38,7 @@ describe('送るアカウントの選択窓', () => {
     await screen.findByRole('dialog')
     fireEvent.click(screen.getByRole('button', { name: /東日本/ }))
     expect(screen.queryByRole('checkbox', { name: '梅田店' })).toBeNull()
-    expect(screen.getByText('選んだ 0 アカウント')).toBeTruthy()
+    expect(screen.getByText(/0 アカウントを選んでいます/)).toBeTruthy()
     expect(within(screen.getByText('銀座店').closest('label')!).getByTitle('フォルダ：東日本')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /未分類/ }))
     expect(screen.getByRole('checkbox', { name: '未分類の店' })).toBeTruthy()

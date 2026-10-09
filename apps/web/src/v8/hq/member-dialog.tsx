@@ -14,7 +14,9 @@ import { useEffect, useId, useState, type ReactNode } from 'react'
 import { Send, ShieldCheck } from 'lucide-react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
 import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
+import { EntityMultiSelect } from '@/components/shared/entity-picker'
+import { toHqAccountItems, toPickerFolders, useHqAccountFolders } from '@/components/shared/hq-account-picker'
+import SearchField from '@/components/shared/search-field'
 import Dialog from '@/components/shared/dialog'
 import { Field as FormField } from '@/components/shared/form-controls'
 import Radio from '@/components/shared/radio'
@@ -114,6 +116,8 @@ export default function MemberDialogV8({
   const uid = useId()
   const [value, setValue] = useState<MemberDialogValue>(initial(member, accounts))
   const [localError, setLocalError] = useState('')
+  const [scopeQuery, setScopeQuery] = useState('')
+  const accountFolders = useHqAccountFolders(open)
   /* 板 `ukPgd`：名前・メールの間違いは欄の下に赤で出し、直すまで送るボタンを押せなくする。 */
   const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string }>({})
 
@@ -130,8 +134,6 @@ export default function MemberDialogV8({
       setFieldErrors((errors) => (errors[field] ? { ...errors, [field]: undefined } : errors))
     }
   }
-  const toggleAccount = (id: string) =>
-    set('scopedLineAccountIds', value.scopedLineAccountIds.includes(id) ? value.scopedLineAccountIds.filter((x) => x !== id) : [...value.scopedLineAccountIds, id])
 
   const submit = () => {
     if (!member) {
@@ -231,12 +233,14 @@ export default function MemberDialogV8({
             <Radio name={`${uid}-scope`} value="accounts" checked={value.accountScope === 'accounts'} disabled={busy} onChange={() => set('accountScope', 'accounts')}>指定したアカウントだけ</Radio>
           </div>
           {value.accountScope === 'accounts' ? (
-            <div className={styles.checks} role="group" aria-label="担当するアカウント">
-              {scopeAccounts.map((account) => (
-                <Checkbox key={account.id} checked={value.scopedLineAccountIds.includes(account.id)} disabled={busy} onCheckedChange={() => toggleAccount(account.id)}>{account.name}</Checkbox>
-              ))}
-              {scopeAccounts.length === 0 ? <p className={styles.note}>アカウントがまだありません。</p> : null}
-            </div>
+            scopeAccounts.length === 0 ? <p className={styles.note}>アカウントがまだありません。</p> : (
+              /* 選ぶ窓（dJZ7Q）のまとめて選ぶ中身を、この窓の中に埋め込む。 */
+              <div className={styles.checks}>
+                <EntityMultiSelect items={toHqAccountItems(scopeAccounts, accountFolders)} folders={toPickerFolders(accountFolders.folders)} foldersFailed={accountFolders.failed}
+                  selected={value.scopedLineAccountIds} onChange={(ids) => set('scopedLineAccountIds', ids)} query={scopeQuery} busy={busy} listLabel="担当するアカウント"
+                  searchSlot={<SearchField aria-label="担当するアカウントを探す" placeholder="名前で探す" value={scopeQuery} onChange={setScopeQuery} onClear={() => setScopeQuery('')} />} />
+              </div>
+            )
           ) : (
             <p className={styles.note}>統括のすべてのアカウントを見て操作できます。</p>
           )}

@@ -16,6 +16,7 @@ import Button from '@/components/shared/button'
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import Dialog from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
+import { HqAccountSelectField } from '@/components/shared/hq-account-picker'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useTenantStatus } from '@/components/tenant-access-context'
@@ -228,14 +229,15 @@ export default function HqSupportV8() {
               />
             </Field>
             <Field label="関係する店舗" htmlFor={`${uid}-account`}>
-              <Select
-                aria-label="関係する店舗"
+              <HqAccountSelectField
+                label="関係する店舗"
                 id={`${uid}-account`}
-                size="full"
+                accounts={accounts}
                 value={input.lineAccountId}
                 disabled={sending}
+                clearable
+                placeholder="（指定しない）"
                 onChange={(value) => set('lineAccountId', value)}
-                options={[{ value: '', label: '指定しない' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
               />
             </Field>
           </div>

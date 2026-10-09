@@ -15,44 +15,10 @@
 .deliver { display: flex; flex-direction: column; gap: var(--tpl-hb-detail-inner-gap); flex: 1; min-width: 0; }
 .sectionTitle { margin: 0; color: var(--color-ink); font-size: var(--text-body); font-weight: 600; line-height: var(--tpl-hb-label-lh); }
 .note { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-hb-small-lh); }
-.chips { display: flex; flex-wrap: wrap; gap: var(--tpl-hb-tool-gap); }
 
-.accounts {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  padding: var(--tpl-hb-list-pad);
-  list-style: none;
-  /* 5人分の高さ。多いときはこの中で送る（下の条件・操作の位置を人数で動かさない）。 */
-  height: var(--tpl-hb-account-list-h);
-  overflow-y: auto;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -0.5px;
-}
 
-.account { flex-shrink: 0; display: flex; align-items: center; gap: var(--tpl-hb-account-gap); height: var(--tpl-hb-account-h); padding: var(--tpl-hb-account-pad); }
-.accountDone > :first-child { opacity: 0.4; }
-.accountText { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-.accountName { overflow: hidden; color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-hb-account-name-lh); text-overflow: ellipsis; white-space: nowrap; }
-.accountHandle { overflow: hidden; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-hb-small-lh); text-overflow: ellipsis; white-space: nowrap; }
 
-.pillOk {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-  gap: var(--tpl-hb-pill-gap);
-  padding: var(--tpl-hb-pill-pad);
-  border-radius: var(--radius-pill);
-  background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-hb-pill-lh);
-  white-space: nowrap;
-}
 
-.dot { width: var(--tpl-hb-dot); height: var(--tpl-hb-dot); border-radius: var(--radius-pill); background: currentColor; }
 .deliverFoot { display: flex; align-items: center; gap: var(--tpl-hb-tool-gap); }
 
 .conditions { display: flex; flex-direction: column; gap: var(--tpl-hb-conditions-gap); }

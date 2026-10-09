@@ -743,4 +743,3 @@ shared-button-importer v8/hq-templates/attribute-distribution.tsx
 shared-button-importer v8/hq-templates/attributes.tsx
 shared-button-importer v8/hq-templates/folder-distribution-dialog.tsx
 shared-button-importer v8/hq-templates/folder-distribution-result.tsx
-shared-button-importer v8/hq-broadcasts/account-picker.tsx

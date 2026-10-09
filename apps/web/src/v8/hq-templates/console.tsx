@@ -1001,7 +1001,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         folders={<DistributionFolderPanel rows={accountFolderRows} activeId={accountFolder} onSelect={setAccountFolder} failed={accountFolders.failed} />}
         collapsedFolders={<>
           <Select aria-label="アカウントのフォルダ" value={accountFolder} onChange={setAccountFolder} options={accountFolderRows.map((row) => ({ value: row.id, label: row.label }))} />
-          {accountFolderRows.find((row) => row.id === accountFolder)?.trailing}
+          {accountFolderRows.find((row) => row.id === accountFolder)?.leading}
         </>}
         toolbar={<div className={styles.toolbar}>
           <span className={styles.selectedTools}>

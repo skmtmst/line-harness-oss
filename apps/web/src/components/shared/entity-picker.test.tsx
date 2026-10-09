@@ -112,3 +112,12 @@ describe('まとめて選ぶ窓', () => {
     expect(screen.getByText('来店アンケート・分類なし')).toBeTruthy()
   })
 })
+
+describe('配るアカウントの欄の補足', () => {
+  it('フォルダごとの数で「渋谷エリア 2・テスト 1」の形にし、フォルダを読めないときは名前を並べる', async () => {
+    const { summarizeByFolder } = await import('./hq-account-picker')
+    const f = [{ id: 's', name: '渋谷エリア' }, { id: 't', name: 'テスト' }]
+    expect(summarizeByFolder([{ id: '1', name: '本店', folderId: 's' }, { id: '2', name: '渋谷店', folderId: 's' }, { id: '3', name: 'TEST', folderId: 't' }], f)).toBe('渋谷エリア 2・テスト 1')
+    expect(summarizeByFolder([{ id: '1', name: '本店' }, { id: '2', name: '渋谷店' }], f)).toBe('本店・渋谷店')
+  })
+})

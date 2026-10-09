@@ -99,7 +99,7 @@ describe('V8 統括のメンバーの窓', () => {
     expect(dialogTitles()).toContain('権限者を招待')
     const radios = Array.from(document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="radio"]'))
     expect(radios.find((r) => r.value === 'accounts')?.checked).toBe(true)
-    const checks = Array.from(document.querySelectorAll('[role="dialog"] [aria-label="担当するアカウント"] label')).map((l) => l.textContent)
+    const checks = Array.from(document.querySelectorAll('[role="dialog"] [aria-label="担当するアカウント"] input[type="checkbox"]')).map((l) => l.getAttribute('aria-label'))
     expect(checks).toEqual(['然 -NEN- 本店', '然 -NEN- 渋谷店'])
     expect(document.querySelector('[role="dialog"]')!.textContent).toContain('閲覧のみ（見るだけ）')
   })
@@ -142,7 +142,7 @@ describe('V8 統括のメンバーの窓', () => {
     await flush()
     const accountsOnly = Array.from(document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="radio"]')).find((r) => r.value === 'accounts')!
     await act(async () => { accountsOnly.click() })
-    const firstAccount = document.querySelector<HTMLElement>('[role="dialog"] [aria-label="担当するアカウント"] input, [role="dialog"] [aria-label="担当するアカウント"] button[role="checkbox"]')!
+    const firstAccount = document.querySelector<HTMLElement>('[role="dialog"] [aria-label="担当するアカウント"] input[type="checkbox"]')!
     await act(async () => { firstAccount.click() })
     await act(async () => { buttonByText('変更を保存')!.click() })
     await flush()
