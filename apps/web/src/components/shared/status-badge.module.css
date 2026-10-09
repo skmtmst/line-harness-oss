@@ -66,7 +66,7 @@
  * 印（形）としても働く。
  */
 [data-theme='v8'] .badge {
-  gap: 5px;
+  gap: var(--polish-status-gap);
   padding: 2px 8px;
   font-size: var(--text-caption);
   font-weight: 600;
