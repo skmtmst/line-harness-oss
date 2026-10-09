@@ -514,6 +514,7 @@ export default function MediaSlot({
           accept={accept}
           disabled={!interactive}
           tabIndex={-1}
+          aria-hidden="true"
           aria-label={`${title}（ファイル）`}
           className={styles.input}
           onClick={(event) => event.stopPropagation()}
