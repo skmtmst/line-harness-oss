@@ -347,3 +347,8 @@
 [data-theme='v8'] .card { padding: var(--polish-space-card); gap: var(--polish-space-row); }
 [data-theme='v8'] .body { gap: var(--polish-space-row); }
 [data-theme='v8'] .items { gap: var(--polish-space-field); }
+
+/* B-152②：選択肢の題はラベル、説明は補足。 */
+[data-theme='v8'] .title { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); line-height: var(--text-lh); }
+[data-theme='v8'] .legend, html[data-theme='v8'] .card:is(.compact, .row) .title { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); line-height: var(--text-lh); }
+[data-theme='v8'] .note { font-size: var(--polish-text-support); font-weight: var(--polish-weight-body); line-height: var(--text-lh); color: var(--color-ink-secondary); }

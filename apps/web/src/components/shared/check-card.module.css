@@ -168,7 +168,7 @@
 
 /* B-152②：役割ごとの文字の段。 */
 [data-theme='v8'] .title, html[data-theme='v8'] .card:is(.compact, .row) .title { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); line-height: var(--text-lh); }
-[data-theme='v8'] .note { font-size: var(--polish-text-note); font-weight: var(--polish-weight-body); }
+[data-theme='v8'] .note { font-size: var(--polish-text-note); font-weight: var(--polish-weight-body); color: var(--color-ink-faint); }
 
 /* B-152・仕上げ7：誤りのある欄もキーボードの輪は青。 */
 [data-theme='v8'] .box:focus-visible, [data-theme='v8'] .invalid .box:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }

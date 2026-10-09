@@ -114,20 +114,20 @@ describe('選ぶカードの箱（fNPdg オン・r3xz1W オフ）の数値', () 
     }
   })
 
-  it('オンは淡緑の地面＋1.5px の濃い緑の枠・題13/600/20・説明12/18（fNPdg）', () => {
+  it('オンは淡緑の地面＋1.5px の濃い緑の枠・題12/500・説明12/400（fNPdg）', () => {
     const c = css()
     expect(c).toMatch(/\[data-theme='v8'\]\s*\.checked[^{]*\{[^}]*outline:\s*1\.5px solid var\(--color-accent-deep\)/s)
     const titles = [...c.matchAll(/\[data-theme='v8'\]\s*\.title\s*\{[^}]*\}/gs)].map((m) => m[0])
     expect(titles.length, 'v8 の題の指定がありません').toBeGreaterThan(0)
     const title = titles[titles.length - 1]
-    expect(title).toMatch(/font-size:\s*13px/)
-    expect(title).toMatch(/line-height:\s*20px/)
-    expect(title).toMatch(/font-weight:\s*600/)
+    expect(title).toMatch(/font-size:\s*var\(--polish-text-support\)/)
+    expect(title).toMatch(/line-height:\s*var\(--text-lh\)/)
+    expect(title).toMatch(/font-weight:\s*var\(--polish-weight-label\)/)
     const notes = [...c.matchAll(/\[data-theme='v8'\]\s*\.note\s*\{[^}]*\}/gs)].map((m) => m[0])
     expect(notes.length, 'v8 の説明の指定がありません').toBeGreaterThan(0)
     const note = notes[notes.length - 1]
-    expect(note).toMatch(/font-size:\s*12px/)
-    expect(note).toMatch(/line-height:\s*18px/)
+    expect(note).toMatch(/font-size:\s*var\(--polish-text-support\)/)
+    expect(note).toMatch(/line-height:\s*var\(--text-lh\)/)
     // 選んだ印タグは濃い緑（#087a3e）。
     expect(c).toMatch(/\[data-theme='v8'\]\s*\.checked \.topIcon\s*\{[^}]*color:\s*var\(--color-accent-deep\)/s)
   })
