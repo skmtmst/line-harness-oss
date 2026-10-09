@@ -107,3 +107,14 @@ test('209：承認を読み切れなかったときは、平均報酬を言い�
   render(<OffersTab />)
   await waitFor(() => expect(screen.getByText('件数が多く、全部は数えられませんでした')).toBeTruthy())
 })
+
+test('B-136：成果のときの動き（タグ・シナリオ・マイル）は上の絞り込み。左のフォルダの列は「すべて」だけで、フォルダを追加は置かない', async () => {
+  net.capStatus.mockResolvedValue({ success: true, data: { version: null } })
+  render(<OffersTab />)
+  await screen.findByRole('button', { name: '紹介Aの操作' })
+  const nav = document.querySelector('nav[aria-label="フォルダ"]') as HTMLElement
+  expect([...nav.querySelectorAll('button[title]')].map((b) => b.getAttribute('title'))).toEqual(['すべて'])
+  expect(nav.textContent).not.toContain('タグを付ける')
+  expect(document.body.textContent).not.toContain('フォルダを追加')
+  expect(screen.getAllByLabelText('成果のときの動き').length).toBeGreaterThan(0)
+})
