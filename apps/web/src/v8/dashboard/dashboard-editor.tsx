@@ -75,15 +75,16 @@ export const KEYBOARD_HINT = '持ち上げるには Space を押し、上下の�
 
 const labelOf = (id: unknown) => CARD_DEFINITION_MAP.get(id as DashboardCardId)?.label ?? String(id)
 
-function CardRow({ item, definition, canMoveUp, canMoveDown, onMove, onToggle }: {
+function CardRow({ item, definition, canMoveUp, canMoveDown, disabled, onMove, onToggle }: {
   item: DashboardPreferenceItem
   definition: CardDefinition
   canMoveUp: boolean
   canMoveDown: boolean
+  disabled: boolean
   onMove: (direction: 'up' | 'down') => void
   onToggle: () => void
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id, disabled })
   return (
     <div
       ref={setNodeRef}
@@ -92,7 +93,7 @@ function CardRow({ item, definition, canMoveUp, canMoveDown, onMove, onToggle }:
       data-off={item.visible ? undefined : ''}
       data-dragging={isDragging ? '' : undefined}
     >
-      <ReorderHandle
+      {!disabled ? <ReorderHandle
         {...attributes}
         {...listeners}
         label={definition.label}
@@ -100,20 +101,20 @@ function CardRow({ item, definition, canMoveUp, canMoveDown, onMove, onToggle }:
         className={styles.grip}
       >
         <GripVertical aria-hidden="true" />
-      </ReorderHandle>
+      </ReorderHandle> : <span className={styles.grip} aria-hidden="true" />}
       <div className={styles.names}>
         <span className={styles.name} title={definition.label}>{definition.label}</span>
         <span className={styles.where} title={definition.description}>{definition.description}</span>
       </div>
       <div role="group" aria-label={`${definition.label}の順番`} className={styles.moves}>
-        <IconButton size="small" aria-label={`${definition.label}を1つ上へ移動`} disabled={!canMoveUp} onClick={() => onMove('up')}>
+        <IconButton size="small" aria-label={`${definition.label}を1つ上へ移動`} disabled={disabled || !canMoveUp} onClick={() => onMove('up')}>
           <ChevronUp aria-hidden="true" />
         </IconButton>
-        <IconButton size="small" aria-label={`${definition.label}を1つ下へ移動`} disabled={!canMoveDown} onClick={() => onMove('down')}>
+        <IconButton size="small" aria-label={`${definition.label}を1つ下へ移動`} disabled={disabled || !canMoveDown} onClick={() => onMove('down')}>
           <ChevronDown aria-hidden="true" />
         </IconButton>
       </div>
-      <Toggle checked={item.visible} onChange={() => onToggle()} label={`${definition.label}を表示`} />
+      <Toggle disabled={disabled} checked={item.visible} onChange={() => onToggle()} label={`${definition.label}を表示`} />
     </div>
   )
 }
@@ -228,6 +229,7 @@ export default function DashboardEditorV8({ open, preferences, saving = false, s
   }, [open])
 
   const toggle = (group: DashboardGroup, id: DashboardCardId) => {
+    if (saving) return
     const before = draft[group]
     const next = toggleDashboardItem(before, id, group === 'today' ? TODAY_TASK_LIMIT : undefined)
     setDraft({ ...draft, [group]: next })
@@ -251,7 +253,7 @@ export default function DashboardEditorV8({ open, preferences, saving = false, s
   const handleDragEnd = (group: DashboardGroup, event: DragEndEvent) => {
     setKeyboardDrag(false)
     const { active, over } = event
-    if (!over || active.id === over.id) return
+    if (saving || !over || active.id === over.id) return
     setDraft((current) => ({
       ...current,
       [group]: reorderDashboardItems(current[group], active.id as DashboardCardId, over.id as DashboardCardId),
@@ -260,6 +262,7 @@ export default function DashboardEditorV8({ open, preferences, saving = false, s
 
   /* 上下ボタンの移動。端では何もしない。結果は日本語で読み上げる。 */
   const handleMove = (group: DashboardGroup, id: DashboardCardId, direction: 'up' | 'down') => {
+    if (saving) return
     const next = moveDashboardItem(draft[group], id, direction)
     if (next === draft[group]) return
     setDraft({ ...draft, [group]: next })
@@ -400,6 +403,7 @@ export default function DashboardEditorV8({ open, preferences, saving = false, s
                             key={item.id}
                             item={item}
                             definition={definition}
+                            disabled={saving}
                             canMoveUp={index > 0}
                             canMoveDown={index < draft[group].length - 1}
                             onMove={(direction) => handleMove(group, item.id, direction)}
