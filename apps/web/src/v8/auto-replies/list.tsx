@@ -501,15 +501,15 @@ export default function AutoRepliesListV8() {
    * 再開したなら止める。止め直すときは変える前の理由を使う）。
    * 送れなかったら戻して「もう一度」の知らせを出す。
    */
-  const runToggle = () => {
-    if (!pendingToggle) return
-    if (pendingToggle.accountId !== selectedAccountId) {
+  const runToggle = (target = pendingToggle) => {
+    if (!target) return
+    if (target.accountId !== selectedAccountId) {
       setToggleError('アカウントが切り替わりました。操作する自動応答を選び直してください。')
       return
     }
-    const requestAccountId = pendingToggle.accountId
-    const ids = pendingToggle.ids
-    const kind = pendingToggle.kind
+    const requestAccountId = target.accountId
+    const ids = target.ids
+    const kind = target.kind
     const reason = toggleReason.trim() === '' ? null : toggleReason.trim()
     const key = listContextKey
     // 逆操作のために、変える前の止めた理由を覚えておく。
@@ -573,14 +573,7 @@ export default function AutoRepliesListV8() {
         setOptimisticRows(null)
         setSelectedIds(new Set())
         reloadIfSameAccount()
-        const reverseKind = targetKind === 'stop' ? 'resume' : 'stop'
-        notifyToast(doneMessage(targetKind), {
-          actionLabel: '元に戻す',
-          onAction: () =>
-            sendToggle(reverseKind, (id) =>
-              reverseKind === 'stop' ? (beforeStopReason.get(id) ?? null) : null,
-            ),
-        })
+        notifyToast(doneMessage(targetKind))
       })()
     }
     setPendingToggle(null)
@@ -876,7 +869,7 @@ export default function AutoRepliesListV8() {
               dividerBefore: true,
               onSelect: () => {
                 setToggleError('')
-                setPendingToggle({ ids: [r.id], names: [name], kind: 'resume', accountId: selectedAccountId })
+                runToggle({ ids: [r.id], names: [name], kind: 'resume', accountId: selectedAccountId })
               },
             },
       )
@@ -926,12 +919,9 @@ export default function AutoRepliesListV8() {
     const name = displayName(r)
     setToggleError('')
     setToggleReason('')
-    setPendingToggle({
-      ids: [r.id],
-      names: [name],
-      kind: r.isActive ? 'stop' : 'resume',
-      accountId: selectedAccountId,
-    })
+    const target: PendingToggle = { ids: [r.id], names: [name], kind: r.isActive ? 'stop' : 'resume', accountId: selectedAccountId }
+    if (r.isActive) setPendingToggle(target)
+    else runToggle(target)
     setPanelId(null)
   }
 
@@ -1090,7 +1080,7 @@ export default function AutoRepliesListV8() {
             : '登録したルールは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。'}
       </p>
       {visibleLoadState === 'error' && (
-        <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+        <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
       )}
     </div>
   ) : sortedItems.length === 0 ? (
@@ -1402,7 +1392,7 @@ export default function AutoRepliesListV8() {
             title={resumableIds.length === 0 ? '停止中のルールが選ばれていません' : undefined}
             onClick={() => {
               setToggleError('')
-              setPendingToggle({ ids: resumableIds, names: [], kind: 'resume', accountId: selectedAccountId })
+              runToggle({ ids: resumableIds, names: [], kind: 'resume', accountId: selectedAccountId })
             }}
           >
             <Play size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />

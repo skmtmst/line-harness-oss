@@ -48,7 +48,7 @@ import { isForbidden } from '@/components/shared/api-error-message'
 import NoPermissionBoard from '@/v8/no-permission/no-permission'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
-import { runUndoable } from '@/lib/undoable'
+import { runUndoable, runOptimistic } from '@/lib/undoable'
 import { useLiveReorder } from '@/lib/use-live-reorder'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -181,6 +181,8 @@ export default function ScenariosListV8() {
   /* 行の「…」。開いている行のID。 */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 行の詳細パネル。開いている行のID。 */
+  const [pendingStop, setPendingStop] = useState<string[] | null>(null)
+  const toggleBusyRef = useRef(false)
   const [panelId, setPanelId] = useState<string | null>(null)
   /** いま掴んでいるシナリオ。落とした先と入れ替える。 */
   const [dragId, setDragId] = useState<string | null>(null)
@@ -205,6 +207,8 @@ export default function ScenariosListV8() {
     setStats(null)
     setStatsFailed(false)
     setSelectedIds(new Set())
+    setPendingStop(null)
+    toggleBusyRef.current = false
   }, [selectedAccountId])
 
   const loadFolders = useCallback(async () => {
@@ -438,24 +442,27 @@ export default function ScenariosListV8() {
    * 「元に戻す」で送らずに戻せる。1本ずつの開始前チェックは詳細画面で行う。
    */
   const runBulkToggle = (next: boolean, ids: string[]) => {
-    if (ids.length === 0 || !canEdit) return
+    if (ids.length === 0 || !canEdit || toggleBusyRef.current) return
+    toggleBusyRef.current = true
+    const account = selectedAccountId
     const key = listContextKey
     setOptimisticRows({
       key,
       rows: scenarios.map((s) => (ids.includes(s.id) ? { ...s, isActive: next } : s)),
     })
-    runUndoable({
-      message: next ? `${ids.length}件の配信を始めました` : `${ids.length}件を停止しました`,
-      commit: async () => {
+    runOptimistic({
+      isCurrent: () => activeAccountRef.current === account,
+      request: async () => {
         const results = await Promise.all(
           ids.map((id) => api.scenarios.update(id, { isActive: next }).catch(() => null)),
         )
         const failed = results.filter((res) => !res || !res.success).length
         if (failed > 0) throw new Error(`${failed}件の保存に失敗しました`)
       },
-      undo: () => setOptimisticRows(null),
+      revert: () => { toggleBusyRef.current = false; setOptimisticRows(null); void loadScenarios() },
       failureMessage: next ? '配信を始められませんでした。' : '停止できませんでした。',
-      onCommitted: () => {
+      onSuccess: () => {
+        toggleBusyRef.current = false
         setOptimisticRows(null)
         setSelectedIds(new Set())
         void loadScenarios()
@@ -993,7 +1000,7 @@ export default function ScenariosListV8() {
               variant="secondary"
               disabled={stoppableIds.length === 0}
               title={stoppableIds.length === 0 ? '稼働中のシナリオが選ばれていません' : undefined}
-              onClick={() => runBulkToggle(false, stoppableIds)}
+              onClick={() => setPendingStop(stoppableIds)}
             >
               <Square size={13} aria-hidden="true" />
               止める
@@ -1374,7 +1381,8 @@ export default function ScenariosListV8() {
         </Dialog>
       </>}
       folders={<>
-        {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ。2026-10-06 オーナー決定） */}
+        <ConfirmDialog open={pendingStop !== null} title="選んだシナリオを停止しますか？" description="これから送る予定のシナリオ配信が止まります。" confirmLabel="停止する" onCancel={() => setPendingStop(null)} onConfirm={() => { const ids = pendingStop; setPendingStop(null); if (ids) runBulkToggle(false, ids) }} />
+      {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ。2026-10-06 オーナー決定） */}
         {createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
         {folderPanel}
       </>}
