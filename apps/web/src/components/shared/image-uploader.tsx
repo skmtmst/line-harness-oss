@@ -1,8 +1,8 @@
 'use client'
 
 import { useCallback, useRef, useState } from 'react'
-import { api } from '@/lib/api'
 import MediaSlot from './media-slot'
+import { uploadImageFile } from './media-library-upload'
 import { TextField } from './text-field'
 
 export type ImageUploaderMode = 'url' | 'line-image'
@@ -71,11 +71,6 @@ export default function ImageUploader({
     [lineImage, maxMB],
   )
 
-  const upload = useCallback(async (file: File) => {
-    const res = await api.uploads.image(file)
-    if (!res.success) throw new Error(res.error ?? 'アップロード失敗')
-    return res.data.url
-  }, [])
 
   const url = value === null ? '' : value.mode === 'url' ? value.url : value.originalContentUrl
   const previewUrl = value === null ? '' : value.mode === 'url' ? value.url : value.previewImageUrl
@@ -89,7 +84,7 @@ export default function ImageUploader({
         accept={lineImage ? 'image/jpeg,image/png' : 'image/*'}
         limitText={lineImage ? '1ファイル1メガバイト以内・JPEG・PNG' : `1ファイル${maxMB}メガバイト以内・画像`}
         validate={validate}
-        upload={upload}
+        upload={uploadImageFile}
         onChange={(next) => onChangeRef.current(next ? toValue(next) : null)}
         onUrl={readOnly ? undefined : () => setManualUrlMode((open) => !open)}
         onMediaPick={readOnly ? undefined : onMediaPick}

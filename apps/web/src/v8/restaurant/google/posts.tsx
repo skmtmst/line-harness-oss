@@ -6,14 +6,15 @@
  * 端末からの画像のアップロードは、入口の page.tsx が渡す道具（mediaUpload）で行う
  * （src/v8 から @/app を読まないため）。渡されないときは登録メディアから選ぶだけ。
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { ImageIcon, Plus, RefreshCw, Send } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Plus, RefreshCw, Send } from 'lucide-react'
 import type { MediaItem } from '@line-crm/shared'
 import { api, ApiError, type MediaUploadSession } from '@/lib/api'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
 import Card from '@/components/shared/card'
 import SectionHeader from '@/components/shared/section-header'
 import Button from '@/components/shared/button'
+import MediaSlot from '@/components/shared/media-slot'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -290,7 +291,6 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
   const [actionError, setActionError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof PostForm, string>>>({})
   const [upload, setUpload] = useState<{ busy: boolean; progress: number; error: string }>({ busy: false, progress: 0, error: '' })
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!postId) { setForm(emptyForm(kindFromUrl)); setInitial(emptyForm(kindFromUrl)); setLoading(false); return }
@@ -443,36 +443,30 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
           <TextArea density="compact" height="post" id="gb-post-summary" value={form.summary} onChange={(e) => set({ summary: e.target.value })} disabled={!editable} maxLength={1500} aria-describedby="gb-post-summary-count" />
           <span id="gb-post-summary-count" className="sr-only">{`${form.summary.length} / 1,500 文字`}</span>
         </Field>
-        <div className={styles.imageRow}>
-          <Button onClick={() => (picker.open ? setPicker({ ...picker, open: false }) : void openPicker())} disabled={!editable || busy !== null || picker.loading || upload.busy} aria-expanded={picker.open}>
-            <ImageIcon aria-hidden className={styles.icon15} />{upload.busy ? `アップロード中… ${upload.progress}%` : '画像を選ぶ'}
-          </Button>
-          <span className={styles.imageName}>{form.mediaFilename ? `${form.mediaFilename}・4:3` : '画像なし'}</span>
-          {form.mediaId && editable ? <Button variant="text" onClick={() => set({ mediaId: null, mediaFilename: null, mediaSourceUrl: null })}>画像を外す</Button> : null}
+        <div className={styles.imageSlot}>
+          <MediaSlot
+            size="compact"
+            title="画像を追加"
+            previewAlt={form.mediaFilename ?? '投稿の画像'}
+            value={form.mediaSourceUrl}
+            accept={mediaUpload?.accept}
+            limitText="4:3推奨・1枚まで"
+            readOnly={!editable}
+            disabled={busy !== null}
+            busy={upload.busy}
+            progress={upload.busy ? upload.progress : undefined}
+            error={upload.error || undefined}
+            onFile={mediaUpload ? (file) => void uploadFromDevice(file) : undefined}
+            onMediaPick={() => (picker.open ? setPicker({ ...picker, open: false }) : void openPicker())}
+            onRemove={() => set({ mediaId: null, mediaFilename: null, mediaSourceUrl: null })}
+          />
+          {form.mediaFilename ? <span className={styles.imageName} title={form.mediaFilename}>{`${form.mediaFilename}・4:3`}</span> : null}
         </div>
-        {upload.error ? <Notice tone="danger">{upload.error}</Notice> : null}
         {picker.open ? (
           <div className={styles.picker} role="group" aria-label="画像を選ぶ">
             <div className={styles.pickerHead}>
               <SectionHeader size="small" title="登録メディアの画像" />
               <span className={styles.spacer} aria-hidden="true" />
-              {mediaUpload ? (
-                <>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept={mediaUpload.accept}
-                    className="sr-only"
-                    tabIndex={-1}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      e.target.value = ''
-                      if (file) void uploadFromDevice(file)
-                    }}
-                  />
-                  <Button onClick={() => fileInputRef.current?.click()} disabled={upload.busy}>端末からアップロード</Button>
-                </>
-              ) : null}
               <Button onClick={() => setPicker({ ...picker, open: false })}>閉じる</Button>
             </div>
             {picker.loading ? <ListState kind="loading" title="登録メディアを読み込んでいます" /> : null}

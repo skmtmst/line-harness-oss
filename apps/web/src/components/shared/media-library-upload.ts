@@ -34,3 +34,10 @@ export async function uploadToMediaLibrary(
   }
   return { url: media.data.item.url, durationMs: metadata.durationMs, item: media.data.item }
 }
+
+/** 画像を預けてその URL を返す（今までの ImageUploader と同じ口 api.uploads.image）。 */
+export async function uploadImageFile(file: File): Promise<string> {
+  const res = await api.uploads.image(file)
+  if (!res.success) throw new Error(res.error ?? 'アップロード失敗')
+  return res.data.url
+}

@@ -25,6 +25,8 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import RadioCard from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
+import MediaSlot from '@/components/shared/media-slot'
+import { uploadImageFile } from '@/components/shared/media-library-upload'
 import { TextField } from '@/components/shared/text-field'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -226,11 +228,21 @@ export default function ColumnNew() {
           <TextField aria-label="記事の URL" value={draft.articleUrl} placeholder="https://example.com/columns/..." invalid={Boolean(errorFor('articleUrl'))} onChange={(event) => set({ articleUrl: event.target.value })} />
           {errorFor('articleUrl') ? <span className={styles.error} role="alert">{errorFor('articleUrl')}</span> : null}
         </label>
-        <label className={styles.field}>
-          <span className={styles.label}>画像の URL</span>
-          <TextField id="nen-col-image" aria-label="画像の URL" value={draft.imageUrl} placeholder="https://cdn.example.com/..." invalid={Boolean(errorFor('imageUrl'))} onChange={(event) => set({ imageUrl: event.target.value })} />
-          {errorFor('imageUrl') ? <span className={styles.error} role="alert">{errorFor('imageUrl')}</span> : null}
-        </label>
+        <div className={styles.field} id="nen-col-image" tabIndex={-1}>
+          <span className={styles.label}>画像</span>
+          <MediaSlot
+            title="画像を追加"
+            previewAlt="コラムの画像"
+            value={draft.imageUrl || null}
+            accept="image/jpeg,image/png"
+            limitText="1ファイル10メガバイト以内・JPEG・PNG"
+            maxBytes={10 * 1024 * 1024}
+            error={errorFor('imageUrl') || undefined}
+            upload={uploadImageFile}
+            onChange={(url) => set({ imageUrl: url ?? '' })}
+            urlEntry={{ value: draft.imageUrl, onChange: (url) => set({ imageUrl: url }), label: '画像の URL', placeholder: 'https://cdn.example.com/...' }}
+          />
+        </div>
       </section>
 
       <section className={`${styles.card} ${styles.cardWide}`} aria-labelledby="nen-col-kind">
