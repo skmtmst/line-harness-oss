@@ -31,14 +31,11 @@ import {
   Circle,
   CircleCheck,
   CircleAlert,
-  CircleDot,
   Image as ImageIcon,
   RectangleHorizontal,
   RectangleVertical,
   Repeat,
   Smartphone,
-  Star,
-  Trash2,
 } from 'lucide-react'
 import {
   RICH_MENU_DIMENSIONS,
@@ -49,8 +46,6 @@ import {
 import Card from '@/components/shared/card'
 import LayoutPicker from '@/components/shared/layout-picker'
 import TargetMissing from '@/components/shared/target-missing'
-import { RowMenu } from '@/components/shared/row-actions'
-import FilterChip from '@/components/shared/filter-chip'
 import { Field, TextInput } from '@/components/shared/form-controls'
 import SectionHeader from '@/components/shared/section-header'
 import Button from '@/components/shared/button'
@@ -67,6 +62,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import VersionCompare from '@/components/shared/version-compare'
 import LinePreview from '@/components/shared/line-preview'
+import TapAreaEditor from '@/components/shared/tap-area-editor'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import { CanvasEditor, areaDisplayName, type Area } from '@/components/rich-menus/canvas-editor'
 import { AreaProperties, intentLabelOf, intentOf } from '@/components/rich-menus/area-properties'
@@ -196,8 +192,16 @@ const TAB_COUNT_OPTIONS = [
   { value: '2', label: '3つ' },
 ]
 
-/** ページの足せる上限（LINE 側の上限。超える分は公開前確認でも止める）。 */
-const MAX_TAB_PAGES = RICH_MENU_MAX_PAGES
+/** ①で選べる切替タブの数の上限（ページの数。LINE 側の上限より多くしない）。 */
+const MAX_TAB_PAGES = Math.min(RICH_MENU_MAX_PAGES, TAB_COUNT_OPTIONS.length)
+
+/** 作る前に①で選んだ画像（タブごとに1枚）。ファイルか登録メディアのどちらか。 */
+type PendingImage = {
+  file: File | null
+  url: string | null
+  dims: { w: number; h: number } | null
+  media: MediaItem | null
+}
 
 /* ---------- 型 ---------- */
 
@@ -315,6 +319,16 @@ function imageUploadErrorText(err: unknown): string {
     return `画像の大きさが合いません。${SIZE_LABEL.large}（大）か${SIZE_LABEL.compact}（小）の画像を選んでください。`
   }
   return message
+}
+
+/** 登録メディアの中身を取り寄せて、ページ画像として上げられるファイルにする。 */
+async function mediaToFile(item: MediaItem, accountId: string): Promise<File> {
+  const res = await fetch(api.media.contentUrl(item.id, accountId), { credentials: 'include' })
+  if (!res.ok) throw new Error(`media fetch failed: ${res.status}`)
+  const blob = await res.blob()
+  return new File([blob], item.filename, {
+    type: item.mimeType === 'image/jpeg' ? 'image/jpeg' : 'image/png',
+  })
 }
 
 /** 公開前の下書きはページに実IDがない。切替ボタンの行き先は orderIndex で持つ（N-161）。 */
@@ -470,8 +484,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const nextLabel = (key: Exclude<StepKey, 'publish'>) => (host && key === 'audience' ? '次へ：配る' : NEXT_LABEL[key])
   const { selectedAccount } = useAccount()
   const publishAttempt = useRef(new ManualPublishAttempt())
-  const pageFileInput = useRef<HTMLInputElement>(null)
-  const shapeFileInput = useRef<HTMLInputElement>(null)
+  /* ①の画像の枠ごとのファイル入力（タブの順）。 */
+  const tabFileInputs = useRef<Array<HTMLInputElement | null>>([])
 
   /*
    * 重ねの撮影用に `?step=buttons|audience|publish` で最初の手順を指定できる。
@@ -491,8 +505,6 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const [pages, setPages] = useState<Page[]>([])
   const [activePageId, setActivePageId] = useState<string | null>(null)
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null)
-  const [pageActionsOpen, setPageActionsOpen] = useState(false)
-  const [canvasToolsOpen, setCanvasToolsOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [imageGuideOpen, setImageGuideOpen] = useState(false)
   const [imageVersion, setImageVersion] = useState(0)
@@ -504,10 +516,11 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const [size, setSize] = useState<'large' | 'compact'>('large')
   const [tabCount, setTabCount] = useState(0)
   const [templateKey, setTemplateKey] = useState('large-2x3')
-  const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null)
-  const [pendingFile, setPendingFile] = useState<File | null>(null)
-  const [pendingFileUrl, setPendingFileUrl] = useState<string | null>(null)
-  const [pendingFileDims, setPendingFileDims] = useState<{ w: number; h: number } | null>(null)
+  /* 作る前のタブごとの画像と名前（タブの順。0 は最初に見せるページ）。作った後はページが持つ。 */
+  const [pendingImages, setPendingImages] = useState<Array<PendingImage | null>>([])
+  const [tabNames, setTabNames] = useState<string[]>([])
+  /* ①でタブを減らすとき、消えるタブに設定があれば確かめる（その間の次の数）。 */
+  const [pendingTabCount, setPendingTabCount] = useState<number | null>(null)
   const [nameError, setNameError] = useState<string | null>(null)
   const [chatBarTextError, setChatBarTextError] = useState<string | null>(null)
 
@@ -552,9 +565,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const [conflictLatest, setConflictLatest] = useState<Group | null>(null)
   const [compareOpen, setCompareOpen] = useState(false)
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false)
-  /** 画像の入れ先。手順①は既定ページ、手順②はいま見ているページ。 */
-  const [imagePickTarget, setImagePickTarget] = useState<'default' | 'active'>('active')
-  const [removePageTarget, setRemovePageTarget] = useState<Page | null>(null)
+  /** 登録メディアから選ぶ画像の入れ先（①のタブの順）。 */
+  const [imagePickTarget, setImagePickTarget] = useState(0)
   const [done, setDone] = useState<'published' | 'scheduled' | null>(null)
 
   const accountId = selectedAccount?.id ?? null
@@ -577,10 +589,12 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         audience,
         targetingCondition: audience === 'targeted' ? targetingCondition : null,
         targetingPriority,
-        media: selectedMedia?.id ?? null,
-        file: pendingFile ? `${pendingFile.name}:${pendingFile.size}` : null,
+        tabNames,
+        images: pendingImages.map((image) =>
+          image ? image.media?.id ?? (image.file ? `${image.file.name}:${image.file.size}` : null) : null,
+        ),
       }),
-    [name, chatBarText, folderId, size, tabCount, templateKey, defaultOpen, audience, targetingCondition, targetingPriority, selectedMedia, pendingFile],
+    [name, chatBarText, folderId, size, tabCount, templateKey, defaultOpen, audience, targetingCondition, targetingPriority, pendingImages, tabNames],
   )
 
   /**
@@ -737,11 +751,33 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
 
   /* ---------- 下書きの作成・保存 ---------- */
 
-  function resetPendingFile() {
-    if (pendingFileUrl) URL.revokeObjectURL(pendingFileUrl)
-    setPendingFile(null)
-    setPendingFileUrl(null)
-    setPendingFileDims(null)
+  /** 作る前のタブの名前（空なら決まりの名前）。 */
+  function defaultTabName(index: number, count: number): string {
+    if (host && count > 0) return `タブ ${String.fromCharCode(65 + index)}`
+    return index === 0 ? 'トップ' : `タブ ${String.fromCharCode(65 + index - 1)}`
+  }
+  function tabNameAt(index: number): string {
+    return tabNames[index]?.trim() || defaultTabName(index, tabCount)
+  }
+
+  /** 作る前に選んだタブの画像を外す（ローカルの見本の URL も返す）。 */
+  function clearPendingImage(index: number) {
+    setPendingImages((prev) => {
+      const current = prev[index]
+      if (current?.url) URL.revokeObjectURL(current.url)
+      const next = [...prev]
+      next[index] = null
+      return next
+    })
+  }
+  function setPendingImageAt(index: number, image: PendingImage) {
+    setPendingImages((prev) => {
+      const current = prev[index]
+      if (current?.url && current.url !== image.url) URL.revokeObjectURL(current.url)
+      const next = [...prev]
+      next[index] = image
+      return next
+    })
   }
 
   function validateBasics(): boolean {
@@ -847,10 +883,15 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       setError('面の分けかたを選び直してください')
       return null
     }
-    let imageR2Key: string | null = null
-    if (pendingFile) {
+    const imageKeys: Array<string | null> = []
+    for (let index = 0; index <= tabCount; index += 1) {
+      const file = pendingImages[index]?.file ?? null
+      if (!file) {
+        imageKeys.push(null)
+        continue
+      }
       try {
-        imageR2Key = (await host.uploadImage(pendingFile, size)).r2Key
+        imageKeys.push((await host.uploadImage(file, size)).r2Key)
       } catch (e) {
         setError(e instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(e.message) ? e.message : imageUploadErrorText(e))
         return null
@@ -858,8 +899,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     }
     const shapePages = Array.from({ length: tabCount + 1 }, (_, index) => ({
       id: `page-${index + 1}`,
-      name: tabCount === 0 ? 'トップ' : `タブ ${String.fromCharCode(65 + index)}`,
-      imageR2Key: index === 0 ? imageR2Key : null,
+      name: tabNameAt(index),
+      imageR2Key: imageKeys[index] ?? null,
       areas: createAreaDrafts(template).map((area, areaIndex) => ({ ...area, id: `p${index + 1}-a${areaIndex + 1}` })),
     }))
     return { id: host.initial?.id, name: name.trim(), chatBarText: chatBarText.trim(), folderId: folderId || null, size, displayAudience: audience === 'all' ? 'all' : 'store', displayOrder: targetingPriority, defaultPageId: shapePages[0].id, pages: shapePages }
@@ -901,27 +942,30 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       targetingCondition: condition ? JSON.stringify(condition) : null,
       targetingPriority,
       defaultOpen,
-      imageMediaId: selectedMedia?.id,
+      imageMediaId: pendingImages[0]?.media?.id,
       pages: Array.from({ length: tabCount + 1 }, (_, index) => ({
-        name: index === 0 ? 'トップ' : `タブ ${String.fromCharCode(65 + index - 1)}`,
+        name: tabNameAt(index),
         orderIndex: index,
         areas,
       })),
     })
     if (!res.success) throw new Error(res.error ?? '作成失敗')
     const createdId = res.data.id
-    // ファイルを直接選んでいたら既定ページへ上げる。
-    if (pendingFile) {
-      const defaultPageId = res.data.pages[0]?.id
-      if (defaultPageId) {
-        try {
-          await api.richMenuGroups.uploadImage(createdId, defaultPageId, pendingFile)
-        } catch (e) {
-          // 下書き自体はできている。画像だけ失敗として知らせる。
-          setError(imageUploadErrorText(e))
-        }
+    // ①で選んだタブごとの画像をそのページへ上げる（最初のページの登録メディアは作るときに渡した）。
+    for (let index = 0; index <= tabCount; index += 1) {
+      const image = pendingImages[index]
+      const pageId = res.data.pages[index]?.id
+      if (!image || !pageId || (index === 0 && image.media && !image.file)) continue
+      try {
+        const file = image.file ?? (image.media && accountId ? await mediaToFile(image.media, accountId) : null)
+        if (file) await api.richMenuGroups.uploadImage(createdId, pageId, file)
+      } catch (e) {
+        // 下書き自体はできている。画像だけ失敗として知らせる。
+        setError(e instanceof ApiError ? imageUploadErrorText(e) : '登録メディアの画像を読み込めませんでした。もう一度お試しください。')
       }
     }
+    pendingImages.forEach((image) => { if (image?.url) URL.revokeObjectURL(image.url) })
+    setPendingImages([])
     await reloadGroup(createdId)
     return true
   }
@@ -1084,53 +1128,85 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     setSelectedAreaId(null)
   }
 
-  function addPage() {
-    const nextOrder = pages.length
-    const newPage: Page = {
-      id: `tmp-${Math.random().toString(36).slice(2, 10)}`,
-      orderIndex: nextOrder,
-      name: `タブ ${String.fromCharCode(65 + (host ? nextOrder : nextOrder - 1))}`,
-      aliasId: '',
-      lineRichmenuId: null,
-      imageR2Key: null,
-      imageContentType: null,
-      areas: host ? createAreaDrafts(TEMPLATES.find((layout) => layout.key === templateKey) ?? template).map((area) => ({ ...area, id: crypto.randomUUID() })) : [],
-    }
-    setPages([...pages, newPage])
-    setActivePageId(newPage.id)
-    setSelectedAreaId(null)
+  /** 消えるページを行き先にしている切替ボタンがあれば、その理由（残るページの中から探す）。 */
+  function removePageBlockers(removed: Page[], remaining: Page[]): string[] {
+    const removedIds = new Set(removed.map((p) => p.id))
+    const referrers = remaining.filter((p) =>
+      p.areas.some(
+        (a) =>
+          a.actionType === 'richmenuswitch' &&
+          removedIds.has(String((a.actionData as { targetPageId?: string }).targetPageId ?? '')),
+      ),
+    )
+    if (referrers.length === 0) return []
+    return [
+      `${referrers.map((p) => `「${p.name}」`).join('、')}のタブ切替ボタンが、消えるタブを行き先にしています。先に手順②で行き先を変えてください。`,
+    ]
   }
 
-  /** このページを消せない理由。空なら消せる。 */
-  function removePageBlockers(target: Page): string[] {
-    const reasons: string[] = []
-    if (pages.length <= 1) {
-      reasons.push('リッチメニューには最低1ページ必要です。これが最後の1ページなので削除できません。')
-    }
-    const referrers = pages
-      .filter((p) => p.id !== target.id)
-      .filter((p) =>
-        p.areas.some(
-          (a) =>
-            a.actionType === 'richmenuswitch' &&
-            (a.actionData as { targetPageId?: string }).targetPageId === target.id,
-        ),
-      )
-    if (referrers.length > 0) {
-      reasons.push(
-        `${referrers.map((p) => `「${p.name}」`).join('、')}のタブ切替ボタンが、このページを行き先にしています。先に行き先を変えてから削除してください。`,
-      )
-    }
-    return reasons
+  /** 画像か、決めた動きがあるページ（消すときに確かめる）。 */
+  function pageHasSettings(page: Page): boolean {
+    return Boolean(page.imageR2Key) || page.areas.some(isAreaActionConfigured)
   }
 
-  function removePage(target: Page) {
-    if (removePageBlockers(target).length > 0) return
-    const remaining = pages.filter((p) => p.id !== target.id).map((p, i) => ({ ...p, orderIndex: i }))
-    setPages(remaining)
-    if (activePageId === target.id) setActivePageId(remaining[0]?.id ?? null)
-    setSelectedAreaId(null)
-    setRemovePageTarget(null)
+  /** ①の切替タブの数（0＝なし・1＝2つ・2＝3つ）を変える。消えるタブに設定があれば確かめの窓を出す。 */
+  function requestTabCount(next: number) {
+    if (!group) {
+      if (next === tabCount) return
+      if (pendingImages.slice(next + 1).some(Boolean)) {
+        setPendingTabCount(next)
+        return
+      }
+      applyTabCount(next)
+      return
+    }
+    if (next + 1 === pages.length) return
+    const removed = pages.slice(next + 1)
+    if (removed.some(pageHasSettings) || removePageBlockers(removed, pages.slice(0, next + 1)).length > 0) {
+      setPendingTabCount(next)
+      return
+    }
+    applyTabCount(next)
+  }
+
+  function applyTabCount(next: number) {
+    setPendingTabCount(null)
+    setTabCount(next)
+    if (!group) {
+      setPendingImages((prev) => {
+        prev.slice(next + 1).forEach((image) => { if (image?.url) URL.revokeObjectURL(image.url) })
+        return prev.slice(0, next + 1)
+      })
+      setTabNames((prev) => prev.slice(0, next + 1))
+      return
+    }
+    const count = next + 1
+    if (pages.length > count) {
+      const remaining = pages.slice(0, count)
+      if (removePageBlockers(pages.slice(count), remaining).length > 0) return
+      setPages(remaining)
+      if (!remaining.some((p) => p.id === activePageId)) {
+        setActivePageId(remaining[0]?.id ?? null)
+        setSelectedAreaId(remaining[0]?.areas[0]?.id ?? null)
+      }
+      return
+    }
+    // 足すタブは①の面の分け方で始める（面と動きはタブごとに持つ）。保存すると作られる。
+    const layout = TEMPLATES.find((t) => t.key === templateKey) ?? TEMPLATES[0]
+    const added: Page[] = Array.from({ length: count - pages.length }, (_, offset) => {
+      const index = pages.length + offset
+      return {
+        id: `tmp-${Math.random().toString(36).slice(2, 10)}`,
+        orderIndex: index,
+        name: host ? `タブ ${String.fromCharCode(65 + index)}` : `タブ ${String.fromCharCode(65 + index - 1)}`,
+        aliasId: '',
+        lineRichmenuId: null,
+        imageR2Key: null,
+        imageContentType: null,
+        areas: createAreaDrafts(layout).map((area) => ({ ...area, id: crypto.randomUUID() })),
+      }
+    })
+    setPages([...pages, ...added])
   }
 
   /* ---------- 画像 ---------- */
@@ -1165,50 +1241,33 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     if (!group || !accountId) return
     setError(null)
     try {
-      const res = await fetch(api.media.contentUrl(item.id, accountId), { credentials: 'include' })
-      if (!res.ok) throw new Error(`media fetch failed: ${res.status}`)
-      const blob = await res.blob()
-      const file = new File([blob], item.filename, {
-        type: item.mimeType === 'image/jpeg' ? 'image/jpeg' : 'image/png',
-      })
-      await uploadPageImage(pageId, file)
+      await uploadPageImage(pageId, await mediaToFile(item, accountId))
     } catch (e) {
       setError(e instanceof ApiError ? imageUploadErrorText(e) : '登録メディアの画像を読み込めませんでした。もう一度お試しください。')
     }
   }
 
-  /**
-   * 画像の入れ先ページを決める。手順①は既定ページ（最初に見せる面）、
-   * 手順②はいま開いているページ。
-   */
-  function imageTargetPage(which: 'default' | 'active'): Page | null {
-    if (!group) return null
-    if (which === 'default') {
-      return pages.find((p) => p.id === group.defaultPageId) ?? pages[0] ?? null
-    }
-    return activePage
-  }
-
-  /** 手順①・手順②で共通の画像ファイル処理。入れ先は呼び出し側が決める。 */
-  function handlePickedFile(file: File | null, which: 'default' | 'active') {
+  /** ①の画像の枠（タブの順）にファイルを入れる。作る前は持っておき、作った後はそのページへ上げる。 */
+  function handlePickedFile(file: File | null, tabIndex: number) {
     if (!file) return
-    // 作成前：手順①の画像は「選んだファイル」を持ち、create 後に既定ページへ上げる。
     if (!group) {
-      resetPendingFile()
       const url = URL.createObjectURL(file)
-      setPendingFile(file)
-      setPendingFileUrl(url)
-      setPendingFileDims(null)
+      setPendingImageAt(tabIndex, { file, url, dims: null, media: null })
       const img = new Image()
-      img.onload = () => setPendingFileDims({ w: img.naturalWidth, h: img.naturalHeight })
+      img.onload = () =>
+        setPendingImages((prev) => {
+          if (prev[tabIndex]?.url !== url) return prev
+          const next = [...prev]
+          next[tabIndex] = { ...prev[tabIndex]!, dims: { w: img.naturalWidth, h: img.naturalHeight } }
+          return next
+        })
       img.src = url
-      setSelectedMedia(null)
       return
     }
-    const target = imageTargetPage(which)
+    const target = pages[tabIndex]
     if (!target) return
     if (target.id.startsWith('tmp-') && !host) {
-      setError('新しいページは、先に下書きを保存してから画像を入れてください。')
+      setError('新しいタブは、先に下書きを保存してから画像を入れてください。')
       return
     }
     void uploadPageImage(target.id, file)
@@ -1217,14 +1276,13 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   function handlePickedMedia(item: MediaItem) {
     setMediaPickerOpen(false)
     if (!group) {
-      setSelectedMedia(item)
-      resetPendingFile()
+      setPendingImageAt(imagePickTarget, { file: null, url: null, dims: null, media: item })
       return
     }
-    const target = imageTargetPage(imagePickTarget)
+    const target = pages[imagePickTarget]
     if (!target) return
     if (target.id.startsWith('tmp-')) {
-      setError('新しいページは、先に下書きを保存してから画像を入れてください。')
+      setError('新しいタブは、先に下書きを保存してから画像を入れてください。')
       return
     }
     void uploadMediaToPage(target.id, item)
@@ -1510,9 +1568,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       : pages.find((p) => p.id === group.defaultPageId) ?? pages[0] ?? null
 
   const previewImageUrl = !group
-    ? selectedMedia && accountId
-      ? api.media.contentUrl(selectedMedia.id, accountId)
-      : pendingFileUrl
+    ? pendingImages[0]?.media && accountId
+      ? api.media.contentUrl(pendingImages[0].media.id, accountId)
+      : pendingImages[0]?.url ?? null
     : previewPage?.imageR2Key
       ? host ? host.imageUrl(previewPage.imageR2Key) : `${api.richMenuGroups.imageUrl(previewPage.imageR2Key)}?v=${imageVersion}`
       : null
@@ -1526,7 +1584,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const previewPages = !group
     ? Array.from({ length: tabCount + 1 }, (_, i) => ({
         id: String(i),
-        name: host && tabCount > 0 ? `タブ ${String.fromCharCode(65 + i)}` : i === 0 ? 'トップ' : `タブ ${String.fromCharCode(65 + i - 1)}`,
+        name: tabNameAt(i),
       }))
     : pages.map((p) => ({ id: p.id, name: p.name }))
 
@@ -1778,76 +1836,57 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
 
 
 
-      {/* ページ画像：ファイルから */}
-      <input
-        ref={pageFileInput}
-        type="file"
-        accept="image/png,image/jpeg"
-        className="sr-only"
-        aria-hidden="true"
-        tabIndex={-1}
-        onChange={(e) => {
-          const file = e.target.files?.[0] ?? null
-          e.target.value = ''
-          handlePickedFile(file, 'active')
-        }}
-      />
-      <input
-        ref={shapeFileInput}
-        type="file"
-        accept="image/png,image/jpeg"
-        className="sr-only"
-        aria-hidden="true"
-        tabIndex={-1}
-        onChange={(e) => {
-          const file = e.target.files?.[0] ?? null
-          e.target.value = ''
-          handlePickedFile(file, 'default')
-        }}
-      />
-
       {host ? null : <MediaPickerDialog
         open={mediaPickerOpen}
         accountId={accountId}
         kind="image"
         title="リッチメニューの画像を選ぶ"
         description={
-          group
-            ? imagePickTarget === 'default'
+          tabCount > 0 || pages.length > 1
+            ? `タブ${imagePickTarget + 1}「${group ? pages[imagePickTarget]?.name ?? '' : tabNameAt(imagePickTarget)}」の画像として登録します。`
+            : group
               ? '最初に見せるページの画像として登録します。'
-              : `ページ「${activePage?.name ?? ''}」の画像として登録します。`
-            : '作成したメニューの最初に見せるページへ登録します。'
+              : '作成したメニューの最初に見せるページへ登録します。'
         }
         onClose={() => setMediaPickerOpen(false)}
         onSelect={handlePickedMedia}
       />}
 
-      <ConfirmDialog
-        open={removePageTarget !== null}
-        title={removePageTarget ? `ページ「${removePageTarget.name}」を削除しますか？` : ''}
-        description={
-          removePageTarget && removePageBlockers(removePageTarget).length > 0
-            ? 'このページはいま削除できません。理由を直してから、もう一度お試しください。'
-            : 'このページと、そのページの面の設定を消します。'
-        }
-        confirmLabel="ページを削除する"
-        destructive
-        // 消せないときは押し口ごと出さない。
-        onConfirm={
-          removePageTarget && removePageBlockers(removePageTarget).length === 0
-            ? () => removePage(removePageTarget)
-            : undefined
-        }
-        onCancel={() => setRemovePageTarget(null)}
-      >
-        {removePageTarget && removePageBlockers(removePageTarget).length > 0 ? (
-          <ul className="list-disc space-y-1 pl-5 text-sm">
-            {removePageBlockers(removePageTarget).map((reason) => (
-              <li key={reason}>{reason}</li>
-            ))}
-          </ul>
-        ) : null}
-      </ConfirmDialog>
+      {/* ①でタブを減らすとき：消えるタブの画像・動きを黙って捨てない。行き先にされているタブは消せない。 */}
+      {(() => {
+        const next = pendingTabCount
+        const removed = next === null ? [] : group ? pages.slice(next + 1) : []
+        const blockers = next === null || !group ? [] : removePageBlockers(removed, pages.slice(0, next + 1))
+        const names = next === null
+          ? []
+          : group
+            ? removed.map((p, i) => `タブ${next + 2 + i}「${p.name}」`)
+            : Array.from({ length: tabCount - next }, (_, i) => `タブ${next + 2 + i}「${tabNameAt(next + 1 + i)}」`)
+        return (
+          <ConfirmDialog
+            open={next !== null}
+            title={blockers.length > 0 ? 'タブの数をいま減らせません' : `タブの数を${next === 0 ? 'なし' : `${(next ?? 0) + 1}つ`}にしますか？`}
+            description={
+              blockers.length > 0
+                ? '消えるタブを行き先にしている切替ボタンがあります。理由を直してから、もう一度お試しください。'
+                : `${names.join('・')}の画像と面の動きは消えます。`
+            }
+            confirmLabel="タブを減らす"
+            destructive
+            // 減らせないときは押し口ごと出さない。
+            onConfirm={blockers.length === 0 && next !== null ? () => applyTabCount(next) : undefined}
+            onCancel={() => setPendingTabCount(null)}
+          >
+            {blockers.length > 0 ? (
+              <ul className="list-disc space-y-1 pl-5 text-sm">
+                {blockers.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            ) : null}
+          </ConfirmDialog>
+        )
+      })()}
 
       <Dialog open={previewOpen} title="LINEでの見え方" cancelLabel="閉じる" onCancel={() => setPreviewOpen(false)}>
         {renderLinePreview()}
@@ -1883,12 +1922,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   /* ======== 手順①：形と画像 ======== */
   function renderShape() {
     const dims = RICH_MENU_DIMENSIONS[size]
-    const shapeImageSelected = selectedMedia !== null || pendingFile !== null
-    const pickedDims =
-      selectedMedia && selectedMedia.width && selectedMedia.height
-        ? { w: selectedMedia.width, h: selectedMedia.height }
-        : pendingFileDims
-    const shapeImageOk = pickedDims !== null ? pickedDims.w === dims.width && pickedDims.h === dims.height : null
+    /* タブの数（ページの数）。作った後はページの数、作る前は①で選んだ数。 */
+    const slotCount = group ? pages.length : tabCount + 1
+    const hasTabs = slotCount > 1
 
     return (
       <>
@@ -1940,22 +1976,42 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           ) : null}
           <div className={styles.segRow}>
             <span className={styles.segLabel}>切替タブの数</span>
-            {locked ? (
-              <span className={styles.cardNote}>
-                {pages.length > 1 ? `${pages.length}ページ` : 'なし'}（手順②でページを足せます）
-              </span>
-            ) : (
-              <>
-                <SegmentedControl
-                  aria-label="切替タブの数"
-                  options={TAB_COUNT_OPTIONS}
-                  value={String(Math.min(tabCount, 2))}
-                  onChange={(v) => setTabCount(Number(v))}
-                />
-                <span className={styles.segHint}>タブで別のメニューへ移れます</span>
-              </>
-            )}
+            <SegmentedControl
+              aria-label="切替タブの数"
+              options={TAB_COUNT_OPTIONS}
+              value={String(Math.min(group ? pages.length - 1 : tabCount, MAX_TAB_PAGES - 1))}
+              onChange={(v) => requestTabCount(Number(v))}
+              disabled={busy}
+            />
+            <span className={styles.segHint}>タブで別のメニューへ移れます</span>
           </div>
+          {/* 採用案 K6Ot7O：タブの数だけ名前の欄（トーク画面のタブに出る名前）。 */}
+          {hasTabs ? (
+            <div className={styles.tabNameGrid}>
+              {Array.from({ length: slotCount }, (_, i) => (
+                <Field key={i} label={`タブ${i + 1}の名前（トーク画面のタブに出ます）`} htmlFor={`rm-tab-name-${i}`}>
+                  <TextInput
+                    id={`rm-tab-name-${i}`}
+                    maxLength={14}
+                    value={group ? pages[i]?.name ?? '' : tabNames[i] ?? defaultTabName(i, tabCount)}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      if (group) {
+                        const page = pages[i]
+                        if (page) updatePage(page.id, { name: value })
+                        return
+                      }
+                      setTabNames((prev) => {
+                        const next = Array.from({ length: tabCount + 1 }, (_, k) => prev[k] ?? defaultTabName(k, tabCount))
+                        next[i] = value
+                        return next
+                      })
+                    }}
+                  />
+                </Field>
+              ))}
+            </div>
+          ) : null}
         </Card>
 
         {/* 面の分け方 */}
@@ -1980,88 +2036,206 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           />
         </Card>
 
-        {/* 画像 */}
+        {/* 画像（採用案 K6Ot7O：タブがあるときはタブごとに1枚、枠を横に並べる）。 */}
         <Card padding="roomy" layout="vertical" className={styles.stackSection}>
           <div className={`flex flex-col ${styles.stackCompact}`}>
-            <SectionHeader title="画像" />
+            <SectionHeader title={hasTabs ? '画像（タブごとに1枚）' : '画像'} />
             <p className={styles.cardNote}>
-              {dims.width}×{dims.height}px・PNG か JPEG・1MB まで
+              {dims.width}×{dims.height}px・PNG か JPEG・1MB まで{hasTabs ? '。タブの数だけ入れます' : ''}
             </p>
           </div>
-          <div className={styles.imageRow}>
-            {shapeImageSelected ? (
-              <>
-                {selectedMedia && accountId ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- 認証つきの管理用URL
-                  <img
-                    src={api.media.contentUrl(selectedMedia.id, accountId)}
-                    alt={`選択中の画像: ${selectedMedia.filename}`}
-                    className={styles.imageThumb}
-                  />
-                ) : pendingFileUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- ローカルプレビュー
-                  <img src={pendingFileUrl} alt={`選択中の画像: ${pendingFile?.name ?? ''}`} className={styles.imageThumb} />
-                ) : null}
-                <div className={styles.imageMeta}>
-                  <span className="font-semibold text-ink">{selectedMedia?.filename ?? pendingFile?.name}</span>
-                  <span className={shapeImageOk === true ? styles.imageMetaOk : undefined}>
-                    {pickedDims ? `${pickedDims.w}×${pickedDims.h}・` : ''}
-                    {selectedMedia?.sizeBytes !== undefined || pendingFile
-                      ? `${Math.round(((selectedMedia?.sizeBytes ?? 0) || pendingFile?.size || 0) / 1024)}KB`
-                      : ''}
-                    {shapeImageOk === true ? '・大きさは合っています' : shapeImageOk === false ? '・大きさが合いません' : ''}
-                  </span>
-                  <span className="flex gap-2">
-                    {host ? null : <Button type="button" onClick={() => { setImagePickTarget('default'); setMediaPickerOpen(true) }} disabled={!accountId}>
-                      <ImageIcon size={15} aria-hidden /> 登録メディアから選ぶ
-                    </Button>}
-                    <Button type="button" onClick={() => { setSelectedMedia(null); resetPendingFile() }}>
-                      選ばない
-                    </Button>
-                  </span>
-                  <button type="button" className={styles.guideLink} onClick={() => setImageGuideOpen(true)}>
-                    <BookOpen size={15} aria-hidden />画像の作り方（大きさ・押しやすい余白）
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                {/* 板 `JeINq`：絵の画像の枠（180×121）。画像なしでは押すとファイルを選ぶ。 */}
-                <Button
-                  type="button"
-                  aria-label="画像ファイルを選ぶ"
-                  disabled={!accountId && !host}
-                  onClick={() => shapeFileInput.current?.click()}
-                  className="bg-success-bg text-accent-deep h-30 w-45 shrink-0 rounded-control border border-hairline text-caption font-semibold disabled:opacity-50"
-                >
-                  <span className="flex flex-col items-center justify-center gap-1">
-                    <ImageIcon size={20} aria-hidden />
-                    画像を選ぶ
-                  </span>
-                </Button>
-                <div className="flex min-w-0 flex-1 flex-col gap-2">
-                  <span className="flex flex-wrap gap-2">
-                    {host ? null : <Button type="button" onClick={() => { setImagePickTarget('default'); setMediaPickerOpen(true) }} disabled={!accountId}>
-                      <ImageIcon size={15} aria-hidden /> 登録メディアから選ぶ
-                    </Button>}
-                    <Button type="button" onClick={() => shapeFileInput.current?.click()} disabled={!accountId && !host}>
-                      ファイルを選ぶ
-                    </Button>
-                  </span>
-                  <button type="button" className={styles.guideLink} onClick={() => setImageGuideOpen(true)}>
-                    <BookOpen size={15} aria-hidden />画像の作り方（大きさ・押しやすい余白）
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-          {!shapeImageOk && shapeImageSelected ? (
-            <p className={styles.fieldError} role="alert">
-              画像の大きさが合いません。{dims.width}×{dims.height}px の画像を選んでください。
-            </p>
-          ) : null}
+          {hasTabs ? (
+            <div className={styles.tabImageGrid}>
+              {Array.from({ length: slotCount }, (_, i) => renderTabImageSlot(i))}
+            </div>
+          ) : (
+            renderSingleImage()
+          )}
         </Card>
       </>
+    )
+  }
+
+  /** ①の画像の枠（タブの順）に入っている画像。作る前は選んだもの、作った後はページの画像。 */
+  function slotImage(index: number): { src: string; name: string; dims: { w: number; h: number } | null; kb: number | null; removable: boolean } | null {
+    if (!group) {
+      const image = pendingImages[index]
+      if (!image) return null
+      if (image.media && accountId) {
+        return {
+          src: api.media.contentUrl(image.media.id, accountId),
+          name: image.media.filename,
+          dims: image.media.width && image.media.height ? { w: image.media.width, h: image.media.height } : null,
+          kb: image.media.sizeBytes !== undefined ? Math.round(image.media.sizeBytes / 1024) : null,
+          removable: true,
+        }
+      }
+      if (image.url && image.file) {
+        return { src: image.url, name: image.file.name, dims: image.dims, kb: Math.round(image.file.size / 1024), removable: true }
+      }
+      return null
+    }
+    const page = pages[index]
+    if (!page?.imageR2Key) return null
+    return {
+      src: host ? host.imageUrl(page.imageR2Key) : `${api.richMenuGroups.imageUrl(page.imageR2Key)}?v=${imageVersion}`,
+      name: '登録した画像',
+      dims: null,
+      kb: null,
+      removable: false,
+    }
+  }
+
+  /** 枠ごとのファイル入力（見えない）。読み上げ名で枠と結ぶ。 */
+  function slotFileInput(index: number, label: string) {
+    return (
+      <input
+        ref={(el) => { tabFileInputs.current[index] = el }}
+        type="file"
+        accept="image/png,image/jpeg"
+        className="sr-only"
+        aria-label={label}
+        tabIndex={-1}
+        onChange={(e) => {
+          const file = e.target.files?.[0] ?? null
+          e.target.value = ''
+          handlePickedFile(file, index)
+        }}
+      />
+    )
+  }
+
+  /*
+   * 画像の入れ方は今のまま（ファイル・登録メディア）。
+   * ImageSlot（共通部品・作業役 imgslot）ができたら、renderSingleImage と renderTabImageSlot の中身をそれに差し替える。
+   */
+  function renderSingleImage() {
+    const dims = RICH_MENU_DIMENSIONS[size]
+    const image = slotImage(0)
+    const imageOk = image?.dims ? image.dims.w === dims.width && image.dims.h === dims.height : null
+    const canPick = Boolean(accountId) || Boolean(host)
+    return (
+      <>
+        {slotFileInput(0, '画像のファイル')}
+        <div className={styles.imageRow}>
+          {image ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element -- 認証つきの管理用URL・ローカルの見本 */}
+              <img src={image.src} alt={`選択中の画像: ${image.name}`} className={styles.imageThumb} />
+              <div className={styles.imageMeta}>
+                <span className="font-semibold text-ink">{image.name}</span>
+                <span className={imageOk === true ? styles.imageMetaOk : undefined}>
+                  {image.dims ? `${image.dims.w}×${image.dims.h}・` : ''}
+                  {image.kb !== null ? `${image.kb}KB` : ''}
+                  {imageOk === true ? '・大きさは合っています' : imageOk === false ? '・大きさが合いません' : ''}
+                </span>
+                <span className="flex gap-2">
+                  {host ? null : <Button type="button" onClick={() => { setImagePickTarget(0); setMediaPickerOpen(true) }} disabled={!accountId}>
+                    <ImageIcon size={15} aria-hidden /> 登録メディアから選ぶ
+                  </Button>}
+                  {image.removable ? (
+                    <Button type="button" onClick={() => clearPendingImage(0)}>
+                      選ばない
+                    </Button>
+                  ) : (
+                    <Button type="button" onClick={() => tabFileInputs.current[0]?.click()} disabled={!canPick || busy}>
+                      ファイルを選ぶ
+                    </Button>
+                  )}
+                </span>
+                <button type="button" className={styles.guideLink} onClick={() => setImageGuideOpen(true)}>
+                  <BookOpen size={15} aria-hidden />画像の作り方（大きさ・押しやすい余白）
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* 板 `JeINq`：絵の画像の枠（180×121）。画像なしでは押すとファイルを選ぶ。 */}
+              <Button
+                type="button"
+                aria-label="画像ファイルを選ぶ"
+                disabled={!canPick}
+                onClick={() => tabFileInputs.current[0]?.click()}
+                className="bg-success-bg text-accent-deep h-30 w-45 shrink-0 rounded-control border border-hairline text-caption font-semibold disabled:opacity-50"
+              >
+                <span className="flex flex-col items-center justify-center gap-1">
+                  <ImageIcon size={20} aria-hidden />
+                  画像を選ぶ
+                </span>
+              </Button>
+              <div className="flex min-w-0 flex-1 flex-col gap-2">
+                <span className="flex flex-wrap gap-2">
+                  {host ? null : <Button type="button" onClick={() => { setImagePickTarget(0); setMediaPickerOpen(true) }} disabled={!accountId}>
+                    <ImageIcon size={15} aria-hidden /> 登録メディアから選ぶ
+                  </Button>}
+                  <Button type="button" onClick={() => tabFileInputs.current[0]?.click()} disabled={!canPick}>
+                    ファイルを選ぶ
+                  </Button>
+                </span>
+                <button type="button" className={styles.guideLink} onClick={() => setImageGuideOpen(true)}>
+                  <BookOpen size={15} aria-hidden />画像の作り方（大きさ・押しやすい余白）
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+        {imageOk === false ? (
+          <p className={styles.fieldError} role="alert">
+            画像の大きさが合いません。{dims.width}×{dims.height}px の画像を選んでください。
+          </p>
+        ) : null}
+      </>
+    )
+  }
+
+  /** タブがあるときの画像の枠（タブ〇「名前」の見出し付き）。 */
+  function renderTabImageSlot(index: number) {
+    const dims = RICH_MENU_DIMENSIONS[size]
+    const image = slotImage(index)
+    const imageOk = image?.dims ? image.dims.w === dims.width && image.dims.h === dims.height : null
+    const tabName = group ? pages[index]?.name ?? '' : tabNameAt(index)
+    const unsaved = Boolean(group && !host && pages[index]?.id.startsWith('tmp-'))
+    const canPick = (Boolean(accountId) || Boolean(host)) && !unsaved && !busy
+    return (
+      <div key={index} className={styles.tabImageSlot}>
+        <span className={styles.tabImageHead}>{`タブ${index + 1}「${tabName}」`}</span>
+        {slotFileInput(index, `タブ${index + 1}の画像のファイル`)}
+        <button
+          type="button"
+          className={styles.tabImageBox}
+          data-filled={image ? '' : undefined}
+          style={{ aspectRatio: `${dims.width} / ${dims.height}` }}
+          aria-label={`タブ${index + 1}の画像ファイルを選ぶ`}
+          disabled={!canPick}
+          onClick={() => tabFileInputs.current[index]?.click()}
+        >
+          {image ? (
+            // eslint-disable-next-line @next/next/no-img-element -- 認証つきの管理用URL・ローカルの見本
+            <img src={image.src} alt={`タブ${index + 1}の画像: ${image.name}`} />
+          ) : (
+            <span className={styles.tabImageEmpty}>
+              <ImageIcon size={18} aria-hidden />
+              画像を追加
+            </span>
+          )}
+        </button>
+        <span className="flex flex-wrap gap-2">
+          {host ? null : <Button type="button" size="compact" onClick={() => { setImagePickTarget(index); setMediaPickerOpen(true) }} disabled={!accountId || unsaved}>
+            <ImageIcon size={15} aria-hidden /> 登録メディアから選ぶ
+          </Button>}
+          {image?.removable ? (
+            <Button type="button" size="compact" onClick={() => clearPendingImage(index)}>
+              選ばない
+            </Button>
+          ) : null}
+        </span>
+        {unsaved ? <p className={styles.fieldHint}>下書きを保存すると、このタブの画像を入れられます。</p> : null}
+        {imageOk === false ? (
+          <p className={styles.fieldError} role="alert">
+            大きさが合いません。{dims.width}×{dims.height}px の画像を選んでください。
+          </p>
+        ) : null}
+      </div>
     )
   }
 
@@ -2073,55 +2247,48 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       .filter((p) => host || !p.id.startsWith('tmp-'))
       .map((p) => ({ id: p.id, name: p.name }))
 
+    /*
+     * 採用案 K6Ot7O：切替タブは①で決め、②は「直すタブ」の切り替えだけ（タブがないときは出さない）。
+     * 採用案 Wmch0：画像（幅 320）を左、面の一覧を右、その下に選んだ面の動き（共通部品 TapAreaEditor）。
+     */
+    const tabSwitch = pages.length > 1 ? (
+      <div className={styles.tabSwitchRow}>
+        <span className={styles.segLabel}>直すタブ</span>
+        <SegmentedControl
+          aria-label="直すタブ"
+          size="compact"
+          options={pages.map((p, i) => ({ value: p.id, label: `タブ${i + 1}「${p.name}」` }))}
+          value={activePage.id}
+          onChange={(id) => {
+            setActivePageId(id)
+            setSelectedAreaId(pages.find((p) => p.id === id)?.areas[0]?.id ?? null)
+          }}
+        />
+        <Button type="button" variant="text" className={styles.tabSwitchLink} onClick={() => goToStep('shape')}>
+          タブの数・名前・画像は ①形と画像 で変えます
+        </Button>
+      </div>
+    ) : null
+
     return (
-      <>
-        {/* 板 `Z0uO6`（2026-10-07 の絵）：外の箱に、札の箱・題・画像・面の一覧を入れる。 */}
-        <div className={styles.buttonsSection}>
-          <div className={styles.tabsCard}>
-            <h2 className={styles.tabsTitle}>切替タブ（ページ）</h2>
-            <p className={styles.cardNote}>ページごとに画像・面・動きを決めます。最後の1ページは消せません。</p>
-          <div className="flex flex-wrap items-center gap-2">
-            {pages.map((p, i) => (
-              <FilterChip key={p.id} selected={p.id === activePage.id} icon={i === 0 ? <CircleDot size={13} aria-hidden /> : <Star size={13} aria-hidden />} onChange={() => {
-                setActivePageId(p.id)
-                setSelectedAreaId(p.areas[0]?.id ?? null)
-                setPageActionsOpen(false)
-              }} title={i === 0 ? '最初に見せるページ' : undefined}>
-                {p.name}
-              </FilterChip>
-            ))}
-            {pages.length < MAX_TAB_PAGES ? <Button type="button" onClick={addPage}>
-              ページを足す
-            </Button> : null}
-          </div>
-          <div className="flex flex-wrap items-end gap-3">
-            <div className={styles.pageName}>
-              <Field label="このページの名前" htmlFor="rm-page-name">
-                <TextInput id="rm-page-name" value={activePage.name}
-                  onChange={(e) => updatePage(activePage.id, { name: e.target.value })} maxLength={14} />
-              </Field>
-            </div>
-            <Button type="button" onClick={() => setRemovePageTarget(activePage)} disabled={pages.length <= 1}>
-              <Trash2 size={15} aria-hidden />このページを消す
-            </Button>
-            <div>
-              <RowMenu appearance="plain" label="ページと画像の操作" open={pageActionsOpen} onOpenChange={setPageActionsOpen} items={[
-                ...(host ? [] : [{ id: 'media', label: '登録メディアから選ぶ', disabled: busy || activePage.id.startsWith('tmp-'), disabledReason: '先に下書きを保存してください', onSelect: () => { setImagePickTarget('active'); setMediaPickerOpen(true) } }]),
-                { id: 'file', label: 'ファイルを選ぶ', disabled: busy || (!host && activePage.id.startsWith('tmp-')), disabledReason: '先に下書きを保存してください', onSelect: () => pageFileInput.current?.click() },
-                { id: 'tools', label: canvasToolsOpen ? '区切りの調整を閉じる' : '区切りを調整する', onSelect: () => setCanvasToolsOpen(!canvasToolsOpen) },
-                { id: 'delete-area', label: '選んだ面を消す', tone: 'danger', disabled: !selectedAreaId, disabledReason: '先に面を選んでください', onSelect: () => { if (selectedAreaId) deleteArea(activePage.id, selectedAreaId) } },
-              ]} />
-            </div>
-          </div>
-          </div>
-          <div className={styles.buttonsHead}>
-            <h2 className={styles.buttonsTitle}>画像の上で面を選ぶ</h2>
-            <p className={styles.cardNote}>面を押すと、下に動きを決める欄が出ます。線を動かして区切り直せます</p>
-          </div>
+      <TapAreaEditor
+        head={tabSwitch}
+        description="面を押すと、下に動きを決める欄が出ます。線を動かして区切り直せます"
+        items={activePage.areas.map((area, i) => ({
+          id: area.id,
+          name: areaDisplayName(area, i),
+          summary: areaActionSummary(area) || null,
+        }))}
+        selectedId={selectedAreaId}
+        onSelect={setSelectedAreaId}
+        emptyNote="画像の上をドラッグすると、面を足せます。"
+        canvas={
           <CanvasEditor
             appearance="v8"
             showAreaList={false}
-            showTools={canvasToolsOpen}
+            showTools
+            showZoom={false}
+            maxWidth={320}
             areas={activePage.areas}
             size={group?.size ?? size}
             imageUrl={pageImageUrl}
@@ -2131,62 +2298,37 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             onUpdateArea={(id, patch) => updateArea(activePage.id, id, patch)}
             onDeleteArea={(id) => deleteArea(activePage.id, id)}
           />
-          {/* 面の一覧 */}
-          {activePage.areas.length > 0 ? (
-            <ul className={styles.areaList}>
-              {activePage.areas.map((area, i) => {
-                const configured = isAreaActionConfigured(area)
-                return (
-                  <li key={area.id}>
-                    <button
-                      type="button"
-                      className={`${styles.areaRow} ${area.id === selectedAreaId ? styles.areaRowOn : ''}`}
-                      aria-pressed={area.id === selectedAreaId}
-                      onClick={() => setSelectedAreaId(area.id)}
-                    >
-                      <span className={styles.areaLetter} aria-hidden>
-                        {String.fromCharCode(65 + i)}
-                      </span>
-                      <span className={styles.areaName}>{areaDisplayName(area, i)}</span>
-                      {configured ? (
-                        <span className={styles.areaAction}>{areaActionSummary(area)}</span>
-                      ) : (
-                        <span className={styles.areaUnset}>未設定</span>
-                      )}
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
+        }
+        detail={
+          selectedArea && activeIndex >= 0 ? (
+            <Card padding="roomy" layout="vertical">
+              <SectionHeader title={`面 ${String.fromCharCode(65 + activeIndex)}「${areaDisplayName(selectedArea, activeIndex)}」の動き`} />
+              <AreaProperties
+                area={selectedArea}
+                pages={areaPages}
+                tags={tags}
+                templates={templates}
+                forms={forms}
+                trackedLinks={trackedLinks}
+                taps={null}
+                onUpdate={(patch) => updateArea(activePage.id, selectedArea.id, patch)}
+                onDelete={() => deleteArea(activePage.id, selectedArea.id)}
+                showManagementDetails={false}
+                allowedIntents={host ? [...HQ_RICH_MENU_INTENTS] : NEW_MENU_INTENTS_WITH_SWITCH}
+              />
+              <div>
+                <Button type="button" variant="text" onClick={() => deleteArea(activePage.id, selectedArea.id)}>
+                  この面を消す
+                </Button>
+              </div>
+            </Card>
           ) : (
-            <p className={styles.cardNote}>画像の上をドラッグすると、面を足せます。</p>
-          )}
-          </div>
-
-        {/* 面の動き */}
-        {selectedArea && activeIndex >= 0 ? (
-          <Card padding="roomy" layout="vertical">
-            <SectionHeader title={`面 ${String.fromCharCode(65 + activeIndex)}「${areaDisplayName(selectedArea, activeIndex)}」の動き`} />
-            <AreaProperties
-              area={selectedArea}
-              pages={areaPages}
-              tags={tags}
-              templates={templates}
-              forms={forms}
-              trackedLinks={trackedLinks}
-              taps={null}
-              onUpdate={(patch) => updateArea(activePage.id, selectedArea.id, patch)}
-              onDelete={() => deleteArea(activePage.id, selectedArea.id)}
-              showManagementDetails={false}
-              allowedIntents={host ? [...HQ_RICH_MENU_INTENTS] : NEW_MENU_INTENTS_WITH_SWITCH}
-            />
-          </Card>
-        ) : (
-          <Card padding="roomy" layout="vertical">
-            <p className={styles.cardNote}>上の画像で面を押すと、ここで動きを決められます。</p>
-          </Card>
-        )}
-      </>
+            <Card padding="roomy" layout="vertical">
+              <p className={styles.cardNote}>上の画像で面を押すと、ここで動きを決められます。</p>
+            </Card>
+          )
+        }
+      />
     )
   }
 

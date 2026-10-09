@@ -116,11 +116,56 @@ describe('作りかけの下書きを ?id= で開き直す', () => {
     expect(screen.queryByRole('button', { name: /^面 C、/ })).toBeNull()
   })
 
+  it('店：①でタブを2つにすると名前の欄と画像の枠がタブの数だけ出て、作った後に各ページへ画像を上げる', async () => {
+    window.history.replaceState(null, '', '/rich-menus/new')
+    type CreatedInput = { pages: Array<{ name: string }> }
+    let input: CreatedInput | null = null
+    const uploads: string[] = []
+    const original = fetch
+    vi.stubGlobal('fetch', vi.fn(async (url: unknown, init?: RequestInit) => {
+      const path = new URL(String(url), 'http://localhost').pathname
+      if (path === '/api/rich-menu-groups' && init?.method === 'POST') {
+        input = JSON.parse(String(init.body))
+        return { ok: true, status: 200, json: async () => ({ success: true, data: { id: 'rmg-x', pages: [{ id: 'p-top' }, { id: 'p-tab' }] } }) }
+      }
+      if (/\/pages\/[^/]+\/image$/.test(path)) {
+        uploads.push(path)
+        return { ok: true, status: 200, json: async () => ({ success: true, data: { imageR2Key: `k-${uploads.length}`, imageContentType: 'image/png' } }) }
+      }
+      if (path === '/api/rich-menu-groups/rmg-x' && input) {
+        return { ok: true, status: 200, json: async () => ({ success: true, data: GROUP }) }
+      }
+      return original(url as RequestInfo, init)
+    }))
+    await act(async () => { root.render(<RichMenuCreateV8 />) })
+    await settle()
+    expect(screen.queryByLabelText('タブ1の名前（トーク画面のタブに出ます）')).toBeNull()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '2つ' })) })
+    expect(screen.getByRole('heading', { name: '画像（タブごとに1枚）' })).toBeTruthy()
+    await act(async () => { fireEvent.change(screen.getByLabelText('タブ1の名前（トーク画面のタブに出ます）'), { target: { value: '予約' } }) })
+    await act(async () => { fireEvent.change(screen.getByLabelText('タブ2の名前（トーク画面のタブに出ます）'), { target: { value: '会員' } }) })
+    const URLs = globalThis.URL as unknown as { createObjectURL?: unknown; revokeObjectURL?: unknown }
+    URLs.createObjectURL = () => 'blob:local'
+    URLs.revokeObjectURL = () => {}
+    for (const index of [1, 2]) {
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText(`タブ${index}の画像のファイル`), { target: { files: [new File(['png'], `t${index}.png`, { type: 'image/png' })] } })
+      })
+    }
+    expect(screen.getByRole('button', { name: 'タブ2の画像ファイルを選ぶ' }).querySelector('img')).not.toBeNull()
+    await act(async () => { fireEvent.change(screen.getByLabelText('メニュー名（友だちには見えません）'), { target: { value: 'タブのメニュー' } }) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '次へ：ボタンの動き' })) })
+    await settle()
+    expect((input as unknown as CreatedInput).pages.map((page) => page.name)).toEqual(['予約', '会員'])
+    expect(uploads).toEqual(['/api/rich-menu-groups/rmg-x/pages/p-top/image', '/api/rich-menu-groups/rmg-x/pages/p-tab/image'])
+  })
+
   it('手順②に下書きのページと面を出し、①だけ済みにする', async () => {
     await act(async () => { root.render(<RichMenuCreateV8 />) })
     await settle()
     const text = host.textContent ?? ''
-    expect(text).toContain('切替タブ（ページ）')
+    expect(text).toContain('直すタブ')
+    expect(text).not.toContain('ページを足す')
     expect(text).toContain('タブA：予約')
     const rows = Array.from(host.querySelectorAll('button[aria-pressed]')).map((b) => b.textContent ?? '')
     expect(rows.some((t) => t.includes('予約する') && t.includes('URLを開く'))).toBe(true)
