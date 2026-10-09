@@ -68,6 +68,17 @@ interface ConfirmDialogProps {
   onCancel: () => void
 }
 
+/** 削除の対象名と実行の文言は、単件・一括ともこの口でそろえる。 */
+export const deleteConfirmationTitle = (name: string) => `「${name}」を削除しますか？`
+export function normalizeDeleteTitle(title: string): string {
+  const quoted = title.match(/「(.+)」.*削除/)
+  if (quoted) return deleteConfirmationTitle(quoted[1])
+  const target = title.match(/^(.+?)を(?:まとめて)?削除/)
+  if (!target) return title
+  const name = /^\d+件$/.test(target[1]) ? `選択した${target[1]}` : target[1]
+  return deleteConfirmationTitle(name)
+}
+
 /** ブラウザ標準 confirm の代わりに使う、管理画面共通の確認ダイアログ。 */
 export default function ConfirmDialog({
   open,
@@ -134,11 +145,11 @@ export default function ConfirmDialog({
   return (
     <Dialog
       open={open}
-      title={deleteName !== undefined ? `「${deleteName}」を削除しますか？` : title}
+      title={deleteName !== undefined ? deleteConfirmationTitle(deleteName) : confirmLabel.includes('削除') ? normalizeDeleteTitle(title) : title}
       description={description}
       tone={destructive ? 'destructive' : 'default'}
       descriptionBand={dangerBand ? 'danger' : warning ? 'warning' : undefined}
-      confirmLabel={deleteName !== undefined ? '削除する' : confirmLabel}
+      confirmLabel={deleteName !== undefined || confirmLabel.includes('削除') ? '削除する' : confirmLabel}
       cancelLabel={cancelLabel}
       busy={busy || executing}
       confirmDisabled={confirmDisabled}
