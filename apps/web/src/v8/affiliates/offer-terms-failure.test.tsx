@@ -43,7 +43,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
   usePathname: () => '/affiliates',
 }))
-vi.mock('@/components/shared/toast', () => ({ notifyToast: vi.fn() }))
+vi.mock('@/components/shared/toast', () => ({ ...(() => { const notifyToast = vi.fn(); return { notifyToast, notifySaved: notifyToast } })() }))
 
 import OfferFormModal from './offer-form'
 import OffersTab from './offers'

@@ -13,7 +13,7 @@ const fx = vi.hoisted(() => ({
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fx.accountId, accounts: [{ id: 'acc-1', name: '銀座店' }, { id: 'acc-2', name: '渋谷店' }] }) }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => fx.role, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
-vi.mock('@/components/shared/toast', () => ({ notifyToast: vi.fn() }))
+vi.mock('@/components/shared/toast', () => ({ ...(() => { const notifyToast = vi.fn(); return { notifyToast, notifySaved: notifyToast } })() }))
 vi.mock('next/navigation', async () => {
   const { useSyncExternalStore } = await import('react')
   return {

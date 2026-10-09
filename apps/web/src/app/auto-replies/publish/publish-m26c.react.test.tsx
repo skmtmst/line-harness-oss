@@ -81,7 +81,7 @@ vi.mock('@/lib/api', async (importOriginal) => ({
 }))
 
 let currentQuery = 'id=r1&step=priority'
-vi.mock('@/components/shared/toast', () => ({ notifyToast: mocks.toast }))
+vi.mock('@/components/shared/toast', () => ({ notifyToast: mocks.toast, notifySaved: mocks.toast }))
 vi.mock('next/navigation', () => ({
   usePathname: () => '/auto-replies/publish',
   useRouter: () => ({ replace: (url: string) => { currentQuery = url.split('?')[1] || ''; root.render(<AutoReplyPublishPage />) }, push: vi.fn() }),
