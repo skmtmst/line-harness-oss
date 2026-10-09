@@ -78,7 +78,8 @@
 .table {
   padding: var(--tpl-sb-tbl-pad);
   border-radius: var(--tpl-sb-card-radius);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
 }
 
 .row {
@@ -161,7 +162,8 @@
   gap: var(--tpl-sb-group-gap);
   padding: var(--tpl-sb-ext-pad);
   border-radius: var(--tpl-sb-card-radius);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
 }
 
 .externalHead {

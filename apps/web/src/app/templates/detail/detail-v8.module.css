@@ -49,10 +49,11 @@
   align-items: center;
   gap: 14px;
   background: var(--color-warning-bg);
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
   padding: 14px 18px;
   margin-bottom: 16px;
+  box-shadow: var(--card-shadow);
 }
 [data-theme='v8'] .draftBandIcon {
   color: var(--color-warning);
@@ -118,9 +119,10 @@
 
 [data-theme='v8'] .card {
   background: var(--color-canvas);
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
   padding: 16px 20px;
+  box-shadow: var(--card-shadow);
 }
 [data-theme='v8'] .cardHead {
   display: flex;
@@ -228,10 +230,11 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
   padding: 12px 14px;
   margin-top: 8px;
+  box-shadow: var(--card-shadow);
 }
 [data-theme='v8'] .versionRowDraft {
   background: var(--color-warning-bg);

@@ -26,9 +26,10 @@
   grid-template-columns: minmax(0, 1fr) 240px;
   gap: 20px; /* gap: 20 */
   padding: 20px; /* padding: 20 */
-  border: 1px solid var(--color-hairline); /* stroke: $hairline */
+  border: 1px solid var(--card-edge); /* stroke: $hairline */
   border-radius: var(--radius-card); /* cornerRadius: $radius-md */
-  background: var(--color-canvas); /* fill: $canvas */
+  background: var(--color-canvas); /* fill: $canvas */;
+  box-shadow: var(--card-shadow);
 }
 
 @media (max-width: 900px) {

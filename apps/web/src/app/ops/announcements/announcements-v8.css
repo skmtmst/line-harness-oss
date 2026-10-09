@@ -1,7 +1,7 @@
 @layer properties, theme, base, components, utilities;
 .ops-ann-page { display: flex; flex-direction: column; gap: 14px; min-width: 0; container-type: inline-size; }
 .ops-ann-columns { display: grid; grid-template-columns: minmax(0, 40fr) minmax(0, 58fr); align-items: start; gap: 14px; }
-.ops-ann-form { display: flex; flex-direction: column; gap: 12px; padding: 18px; border: 1px solid var(--color-hairline); border-radius: var(--radius-card); min-width: 0; }
+.ops-ann-form { display: flex; flex-direction: column; gap: 12px; padding: 18px; border: 1px solid var(--card-edge); border-radius: var(--radius-card); min-width: 0; box-shadow: var(--card-shadow); }
 .ops-ann-field { display: grid; gap: 6px; font-size: 13px; font-weight: 500; color: var(--color-ink); }
 .ops-ann-body { height: 110px; }
 .ops-ann-choices { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
