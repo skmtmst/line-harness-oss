@@ -175,3 +175,17 @@
 
 /* B-152⑩：説明文は省略せず、必要な行数で読む。 */
 [data-theme='v8'] .note, html[data-theme='v8'] .card:is(.compact, .row) .note { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+
+/* B-152⑦：カード全体の地と濃さをそろえ、箱を二重に薄くしない。 */
+[data-theme='v8'] .card {
+  --polish-overlay-strength: var(--polish-overlay-idle);
+  background-image: linear-gradient(color-mix(in srgb, var(--polish-overlay-ink) calc(var(--polish-overlay-strength) * var(--polish-overlay-range)), transparent), color-mix(in srgb, var(--polish-overlay-ink) calc(var(--polish-overlay-strength) * var(--polish-overlay-range)), transparent));
+  transition-property: background-color, border-color, outline-color, opacity, --polish-overlay-strength;
+  transition-duration: var(--polish-interaction-duration);
+}
+[data-theme='v8'] .card:not(.disabled):hover { --polish-overlay-strength: var(--polish-hover-opacity); }
+[data-theme='v8'] .card:not(.checked):not(.disabled):hover { background-color: var(--color-canvas); }
+[data-theme='v8'] .card:not(.disabled):active { --polish-overlay-strength: var(--polish-active-opacity); }
+[data-theme='v8'] .card:has(.box:focus-visible) { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
+[data-theme='v8'] .disabled { opacity: var(--polish-disabled-opacity); }
+html[data-theme='v8'] .disabled .box:disabled { opacity: var(--polish-enabled-opacity); }
