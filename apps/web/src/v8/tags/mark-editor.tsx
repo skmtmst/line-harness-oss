@@ -504,8 +504,8 @@ function MarkEditorBody({ markId }: { markId?: string }) {
                 </>
               ) : createRule ? (
                 <div className={styles.ruleForm}>
-                  <Field label="きっかけ"><Select aria-label="きっかけ" value={ruleEvent} onChange={(value) => setRuleEvent(value as SupportMarkAutomationEvent)} options={EVENT_LABELS.map((item) => ({ value: item.value, label: item.label }))} size="full" /></Field>
-                  <p className={styles.fieldNote}>{`→ 「${name || 'このマーク'}」に変える`}</p>
+                  <Field note={<>{`→ 「${name || 'このマーク'}」に変える`}</>} label="きっかけ"><Select aria-label="きっかけ" value={ruleEvent} onChange={(value) => setRuleEvent(value as SupportMarkAutomationEvent)} options={EVENT_LABELS.map((item) => ({ value: item.value, label: item.label }))} size="full" /></Field>
+
                   <Field label="手動で変更した直後の保護"><Select
                       aria-label="手動変更の保護時間"
                       value={String(ruleProtectionMinutes)}

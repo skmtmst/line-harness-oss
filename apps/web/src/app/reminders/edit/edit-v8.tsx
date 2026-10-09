@@ -1212,7 +1212,7 @@ function TimingEditor({
             if (Number.isInteger(next) && next >= 0) onChange({ offsetDays: after ? next : -next })
           }}
         />
-        
+
         <Select
           value={after ? 'after' : 'before'}
           onChange={(next) => onChange({ offsetDays: next === 'after' ? days : -days })}

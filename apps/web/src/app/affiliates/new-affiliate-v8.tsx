@@ -487,7 +487,7 @@ export function NewAffiliateV8() {
                     onChange={(event) => setCommissionRate(event.target.value)}
                     placeholder="10"
                   />
-                  
+
                 </span>
               </label>
             ) : null}

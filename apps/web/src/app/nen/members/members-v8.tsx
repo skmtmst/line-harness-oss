@@ -1065,7 +1065,7 @@ function LifetimeTabV8({
                   <Td className="w-44">
                     <span className="flex items-center gap-2">
                       <NumberInput numericText unit="円" aria-label={`節目 ${index + 1}`} inputMode="numeric" value={row.threshold} disabled={readonly} onChange={(event) => update(index, { threshold: event.target.value })} />
-                      
+
                     </span>
                   </Td>
                   <Td className="w-48"><TextField aria-label={`称号 ${index + 1}`} value={row.title} maxLength={30} disabled={readonly} onChange={(event) => update(index, { title: event.target.value })} /></Td>

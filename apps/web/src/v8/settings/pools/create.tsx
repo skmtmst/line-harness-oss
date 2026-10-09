@@ -148,14 +148,14 @@ export default function PoolCreateV8() {
             <Field label="プール名" htmlFor="pl-name" error={inputError?.target === 'pl-name' ? inputError.message : undefined}>
               <TextField id="pl-name" value={name} onChange={(event) => { setName(event.target.value); if (inputError?.target === 'pl-name') setInputError(null) }} placeholder="例：渋谷エリア" maxLength={100} />
             </Field>
-            <Field label="URLに使う名前（あとから変えられません）" htmlFor="pl-slug" error={inputError?.target === 'pl-slug' ? inputError.message : undefined}>
-              <TextField id="pl-slug" value={slug} onChange={(event) => { setSlug(event.target.value); if (inputError?.target === 'pl-slug') setInputError(null) }} placeholder="shibuya" maxLength={32} />
-            </Field>
-            <p className={styles.hint}>
+            <Field note={<>
               {slugValid
                 ? `保存すると、このURLが発行されます：${publicUrl}`
                 : '半角英小文字・数字・ハイフンで2〜32文字。配ったURLが使えなくなるため、あとから変えられません。'}
-            </p>
+            </>} label="URLに使う名前（あとから変えられません）" htmlFor="pl-slug" error={inputError?.target === 'pl-slug' ? inputError.message : undefined}>
+              <TextField id="pl-slug" value={slug} onChange={(event) => { setSlug(event.target.value); if (inputError?.target === 'pl-slug') setInputError(null) }} placeholder="shibuya" maxLength={32} />
+            </Field>
+
           </section>
 
           <section className={styles.card} aria-labelledby="pool-create-where">

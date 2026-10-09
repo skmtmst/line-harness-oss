@@ -741,7 +741,7 @@ function ConversionCreate() {
         >まだ計測せず、下書きとして保存する</Checkbox>
         <Disclosure size="compact" title="詳細設定" hint="帰属期間・集計対象">
           <div className={styles.fieldRow}>
-            <Field label="友だち追加からの計測期間（日）" htmlFor="cv-days" error={fieldIssue?.field === 'cv-days' ? fieldIssue.message : undefined}>
+            <Field note={<>空欄なら既定の90日です。</>} label="友だち追加からの計測期間（日）" htmlFor="cv-days" error={fieldIssue?.field === 'cv-days' ? fieldIssue.message : undefined}>
               <NumberInput numericText unit="日"
                 aria-label="友だち追加からの計測期間"
                 inputMode="numeric"
@@ -749,7 +749,7 @@ function ConversionCreate() {
                 placeholder="90"
                 onChange={(event) => { setFieldIssue((current) => current?.field === 'cv-days' ? null : current); setAttributionDays(event.target.value) }}
               />
-              <span className={styles.fieldNote}>空欄なら既定の90日です。</span>
+
             </Field>
             <div className={styles.field}>
               <span className={styles.label}>集計対象アカウント</span>

@@ -660,7 +660,7 @@ export default function ScenarioFirstStepV8() {
                                 className={styles.whenNumber}
                                 aria-label="さらに何時間後"
                               />
-                              
+
                               <NumberInput
                                 type="number"
                                 min={0}

@@ -513,7 +513,9 @@ export default function NewCommonVarV8() {
               </div>
             ) : null}</Field></div>
         </div>
-        <div className={styles.field}><Field label="差し込み名（あとから変えられません）" htmlFor="cv-key"><div className={styles.keyRow}>
+        <div className={styles.field}><Field note={<>
+            半角の英小文字で始め、英小文字・数字・下線だけ・32文字まで。変えるとテンプレートの差し込みが空になるため、あとから変えられません。
+          </>} label="差し込み名（あとから変えられません）" htmlFor="cv-key"><div className={styles.keyRow}>
             <span className={styles.keyBox}>
               <span className={styles.keyMark} aria-hidden="true">{'{{var.'}</span>
               <input
@@ -539,9 +541,7 @@ export default function NewCommonVarV8() {
             </Button>
           </div>
 <VarFieldError message={keyFieldError} />
-<p className={styles.fieldHint}>
-            半角の英小文字で始め、英小文字・数字・下線だけ・32文字まで。変えるとテンプレートの差し込みが空になるため、あとから変えられません。
-          </p></Field></div>
+</Field></div>
       </section>
 
       <section className={styles.card} aria-labelledby="cv-new-type-heading">

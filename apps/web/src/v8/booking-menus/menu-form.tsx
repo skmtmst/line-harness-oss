@@ -892,7 +892,7 @@ export default function MenuFormV8() {
                   aria-label="かかる時間（分）"
                   aria-invalid={fieldErrors.duration !== undefined}
                 />
-                
+
               </span>
               <span className={styles.unitField}>
                 <span className={styles.unitPrefix}>¥</span>
@@ -1007,14 +1007,14 @@ export default function MenuFormV8() {
                   <span className={styles.ruleLabel}>受付の締め切り</span>
                   <span className={`${styles.ruleValue} ${styles.ruleOwn}`}>
                     <NumberInput unit="時間前" type="number" min={1} value={cutoffHours} onChange={(e) => setCutoffHours(e.target.value)} aria-label="受付の締め切り（時間前）" />
-                    
+
                   </span>
                 </div>
                 <div className={styles.ruleRow}>
                   <span className={styles.ruleLabel}>キャンセルの期限</span>
                   <span className={`${styles.ruleValue} ${styles.ruleOwn}`}>
                     <NumberInput unit="時間前" type="number" min={1} value={cancelDeadlineHours} onChange={(e) => setCancelDeadlineHours(e.target.value)} aria-label="キャンセルの期限（時間前）" />
-                    
+
                   </span>
                 </div>
               </>
@@ -1056,7 +1056,7 @@ export default function MenuFormV8() {
                       onChange={(e) => setConcurrentCapacity(e.target.value)}
                       aria-label="同時に受けられる件数"
                     />
-                    
+
                   </span></Field>
                 <Field label="後の空き時間（片付け・移動）"><span className={styles.unitField}>
                     <NumberInput unit="分"
@@ -1075,7 +1075,7 @@ export default function MenuFormV8() {
                       aria-label="後の空き時間（分）"
                       aria-invalid={fieldErrors.buffer !== undefined}
                     />
-                    
+
                   </span>
 {fieldErrors.buffer !== undefined ? (
                     <span className={styles.fieldError} role="alert">{fieldErrors.buffer}</span>

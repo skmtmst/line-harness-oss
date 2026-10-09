@@ -42,6 +42,15 @@ export function FieldError({ id, children }: { id: string; children: ReactNode }
   return children ? <p id={id} className={styles.error} role="alert">{children}</p> : null
 }
 
+/** 補足は1行。長い説明と改行を含む説明はラベル横の「？」へ。 */
+export function fieldNoteText(node: ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(fieldNoteText).join('')
+  if (React.isValidElement<{ children?: ReactNode }>(node)) return fieldNoteText(node.props.children)
+  return ''
+}
+export function fieldNoteIsLong(node: ReactNode): boolean { const text = fieldNoteText(node).trim(); return /\n/.test(text) || [...text].length > 32 }
+
 /** 1行の入力欄。ラベルと説明の付け方を全画面でそろえる。 */
 export function Field({
   label,
@@ -121,7 +130,9 @@ export function Field({
   const actualCount = count ?? autoCount
   const actualRequired = required || autoRequired || Boolean(typeof label === 'string' && label.match(/[（(]必須[）)]/u))
   const shownLabel = typeof label === 'string' ? label.replace(/\s*[（(](任意|必須)[）)]/gu, '').replace(/\s*[*＊]$/, '') : label
-  const hasHelp = help !== undefined && help !== null
+  const longNote = fieldNoteIsLong(note)
+  const actualHelp = longNote ? <>{help}{help ? <br /> : null}{note}</> : help
+  const hasHelp = actualHelp !== undefined && actualHelp !== null
   /*
    * 誤りの見せ方を全画面でそろえる（動きの点検・8）。
    * - 誤りが出た欄で打ち直し始めたら、その場で赤と文を引っ込める（直している最中に赤くし続けない）。
@@ -141,7 +152,7 @@ export function Field({
   const noteId = `${baseId}-note`
   const errorId = `${baseId}-error`
   const countId = `${baseId}-count`
-  const showNote = !shownError && Boolean(note)
+  const showNote = !shownError && Boolean(note) && !longNote
   const over = actualCount ? actualCount.value > actualCount.max : false
   const describedBy = [shownError ? errorId : null, showNote ? noteId : null, actualCount ? countId : null].filter(Boolean).join(' ') || undefined
   return (
@@ -171,7 +182,7 @@ export function Field({
         {optional !== false && !actualRequired && <OptionalBadge />}
         {hasHelp ? (
           <HelpTip label={`${helpLabel ?? (typeof shownLabel === 'string' ? shownLabel : 'この欄')}の説明`}>
-            {help}
+            {actualHelp}
             {helpHref ? <a href={helpHref} className={styles.helpLink}>くわしく</a> : null}
           </HelpTip>
         ) : null}

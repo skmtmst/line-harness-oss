@@ -108,7 +108,7 @@ function RuleNumberFieldV8({ label, unit, min, max, value, onChange, trackEmpty,
           }}
           className={styles.numInput}
         />
-        
+
       </span>
 {hint ? <span className="text-ink-faint mt-1 block text-xs">＝{hint}</span> : null}</Field>
   )

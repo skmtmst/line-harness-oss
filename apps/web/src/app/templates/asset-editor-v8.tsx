@@ -601,13 +601,13 @@ export default function TemplateAssetEditorV8({ kind, visual = false }: { kind: 
                     <Field label="当たる確率" htmlFor="ta8-lottery-rate">
                       <span className="flex items-center gap-2">
                         <NumberInput unit="%" id="ta8-lottery-rate" type="number" min={1} max={100} className={inputClass} value={lotteryRate} onChange={(event) => setLotteryRate(event.target.value)} />
-                        
+
                       </span>
                     </Field>
                     <Field label="当選人数の上限" htmlFor="ta8-winner-limit">
                       <span className="flex items-center gap-2">
                         <NumberInput unit="人" id="ta8-winner-limit" type="number" min={1} className={inputClass} value={winnerLimit} onChange={(event) => setWinnerLimit(event.target.value)} />
-                        
+
                       </span>
                     </Field>
                   </div>
