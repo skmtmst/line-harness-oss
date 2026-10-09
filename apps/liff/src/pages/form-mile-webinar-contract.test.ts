@@ -160,11 +160,13 @@ describe('回答フォーム3点 (m11c: 必須は琥珀・白い帯と説明・�
   it('必須は欄名の横の小さな赤い札。入力の失敗の赤とは分ける', () => {
     const src = formSrc();
     // 必須の印は ★V8 (B8rCt・g9osGN) の赤い札 (地 #fdecec・文字 liff-sun)
-    expect(src).toMatch(/function RequiredMark[\s\S]*?bg-liff-required-bg/);
-    expect(src).toMatch(/function RequiredMark[\s\S]*?text-liff-sun/);
-    expect(src).toContain('<RequiredMark />');
-    // 必須に失敗の赤を渡さない
-    expect(src).not.toMatch(/<RequiredMark[^/]*color/);
+    const controls = readFileSync(join(ROOT, '..', 'components', 'forms', 'controls.tsx'), 'utf8');
+    const styles = readFileSync(join(ROOT, '..', 'components', 'forms', 'controls.module.css'), 'utf8');
+    expect(src).toContain('<FieldLabel');
+    expect(src).toContain('required={block.required}');
+    expect(controls).toContain('styles.required');
+    expect(styles).toContain('var(--color-liff-required-bg)');
+    expect(styles).toContain('var(--color-liff-sun)');
     // 入力の失敗 (欄の下の直し方・枠) はお店のテーマの error のまま
     expect(src).toContain('errorColor={theme.error}');
   });
@@ -213,8 +215,8 @@ describe('ウェビナーの配信中は ★V8 RpW2h の暗い地、時刻の同
     const live = src.slice(src.indexOf('ライブ中 (★V8 RpW2h)'));
     expect(live).toContain('bg-night-deep');
     expect(live).toContain('aspect-video');
-    expect(live).toContain('bg-night-cta');
-    expect(live).toContain('bg-liff-primary');
+    expect(live).toContain('variant="nightAction"');
+    expect(live).toContain('variant="nightSend"');
     // 待機・終了などは白い殻のまま
     expect(src).toContain('bg-canvas');
   });
@@ -233,7 +235,8 @@ describe('ウェビナーの配信中は ★V8 RpW2h の暗い地、時刻の同
     expect(src).toContain('ご視聴ありがとうございました');
     expect(src).toContain('友だち追加すると見られます');
     expect(src).toContain('この端末では再生できません');
-    expect(src).toContain('読み込めませんでした');
+    expect(src).toContain('<LoadErrorView');
+    expect(readFileSync(join(ROOT, '..', 'components', 'LoadErrorView.tsx'), 'utf8')).toContain('読み込めませんでした');
   });
 
   it('会話は「名前　本文」の1行。自分の名前だけ色を変える', () => {

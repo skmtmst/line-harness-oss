@@ -31,7 +31,8 @@ describe('押せる所の大きさ', () => {
       expect(at, `${file} ${marker}`).toBeGreaterThan(-1);
       // 印の近く（同じ要素の className）に liff-hit がある
       const around = src.slice(Math.max(0, at - 400), at + 400);
-      expect(around, `${file} ${marker}`).toContain('liff-hit');
+      expect(around, `${file} ${marker}`).toMatch(/<Button variant="(?:icon|arrow|chip)"/);
+      expect(read('../components/ui/Button.tsx')).toMatch(/(?:icon|arrow|chip): `?'liff-hit/);
     }
   });
 

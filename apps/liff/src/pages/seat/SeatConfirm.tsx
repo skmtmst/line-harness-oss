@@ -1,8 +1,9 @@
+import { TextInput, FieldLabel, FieldCount } from '../../components/forms/controls.js';
+import Button from '../../components/ui/Button.js';
 import { useEffect, useState } from 'react';
 import PrivacyNote from '../../components/ui/PrivacyNote.js';
 import { changeRule, longDate, remainingText, stayText, zonedParts } from '../../lib/seat-reserve.js';
 
-const FIELD = 'h-9 w-full rounded-(--liff-radius) bg-canvas px-3 text-sm text-ink placeholder:text-liff-sub outline outline-1 -outline-offset-1 outline-liff-line-strong focus-visible:outline-2 focus-visible:outline-ink';
 
 /**
  * ② 確認 (★V8 km8EG)。お店・日時・人数・お席・お名前・電話の箱、ご要望、取り消しの決まり、仮押さえの残り時間。
@@ -91,13 +92,13 @@ export default function SeatConfirm({
         ))}
         <div className="flex items-start gap-3">
           <dt className="shrink-0 text-[13px] leading-5 text-liff-sub">
-            <label htmlFor="seat-phone">電話</label>
+            <FieldLabel htmlFor="seat-phone">電話</FieldLabel>
           </dt>
           <dd className="min-w-0 flex-1">
             {reschedule ? (
               <span className="block truncate text-[13px] leading-5 font-semibold text-ink">{phone || '—'}</span>
             ) : (
-              <input
+              <TextInput
                 id="seat-phone"
                 type="tel"
                 inputMode="tel"
@@ -105,32 +106,30 @@ export default function SeatConfirm({
                 maxLength={50}
                 value={phone}
                 onChange={(e) => onPhone(e.target.value)}
-                placeholder="任意（お店からの連絡用）"
-                className="block w-full bg-transparent text-[13px] leading-5 font-semibold text-ink placeholder:font-normal placeholder:text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
+                placeholder="お店からの連絡用"
               />
             )}
+            {!reschedule && <FieldCount value={phone} max={50} />}
           </dd>
         </div>
       </dl>
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="seat-note" className="flex items-center gap-1.5 text-[13px] leading-5 font-bold text-ink">
-          ご要望（任意）<span className="text-[11px] leading-[17px] font-normal text-liff-sub">任意</span>
-        </label>
+        <FieldLabel htmlFor="seat-note">ご要望</FieldLabel>
         {reschedule ? (
           <p className="flex h-9 items-center truncate rounded-(--liff-radius) bg-canvas px-3 text-sm text-ink outline outline-1 -outline-offset-1 outline-liff-line-strong">
             {note || 'なし'}
           </p>
         ) : (
-          <input
+          <TextInput
             id="seat-note"
             type="text"
             maxLength={200}
             value={note}
             onChange={(e) => onNote(e.target.value)}
             placeholder="例：記念日です・ベビーカーで行きます"
-            className={FIELD}
           />
         )}
+        {!reschedule && <FieldCount value={note} max={200} />}
       </div>
       <ul className="flex flex-col gap-1 rounded-(--liff-radius) bg-liff-off-bg p-3 text-xs leading-[18px] text-liff-sub">
         <li>{`・${changeRule(startsAt, cancelDeadlineMinutesBefore, timeZone, now)}`}</li>
@@ -150,13 +149,12 @@ export default function SeatConfirm({
       )}
       <PrivacyNote />
       <div className="flex">
-        <button
+        <Button variant="text"
           type="button"
           onClick={onBack}
-          className="liff-hit text-xs leading-[18px] text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
         >
           ← 時刻を選び直す
-        </button>
+        </Button>
       </div>
       <div className="pb-40" aria-hidden="true" />
     </div>

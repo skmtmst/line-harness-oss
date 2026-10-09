@@ -14,6 +14,7 @@ import type { WebinarState } from '../lib/api.js';
 vi.mock('@line/liff', () => ({ default: { isInClient: () => false, openWindow: vi.fn() } }));
 vi.mock('../lib/api.js', () => ({
   api: {
+    liffConfig: vi.fn().mockResolvedValue({ success: true, data: {} }),
     webinarState: vi.fn(),
     webinarHeartbeat: vi.fn().mockResolvedValue({ ok: true }),
     webinarComment: vi.fn(),
@@ -79,6 +80,29 @@ describe('監査 L7：変換中の Enter では送らない', () => {
   });
 });
 
+describe('共通の頭・読み込み・失敗の表示', () => {
+  it('待っている間も頭を出し、共通の読み込み表示で知らせる', () => {
+    webinarState.mockImplementation(() => new Promise(() => {}));
+    open();
+    expect(screen.getByRole('banner')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '閉じる' })).toBeTruthy();
+    expect(screen.getByRole('status').getAttribute('aria-busy')).toBe('true');
+  });
+
+  it('読めなかったら頭と共通の失敗表示を残し、読み直して配信へ戻れる', async () => {
+    webinarState.mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValue(LIVE);
+    open();
+    expect(await screen.findByText('読み込めませんでした')).toBeTruthy();
+    expect(screen.getByRole('banner')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }));
+    const input = await screen.findByRole('textbox', { name: 'コメントを書く' });
+    expect(screen.getAllByRole('banner')).toHaveLength(1);
+    expect(document.title).toBe('秋の説明会 | musubo');
+    fireEvent.change(input, { target: { value: '質問です' } });
+    expect(screen.getByText('4/500文字')).toBeTruthy();
+  });
+});
+
 describe('監査 L9：送れなかったコメント', () => {
   it('行に「送れませんでした」を出し、書いた文を入力欄へ戻す', async () => {
     webinarState.mockResolvedValue(LIVE);
@@ -86,7 +110,7 @@ describe('監査 L9：送れなかったコメント', () => {
     open();
     const input = (await screen.findByRole('textbox', { name: 'コメントを書く' })) as HTMLInputElement;
     fireEvent.change(input, { target: { value: '質問です' } });
-    fireEvent.click(screen.getByRole('button', { name: '送信' }));
+    fireEvent.click(screen.getByRole('button', { name: '送信する' }));
     expect(await screen.findByText('（送れませんでした）')).toBeTruthy();
     expect(input.value).toBe('質問です');
     webinarComment.mockResolvedValue({ ok: true });

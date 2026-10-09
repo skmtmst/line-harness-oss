@@ -5,15 +5,15 @@ import Icon from './Icon.js';
 
 /**
  * LIFF 共通の確認窓。管理画面の ConfirmDialog と同じ形
- * (題・影響・「やめる」と危ない操作のボタン)。
+ * (題・影響・「閉じる」と危ない操作のボタン)。
  *
  * ブラウザの `confirm()` は使わない。見た目が OS 任せで、
  * 何を取り消すのかを読ませられず、押し間違いを止められない。
  * 取り消せない操作 (`destructive`) は赤い実行ボタン＋警告の印にする。
  *
  * キーボードの動き:
- * - 開いている間の Escape は「やめる」と同じ。処理中 (`busy`) は閉じない。
- * - 開いたら安全な方 (「やめる」) へフォーカスを移し、Tab は窓の中を回る。
+ * - 開いている間の Escape は「閉じる」と同じ。処理中 (`busy`) は閉じない。
+ * - 開いたら安全な方 (「閉じる」) へフォーカスを移し、Tab は窓の中を回る。
  *   閉じたら開く前の場所へ戻す。
  *
  * 折れ方:
@@ -25,7 +25,7 @@ export default function ConfirmDialog({
   title,
   description,
   confirmLabel = '実行する',
-  cancelLabel = 'やめる',
+  cancelLabel = '閉じる',
   destructive = false,
   busy = false,
   error,
@@ -53,7 +53,7 @@ export default function ConfirmDialog({
   const cancelRef = useRef<HTMLButtonElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
 
-  // 開いている間の Escape は「やめる」と同じ。処理中は閉じない。
+  // 開いている間の Escape は「閉じる」と同じ。処理中は閉じない。
   useEffect(() => {
     if (!open || busy) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -68,7 +68,7 @@ export default function ConfirmDialog({
     };
   }, [open, busy, onCancel]);
 
-  // 開いたら安全な方 (「やめる」) へ移し、閉じたら開く前へ戻す。
+  // 開いたら安全な方 (「閉じる」) へ移し、閉じたら開く前へ戻す。
   useEffect(() => {
     if (!open) return;
     openerRef.current =

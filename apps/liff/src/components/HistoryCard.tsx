@@ -48,7 +48,7 @@ export default function HistoryCard({
             )}
             {onCancel && (
               <Button variant="secondary" className="flex-1" disabled={disabled} onClick={onCancel}>
-                キャンセル
+                キャンセルする
               </Button>
             )}
           </div>

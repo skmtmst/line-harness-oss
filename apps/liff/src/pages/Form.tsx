@@ -1,3 +1,4 @@
+import { TextInput, ChoiceInput, FieldLabel, FieldCount } from '../components/forms/controls.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import liff from '@line/liff';
@@ -76,18 +77,6 @@ function initialAnswers(layout: FormLayout): Answers {
 }
 
 /**
- * 必須の印。★V8 (B8rCt・g9osGN) は欄名の横の小さな赤い札。
- * 入力の失敗 (お店のテーマの error) とは分け、必須は常にこの札にする。
- */
-function RequiredMark() {
-  return (
-    <span className="rounded bg-liff-required-bg px-1.5 py-px text-[10px] font-bold whitespace-nowrap text-liff-sun">
-      必須
-    </span>
-  );
-}
-
-/**
  * 送信ボタンの文字。管理画面で決めた名前があればそれを使い、
  * 決めていないとき (空・旧い既定の「送信」) は設計どおり「送信する」。
  */
@@ -105,19 +94,16 @@ function otherLabel(block: FormInputBlock): string {
 function OtherTextInput({
   value,
   onChange,
-  inputClass,
 }: {
   value: string;
   onChange: (next: string) => void;
-  inputClass: string;
 }) {
   return (
-    <input
+    <TextInput
       type="text"
       value={value}
       placeholder="具体的に入力してください"
       onChange={(e) => onChange(e.target.value)}
-      className={`${inputClass} mt-1.5`}
     />
   );
 }
@@ -517,25 +503,23 @@ export default function Form() {
             <div className="mx-6 mb-6 rounded-[10px] border border-liff-line-strong bg-canvas p-4">
               <p className="text-sm font-bold text-ink">{bookingError}</p>
               <div className="mt-3 flex gap-2">
-                <button
+                <Button variant="primary" className="flex-1"
                   type="button"
                   onClick={() => void retryBookings()}
                   disabled={bookingRetrying}
-                  className="min-h-11 flex-1 rounded-[10px] bg-liff-primary px-3 text-sm font-bold text-white disabled:opacity-50"
                 >
                   {bookingRetrying ? '確保中...' : '予約を取り直す'}
-                </button>
-                <button
+                </Button>
+                <Button variant="secondary" className="flex-1"
                   type="button"
                   onClick={() => {
                     setBookingError(null);
                     setDone(false);
                     window.scrollTo({ top: 0 });
                   }}
-                  className="min-h-11 flex-1 rounded-[10px] border border-liff-line-strong bg-canvas px-3 text-sm font-bold text-ink"
                 >
                   日時を選び直す
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -651,23 +635,21 @@ export default function Form() {
       </div>
 
       <BottomBar>
-        <button
+        <Button variant="primary"
           type="button"
           onClick={() => (isLast ? submit() : goNext())}
           disabled={sending}
-          className="w-full py-3 text-[15px] font-bold disabled:opacity-50"
           style={{ backgroundColor: theme.main, color: submitButtonText(theme, hasCustomTheme), borderRadius: radius }}
         >
           {sending ? '送信中...' : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
-        </button>
+        </Button>
         {trail.length > 0 && (
-          <button
+          <Button variant="text"
             type="button"
             onClick={goBack}
-            className="liff-hit self-center px-4 py-1 text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
           >
             ← {options.prevLabel || '前のページへ'}
-          </button>
+          </Button>
         )}
       </BottomBar>
 
@@ -678,21 +660,19 @@ export default function Form() {
               {options.confirmDialog?.text || '送信してよろしいですか？'}
             </p>
             <div className="mt-4 flex gap-2">
-              <button
+              <Button variant="secondary" className="flex-1"
                 type="button"
                 onClick={() => setConfirming(false)}
-                className="flex-1 rounded-lg border border-hairline bg-canvas py-2 text-sm text-ink"
               >
-                {options.confirmDialog?.cancelLabel || 'キャンセル'}
-              </button>
-              <button
+                {options.confirmDialog?.cancelLabel || '閉じる'}
+              </Button>
+              <Button variant="primary" className="flex-1"
                 type="button"
                 onClick={() => submit()}
-                className="flex-1 py-2 text-sm font-bold"
                 style={{ backgroundColor: theme.main, color: submitButtonText(theme, hasCustomTheme), borderRadius: radius }}
               >
                 {submitLabelText(options.confirmDialog?.okLabel)}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -819,16 +799,15 @@ function AddressFields({
         <div className="space-y-1">
           <p className="text-xs text-ink-faint">候補が複数あります。選んでください</p>
           {candidates.map((c) => (
-            <button
+            <Button variant="option"
               key={`${c.postalCode}-${c.town}`}
               type="button"
               onClick={() => applyCandidate(c)}
-              className="block w-full rounded-[10px] border border-liff-line-strong bg-canvas px-3 py-2 text-left text-sm text-ink"
             >
               {c.prefecture}
               {c.city}
               {c.town}
-            </button>
+            </Button>
           ))}
         </div>
       )}
@@ -974,7 +953,7 @@ export function BookingSlotPicker({
       {!fixedStaffId && staffList.length > 1 && (
         <div className="flex flex-wrap gap-2">
           {staffList.map((s) => (
-            <button
+            <Button variant="chip" selected={staffId === s.id}
               key={s.id}
               type="button"
               onClick={() => {
@@ -983,14 +962,9 @@ export function BookingSlotPicker({
                 setStaffId(s.id);
               }}
               aria-pressed={staffId === s.id}
-              className={`min-h-11 rounded-[10px] border px-3 text-sm ${
-                staffId === s.id
-                  ? 'border-liff-primary bg-liff-soft font-bold text-ink'
-                  : 'border-liff-line-strong bg-canvas text-ink'
-              }`}
             >
               {s.display_name}
-            </button>
+            </Button>
           ))}
         </div>
       )}
@@ -1077,18 +1051,9 @@ function BlockView({
 
   if (block.kind === 'button') {
     return (
-      <a
-        href={block.url}
-        target="_blank"
-        rel="noreferrer"
-        className={`block rounded-lg py-3 text-center text-sm font-bold ${
-          block.style === 'outline'
-            ? 'border border-liff-primary text-liff-primary'
-            : 'bg-liff-primary text-white'
-        }`}
-      >
+      <Button href={block.url} external variant={block.style === 'outline' ? 'secondary' : 'primary'}>
         {block.label}
-      </a>
+      </Button>
     );
   }
 
@@ -1097,8 +1062,6 @@ function BlockView({
   const value = answers[block.name];
   const text = typeof value === 'string' ? value : '';
   const checked = Array.isArray(value) ? (value as string[]) : [];
-  const inputClass =
-    'w-full rounded-[10px] border border-liff-line-strong bg-canvas px-3.5 py-3 text-sm text-ink placeholder:text-liff-idle focus:border-liff-primary focus:outline-none';
   /** 直しがある欄は枠を直しの色にする (お店のテーマの error)。 */
   const invalidStyle = error ? { borderColor: errorColor } : undefined;
   // 欄名・説明・直しの文を入力と結ぶ（読み上げで欄名と直し方が分かるように）。
@@ -1115,19 +1078,14 @@ function BlockView({
     block.type === 'prefecture' ||
     block.type === 'select' ||
     (block.type === 'date' && block.dateStyle !== 'ymd');
-  const fieldProps = { id: fieldId, 'aria-describedby': describedBy };
+  const fieldProps = { id: fieldId, 'aria-describedby': describedBy, 'aria-required': !!block.required };
 
   return (
     <div className="flex flex-col gap-2">
       {/* ★V8 (B8rCt)：欄名と必須の札を1行に並べ、選択肢まで 8 空ける。 */}
-      <label
-        id={labelId}
-        htmlFor={singleControl ? fieldId : undefined}
-        className="flex items-center gap-1.5 text-sm font-bold text-ink"
-      >
+      <FieldLabel id={labelId} htmlFor={singleControl ? fieldId : undefined} required={block.required}>
         {block.label}
-        {block.required && <RequiredMark />}
-      </label>
+      </FieldLabel>
       {block.description && (
         <p id={descId} className="-mt-1 text-xs text-ink-faint">{block.description}</p>
       )}
@@ -1156,7 +1114,6 @@ function BlockView({
           <FormSelectControl
             value={text}
             onChange={(e) => onChange(block.name, e.target.value)}
-            className={inputClass}
             style={invalidStyle}
             aria-invalid={!!error}
             {...fieldProps}
@@ -1176,7 +1133,6 @@ function BlockView({
               // 「その他」を自由記入したときは、プルダウンにはその選択肢を出す
               value={isOtherFreeText(block, text) ? otherLabel(block) : text}
               onChange={(e) => onChange(block.name, e.target.value)}
-              className={inputClass}
               style={invalidStyle}
               aria-invalid={!!error}
               {...fieldProps}
@@ -1192,7 +1148,6 @@ function BlockView({
               <OtherTextInput
                 value={text}
                 onChange={(next) => onChange(block.name, next)}
-                inputClass={inputClass}
               />
             )}
           </div>
@@ -1209,12 +1164,11 @@ function BlockView({
               return (
                 <div key={choice.id}>
                   <FormChoiceRow selected={checkedRadio}>
-                    <input
+                    <ChoiceInput
                       type="radio"
                       name={block.name}
                       checked={checkedRadio}
                       onChange={() => onChange(block.name, choice.label)}
-                      className="h-[18px] w-[18px] shrink-0 accent-liff-primary"
                     />
                     {choice.label}
                   </FormChoiceRow>
@@ -1222,7 +1176,6 @@ function BlockView({
                     <OtherTextInput
                       value={isFree ? text : ''}
                       onChange={(next) => onChange(block.name, next)}
-                      inputClass={inputClass}
                     />
                   )}
                 </div>
@@ -1241,10 +1194,9 @@ function BlockView({
               return (
                 <div key={choice.id}>
                   <FormChoiceRow selected={isChecked}>
-                    <input
+                    <ChoiceInput
                       type="checkbox"
                       checked={isChecked}
-                      className="h-[18px] w-[18px] shrink-0 accent-liff-primary"
                       onChange={() => {
                         if (!choice.isOther) {
                           onToggle(block.name, choice.label);
@@ -1284,7 +1236,6 @@ function BlockView({
                               ],
                         )
                       }
-                      inputClass={inputClass}
                     />
                   )}
                 </div>
@@ -1321,13 +1272,12 @@ function BlockView({
             {text && (
               <div className="mt-2">
                 <img src={text} alt="送った画像" className="max-h-40 rounded-lg" />
-                <button
+                <Button variant="text" className="mt-1"
                   type="button"
                   onClick={() => onChange(block.name, '')}
-                  className="mt-1 min-h-11 text-xs text-ink-faint underline"
                 >
                   選び直す
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -1345,9 +1295,7 @@ function BlockView({
         {(block.type === 'text' || block.type === 'textarea') &&
           block.limit?.max &&
           !block.limit.hideCounter && (
-            <p className="mt-1 text-right text-xs text-ink-faint tabular-nums">
-              {text.length}/{block.limit.max}
-            </p>
+            <FieldCount value={text} max={block.limit.max} />
           )}
       </div>
 

@@ -1,3 +1,6 @@
+import LoadErrorView from '../components/LoadErrorView.js';
+import { TextInput, FieldCount } from '../components/forms/controls.js';
+import Button from '../components/ui/Button.js';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import liff from '@line/liff';
@@ -6,7 +9,7 @@ import { logFailure } from '../lib/user-message.js';
 import LoadingView from '../components/LoadingView.js';
 import StatusView from '../components/ui/StatusView.js';
 import Icon from '../components/ui/Icon.js';
-import { liffDocumentTitle } from '../components/ui/LiffHeader.js';
+import LiffHeader from '../components/ui/LiffHeader.js';
 
 // 疑似ライブプレーヤー。時刻の権威はサーバー:
 //   期待位置 = state.offsetSeconds + (performance.now() - t0) / 1000
@@ -45,10 +48,6 @@ function formatJp(epoch: number): string {
 export default function Webinar() {
   const { slug } = useParams<{ slug: string }>();
   const [state, setState] = useState<WebinarState | null>(null);
-  // 上の帯の無い画面なので、題はここで付ける（「<ウェビナー名> | musubo」）。
-  useEffect(() => {
-    document.title = liffDocumentTitle(state?.title || 'ウェビナー');
-  }, [state?.title]);
   const [error, setError] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   /** この端末では再生できない (HLS 非対応など)。読み直しても直らない。 */
@@ -289,6 +288,7 @@ export default function Webinar() {
   // ---- 白い地の共通の殻（⑤LINEらしい。夜の型はM2の型が入ってから） ----
   const shell = (content: ReactNode) => (
     <div className="min-h-screen bg-canvas text-ink" data-design-node="RpW2h">
+      <LiffHeader title={state?.title || 'ウェビナー'} />
       <div className="mx-auto w-full max-w-md px-4 pt-4 pb-12">{content}</div>
     </div>
   );
@@ -296,12 +296,7 @@ export default function Webinar() {
   // 読み込めなかった時 (7 の注記: 5-b と同じ文面。白地なので濃い字で出す)。
   if (loadFailed) {
     return shell(
-      <StatusView
-        icon="cloud-off"
-        title="読み込めませんでした"
-        body="電波のよいところで、もう一度お試しください。"
-        action={{ label: 'もう一度読み込む', onClick: () => void load() }}
-      />,
+      <LoadErrorView onRetry={() => void load()} />,
     );
   }
   // 友だち追加前 (7-e)。足す操作は LINE 側なのでボタンは出さない。
@@ -326,19 +321,7 @@ export default function Webinar() {
   }
   if (!state) {
     return shell(
-      <div role="status" aria-live="polite" aria-busy="true" aria-label="読み込み中">
-        <div className="space-y-3" aria-hidden="true">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="flex animate-pulse gap-3 rounded-xl bg-liff-chip p-4">
-              <div className="h-12 w-12 shrink-0 rounded-lg bg-liff-line" />
-              <div className="flex flex-1 flex-col justify-center gap-2">
-                <div className="h-3 w-2/5 rounded bg-liff-line" />
-                <div className="h-3 w-4/5 rounded bg-liff-line" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>,
+      <LoadingView />,
     );
   }
 
@@ -425,6 +408,7 @@ export default function Webinar() {
     .slice(11, 16);
   return (
     <div className="flex h-screen flex-col bg-night-deep text-night-body" data-design-node="RpW2h">
+      <LiffHeader title={state.title} />
       <div className="relative aspect-video w-full shrink-0 bg-night-panel">
         <video ref={videoRef} className="h-full w-full object-contain" playsInline />
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1.5">
@@ -433,9 +417,8 @@ export default function Webinar() {
             ● ライブ
           </span>
           {needsTap && (
-            <button
+            <Button variant="nightSound"
               type="button"
-              className="liff-hit pointer-events-auto inline-flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-white"
               onClick={() => {
                 const v = videoRef.current;
                 if (v) {
@@ -446,8 +429,8 @@ export default function Webinar() {
               }}
             >
               <Icon name="volume-x" className="h-3.5 w-3.5" />
-              タップで音声ON
-            </button>
+              音声をオンにする
+            </Button>
           )}
         </div>
       </div>
@@ -468,7 +451,7 @@ export default function Webinar() {
               <>
                 <span className="text-night-mine">{item.authorName}</span>
                 {`\u3000${item.body}`}
-                {item.failed && <><span className="text-night-dim">（送れませんでした）</span><button type="button" className="liff-hit text-night-mine" disabled={commentBusy} onClick={() => void sendComment(item)}>再送する</button></>}
+                {item.failed && <><span className="text-night-dim">（送れませんでした）</span><Button variant="nightText" type="button" disabled={commentBusy} onClick={() => void sendComment(item)}>再送する</Button></>}
               </>
             ) : (
               `${item.authorName}\u3000${item.body}`
@@ -479,13 +462,12 @@ export default function Webinar() {
 
       {ctaVisible && state.cta && (
         <div className="px-4 pb-2">
-          <button
+          <Button variant="nightAction"
             type="button"
             onClick={clickCta}
-            className="flex h-12 w-full items-center justify-center rounded-xl bg-night-cta text-[15px] font-bold text-white"
           >
             {state.cta.label}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -494,7 +476,7 @@ export default function Webinar() {
         // 板 (RpW2h) どおり下に 30 空ける (端末の下の帯の分を含む)。
         style={{ paddingBottom: 'max(1.875rem, env(safe-area-inset-bottom))' }}
       >
-        <input
+        <TextInput appearance="night" className="flex-1"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
@@ -505,17 +487,16 @@ export default function Webinar() {
           placeholder="コメントを書く"
           maxLength={500}
           aria-label="コメントを書く"
-          className="h-[42px] min-w-0 flex-1 rounded-full bg-night-panel px-4 text-[13px] text-white placeholder:text-night-dim"
         />
-        <button
+        <Button variant="nightSend"
           type="button"
           disabled={commentBusy || !input.trim()} onClick={() => void sendComment()}
-          aria-label="送信"
-          className="liff-hit flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-liff-primary text-white"
+          aria-label="送信する"
         >
           <Icon name="send" className="h-[18px] w-[18px]" />
-        </button>
+        </Button>
       </div>
+      <div className="px-4 pb-3"><FieldCount value={input} max={500} night /></div>
     </div>
   );
 }

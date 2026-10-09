@@ -1,3 +1,4 @@
+import { TextInput } from '../components/forms/controls.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { VISIT_STAMP_DEFAULT_COLOR, visitStampDarkInk } from '@line-crm/shared';
 import stampStyles from './VisitStamps.module.css';
@@ -115,10 +116,10 @@ function InfoRows({ rows }: { rows: Array<[string, string]> }) {
 
 function TextButton({ icon, children, onClick }: { icon?: 'camera'; children: string; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="liff-press mx-auto flex h-9 items-center justify-center gap-1.5 px-3.5 text-[13px] font-semibold text-liff-sub focus-visible:outline-2 focus-visible:outline-ink">
+    <Button variant="text" className="mx-auto" type="button" onClick={onClick}>
       {icon ? <Icon name={icon} className="h-4 w-4" /> : null}
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -284,17 +285,16 @@ export default function VisitStamps() {
             const selected = chosen?.id === r.id;
             return (
               <li key={r.id}>
-                <button
+                <Button variant="option" selected={selected}
                   type="button"
                   disabled={!ok}
                   onClick={() => setPicked(r.id)}
                   aria-pressed={ok ? selected : undefined}
-                  className={`flex w-full items-center gap-2.5 text-left disabled:cursor-default ${selected && info.usable.length > 1 ? 'font-semibold' : ''}`}
                 >
                   <span className="w-10 shrink-0 text-[13px] leading-5 font-semibold text-ink">{`${r.stamps}個`}</span>
                   <span className="min-w-0 flex-1 truncate text-sm leading-[21px] text-ink">{r.name}</span>
                   <span className="text-[13px] leading-5 text-liff-sub">{ok ? '使えます' : `あと ${r.stamps - wallet.balance}個`}</span>
-                </button>
+                </Button>
               </li>
             );
           })}
@@ -362,7 +362,7 @@ function ShowReward({ redemption, shopName, onBack, onUse }: {
                 </span>
               ))}
             </span>
-            <input
+            <TextInput appearance="pin"
               ref={input}
               aria-label="店員の暗証番号（4桁）"
               inputMode="numeric"
@@ -371,7 +371,6 @@ function ShowReward({ redemption, shopName, onBack, onUse }: {
               maxLength={4}
               value={pin}
               onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-              className="absolute inset-x-0 bottom-0 h-12 w-full cursor-text opacity-0"
             />
           </label>
           <p className="text-xs leading-[18px] text-liff-sub">お客さまご自身では使用済みにできません</p>
@@ -470,19 +469,19 @@ function PaperCard({ accountId, cardId, requests, onSent, onBack }: { accountId:
               </>
             )}
           </div>
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" className="sr-only" aria-label="紙のカードの写真"
+          <TextInput appearance="hidden" ref={fileRef} type="file" accept="image/*" capture="environment" aria-label="紙のカードの写真"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) { if (photo) URL.revokeObjectURL(photo.url); setPhoto({ file: f, url: URL.createObjectURL(f) }); setError(''); } e.target.value = ''; }} />
           {/* 絵の「撮り直す」は高さ36の枠のボタン（副ボタン 44 より低い）。 */}
-          <button type="button" onClick={() => fileRef.current?.click()} className="liff-press flex h-9 w-full items-center justify-center gap-1.5 rounded-(--liff-radius) border border-liff-line-strong bg-canvas px-3.5 text-[13px] font-semibold text-ink focus-visible:outline-2 focus-visible:outline-ink active:bg-liff-off-bg">
+          <Button variant="secondary" type="button" onClick={() => fileRef.current?.click()}>
             <Icon name="camera" className="h-4 w-4" />{photo ? '撮り直す' : '写真を撮る'}
-          </button>
+          </Button>
         </div>
         <div className="flex flex-col gap-2">
           <h2 className="text-sm leading-[21px] font-semibold text-ink">② 押してある数</h2>
           <div className="flex items-center gap-3">
-            <button type="button" aria-label="1個へらす" disabled={stamps <= 1} onClick={() => setStamps((n) => Math.max(1, n - 1))} className="liff-press flex h-9 w-9 items-center justify-center rounded-(--liff-radius) bg-canvas outline outline-liff-line disabled:opacity-40"><Icon name="minus" className="h-4 w-4" /></button>
+            <Button variant="icon" type="button" aria-label="1個へらす" disabled={stamps <= 1} onClick={() => setStamps((n) => Math.max(1, n - 1))}><Icon name="minus" className="h-4 w-4" /></Button>
             <span className="liff-num text-xl leading-[30px] font-bold text-ink" aria-live="polite">{`${stamps} 個`}</span>
-            <button type="button" aria-label="1個ふやす" disabled={stamps >= 100} onClick={() => setStamps((n) => Math.min(100, n + 1))} className="liff-press flex h-9 w-9 items-center justify-center rounded-(--liff-radius) bg-canvas outline outline-liff-line disabled:opacity-40"><Icon name="plus" className="h-4 w-4" /></button>
+            <Button variant="icon" type="button" aria-label="1個ふやす" disabled={stamps >= 100} onClick={() => setStamps((n) => Math.min(100, n + 1))}><Icon name="plus" className="h-4 w-4" /></Button>
           </div>
         </div>
         {error ? <p role="alert" className="text-[13px] leading-5 text-danger">{error}</p> : null}

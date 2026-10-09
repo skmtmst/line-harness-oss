@@ -36,7 +36,7 @@ function layout(): FormLayout {
         id: 's1',
         name: 'ご連絡先',
         blocks: [
-          { id: 'b1', kind: 'input', type: 'text', name: '名前', label: 'お名前', required: true, description: 'フルネームで' },
+          { id: 'b1', kind: 'input', type: 'text', name: '名前', label: 'お名前', required: true, description: 'フルネームで', placeholder: '例: 山田太郎', limit: { max: 20 } },
           { id: 'b2', kind: 'input', type: 'textarea', name: '要望', label: 'ご要望' },
           { id: 'b3', kind: 'input', type: 'prefecture', name: '県', label: 'お住まいの都道府県' },
           { id: 'b4', kind: 'input', type: 'rating', name: '対応', label: '担当の対応は？' },
@@ -67,6 +67,18 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe('監査 L12：欄名・説明・直しの文を入力と結ぶ', () => {
+  it('必要度の札と全角の入力例を出し、入力した文字数を上限付きで数える', async () => {
+    const name = await screen.findByRole('textbox', { name: 'お名前' });
+    expect(name.getAttribute('placeholder')).toBe('例：山田太郎');
+    expect(name.getAttribute('aria-required')).toBe('true');
+    expect(name.getAttribute('maxlength')).toBe('20');
+    expect(screen.getAllByText('必須')).toHaveLength(2);
+    expect(screen.getAllByText('任意')).toHaveLength(6);
+    expect(screen.getByText('0/20文字')).toBeTruthy();
+    fireEvent.change(name, { target: { value: 'あいうえおかきくけこさし' } });
+    expect(screen.getByText('12/20文字')).toBeTruthy();
+  });
+
   it('1つの入力で答える欄は欄名で呼べる', async () => {
     expect(await screen.findByRole('textbox', { name: /お名前/ })).toBeTruthy();
     expect(screen.getByRole('textbox', { name: 'ご要望' })).toBeTruthy();

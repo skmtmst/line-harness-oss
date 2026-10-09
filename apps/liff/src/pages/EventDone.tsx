@@ -18,7 +18,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog.js';
  * 上の帯と下の帯の間の真ん中に、丸・題・本文・申し込みの箱を置く。
  * 下の帯は「LINEに戻る」と「自分のイベントを見る」。
  * キャンセル待ちで、自分の待ち (GET /api/liff/events/me/waitlist) が見つかったときは、
- * 絵のとおり箱に「順番 N 番目」を足し、2つ目のボタンを「キャンセル待ちをやめる」にする
+ * 絵のとおり箱に「順番 N 番目」を足し、2つ目のボタンを「キャンセル待ちを取り消す」にする
  * (確認窓 → POST …/waitlist/:id/cancel → 自分のイベントへ)。見つからなければ今の形のまま。
  */
 export default function EventDone() {
@@ -140,7 +140,7 @@ export default function EventDone() {
         </Button>
         {waitEntry ? (
           <Button variant="secondary" onClick={() => setAskLeave(true)}>
-            キャンセル待ちをやめる
+            キャンセル待ちを取り消す
           </Button>
         ) : (
           <Button variant="secondary" onClick={goMine}>
@@ -152,8 +152,8 @@ export default function EventDone() {
       <ConfirmDialog
         open={askLeave}
         title="キャンセル待ちをやめますか"
-        description="やめると今の順番は戻りません。空きが出てもお知らせしません。"
-        confirmLabel="やめる"
+        description="取り消すと今の順番は戻りません。空きが出てもお知らせしません。"
+        confirmLabel="取り消す"
         cancelLabel="待ち続ける"
         destructive
         busy={leaving}
