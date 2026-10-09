@@ -32,7 +32,7 @@ test('情報欄・対応マーク・共通情報を更新し、テキストと�
   expect(again.failedEffects).toEqual([]); expect(pushText).toHaveBeenCalledTimes(2);
   expect(db.raw.prepare('SELECT value FROM common_vars').get()).toEqual({ value: '1' });
 });
-test('送信経路がないとき・イベントの日時が決まらないときは完了と偽らない', async () => {
+test('送信経路がないとき・使えないイベントのときは完了と偽らない', async () => {
   const layout = emptyLayout(); layout.options.afterActions = [action('send_message', { content: '本文' }), action('event_booking', { eventId: 'event1' })];
   const result = await applyFormLayoutEffects({ db: db.db, formId: 'form1', friendId: 'f1', layout, answers: {} });
   expect(result.failedEffects).toEqual(['afterAction:0', 'afterAction:1']);

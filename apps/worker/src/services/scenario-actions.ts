@@ -22,6 +22,7 @@ import {
   validateFriendFieldValue,
   type PinnedScenarioAction,
 } from '@line-crm/db'
+import { runEventBookingAction, validEventBookingAction } from './event-booking-action.js'
 import { matchesCondition, parseCondition } from './segment-query.js'
 
 export type ScenarioActionHook = 'step_sent' | 'scenario_completed' | 'choice_selected'
@@ -64,6 +65,8 @@ export interface RunActionRowsOptions {
    * - `pinned` … scenario_pinned_action_fires（版固定の実行用。live 行が消えても書ける）
    */
   fires?: 'live' | 'pinned'
+  /** 呼び出し元の工程キー。同じイベントの再送では予約を増やさない。 */
+  sourceEventId?: string
   /**
    * シナリオの LINE 公式アカウント。タグ・テンプレート・遷移先が別の
    * アカウントのものなら実行しない。null は共通シナリオ（確かめない）。
@@ -149,7 +152,7 @@ export function isScenarioActionComplete(actionType: string, config: unknown): b
     case 'reminder':
       return typeof c.reminderId === 'string' && c.reminderId !== ''
     case 'event_booking':
-      return typeof c.eventId === 'string' && c.eventId !== ''
+      return validEventBookingAction(c)
     default:
       return false
   }
@@ -486,9 +489,18 @@ async function executeAction(
       return false
     }
 
+    case 'event_booking': {
+      if(!validEventBookingAction(config)) throw new Error('イベントの設定が不完全です');
+      // 「1回だけ」は確認と実行の間に並走しても同じ受付キーを使う。
+      // 公開版では下書き時のaction keyを保ち、版が変わっても重ねて申し込まない。
+      const effectKey = action.repeat_on_refire === 0
+        ? `once:${action.fires_key ?? action.id}`
+        : `${options.sourceEventId ?? crypto.randomUUID()}:${action.id}`;
+      await runEventBookingAction(db,config,friendId,effectKey);
+      return false;
+    }
     case 'send_message':
     case 'reminder':
-    case 'event_booking':
       console.info(`[scenario-actions] deferred action=${action.id} type=${action.action_type} friend=${friendId}`)
       return false
 

@@ -2,6 +2,7 @@ import { getBroadcastMessageAsset, getFriendFieldByIdForScope, getSupportMarkByI
 import { DEFAULT_TENANT_ID, layoutToFields, researchFormLayout, type FormAction, type ResearchGate } from '@line-crm/shared';
 import { isScenarioActionComplete, runActionRows, type ScenarioActionRow } from './scenario-actions.js';
 import { runAutoReplyAction, validateAutoReplyOperatorAction, type AutoReplyExecutionAction } from './auto-reply-operator-action.js';
+import { runEventBookingAction } from './event-booking-action.js';
 import type { Env } from '../index.js';
 
 async function researchBelongsToAccount(db: D1Database, ownerId: string | null, accountId: string | null): Promise<boolean> {
@@ -17,7 +18,6 @@ export async function ensureResearchForm(db: D1Database, assetId: string, accoun
   if (!asset || asset.kind !== 'research' || asset.published_version < 1 || !await researchBelongsToAccount(db, asset.line_account_id, accountId)) throw new Error('RESEARCH_NOT_FOUND');
   const layout = researchFormLayout(asset.id, asset.published_version, asset.name, JSON.parse(asset.payload_json));
   for (const action of layout.options.afterActions ?? []) {
-    if (action.kind === 'research_action' && action.actionType === 'event_booking') throw new Error('イベント予約操作は、日時の選び方を確認するまで実行できません');
     if (action.kind === 'research_action' && action.actionType !== 'notify_staff' && !isScenarioActionComplete(action.actionType, action.config)) throw new Error('回答後に行うことの設定を完成させてください');
   }
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([asset.id, asset.published_version, accountId])));
@@ -54,6 +54,7 @@ export async function runResearchAnswerAction(db: D1Database, action: Extract<Fo
   const friend = await db.prepare('SELECT line_account_id FROM friends WHERE id = ?').bind(friendId).first<{ line_account_id: string | null }>();
   if (!friend?.line_account_id) throw new Error('回答者のアカウントを確認できませんでした');
   await validateResearchActionScope(db, action, friend.line_account_id);
+  if(action.actionType==='event_booking') { await runEventBookingAction(db,action.config as unknown as import('./event-booking-action.js').EventBookingActionConfig,friendId,effectKey); return; }
   const row: AutoReplyExecutionAction = {
     id: effectKey, scenario_id: '', hook: 'choice_selected', step_id: null, choice_index: null,
     sort_order: 0, action_type: action.actionType, config_json: JSON.stringify(action.config), condition_json: null, repeat_on_refire: 1,
@@ -94,6 +95,10 @@ export async function validateResearchActionScope(db: D1Database, action: Extrac
     case 'scenario': if (c.scenarioId) await requireResource('scenarios', c.scenarioId); break;
     case 'send_template': await requireResource('templates', c.templateId, true); break;
     case 'reminder': await requireResource('reminders', c.reminderId); break;
-    case 'event_booking': throw new Error('イベント予約操作は、日時の選び方を確認するまで実行できません');
+    case 'event_booking': {
+      const row=await db.prepare(`SELECT id FROM events WHERE id=? AND deleted_at IS NULL AND ((target_type='single' AND line_account_id=?) OR (target_type='multi-account-dedup' AND EXISTS(SELECT 1 FROM json_each(account_ids) WHERE value=?)))`).bind(String(c.eventId),accountId,accountId).first();
+      if(!row) throw new Error('このアカウントで使えるイベントを選んでください');
+      break;
+    }
   }
 }
