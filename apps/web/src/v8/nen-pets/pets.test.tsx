@@ -189,7 +189,7 @@ describe('V8 マイペット（src/v8/nen-pets）', () => {
     await click(byLabel('「こむぎ」の操作'))
     expect(byText('ペットの情報を直す')).toBeFalsy()
     expect(byText('飼い主を開く')).toBeTruthy()
-    expect(buttons().some((b) => b.textContent?.includes('CSV で書き出す'))).toBe(true)
+    expect(buttons().some((b) => b.textContent?.includes('CSVで書き出す'))).toBe(true)
     await act(async () => { root.render(<PetsV8 accountId="acc-1" tab="feeding" onChangeTab={() => {}} />) })
     await settle()
     for (const text of ['既定にする', 'これを使う', '＋ 主食を追加する', '＋ 然の商品を追加する', '保存する', 'キャンセル']) {

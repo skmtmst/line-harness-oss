@@ -53,6 +53,7 @@ import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import { formatDateTime } from '@/lib/format'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
 
 type Channel = { email: boolean; line: boolean }
 type CopyableAccessUser = AccessUserItem & { roleBundle: Exclude<AccessRoleBundle, 'custom'> }
@@ -136,7 +137,7 @@ function downloadAuditCsv(rows: AuditEventItem[]): void {
   const url = URL.createObjectURL(new Blob([`\uFEFF${body}`], { type: 'text/csv;charset=utf-8' }))
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = 'access-audit.csv'
+  anchor.download = csvFileName("権限の履歴")
   anchor.click()
   URL.revokeObjectURL(url)
 }

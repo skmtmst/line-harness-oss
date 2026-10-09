@@ -30,6 +30,7 @@ import { csvExportLine } from '../list/csv-export'
 import { ExecuteConfirmDialog, MigrationItemDialog, RollbackConfirmDialog, runStatusView } from './uid-dialogs'
 import { classLabel, decisionLabel, formatMappingBytes, ITEM_PAGE_SIZE, MIGRATION_STEPS, useUidMigration, type ItemClassification } from './use-uid-migration'
 import styles from './migrations.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 const PRE_EXECUTE = ['dry_run', 'review', 'ready']
 
@@ -84,7 +85,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `uid-migration-${active.id}.csv`
+    anchor.download = csvFileName("UID移行")
     anchor.click()
     URL.revokeObjectURL(url)
   }

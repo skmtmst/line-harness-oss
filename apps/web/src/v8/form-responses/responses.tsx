@@ -37,6 +37,7 @@ import {
 } from './summary'
 import styles from './responses.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { csvFileName } from '@/lib/csv-file-name'
 
 type Submission = {
   id: string
@@ -285,7 +286,7 @@ function Responses() {
       } while (all.length < expected && currentPage <= 1001)
       if (all.length < expected) throw new Error('export_incomplete')
       const keys = [...new Set([...fieldKeys, ...all.flatMap((item) => Object.keys(item.data as Record<string, unknown>))])]
-      saveCsv(`${form.name}-回答.csv`, all, keys, labels)
+      saveCsv(csvFileName("フォーム回答"), all, keys, labels)
     } catch (caught) {
       setExportError(caught instanceof Error && caught.message === 'export_too_many'
         ? `回答が一度に書き出せる上限（${formatNumber(MAX_EXPORT_ROWS)}件）を超えています。`

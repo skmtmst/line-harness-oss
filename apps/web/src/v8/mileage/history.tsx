@@ -44,6 +44,7 @@ import { MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import styles from './mileage.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { csvFileName } from '@/lib/csv-file-name'
 
 function viewName(item: MileageAdminHistoryItem) {
   return item.displayName || '名前未取得'
@@ -189,7 +190,7 @@ export default function HistoryTab() {
       const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `mileage-history-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = csvFileName("マイル履歴")
       anchor.click()
       URL.revokeObjectURL(url)
     } catch {
@@ -446,7 +447,7 @@ export default function HistoryTab() {
       help="行を押すと、その友だちのマイルの詳細を開きます。「増やす・減らす」は理由を書いて明細を足します（オーナー・管理者だけ）。"
       actions={<div className={styles.headActions}>
         <Button onClick={exportCsv} disabled={!canExport}>
-          <Download size={15} aria-hidden="true" /> CSV で書き出す
+          <Download size={15} aria-hidden="true" /> CSVで書き出す
         </Button>
         {/* 閲覧のみの人には出さない。 */}
         {!readonly ? (

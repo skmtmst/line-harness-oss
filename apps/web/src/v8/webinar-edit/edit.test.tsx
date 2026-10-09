@@ -158,7 +158,7 @@ describe('V8 ウェビナーの編集', () => {
     expect(host.textContent).toContain('見ていない・見逃し案内の対象')
     const chat = host.querySelector('a[href="/chats?friend=f-1"]')
     expect(chat?.textContent).toContain('チャットを見る')
-    expect(buttonText('CSV で書き出す')).toBeTruthy()
+    expect(buttonText('CSVで書き出す')).toBeTruthy()
   })
 
   it('分析のフォーム送信はAPIの重複を除いた人数として帯と棒の両方に表示する', async () => {

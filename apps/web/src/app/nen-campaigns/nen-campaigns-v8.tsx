@@ -56,6 +56,7 @@ import {
   type NenTab,
 } from './nen-overview'
 import styles from './nen-campaigns-v8.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 /** 板ごとの data-design-node（札で切り替える外枠の印）。 */
 const BOARD_NODE: Record<NenTab, string> = {
@@ -72,7 +73,7 @@ const TAB_LABEL: Record<NenTab, string> = {
   history: '送った履歴',
 }
 
-/* 自動配信のCSV（MuhWR の「CSV で書き出す」。一覧に出ている決めごとをそのまま出す）。 */
+/* 自動配信のCSV（MuhWR の「CSVで書き出す」。一覧に出ている決めごとをそのまま出す）。 */
 function autoSettingsToCsv(settings: NenCampaignSetting[], sentByKey: Map<string, number>): string {
   const header = ['配信名', 'きっかけ', '対象', '状態', '今月送信（通）']
   const lines = settings.map((setting) => [
@@ -106,7 +107,7 @@ export default function NenCampaignsV8(props: NenOverviewProps) {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `nen-auto-${new Date().toISOString().slice(0, 10)}.csv`
+      a.download = csvFileName("NEN配信")
       a.click()
       URL.revokeObjectURL(url)
     } finally {

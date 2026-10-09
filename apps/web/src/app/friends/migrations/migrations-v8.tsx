@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 CSV で書き出す・取り込む（Pencil `T9gblG`、状態 `SXCb3`）。
+ * ★V8 CSVで書き出す・取り込む（Pencil `T9gblG`、状態 `SXCb3`）。
  *
  * 手順と API は v7 と同じ `useFriendMigrations`。違いは見せ方——
  * 「← 友だち一覧 › データ管理 › CSVで書き出す・取り込む」と

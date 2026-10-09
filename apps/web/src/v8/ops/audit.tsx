@@ -14,6 +14,7 @@ import Pagination from '@/components/shared/pagination'
 import { OpsHead } from './shell'
 import parts from './parts.module.css'
 import styles from './audit.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 /**
  * 運営の監査ログ V8（絵 `e7ljE`）。
@@ -105,7 +106,7 @@ export default function OpsAuditV8() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `musubo-audit-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = csvFileName("運営の操作履歴")
     a.click()
     URL.revokeObjectURL(url)
     setExportNote(truncated
@@ -124,7 +125,7 @@ export default function OpsAuditV8() {
         environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
         actions={(
           <Button onClick={() => void exportCsv()} disabled={exporting || total === 0} busy={exporting} busyLabel="書き出しています…">
-            <Download aria-hidden="true" />CSV で書き出す
+            <Download aria-hidden="true" />CSVで書き出す
           </Button>
         )}
       />

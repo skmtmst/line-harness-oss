@@ -44,6 +44,7 @@ import {
 } from './helpers'
 import type { DetailChrome, EditContext } from './types'
 import styles from './participants.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 type LoadState = 'loading' | 'ready' | 'error' | 'denied'
 
@@ -81,7 +82,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
     const request = generation.current
     setCsvBusy(true)
     setCsvError('')
-    void downloadApiFile(webinarApi.participantsCsvUrl(webinar.id, filter || undefined), 'webinar-participants.csv')
+    void downloadApiFile(webinarApi.participantsCsvUrl(webinar.id, filter || undefined), csvFileName("動画セミナー参加者"))
       .catch(() => { if (request === generation.current) setCsvError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。') })
       .finally(() => { csvLock.current = false; setCsvBusy(false) })
   }, [webinar.id, filter])
@@ -223,7 +224,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   }
 
   const csvButton = state === 'ready'
-    ? <Button onClick={downloadCsv} disabled={csvBusy} busy={csvBusy} busyLabel="書き出しています…"><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
+    ? <Button onClick={downloadCsv} disabled={csvBusy} busy={csvBusy} busyLabel="書き出しています…"><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
     : null
 
   return (

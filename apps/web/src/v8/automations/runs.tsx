@@ -41,6 +41,7 @@ import {
 } from './shell'
 import styles from './runs.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
 
 type RunStatus = AutomationRunDetail['status']
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
@@ -364,7 +365,7 @@ export default function AutomationRunsV8() {
       search: query.trim() || undefined,
       status: resultFilter !== 'all' ? resultFilter : undefined,
       includeTest,
-    }), 'automation-runs.csv')
+    }), csvFileName("オートメーションの実行履歴"))
       .then((result) => {
         if (result.truncated && result.totalCount !== null) {
           const rest = result.totalCount - (result.returnedCount ?? 0)
@@ -585,7 +586,7 @@ export default function AutomationRunsV8() {
       title="オートメーション"
 
       actions={canExport
-        ? <Button onClick={downloadRunsCsv} disabled={csvBusy} busy={csvBusy} busyLabel="書き出しています…" title="いまの検索・絞り込みの行が出ます（5,000件まで）"><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
+        ? <Button onClick={downloadRunsCsv} disabled={csvBusy} busy={csvBusy} busyLabel="書き出しています…" title="いまの検索・絞り込みの行が出ます（5,000件まで）"><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
         : undefined}
       tabs={<AutomationTabs active="runs" counts={tabCounts} />}
       stats={<AutomationBand label="動いた記録の数の帯" cells={cells} />}

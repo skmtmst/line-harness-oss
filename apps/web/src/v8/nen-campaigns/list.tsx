@@ -80,6 +80,7 @@ import {
 import StatusBadge from '@/components/shared/status-badge'
 import styles from './list.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
 
 export type { NenTab } from './display'
 
@@ -220,11 +221,11 @@ export default function NenCampaignsList(props: NenCampaignsListProps) {
   )
   const tabError = props.tabError ?? ''
 
-  const exportCsv = () => downloadCsv(autoSettingsToCsv(autoSettings, sentByKey), `nen-auto-${new Date().toISOString().slice(0, 10)}.csv`)
+  const exportCsv = () => downloadCsv(autoSettingsToCsv(autoSettings, sentByKey), csvFileName("NEN配信"))
 
   const actions = tab === 'columns'
     ? (canEdit ? <Button href="/nen-campaigns/columns/new"><PenLine size={15} aria-hidden="true" />コラムを書く</Button> : null)
-    : <Button type="button" onClick={exportCsv} disabled={autoSettings.length === 0}><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
+    : <Button type="button" onClick={exportCsv} disabled={autoSettings.length === 0}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
 
   // 取れていないタブの件数に 0 を出さない。
   const countLabel = (base: string, count: number) => (tabError || (loading && settings.length === 0) ? base : `${base} ${count}`)

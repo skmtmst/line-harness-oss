@@ -42,6 +42,7 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
 import styles from './runs.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
 
 /* 再実行・一時停止は owner/admin だけ（R530・再実行POST・停止口の requireRole と同じ境目）。 */
 const NO_MANAGE_NOTE = '閲覧のみで見ています。再実行・一時停止はオーナーと管理者だけができます。実行結果の確認と書き出しはこのまま使えます。'
@@ -330,7 +331,7 @@ export default function AutoReplyRunsV8() {
       const url = URL.createObjectURL(new Blob([csvFor(rows)], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `auto-reply-runs${requestedRuleId ? `-${requestedRuleId}` : ''}.csv`
+      anchor.download = csvFileName("自動応答の実行履歴")
       anchor.click()
       URL.revokeObjectURL(url)
       setActionMessage(

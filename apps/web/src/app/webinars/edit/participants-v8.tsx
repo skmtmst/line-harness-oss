@@ -27,6 +27,7 @@ import {
   percent,
   type ParticipantRow,
 } from './participants-shared'
+import { csvFileName } from '@/lib/csv-file-name'
 
 export type ParticipantExport = { download: () => void; busy: boolean; available: boolean }
 
@@ -108,7 +109,7 @@ export default function ParticipantsV8({
     const request = generation.current
     setCsvBusy(true)
     setCsvError('')
-    void downloadApiFile(webinarApi.participantsCsvUrl(webinarId, selected), 'webinar-participants.csv')
+    void downloadApiFile(webinarApi.participantsCsvUrl(webinarId, selected), csvFileName("動画セミナー"))
       .catch(() => { if (request === generation.current) setCsvError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。') })
       .finally(() => { csvLock.current = false; setCsvBusy(false) })
   }, [webinarId])

@@ -38,6 +38,7 @@ import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { PageHeading } from '@/components/templates/page-frame'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
 
 const n = (value: number) => value.toLocaleString('ja-JP')
 /** 開いた・押した・反応（API-18）。店の計測がまだ取れていない（null）は「—」。 */
@@ -398,7 +399,7 @@ export default function HqBroadcastDetail() {
     if (!run || exporting) return
     setExporting(true); setError('')
     try {
-      await downloadApiFile(hqBroadcastsApi.exportPath(run.id), `一括配信-${run.title}.csv`)
+      await downloadApiFile(hqBroadcastsApi.exportPath(run.id), csvFileName("一括配信"))
     } catch (caught) {
       setError(errorText(caught, 'CSVを書き出せませんでした。もう一度お試しください。'))
     } finally {

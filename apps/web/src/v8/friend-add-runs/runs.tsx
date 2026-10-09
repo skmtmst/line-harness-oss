@@ -42,6 +42,7 @@ import { describeFriendAddFailure } from '@/v8/friend-add/failure'
 import { useCursorStack } from '@/v8/friend-add/use-cursor-stack'
 import { csvCell, elapsedText, formatJstDateTime, jstTime, routingAction, routingLabel } from './status'
 import styles from './runs.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 type KindFilter = 'all' | FriendAddEventKind
 type AttributionFilter = 'all' | FriendAddEventAttributionStatus
@@ -370,7 +371,7 @@ function FriendAddRunsInner() {
       const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = 'friend-add-runs.csv'
+      anchor.download = csvFileName("友だち追加の実行履歴")
       anchor.click()
       URL.revokeObjectURL(url)
       setMessage(exportCursor

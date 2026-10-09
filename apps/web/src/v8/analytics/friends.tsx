@@ -32,6 +32,7 @@ import {
 } from './parts'
 import styles from './analytics.module.css'
 import { useReportPeriod } from '@/components/shared/period-picker'
+import { csvFileName } from '@/lib/csv-file-name'
 
 type Day = AnalyticsFriendsOverview['data']['days'][number]
 type Campaign = AnalyticsFriendsOverview['data']['campaigns'][number]
@@ -89,7 +90,7 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
   const daysShown = overview !== null && (overview.state === 'available' || overview.state === 'partial')
   const exportCsv = () => {
     if (!overview) return
-    downloadCsv('analytics-friends.csv', [['日付', '増えた', '減った', '差し引き'], ...overview.days.map((day) => [day.date, day.added, day.removed, day.net])])
+    downloadCsv(csvFileName("友だち分析"), [['日付', '増えた', '減った', '差し引き'], ...overview.days.map((day) => [day.date, day.added, day.removed, day.net])])
   }
   useRegisterExport(exportCsv, !daysShown)
 
@@ -107,7 +108,7 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
   const pendingReason = overview.stateReason ?? '日ごとの集計がまだありません'
   const selectedDay = overview.days.find((day) => day.date === selectedDate) ?? null
   const caption = periodCaption(state.data.period.from, state.data.period.to, state.data.dataCutoffAt)
-  const menu = (title: string) => <KpiMenu title={title} label="日ごとの数を CSV で書き出す" onExport={exportCsv} disabled={!daysShown} />
+  const menu = (title: string) => <KpiMenu title={title} label="日ごとの数を CSVで書き出す" onExport={exportCsv} disabled={!daysShown} />
 
   return <>
     <KpiBand className={styles.band}>

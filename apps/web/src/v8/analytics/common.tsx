@@ -14,7 +14,7 @@ import styles from './analytics.module.css'
 export const RangePickerV8 = PeriodPicker
 
 /** 数の帯の「…」。この見かたで使える操作だけ（いまは CSV の書き出し）。 */
-export function KpiMenu({ title, label = 'CSV で書き出す', onExport, disabled }: { title: string; label?: string; onExport: () => void; disabled: boolean }) {
+export function KpiMenu({ title, label = 'CSVで書き出す', onExport, disabled }: { title: string; label?: string; onExport: () => void; disabled: boolean }) {
   return <span className={styles.kpiMenu}>
     <RowMenu className={styles.kpiMenuButton} label={`${title}の操作`} items={[{ id: 'csv', label, disabled, onSelect: onExport }]} />
   </span>

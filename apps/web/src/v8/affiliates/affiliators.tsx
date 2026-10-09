@@ -63,6 +63,7 @@ import {
   ToolbarNotices,
 } from './parts'
 import styles from './affiliates.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 type FilterKey = 'active' | 'reward'
 type SortKey = 'conversions' | 'reward' | 'name' | 'newest'
@@ -355,7 +356,7 @@ export default function AffiliatorsTab() {
   }, [bulkTargets, bulkBusy, loadList])
 
   const exportCsv = () => {
-    downloadCsv(`affiliates-${new Date().toISOString().slice(0, 10)}.csv`, [
+    downloadCsv(csvFileName("アフィリエイター"), [
       ['名前', '紹介コード', '紹介リンク数', '友だち追加', '成果', '承認済み報酬'],
       ...shownRows.map((row) => [row.name, row.code, row.linkCount, row.friendAdds, row.totalConversions, Math.round(row.rewardAmount)]),
     ])
@@ -624,7 +625,7 @@ export default function AffiliatorsTab() {
     <AffiliateFrame
       actions={
         <Button onClick={exportCsv} disabled={shownRows.length === 0}>
-          <Download size={15} aria-hidden="true" /> CSV で書き出す
+          <Download size={15} aria-hidden="true" /> CSVで書き出す
         </Button>
       }
       stats={stats}

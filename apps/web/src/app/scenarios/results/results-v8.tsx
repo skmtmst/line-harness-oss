@@ -34,6 +34,7 @@ import { scenarioReferenceData } from '@/components/scenarios/scenario-reference
 import { FriendPlanDialog } from '@/components/scenarios/scenario-dialogs'
 import { shortDateTime } from '@/lib/hq-banners'
 import { formatNumber } from '@/lib/format'
+import { csvFileName } from '@/lib/csv-file-name'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -283,7 +284,7 @@ export default function ScenarioResultsV8() {
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `scenario-results-${id}.csv`
+    anchor.download = csvFileName("シナリオ配信の結果")
     anchor.click()
     URL.revokeObjectURL(url)
   }

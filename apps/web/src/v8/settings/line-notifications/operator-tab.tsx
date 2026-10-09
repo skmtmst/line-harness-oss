@@ -30,6 +30,7 @@ import { ApiError, api, type OperatorNotificationRule } from '@/lib/api'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { EVENT_OPTIONS } from '../../line-notifications/operator-words'
 import styles from './screen.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 type LoadState = 'loading' | 'ready' | 'error' | 'forbidden'
 type DraftConditions = { recipientLabel?: string; scheduleLabel?: string }
@@ -148,7 +149,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `operator-notifications-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = csvFileName("担当者へのお知らせ")
       anchor.click()
       URL.revokeObjectURL(url)
       setNotice({ text: '実行記録をCSVで書き出しました。', error: false })
@@ -240,7 +241,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
 
     <ConfirmDialog
       open={exportOpen && canManage}
-      title="CSVを書き出す理由"
+      title="CSVで書き出す理由"
       description="個人情報を含むため、確認した目的を記録します。"
       confirmLabel="書き出す"
       busy={busy === 'csv'}

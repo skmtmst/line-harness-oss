@@ -18,6 +18,7 @@ import { KpiMenu, RangePickerV8, dataRangeCaption, shortDateTime } from './commo
 import { METRIC_STATE_TEXT, downloadCsv, metricText, rangeFor, shownValue, useOverview, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
 import { useReportPeriod } from '@/components/shared/period-picker'
+import { csvFileName } from '@/lib/csv-file-name'
 
 /** 表の数。集計待ち・取得できない数は 0 にせず「—」と理由（title）。 */
 export function MetricText({ metric, percent, currency }: { metric: AnalyticsMetric<number | string>; percent?: boolean; currency?: boolean }) {
@@ -41,7 +42,7 @@ export default function ReactionsV8({ accountId }: { accountId: string }) {
   ].filter(Boolean).join('・') : ''
   const exportCampaigns = () => {
     if (!overview) return
-    downloadCsv('analytics-reactions.csv', [
+    downloadCsv(csvFileName("反応"), [
       ['配信', '種類', '送った日時', '対象', '到達', '送信通数', '開封', 'LINEクリック', '成果'],
       ...overview.campaigns.map((item) => [
         item.name, item.kind === 'broadcast' ? '一斉配信' : 'シナリオ', item.sentAt,
@@ -82,7 +83,7 @@ export default function ReactionsV8({ accountId }: { accountId: string }) {
         <RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} />
         <span className={styles.caption} title={`データ締切 ${state.data.dataCutoffAt}`}>{dataRangeCaption(state.data.period.from, state.data.period.to, state.data.dataCutoffAt)}</span>
         <span className={styles.spacer} />
-        <Button variant="secondary" onClick={exportCampaigns} disabled={exportDisabled}><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
+        <Button variant="secondary" onClick={exportCampaigns} disabled={exportDisabled}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
       </div>
       <p className={styles.caption}>配信ごとの開かれ方・押され方です。20人未満など取得できない数は、0ではなく「—」と理由で示します。{truncationNote ? ` ${truncationNote}までを表示しています。それより古い配信は一覧にも CSV にも入りません。` : ''}</p>
       <div className={styles.table} role="table" aria-label="配信ごとの反応">

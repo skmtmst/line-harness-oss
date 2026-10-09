@@ -25,6 +25,7 @@ import PetsListV8 from './list'
 import FeedingV8 from './feeding'
 import { EMPTY_QUERY, downloadCsv, petsToCsv, type PetTab, type PetsQuery } from './parts'
 import styles from './pets.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 export type { PetTab } from './parts'
 
@@ -80,7 +81,7 @@ export default function PetsV8({
     try {
       const res = await nenPetsApi.pets(accountId, { ...query, pageSize: 'all' })
       if (!res.success) throw new Error(res.error)
-      downloadCsv(petsToCsv(res.data.items), `nen-pets-${new Date().toISOString().slice(0, 10)}.csv`)
+      downloadCsv(petsToCsv(res.data.items), csvFileName("ペット"))
     } catch {
       setExportError(true)
     } finally {
@@ -125,7 +126,7 @@ export default function PetsV8({
       help="お客さまがマイページで登録したペットです。体重と主食から、1日のごはんの目安を出します。"
       actions={accountId ? (
         <Button type="button" onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています…">
-          <Download size={15} aria-hidden="true" />CSV で書き出す
+          <Download size={15} aria-hidden="true" />CSVで書き出す
         </Button>
       ) : null}
       tabs={tabs}
@@ -147,12 +148,12 @@ export default function PetsV8({
   )
 }
 
-/** 数の帯の「…」。この画面で使える操作（いまの絞り込みで CSV を書き出す）。 */
+/** 数の帯の「…」。この画面で使える操作（いまの絞り込みで CSVで書き出す）。 */
 function KpiMenu({ title, busy, onExport }: { title: string; busy: boolean; onExport: () => void }) {
   const [open, setOpen] = useState(false)
   return (
     <span className={styles.kpiMenu}>
-      <RowMenu className={styles.kpiMenuButton} label={`${title}のメニュー`} open={open} onOpenChange={setOpen} items={[{ id: 'csv', label: 'CSV で書き出す', disabled: busy, onSelect: () => { setOpen(false); onExport() } }]} />
+      <RowMenu className={styles.kpiMenuButton} label={`${title}のメニュー`} open={open} onOpenChange={setOpen} items={[{ id: 'csv', label: 'CSVで書き出す', disabled: busy, onSelect: () => { setOpen(false); onExport() } }]} />
     </span>
   )
 }

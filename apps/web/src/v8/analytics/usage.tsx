@@ -24,6 +24,7 @@ import { MetricText } from './reactions'
 import { METRIC_STATE_TEXT, downloadCsv, metricCardState, metricText, periodCaption, rangeFor, shownValue, useOverview, useRegisterExport, formatAnalyticsDateTime } from './parts'
 import styles from './analytics.module.css'
 import { useReportPeriod } from '@/components/shared/period-picker'
+import { csvFileName } from '@/lib/csv-file-name'
 
 type Category = AnalyticsUsageOverview['data']['categories'][number]
 
@@ -80,7 +81,7 @@ export default function UsageV8({ accountId }: { accountId: string }) {
   const overview = state.data?.data ?? null
   const exportUsage = () => {
     if (!overview) return
-    downloadCsv('analytics-usage.csv', [
+    downloadCsv(csvFileName("使われ方"), [
       ['機能', '作成', '利用中', '未使用', '最終利用', '気づいたこと', '参照の状態'],
       ...overview.categories.map((item) => [item.label, shownValue(item.created), shownValue(item.inUse), shownValue(item.unused), item.lastUsedAt.value, usageObservation(item).text, referenceHealthText(item.brokenReferences)]),
     ])

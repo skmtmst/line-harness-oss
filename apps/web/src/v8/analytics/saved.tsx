@@ -22,6 +22,7 @@ import { formatNumber } from '@/lib/format'
 import { KpiMenu, StatePill, shortDateTime, shortDay } from './common'
 import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 const SAVED_STATE_LABELS: Record<SavedAnalyticsSnapshot['state'], string> = { available: '利用可能', partial: '一部集計', unavailable: '未取得', failed: '失敗' }
 const REPORT_STATUS_LABELS: Record<AnalyticsReportSchedule['status'], string> = { active: '有効', paused: '停止中', archived: 'アーカイブ' }
@@ -197,7 +198,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
   }, [visibleItems, selectedId])
   // 「定義が古い」は版ずれだけを数える（未取得・失敗とは別の軸）。
   const staleCount = items.filter((item) => item.latestSnapshot?.definitionStale).length
-  const exportSaved = () => downloadCsv('analytics-saved.csv', [
+  const exportSaved = () => downloadCsv(csvFileName("保存したレポート"), [
     ['分析名', '種類', '作った人', '定義版', '更新日時', '集計状態', '保存結果数'],
     ...visibleItems.map((item) => [
       item.name, kindLabel(item.kind), item.createdByName, item.currentVersionNumber, item.updatedAt,
@@ -207,7 +208,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
   ])
   const exportSnapshots = () => {
     if (!selected) return
-    downloadCsv(`analytics-saved-${selected.id}.csv`, [
+    downloadCsv(csvFileName("保存したレポート"), [
       ['対象期間', 'データ締切', '集計状態', '結果の要約'],
       ...snapshots.map((snapshot) => [
         `${snapshot.periodFrom}〜${snapshot.periodTo}`, snapshot.dataCutoffAt, SAVED_STATE_LABELS[snapshot.state],
@@ -283,7 +284,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
                 </div>)}
               </div>}
             {selected ? <div className={styles.rowActions} data-gap="wide">
-              <Button variant="secondary" disabled={snapshots.length === 0} onClick={exportSnapshots}><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
+              <Button variant="secondary" disabled={snapshots.length === 0} onClick={exportSnapshots}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
               {canManage ? <Button variant="secondary" href={`/analytics?tab=${selected.kind}`} title="条件を変えるときは、元の分析で集計し直してから保存します"><FilePen size={15} aria-hidden="true" />内容を変える</Button> : null}
             </div> : null}
             <p className={styles.caption}>保存時点の固定結果です。いま集計し直しても変わりません。</p>

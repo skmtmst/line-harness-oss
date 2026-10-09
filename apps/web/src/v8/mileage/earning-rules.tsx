@@ -55,6 +55,7 @@ import {
 import { CreateButton, MileageFrame, useMileageShell } from './frame'
 import { notifyToast } from '@/components/shared/toast'
 import styles from './mileage.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 const EVENT_LABELS: Record<string, string> = {
   friend_added: '友だち追加',
@@ -305,7 +306,7 @@ export default function EarningRulesTab() {
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `mileage-earning-rules-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = csvFileName("マイルの獲得ルール")
       anchor.click()
       URL.revokeObjectURL(url)
     } catch {
@@ -904,7 +905,7 @@ export default function EarningRulesTab() {
       help="行の「…」から 編集・止める・複製・この決めごとの履歴を見る。"
       actions={
         <Button onClick={() => void exportCsv()} disabled={exporting || rules.length === 0}>
-          <Download size={15} aria-hidden="true" /> CSV で書き出す
+          <Download size={15} aria-hidden="true" /> CSVで書き出す
         </Button>
       }
       stats={stats}

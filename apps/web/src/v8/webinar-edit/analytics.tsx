@@ -23,6 +23,7 @@ import { fmtSec, percent, thisMonthReservations } from './helpers'
 import type { DetailChrome, EditContext } from './types'
 import styles from './analytics.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
 
 export default function AnalyticsPane({ ctx, chrome }: { ctx: EditContext; chrome: DetailChrome }) {
   const { webinar, analytics, analyticsState } = ctx
@@ -53,7 +54,7 @@ export default function AnalyticsPane({ ctx, chrome }: { ctx: EditContext; chrom
     locked.current = true
     setBusy(true)
     setError('')
-    void downloadApiFile(webinarApi.participantsCsvUrl(webinar.id), 'webinar-participants.csv').catch((cause) => {
+    void downloadApiFile(webinarApi.participantsCsvUrl(webinar.id), csvFileName("動画セミナー参加者")).catch((cause) => {
       if (request !== generation.current) return
       if (cause instanceof ApiError && cause.status === 403) {
         setPermission('denied')
@@ -66,7 +67,7 @@ export default function AnalyticsPane({ ctx, chrome }: { ctx: EditContext; chrom
   }, [permission, webinar.id])
 
   const csvButton = permission === 'ready' && analyticsState === 'ready'
-    ? <Button onClick={download} disabled={busy} busy={busy} busyLabel="書き出しています…"><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
+    ? <Button onClick={download} disabled={busy} busy={busy} busyLabel="書き出しています…"><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
     : null
 
   const summary = analytics?.summary ?? null
@@ -95,7 +96,7 @@ export default function AnalyticsPane({ ctx, chrome }: { ctx: EditContext; chrom
         ) : (
           <>
             {permission === 'error'
-              ? <Notice tone="info" action={<Button onClick={() => setAttempt((value) => value + 1)}>もう一度読み込む</Button>}>CSVを書き出す権限を確認できませんでした。分析の集計は表示しています。</Notice>
+              ? <Notice tone="info" action={<Button onClick={() => setAttempt((value) => value + 1)}>もう一度読み込む</Button>}>CSVで書き出す権限を確認できませんでした。分析の集計は表示しています。</Notice>
               : error ? <Notice tone="info">{error}</Notice> : null}
             <Funnel summary={analytics.summary} />
             <Retention analytics={analytics} durationSeconds={webinar.durationSeconds} />

@@ -27,6 +27,7 @@ import { useAutomationRunPermissions } from '@/components/automations/use-can-ma
 import { formatDateTime, formatNumber } from '@/lib/format'
 import type { AutoV8Counts, AutoV8Model } from './automations-v8'
 import styles from './automations-v8.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 type RunStatus = 'queued' | 'claimed' | 'succeeded' | 'skipped' | 'waiting' | 'retry_wait' | 'partial' | 'permanent_failed' | 'cancelled'
 
@@ -334,7 +335,7 @@ export function V8RunsTab({
       search: query.trim() || undefined,
       status: resultFilter !== 'all' ? resultFilter : undefined,
       includeTest,
-    }), 'automation-runs.csv')
+    }), csvFileName("オートメーションの実行履歴"))
       .then((result) => {
         if (result.truncated && result.totalCount !== null) {
           const rest = result.totalCount - (result.returnedCount ?? 0)

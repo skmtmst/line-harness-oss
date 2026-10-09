@@ -43,6 +43,7 @@ import { MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import styles from './mileage.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { csvFileName } from '@/lib/csv-file-name'
 
 function dateOnlyDaysAgo(days: number) {
   const date = new Date()
@@ -259,7 +260,7 @@ export default function BalancesTab() {
       const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `mileage-balances-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = csvFileName("マイル残高")
       anchor.click()
       URL.revokeObjectURL(url)
     } catch {

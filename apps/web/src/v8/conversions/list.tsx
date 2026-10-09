@@ -94,6 +94,7 @@ import { focusConversionField, type ConversionFieldIssue } from './field-issue'
 import styles from './list.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
 
 type StatusFilter = 'all' | ConversionDefinitionFilter
 /** フォルダの列の「未分類」（`?folder=unfiled`）。 */
@@ -722,7 +723,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
     setExportError('')
     try {
       const blob = await api.conversions.exportDefinitions({ ...definitionRange(30), lineAccountId: accountId ?? undefined })
-      downloadCsvBlob(blob, `conversion-definitions-${definitionRange(1).to}.csv`)
+      downloadCsvBlob(blob, csvFileName("成果地点"))
     } catch {
       setExportError('CSVを書き出せませんでした。権限を確認して、もう一度お試しください。')
     } finally {
@@ -1154,7 +1155,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
 
       actions={
         <Button onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています…">
-          <Download size={15} aria-hidden="true" />CSV で書き出す
+          <Download size={15} aria-hidden="true" />CSVで書き出す
         </Button>
       }
       stats={<>

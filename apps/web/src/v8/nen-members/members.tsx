@@ -29,6 +29,7 @@ import LifetimeV8 from './lifetime'
 import { csvLine, yen, type LoadStatus, type MemberTab, type SavedHandler } from './parts'
 import Notice from '@/components/shared/notice'
 import styles from './members.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 export type { LoadStatus, MemberTab } from './parts'
 
@@ -145,7 +146,7 @@ function KpiMenu({ title, accountId }: { title: string; accountId: string }) {
   const [open, setOpen] = useState(false)
   const { exportCsv, busy } = useMembersCsv(accountId)
   return <span className={styles.kpiMenu}>
-    <RowMenu className={styles.kpiMenuButton} label={`${title}の操作`} open={open} onOpenChange={setOpen} items={[{ id: 'csv', label: 'CSV で書き出す', disabled: busy, onSelect: () => { setOpen(false); void exportCsv() } }]} />
+    <RowMenu className={styles.kpiMenuButton} label={`${title}の操作`} open={open} onOpenChange={setOpen} items={[{ id: 'csv', label: 'CSVで書き出す', disabled: busy, onSelect: () => { setOpen(false); void exportCsv() } }]} />
   </span>
 }
 
@@ -186,7 +187,7 @@ function useMembersCsv(accountId: string) {
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `nen-members-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = csvFileName("NEN会員")
       anchor.click()
       URL.revokeObjectURL(url)
     } catch (caught) {
@@ -200,14 +201,14 @@ function useMembersCsv(accountId: string) {
   return { exportCsv, busy, error }
 }
 
-/** 板の頭の「CSV で書き出す」。閲覧のみでも使える（書き出しは読むだけ）。 */
+/** 板の頭の「CSVで書き出す」。閲覧のみでも使える（書き出しは読むだけ）。 */
 function CsvExportButton({ accountId }: { accountId: string }) {
   const { exportCsv, busy, error } = useMembersCsv(accountId)
   return (
     <span className={styles.csvWrap}>
       <Button variant="secondary" onClick={() => void exportCsv()} disabled={busy}>
         <Download size={15} aria-hidden="true" />
-        {busy ? '書き出しています…' : 'CSV で書き出す'}
+        {busy ? '書き出しています…' : 'CSVで書き出す'}
       </Button>
       {error ? <span className={styles.csvError} role="alert">{error}</span> : null}
     </span>

@@ -109,7 +109,7 @@ export default function MembersPageV8({
             ネットショップの会員と LINE の友だちを結びつけて、ランクやペットの情報を見ます。
           </p>
         </div>
-        {/* fb9NJ・e5yBLx：ランク設定の板にも「CSV で書き出す」がある。 */}
+        {/* fb9NJ・e5yBLx：ランク設定の板にも「CSVで書き出す」がある。 */}
         {(tab === 'members' || tab === 'ranks') && accountId ? <CsvExportButton accountId={accountId} /> : null}
       </header>
 
@@ -208,7 +208,7 @@ export function MembersKpiBand({
   )
 }
 
-/** 「CSV で書き出す」。いまの絞り込みは付けず、見えている会員をすべて書き出す。 */
+/** 「CSVで書き出す」。いまの絞り込みは付けず、見えている会員をすべて書き出す。 */
 function CsvExportButton({ accountId }: { accountId: string }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -262,7 +262,7 @@ function CsvExportButton({ accountId }: { accountId: string }) {
     <span className={styles.csvWrap}>
       <Button variant="secondary" onClick={() => void exportCsv()} disabled={busy}>
         <Download aria-hidden="true" className="h-4 w-4" />
-        {busy ? '書き出しています…' : 'CSV で書き出す'}
+        {busy ? '書き出しています…' : 'CSVで書き出す'}
       </Button>
       {error ? <span className={styles.csvError} role="alert">{error}</span> : null}
     </span>

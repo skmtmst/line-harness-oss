@@ -26,6 +26,7 @@ import { downloadCsv, periodCaption, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
 import PeriodPicker, { useReportPeriod } from '@/components/shared/period-picker'
 import { Field } from '@/components/shared/form-controls'
+import { csvFileName } from '@/lib/csv-file-name'
 
 type CrossQueueStatus = { state: 'pending' | 'running' | 'available' | 'partial' | 'unavailable' | 'failed'; queuePosition: number | null; pendingAhead: number; estimatedWaitMs: number | null; nextTickAt: string | null }
 export type CrossSaveSlot = (props: { sourceResultId: string; defaultName: string }) => ReactNode
@@ -293,7 +294,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
 
   const exportCross = () => {
     if (!crossResult) return
-    downloadCsv('analytics-cross.csv', [
+    downloadCsv(csvFileName("掛け合わせ集計"), [
       [`${resultAxes?.row ?? 'たて'} ＼ ${resultAxes?.column ?? 'よこ'}`, ...cols.map((column) => column.label), '合計'],
       ...rows.map((row) => [row.label, ...cols.map((column) => lookup.get(`${row.key}\u0000${column.key}`)?.value ?? 0), rowTotals.get(row.key) ?? 0]),
       ['合計', ...cols.map((column) => colTotals.get(column.key) ?? 0), grandTotal],

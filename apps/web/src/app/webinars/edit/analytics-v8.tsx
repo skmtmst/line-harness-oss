@@ -10,6 +10,7 @@ import RetentionSection from './retention-section'
 import ViewerComments from './viewer-comments'
 import AnalyticsDetails from './analytics-details'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
 
 export default function AnalyticsV8({ webinarId, durationSeconds, analytics, analyticsState, onRetry, onExportChange }: {
   webinarId: string
@@ -46,7 +47,7 @@ export default function AnalyticsV8({ webinarId, durationSeconds, analytics, ana
     locked.current = true
     setBusy(true)
     setError('')
-    void downloadApiFile(webinarApi.participantsCsvUrl(webinarId), 'webinar-participants.csv').catch((cause) => {
+    void downloadApiFile(webinarApi.participantsCsvUrl(webinarId), csvFileName("動画セミナー")).catch((cause) => {
       if (request !== generation.current) return
       if (cause instanceof ApiError && cause.status === 403) {
         setPermission('denied')
@@ -67,7 +68,7 @@ export default function AnalyticsV8({ webinarId, durationSeconds, analytics, ana
   if (!analytics) return <p className="text-ink-faint text-sm" role="status">分析データを読み込んでいます…</p>
 
   return <div data-design-node="z2dgw" data-webinar-analytics>
-    {permission === 'error' ? <Notice tone="info" action={<Button onClick={() => setAttempt((value) => value + 1)}>もう一度読み込む</Button>}>CSVを書き出す権限を確認できませんでした。分析の集計は表示しています。</Notice> : error ? <Notice tone="info">{error}</Notice> : null}
+    {permission === 'error' ? <Notice tone="info" action={<Button onClick={() => setAttempt((value) => value + 1)}>もう一度読み込む</Button>}>CSVで書き出す権限を確認できませんでした。分析の集計は表示しています。</Notice> : error ? <Notice tone="info">{error}</Notice> : null}
     <AnalyticsFunnelV8 summary={analytics.summary} daily={analytics.daily} />
     <RetentionSection retention={analytics.retention ?? { bucketSeconds: 60, started: 0, points: [] }} completed={analytics.summary.completed} ctaAtSeconds={analytics.ctaAtSeconds ?? null} heartbeatRejects={analytics.heartbeatRejects ?? 0} durationSeconds={durationSeconds} />
     <AnalyticsDetails analytics={analytics} />

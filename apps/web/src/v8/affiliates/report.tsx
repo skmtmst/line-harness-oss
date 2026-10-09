@@ -37,6 +37,7 @@ import { AffiliateFrame, useAffiliateShell } from './frame'
 import { AffiliateToolbar, RetryButton, RowMenu, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import styles from './affiliates.module.css'
 import PeriodPicker, { useReportPeriod } from '@/components/shared/period-picker'
+import { csvFileName } from '@/lib/csv-file-name'
 
 type ViewKey = 'affiliate' | 'offer'
 
@@ -177,7 +178,7 @@ export default function ReportTab() {
   const ready = state === 'ready'
 
   const exportCsv = () => {
-    downloadCsv(`affiliate-report-${new Date().toISOString().slice(0, 10)}.csv`, view === 'affiliate'
+    downloadCsv(csvFileName("アフィリエイト成果レポート"), view === 'affiliate'
       ? [['アフィリエイター', 'いちばん多い案件', '成果', '売上', '報酬', '前の期間の報酬'], ...shown.map((row) => [row.name, row.sub ?? '', row.conversions, row.revenue, row.missingReward ? '' : row.reward, row.prevReward ?? ''])]
       : [['案件', '成果', '売上', '報酬', '前の期間の報酬'], ...shown.map((row) => [row.name, row.conversions, row.revenue, row.missingReward ? '' : row.reward, row.prevReward ?? ''])])
   }
@@ -348,7 +349,7 @@ export default function ReportTab() {
       help={view === 'affiliate'
           ? '行を押すと、その人の成果の明細（いつ・どの案件・いくら）を開きます。CSV は今の期間・今の並びで書き出します。'
           : '案件ごとの成果・売上・報酬です。CSV は今の期間・今の並びで書き出します。'}
-      actions={<Button onClick={exportCsv} disabled={!ready || shown.length === 0}><Download size={15} aria-hidden="true" /> CSV で書き出す</Button>}
+      actions={<Button onClick={exportCsv} disabled={!ready || shown.length === 0}><Download size={15} aria-hidden="true" /> CSVで書き出す</Button>}
       stats={stats}
       toolbar={toolbar}
       overlays={<>

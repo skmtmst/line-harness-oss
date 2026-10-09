@@ -20,6 +20,7 @@ import { MetricText } from './reactions'
 import { downloadCsv, metricText, rangeFor, shownValue, useOverview, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
 import { useReportPeriod, type PeriodRange } from '@/components/shared/period-picker'
+import { csvFileName } from '@/lib/csv-file-name'
 
 function metricSum(metrics: Array<AnalyticsMetric<number>>): number | null {
   const values = metrics.map(shownValue)
@@ -58,7 +59,7 @@ export function RoutesFrame({ accountId, children, exportCsv, exportDisabled, da
   const overview = state.data?.data ?? null
   const exportRoutes = () => {
     if (!overview) return
-    downloadCsv('analytics-routes.csv', [
+    downloadCsv(csvFileName("流入経路"), [
       ['経路', '友だち', '反応', '成果', '売上', 'かかった費用', '差し引き'],
       ...overview.routes.map((item) => [item.name, shownValue(item.friendAdds), shownValue(item.reactionPeople), shownValue(item.conversions.approved), shownValue(item.conversions.revenue), shownValue(item.adCost), shownValue(item.profitAfterAdCost)]),
     ])
@@ -99,7 +100,7 @@ export function RoutesFrame({ accountId, children, exportCsv, exportDisabled, da
         <span className={styles.caption}>{dataRangeCaption(state.data.period.from, state.data.period.to, state.data.dataCutoffAt)}</span>
         <span className={styles.spacer} />
         <Link href={overview.searchConsoleHref} className={styles.textLink}>Search Console を見る<ArrowRight size={12} aria-hidden="true" /></Link>
-        <Button variant="secondary" onClick={onExport} disabled={disabled}><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
+        <Button variant="secondary" onClick={onExport} disabled={disabled}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
       </div>
       {children ? children(overview) : <RoutesTable overview={overview} clicks={clicks} />}
     </div>

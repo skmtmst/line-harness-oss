@@ -25,6 +25,7 @@ import { csvExportLine } from '../list/csv-export'
 import { CANDIDATE_PAGE_SIZE, useDuplicatesData } from './use-duplicates-data'
 import { CONFIDENCE_WORD, STATUS_FILTERS, STATUS_WORD, confidenceTone, slashDateTime, statusTone } from './words'
 import styles from './list.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 export default function DuplicatesListV8() {
   usePageTitle('友だち')
@@ -51,7 +52,7 @@ export default function DuplicatesListV8() {
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `duplicates-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = csvFileName("重複した友だち")
     anchor.click()
     URL.revokeObjectURL(url)
   }

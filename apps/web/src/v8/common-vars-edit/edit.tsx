@@ -82,6 +82,7 @@ import styles from './edit.module.css'
 import { focusFieldById } from '@/lib/use-form-errors'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
 
 /** 予定の日時（`YYYY-MM-DDTHH:mm`・日本時間）を「10/1 0:00」の形にする。 */
 export function scheduleStamp(value: string): string {
@@ -716,7 +717,7 @@ function EditCommonVarV8Inner() {
     )
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = 'common-information-impact.csv'
+    anchor.download = csvFileName("共通情報の影響範囲")
     anchor.click()
     URL.revokeObjectURL(url)
   }

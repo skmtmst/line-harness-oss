@@ -87,6 +87,7 @@ import {
 import styles from './list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
 
 type SortKey = 'updated' | 'created' | 'name'
 type SavedFilter = '' | 'active' | 'draft' | 'archived'
@@ -704,7 +705,7 @@ function WebinarList() {
       const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
       const link = document.createElement('a')
       link.href = url
-      link.download = 'webinars.csv'
+      link.download = csvFileName("動画セミナー")
       link.click()
       URL.revokeObjectURL(url)
     } catch {

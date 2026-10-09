@@ -11,6 +11,7 @@ import { BarChart } from '@/components/shared/bar-chart'
 import { formatNumber } from '@/lib/format'
 import { analyticsWeekday } from './analytics-time'
 import './readonly-v8.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 /** 成果地点の既存APIを使う閲覧画面。コンバージョン側の旧入口も残す。 */
 export default function ConversionReportV8({ accountId }: { accountId: string }) {
@@ -48,7 +49,7 @@ export default function ConversionReportV8({ accountId }: { accountId: string })
     try {
       const blob = await api.conversions.exportDefinitions({ ...range, lineAccountId: accountId })
       const url = URL.createObjectURL(blob)
-      const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'conversion-report.csv'; anchor.click(); URL.revokeObjectURL(url)
+      const anchor = document.createElement('a'); anchor.href = url; anchor.download = csvFileName("成果レポート"); anchor.click(); URL.revokeObjectURL(url)
     } catch { setExportError('CSVを書き出せませんでした。もう一度お試しください。') }
     finally { setExporting(false) }
   }

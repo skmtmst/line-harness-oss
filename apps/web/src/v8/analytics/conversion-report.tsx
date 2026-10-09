@@ -18,6 +18,7 @@ import { useReportPeriod } from '@/components/shared/period-picker'
 import { analyticsWeekday } from './parts'
 import { shortDay } from './common'
 import styles from './analytics.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 type Point = ConversionDefinitionReport['byDefinition'][number]
 
@@ -70,7 +71,7 @@ export default function ConversionReportV8({ accountId }: { accountId: string })
     try {
       const blob = await api.conversions.exportDefinitions({ ...range, lineAccountId: accountId })
       const url = URL.createObjectURL(blob)
-      const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'conversion-report.csv'; anchor.click(); URL.revokeObjectURL(url)
+      const anchor = document.createElement('a'); anchor.href = url; anchor.download = csvFileName("成果レポート"); anchor.click(); URL.revokeObjectURL(url)
     } catch { setExportError('CSVを書き出せませんでした。もう一度お試しください。') } finally { setExporting(false) }
   }
 

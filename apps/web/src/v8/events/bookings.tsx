@@ -425,7 +425,7 @@ function Bookings({ eventId }: { eventId: string }) {
       actions={(
         <div className={styles.headActions}>
           <Button onClick={() => void exportCsv()} disabled={csvBusy || !applicants} busy={csvBusy} busyLabel="書き出しています…">
-            <Download size={15} aria-hidden="true" />CSV を書き出す
+            <Download size={15} aria-hidden="true" />CSVで書き出す
           </Button>
           <div className={styles.occurrencePick}>
             <Select

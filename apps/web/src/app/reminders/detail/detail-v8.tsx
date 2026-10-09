@@ -56,6 +56,7 @@ import { PhoneMockV8, SummaryCardV8 } from '../wizard-v8-ui'
 import styles from '../wizard-v8.module.css'
 import detailStyles from './detail-v8.module.css'
 import { dateTimeLocalJst, dateTimeLocalJstToUtcIso } from './registrants-panel'
+import { csvFileName } from '@/lib/csv-file-name'
 
 const PAGE_SIZE = 20
 /** 書き出しの上限。実行結果が多いとき、手元に全部ため込むと固まる。 */
@@ -254,7 +255,7 @@ function ReminderDetailV8() {
       const url = URL.createObjectURL(new Blob([csvFor(all)], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `reminder-runs-${reminderId}.csv`
+      anchor.download = csvFileName("リマインダの実行履歴")
       anchor.click()
       URL.revokeObjectURL(url)
     } catch {

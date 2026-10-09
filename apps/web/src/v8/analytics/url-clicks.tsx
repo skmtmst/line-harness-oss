@@ -20,6 +20,7 @@ import { MetricText } from './reactions'
 import { downloadCsv, formatAnalyticsDateTime, periodCaption, rangeFor, shownValue, useOverview, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
 import { useReportPeriod } from '@/components/shared/period-picker'
+import { csvFileName } from '@/lib/csv-file-name'
 
 type Link = AnalyticsUrlClicksOverview['data']['links'][number]
 
@@ -60,7 +61,7 @@ export default function UrlClicksV8({ accountId }: { accountId: string }) {
   const lastPage = Math.max(0, Math.ceil(links.length / pageSize) - 1)
   const currentPage = Math.min(page, lastPage)
   const visibleLinks = links.slice(currentPage * pageSize, (currentPage + 1) * pageSize)
-  const exportRows = () => downloadCsv('analytics-url-clicks.csv', [
+  const exportRows = () => downloadCsv(csvFileName("URLクリック"), [
     ['リンク名', 'URL', '押された回数', '押した人', '使われた場所'],
     ...links.map((item) => [item.name, item.originalUrl, shownValue(item.clicks), shownValue(item.knownClickPeople), item.usageLocations.join('、')]),
   ])
@@ -72,7 +73,7 @@ export default function UrlClicksV8({ accountId }: { accountId: string }) {
     <div className={styles.selectBox}><Select id="url-state" aria-label="URLの状態" value={status} options={[{ value: 'all', label: 'すべての状態' }, { value: 'active', label: '計測中' }, { value: 'stopped', label: '停止中' }]} onChange={(value) => { setStatus(value); setPage(0) }} /></div>
     <RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} />
     <span className={styles.spacer} />
-    <Button variant="secondary" onClick={exportRows} disabled={exportDisabled}><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
+    <Button variant="secondary" onClick={exportRows} disabled={exportDisabled}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
   </div>
 
   if (!state.data) {

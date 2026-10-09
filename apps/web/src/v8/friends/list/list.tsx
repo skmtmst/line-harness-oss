@@ -75,6 +75,7 @@ import { readFriendsListSnapshot, writeFriendsListSnapshot } from './list-state'
 import { lastContactOf, monthDay, monthDayTime, statusOf, messageWord, splitTags } from './words'
 import styles from './list.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
 type PageSize = (typeof PAGE_SIZE_OPTIONS)[number]
@@ -459,7 +460,7 @@ export default function FriendsListV8() {
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `friends-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = csvFileName("友だち")
     anchor.click()
     URL.revokeObjectURL(url)
   }, [friends])

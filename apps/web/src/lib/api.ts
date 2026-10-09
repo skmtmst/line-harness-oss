@@ -1,3 +1,4 @@
+import { csvFileName } from './csv-file-name'
 import { getFeatureDisabledContext } from './feature-disabled-context'
 import type {QuestionAnswerRecovery,ResumeQuestionAnswerRequest,ResumeQuestionAnswerResponse} from '@line-crm/shared';
 import type { AutomationTabCounts, MediaTabCounts, ConversionApprovalCounts } from '@line-crm/shared';
@@ -3057,7 +3058,7 @@ export async function downloadApiFile(path: string, fallbackFilename: string): P
   try {
     const anchor = document.createElement('a')
     anchor.href = href
-    anchor.download = named ? decodeURIComponent(named) : fallbackFilename
+    anchor.download = /\.csv$/i.test(fallbackFilename) ? csvFileName(fallbackFilename) : named ? decodeURIComponent(named) : fallbackFilename
     anchor.click()
   } finally {
     URL.revokeObjectURL(href)

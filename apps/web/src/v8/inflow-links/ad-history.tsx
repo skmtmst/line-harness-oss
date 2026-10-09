@@ -25,6 +25,7 @@ import { AD_LOG_PAGE_SIZE, adDateTime, adLogStatus, adPlatformLabel, useAdLogs }
 import adsStyles from './ads.module.css'
 import styles from './ad-pages.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
+import { csvFileName } from '@/lib/csv-file-name'
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'すべての状態' },
@@ -77,7 +78,7 @@ export default function AdHistoryV8() {
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `広告への送信履歴_${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = csvFileName("広告への送信履歴")
     anchor.click()
     URL.revokeObjectURL(url)
   }

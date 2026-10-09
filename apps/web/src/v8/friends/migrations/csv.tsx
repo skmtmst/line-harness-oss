@@ -25,6 +25,7 @@ import { csvExportLine } from '../list/csv-export'
 import { formatImportBytes, JOB_STATUS_LABELS, MANAGE_FORBIDDEN, useFriendMigrations } from './use-friend-migrations'
 import styles from './migrations.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
 
 const COLUMN_CHOICES = [
   ['basic', '基本（LINEユーザーID・表示名・本名・登録日）', false],
@@ -53,7 +54,7 @@ export default function CsvMigrationsV8() {
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `friend-migration-history-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = csvFileName("友だちの移行履歴")
     anchor.click()
     URL.revokeObjectURL(url)
   }
@@ -100,7 +101,7 @@ export default function CsvMigrationsV8() {
           <div className={styles.cardFoot}>
             {m.exportResult ? (
               <a className={styles.link} href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}${m.exportResult.downloadUrl}`}>
-                {`CSVをダウンロード（${m.exportResult.rowCount ?? '—'}件）`}
+                {`CSVで書き出す（${m.exportResult.rowCount ?? '—'}件）`}
               </a>
             ) : null}
             {/* 変えられない人には押せないボタンを置かない（理由は上の1行）。 */}
@@ -224,7 +225,7 @@ export default function CsvMigrationsV8() {
                           {JOB_STATUS_LABELS[job.status] ?? '確認中'}
                         </span>
                         {downloadable ? (
-                          <a className={styles.link} href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/friends/exports/${job.id}/download`}>CSVをダウンロード</a>
+                          <a className={styles.link} href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/friends/exports/${job.id}/download`}>CSVで書き出す</a>
                         ) : null}
                       </span>
                     </Td>

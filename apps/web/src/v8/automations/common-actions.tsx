@@ -386,13 +386,13 @@ export default function CommonActionsV8() {
 
       actions={canExportCsv && selectedAccountId
         ? csvEmpty
-          ? <Button disabled title="条件に合う共通アクションがないため書き出せません"><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
+          ? <Button disabled title="条件に合う共通アクションがないため書き出せません"><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
           : (
             <Button
               href={api.commonActions.csvUrl({ accountId: selectedAccountId, status: filter === 'all' ? undefined : filter, query: deferredQuery.trim() || undefined })}
               title={csvScoped ? `この条件の${total}件を書き出します` : `全${total}件を書き出します`}
             >
-              <Download size={15} aria-hidden="true" />CSV で書き出す
+              <Download size={15} aria-hidden="true" />CSVで書き出す
             </Button>
           )
         : undefined}

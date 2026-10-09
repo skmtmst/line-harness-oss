@@ -48,6 +48,7 @@ import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { formatDateTime } from '@/lib/format'
 import { webinarLoadFailure, type WebinarLoadFailure } from './webinar-load-failure'
 import styles from './list-v8.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 type SortKey = 'updated' | 'created' | 'name'
 type SavedFilter = '' | 'active' | 'draft' | 'archived'
@@ -860,7 +861,7 @@ function WebinarListV8Inner() {
       const csv = await webinarListCsv({ accountId: selectedAccountId, params: { q: debouncedQuery.trim() || undefined, folder: selectedFolder || undefined, status: savedFilter || undefined, sort: sortKey }, list: webinarApi.list, isCurrent: () => currentCsvScope.current === csvScope })
       if (csv === null) return
       const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
-      const link = document.createElement('a'); link.href = url; link.download = 'webinars.csv'; link.click(); URL.revokeObjectURL(url)
+      const link = document.createElement('a'); link.href = url; link.download = csvFileName("動画セミナー"); link.click(); URL.revokeObjectURL(url)
     } catch { if (currentCsvScope.current === csvScope) setCsvError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。') }
     finally { csvLock.current = false; setCsvBusy(false) }
   }

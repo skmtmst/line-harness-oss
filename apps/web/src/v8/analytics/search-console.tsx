@@ -24,6 +24,7 @@ import { formatDateTime, formatNumber } from '@/lib/format'
 import { KpiMenu, StatePill, shortDay } from './common'
 import styles from './analytics.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { csvFileName } from '@/lib/csv-file-name'
 
 const RANGES = [7, 28, 90] as const
 type RangeDays = typeof RANGES[number]
@@ -110,7 +111,7 @@ export default function SearchConsoleV8() {
     const url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `search-console-${data.startDate}_${data.endDate}.csv`
+    anchor.download = csvFileName("Search Console")
     anchor.click()
     URL.revokeObjectURL(url)
   }
@@ -125,7 +126,7 @@ export default function SearchConsoleV8() {
     boardId="h1G4d"
     title="Search Console"
     help={<span className={styles.description}>Google の検索から、どのキーワード・どのページで人が来たかを見ます。サイトスクリプトとつなぐと、検索から友だち追加までを結べます。</span>}
-    actions={<Button variant="secondary" onClick={exportCsv} disabled={!data || loading}><Download size={15} aria-hidden="true" />CSV で書き出す</Button>}
+    actions={<Button variant="secondary" onClick={exportCsv} disabled={!data || loading}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>}
   >
     {loading ? <div className={styles.body} data-gap="tab"><DelayedSkeleton loading skeleton={<Skeleton className="block h-36 w-full rounded-card" />} /></div>
       : loadError ? <div className={styles.body} data-gap="tab"><ListState kind="error" error={loadError} onRetry={() => setAttempt((current) => current + 1)} /></div>

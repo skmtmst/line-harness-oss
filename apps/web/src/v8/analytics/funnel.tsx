@@ -26,6 +26,7 @@ import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, rangeFor, us
 import styles from './analytics.module.css'
 import { useReportPeriod } from '@/components/shared/period-picker'
 import { Field } from '@/components/shared/form-controls'
+import { csvFileName } from '@/lib/csv-file-name'
 
 type FunnelStatus = 'active' | 'stopped' | 'archived'
 type FunnelSummary = { id: string; name: string; windowDays: number; createdAt: string; status: FunnelStatus; currentVersion: { id: string; versionNumber: number; createdAt: string } | null; migrationState: 'ready' | 'needs_migration' }
@@ -242,7 +243,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
   const inactiveFunnels = funnels.filter((f) => f.status !== 'active')
   const exportFunnel = () => {
     if (!result) return
-    downloadCsv('analytics-funnel.csv', [
+    downloadCsv(csvFileName("ファネル"), [
       ...(run && run.state !== 'available' ? [['集計状態', `${STATE_LABELS[run.state]}${run.stateReason ? `（${run.stateReason}）` : ''}`]] : []),
       ...(run?.versionNumber != null ? [['集計した定義版', `${run.versionNumber}`]] : []),
       ['段', '到達した人', '前の段からの通過率', 'ここで止まった人', 'まだ途中の人'],
