@@ -5,7 +5,7 @@
  * 「フォルダを追加」「…」（名前・色・並べ替え・消す）と注を、変えてよい人にだけ出す。
  * kind が null（API が無い一覧）は「すべて」だけで、押せない口を置かない。
  */
-import React, { act, useState } from 'react'
+import React, { act, createRef, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Folder } from '@line-crm/shared'
@@ -27,11 +27,11 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   return { ...actual, api: { ...actual.api, folders: { ...actual.api.folders, list, delete: remove, swapOrder: swap } } }
 })
 
-import ManagedFolderPanel, { useManagedFolders } from './managed-folder-panel'
+import ManagedFolderPanel, { useManagedFolders, type ManagedFolderControl } from './managed-folder-panel'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-function Screen({ kind, canManage, onSelectSpy }: { kind: string | null; canManage: boolean; onSelectSpy?: (id: string) => void }) {
+function Screen({ kind, canManage, onSelectSpy, controlRef }: { kind: string | null; canManage: boolean; onSelectSpy?: (id: string) => void; controlRef?: React.Ref<ManagedFolderControl> }) {
   const state = useManagedFolders(kind, 'acc-1')
   const [active, setActive] = useState('f-1')
   return (
@@ -47,6 +47,7 @@ function Screen({ kind, canManage, onSelectSpy }: { kind: string | null; canMana
       allCount={9}
       unfiledCount={state.unfiledCount}
       createAction={canManage ? <button type="button">シナリオを作る</button> : undefined}
+      controlRef={controlRef}
     />
   )
 }
@@ -132,5 +133,22 @@ describe('一覧の左のフォルダの列（共通）', () => {
     expect(host.textContent).toContain('シナリオを作る')
     expect(host.textContent).not.toContain('フォルダを追加')
     expect(host.textContent).not.toContain('未分類')
+  })
+
+  it('畳んだ板の「フォルダの操作」から同じ窓を開ける（変えてよい人だけ）', async () => {
+    const ref = createRef<ManagedFolderControl>()
+    await act(async () => { root.render(<Screen kind="scenario" canManage controlRef={ref} />) })
+    await act(async () => { ref.current?.startDelete(folder('f-2', '会員', 1, null)) })
+    expect(document.body.textContent).toContain('フォルダ「会員」を消しますか？')
+    await click(buttonByText('キャンセル'))
+    await act(async () => { ref.current?.startAdd() })
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('フォルダを追加')
+
+    act(() => root.unmount())
+    root = createRoot(host)
+    const viewerRef = createRef<ManagedFolderControl>()
+    await act(async () => { root.render(<Screen kind="scenario" canManage={false} controlRef={viewerRef} />) })
+    await act(async () => { viewerRef.current?.startAdd() })
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
   })
 })

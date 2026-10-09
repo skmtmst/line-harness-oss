@@ -14,7 +14,7 @@
  * `kind={null}` はフォルダの受け口（API）がまだ無い一覧。「すべて」だけを出し、
  * 追加・「…」・未分類・注は出さない（押せない口を置かない）。API ができたら kind を渡すだけで全部が出る。
  */
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from 'react'
 import type { Folder } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import FolderPanel, { type FolderPanelRow } from './folder-panel'
@@ -78,6 +78,13 @@ export function useManagedFolders(kind: string | null, accountId?: string | null
   return { folders, unfiledCount, loaded, error, reload }
 }
 
+/** 畳んだ板の道具の段など、列の外から同じ窓を開くための口。 */
+export interface ManagedFolderControl {
+  startAdd: () => void
+  startEdit: (folder: Folder) => void
+  startDelete: (folder: Folder) => void
+}
+
 export interface ManagedFolderPanelProps {
   /** `folders.kind`。null はフォルダの API がまだ無い一覧（「すべて」だけ）。 */
   kind: string | null
@@ -118,6 +125,8 @@ export interface ManagedFolderPanelProps {
   onAddStart?: () => void
   /** 作ったフォルダを選ぶなど、追加できたあとにすること（読み直しは onChanged が行う）。 */
   onAdded?: (folder: Folder) => void
+  /** 列が畳まれているときに、道具の段の「フォルダの操作」から同じ窓を開く。変えてよい人のときだけ働く。 */
+  controlRef?: Ref<ManagedFolderControl>
 }
 
 /**
@@ -175,6 +184,7 @@ export default function ManagedFolderPanel({
   disabled,
   onAddStart,
   onAdded,
+  controlRef,
 }: ManagedFolderPanelProps) {
   const [adding, setAdding] = useState(false)
   const managed = kind !== null
@@ -196,6 +206,12 @@ export default function ManagedFolderPanel({
     },
     placeholder,
   })
+
+  useImperativeHandle(controlRef, () => ({
+    startAdd: () => { if (editable) { onAddStart?.(); setAdding(true) } },
+    startEdit: (folder) => { const index = folders.findIndex((f) => f.id === folder.id); if (index >= 0) actions.rowActions(folder, index).onEdit?.() },
+    startDelete: (folder) => { const index = folders.findIndex((f) => f.id === folder.id); if (index >= 0) actions.rowActions(folder, index).onDelete?.() },
+  }))
 
   const rows: FolderPanelRow[] = [
     { kind: 'all', id: allId, label: 'すべて', count: allCount },

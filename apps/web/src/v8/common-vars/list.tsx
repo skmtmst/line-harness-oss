@@ -58,8 +58,7 @@ import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderAddDialog from '@/components/shared/folder-add-dialog'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import ManagedFolderPanel, { managedFolderNavRows, type ManagedFolderControl } from '@/components/shared/managed-folder-panel'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Pagination from '@/components/shared/pagination'
@@ -255,6 +254,8 @@ function CommonVarsListInner() {
   const orderAnchorRef = useRef<HTMLButtonElement | null>(null)
   const [folderMenuOpen, setFolderMenuOpen] = useState(false)
   const folderMenuAnchorRef = useRef<HTMLButtonElement | null>(null)
+  /* 畳んだ板の「フォルダの操作」から、列と同じ窓（共通のフォルダの列）を開く。 */
+  const folderControlRef = useRef<ManagedFolderControl | null>(null)
 
   /** 選んでいるフォルダ。URLに出して、戻るとブックマークを壊さない（v7 と同じ `?folder=`）。 */
   const folderFilter = params.get('folder') ?? ''
@@ -263,11 +264,6 @@ function CommonVarsListInner() {
     samePageUrl.replace(id ? `/contents/vars?folder=${encodeURIComponent(id)}` : '/contents/vars')
   }
 
-  const [addingFolder, setAddingFolder] = useState(false)
-  const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
-  const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
-  const [folderBusy, setFolderBusy] = useState(false)
-  const [folderError, setFolderError] = useState('')
 
   const loadFolders = useCallback(async () => {
     const accountAtRequest = selectedAccountId
@@ -406,26 +402,6 @@ function CommonVarsListInner() {
   const toggleChip = (next: VarsChip) => {
     setChip((currentChip) => (currentChip === next ? 'all' : next))
     setPage(1)
-  }
-
-  const removeFolder = async () => {
-    if (!deletingFolder || !selectedAccountId || folderBusy) return
-    const accountAtRequest = selectedAccountId
-    setFolderBusy(true)
-    setFolderError('')
-    try {
-      const res = await api.folders.delete(deletingFolder.id, accountAtRequest)
-      if (!res.success) throw new Error(res.error)
-      if (accountAtRequest !== latestAccountRef.current) return
-      setDeletingFolder(null)
-      if (folderFilter === deletingFolder.id) setFolderFilter('')
-      void load()
-      void loadFolders()
-    } catch {
-      if (accountAtRequest === latestAccountRef.current) setFolderError('フォルダを削除できませんでした。')
-    } finally {
-      setFolderBusy(false)
-    }
   }
 
   /*
@@ -957,20 +933,7 @@ function CommonVarsListInner() {
     return folder ? { name: folder.name, color: folder.color } : null
   }
   /* 並びは絵どおり：すべて → 作ったフォルダ → 未分類（最後）。 */
-  const folderRows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: '', label: 'すべて', count: listFailed ? null : items.length },
-    ...folders.map((folder) => ({
-      kind: 'folder' as const,
-      id: folder.id,
-      label: folder.name,
-      count: folder.itemCount ?? null,
-      color: folder.color,
-      onEdit: canWrite ? () => setEditingFolder(folder) : undefined,
-      onDelete: canWrite ? () => { setFolderError(''); setDeletingFolder(folder) } : undefined,
-      deleteNote: '削除しても、入っていた共通情報は未分類として残ります。',
-    })),
-    { kind: 'unfiled' as const, id: UNGROUPED, label: '未分類', count: unfiledCount },
-  ]
+  const folderRows = managedFolderNavRows('common_var', folders, { allId: '', unfiledId: UNGROUPED })
   const folderOptions = [
     { value: '', label: 'フォルダ：すべて' },
     ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
@@ -986,18 +949,25 @@ function CommonVarsListInner() {
   ) : null
 
   const folderPanel = (
-    <FolderPanel
+    /* 共通のフォルダの列（種類 common_var・B-136）。名前・色・並べ替え・消すは「…」から。消すと中身は未分類へ移るので一覧も読み直す。 */
+    <ManagedFolderPanel
+      kind="common_var"
+      accountId={selectedAccountId}
+      folders={folders}
+      onChanged={() => Promise.all([load(), loadFolders()]).then(() => undefined)}
+      canManage={canWrite && Boolean(selectedAccountId)}
+      itemLabel="共通情報"
       activeId={folderFilter}
       onSelect={setFolderFilter}
-      onAddFolder={canWrite ? () => setAddingFolder(true) : undefined}
-      addFolderLabel="フォルダを追加"
-      rows={folderRows}
+      allId=""
+      unfiledId={UNGROUPED}
+      allCount={listFailed ? null : items.length}
+      unfiledCount={unfiledCount}
+      placeholder="例: 01_店舗案内"
+      controlRef={folderControlRef}
     >
       {folderFailureNote}
-      {folderError ? <p role="alert" className={styles.folderNote}>{folderError}</p> : null}
-      {/* 絵は字の途中で折る（言葉のまとまりで折ると3行目に落ちる）。 */}
-      <p className={styles.folderNote}><span className={styles.breakAnywhere}>フォルダを消しても、中の共通情報は未分類に残ります</span></p>
-    </FolderPanel>
+    </ManagedFolderPanel>
   )
 
   /* ===== 道具の段（広い板と 1152 で同じ部品を並べ替える） ===== */
@@ -1120,15 +1090,15 @@ function CommonVarsListInner() {
               anchorRef={folderMenuAnchorRef}
               ariaLabel="フォルダの操作"
               items={[
-                { id: 'add', label: 'フォルダを追加する', onSelect: () => { setFolderMenuOpen(false); setAddingFolder(true) } },
+                { id: 'add', label: 'フォルダを追加する', onSelect: () => { setFolderMenuOpen(false); folderControlRef.current?.startAdd() } },
                 ...(selectedUserFolder ? [
-                  { id: 'rename', label: 'フォルダ名を変える', onSelect: () => { setFolderMenuOpen(false); setEditingFolder(selectedUserFolder) } },
+                  { id: 'rename', label: 'フォルダ名を変える', onSelect: () => { setFolderMenuOpen(false); folderControlRef.current?.startEdit(selectedUserFolder) } },
                   {
                     id: 'delete',
                     label: 'フォルダを削除する',
                     tone: 'danger' as const,
                     dividerBefore: true,
-                    onSelect: () => { setFolderMenuOpen(false); setFolderError(''); setDeletingFolder(selectedUserFolder) },
+                    onSelect: () => { setFolderMenuOpen(false); folderControlRef.current?.startDelete(selectedUserFolder) },
                   },
                 ] : []),
               ]}
@@ -1804,43 +1774,6 @@ function CommonVarsListInner() {
           />
         </label>
       </ConfirmDialog>
-
-      {addingFolder ? (
-        <FolderAddDialog
-          kind="common_var"
-          accountId={selectedAccountId}
-          note="共通情報を分けてしまう箱です。削除しても、入っていた共通情報は未分類として残ります。"
-          placeholder="例: 01_店舗案内"
-          onClose={() => setAddingFolder(false)}
-          onAdded={() => { setAddingFolder(false); void load(); void loadFolders() }}
-        />
-      ) : null}
-
-      {editingFolder ? (
-        <FolderAddDialog
-          kind="common_var"
-          folder={editingFolder}
-          accountId={selectedAccountId}
-          note="共通情報を分けてしまう箱です。削除しても、入っていた共通情報は未分類として残ります。"
-          placeholder="例: 01_店舗案内"
-          onClose={() => setEditingFolder(null)}
-          onAdded={() => { setEditingFolder(null); void load(); void loadFolders() }}
-        />
-      ) : null}
-
-      <ConfirmDialog
-        open={deletingFolder !== null}
-        title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
-        description={deletingFolder?.itemCount != null
-          ? `削除しても、入っていた共通情報は未分類として残ります。いまこのフォルダに入っているのは${deletingFolder.itemCount}件です。`
-          : '削除しても、入っていた共通情報は未分類として残ります。'}
-        confirmLabel="削除する"
-        destructive
-        busy={folderBusy}
-        error={folderError || undefined}
-        onCancel={() => { if (!folderBusy) { setDeletingFolder(null); setFolderError('') } }}
-        onConfirm={() => void removeFolder()}
-      />
 
       {activeItem ? (
         <DetailPanel
