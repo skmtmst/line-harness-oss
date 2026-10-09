@@ -29,7 +29,8 @@ async function authority(c: Context<Env>): Promise<HqTemplateAuthority> {
   return auth.authority;
 }
 const reasons: Record<string, string> = {
-  CARD_REFERENCE_UNAVAILABLE: '配り先に同じ名前のフォーム・シナリオが1件だけあるか、フォーム用のLIFFが設定されているか確認してください',
+  LIFF_UNAVAILABLE: '配り先のLINEアカウントにLIFFが設定されていません。LIFFを設定してから配り直してください',
+  CARD_REFERENCE_UNAVAILABLE: '配り先に同じ名前のフォーム・シナリオ・予約メニュー・スタンプカードが1件だけあるか、LIFFが設定されているか確認してください',
   INVALID_REQUEST_ID: '作成依頼の識別情報を確認してください',
   IDEMPOTENCY_CONFLICT: '同じ作成依頼の内容が変わっています。元の内容で再確認してください',
   CREATE_RECEIPT_UNAVAILABLE: '作成済みの記録を確認できません。一覧から状態を確認してください',

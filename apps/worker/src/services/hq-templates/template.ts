@@ -1,4 +1,4 @@
-import { parseHqMessageCard, composeHqMessageCard, type HqMessageCard } from '@line-crm/shared';
+import { parseHqMessageCard, composeHqMessageCard, type HqMessageCard, isLiffActionKind, collectLiffActionLocators, replaceLiffActionLocators } from '@line-crm/shared';
 import type { HqTemplateBinding, HqTemplateStatement } from '@line-crm/db';
 import {
   VERSION_CONFLICT_MESSAGE,
@@ -96,6 +96,7 @@ export type MessageTemplatePreflightItem = Readonly<{
 export interface MessageTemplateAdapterDependencies {
   /** Trusted runtime resolutions of card references, checked against the preflight snapshot. */
   cardTargets?: Readonly<Record<string, string>>;
+  liffTargets?: Readonly<Record<string, string>>;
   referenceTargets?: Readonly<Record<string,string>>;
   /** Must resolve by tenant + source account + immutable version id in one authoritative DB lookup. */
   resolveSourceVersion(input: Readonly<{
@@ -327,6 +328,7 @@ export function parseMessageTemplateDefinition(value: unknown): MessageTemplateD
     },
     media,
   };
+  try { collectLiffActionLocators(parsed); } catch { throw new TemplateHqTemplateError('INVALID_DEFINITION', 422); }
   referencedMedia(parsed);
   return parsed;
 }
@@ -767,11 +769,14 @@ export async function planMessageTemplateDistribution(input: {
   const rootName = resolved[0]?.aliasName ?? definition.template.name;
   let template = definition.template;
   if (definition.card) {
-    for (const button of definition.card.buttons) if (['form', 'scenario'].includes(button.action) && !dependencies.cardTargets?.[`${button.action}:${button.value}`]) throw new TemplateHqTemplateError('REFERENCE_UNAVAILABLE', 422);
+    for (const button of definition.card.buttons) if ((isLiffActionKind(button.action) || button.action === 'scenario') && !dependencies.cardTargets?.[`${button.action}:${button.value}`]) throw new TemplateHqTemplateError('REFERENCE_UNAVAILABLE', 422);
     const image = definition.media.find(item => item.id === definition.card!.imageMediaId);
     template = { ...template, ...composeHqMessageCard(definition.card, targetTemplateId, image?.publicUrl ?? undefined, dependencies.cardTargets) };
   }
-  const messageContent = replaceExactLocators(template.messageContent, replacements)!;
+  for (const locator of (definition.card ? new Map<string, never>() : collectLiffActionLocators(definition)).keys()) {
+    if (!dependencies.liffTargets?.[locator]) throw new TemplateHqTemplateError('REFERENCE_UNAVAILABLE', 422);
+  }
+  const messageContent = replaceExactLocators(replaceLiffActionLocators(template, dependencies.liffTargets ?? {}).messageContent, replacements)!;
   const carouselActionsJson = replaceExactLocators(template.carouselActionsJson, replacements);
   const carouselTapLimitText = replaceExactLocators(template.carouselTapLimitText, replacements);
   const questionJson = replaceExactLocators(template.questionJson, replacements);
@@ -812,7 +817,7 @@ export async function planMessageTemplateDistribution(input: {
       if(!target1040?.endsWith('/1040')) throw new TemplateHqTemplateError('MEDIA_COPY_INVALID',422);
       replacements.set(sourceBase,target1040.slice(0,-5));
     }
-    const payload=JSON.parse(replaceExactLocators(JSON.stringify(asset.payload),replacements)!);
+    const payload=JSON.parse(replaceExactLocators(JSON.stringify(replaceLiffActionLocators(asset.payload, dependencies.liffTargets ?? {})),replacements)!);
     // assetId と画像の旧所属を持ち越さない。
     payload.assetId=targetTemplateId;
     if(payload.imageMediaId) payload.imageMediaId=replacements.get(payload.imageMediaId) ?? null;
