@@ -122,6 +122,7 @@ import { browserDraftKey } from '@/v8/autosave/use-browser-draft'
 import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice'
 import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft'
 import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import {
   scenarioReachBarWidth,
@@ -1842,9 +1843,12 @@ export default function ScenarioDetailV8({
 
         {!stepForm.question && stepForm.inputMode === 'template' && (
           <div>
-            <label className="block text-xs font-medium text-ink-secondary mb-1">テンプレート <span className="text-danger">*</span></label>
-            <Select
-              aria-label="テンプレート"
+            <span className="block text-xs font-medium text-ink-secondary mb-1">テンプレート <span className="text-danger">*</span></span>
+            <EntityKindField
+              kind="template"
+              label="テンプレート"
+              options={templates}
+              accountId={scenario?.lineAccountId ?? undefined}
               value={stepForm.templateId ?? ''}
               onChange={(value) => {
                 const templateId = value || null
@@ -1859,14 +1863,6 @@ export default function ScenarioDetailV8({
                   messageContent: template?.messageContent ?? stepForm.messageContent,
                 })
               }}
-              options={[
-                { value: '', label: '-- 選択してください --' },
-                ...templates.map((t) => ({
-                  value: t.id,
-                  label: `${t.name}${t.category ? ` (${t.category})` : ''}`,
-                })),
-              ]}
-              size="full"
             />
             <p className="text-xs text-warning mt-1">
               ⓘ テンプレートが修正されると、このステップの内容も自動で同期されます

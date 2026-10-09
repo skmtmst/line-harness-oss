@@ -65,6 +65,7 @@ import { describeAutoReplyDiff } from './auto-reply-conflict-diff'
 import { SaveConflictBand, SaveConflictCompareDialog } from '@/components/shared/save-conflict'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import Toggle from '@/components/shared/toggle'
 import Notice from '@/components/shared/notice'
@@ -98,7 +99,6 @@ import {
 import {
   MESSAGE_KIND_WORDS,
   matchTypeWord,
-  responseTypeWord,
 } from '@/app/auto-replies/auto-reply-words'
 import { inEvaluationOrder, PRIORITY_MAX, PRIORITY_MIN, type OrderedRule } from '@/app/auto-replies/auto-reply-order'
 import { canPublish, publishGates } from '@/app/auto-replies/publish/publish-flow'
@@ -466,7 +466,7 @@ function AutoReplyWizardV8Inner() {
   const [compareError, setCompareError] = useState('')
   // 作る②の1152（`Z2LIUx`）。折り畳みはCSSが担い、ここでは板IDだけを切り替える。
   const narrow = useNarrowViewport()
-  const [templates, setTemplates] = useState<Array<{ id: string; name: string; messageType: string; messageContent: string }>>([])
+  const [templates, setTemplates] = useState<Array<{ id: string; name: string; messageType: string; messageContent: string; folderId?: string | null; updatedAt?: string }>>([])
   const [folders, setFolders] = useState<Array<{ id: string; name: string; color?: string | null }>>([])
   const [rules, setRules] = useState<RuleRow[]>([])
   const [conflicts, setConflicts] = useState<AutoReplyConflict[]>([])
@@ -593,6 +593,8 @@ function AutoReplyWizardV8Inner() {
             name: t.name,
             messageType: t.messageType,
             messageContent: t.messageContent,
+            folderId: t.folderId,
+            updatedAt: t.updatedAt,
           })),
         )
       }
@@ -2066,23 +2068,20 @@ function AutoReplyWizardV8Inner() {
 
                 {form.mode === 'template' && (
                   <div className={styles.field}>
-                    <label htmlFor="wiz-template" className={styles.label}>
+                    <span className={styles.label}>
                       テンプレート
-                    </label>
-                    <Select
+                    </span>
+                    <EntityKindField
+                      kind="template"
                       id="wiz-template"
-                      error={fieldError('wiz-template')}
-                      aria-label="テンプレート"
+                      label="テンプレート"
+                      options={templates}
+                      accountId={matchedAccountId}
+                      invalid={!!fieldError('wiz-template')}
                       value={form.templateId ?? ''}
                       onChange={(v) => patch({ templateId: v || null })}
-                      options={[
-                        { value: '', label: '選んでください' },
-                        ...templates.map((t) => ({
-                          value: t.id,
-                          label: `${t.name}（${responseTypeWord(t.messageType).label}）`,
-                        })),
-                      ]}
                     />
+                    {fieldError('wiz-template') ? <FieldError id="wiz-template-error">{fieldError('wiz-template')}</FieldError> : null}
                     <p className={styles.hint}>テンプレートの管理は「ひな形を管理」からできます。</p>
                   </div>
                 )}

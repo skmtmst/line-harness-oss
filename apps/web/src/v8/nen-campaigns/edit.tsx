@@ -25,6 +25,7 @@ import Notice from '@/components/shared/notice'
 import Radio from '@/components/shared/radio'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import { useAccount } from '@/contexts/account-context'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
@@ -527,18 +528,20 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
         <div className={styles.row}>
           <div className={styles.field}>
             <span className={styles.labelSmall}>回答フォームを開かせる（任意）</span>
-            {!canEdit ? <StaticBox label="回答フォーム" value={formAction?.formName ?? '開かせない'} /> : <Select
-              aria-label="回答フォームを開かせる（任意）"
-              size="full"
-              value={formAction?.formId ?? ''}
-              error={formIssueMessage ?? undefined}
-              onChange={chooseForm}
-              options={[
-                { value: '', label: '開かせない' },
-                ...(formAction && !selectedForm ? [{ value: formAction.formId, label: `${formAction.formName}（見つかりません）`, disabled: true }] : []),
-                ...forms.map((form) => ({ value: form.id, label: form.isActive ? form.name : `${form.name}（公開されていません）`, disabled: !form.isActive })),
-              ]}
-            />}
+            {!canEdit ? <StaticBox label="回答フォーム" value={formAction?.formName ?? '開かせない'} /> : <>
+              <EntityKindField
+                kind="form"
+                label="回答フォームを開かせる（任意）"
+                options={forms.filter((form) => form.isActive || form.id === formAction?.formId)}
+                meta={(row) => (row.isActive === false ? '公開されていません' : undefined)}
+                placeholder="（開かせない）"
+                clearable
+                invalid={Boolean(formIssueMessage)}
+                value={formAction?.formId ?? ''}
+                onChange={chooseForm}
+              />
+              {formIssueMessage ? <p className={styles.error} role="alert">{formIssueMessage}</p> : null}
+            </>}
           </div>
           <div className={styles.field}>
             <span className={styles.labelSmall}>回答後にマイルを付ける</span>

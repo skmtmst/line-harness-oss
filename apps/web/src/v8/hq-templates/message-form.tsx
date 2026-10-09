@@ -17,6 +17,8 @@ import LinePreview, { LinePreviewMessage } from '@/components/shared/line-previe
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
+import { EntityPickerField } from '@/components/shared/entity-picker'
+import { ENTITY_KINDS } from '@/components/shared/entity-picker-sources'
 import FolderSelect from '@/components/shared/folder-select'
 import { decodeImageSize, type TemplateMedia } from './definition'
 import styles from './console.module.css'
@@ -141,16 +143,15 @@ export default function MessageForm({
                         <span className={styles.label}>参照先</span>
                         <button type="button" className={styles.textButton} disabled={disabled} onClick={() => updateCard({ ...card, buttons: card.buttons.filter((row) => row.id !== button.id) })}>{`ボタン${index + 1}を外す`}</button>
                       </span>
-                      <Select
-                        aria-label={`ボタン${index + 1}の参照先`} size="full"
+                      {/* 統括の参照先はアカウントをまたぐので、店のフォルダは読まず行を直接渡す。 */}
+                      <EntityPickerField
+                        label={`ボタン${index + 1}の参照先`}
+                        noun={ENTITY_KINDS[button.action].noun}
+                        icon={ENTITY_KINDS[button.action].icon}
                         disabled={disabled || Boolean(referenceError)}
+                        items={references.filter((row) => row.kind === button.action).map((row) => ({ id: row.id, name: row.name, meta: row.accountName, keywords: row.accountName }))}
                         value={button.value}
                         onChange={(next) => updateButton(button.id, { value: next })}
-                        options={[
-                          { value: '', label: '選択してください' },
-                          ...(button.value && !references.some((row) => row.kind === button.action && row.id === button.value) ? [{ value: button.value, label: '保存済みの参照先（候補を確認してください）' }] : []),
-                          ...references.filter((row) => row.kind === button.action).map((row) => ({ value: row.id, label: `${row.name}（${row.accountName}）` })),
-                        ]}
                       />
                     </div>
                   ) : (

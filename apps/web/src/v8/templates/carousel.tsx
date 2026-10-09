@@ -31,6 +31,7 @@ import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
@@ -328,15 +329,12 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   const onPublish = async () => { if (host) { hostSave(true); return } const savedId = await saveNow(); if (savedId) await publishSaved(savedId) }
 
   /* 回答フォームの候補：受け付け中のフォーム。選んであるのが一覧に無い・止めてあるときも消さずに出す。 */
-  const formOptions = (current: string) => {
+  const formRows = (current: string) => {
     const active = forms.filter((form) => form.isActive)
-    const options = [{ value: '', label: '回答フォームを選ぶ', disabled: true }, ...active.map((form) => ({ value: form.id, label: form.name }))]
-    if (current && !active.some((form) => form.id === current)) {
-      const stopped = forms.find((form) => form.id === current)
-      options.push({ value: current, label: stopped ? `${stopped.name}（受け付けを止めています）` : '見つからない回答フォーム' })
-    }
-    return options
+    const stopped = current && !active.some((form) => form.id === current) ? forms.find((form) => form.id === current) : undefined
+    return stopped ? [...active, stopped] : active
   }
+  const formMeta = (row: { isActive?: boolean | null }) => row.isActive === false ? '受け付けを止めています' : undefined
 
   const panel = panels[selected] ?? panels[0]
   const selectedIndex = panels[selected] ? selected : 0
@@ -545,9 +543,9 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                       ) : action.kind === 'message' ? (
                         <input className={`${styles.input} ${own.colBody}`} value={action.text} placeholder={`押した人が送る文（${MESSAGE_TEXT_MAX}文字まで）`} aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の送る文`} aria-invalid={[...action.text].length > MESSAGE_TEXT_MAX || undefined} title={action.text || undefined} onChange={(event) => setAction({ text: event.target.value })} />
                       ) : action.kind === 'form' ? (
-                        <span className={own.colBody}>
-                          <Select size="full" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の回答フォーム`} value={action.formId} onChange={(value) => setAction({ formId: value })} options={formOptions(action.formId)} />
-                        </span>
+                        <div className={own.colBody}>
+                          <EntityKindField kind="form" label={`カード${selectedIndex + 1}のボタン${ai + 1}の回答フォーム`} options={formRows(action.formId)} meta={formMeta} accountId={folderAccountId} value={action.formId} onChange={(value) => setAction({ formId: value })} />
+                        </div>
                       ) : action.kind === 'booking' || action.kind === 'booking_history' ? (
                         <span className={`${own.colBody} ${own.fixedBody}`}>{action.kind === 'booking' ? 'このアカウントの予約ページを開きます' : 'このアカウントの予約履歴を開きます'}</span>
                       ) : (

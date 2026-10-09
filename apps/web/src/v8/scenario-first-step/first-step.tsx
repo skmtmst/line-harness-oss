@@ -43,6 +43,7 @@ import { pruneCondition } from '@/lib/segment-condition'
 import { CreatePage } from '@/components/templates'
 import { Steps } from '@/components/templates/steps'
 import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { Field } from '@/components/shared/form-controls'
 import { TimeField } from '@/components/shared/date-time-field'
 import SegmentedControl from '@/components/shared/segmented'
@@ -784,24 +785,18 @@ export default function ScenarioFirstStepV8() {
         ) : (
           <div className={styles.inlineField}>
             <span className={styles.inlineLabel}>テンプレート</span>
-            <Select
-              value={templateId}
-              onChange={(value) => editTemplateId(value)}
-              error={contentError || undefined}
-              aria-label="配信するテンプレート"
-              size="full"
-              options={[
-                { value: '', label: '選んでください' },
-                ...templates.map((template) => ({
-                  value: template.id,
-                  label: `${template.name}（${
-                    { text: 'テキスト', image: 'リッチメッセージ', flex: 'カードタイプ', carousel: 'カルーセル' }[
-                      template.messageType as 'text' | 'image' | 'flex' | 'carousel'
-                    ] ?? template.messageType
-                  }）`,
-                })),
-              ]}
-            />
+            <div className="w-full min-w-0">
+              <EntityKindField
+                kind="template"
+                label="配信するテンプレート"
+                options={templates}
+                accountId={scenario?.lineAccountId ?? undefined}
+                value={templateId}
+                onChange={(value) => editTemplateId(value)}
+                invalid={Boolean(contentError)}
+              />
+              {contentError ? <p className={styles.fieldError} role="alert">{contentError}</p> : null}
+            </div>
             <span className={styles.cardDesc}>テンプレートを直すと、この通の中身も一緒に変わります。</span>
           </div>
         )}
