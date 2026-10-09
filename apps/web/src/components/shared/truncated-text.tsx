@@ -47,20 +47,20 @@ export default function TruncatedText({ value, url = false, className, ...props 
     update()
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null
     observer?.observe(node)
-    const parent = node.closest('a, button, [role="button"], [role="tab"]')
+    const parent = node.closest?.('a, button, [role="button"], [role="tab"]')
     setNested(Boolean(parent))
-    parent?.addEventListener('focus', open)
-    parent?.addEventListener('blur', close)
-    window.addEventListener('resize', update)
-    return () => { observer?.disconnect(); parent?.removeEventListener('focus', open); parent?.removeEventListener('blur', close); window.removeEventListener('resize', update); clear() }
+    parent?.addEventListener?.('focus', open)
+    parent?.addEventListener?.('blur', close)
+    window.addEventListener?.('resize', update)
+    return () => { observer?.disconnect(); parent?.removeEventListener?.('focus', open); parent?.removeEventListener?.('blur', close); window.removeEventListener?.('resize', update); clear() }
   }, [shown, value, open, close, clear])
   useEffect(() => {
     if (!position) return
     const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') close() }
     document.addEventListener('keydown', escape)
-    window.addEventListener('scroll', close, true)
-    window.addEventListener('resize', close)
-    return () => { document.removeEventListener('keydown', escape); window.removeEventListener('scroll', close, true); window.removeEventListener('resize', close) }
+    window.addEventListener?.('scroll', close, true)
+    window.addEventListener?.('resize', close)
+    return () => { document.removeEventListener('keydown', escape); window.removeEventListener?.('scroll', close, true); window.removeEventListener?.('resize', close) }
   }, [position, close])
   return <>
     <span {...props} ref={ref} className={[styles.text, className].filter(Boolean).join(' ')} data-truncated-text="" tabIndex={nested ? undefined : clipped ? 0 : undefined} aria-describedby={position ? id : undefined} aria-label={shown !== value ? value : props['aria-label']} onMouseEnter={open} onMouseLeave={leave} onFocus={open} onBlur={close}>{shown}</span>
