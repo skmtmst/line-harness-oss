@@ -88,7 +88,7 @@ describe('UVnvR 休業日・貸切', () => {
     const band = document.querySelector('[data-closure-band]') as HTMLElement
     expect(band.textContent).toContain('他の予約サイトの枠を閉じてください（未対応 2件）')
     expect(band.textContent).toContain('ホットペッパー・食べログの')
-    expect(within(band).getByRole('link', { name: 'ホットペッパーの管理画面を開く ↗' }).getAttribute('href')).toBe('https://cms.example.jp/')
+    expect(within(band).getByRole('link', { name: 'ホットペッパーの管理画面を開く' }).getAttribute('href')).toBe('https://cms.example.jp/')
     fireEvent.click(within(band).getByRole('button', { name: 'ホットペッパーの枠を閉じた' }))
     await waitFor(() => expect(fixture.completeChannelCloseTask).toHaveBeenCalledWith('account-1', 'k1'))
   })

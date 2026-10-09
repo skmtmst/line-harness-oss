@@ -27,6 +27,7 @@ import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import StoreTabs, { type StoreTabKey } from '../store-tabs/store-tabs'
 import styles from './shell.module.css'
+import StoreFilterTabs from '@/components/shared/store-filter-tabs'
 
 export interface RestaurantV8Context {
   data: RestaurantSnapshot
@@ -230,10 +231,10 @@ export default function RestaurantShell({ boardId, title, description, query, he
     children(ctx)
   )
   const storePicker = snapshot && snapshot.stores.length > 0 ? (
-    <span className={`${styles.storePicker} ${layout === 'standard' ? '' : styles.storeLedger}`}>
-      <Select
-        aria-label="店舗を選ぶ"
-        size="full"
+    <span>
+      <StoreFilterTabs
+
+
         value={selectedStoreId}
         onChange={setSelectedStoreId}
         options={snapshot.stores.map((item) => ({ value: item.id, label: `店舗：${item.name}` }))}

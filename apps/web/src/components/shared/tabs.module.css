@@ -219,3 +219,6 @@
   box-sizing: border-box; height: var(--tpl-wh-tab-h); min-height: 0;
   align-items: flex-start; padding-bottom: 0; line-height: var(--tpl-tabs-text-lh);
 }
+
+.list[data-wrap='true'] { min-width: 0; max-width: 100%; }
+.list[data-wrap='true'] .items { flex-wrap: wrap; min-width: 0; max-width: 100%; }

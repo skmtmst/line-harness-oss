@@ -25,6 +25,7 @@ import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import styles from './frame.module.css'
+import StoreFilterTabs from '@/components/shared/store-filter-tabs'
 
 export interface RestaurantContext {
   data: RestaurantSnapshot
@@ -138,9 +139,9 @@ export default function RestaurantFrame({
   )
 
   const picker = snapshot && snapshot.stores.length > 0 ? (
-    <Select
-      aria-label="店舗を選ぶ"
-      width={STORE_PICKER_WIDTH}
+    <StoreFilterTabs
+
+
       value={selectedStoreId}
       onChange={setSelectedStoreId}
       options={[

@@ -97,7 +97,7 @@ describe('電話予約（E-2）', () => {
     expect((screen.getByRole('textbox', { name: 'お名前' }) as HTMLInputElement).value).toBe('鈴木 美咲')
     fireEvent.click(screen.getByText(/明日/))
     fireEvent.click(await screen.findByRole('button', { name: '19:00' }))
-    expect(screen.getByRole('switch', { name: 'LINE で確認を送る' })).not.toBeNull()
+    expect(screen.getByRole('checkbox', { name: 'LINE で確認を送る' })).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /予約を入れる/ }))
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith({ lineFailed: false }))
     expect(api.createReservation).toHaveBeenCalledWith('acc', expect.objectContaining({

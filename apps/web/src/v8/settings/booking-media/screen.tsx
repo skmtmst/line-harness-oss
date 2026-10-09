@@ -41,6 +41,7 @@ import styles from './screen.module.css'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
+import StoreFilterTabs from '@/components/shared/store-filter-tabs'
 
 export type MediaRow = {
   code: string
@@ -441,8 +442,8 @@ export default function BookingMediaPage() {
           actions={(
             <span className={styles.headActions}>
               {stores.length > 1 ? (
-                <span className={styles.storeSelect}>
-                  <Select aria-label="店舗" value={storeId} onChange={(value) => { if (value === storeId) return; if (changes > 0) setPendingStoreId(value); else setStoreId(value) }} options={stores.map((s) => ({ value: s.id, label: s.name }))} />
+                <span>
+                  <StoreFilterTabs  value={storeId} onChange={(value) => { if (value === storeId) return; if (changes > 0) setPendingStoreId(value); else setStoreId(value) }} options={stores.map((s) => ({ value: s.id, label: s.name }))} />
                 </span>
               ) : null}
               {canManage ? <Button onClick={() => { setAdding(true); setAddName(''); setAddError(''); setAddNameError('') }}><Plus size={15} aria-hidden="true" />媒体を足す</Button> : null}
