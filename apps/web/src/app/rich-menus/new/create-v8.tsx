@@ -46,6 +46,7 @@ import Card from '@/components/shared/card'
 import LayoutPicker from '@/components/shared/layout-picker'
 import TargetMissing from '@/components/shared/target-missing'
 import { Field, TextInput } from '@/components/shared/form-controls'
+import { useFormErrors } from '@/lib/use-form-errors'
 import SectionHeader from '@/components/shared/section-header'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
@@ -520,8 +521,6 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const [tabNames, setTabNames] = useState<string[]>([])
   /* ①でタブを減らすとき、消えるタブに設定があれば確かめる（その間の次の数）。 */
   const [pendingTabCount, setPendingTabCount] = useState<number | null>(null)
-  const [nameError, setNameError] = useState<string | null>(null)
-  const [chatBarTextError, setChatBarTextError] = useState<string | null>(null)
 
   /* 手順③ */
   const [audience, setAudience] = useState<'all' | 'targeted'>('all')
@@ -779,17 +778,27 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     })
   }
 
+  /*
+   * 保存で落ちた欄（B-139）。名前・トーク画面の下の文言は①、切り替えの行き先は②の面。
+   * 帯ではなく欄を赤くして真下に理由を出し、別の手順・タブ・面ならそこを開いて移る。面の一覧に赤い丸。
+   */
+  const fields = useFormErrors()
+  fields.define('name', 'メニュー名', () => (name.trim() ? null : '名前を入力してください'), { reveal: () => setStep('shape') })
+  fields.define('chatbar', 'トーク画面の下の文言', () => (chatBarText.trim() ? null : 'トーク画面の下の文言を入力してください'), { reveal: () => setStep('shape') })
+  if (group) {
+    pages.forEach((page, pageIndex) => {
+      page.areas.forEach((area, areaIndex) => {
+        if (area.actionType !== 'richmenuswitch') return
+        fields.define(`area-${area.id}`, `タブ${pageIndex + 1}の面 ${String.fromCharCode(65 + areaIndex)} の切り替え先`, () => (
+          String(area.actionData?.targetPageId ?? '').trim() ? null : '「メニューを切り替える」面の行き先ページが決まっていません。切り替え先を選んでください。'
+        ), { reveal: () => { setStep('buttons'); setActivePageId(page.id); setSelectedAreaId(area.id) }, group: `area-${area.id}` })
+      })
+    })
+  }
+
   function validateBasics(): boolean {
-    if (!name.trim()) {
-      setNameError('名前を入力してください')
+    if (fields.submit().length > 0) {
       setError(null)
-      requestAnimationFrame(() => document.getElementById('rm-name')?.focus())
-      return false
-    }
-    if (!chatBarText.trim()) {
-      setChatBarTextError('トーク画面の下の文言を入力してください')
-      setError(null)
-      requestAnimationFrame(() => document.getElementById('rm-chatbar')?.focus())
       return false
     }
     return true
@@ -1009,16 +1018,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         const ok = await createDraft()
         if (!ok) return false
       } else {
-        // 切替ボタンの行き先未設定は先に止める（server 400 を日本語で先回り）。
-        const unsetSwitch = pages.some((p) =>
-          p.areas.some(
-            (a) => a.actionType === 'richmenuswitch' && !String(a.actionData?.targetPageId ?? '').trim(),
-          ),
-        )
-        if (unsetSwitch) {
-          setError('「メニューを切り替える」面の行き先ページが決まっていません。面の設定で切り替え先を選んでください。')
-          return false
-        }
+        // 切替ボタンの行き先未設定は validateBasics（欄の誤り）で先に止めている（server 400 を日本語で先回り）。
         await persistDraft()
         if (!host) await reloadGroup(group.id)
       }
@@ -1930,11 +1930,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         <Card padding="roomy" layout="vertical" className={styles.stackSection}>
           <SectionHeader title="名前とフォルダ" />
           <div className={styles.fieldGrid}>
-            <Field label="メニュー名（友だちには見えません）" htmlFor="rm-name" error={nameError}>
-              <TextInput id="rm-name" value={name} onChange={(e) => {
-                setName(e.target.value)
-                if (nameError) setNameError(null)
-              }} placeholder="例：通常メニュー（会員向け）" invalid={Boolean(nameError)} />
+            <Field label="メニュー名（友だちには見えません）" htmlFor="rm-name" error={fields.error('name')}>
+              <TextInput {...fields.bind('name')} id="rm-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="例：通常メニュー（会員向け）" invalid={fields.invalid('name')} />
             </Field>
             <Field label="フォルダ">
               <FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId}
@@ -1950,11 +1947,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                     : folderCreator((name, color) => api.folders.create({ kind: 'rich_menu', name, color }), folderById, (created) => setFolders((current) => [...current, created]))} />
             </Field>
           </div>
-          <Field label="トーク画面の下の文言（14文字まで）" htmlFor="rm-chatbar" error={chatBarTextError}>
-            <TextInput id="rm-chatbar" value={chatBarText} maxLength={14} onChange={(e) => {
-              setChatBarText(e.target.value)
-              if (chatBarTextError) setChatBarTextError(null)
-            }} placeholder="メニュー" invalid={Boolean(chatBarTextError)} />
+          <Field label="トーク画面の下の文言（14文字まで）" htmlFor="rm-chatbar" error={fields.error('chatbar')}>
+            <TextInput {...fields.bind('chatbar')} id="rm-chatbar" value={chatBarText} maxLength={14} onChange={(e) => setChatBarText(e.target.value)} placeholder="メニュー" invalid={fields.invalid('chatbar')} />
           </Field>
         </Card>
 
@@ -2212,6 +2206,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           id: area.id,
           name: areaDisplayName(area, i),
           summary: areaActionSummary(area) || null,
+          errorCount: fields.countIn(`area-${area.id}`),
         }))}
         selectedId={selectedAreaId}
         onSelect={setSelectedAreaId}
@@ -2235,6 +2230,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         }
         detail={
           selectedArea && activeIndex >= 0 ? (
+            <div {...fields.bind(`area-${selectedArea.id}`)}>
             <Card padding="roomy" layout="vertical">
               <SectionHeader title={`面 ${String.fromCharCode(65 + activeIndex)}「${areaDisplayName(selectedArea, activeIndex)}」の動き`} />
               <AreaProperties
@@ -2249,6 +2245,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                 onDelete={() => deleteArea(activePage.id, selectedArea.id)}
                 showManagementDetails={false}
                 allowedIntents={host ? [...HQ_RICH_MENU_INTENTS] : NEW_MENU_INTENTS_WITH_SWITCH}
+                error={fields.error(`area-${selectedArea.id}`)}
               />
               <div>
                 <Button type="button" variant="text" onClick={() => deleteArea(activePage.id, selectedArea.id)}>
@@ -2256,6 +2253,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                 </Button>
               </div>
             </Card>
+            </div>
           ) : (
             <Card padding="roomy" layout="vertical">
               <p className={styles.cardNote}>上の画像で面を押すと、ここで動きを決められます。</p>

@@ -217,4 +217,28 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     expect(saved().pages).toHaveLength(2)
     expect(fetch).not.toHaveBeenCalled()
   })
+  /* B-139：保存で落ちた欄は帯ではなく欄で知らせ、別の手順・タブ・面ならそこを開いて移る。 */
+  it('名前と文言が空なら次へ進まず、2つの欄を赤くして真下に理由を出し、名前へ移る', async () => {
+    render(<RichMenuCreateV8 host={host} />)
+    fireEvent.change(screen.getByLabelText('トーク画面の下の文言（14文字まで）'), { target: { value: '' } })
+    click('次へ：ボタンの動き')
+    const name = document.getElementById('rm-name') as HTMLInputElement
+    await waitFor(() => expect(name.getAttribute('aria-invalid')).toBe('true'))
+    expect(screen.getByText('名前を入力してください')).toBeTruthy()
+    expect(screen.getByText('トーク画面の下の文言を入力してください')).toBeTruthy()
+    expect(document.getElementById('rm-chatbar')?.getAttribute('aria-invalid')).toBe('true')
+    await waitFor(() => expect(document.activeElement).toBe(name))
+    expect(screen.queryByText('画像の上で面を選ぶ')).toBeNull()
+  })
+  it('切り替えの行き先が無い面は保存せず、その面を選んで理由を出し、一覧に赤い丸を付ける', async () => {
+    await start('2つ')
+    selectArea('A'); pickIntent('メニューを切り替える')
+    selectArea('B')
+    click('下書きを保存')
+    await waitFor(() => expect(screen.getByText('「メニューを切り替える」面の行き先ページが決まっていません。切り替え先を選んでください。')).toBeTruthy())
+    expect(screen.getByRole('heading', { name: /面 A「/ })).toBeTruthy()
+    expect(screen.getByRole('img', { name: /直す欄が1か所/ })).toBeTruthy()
+    expect(host.onSave).not.toHaveBeenCalled()
+  })
+
 })

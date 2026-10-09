@@ -12,6 +12,7 @@ import {
   type TapActionKind, type TapActionValue,
 } from '@/lib/tap-actions'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
+import { FieldError } from '@/components/shared/form-controls'
 import type { Area } from './canvas-editor'
 import { RICH_MENU_ACTION_TYPE_BY_INTENT, richMenuUriError, type RichMenuAreaIntent } from '@line-crm/shared'
 
@@ -29,6 +30,8 @@ type Props = {
   taps: { count: number; viaTrackedLink: number } | null
   onUpdate: (patch: Partial<Area>) => void
   onDelete?: () => void
+  /** 保存で落ちた、この面の動きの理由（B-139）。欄の真下に出し、欄を赤くする。 */
+  error?: string | null
   /** 新規作成では座標・実績・削除を隠し、動きの設定だけを使う。 */
   showManagementDetails?: boolean
   allowedIntents?: RichMenuAreaIntent[]
@@ -218,6 +221,7 @@ export function AreaProperties({
   scope,
   liffId: liffIdProp,
   readOnly = false,
+  error = null,
 }: Props) {
   const inputId = useId()
   const data = (area.actionData ?? {}) as Record<string, unknown>
@@ -426,6 +430,7 @@ export function AreaProperties({
             renderBody={(kind) => kind === 'uri' ? urlBody : kind === 'form' && forms.length === 0 ? formEmpty : extraIntentOf(kind) ? null : undefined}
           />
         </div>
+        {intent === 'switch' ? null : <FieldError id={`${inputId}-action-error`}>{error}</FieldError>}
       </div>
 
       {intent === 'tel' && (
@@ -468,6 +473,7 @@ export function AreaProperties({
             value={(data.targetPageId as string) ?? ''}
             onChange={(value) => onUpdate({ actionData: { ...data, targetPageId: value } })}
             aria-label="切り替え先のページ"
+            invalid={Boolean(error)}
             options={[
               { value: '', label: '選択...' },
               ...pages.map((p) => ({ value: p.id, label: p.name })),
@@ -479,6 +485,7 @@ export function AreaProperties({
               タブの切り替えには2ページ以上必要です。先にページを追加してください。
             </p>
           )}
+          <FieldError id={`${inputId}-action-error`}>{error}</FieldError>
         </Field>
       )}
 
