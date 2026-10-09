@@ -1045,7 +1045,7 @@ function V8ScoreAdjustDialog({
       </div>
 
       <p className={styles.dlgLabel}>点数</p>
-      <input
+      <NumberInput numericText
         className={styles.dlgInput}
         inputMode="numeric"
         value={amountText}

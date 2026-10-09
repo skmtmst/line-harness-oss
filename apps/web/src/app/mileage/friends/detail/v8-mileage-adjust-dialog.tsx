@@ -344,7 +344,7 @@ export default function V8MileageAdjustDialog({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <p className={styles.dlgLabel}>マイル数</p>
-              <input
+              <NumberInput numericText
                 className={styles.dlgInput}
                 inputMode="numeric"
                 value={zeroing ? String(currentBalance) : amountText}
@@ -410,7 +410,7 @@ export default function V8MileageAdjustDialog({
               <p className={styles.dlgPersonName}>高額調整の承認境界が未設定です</p>
               <p className={styles.dlgPersonSub}>この値以上は、この画面では実行せず、別のオーナー承認を必要とします。</p>
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginTop: 8 }}>
-                <input
+                <NumberInput numericText
                   className={styles.dlgInput}
                   inputMode="numeric"
                   value={policyThresholdText}

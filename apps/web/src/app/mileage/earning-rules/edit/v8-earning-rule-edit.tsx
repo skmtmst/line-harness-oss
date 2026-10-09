@@ -303,7 +303,7 @@ function EditInner() {
             <div className={formStyles.grid2}>
               <div className={formStyles.field}>
                 <span className={formStyles.label}>付与マイル <span className={formStyles.required}>必須</span></span>
-                <TextInput {...fields.bind('amount')} invalid={fields.invalid('amount')} aria-describedby={describedBy('amount')} type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="付与マイル" />
+                <NumberInput {...fields.bind('amount')} invalid={fields.invalid('amount')} aria-describedby={describedBy('amount')} type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="付与マイル" />
                 <FieldError id="er-amount-error">{fields.error('amount')}</FieldError>
                 <span className={formStyles.hint}>1以上で入力してください。</span>
               </div>
@@ -359,7 +359,7 @@ function EditInner() {
               <div className={formStyles.field}>
                 <span className={formStyles.label}>付いたマイルの有効期限</span>
                 <span className={formStyles.inlineRow}>
-                  <TextInput {...fields.bind('expiry')} invalid={fields.invalid('expiry')} aria-describedby={describedBy('expiry')} type="number" min={1} max={3650} value={expiresAfterDays} onChange={(e) => setExpiresAfterDays(e.target.value)} aria-label="有効期限の日数" />
+                  <NumberInput {...fields.bind('expiry')} invalid={fields.invalid('expiry')} aria-describedby={describedBy('expiry')} type="number" min={1} max={3650} value={expiresAfterDays} onChange={(e) => setExpiresAfterDays(e.target.value)} aria-label="有効期限の日数" />
                   <span className={formStyles.hint}>日後（空欄なら期限なし）</span>
                 </span>
                 <FieldError id="er-expiry-error">{fields.error('expiry')}</FieldError>

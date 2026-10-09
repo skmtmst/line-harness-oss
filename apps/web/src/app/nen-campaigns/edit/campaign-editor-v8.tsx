@@ -322,8 +322,8 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
               <div className={styles.fieldLabel}>
                 きっかけ
                 <p className={styles.static}>{triggerLabel(setting)}</p>
-                {!isBirthday ? <label className={styles.delay}>
-                  <NumberInput aria-label="きっかけからの日数" type="number" min={0} max={365}
+                {!isBirthday ? <div className={styles.delay}>
+                  <NumberInput unit="日後" aria-label="きっかけからの日数" type="number" min={0} max={365}
                     value={String(merged.delayDays)} onChange={(event) => setDraft((previous) => ({ ...previous, delayDays: Number(event.target.value) }))} />
 
                 </div> : null}

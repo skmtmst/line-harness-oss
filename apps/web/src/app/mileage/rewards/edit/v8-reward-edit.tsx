@@ -353,7 +353,7 @@ function RewardEditorInner() {
             <div className={formStyles.grid2}>
               <Field label="名前" required><TextInput id="reward-name" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="例：送料無料クーポン" aria-label="名前" />
 {touched && !form.name.trim() ? <span className={formStyles.required}>使い道の名前を入力してください</span> : null}</Field>
-              <Field label="必要マイル" required><TextInput inputMode="numeric" value={form.requiredMiles} onChange={(e) => set('requiredMiles', e.target.value)} placeholder="例：500" aria-label="必要マイル" />
+              <Field label="必要マイル" required><NumberInput numericText inputMode="numeric" value={form.requiredMiles} onChange={(e) => set('requiredMiles', e.target.value)} placeholder="例：500" aria-label="必要マイル" />
 {touched && errors.includes('必要マイルは1以上の整数で入力してください') ? <span className={formStyles.required}>必要マイルは1以上の整数で入力してください</span> : null}</Field>
             </div>
             <Disclosure title="説明を添える（任意）" size="compact">
@@ -466,12 +466,12 @@ function RewardEditorInner() {
             <div className={formStyles.grid2}>
               <div className={formStyles.field}>
                 <Field label="出す数" htmlFor="reward-stock-v8" note="空欄なら限りなし。0 と書くと品切れ（交換できません）" error={touched && errors.includes(LIMIT_FIELD_ERRORS.stockLimit) ? LIMIT_FIELD_ERRORS.stockLimit : undefined}>
-                  <TextInput id="reward-stock-v8" inputMode="numeric" value={form.stockLimit} onChange={(e) => set('stockLimit', normalizeDigits(e.target.value))} placeholder="制限なし" />
+                  <NumberInput numericText id="reward-stock-v8" inputMode="numeric" value={form.stockLimit} onChange={(e) => set('stockLimit', normalizeDigits(e.target.value))} placeholder="制限なし" />
                 </Field>
               </div>
               <div className={formStyles.field}>
                 <Field label="1人あたり" htmlFor="reward-per-friend-v8" note="空欄なら何回でも" error={touched && errors.includes(LIMIT_FIELD_ERRORS.perFriendLimit) ? LIMIT_FIELD_ERRORS.perFriendLimit : undefined}>
-                  <TextInput id="reward-per-friend-v8" inputMode="numeric" value={form.perFriendLimit} onChange={(e) => set('perFriendLimit', normalizeDigits(e.target.value))} placeholder="1回まで" />
+                  <NumberInput numericText id="reward-per-friend-v8" inputMode="numeric" value={form.perFriendLimit} onChange={(e) => set('perFriendLimit', normalizeDigits(e.target.value))} placeholder="1回まで" />
                 </Field>
               </div>
             </div>
@@ -485,7 +485,7 @@ function RewardEditorInner() {
             </div>
             <div className={formStyles.field}>
               <Field label="交換後に使える日数" htmlFor="reward-expires-v8" note="空欄なら期限なし" error={touched && errors.includes(LIMIT_FIELD_ERRORS.benefitExpiresDays) ? LIMIT_FIELD_ERRORS.benefitExpiresDays : undefined}>
-                <TextInput id="reward-expires-v8" inputMode="numeric" value={form.benefitExpiresDays} onChange={(e) => set('benefitExpiresDays', normalizeDigits(e.target.value))} placeholder="期限なし" />
+                <NumberInput numericText id="reward-expires-v8" inputMode="numeric" value={form.benefitExpiresDays} onChange={(e) => set('benefitExpiresDays', normalizeDigits(e.target.value))} placeholder="期限なし" />
               </Field>
             </div>
           </section>

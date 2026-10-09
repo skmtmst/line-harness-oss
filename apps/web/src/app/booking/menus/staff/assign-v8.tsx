@@ -445,8 +445,7 @@ export default function AssignMatrixV8() {
                       升を押したとき（{staffLabel(selectedStaff)} × {selectedMenu.name}）
                     </h3>
                   <div className={styles.overrideFields}>
-                    <Field label="このスタッフの所要時間"><span className={styles.unitField}>
-                        <NumberInput
+                    <Field label="このスタッフの所要時間" note={`メニューは ${selectedMenu.duration_minutes} 分`}><NumberInput unit="分"
                           type="number"
                           min={1}
                           disabled={!canEditMenus || !selectedRow.is_offered}
@@ -460,11 +459,8 @@ export default function AssignMatrixV8() {
                           placeholder={String(selectedMenu.duration_minutes)}
                           aria-label={`${staffLabel(selectedStaff)} の ${selectedMenu.name} の所要時間`}
                         />
-                        <span className={styles.unitSuffix}>分（メニューは {selectedMenu.duration_minutes} 分）</span>
-                      </span></Field>
-                    <Field label="このスタッフの料金"><span className={styles.unitField}>
-                        <span className={styles.unitSuffix}>¥</span>
-                        <NumberInput
+                        </Field>
+                    <Field label="このスタッフの料金" note={`メニューは ${menuPriceLabel(selectedMenu)}`}><NumberInput unit="円"
                           type="number"
                           min={0}
                           disabled={!canEditMenus || !selectedRow.is_offered}

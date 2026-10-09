@@ -323,7 +323,7 @@ export default function V8EarningRuleNew() {
           <section className={formStyles.card} aria-label="何マイル付けるか">
             <h2 className={formStyles.cardTitle}>何マイル付けるか</h2>
             <div className={formStyles.grid2}>
-              <Field label="マイル" required><TextInput
+              <Field label="マイル" required><NumberInput
                   type="number"
                   min={1}
                   value={amount}
@@ -395,7 +395,7 @@ export default function V8EarningRuleNew() {
             <Disclosure title="詳しい設定（倍率・通知・取り消し・公開）" size="compact">
               <div className={formStyles.detailsBody}>
                 <Field label="付いたマイルの有効期限"><span className={formStyles.inlineRow}>
-                    <TextInput type="number" min={1} max={3650} value={expiresAfterDays} onChange={(e) => setExpiresAfterDays(e.target.value)} aria-label="有効期限の日数" />
+                    <NumberInput type="number" min={1} max={3650} value={expiresAfterDays} onChange={(e) => setExpiresAfterDays(e.target.value)} aria-label="有効期限の日数" />
                     <span className={formStyles.hint}>日後（空欄なら期限なし）</span>
                   </span></Field>
                 <Checkbox
