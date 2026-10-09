@@ -162,3 +162,6 @@
 /* 単独の確認行（Yyw6i）。既定のカード寸法は変えない。 */
 [data-theme='v8'] .row { align-items: center; min-height: 36px; padding: 8px 10px; gap: 8px; border-radius: var(--radius-control); }
 [data-theme='v8'] .row .title { font-size: 13px; font-weight: 500; line-height: 20px; }
+
+/* B-152①：チェック付きカードも内側16。 */
+[data-theme='v8'] .card { padding: var(--polish-space-card); gap: var(--polish-space-field); }

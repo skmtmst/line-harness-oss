@@ -52,3 +52,5 @@
 }
 
 [data-theme='v8'] .root[data-size="small"] .title { font-size: var(--text-body); font-weight: 700; line-height: var(--tpl-rt-label-lh); }
+
+[data-theme='v8'] .root { gap: var(--polish-space-row); }

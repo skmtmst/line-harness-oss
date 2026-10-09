@@ -27,7 +27,7 @@ function token(name: string): string {
 }
 
 describe("外部連携の板の数字", () => {
-  it("作るの段カードは余白20（四方）", () => {
+  it("作るの段カードは共通の余白16（四方）", () => {
     expect(CREATE).toContain('<Card variant="form"');
     expect(CARD_CSS).toMatch(/\.form \{[^}]*padding: var\(--tpl-cn-card-pad\);/s);
     expect(token("--tpl-cn-card-pad")).toBe("20px");
