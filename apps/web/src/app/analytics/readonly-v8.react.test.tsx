@@ -49,7 +49,7 @@ describe('V8の閲覧と実測値の保護', () => {
   })
   it('期間を変えると選択中アカウントの集計を取得し直す', async () => {
     await render()
-    const range = [...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === '7日')!
+    const range = [...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === '過去7日')!
     await act(async () => range.click())
     expect(state.calls.length).toBe(2)
     expect(state.calls.every((call) => call.startsWith('account-a:'))).toBe(true)

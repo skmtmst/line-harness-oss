@@ -23,9 +23,9 @@ export function useReportPeriod(initialDays = 30) {
   return { days, setDays, range, customRange, setRange }
 }
 /** 集計期間の言葉・日付欄を一か所で管理する。API制限のある口は supportedDays を渡す。 */
-export default function PeriodPicker({ days, onChange, customRange, onRangeChange, supportedDays = PERIOD_DAYS, size = 'medium', className, choices }: {
+export default function PeriodPicker({ days, onChange, customRange, onRangeChange, supportedDays = PERIOD_DAYS, size = 'medium', choices }: {
   days: number; onChange: (days: number) => void; customRange?: PeriodRange | null; onRangeChange?: (range: PeriodRange) => void
-  choices?: { days: number; label: string }[]; supportedDays?: readonly number[]; size?: 'small' | 'medium'; className?: string
+  choices?: { days: number; label: string }[]; supportedDays?: readonly number[]; size?: 'small' | 'medium'
 }) {
   const [customOpen, setCustomOpen] = useState(false)
   const [draft, setDraft] = useState<PeriodRange>(() => customRange ?? pastPeriod(days))
@@ -33,7 +33,7 @@ export default function PeriodPicker({ days, onChange, customRange, onRangeChang
   const options = choices ? choices.map((item) => ({ value: String(item.days), label: item.label })) : supportedDays.map((value) => ({ value: String(value), label: `過去${value}日` }))
   if (onRangeChange) options.push({ value: 'custom', label: '期間を指定' })
   const update = (next: PeriodRange) => { setDraft(next); if (validPeriod(next)) onRangeChange?.(next) }
-  return <div className={[styles.root, className].filter(Boolean).join(' ')}>
+  return <div className={styles.root}>
     <SegmentedControl aria-label="集計期間" size={size} options={options} value={custom ? 'custom' : String(days)} onChange={(value) => {
       if (value === 'custom') { setDraft(customRange ?? pastPeriod(days)); setCustomOpen(true) }
       else { setCustomOpen(false); onChange(Number(value)) }
