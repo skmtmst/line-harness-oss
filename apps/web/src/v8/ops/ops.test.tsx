@@ -5,6 +5,7 @@
  * 停止の窓が名前と理由を確かめるまで口を呼ばないことを見る。
  */
 import React, { act } from 'react'
+import { fireEvent } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -126,11 +127,29 @@ describe('送る・止める前に確かめる', () => {
   it('お知らせ：今すぐ送るを押すと確認の窓が開き、まだ送らない', async () => {
     await act(async () => { root.render(<OpsAnnouncementsV8 />) })
     await settle()
+    // 件名と本文を入れてから押す（足りない欄があるうちは確認の窓を開かない。B-139）。
+    fireEvent.change(document.querySelector('#ann-subject')!, { target: { value: 'メンテナンスのお知らせ' } })
+    fireEvent.change(document.querySelector('#ann-body')!, { target: { value: '深夜に止まります。' } })
     const send = buttons('今すぐ送る')[0] as HTMLButtonElement
     expect(send).toBeTruthy()
     await act(async () => { send.click() })
     await settle()
     expect(text()).toContain('このお知らせを送りますか？')
+    expect(calls.filter((c) => c.method === 'POST' && c.url.endsWith('/api/ops/announcements'))).toHaveLength(0)
+  })
+
+  it('B-139 お知らせ：件名と本文が空なら確認の窓を開かず、欄が赤くなり理由が出て、件名の欄へ移る', async () => {
+    await act(async () => { root.render(<OpsAnnouncementsV8 />) })
+    await settle()
+    await act(async () => { (buttons('今すぐ送る')[0] as HTMLButtonElement).click() })
+    for (let i = 0; i < 2; i += 1) await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    expect(text()).not.toContain('このお知らせを送りますか？')
+    const subject = document.querySelector('#ann-subject') as HTMLInputElement
+    expect(subject.getAttribute('aria-invalid')).toBe('true')
+    expect(document.querySelector('#ann-subject-error')?.textContent).toBe('件名を入力してください')
+    expect(document.querySelector('#ann-body')?.getAttribute('aria-invalid')).toBe('true')
+    expect(document.querySelector('#ann-body-error')?.textContent).toBe('本文を入力してください')
+    expect(document.activeElement).toBe(subject)
     expect(calls.filter((c) => c.method === 'POST' && c.url.endsWith('/api/ops/announcements'))).toHaveLength(0)
   })
 
