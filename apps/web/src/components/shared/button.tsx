@@ -26,6 +26,8 @@ type CommonProps = {
   align?: 'start'
   /** 行内の時刻など、リンク色にしない文字操作。 */
   textTone?: 'action' | 'ink'
+  /** 欄の横の小さな文字操作。指定した操作だけ詰め、既定のボタンは変えない。 */
+  presentation?: 'account-inline' | 'registration-inline'
   className?: string
   children: ReactNode
 }
@@ -80,9 +82,9 @@ export default function Button(props: ButtonProps) {
   const classes = [styles.button, styles[variant], styles[size], props.textTone === 'ink' ? styles.textInk : null, props.className].filter(Boolean).join(' ')
 
   if ('href' in props && props.href !== undefined) {
-    const { children, className: _className, href, size: _size, variant: _variant, align, textTone: _textTone, ...linkProps } = props
+    const { children, className: _className, href, size: _size, variant: _variant, align, textTone: _textTone, presentation, ...linkProps } = props
     return (
-      <Link href={href} className={classes} data-align={align} {...linkProps}>
+      <Link href={href} className={classes} data-align={align} data-presentation={presentation} {...linkProps}>
         {children}
       </Link>
     )
@@ -100,6 +102,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     size: _size,
     align,
     textTone: _textTone,
+    presentation,
     href: _href,
     type = 'button',
     busy,
@@ -171,6 +174,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
       type={type}
       className={classes}
       data-align={align}
+      data-presentation={presentation}
       ref={setRefs}
       disabled={disabled || busyNow}
       aria-busy={busyNow ? true : undefined}

@@ -421,3 +421,10 @@
 [data-theme='v8'] .panel[data-layout='continuous'] > .steps { padding: 0; border: 0; background: transparent; }
 [data-theme='v8'] .panel[data-layout='continuous'] > .content { padding: 0; }
 [data-theme='v8'] .panel[data-layout='continuous'] .actions { padding: 6px 0 0; border: 0; }
+
+/* アカウントの窓は頭・本文・操作を同じ余白で続ける。既定の窓は変えない。 */
+[data-theme='v8'] .panel[data-layout='account-inset'] { padding: var(--tpl-acd-dlg-pad); gap: var(--tpl-acd-dlg-gap); }
+[data-theme='v8'] .panel[data-layout='account-inset'] > .headerRow,
+[data-theme='v8'] .panel[data-layout='account-inset'] > .content { padding: 0; }
+[data-theme='v8'] .panel[data-layout='account-inset'] .title { font-size: var(--tpl-acd-dlg-title-size); line-height: var(--tpl-acd-dlg-title-lh); }
+[data-theme='v8'] .panel[data-layout='account-inset'] .insetActions { display: flex; justify-content: flex-end; align-items: center; gap: var(--tpl-acd-actions-gap); padding: var(--tpl-acd-dlg-foot-pad); box-shadow: var(--tpl-acd-line-top); }

@@ -121,8 +121,8 @@ export function DataTable({
   children: ReactNode
   className?: string
   'data-design'?: string
-  /** 時間×卓と予約一覧の寸法、飲食店のカード内の密度。指定した表だけに適用する。 */
-  presentation?: 'ledger' | 'calendar' | 'inventory' | 'channels' | 'columns'
+  /** 時間×卓と予約一覧の寸法、飲食店のカード内の密度、アカウントのカード内の表。指定した表だけに適用する。 */
+  presentation?: 'ledger' | 'calendar' | 'inventory' | 'channels' | 'columns' | 'account-list' | 'account-handover' | 'connection-check'
   /** 連携画面の3種類の行（reviews・media・sample）と設定内の詰めた一覧（compact・records）。指定のない表の見た目は変えない。 */
   density?: 'reviews' | 'media' | 'sample' | 'compact' | 'records'
   /** 列の幅を持つ設定一覧。共通の枠・セル・行で描く。 */
@@ -149,7 +149,7 @@ export function DataTable({
         '--table-body-text-size': columnLayout.bodyTextSize ?? 'var(--text-label)',
       } : {}),
     } as CSSProperties) : undefined}>
-      <table className={shell.table} data-design={dataDesign} aria-label={label ?? ariaLabel} style={grid ? {
+      <table className={shell.table} data-design={dataDesign} data-table-presentation={presentation} aria-label={label ?? ariaLabel} style={grid ? {
         '--table-columns': grid.columns,
         '--table-compact-columns': grid.compactColumns ?? grid.columns,
         '--table-row-padding': grid.padding,

@@ -8,7 +8,7 @@
  * StrictMode を切って避けず、印を付くたびに true へ戻して直す。
  */
 import React, { StrictMode } from 'react'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LineAccount } from '@line-crm/shared'
 
@@ -54,6 +54,18 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('資格情報の差し替えは StrictMode の下でも結果を出して「保存中」を解く（WEB132）', () => {
+  it('空欄なら先頭の欄へ移動し、欄の下だけで知らせて送らない', async () => {
+    render(<StrictMode><CredentialsDialog account={A} kind="messaging" onClose={() => {}} onSaved={() => {}} /></StrictMode>)
+    await act(async () => { saveButton().click() })
+    const input = document.querySelector('[role="dialog"] input') as HTMLInputElement
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+    await waitFor(() => expect(document.activeElement).toBe(input))
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(update).not.toHaveBeenCalled()
+    fillSecret()
+    expect(input.getAttribute('aria-invalid')).not.toBe('true')
+  })
+
   it('成功したら保存済みにして窓を閉じる', async () => {
     update.mockResolvedValue({ success: true, data: A })
     const onSaved = vi.fn()

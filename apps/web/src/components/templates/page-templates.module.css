@@ -253,6 +253,17 @@
 }
 
 :global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-spacing='compact'] > .steps { margin-top: var(--tpl-steps-compact-top-gap); }
+/* 広い設定本文の口。画面の CSS から型の余白・幅を上書きしない。 */
+:global([data-theme='v8']) .settings[data-content-layout] { gap: 0; }
+:global([data-theme='v8']) .settingsContent[data-content-layout] { max-width: none; }
+:global([data-theme='v8']) .settingsContent[data-content-layout='wide'] { padding: var(--tpl-sa-content-pad); gap: var(--tpl-sa-gap); }
+:global([data-theme='v8']) .settingsContent[data-content-layout='account-detail'] { padding: var(--tpl-acd-pad); gap: var(--tpl-acd-stack-gap); }
+:global([data-theme='v8']) .settingsContent[data-content-layout='account-handover'] { padding: var(--tpl-acct-handover-content-pad); gap: var(--tpl-acd-gap); }
+@container v8-page (max-width: 1099px) {
+  /* アカウントの本文を設定メニューの下へ押し出さない。移動先は外側の設定メニューにもある。 */
+  :global([data-theme='v8']) .settings[data-content-layout] > .settingsNav { display: none; }
+  :global([data-theme='v8']) .settingsContent[data-content-layout] { width: 100%; padding-left: var(--tpl-head-pad-side); align-self: stretch; }
+}
 /* ページが畳まれても、窓の中のフォルダは窓の寸法で並べる。 */
 :global([data-theme='v8']) .listBody[data-dialog-layout] .folders { display: flex; }
 :global([data-theme='v8']) .listBody[data-dialog-layout] .collapsedFolders { display: none; }
@@ -265,7 +276,7 @@
 :global([data-theme='v8']) .frame:is([data-template-layout='accounts'], [data-template-layout='account-detail'], [data-template-layout='account-handover']) .settings { gap: 0; }
 :global([data-theme='v8']) .frame[data-template-layout='accounts'] .settingsContent { max-width: none; padding: var(--tpl-sa-content-pad); gap: var(--tpl-sa-gap); }
 :global([data-theme='v8']) .frame[data-template-layout='account-detail'] .settingsContent { max-width: none; padding: var(--tpl-acd-pad); gap: var(--tpl-acd-stack-gap); }
-:global([data-theme='v8']) .frame[data-template-layout='account-handover'] .settingsContent { max-width: none; padding: var(--tpl-acd-pad); gap: var(--tpl-acd-gap); }
+:global([data-theme='v8']) .frame[data-template-layout='account-handover'] .settingsContent { max-width: none; padding: var(--tpl-acct-handover-content-pad); gap: var(--tpl-acd-gap); }
 :global([data-theme='v8']) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) { --tpl-setnav-w: var(--tpl-sb-nav-w); --tpl-settings-gap: 0px; }
 :global([data-theme='v8']) .frame[data-template-layout='wide-nav'] { --tpl-head-gap: var(--tpl-sb-head-gap); --tpl-head-pad-bottom: var(--tpl-sb-head-pad-bottom); --tpl-desc-size: var(--tpl-sb-desc-size); --tpl-desc-lh: var(--tpl-sb-desc-lh); }
 :global([data-theme='v8']) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) .settingsContent { max-width: none; }
@@ -274,3 +285,8 @@
 :global([data-theme='v8']) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) > .footer { margin-inline: var(--tpl-sb-footer-side); }
 :global([data-theme='v8']) .frame[data-template-layout='narrow-nav'] { --tpl-setnav-w: var(--tpl-sb-nav-w-narrow); --tpl-settings-content-pad-block: var(--tpl-sb-narrow-pad-top) var(--tpl-sb-narrow-pad-bottom); --tpl-settings-content-pad-side: var(--tpl-sb-narrow-pad-side); --tpl-settings-content-gap: var(--tpl-sb-narrow-gap); }
 :global([data-theme='v8']) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) :global([data-settings-nav='inline'] li > ul) { --tpl-setnav-item-pad: var(--tpl-st2-setnav-child-pad); }
+/* 同じ畳み方を SettingsPage.layout のアカウント3板にも使う（x2dSNv は上24：アカウント担当の測り）。 */
+@container v8-page (max-width: 1099px) {
+  :global([data-theme='v8']) .frame:is([data-template-layout='accounts'], [data-template-layout='account-detail'], [data-template-layout='account-handover']) .settings > .settingsNav { display: none; }
+  :global([data-theme='v8']) .frame:is([data-template-layout='accounts'], [data-template-layout='account-detail'], [data-template-layout='account-handover']) .settingsContent { width: 100%; padding-left: var(--tpl-head-pad-side); align-self: stretch; }
+}

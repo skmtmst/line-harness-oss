@@ -408,3 +408,34 @@
     grid-template-columns: var(--table-compact-columns);
   }
 }
+/* カード内の表。既定の一覧には効かせず、部品側で余白と線を持つ。 */
+[data-theme='v8'] .frame[data-table-presentation='account-list'],
+[data-theme='v8'] .frame[data-table-presentation='account-handover'] {
+  overflow: hidden; border-radius: var(--radius-card); box-shadow: var(--tpl-sa-ring);
+}
+[data-theme='v8'] .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) { display: block; }
+[data-theme='v8'] .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) :is(thead, tbody) { display: block; }
+[data-theme='v8'] .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) tr {
+  display: flex; align-items: center; gap: var(--tpl-sa-acc-gap); height: auto; min-width: 0;
+}
+[data-theme='v8'] .table[data-table-presentation='account-list'] thead tr { padding: var(--tpl-sa-acc-head-pad); }
+[data-theme='v8'] .table[data-table-presentation='account-list'] tbody tr { padding: var(--tpl-sa-acc-row-pad); }
+[data-theme='v8'] .table[data-table-presentation='account-handover'] thead tr { padding: var(--tpl-acd-ho-head-pad); }
+[data-theme='v8'] .table[data-table-presentation='account-handover'] tbody tr { padding: var(--tpl-acd-ho-row-pad); }
+[data-theme='v8'] .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) th {
+  display: block; height: auto; padding: 0; font-size: var(--text-micro); font-weight: 600; line-height: var(--tpl-sa-label-lh);
+}
+[data-theme='v8'] .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) td {
+  display: block; padding: 0; box-shadow: none; font-size: var(--text-caption); line-height: var(--tpl-sa-member-name-lh); min-width: 0;
+}
+[data-theme='v8'] .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) tbody tr { box-shadow: var(--tpl-sa-line-top); }
+[data-theme='v8'] .table[data-table-presentation='account-list'] tbody tr:hover { background: var(--color-canvas-sunken); }
+[data-theme='v8'] .table[data-table-presentation='connection-check'] { border-collapse: collapse; }
+[data-theme='v8'] .table[data-table-presentation='connection-check'] tr { height: var(--tpl-htn-result-row-h); box-shadow: var(--tpl-htn-line-bottom); }
+[data-theme='v8'] .table[data-table-presentation='connection-check'] td {
+  padding: 0; box-shadow: none; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+[data-theme='v8'] .table[data-table-presentation='connection-check'] td:first-child { width: var(--tpl-htn-result-label-w); color: var(--color-ink); font-weight: 700; }
+[data-theme='v8'] .table[data-table-presentation='connection-check'] td:last-child { width: var(--tpl-htn-result-badge-w); text-align: right; }
+
+[data-theme='v8'] .table.table[data-table-presentation='account-list'] :is(th, td):nth-child(4) { padding-right: var(--tpl-sa-acc-friends-pad); }
