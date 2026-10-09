@@ -1081,7 +1081,8 @@
       "code": "src/components/shared/table.tsx",
       "implementationFiles": [
         "src/components/shared/grid-table.tsx",
-        "src/components/shared/truncated-text.tsx"
+        "src/components/shared/truncated-text.tsx",
+        "src/components/shared/list-state.tsx"
       ],
       "cssModule": "src/components/shared/table.module.css",
       "components": [

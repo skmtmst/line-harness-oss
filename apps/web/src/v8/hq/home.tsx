@@ -426,7 +426,7 @@ export default function HqHomeV8() {
       )}
     />
   ) : loading ? (
-    <ListState kind="loading" title="アカウントを読み込んでいます" />
+    <ListState kind="loading" loadingShape={view === 'cards' ? 'cards' : 'list'} title="アカウントを読み込んでいます" />
   ) : accounts.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */
     <EmptyList

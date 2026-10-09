@@ -594,7 +594,7 @@ function ProjectInner() {
               */}
             {running ? (
               <div className={styles.runningBand} role="status" aria-live="polite">
-                <LoaderCircle aria-hidden="true" className={`${styles.icon} ${styles.spin}`} />
+                <Hourglass aria-hidden="true" className={styles.icon} />
                 <span className={styles.runningText}>{`${Math.min(doneSoFar + 1, running.requestedCount)} / ${running.requestedCount} 枚目を作っています。閉じても作り続けます`}</span>
               </div>
             ) : null}
@@ -801,7 +801,7 @@ function PendingTile({ running, label }: { running: boolean; label: string }) {
   return (
     <article className={styles.tile} role="status" aria-live="polite">
       <div className={`${styles.tileImage} ${styles.pending}`}>
-        {running ? <LoaderCircle aria-hidden="true" className={`${styles.pendingIcon} ${styles.spin}`} /> : <Hourglass aria-hidden="true" className={styles.pendingIcon} />}
+        <Hourglass aria-hidden="true" className={styles.pendingIcon} />
         <span className={styles.pendingText}>{running ? '作っています…' : '待っています'}</span>
       </div>
       <div className={styles.tileMeta}><span className={styles.metaText}>{label}</span></div>
