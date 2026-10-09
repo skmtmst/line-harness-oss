@@ -42,10 +42,8 @@ import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/ui/page-size-select'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
-import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import ManagedFolderPanel, { managedFolderOptions } from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
-import { useFolderRowActions } from '@/components/shared/folder-row-actions'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -165,7 +163,6 @@ export default function AutomationListV8() {
   const [skipped, setSkipped] = useState<number | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
   const [folderFilter, setFolderFilter] = useState('')
-  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   /* ?search= で開くと、その言葉で探した状態から始める（動いた記録の「ルールを開く」）。 */
   const [search, setSearch] = useState(() => searchParams.get('search') ?? '')
   const [onlyActive, setOnlyActive] = useState(false)
@@ -225,17 +222,6 @@ export default function AutomationListV8() {
     }
   }, [selectedAccountId])
 
-  /* フォルダの「…」：名前を変える・色を変える・並べ替える・消す（共通部品・B-35）。 */
-  const folderActions = useFolderRowActions({
-    kind: 'automation',
-    folders,
-    accountId: selectedAccountId ?? null,
-    enabled: canEdit,
-    itemLabel: '自動化',
-    countOf: () => null,
-    onChanged: () => loadFolders(),
-    onDeleted: (id) => { if (folderFilter === id) setFolderFilter('') },
-  })
 
   useEffect(() => {
     if (accountLoading) return
@@ -382,21 +368,12 @@ export default function AutomationListV8() {
   ]
 
   /* ===== フォルダ ===== */
-  const folderRows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: '', label: 'すべて', count: ready ? items.length : null },
-    ...folders.map((folder, index) => ({ kind: 'folder' as const, ...folderActions.rowActions(folder, index), id: folder.id, label: folder.name, count: null, color: folder.color })),
-    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: ready ? items.length : null },
-  ]
   const folderSelect = (
     <Select
       aria-label="フォルダ"
       value={folderFilter}
       onChange={setFolderFilter}
-      options={[
-        { value: '', label: 'フォルダ：すべて' },
-        ...folders.map((folder) => ({ value: folder.id, label: `フォルダ：${folder.name}` })),
-        { value: UNFILED, label: 'フォルダ：未分類' },
-      ]}
+      options={managedFolderOptions('automation', folders, { allId: '', unfiledId: UNFILED })}
     />
   )
   /* 閲覧のみには押せない「ルールを作る」を置かない（場所だけ空ける）。 */
@@ -598,33 +575,28 @@ export default function AutomationListV8() {
       </>}
       folders={<>
         {createButton(true)}
-        <FolderPanel
+        {/* 共通のフォルダの列（種類 automation）。ルールの一覧がフォルダを返すまでは、件数を出さずルールは未分類に数える。 */}
+        <ManagedFolderPanel
+          kind="automation"
+          accountId={selectedAccountId}
+          folders={folders}
+          onChanged={loadFolders}
+          canManage={canEdit}
+          itemLabel="ルール"
           activeId={folderFilter}
           onSelect={setFolderFilter}
-          onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}
-          addFolderLabel="フォルダを追加"
-          rows={folderRows}
-        >
-          {/* 閲覧のみには押せない「フォルダを追加」を置かない（場所だけ空ける）。 */}
-          {canEdit ? null : <span className={styles.addSpace} aria-hidden="true" />}
-          <p className={styles.folderNote}>フォルダを消しても、中のルールは未分類に残ります</p>
-        </FolderPanel>
+          allId=""
+          unfiledId={UNFILED}
+          allCount={ready ? items.length : null}
+          unfiledCount={ready ? items.length : null}
+          countOf={() => null}
+          placeholder="例: 予約・購入"
+        />
       </>}
       collapsedFolders={narrow ? undefined : <>{createButton(false)}{folderSelect}</>}
       toolbar={narrow ? narrowToolbar : wideToolbar}
       pagination={pager}
       overlays={<>
-        {folderActions.dialogs}
-        {folderDialogOpen ? (
-          <FolderAddDialog
-            kind="automation"
-            accountId={selectedAccountId}
-            note="ルールを分けてしまう箱です。消しても、入っていたルールは未分類として残ります。"
-            placeholder="例: 予約・購入"
-            onClose={() => setFolderDialogOpen(false)}
-            onAdded={() => void loadFolders()}
-          />
-        ) : null}
         <ConfirmDialog
           open={pending !== null}
           title={pending ? `「${pending.item.name}」を${pending.kind === 'archive' ? '削除' : pending.item.isActive ? '止め' : '動か'}ますか？` : ''}
