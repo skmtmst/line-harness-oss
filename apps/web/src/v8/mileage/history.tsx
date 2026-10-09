@@ -79,6 +79,7 @@ export default function HistoryTab() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const requestRef = useRef(0)
   const [result, setResult] = useState<MileageAdminHistory | null>(null)
+  const [periodResult, setPeriodResult] = useState<MileageAdminHistory | null>(null)
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
   const [exportError, setExportError] = useState('')
   const [pendingAction, setPendingAction] = useState<{ kind: 'confirm' | 'void'; item: MileageAdminHistoryItem } | null>(null)
@@ -116,7 +117,7 @@ export default function HistoryTab() {
     setError(false)
     setExportError('')
     try {
-      const response = await api.mileage.history({
+      const [response, period] = await Promise.all([api.mileage.history({
         accountId: selectedAccountId ?? '',
         search: search || undefined,
         entryType: entryTypeFilter,
@@ -124,18 +125,19 @@ export default function HistoryTab() {
         from,
         limit: pageSize,
         offset: (page - 1) * pageSize,
-      })
+      }), api.mileage.history({ accountId: selectedAccountId ?? '', from: daysAgo(29), to: daysAgo(0), limit: 1, offset: 0 }).catch(() => null)])
       if (request !== requestRef.current) return
       if (!response.success) throw new Error(response.error)
       /* 「使った・取り消しのみ」は口に種類の絞り込みが無いので、付けた分を手元で除く。 */
       if (spentOnly) {
         response.data.items = response.data.items.filter((item) => !isGranted(item))
       }
+      setPeriodResult(period?.success ? period.data : null)
       setResult(response.data)
       setLoadedAccountId(selectedAccountId)
     } catch (caught) {
       if (request !== requestRef.current) return
-      setResult(null)
+      setResult(null); setPeriodResult(null)
       if (!(caught instanceof ApiError && caught.status === 400)) setError(true)
     } finally {
       if (request === requestRef.current) setLoading(false)
@@ -158,7 +160,7 @@ export default function HistoryTab() {
   const items = useMemo(() => result?.items ?? [], [result])
   const total = mileagePaginationTotal(result)
   const pageCount = Math.max(1, Math.ceil((total ?? 0) / pageSize))
-  const byType = result?.summary.byType ?? []
+  const byType = periodResult?.summary.byType ?? []
   const countOf = (entryType: MileageHistoryItem['entryType']) =>
     byType.find((item) => item.entryType === entryType)?.count ?? 0
   const amountOf = (entryType: MileageHistoryItem['entryType']) =>
@@ -234,15 +236,15 @@ export default function HistoryTab() {
     setPage(1)
   }
 
-  const ready = !loading && !error
+  const ready = !loading && !error && periodResult !== null
 
   const stats = (
     <KpiBand>
       <KpiCard
         presentation="band"
-        title="今月の動き"
+        title="直近30日の動き"
         icon={<History size={14} aria-hidden="true" />}
-        value={ready ? total : null}
+        value={ready ? mileagePaginationTotal(periodResult) : null}
         unit="件"
         detail={ready ? `付けた ${formatNumber(grantedCount)}・使った ${formatNumber(countOf('spend'))}・取り消し ${formatNumber(reversalCount)}` : '—'}
       />
@@ -251,7 +253,7 @@ export default function HistoryTab() {
         title="付けた"
         icon={<TrendingUp size={14} aria-hidden="true" />}
         value={ready ? amountOf('grant') : null}
-        unit=""
+        unit="マイル"
         detail=""
       />
       <KpiCard
@@ -259,7 +261,7 @@ export default function HistoryTab() {
         title="使った"
         icon={<TrendingDown size={14} aria-hidden="true" />}
         value={ready ? Math.abs(amountOf('spend')) : null}
-        unit=""
+        unit="マイル"
         detail={`交換 ${formatNumber(countOf('spend'))}件`}
       />
       <KpiCard

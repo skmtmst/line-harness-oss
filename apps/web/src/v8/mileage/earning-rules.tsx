@@ -535,15 +535,15 @@ export default function EarningRulesTab() {
       />
       <KpiCard
         presentation="band"
-        title="今月 付けたマイル"
+        title="直近30日 付けたマイル"
         icon={<Coins size={14} aria-hidden="true" />}
         value={ready ? grantedMiles ?? 0 : null}
         unit=""
-        detail={dash(`${formatMileageNumber(grantedCount ?? 0)}人に`)}
+        detail={dash(`${formatMileageNumber(grantedCount ?? 0)}件`)}
       />
       <KpiCard
         presentation="band"
-        title="今月 使われたマイル"
+        title="直近30日 使われたマイル"
         icon={<Gift size={14} aria-hidden="true" />}
         value={ready ? spentMiles ?? 0 : null}
         unit=""
