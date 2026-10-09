@@ -1,6 +1,7 @@
 'use client'
 
 import { forwardRef, type InputHTMLAttributes, type TextareaHTMLAttributes } from 'react'
+import { guardCompositionEnter } from './composition-enter'
 import { joinDescribedBy, useFieldContext } from './field-context'
 import styles from './text-field.module.css'
 
@@ -43,7 +44,7 @@ function useControlA11y(props: {
 export const TextField = forwardRef<
   HTMLInputElement,
   ControlOwnProps & Omit<InputHTMLAttributes<HTMLInputElement>, 'className'>
->(function TextField({ invalid, className, id, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired, ...rest }, ref) {
+>(function TextField({ invalid, className, id, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired, onKeyDown, ...rest }, ref) {
   const a11y = useControlA11y({ id, invalid, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired })
   return (
     <input
@@ -51,6 +52,7 @@ export const TextField = forwardRef<
       type="text"
       data-design-node="Ume2U"
       {...rest}
+      onKeyDown={guardCompositionEnter(onKeyDown)}
       id={a11y.id}
       required={required}
       aria-describedby={a11y['aria-describedby']}
@@ -70,7 +72,7 @@ export const TextField = forwardRef<
 export const TextArea = forwardRef<
   HTMLTextAreaElement,
   ControlOwnProps & { compact?: boolean; density?: 'regular' | 'compact'; height?: 'post' | 'reply'; size?: 'short' | 'single-row' } & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'className'>
->(function TextArea({ compact, density, height, size, invalid, className, id, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired, ...rest }, ref) {
+>(function TextArea({ compact, density, height, size, invalid, className, id, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired, onKeyDown, ...rest }, ref) {
   const a11y = useControlA11y({ id, invalid, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired })
   return (
     <textarea
@@ -79,6 +81,7 @@ export const TextArea = forwardRef<
       data-density={density}
       data-height={height}
       {...rest}
+      onKeyDown={guardCompositionEnter(onKeyDown)}
       id={a11y.id}
       required={required}
       aria-describedby={a11y['aria-describedby']}

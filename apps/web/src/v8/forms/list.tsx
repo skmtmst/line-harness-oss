@@ -1469,6 +1469,7 @@ export default function FormsListV8() {
               value={duplicateName}
               onChange={(event) => setDuplicateName(event.target.value)}
               onKeyDown={(event) => {
+                if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return
                 if (event.key === 'Enter') void duplicateForm()
               }}
               className={styles.panelInput}

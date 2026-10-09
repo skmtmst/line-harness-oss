@@ -1768,6 +1768,7 @@ function MediaCardV8({
               value={renaming.value}
               onChange={(e) => onRenameChange(e.target.value)}
               onKeyDown={(e) => {
+                if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return
                 if (e.key === 'Enter') onRenameConfirm()
                 if (e.key === 'Escape') onRenameCancel()
               }}

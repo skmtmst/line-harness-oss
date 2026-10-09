@@ -3,6 +3,7 @@
 import { LoaderCircle, Search, X } from 'lucide-react'
 import React, { forwardRef, useEffect, useRef } from 'react'
 import type { InputHTMLAttributes } from 'react'
+import { guardCompositionEnter } from './composition-enter'
 import styles from './search-field.module.css'
 
 export interface SearchFieldProps
@@ -25,7 +26,7 @@ export interface SearchFieldProps
 
 /** Pencil V5 `phlR1` を正本にした検索欄。 */
 const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(function SearchField(
-  { className, disabled, hidden, loading = false, onChange, onClear, shortcut, value, ...props },
+  { className, disabled, hidden, loading = false, onChange, onClear, shortcut, value, onKeyDown, ...props },
   ref,
 ) {
   const hasValue = String(value ?? '').length > 0
@@ -70,6 +71,7 @@ const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(function Sear
         className={styles.input}
         onChange={(event) => onChange(event.target.value)}
         {...props}
+        onKeyDown={guardCompositionEnter(onKeyDown)}
       />
       {shortcut ? (
         <kbd className={styles.shortcut} aria-hidden="true">
