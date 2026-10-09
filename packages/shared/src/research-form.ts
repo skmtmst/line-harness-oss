@@ -1,3 +1,4 @@
+import { tapExtrasError, type TapExtras } from './tap-extras.js';
 import { emptyLayout, type FormAction, type FormInputBlock, type FormLayout } from './form-layout.js';
 
 export interface ResearchAnswerAction {
@@ -35,9 +36,11 @@ export function researchFormLayout(assetId: string, version: number, name: strin
     if (typeof q.text !== 'string' || !q.text.trim() || !['single','multiple','free'].includes(String(format)) || typeof q.required !== 'boolean') throw new Error('質問文・答え方・必須の指定を確認してください');
     const choices = format === 'free' ? undefined : q.choices;
     if (format !== 'free' && (!Array.isArray(choices) || choices.length < 1 || choices.length > 13 || choices.some(c => typeof c !== 'string' || !c.trim()))) throw new Error('選択肢は1〜13件で設定してください');
+    if (q.choiceTapExtras !== undefined && (!Array.isArray(q.choiceTapExtras) || q.choiceTapExtras.length !== (Array.isArray(choices) ? choices.length : 0) || q.choiceTapExtras.some(extra => tapExtrasError(extra)))) throw new Error('選択肢の追加処理を確認してください');
+    const extras = q.choiceTapExtras as TapExtras[] | undefined;
     return { id: `question-${index + 1}`, kind: 'input', name: `question_${index + 1}`, label: q.text,
       type: format === 'single' ? 'radio' : format === 'multiple' ? 'checkbox' : 'textarea', required: q.required,
-      ...(Array.isArray(choices) ? { choices: choices.map((label, i) => ({ id: `choice-${i + 1}`, label: String(label) })) } : {}) };
+      ...(Array.isArray(choices) ? { choices: choices.map((label, i) => ({ id: `choice-${i + 1}`, label: String(label), ...(extras?.[i] ? { tapExtras: extras[i] } : {}) })) } : {}) };
   });
   if (payload.answerActions !== undefined && !Array.isArray(payload.answerActions)) throw new Error('回答後に行うことを確認してください');
   layout.options.afterActions = (payload.answerActions as unknown[] ?? []).map((raw): FormAction => {

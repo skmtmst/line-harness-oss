@@ -10,11 +10,13 @@
  * 「押されたら」は今の質問の部品（QuestionEditor）を窓で開いて決める（タグ・友だち情報・シナリオ・URL などの全部の設定が残る）。
  * 受け付ける URL：`/templates/questions/new`・`?id=<テンプレート>`（直す）。
  */
+import TapExtrasField from '@/components/shared/tap-extras-field'
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronDown, Plus, Send, Trash2 } from 'lucide-react'
-import type { Folder, Scenario, Tag } from '@line-crm/shared'
+import { tapExtrasError, type Folder, type Scenario, type Tag } from '@line-crm/shared'
+import { tapExtraSaveError } from '@/lib/tap-actions'
 import { api } from '@/lib/api'
 import { describeApiFailure, isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
 import QuestionEditor, { emptyQuestion, newChoiceKey, type QuestionChoice, type ScenarioQuestion } from '@/components/scenarios/question-editor'
@@ -167,6 +169,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   fields.define('name', 'テンプレート名', () => (name.trim() ? null : 'テンプレート名を入力してください。'))
   fields.define('text', '質問文', () => (question.text.trim() ? null : '質問文を入力してください。'))
   question.choices.forEach((choice, index) => {
+    fields.define(`extras-${index}`, `選択肢 ${index + 1} の追加処理`, () => tapExtrasError({ tagIds: choice.addTagIds, scoreChange: choice.scoreChange }))
     fields.define(`choice-${index}`, `選択肢 ${index + 1} のボタンの文字`, () => (choice.label.trim() ? null : 'ボタンの文字を入力してください。'))
   })
   const { leaveTarget, confirmLeave, cancelLeave, guarded, disarm } = useUnsavedGuard({ dirty, busy: saving || publishing })
@@ -198,6 +201,8 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
       if (!result.success) { setError(result.error || '保存できませんでした。'); return false }
       return true
     } catch (caught) {
+      const extraError = tapExtraSaveError(caught)
+      if (extraError) { fields.setServerErrors(Object.fromEntries(question.choices.map((_, ci) => [`extras-${ci}`, extraError]))); return false }
       setError(describeApiFailure(caught, '保存', { scope: 'store' }))
       return false
     } finally {
@@ -338,6 +343,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
                     <ChevronDown className={styles.pickIcon} aria-hidden="true" />
                   </button>
                 </div>}
+                <div {...fields.bind(`extras-${index}`)}><TapExtrasField error={fields.error(`extras-${index}`)} name={`選択肢${index + 1}`} unavailable={choice.behavior === 'tel' || choice.behavior === 'mail' ? '電話・メールを開く動きではタグ・加点を使えません。' : undefined} value={{ tagIds: choice.addTagIds, scoreChange: choice.scoreChange }} tags={tags} accountId={host ? null : selectedAccountId} onChange={extra => setChoice(index, { addTagIds: extra.tagIds, scoreChange: extra.scoreChange })} /></div>
                 <Field label="押したときの返信"><input className={styles.input} value={choice.reply ?? ''} maxLength={4500} onChange={(event) => setChoice(index, { reply: event.target.value })} /></Field>
               </div>
             ))}

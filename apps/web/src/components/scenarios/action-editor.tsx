@@ -29,6 +29,8 @@
  *     既にある設定を黙って上書きすることになる
  */
 
+import TagPickerField from '@/components/shared/tag-picker-field'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { Bell, Calendar, FileText, Flag, MessageSquare, Tag, User, Variable, Workflow } from 'lucide-react'
@@ -1048,6 +1050,7 @@ export function ActionConfigEditor({
   targetsLoading?: boolean
   onChange: (config: unknown) => void
 }) {
+  const theme = useAdminTheme()
   const c = (action.config ?? {}) as Record<string, unknown>
 
   switch (action.actionType) {
@@ -1067,7 +1070,7 @@ export function ActionConfigEditor({
               />
             ))}
           </RadioCardGroup>
-          <div className="flex flex-wrap gap-1.5">
+          {theme === 'v8' ? <TagPickerField label="タグの操作対象" options={tags} value={selected} onChange={tagIds => onChange({ ...c, tagIds })} /> : <div className="flex flex-wrap gap-1.5">
             {tags.map((tag) => {
               const on = selected.includes(tag.id)
               return (
@@ -1083,7 +1086,7 @@ export function ActionConfigEditor({
                 </Button>
               )
             })}
-          </div>
+          </div>}
         </>
       )
     }

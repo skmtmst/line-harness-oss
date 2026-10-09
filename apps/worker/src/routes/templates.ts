@@ -1,4 +1,6 @@
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { validateTapExtraReferences } from '../services/tap-extras.js';
+import { tapExtrasError } from '@line-crm/shared';
 import { Hono } from 'hono';
 import { prepareRichVideoTemplate } from '../services/rich-video-template.js';
 import {
@@ -106,6 +108,10 @@ function readQuestionPayload(body: Record<string, unknown>):
   }
   if (question.choices.some((choice) => typeof choice.behavior !== 'string' || !QUESTION_BEHAVIORS.has(choice.behavior))) {
     return { ok: false, error: '選択後の動きを確認してください' };
+  }
+  for (const choice of question.choices) {
+    const error = tapExtrasError({ tagIds: choice.addTagIds, scoreChange: choice.scoreChange });
+    if (error) return { ok: false, error };
   }
   return { ok: true, question, questionJson: raw };
 }
@@ -599,6 +605,9 @@ templates.post('/api/templates', requireRole('owner', 'admin'), inputJsonBoundar
     const folderScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const folder = await readFolderId(c.env.DB, body as unknown as Record<string, unknown>, body.accountId, folderScope.canSeeUnassigned);
     if (!folder.ok) return inputError(c, { success: false, error: folder.error }, 422, ["folderId"]);
+    const extraTree = { question: question.question?.choices.map(choice => ({ tapExtras: { tagIds: choice.addTagIds, scoreChange: choice.scoreChange } })), content: !question.question && body.messageType !== 'text' && body.messageContent ? JSON.parse(body.messageContent) : null };
+    const extrasError = await validateTapExtraReferences(c.env.DB, extraTree, body.accountId ?? null);
+    if (extrasError) return c.json({ success: false, error: extrasError, code: 'TAP_EXTRA_INVALID', field: 'tapExtras', fieldErrors: { tapExtras: extrasError } }, 422);
     const item = await createTemplate(c.env.DB, {
       ...body,
       folderId: folder.folderId ?? null,
@@ -706,6 +715,13 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), inputJsonBoun
     const folderScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const folder = await readFolderId(c.env.DB, body as unknown as Record<string, unknown>, existing.line_account_id, folderScope.canSeeUnassigned);
     if (!folder.ok) return inputError(c, { success: false, error: folder.error }, 422, ["folderId"]);
+    if (hasContentEdit) {
+      const savedQuestion = 'question' in body ? question.question : questionValue(draftQuestionJsonOf(existing));
+      const extraTree: unknown[] = (savedQuestion?.choices ?? []).map(choice => ({ tapExtras: { tagIds: choice.addTagIds, scoreChange: choice.scoreChange } }));
+      if (baseMessageType !== 'text') { try { extraTree.push(JSON.parse(baseMessageContent)); } catch { /* 既存の本文検査で扱う */ } }
+      const extrasError = await validateTapExtraReferences(c.env.DB, extraTree, existing.line_account_id);
+      if (extrasError) return c.json({ success: false, error: extrasError, code: 'TAP_EXTRA_INVALID', fieldErrors: { tapExtras: extrasError } }, 422);
+    }
     const metadataUpdates: {
       name?: string;
       category?: string;

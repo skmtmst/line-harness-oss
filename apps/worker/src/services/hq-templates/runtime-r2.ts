@@ -279,6 +279,8 @@ function templateResourceReferences(definition: import('@line-crm/shared').Messa
   };
   if(definition.template.questionJson) visit(JSON.parse(definition.template.questionJson));
   if(definition.asset) visit(definition.asset.payload);
+  if(definition.card) visit(definition.card);
+  try { visit(JSON.parse(definition.template.messageContent)); } catch { /* text */ }
   return [...refs.values()];
 }
 async function templateReferencePlan(b:R2RuntimeBinding,definition:import('@line-crm/shared').MessageTemplateDefinition,account:string,execution=false) {

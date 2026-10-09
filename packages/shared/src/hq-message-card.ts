@@ -1,10 +1,11 @@
+import { tapExtrasError, type TapExtras } from './tap-extras.js';
 import { hqLiffActionLocator, isLiffActionKind, type LiffAction } from './liff-action.js';
 export interface HqMessageCard {
   format: 'text' | 'flex'
   title: string
   body: string
   imageMediaId?: string
-  buttons: Array<{ id: string; label: string; action: 'url' | 'message' | 'form' | 'booking' | 'booking_history' | 'visit_stamp' | 'scenario'; value: string }>
+  buttons: Array<{ id: string; label: string; action: 'url' | 'message' | 'form' | 'booking' | 'booking_history' | 'visit_stamp' | 'scenario'; value: string; tapExtras?: TapExtras }>
 }
 export interface HqMessageReference {
   kind: 'form' | 'scenario' | 'booking' | 'visit_stamp'
@@ -21,7 +22,8 @@ export function parseHqMessageCard(value: unknown): HqMessageCard {
     || !text(value.body, value.format === 'flex' ? 2000 : 5000) || !Array.isArray(value.buttons) || value.buttons.length > 3
     || (value.imageMediaId !== undefined && !identifier(value.imageMediaId))) throw new Error('タイトル・本文・ボタンを確認してください。')
   for (const button of value.buttons) {
-    if (!record(button) || Object.keys(button).some(k => !['id', 'label', 'action', 'value'].includes(k))
+    if (!record(button) || Object.keys(button).some(k => !['id', 'label', 'action', 'value', 'tapExtras'].includes(k))
+      || tapExtrasError(button.tapExtras)
       || !identifier(button.id) || !text(button.label, 20) || !['url', 'message', 'form', 'booking', 'booking_history', 'visit_stamp', 'scenario'].includes(String(button.action))
       || !text(button.value, button.action === 'message' ? 300 : 2000, ['booking', 'booking_history', 'visit_stamp'].includes(String(button.action)))
       || (['form', 'scenario', 'booking', 'visit_stamp'].includes(String(button.action)) && button.value !== '' && !identifier(button.value))
@@ -45,7 +47,7 @@ export function composeHqMessageCard(card: HqMessageCard, templateId: string, im
   if (card.format === 'text') return { messageType: 'text' as const, messageContent: [card.title, card.body].filter(Boolean).join('\n'), carouselActionsJson: null }
   const operations: Record<string, unknown[]> = {}
   const buttons = card.buttons.map((button, index) => {
-    let action: Record<string, string>
+    let action: Record<string, unknown>
     if (button.action === 'url') action = { type: 'uri', label: button.label, uri: button.value }
     else if (button.action === 'message') action = { type: 'message', label: button.label, text: button.value }
     else if (isLiffActionKind(button.action)) {
@@ -59,7 +61,7 @@ export function composeHqMessageCard(card: HqMessageCard, templateId: string, im
       action = { type: 'postback', label: button.label, data: `ctpl=${templateId}&c=0&a=${index}` }
       operations[String(index)] = [{ actionType: 'scenario', config: { op: 'start', scenarioId: targets[`scenario:${button.value}`] ?? button.value } }]
     }
-    return { type: 'button', style: 'primary', action }
+    return { type: 'button', style: 'primary', action: { ...action, ...(button.tapExtras ? { tapExtras: button.tapExtras } : {}) } }
   })
   const contents = [...(card.title ? [{ type: 'text', text: card.title, weight: 'bold', wrap: true }] : []), { type: 'text', text: card.body, wrap: true, margin: 'md' }]
   const bubble = { type: 'bubble', ...(imageUrl ? { hero: { type: 'image', url: imageUrl, size: 'full', aspectRatio: '20:13', aspectMode: 'cover' } } : {}), body: { type: 'box', layout: 'vertical', contents }, ...(buttons.length ? { footer: { type: 'box', layout: 'vertical', spacing: 'sm', contents: buttons } } : {}) }

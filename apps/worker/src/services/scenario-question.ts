@@ -13,6 +13,7 @@
  * 読める）。LINE の postback data は300文字までなので、本文は入れずに参照
  * だけ載せる。
  */
+import { hasTapExtras, tapExtrasError, type TapExtras } from '@line-crm/shared'
 import type { Message } from '@line-crm/line-sdk'
 
 /** 選択肢を押したあとの挙動。Lステップの「選択後の挙動」と同じ並び。 */
@@ -51,6 +52,7 @@ export interface ScenarioQuestionChoice {
   reply?: string
   /** 2度目に押したときに返す文。空なら既定の文言。 */
   repeatReply?: string
+  scoreChange?: number | null
   addTagIds?: string[]
   removeTagIds?: string[]
   field?: { fieldId: string; value: string }
@@ -78,6 +80,7 @@ export function parseQuestion(raw: string | null | undefined): ScenarioQuestion 
     if (!parsed || typeof parsed !== 'object') return null
     if (typeof parsed.text !== 'string' || parsed.text.trim() === '') return null
     if (!Array.isArray(parsed.choices) || parsed.choices.length === 0) return null
+    if (parsed.choices.some(choice => choice && tapExtrasError({ tagIds: choice.addTagIds, scoreChange: choice.scoreChange }))) return null
     return {
       ...parsed,
       tapMode: parsed.tapMode === 'multiple' ? 'multiple' : 'single',
@@ -167,21 +170,21 @@ export function parseQuestionPostback(
  * こちらで受けないと、タグ付けも返信もできないため。URL・電話・メールは
  * LINE 側で開かせたいので、それぞれの action を使う。
  *
- * ただし **押した記録は必ず欲しい**ので、URL などを開く場合も postback を
- * 併用したいところだが、LINE のボタンは action を1つしか持てない。
- * ここは「開く」を優先する。記録が要るときは、画面側で「何もしない」＋
- * 本文にURLを書く運用になる。
+ * URLの追加処理は、送る直前に既存の計測リンクへ置き換えて受け取る。
+ * 電話・メールは計測リンクを通せないため、追加処理を付けない。
  */
 function buildChoiceAction(
   choice: ScenarioQuestionChoice,
   ref: QuestionStepRef,
   index: number,
 ): Record<string, unknown> {
+  const tapExtras: TapExtras = { tagIds: choice.addTagIds, scoreChange: choice.scoreChange }
+  const extraMetadata = hasTapExtras(tapExtras) ? { tapExtras } : {}
   const label = (choice.label || `選択肢${index + 1}`).slice(0, 20)
 
   switch (choice.behavior) {
     case 'url':
-      if (choice.url) return { type: 'uri', label, uri: choice.url }
+      if (choice.url) return { type: 'uri', label, uri: choice.url, ...extraMetadata }
       break
     case 'tel':
       if (choice.tel) return { type: 'uri', label, uri: `tel:${choice.tel}` }
@@ -190,10 +193,10 @@ function buildChoiceAction(
       if (choice.email) return { type: 'uri', label, uri: `mailto:${choice.email}` }
       break
     case 'add_friend':
-      if (choice.url) return { type: 'uri', label, uri: choice.url }
+      if (choice.url) return { type: 'uri', label, uri: choice.url, ...extraMetadata }
       break
     case 'form':
-      if (choice.url) return { type: 'uri', label, uri: choice.url }
+      if (choice.url) return { type: 'uri', label, uri: choice.url, ...extraMetadata }
       break
     default:
       break

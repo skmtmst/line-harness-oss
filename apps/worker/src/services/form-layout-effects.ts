@@ -1,3 +1,4 @@
+import { applyTapExtras } from './tap-extras.js';
 import { researchGateProblem, runResearchAnswerAction, validateResearchActionScope } from './research-forms.js';
 import type { Env } from '../index.js';
 /**
@@ -555,6 +556,12 @@ async function runChoiceEffects(
 
   const chosen = (block.choices ?? []).filter((c) => formChoiceIsSelected(block, c, selected));
   for (const choice of chosen) {
+    if (input.layout.options.researchGate && choice.tapExtras) {
+      if (!input.idempotencyPrefix) throw new Error('回答の受付番号を確認できませんでした');
+      const friend = await input.db.prepare('SELECT line_account_id FROM friends WHERE id=?').bind(input.friendId).first<{line_account_id: string | null}>();
+      if (!friend?.line_account_id) throw new Error('回答者のアカウントを確認できませんでした');
+      await applyTapExtras(input.db, input.friendId, friend.line_account_id, choice.tapExtras, `${input.idempotencyPrefix}:research:${block.id}:${choice.id}`);
+    }
     switch (block.choiceMode) {
       case 'tag':
         await applyChoiceTag(input, choice);

@@ -24,7 +24,7 @@ export class TemplateHqTemplateError extends Error {
 }
 
 export type { MessageTemplateDefinition, MessageTemplateMediaDefinition } from '@line-crm/shared';
-import { type MessageTemplateDefinition, type MessageTemplateMediaDefinition, validateAssetPayload, isBroadcastAssetKind, convertBroadcastAsset, templateKind } from '@line-crm/shared';
+import { type MessageTemplateDefinition, type MessageTemplateMediaDefinition, validateAssetPayload, validateTapExtrasTree, tapExtrasError, isBroadcastAssetKind, convertBroadcastAsset, templateKind } from '@line-crm/shared';
 import { parseQuestion } from '../scenario-question.js';
 export type MessageTemplateTargetSnapshot = Readonly<{
   tenantId: string;
@@ -329,6 +329,14 @@ export function parseMessageTemplateDefinition(value: unknown): MessageTemplateD
     media,
   };
   try { collectLiffActionLocators(parsed); } catch { throw new TemplateHqTemplateError('INVALID_DEFINITION', 422); }
+  const extrasError = validateTapExtrasTree(parsed.asset?.payload ?? parsed.card ?? {});
+  let contentExtras: string | null = null;
+  try { contentExtras = validateTapExtrasTree(JSON.parse(parsed.template.messageContent)); } catch { /* text */ }
+  if (extrasError || contentExtras) throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
+  if (parsed.template.questionJson) {
+    const q = parseQuestion(parsed.template.questionJson);
+    if (q?.choices.some(choice => tapExtrasError({ tagIds: choice.addTagIds, scoreChange: choice.scoreChange }))) throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
+  }
   referencedMedia(parsed);
   return parsed;
 }

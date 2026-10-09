@@ -1,3 +1,4 @@
+import type { TapExtras } from './tap-extras.js';
 import type { ResearchAnswerAction, ResearchGate } from './research-form.js';
 /**
  * 回答フォームの中身（レイアウト）。
@@ -83,6 +84,8 @@ export interface FormInputLimit {
  * がどの列を使うかを決める。
  */
 export interface FormChoice {
+  /** リサーチで選んだ答えの追加処理。回答を送信した後に実行する。 */
+  tapExtras?: TapExtras;
   id: string;
   label: string;
   /** choiceMode = 'tag' のとき付けるタグ */

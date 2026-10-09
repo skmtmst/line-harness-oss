@@ -122,3 +122,18 @@ test('未割当の旧素材は既定統括だけに公開し、別統括へ読�
   expect((await submit(formId)).status).toBe(400);
   expect(db.raw.prepare('SELECT COUNT(*) AS n FROM form_submissions').get()).toEqual({ n: 0 });
 });
+
+test('選んだ答えのタグと加点はLIFF回答後にだけ実行し、同じ回答の再送で二重加点しない', async () => {
+  update({ questions: [
+    { text: 'ペット', format: 'single', required: true, choices: ['犬', '猫'], choiceTapExtras: [{ tagIds: ['t1'], scoreChange: 10 }, { scoreChange: 50 }] },
+    { text: '食事', format: 'multiple', required: true, choices: ['朝', '昼', '夜'], choiceTapExtras: [{ scoreChange: 2 }, { scoreChange: 3 }, { scoreChange: 4 }] },
+  ], answerActions: [] });
+  const id = await ensureResearchForm(db.db, 'r1', 'a1');
+  expect(db.raw.prepare("SELECT score FROM friends WHERE id='f1'").get()).toEqual({score: 0});
+  const answers = { question_1: '犬', question_2: ['朝', '夜'] };
+  expect((await submit(id, answers)).status).toBe(201);
+  expect((await submit(id, answers)).status).toBe(200);
+  expect(db.raw.prepare("SELECT score FROM friends WHERE id='f1'").get()).toEqual({score: 16});
+  expect(db.raw.prepare("SELECT tag_id FROM friend_tags WHERE friend_id='f1'").all()).toEqual([{tag_id: 't1'}]);
+  expect(db.raw.prepare("SELECT COUNT(*) n FROM friend_scores WHERE friend_id='f1'").get()).toEqual({n: 3});
+});

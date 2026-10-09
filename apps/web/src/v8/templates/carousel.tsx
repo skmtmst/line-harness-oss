@@ -16,6 +16,7 @@
  */
 import { notifySaved } from '@/components/shared/toast'
 import { createPageReturnHref } from '@/components/shared/create-page'
+import { tapExtrasError, type TapExtras } from '@line-crm/shared'
 import { Suspense, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -92,15 +93,16 @@ export function panelsFromContent(messageContent: string, storedActions: Record<
       text: col.text ?? '',
       actions: Array.isArray(col.actions) && col.actions.length > 0
         ? (col.actions as unknown as Array<Record<string, unknown>>).map((a, ai) => {
+          const tapExtras = a.tapExtras as TapExtras | undefined
           const label = typeof a.label === 'string' ? a.label : ''
           const actions = readInlineActions((storedActions?.[String(i)]?.[String(ai)] as unknown[]) ?? null)
-          if (a.type === 'message') return { label, kind: 'message' as const, uri: '', text: typeof a.text === 'string' ? a.text : '', formId: '', actions }
+          if (a.type === 'message') return { tapExtras, label, kind: 'message' as const, uri: '', text: typeof a.text === 'string' ? a.text : '', formId: '', actions }
           const isUri = a.type === 'uri' || typeof a.uri === 'string'
-          if (!isUri) return { label, kind: 'action' as const, uri: '', text: '', formId: '', actions }
+          if (!isUri) return { tapExtras, label, kind: 'action' as const, uri: '', text: '', formId: '', actions }
           const uri = typeof a.uri === 'string' ? a.uri : ''
           const page = choiceFromUri(uri)
           /* LIFF のページは種類に戻す（URL は保存のときにアカウントの LIFF ID で作り直す）。それ以外は URL のまま。 */
-          return { label, kind: page.kind, uri: page.kind === 'uri' ? uri : '', text: '', formId: page.formId, actions }
+          return { tapExtras, label, kind: page.kind, uri: page.kind === 'uri' ? uri : '', text: '', formId: page.formId, actions }
         })
         : [emptyChoice()],
     }
@@ -140,6 +142,8 @@ const HOST_ALLOWED: readonly ChoiceKind[] = HOST_CHOICE_KINDS
 /** 1つのボタンの誤り（文字のあるボタンだけ見る）。欄の真下に出すので「カード〇のボタン〇」は付けない（B-139）。 */
 function buttonProblem(a: Panel['actions'][number], liffId: string | null, hqHost: boolean): string | null {
   if (!a.label.trim()) return null
+  const extrasError = tapExtrasError(a.tapExtras)
+  if (extrasError) return extrasError
   if (hqHost && !HOST_ALLOWED.includes(a.kind)) return '統括のカルーセルのボタンは「URLを開く」か「テキストを送る」にしてください'
   if (a.kind === 'message') {
     if (!a.text.trim()) return '送る文を入力してください'
@@ -294,7 +298,8 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
       const res = await saveCarousel({ templateId: id ?? createdId, selectedAccountId, name, panels, folderId, tapLimitMode, tapLimitText, liffId })
       if (!res.ok) {
         if (res.createdId) setCreatedId(res.createdId)
-        setError(res.error)
+        if (res.tapExtraError) fields.setServerErrors(Object.fromEntries(panels.flatMap((p, ci) => p.actions.flatMap((a, ai) => a.tapExtras ? [[`card-${ci}-button-${ai}`, res.tapExtraError]] : []))))
+        else setError(res.error)
         setSaveFailed(true)
         return null
       }
@@ -559,12 +564,14 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                       <TapActionField
                         name={`カード${selectedIndex + 1}のボタン${ai + 1}`}
                         kindLabel={`カード${selectedIndex + 1}のボタン${ai + 1}の動き`}
-                        value={{ kind: action.kind, uri: action.uri, text: action.text, refId: action.formId }}
+                        allowExtras accountId={hqHost ? null : folderAccountId} extrasError={fields.error(`card-${selectedIndex}-button-${ai}`)}
+                        value={{ kind: action.kind, uri: action.uri, text: action.text, refId: action.formId, tapExtras: action.tapExtras }}
                         onChange={(patch) => setAction({
                           ...(patch.kind !== undefined ? { kind: patch.kind as ChoiceKind } : {}),
                           ...(patch.uri !== undefined ? { uri: patch.uri } : {}),
                           ...(patch.text !== undefined ? { text: patch.text } : {}),
                           ...(patch.refId !== undefined ? { formId: patch.refId } : {}),
+                          ...(patch.tapExtras !== undefined ? { tapExtras: patch.tapExtras } : {}),
                         })}
                         kinds={choiceKindOptions({ host: hqHost, current: action.kind }).filter(isTapActionKind)}
                         extraKinds={hqHost ? [] : ACTION_EXTRA_KIND}

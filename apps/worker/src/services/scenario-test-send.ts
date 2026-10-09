@@ -1,3 +1,4 @@
+import { stripTapExtras } from '@line-crm/shared';
 /*
  * シナリオのテスト送信。
  *
@@ -93,7 +94,7 @@ export async function buildStepMessages(
 
   const question = parseQuestion(resolved.questionJson)
   if (question) {
-    return buildQuestionMessages(
+    return stripTapExtras(buildQuestionMessages(
       {
         ...question,
         intro: question.intro
@@ -102,7 +103,7 @@ export async function buildStepMessages(
         text: expandVariables(question.text, friendWithMeta, workerUrl, 'text', extra),
       },
       step.id,
-    )
+    )) as Message[]
   }
 
   const expanded = expandVariables(
@@ -112,7 +113,8 @@ export async function buildStepMessages(
     resolved.messageType,
     extra,
   )
-  return [buildMessage(resolved.messageType, expanded)]
+  const testContent = resolved.messageType !== 'text' && expanded.includes('\"tapExtras\"') ? JSON.stringify(stripTapExtras(JSON.parse(expanded))) : expanded
+  return [buildMessage(resolved.messageType, testContent)]
 }
 
 /**

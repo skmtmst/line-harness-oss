@@ -1,3 +1,4 @@
+import { decorateTapExtras } from './tap-extras.js';
 import { extractFlexAltText } from '../utils/flex-alt-text.js';
 // メッセージの組み立ては一斉配信と共有する。ここからも取れるようにしておく（呼び出し側が多い）。
 import { buildMessage } from './line-message.js';
@@ -636,6 +637,12 @@ async function processSingleDelivery(
           : { kind: 'version' as const, stepId: currentStep.id },
       )
     : [buildMessage(tracked.messageType, tracked.content)];
+  if (question && JSON.stringify(messages).includes('\"tapExtras\"')) {
+    const decorated = await decorateTapExtras(db, messages, workerUrl || '', deliveryAccountId ?? null);
+      const { appendFriendToTrackedLinks } = await import('./auto-track.js');
+      const personalized = JSON.parse(await appendFriendToTrackedLinks(db, JSON.stringify(decorated), workerUrl || '', friend.id));
+    messages.splice(0, messages.length, ...(personalized as Message[]));
+  }
   // Resolve the correct LINE client for this friend's account
   let deliveryClient = lineClient;
   if (deliveryAccountId) {
