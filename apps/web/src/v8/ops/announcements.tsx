@@ -248,11 +248,17 @@ export default function OpsAnnouncementsV8() {
       if (!res.success) { setFormError('保存できませんでした'); return }
       setConfirmSend(false)
       notifySaved(mode === 'draft' ? '下書きとして保存しました' : mode === 'schedule' ? `${formatDateTime(res.data.publishAt)} に配信を予約しました` : `送りました（${res.data.recipientsTotal}人。LINE ${res.data.lineSent}・メール ${res.data.mailSent}）`)
-      setBaseline(EMPTY)
-      setForm(EMPTY)
-      setEditingId(null)
-      setEditingUpdatedAt(null)
-      setCreateKey(crypto.randomUUID())
+      collision.clear()
+      if (editingId) {
+        setBaseline(form)
+        setEditingUpdatedAt(res.data.updatedAt)
+      } else {
+        setBaseline(EMPTY)
+        setForm(EMPTY)
+        setEditingId(null)
+        setEditingUpdatedAt(null)
+        setCreateKey(crypto.randomUUID())
+      }
       await load()
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
