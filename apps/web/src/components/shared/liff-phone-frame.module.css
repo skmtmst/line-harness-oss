@@ -1,0 +1,129 @@
+/*
+ * お客さまの予約画面の写し（LIFF ②担当・③日時）。器は幅330・高さ714・縁8（外側に描く）。
+ * 色は --v8-liff-*、寸法は --tpl-bks-ph-*（globals.css）。
+ */
+.phone {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: var(--tpl-bks-ph-w);
+  height: var(--tpl-bks-ph-h);
+  overflow: hidden;
+  border-radius: var(--v8-liff-phone-radius);
+  outline: var(--tpl-bks-ph-frame) solid var(--color-ink);
+  background: var(--color-canvas);
+  /* 器の縁は外側に描く（絵と同じく、縁は周りの間に重なる）。 */
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: var(--tpl-bks-ph-status-h);
+  padding: var(--tpl-bks-ph-status-pad);
+}
+
+.time {
+  color: var(--color-ink);
+  font-size: var(--tpl-bks-ph-time-size);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.statusIcons {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bks-ph-steps-gap);
+  margin-left: auto;
+  color: var(--color-ink);
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: var(--tpl-bks-ph-bar-h);
+  padding: var(--tpl-bks-ph-bar-pad);
+  border-bottom: 1px solid var(--v8-liff-line);
+}
+
+.barSide {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--tpl-bks-ph-side-w);
+  color: var(--color-ink);
+}
+
+.barTitle {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+}
+
+.barMain {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--tpl-bks-ph-bar-title-lh);
+}
+
+.barShop {
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bks-ph-shop-size);
+  line-height: var(--tpl-bks-ph-shop-lh);
+}
+
+.steps {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--tpl-bks-ph-steps-gap);
+  padding: var(--tpl-bks-ph-steps-pad);
+}
+
+.step {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-bks-ph-steps-gap);
+  min-width: 0;
+}
+
+.stepLine {
+  height: var(--tpl-bks-ph-step-h);
+  border-radius: var(--v8-liff-step-radius);
+  background: var(--v8-liff-line);
+}
+
+.step[data-state='done'] .stepLine,
+.step[data-state='now'] .stepLine { background: var(--v8-liff-primary); }
+
+.stepLabel {
+  color: var(--v8-liff-idle);
+  font-size: var(--text-nano);
+  font-weight: 500;
+  line-height: var(--tpl-bks-ph-step-lh);
+  white-space: nowrap;
+}
+
+.step[data-state='done'] .stepLabel { color: var(--v8-liff-sub); }
+.step[data-state='now'] .stepLabel { color: var(--color-ink); font-weight: 700; }
+
+.body {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-bks-ph-body-gap);
+  min-height: 0;
+  padding: var(--tpl-bks-ph-body-pad);
+  overflow: hidden;
+}
+
+
+.content { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; }
+.root { display: flex; flex-direction: column; align-items: center; gap: 12px; min-width: 0; }
+.caption { align-self: stretch; margin: 0; font-size: var(--text-label); font-weight: 600; }
+.home { flex-shrink: 0; height: 20px; display: grid; place-items: center; }
+.home span { width: 100px; height: 4px; border-radius: 4px; background: var(--color-ink); }

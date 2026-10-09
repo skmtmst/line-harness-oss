@@ -1,5 +1,7 @@
 'use client'
 
+import LiffPhoneFrame from '@/components/shared/liff-phone-frame'
+
 /**
  * 予約スタッフの画面の右の列に出す「お客さまの予約画面」の写し（押せない見本）。
  * 実 LIFF（apps/liff）の並び「①メニュー → ②担当 → ③日時 → ④確認」の②と③。
@@ -13,7 +15,6 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import styles from './phone.module.css'
 
 const WEEKDAY_JP = '日月火水木金土'
-const STEP_LABELS = ['メニュー', '担当', '日時', '確認']
 
 function addDaysStr(date: string, days: number): string {
   const d = new Date(`${date}T00:00:00Z`)
@@ -37,40 +38,8 @@ export function priceLabel(menu: Pick<BookingMenu, 'price_mode' | 'base_price'>)
   return `¥${menu.base_price.toLocaleString('ja-JP')}`
 }
 
-function PhoneChrome({ step, children, foot }: { step: number; children: ReactNode; foot: ReactNode }) {
-  return (
-    <div className={styles.phone} role="img" aria-label="お客さまの予約画面の見本">
-      <div className={styles.status}>
-        <span className={styles.time}>9:41</span>
-        <span className={styles.statusIcons} aria-hidden="true">
-          <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="1" /><rect x="4.5" y="5" width="3" height="6" rx="1" /><rect x="9" y="3" width="3" height="8" rx="1" /><rect x="13.5" y="0.5" width="3" height="10.5" rx="1" /></svg>
-          <svg width="25" height="11" viewBox="0 0 25 11" fill="none" stroke="currentColor"><rect x="0.5" y="0.5" width="21" height="10" rx="3" /><rect x="2.5" y="2.5" width="15" height="6" rx="1.5" fill="currentColor" stroke="none" /><path d="M23.5 3.5v4a2 2 0 0 0 0-4z" fill="currentColor" stroke="none" /></svg>
-        </span>
-      </div>
-      <div className={styles.bar}>
-        <span className={styles.barSide} aria-hidden="true">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M2 2l10 10M12 2L2 12" /></svg>
-        </span>
-        <span className={styles.barTitle}>
-          <span className={styles.barMain}>ご予約</span>
-          <span className={styles.barShop}>然 - NEN -</span>
-        </span>
-        <span className={styles.barSide} aria-hidden="true">
-          <svg width="18" height="6" viewBox="0 0 18 6" fill="currentColor"><circle cx="3" cy="3" r="1.6" /><circle cx="9" cy="3" r="1.6" /><circle cx="15" cy="3" r="1.6" /></svg>
-        </span>
-      </div>
-      <div className={styles.steps} aria-hidden="true">
-        {STEP_LABELS.map((label, i) => (
-          <span key={label} className={styles.step} data-state={i + 1 < step ? 'done' : i + 1 === step ? 'now' : 'idle'}>
-            <span className={styles.stepLine} />
-            <span className={styles.stepLabel}>{i + 1} {label}</span>
-          </span>
-        ))}
-      </div>
-      <div className={styles.body}>{children}</div>
-      <div className={styles.foot}>{foot}</div>
-    </div>
-  )
+function PhoneChrome({ step, children, foot }: { step: number; children: React.ReactNode; foot: React.ReactNode }) {
+  return <LiffPhoneFrame step={step} footer={<div className={styles.foot}>{foot}</div>}><div className={styles.body}>{children}</div></LiffPhoneFrame>
 }
 
 function CheckMark() {

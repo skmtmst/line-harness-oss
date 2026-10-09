@@ -16,7 +16,7 @@ import {
 import type { FormLayout } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import * as accountContext from '@/contexts/account-context'
-import FlexPreview from '@/components/flex-preview'
+import { LinePreviewFlex as FlexPreview } from '@/components/shared/line-preview'
 import LinePreview, { LinePreviewMessage } from './line-preview'
 import ListState from './list-state'
 import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '@/components/templates/message-template-editor'

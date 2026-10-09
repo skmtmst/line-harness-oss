@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRef, type ReactNode } from 'react'
 import { listInterpolations, validateFlexContent, type CommonVar, type FriendField } from '@line-crm/shared'
-import FlexPreviewComponent from '@/components/flex-preview'
+import { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import Button from '@/components/shared/button'
 import LinePreview from '@/components/shared/line-preview'

@@ -33,7 +33,7 @@ import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/com
 import { TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
 import { notifyToast } from '@/components/shared/toast'
-import FlexPreview from '@/components/flex-preview'
+import { LinePreviewFlex as FlexPreview } from '@/components/shared/line-preview'
 import { buildTemplatePreview, extractMessageUrls, LEGACY_MESSAGE_NOTICE } from '@/components/templates/message-template-editor'
 import {
   ACCOUNT_MISMATCH_MESSAGE,

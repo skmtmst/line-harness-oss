@@ -29,7 +29,7 @@ import LinePreview from '@/components/shared/line-preview'
 import { InsertText } from '@/components/shared/insert-text-field'
 import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '@/components/templates/message-template-editor'
 import TargetMissing from '@/components/shared/target-missing'
-import FlexPreviewComponent from '@/components/flex-preview'
+import { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview'
 import {
   buildUsageRows,
   insertionNames,

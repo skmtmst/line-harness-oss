@@ -1,5 +1,7 @@
 'use client'
 
+import LiffPhoneFrame from '@/components/shared/liff-phone-frame'
+
 /**
  * 予約設定の右欄に出す「お客さまの予約画面」の写し（★V8 `owaS3` 右のスマホ）。
  *
@@ -17,7 +19,6 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import styles from './settings-v8.module.css'
 
 const WEEKDAY_JP = '日月火水木金土'
-const STEP_LABELS = ['メニュー', '担当', '日時', '確認']
 
 export type LiffPhoneStep = 'menu' | 'staff' | 'datetime'
 
@@ -64,41 +65,7 @@ function PhoneListSkeleton() {
 }
 
 function PhoneChrome({ step, children }: { step: number; children: React.ReactNode }) {
-  return (
-    <div className={styles.phone} role="img" aria-label="お客さまの予約画面の見本">
-      <div className={styles.phoneStatusBar}>
-        <span className={styles.phoneTime}>9:41</span>
-        <span className={styles.phoneStatusIcons} aria-hidden="true">
-          <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="3" width="3" height="8" rx="1"/><rect x="13.5" y="0.5" width="3" height="10.5" rx="1"/></svg>
-          <svg width="25" height="11" viewBox="0 0 25 11" fill="none" stroke="currentColor"><rect x="0.5" y="0.5" width="21" height="10" rx="3"/><rect x="2.5" y="2.5" width="15" height="6" rx="1.5" fill="currentColor" stroke="none"/><path d="M23.5 3.5v4a2 2 0 0 0 0-4z" fill="currentColor" stroke="none"/></svg>
-        </span>
-      </div>
-      <div className={styles.phoneLiffBar}>
-        <span className={styles.phoneLiffSide} aria-hidden="true">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M2 2l10 10M12 2L2 12" /></svg>
-        </span>
-        <span className={styles.phoneLiffTitle}>
-          <span className={styles.phoneLiffTitleMain}>ご予約</span>
-          <span className={styles.phoneLiffTitleShop}>然 - NEN -</span>
-        </span>
-        <span className={styles.phoneLiffSide} aria-hidden="true">
-          <svg width="18" height="6" viewBox="0 0 18 6" fill="currentColor"><circle cx="3" cy="3" r="1.6"/><circle cx="9" cy="3" r="1.6"/><circle cx="15" cy="3" r="1.6"/></svg>
-        </span>
-      </div>
-      <div className={styles.phoneSteps} aria-hidden="true">
-        {STEP_LABELS.map((label, i) => {
-          const state = i + 1 < step ? styles.phoneStepDone : i + 1 === step ? styles.phoneStepNow : ''
-          return (
-            <span key={label} className={`${styles.phoneStep} ${state}`}>
-              <span className={styles.phoneStepLine} />
-              <span className={styles.phoneStepLabel}>{i + 1} {label}</span>
-            </span>
-          )
-        })}
-      </div>
-      {children}
-    </div>
-  )
+  return <LiffPhoneFrame step={step}>{children}</LiffPhoneFrame>
 }
 
 /** 写しのメニューカード。作りかけ（Pick だけ）でも描けるよう、使う欄だけを要求する。 */

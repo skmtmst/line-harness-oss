@@ -27,6 +27,7 @@
 import { useSyncExternalStore, type ReactNode } from 'react'
 import { BatteryFull, ChevronDown, ChevronLeft, Menu, Phone, Search, Signal, Wifi } from 'lucide-react'
 import HelpTip from './help-tip'
+import FlexPreview from '@/components/flex-preview'
 import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
 import styles from './line-preview.module.css'
 
@@ -217,3 +218,6 @@ export function LinePreviewCard({ imageUrl, title, description, price, time, act
     <span className={styles.messageTime}>{time}</span>
   </div>
 }
+
+/** Flex はトーク枠内で描く。JSON の検査・安全な描画は既存レンダラーに任せる。 */
+export function LinePreviewFlex({ content, maxWidth }: { content: string; maxWidth?: number }) { return <FlexPreview content={content} maxWidth={maxWidth} /> }
