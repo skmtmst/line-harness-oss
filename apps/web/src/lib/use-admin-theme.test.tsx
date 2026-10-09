@@ -43,18 +43,22 @@ describe('画面は常に V8（試験の外）', () => {
       seen.push(theme)
       return <span data-theme-probe={theme} />
     }
-    expect(renderToString(<Probe />)).toContain('data-theme-probe="v8"')
+    const html = renderToString(<Probe />)
+    expect(html).toContain('data-theme-probe="v8"')
     const container = document.createElement('div')
+    container.innerHTML = html
     document.body.appendChild(container)
+    const errors: unknown[] = []
     let root!: Root
     await act(async () => {
-      root = hydrateRoot(container, <Probe />)
+      root = hydrateRoot(container, <Probe />, { onRecoverableError: (error) => errors.push(error) })
     })
     await act(async () => {
       window.dispatchEvent(new Event(ADMIN_THEME_CHANGED_EVENT))
     })
     expect(seen.length).toBeGreaterThan(0)
     expect(seen.every((theme) => theme === 'v8')).toBe(true)
+    expect(errors).toEqual([])
     await act(async () => { root.unmount() })
   })
 
@@ -77,7 +81,7 @@ describe('試験の中だけ：v7 の画面の試験のための選択口', () =
 
   it('試験の中で変数なしなら v7 を選べる（タグの入口は V8 だけになった）', () => {
     // タグの入口（app/tags/page.tsx）は 2026-10-09 の V7 削除で V8 だけを出す（mainA）。
-    // テーマの仕組みそのもの（変数なしは v7）は rmv7 が V8 固定にするまで残るので、値だけを見る。
+    // 試験専用の選択口（変数なしは v7）の値だけを見る。
     function Probe() {
       return <span data-theme-probe={useAdminTheme()} />
     }

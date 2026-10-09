@@ -14,7 +14,7 @@ export function adminThemeTestOnlyChoice(): boolean {
   return process.env.NODE_ENV === 'test'
 }
 
-/** 最初の描画の見た目。layout.tsx の `<html data-theme>` と use-admin-theme.ts の初期状態が同じ値を使う。 */
+/** 最初の描画の見た目。試験の外では layout.tsx の `<html data-theme="v8">` と必ず一致する。 */
 export function adminThemeDefault(): 'v7' | 'v8' {
   if (!adminThemeTestOnlyChoice()) return 'v8'
   return process.env.NEXT_PUBLIC_ADMIN_THEME === 'v8' ? 'v8' : 'v7'

@@ -8,8 +8,9 @@
  *   - globals.css の V8 値は [data-theme="v8"] の下にある
  */
 import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
-import { existsSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync as readRawSource } from 'node:fs'
 import { join } from 'node:path'
+import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 
 const WEB = join(__dirname, '..', '..')
@@ -36,6 +37,34 @@ describe('見た目は V8 に固定', () => {
     expect(settings).not.toContain('data-design="theme-preview"')
     expect(settings).not.toContain('applyAdminTheme')
     expect(existsSync(join(WEB, 'src/components/theme-preview-switch.tsx'))).toBe(false)
+  })
+
+  it('追加された画面にも独自の環境変数・保存済みテーマの選択口がない', () => {
+    const src = join(WEB, 'src')
+    const failures: string[] = []
+    function scan(dir: string) {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const file = join(dir, entry.name)
+        if (entry.isDirectory()) { scan(file); continue }
+        if (!/\.tsx?$/.test(file) || /\.test\.tsx?$/.test(file)) continue
+        const source = ts.createSourceFile(file, readRawSource(file, 'utf8'), ts.ScriptTarget.Latest, true)
+        function visit(node: ts.Node) {
+          // コメントは調べない。試験専用の環境変数の読み取りは共通関数だけに置く。
+          if (ts.isStringLiteral(node) && node.text === 'lh-admin-theme') failures.push(file)
+          const envChoice = (ts.isPropertyAccessExpression(node) && node.name.text === 'NEXT_PUBLIC_ADMIN_THEME')
+            || (ts.isElementAccessExpression(node) && ts.isStringLiteral(node.argumentExpression) && node.argumentExpression.text === 'NEXT_PUBLIC_ADMIN_THEME')
+          if (envChoice && file !== join(src, 'lib/admin-theme-default.ts')) failures.push(file)
+          if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken
+            && /^document\.documentElement\.dataset(?:\.theme|\[['"]theme['"]\])$/.test(node.left.getText(source))) failures.push(file)
+          if (ts.isCallExpression(node) && node.expression.getText(source) === 'document.documentElement.setAttribute'
+            && node.arguments[0] && ts.isStringLiteral(node.arguments[0]) && node.arguments[0].text === 'data-theme') failures.push(file)
+          ts.forEachChild(node, visit)
+        }
+        visit(source)
+      }
+    }
+    scan(src)
+    expect([...new Set(failures)]).toEqual([])
   })
 
   it('配備（検証・本番）と検証配備の手順に見た目の指定は無い', () => {

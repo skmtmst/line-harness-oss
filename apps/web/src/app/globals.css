@@ -538,7 +538,7 @@
  * `<html data-theme="v8">` のときだけ効く、V7 と値の違うトークン。
  * ここに無いトークンは :root（＝V7）の値がそのまま効く。
  * 画面は常に v8（2026-10-09 V8 固定。layout.tsx が `<html data-theme="v8">` を出す）。
- * :root（v7 の値）は、使われないまま残した v7 の画面の試験のためだけに残る。
+ * :root の共通の値と旧画面用の値は、機能ごとの書き換えまで残す。
  *
  * 値の出どころは Pencil ★V8（~/Downloads/LINE-Harness-V8.pen）と
  * lh-work/design/v8/COMPONENT-MAP.md。部品ごとの移行（④）で、部品が
