@@ -162,7 +162,7 @@ function AccountMigrationV7({ m }: { m: ReturnType<typeof useUidMigration> }) {
   } = m
 
   if (status === 'loading') return <ListState kind="loading" title="UID移行を読み込んでいます" description="移行履歴とアカウントを確認しています。" />
-  if (status === 'error') return <ListState kind="error" title="UID移行を表示できませんでした" description="登録した移行履歴は消えていません。" action={<Button onClick={() => void load()}>再読み込み</Button>} />
+  if (status === 'error') return <ListState kind="error" title="UID移行を表示できませんでした" description="登録した移行履歴は消えていません。" onRetry={() => void load()} />
 
   return (
     <div data-design-node="vtBCu" className="flex flex-col gap-4">

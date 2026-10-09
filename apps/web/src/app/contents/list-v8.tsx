@@ -1356,7 +1356,7 @@ export default function MediaLibraryListV8() {
               kind="error"
               title="表示できませんでした"
               description="再読み込みしても直らないときは、エラー報告へお知らせください。"
-              action={<Button variant="secondary" onClick={() => void load()}>もう一度読み込む</Button>}
+              onRetry={() => void load()}
             />
           ) : current.length === 0 ? (
             <div>

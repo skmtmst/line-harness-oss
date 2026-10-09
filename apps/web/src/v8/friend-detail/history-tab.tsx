@@ -74,7 +74,7 @@ export default function HistoryTab({ friend, friendId, data }: { friend: FriendD
         ) : historyStatus === 'error' ? (
           <div className={`${styles.centered} ${styles.pane}`} role="alert">
             <p className={styles.paneNote}>履歴を読み込めませんでした。</p>
-            <Button onClick={() => void data.loadHistory()}>もう一度試す</Button>
+            <Button onClick={() => void data.loadHistory()}>もう一度読み込む</Button>
           </div>
         ) : (
           <>

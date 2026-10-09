@@ -74,7 +74,7 @@ function retryButton(): HTMLButtonElement | undefined {
 }
 
 describe('ウェビナー編集の読み込み失敗の出し分け（D004）', () => {
-  it('403は権限の案内を出し、再試行は出さない', async () => {
+  it('403は権限の案内を出し、再読み込みを出す', async () => {
     const { ApiError } = await import('@/lib/api')
     fixture.get.mockRejectedValue(new ApiError(403, 'Forbidden'))
     fixture.editor.mockRejectedValue(new ApiError(403, 'Forbidden'))
@@ -82,7 +82,7 @@ describe('ウェビナー編集の読み込み失敗の出し分け（D004）', 
 
     expect(host.textContent).toContain('ウェビナーを見る権限がありません')
     expect(host.textContent).not.toContain('通信が切れた')
-    expect(retryButton()).toBeUndefined()
+    expect(retryButton()).toBeTruthy()
   })
 
   it('429は混み合いの案内を出し、再試行は出る', async () => {

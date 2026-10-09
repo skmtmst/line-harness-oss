@@ -642,7 +642,7 @@ export default function TagsTab({
       <AlertCircle className={styles.stateIconError} aria-hidden="true" />
       <p className={styles.stateTitle}>タグを読み込めませんでした</p>
       <p className={styles.stateDesc}>再読み込みしても直らない場合はエラー報告へ。</p>
-      <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+      <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
     </div>
   ) : ready && visible.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */
@@ -836,7 +836,7 @@ export default function TagsTab({
           <p role="alert" className={styles.errorBand}>
             <AlertCircle className={styles.errorIcon} aria-hidden="true" />
             {actionError}
-            <button type="button" onClick={() => { setActionError(''); void load() }}>読み直す</button>
+            <button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button>
           </p>
         ) : null}
         {table}

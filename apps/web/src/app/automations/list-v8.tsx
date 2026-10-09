@@ -311,7 +311,7 @@ export default function AutomationListV8() {
           kind="error"
           title="ルールを表示できませんでした"
           description="ルールは消えていません。通信を確かめて、もう一度お試しください。"
-          action={<Button variant="secondary" onClick={() => void load()}>もう一度読み込む</Button>}
+          onRetry={() => void load()}
         />
       ) : null}
 

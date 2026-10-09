@@ -390,7 +390,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
     )
   }
   if (!subjectDraft || !subjectSettings) {
-    return <ListState kind="error" title="下書きを表示できませんでした" description={error || '下書きを読み込めませんでした。'} action={<Button onClick={() => void loadDraft()}>再読み込み</Button>} />
+    return <ListState kind="error" title="下書きを表示できませんでした" description={error || '下書きを読み込めませんでした。'} onRetry={() => void loadDraft()} />
   }
 
   const testIssue = testSend.phase.kind === 'failed' || testSend.phase.kind === 'unknown' ? testSend.phase.message : ''

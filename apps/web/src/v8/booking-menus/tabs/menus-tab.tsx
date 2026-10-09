@@ -211,7 +211,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
         icon={<AccountIcon />}
         title="予約設定を読み込めませんでした"
         description={error ?? '通信状態を確認して、もう一度お試しください。'}
-        action={<Button onClick={onReload}>もう一度試す</Button>}
+        action={<Button onClick={onReload}>もう一度読み込む</Button>}
       />
     )
   }

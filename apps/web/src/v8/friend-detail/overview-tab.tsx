@@ -141,7 +141,7 @@ export default function OverviewTab({
           {mileageStatus === 'error' ? (
             <p className={`${styles.memo} ${styles.faint}`}>
               マイルを読み込めませんでした
-              <button type="button" className={styles.retry} onClick={() => void data.loadMileage()}>もう一度試す</button>
+              <button type="button" className={styles.retry} onClick={() => void data.loadMileage()}>もう一度読み込む</button>
             </p>
           ) : (
             <div className={styles.mile}>
@@ -158,7 +158,7 @@ export default function OverviewTab({
           {richMenuStatus === 'error' ? (
             <p className={`${styles.memo} ${styles.faint}`}>
               読み込めませんでした
-              <button type="button" className={styles.retry} onClick={() => void data.loadRichMenu()}>もう一度試す</button>
+              <button type="button" className={styles.retry} onClick={() => void data.loadRichMenu()}>もう一度読み込む</button>
             </p>
           ) : (
             <p className={styles.value} title={richMenu?.name ?? undefined}>
@@ -193,7 +193,7 @@ export default function OverviewTab({
             {data.fieldsStatus === 'error' ? (
               <p className={`${styles.memo} ${styles.faint}`}>
                 情報欄を読み込めませんでした
-                <button type="button" className={styles.retry} onClick={() => void data.loadFields()}>もう一度試す</button>
+                <button type="button" className={styles.retry} onClick={() => void data.loadFields()}>もう一度読み込む</button>
               </p>
             ) : null}
             <section className={styles.group} aria-label="友だち情報">
@@ -263,7 +263,7 @@ export default function OverviewTab({
           ) : deliveryFailed ? (
             <p className={styles.secNote} role="alert">
               配信予定を読み込めませんでした
-              <button type="button" className={styles.retry} onClick={() => void data.loadUpcoming()}>もう一度試す</button>
+              <button type="button" className={styles.retry} onClick={() => void data.loadUpcoming()}>もう一度読み込む</button>
             </p>
           ) : nextDelivery ? (
             <Link
@@ -307,7 +307,7 @@ export default function OverviewTab({
               {mileageStatus === 'loading' || mileageStatus === 'idle'
                 ? 'つながり情報を読み込んでいます…'
                 : mileageStatus === 'error'
-                  ? <>つながり情報を読み込めませんでした<button type="button" className={styles.retry} onClick={() => void data.loadMileage()}>もう一度試す</button></>
+                  ? <>つながり情報を読み込めませんでした<button type="button" className={styles.retry} onClick={() => void data.loadMileage()}>もう一度読み込む</button></>
                   : mileageInsights && mileageInsights.accountCount > 1
                     ? `${mileageInsights.accountCount}件のLINEアカウントで同じ人としてつながっています${mileageConnections.length ? `（${mileageConnections.map((c) => c.accountName).join('・')}）` : ''}。重複候補が見つかると、根拠と確信度を表示します。`
                     : 'このアカウントのみに登録があります。重複候補が見つかると、根拠と確信度を表示します。'}
@@ -326,7 +326,7 @@ export default function OverviewTab({
           ) : data.historyStatus === 'error' ? (
             <p className={styles.secNote}>
               履歴を読み込めませんでした
-              <button type="button" className={styles.retry} onClick={() => void data.loadHistory()}>もう一度試す</button>
+              <button type="button" className={styles.retry} onClick={() => void data.loadHistory()}>もう一度読み込む</button>
             </p>
           ) : (
             <div className={styles.recentList}>

@@ -139,7 +139,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
         icon={<AccountIcon />}
         title="受付枠を読み込めませんでした"
         description={settingsError ?? '通信状態を確認して、もう一度お試しください。'}
-        action={<Button onClick={onReload}>読み直す</Button>}
+        action={<Button onClick={onReload}>もう一度読み込む</Button>}
       />
     )
   }
@@ -271,7 +271,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
             icon={<AccountIcon />}
             title="設備を読み込めませんでした"
             description={resourcesError ?? 'もう一度お試しください。'}
-            action={<Button onClick={onResourcesRetry}>読み直す</Button>}
+            action={<Button onClick={onResourcesRetry}>もう一度読み込む</Button>}
           />
         ) : null}
         {resourcesStatus === 'ready' && resources ? (

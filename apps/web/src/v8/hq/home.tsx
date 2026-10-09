@@ -422,7 +422,7 @@ export default function HqHomeV8() {
       tone="danger"
       message={loadFailureNotice(loadError, '統括のアカウント情報')}
       action={classifyApiFailure(loadError) === 'forbidden' ? undefined : (
-        <Button type="button" onClick={() => { setLoading(true); setReloadKey((key) => key + 1) }}>再読み込み</Button>
+        <Button type="button" onClick={() => { setLoading(true); setReloadKey((key) => key + 1) }}>もう一度読み込む</Button>
       )}
     />
   ) : loading ? (
@@ -487,7 +487,7 @@ export default function HqHomeV8() {
         <Notice
           tone="warn"
           message="保存はできましたが、一覧を読み直せませんでした。"
-          action={<Button type="button" onClick={() => void reloadAfterSave()}>読み直す</Button>}
+          action={<Button type="button" onClick={() => void reloadAfterSave()}>もう一度読み込む</Button>}
         />
       ) : null}
 

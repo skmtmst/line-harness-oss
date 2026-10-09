@@ -1136,7 +1136,7 @@ function CommonVarsListInner() {
         <span className={`${styles.stateIcon} ${styles.stateIconError}`}><TriangleAlert size={18} aria-hidden="true" /></span>
         <p className={styles.stateTitle}>共通情報を読み込めませんでした</p>
         <p className={styles.stateDesc}>{error || '読み込みに失敗しました。接続を確かめて、もう一度お試しください。'}</p>
-        <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+        <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
       </div>
     )
   ) : filtered.length === 0 ? (

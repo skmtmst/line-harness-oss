@@ -322,7 +322,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
       <AlertCircle className={styles.stateIconError} aria-hidden="true" />
       <p className={styles.stateTitle}>保存した検索を読み込めませんでした</p>
       <p className={styles.stateDesc}>{loadError}</p>
-      <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+      <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
     </div>
   ) : ready && items.length === 0 ? (
     <div className={styles.stateCard}>
@@ -496,7 +496,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
             {retryOrder ? (
               <button type="button" onClick={() => { const next = retryOrder; setRetryOrder(null); if (next) void applyOrder(next) }}>再試行</button>
             ) : (
-              <button type="button" onClick={() => { setError(''); void load() }}>読み直す</button>
+              <button type="button" onClick={() => { setError(''); void load() }}>もう一度読み込む</button>
             )}
           </p>
         ) : null}

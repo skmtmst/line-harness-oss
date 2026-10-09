@@ -325,7 +325,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
   return (
     <>
       {loadError ? (
-        <Notice tone="warn" message={loadError} action={<Button onClick={() => setRefresh((n) => n + 1)}>再読込</Button>} />
+        <Notice tone="warn" message={loadError} action={<Button onClick={() => setRefresh((n) => n + 1)}>もう一度読み込む</Button>} />
       ) : null}
       {conflict ? (
         <Notice

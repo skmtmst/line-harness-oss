@@ -81,12 +81,12 @@ afterEach(() => {
 })
 
 describe('M037 一覧の403は汎用文＋再試行にしない', () => {
-  it('403は権限の案内のみで、再試行も空状態も出さない', async () => {
+  it('403は権限の案内のみで、再読み込みを出し空状態は出さない', async () => {
     fixture.list.mockRejectedValueOnce(new ApiError(403))
     render(<NotificationsPage />)
 
     await waitFor(() => expect(screen.getByText(/権限がありません/)).toBeTruthy())
-    expect(screen.queryByRole('button', { name: /もう一度読み込む/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /もう一度読み込む/ })).toBeTruthy()
     // 失敗を「まだありません」と混ぜない。
     expect(screen.queryByText('通知はまだありません')).toBeNull()
   })

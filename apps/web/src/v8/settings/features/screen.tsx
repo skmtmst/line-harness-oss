@@ -59,7 +59,7 @@ function UsageBadge({ category, onRetry }: { category: UsageCategory; onRetry?: 
     return (
       <span className={styles.usage} title={category.inUse.reason ?? category.created.reason ?? '利用状況はまだ分かりません'}>
         利用数は未取得
-        {onRetry && <button type="button" onClick={onRetry} aria-label="利用数を読み直す">読み直す</button>}
+        {onRetry && <button type="button" onClick={onRetry} aria-label="利用数を読み直す">もう一度読み込む</button>}
       </span>
     )
   }
@@ -82,7 +82,7 @@ function FeatureUsageBadge({ usage, label, onRetry }: { usage: FeatureUsage; lab
     return (
       <span className={styles.usage} title={title}>
         利用状況は取得失敗
-        {onRetry && <button type="button" onClick={onRetry} aria-label="利用状況を読み直す">読み直す</button>}
+        {onRetry && <button type="button" onClick={onRetry} aria-label="利用状況を読み直す">もう一度読み込む</button>}
       </span>
     )
   }

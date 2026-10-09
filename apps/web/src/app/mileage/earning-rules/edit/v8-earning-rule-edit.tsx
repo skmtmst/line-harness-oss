@@ -221,7 +221,7 @@ function EditInner() {
           kind="error"
           title="たまる決めごとを読み込めませんでした"
           description="再読み込みしても直らない場合はエラー報告へ。"
-          action={<Button onClick={() => void load()}>読み直す</Button>}
+          onRetry={() => void load()}
         />
       </div>
     )

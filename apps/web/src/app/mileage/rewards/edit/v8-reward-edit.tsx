@@ -306,7 +306,7 @@ function RewardEditorInner() {
   if (state === 'error') {
     return (
       <div data-design-node="L2Bzp">
-        <ListState kind="error" title="使い道を表示できませんでした" description="再読み込みしても直らない場合はエラー報告へ。" action={<Button onClick={() => void load()}>使い道を再読み込み</Button>} />
+        <ListState kind="error" title="使い道を表示できませんでした" description="再読み込みしても直らない場合はエラー報告へ。" onRetry={() => void load()} />
       </div>
     )
   }

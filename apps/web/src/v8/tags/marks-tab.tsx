@@ -338,7 +338,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
       <AlertCircle className={styles.stateIconError} aria-hidden="true" />
       <p className={styles.stateTitle}>対応マークを読み込めませんでした</p>
       <p className={styles.stateDesc}>{error || '再読み込みしても直らない場合はエラー報告へ。'}</p>
-      <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+      <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
     </div>
   ) : listReady && items.length === 0 ? (
     <div className={styles.stateCard}>
@@ -522,7 +522,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
             {retryOrder ? (
               <button type="button" onClick={() => { const next = retryOrder; setRetryOrder(null); if (next) void applyOrder(next) }}>再試行</button>
             ) : (
-              <button type="button" onClick={() => { setActionError(''); void load() }}>読み直す</button>
+              <button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button>
             )}
           </p>
         ) : null}

@@ -550,7 +550,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
             {retryOrder ? (
               <button type="button" onClick={() => { const next = retryOrder; setRetryOrder(null); if (next) void applyOrder(next) }}>再試行</button>
             ) : (
-              <button type="button" onClick={() => { setActionError(''); void load() }}>読み直す</button>
+              <button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button>
             )}
           </p>
         ) : null}

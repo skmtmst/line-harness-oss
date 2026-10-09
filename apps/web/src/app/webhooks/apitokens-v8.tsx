@@ -387,7 +387,7 @@ function ApiTokensV8Inner() {
             kind="error"
             title="鍵を読み込めませんでした"
             description={loadError}
-            action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+            onRetry={() => void load()}
           />
         ) : null}
         {status === 'forbidden' ? (

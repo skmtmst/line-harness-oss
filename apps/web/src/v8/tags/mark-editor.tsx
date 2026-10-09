@@ -481,7 +481,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
                   {rulesState === 'error' ? (
                     <div className={styles.inlineRetry}>
                       <p className={styles.fieldError} role="alert">きまりを読み込めませんでした。</p>
-                      <Button type="button" variant="text" onClick={() => void loadRules()}>読み直す</Button>
+                      <Button type="button" variant="text" onClick={() => void loadRules()}>もう一度読み込む</Button>
                     </div>
                   ) : null}
                   {rulesState === 'ready' && rules.length === 0 ? <p className={styles.fieldNote}>今は自動で変えません。必要なときだけきまりを作ってください。</p> : null}

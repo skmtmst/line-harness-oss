@@ -1049,7 +1049,7 @@ function StaffPageHost() {
           <GridCell className={styles.colMenu} role="columnheader"><span className={styles.srOnly}>操作</span></GridCell>
         </GridHeadRow>
         {loading ? <p className={styles.stateRow} role="status">ログインユーザーを読み込んでいます…</p>
-          : error ? <div className={styles.stateRow} role="alert"><p>ログインユーザーを読み込めませんでした。登録した内容は消えていません。</p><Button onClick={() => void load()}>読み直す</Button></div>
+          : error ? <div className={styles.stateRow} role="alert"><p>ログインユーザーを読み込めませんでした。登録した内容は消えていません。</p><Button onClick={() => void load()}>もう一度読み込む</Button></div>
           : shown.length === 0 ? <p className={styles.stateRow}>条件に合うログインユーザーはいません。条件を変えてお試しください。</p>
           : shown.map((user) => {
             const member = memberById.get(user.id)

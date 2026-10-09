@@ -665,7 +665,7 @@ export default function EventsListV8() {
               <ListState
                 kind="error"
                 description="登録したイベントは消えていません。再読み込みしても直らない場合はエラー報告へ。"
-                action={<Button onClick={() => void refresh()}>イベントを再読み込み</Button>}
+                onRetry={() => void refresh()}
               />
             </div>
           ) : items.length === 0 && !filterActive ? (

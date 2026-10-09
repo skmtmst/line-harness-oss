@@ -845,7 +845,7 @@ export default function ScenariosListV8() {
         </span>
         <p className={styles.stateTitle}>シナリオを読み込めませんでした</p>
         <p className={styles.stateDesc}>作ったシナリオは消えていません。通信を確かめて、もう一度試してください。</p>
-        <Button type="button" onClick={() => void loadScenarios()}>もう一度試す</Button>
+        <Button type="button" onClick={() => void loadScenarios()}>もう一度読み込む</Button>
       </div>
     ) : scenarios.length === 0 ? (
       /* 修正案 D-2（2026-10-07 採用）：空の一覧は次の一歩へ導く。 */

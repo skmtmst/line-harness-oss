@@ -332,7 +332,7 @@ function EventsListPageV7() {
          */
         <ListState kind="forbidden" title="イベントを見る権限がありません" />
       ) : loadStatus === 'error' ? (
-        <ListState kind="error" description="登録したイベントは消えていません。再読み込みしても直らない場合はエラー報告へ。" action={<Button onClick={() => void refresh()}>イベントを再読み込み</Button>} />
+        <ListState kind="error" description="登録したイベントは消えていません。再読み込みしても直らない場合はエラー報告へ。" onRetry={() => void refresh()} />
       ) : items.length === 0 && !query.trim() && filter === 'all' ? (
         <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
           <p className="text-ink mb-2 font-medium">イベントがまだありません</p>

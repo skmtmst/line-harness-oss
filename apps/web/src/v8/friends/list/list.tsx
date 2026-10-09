@@ -746,7 +746,7 @@ export default function FriendsListV8() {
       {optionsFailed ? (
         <p className={styles.optionsFailed}>
           絞り込みの選択肢を読み込めませんでした。タグが空なのは、取れなかっただけかもしれません。
-          <button type="button" onClick={() => { void loadOptions(); void loadMarks() }} className={styles.linkButton}>再読み込み</button>
+          <button type="button" onClick={() => { void loadOptions(); void loadMarks() }} className={styles.linkButton}>もう一度読み込む</button>
         </p>
       ) : null}
     </div>

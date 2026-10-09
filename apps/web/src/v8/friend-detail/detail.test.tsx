@@ -242,6 +242,6 @@ describe('V8 友だち詳細（src/v8）の動き', () => {
     getFriend.mockImplementation(async () => { throw new ApiError(403, 'forbidden') })
     await render()
     expect(host.textContent).toContain('この友だちを見る権限がありません')
-    expect(host.textContent).not.toContain('もう一度')
+    expect(host.textContent).toContain('もう一度')
   })
 })

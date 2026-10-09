@@ -1830,7 +1830,7 @@ export default function AutoRepliesListV8() {
         {actionError ? (
           <p className={styles.errorBand} style={{ padding: '10px 14px' }} role="alert">
             {actionError}
-            <button type="button" onClick={() => void load()}>読み直す</button>
+            <button type="button" onClick={() => void load()}>もう一度読み込む</button>
           </p>
         ) : null}
         {listBody}

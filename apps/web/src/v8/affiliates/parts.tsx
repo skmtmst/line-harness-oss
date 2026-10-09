@@ -159,7 +159,7 @@ export function StateCard({
 
 /** 失敗の1枚の「もう一度試す」。 */
 export function RetryButton({ onRetry }: { onRetry: () => void }) {
-  return <Button type="button" onClick={onRetry}>もう一度試す</Button>
+  return <Button type="button" onClick={onRetry}>もう一度読み込む</Button>
 }
 
 /** 行の右端の「…」。メニューの目印が行を1段増やさないよう箱で包む。 */

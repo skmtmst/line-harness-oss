@@ -306,7 +306,7 @@ function PoolMembers({ poolId, accounts, canManage, onChange }: {
       {listError ? (
         <p role="alert" className={styles.inlineError}>
           {listError}{' '}
-          <button type="button" className={styles.textButton} onClick={() => void reload()}>読み直す</button>
+          <button type="button" className={styles.textButton} onClick={() => void reload()}>もう一度読み込む</button>
         </p>
       ) : null}
       {canManage && candidates.length > 0 ? (

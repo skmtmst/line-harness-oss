@@ -1068,7 +1068,7 @@ export default function TemplatesListV8() {
           : '登録したテンプレートは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。'}
       </p>
       {view === 'error' && (
-        <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+        <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
       )}
     </div>
   ) : filteredTemplates.length === 0 ? (

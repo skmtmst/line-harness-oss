@@ -271,7 +271,7 @@ export function useScenarioPicker(
         ) : listStatus === 'error' ? (
           <p className={styles.secNote}>
             シナリオの選択肢を読み込めませんでした
-            <button type="button" className={styles.retry} onClick={() => void openPicker()}>もう一度試す</button>
+            <button type="button" className={styles.retry} onClick={() => void openPicker()}>もう一度読み込む</button>
           </p>
         ) : active.length === 0 ? (
           <p className={styles.secNote}>登録できるシナリオがありません。</p>

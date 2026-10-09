@@ -536,7 +536,7 @@ function AdV8Gate({
         kind="error"
         title="広告との接続状況を表示できませんでした"
         description="接続設定は消えていません。状態を読み直して、もう一度お試しください。"
-        action={<Button onClick={() => void model.reload()}>広告の状態を再読み込み</Button>}
+        onRetry={() => void model.reload()}
       />
     )
   }
@@ -827,7 +827,7 @@ export function AdMetricsV8() {
               kind="error"
               title="広告費を読み込めませんでした"
               description="記録は消えていません。もう一度読み込んでください。"
-              action={<Button onClick={() => void model.reload()}>もう一度読み込む</Button>}
+              onRetry={() => void model.reload()}
             />
           ) : model.costRows.length === 0 ? (
             <ListState

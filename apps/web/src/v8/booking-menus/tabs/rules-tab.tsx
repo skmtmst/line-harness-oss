@@ -232,7 +232,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
         icon={<AccountIcon />}
         title="予約のルールを読み込めませんでした"
         description={error ?? '通信状態を確認して、もう一度お試しください。'}
-        action={<Button onClick={onReload}>読み直す</Button>}
+        action={<Button onClick={onReload}>もう一度読み込む</Button>}
       />
     )
   }

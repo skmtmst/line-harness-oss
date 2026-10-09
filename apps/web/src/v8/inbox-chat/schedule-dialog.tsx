@@ -114,7 +114,7 @@ export default function ScheduleSendDialog({
       {rowsFailed ? (
         <p className={styles.schError}>
           予約の一覧を読み込めませんでした。
-          <button type="button" data-inbox-v6="scheduled-retry" className={styles.schLink} onClick={onRetryRows}>再読み込み</button>
+          <button type="button" data-inbox-v6="scheduled-retry" className={styles.schLink} onClick={onRetryRows}>もう一度読み込む</button>
         </p>
       ) : null}
       {rows.length > 0 ? (

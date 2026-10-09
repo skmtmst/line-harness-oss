@@ -1446,7 +1446,7 @@ export default function RichMenusListV8() {
       {actionError ? (
         <p className={styles.errorBand} role="alert">
           {actionError}
-          <button type="button" onClick={() => void reload()}>読み直す</button>
+          <button type="button" onClick={() => void reload()}>もう一度読み込む</button>
         </p>
       ) : null}
       {listBody}

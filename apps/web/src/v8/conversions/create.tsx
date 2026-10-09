@@ -492,7 +492,7 @@ function ConversionCreate() {
                   onCheckedChange={(next) => toggleUsageGroup(group.kind, next)}
                 >{group.label}</Checkbox>
                 {result.state === 'error' ? (
-                  <Button variant="text" onClick={() => requestUsageKind(group.kind, lineAccountId)} disabled={!lineAccountId}>読み直す</Button>
+                  <Button variant="text" onClick={() => requestUsageKind(group.kind, lineAccountId)} disabled={!lineAccountId}>もう一度読み込む</Button>
                 ) : (
                   <span className={styles.usageState} role={result.state === 'forbidden' ? 'status' : undefined}>{stateText}</span>
                 )}

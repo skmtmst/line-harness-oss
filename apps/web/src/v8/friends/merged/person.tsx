@@ -80,7 +80,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
           {m.saveError ? (
             <p className={styles.error} role="alert">
               {m.saveError}
-              <button type="button" className={styles.link} onClick={m.reload}>読み直す</button>
+              <button type="button" className={styles.link} onClick={m.reload}>もう一度読み込む</button>
             </p>
           ) : null}
 

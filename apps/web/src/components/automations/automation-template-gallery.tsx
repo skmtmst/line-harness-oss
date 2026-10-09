@@ -100,7 +100,7 @@ export default function AutomationTemplateGallery({
         kind="error"
         title="見本を表示できませんでした"
         description="まだ下書きは作っていません。再読み込みしてから選んでください。"
-        action={<Button variant="secondary" onClick={() => void load()}>見本を再読み込み</Button>}
+        onRetry={() => void load()}
       />
     )
   }

@@ -1018,7 +1018,7 @@ function StoreShiftsView() {
           kind="error"
           title="受付時間と休業日を表示できませんでした"
           description="保存済みの設定は消えていません。時間をおいて、もう一度読み込んでください。"
-          action={<Button onClick={() => setReloadKey((value) => value + 1)}>受付時間と休業日を再読み込み</Button>}
+          onRetry={() => setReloadKey((value) => value + 1)}
         />
       ) : loadStatus === 'loading' || loadedAccountRef.current !== selectedAccountId || !settings ? (
         <ListState kind="loading" title="受付時間と休業日を読み込んでいます" />

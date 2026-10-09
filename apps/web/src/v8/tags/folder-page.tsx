@@ -203,7 +203,7 @@ function TagFolderPage() {
           {loadState === 'error' ? (
             <div className={styles.inlineRetry}>
               <p className={styles.fieldError}>読み込めませんでした</p>
-              <Button type="button" variant="text" onClick={loadFolder}>再読み込み</Button>
+              <Button type="button" variant="text" onClick={loadFolder}>もう一度読み込む</Button>
             </div>
           ) : null}
         </>

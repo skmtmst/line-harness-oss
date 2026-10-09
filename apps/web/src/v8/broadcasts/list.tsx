@@ -997,7 +997,7 @@ export default function BroadcastListV8() {
       <DelayedSkeleton loading skeleton={loadingSkeleton} />
     </div>
   ) : forbidden ? (
-    stateCard(<AlertCircle size={20} aria-hidden="true" />, '配信を見る権限がありません', '見るには権限が要ります。オーナーか管理者に追加を依頼してください。', null, true)
+    stateCard(<AlertCircle size={20} aria-hidden="true" />, '配信を見る権限がありません', '見るには権限が要ります。オーナーか管理者に追加を依頼してください。', <Button onClick={() => void loadList((page - 1) * pageSize)}>もう一度読み込む</Button>, true)
   ) : error ? (
     stateCard(<AlertCircle size={20} aria-hidden="true" />, '一斉配信を読み込めませんでした', error,
       <Button type="button" onClick={() => void loadList((page - 1) * pageSize)}>もう一度読み込む</Button>, true)

@@ -447,7 +447,7 @@ export default function BookingMediaPage() {
         />
         <div className={styles.body}>
           {conflict ? (
-            <Notice tone="warn" role="alert" action={<Button size="compact" onClick={() => void load()}>読み直す</Button>}>
+            <Notice tone="warn" role="alert" action={<Button size="compact" onClick={() => void load()}>もう一度読み込む</Button>}>
               ほかの人が先にこの店の媒体の設定を変えました。読み直してから、もう一度変えてください。
             </Notice>
           ) : null}

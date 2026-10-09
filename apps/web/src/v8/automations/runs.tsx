@@ -595,7 +595,7 @@ export default function AutomationRunsV8() {
         {deepLinkMessage ? (
           <DetailPanel open title="実行記録の中身" onClose={() => setDeepLinkRunId(null)}>
             <p className={styles.panelText}>{deepLinkMessage}</p>
-            {deepLinkError === 'error' ? <Button onClick={() => setDeepLinkReloadKey((key) => key + 1)}>もう一度読む</Button> : null}
+            {deepLinkError === 'error' ? <Button onClick={() => setDeepLinkReloadKey((key) => key + 1)}>もう一度読み込む</Button> : null}
           </DetailPanel>
         ) : null}
         <DetailPanel
@@ -643,7 +643,7 @@ export default function AutomationRunsV8() {
               ) : detailError === 'error' ? (
                 <div className={styles.panelActions}>
                   <p className={styles.panelText}>詳細を読み込めませんでした。記録は消えていません。</p>
-                  <Button onClick={() => setDetailReloadKey((key) => key + 1)}>もう一度読む</Button>
+                  <Button onClick={() => setDetailReloadKey((key) => key + 1)}>もう一度読み込む</Button>
                 </div>
               ) : runDetail && runDetail.steps.length > 0 ? (
                 <ul className={styles.steps}>
