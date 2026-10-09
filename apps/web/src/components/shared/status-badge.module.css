@@ -113,7 +113,7 @@
   gap: var(--polish-status-gap); padding: var(--polish-status-pad);
   border: 0; border-radius: var(--radius-pill);
   background: var(--polish-status-neutral-bg); color: var(--polish-status-neutral-ink);
-  font-size: var(--polish-text-support); font-weight: 600; line-height: 1.5;
+  font-size: var(--polish-text-support); font-weight: var(--polish-status-weight); line-height: 1.5;
   max-width: 100%; min-width: 0;
 }
 [data-theme='v8'] .badge:not(.annotation)[data-tone='success'] { background: var(--polish-status-success-bg); color: var(--polish-status-success-ink); }

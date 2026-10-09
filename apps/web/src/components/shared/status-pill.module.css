@@ -58,7 +58,7 @@
   gap: var(--polish-status-gap); padding: var(--polish-status-pad);
   border: 0; border-radius: var(--radius-pill);
   background: var(--status-bg); color: var(--status-ink);
-  font-size: var(--polish-text-support); font-weight: 600; line-height: 1.5;
+  font-size: var(--polish-text-support); font-weight: var(--polish-status-weight); line-height: 1.5;
   max-width: 100%; min-width: 0;
 }
 [data-theme='v8'] .pill[data-tone='success'] { --status-dot: var(--polish-status-success-dot); --status-bg: var(--polish-status-success-bg); --status-ink: var(--polish-status-success-ink); }

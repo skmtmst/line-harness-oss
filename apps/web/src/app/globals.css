@@ -501,6 +501,7 @@
   --polish-icon-stroke: 1.75;
 }
 :root {
+  --polish-status-weight: 600;
   --polish-status-dot-size: 6px;
   --polish-status-gap: 8px;
   --polish-status-pad: 2px 8px;
