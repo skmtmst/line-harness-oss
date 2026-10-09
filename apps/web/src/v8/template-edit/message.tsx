@@ -19,6 +19,9 @@ import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useAccount } from '@/contexts/account-context'
+import { useFormErrors } from '@/lib/use-form-errors'
+import ValidationSummary from '@/components/shared/validation-summary'
+import { FieldError } from '@/components/shared/form-controls'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
@@ -116,6 +119,14 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     setAutoCreated(null)
   }
   const { name, folderId, messageType, messageContent } = editor.draft
+  /* 保存で落ちた欄は、その欄を赤くして真下に理由を出し、1つ目の欄へ移る（B-139）。 */
+  const fields = useFormErrors()
+  fields.define('name', 'テンプレート名', () => (name.trim() ? null : 'テンプレート名を入力してください。'))
+  fields.define('content', messageType === 'text' ? '本文' : 'メッセージ内容', () => {
+    if (!messageContent.trim()) return '本文を入力してください。'
+    if (messageType === 'flex' && validateFlexContent('flex', messageContent)) return 'カードの形を直してから保存してください。'
+    return null
+  })
   const updateDraft = (patch: Partial<TemplateDraft>) => setEditor((prev) => ({ ...prev, draft: { ...prev.draft, ...patch } }))
 
   const binding = { templateId: id, templateStatus: editor.status, templateAccountId: editor.templateAccountId, selectedAccountId }
@@ -271,6 +282,10 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
    * 競合（409）は自動でも帯を出す（このまま書くと相手の変更が消えるため）。
    */
   const saveNow = async ({ silent = false }: { silent?: boolean } = {}): Promise<string | null> => {
+    if (!silent && fields.submit().length > 0) {
+      setError('')
+      return null
+    }
     if (!silent) {
       setSaving(true)
       setError('')
@@ -346,9 +361,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   const hostSave = (distribute: boolean) => {
     if (!host) return
     const draft = editor.draft
-    if (!draft.name.trim()) { setError('テンプレート名を入力してください。'); return }
-    if (!draft.messageContent.trim()) { setError('本文を入力してください。'); return }
-    if (draft.messageType === 'flex' && validateFlexContent('flex', draft.messageContent)) { setError('カードの形を直してから保存してください。'); return }
+    if (fields.submit().length > 0) { setError(''); return }
     setError('')
     setClean(snapshot(draft))
     host.onSave({ kind: 'message', name: draft.name.trim(), messageType: draft.messageType, messageContent: draft.messageContent }, distribute)
@@ -549,6 +562,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
             {messageType === 'flex' || messageType === 'image' ? <Notice tone="warn" message={LEGACY_MESSAGE_NOTICE} /> : null}
             {error || loadFailed ? <p role="alert" className={styles.error}>{loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : error}</p> : null}
             {exampleNote && !id ? <p role="status" className={styles.error}>{exampleNote}</p> : null}
+            <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
             <Card padding="none" layout="vertical" className={styles.card}>
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>名前とフォルダ</h2>
@@ -557,7 +571,8 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
               <div className={styles.pair}>
                 <div className={`${styles.field} ${styles.grow}`}>
                   <label htmlFor="te-name" className={styles.label}>テンプレート名</label>
-                  <TextField id="te-name" value={name} onChange={(event) => updateDraft({ name: event.target.value })} placeholder="例：予約前日のご案内" aria-required="true" />
+                  <TextField {...fields.bind('name')} id="te-name" value={name} onChange={(event) => updateDraft({ name: event.target.value })} placeholder="例：予約前日のご案内" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-name-error' : undefined} />
+                  <FieldError id="te-name-error">{fields.error('name')}</FieldError>
                 </div>
                 <div className={`${styles.field} ${styles.folderField}`}>
                   <label htmlFor="te-folder" className={styles.labelSmall}>フォルダ</label>
@@ -582,10 +597,12 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>中身</h2>
               </div>
-              <div className={styles.bodyBox}>
+              <div className={styles.bodyBox} {...fields.bind('content')}>
                 <InsertTextField
                   id="te-content"
                   ref={contentRef}
+                  aria-invalid={fields.invalid('content') || undefined}
+                  aria-describedby={fields.invalid('content') ? 'te-content-error' : undefined}
                   aria-label={messageType === 'text' ? '本文' : 'メッセージ内容'}
                   aria-required="true"
                   className={styles.bodyText}
@@ -598,7 +615,8 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                 <span className={styles.bodySpacer} aria-hidden="true" />
                 <InsertRow accountId={editorAccountId} state={referenceState} references={references} length={messageContent.length} onInsert={insert} />
               </div>
-              {messageType === 'flex' && flexError && messageContent.trim() ? (
+              <FieldError id="te-content-error">{fields.error('content')}</FieldError>
+              {messageType === 'flex' && flexError && messageContent.trim() && !fields.invalid('content') ? (
                 <p role="alert" className={styles.error}>{flexError}このままでは保存できません。</p>
               ) : null}
               <p className={styles.hint}>
