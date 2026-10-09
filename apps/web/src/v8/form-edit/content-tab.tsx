@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { newBlockId, type FormBlock, type FormInputBlock, type FormLayout } from '@line-crm/shared'
 import BlockEditor from '@/components/forms/block-editor'
+import FormFileSettings from '@/components/shared/form-file-settings'
 import type { FormRefs } from '@/components/forms/form-refs'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -315,6 +316,7 @@ function InputFields({ block, refs, patch }: { block: FormInputBlock; refs: Form
           <TextField id={`${labelId}-placeholder`} value={block.placeholder ?? ''} placeholder="例：山田 太郎" onChange={(e) => set({ placeholder: e.target.value })} />
         </Labeled>
       ) : null}
+      {block.type === 'file' ? <FormFileSettings block={block} onChange={set} /> : null}
       {isChoiceType(block.type) ? <ChoiceFields block={block} set={set} /> : null}
       {block.type === 'booking' ? <BookingFields block={block} refs={refs} set={set} /> : <SaveTo block={block} refs={refs} set={set} />}
     </>

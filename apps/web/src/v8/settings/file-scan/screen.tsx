@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Pencil, RotateCcw, Trash2 } from 'lucide-react'
 import Button from '@/components/shared/button'
+import FormDocumentRetention from '@/components/shared/form-document-retention'
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -378,6 +379,7 @@ export default function FileScanScreen() {
         ) : null}
       </section>
 
+      {selectedAccountId ? <FormDocumentRetention key={selectedAccountId} accountId={selectedAccountId} /> : null}
       {dialogs}
     </SbSettingsScreen>
   )

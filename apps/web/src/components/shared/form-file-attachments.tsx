@@ -1,0 +1,42 @@
+'use client'
+import { useEffect, useState } from 'react'
+import { FileText, Lock } from 'lucide-react'
+import type { FormFileAnswer } from '@line-crm/shared'
+import { fetchApiBlob } from '@/lib/api'
+import Button from './button'
+import Dialog from './dialog'
+import styles from './form-file-attachments.module.css'
+export function isFormFiles(value: unknown): value is FormFileAnswer[] {
+  return Array.isArray(value) && value.some(v => v && typeof v === 'object' && typeof v.fileId === 'string')
+}
+function Attachment({ file }: { file: FormFileAnswer }) {
+  const [url, setUrl] = useState<string | null>(null)
+  const [open, setOpen] = useState(false)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    if (file.state !== 'ready') return;
+    let active = true; let objectUrl: string | null = null
+    void fetchApiBlob(`/api/form-files/${encodeURIComponent(file.fileId)}/content`).then(blob => {
+      if (!active) return;
+      objectUrl = URL.createObjectURL(blob); setUrl(objectUrl)
+    }).catch(() => { if (active) setError('書類を開けませんでした') })
+    return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl) }
+  }, [file.fileId, file.state])
+  if (file.state === 'expired') return <span>期限で消しました</span>
+  if (file.state === 'restricted') return <span><Lock size={14} aria-hidden />見る権限がありません</span>
+  if (file.state !== 'ready') return <span>検査が終わるまで開けません</span>
+  const pdf = file.mimeType === 'application/pdf'
+  return <>
+    <Button size="compact" onClick={() => setOpen(true)} aria-label={`${file.filename || '書類'}を開く`}>
+      {pdf ? <FileText size={16} aria-hidden /> : url ? <img src={url} alt="添付の小さな見本" className={styles.thumbnail} /> : null}
+      {file.filename || '書類'}
+    </Button>
+    <Dialog open={open} title={file.filename || '書類'} designWidth={720} onCancel={() => setOpen(false)} cancelLabel="閉じる">
+      {error ? <p role="alert">{error}</p> : url ? pdf ? <iframe src={url} title={file.filename || 'PDF'} className={styles.document} /> : <img src={url} alt={file.filename || '書類'} className={styles.image} /> : <p>読み込んでいます…</p>}
+    </Dialog>
+  </>
+}
+export default function FormFileAttachments({ value }: { value: unknown }) {
+  if (!isFormFiles(value)) return <>{Array.isArray(value) ? value.join(', ') : String(value ?? '')}</>
+  return <span className={styles.files}>{value.map(file => <Attachment key={file.fileId} file={file} />)}</span>
+}

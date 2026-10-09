@@ -748,3 +748,6 @@ shared-button-importer v8/settings/ec-commerce/subscriptions.tsx
 shared-button-importer components/shared/message-composer.tsx
 shared-button-importer components/shared/message-composer-media.tsx
 shared-button-importer v8/template-edit/frame.tsx
+
+shared-button-importer components/shared/form-file-attachments.tsx
+shared-button-importer components/shared/form-document-retention.tsx

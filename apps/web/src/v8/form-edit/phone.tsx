@@ -145,7 +145,7 @@ function PhoneQuestion({ block, bookingMenus }: { block: FormInputBlock; booking
         })}
       </div> : null}
       {block.type === 'rating' ? <RatingStars name={block.name} current={normalizeRatingValue(text)} onChange={() => {}} /> : null}
-      {block.type === 'file' ? <FormFileControl label={block.label} /> : null}
+      {block.type === 'file' ? <FormFileControl label={block.label} kind={block.fileKind} kinds={block.fileKinds} bothSides={block.fileBothSides} maxCount={block.fileMaxCount} /> : null}
       {block.type === 'address' ? <AddressControls draft={{ postalCode: '', prefecture: '', city: '', addressLine1: '', addressLine2: '' }} placeholder={block.placeholder} onChange={() => {}} /> : null}
       {block.type === 'booking' ? <BookingPreview block={block} bookingMenus={bookingMenus} /> : null}
     </div>
