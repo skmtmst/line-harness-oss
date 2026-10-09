@@ -49,7 +49,7 @@ lineAccountTags.post('/api/line-account-tags', requireRole('owner', 'admin'), de
   const fields: Record<string, string> = {};
   const input = readAccountClassificationInput(await c.req.json().catch(() => null), true, fields);
   if (!input?.name) return inputError(c, { success: false, error: 'タグの名前・色・並び順を確認してください', fields }, 400);
-  const tag = await createLineAccountTag(c.env.DB, tenantOf(c), { ...input, name: input.name });
+  const tag = await createLineAccountTag(c.env.DB, tenantOf(c), { ...input, name: input.name, color: input.color ?? '#94a3b8' });
   auditLog(c, 'line_account_tag.create', { kind: 'line_account_tag', id: tag.id });
   return c.json({ success: true, data: serializeLineAccountTag(tag) }, 201);
 });

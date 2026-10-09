@@ -804,7 +804,7 @@ export async function createTag(
 ): Promise<Tag> {
   const id = crypto.randomUUID();
   const now = jstNow();
-  const color = input.color ?? '#3B82F6';
+  const color = input.color ?? '#94a3b8';
 
   await assertTagNameAvailable(db, input.name, null);
 
@@ -882,7 +882,7 @@ export async function createTagsBulk(
     });
     if (insertable.length === 0) continue;
     const values = insertable
-      .map(() => "(?, ?, '#3B82F6', (SELECT id FROM folders WHERE kind = 'tag' AND id = ?), ?, NULL, ?)")
+      .map(() => "(?, ?, '#94a3b8', (SELECT id FROM folders WHERE kind = 'tag' AND id = ?), ?, NULL, ?)")
       .join(', ');
     const binds = insertable.flatMap((row) => [row.id, row.name, row.groupId, now, row.normalizedName]);
 

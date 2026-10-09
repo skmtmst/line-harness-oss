@@ -1205,7 +1205,7 @@ tags.post('/api/tags', requireRole('owner', 'admin'), inputJsonBoundary(), async
         actions,
         actorId: c.get('staff')?.id ?? null,
       });
-      return c.json({ success: true, data: tagDefinitionResponse(detail) }, 201);
+      return c.json({ success: true, data: { ...tagDefinitionResponse(detail), color: detail.tag.color } }, 201);
     }
 
     const name = typeof body.name === 'string' ? body.name.trim() : '';
@@ -1257,7 +1257,7 @@ tags.post('/api/tags', requireRole('owner', 'admin'), inputJsonBoundary(), async
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
 
-    return c.json({ success: true, data: serializeTag(tag) }, 201);
+    return c.json({ success: true, data: { ...serializeTag(tag), color: tag.color } }, 201);
   } catch (err) {
     const handled = tagDefinitionError(c, err);
     if (handled) return handled;

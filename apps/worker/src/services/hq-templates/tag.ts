@@ -102,7 +102,7 @@ export function parseTagDefinition(v: unknown): TagDefinition {
   const allowedTagKeys = new Set(['name','color','description','folderId','isStarred','manualAssignmentAllowed','reapplyPolicy','linkedEnabled','mileage','actions']);
   if (Object.keys(tag).some(key => !allowedTagKeys.has(key))) throw new HqTemplateError('UNSUPPORTED_REFERENCE');
   return { schemaVersion: 1, tag: {
-    name: boundedText(tag.name), color: color(tag.color) ?? '#3B82F6',
+    name: boundedText(tag.name), color: color(tag.color) ?? '#94a3b8',
     description: tag.description == null || tag.description === '' ? null : boundedText(tag.description, 2000), folderId,
     ...(tag.isStarred === undefined ? {} : { isStarred: boolean(tag.isStarred, false) }),
     ...(tag.manualAssignmentAllowed === undefined ? {} : { manualAssignmentAllowed: boolean(tag.manualAssignmentAllowed, true) }),

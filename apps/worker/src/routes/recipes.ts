@@ -112,9 +112,9 @@ function cloneStatements(
     if (item.kind === 'tag') {
       statements.push(db.prepare(
         `INSERT INTO tags
-           (id, name, normalized_name, description, line_account_id, status, created_from_recipe_id,
+           (id, name, normalized_name, description, line_account_id, color, status, created_from_recipe_id,
             recipe_clone_run_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, '#94a3b8', 'active', ?, ?, ?, ?)`,
       ).bind(item.id, item.name, normalizeTagNameForCleanup(item.name), item.note, accountId, recipe.id, runId, now, now));
     } else if (item.kind === 'template') {
       statements.push(db.prepare(
