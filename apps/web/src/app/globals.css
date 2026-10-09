@@ -552,6 +552,19 @@
  *     器の内側1pxの縁と、白いつまみの薄い影（同上）
  */
 [data-theme="v8"] {
+  /* B-71③・WQmep：対応状況の札（点・薄い地・濃い文字）。 */
+  --color-support-unread: #b91c1c;
+  --color-support-unread-bg: #fdecec;
+  --color-support-unread-dot: #dc2626;
+  --color-support-progress: #a15c00;
+  --color-support-progress-bg: #fdf3e3;
+  --color-support-progress-dot: #d97706;
+  --color-support-resolved: #15803d;
+  --color-support-resolved-bg: #e8f5ec;
+  --color-support-resolved-dot: #16a34a;
+  --color-support-hold: #4b5563;
+  --color-support-hold-bg: #f1f2f4;
+  --color-support-hold-dot: #6b7280;
   /* 面の分け方（案A・JeINq／EFV8l）。タイルと見本の選択色。 */
   --color-layout-picker-sample: #f1f2f4;
   --color-layout-picker-sample-selected: #cfe9d8;

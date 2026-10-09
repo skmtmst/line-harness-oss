@@ -7,18 +7,18 @@ export const SUPPORT_STATUS_TONES: Record<SupportStatus, StatusBadgeTone> = {
   unread: 'danger', in_progress: 'warning', on_hold: 'neutral', resolved: 'success',
 }
 
-/** 色は点だけに付け、状態は必ず文字でも伝える。 */
+/** 状態は色の点と文字の両方で伝える。 */
 export function StatusDot({ tone = 'neutral', color }: { tone?: StatusBadgeTone; color?: string | null }) {
   return <span className={styles.dot} data-tone={tone} style={color ? { backgroundColor: color } : undefined} aria-hidden="true" />
 }
 
-/** オーナー決定 2026-10-08：対応状況は白地・薄い枠の丸い札。 */
+/** B-71③：対応状況は色の点・薄い地・濃い文字の丸い札。 */
 export default function StatusPill({ children, tone = 'neutral', color, ...props }: Omit<HTMLAttributes<HTMLSpanElement>, 'children' | 'color' | 'className'> & {
   children: ReactNode
   tone?: StatusBadgeTone
   color?: string | null
 }) {
-  return <span className={styles.pill} {...props}>
+  return <span className={styles.pill} {...props} data-tone={tone}>
     <StatusDot tone={tone} color={color} />
     <span className={styles.name}>{children}</span>
   </span>

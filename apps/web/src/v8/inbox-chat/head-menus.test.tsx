@@ -8,9 +8,10 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import ConversationHead from './conversation-head'
+import { HeadStatusMenu } from './head-menus'
 
 beforeEach(() => { vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true) })
-afterEach(() => { cleanup(); vi.unstubAllGlobals() })
+afterEach(() => { cleanup(); delete document.documentElement.dataset.theme; vi.unstubAllGlobals() })
 
 const operators = [{ id: 'op-k', name: 'Kenta' }, { id: 'op-m', name: 'Masato' }]
 
@@ -30,6 +31,22 @@ function mount(extra: Partial<React.ComponentProps<typeof ConversationHead>> = {
 }
 
 describe('会話の頭のメニュー', () => {
+  test('V8で状態を変えると札と点の色が同時に変わり、保存失敗で戻した値も反映する', () => {
+    document.documentElement.dataset.theme = 'v8'
+    const onChange = vi.fn()
+    const { rerender } = render(<HeadStatusMenu value="unread" onChange={onChange} />)
+    const button = screen.getByRole('button', { name: '対応状況を変える' })
+    expect(button.dataset.tone).toBe('danger')
+    fireEvent.click(button)
+    fireEvent.click(screen.getByRole('option', { name: '保留' }).querySelector('button')!)
+    expect(onChange).toHaveBeenCalledWith('on_hold')
+    for (const [value, tone] of [['on_hold', 'neutral'], ['in_progress', 'warning'], ['resolved', 'success'], ['unread', 'danger']] as const) {
+      rerender(<HeadStatusMenu value={value} onChange={onChange} />)
+      expect(button.dataset.tone).toBe(tone)
+      expect(button.querySelector('[data-tone]')?.getAttribute('data-tone')).toBe(tone)
+    }
+  })
+
   test('対応状況は1つだけ選ぶ一覧。チェックボックスは出さず、選ぶと変わる', () => {
     const { onStatus } = mount()
     fireEvent.click(screen.getByRole('button', { name: '対応状況を変える' }))
