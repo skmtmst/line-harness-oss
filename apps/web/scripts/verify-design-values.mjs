@@ -41,6 +41,13 @@ export function normalize(value) {
   v = v.replace(/#([0-9a-f])([0-9a-f])([0-9a-f])\b/g, '#$1$1$2$2$3$3')
   v = v.replace(/(^|[\s(,])\.(\d)/g, '$10.$2')
   v = v.replace(/\s*,\s*/g, ',')
+  // CSSの最適化は rgba() と8桁hexを相互に変える。色は8bitへそろえ、書式だけの違いで落とさない。
+  v = v.replace(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)/g, (all, r, g, b, a = '1') => {
+    const channels = [Number(r), Number(g), Number(b), Math.round(Number(a) * 255)]
+    if (channels.some((c) => !Number.isFinite(c) || c < 0 || c > 255)) return all
+    return '#' + channels.map((c) => c.toString(16).padStart(2, '0')).join('')
+  })
+  v = v.replace(/#([0-9a-f]{6})ff\b/g, '#$1')
   return v
 }
 
@@ -105,17 +112,22 @@ function ruleBody(css, selector) {
  * 1つへ束ねる。単独セレクタだけを探すと、実際には配信されている宣言を
  * 「宣言なし」と誤判定するため、カンマ区切りのセレクタも読む。
  */
-export function builtRuleBody(css, prefix, cls) {
+export function builtRuleBody(css, prefix, cls, selector) {
   // hover・[hidden]・子孫指定は別状態なので、基準状態の完全一致だけを拾う。
   // @media などの条件付きブロックも同じ理由で先に除く。
   css = stripConditionalBlocks(css)
   const escaped = `${prefix}_${cls}__`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const target = new RegExp(`^\\.${escaped}[A-Za-z0-9_-]+$`)
+  const selectorKey = (value) => value.trim().replace(/\[([^\]=]+)=["']([^"']+)["']\]/g, '[$1=$2]')
+    .replace(/\s*>\s*\*?/g, '>').replace(/\s+/g, ' ')
+  const moduleClass = new RegExp(`\\.${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}_([A-Za-z0-9_-]+?)__[A-Za-z0-9_-]+`, 'g')
   const re = /([^{}]+)\{([^{}]*)\}/g
   const bodies = []
   let m
   while ((m = re.exec(css))) {
-    if (m[1].split(',').some((selector) => target.test(selector.trim()))) bodies.push(m[2])
+    if (m[1].split(',').some((actual) => selector
+      ? selectorKey(actual.replace(moduleClass, '.$1')) === selectorKey(selector)
+      : target.test(actual.trim()))) bodies.push(m[2])
   }
   return bodies.join(';')
 }
@@ -588,9 +600,10 @@ export function verify() {
         continue
       }
     }
-    const ok = normalize(got) === want
+    const actual = normalize(t.status === 'active' ? resolveVars(got, builtVars) : got)
+    const ok = actual === want
     if (ok) matched++
-    else failures.push(`不一致: ${name}\n    設計 Pencil ${t.pencil} = ${want}\n    実際 ${normalize(got)}`)
+    else failures.push(`不一致: ${name}\n    設計 Pencil ${t.pencil} = ${want}\n    実際 ${actual}`)
     lines.push(`  ${pad(name, 24)}${pad(t.pencil, 18)}${pad(want, 24)}${ok ? '一致' : '★不一致'}`)
   }
 
@@ -628,7 +641,7 @@ export function verify() {
       const body =
         part.status === 'implemented'
           ? ruleBody(css, d.class)
-          : builtRuleBody(built, part.cssPrefix, d.class)
+          : builtRuleBody(built, part.cssPrefix, d.class, d.selector)
 
       if (!body) {
         const why =

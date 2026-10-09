@@ -242,7 +242,8 @@ export function AppearanceTab(props: Props) {
         <div className={styles.field}><Field label="覚え書き" htmlFor="fe-desc"><TextArea id="fe-desc" rows={2} value={props.description} onChange={(e) => props.onChangeDescription(e.target.value)} /></Field></div>
       </section>
 
-      <Dialog open={linkOpen} title="リンクの見え方" description="LINEやSNSにこのフォームのURLを貼ったときに出るカードです。空のままなら自動で作ります。" confirmLabel="閉じる" onConfirm={() => setLinkOpen(false)} onCancel={() => setLinkOpen(false)}>
+      {/* 3欄は親のフォームへ即時反映済み。窓を閉じても入力を捨てない。 */}
+      <Dialog open={linkOpen} dirty={false} title="リンクの見え方" description="LINEやSNSにこのフォームのURLを貼ったときに出るカードです。空のままなら自動で作ります。" confirmLabel="閉じる" onConfirm={() => setLinkOpen(false)} onCancel={() => setLinkOpen(false)}>
         <div className={styles.dialogFields}>
           <div className={styles.field}><Field label="カードの見出し" htmlFor="fe-og-title"><TextField id="fe-og-title" maxLength={80} value={props.ogTitle} onChange={(e) => props.onChangeOgTitle(e.target.value)} /></Field></div>
           <div className={styles.field}><Field label="カードの説明" htmlFor="fe-og-desc"><TextArea id="fe-og-desc" rows={3} maxLength={200} value={props.ogDescription} onChange={(e) => props.onChangeOgDescription(e.target.value)} /></Field></div>

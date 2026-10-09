@@ -160,7 +160,7 @@
       "note": "追加。数字の下の内訳",
       "lastCheckedAt": "2026-08-24"
     },
-    "--shadow-card": {
+    "--shadow-card-surface": {
       "pencil": "XywGr effect → #673 Beautiful shadows sm",
       "source": "0 1px 1px rgba(29, 29, 31, 0.16), 0 2px 4px rgba(29, 29, 31, 0.08)",
       "resolved": "0 1px 1px #1d1d1f29,0 2px 4px #1d1d1f14",
@@ -543,10 +543,11 @@
         },
         {
           "pencil": "XywGr stroke: $hairline / 1 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: B-149 数の帯のマスは右の線だけ（旧 1px solid #dadde2）",
-          "class": "card",
+          "class": "strip",
+          "selector": "[data-theme=v8] .strip[data-kpi-presentation=band] > *:not(:last-child)",
           "prop": "border-right",
-          "source": "1px solid #1d1d1f12",
-          "resolved": "1px solid #1d1d1f12"
+          "source": "1px solid #00000012",
+          "resolved": "1px solid #00000012"
         },
         {
           "pencil": "XywGr cornerRadius: $radius-md → 2026-10-09 V8（Pen 決まり B-146〜B-161）: B-153 数は線の帯（カードにしない）（旧 12px）",
@@ -565,8 +566,9 @@
         {
           "pencil": "XywGr effect: #1920261A 1,1,2 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: B-153 数は線の帯（影なし）（旧 0px 2px 3px -1px #1d1d1f14,0px 1px 0px 0px #1d1d1f05,0px 0px 0px 1px #1d1d1f14）",
           "class": "card",
+          "selector": "[data-theme=v8] .strip[data-kpi-presentation=band] .card",
           "prop": "box-shadow",
-          "source": "var(--shadow-card)",
+          "source": "none",
           "resolved": "none"
         },
         {

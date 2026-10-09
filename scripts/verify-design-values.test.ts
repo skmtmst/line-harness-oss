@@ -24,10 +24,29 @@ describe('ビルド後CSSの設計照合', () => {
     ].join('')
     expect(builtRuleBody(css, 'breadcrumb', 'root')).toBe('gap:8px')
   })
+
+  it('数の帯はビルド済みのV8指定で照合し、旧カードや狭い幅の別状態を混ぜない', () => {
+    const css = [
+      '.kpi-card_card__A1{box-shadow:var(--card-shadow)}',
+      '[data-theme=v8] .kpi-card_strip__B2[data-kpi-presentation=band] .kpi-card_card__A1{box-shadow:none}',
+      '[data-theme=v8] .kpi-card_strip__B2[data-kpi-presentation=band]>:not(:last-child){border-right:1px solid var(--tpl-band-line)}',
+      '@container (max-width:500px){[data-theme=v8] .kpi-card_strip__B2[data-kpi-presentation=band]>:not(:last-child){border-right:0}}',
+    ].join('')
+    expect(builtRuleBody(css, 'kpi-card', 'card', "[data-theme='v8'] .strip[data-kpi-presentation='band'] .card")).toBe('box-shadow:none')
+    expect(builtRuleBody(css, 'kpi-card', 'strip', '[data-theme=v8] .strip[data-kpi-presentation=band] > *:not(:last-child)')).toBe('border-right:1px solid var(--tpl-band-line)')
+    expect(builtRuleBody(css, 'kpi-card', 'card', '[data-theme=v8] .strip[data-kpi-presentation=cards] .card')).toBe('')
+  })
 })
 
 
 describe('未利用の部品のトークン照合', () => {
+  it('CSS最適化で色の表記が変わっても同じ縁を比較し、色や透明度の差は検出する', () => {
+    const snapshot = normalize('1px solid #1d1d1f14')
+    expect(normalize('1px solid rgba(29, 29, 31, 0.08)')).toBe(snapshot)
+    expect(normalize('1px solid rgba(29, 29, 31, 0.09)')).not.toBe(snapshot)
+    expect(normalize('1px solid rgba(30, 29, 31, 0.08)')).not.toBe(snapshot)
+    expect(normalize('rgb(255, 255, 255)')).toBe(normalize('#fff'))
+  })
   it('トークンへの置き換えを許すが、解いた値のずれは通さない', () => {
     const snapshot = '1px solid #1d1d1f12'
     const declaration = '1px solid var(--color-hairline)'
