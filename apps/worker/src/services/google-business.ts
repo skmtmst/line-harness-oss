@@ -136,12 +136,6 @@ export function buildAuthorizeUrl(input: {
   loginHint?: string | null;
   /** 省略時は Googleビジネス用。Sheets 連携など別スコープで使うときに渡す。 */
   scopes?: readonly string[];
-  /**
-   * true のとき、Googleのアカウント選択画面を必ず出す（`prompt=select_account consent`）。
-   * ブラウザが別のGoogleアカウントでログイン済みでも、店舗を管理しているアカウントへ
-   * 切り替えられるようにするため。特定のアドレスを事前登録する必要はない。
-   */
-  selectAccount?: boolean;
 }): string {
   const url = new URL(AUTHORIZE_URL);
   url.searchParams.set('client_id', input.clientId);
@@ -152,7 +146,7 @@ export function buildAuthorizeUrl(input: {
   url.searchParams.set('code_challenge', input.codeChallenge);
   url.searchParams.set('code_challenge_method', 'S256');
   url.searchParams.set('access_type', 'offline');
-  url.searchParams.set('prompt', input.selectAccount ? 'select_account consent' : 'consent');
+  url.searchParams.set('prompt', 'consent');
   // `include_granted_scopes` は付けない。
   // Googleビジネス用とSheets用で同じOAuthクライアントを使う環境があり（sheetsOauthClient の予備）、
   // 付けると「以前そのクライアントへ許可した別のスコープ」まで含んだトークンが返る。

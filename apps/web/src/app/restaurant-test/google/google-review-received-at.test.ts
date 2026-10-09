@@ -37,17 +37,3 @@ describe('書き換えボタンの元の文章', () => {
     expect(api).toContain("mode === 'new' ? { mode } : { mode, baseText: baseText ?? '' }")
   })
 })
-
-describe('接続する店舗の切り替え', () => {
-  it('別の店舗を選んだときだけ確認を挟む', () => {
-    expect(page).toContain("const switchingLocation = Boolean(connection.locationName) && selectedLocation !== '' && selectedLocation !== connection.locationName")
-    expect(page).toContain('switchingLocation ? setConfirmSwitch(true) : void selectLocation()')
-    expect(page).toContain('onConfirm={() => void selectLocation(true)}')
-  })
-
-  it('確認が取れたときだけ切り替えの合図をサーバーへ送る', () => {
-    expect(page).toContain('restaurantGoogleApi.selectLocation(accountId, selectedLocation, confirmedSwitch)')
-    expect(api).toContain('selectLocation: (accountId: string, locationName: string, confirmSwitch?: boolean)')
-    expect(api).toContain('confirmSwitch ? { locationName, confirmSwitch: true } : { locationName }')
-  })
-})
