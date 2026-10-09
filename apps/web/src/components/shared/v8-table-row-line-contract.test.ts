@@ -19,7 +19,7 @@ describe('V8 の表：行の下の線は行の内側に描く', () => {
   it('セルの下線は border ではなく inset の影', () => {
     const rules = [...css.matchAll(/\[data-theme='v8'\] \.bodyCell \{([^}]*)\}/g)].map((m) => m[1])
     expect(rules.some((body) => /box-shadow: var\(--shadow-row-line\)/.test(body))).toBe(true)
-    expect(globals).toMatch(/--shadow-row-line: inset 0 -1px 0 var\(--color-divider\);/)
+    expect(globals).toMatch(/--shadow-row-line: inset 0 -1px 0 var\(--color-hairline\);/)
     expect(rules.some((body) => /border-bottom: 1px solid/.test(body))).toBe(false)
   })
 })

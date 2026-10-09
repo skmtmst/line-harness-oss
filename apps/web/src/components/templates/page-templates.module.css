@@ -32,6 +32,8 @@
 :global([data-theme='v8']) .section { padding: var(--tpl-section-pad); min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-section-gap); border-bottom: 1px solid var(--color-hairline); }
 :global([data-theme='v8']) .split { display: flex; flex: 1; min-width: 0; }
 :global([data-theme='v8']) .main { min-width: 0; flex: 1; }
+/* B-149：境目の線はフォルダの列が持つ。中身は左線を重ねない。 */
+:global([data-theme='v8']) .folders + .main { border-left: 0; }
 :global([data-theme='v8']) .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side); }
 :global([data-theme='v8']) .content { min-width: 0; }
 :global([data-theme='v8']) .content[data-content-inset] { padding: 0 var(--tpl-toolbar-pad-side) var(--tpl-page-pad-block); }

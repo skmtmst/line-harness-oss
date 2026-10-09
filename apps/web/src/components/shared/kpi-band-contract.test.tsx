@@ -33,7 +33,7 @@ describe('数の帯（Pp3nS）', () => {
     expect(strip![0]).toMatch(/border-block:\s*1px solid var\(--color-hairline\)/)
     expect(strip![0]).toMatch(/border-radius:\s*var\(--radius-none\)/)
     expect(css).toMatch(
-      /\[data-theme='v8'\] \.strip\[data-kpi-presentation='band'\] > \* \+ \* \{[^}]*border-left:\s*1px solid var\(--color-hairline\)/s,
+      /\[data-theme='v8'\] \.strip\[data-kpi-presentation='band'\] > :not\(:last-child\) \{[^}]*border-right:\s*1px solid var\(--color-hairline\)/s,
     )
     expect(css).toMatch(
       /\[data-theme='v8'\] \.strip\[data-kpi-presentation='band'\] \.number \{[^}]*font-size:\s*var\(--tpl-band-number-size\)/s,
