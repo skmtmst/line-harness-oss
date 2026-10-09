@@ -290,3 +290,20 @@ test.each(['すぐ返る', '入力後に返る'] as const)(
       [1, 2, 4, 5].map((weekday) => ({ id: `bb-${weekday}`, weekday, start_time: '12:00', end_time: end })))
   },
 )
+
+test('BUG-03：空きの取得失敗を満席と区別し、見本の再試行で回復する', async () => {
+  fixture.listMenus.mockResolvedValue({ menus: [{ id: 'm1', name: '相談', is_active: 1 }] })
+  fixture.getAvailability.mockRejectedValueOnce(new Error('network failed'))
+  render(<StaffShiftsV8 staffId="bs-1" />)
+  const failed = await screen.findByText('読み込めませんでした')
+  const preview = screen.getByRole('group', { name: 'お客さまの予約画面の見本' })
+  expect(preview.contains(failed)).toBe(true)
+  expect(within(preview).queryAllByText('満')).toHaveLength(0)
+  const marks = screen.getByLabelText('佐々木の予約枠（14日分）')
+  expect(marks.textContent).not.toContain('×')
+  fixture.getAvailability.mockResolvedValueOnce({ by_staff: [{ staff_id: 'bs-1', slots: [{ date: '2099-10-15', start: '09:00', end: '10:00', remaining: 1 }] }], closed_dates: [] })
+  fireEvent.click(within(preview).getByRole('button', { name: 'もう一度読み込む' }))
+  await waitFor(() => expect(screen.queryByText('読み込めませんでした')).toBeNull())
+  await waitFor(() => expect(within(preview).getByText('空き')).toBeTruthy())
+  expect(fixture.getAvailability).toHaveBeenCalledTimes(2)
+})

@@ -9,6 +9,7 @@
  */
 import type { ReactNode } from 'react'
 import type { BookingAvailabilitySlot, BookingMenu, BookingStaff } from '@/lib/api'
+import Button from '@/components/shared/button'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import styles from './phone.module.css'
 
@@ -37,9 +38,9 @@ export function priceLabel(menu: Pick<BookingMenu, 'price_mode' | 'base_price'>)
   return `¥${menu.base_price.toLocaleString('ja-JP')}`
 }
 
-function PhoneChrome({ step, children, foot }: { step: number; children: ReactNode; foot: ReactNode }) {
+function PhoneChrome({ step, children, foot, interactive = false }: { step: number; children: ReactNode; foot: ReactNode; interactive?: boolean }) {
   return (
-    <div className={styles.phone} role="img" aria-label="お客さまの予約画面の見本">
+    <div className={styles.phone} role={interactive ? 'group' : 'img'} aria-label="お客さまの予約画面の見本">
       <div className={styles.status}>
         <span className={styles.time}>9:41</span>
         <span className={styles.statusIcons} aria-hidden="true">
@@ -139,17 +140,18 @@ export function PhoneStaffStep({ menu, staff, designationFree, status = 'ready' 
 }
 
 /** ③ 日時を選ぶ（週で見る）。空きのある先頭の日から5日を並べ、その日の時刻を出す。 */
-export function PhoneDatetimeStep({ menu, staffName, slots, closedDates, closedWeekdays, status = 'ready' }: {
+export function PhoneDatetimeStep({ menu, staffName, slots, closedDates, closedWeekdays, status = 'ready', onRetry }: {
   menu: BookingMenu | null
   /** 指名したときの担当の名前。無ければ「指名なし」。 */
   staffName: string | null
   slots: BookingAvailabilitySlot[]
   closedDates: string[]
   closedWeekdays: number[]
+  onRetry?: () => void
   status?: 'loading' | 'ready' | 'error'
 }) {
   const byDate = new Map<string, BookingAvailabilitySlot[]>()
-  for (const slot of slots) {
+  for (const slot of status === 'ready' ? slots : []) {
     const list = byDate.get(slot.date) ?? []
     list.push(slot)
     byDate.set(slot.date, list)
@@ -165,6 +167,7 @@ export function PhoneDatetimeStep({ menu, staffName, slots, closedDates, closedW
   return (
     <PhoneChrome
       step={3}
+      interactive
       foot={<>
         {picked && selected ? <span className={styles.footPick}>{formatJpDay(selected)}{phoneTime(picked.start)}〜{phoneTime(picked.end)}</span> : null}
         <span className={styles.cta} data-off={picked ? undefined : true}>内容を確かめる</span>
@@ -176,7 +179,7 @@ export function PhoneDatetimeStep({ menu, staffName, slots, closedDates, closedW
         <span className={styles.segItem} data-now="true">週で見る</span>
         <span className={styles.segItem}>カレンダー</span>
       </div>
-      <div className={styles.week}>
+      {status === 'ready' ? <div className={styles.week}>
         <svg className={styles.nav} data-off="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5" /></svg>
         <div className={styles.days}>
           {days.map((date) => {
@@ -194,11 +197,14 @@ export function PhoneDatetimeStep({ menu, staffName, slots, closedDates, closedW
           })}
         </div>
         <svg className={styles.nav} width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" /></svg>
-      </div>
+      </div> : null}
       {selected ? <p className={styles.dayLabel}>{formatJpDay(selected)}の空き</p> : null}
       {status === 'loading' ? (
         <DelayedSkeleton loading skeleton={<span className={styles.slots} aria-hidden="true">{[0, 1, 2].map((i) => <Skeleton key={i} width="100%" height={44} />)}</span>} />
-      ) : status === 'error' ? <p className={styles.sub}>空きを読み込めませんでした。</p>
+      ) : status === 'error' ? <>
+        <p className={styles.sub}>読み込めませんでした</p>
+        <Button onClick={onRetry} disabled={!onRetry}>もう一度読み込む</Button>
+      </>
         : selected === null ? <p className={styles.sub}>この期間に空きはありません。</p>
           : (
             <div className={styles.slots}>
