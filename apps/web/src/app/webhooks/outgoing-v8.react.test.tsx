@@ -63,6 +63,7 @@ function outgoing(overrides: Partial<OutgoingWebhookOverview> = {}): OutgoingWeb
 }
 
 let outgoingItems: OutgoingWebhookOverview[] = [outgoing()]
+let folderItems: unknown[] = []
 
 const json = (data: unknown, status = 200) => new Response(
   JSON.stringify(data),
@@ -71,6 +72,7 @@ const json = (data: unknown, status = 200) => new Response(
 
 beforeEach(() => {
   outgoingItems = [outgoing()]
+  folderItems = []
   staffRole = 'owner'
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -79,6 +81,9 @@ beforeEach(() => {
     const url = String(input)
     if (url.includes('/api/staff/me') || url.includes('/staff/me')) {
       return json({ success: true, data: { role: staffRole } })
+    }
+    if (url.includes('/api/folders')) {
+      return json({ success: true, data: folderItems })
     }
     if (url.includes('/incoming')) return json({ success: true, data: [] })
     if (url.includes('/api/webhooks/outgoing')) {
@@ -143,7 +148,27 @@ test('v8 で失敗がある行は失敗ありの札と失敗の内訳が出る',
   expect(board?.textContent).toContain('やり直す')
 })
 
-test('v8 の行の名前の前にフォルダの丸が付く。送り先はまだフォルダへ入れられないので未分類の輪（閲覧のみでも出す）', async () => {
+test('v8 の左のフォルダの列（共通・種類 webhook）で絞れる。フォルダに入った送り先は名前の前にそのフォルダの色の丸（B-136）', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  folderItems = [{ id: 'f-crm', kind: 'webhook', name: '顧客', parentId: null, displayOrder: 0, color: '#16a34a', createdAt: '', updatedAt: '' }]
+  outgoingItems = [outgoing({ folderId: 'f-crm' } as Partial<OutgoingWebhookOverview>), outgoing({ id: 'wh-2', name: '在庫連携' })]
+  await renderPage()
+  await act(async () => {})
+  const nav = host.querySelector('nav[aria-label="フォルダ"]') as HTMLElement
+  expect(nav.querySelector('button[title="顧客"]')?.textContent).toContain('1')
+  expect(nav.querySelector('button[title="未分類"]')?.textContent).toContain('1')
+  expect(host.querySelector('tr[data-row-id="wh-1"] [aria-label="フォルダ：顧客"]')).not.toBeNull()
+  expect(host.querySelector('tr[data-row-id="wh-2"] [aria-label="フォルダ：未分類"]')).not.toBeNull()
+  await act(async () => { (nav.querySelector('button[title="顧客"]') as HTMLButtonElement).click() })
+  expect(host.querySelector('tr[data-row-id="wh-1"]')).not.toBeNull()
+  expect(host.querySelector('tr[data-row-id="wh-2"]')).toBeNull()
+  await act(async () => { (nav.querySelector('button[title="未分類"]') as HTMLButtonElement).click() })
+  expect(host.querySelector('tr[data-row-id="wh-1"]')).toBeNull()
+  expect(host.querySelector('tr[data-row-id="wh-2"]')).not.toBeNull()
+  await act(async () => { (nav.querySelector('button[title="すべて"]') as HTMLButtonElement).click() })
+})
+
+test('v8 の行の名前の前にフォルダの丸が付く。フォルダに入っていない送り先は未分類の輪（閲覧のみでも出す）', async () => {
   staffRole = 'staff'
   document.documentElement.dataset.theme = 'v8'
   await renderPage()

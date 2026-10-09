@@ -244,17 +244,6 @@ a.name:hover {
 .narrowSearch { width: var(--tpl-wb-search-w); }
 .spacer { flex: 1 1 0; }
 
-.addSpace {
-  display: block;
-  height: var(--tpl-wh-add-space);
-}
-.folderNote {
-  margin: 0;
-  color: var(--color-ink-faint);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-wh-note-lh);
-}
-
 /* 試し送信の窓の URL。 */
 .urlBox {
   padding: var(--tpl-wb-target-pad);

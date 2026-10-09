@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Bookmark, Inbox, LayoutTemplate, Pause, Play, Plus, Send } from 'lucide-react'
+import { Bookmark, LayoutTemplate, Pause, Play, Plus, Send } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, type OutgoingWebhookOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -35,9 +35,7 @@ import Select from '@/components/shared/select'
 import FilterChip from '@/components/shared/filter-chip'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import Pagination from '@/components/shared/pagination'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
-import FolderAddDialog from '@/components/shared/folder-add-dialog'
-import { useFolderRowActions } from '@/components/shared/folder-row-actions'
+import ManagedFolderPanel, { folderDotFor, managedFolderOptions } from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -99,7 +97,6 @@ export default function WebhooksOutgoingV8() {
   const { outgoing, outgoingStatus, summary, loadedAccountId, reload } = overview
 
   const [folders, setFolders] = useState<Folder[]>([])
-  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   /*
    * 検索語・フォルダ・絞り込み・並び順・件数・ページは URL に置く（動きの点検 5 番）。
    * 送り先を開いて「戻る」と同じ一覧に戻る。絞り込みを変えたらページは 1 へ
@@ -164,8 +161,8 @@ export default function WebhooksOutgoingV8() {
   const filtered = useMemo(() => {
     const rows = displayed.filter((item) => {
       if (!matchesQuery(item, query)) return false
-      // 送り先はまだフォルダへ入れられない（全件が未分類）。フォルダを選ぶと 0 件。
-      if (folderFilter && folderFilter !== UNFILED) return false
+      // 左のフォルダの列で絞る（未分類はフォルダに入っていない送り先）。
+      if (folderFilter === UNFILED ? Boolean(item.folderId) : folderFilter !== '' && item.folderId !== folderFilter) return false
       if (chip === 'active') return item.isActive
       if (chip === 'paused') return !item.isActive
       if (chip === 'failed') return item.deliverySummary.failed > 0
@@ -381,23 +378,14 @@ export default function WebhooksOutgoingV8() {
   }
 
   /* ===== フォルダの列 ===== */
-  const folderActions = useFolderRowActions({ kind: 'webhook', folders, enabled: canManage, accountId: selectedAccountId, itemLabel: '送り先', onChanged: loadFolders })
-
-  const folderRows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: '', label: 'すべて', count: ready ? displayed.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
-    ...folders.map((folder, index) => ({ ...folderActions.rowActions(folder, index), kind: 'folder' as const, id: folder.id, label: folder.name, count: folder.itemCount ?? null, color: folder.color })),
-    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: ready ? displayed.length : null },
-  ]
+  /* 件数は読み込んだ送り先（全件）から数える。 */
+  const folderCountOf = (folder: Folder) => (ready ? displayed.filter((item) => item.folderId === folder.id).length : null)
   const folderSelect = (
     <Select
       aria-label="フォルダ"
       value={folderFilter}
       onChange={(value) => setFolderFilter(value)}
-      options={[
-        { value: '', label: 'フォルダ：すべて' },
-        ...folders.map((folder) => ({ value: folder.id, label: `フォルダ：${folder.name}` })),
-        { value: UNFILED, label: 'フォルダ：未分類' },
-      ]}
+      options={managedFolderOptions('webhook', folders, { allId: '', unfiledId: UNFILED })}
     />
   )
   /* 閲覧のみには押せない作るボタンを置かない（場所だけ空ける）。 */
@@ -585,7 +573,7 @@ export default function WebhooksOutgoingV8() {
                 const tone = toggling ? 'neutral' : failing ? 'danger' : item.isActive ? 'active' : 'neutral'
                 const stateWord = toggling ? '切り替え中' : failing ? '失敗あり' : item.isActive ? '動いている' : '止めている'
                 const nameNode = (
-                  <FolderDotName folder={null}>
+                  <FolderDotName folder={folderDotFor(folders, item.folderId)}>
                     {canManage ? (
                       <Link href={`/webhooks/edit?id=${item.id}`} className={styles.name} title={item.name}>{item.name}</Link>
                     ) : (
@@ -639,8 +627,8 @@ export default function WebhooksOutgoingV8() {
                 return (
                   <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
                     <Td className={styles.colName}>
-                      {/* 送り先はまだフォルダへ入れられない（全件が未分類）ので、丸は未分類の輪。 */}
-                      <FolderDotName folder={null}>
+                      {/* 名前の前に左の列と同じフォルダの色の丸（未分類は色の無い輪）。 */}
+                      <FolderDotName folder={folderDotFor(folders, item.folderId)}>
                         {canManage ? (
                           <Link href={`/webhooks/edit?id=${item.id}`} className={styles.name} title={item.name}>{item.name}</Link>
                         ) : (
@@ -737,33 +725,27 @@ export default function WebhooksOutgoingV8() {
       </>}
       folders={<>
         {createButton}
-        <FolderPanel
+        <ManagedFolderPanel
+          kind="webhook"
+          accountId={selectedAccountId}
+          folders={folders}
+          onChanged={loadFolders}
+          canManage={canManage}
+          itemLabel="送り先"
           activeId={folderFilter}
-          onSelect={(id) => setFolderFilter(id)}
-          onAddFolder={canManage ? () => setFolderDialogOpen(true) : undefined}
-          addFolderLabel="フォルダを追加"
-          rows={folderRows}
-        >
-          {/* 閲覧のみには押せない「フォルダを追加」を置かない（場所だけ空ける）。 */}
-          {canManage ? null : <span className={styles.addSpace} aria-hidden="true" />}
-          <p className={styles.folderNote}>フォルダを消しても、中の送り先は未分類に残ります</p>
-        </FolderPanel>
+          onSelect={setFolderFilter}
+          allId=""
+          unfiledId={UNFILED}
+          allCount={ready ? displayed.length : null}
+          unfiledCount={ready ? displayed.filter((item) => !item.folderId).length : null}
+          countOf={folderCountOf}
+          placeholder="例: 顧客・会員"
+        />
       </>}
       collapsedFolders={narrow ? undefined : <>{createButton}{folderSelect}</>}
       toolbar={narrow ? narrowToolbar : wideToolbar}
       pagination={pager}
       overlays={<>
-        {folderActions.dialogs}
-        {folderDialogOpen ? (
-          <FolderAddDialog
-            kind="webhook"
-            accountId={selectedAccountId}
-            note="送り先を分けてしまう箱です。消しても、入っていた送り先は未分類として残ります。"
-            placeholder="例: 顧客・会員"
-            onClose={() => setFolderDialogOpen(false)}
-            onAdded={() => void loadFolders()}
-          />
-        ) : null}
         <ConfirmDialog
           open={testTarget !== null}
           title="試し送信をします"
