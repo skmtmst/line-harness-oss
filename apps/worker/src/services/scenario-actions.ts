@@ -176,6 +176,8 @@ export interface RunActionsResult {
   skippedByOnce: number
   /** 失敗した数。失敗しても配信は続ける。 */
   failed: number
+  /** B-179: 空き・申込なしは理由を記録し、この処理だけを止める。 */
+  eventBookingFailure?: { code: string; reason: string }
   /** 中身が埋まっていないため飛ばした数。 */
   skippedIncomplete: number
   /**
@@ -413,6 +415,10 @@ export async function runActionRows(
       // 1つ失敗しても残りは続ける。配信も止めない。
       console.error(`[scenario-actions] action=${action.id} type=${action.action_type} failed`, err)
       result.failed++
+      if (action.action_type === 'event_booking' && err instanceof Error && 'code' in err &&
+        (err.code === 'event_booking_unavailable' || err.code === 'event_booking_missing')) {
+        result.eventBookingFailure = { code: err.code, reason: err.message }
+      }
     }
   }
 
@@ -478,18 +484,17 @@ async function executeAction(
 
     case 'send_template':
     case 'send_message':
+    case 'event_booking':
     case 'reminder': {
       const c = config as Record<string, unknown>
       const type = action.action_type === 'reminder'
-        ? (c.op === 'stop' || c.op === 'cancel' ? 'stop_reminder' : 'start_reminder') : 'send_message'
+        ? (c.op === 'stop' || c.op === 'cancel' ? 'stop_reminder' : 'start_reminder')
+        : action.action_type === 'event_booking' ? 'event_booking' : 'send_message'
       await executeConfiguredAction(db, { friendId, accountId, source: 'scenario-action',
         sourceEventId: options.sourceEventId ?? (action.repeat_on_refire === 0 ? `once:${action.fires_key ?? action.id}` : crypto.randomUUID()),
         actionId: action.id, type, params: c, dependencies: options.executorDependencies })
       return false
     }
-    case 'event_booking':
-      throw new Error('イベント予約の対象回・操作の仕様が未確定です')
-
     default: {
       const exhaustive: never = action.action_type
       throw new Error(`Unknown action type: ${String(exhaustive)}`)

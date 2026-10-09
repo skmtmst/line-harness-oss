@@ -77,3 +77,12 @@ it.each([['send_template','テンプレート','案内'],['reminder','リマイ�
   expect(screen.getByText(selected)).toBeTruthy()
   expect(screen.getByRole('button',{name:label+'：変える'})).toBeTruthy()
 })
+
+it('B-179：イベントの取り消しを選んでもイベントと指定回を保つ', async () => {
+  const changed = vi.fn()
+  const { fireEvent } = await import('@testing-library/react')
+  render(<InlineActionList actions={[{ key: 'event', actionType: 'event_booking', config: { eventId: 'e', slotId: 'slot', op: 'register' }, onFailure: 'continue' }]} onChange={changed} {...EMPTY_OPTIONS} events={[{ id: 'e', name: '相談会' }]} />)
+  fireEvent.click(screen.getByRole('button', { name: 'イベント予約の操作' }))
+  fireEvent.click(screen.getByRole('button', { name: '申し込みを取り消す' }))
+  expect(changed).toHaveBeenCalledWith([expect.objectContaining({ config: { eventId: 'e', slotId: 'slot', op: 'cancel' } })])
+})

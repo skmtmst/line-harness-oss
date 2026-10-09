@@ -732,6 +732,10 @@ export function createAutomationActionExecutors(
     send_message: (context) => sendMessageExecutor(context, dependencies),
     start_reminder: (context) => reminderExecutor(context, 'start'),
     stop_reminder: (context) => reminderExecutor(context, 'stop'),
+    event_booking: async (context) => {
+      const { executeEventBookingAction } = await import('./event-booking-actions.js');
+      await executeEventBookingAction(context);
+    },
     grant_mileage: mileageExecutor,
     send_webhook: (context) => webhookExecutor(context, dependencies),
     switch_rich_menu: (context) => richMenuExecutor(context, dependencies, 'link'),
