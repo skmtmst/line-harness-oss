@@ -64,7 +64,8 @@ const LEGACY_SCREENS = Object.entries(structure.screens) as Array<
 const V8_SECTIONS: Record<string, string[]> = {
   '/hq/members': ['Table'],
   '/broadcasts/new': [],
-  '/settings': ['theme-preview', '機能の一覧'],
+  // 「画面の見た目」の切り替えは V8 固定（2026-10-09）で外した。
+  '/settings': ['機能の一覧'],
   '/ec-commerce': ['Head'],
   '/form-submissions': [],
   '/friends/detail': ['Left', 'Right'],

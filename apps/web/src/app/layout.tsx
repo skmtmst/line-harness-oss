@@ -4,7 +4,6 @@ import './globals.css'
 import AppShell from '@/components/app-shell'
 import ClientErrorReporter from '@/components/client-error-reporter'
 import ToastHost from '@/components/shared/toast'
-import { adminThemeDefault, adminThemeLocked } from '@/lib/admin-theme-default'
 
 /**
  * 書き出しの時点で決まる題。
@@ -16,31 +15,12 @@ import { adminThemeDefault, adminThemeLocked } from '@/lib/admin-theme-default'
 const DEFAULT_TITLE = 'musubo LINE管理システム'
 
 /*
- * ★V8 移行②: テーマの切り替え。
- *
- * `<html data-theme="v7|v8">` が globals.css の `[data-theme="v8"]` の
- * 値を効かせるスイッチ。既定は v7（値は何も書かなくても :root のもの）。
- *
- *   環境変数 NEXT_PUBLIC_ADMIN_THEME=v8 … その環境（検証環境）の既定を v8 に
- *   localStorage lh-admin-theme        … 担当者が設定画面の「画面の見た目
- *                                         （試作）」でこのブラウザだけ切り替える
- *
- * localStorage は書き出しの時点では読めないので、描画が始まる前に
- * 下の短いスクリプトで `<html>` の data-theme を差し替える。
+ * 見た目は常に V8（2026-10-09 オーナー決定）。`<html data-theme="v8">` が
+ * globals.css の `[data-theme="v8"]` の値を効かせる。環境変数・このブラウザに
+ * 保存した選択・設定画面の切り替えはもう無い（最初の描画から v8。v7 が一瞬出ない）。
  */
-/* React の初期状態（lib/use-admin-theme.ts）と同じ関数で読む。片方だけ変えない。 */
-const ADMIN_THEME = adminThemeDefault()
 /*
- * 既定が v8 の環境（検証環境）は V8 だけにする（2026-10-07 オーナー「検証環境は V8 に切り替えて」）。
- * 前に「画面の見た目（試作）」で v7 を選んだブラウザでも v8 で開く（localStorage の選択を読まない）。
- */
-const ADMIN_THEME_LOCKED = adminThemeLocked()
-const THEME_BOOT = ADMIN_THEME_LOCKED
-  ? ''
-  : `(function(){try{var t=localStorage.getItem('lh-admin-theme');if(t==='v7'||t==='v8'){document.documentElement.dataset.theme=t}}catch(e){}})()`
-
-/*
- * ★V7 の書体。英字と数字は Inter、かなと漢字は Noto Sans JP に見える
+ * 管理画面の書体。英字と数字は Inter、かなと漢字は Noto Sans JP に見える
  * （--font-sans の並びが正本。Inter に日本語グリフが無いので、かなと漢字は
  * 自動で Noto Sans JP に落ちる）。
  *
@@ -82,12 +62,9 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    // 描く前の短いスクリプトが data-theme を v8 へ差し替えるので、html の属性だけは食い違いの警告を出さない（開発時の「1 Issue」）。
-    <html lang="ja" data-theme={ADMIN_THEME} className={`${inter.variable} ${notoSansJp.variable}`} suppressHydrationWarning>
+    <html lang="ja" data-theme="v8" className={`${inter.variable} ${notoSansJp.variable}`}>
       {/* 書体は globals.css の --font-sans が正本（#976 U080）。inline style はやめる。 */}
       <body className="bg-canvas-sunken text-ink antialiased font-sans">
-        {/* localStorage のテーマ指定を描画前に反映する（白い板のちらつき防止） */}
-        {THEME_BOOT ? <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} /> : null}
         <ClientErrorReporter />
         <AppShell>
           {children}

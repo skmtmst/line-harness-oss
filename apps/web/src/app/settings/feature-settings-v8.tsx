@@ -19,7 +19,6 @@ import {
 } from '@/lib/feature-settings'
 import { applyItemOrder, FEATURE_SETTINGS_CONFLICT_MESSAGE } from './feature-settings-view'
 import SearchField from '@/components/shared/search-field'
-import ThemePreviewSwitch from '@/components/theme-preview-switch'
 import HelpTip from '@/components/shared/help-tip'
 import { SettingsShellV8 } from './settings-nav-v8'
 import {
@@ -604,7 +603,6 @@ export function FeatureSettingsV8() {
         onConfirm={resetToDefaults}
       />
 
-      {!loadFailed && !loading && <ThemePreviewSwitch />}
       <UnsavedLeaveDialog
         open={leaveTarget !== null}
         subject="この画面で変更した機能の表示・並び順"
