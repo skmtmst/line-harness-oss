@@ -126,7 +126,7 @@ export default function MemberDialogV8({
 
   const set = <K extends keyof MemberDialogValue>(key: K, next: MemberDialogValue[K]) => {
     setValue((v) => ({ ...v, [key]: next }))
-    const field = key === 'name' || key === 'email' ? key
+    const field: 'name' | 'email' | 'scope' | 'assigned' | null = key === 'name' || key === 'email' ? key
       : key === 'scopedLineAccountIds' || key === 'accountScope' ? 'scope'
         : key === 'assignedLineAccountId' ? 'assigned' : null
     if (field) setFieldErrors((errors) => (errors[field] ? { ...errors, [field]: undefined } : errors))
