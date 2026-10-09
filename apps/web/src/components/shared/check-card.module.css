@@ -129,7 +129,7 @@
 
 /* 正本 w6uYMd / RRxK5：枠を寸法に足さず、上端にチェックをそろえる。 */
 [data-theme='v8'] .card {
-  align-items: flex-start; border: 0; border-radius: 12px;
+  align-items: flex-start; border: 0; border-radius: var(--polish-radius-card);
   outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
   font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
 }

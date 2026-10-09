@@ -36,7 +36,7 @@ describe('帯/案内（ThDed）の数値', () => {
     expect(notice, 'V8 の帯の指定がありません').toBeTruthy()
     expect(notice![0]).toMatch(/gap:\s*10px/)
     expect(notice![0]).toMatch(/padding:\s*10px 14px/)
-    expect(notice![0]).toMatch(/border-radius:\s*10px/)
+    expect(notice![0]).toMatch(/border-radius:\s*var\(--polish-radius-control\)/)
     expect(notice![0]).toMatch(/line-height:\s*20px/)
     expect(css).toMatch(/\.message\s*{[^}]*flex:\s*1/s)
   })

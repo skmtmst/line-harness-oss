@@ -38,7 +38,7 @@
 [data-theme='v8'] .root {
   flex-shrink: 0;
   justify-content: flex-start;
-  border-radius: 6px;
+  border-radius: var(--polish-radius-small);
   font-family: var(--font-inter), system-ui, sans-serif;
   font-variant-numeric: normal;
   font-size: 12px;

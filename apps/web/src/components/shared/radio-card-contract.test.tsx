@@ -109,7 +109,7 @@ describe('選ぶカードの箱（fNPdg オン・r3xz1W オフ）の数値', () 
     const blocks = [...css().matchAll(/\[data-theme='v8'\]\s*\.card\s*\{[^}]*\}/gs)].map((m) => m[0])
     expect(blocks.length, 'v8 の箱の指定がありません').toBeGreaterThan(0)
     // 値は複数の v8 ブロックに分かれる。どれかにあればよい（後勝ちで打ち消しなし）。
-    for (const re of [/min-height:\s*98px/, /padding:\s*14px/, /gap:\s*8px/, /border-radius:\s*12px/]) {
+    for (const re of [/min-height:\s*98px/, /padding:\s*14px/, /gap:\s*8px/, /border-radius:\s*var\(--polish-radius-card\)/]) {
       expect(blocks.some((b) => re.test(b)), `${re} が v8 の箱にありません`).toBe(true)
     }
   })

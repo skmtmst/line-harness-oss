@@ -148,7 +148,7 @@ button.item:disabled {
 }
 
 [data-theme='v8'] .item {
-  border: 0; border-radius: 8px; color: var(--color-ink-secondary);
+  border: 0; border-radius: var(--polish-radius-control); color: var(--color-ink-secondary);
   outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
   font-family: var(--font-inter), Inter, sans-serif; line-height: 20px;
 }

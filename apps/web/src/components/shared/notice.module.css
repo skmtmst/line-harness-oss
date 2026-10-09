@@ -111,7 +111,7 @@
 
 /* 正本 ThDed。案内の印だけ青、本文は副文字色。 */
 [data-theme='v8'] .notice {
-  gap: 10px; padding: 10px 14px; border-radius: 10px;
+  gap: 10px; padding: 10px 14px; border-radius: var(--polish-radius-control);
   font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
   line-height: 20px;
 }
