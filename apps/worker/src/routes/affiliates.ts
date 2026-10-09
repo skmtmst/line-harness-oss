@@ -1,3 +1,4 @@
+import { FolderAssignmentError } from '@line-crm/db';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getAffiliates,
@@ -85,6 +86,7 @@ function commissionRateError(value: unknown): string | null {
 function serializeAffiliate(row: {
   id: string;
   tenant_id?: string;
+  folder_id?: string | null;
   line_account_id?: string | null;
   name: string;
   code: string;
@@ -100,6 +102,7 @@ function serializeAffiliate(row: {
 }) {
   return {
     id: row.id,
+    folderId: row.folder_id ?? null,
     tenantId: row.tenant_id ?? null,
     lineAccountId: row.line_account_id ?? null,
     name: row.name,
@@ -389,6 +392,7 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<{
       name?: string;
+      folderId?: string | null;
       code?: string;
       commissionRate?: number;
       rewardMode?: 'none' | 'fixed' | 'rate';
@@ -474,6 +478,7 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
       try {
         const item = await createAffiliate(c.env.DB, {
           tenantId: scope.tenantId,
+          folderId: body.folderId,
           lineAccountId,
           name: resolvedName,
           code,
@@ -505,6 +510,7 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
     try {
       item = await createAffiliateWithRandomCode(c.env.DB, {
         tenantId: scope.tenantId,
+        folderId: body.folderId,
         lineAccountId,
         name: resolvedName,
         commissionRate: body.commissionRate,
@@ -556,6 +562,7 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
       201,
     );
   } catch (err) {
+    if(err instanceof FolderAssignmentError)return c.json({success:false,error:err.message},422);
     console.error('POST /api/affiliates error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
@@ -569,6 +576,7 @@ affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), async (c) =
     const { scope } = await getAffiliateScope(c);
     const body = await c.req.json<{
       name?: string;
+      folderId?: string | null;
       commissionRate?: number;
       rewardMode?: 'none' | 'fixed' | 'rate';
       isActive?: boolean;
@@ -584,6 +592,7 @@ affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), async (c) =
 
     const updated = await updateAffiliate(c.env.DB, id, {
       name: body.name,
+      folder_id: body.folderId,
       commission_rate: body.commissionRate,
       reward_mode: body.rewardMode,
       is_active: body.isActive !== undefined ? (body.isActive ? 1 : 0) : undefined,
@@ -598,6 +607,7 @@ affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), async (c) =
     if (err instanceof Error && err.message === 'APPROVED_REWARD_SNAPSHOT_MISSING') {
       return c.json({ success: false, code: err.message, error: '過去の承認額を確かめられないため、報酬方式を変更できません。過去の記録を照合してください。' }, 409);
     }
+    if(err instanceof FolderAssignmentError)return c.json({success:false,error:err.message},422);
     console.error('PUT /api/affiliates/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }

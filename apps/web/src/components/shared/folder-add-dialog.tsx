@@ -19,6 +19,7 @@ import { isImeComposing } from './ime'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import FolderEditorDialog from './folder-editor-dialog'
 import { describeFolderFailure } from './folder-failure'
+import { folderDisplayColor } from './folder-dot'
 import { notifyToast } from './toast'
 
 /** フォルダの色。全画面で同じ8色を使う。 */
@@ -80,7 +81,7 @@ export default function FolderAddDialog({
 }: FolderAddDialogProps) {
   const theme = useAdminTheme()
   const [name, setName] = useState(folder?.name ?? '')
-  const [color, setColor] = useState<string | null>(theme === 'v8' ? (folder ? folder.color ?? null : FOLDER_SELECT_COLORS[0].value) : folder?.color ?? FOLDER_COLORS[0])
+  const [color, setColor] = useState<string | null>(theme === 'v8' ? (folder ? folderDisplayColor(folder) : FOLDER_SELECT_COLORS[0].value) : folder?.color ?? FOLDER_COLORS[0])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [nameError, setNameError] = useState('')

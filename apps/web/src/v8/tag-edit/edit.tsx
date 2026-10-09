@@ -229,6 +229,7 @@ export default function TagEditV8() {
   }
   // 保管済みのタグは通常の編集を出さない（#710）。
   if (tag.status === 'archived') {
+    if (!canEdit) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
     return <ArchivedTagEditor tag={tag} accountId={selectedAccountId} onCancel={() => router.push('/tags')} onSaved={(updated) => { if (targetRef.current === targetKey && targetGenerationRef.current === targetGeneration) setTag((current) => (current ? { ...current, ...updated } : current)) }} />
   }
 

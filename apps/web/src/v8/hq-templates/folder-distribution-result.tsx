@@ -5,6 +5,7 @@ import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import TagPill from '@/components/shared/tag-pill'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
 import StatusBadge from '@/components/shared/status-badge'
 import type { HqTemplateFolder } from '@line-crm/shared'
 import type { HqAccount } from '@/lib/hq-templates-api'
@@ -26,7 +27,10 @@ export default function FolderDistributionResult({ name, runs, accounts, folders
   const [show, setShow] = useState(false)
   useEffect(() => { if (done) setShow(true) }, [done])
   const accountName = (id: string) => accounts.find((account) => account.id === id)?.name ?? id
-  const colorOf = (id: string | null | undefined) => folders.find((folder) => folder.id === id)?.color
+  const colorOf = (id: string | null | undefined) => {
+    const folder = folders.find((folder) => folder.id === id)
+    return folder ? folderDisplayColor(folder) : null
+  }
   const displayRows = rows.filter((row) => row.store).map((row) => ({ key: `${row.template.id}:${row.accountId}`, name: row.template.template_type === 'tag' ? row.store?.accountName ?? accountName(row.accountId) : `${row.template.name} · ${row.store?.accountName ?? accountName(row.accountId)}`, tag: row.template.template_type === 'tag' ? { name: row.template.name, color: colorOf(row.template.folder_id) } : undefined, store: row.store! }))
   return <PageFrame kind="wizard" boardId="dEvJM">
     <PageHeading title={`アカウントへ配る：フォルダ「${name}」`} />

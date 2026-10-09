@@ -442,7 +442,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       )}
 
       {/* main card */}
-      <div className="bg-canvas rounded-control shadow-card border border-hairline overflow-hidden">
+      <div className="bg-canvas rounded-control shadow-card-surface border border-hairline overflow-hidden">
         {/* tab nav */}
         <div className="flex border-b border-hairline">
           {TABS.map((t) => {

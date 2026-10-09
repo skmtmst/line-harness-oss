@@ -52,6 +52,7 @@ export interface BannerStats {
 }
 
 export interface BannerProject {
+  folderId?: string | null;
   id: string
   name: string
   description: string | null
@@ -151,6 +152,7 @@ export interface BannerImageMedia {
 export type BannerImageSource = 'generated' | 'upload' | 'edited'
 
 export interface BannerImage {
+  folderId?: string | null;
   id: string
   projectId: string
   generationId: string | null

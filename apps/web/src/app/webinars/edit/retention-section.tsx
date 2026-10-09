@@ -93,7 +93,7 @@ export default function RetentionSection({
     <section
       id="webinar-analytics-retention"
       aria-labelledby="webinar-analytics-retention-title"
-      className="border-hairline bg-canvas scroll-mt-4 rounded-card border p-4 shadow-card"
+      className="border-hairline bg-canvas scroll-mt-4 rounded-card border p-4 shadow-card-surface"
     >
       <div className="flex items-center gap-1.5">
         <h2 id="webinar-analytics-retention-title" className="text-ink text-base font-bold">

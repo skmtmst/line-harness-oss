@@ -1,12 +1,13 @@
+import { hqLiffActionLocator, isLiffActionKind, type LiffAction } from './liff-action.js';
 export interface HqMessageCard {
   format: 'text' | 'flex'
   title: string
   body: string
   imageMediaId?: string
-  buttons: Array<{ id: string; label: string; action: 'url' | 'message' | 'form' | 'scenario'; value: string }>
+  buttons: Array<{ id: string; label: string; action: 'url' | 'message' | 'form' | 'booking' | 'booking_history' | 'visit_stamp' | 'scenario'; value: string }>
 }
 export interface HqMessageReference {
-  kind: 'form' | 'scenario'
+  kind: 'form' | 'scenario' | 'booking' | 'visit_stamp'
   id: string
   name: string
   accountName: string
@@ -21,9 +22,11 @@ export function parseHqMessageCard(value: unknown): HqMessageCard {
     || (value.imageMediaId !== undefined && !identifier(value.imageMediaId))) throw new Error('タイトル・本文・ボタンを確認してください。')
   for (const button of value.buttons) {
     if (!record(button) || Object.keys(button).some(k => !['id', 'label', 'action', 'value'].includes(k))
-      || !identifier(button.id) || !text(button.label, 20) || !['url', 'message', 'form', 'scenario'].includes(String(button.action))
-      || !text(button.value, button.action === 'message' ? 300 : 2000)
-      || (['form', 'scenario'].includes(String(button.action)) && !identifier(button.value))) throw new Error('ボタンの文字と押したときを入力してください。')
+      || !identifier(button.id) || !text(button.label, 20) || !['url', 'message', 'form', 'booking', 'booking_history', 'visit_stamp', 'scenario'].includes(String(button.action))
+      || !text(button.value, button.action === 'message' ? 300 : 2000, ['booking', 'booking_history', 'visit_stamp'].includes(String(button.action)))
+      || (['form', 'scenario', 'booking', 'visit_stamp'].includes(String(button.action)) && button.value !== '' && !identifier(button.value))
+      || (button.action === 'form' && !identifier(button.value))
+      || (button.action === 'booking_history' && button.value !== '')) throw new Error('ボタンの文字と押したときを入力してください。')
     if (button.action === 'url') {
       let url: URL
       try { url = new URL(button.value) } catch { throw new Error('ボタンには正しいURLを入力してください。') }
@@ -45,7 +48,13 @@ export function composeHqMessageCard(card: HqMessageCard, templateId: string, im
     let action: Record<string, string>
     if (button.action === 'url') action = { type: 'uri', label: button.label, uri: button.value }
     else if (button.action === 'message') action = { type: 'message', label: button.label, text: button.value }
-    else if (button.action === 'form') action = { type: 'uri', label: button.label, uri: targets[`form:${button.value}`] ?? hqCardFormLocator(button.value) }
+    else if (isLiffActionKind(button.action)) {
+      const spec: LiffAction = button.action === 'form' ? { kind: 'form', formId: button.value }
+        : button.action === 'booking' ? { kind: 'booking', ...(button.value ? { menuId: button.value } : {}) }
+        : button.action === 'visit_stamp' ? { kind: 'visit_stamp', ...(button.value ? { cardId: button.value } : {}) }
+        : { kind: 'booking_history' };
+      action = { type: 'uri', label: button.label, uri: targets[`${button.action}:${button.value}`] ?? (button.action === 'form' ? hqCardFormLocator(button.value) : hqLiffActionLocator(spec)) };
+    }
     else {
       action = { type: 'postback', label: button.label, data: `ctpl=${templateId}&c=0&a=${index}` }
       operations[String(index)] = [{ actionType: 'scenario', config: { op: 'start', scenarioId: targets[`scenario:${button.value}`] ?? button.value } }]

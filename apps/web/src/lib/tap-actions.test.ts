@@ -2,6 +2,20 @@ import { describe, expect, test } from 'vitest'
 import { TAP_ACTION_DEFS, tapActionFromSavedUri, tapActionFromUri, tapActionLiffUrl, tapActionProblem, tapActionToUri } from './tap-actions'
 
 describe('押したらの決まり（YPzmo）', () => {
+  test('フォーム未選択とLIFF未設定の編集値を持ち、保存前に止める', () => {
+    const url = tapActionLiffUrl('{{liff_id}}', 'form')
+    expect(url).toBe('https://liff.line.me/{{liff_id}}/?page=form&id=')
+    expect(tapActionFromUri(url)).toEqual({ kind: 'form', refId: '' })
+    expect(tapActionProblem(tapActionFromSavedUri(url), { where: 'ボタン1', hasLiff: false })).toBe('ボタン1の回答フォームを選んでください')
+  })
+  test('共通関数のID検査を保ち、空白やクエリを混ぜたIDを送信用URLにしない', () => {
+    expect(() => tapActionLiffUrl('L-1', 'visit_stamp', 'c 1')).toThrow('INVALID_LIFF_ACTION_ID')
+    expect(() => tapActionLiffUrl('L-1', 'form', 'form 1')).toThrow('INVALID_LIFF_ACTION_ID')
+    expect(tapActionFromUri('https://liff.line.me/L-1/?page=salon-book&menu=m%26admin')).toEqual({ kind: 'uri', refId: '' })
+  })
+  test.each(['menu_id=m1', 'menu=m1', 'menu_id=m1&menu=old'])('保存済みの予約メニューを読み戻す: %s', (query) => {
+    expect(tapActionFromUri(`https://liff.line.me/L-1/?page=salon-book&${query}`)).toEqual({ kind: 'booking', refId: 'm1' })
+  })
   test('選べるのは絵の順の6つ', () => {
     expect(TAP_ACTION_DEFS.map((def) => def.label)).toEqual(['URLを開く', 'テキストを送る', '予約', '回答フォーム', '予約履歴', '来店スタンプ'])
     expect(TAP_ACTION_DEFS.filter((def) => def.needsLiff).map((def) => def.kind)).toEqual(['booking', 'form', 'booking_history', 'visit_stamp'])
@@ -11,10 +25,10 @@ describe('押したらの決まり（YPzmo）', () => {
     const cases = [
       ['form', 'f1', 'https://liff.line.me/L-1/?page=form&id=f1'],
       ['booking', '', 'https://liff.line.me/L-1/?page=salon-book'],
-      ['booking', 'm1', 'https://liff.line.me/L-1/?page=salon-book&menu=m1'],
+      ['booking', 'm1', 'https://liff.line.me/L-1/?page=salon-book&menu_id=m1'],
       ['booking_history', '', 'https://liff.line.me/L-1/?page=salon-book&view=history'],
       ['visit_stamp', '', 'https://liff.line.me/L-1/?page=visit-stamps'],
-      ['visit_stamp', 'c 1', 'https://liff.line.me/L-1/?page=visit-stamps&card=c%201'],
+      ['visit_stamp', 'c-1', 'https://liff.line.me/L-1/?page=visit-stamps&card=c-1'],
     ] as const
     for (const [kind, refId, url] of cases) {
       expect(tapActionLiffUrl('L-1', kind, refId)).toBe(url)

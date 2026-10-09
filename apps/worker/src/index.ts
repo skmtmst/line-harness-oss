@@ -823,13 +823,22 @@ app.get('/r/:ref', async (c) => {
   // friend-add gate (initSalonBooking, initEventBooking); page=book/form
   // would bypass that gate and bypass ref-based attribution, so they are
   // intentionally excluded until those initializers are unified.
-  const PAGE_PASSTHROUGH_ALLOWED = new Set(['salon-book', 'event', 'event-me', 'webinar']);
+  const PAGE_PASSTHROUGH_ALLOWED = new Set(['salon-book', 'event', 'event-me', 'webinar', 'visit-stamps']);
   const page = c.req.query('page');
   if (page && PAGE_PASSTHROUGH_ALLOWED.has(page)) liffParams.set('page', page);
   const id = c.req.query('id');
   if (id) liffParams.set('id', id);
   const slug = c.req.query('slug');
   if (slug) liffParams.set('slug', slug);
+  if (page === 'salon-book') {
+    const menuId = c.req.query('menu_id');
+    if (menuId && /^[A-Za-z0-9_-]{1,128}$/.test(menuId)) liffParams.set('menu_id', menuId);
+    if (c.req.query('view') === 'history') liffParams.set('view', 'history');
+  }
+  if (page === 'visit-stamps') {
+    const card = c.req.query('card');
+    if (card && /^[A-Za-z0-9_-]{1,128}$/.test(card)) liffParams.set('card', card);
+  }
 
   // Ad click IDs + UTM passthrough. /auth/line forwards its full query string
   // to /r/:ref, but rebuilding liffParams here without these keys silently
@@ -1117,7 +1126,7 @@ ${longPressBlock}
 // attribution を汚染する、という 2 つの問題があるため別ルートに分けている。
 // 仕様:
 // - クエリ: liffId (必須, `<digits>-<id>` 形式) / page / id
-// - page は `/r/:ref` と同じ allowlist (salon-book / event / event-me)
+// - page は `/r/:ref` と同じ allowlist (salon-book / event / event-me / webinar / visit-stamps)
 // - mobile UA は「LINEで開く」ボタン、desktop は QR を返す (`/r/:ref` 同等)
 app.get('/o', async (c) => {
   if (isLinkPreviewBot(c.req.header('user-agent') || '')) {
@@ -1131,13 +1140,21 @@ app.get('/o', async (c) => {
 
   const liffParams = new URLSearchParams();
   liffParams.set('liffId', liffId);
-  const PAGE_PASSTHROUGH_ALLOWED = new Set(['salon-book', 'event', 'event-me', 'webinar']);
+  const PAGE_PASSTHROUGH_ALLOWED = new Set(['salon-book', 'event', 'event-me', 'webinar', 'visit-stamps']);
   const page = c.req.query('page');
   if (page && PAGE_PASSTHROUGH_ALLOWED.has(page)) liffParams.set('page', page);
   const id = c.req.query('id');
   if (id) liffParams.set('id', id);
   const slug = c.req.query('slug');
   if (slug) liffParams.set('slug', slug);
+  if (page === 'salon-book') {
+    const menuId = c.req.query('menu_id');
+    if (menuId && /^[A-Za-z0-9_-]{1,128}$/.test(menuId)) liffParams.set('menu_id', menuId);
+  }
+  if (page === 'visit-stamps') {
+    const card = c.req.query('card');
+    if (card && /^[A-Za-z0-9_-]{1,128}$/.test(card)) liffParams.set('card', card);
+  }
   // N-396: 管理画面が発行する「予約履歴URL」は salon-book の view=history を
   // 指す。任意の view を通すと未定義画面へ誘導できてしまうので、履歴だけを通す。
   const view = c.req.query('view');

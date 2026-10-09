@@ -295,7 +295,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
       {/* ★V7: 基本の段も共通の枠の幅で「本体＋右の案内」の2列にする。右の文は画面内の既存の文だけを使う。 */}
       <div className="grid items-start gap-4 xl:grid-cols-3">
         <div className="min-w-0 space-y-5 xl:col-span-2">
-      <section className="space-y-4 rounded-card border border-hairline bg-canvas p-5 shadow-card sm:p-6">
+      <section className="space-y-4 rounded-card border border-hairline bg-canvas p-5 shadow-card-surface sm:p-6">
         <div><h2 className="font-bold text-ink">基本情報</h2><p className="mt-1 text-xs text-ink-faint">普段変更する項目だけを表示しています</p></div>
         <div>
           <label className={labelClass}>
@@ -379,7 +379,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
         </details>
       </section>
 
-      <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
+      <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card-surface">
         <div className="p-5 sm:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div><h2 className="font-bold text-ink">配信スケジュール</h2><p className="mt-1 text-xs text-ink-faint">日本時間。参加画面には直近の候補だけが表示されます。</p></div>

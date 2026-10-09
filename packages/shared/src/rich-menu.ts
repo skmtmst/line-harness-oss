@@ -14,6 +14,9 @@ export type RichMenuAreaIntent =
   | "tel"
   | "text"
   | "template"
+  | "booking"
+  | "booking_history"
+  | "visit_stamp"
   | "form"
   | "switch"
   | "postback"
@@ -34,6 +37,9 @@ export const RICH_MENU_ACTION_TYPE_BY_INTENT = {
   url: "uri",
   tel: "uri",
   form: "uri",
+  booking: "uri",
+  booking_history: "uri",
+  visit_stamp: "uri",
   text: "message",
   template: "postback",
   switch: "richmenuswitch",
@@ -77,6 +83,9 @@ export const RICH_MENU_DB_ACTION_TYPE_BY_INTENT = {
   url: "uri",
   tel: "uri",
   form: "uri",
+  booking: "uri",
+  booking_history: "uri",
+  visit_stamp: "uri",
   text: "message",
   template: "postback",
   switch: "richmenuswitch",

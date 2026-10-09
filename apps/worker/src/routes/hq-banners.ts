@@ -1,8 +1,10 @@
+import { hqBannerFolders } from './hq-banner-folders.js';
 import { processBannerGeneration, BannerJobFailure } from '../services/banner-jobs.js';
 import { bannerGenerationOperationId, bannerGenerationRequestMatches } from '../services/banner-generation-retry.js';
 import { Hono, type Context } from 'hono';
 import {
   getWorkflowStep,
+  HqFolderError,
   bannerReferencesFromRow,
   createBannerGeneration,
   createBannerImage,
@@ -92,6 +94,7 @@ const UPLOAD_ALLOWED: Record<string, { ext: string }> = {
 };
 
 hqBanners.use('/api/hq/banners/*', requireRole('owner', 'admin'));
+hqBanners.route('/',hqBannerFolders);
 
 function tenantOf(c: Context<Env>): string {
   return c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
@@ -163,6 +166,7 @@ function refusal(usage: UsageSnapshot, needed: number): string | null {
 function serializeProject(p: BannerProject) {
   return {
     id: p.id,
+    folderId: p.folder_id ?? null,
     name: p.name,
     description: p.description,
     isFavorite: p.is_favorite === 1,
@@ -249,6 +253,7 @@ function serializeMedia(m: Media, base: string) {
 function serializeImage(i: BannerImageWithDetail, base: string) {
   return {
     id: i.id,
+    folderId: i.folder_id ?? null,
     projectId: i.project_id,
     generationId: i.generation_id,
     sequence: i.sequence,
@@ -338,7 +343,7 @@ hqBanners.get('/api/hq/banners/projects', async (c) => {
   try {
     const archived = c.req.query('archived') === '1';
     const query = c.req.query('q')?.trim() || undefined;
-    const items = await listBannerProjects(c.env.DB, { tenantId: tenantOf(c), archived, query });
+    const items = await listBannerProjects(c.env.DB, { tenantId: tenantOf(c), archived, query, folderId: c.req.query('folderId') === '__none__' ? null : c.req.query('folderId') });
     return c.json({ success: true, data: items.map(serializeProject) });
   } catch (err) {
     console.error('GET /api/hq/banners/projects error:', err);
@@ -359,9 +364,11 @@ hqBanners.post('/api/hq/banners/projects', async (c) => {
       name,
       description,
       createdBy: c.get('staff')?.id ?? null,
+      folderId: body?.folderId as string | null | undefined,
     });
     return c.json({ success: true, data: serializeProject(project) }, 201);
   } catch (err) {
+    if(err instanceof HqFolderError)return c.json({success:false,error:err.code},err.status);
     console.error('POST /api/hq/banners/projects error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
@@ -395,7 +402,8 @@ hqBanners.patch('/api/hq/banners/projects/:id', async (c) => {
   try {
     const tenantId = tenantOf(c);
     const body = await readJson(c);
-    const patch: { name?: string; description?: string; isFavorite?: boolean; archived?: boolean } = {};
+    const patch: { name?: string; description?: string; isFavorite?: boolean; archived?: boolean; folderId?: string | null } = {};
+    if (body && 'folderId' in body) patch.folderId = body.folderId as string | null;
     if (typeof body?.name === 'string') {
       const name = body.name.trim();
       if (!name || name.length > 100) {
@@ -410,6 +418,7 @@ hqBanners.patch('/api/hq/banners/projects/:id', async (c) => {
     if (!project) return c.json({ success: false, error: 'プロジェクトが見つかりません' }, 404);
     return c.json({ success: true, data: serializeProject(project) });
   } catch (err) {
+    if(err instanceof HqFolderError)return c.json({success:false,error:err.code},err.status);
     console.error('PATCH /api/hq/banners/projects/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
@@ -622,6 +631,7 @@ hqBanners.get('/api/hq/banners/images', async (c) => {
       delivered: delivered === undefined ? undefined : delivered === '1',
       shape: shape as 'square' | 'landscape' | 'portrait' | 'rich_menu' | undefined,
       projectId: c.req.query('projectId')?.trim() || undefined,
+      folderId: c.req.query('folderId') === '__none__' ? null : c.req.query('folderId'),
       favoriteOnly: c.req.query('favorite') === '1',
       presetKey: c.req.query('preset')?.trim() || undefined,
       query: c.req.query('q')?.trim() || undefined,
@@ -654,7 +664,8 @@ hqBanners.patch('/api/hq/banners/images/:id', async (c) => {
   try {
     const tenantId = tenantOf(c);
     const body = await readJson(c);
-    const patch: { isFavorite?: boolean; projectId?: string } = {};
+    const patch: { isFavorite?: boolean; projectId?: string; folderId?: string | null } = {};
+    if (body && 'folderId' in body) patch.folderId = body.folderId as string | null;
     if (typeof body?.isFavorite === 'boolean') patch.isFavorite = body.isFavorite;
     if (typeof body?.projectId === 'string') {
       const target = await getBannerProject(c.env.DB, body.projectId, tenantId);
@@ -667,6 +678,7 @@ hqBanners.patch('/api/hq/banners/images/:id', async (c) => {
     const detail = await getBannerImageWithDetail(c.env.DB, existing.id, tenantId);
     return c.json({ success: true, data: serializeImage(detail!, workerUrl(c)) });
   } catch (err) {
+    if(err instanceof HqFolderError)return c.json({success:false,error:err.code},err.status);
     console.error('PATCH /api/hq/banners/images/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }

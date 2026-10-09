@@ -28,6 +28,12 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {}, usePageChrome: () => ({ title: '' }) }))
 
+const forcedRole = vi.hoisted(() => ({ value: null as string | null }))
+vi.mock('@/lib/staff-role', async original => {
+  const actual = await original<typeof import('@/lib/staff-role')>()
+  return { ...actual, useStaffRole: () => { const role = actual.useStaffRole(); return forcedRole.value ?? role } }
+})
+const staffMe = vi.hoisted(() => vi.fn())
 const formsGet = vi.hoisted(() => vi.fn())
 const formsUpdate = vi.hoisted(() => vi.fn())
 const formsPublish = vi.hoisted(() => vi.fn())
@@ -47,7 +53,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       ...actual.api,
       forms: { ...actual.api.forms, get: formsGet, update: formsUpdate, publish: formsPublish },
       // 下書きの自動保存は閲覧のみの人には動かさないため、役割を読む（通信させない）。
-      staff: { ...actual.api.staff, me: async () => ({ success: true, data: { role: 'owner' } }) },
+      staff: { ...actual.api.staff, me: staffMe },
       friendFields: { ...actual.api.friendFields, list: emptyList },
       scenarios: { ...actual.api.scenarios, list: emptyList },
       reminders: { ...actual.api.reminders, list: emptyList },
@@ -94,6 +100,8 @@ const render = async (query: string) => {
 }
 
 beforeEach(() => {
+  forcedRole.value = null
+  staffMe.mockReset().mockResolvedValue({ success: true, data: { role: 'owner' } })
   document.documentElement.dataset.theme = 'v8'
   formsGet.mockImplementation(async () => ({ success: true, data: structuredClone(formData) }))
   formsUpdate.mockImplementation(async () => ({ success: true, data: { id: 'form-1', contentRevision: 8, updatedAt: '' } }))
@@ -120,6 +128,70 @@ describe('回答フォームの編集（V8）', () => {
     // 開いている設定（質問文の欄）に質問の文が入っている
     expect(screen.getByDisplayValue('今日のご来店の目的は？')).toBeTruthy()
     expect(screen.getByText('下書き・公開中の版と違うところがあります')).toBeTruthy()
+  })
+
+  it.each(['staff', 'owner', 'admin'])('役割の読み込み後、保存・公開は権限で隠す（%s）', async (role) => {
+    staffMe.mockResolvedValue({ success: true, data: { role } })
+    await render('id=form-1')
+    await screen.findByText('ページ1 のブロック')
+    for (const name of ['下書きを保存', 'この版を公開']) {
+      expect(screen.queryByRole('button', { name }) !== null).toBe(role !== 'staff')
+    }
+    if (role === 'staff') expect(screen.getByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')).toBeTruthy()
+  })
+
+  it('役割を確認中は保存・公開を出さず、staff と分かったあとも出さない', async () => {
+    let resolveRole!: (response: { success: true; data: { role: string } }) => void
+    staffMe.mockImplementation(() => new Promise((resolve) => { resolveRole = resolve }))
+    await render('id=form-1')
+    await screen.findByText('ページ1 のブロック')
+    const expectHidden = () => {
+      for (const name of ['下書きを保存', 'この版を公開', '比べてから保存']) {
+        expect(screen.queryByRole('button', { name })).toBeNull()
+      }
+    }
+    expectHidden()
+    await act(async () => { resolveRole({ success: true, data: { role: 'staff' } }) })
+    expectHidden()
+    expect(formsUpdate).not.toHaveBeenCalled()
+    expect(formsPublish).not.toHaveBeenCalled()
+  })
+
+  it('閲覧のみの3タブは内容を読めるが、追加・変更・試しURL作成は出さない', async () => {
+    staffMe.mockResolvedValue({ success: true, data: { role: 'staff' } })
+    await render('id=form-1')
+    expect(within(host.querySelector('[data-fe-root]') as HTMLElement).getByText('今日のご来店の目的は？')).toBeTruthy()
+    for (const name of ['ページを足す', '公開前に試す（試しのURLを作る）']) expect(screen.queryByRole('button', { name })).toBeNull()
+    expect(host.querySelector('[data-fe-root] input, [data-fe-root] textarea')).toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: '答え終わったあと' }))
+    expect(screen.getByText('テキストを送る「ご回答ありがとうございます」')).toBeTruthy()
+    expect(host.querySelector('[data-fe-root] input, [data-fe-root] textarea')).toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: '受付と見た目' }))
+    expect(screen.getAllByText('来店アンケート').length).toBeGreaterThan(0)
+    expect(host.querySelector('[data-fe-root] input, [data-fe-root] textarea')).toBeNull()
+    expect(formsUpdate).not.toHaveBeenCalled()
+  })
+
+  it('競合が残っていてもstaffに変わると保存と比較の入口を隠す', async () => {
+    formsUpdate.mockRejectedValue(new ApiError(409, 'conflict', 'VERSION_CONFLICT', { updatedAt: '' }))
+    formsGet.mockResolvedValueOnce({ success: true, data: structuredClone(formData) })
+      .mockResolvedValue({ success: true, data: { ...structuredClone(formData), name: '別の人の保存' } })
+    await render('id=form-1')
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    await screen.findByRole('button', { name: '比べてから保存' })
+    forcedRole.value = 'staff'
+    await render('id=form-1')
+    for (const name of ['下書きを保存', 'この版を公開', '比べてから保存', '違いを比べる']) {
+      expect(screen.queryByRole('button', { name })).toBeNull()
+    }
+  })
+
+  it('役割の取得が失敗しても保存・公開を出さない', async () => {
+    staffMe.mockRejectedValue(new Error('役割を読めない'))
+    await render('id=form-1')
+    expect(screen.queryByRole('button', { name: '下書きを保存' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'この版を公開' })).toBeNull()
+    expect(formsUpdate).not.toHaveBeenCalled()
   })
 
   it('押せない（disabled の）ボタンを置いていない', async () => {

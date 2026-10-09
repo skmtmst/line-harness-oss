@@ -225,7 +225,7 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
         </Button>
       </div>
 
-      <div className="rounded-card border border-hairline bg-canvas shadow-card">
+      <div className="rounded-card border border-hairline bg-canvas shadow-card-surface">
         <div className="flex flex-wrap items-center gap-2 border-b border-hairline px-4 py-3">
           <SearchField
             aria-label="友だち名で検索"

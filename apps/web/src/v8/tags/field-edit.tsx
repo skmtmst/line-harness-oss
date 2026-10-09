@@ -231,6 +231,8 @@ export default function FieldEdit() {
     )
   }
 
+  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+
   const notices = (
     <>
       {/* ほかの担当者の変更と入力を比べて決める。入力は残す（R517）。 */}

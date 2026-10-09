@@ -42,4 +42,19 @@ describe('L13：入口の移動と再読込で liffId を保つ', () => {
     expect(await screen.findByText('案内:offer-1')).toBeTruthy();
     expect(screen.queryByTestId('booking-url')).toBeNull();
   });
+
+  it('LINEから戻った検索指定を認証前に戻し、予約へ渡す', async () => {
+    vi.stubEnv('VITE_DEFAULT_LIFF_ID', 'account-A');
+    window.history.replaceState(null, '', `/?liff.state=${encodeURIComponent('/?liffId=account-B&page=salon-book&menu_id=menu-1')}&code=oauth`);
+    vi.resetModules();
+    const auth = await import('./lib/liff-auth.js');
+    await auth.initLiff();
+    expect(auth.getLiffId()).toBe('account-B');
+    const restored = new URLSearchParams(window.location.search);
+    expect(restored.get('menu_id')).toBe('menu-1');
+    expect(restored.get('code')).toBe('oauth');
+    render(<MemoryRouter initialEntries={[`/${window.location.search}`]}><App /></MemoryRouter>);
+    const next = (await screen.findByTestId('booking-url')).textContent!;
+    expect(new URL(next, 'https://example.com').searchParams.get('menu_id')).toBe('menu-1');
+  });
 });
