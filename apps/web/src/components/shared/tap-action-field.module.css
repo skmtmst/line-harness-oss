@@ -1,3 +1,6 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+
 /*
  * 「押したら」の共通の欄（YPzmo）。値は globals.css の [data-theme="v8"] の --tap-action-*。
  * 画面側で上書きしない（幅は呼び出し側の箱で決める）。
@@ -251,4 +254,5 @@
   padding: var(--tap-action-option-pad);
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
+}
 }
