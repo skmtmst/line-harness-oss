@@ -119,5 +119,5 @@
 [data-theme='v8'] .title { font-size: var(--polish-text-section); font-weight: var(--polish-weight-title); }
 
 /* B-152・仕上げ5：空の表示 */
-[data-theme='v8'] [data-list-state='empty'] .iconWrap { width: var(--polish-icon-empty); height: var(--polish-icon-empty); border-radius: 0; outline: 0; background: transparent; }
+[data-theme='v8'] [data-list-state='empty'] .iconWrap { width: var(--polish-icon-empty); height: var(--polish-icon-empty); border-radius: 0; outline-color: transparent; background: transparent; }
 [data-theme='v8'] [data-list-state='empty'] .iconWrap svg { width: var(--polish-icon-empty); height: var(--polish-icon-empty); stroke-width: var(--polish-icon-stroke); color: inherit; }
