@@ -24,6 +24,7 @@ import { formatNumber } from '@/lib/format'
 import { KpiMenu, RangePickerV8, StatePill } from './common'
 import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, rangeFor, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
+import { useReportPeriod } from '@/components/shared/period-picker'
 import { Field } from '@/components/shared/form-controls'
 
 type FunnelStatus = 'active' | 'stopped' | 'archived'
@@ -101,7 +102,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
   useEffect(() => { if (presetConversion?.id && canManage) setCreating(true) }, [presetConversion?.id, canManage])
   const [picked, setPicked] = useState<number | null>(null)
   const [usageNotice, setUsageNotice] = useState('')
-  const [funnelDays, setFunnelDays] = useState(30)
+  const { days: funnelDays, setDays: setFunnelDays, customRange, setRange } = useReportPeriod()
   const [audienceSelection, setAudienceSelection] = useState<'reached' | 'stopped' | 'in_progress'>('stopped')
   const [audienceBusy, setAudienceBusy] = useState(false)
   // アカウント・ファネル・期間を切り替えた瞬間に世代を進め、古い応答を出さない。
@@ -145,7 +146,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
     const generation = viewGeneration.current
     setRunning(true); setRunError('')
     try {
-      const response = await api.analytics.v6Funnels.run(accountId, selected, funnelCohortRange(funnelDays))
+      const response = await api.analytics.v6Funnels.run(accountId, selected, (customRange ? { cohortFrom: `${customRange.from}T00:00:00.000+09:00`, cohortTo: new Date(Math.min(Date.now(), Date.parse(`${customRange.to}T23:59:59.999+09:00`))).toISOString() } : funnelCohortRange(funnelDays)))
       if (!response.success) throw new Error(response.error)
       if (generation !== viewGeneration.current) return
       setRun(response.data); setGroupKey(response.data.groups[0]?.key ?? 'all')
@@ -366,7 +367,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
           {run ? <p className={styles.caption}>{`集計期間 ${formatAnalyticsDate(run.cohortFrom)}〜${formatAnalyticsDate(run.cohortTo)} ／ データ締切 ${formatAnalyticsDateTime(run.dataCutoffAt)}${run.versionNumber != null ? ` ／ 集計した定義版 ${run.versionNumber}` : ''}`}</p> : null}
           <Disclosure title="定義の操作と集計の詳細" size="compact">
             <div className={styles.toolbar}>
-              <RangePickerV8 days={funnelDays} onChange={(days) => { setFunnelDays(days); setPicked(null); setRunning(false) }} />
+              <RangePickerV8 customRange={customRange} onRangeChange={(range) => { setRange(range); setPicked(null); setRunning(false) }} days={funnelDays} onChange={(days) => { setFunnelDays(days); setPicked(null); setRunning(false) }} />
               <Button onClick={() => void runNow()} disabled={running || selectedFunnel?.status !== 'active'} variant="secondary" busy={running} busyLabel="再集計中">{`この${funnelDays}日を再集計`}</Button>
             </div>
             {selectedFunnel ? <p className={styles.caption}>{`${selectedFunnel.windowDays}日以内に通った人を数えます。${selectedFunnel.currentVersion ? ` 定義版 ${selectedFunnel.currentVersion.versionNumber}` : ' 現行定義の移行が必要です'}${selectedFunnel.status === 'stopped' ? ' 停止中です。再集計や対象者づくりはできません。' : ''}${selectedFunnel.status === 'archived' ? ' アーカイブです。過去の結果だけを見られます。' : ''}`}</p> : null}

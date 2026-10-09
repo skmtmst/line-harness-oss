@@ -31,6 +31,7 @@ import {
   useRegisterExport,
 } from './parts'
 import styles from './analytics.module.css'
+import { useReportPeriod } from '@/components/shared/period-picker'
 
 type Day = AnalyticsFriendsOverview['data']['days'][number]
 type Campaign = AnalyticsFriendsOverview['data']['campaigns'][number]
@@ -78,8 +79,7 @@ function RouteBreakdown({ accountId, from, to }: { accountId: string; from: stri
 }
 
 export default function FriendsV8({ accountId }: { accountId: string }) {
-  const [days, setDays] = useState(30)
-  const range = useMemo(() => rangeFor(days - 1), [days])
+  const { days, setDays, range, customRange, setRange } = useReportPeriod()
   const [selectedDate, setSelectedDate] = useState('')
   const state = useOverview<AnalyticsFriendsOverview>(
     () => api.analytics.friendsOverview(accountId, range),
@@ -95,7 +95,7 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
 
   if (!state.data || !overview) {
     return <div className={styles.body}>
-      <div className={styles.periodRow}><RangePickerV8 size="small" days={days} onChange={setDays} /></div>
+      <div className={styles.periodRow}><RangePickerV8 customRange={customRange} onRangeChange={setRange} size="small" days={days} onChange={setDays} /></div>
       {state.loading ? <ListState kind="loading" title="分析を読み込んでいます" /> : <ListState kind="error" description={state.error} onRetry={state.retry} />}
     </div>
   }
@@ -124,7 +124,7 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
             <h2 id="friends-daily-title" className={styles.cardTitle}>{`日ごとの増減（この${days}日）`}</h2>
             <HelpTip label="日ごとの増減の説明">{`棒を選ぶとその日の数と配信・シナリオが出ます。${caption}`}</HelpTip>
             <span className={styles.spacer} />
-            <RangePickerV8 size="small" days={days} onChange={(value) => { setDays(value); setSelectedDate('') }} />
+            <RangePickerV8 customRange={customRange} onRangeChange={setRange} size="small" days={days} onChange={(value) => { setDays(value); setSelectedDate('') }} />
           </div>
           <div className={styles.legend}>
             <span data-swatch="up">増えた</span><span data-swatch="down">減った</span><span data-swatch="broadcast">配信した日</span><span data-swatch="scenario">シナリオを始めた日</span>

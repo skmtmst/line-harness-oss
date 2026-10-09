@@ -23,6 +23,7 @@ import { KpiMenu, RangePickerV8, shortWhen } from './common'
 import { MetricText } from './reactions'
 import { METRIC_STATE_TEXT, downloadCsv, metricCardState, metricText, periodCaption, rangeFor, shownValue, useOverview, useRegisterExport, formatAnalyticsDateTime } from './parts'
 import styles from './analytics.module.css'
+import { useReportPeriod } from '@/components/shared/period-picker'
 
 type Category = AnalyticsUsageOverview['data']['categories'][number]
 
@@ -57,8 +58,7 @@ function TidyMenu({ item }: { item: Category }) {
 }
 
 export default function UsageV8({ accountId }: { accountId: string }) {
-  const [days, setDays] = useState(30)
-  const range = useMemo(() => rangeFor(days - 1), [days])
+  const { days, setDays, range, customRange, setRange } = useReportPeriod()
   const [menuFeatures, setMenuFeatures] = useState<{ enabled: number; total: number } | null>(null)
   const [menuFeaturesError, setMenuFeaturesError] = useState('')
   const [menuReload, setMenuReload] = useState(0)
@@ -90,7 +90,7 @@ export default function UsageV8({ accountId }: { accountId: string }) {
 
   if (!state.data || !overview) {
     return <div className={styles.body} data-gap="tab">
-      <div className={styles.toolbar}><RangePickerV8 days={days} onChange={setDays} /></div>
+      <div className={styles.toolbar}><RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} /></div>
       {state.loading ? <ListState kind="loading" title="分析を読み込んでいます" /> : <ListState kind="error" description={state.error} onRetry={state.retry} />}
     </div>
   }
@@ -132,7 +132,7 @@ export default function UsageV8({ accountId }: { accountId: string }) {
             </div>)}
           </div>
           <p className={styles.caption}>{`${periodCaption(state.data.period.from, state.data.period.to, state.data.dataCutoffAt)} ／ 利用関係を最後に確認: ${formatAnalyticsDateTime(overview.checkedAt)}`}</p>
-          <Disclosure title="集計期間を変える" hint={`この${days}日`} size="compact"><RangePickerV8 days={days} onChange={setDays} /></Disclosure>
+          <Disclosure title="集計期間を変える" hint={`この${days}日`} size="compact"><RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} /></Disclosure>
         </div>
         <aside className={styles.flowCard} aria-labelledby="usage-observations-title">
           <h2 id="usage-observations-title" className={styles.hoursTitle}>気づいたこと</h2>

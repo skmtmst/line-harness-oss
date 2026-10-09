@@ -24,6 +24,7 @@ import { formatNumber, formatTime } from '@/lib/format'
 import { KpiMenu } from './common'
 import { downloadCsv, periodCaption, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
+import PeriodPicker, { useReportPeriod } from '@/components/shared/period-picker'
 import { Field } from '@/components/shared/form-controls'
 
 type CrossQueueStatus = { state: 'pending' | 'running' | 'available' | 'partial' | 'unavailable' | 'failed'; queuePosition: number | null; pendingAhead: number; estimatedWaitMs: number | null; nextTickAt: string | null }
@@ -97,7 +98,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
   const [measureEventType, setMeasureEventType] = useState(MEASURE_EVENTS[0].value)
   const [rowAxis, setRowAxis] = useState<string>('tag')
   const [columnAxis, setColumnAxis] = useState<string>('route')
-  const [crossDays, setCrossDays] = useState(30)
+  const { days: crossDays, setDays: setCrossDays, customRange, setRange } = useReportPeriod()
   const [crossResult, setCrossResult] = useState<AnalyticsCrossResult | null>(null)
   const [crossRunId, setCrossRunId] = useState('')
   const [crossResultId, setCrossResultId] = useState('')
@@ -232,8 +233,8 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
         columnAxis: axisOf(columnAxis),
         measure: measureKind === 'events' ? { kind: 'events', eventType: measureEventType } : { kind: 'unique_friends' },
         filters: [],
-        periodFrom: from.toISOString(),
-        periodTo: now.toISOString(),
+        periodFrom: customRange ? `${customRange.from}T00:00:00+09:00` : from.toISOString(),
+        periodTo: customRange ? new Date(Math.min(Date.now(), Date.parse(`${customRange.to}T23:59:59.999+09:00`))).toISOString() : now.toISOString(),
       })
       if (!response.success) throw new Error(response.error)
       if (viewGeneration.current !== generation) return
@@ -344,7 +345,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
         {measureKind === 'events' ? <Field label="数えるイベント"><Select id="cross-measure-event" value={measureEventType} onChange={setMeasureEventType} aria-label="数えるイベント" size="full" options={MEASURE_EVENTS} /></Field> : null}
         <Field label="たての軸"><Select aria-label="たての軸" value={rowAxis} onChange={setRowAxis} size="full" options={axisOptions(ROW_AXES)} /></Field>
         <Field label="よこの軸"><Select id="cross-field" aria-label="よこの軸" value={columnAxis} onChange={setColumnAxis} size="full" options={axisOptions(COLUMN_AXES)} /></Field>
-        <Field label="期間"><Select aria-label="期間" value={String(crossDays)} onChange={(value) => setCrossDays(Number(value))} size="full" options={PERIODS.map((days) => ({ value: String(days), label: `この${days}日` }))} /></Field>
+        <PeriodPicker days={crossDays} onChange={setCrossDays} customRange={customRange} onRangeChange={setRange} />
         <Button variant="primary" onClick={() => void runCross()} disabled={loading || !crossStorageRestored || sameAxis || Boolean(crossRunId)} busy={loading} busyLabel="集計中" title={sameAxis ? 'たてとよこに同じ軸は選べません' : '期間や軸を変えた場合は、新しい結果として集計します'}>集計する</Button>
         <span className={styles.spacer} />
         {crossResult && crossResultId && canManage && renderSave ? <span title="条件の定義と、いま表示している結果を別々に固定して残します">{renderSave({ sourceResultId: crossResultId, defaultName: `クロス分析 ${resultAxes?.row ?? ''} × ${resultAxes?.column ?? ''}` })}</span> : null}

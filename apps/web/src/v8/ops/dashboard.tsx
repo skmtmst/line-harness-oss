@@ -14,7 +14,7 @@ import Dialog from '@/components/shared/dialog'
 import KpiCard from '@/components/shared/kpi-card'
 import kpiStyles from '@/components/shared/kpi-card.module.css'
 import ListState from '@/components/shared/list-state'
-import SegmentedControl from '@/components/shared/segmented'
+import PeriodPicker from '@/components/shared/period-picker'
 import { OpsHead } from './shell'
 import parts from './parts.module.css'
 import styles from './dashboard.module.css'
@@ -109,7 +109,7 @@ export default function OpsDashboardV8() {
         title="ダッシュボード"
         description="契約先の売上・使用量・お問い合わせを見て、要対応から片づけます。"
         environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
-        actions={<SegmentedControl aria-label="期間" value={period} onChange={setPeriod} options={PERIODS} />}
+        actions={<PeriodPicker days={PERIODS.findIndex((item) => item.value === period)} choices={PERIODS.map((item, index) => ({ days: index, label: item.label }))} onChange={(value) => setPeriod(PERIODS[value].value)} />}
       />
 
       {!data && error ? (

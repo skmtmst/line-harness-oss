@@ -12,7 +12,7 @@ import Card from '@/components/shared/card'
 import SectionHeader from '@/components/shared/section-header'
 import KpiBand from '@/components/shared/kpi-band'
 import { RowMenu } from '@/components/shared/row-actions'
-import SegmentedControl from '@/components/shared/segmented'
+import PeriodPicker from '@/components/shared/period-picker'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -122,7 +122,7 @@ export default function PerformanceBoard({ accountId }: { accountId: string }) {
     <>
       <div className={styles.toolbar}>
         <p className={styles.toolbarText} title={range ? `集計期間 ${range}（日本時間）` : undefined}>Google の検索・地図でどれだけ見られたか</p>
-        <SegmentedControl aria-label="集計期間" value={String(days)} onChange={(value) => setDays(Number(value) as GooglePerformanceDays)} options={DAYS.map((d) => ({ value: String(d), label: `直近${d}日` }))} />
+        <PeriodPicker days={days} onChange={(value) => setDays(value as GooglePerformanceDays)} supportedDays={DAYS} />
       </div>
       {loading && !data ? <div className={styles.stateBox}><ListState kind="loading" title="パフォーマンスを読み込んでいます" /></div> : null}
       {loadError ? <ListState kind="error" title="パフォーマンスを表示できませんでした" description={loadError} onRetry={() => void load()} /> : null}

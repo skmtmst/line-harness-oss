@@ -19,6 +19,7 @@ import { KpiMenu, RangePickerV8, StatePill } from './common'
 import { MetricText } from './reactions'
 import { downloadCsv, formatAnalyticsDateTime, periodCaption, rangeFor, shownValue, useOverview, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
+import { useReportPeriod } from '@/components/shared/period-picker'
 
 type Link = AnalyticsUrlClicksOverview['data']['links'][number]
 
@@ -42,8 +43,7 @@ const shortUrl = (url: string) => url.replace(/^https?:\/\//, '')
 export default function UrlClicksV8({ accountId }: { accountId: string }) {
   const [pageSize, setPageSize] = useState(10)
   const [page, setPage] = useState(0)
-  const [days, setDays] = useState(30)
-  const range = useMemo(() => rangeFor(days - 1), [days])
+  const { days, setDays, range, customRange, setRange } = useReportPeriod()
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
   // 検索語は API へ渡し、200件を超えた URL にも届くようにする。
@@ -70,7 +70,7 @@ export default function UrlClicksV8({ accountId }: { accountId: string }) {
   const toolbar = <div className={styles.toolbar}>
     <div className={styles.searchBox}><SearchField id="url-click-search" aria-label="URL・配信名・リンク名で探す" value={query} onChange={(value) => { setQuery(value); setPage(0) }} onClear={() => { setQuery(''); setPage(0) }} placeholder="URL・配信名・リンク名で探す" loading={state.loading} /></div>
     <div className={styles.selectBox}><Select id="url-state" aria-label="URLの状態" value={status} options={[{ value: 'all', label: 'すべての状態' }, { value: 'active', label: '計測中' }, { value: 'stopped', label: '停止中' }]} onChange={(value) => { setStatus(value); setPage(0) }} /></div>
-    <RangePickerV8 days={days} onChange={setDays} />
+    <RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} />
     <span className={styles.spacer} />
     <Button variant="secondary" onClick={exportRows} disabled={exportDisabled}><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
   </div>

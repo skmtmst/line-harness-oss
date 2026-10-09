@@ -14,7 +14,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import SegmentedControl from '@/components/shared/segmented'
+import PeriodPicker from '@/components/shared/period-picker'
 import Select from '@/components/shared/select'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -116,7 +116,7 @@ export default function SearchConsoleV8() {
   }
   const settingsSiteUrl = data?.siteUrl ?? setup?.siteUrl
   const settingsHref = settingsSiteUrl ? `https://search.google.com/search-console/users?resource_id=${encodeURIComponent(settingsSiteUrl)}` : null
-  const periodControl = <SegmentedControl aria-label="集計期間" value={String(days)} options={RANGES.map((range) => ({ value: String(range), label: `${range}日` }))} onChange={(value) => setDays(Number(value) as RangeDays)} />
+  const periodControl = <PeriodPicker days={days} onChange={(value) => setDays(value as RangeDays)} supportedDays={RANGES} />
   const settingsButton = settingsHref ? <Button variant="secondary" href={settingsHref} target="_blank" rel="noreferrer"><SlidersHorizontal size={15} aria-hidden="true" />連携を設定</Button> : null
   const maxDaily = Math.max(1, ...(data?.daily ?? []).map((row) => row.clicks))
   const middle = data ? data.daily[Math.floor(data.daily.length / 2)] : null

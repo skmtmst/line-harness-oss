@@ -19,6 +19,7 @@ import { KpiMenu, RangePickerV8, dataRangeCaption } from './common'
 import { MetricText } from './reactions'
 import { downloadCsv, metricText, rangeFor, shownValue, useOverview, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
+import { useReportPeriod, type PeriodRange } from '@/components/shared/period-picker'
 
 function metricSum(metrics: Array<AnalyticsMetric<number>>): number | null {
   const values = metrics.map(shownValue)
@@ -27,29 +28,33 @@ function metricSum(metrics: Array<AnalyticsMetric<number>>): number | null {
 const yen = (value: number | null, signed = false) => value === null ? undefined : `${signed && value > 0 ? '+' : ''}¥${formatNumber(value)}`
 
 /** 経路と成果の数の帯と道具の段を読み込み、本文は呼び出し側（経路の表／成果地点のレポート）が描く。 */
-export function useRoutesOverview(accountId: string, controlled?: { days: number; setDays: (days: number) => void }) {
-  const [ownDays, setOwnDays] = useState(30)
-  const days = controlled?.days ?? ownDays
-  const setDays = controlled?.setDays ?? setOwnDays
-  const range = useMemo(() => rangeFor(days - 1), [days])
+export function useRoutesOverview(accountId: string, controlled?: { days: number; setDays: (days: number) => void; customRange?: PeriodRange | null; setRange?: (range: PeriodRange) => void }) {
+  const own = useReportPeriod()
+  const days = controlled?.days ?? own.days
+  const setDays = controlled?.setDays ?? own.setDays
+  const customRange = controlled ? controlled.customRange : own.customRange
+  const setRange = controlled ? controlled.setRange : own.setRange
+  const range = customRange ?? rangeFor(days - 1)
   const state = useOverview<AnalyticsRoutesOverview>(
     () => api.analytics.routesOverview(accountId, range),
     `${accountId}:${range.from}:${range.to}:routes`,
   )
-  return { days, setDays, range, state }
+  return { days, setDays, range, customRange, setRange, state }
 }
 
-export function RoutesFrame({ accountId, children, exportCsv, exportDisabled, days: controlledDays, onDaysChange }: {
+export function RoutesFrame({ accountId, children, exportCsv, exportDisabled, days: controlledDays, onDaysChange, customRange: controlledRange, onRangeChange }: {
   accountId: string
   /** 期間を呼び出し側で持つとき（成果地点ごとのレポートは同じ期間で成果を読む）。 */
   days?: number
   onDaysChange?: (days: number) => void
+  customRange?: PeriodRange | null
+  onRangeChange?: (range: PeriodRange) => void
   /** 道具の段より下。渡さないときは経路の表（PFe9c）。 */
   children?: (overview: AnalyticsRoutesOverview['data'] | null) => ReactNode
   exportCsv?: () => void
   exportDisabled?: boolean
 }) {
-  const { days, setDays, state } = useRoutesOverview(accountId, controlledDays !== undefined && onDaysChange ? { days: controlledDays, setDays: onDaysChange } : undefined)
+  const { days, setDays, customRange, setRange, state } = useRoutesOverview(accountId, controlledDays !== undefined && onDaysChange ? { days: controlledDays, setDays: onDaysChange, customRange: controlledRange, setRange: onRangeChange } : undefined)
   const overview = state.data?.data ?? null
   const exportRoutes = () => {
     if (!overview) return
@@ -64,7 +69,7 @@ export function RoutesFrame({ accountId, children, exportCsv, exportDisabled, da
 
   if (!state.data || !overview) {
     return <div className={styles.body} data-gap="tab">
-      <div className={styles.toolbar}><RangePickerV8 days={days} onChange={setDays} /></div>
+      <div className={styles.toolbar}><RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} /></div>
       {state.loading ? <ListState kind="loading" title="分析を読み込んでいます" /> : <ListState kind="error" description={state.error} onRetry={state.retry} />}
       {/* 成果地点のレポートは経路の集計とは別の口。経路が読めなくても下は出す。 */}
       {children ? children(null) : null}
@@ -90,7 +95,7 @@ export function RoutesFrame({ accountId, children, exportCsv, exportDisabled, da
     </KpiBand>
     <div className={styles.body} data-gap="tab">
       <div className={styles.toolbar}>
-        <RangePickerV8 days={days} onChange={setDays} />
+        <RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} />
         <span className={styles.caption}>{dataRangeCaption(state.data.period.from, state.data.period.to, state.data.dataCutoffAt)}</span>
         <span className={styles.spacer} />
         <Link href={overview.searchConsoleHref} className={styles.textLink}>Search Console を見る<ArrowRight size={12} aria-hidden="true" /></Link>

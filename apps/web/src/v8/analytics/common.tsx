@@ -7,13 +7,11 @@ import { statusLabel } from '@/lib/status-labels'
 import { type ReactNode } from 'react'
 import { RowMenu } from '@/components/shared/row-actions'
 import SegmentedControl from '@/components/shared/segmented'
-import { RANGES } from './parts'
+import PeriodPicker from '@/components/shared/period-picker'
 import styles from './analytics.module.css'
 
-/** 期間の切り替え（7日・30日・90日）。small はカードの中（器3・項目 5/14）、medium は道具の段。 */
-export function RangePickerV8({ days, onChange, size = 'medium' }: { days: number; onChange: (days: number) => void; size?: 'small' | 'medium' }) {
-  return <SegmentedControl size={size} className={size === 'small' ? styles.range : undefined} aria-label="集計期間" options={RANGES.map((range) => ({ value: String(range), label: `${range}日` }))} value={String(days)} onChange={(value) => onChange(Number(value))} />
-}
+/** 集計期間は共通部品へ。 */
+export const RangePickerV8 = PeriodPicker
 
 /** 数の帯の「…」。この見かたで使える操作だけ（いまは CSV の書き出し）。 */
 export function KpiMenu({ title, label = 'CSV で書き出す', onExport, disabled }: { title: string; label?: string; onExport: () => void; disabled: boolean }) {

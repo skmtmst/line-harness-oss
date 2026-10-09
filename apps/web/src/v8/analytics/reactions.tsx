@@ -17,6 +17,7 @@ import { formatNumber } from '@/lib/format'
 import { KpiMenu, RangePickerV8, dataRangeCaption, shortDateTime } from './common'
 import { METRIC_STATE_TEXT, downloadCsv, metricText, rangeFor, shownValue, useOverview, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
+import { useReportPeriod } from '@/components/shared/period-picker'
 
 /** 表の数。集計待ち・取得できない数は 0 にせず「—」と理由（title）。 */
 export function MetricText({ metric, percent, currency }: { metric: AnalyticsMetric<number | string>; percent?: boolean; currency?: boolean }) {
@@ -25,8 +26,7 @@ export function MetricText({ metric, percent, currency }: { metric: AnalyticsMet
 }
 
 export default function ReactionsV8({ accountId }: { accountId: string }) {
-  const [days, setDays] = useState(30)
-  const range = useMemo(() => rangeFor(days - 1), [days])
+  const { days, setDays, range, customRange, setRange } = useReportPeriod()
   const state = useOverview<AnalyticsReactionsOverview>(
     () => api.analytics.reactionsOverview(accountId, range),
     `${accountId}:${range.from}:${range.to}:reactions`,
@@ -57,7 +57,7 @@ export default function ReactionsV8({ accountId }: { accountId: string }) {
 
   if (!state.data || !overview) {
     return <div className={styles.body}>
-      <div className={styles.toolbar}><RangePickerV8 days={days} onChange={setDays} /></div>
+      <div className={styles.toolbar}><RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} /></div>
       {state.loading ? <ListState kind="loading" title="分析を読み込んでいます" /> : <ListState kind="error" description={state.error} onRetry={state.retry} />}
     </div>
   }
@@ -79,7 +79,7 @@ export default function ReactionsV8({ accountId }: { accountId: string }) {
     </KpiBand>
     <div className={styles.body} data-gap="tab">
       <div className={styles.toolbar}>
-        <RangePickerV8 days={days} onChange={setDays} />
+        <RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} />
         <span className={styles.caption} title={`データ締切 ${state.data.dataCutoffAt}`}>{dataRangeCaption(state.data.period.from, state.data.period.to, state.data.dataCutoffAt)}</span>
         <span className={styles.spacer} />
         <Button variant="secondary" onClick={exportCampaigns} disabled={exportDisabled}><Download size={15} aria-hidden="true" />CSV で書き出す</Button>

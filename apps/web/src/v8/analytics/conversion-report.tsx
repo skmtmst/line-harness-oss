@@ -14,6 +14,7 @@ import ListState from '@/components/shared/list-state'
 import { api, type ConversionDefinitionReport } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { RoutesFrame } from './routes'
+import { useReportPeriod } from '@/components/shared/period-picker'
 import { analyticsWeekday } from './parts'
 import { shortDay } from './common'
 import styles from './analytics.module.css'
@@ -38,7 +39,7 @@ function RowMenu({ point, onShowDaily }: { point: Point; onShowDaily: () => void
 }
 
 export default function ConversionReportV8({ accountId }: { accountId: string }) {
-  const [days, setDays] = useState(30)
+  const { days, setDays, customRange, setRange, range } = useReportPeriod()
   const [attempt, setAttempt] = useState(0)
   const [report, setReport] = useState<ConversionDefinitionReport | null>(null)
   const [loading, setLoading] = useState(true)
@@ -46,7 +47,6 @@ export default function ConversionReportV8({ accountId }: { accountId: string })
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
   const [pointId, setPointId] = useState<string | null>(null)
-  const range = useMemo(() => rangeOf(days), [days])
   useEffect(() => {
     let active = true
     setLoading(true); setError(''); setReport(null)
@@ -74,7 +74,7 @@ export default function ConversionReportV8({ accountId }: { accountId: string })
     } catch { setExportError('CSVを書き出せませんでした。もう一度お試しください。') } finally { setExporting(false) }
   }
 
-  return <RoutesFrame accountId={accountId} days={days} onDaysChange={(value) => { setDays(value); setPointId(null) }} exportCsv={() => void exportCsv()} exportDisabled={!report || exporting}>
+  return <RoutesFrame customRange={customRange} onRangeChange={(value) => { setRange(value); setPointId(null) }} accountId={accountId} days={days} onDaysChange={(value) => { setDays(value); setPointId(null) }} exportCsv={() => void exportCsv()} exportDisabled={!report || exporting}>
     {() => <div className={styles.reportStack}>
       {exportError ? <p role="alert" className={styles.caption}>{exportError}</p> : null}
       {loading ? <ListState kind="loading" title="成果レポートを読み込んでいます" />
