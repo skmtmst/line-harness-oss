@@ -187,9 +187,15 @@ export async function stubApi(page, mockFetch) {
   })
 }
 
-async function gotoTarget(page, target) {
-  // 読み込み完了は下の実データの印で判定する。通信待ちで画面を再読込しない。
-  await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 20000 })
+async function gotoTarget(page, target, waitUntil = 'networkidle') {
+  // 標準画面は従来の通信待ちを保つ。負荷画面は下の実データの印で判定する。
+  // 通信待ちがtimeoutしても、描画中の画面を再読込しない。
+  try {
+    await page.goto(target, { waitUntil, timeout: 20000 })
+  } catch (error) {
+    if (waitUntil !== 'networkidle' || error.name !== 'TimeoutError') throw error
+    await page.waitForLoadState('domcontentloaded', { timeout: 20000 })
+  }
 }
 
 export async function measureScreen(browser, target, name, route) {
@@ -282,7 +288,7 @@ async function measureStress(browser, target) {
   try {
   const responseState = await installStressApi(page, target)
   const start = Date.now()
-  await gotoTarget(page, target.url('/friends'))
+  await gotoTarget(page, target.url('/friends'), 'domcontentloaded')
   await waitForScreenReady(page, '/friends', 2000)
   const rows = assertStressResponse(responseState)
   const renderedRows = await page.locator('[data-friend-row]').count()
