@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CircleSlash, Send } from 'lucide-react'
-import { hasTapExtras, type TapExtras, type Folder, type MediaItem, type TemplateImagemapUpload } from '@line-crm/shared'
+import { type TapExtras, type Folder, type MediaItem, type TemplateImagemapUpload } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -108,7 +108,6 @@ function visualAreas(): Record<string, AreaDraft> {
 
 /** 保存値（payload）を組み立てる。足りないときは理由を返す（今の画面と同じ決まり）。 */
 function richAreaProblem(draft: AreaDraft, where: string, hasLiff: boolean): string | null {
-  if (draft.kind === 'message' && hasTapExtras(draft.tapExtras)) return `${where}のテキストを送る動きではタグ・加点を使えません。追加処理を外すか、URLを開く動きへ変更してください`
   return tapActionProblem(draft, { where, hasLiff, textMax: RICH_MESSAGE_TEXT_MAX })
 }
 
@@ -584,7 +583,6 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                     <div className={rich.areaTap} {...fields.bind(`area-${area.label}`)} aria-describedby={fields.invalid(`area-${area.label}`) ? 'te-rich-area-error' : undefined}>
                       <TapActionField
                         allowExtras={draft.kind !== "none"} accountId={tapAccountId} extrasError={fields.error(`area-${area.label}`)}
-                        extrasUnavailable={draft.kind === 'message' ? 'この動きではタグ・加点を使えません。URLを開く動きへ変更してください。' : undefined}
                         name={`面 ${area.label} `}
                         kindLabel={`面 ${area.label} を押したら`}
                         value={draft}

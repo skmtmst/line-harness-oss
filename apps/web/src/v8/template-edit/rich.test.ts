@@ -20,13 +20,15 @@ describe('面の呼び名', () => {
 })
 
 describe('保存値', () => {
-  test('URLの追加処理は保存し、テキストへの変更後に残った追加処理は送らない', () => {
+  test('URLとテキストの両方でタグ・合計点を保存する', () => {
     const input = { imageUrl: 'https://x.example/a.png', pickedMedia: null, shape: shape('1') }
     const tapExtras = { tagIds: ['tag'], scoreChange: 10 }
     const built = buildRichPayload({ ...input, areas: { A: { ...emptyAreaDraft(), kind: 'uri', uri: 'https://x.example', tapExtras } } })
     if (!('payload' in built)) throw new Error(built.error)
     expect(built.payload.tapAreas).toMatchObject([{ tapExtras }])
-    expect(buildRichPayload({ ...input, areas: { A: { ...emptyAreaDraft(), kind: 'message', text: '返信', tapExtras } } })).toMatchObject({ error: expect.stringContaining('追加処理を外すか、URLを開く動きへ変更してください') })
+    const message = buildRichPayload({ ...input, areas: { A: { ...emptyAreaDraft(), kind: 'message', text: '返信', tapExtras } } })
+    if (!('payload' in message)) throw new Error(message.error)
+    expect(message.payload.tapAreas).toMatchObject([{ actionType: 'message', text: '返信', tapExtras }])
   })
 
   test('画像が無ければ送らない・URL を選んで空なら送らない', () => {
