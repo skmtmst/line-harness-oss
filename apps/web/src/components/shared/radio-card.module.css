@@ -342,3 +342,8 @@
 [data-theme='v8'] .small .body { gap: var(--tpl-cn-choice-gap); }
 [data-theme='v8'] .small .title { font-weight: 700; line-height: var(--tpl-cn-name-lh); }
 [data-theme='v8'] .small .note { font-size: var(--text-micro); line-height: var(--tpl-cn-sub-lh); }
+
+/* B-152①：選ぶカードも内側16・カードの中の間8・欄の間12。 */
+[data-theme='v8'] .card { padding: var(--polish-space-card); gap: var(--polish-space-row); }
+[data-theme='v8'] .body { gap: var(--polish-space-row); }
+[data-theme='v8'] .items { gap: var(--polish-space-field); }
