@@ -7,7 +7,8 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Select from '@/components/shared/select'
-import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
+import { AttachmentRow } from '@/components/shared/file-drop'
+import MediaSlot from '@/components/shared/media-slot'
 import { formatDateTime } from '@/lib/format'
 
 const LABELS: Record<BroadcastAssetKind, { title: string; description: string; singular: string }> = {
@@ -195,35 +196,21 @@ export default function BroadcastAssetManager({ kind, onChanged }: { kind: Broad
         {/*
           画像の送信は1回のAPI呼び出しで、途中の割合を測れない。
           実測できない進みは出さない（Progress は足さない）。
-          カルーセルのパネル内の小さな画像選びは、落とす場所が入らない
-          大きさのため今回は変えない。
+          パネル内の画像も同じ画像を入れる所（MediaSlot・Z7vd2）の小さい形。
         */}
-        {imageUrl ? (
-          <div className="space-y-2">
-            <img src={imageUrl} alt="" className="mx-auto max-h-56 rounded-control" />
-            {imageFile ? (
-              <AttachmentRow
-                name={imageFile.name}
-                meta={formatAssetBytes(imageFile.size)}
-                tone="photo"
-                onRemove={clearImage}
-              />
-            ) : (
-              <div className="text-center"><Button type="button" onClick={clearImage}>画像を外す</Button></div>
-            )}
-          </div>
-        ) : (
-          <FileDropzone
-            title="ここに画像を置く"
-            hint="JPEG・PNG（10MB以下）"
-            accept="image/jpeg,image/png"
-            chooseLabel="画像をアップロード"
-            onFiles={(files) => { const picked = files[0]; if (picked) void upload(picked) }}
-          />
-        )}
+        <MediaSlot
+          title="画像を追加"
+          value={imageUrl || null}
+          accept="image/jpeg,image/png"
+          limitText="1ファイル10メガバイト以内・JPEG・PNG"
+          fit="contain"
+          onFile={(file) => void upload(file)}
+          onRemove={clearImage}
+        />
+        {imageFile ? <AttachmentRow name={imageFile.name} meta={formatAssetBytes(imageFile.size)} tone="photo" onRemove={clearImage} /> : null}
         <input value={actionUrl} onChange={(e) => setActionUrl(e.target.value)} placeholder="タップ時に開くURL" className="w-full rounded-card border px-3 py-2.5 text-sm" />
       </>}
-      {kind === 'card_message' && <div className="space-y-3">{cards.map((card, index) => <div key={card.id} className="rounded-card border bg-surface-pearl p-4"><div className="mb-3 flex justify-between"><b className="text-sm">パネル {index + 1}</b><button disabled={cards.length === 1} onClick={() => setCards((all) => all.filter((_, i) => i !== index))} className="text-xs text-status-danger disabled:opacity-30">削除する</button></div><div className="grid gap-3 md:grid-cols-2"><Select aria-label={`パネル ${index + 1} の種類`} value={card.template} onChange={(value) => setCards((all) => all.map((c,i) => i===index ? {...c,template:value}:c))} options={[{ value: 'product', label: 'プロダクト' }, { value: 'location', label: 'ロケーション' }, { value: 'person', label: '人物' }, { value: 'image', label: '画像' }]} size="full" /><label className="rounded-control border border-dashed px-3 py-2 text-center text-sm">{card.imageUrl ? '画像設定済み' : '画像を選択'}<input type="file" accept="image/jpeg,image/png" className="hidden" onChange={(e) => { const f=e.target.files?.[0]; if(f) void upload(f,index) }}/></label><input value={card.title} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,title:e.target.value}:c))} placeholder="タイトル" className="rounded-control border px-3 py-2 text-sm"/><input value={card.description} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,description:e.target.value}:c))} placeholder="説明" className="rounded-control border px-3 py-2 text-sm"/><input value={card.actionLabel} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,actionLabel:e.target.value}:c))} placeholder="ボタン名" className="rounded-control border px-3 py-2 text-sm"/><input value={card.actionUrl} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,actionUrl:e.target.value}:c))} placeholder="アクションURL" className="rounded-control border px-3 py-2 text-sm"/></div></div>)}<button disabled={cards.length >= maxCards} onClick={() => setCards((all) => [...all,newCard()])} className="w-full rounded-card border border-dashed py-3 text-sm font-medium text-success disabled:text-ink-faint">＋ パネルを追加する（{cards.length}/{MAX_PANELS}）</button><Checkbox checked={moreCard} onCheckedChange={setMoreCard}>末尾に「もっと見る」パネルを表示</Checkbox>{moreCard && <p className="text-xs text-ink-faint">「もっと見る」で1枠使うため、パネルは{MAX_PANELS - 1}枚までです。</p>}</div>}
+      {kind === 'card_message' && <div className="space-y-3">{cards.map((card, index) => <div key={card.id} className="rounded-card border bg-surface-pearl p-4"><div className="mb-3 flex justify-between"><b className="text-sm">パネル {index + 1}</b><button disabled={cards.length === 1} onClick={() => setCards((all) => all.filter((_, i) => i !== index))} className="text-xs text-status-danger disabled:opacity-30">削除する</button></div><div className="grid gap-3 md:grid-cols-2"><Select aria-label={`パネル ${index + 1} の種類`} value={card.template} onChange={(value) => setCards((all) => all.map((c,i) => i===index ? {...c,template:value}:c))} options={[{ value: 'product', label: 'プロダクト' }, { value: 'location', label: 'ロケーション' }, { value: 'person', label: '人物' }, { value: 'image', label: '画像' }]} size="full" /><MediaSlot size="compact" title="画像を追加" previewAlt={`パネル ${index + 1} の画像`} value={card.imageUrl || null} accept="image/jpeg,image/png" limitText="10MB 以内" onFile={(f) => void upload(f,index)} onRemove={() => setCards((all) => all.map((c,i) => i===index ? {...c,imageUrl:''}:c))} /><input value={card.title} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,title:e.target.value}:c))} placeholder="タイトル" className="rounded-control border px-3 py-2 text-sm"/><input value={card.description} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,description:e.target.value}:c))} placeholder="説明" className="rounded-control border px-3 py-2 text-sm"/><input value={card.actionLabel} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,actionLabel:e.target.value}:c))} placeholder="ボタン名" className="rounded-control border px-3 py-2 text-sm"/><input value={card.actionUrl} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,actionUrl:e.target.value}:c))} placeholder="アクションURL" className="rounded-control border px-3 py-2 text-sm"/></div></div>)}<button disabled={cards.length >= maxCards} onClick={() => setCards((all) => [...all,newCard()])} className="w-full rounded-card border border-dashed py-3 text-sm font-medium text-success disabled:text-ink-faint">＋ パネルを追加する（{cards.length}/{MAX_PANELS}）</button><Checkbox checked={moreCard} onCheckedChange={setMoreCard}>末尾に「もっと見る」パネルを表示</Checkbox>{moreCard && <p className="text-xs text-ink-faint">「もっと見る」で1枠使うため、パネルは{MAX_PANELS - 1}枚までです。</p>}</div>}
       {(kind === 'coupon' || kind === 'research') && <><textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder={kind === 'coupon' ? '特典内容・利用条件' : 'アンケートの説明'} className="w-full rounded-card border p-3 text-sm" rows={3}/><input value={actionUrl} onChange={(e) => setActionUrl(e.target.value)} placeholder={kind === 'coupon' ? 'クーポンを開くURL' : '回答フォームURL'} className="w-full rounded-card border px-3 py-2.5 text-sm" /></>}
       {error && <p className="text-sm text-status-danger">{error}</p>}<div className="flex justify-end gap-2"><button onClick={reset} className="rounded-control border px-4 py-2 text-sm">キャンセル</button><Button variant="primary" className="px-5 py-2 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving} onClick={() => void save()}>{saving ? '保存中…' : '保存する'}</Button></div></div>
     </section>}
