@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { Message } from '@line-crm/line-sdk';
@@ -69,7 +70,7 @@ type InboxSavedViewAccess = SavedSearchAccess & { canSeeUnassigned: boolean };
 async function inboxSavedViewAccess(c: Context<Env>): Promise<InboxSavedViewAccess | Response> {
   const lineAccountId = c.req.query('lineAccountId');
   if (!lineAccountId) {
-    return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+    return inputError(c, { success: false, error: 'LINE公式アカウントを選んでください' }, 400, ["lineAccountId"]);
   }
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   if (!scope.allowedAccountIds.includes(lineAccountId)) {
@@ -492,10 +493,10 @@ chats.get('/api/operators', requireRole('owner', 'admin', 'staff'), async (c) =>
   }
 });
 
-chats.post('/api/operators', requireRole('owner', 'admin'), async (c) => {
+chats.post('/api/operators', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"email":["string"],"role":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{ name: string; email: string; role?: string }>();
-    if (!body.name || !body.email) return c.json({ success: false, error: 'name and email are required' }, 400);
+    if (!body.name || !body.email) return inputError(c, { success: false, error: 'name and email are required' }, 400, ["name","email"]);
     const item = await createOperator(c.env.DB, body);
     return c.json({ success: true, data: { id: item.id, name: item.name, email: item.email, role: item.role } }, 201);
   } catch (err) {
@@ -504,7 +505,7 @@ chats.post('/api/operators', requireRole('owner', 'admin'), async (c) => {
   }
 });
 
-chats.put('/api/operators/:id', requireRole('owner', 'admin'), async (c) => {
+chats.put('/api/operators/:id', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json();
@@ -1324,7 +1325,7 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
 });
 
 // 開いた担当者だけを既読にする。対応状態は共有だが、既読位置は共有しない。
-chats.post('/api/chats/:id/read', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
+chats.post('/api/chats/:id/read', requireRole('owner', 'admin', 'staff'), requireVisibleChat, inputJsonBoundary(), async (c) => {
   try {
     const resolved = await resolveOrCreateChat(c.env.DB, c.req.param('id'));
     if (!resolved) return c.json({ success: false, error: 'Chat not found' }, 404);
@@ -1352,7 +1353,7 @@ chats.post('/api/chats/:id/read', requireRole('owner', 'admin', 'staff'), requir
   }
 });
 
-chats.post('/api/chats/read-all', requireRole('owner', 'admin', 'staff'), async (c) => {
+chats.post('/api/chats/read-all', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   try {
     const now = jstNow();
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
@@ -1444,7 +1445,7 @@ chats.get('/api/inbox/saved-views', requireRole('owner', 'admin', 'staff'), asyn
   });
 });
 
-chats.post('/api/inbox/saved-views', requireRole('owner', 'admin', 'staff'), async (c) => {
+chats.post('/api/inbox/saved-views', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   const access = await inboxSavedViewAccess(c);
   if (access instanceof Response) return access;
@@ -1452,17 +1453,17 @@ chats.post('/api/inbox/saved-views', requireRole('owner', 'admin', 'staff'), asy
     .json<Record<string, unknown>>()
     .catch((): Record<string, unknown> => ({}));
   const name = typeof body.name === 'string' ? body.name.trim() : '';
-  if (!name) return c.json({ success: false, error: '名前を入力してください' }, 400);
-  if (name.length > 40) return c.json({ success: false, error: '名前は40文字以内で入力してください' }, 400);
+  if (!name) return inputError(c, { success: false, error: '名前を入力してください' }, 400, ["name"]);
+  if (name.length > 40) return inputError(c, { success: false, error: '名前は40文字以内で入力してください' }, 400, ["name"]);
   const conditions = validateInboxSavedViewConditions(body.conditions);
-  if (!conditions.ok) return c.json({ success: false, error: conditions.error }, 422);
+  if (!conditions.ok) return inputError(c, { success: false, error: conditions.error }, 422, ["conditions"]);
   const isShared = body.isShared === true;
   if (isShared && staff.role === 'staff') {
     return c.json({ success: false, error: '共有の検索を作る権限がありません' }, 403);
   }
   const rows = await getSavedSearches(c.env.DB, 'chats', access);
   if (rows.filter((row) => row.created_by === staff.id).length >= 50) {
-    return c.json({ success: false, error: '保存できる検索は50件までです' }, 422);
+    return inputError(c, { success: false, error: '保存できる検索は50件までです' }, 422, []);
   }
   if (rows.some((row) => row.created_by === staff.id && row.name === name)) {
     return c.json({ success: false, error: '同じ名前の保存検索があります' }, 409);
@@ -1479,7 +1480,7 @@ chats.post('/api/inbox/saved-views', requireRole('owner', 'admin', 'staff'), asy
   return c.json({ success: true, data: serializeInboxSavedView(saved) }, 201);
 });
 
-chats.patch('/api/inbox/saved-views/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
+chats.patch('/api/inbox/saved-views/:id', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   const access = await inboxSavedViewAccess(c);
   if (access instanceof Response) return access;
@@ -1496,8 +1497,8 @@ chats.patch('/api/inbox/saved-views/:id', requireRole('owner', 'admin', 'staff')
   const patch: Parameters<typeof updateSavedSearch>[3] = {};
   if (body.name !== undefined) {
     const name = String(body.name).trim();
-    if (!name) return c.json({ success: false, error: '名前を入力してください' }, 400);
-    if (name.length > 40) return c.json({ success: false, error: '名前は40文字以内で入力してください' }, 400);
+    if (!name) return inputError(c, { success: false, error: '名前を入力してください' }, 400, ["name"]);
+    if (name.length > 40) return inputError(c, { success: false, error: '名前は40文字以内で入力してください' }, 400, ["name"]);
     const rows = await getSavedSearches(c.env.DB, 'chats', access);
     if (rows.some((row) => row.id !== existing.id && row.created_by === existing.created_by && row.name === name)) {
       return c.json({ success: false, error: '同じ名前の保存検索があります' }, 409);
@@ -1506,7 +1507,7 @@ chats.patch('/api/inbox/saved-views/:id', requireRole('owner', 'admin', 'staff')
   }
   if (body.conditions !== undefined) {
     const conditions = validateInboxSavedViewConditions(body.conditions);
-    if (!conditions.ok) return c.json({ success: false, error: conditions.error }, 422);
+    if (!conditions.ok) return inputError(c, { success: false, error: conditions.error }, 422, ["conditions"]);
     patch.conditions = conditions.value;
   }
   if (body.isShared !== undefined) {
@@ -1535,10 +1536,10 @@ chats.delete('/api/inbox/saved-views/:id', requireRole('owner', 'admin', 'staff'
   return c.json({ success: true, data: null });
 });
 
-chats.post('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
+chats.post('/api/chats', requireRole('owner', 'admin', 'staff'), inputJsonBoundary({"friendId":["string"],"operatorId":["string"],"lineAccountId":["null","string"]}), async (c) => {
   try {
     const body = await c.req.json<{ friendId: string; operatorId?: string; lineAccountId?: string | null }>();
-    if (!body.friendId) return c.json({ success: false, error: 'friendId is required' }, 400);
+    if (!body.friendId) return inputError(c, { success: false, error: 'friendId is required' }, 400, ["friendId"]);
     if (body.lineAccountId !== null && body.lineAccountId !== undefined
       && (!body.lineAccountId
         || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId]))) {
@@ -1558,7 +1559,7 @@ chats.post('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
 });
 
 // チャットのアサイン/ステータス更新/ノート更新
-chats.put('/api/chats/:id', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
+chats.put('/api/chats/:id', requireRole('owner', 'admin', 'staff'), requireVisibleChat, inputJsonBoundary({"operatorId":["null","string"],"status":["string"],"notes":["string"],"revision":["number"],"reason":["string"]}), async (c) => {
   try {
     const id = c.req.param('id');
     const resolved = await resolveOrCreateChat(c.env.DB, id);
@@ -1571,15 +1572,15 @@ chats.put('/api/chats/:id', requireRole('owner', 'admin', 'staff'), requireVisib
       reason?: string;
     }>();
     if (body.status !== undefined && !isInboxStatus(body.status)) {
-      return c.json({ success: false, error: '対応状態が正しくありません' }, 400);
+      return inputError(c, { success: false, error: '対応状態が正しくありません' }, 400, ["status"]);
     }
     if (body.notes !== undefined && body.notes.length > 10_000) {
-      return c.json({ success: false, error: '内部メモは10,000文字以内で入力してください' }, 400);
+      return inputError(c, { success: false, error: '内部メモは10,000文字以内で入力してください' }, 400, ["notes"]);
     }
     if (body.operatorId) {
       const operator = await getOperatorById(c.env.DB, body.operatorId);
       if (!operator || !operator.is_active) {
-        return c.json({ success: false, error: '担当者が見つかりません' }, 400);
+        return inputError(c, { success: false, error: '担当者が見つかりません' }, 400, ["operatorId"]);
       }
     }
 
@@ -1693,7 +1694,7 @@ chats.put('/api/chats/:id', requireRole('owner', 'admin', 'staff'), requireVisib
 });
 
 // オペレーター入力中のローディング表示を開始
-chats.post('/api/chats/:id/loading', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
+chats.post('/api/chats/:id/loading', requireRole('owner', 'admin', 'staff'), requireVisibleChat, inputJsonBoundary({"loadingSeconds":["number"]}), async (c) => {
   try {
     const chatId = c.req.param('id');
     const chat = await resolveOrCreateChat(c.env.DB, chatId);
@@ -1731,13 +1732,13 @@ chats.post('/api/chats/:id/loading', requireRole('owner', 'admin', 'staff'), req
 });
 
 // オペレーターからメッセージ送信
-chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
+chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requireVisibleChat, inputJsonBoundary({"messageType":["string"],"content":["string"],"revision":["number"],"quotedMessageId":["string"]}), async (c) => {
   let leasedConversationId: string | null = null;
   try {
     const chatId = c.req.param('id');
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
     if (!isValidIdempotencyKey(idempotencyKey)) {
-      return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+      return inputError(c, { success: false, error: '有効なIdempotency-Keyが必要です' }, 400, []);
     }
     const chat = await resolveOrCreateChat(c.env.DB, chatId);
     if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
@@ -1747,9 +1748,9 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     try {
       body = await c.req.json<{ messageType?: string; content: string; revision?: number; quotedMessageId?: string }>();
     } catch {
-      return c.json({ success: false, error: 'content is required' }, 400);
+      return inputError(c, { success: false, error: 'content is required' }, 400, ["content"]);
     }
-    if (typeof body?.content !== 'string' || !body.content) return c.json({ success: false, error: 'content is required' }, 400);
+    if (typeof body?.content !== 'string' || !body.content) return inputError(c, { success: false, error: 'content is required' }, 400, ["content"]);
     if (body.revision !== undefined && body.revision !== chat.revision) {
       return c.json({
         success: false,
@@ -1783,7 +1784,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
       { kind: 'chat', id: friend.id },
     );
     if (rendered.unresolved.length > 0) {
-      return c.json({ success: false, ...unresolvedVariablesPayload(rendered.unresolved) }, 400);
+      return inputError(c, { success: false, ...unresolvedVariablesPayload(rendered.unresolved) }, 400, ["friend","messageType","content","liffId"]);
     }
 
     // 引用元の検証は外部送信より前に行う。別friend・別アカウント・取消済みを
@@ -1833,7 +1834,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
       message = built.message;
       rendered.content = built.content;
     } catch (error) {
-      if (error instanceof ChatAttachmentError) return c.json({ success: false, code: error.code, error: error.message }, 400);
+      if (error instanceof ChatAttachmentError) return inputError(c, { success: false, code: error.code, error: error.message }, 400, ["attachmentIds"]);
       throw error;
     }
 
@@ -1929,14 +1930,14 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
         channel: 'line', conversationId: friend.id, staffId: c.get('staff').id,
       });
       leasedConversationId = null;
-      return c.json({
+      return inputError(c, {
         success: false,
         error: failure.status === 'unknown'
           ? 'LINEへの送達結果を確認できないため、自動再送を停止しました'
           : 'LINEへ送信できませんでした',
         code: failure.code,
         data: { retryable: failure.retryable, nextRetryAt: failure.nextRetryAt },
-      }, failure.httpStatus);
+      }, failure.httpStatus, []);
     }
 
     // メッセージログに記録
@@ -2064,7 +2065,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
  * LINE呼出し・履歴書込みはしない。`unresolved` に残る差し込みは
  * 送信時にそのまま拒否されるので、画面はここで事前に見せられる。
  */
-chats.post('/api/chats/:id/render-preview', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
+chats.post('/api/chats/:id/render-preview', requireRole('owner', 'admin', 'staff'), requireVisibleChat, inputJsonBoundary(), async (c) => {
   try {
     const chat = await resolveOrCreateChat(c.env.DB, c.req.param('id'));
     if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
@@ -2073,10 +2074,10 @@ chats.post('/api/chats/:id/render-preview', requireRole('owner', 'admin', 'staff
     try {
       body = await c.req.json();
     } catch {
-      return c.json({ success: false, error: 'content is required' }, 400);
+      return inputError(c, { success: false, error: 'content is required' }, 400, ["content"]);
     }
     const content = typeof body?.content === 'string' ? body.content : '';
-    if (!content) return c.json({ success: false, error: 'content is required' }, 400);
+    if (!content) return inputError(c, { success: false, error: 'content is required' }, 400, ["content"]);
     const messageType = typeof body.messageType === 'string' ? body.messageType : 'text';
 
     const { friend, liffId } = await resolveFriendAndAccessToken(
@@ -2111,13 +2112,13 @@ chats.post('/api/chats/:id/render-preview', requireRole('owner', 'admin', 'staff
  * LINEへは1回のpush要求のメッセージ配列として送る。片方の検証失敗時は
  * LINE呼び出し0回・保存0件。冪等予約は単体口と共用する。
  */
-chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
+chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'), requireVisibleChat, inputJsonBoundary(), async (c) => {
   let leasedConversationId: string | null = null;
   try {
     const chatId = c.req.param('id');
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
     if (!isValidIdempotencyKey(idempotencyKey)) {
-      return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+      return inputError(c, { success: false, error: '有効なIdempotency-Keyが必要です' }, 400, []);
     }
     const chat = await resolveOrCreateChat(c.env.DB, chatId);
     if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
@@ -2126,7 +2127,7 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
     try {
       body = await c.req.json();
     } catch {
-      return c.json({ success: false, error: 'content is required' }, 400);
+      return inputError(c, { success: false, error: 'content is required' }, 400, ["content"]);
     }
     const image = body.image ?? null;
     const text = typeof body.text === 'string' ? body.text : null;
@@ -2136,9 +2137,9 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
       ? body.texts.filter((t): t is string => typeof t === 'string' && t.length > 0)
       : [];
     const texts = [...(text ? [text] : []), ...extraTexts];
-    if (!image && texts.length === 0) return c.json({ success: false, error: 'content is required' }, 400);
+    if (!image && texts.length === 0) return inputError(c, { success: false, error: 'content is required' }, 400, ["image","text","texts"]);
     if (texts.length + (image ? 1 : 0) > 5) {
-      return c.json({ success: false, error: 'まとめて送れるのは5通までです' }, 400);
+      return inputError(c, { success: false, error: 'まとめて送れるのは5通までです' }, 400, ["text","texts","image"]);
     }
     if (body.revision !== undefined && body.revision !== chat.revision) {
       return c.json({
@@ -2183,7 +2184,7 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
     if (image) {
       if (typeof image.originalContentUrl !== 'string' || !image.originalContentUrl
         || typeof image.previewImageUrl !== 'string' || !image.previewImageUrl) {
-        return c.json({ success: false, error: '画像メッセージの形式が正しくありません' }, 400);
+        return inputError(c, { success: false, error: '画像メッセージの形式が正しくありません' }, 400, ["image"]);
       }
       imagePart = {
         originalContentUrl: image.originalContentUrl,
@@ -2199,11 +2200,11 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
         { kind: 'chat', id: friend.id },
       );
       if (renderedText.unresolved.length > 0) {
-        return c.json({ success: false, ...unresolvedVariablesPayload(renderedText.unresolved) }, 400);
+        return inputError(c, { success: false, ...unresolvedVariablesPayload(renderedText.unresolved) }, 400, ["friend","liffId"]);
       }
       // 上限は解決後の長さで判定する(展開で超え得る)。
       if (renderedText.content.length > 5000) {
-        return c.json({ success: false, error: 'メッセージは5000文字以内で入力してください' }, 400);
+        return inputError(c, { success: false, error: 'メッセージは5000文字以内で入力してください' }, 400, ["friend","liffId"]);
       }
       textParts.push(renderedText.content);
     }
@@ -2325,14 +2326,14 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
         channel: 'line', conversationId: friend.id, staffId: c.get('staff').id,
       });
       leasedConversationId = null;
-      return c.json({
+      return inputError(c, {
         success: false,
         error: failure.status === 'unknown'
           ? 'LINEへの送達結果を確認できないため、自動再送を停止しました'
           : 'LINEへ送信できませんでした',
         code: failure.code,
         data: { retryable: failure.retryable, nextRetryAt: failure.nextRetryAt },
-      }, failure.httpStatus);
+      }, failure.httpStatus, []);
     }
 
     const logBaseId = idempotencyKey;
@@ -2483,12 +2484,12 @@ function validateScheduledAt(raw: unknown): { ok: true; scheduledAt: string } | 
  * 新しい行を作らず既存行を返す(#977)。replayed=true でどちらの再利用かは
  * 区別せず、画面は返された予約1件だけを表示すればよい。
  */
-chats.post('/api/chats/:id/schedule', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
+chats.post('/api/chats/:id/schedule', requireRole('owner', 'admin', 'staff'), requireVisibleChat, inputJsonBoundary(), async (c) => {
   try {
     const chatId = c.req.param('id');
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
     if (!isValidIdempotencyKey(idempotencyKey)) {
-      return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+      return inputError(c, { success: false, error: '有効なIdempotency-Keyが必要です' }, 400, []);
     }
     const chat = await resolveOrCreateChat(c.env.DB, chatId);
     if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
@@ -2497,24 +2498,24 @@ chats.post('/api/chats/:id/schedule', requireRole('owner', 'admin', 'staff'), re
     try {
       body = await c.req.json();
     } catch {
-      return c.json({ success: false, error: 'content is required' }, 400);
+      return inputError(c, { success: false, error: 'content is required' }, 400, ["content"]);
     }
     const content = typeof body?.content === 'string' ? body.content : '';
     const messageType = body?.messageType === undefined ? 'text' : body.messageType;
-    if (typeof messageType !== 'string') return c.json({ success: false, error: 'messageType is not supported' }, 400);
-    if (!content) return c.json({ success: false, error: 'content is required' }, 400);
+    if (typeof messageType !== 'string') return inputError(c, { success: false, error: 'messageType is not supported' }, 400, ["messageType"]);
+    if (!content) return inputError(c, { success: false, error: 'content is required' }, 400, ["content"]);
     if (messageType === 'text' && content.length > 5000) {
-      return c.json({ success: false, error: 'メッセージは5000文字以内で入力してください' }, 400);
+      return inputError(c, { success: false, error: 'メッセージは5000文字以内で入力してください' }, 400, ["messageType","content"]);
     }
     // N-026: 送信時に解決される差し込み(name/field/var/date等)は予約へ通すが、
     // カタログに無い名前は将来も解決できないのでここで拒否する(予約行も作らない)。
     const unsupported = findUnsupportedInterpolations(content);
     if (unsupported.length > 0) {
-      return c.json({ success: false, ...unresolvedVariablesPayload(unsupported) }, 400);
+      return inputError(c, { success: false, ...unresolvedVariablesPayload(unsupported) }, 400, ["content"]);
     }
     const time = validateScheduledAt(body.scheduledAt);
     if (!time.ok) {
-      return c.json({ success: false, error: '未来の日時を指定してください' }, 400);
+      return inputError(c, { success: false, error: '未来の日時を指定してください' }, 400, ["scheduledAt"]);
     }
 
     const { friend } = await resolveFriendAndAccessToken(
@@ -2556,7 +2557,7 @@ chats.post('/api/chats/:id/schedule', requireRole('owner', 'admin', 'staff'), re
         })).content;
       }
     } catch (error) {
-      if (error instanceof ChatAttachmentError) return c.json({ success: false, code: error.code, error: error.message }, 400);
+      if (error instanceof ChatAttachmentError) return inputError(c, { success: false, code: error.code, error: error.message }, 400, ["attachmentIds"]);
       throw error;
     }
 
@@ -2612,7 +2613,7 @@ chats.get('/api/chats/:id/scheduled', requireRole('owner', 'admin', 'staff'), re
  * PATCH /api/chats/:id/scheduled/:scheduleId — 予約の時刻・本文変更。
  * scheduled の行だけCASで書き換える。sending以降は409。
  */
-chats.patch('/api/chats/:id/scheduled/:scheduleId', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
+chats.patch('/api/chats/:id/scheduled/:scheduleId', requireRole('owner', 'admin', 'staff'), requireVisibleChat, inputJsonBoundary(), async (c) => {
   try {
     const chatId = c.req.param('id');
     const scheduleId = c.req.param('scheduleId');
@@ -2628,32 +2629,32 @@ chats.patch('/api/chats/:id/scheduled/:scheduleId', requireRole('owner', 'admin'
     try {
       body = await c.req.json();
     } catch {
-      return c.json({ success: false, error: 'content is required' }, 400);
+      return inputError(c, { success: false, error: 'content is required' }, 400, ["content"]);
     }
     const updates: { scheduledAt?: string; content?: string } = {};
     if (body.scheduledAt !== undefined) {
       const time = validateScheduledAt(body.scheduledAt);
       if (!time.ok) {
-        return c.json({ success: false, error: '未来の日時を指定してください' }, 400);
+        return inputError(c, { success: false, error: '未来の日時を指定してください' }, 400, ["scheduledAt"]);
       }
       updates.scheduledAt = time.scheduledAt;
     }
     if (body.content !== undefined) {
       if (typeof body.content !== 'string' || !body.content) {
-        return c.json({ success: false, error: 'content is required' }, 400);
+        return inputError(c, { success: false, error: 'content is required' }, 400, ["content"]);
       }
       if (existing.message_type === 'text' && body.content.length > 5000) {
-        return c.json({ success: false, error: 'メッセージは5000文字以内で入力してください' }, 400);
+        return inputError(c, { success: false, error: 'メッセージは5000文字以内で入力してください' }, 400, ["content"]);
       }
       // N-026: 予約作成と同じく、カタログに無い差し込み名はここで拒否する。
       const unsupported = findUnsupportedInterpolations(body.content);
       if (unsupported.length > 0) {
-        return c.json({ success: false, ...unresolvedVariablesPayload(unsupported) }, 400);
+        return inputError(c, { success: false, ...unresolvedVariablesPayload(unsupported) }, 400, ["content"]);
       }
       updates.content = body.content;
     }
     if (updates.scheduledAt === undefined && updates.content === undefined) {
-      return c.json({ success: false, error: '変更する項目がありません' }, 400);
+      return inputError(c, { success: false, error: '変更する項目がありません' }, 400, ["scheduledAt","content"]);
     }
 
     try {
@@ -2669,7 +2670,7 @@ chats.patch('/api/chats/:id/scheduled/:scheduleId', requireRole('owner', 'admin'
         if (updates.content !== undefined) updates.content = built.content;
       }
     } catch (error) {
-      if (error instanceof ChatAttachmentError) return c.json({ success: false, code: error.code, error: error.message }, 400);
+      if (error instanceof ChatAttachmentError) return inputError(c, { success: false, code: error.code, error: error.message }, 400, ["attachmentIds"]);
       throw error;
     }
 

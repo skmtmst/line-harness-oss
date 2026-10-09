@@ -1,3 +1,4 @@
+import type { ApiFieldErrors } from '@line-crm/shared'
 import { getFeatureDisabledContext } from './feature-disabled-context'
 import type {QuestionAnswerRecovery,ResumeQuestionAnswerRequest,ResumeQuestionAnswerResponse} from '@line-crm/shared';
 import type { AutomationTabCounts, MediaTabCounts, ConversionApprovalCounts } from '@line-crm/shared';
@@ -2529,6 +2530,8 @@ const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
  * the string.
  */
 export class ApiError extends Error {
+  /** useFormErrors のサーバー側の検証結果として渡す欄ごとの理由。 */
+  readonly fields: ApiFieldErrors
   readonly status: number
   readonly code: string | undefined
   /** 409などで画面を最新状態へ描き直すための機械データ。利用者へ直接表示しない。 */
@@ -2544,9 +2547,10 @@ export class ApiError extends Error {
    */
   readonly retryAfterSeconds: number | undefined
 
-  constructor(status: number, message?: string, code?: string, data?: unknown, trackingId?: string, retryAfterSeconds?: number) {
+  constructor(status: number, message?: string, code?: string, data?: unknown, trackingId?: string, retryAfterSeconds?: number, fields: ApiFieldErrors = {}) {
     super(message || `API error: ${status}`)
     this.name = 'ApiError'
+    this.fields = fields
     this.status = status
     this.code = code
     this.data = data
@@ -2686,6 +2690,27 @@ export function extractApiErrorMessage(raw: string, status: number): string {
   }
   return ''
 }
+
+/** 400/422 の欄ごとの理由だけを取り出す。古い error のみの応答も受けられる。 */
+export function extractApiFieldErrors(raw: string, status: number): ApiFieldErrors {
+  if (status !== 400 && status !== 422) return {}
+  try {
+    const payload: unknown = JSON.parse(raw)
+    if (!payload || typeof payload !== 'object' || !('fields' in payload)) return {}
+    const fields = payload.fields
+    if (!fields || typeof fields !== 'object' || Array.isArray(fields)) return {}
+    return Object.fromEntries(Object.entries(fields).flatMap(([key, reason]) => {
+      const message = safeOperatorMessage(reason)
+      return key.length > 0 && message ? [[key, message]] : []
+    }))
+  } catch { return {} }
+}
+
+/** 保存の catch からフォームへ渡す。ネットワークエラーなどには欄の理由はない。 */
+export function getApiFieldErrors(error: unknown): ApiFieldErrors {
+  return error instanceof ApiError ? error.fields : {}
+}
+
 
 /**
  * 画面分岐にだけ使う、Worker由来の機械コードを取り出す。
@@ -2926,6 +2951,7 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
       extractApiErrorTrackingId(raw),
       // m23m: 429の待ち秒数（Retry-After）。画面は待つ案内に使う。
       parseRetryAfterSeconds(res.headers.get('Retry-After')),
+      extractApiFieldErrors(raw, res.status),
     )
   }
   if (res.status === 204) return undefined as T
@@ -2963,6 +2989,7 @@ export async function refreshCachedList<T>(path: string): Promise<T> {
       undefined,
       extractApiErrorTrackingId(raw),
       parseRetryAfterSeconds(res.headers.get('Retry-After')),
+      extractApiFieldErrors(raw, res.status),
     )
   }
   const body = (await res.json()) as T
@@ -2993,6 +3020,7 @@ export async function fetchApiBlob(path: string, init?: { method?: string; accou
       undefined,
       extractApiErrorTrackingId(raw),
       parseRetryAfterSeconds(res.headers.get('Retry-After')),
+      extractApiFieldErrors(raw, res.status),
     )
   }
   return res.blob()
@@ -3039,6 +3067,7 @@ export async function downloadApiFile(path: string, fallbackFilename: string): P
       undefined,
       extractApiErrorTrackingId(raw),
       parseRetryAfterSeconds(res.headers.get('Retry-After')),
+      extractApiFieldErrors(raw, res.status),
     )
   }
   const disposition = res.headers.get('Content-Disposition') ?? ''

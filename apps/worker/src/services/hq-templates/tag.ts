@@ -2,7 +2,17 @@ import { normalizeScopedTagName, type HqTemplateStatement } from '@line-crm/db';
 import { unsupportedHqTemplateAdapter, type HqTemplateResolution, type HqTemplateAdapter, type HqTemplateAuthority } from './contract.js';
 
 export class HqTemplateError extends Error {
-  constructor(public code: string, public status: 400 | 403 | 404 | 409 | 422 | 500 = 400) { super(code); }
+  readonly fields: Record<string, string>;
+  constructor(public code: string, public status: 400 | 403 | 404 | 409 | 422 | 500 = 400, fieldKeys?: readonly string[]) {
+    super(code);
+    const keys: Record<string, string[]> = {
+      INVALID_VERSION: ['version'], INVALID_IMAGE: ['definition'], INVALID_TYPE: ['type'], INVALID_KIND: ['kind'], INVALID_REQUEST_ID: ['requestId'],
+      INVALID_DEFINITION: ['definition'], UNSUPPORTED_REFERENCE: ['definition'], UNSUPPORTED: ['definition'],
+      INVALID_FOLDER_COLOR: ['color'], INVALID_FOLDER: ['folderId'], INVALID_NAME: ['name'], INVALID_REVISION: ['expectedRevision'],
+      INVALID_ACCOUNTS: ['accountIds'], INVALID_SELECTION: ['preflightId', 'resolutions'],
+    };
+    this.fields = Object.fromEntries((fieldKeys ?? keys[code] ?? []).map(key => [key, '入力内容を確認してください']));
+  }
 }
 export type TagDefinition = {
   schemaVersion: 1;
@@ -25,8 +35,8 @@ function object(v: unknown): Record<string, unknown> {
   if (!v || typeof v !== 'object' || Array.isArray(v)) throw new HqTemplateError('INVALID_DEFINITION');
   return v as Record<string, unknown>;
 }
-export function boundedText(v: unknown, max = 200): string {
-  if (typeof v !== 'string' || !v.trim() || v.length > max) throw new HqTemplateError('INVALID_DEFINITION');
+export function boundedText(v: unknown, max = 200, field = 'definition'): string {
+  if (typeof v !== 'string' || !v.trim() || v.length > max) throw new HqTemplateError('INVALID_DEFINITION', 400, [field]);
   return v.trim();
 }
 function color(v: unknown): string | null {
@@ -92,7 +102,7 @@ export function parseTagDefinition(v: unknown): TagDefinition {
   const allowedTagKeys = new Set(['name','color','description','folderId','isStarred','manualAssignmentAllowed','reapplyPolicy','linkedEnabled','mileage','actions']);
   if (Object.keys(tag).some(key => !allowedTagKeys.has(key))) throw new HqTemplateError('UNSUPPORTED_REFERENCE');
   return { schemaVersion: 1, tag: {
-    name: boundedText(tag.name), color: color(tag.color) ?? '#3B82F6',
+    name: boundedText(tag.name), color: color(tag.color) ?? '#94a3b8',
     description: tag.description == null || tag.description === '' ? null : boundedText(tag.description, 2000), folderId,
     ...(tag.isStarred === undefined ? {} : { isStarred: boolean(tag.isStarred, false) }),
     ...(tag.manualAssignmentAllowed === undefined ? {} : { manualAssignmentAllowed: boolean(tag.manualAssignmentAllowed, true) }),

@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -42,11 +43,11 @@ meetConsultations.get('/api/meet-consultations', requireRole('owner', 'admin', '
   return c.json({ success: true, data: result.results ?? [] });
 });
 
-meetConsultations.post('/api/meet-consultations', requireRole('owner', 'admin', 'staff'), async (c) => {
+meetConsultations.post('/api/meet-consultations', requireRole('owner', 'admin', 'staff'), inputJsonBoundary({"externalEventId":["string"],"friendId":["string"],"title":["string"],"startsAt":["string"],"endsAt":["string"],"meetUrl":["string"],"bookingId":["null","string"],"bookingVersion":["null","number"]}), async (c) => {
   try {
     const body = await c.req.json<RegisterMeetConsultationInput>();
     if (typeof body.friendId !== 'string' || !body.friendId.trim()) {
-      return c.json({ success: false, error: 'friendId is required' }, 400);
+      return inputError(c, { success: false, error: 'friendId is required' }, 400, ["friendId"]);
     }
     const [friend, existing] = await Promise.all([
       c.env.DB.prepare('SELECT line_account_id FROM friends WHERE id = ?')
@@ -68,7 +69,7 @@ meetConsultations.post('/api/meet-consultations', requireRole('owner', 'admin', 
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const status = message === 'friend not found or not following' ? 404 : 400;
-    return c.json({ success: false, error: message }, status);
+    return inputError(c, { success: false, error: message }, status, ["externalEventId","friendId","startsAt","meetUrl"]);
   }
 });
 

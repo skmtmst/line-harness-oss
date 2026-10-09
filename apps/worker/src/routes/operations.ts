@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context, Next } from 'hono';
 import {
@@ -326,11 +327,11 @@ operations.get('/api/operations/health', requireRole('owner', 'admin'), async (c
   }
 });
 
-operations.post('/api/operations/health/runs', requireRole('owner', 'admin'), async (c) => {
+operations.post('/api/operations/health/runs', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const body = await c.req.json<{ lineAccountId?: unknown }>()
     .catch(() => ({} as { lineAccountId?: unknown }));
   if (typeof body.lineAccountId !== 'string' || !body.lineAccountId.trim()) {
-    return c.json({ success: false, error: 'LINEアカウントを指定してください' }, 400);
+    return inputError(c, { success: false, error: 'LINEアカウントを指定してください' }, 400, ["lineAccountId"]);
   }
   const accountId = body.lineAccountId.trim();
   if (!await canReadScope(c, accountId)) {
@@ -370,13 +371,13 @@ operations.get('/api/operations/alerts', requireRole('owner', 'admin'), async (c
   }
 });
 
-operations.post('/api/operations/alerts/:id/acknowledge', requireRole('owner', 'admin'), async (c) => {
+operations.post('/api/operations/alerts/:id/acknowledge', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const body = await c.req.json<{ lineAccountId?: unknown; expectedVersion?: unknown; note?: unknown }>()
     .catch(() => ({} as { lineAccountId?: unknown; expectedVersion?: unknown; note?: unknown }));
   if (typeof body.lineAccountId !== 'string' || !body.lineAccountId.trim()
     || !Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 1
     || (body.note !== undefined && typeof body.note !== 'string')) {
-    return c.json({ success: false, error: '受領内容を確認してから、もう一度読み直してください' }, 400);
+    return inputError(c, { success: false, error: '受領内容を確認してから、もう一度読み直してください' }, 400, ["lineAccountId","expectedVersion","note"]);
   }
   const accountId = body.lineAccountId.trim();
   if (!await canReadScope(c, accountId)) {
@@ -406,10 +407,10 @@ operations.post('/api/operations/alerts/:id/acknowledge', requireRole('owner', '
   }
 });
 
-operations.post('/api/operations/alerts/:id/notifications/retry', requireRole('owner', 'admin'), async (c) => {
+operations.post('/api/operations/alerts/:id/notifications/retry', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const body = await c.req.json<{ lineAccountId?: unknown }>().catch(() => ({} as { lineAccountId?: unknown }));
   if (typeof body.lineAccountId !== 'string' || !body.lineAccountId.trim()) {
-    return c.json({ success: false, error: 'LINEアカウントを指定してください' }, 400);
+    return inputError(c, { success: false, error: 'LINEアカウントを指定してください' }, 400, ["lineAccountId"]);
   }
   const accountId = body.lineAccountId.trim();
   if (!await canReadScope(c, accountId)) {
@@ -600,16 +601,16 @@ operations.post(
   requireRole('owner', 'admin'),
   requireEmergencyControlPermission,
   requireIrreversibleConfirmation('operation-stop'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     let body: Record<string, unknown>;
     try {
       body = await c.req.json<Record<string, unknown>>();
     } catch {
-      return c.json({ success: false, error: '入力内容を読み取れませんでした' }, 400);
+      return inputError(c, { success: false, error: '入力内容を読み取れませんでした' }, 400, []);
     }
     if (!Object.hasOwn(body, 'lineAccountId')
       || (body.lineAccountId !== null && typeof body.lineAccountId !== 'string')) {
-      return c.json({ success: false, error: '停止する範囲を明示してください' }, 400);
+      return inputError(c, { success: false, error: '停止する範囲を明示してください' }, 400, ["lineAccountId"]);
     }
     const accountId = requestedAccountId(
       typeof body.lineAccountId === 'string' ? body.lineAccountId : null,
@@ -619,16 +620,16 @@ operations.post(
     }
     const capabilities = parseCapabilities(body.capabilities);
     if (!capabilities) {
-      return c.json({ success: false, error: '停止対象を1つ以上正しく指定してください' }, 400);
+      return inputError(c, { success: false, error: '停止対象を1つ以上正しく指定してください' }, 400, ["capabilities"]);
     }
     if (body.confirmation !== '停止') {
-      return c.json({ success: false, error: '確認のため「停止」と入力してください' }, 400);
+      return inputError(c, { success: false, error: '確認のため「停止」と入力してください' }, 400, ["confirmation"]);
     }
     if (typeof body.reason !== 'string' || !body.reason.trim() || body.reason.trim().length > 200) {
-      return c.json({ success: false, error: '停止理由を200文字以内で入力してください' }, 400);
+      return inputError(c, { success: false, error: '停止理由を200文字以内で入力してください' }, 400, ["reason"]);
     }
     if (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 0) {
-      return c.json({ success: false, error: '最新の停止状態を読み直してください' }, 400);
+      return inputError(c, { success: false, error: '最新の停止状態を読み直してください' }, 400, ["expectedVersion"]);
     }
     const detail = typeof body.detail === 'string' && body.detail.trim()
       ? body.detail.trim().slice(0, 1_000)
@@ -636,7 +637,7 @@ operations.post(
 
     const idempotencyKey = requiredIdempotencyKey(c);
     if (!idempotencyKey) {
-      return c.json({ success: false, error: '再実行を安全にするキーを指定してください' }, 400);
+      return inputError(c, { success: false, error: '再実行を安全にするキーを指定してください' }, 400, []);
     }
     const actorId = c.get('staff')!.id;
     const requestHash = await sha256Hex(JSON.stringify({
@@ -719,7 +720,7 @@ operations.post(
   '/api/operations/incidents/:id/restore-preview',
   requireRole('owner', 'admin'),
   requireEmergencyControlPermission,
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const incident = await getOperationIncident(c.env.DB, c.req.param('id'));
       if (!incident) return c.json({ success: false, error: '緊急操作の記録が見つかりません' }, 404);
@@ -751,23 +752,23 @@ operations.post(
   requireRole('owner', 'admin'),
   requireEmergencyControlPermission,
   requireIrreversibleConfirmation('operation-restore'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     let body: Record<string, unknown>;
     try {
       body = await c.req.json<Record<string, unknown>>();
     } catch {
-      return c.json({ success: false, error: '入力内容を読み取れませんでした' }, 400);
+      return inputError(c, { success: false, error: '入力内容を読み取れませんでした' }, 400, []);
     }
     if (body.confirmation !== '復旧') {
-      return c.json({ success: false, error: '確認のため「復旧」と入力してください' }, 400);
+      return inputError(c, { success: false, error: '確認のため「復旧」と入力してください' }, 400, ["confirmation"]);
     }
     if (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 1) {
-      return c.json({ success: false, error: '最新の停止状態を読み直してください' }, 400);
+      return inputError(c, { success: false, error: '最新の停止状態を読み直してください' }, 400, ["expectedVersion"]);
     }
 
     const idempotencyKey = requiredIdempotencyKey(c);
     if (!idempotencyKey) {
-      return c.json({ success: false, error: '再実行を安全にするキーを指定してください' }, 400);
+      return inputError(c, { success: false, error: '再実行を安全にするキーを指定してください' }, 400, []);
     }
 
     try {
@@ -879,7 +880,7 @@ operations.post(
   },
 );
 
-operations.post('/api/internal/deployments/events', async (c) => {
+operations.post('/api/internal/deployments/events', inputJsonBoundary(), async (c) => {
   const secret = c.env.OPERATIONS_DEPLOYMENT_SIGNING_SECRET;
   if (!secret || secret.length < 32) {
     return c.json({ success: false, error: 'Deployment event receiver is not configured' }, 503);
@@ -895,7 +896,7 @@ operations.post('/api/internal/deployments/events', async (c) => {
   }
   let body: Record<string, unknown>;
   try { body = JSON.parse(rawBody) as Record<string, unknown>; } catch {
-    return c.json({ success: false, error: 'Invalid JSON' }, 400);
+    return inputError(c, { success: false, error: 'Invalid JSON' }, 400, []);
   }
   const phases = ['queued', 'deploying', 'verifying', 'succeeded', 'failed', 'rolled_back'] as const;
   if (
@@ -905,7 +906,7 @@ operations.post('/api/internal/deployments/events', async (c) => {
     || typeof body.occurredAt !== 'string' || !Number.isFinite(Date.parse(body.occurredAt))
     || typeof body.phase !== 'string' || !phases.includes(body.phase as typeof phases[number])
   ) {
-    return c.json({ success: false, error: 'Invalid deployment event' }, 400);
+    return inputError(c, { success: false, error: 'Invalid deployment event' }, 400, ["deploymentId","environment","actor","occurredAt","phase"]);
   }
   const migrations = Array.isArray(body.migrations)
     ? body.migrations.filter((value): value is string => typeof value === 'string').slice(0, 100)

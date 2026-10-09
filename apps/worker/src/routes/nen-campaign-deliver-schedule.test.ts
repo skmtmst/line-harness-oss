@@ -75,9 +75,9 @@ describe('コラムの配信予約（POST /columns/:id/deliver）', () => {
       scheduledAt: '2020-01-01T00:00:00+09:00',
     });
     expect(res.status).toBe(400);
-    const body = await res.json() as { success: boolean; error: string };
+    const body = await res.json() as { success: boolean; error: string; code: string };
     expect(body.success).toBe(false);
-    expect(body.error).toBe('past_datetime');
+    expect(body.code).toBe('past_datetime');
     expect(mocks.queueColumnDelivery).not.toHaveBeenCalled();
   });
 
@@ -87,8 +87,8 @@ describe('コラムの配信予約（POST /columns/:id/deliver）', () => {
       scheduledAt: 'not-a-date',
     });
     expect(res.status).toBe(400);
-    const body = await res.json() as { success: boolean; error: string };
-    expect(body.error).toBe('scheduled_at_invalid');
+    const body = await res.json() as { success: boolean; error: string; code: string };
+    expect(body.code).toBe('scheduled_at_invalid');
     expect(mocks.queueColumnDelivery).not.toHaveBeenCalled();
   });
 
@@ -124,8 +124,8 @@ describe('コラムの新規作成（POST /columns）', () => {
       scheduledAt: '2020-01-01T00:00:00+09:00',
     }));
     expect(res.status).toBe(400);
-    const body = await res.json() as { success: boolean; error: string };
-    expect(body.error).toBe('past_datetime');
+    const body = await res.json() as { success: boolean; error: string; code: string };
+    expect(body.code).toBe('past_datetime');
     expect(mocks.prepare).not.toHaveBeenCalled();
     expect(mocks.queueColumnDelivery).not.toHaveBeenCalled();
   });
@@ -135,8 +135,8 @@ describe('コラムの新規作成（POST /columns）', () => {
       scheduledAt: 'not-a-date',
     }));
     expect(res.status).toBe(400);
-    const body = await res.json() as { success: boolean; error: string };
-    expect(body.error).toBe('scheduled_at_invalid');
+    const body = await res.json() as { success: boolean; error: string; code: string };
+    expect(body.code).toBe('scheduled_at_invalid');
     expect(mocks.prepare).not.toHaveBeenCalled();
   });
 

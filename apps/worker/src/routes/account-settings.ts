@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
   getLinkBaseUrl,
@@ -113,17 +114,17 @@ accountSettings.get('/api/account-settings/test-recipient-login-users', async (c
 });
 
 // PUT /api/account-settings/test-recipients
-accountSettings.put('/api/account-settings/test-recipients', requireRole('owner', 'admin'), async (c) => {
+accountSettings.put('/api/account-settings/test-recipients', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"friendIds":["array"]}), async (c) => {
   const body = await c.req.json<{ accountId: string; friendIds: string[] }>();
-  if (!body.accountId) return c.json({ success: false, error: 'accountId required' }, 400);
+  if (!body.accountId) return inputError(c, { success: false, error: 'accountId required' }, 400, ["accountId"]);
   if (!Array.isArray(body.friendIds)) {
-    return c.json({ success: false, error: 'friendIds must be an array' }, 400);
+    return inputError(c, { success: false, error: 'friendIds must be an array' }, 400, ["friendIds"]);
   }
   if (body.friendIds.length > MAX_TEST_RECIPIENTS) {
-    return c.json({ success: false, error: `friendIds must contain at most ${MAX_TEST_RECIPIENTS} items` }, 400);
+    return inputError(c, { success: false, error: `friendIds must contain at most ${MAX_TEST_RECIPIENTS} items` }, 400, ["friendIds"]);
   }
   if (body.friendIds.some((friendId) => typeof friendId !== 'string' || friendId.length === 0)) {
-    return c.json({ success: false, error: 'friendIds must contain non-empty strings' }, 400);
+    return inputError(c, { success: false, error: 'friendIds must contain non-empty strings' }, 400, ["friendIds"]);
   }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: 'Forbidden' }, 403);
@@ -136,7 +137,7 @@ accountSettings.put('/api/account-settings/test-recipients', requireRole('owner'
       `SELECT id FROM friends WHERE line_account_id = ? AND id IN (${placeholders})`
     ).bind(body.accountId, ...uniqueFriendIds).all<{ id: string }>();
     if (matchingFriends.results.length !== uniqueFriendIds.length) {
-      return c.json({ success: false, error: 'One or more friendIds are invalid for this account' }, 400);
+      return inputError(c, { success: false, error: 'One or more friendIds are invalid for this account' }, 400, ["accountId","friendIds"]);
     }
   }
 
@@ -173,7 +174,7 @@ accountSettings.get('/api/account-settings/link-base-url', async (c) => {
  * - Must start with https:// (if non-empty).
  * - Trailing slash is stripped before saving.
  */
-accountSettings.put('/api/account-settings/link-base-url', requireRole('owner'), async (c) => {
+accountSettings.put('/api/account-settings/link-base-url', requireRole('owner'), inputJsonBoundary(), async (c) => {
   const body = await c.req
     .json<{ value?: string }>()
     .catch((): { value?: string } => ({}));
@@ -184,7 +185,7 @@ accountSettings.put('/api/account-settings/link-base-url', requireRole('owner'),
     return c.json({ success: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Validation error';
-    return c.json({ success: false, error: message }, 400);
+    return inputError(c, { success: false, error: message }, 400, ["value"]);
   }
 });
 
@@ -197,7 +198,7 @@ accountSettings.get('/api/account-settings/tracked-link-base-url', async (c) => 
   return c.json({ success: true, data: value });
 });
 
-accountSettings.put('/api/account-settings/tracked-link-base-url', requireRole('owner'), async (c) => {
+accountSettings.put('/api/account-settings/tracked-link-base-url', requireRole('owner'), inputJsonBoundary(), async (c) => {
   const body = await c.req
     .json<{ value?: string }>()
     .catch((): { value?: string } => ({}));
@@ -208,7 +209,7 @@ accountSettings.put('/api/account-settings/tracked-link-base-url', requireRole('
     return c.json({ success: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Validation error';
-    return c.json({ success: false, error: message }, 400);
+    return inputError(c, { success: false, error: message }, 400, ["value"]);
   }
 });
 

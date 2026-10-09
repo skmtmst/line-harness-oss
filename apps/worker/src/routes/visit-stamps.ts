@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { bodyLimit } from 'hono/body-limit';
 import { featureJobCanRun } from '../services/feature-enforcement.js';
 import { Hono, type Context } from 'hono';
@@ -11,7 +12,7 @@ import { StampError, stampId, stampCard, readStampCard, saveStampCard, stampWall
   setStampPin, offerStampReward, useStampReward, requestPaperStamps, applyPaperStamps, getStampVisit, reconcileStampVisit, stampCardLocked } from '../services/visit-stamps.js';
 
 export const visitStamps=new Hono<Env>();
-visitStamps.onError((e,c)=>c.json({success:false,error:e instanceof StampError?e.message:'スタンプの処理を確認できません'},e instanceof StampError?e.status:500));
+visitStamps.onError((e,c)=>inputError(c, {success:false,...(e instanceof StampError && (e.status === 400 || e.status === 422) ? {fields:e.fields} : {}),error:e instanceof StampError?e.message:'スタンプの処理を確認できません'},e instanceof StampError?e.status:500));
 const tenant=(c:Context<Env>)=>{const t=c.get('staff')?.tenantId;if(!t)throw new StampError('ログインが必要です',401);return t;};
 async function account(c:Context<Env>,id:unknown) {
   const a=stampId(id);const db=dbFor(c.env),row=await db.prepare('SELECT tenant_id FROM line_accounts WHERE id=?').bind(a).first<{tenant_id:string}>();
@@ -39,13 +40,13 @@ visitStamps.get('/api/visit-stamps/cards',async c=>{
   const data=[];for(const r of rows)data.push(await readStampCard(dbFor(c.env),await stampCard(dbFor(c.env),r.id,tenant(c))));
   return c.json({success:true,data});
 });
-visitStamps.post('/api/visit-stamps/cards',requireRole('owner','admin'),async c=>{
+visitStamps.post('/api/visit-stamps/cards',requireRole('owner','admin'),inputJsonBoundary(), async c=>{
   const input=await body(c) as unknown as VisitStampCardInput;
   await backgroundImage(c,input);
   if(!Array.isArray(input.accountIds))throw new StampError('押せる店舗を選んでください');for(const a of input.accountIds)await account(c,a);
   return c.json({success:true,data:await saveStampCard(dbFor(c.env),tenant(c),input)},201);
 });
-visitStamps.put('/api/visit-stamps/cards/:id',requireRole('owner','admin'),async c=>{
+visitStamps.put('/api/visit-stamps/cards/:id',requireRole('owner','admin'),inputJsonBoundary(), async c=>{
   const db=dbFor(c.env),old=await readStampCard(db,await stampCard(db,c.req.param('id'),tenant(c))),input=await body(c) as unknown as VisitStampCardInput;
   await backgroundImage(c,input);
   if(!Array.isArray(input.accountIds))throw new StampError('押せる店舗を選んでください');for(const a of [...old.accountIds,...input.accountIds])await account(c,a);
@@ -55,16 +56,16 @@ visitStamps.get('/api/visit-stamps/cards/:id/wallet',async c=>{
   const a=await account(c,c.req.query('accountId')),db=dbFor(c.env);await stampCard(db,c.req.param('id'),tenant(c));const friend=stampId(c.req.query('friendId'));
   const wallet=await stampWallet(db,c.req.param('id'),friend,a);return c.json({success:true,data:{wallet,entries:await stampEntries(db,c.req.param('id'),wallet.friendId)}});
 });
-visitStamps.post('/api/visit-stamps/cards/:id/grants',requireRole('owner','admin','staff'),async c=>{
+visitStamps.post('/api/visit-stamps/cards/:id/grants',requireRole('owner','admin','staff'),inputJsonBoundary(), async c=>{
   const b=await body(c),a=await account(c,b.accountId),db=dbFor(c.env);await stampCard(db,c.req.param('id'),tenant(c));
   return c.json({success:true,data:await grantStamps(db,{cardId:c.req.param('id'),friendId:stampId(b.friendId),accountId:a,count:b.count as number,reason:b.reason as string,actorId:c.get('staff')!.id,requestId:stampId(b.requestId),kind:b.source==='paper'?'paper':'manual'})});
 });
-visitStamps.post('/api/visit-stamps/entries/:id/reverse',requireRole('owner','admin'),async c=>{
+visitStamps.post('/api/visit-stamps/entries/:id/reverse',requireRole('owner','admin'),inputJsonBoundary(), async c=>{
   const b=await body(c),db=dbFor(c.env),entry=await db.prepare('SELECT line_account_id FROM visit_stamp_entries WHERE id=?').bind(c.req.param('id')).first<{line_account_id:string}>();
   if(!entry)throw new StampError('記録が見つかりません',404);await account(c,entry.line_account_id);
   return c.json({success:true,data:await reverseStampEntry(db,c.req.param('id'),tenant(c),c.get('staff')!.id,b.reason as string)});
 });
-visitStamps.put('/api/visit-stamps/pins/:staffId',requireRole('owner','admin'),async c=>{
+visitStamps.put('/api/visit-stamps/pins/:staffId',requireRole('owner','admin'),inputJsonBoundary(), async c=>{
   const b=await body(c),a=await account(c,b.accountId),db=dbFor(c.env),member=await getStaffById(db,stampId(c.req.param('staffId')));
   if(!member||!member.is_active||member.tenant_id!==tenant(c)||member.access_level==='read_only'||!(await getVisibleLineAccountScope(db,{
     id:member.id,name:member.name,role:member.role,tenantId:member.tenant_id,readOnly:false,accountScope:member.account_scope??'all',
@@ -75,13 +76,13 @@ visitStamps.get('/api/visit-stamps/paper-requests',async c=>{
   const a=await account(c,c.req.query('accountId'));
   return c.json({success:true,data:(await dbFor(c.env).prepare('SELECT * FROM visit_stamp_paper_requests WHERE line_account_id=? ORDER BY created_at DESC LIMIT 200').bind(a).all()).results});
 });
-visitStamps.post('/api/visit-stamps/paper-requests/:id/review',requireRole('owner','admin','staff'),async c=>{
+visitStamps.post('/api/visit-stamps/paper-requests/:id/review',requireRole('owner','admin','staff'),inputJsonBoundary(), async c=>{
   const b=await body(c),db=dbFor(c.env),r=await db.prepare('SELECT line_account_id FROM visit_stamp_paper_requests WHERE id=?').bind(c.req.param('id')).first<{line_account_id:string}>();
   if(!r)throw new StampError('申請が見つかりません',404);await account(c,r.line_account_id);
   if(!['approve','reject'].includes(b.action as string))throw new StampError('承認か却下を選んでください');
   return c.json({success:true,data:await applyPaperStamps(db,c.req.param('id'),tenant(c),c.get('staff')!.id,b.action==='approve',b.reason as string)});
 });
-visitStamps.post('/api/visit-stamps/visits/:kind/:id/checkout',requireRole('owner','admin','staff'),async c=>{
+visitStamps.post('/api/visit-stamps/visits/:kind/:id/checkout',requireRole('owner','admin','staff'),inputJsonBoundary(), async c=>{
   const b=await body(c),kind=c.req.param('kind') as 'restaurant'|'booking',db=dbFor(c.env),visit=await getStampVisit(db,kind,c.req.param('id'));
   if(!visit)throw new StampError('来店が見つかりません',404);await account(c,visit.account_id);if(!visit.visited)throw new StampError('来店済みの記録だけ会計できます',409);
   if(!Number.isSafeInteger(b.amount)||(b.amount as number)<0||(b.amount as number)>100000000)throw new StampError('会計金額を確認してください');
@@ -113,15 +114,15 @@ visitStamps.get('/api/liff/visit-stamps/cards/:id',async c=>{
   const x=await customer(c),card=await stampCard(x.db,c.req.param('id'),x.tenantId),wallet=await stampWallet(x.db,card.id,x.friendId,x.a);
   return c.json({success:true,data:{card:await readStampCard(x.db,card),wallet,entries:await stampEntries(x.db,card.id,wallet.friendId)}});
 });
-visitStamps.post('/api/liff/visit-stamps/cards/:id/rewards',async c=>{
+visitStamps.post('/api/liff/visit-stamps/cards/:id/rewards',inputJsonBoundary(), async c=>{
   const x=await customer(c),b=await body(c);await stampCard(x.db,c.req.param('id'),x.tenantId);
   return c.json({success:true,data:await offerStampReward(x.db,c.req.param('id'),x.friendId,x.a,stampId(b.rewardId),stampId(b.requestId))},201);
 });
-visitStamps.post('/api/liff/visit-stamps/redemptions/:id/use',async c=>{
+visitStamps.post('/api/liff/visit-stamps/redemptions/:id/use',inputJsonBoundary(), async c=>{
   const x=await customer(c),b=await body(c);
   return c.json({success:true,data:await useStampReward(x.db,c.req.param('id'),x.friendId,x.a,null,b.pin as string)});
 });
-visitStamps.post('/api/liff/visit-stamps/cards/:id/paper-requests',async c=>{
+visitStamps.post('/api/liff/visit-stamps/cards/:id/paper-requests',inputJsonBoundary(), async c=>{
   const x=await customer(c),b=await body(c) as unknown as VisitStampPaperInput;await stampCard(x.db,c.req.param('id'),x.tenantId);
   if(typeof b.photoUrl!=='string'||!b.photoUrl.startsWith(new URL('/api/liff/visit-stamps/paper-photos/',c.req.url).href)||!await x.db.prepare('SELECT id FROM visit_stamp_paper_photos WHERE friend_id=? AND line_account_id=? AND card_id=? AND id=?').bind(x.friendId,x.a,c.req.param('id'),b.photoUrl.split('/').at(-1)?.split('?')[0]??'').first())throw new StampError('本人が預けた写真を指定してください',403);
   return c.json({success:true,data:await requestPaperStamps(x.db,c.req.param('id'),x.friendId,x.a,b.photoUrl,b.stamps)},201);
@@ -149,7 +150,7 @@ visitStamps.get('/api/liff/visit-stamps/cards/:id/paper-requests',async c=>{
  return c.json({success:true,data:rows});
 });
 const PHOTO_LIMIT=5*1024*1024;
-visitStamps.post('/api/liff/visit-stamps/cards/:id/paper-photos',bodyLimit({maxSize:PHOTO_LIMIT+65536,onError:c=>c.json({success:false,error:'写真は5MBまでです'},413)}),async c=>{
+visitStamps.post('/api/liff/visit-stamps/cards/:id/paper-photos',bodyLimit({maxSize:PHOTO_LIMIT+65536,onError:c=>c.json({success:false,error:'写真は5MBまでです'},413)}),inputJsonBoundary(), async c=>{
  const x=await customer(c),card=c.req.param('id');await stampCard(x.db,card,x.tenantId);await stampWallet(x.db,card,x.friendId,x.a);
  const form=await c.req.formData().catch(()=>null);if(!form)throw new StampError('写真を選んでください');const file:unknown=form.get('file');
  if(file instanceof File&&file.size>PHOTO_LIMIT)return c.json({success:false,error:'写真は5MBまでです'},413);

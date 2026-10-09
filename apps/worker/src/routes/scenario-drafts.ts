@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { ScenarioDraft, ScenarioDraftInput } from '@line-crm/shared';
@@ -34,7 +35,7 @@ const serialize = (r: DraftRow): ScenarioDraft => ({
 async function access(c: Context<Env>): Promise<string | Response> {
   const accountId = c.req.query('lineAccountId');
   if (!accountId || !/^[^\x00-\x1f]{1,200}$/.test(c.req.param('key') ?? ''))
-    return c.json({ success: false, error: 'invalid_key_or_account' }, 400);
+    return inputError(c, { success: false, error: 'invalid_key_or_account' }, 400, ["lineAccountId"]);
   if (!(await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])))
     return c.json({ success: false, error: 'not_found' }, 404);
   c.header('Cache-Control', 'no-store');
@@ -67,7 +68,7 @@ scenarioDrafts.get('/api/scenario-drafts/:key', async (c) => {
 scenarioDrafts.put(
   '/api/scenario-drafts/:key',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary({"expectedVersion":["string","number"],"content":["object"],"scenarioId":["null","string"],"stepId":["null","string"]}), async (c) => {
     const account = await access(c);
     if (account instanceof Response) return account;
     const b = await c.req.json<ScenarioDraftInput>().catch(() => null);
@@ -81,7 +82,7 @@ scenarioDrafts.put(
       (b.stepId != null && typeof b.stepId !== 'string') ||
       (b.stepId && !b.scenarioId)
     )
-      return c.json({ success: false, error: 'invalid_draft' }, 400);
+      return inputError(c, { success: false, error: 'invalid_draft' }, 400, ["expectedVersion","content","scenarioId","stepId"]);
     const content = JSON.stringify(b.content);
     if (new TextEncoder().encode(content).length > 262144)
       return c.json({ success: false, error: 'draft_too_large' }, 413);

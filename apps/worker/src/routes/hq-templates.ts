@@ -1,3 +1,4 @@
+import { folderInputError, inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { swapHqFolderOrder, HqFolderError } from '@line-crm/db';
 import { isFriendAttributeType, preflightFriendAttribute, distributeFriendAttribute, friendAttributeResult } from '../services/hq-templates/friend-attribute-distribution.js';
 import { TEMPLATE_KINDS, type TemplateKindCounts, type TemplateKind } from '@line-crm/shared';
@@ -53,7 +54,7 @@ async function body(c: { req: { text(): Promise<string> } }): Promise<Record<str
 }
 hqTemplates.onError((error, c) => {
   const typed = error instanceof HqTemplateError, code = typed ? error.code : 'UNAVAILABLE';
-  return c.json({ success: false, code, error: reasons[code] ?? (typed && error.status < 500 ? '入力内容を確認してください' : '処理結果を確認できません。再確認してください') }, typed ? error.status : 500);
+  return inputError(c, { success: false, code, ...(typed && (error.status === 400 || error.status === 422) ? { fields: error.fields } : {}), error: reasons[code] ?? (typed && error.status < 500 ? '入力内容を確認してください' : '処理結果を確認できません。再確認してください') }, typed ? error.status : 500);
 });
 // The route-local boundary also protects direct route mounting in tests/other apps.
 hqTemplates.use('/api/hq/templates/*', requireRole('owner', 'admin'), async (c, next) => {
@@ -61,10 +62,10 @@ hqTemplates.use('/api/hq/templates/*', requireRole('owner', 'admin'), async (c, 
   catch (error) {
     const typed = error instanceof HqTemplateError;
     const code = typed ? error.code : 'UNAVAILABLE';
-    return c.json({ success: false, error: reasons[code] ?? (typed && error.status < 500 ? '入力内容を確認してください' : '処理結果を確認できません。しばらくしてから再確認してください'), code }, typed ? error.status : 500);
+    return inputError(c, { success: false, ...(typed && (error.status === 400 || error.status === 422) ? { fields: error.fields } : {}), error: reasons[code] ?? (typed && error.status < 500 ? '入力内容を確認してください' : '処理結果を確認できません。しばらくしてから再確認してください'), code }, typed ? error.status : 500);
   }
 });
-hqTemplates.post('/api/hq/templates/media', async c => {
+hqTemplates.post('/api/hq/templates/media', inputJsonBoundary(), async c => {
   const auth = await authority(c);
   try {
     const data = c.req.query('purpose')==='rich_message'
@@ -120,25 +121,25 @@ hqTemplates.get('/api/hq/templates/attribute-kind-counts',async c=>{
  const rows=await listTemplates(dbFor(c.env),await authority(c));
  return c.json({success:true,data:{tag:rows.filter(r=>r.template_type==='tag').length,friend_field:rows.filter(r=>r.template_type==='friend_field').length,support_mark:rows.filter(r=>r.template_type==='mark').length}});
 });
-hqTemplates.post('/api/hq/templates/folders/:id/swap-order',async c=>{
+hqTemplates.post('/api/hq/templates/folders/:id/swap-order',inputJsonBoundary({withId:['string'],expectedRevision:['number'],withExpectedRevision:['number']}),async c=>{
  const a=await authority(c),b=await body(c);
  try {return c.json({success:true,data:await swapHqFolderOrder(dbFor(c.env),'hq_template_folders',a.tenantId,c.req.param('id'),b as unknown as Parameters<typeof swapHqFolderOrder>[4])});}
- catch(e) {if(e instanceof HqFolderError)return c.json({success:false,error:e.code},e.status);throw e;}
+ catch(e) {if(e instanceof HqFolderError)return folderInputError(c, e);throw e;}
 });
 hqTemplates.get('/api/hq/templates/folders', async c => c.json({ success:true, data:await listTemplateFolders(dbFor(c.env),await authority(c)) }));
-hqTemplates.post('/api/hq/templates/folders', async c => c.json({ success:true, data:await saveTemplateFolder(dbFor(c.env),await authority(c),await body(c)) },201));
-hqTemplates.patch('/api/hq/templates/folders/:id', async c => c.json({ success:true, data:await saveTemplateFolder(dbFor(c.env),await authority(c),await body(c),c.req.param('id')) }));
+hqTemplates.post('/api/hq/templates/folders', inputJsonBoundary({ name: ['string'], color: ['string', 'null'] }), async c => c.json({ success:true, data:await saveTemplateFolder(dbFor(c.env),await authority(c),await body(c)) },201));
+hqTemplates.patch('/api/hq/templates/folders/:id', inputJsonBoundary({ name: ['string'], color: ['string', 'null'] }), async c => c.json({ success:true, data:await saveTemplateFolder(dbFor(c.env),await authority(c),await body(c),c.req.param('id')) }));
 hqTemplates.delete('/api/hq/templates/folders/:id', async c => c.json({ success:true, data:await deleteTemplateFolder(dbFor(c.env),await authority(c),c.req.param('id'),(await body(c)).expectedRevision) }));
-hqTemplates.post('/api/hq/templates/:id/duplicate', async c => c.json({ success:true, data:await duplicateTemplate(dbFor(c.env),await authority(c),c.req.param('id'),await body(c)) },201));
+hqTemplates.post('/api/hq/templates/:id/duplicate', inputJsonBoundary(), async c => c.json({ success:true, data:await duplicateTemplate(dbFor(c.env),await authority(c),c.req.param('id'),await body(c)) },201));
 hqTemplates.get('/api/hq/templates/:id/versions',async c=>c.json({success:true,data:await templateVersions(dbFor(c.env),await authority(c),c.req.param('id'))}));
 hqTemplates.get('/api/hq/templates/:id/versions/compare',async c=>c.json({success:true,data:await compareTemplateVersions(dbFor(c.env),await authority(c),c.req.param('id'),Number(c.req.query('from')),Number(c.req.query('to')))}));
-hqTemplates.post('/api/hq/templates/:id/versions/:version/restore',async c=>{
+hqTemplates.post('/api/hq/templates/:id/versions/:version/restore',inputJsonBoundary(), async c=>{
   const input=await body(c),data=await restoreTemplateVersion(dbFor(c.env),await authority(c),c.req.param('id'),Number(c.req.param('version')),input.expectedRevision);
   c.set('auditRecorded',true);return c.json({success:true,data});
 });
 hqTemplates.get('/api/hq/templates/:id/received-versions',async c=>c.json({success:true,data:await templateReceivedVersions(dbFor(c.env),await authority(c),c.req.param('id'))}));
 hqTemplates.get('/api/hq/templates/:id', async c => c.json({ success: true, data: await templateDetail(dbFor(c.env), await authority(c), c.req.param('id')) }));
-hqTemplates.post('/api/hq/templates', async c => {
+hqTemplates.post('/api/hq/templates', inputJsonBoundary(), async c => {
   const auth = await authority(c), input = await body(c), headerKey = c.req.header('Idempotency-Key');
   if (headerKey !== undefined && input.requestId !== undefined && headerKey !== input.requestId) throw new HqTemplateError('INVALID_REQUEST_ID');
   input.requestId = templateCreationRequestId(headerKey ?? input.requestId);
@@ -146,7 +147,7 @@ hqTemplates.post('/api/hq/templates', async c => {
   c.set('auditRecorded', true);
   return c.json({ success: true, data }, 201);
 });
-hqTemplates.patch('/api/hq/templates/:id', async c => {
+hqTemplates.patch('/api/hq/templates/:id', inputJsonBoundary(), async c => {
   const data = await saveTemplate(dbFor(c.env), await authority(c), await body(c), c.req.param('id'));
   c.set('auditRecorded', true); return c.json({ success: true, data });
 });
@@ -155,7 +156,7 @@ hqTemplates.delete('/api/hq/templates/:id', async c => {
   const data = await deleteTemplate(dbFor(c.env), await authority(c), c.req.param('id'), input.expectedRevision);
   c.set('auditRecorded', true); return c.json({ success: true, data });
 });
-hqTemplates.post('/api/hq/templates/:id/preflight', async c => {
+hqTemplates.post('/api/hq/templates/:id/preflight', inputJsonBoundary(), async c => {
   const input = await body(c);
   if (!Array.isArray(input.accountIds) || input.accountIds.some(v => typeof v !== 'string')) throw new HqTemplateError('INVALID_ACCOUNTS');
   const auth=await authority(c),db=dbFor(c.env),{template}=await templateDetail(db,auth,c.req.param('id'));
@@ -165,7 +166,7 @@ hqTemplates.post('/api/hq/templates/:id/preflight', async c => {
   }
   return c.json({ success: true, data: await preflightDistribution(dbFor(c.env), await authority(c), c.req.param('id'), input.accountIds as string[], c.env.IMAGES, input.textOverrides) });
 });
-hqTemplates.post('/api/hq/templates/:id/distribute', async c => {
+hqTemplates.post('/api/hq/templates/:id/distribute', inputJsonBoundary(), async c => {
   const input = await body(c);
   const auth=await authority(c),db=dbFor(c.env),{template}=await templateDetail(db,auth,c.req.param('id'));
   const modes=isFriendAttributeType(template.template_type)?['create','overwrite','alias','skip']:['create','overwrite','alias'];

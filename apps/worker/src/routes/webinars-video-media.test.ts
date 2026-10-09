@@ -139,21 +139,21 @@ describe('ウェビナー動画のメディア選択 (N-115)', () => {
   test('動画でないメディアは拒否する', async () => {
     const res = await put(WEBINAR_A, KEY_OWNER, { videoMediaId: MEDIA_IMAGE_A });
     expect(res.status).toBe(400);
-    expect((await res.json() as { error: string }).error).toBe('video_media_not_video');
+    expect((await res.json() as { error: string; code: string }).code).toBe('video_media_not_video');
     expect(savedPrefix(WEBINAR_A)).toBeNull();
   });
 
   test('別アカウントのメディアは選べない', async () => {
     const res = await put(WEBINAR_A, KEY_OWNER, { videoMediaId: MEDIA_VIDEO_B });
     expect(res.status).toBe(400);
-    expect((await res.json() as { error: string }).error).toBe('video_media_not_found');
+    expect((await res.json() as { error: string; code: string }).code).toBe('video_media_not_found');
     expect(savedPrefix(WEBINAR_A)).toBeNull();
   });
 
   test('存在しないメディアIDは拒否する', async () => {
     const res = await put(WEBINAR_A, KEY_OWNER, { videoMediaId: 'missing-media' });
     expect(res.status).toBe(400);
-    expect((await res.json() as { error: string }).error).toBe('video_media_not_found');
+    expect((await res.json() as { error: string; code: string }).code).toBe('video_media_not_found');
   });
 
   test('videoMediaIdとvideoPrefixの同時指定は拒否する', async () => {
@@ -162,7 +162,7 @@ describe('ウェビナー動画のメディア選択 (N-115)', () => {
       videoPrefix: 'hand-written/prefix',
     });
     expect(res.status).toBe(400);
-    expect((await res.json() as { error: string }).error).toBe('ambiguous_video_source');
+    expect((await res.json() as { error: string; code: string }).code).toBe('ambiguous_video_source');
     expect(savedPrefix(WEBINAR_A)).toBeNull();
   });
 

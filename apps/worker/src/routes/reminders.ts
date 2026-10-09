@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
   getFriendById,
@@ -790,14 +791,14 @@ function versionResponse(row: ReminderVersionRow, fallbackLeapYearPolicy?: 'feb2
  * 経路が /api/reminders/:id より前にあるのは、:id に "reorder" として
  * 吸われるのを避けるため（シナリオと同じ並べ方）。
  */
-reminders.patch('/api/reminders/reorder', requireRole('owner', 'admin'), async (c) => {
+reminders.patch('/api/reminders/reorder', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ ids?: unknown }>();
     if (!Array.isArray(body.ids) || body.ids.some((v) => typeof v !== 'string')) {
-      return c.json({ success: false, error: 'ids must be an array of reminder ids' }, 400);
+      return inputError(c, { success: false, error: 'ids must be an array of reminder ids' }, 400, ["ids"]);
     }
     if (body.ids.length > 500) {
-      return c.json({ success: false, error: 'too many ids' }, 400);
+      return inputError(c, { success: false, error: 'too many ids' }, 400, ["ids"]);
     }
     /*
      * 渡されたidが操作できるアカウントのものか確かめる。範囲外が1件でも
@@ -991,17 +992,17 @@ reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c
 });
 
 /** V6 7-1-B: 定義と初版下書きを一度に作る。 */
-reminders.post('/api/reminders/drafts', requireRole('owner', 'admin'), async (c) => {
+reminders.post('/api/reminders/drafts', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const parsed = readDraftSettings(await c.req.json<unknown>());
-    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, parsed.status === 422 ? 422 : 400);
+    if (!parsed.ok) return inputError(c, { success: false, error: parsed.error }, parsed.status === 422 ? 422 : 400, ["name","triggerType","triggerConfig"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [parsed.value.lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
     const folderError = await validateReminderFolder(c.env.DB, parsed.value.folderId);
-    if (folderError) return c.json({ success: false, error: folderError }, 422);
+    if (folderError) return inputError(c, { success: false, error: folderError }, 422, ["folderId"]);
     const referenceError = await validateReminderDraftReferences(c.env.DB, parsed.value);
-    if (referenceError) return c.json({ success: false, error: referenceError }, 422);
+    if (referenceError) return inputError(c, { success: false, error: referenceError }, 422, ["steps"]);
     // 新規作成で省略された方針は要件の既定 'feb28'。
     parsed.value.leapYearPolicy ??= 'feb28';
     const created = await createReminderWithDraftVersion(c.env.DB, parsed.value);
@@ -1084,18 +1085,18 @@ reminders.get('/api/reminders/:id/draft', async (c) => {
   }
 });
 
-reminders.put('/api/reminders/:id/draft', requireRole('owner', 'admin'), async (c) => {
+reminders.put('/api/reminders/:id/draft', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const rawBody = await c.req.json<unknown>();
     const parsed = readDraftSettings(rawBody);
-    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, parsed.status === 422 ? 422 : 400);
+    if (!parsed.ok) return inputError(c, { success: false, error: parsed.error }, parsed.status === 422 ? 422 : 400, ["name","triggerType","triggerConfig"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [parsed.value.lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
     const folderError = await validateReminderFolder(c.env.DB, parsed.value.folderId);
-    if (folderError) return c.json({ success: false, error: folderError }, 422);
+    if (folderError) return inputError(c, { success: false, error: folderError }, 422, ["folderId"]);
     const referenceError = await validateReminderDraftReferences(c.env.DB, parsed.value);
-    if (referenceError) return c.json({ success: false, error: referenceError }, 422);
+    if (referenceError) return inputError(c, { success: false, error: referenceError }, 422, ["steps"]);
     // N-080: 画面を開いたときの下書き版を送ってもらい、先に別の保存・公開が
     // 走っていたら 409 で止める。古い画面からの上書き保存を防ぐ。
     if (parsed.value.leapYearPolicy === undefined) {
@@ -1135,13 +1136,13 @@ reminders.put('/api/reminders/:id/draft', requireRole('owner', 'admin'), async (
   }
 });
 
-reminders.post('/api/reminders/:id/validate', requireRole('owner', 'admin'), async (c) => {
+reminders.post('/api/reminders/:id/validate', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const draft = await getReminderDraftVersion(c.env.DB, c.req.param('id'));
     if (!draft) return c.json({ success: false, error: '下書きが見つかりません' }, 404);
     const settings = parseReminderVersionSettings(draft);
     const referenceError = await validateReminderDraftReferences(c.env.DB, settings);
-    if (referenceError) return c.json({ success: false, error: referenceError }, 422);
+    if (referenceError) return inputError(c, { success: false, error: referenceError }, 422, ["steps"]);
     return c.json({ success: true, data: await validateReminderDraft(c.env.DB, settings, draft) });
   } catch (err) {
     console.error('POST /api/reminders/:id/validate error:', err);
@@ -1156,7 +1157,7 @@ reminders.post('/api/reminders/:id/validate', requireRole('owner', 'admin'), asy
  * 下書きは触らない。顔ぶれ (先頭20人) も同じ条件・範囲で切る。
  * 権限は検証の口と同じ (owner/admin + この店舗が見えること)。
  */
-reminders.post('/api/reminders/:id/audience', requireRole('owner', 'admin'), async (c) => {
+reminders.post('/api/reminders/:id/audience', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const draft = await getReminderDraftVersion(c.env.DB, c.req.param('id'));
     if (!draft) return c.json({ success: false, error: '下書きが見つかりません' }, 404);
@@ -1176,7 +1177,7 @@ reminders.post('/api/reminders/:id/audience', requireRole('owner', 'admin'), asy
       });
     }
     const checked = readTargetCondition(body.condition);
-    if (!checked.ok) return c.json({ success: false, error: checked.error }, 422);
+    if (!checked.ok) return inputError(c, { success: false, error: checked.error }, 422, ["condition"]);
     const effective: ReminderDraftSettings = { ...settings, targetCondition: checked.value };
     const audience = await countReminderAudience(c.env.DB, effective);
     const sample = await sampleReminderAudience(c.env.DB, effective);
@@ -1190,7 +1191,7 @@ reminders.post('/api/reminders/:id/audience', requireRole('owner', 'admin'), asy
   }
 });
 
-reminders.post('/api/reminders/:id/preview', async (c) => {
+reminders.post('/api/reminders/:id/preview', inputJsonBoundary(), async (c) => {
   try {
     const draft = await getReminderDraftVersion(c.env.DB, c.req.param('id'));
     if (!draft) return c.json({ success: false, error: '下書きが見つかりません' }, 404);
@@ -1205,11 +1206,11 @@ reminders.post('/api/reminders/:id/preview', async (c) => {
       targetDate = new Date(Date.now() + 7 * 86_400_000);
     } else {
       if (typeof body.targetDate !== 'string') {
-        return c.json({ success: false, error: '基準日を指定してください' }, 400);
+        return inputError(c, { success: false, error: '基準日を指定してください' }, 400, ["targetDate"]);
       }
       targetDate = new Date(body.targetDate);
       if (Number.isNaN(targetDate.getTime())) {
-        return c.json({ success: false, error: '基準日が正しくありません' }, 400);
+        return inputError(c, { success: false, error: '基準日が正しくありません' }, 400, ["targetDate"]);
       }
     }
     const settings = parseReminderVersionSettings(draft);
@@ -1248,12 +1249,12 @@ reminders.get('/api/reminders/:id/test-recipient', async (c) => {
   }
 });
 
-reminders.post('/api/reminders/:id/test-send', requireRole('owner', 'admin'), async (c) => {
+reminders.post('/api/reminders/:id/test-send', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const draft = await getReminderDraftVersion(c.env.DB, c.req.param('id'));
   if (!draft) return c.json({ success: false, error: '下書きが見つかりません' }, 404);
   const requestKey = c.req.header('Idempotency-Key')?.trim();
   if (!isValidIdempotencyKey(requestKey)) {
-    return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+    return inputError(c, { success: false, error: '有効なIdempotency-Keyが必要です' }, 400, []);
   }
   try {
     const settings = parseReminderVersionSettings(draft);
@@ -1261,7 +1262,7 @@ reminders.post('/api/reminders/:id/test-send', requireRole('owner', 'admin'), as
       return c.json({ success: false, error: 'Reminder not found' }, 404);
     }
     const referenceError = await validateReminderDraftReferences(c.env.DB, settings);
-    if (referenceError) return c.json({ success: false, error: referenceError }, 422);
+    if (referenceError) return inputError(c, { success: false, error: referenceError }, 422, ["steps"]);
     const result = await testReminderDraft(c.env.DB, draft, settings, requestKey, {
       staffId: c.get('staff')?.id,
     });
@@ -1278,21 +1279,21 @@ reminders.post('/api/reminders/:id/test-send', requireRole('owner', 'admin'), as
     const code = err instanceof Error ? err.message : '';
     if (code === 'REMINDER_TEST_RECIPIENT_NOT_CONFIGURED') {
       // 未設定と「設定済みだが届けられない」を分けて返す（画面の導線が違う）。
-      return c.json({
+      return inputError(c, {
         success: false,
         error: 'テスト送信先を設定してください',
         code: 'TEST_RECIPIENT_NOT_CONFIGURED',
-      }, 422);
+      }, 422, []);
     }
     if (code === 'REMINDER_TEST_RECIPIENT_NOT_AVAILABLE') {
-      return c.json({
+      return inputError(c, {
         success: false,
         error: '設定済みのテスト送信先がこのアカウントで利用できません',
         code: 'TEST_RECIPIENT_NOT_AVAILABLE',
-      }, 422);
+      }, 422, []);
     }
     if (code === 'REMINDER_TEST_STEP_NOT_FOUND') {
-      return c.json({ success: false, error: '送る内容を1件以上設定してください' }, 422);
+      return inputError(c, { success: false, error: '送る内容を1件以上設定してください' }, 422, []);
     }
     if (code === 'REMINDER_TEST_KEY_CONFLICT') {
       return c.json({ success: false, error: '同じキーが別のテスト送信に使われています' }, 409);
@@ -1302,17 +1303,17 @@ reminders.post('/api/reminders/:id/test-send', requireRole('owner', 'admin'), as
   }
 });
 
-reminders.post('/api/reminders/:id/publish', requireRole('owner', 'admin'), async (c) => {
+reminders.post('/api/reminders/:id/publish', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const reminderId = c.req.param('id');
     const draft = await getReminderDraftVersion(c.env.DB, reminderId);
     if (!draft) return c.json({ success: false, error: '下書きが見つかりません' }, 404);
     const settings = parseReminderVersionSettings(draft);
     const referenceError = await validateReminderDraftReferences(c.env.DB, settings);
-    if (referenceError) return c.json({ success: false, error: referenceError }, 422);
+    if (referenceError) return inputError(c, { success: false, error: referenceError }, 422, ["steps"]);
     const validation = await validateReminderDraft(c.env.DB, settings, draft);
     if (!validation.valid) {
-      return c.json({ success: false, error: '公開前の確認が完了していません', data: validation }, 422);
+      return inputError(c, { success: false, error: '公開前の確認が完了していません', data: validation }, 422, []);
     }
     const published = await publishReminderDraftVersion(c.env.DB, reminderId, c.get('staff').id);
     return c.json({ success: true, data: versionResponse(published) });
@@ -1440,7 +1441,7 @@ reminders.get('/api/reminders/:id/runs', async (c) => {
   }
 });
 
-reminders.post('/api/reminders', requireRole('owner', 'admin'), async (c) => {
+reminders.post('/api/reminders', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"description":["string"],"lineAccountId":["null","string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       name: string;
@@ -1449,25 +1450,25 @@ reminders.post('/api/reminders', requireRole('owner', 'admin'), async (c) => {
     } & Record<string, unknown>>();
     // N-078: 下書き保存と同じ規則で、前後空白を落としてから上限を数える。
     const name = typeof body.name === 'string' ? body.name.trim() : '';
-    if (!name) return c.json({ success: false, error: 'name is required' }, 400);
+    if (!name) return inputError(c, { success: false, error: 'name is required' }, 400, ["name"]);
     if (name.length > REMINDER_NAME_MAX_LENGTH) {
-      return c.json({ success: false, error: REMINDER_NAME_TOO_LONG_MESSAGE }, 422);
+      return inputError(c, { success: false, error: REMINDER_NAME_TOO_LONG_MESSAGE }, 422, ["name"]);
     }
     if (typeof body.lineAccountId !== 'string' || !body.lineAccountId.trim()) {
-      return c.json({ success: false, error: 'LINEアカウントを選んでください' }, 400);
+      return inputError(c, { success: false, error: 'LINEアカウントを選んでください' }, 400, ["lineAccountId"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
     const trigger = readTriggerInput(body);
-    if (!trigger.ok) return c.json({ success: false, error: trigger.error }, 400);
+    if (!trigger.ok) return inputError(c, { success: false, error: trigger.error }, 400, ["triggerType","triggerFieldId","triggerEventId","repeatYearly","leapYearPolicy","deliveryMode","triggerOffsetMinutes","sendAtTime","targetTagId","folderId"]);
     const folderError = await validateReminderFolder(c.env.DB, trigger.value.folderId);
-    if (folderError) return c.json({ success: false, error: folderError }, 422);
+    if (folderError) return inputError(c, { success: false, error: folderError }, 422, ["folderId"]);
     // N-067: Idempotency-Key 付きの登録は二重作成しない。キーなしは従来通り。
     const requestKey = c.req.header('Idempotency-Key')?.trim();
     if (requestKey !== undefined && requestKey !== '') {
       if (!isValidIdempotencyKey(requestKey)) {
-        return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+        return inputError(c, { success: false, error: '有効なIdempotency-Keyが必要です' }, 400, []);
       }
       const result = await createReminderIdempotent(c.env.DB, {
         lineAccountId: body.lineAccountId.trim(),
@@ -1491,12 +1492,12 @@ reminders.post('/api/reminders', requireRole('owner', 'admin'), async (c) => {
   }
 });
 
-reminders.put('/api/reminders/:id', requireRole('owner', 'admin'), async (c) => {
+reminders.put('/api/reminders/:id', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<Record<string, unknown>>();
     const trigger = readTriggerInput(body);
-    if (!trigger.ok) return c.json({ success: false, error: trigger.error }, 400);
+    if (!trigger.ok) return inputError(c, { success: false, error: trigger.error }, 400, ["triggerType","triggerFieldId","triggerEventId","repeatYearly","leapYearPolicy","deliveryMode","triggerOffsetMinutes","sendAtTime","targetTagId","folderId"]);
     /*
      * 送るタイミングの決め方は作成後に変えられない（画面にもそう書いてある）。
      * 変えると登録済みの配信予定がずれるので、変わっているときだけ422で止める。
@@ -1506,18 +1507,18 @@ reminders.put('/api/reminders/:id', requireRole('owner', 'admin'), async (c) => 
       const current = await getReminderById(c.env.DB, id);
       if (!current) return c.json({ success: false, error: 'Not found' }, 404);
       if ((current.trigger_type ?? 'manual') !== trigger.value.triggerType) {
-        return c.json({ success: false, error: '送るタイミングの決め方は作成後に変えられません' }, 422);
+        return inputError(c, { success: false, error: '送るタイミングの決め方は作成後に変えられません' }, 422, ["triggerType","triggerFieldId","triggerEventId","repeatYearly","leapYearPolicy","deliveryMode","triggerOffsetMinutes","sendAtTime","targetTagId","folderId"]);
       }
     }
     const folderError = await validateReminderFolder(c.env.DB, trigger.value.folderId);
-    if (folderError) return c.json({ success: false, error: folderError }, 422);
+    if (folderError) return inputError(c, { success: false, error: folderError }, 422, ["folderId"]);
     // N-078: 名前の更新も作成と同じ上限で止める。画面の maxLength だけでは
     // API を直接叩かれたときに抜ける。
     if (body.name !== undefined) {
       const name = typeof body.name === 'string' ? body.name.trim() : '';
-      if (!name) return c.json({ success: false, error: 'リマインダ名を入力してください' }, 400);
+      if (!name) return inputError(c, { success: false, error: 'リマインダ名を入力してください' }, 400, ["name"]);
       if (name.length > REMINDER_NAME_MAX_LENGTH) {
-        return c.json({ success: false, error: REMINDER_NAME_TOO_LONG_MESSAGE }, 422);
+        return inputError(c, { success: false, error: REMINDER_NAME_TOO_LONG_MESSAGE }, 422, ["name"]);
       }
       body.name = name;
     }
@@ -1553,7 +1554,7 @@ reminders.delete('/api/reminders/:id', requireRole('owner', 'admin'), async (c) 
  * 削除時に取り消した登録・配信予定は戻さない（日時が過ぎた相手へ
  * いきなり送らないため）。消していない行・無い行は 404。
  */
-reminders.post('/api/reminders/:id/restore', requireRole('owner', 'admin'), async (c) => {
+reminders.post('/api/reminders/:id/restore', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const restored = await restoreReminder(c.env.DB, c.req.param('id'));
     if (!restored) {
@@ -1571,7 +1572,7 @@ reminders.post('/api/reminders/:id/restore', requireRole('owner', 'admin'), asyn
 
 // ========== リマインダステップ ==========
 
-reminders.post('/api/reminders/:id/steps', requireRole('owner', 'admin'), async (c) => {
+reminders.post('/api/reminders/:id/steps', requireRole('owner', 'admin'), inputJsonBoundary({"offsetMinutes":["number"],"messageType":["string"],"messageContent":["string"],"offsetDays":["null","number"],"sendAtTime":["null","string"],"templateId":["null","string"]}), async (c) => {
   try {
     const reminderId = c.req.param('id');
     const body = await c.req.json<{
@@ -1583,31 +1584,31 @@ reminders.post('/api/reminders/:id/steps', requireRole('owner', 'admin'), async 
       templateId?: string | null;
     }>();
     if (body.offsetMinutes === undefined || !body.messageType || !body.messageContent) {
-      return c.json({ success: false, error: 'offsetMinutes, messageType, messageContent are required' }, 400);
+      return inputError(c, { success: false, error: 'offsetMinutes, messageType, messageContent are required' }, 400, ["offsetMinutes","messageType","messageContent"]);
     }
     // 下書き側と同じ種類の一覧で検査する。巨大な本文や変な種類をDBへ入れない。
     if (!REMINDER_MESSAGE_TYPES.has(body.messageType)) {
-      return c.json({ success: false, error: `messageType must be one of ${[...REMINDER_MESSAGE_TYPES].join(', ')}` }, 400);
+      return inputError(c, { success: false, error: `messageType must be one of ${[...REMINDER_MESSAGE_TYPES].join(', ')}` }, 400, ["messageType"]);
     }
     if (typeof body.messageContent !== 'string' || !body.messageContent.trim()) {
-      return c.json({ success: false, error: 'messageContent must not be empty' }, 400);
+      return inputError(c, { success: false, error: 'messageContent must not be empty' }, 400, ["messageContent"]);
     }
     if (body.messageContent.length > 5000) {
-      return c.json({ success: false, error: 'messageContent must be at most 5000 characters' }, 400);
+      return inputError(c, { success: false, error: 'messageContent must be at most 5000 characters' }, 400, ["messageContent"]);
     }
     if (
       body.sendAtTime !== undefined &&
       body.sendAtTime !== null &&
       !/^([01]\d|2[0-3]):[0-5]\d$/.test(body.sendAtTime)
     ) {
-      return c.json({ success: false, error: 'sendAtTime must be HH:MM' }, 400);
+      return inputError(c, { success: false, error: 'sendAtTime must be HH:MM' }, 400, ["sendAtTime"]);
     }
     if (
       body.offsetDays !== undefined &&
       body.offsetDays !== null &&
       (!Number.isInteger(body.offsetDays) || Math.abs(body.offsetDays) > 365)
     ) {
-      return c.json({ success: false, error: 'offsetDays must be an integer within +/- 365' }, 400);
+      return inputError(c, { success: false, error: 'offsetDays must be an integer within +/- 365' }, 400, ["offsetDays"]);
     }
     const step = await createReminderStep(c.env.DB, { reminderId, ...body });
     return c.json({
@@ -1645,12 +1646,12 @@ reminders.delete('/api/reminders/:id/steps/:stepId', requireRole('owner', 'admin
 
 // ========== 友だちリマインダ登録 ==========
 
-reminders.post('/api/reminders/:id/enroll/:friendId', requireRole('owner', 'admin', 'staff'), async (c) => {
+reminders.post('/api/reminders/:id/enroll/:friendId', requireRole('owner', 'admin', 'staff'), inputJsonBoundary({"targetDate":["string"]}), async (c) => {
   try {
     const reminderId = c.req.param('id');
     const friendId = c.req.param('friendId');
     const body = await c.req.json<{ targetDate: string }>();
-    if (!body.targetDate) return c.json({ success: false, error: 'targetDate is required' }, 400);
+    if (!body.targetDate) return inputError(c, { success: false, error: 'targetDate is required' }, 400, ["targetDate"]);
     // staff も通す分、担当外アカウントのリマインダ・友だちはここで隠す。
     const reminder = await getReminderById(c.env.DB, reminderId);
     const friend = await getFriendById(c.env.DB, friendId);
@@ -1736,12 +1737,12 @@ reminders.get('/api/reminders/:id/registrants', requireRole('owner', 'admin', 's
 });
 
 /** 基準日を変える。旧日程の未送信だけを止め、送信済み履歴は残す。 */
-reminders.patch('/api/reminders/:id/registrants/:enrollmentId', requireRole('owner', 'admin', 'staff'), async (c) => {
+reminders.patch('/api/reminders/:id/registrants/:enrollmentId', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ targetDate?: unknown; expectedLockVersion?: unknown }>();
     const targetDate = canonicalTargetDate(body.targetDate);
     if (!targetDate || !isNonNegativeInteger(body.expectedLockVersion)) {
-      return c.json({ success: false, error: 'targetDate と expectedLockVersion を正しく指定してください' }, 400);
+      return inputError(c, { success: false, error: 'targetDate と expectedLockVersion を正しく指定してください' }, 400, ["targetDate","expectedLockVersion"]);
     }
     return mutationResponse(c, await moveReminderRegistrantTargetDate(c.env.DB, {
       reminderId: c.req.param('id'),
@@ -1757,11 +1758,11 @@ reminders.patch('/api/reminders/:id/registrants/:enrollmentId', requireRole('own
 });
 
 /** 取消は送信済み履歴を消さず、未送信行だけを止める。 */
-reminders.post('/api/reminders/:id/registrants/:enrollmentId/cancel', requireRole('owner', 'admin', 'staff'), async (c) => {
+reminders.post('/api/reminders/:id/registrants/:enrollmentId/cancel', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ expectedLockVersion?: unknown }>();
     if (!isNonNegativeInteger(body.expectedLockVersion)) {
-      return c.json({ success: false, error: 'expectedLockVersion を正しく指定してください' }, 400);
+      return inputError(c, { success: false, error: 'expectedLockVersion を正しく指定してください' }, 400, ["expectedLockVersion"]);
     }
     return mutationResponse(c, await cancelReminderRegistrant(c.env.DB, {
       reminderId: c.req.param('id'),
@@ -1813,11 +1814,11 @@ async function buildResumeExpectedRuns(
 }
 
 /** 再開は未来の予定を作り直す (buildResumeExpectedRuns)。 */
-reminders.post('/api/reminders/:id/registrants/:enrollmentId/resume', requireRole('owner', 'admin', 'staff'), async (c) => {
+reminders.post('/api/reminders/:id/registrants/:enrollmentId/resume', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ expectedLockVersion?: unknown }>();
     if (!isNonNegativeInteger(body.expectedLockVersion)) {
-      return c.json({ success: false, error: 'expectedLockVersion を正しく指定してください' }, 400);
+      return inputError(c, { success: false, error: 'expectedLockVersion を正しく指定してください' }, 400, ["expectedLockVersion"]);
     }
     const expectedRuns = await buildResumeExpectedRuns(
       c.env.DB,
@@ -1917,7 +1918,7 @@ reminders.delete('/api/friend-reminders/:id', requireRole('owner', 'admin', 'sta
 });
 
 /** 失敗した1通だけを、同じ依頼の二重受付なしで再試行する。 */
-reminders.post('/api/reminder-runs/:runId/retry', requireRole('owner', 'admin'), async (c) => {
+reminders.post('/api/reminder-runs/:runId/retry', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const run = await getReminderDeliveryRunById(c.env.DB, c.req.param('runId'));
     if (!run) return c.json({ success: false, error: '実行結果が見つかりません' }, 404);
@@ -1942,7 +1943,7 @@ reminders.post('/api/reminder-runs/:runId/retry', requireRole('owner', 'admin'),
 
     const requestKey = c.req.header('Idempotency-Key');
     if (!isValidIdempotencyKey(requestKey)) {
-      return c.json({ success: false, error: '再試行キーが必要です' }, 400);
+      return inputError(c, { success: false, error: '再試行キーが必要です' }, 400, []);
     }
     const retried = await retryReminderDeliveryRun(c.env.DB, {
       id: run.id,

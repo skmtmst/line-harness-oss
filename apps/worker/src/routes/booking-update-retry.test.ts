@@ -354,7 +354,7 @@ describe('PATCH /api/booking/admin/bookings/:id (N-389)', () => {
     const { app, env } = makeApp(db);
     const res = await patchBooking(app, env, 'B1', { customer_note: 'x' });
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ error: 'missing_lock_version' });
+    await expect(res.json()).resolves.toMatchObject({ code: 'missing_lock_version' , fields: expect.any(Object), error: expect.any(String) });
   });
 
   test('他アカウントの予約は404、版が古い予約は409', async () => {
@@ -475,7 +475,7 @@ describe('PATCH /api/booking/admin/bookings/:id (N-389)', () => {
       notification_policy: { day_before: true },
     });
     expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toEqual({ error: 'line_notification_unavailable' });
+    await expect(res.json()).resolves.toMatchObject({ code: 'line_notification_unavailable' , fields: expect.any(Object), error: expect.any(String) });
   });
 
   test('未連携の予約でもメモは変更でき、お知らせは作らない', async () => {
@@ -520,7 +520,7 @@ describe('PATCH /api/booking/admin/bookings/:id (N-389)', () => {
       starts_at: new Date(Date.now() - 3600_000).toISOString(),
     });
     expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toEqual({ error: 'past_datetime' });
+    await expect(res.json()).resolves.toMatchObject({ code: 'past_datetime' , fields: expect.any(Object), error: expect.any(String) });
   });
 
   test('別店舗のスタッフへは変えられない (404)', async () => {
@@ -720,7 +720,7 @@ describe('POST /api/booking/admin/bookings/:id/notifications/:runId/retry (N-393
 
     const phoneOnly = await retry(app, env, 'B2', 'op-x');
     expect(phoneOnly.status).toBe(422);
-    await expect(phoneOnly.json()).resolves.toEqual({ error: 'line_notification_unavailable' });
+    await expect(phoneOnly.json()).resolves.toMatchObject({ code: 'line_notification_unavailable' , fields: expect.any(Object), error: expect.any(String) });
   });
 
   test('失敗した通知を同じ行のまま再送し、監査へ残す', async () => {

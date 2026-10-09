@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -7,7 +8,7 @@ import { imageDimensions } from '../services/media-metadata.js';
 const images = new Hono<Env>();
 
 // POST /api/images — upload image (base64 or binary)
-images.post('/api/images', requireRole('owner', 'admin', 'staff'), async (c) => {
+images.post('/api/images', requireRole('owner', 'admin', 'staff'), inputJsonBoundary({"data":["string"],"mimeType":["string"],"filename":["string"]}), async (c) => {
   try {
     const contentType = c.req.header('Content-Type') || '';
 
@@ -23,7 +24,7 @@ images.post('/api/images', requireRole('owner', 'admin', 'staff'), async (c) => 
       }>();
 
       if (!body.data) {
-        return c.json({ success: false, error: 'data (base64) is required' }, 400);
+        return inputError(c, { success: false, error: 'data (base64) is required' }, 400, ["data"]);
       }
 
       let base64 = body.data;
@@ -45,12 +46,12 @@ images.post('/api/images', requireRole('owner', 'admin', 'staff'), async (c) => 
     }
 
     if (data.byteLength > 10 * 1024 * 1024) {
-      return c.json({ success: false, error: 'Image too large (max 10MB)' }, 400);
+      return inputError(c, { success: false, error: 'Image too large (max 10MB)' }, 400, ["data"]);
     }
 
     const allowedTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
     if (!allowedTypes.includes(mimeType)) {
-      return c.json({ success: false, error: `Unsupported image type: ${mimeType}. Allowed: ${allowedTypes.join(', ')}` }, 400);
+      return inputError(c, { success: false, error: `Unsupported image type: ${mimeType}. Allowed: ${allowedTypes.join(', ')}` }, 400, ["mimeType"]);
     }
 
     // 保存の前に検査の段を入れる。危険な中身は保存せず、URL も返さない。
@@ -67,7 +68,7 @@ images.post('/api/images', requireRole('owner', 'admin', 'staff'), async (c) => 
       const message = preCheck.verdict === 'quarantined'
         ? '確認のため受け付けできません'
         : `受け付けできません（${preCheck.detail}）`;
-      return c.json({ success: false, code: 'file_scan_blocked', error: message }, 422);
+      return inputError(c, { success: false, code: 'file_scan_blocked', error: message }, 422, []);
     }
 
     const ext = mimeType.split('/')[1] === 'jpeg' ? 'jpg' : mimeType.split('/')[1];

@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { hasFirstDeliveredMessage, hasSavedFeatureConfiguration, resolveLineCredential } from '@line-crm/db';
 import type { Env } from '../index.js';
@@ -253,7 +254,7 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
  * **完了ではない。** 閉じた日時は帯を出さないためだけの記憶で、
  * 段の判定には一切入れない（§15）。
  */
-gettingStarted.post('/api/getting-started/dismiss', requireRole('owner', 'admin', 'staff'), async (c) => {
+gettingStarted.post('/api/getting-started/dismiss', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   try {
     const staff = c.get('staff');
     if (!staff?.id) {

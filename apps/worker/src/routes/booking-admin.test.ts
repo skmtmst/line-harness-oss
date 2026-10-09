@@ -376,7 +376,7 @@ describe('POST /api/booking/admin/bookings', () => {
       execCtx,
     );
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ error: 'missing_idempotency_key' });
+    await expect(res.json()).resolves.toMatchObject({ code: 'missing_idempotency_key' , fields: expect.any(Object), error: expect.any(String) });
   });
 
   test('400 without account_id', async () => {
@@ -518,7 +518,7 @@ describe('POST /api/booking/admin/bookings', () => {
       execCtx,
     );
     expect(res.status).toBe(404);
-    const body = (await res.json()) as { error: string };
+    const body = (await res.json()) as { error: string; code: string };
     expect(body.error).toBe('staff_not_found');
   });
 
@@ -688,7 +688,7 @@ describe('POST /api/booking/admin/bookings', () => {
       execCtx,
     );
     expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toEqual({ error: 'line_notification_unavailable' });
+    await expect(res.json()).resolves.toMatchObject({ code: 'line_notification_unavailable' , fields: expect.any(Object), error: expect.any(String) });
     expect(db.calls.some((call) => call.sql.includes('INSERT INTO bookings'))).toBe(false);
   });
 
@@ -1076,27 +1076,27 @@ describe('staff breaks API (N-405 #655)', () => {
         ],
       });
       expect(overlap.status).toBe(422);
-      await expect(overlap.json()).resolves.toEqual({ error: 'break_overlap' });
+      await expect(overlap.json()).resolves.toMatchObject({ code: 'break_overlap' , fields: expect.any(Object), error: expect.any(String) });
 
       const outside = await putKind(app, env, 'breaks', {
         expectedVersion: version,
         breaks: [{ weekday: 3, start_time: '12:00', end_time: '13:00' }],
       });
       expect(outside.status).toBe(422);
-      await expect(outside.json()).resolves.toEqual({ error: 'break_outside_working_hours' });
+      await expect(outside.json()).resolves.toMatchObject({ code: 'break_outside_working_hours', error: expect.any(String), fields: expect.any(Object) });
 
       const inverted = await putKind(app, env, 'breaks', {
         expectedVersion: version,
         breaks: [{ weekday: 1, start_time: '13:00', end_time: '12:00' }],
       });
       expect(inverted.status).toBe(422);
-      await expect(inverted.json()).resolves.toEqual({ error: 'invalid_time_range' });
+      await expect(inverted.json()).resolves.toMatchObject({ code: 'invalid_time_range', error: expect.any(String), fields: expect.any(Object) });
 
       const noVersion = await putKind(app, env, 'breaks', {
         breaks: [{ weekday: 1, start_time: '12:00', end_time: '13:00' }],
       });
       expect(noVersion.status).toBe(400);
-      await expect(noVersion.json()).resolves.toEqual({ error: 'invalid_version' });
+      await expect(noVersion.json()).resolves.toMatchObject({ code: 'invalid_version', error: expect.any(String), fields: expect.any(Object) });
     } finally {
       sqlite.close();
     }
@@ -1270,7 +1270,7 @@ describe('staff breaks API (N-405 #655)', () => {
         breaks: [{ work_date: '2026-03-08', start_time: '02:30', end_time: '03:30' }],
       });
       expect(gap.status).toBe(422);
-      await expect(gap.json()).resolves.toEqual({ error: 'dst_gap' });
+      await expect(gap.json()).resolves.toMatchObject({ code: 'dst_gap' , fields: expect.any(Object), error: expect.any(String) });
     } finally {
       sqlite.close();
     }
@@ -1289,7 +1289,7 @@ describe('staff breaks API (N-405 #655)', () => {
         breaks: [{ work_date: '2026-09-24', start_time: '12:00', end_time: '13:00' }],
       });
       expect(noWork.status).toBe(422);
-      await expect(noWork.json()).resolves.toEqual({ error: 'break_outside_working_hours' });
+      await expect(noWork.json()).resolves.toMatchObject({ code: 'break_outside_working_hours' , fields: expect.any(Object), error: expect.any(String) });
     } finally {
       sqlite.close();
     }

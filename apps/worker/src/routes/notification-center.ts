@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
   getNotificationCenter,
@@ -86,15 +87,15 @@ notificationCenter.get('/api/notifications/center', async (c) => {
 notificationCenter.post(
   '/api/notifications/center/read-all',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary({"lineAccountId":["string"],"category":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{ lineAccountId?: string; category?: string }>();
-    if (!body.lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!body.lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     if (!await canReadAccount(c.env.DB, c.get('staff'), body.lineAccountId)) {
       return c.json({ success: false, error: 'このLINEアカウントの通知は変更できません' }, 403);
     }
     const category = categoryFrom(body.category);
-    if (category === null) return c.json({ success: false, error: '通知の種類が正しくありません' }, 400);
+    if (category === null) return inputError(c, { success: false, error: '通知の種類が正しくありません' }, 400, ["category"]);
     const updated = await markAllNotificationsRead(c.env.DB, {
       lineAccountId: body.lineAccountId,
       staffId: c.get('staff').id,
@@ -111,10 +112,10 @@ notificationCenter.post(
 notificationCenter.post(
   '/api/notifications/center/:id/read',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary({"lineAccountId":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{ lineAccountId?: string }>();
-    if (!body.lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!body.lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     if (!await canReadAccount(c.env.DB, c.get('staff'), body.lineAccountId)) {
       return c.json({ success: false, error: 'このLINEアカウントの通知は変更できません' }, 403);
     }

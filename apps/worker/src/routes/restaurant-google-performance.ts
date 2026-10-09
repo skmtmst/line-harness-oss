@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 /**
  * 飲食店向け「Googleビジネス」第4段：パフォーマンス表示（GB-9 Zq8DN）。
  *
@@ -130,7 +131,7 @@ restaurantGooglePerformance.get('/api/restaurant-test/google/performance', async
  * アクセストークン取得・Google呼び出し・失敗時のconnection状態更新は processGoogleBusinessDailyMetrics 側が担う。
  * 口コミ・投稿・プロフィールのsyncと同じくGoogleから読んで自DBに書くだけ（Googleへの書き込みは無い）ため、担当者にも許可する。
  */
-restaurantGooglePerformance.post('/api/restaurant-test/google/performance/sync', requireRole('owner', 'admin', 'staff'), async (c) => {
+restaurantGooglePerformance.post('/api/restaurant-test/google/performance/sync', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   const ctx = await requireConnectedStore(c);
   if (ctx instanceof Response) return ctx;
   const { store } = ctx;

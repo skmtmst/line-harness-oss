@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary, inputShapeErrors } from '../lib/input-errors.js';
 /**
  * 飲食店向け「Googleビジネス」第3段：投稿（最新情報・イベント・特典）。
  * 設計正本：Googleビジネス正本.pen GB-4（MAozg）/ GB-5（fxNNJ・hZb3O）/ GB-6（sZEnK）
@@ -583,7 +584,7 @@ export async function applyGooglePostsSync(env: Env['Bindings'], storeId: string
   }
 }
 
-restaurantGooglePosts.post('/api/restaurant-test/google/posts/sync', async (c) => {
+restaurantGooglePosts.post('/api/restaurant-test/google/posts/sync', inputJsonBoundary(), async (c) => {
   const ctx = await requireConnectedStore(c);
   if (ctx instanceof Response) return ctx;
   const { store, connection } = ctx;
@@ -608,14 +609,19 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/sync', async (c) =
 
 // ---------- 下書き ----------
 
-restaurantGooglePosts.post('/api/restaurant-test/google/posts', async (c) => {
+restaurantGooglePosts.post('/api/restaurant-test/google/posts', inputJsonBoundary({ instagram: ['object', 'null'] }), async (c) => {
   const store = await storeFor(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as Record<string, unknown>);
+  const instagramFields = body.instagram && typeof body.instagram === 'object'
+    ? inputShapeErrors(body.instagram as Record<string, unknown>, { enabled: ['boolean'], caption: ['string', 'null'] }) : {};
+  if (Object.keys(instagramFields).length) return fail(c, 400, 'Instagram の入力内容の形式を確認してください', {
+    code: 'invalid_request', fields: Object.fromEntries(Object.entries(instagramFields).map(([key, reason]) => [`instagram.${key}`, reason])),
+  });
   const input = parseDraftInput(body);
-  if (!input) return fail(c, 400, 'kind が不正です', { code: 'invalid_request' });
+  if (!input) return fail(c, 400, 'kind が不正です', { code: 'invalid_request' }, ["kind","summary","title","schedule","cta","offer","mediaId"]);
   const instagramError = instagramDraftError(input);
-  if (instagramError) return fail(c, 400, instagramError, { code: 'invalid_request' });
+  if (instagramError) return fail(c, 400, instagramError, { code: 'invalid_request' }, [!input.mediaId ? 'mediaId' : 'instagram.caption']);
   const mediaResult = await resolveMedia(c, store, input.mediaId);
   if (!mediaResult.ok) return fail(c, 404, mediaResult.error, { code: 'media_not_found' });
   const row = await insertDraft(c, store, input, mediaResult.media);
@@ -637,24 +643,29 @@ restaurantGooglePosts.get('/api/restaurant-test/google/posts/:id', async (c) => 
   });
 });
 
-restaurantGooglePosts.put('/api/restaurant-test/google/posts/:id', async (c) => {
+restaurantGooglePosts.put('/api/restaurant-test/google/posts/:id', inputJsonBoundary({ instagram: ['object', 'null'] }), async (c) => {
   const store = await storeFor(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const row = await postFor(c, store.id, c.req.param('id'));
   if (!row) return fail(c, 404, '投稿が見つかりません');
   if (row.status !== 'draft') return fail(c, 409, 'この投稿は編集できません', { code: 'not_editable' });
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as Record<string, unknown>);
+  const instagramFields = body.instagram && typeof body.instagram === 'object'
+    ? inputShapeErrors(body.instagram as Record<string, unknown>, { enabled: ['boolean'], caption: ['string', 'null'] }) : {};
+  if (Object.keys(instagramFields).length) return fail(c, 400, 'Instagram の入力内容の形式を確認してください', {
+    code: 'invalid_request', fields: Object.fromEntries(Object.entries(instagramFields).map(([key, reason]) => [`instagram.${key}`, reason])),
+  });
   const input = parseDraftInput(body);
-  if (!input) return fail(c, 400, 'kind が不正です', { code: 'invalid_request' });
+  if (!input) return fail(c, 400, 'kind が不正です', { code: 'invalid_request' }, ["kind","summary","title","schedule","cta","offer","mediaId"]);
   const instagramError = instagramDraftError(input);
-  if (instagramError) return fail(c, 400, instagramError, { code: 'invalid_request' });
+  if (instagramError) return fail(c, 400, instagramError, { code: 'invalid_request' }, [!input.mediaId ? 'mediaId' : 'instagram.caption']);
   const mediaResult = await resolveMedia(c, store, input.mediaId);
   if (!mediaResult.ok) return fail(c, 404, mediaResult.error, { code: 'media_not_found' });
   await updateDraft(c, store, row.id, input, mediaResult.media);
   return c.json({ success: true, post: publicPost((await postFor(c, store.id, row.id))!) });
 });
 
-restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/cancel', async (c) => {
+restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/cancel', inputJsonBoundary(), async (c) => {
   const store = await storeFor(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const row = await postFor(c, store.id, c.req.param('id'));
@@ -666,23 +677,23 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/cancel', async
 
 // ---------- 公開 ----------
 
-restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/publish', requireRole('owner', 'admin'), async (c) => {
+restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/publish', requireRole('owner', 'admin'), inputJsonBoundary({"confirmed":["boolean"]}), async (c) => {
   const ctx = await requireConnectedStore(c);
   if (ctx instanceof Response) return ctx;
   const { store, connection } = ctx;
   const row = await postFor(c, store.id, c.req.param('id'));
   if (!row) return fail(c, 404, '投稿が見つかりません');
   const body = await c.req.json<{ confirmed?: boolean }>().catch(() => ({}) as { confirmed?: boolean });
-  if (body.confirmed !== true) return fail(c, 400, '投稿先・種類・本文の確認が必要です', { code: 'confirmation_required' });
+  if (body.confirmed !== true) return fail(c, 400, '投稿先・種類・本文の確認が必要です', { code: 'confirmation_required' }, ["confirmed"]);
   if (!writeEnabled(c.env)) return fail(c, 403, 'この環境ではGoogleへ投稿できません', { code: 'write_disabled' });
   if (row.status === 'published' || row.status === 'accepted') return fail(c, 409, 'この投稿はすでに送信済みです', { code: 'already_sent' });
   if (row.status === 'cancelled' || row.status === 'deleted') return fail(c, 409, 'この投稿は取り消されています', { code: 'cancelled' });
-  if (row.publish_mode === 'scheduled') return fail(c, 400, '日時指定の投稿はこの環境では未対応です', { code: 'not_supported' });
+  if (row.publish_mode === 'scheduled') return fail(c, 400, '日時指定の投稿はこの環境では未対応です', { code: 'not_supported' }, ["store"]);
 
   const timeZone = await storeTimeZone(c, store.id);
   const draft = draftFromRow(row);
   const validated = validatePostDraft(draft, todayIn(timeZone));
-  if (!validated.ok) return fail(c, 400, `投稿の内容を見直してください（${validated.reason}）`, { code: 'invalid_request' });
+  if (!validated.ok) return fail(c, 400, `投稿の内容を見直してください（${validated.reason}）`, { code: 'invalid_request' }, ["store"]);
 
   let options: RequestOptions;
   try {
@@ -751,7 +762,7 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/publish', requ
       return fail(c, 400, `Googleに受け付けられない内容です${detail ? `（${detail}）` : ''}`, {
         code: 'invalid_request',
         post: publicPost((await postFor(c, store.id, row.id))!),
-      });
+      }, []);
     }
     return googleErrorResponse(c, error);
   }
@@ -764,6 +775,7 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/publish', requ
 restaurantGooglePosts.post(
   '/api/restaurant-test/google/posts/:id/instagram/retry',
   requireRole('owner', 'admin'),
+  inputJsonBoundary(),
   async (c) => {
     const store = await storeFor(c);
     if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
@@ -788,14 +800,14 @@ restaurantGooglePosts.post(
   },
 );
 
-restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/remove', requireRole('owner', 'admin'), async (c) => {
+restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/remove', requireRole('owner', 'admin'), inputJsonBoundary({"confirmed":["boolean"]}), async (c) => {
   const ctx = await requireConnectedStore(c);
   if (ctx instanceof Response) return ctx;
   const { store, connection } = ctx;
   const row = await postFor(c, store.id, c.req.param('id'));
   if (!row) return fail(c, 404, '投稿が見つかりません');
   const body = await c.req.json<{ confirmed?: boolean }>().catch(() => ({}) as { confirmed?: boolean });
-  if (body.confirmed !== true) return fail(c, 400, '削除の確認が必要です', { code: 'confirmation_required' });
+  if (body.confirmed !== true) return fail(c, 400, '削除の確認が必要です', { code: 'confirmation_required' }, ["confirmed"]);
   if (!writeEnabled(c.env)) return fail(c, 403, 'この環境ではGoogleを操作できません', { code: 'write_disabled' });
   if (!row.google_post_name) return fail(c, 409, 'まだGoogleへ公開されていません', { code: 'not_published' });
 

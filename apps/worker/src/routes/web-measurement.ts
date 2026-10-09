@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
   createMeasurementSite,
@@ -50,7 +51,7 @@ webMeasurement.options('/api/public/web-conversions', (c) => c.body(null, 204, c
  * 許可外ドメイン・同意が無い・友だちと結び付かない場合も 204 で、
  * 内部の台帳には「受け付けなかった」だけが残る。
  */
-webMeasurement.post('/api/public/web-conversions', async (c) => {
+webMeasurement.post('/api/public/web-conversions', inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{
       siteId?: unknown;
@@ -211,7 +212,7 @@ webMeasurement.get(
 );
 
 // POST /api/measurement-sites — サイトを足す
-webMeasurement.post('/api/measurement-sites', requireRole('owner', 'admin'), async (c) => {
+webMeasurement.post('/api/measurement-sites', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{
       accountId?: unknown;
@@ -223,18 +224,18 @@ webMeasurement.post('/api/measurement-sites', requireRole('owner', 'admin'), asy
     const accountId = String(body.accountId ?? body.account_id ?? '').trim()
       || (scope.allowedAccountIds.length === 1 ? scope.allowedAccountIds[0] : '');
     if (!accountId || !scope.allowedAccountIds.includes(accountId)) {
-      return c.json({ success: false, error: 'account_id is required' }, 400);
+      return inputError(c, { success: false, error: 'account_id is required' }, 400, ["accountId","account_id"]);
     }
     const label = String(body.label ?? '').trim();
     if (!label || label.length > 100) {
-      return c.json({ success: false, error: 'サイトの名前を入れてください' }, 400);
+      return inputError(c, { success: false, error: 'サイトの名前を入れてください' }, 400, ["label"]);
     }
     const rawDomains = Array.isArray(body.domains) ? body.domains : [];
     const domains = [...new Set(
       rawDomains.map((d) => normalizeSiteHost(d)).filter((d): d is string => d !== null),
     )];
     if (domains.length === 0) {
-      return c.json({ success: false, error: '計測を許可するドメインを1つ以上入れてください' }, 400);
+      return inputError(c, { success: false, error: '計測を許可するドメインを1つ以上入れてください' }, 400, ["domains"]);
     }
     const site = await createMeasurementSite(c.env.DB, { lineAccountId: accountId, label, domains });
     auditLog(c, 'measurement_site.create', { kind: 'measurement_site', id: site.id }, { lineAccountId: accountId });
@@ -246,7 +247,7 @@ webMeasurement.post('/api/measurement-sites', requireRole('owner', 'admin'), asy
 });
 
 // PATCH /api/measurement-sites/:id — 名前・許可ドメインの更新
-webMeasurement.patch('/api/measurement-sites/:id', requireRole('owner', 'admin'), async (c) => {
+webMeasurement.patch('/api/measurement-sites/:id', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const site = await getMeasurementSite(c.env.DB, c.req.param('id'));
     if (!site) return c.json({ success: false, error: 'Site not found' }, 404);
@@ -257,18 +258,18 @@ webMeasurement.patch('/api/measurement-sites/:id', requireRole('owner', 'admin')
     const body = await c.req.json<{ label?: unknown; domains?: unknown }>();
     const label = body.label === undefined ? undefined : String(body.label).trim();
     if (label !== undefined && (!label || label.length > 100)) {
-      return c.json({ success: false, error: 'サイトの名前を入れてください' }, 400);
+      return inputError(c, { success: false, error: 'サイトの名前を入れてください' }, 400, ["label"]);
     }
     let domains: string[] | undefined;
     if (body.domains !== undefined) {
       if (!Array.isArray(body.domains)) {
-        return c.json({ success: false, error: 'domains は配列で指定してください' }, 400);
+        return inputError(c, { success: false, error: 'domains は配列で指定してください' }, 400, ["domains"]);
       }
       domains = [...new Set(
         body.domains.map((d) => normalizeSiteHost(d)).filter((d): d is string => d !== null),
       )];
       if (domains.length === 0) {
-        return c.json({ success: false, error: '計測を許可するドメインを1つ以上入れてください' }, 400);
+        return inputError(c, { success: false, error: '計測を許可するドメインを1つ以上入れてください' }, 400, ["domains"]);
       }
     }
     await updateMeasurementSiteDomains(c.env.DB, site.id, domains ?? [], label);
@@ -307,7 +308,7 @@ async function changeSiteStopState(c: Context<Env>, id: string, stop: boolean): 
   const body = await c.req.json<{ reason?: unknown }>().catch(() => ({}) as { reason?: unknown });
   const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
   if (!reason || reason.length > 200) {
-    return c.json({ success: false, error: '停止する理由を200字以内で入れてください' }, 400);
+    return inputError(c, { success: false, error: '停止する理由を200字以内で入れてください' }, 400, ["reason"]);
   }
   const result = await stopMeasurementSite(c.env.DB, site.id, reason);
   if (result === 'already_stopped') {
@@ -320,7 +321,7 @@ async function changeSiteStopState(c: Context<Env>, id: string, stop: boolean): 
 webMeasurement.post(
   '/api/measurement-sites/:id/stop',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       return await changeSiteStopState(c, c.req.param('id'), true);
     } catch (err) {
@@ -333,7 +334,7 @@ webMeasurement.post(
 webMeasurement.post(
   '/api/measurement-sites/:id/resume',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       return await changeSiteStopState(c, c.req.param('id'), false);
     } catch (err) {
