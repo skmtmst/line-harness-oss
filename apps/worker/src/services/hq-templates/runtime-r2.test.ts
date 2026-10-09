@@ -86,6 +86,28 @@ async function tapFixture(place: 'card' | 'carousel' | 'card_asset' | 'rich_mess
   return { ...f, locator };
 }
 describe('押したら6つ × 統括の配布', () => {
+  test.each(['card', 'carousel', 'card_asset'] as const)('%s の既存LIFFリンクを店ごとに置き換え、本文は保つ（B-129）', async place => {
+    const url = 'https://liff.line.me/liff-source/?page=salon-book&view=history';
+    const f = await tapFixture(place, { action: 'url', value: url });
+    const source = f.raw.prepare("SELECT definition_json FROM hq_template_versions WHERE id='v'").get();
+    for (const account of ['a', 'b']) {
+      expect(await f.execute(await f.preflight(account))).toMatchObject({status:'succeeded'});
+      if (place === 'card_asset') {
+        const row = f.raw.prepare('SELECT payload_json FROM broadcast_message_assets WHERE line_account_id=?').get(account) as {payload_json:string};
+        expect(JSON.parse(row.payload_json).cards[0].actionUrl).toBe(`https://liff.line.me/liff-${account}/?page=salon-book&view=history`);
+      } else {
+        const row = f.raw.prepare('SELECT message_content FROM templates WHERE line_account_id=?').get(account) as {message_content:string};
+        const content = JSON.parse(row.message_content);
+        expect(place === 'card' ? content.footer.contents[0].action.uri : content[0].actions[0].uri).toBe(`https://liff.line.me/liff-${account}/?page=salon-book&view=history`);
+        expect(place === 'card' ? content.body.contents[1].text : content[0].text).toBe(url);
+      }
+    }
+    expect(f.raw.prepare("SELECT definition_json FROM hq_template_versions WHERE id='v'").get()).toEqual(source);
+    f.raw.exec("UPDATE line_accounts SET liff_id=NULL WHERE id='c'");
+    await expect(f.preflight('c')).rejects.toMatchObject({code:'LIFF_UNAVAILABLE'});
+    expect(f.raw.prepare("SELECT COUNT(*) n FROM templates WHERE line_account_id='c'").get()).toEqual({n:0});
+  });
+
   test.each(['card', 'carousel', 'card_asset', 'rich_message', 'rich_menu'] as const)('%s の6つと選択先ありを配布し読み戻す', async place => {
     for (const choice of tapChoices) {
       const f = await tapFixture(place, choice);

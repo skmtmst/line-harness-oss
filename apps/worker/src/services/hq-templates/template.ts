@@ -345,7 +345,10 @@ export function parseMessageTemplateDefinition(value: unknown): MessageTemplateD
     },
     media,
   };
-  try { collectLiffActionLocators(parsed); } catch { throw new TemplateHqTemplateError('INVALID_DEFINITION', 422); }
+  try {
+    collectLiffActionLocators(parsed);
+    for (const button of parsed.card?.buttons ?? []) if (button.action === 'url') collectLiffActionLocators({ uri: button.value });
+  } catch { throw new TemplateHqTemplateError('INVALID_DEFINITION', 422); }
   referencedMedia(parsed);
   return parsed;
 }
@@ -790,7 +793,10 @@ export async function planMessageTemplateDistribution(input: {
     const image = definition.media.find(item => item.id === definition.card!.imageMediaId);
     template = { ...template, ...composeHqMessageCard(definition.card, targetTemplateId, image?.publicUrl ?? undefined, dependencies.cardTargets) };
   }
-  for (const locator of (definition.card ? new Map<string, never>() : collectLiffActionLocators(definition)).keys()) {
+  const liffLocators = definition.card
+    ? collectLiffActionLocators(definition.card.buttons.filter(button => button.action === 'url').map(button => ({ uri: button.value })))
+    : collectLiffActionLocators(definition);
+  for (const locator of liffLocators.keys()) {
     if (!dependencies.liffTargets?.[locator]) throw new TemplateHqTemplateError('REFERENCE_UNAVAILABLE', 422);
   }
   const messageContent = replaceExactLocators(replaceLiffActionLocators(template, dependencies.liffTargets ?? {}).messageContent, replacements)!;
