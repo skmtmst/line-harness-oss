@@ -133,6 +133,9 @@ const ALLOWLIST_MAX = 772;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'POST /api/hq/templates/media/upload-sessions',
+  'POST /api/hq/templates/media/upload-sessions/{id}/complete',
+  'DELETE /api/hq/templates/media/upload-sessions/{id}',
   "GET /api/hq/banners/folders",
   "POST /api/hq/banners/folders",
   "PATCH /api/hq/banners/folders/{id}",
