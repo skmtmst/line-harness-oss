@@ -65,6 +65,9 @@ export type RichMenuAreaIntent =
   | 'tel'      // 電話をかける     → uri (tel:)
   | 'text'     // テキストを送る   → message
   | 'template' // テンプレートを送る → postback (こちらから送る)
+  | 'booking'
+  | 'booking_history'
+  | 'visit_stamp'
   | 'form'     // 回答フォームを開く → uri (LIFF)
   | 'switch'   // メニューを切り替える → richmenuswitch
   | 'postback'
