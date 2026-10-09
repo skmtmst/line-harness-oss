@@ -1255,8 +1255,7 @@ function AutoReplyWizardV8Inner() {
             <span className={styles.doneIcon} aria-hidden="true">
               <Check size={24} />
             </span>
-            <h1 id="auto-reply-done-title" className={styles.doneTitle}>{`「${published!.name}」を有効にしました`}</h1>
-            <p className={styles.doneNote}>
+            <PageHeading title={`「${published!.name}」を有効にしました`} titleId="auto-reply-done-title" help={<>
               これから届くメッセージで動き始めます。止めているあいだに届いた分には、さかのぼって返しません。止めたいときは、一覧の「…」から止められます。
             </p>
             <dl className={styles.doneRows}>

@@ -37,6 +37,7 @@ import shell from '../../menus/settings-v8.module.css'
 import styles from './staff-new-v8.module.css'
 import TextLink from '@/components/shared/text-link'
 import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 export default function StaffNewV8() {
   const { selectedAccountId, selectedAccount } = useAccount()
@@ -311,8 +312,8 @@ export default function StaffNewV8() {
     <div className={shell.shell} data-design-node="CcA4k">
       <header className={shell.boardHead} data-design="Head">
         <Link href="/booking/menus?tab=staff" className={shell.backLink}>← 担当スタッフへ</Link>
-        <h1 className={shell.headTitle}>予約スタッフを登録</h1>
-        <p className={shell.headNote}>お客さまが予約するときに指名できる担当者を登録します。</p>
+        <PageHeading title="予約スタッフを登録" help={<> お客さまが予約するときに指名できる担当者を登録します。</>} />
+
       </header>
 
       <div className={shell.body} data-design="Body">

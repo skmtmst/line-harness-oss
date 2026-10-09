@@ -17,6 +17,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useCanManageAutomations } from '@/components/automations/use-automation-permission'
 import Button from '@/components/shared/button'
 import styles from './automations-v8.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
 
 export type AutoV8TabKey = 'rules' | 'common-actions' | 'runs' | 'templates'
 
@@ -104,8 +105,8 @@ export function V8AutoShell({
     <div data-design-node={autoV8Node(tab)} className={styles.board}>
       <div className={styles.head}>
         <div className={styles.headText}>
-          <h1 className={styles.headTitle}>オートメーション</h1>
-          <p className={styles.headDescription}>「○○したら△△する」を決めておくと、友だちの動きに合わせて自動で動きます。</p>
+          <PageHeading title="オートメーション" help={<> 「○○したら△△する」を決めておくと、友だちの動きに合わせて自動で動きます。</>} />
+
         </div>
         {actions ? <div className={styles.headActions}>{actions}</div> : null}
       </div>

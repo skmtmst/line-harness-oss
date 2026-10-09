@@ -121,6 +121,7 @@ import { formatDateTime, formatNumber } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -2136,7 +2137,7 @@ export default function ScenarioDetailV8({
       <div className={styles.head} data-design="Head">
         <div className={styles.headText}>
           <div className={styles.titleRow}>
-            <h1 className={styles.title}>{scenario.name}</h1>
+            <PageHeading title={scenario.name} />
             <StatusChip status={scenario.isActive ? 'running' : 'paused'} withHelp />
             <button
               type="button"

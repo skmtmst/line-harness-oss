@@ -58,6 +58,7 @@ import styles from './members-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { csvFileName } from '@/lib/csv-file-name'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -107,8 +108,7 @@ export default function MembersPageV8({
     <div className={styles.board} data-design-node={BOARD_NODE[tab]}>
       <header className={styles.head}>
         <div className={styles.headText}>
-          <h1 className={styles.headTitle}>会員</h1>
-          <p className={styles.headDescription}>
+          <PageHeading title="会員" help={<>
             ネットショップの会員と LINE の友だちを結びつけて、ランクやペットの情報を見ます。
           </p>
         </div>

@@ -14,6 +14,7 @@ import { ApiError } from '@/lib/api'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 import styles from './auth.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type Check = { email: string; name: string; needsPassword: boolean }
 
@@ -108,8 +109,7 @@ export default function OpsInviteV8() {
         </span>
       </div>
       <section className={styles.card} aria-labelledby="ops-invite-title">
-        <h1 id="ops-invite-title" className={styles.title}>運営メンバーの招待</h1>
-        <p className={styles.lead}>
+        <PageHeading title="運営メンバーの招待" titleId="ops-invite-title" titleAs="h1" help={<>
           {check && !check.needsPassword
             ? '運営コンソールに招待されました（有効期限は24時間）。続けると 2要素認証の設定に進みます。'
             : '運営コンソールに招待されました（有効期限は24時間）。名前とパスワードを決めると、次に2要素認証を設定します。'}

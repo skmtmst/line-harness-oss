@@ -33,6 +33,7 @@ import {
 } from '@line-crm/shared'
 import styles from './automation-api-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { PageHeading } from '@/components/templates/page-frame'
 
 /*
  * ★V8 オートメーション一覧（板 `LWQXd`）。
@@ -290,8 +291,8 @@ export default function AutomationListV8() {
     <div className={styles.board} data-design-node="LWQXd">
       <div className={styles.head}>
         <div>
-          <h1 className={styles.title}>オートメーション</h1>
-          <p className={styles.lead}>「○○したら△△する」を決めておくと、友だちの動きに合わせて自動で動きます。</p>
+          <PageHeading title="オートメーション" help={<> 「○○したら△△する」を決めておくと、友だちの動きに合わせて自動で動きます。</>} />
+
         </div>
         <Button href="/automations?tab=templates" variant="secondary">見本から作る</Button>
       </div>

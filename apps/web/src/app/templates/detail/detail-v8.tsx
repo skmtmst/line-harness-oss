@@ -39,6 +39,7 @@ import { isTemplateDetailData, type TemplateDetailData } from '../template-detai
 import styles from './detail-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type Usage = NonNullable<TemplateDetailData['usedBy']>
 
@@ -458,7 +459,7 @@ export default function TemplateDetailV8() {
       ) : (
         <>
           <header data-design="Head" className={styles.head}>
-            <h1 className={styles.headTitle}>{template.name}</h1>
+            <PageHeading title={template.name} />
             <p className={styles.headMeta}>
               {[messageTypeText(template.messageType), folderName ?? template.category ?? '未分類']
                 .filter(Boolean)

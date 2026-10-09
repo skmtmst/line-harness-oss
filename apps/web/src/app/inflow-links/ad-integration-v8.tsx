@@ -36,6 +36,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
+import { PageHeading } from '@/components/templates/page-frame'
 
 const LOG_PAGE_SIZE = 20
 
@@ -670,7 +671,8 @@ export function AdMetricsV8() {
       <div className={styles.board} data-design-node="qSTVR">
         <div className={styles.head}>
           <div className={styles.headText}>
-            <p className={styles.headBack}>
+
+            <PageHeading title="広告連携" help={<>
               <Link href="/inflow-links" className={styles.headBackLink}>
                 ← 流入と計測へ
               </Link>
@@ -1025,7 +1027,8 @@ export function AdConnectionsV8() {
       <div className={styles.board} data-design-node="FDBsG">
         <div className={styles.head}>
           <div className={styles.headText}>
-            <p className={styles.headBack}>
+
+            <PageHeading title="広告とのつなぎ" help={<>
               <Link href="/inflow-links" className={styles.headBackLink}>
                 ← 流入と計測へ
               </Link>
@@ -1152,7 +1155,8 @@ export function AdHistoryV8() {
       <div className={styles.board} data-design-node="p0kA3">
         <div className={styles.head}>
           <div className={styles.headText}>
-            <p className={styles.headBack}>
+
+            <PageHeading title="広告への送信履歴" help={<>
               <Link href="/inflow-links?tab=connections" className={styles.headBackLink}>
                 ← 広告とのつなぎへ戻る
               </Link>

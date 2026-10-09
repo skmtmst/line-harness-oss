@@ -52,6 +52,7 @@ import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import styles from './outgoing-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 type OutgoingFilter = 'all' | 'active' | 'paused' | 'failed'
@@ -191,8 +192,8 @@ export function WebhooksV8Head({ activeTab, outgoingCount, incomingCount }: {
     <>
       <div className={styles.head}>
         <div className={styles.headText}>
-          <h1 className={styles.headTitle}>外部連携</h1>
-          <p className={styles.headDescription}>ほかのシステムと、友だちの動きをやり取りします。送る・受け取る・API・Google Sheets をここで決めます。</p>
+          <PageHeading title="外部連携" help={<> ほかのシステムと、友だちの動きをやり取りします。送る・受け取る・API・Google Sheets をここで決めます。</>} />
+
         </div>
         <Button variant="secondary" href="/webhooks?tab=notify">見本から作る</Button>
       </div>

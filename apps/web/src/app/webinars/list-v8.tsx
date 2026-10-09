@@ -51,6 +51,7 @@ import styles from './list-v8.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type SortKey = 'updated' | 'created' | 'name'
 type SavedFilter = '' | 'active' | 'draft' | 'archived'
@@ -871,8 +872,8 @@ function WebinarListV8Inner() {
     <div className={styles.board} data-design-node="UyUMw">
       <div className={styles.head}>
         <div className={styles.headText}>
-          <h1 className={styles.headTitle}>ウェビナー</h1>
-          <p className={styles.headDescription}>録画やライブのセミナーをLINEで案内し、申込から視聴・相談までをつなげます。</p>
+          <PageHeading title="ウェビナー" help={<> 録画やライブのセミナーをLINEで案内し、申込から視聴・相談までをつなげます。</>} />
+
         </div>
         <Button onClick={() => void exportCsv()} disabled={!hasListData || query !== debouncedQuery || csvBusy} busy={csvBusy} busyLabel="書き出しています…">CSVで書き出す</Button>
       </div>

@@ -38,6 +38,7 @@ import { formatNumber } from '@/lib/format'
 import styles from './campaign-editor-v8.module.css'
 import NumberInput from '@/components/shared/number-field'
 import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 const TRIGGER_LABEL: Record<string, string> = {
   'ec.order.confirmed': '注文を受け付けたとき',
@@ -292,8 +293,8 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
         <nav className={styles.crumb} aria-label="パンくず">
           <Link href="/nen-campaigns">← NEN配信へ</Link>
         </nav>
-        <h1 className={styles.headTitle}>{setting.label}（配信を直す）</h1>
-        <p className={styles.headDesc}>{timing}。保存した新しい中身は、次のきっかけからの配信に使われます。</p>
+        <PageHeading title={<>{setting.label}（配信を直す）</>} help={<> {timing}。保存した新しい中身は、次のきっかけからの配信に使われます。</>} />
+
       </div>
 
       {error ? <Notice tone="danger" message={error} /> : null}

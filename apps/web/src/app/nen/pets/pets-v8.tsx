@@ -55,6 +55,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -115,8 +116,8 @@ export default function PetsPageV8({
     <div data-design-node={BOARD_NODE[tab]} className={styles.board}>
       <div className={styles.head}>
         <div className={styles.headText}>
-          <h1 className={styles.headTitle}>マイペット</h1>
-          <p className={styles.headDesc}>お客さまがマイページで登録したペットです。体重と主食から、1日のごはんの目安を出します。</p>
+          <PageHeading title="マイペット" help={<> お客さまがマイページで登録したペットです。体重と主食から、1日のごはんの目安を出します。</>} />
+
         </div>
       </div>
       <div data-design="Tabs" data-design-node="pets-tabs-v8">

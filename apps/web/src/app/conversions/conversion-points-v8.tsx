@@ -50,6 +50,7 @@ import { inputClass } from '@/components/shared/form-controls'
 import styles from './conversion-points-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 /** V8 の絞り込み。`all` を含む以外は v7 の `StatusFilter` と同じ。 */
 export type ConversionPointsV8Status = 'all' | ConversionDefinitionFilter
@@ -241,8 +242,7 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
     <div className={styles.board} data-design-node="r6dJFy">
       <div className={styles.head}>
         <div className={styles.headText}>
-          <h1 className={styles.headTitle}>コンバージョン</h1>
-          <p className={styles.headDescription}>
+          <PageHeading title="コンバージョン" help={<>
             成果として数えるできごと（成果地点）を決めます。配信・流入・アフィリエイトの成果は、この数え方で集計します。
           </p>
         </div>

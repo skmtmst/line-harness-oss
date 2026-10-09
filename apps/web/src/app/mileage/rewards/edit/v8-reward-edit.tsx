@@ -325,8 +325,8 @@ function RewardEditorInner() {
     <div data-design-node="L2Bzp" className={formStyles.page}>
       <div className={formStyles.head}>
         <Link className={formStyles.back} href="/mileage?tab=rewards">← マイルへ</Link>
-        <h1 className={formStyles.title}>使い道を作る</h1>
-        <p className={formStyles.description}>マイルと交換できる特典を決めます。出ると、お客さまのLINE（マイルの画面）に並びます。</p>
+        <PageHeading title="使い道を作る" help={<> マイルと交換できる特典を決めます。出ると、お客さまのLINE（マイルの画面）に並びます。</>} />
+
       </div>
 
       {failure ? <Notice tone="danger" message={failure} /> : null}

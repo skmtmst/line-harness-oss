@@ -29,6 +29,7 @@ import styles from './register-v8.module.css'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 const V8_STEPS = [
   { number: 1, label: 'LINE準備', designNode: 'xj3zz' },
@@ -576,8 +577,7 @@ export default function RegisterV8() {
   return (
     <div className={styles.board}>
       <div className={styles.head}>
-        <h1>LINEアカウントを登録</h1>
-        <p>{currentStep === 4 && !createdId
+        <PageHeading title="LINEアカウントを登録" help={<> {currentStep === 4 && !createdId
           ? '接続確認が5段すべて通るまで登録しません。止まった項目を直して、もう一度「接続して設定する」を押します。'
           : currentStep === 5 ? '登録が完了しました。' : '画面に出る名前と、だれがこのアカウントを扱うかを決めます。'}</p>
       </div>

@@ -32,6 +32,7 @@ import BranchEditors, { newBranchStep, updateBranchStep, type BranchPatch } from
 import { mergeOrderedActions, stepNumbers } from './action-order'
 import styles from '@/app/automations/automations-v8.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 const EMPTY_RESOURCES: CommonActionResources = {
   tags: [], scenarios: [], templates: [], webhooks: [], richMenus: [], commonActions: [],
@@ -159,8 +160,7 @@ export function CommonActionNewV8() {
       <div className={styles.head}>
         <div className={styles.headText}>
           <Link href="/common-actions" className={styles.backLink}>← 共通アクションへ</Link>
-          <h1 className={styles.headTitle}>共通アクションを作る</h1>
-          <p className={styles.headDescription}>
+          <PageHeading title="共通アクションを作る" help={<>
             いくつもの所から呼び出せる「処理のまとまり」を作ります。ここでは下書きを保存し、公開は版の画面から行います。使う所はいまの版のまま。使う所ごとに新しい版へ更新します。
           </p>
         </div>

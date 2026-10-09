@@ -64,6 +64,7 @@ import MediaUploadDialog from './media-upload-dialog'
 import styles from './list-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type MediaSort = 'newest' | 'oldest' | 'name' | 'size' | 'usage'
 const UNGROUPED = '__ungrouped__'
@@ -1062,8 +1063,8 @@ export default function MediaLibraryListV8() {
     <div data-design-node="O7hUt7" className={styles.board}>
       <div className={styles.head}>
         <div className={styles.headText}>
-          <h1 className={styles.headTitle}>登録メディア一覧</h1>
-          <p className={styles.headDescription}>配信で使う画像・動画・音声・ファイルの置き場です。</p>
+          <PageHeading title="登録メディア一覧" help={<> 配信で使う画像・動画・音声・ファイルの置き場です。</>} />
+
         </div>
         <div className={styles.headActions}>
           <Button type="button" variant="primary" onClick={() => setUploadOpen(true)}>メディアを登録する</Button>

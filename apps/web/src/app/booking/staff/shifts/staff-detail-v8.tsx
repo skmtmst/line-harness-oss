@@ -52,6 +52,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { DetailLoading } from '@/components/templates/detail-page'
 import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -848,8 +849,8 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
       {isStaffRole ? null : (
         <Link href="/booking/menus?tab=staff" className={shell.backLink}>← 担当スタッフへ</Link>
       )}
-      <h1 className={shell.headTitle}>{node === 'wvGke' ? '自分の勤務' : headTitle}</h1>
-      <p className={shell.headNote}>{headDesc}</p>
+      <PageHeading title={node === 'wvGke' ? '自分の勤務' : headTitle} help={<> {headDesc}</>} />
+
     </header>
   )
 
@@ -1399,8 +1400,8 @@ export function OwnShiftEntryV8() {
 
   const head = (
     <header className={shell.boardHead} data-design="Head">
-      <h1 className={shell.headTitle}>自分の勤務</h1>
-      <p className={shell.headNote}>あなたの出勤・休憩・この日だけのシフトを決めます。</p>
+      <PageHeading title="自分の勤務" help={<> あなたの出勤・休憩・この日だけのシフトを決めます。</>} />
+
     </header>
   )
 

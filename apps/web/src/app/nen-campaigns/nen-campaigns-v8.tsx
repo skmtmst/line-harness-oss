@@ -59,6 +59,7 @@ import styles from './nen-campaigns-v8.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 /** 板ごとの data-design-node（札で切り替える外枠の印）。 */
 const BOARD_NODE: Record<NenTab, string> = {
@@ -121,8 +122,8 @@ export default function NenCampaignsV8(props: NenOverviewProps) {
     <div data-design-node={BOARD_NODE[tab]} className={styles.board}>
       <div className={styles.head}>
         <div className={styles.headText}>
-          <h1 className={styles.headTitle}>NEN配信</h1>
-          <p className={styles.headDesc}>ネットショップの注文や誕生日に合わせて、決まったメッセージやコラムを自動で送ります。</p>
+          <PageHeading title="NEN配信" help={<> ネットショップの注文や誕生日に合わせて、決まったメッセージやコラムを自動で送ります。</>} />
+
         </div>
         {tab === 'columns' ? (
           <Button href="/nen-campaigns/columns/new">コラムを書く</Button>

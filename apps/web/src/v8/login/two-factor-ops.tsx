@@ -23,6 +23,7 @@ import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import styles from './two-factor-ops.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
 
 /* 通信断・JSON でない返事は技術文言を出さない（v7 の two-factor-error と同じ決まりを写した）。 */
 export function opsTwoFactorFailureMessage(caught: unknown, fallback = '認証できませんでした'): string {
@@ -108,8 +109,8 @@ export default function OpsTwoFactorV8() {
   return (
     <main className={styles.page}>
       <section className={styles.card} data-design-node="tOPeY" aria-labelledby="ops-two-factor-title">
-        <h1 id="ops-two-factor-title" className={styles.title}>6桁の確認</h1>
-        <p className={styles.desc}>パスワードを確かめました。認証アプリに出ている6桁を入れてください。</p>
+        <PageHeading title="6桁の確認" titleId="ops-two-factor-title" titleAs="h1" help={<> パスワードを確かめました。認証アプリに出ている6桁を入れてください。認証アプリが使えないときは、運営のオーナーに連絡してください。</>} />
+
         {missingChallenge ? (
           <Notice tone="info" id="ops-two-factor-missing" message="ログインの情報が見つかりませんでした。ログインからやり直してください。" action={<Link href="/ops/login" onClick={clearTwoFactorChallenge}>ログインに戻る</Link>} />
         ) : error ? <Notice tone="danger" id="ops-two-factor-error" message={error} /> : null}

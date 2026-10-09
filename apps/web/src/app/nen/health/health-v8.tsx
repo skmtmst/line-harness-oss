@@ -50,6 +50,7 @@ import { SummarySheet, SKIN_LABELS, TEAR_LABELS, countText, md } from './summary
 import type { HealthTabKey } from './page'
 import styles from './health-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -110,8 +111,8 @@ export default function HealthPageV8({
     <div data-design-node={BOARD_NODE[tab]} className={styles.board}>
       <div className={styles.head}>
         <div className={styles.headText}>
-          <h1 className={styles.headTitle}>健康日記</h1>
-          <p className={styles.headDesc}>お客さまがマイページで付けたペットの記録（体重・食事・うんち・元気）を見ます。気になる変化を見つけて声をかけられます。</p>
+          <PageHeading title="健康日記" help={<> お客さまがマイページで付けたペットの記録（体重・食事・うんち・元気）を見ます。気になる変化を見つけて声をかけられます。</>} />
+
         </div>
         <Button type="button" variant="secondary" onClick={() => window.print()} disabled={!canPrint} title={canPrint ? undefined : '一覧の「30日のまとめ」を開くと書き出せます'}>獣医師向け PDF を書き出す</Button>
       </div>

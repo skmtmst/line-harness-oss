@@ -36,6 +36,7 @@ import { shortDateTime } from '@/lib/hq-banners'
 import { formatNumber } from '@/lib/format'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -431,7 +432,7 @@ export default function ScenarioResultsV8() {
       {scenario && (
         <div className={styles.head}>
           <div className={styles.titleRow}>
-            <h1 className={styles.title}>{scenario.name}</h1>
+            <PageHeading title={scenario.name} />
             <StatusChip status={scenario.isActive ? 'running' : 'paused'} />
             <span className={styles.titleSuffix}>配信結果</span>
           </div>

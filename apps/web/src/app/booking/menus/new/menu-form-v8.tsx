@@ -54,6 +54,7 @@ import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -759,8 +760,7 @@ export default function MenuFormV8() {
     <div className={shell.shell} data-design-node="QqER7">
       <header className={shell.boardHead} data-design="Head">
         <Link href="/booking/menus" className={shell.backLink}>← 予約へ</Link>
-        <h1 className={shell.headTitle}>{editTarget ? '予約メニューを直す' : '予約メニューを作る'}</h1>
-        <p className={shell.headNote}>
+        <PageHeading title={editTarget ? '予約メニューを直す' : '予約メニューを作る'} help={<>
           {editTarget ? '保存すると、お客さまの画面にすぐ出ます' : 'まだお客さまの画面には出ていません'}
         </p>
       </header>

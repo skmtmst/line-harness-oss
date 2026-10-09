@@ -86,6 +86,7 @@ import styles from './list-v8.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -947,8 +948,7 @@ function CommonVarsListV8Inner() {
     <div data-design-node="FM94M XIzkJ" className={styles.board}>
       <div className={styles.head}>
         <div className={styles.headText}>
-          <h1 className={styles.headTitle}>共通情報</h1>
-          <p className={styles.headDescription}>
+          <PageHeading title="共通情報" help={<>
             会社名・営業時間・電話番号など、何度も使う文字をここで持ち、テンプレートや配信に差し込みます。ここを変えると、差し込んだ所がまとめて変わります。
           </p>
         </div>

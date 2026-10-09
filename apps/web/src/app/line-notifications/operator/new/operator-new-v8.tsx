@@ -34,6 +34,7 @@ import type { OperatorNotificationTeam } from '@line-crm/shared'
 import styles from './operator-new-v8.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 const THRESHOLD_OPTIONS = [
   { value: 'one', label: '1件でも' },
@@ -430,10 +431,7 @@ function NewOperatorNotificationV8Inner() {
   return (
     <div data-design-node="gjUz3" className={styles.board}>
       <div>
-        <h1 className={styles.headTitle}>
-          運用者へのお知らせを{editId ? 'なおす' : '作る'}
-        </h1>
-        <p className={styles.headDescription}>
+        <PageHeading title={<>運用者へのお知らせを{editId ? 'なおす' : '作る'}</>} help={<>
           宛先はお店の人です。あとから顧客向けへは変えられません。顧客へ送るものは「顧客へのお知らせ」で作ります。
         </p>
       </div>

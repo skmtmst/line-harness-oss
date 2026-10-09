@@ -252,8 +252,8 @@ export default function V8EarningRuleNew() {
     <div data-design-node={conflict ? "BnrQp" : "ctLwT"} className={formStyles.page}>
       <div className={formStyles.head}>
         <Link className={formStyles.back} href="/mileage?tab=earning-rules">← マイルへ</Link>
-        <h1 className={formStyles.title}>たまる決めごとを作る</h1>
-        <p className={formStyles.description}>どの行動で・何マイル・だれに付けるかを決めます。作った日からの行動に付きます（さかのぼらない）。</p>
+        <PageHeading title="たまる決めごとを作る" help={<> どの行動で・何マイル・だれに付けるかを決めます。作った日からの行動に付きます（さかのぼらない）。</>} />
+
       </div>
 
       {conflict ? (

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 
 import Notice from '@/components/shared/notice'
+import { PageHeading } from '@/components/templates/page-frame'
 
 export const STAFF_TAB_KEYS = [
   { key: 'members', label: 'いまいる人' }, { key: 'invited', label: '招待中' },

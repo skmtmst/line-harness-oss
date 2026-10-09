@@ -34,6 +34,7 @@ import PhotoPolicyHistoryV8 from './photo-policy-history-v8'
 import styles from './photo-review-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type PhotoStatus = 'pending' | 'adopted' | 'rejected'
 type PhotoView = 'list' | 'detail' | 'publications'
@@ -474,8 +475,8 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
     <div data-design-node={boardNode(view, status, canEdit)} className={styles.board}>
       <div className={styles.head}>
         <div className={styles.headText}>
-          <h1 className={styles.headTitle}>投稿</h1>
-          <p className={styles.headDesc}>お客さまが送ってくれたペットの写真を確かめて、公式サイトに載せるかを決めます。</p>
+          <PageHeading title="投稿" help={<> お客さまが送ってくれたペットの写真を確かめて、公式サイトに載せるかを決めます。</>} />
+
         </div>
         <Button type="button" variant="secondary" onClick={() => setHistoryOpen(true)}><History size={15} aria-hidden="true" />版の履歴を見る</Button>
       </div>

@@ -26,6 +26,7 @@ import V8BalancesTab from './v8-balances-tab'
 import V8HistoryTab from './v8-history-tab'
 import V8RewardsTab from './v8-rewards-tab'
 import V8ScoreTab from './v8-score-tab'
+import { PageHeading } from '@/components/templates/page-frame'
 
 const TABS = [
   { key: 'earning-rules', label: 'たまる決めごと', node: 'OC0gy' },
@@ -74,8 +75,8 @@ export function V8Head({ actions }: { actions?: React.ReactNode }) {
   return (
     <div className={styles.head}>
       <div className={styles.headText}>
-        <h1 className={styles.headTitle}>マイル</h1>
-        <p className={styles.headDescription}>行動でマイルがたまり、クーポン・特典と交換できます。</p>
+        <PageHeading title="マイル" help={<> 行動でマイルがたまり、クーポン・特典と交換できます。</>} />
+
       </div>
       {actions ? <div className={styles.headActions}>{actions}</div> : null}
     </div>

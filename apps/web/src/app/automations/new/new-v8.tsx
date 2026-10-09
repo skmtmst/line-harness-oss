@@ -51,6 +51,7 @@ import { formatNumber, formatTime } from '@/lib/format'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 /**
  * ルールを作る。Pencil ★V6 `Rv8Jv`（25-1-A つくる）。
@@ -2187,8 +2188,8 @@ export function NewAutomationV8({
       <div className={styles.head}>
         <div className={styles.headText}>
           <Link href={backHref} className={styles.backLink}>{backLabel}</Link>
-          <h1 className={styles.headTitle}>{chrome === 'draft' ? '下書きを仕上げる' : 'ルールを作る'}</h1>
-          <p className={styles.headDescription}>{headDescription}</p>
+          <PageHeading title={chrome === 'draft' ? '下書きを仕上げる' : 'ルールを作る'} help={<> {headDescription}</>} />
+
         </div>
       </div>
 

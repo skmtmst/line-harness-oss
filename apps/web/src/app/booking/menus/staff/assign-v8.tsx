@@ -43,6 +43,7 @@ import shell from '../settings-v8.module.css'
 import styles from './assign-v8.module.css'
 import NumberInput from '@/components/shared/number-field'
 import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 /* 予約設定の5タブ（settings-v8.tsx の V8_TABS と同じ並び）。 */
 const V8_TABS = [
@@ -313,7 +314,7 @@ export default function AssignMatrixV8() {
     <div className={shell.shell} data-design-node="ooufy">
       <header className={shell.boardHead} data-design="Head">
         <Link href="/booking/bookings" className={shell.backLink}>← 予約へ</Link>
-        <h1 className={shell.headTitle}>担当メニューをまとめて決める</h1>
+        <PageHeading title="担当メニューをまとめて決める" />
         <p className={shell.headNote} role="status" aria-live="polite">
           {dirty ? '未保存の変更があります' : 'メニューごとに、予約を受けられるスタッフを決めます'}
         </p>

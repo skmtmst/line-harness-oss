@@ -10,6 +10,7 @@ import { BookOpen, CircleHelp, Lock } from 'lucide-react'
 import Button from '@/components/shared/button'
 import styles from './no-permission.module.css'
 
+import { PageHeading } from '@/components/templates/page-frame'
 export type NoPermissionBoardProps = {
   /** 機能名。題と「○○を開く権限がありません」になる。 */
   featureName: string
@@ -38,8 +39,8 @@ export default function NoPermissionBoard({
   return (
     <div data-design-node="O5tUeE" className={styles.board}>
       <div className={styles.head}>
-        <h1 className={styles.title}>{featureName}</h1>
-        <p className={styles.description}>この機能は、あなたの役割では開けません。</p>
+        <PageHeading title={featureName} help={<> この機能は、あなたの役割では開けません。</>} />
+
       </div>
       <div className={styles.center}>
         <section className={styles.card} role="alert">

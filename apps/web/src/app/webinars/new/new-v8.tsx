@@ -21,6 +21,7 @@ import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { STEPS } from '@/app/webinars/edit/edit-steps'
 import styles from './new-v8.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type DeliveryKind = 'on-demand' | 'scheduled'
 
@@ -183,7 +184,7 @@ function NewWebinarV8Inner() {
       <nav data-design="Crumb" className={styles.crumb} aria-label="パンくず">
         <Link href="/webinars" className={styles.crumbLink}>← ウェビナーへ</Link>
       </nav>
-      <h1 data-design="Head" className={styles.headTitle}>ウェビナーを作る</h1>
+      <PageHeading title="ウェビナーを作る" help={<> 管理名と公開ページの基本、開催形式を決めます。保存しても、まだ誰にも公開されません。</>} />
       <StepBand current={0} />
       <p className={styles.headDescription}>管理名と公開ページの基本、開催形式を決めます。保存しても、まだ誰にも公開されません。</p>
 

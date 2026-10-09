@@ -29,6 +29,7 @@ import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 import styles from '@/app/automations/automations-v8.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { PageHeading } from '@/components/templates/page-frame'
 
 const CONSUMER_LABELS: Record<string, string> = {
   scenario: 'シナリオ配信',
@@ -252,8 +253,7 @@ function VersionsV8Inner() {
       <div className={styles.head}>
         <div className={styles.headText}>
           <Link href="/common-actions" className={styles.backLink}>← 共通アクション一覧へ戻る</Link>
-          <h1 className={styles.headTitle}>{detail.name}（版と使われている場所）</h1>
-          <p className={styles.headDescription}>
+          <PageHeading title={<>{detail.name}（版と使われている場所）</>} help={<>
             公開した版は書き換えられません。公開しても、呼び出し元は自動で変わりません。使う場所ごとに新しい版へ更新します。
           </p>
         </div>

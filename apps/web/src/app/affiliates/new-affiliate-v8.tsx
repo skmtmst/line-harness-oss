@@ -33,6 +33,7 @@ import './create-v8.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 const FRIEND_PAGE_SIZE = 20
 const AFFILIATE_LIST_PATH = '/conversions?tab=affiliates'
@@ -292,8 +293,8 @@ export function NewAffiliateV8() {
     <div data-design-node="RaMf3" className="af-create-board">
       <div className="af-create-head">
         <Link href="/affiliates" className="af-create-backLink">← 成果とアフィリエイトへ</Link>
-        <h1 className="af-create-headTitle">アフィリエイターを作る</h1>
-        <p className="af-create-headDescription">登録すると紹介リンクができます。成果はその人の紹介リンクから来た人で数えます。</p>
+        <PageHeading title="アフィリエイターを作る" help={<> 登録すると紹介リンクができます。成果はその人の紹介リンクから来た人で数えます。</>} />
+
       </div>
 
       {codeConflict ? (

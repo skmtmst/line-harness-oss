@@ -264,8 +264,8 @@ export default function RestaurantShell({ boardId, title, description, query, he
       /> : (
       <div className={`${styles.head} ${layout === 'standard' ? '' : styles.headLedger}`}>
         <div className={styles.headText}>
-          <h1 className={`${styles.headTitle} ${headSize === 'compact' ? styles.headTitleCompact : ''}`}>{title}</h1>
-          <p className={`${styles.headDescription} ${headSize === 'compact' ? styles.headDescriptionCompact : ''}`}>{typeof description === 'function' ? description(ctx) : description}</p>
+          <PageHeading title={title} help={<> {typeof description === 'function' ? description(ctx) : description}</>} />
+
         </div>
         {headAfter ? headAfter(ctx, storePicker) : storePicker}
       </div>

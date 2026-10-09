@@ -349,8 +349,7 @@ function FriendDetailInner() {
       <div className={styles.head}>
         <div className={styles.headText}>
           <Link href="/mileage?tab=balances" style={{ color: 'var(--color-action)', fontSize: 13 }}>← マイルへ</Link>
-          <h1 className={styles.headTitle}>{displayName}</h1>
-          <p className={styles.headDescription}>
+          <PageHeading title={displayName} help={<>
             {[joinedAt ? `友だちになった日 ${joinedAt}` : null, `会員ランク ${rankLabel}`, lastActive ? `最後に動いた日 ${lastActive}` : null]
               .filter(Boolean).join('・')}
           </p>

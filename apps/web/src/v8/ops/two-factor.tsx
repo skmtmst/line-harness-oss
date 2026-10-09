@@ -15,6 +15,7 @@ import { qrToDataURL } from '@/lib/qr-image'
 import { opsCall } from '@/components/ops/ops-ui'
 import styles from './auth.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type Session = { id: string; name: string; platformAdmin?: boolean; platformAdminState?: string | null }
 
@@ -120,8 +121,8 @@ export default function OpsTwoFactorV8() {
         </span>
       </div>
       <section className={styles.card} aria-labelledby="ops-totp-title">
-        <h1 id="ops-totp-title" className={styles.title}>2要素認証を設定</h1>
-        <p className={styles.lead}>認証アプリ（Google Authenticator など）で QR を読み取り、表示された6桁を入れます。</p>
+        <PageHeading title="2要素認証を設定" titleId="ops-totp-title" titleAs="h1" help={<> 認証アプリ（Google Authenticator など）で QR を読み取り、表示された6桁を入れます。</>} />
+
         {state === 'loading' ? (
           <ListState permissionScope="hq" kind="loading" title="準備しています" />
         ) : state === 'denied' ? (

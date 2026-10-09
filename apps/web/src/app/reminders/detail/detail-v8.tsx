@@ -59,6 +59,7 @@ import { dateTimeLocalJst, dateTimeLocalJstToUtcIso } from './registrants-panel'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
+import { PageHeading } from '@/components/templates/page-frame'
 
 const PAGE_SIZE = 20
 /** 書き出しの上限。実行結果が多いとき、手元に全部ため込むと固まる。 */
@@ -387,7 +388,7 @@ function ReminderDetailV8() {
           <ChevronLeft size={14} aria-hidden="true" />
           リマインダへ
         </Link>
-        <h1 className={styles.headTitle}>{data.reminder.name}</h1>
+        <PageHeading title={data.reminder.name} />
         <p className={styles.headMeta}>
           {[
             reminder?.triggerType ? `基準日：${reminderTriggerLabel(reminder.triggerType)}` : null,

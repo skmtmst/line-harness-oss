@@ -12,6 +12,7 @@ import { authRequest, emailError, internalAuthFailureCopy } from '@/lib/auth-ema
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 import styles from './auth.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 const LINE_LOGIN_FAILURE_CODES = new Set([
   'line_token_failed',
@@ -122,7 +123,7 @@ export default function OpsLoginV8() {
         </span>
       </div>
       <section className={styles.card} aria-labelledby="ops-login-title">
-        <h1 id="ops-login-title" className={styles.title}>ログイン</h1>
+        <PageHeading title="ログイン" titleId="ops-login-title" titleAs="h1" help={<> 運営メンバーの招待を受けた方は、招待メールのリンクから設定してください</>} />
         <form onSubmit={(event) => void submit(event)} noValidate className={styles.form}>
           {error ? <Notice tone="danger" message={error} /> : null}
           <div className={styles.field}><Field label="メールアドレス" htmlFor="ops-login-email"><TextField

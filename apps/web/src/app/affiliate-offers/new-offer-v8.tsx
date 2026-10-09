@@ -20,6 +20,7 @@ import { formatNumber } from '@/lib/format'
 import '../affiliates/create-v8.css'
 import NumberInput from '@/components/shared/number-field'
 import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 const OFFER_LIST_PATH = '/conversions?tab=offers'
 
@@ -215,8 +216,8 @@ export function NewOfferV8() {
     <div data-design-node="Td4TN" className="af-create-board">
       <div className="af-create-head">
         <Link href="/affiliates" className="af-create-backLink">← 成果とアフィリエイトへ</Link>
-        <h1 className="af-create-headTitle">案件を作る</h1>
-        <p className="af-create-headDescription">「何を紹介すると、いくら払うか」を決めます。公開すると、アフィリエイターの画面に出ます。</p>
+        <PageHeading title="案件を作る" help={<> 「何を紹介すると、いくら払うか」を決めます。公開すると、アフィリエイターの画面に出ます。</>} />
+
       </div>
 
       <div className="af-create-columns">

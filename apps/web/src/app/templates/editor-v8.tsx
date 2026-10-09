@@ -22,6 +22,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import styles from './editor-v8.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
 
 /** 左に積む白いカード1枚。題と一行の説明つき。 */
 export function EditorCard({
@@ -145,7 +146,7 @@ export default function EditorV8({
           {backLabel}
         </Link>
         <div>
-          <h1 className={styles.headTitle}>{title}</h1>
+          <PageHeading title={title} />
           {lead ? <p className={styles.headLead}>{lead}</p> : null}
         </div>
       </header>

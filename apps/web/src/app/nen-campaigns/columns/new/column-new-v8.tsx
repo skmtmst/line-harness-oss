@@ -50,6 +50,7 @@ import { formatNumber } from '@/lib/format'
 import styles from './column-new-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 export default function ColumnNewV8() {
   const router = useRouter()
@@ -133,8 +134,8 @@ export default function ColumnNewV8() {
         <nav className={styles.crumb} aria-label="パンくず">
           <Link href="/nen-campaigns">← NEN配信へ</Link>
         </nav>
-        <h1 className={styles.headTitle}>コラムを書く</h1>
-        <p className={styles.headDesc}>外部サイトの記事へつなぐ下書きを作ります。記事本文は外部サイトで管理します。</p>
+        <PageHeading title="コラムを書く" help={<> 外部サイトの記事へつなぐ下書きを作ります。記事本文は外部サイトで管理します。</>} />
+
       </div>
 
       {failure ? (
