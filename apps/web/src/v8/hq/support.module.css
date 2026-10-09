@@ -25,8 +25,9 @@
   min-width: 0;
   padding: var(--tpl-hq-plan-pad);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
+  box-shadow: var(--card-shadow);
 }
 
 .pair {
@@ -191,8 +192,9 @@
   min-width: 0;
   overflow: hidden;
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
+  box-shadow: var(--card-shadow);
 }
 
 .head,

@@ -108,7 +108,7 @@ it('統括のフォルダは色の保存に失敗しても窓を残し、再試�
   fireEvent.click(await screen.findByRole('menuitem', { name: '色を変える' }))
   const dialog = within(screen.getByRole('dialog', { name: 'フォルダを直す' }))
   fireEvent.click(dialog.getByRole('button', { name: 'フォルダの色：青' }))
-  expect(screen.getAllByRole('radio')).toHaveLength(10)
+  expect(screen.getAllByRole('radio')).toHaveLength(9) // 9色だけ。色なしは選べない（2026-10-09 オーナー）
   fireEvent.click(screen.getByRole('radio', { name: 'ピンク' }))
   fireEvent.click(dialog.getByRole('button', { name: '保存する' }))
   await waitFor(() => expect(dialog.getByRole('alert').textContent).toContain('保存できませんでした'))

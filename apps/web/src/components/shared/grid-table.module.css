@@ -1,0 +1,43 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+.table {
+  display: flex;
+  flex-direction: column;
+  gap: var(--grid-table-row-gap, 0);
+  min-width: 0;
+  overflow: hidden;
+  padding: var(--grid-table-padding, 0);
+}
+.table[data-framed] {
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--card-edge);
+  outline-offset: -1px;
+  box-shadow: var(--card-shadow);
+}
+.row {
+  display: grid;
+  grid-template-columns: var(--grid-table-columns);
+  align-items: center;
+  column-gap: var(--grid-table-gap);
+  min-width: 0;
+  min-height: var(--grid-table-row-height, 0);
+  padding: var(--grid-table-row-padding);
+  box-shadow: var(--shadow-row-line);
+  color: var(--grid-table-color, var(--color-ink-secondary));
+  font-size: var(--grid-table-font-size);
+  line-height: var(--grid-table-line-height, inherit);
+}
+.row[data-head] {
+  min-height: var(--grid-table-head-height, 0);
+  padding: var(--grid-table-head-padding, var(--grid-table-row-padding));
+  background: var(--grid-table-head-background, transparent);
+  color: var(--grid-table-head-color, var(--color-ink-secondary));
+  font-size: var(--grid-table-head-font-size, var(--grid-table-font-size));
+  font-weight: 600;
+  line-height: var(--grid-table-head-line-height, var(--grid-table-line-height, inherit));
+  white-space: nowrap;
+}
+.row[data-broken] { background: var(--color-status-danger-soft); }
+.row:last-child:not([data-head]) { box-shadow: none; }
+.cell { min-width: 0; }
+}

@@ -80,7 +80,8 @@
 .group {
   overflow: hidden;
   border-radius: var(--tpl-sb-card-radius);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
 }
 
 .groupHead {
@@ -334,9 +335,10 @@
   margin: 0;
   padding: var(--tpl-sb-state-pad);
   border-radius: var(--tpl-sb-card-radius);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   color: var(--color-ink-secondary);
   font-size: var(--tpl-sb-band-text);
+  box-shadow: var(--card-shadow);
 }
 
 .skeleton {
@@ -389,119 +391,17 @@
   font-size: var(--tpl-sb-chip-text);
 }
 
-/* 並び替えの窓（ztgRD）。 */
-.dialogOverlay {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--tpl-sb-overlay-pad);
-  background: var(--color-scrim);
-}
-
-.dialog {
-  display: flex;
-  flex-direction: column;
-  width: var(--tpl-sb-dlg-w);
-  max-width: 100%;
-  max-height: min(80vh, var(--tpl-sb-dlg-max-h));
-  overflow: hidden;
-  border-radius: var(--tpl-sb-card-radius);
-  background: var(--color-canvas);
-}
-
-.dialogHead {
-  padding: var(--tpl-sb-dlg-head-pad);
-  border-bottom: 1px solid var(--color-hairline);
-}
-
-.dialogTitle {
+.orderDescription {
   margin: 0;
-  color: var(--color-ink);
-  font-size: var(--tpl-sb-dlg-title);
-  font-weight: 600;
-}
-
-.dialogDesc {
-  margin: var(--tpl-sb-dlg-gap) 0 0;
   color: var(--color-ink-secondary);
-  font-size: var(--tpl-sb-dlg-desc);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-sb-row-name-lh);
 }
-
-.dialogBody {
-  flex: 1;
-  overflow-y: auto;
-  padding: var(--tpl-sb-dlg-body-pad);
-}
-
-.orderGroupLabel {
+.orderGroupName {
   margin: 0;
-  padding: var(--tpl-sb-dlg-group-pad);
   color: var(--color-ink-faint);
-  font-size: var(--tpl-sb-row-sub);
-  font-weight: 600;
-}
-
-.orderRow {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-sb-band-gap);
-  padding: var(--tpl-sb-dlg-row-pad);
-  color: var(--color-ink);
-  font-size: var(--tpl-sb-band-text);
-}
-
-.orderRow + .orderRow {
-  border-top: 1px solid var(--color-hairline);
-}
-
-.orderRowLabel {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.moveBtn {
-  width: var(--tpl-sb-dlg-move);
-  height: var(--tpl-sb-dlg-move);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-mini);
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--tpl-sb-row-sub);
-  cursor: pointer;
-}
-
-.moveBtn:disabled {
-  background: var(--color-shell);
-  color: var(--color-ink-faint);
-  cursor: default;
-}
-
-.dialogFoot {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-sb-band-gap);
-  padding: var(--tpl-sb-dlg-foot-pad);
-  border-top: 1px solid var(--color-hairline);
-}
-
-.dialogFootLead {
-  margin-right: auto;
-}
-
-.dialogFootLead button {
-  padding: var(--tpl-sb-dlg-link-pad);
-  border: 0;
-  background: none;
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-sb-band-text);
-  font-weight: 600;
-  cursor: pointer;
+  font-size: var(--text-caption);
+  line-height: var(--tpl-sb-row-sub-lh);
 }
 
 .live {

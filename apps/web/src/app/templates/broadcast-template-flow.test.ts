@@ -30,7 +30,7 @@ describe('コンテンツテンプレートから一斉配信への引用導線'
     expect(formSource).toContain('api.templates.list(undefined, requestAccountId)')
     expect(formSource).toContain('filterSendableTemplates(templateResult.data')
     expect(formSource).toContain('api.broadcastMessageAssets.list')
-    expect(formSource).toContain('テンプレートから選ぶ')
+    expect(formSource).toContain('<MessageComposer')
   })
 
   it('ignores stale template responses after switching accounts (generation check)', () => {

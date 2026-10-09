@@ -43,9 +43,10 @@
   flex-direction: column;
   min-width: 0;
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 .tools {
   display: flex;
@@ -181,9 +182,10 @@
   min-height: var(--tpl-ar-run-box-h);
   padding: var(--tpl-section-pad);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 .boxTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-ar-run-box-title-lh); }
 .kv { display: flex; flex-direction: column; margin: 0; }

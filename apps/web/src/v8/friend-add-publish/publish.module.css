@@ -166,9 +166,10 @@
   width: min(var(--tpl-cfl-done-w), 100%);
   padding: var(--tpl-cfl-done-card-pad);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 .doneMark {
   display: inline-grid;

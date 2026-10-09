@@ -62,7 +62,6 @@ import { mergeVisibleOrder } from '@/components/friend-fields/reorder-utils'
 import TagCsvImportDialog from '@/components/friend-fields/tag-csv-import-dialog'
 import { isCurrentTagListRequest, type TagListRequestKey } from '@/components/friend-fields/tag-list-state'
 import {
-  FOLDER_FALLBACK_COLOR,
   DeleteTagDialog,
   QUICK_FILTERS,
   UNGROUPED,
@@ -74,6 +73,7 @@ import {
   usageLabel,
 } from '@/components/friend-fields/tags-page-v4'
 import styles from './list.module.css'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
 
 /** 付け方の呼び名（絵 I1E7Bt の「EC 連携・LINE ログイン・EC 購入・誕生日のきまり」）。v7 の呼び名（tags-page-v4）は触らない。 */
 const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
@@ -138,7 +138,7 @@ function TagFolderDialog({
   onSaved: () => void
 }) {
   const [name, setName] = useState(group?.name ?? '')
-  const [color, setColor] = useState<string | null>(group ? group.color ?? null : DEFAULT_TAG_FOLDER_COLOR)
+  const [color, setColor] = useState<string | null>(group ? folderDisplayColor(group) : DEFAULT_TAG_FOLDER_COLOR)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -170,7 +170,6 @@ function TagFolderDialog({
       description="タグを分けてしまう箱です。消しても、入っていたタグは未分類として残ります。"
       name={name} onNameChange={setName} color={color} onColorChange={setColor}
       colors={TAG_FOLDER_COLORS}
-      allowClear={Boolean(group)}
       placeholder="例: VIP" busy={saving} error={error || undefined}
       onCancel={onClose} onConfirm={() => void save()} confirmLabel={group ? '保存する' : 'フォルダを作る'}
     />
@@ -736,7 +735,7 @@ export default function TagsTab({
                           <span className={styles.gripSpace} aria-hidden="true" />
                         )}
                       </span>
-                      <TagPill name={tag.name} color={group?.color} size="sm" compactAtNarrow href={editHref} />
+                      <TagPill name={tag.name} color={group ? folderDisplayColor(group) : null} size="sm" compactAtNarrow href={editHref} />
                       {tag.status === 'archived' ? <StatusBadge size="annotation" dot={false}>保管済み</StatusBadge> : null}
                       {tag.cleanupReasons?.includes('duplicate_name') ? (
                         <StatusBadge size="annotation" tone="warning" dot={false} title="正規化した名前がほかのタグと重なっています。整理候補です。">名前が重なっている</StatusBadge>
@@ -749,7 +748,7 @@ export default function TagsTab({
                   <Td className={styles.colFolder}>
                     <span className={styles.folderCell} title={group?.name ?? '未分類'}>
                       {group ? (
-                        <Folder className={styles.folderIcon} aria-hidden="true" color={group.color ?? FOLDER_FALLBACK_COLOR} fill={group.color ?? FOLDER_FALLBACK_COLOR} />
+                        <Folder className={styles.folderIcon} aria-hidden="true" color={folderDisplayColor(group)} fill={folderDisplayColor(group)} />
                       ) : (
                         <FolderOpen className={styles.folderIcon} aria-hidden="true" />
                       )}

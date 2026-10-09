@@ -21,19 +21,20 @@ import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import { TextField } from '@/components/shared/text-field'
 import { TemplateEditFrame } from './frame'
+import type { TemplateEditHost } from './host'
 import { RICH_VIDEO_BUTTON_LABELS, richVideoContent, richVideoDraftIssue, videoPreviewFile, type RichVideoDraft, type RichVideoIssue } from './rich-video-core'
 import styles from './edit.module.css'
 import videoStyles from './rich-video.module.css'
 
 const emptyDraft: RichVideoDraft = {name:'',folderId:'',originalContentUrl:'',previewImageUrl:'',height:1040,buttonEnabled:true,actionLabel:'詳しく見る',actionUrl:'',altText:''}
 
-export default function TemplateRichVideoEditor({ id = null, visual = false }: { id?: string | null; visual?: boolean }) {
+export default function TemplateRichVideoEditor({ id = null, visual = false, host }: { id?: string | null; visual?: boolean; host?: TemplateEditHost }) {
   const router = useRouter()
   const { selectedAccountId, accounts } = useAccount()
   const role = useStaffRole()
   const canMutate = canManageRole(role)
-  usePageTitle(id ? 'リッチビデオを編集' : 'リッチビデオを作る')
-  usePageCrumbs([{label:'ホーム',href:'/'},{label:'テンプレート',href:'/templates'}])
+  usePageTitle(host?.composer ? null : id ? 'リッチビデオを編集' : 'リッチビデオを作る', !host?.composer)
+  usePageCrumbs([{label:'ホーム',href:'/'},{label:'テンプレート',href:'/templates'}], !host)
   const [draft,setDraft] = useState<RichVideoDraft>(() => visual ? {...emptyDraft,name:'新メニュー紹介の動画',actionUrl:'https://nen-petfood.jp/new-menu',altText:'新メニューの動画が届きました'} : emptyDraft)
   const [folders,setFolders] = useState<Folder[]>([])
   const [error,setError] = useState('')
@@ -48,8 +49,9 @@ export default function TemplateRichVideoEditor({ id = null, visual = false }: {
   const [savedId,setSavedId] = useState(id)
   const snapshot = JSON.stringify(draft)
   const [clean,setClean] = useState(snapshot)
-  const { leaveTarget,confirmLeave,cancelLeave,disarm } = useUnsavedGuard({dirty:snapshot !== clean,busy})
+  const { leaveTarget,confirmLeave,cancelLeave,disarm,guarded } = useUnsavedGuard({dirty:snapshot !== clean,busy})
   const generation = useRef(0)
+  const saveLock = useRef(false)
   const patch = (next: Partial<RichVideoDraft>) => {setIssue(null);setDraft(current=>({...current,...next}))}
 
   useEffect(()=> {
@@ -64,6 +66,10 @@ export default function TemplateRichVideoEditor({ id = null, visual = false }: {
   useEffect(()=> {
     const current = ++generation.current
     if (!id) {
+      const initial = host?.initialContent
+      if (initial?.kind === 'message' && initial.messageType === 'imagemap') {
+        try { const p = JSON.parse(initial.messageContent); if (p.video) { const next: RichVideoDraft = {name:initial.name,folderId:'',originalContentUrl:p.video.originalContentUrl,previewImageUrl:p.video.previewImageUrl,height:p.baseSize.height,buttonEnabled:Boolean(p.video.externalLink),actionLabel:p.video.externalLink?.label??'詳しく見る',actionUrl:p.video.externalLink?.linkUri??'',altText:p.altText??''};setDraft(next);setClean(JSON.stringify(next));setLoading(false);return ()=>{generation.current++} } } catch { setError('動画の中身を読み込めませんでした。') }
+      }
       setDraft(visual ? {...emptyDraft,name:'新メニュー紹介の動画',actionUrl:'https://nen-petfood.jp/new-menu',altText:'新メニューの動画が届きました'} : emptyDraft)
       setBinding(null); setSavedId(null); setLoading(false)
       return ()=>{generation.current++}
@@ -86,13 +92,13 @@ export default function TemplateRichVideoEditor({ id = null, visual = false }: {
     if(image ? !['image/jpeg','image/png'].includes(file.type) || file.size>1024*1024 : file.type!=='video/mp4' || file.size>200*1024*1024){setIssue({field:image?'preview':'video',message:image?'プレビュー画像はJPEG・PNG、1MBまでです。':'動画はMP4・200MBまでです。'});return}
     const current = generation.current
     setBusy(true);setError('')
-    if(!image){patch({originalContentUrl:'',previewImageUrl:''});setNeedsImage(false);setFileName('')}
+
     try {
       const res=await api.broadcastMessageAssets.upload(file,selectedAccountId)
       if(current!==generation.current)return
       if(!res.success)throw new Error(res.error||'アップロードできませんでした')
       if(image){patch({previewImageUrl:res.data.url});setNeedsImage(false);return}
-      patch({originalContentUrl:res.data.url});setFileName(file.name)
+      patch({originalContentUrl:res.data.url,previewImageUrl:''});setNeedsImage(false);setFileName(file.name)
       try {
         const preview = await videoPreviewFile(file)
         if(current!==generation.current)return
@@ -105,8 +111,8 @@ export default function TemplateRichVideoEditor({ id = null, visual = false }: {
     finally{if(current===generation.current)setBusy(false)}
   }
   const mismatch = Boolean(id && binding !== selectedAccountId)
-  const save = async () => {
-    if(!canMutate || busy || loading || loadFailed || mismatch || !selectedAccountId)return
+  const save = async (alsoSave = false) => {
+    if(saveLock.current || !canMutate || busy || loading || loadFailed || mismatch || !selectedAccountId)return
     const validation = richVideoDraftIssue(draft)
     if(validation){
       setError('');setIssue(validation)
@@ -114,16 +120,40 @@ export default function TemplateRichVideoEditor({ id = null, visual = false }: {
       return
     }
     const current = generation.current
-    setBusy(true);setError('')
+    if (host?.composer && !alsoSave) {
+      const initial = host.initialContent
+      let content: ReturnType<typeof richVideoContent> | null = null
+      if (initial?.kind === 'message') {
+        try { content = JSON.parse(initial.messageContent) } catch { /* 保存済みの画像の組を読めない。 */ }
+      }
+      if (initial?.kind !== 'message' || !content?.video || content.video.originalContentUrl !== draft.originalContentUrl || content.video.previewImageUrl !== draft.previewImageUrl || content.baseSize.height !== draft.height) {
+        setError('新しいリッチビデオを入れるには「テンプレートとしても保存する」にチェックを入れてください。');return
+      }
+      saveLock.current = true;setBusy(true);setError('')
+      try {
+        const inserted = await host.onSave({...initial,name:draft.name.trim(),messageContent:JSON.stringify({...content,altText:draft.altText.trim(),video:richVideoContent(draft).video})},false)
+        if (current === generation.current && inserted !== false) disarm()
+      } catch { if(current===generation.current)setError('この吹き出しに入れられませんでした。もう一度お試しください。') }
+      finally {saveLock.current=false;if(current===generation.current)setBusy(false)}
+      return
+    }
+    saveLock.current=true;setBusy(true);setError('')
     try{
       const data = {category:'general',name:draft.name.trim(),folderId:draft.folderId||null,messageType:'imagemap',messageContent:JSON.stringify(richVideoContent(draft))}
       const res = savedId ? await api.templates.update(savedId,data) : await api.templates.create({...data,accountId:selectedAccountId})
       if(current !== generation.current)return
       if(!res.success)throw new Error(res.error||'保存できませんでした')
       setSavedId(res.data.id)
-      setClean(snapshot);disarm();router.push('/templates')
+      if (host?.composer) {
+        const saved = await api.templates.get(res.data.id)
+        if(current !== generation.current)return
+        if (!saved.success) throw new Error('保存した動画を確認できませんでした。もう一度お試しください。')
+        const inserted = await host.onSave({kind:'message',name:draft.name.trim(),messageType:'imagemap',messageContent:saved.data.messageContent}, alsoSave)
+        if (inserted === false) return
+      }
+      setClean(snapshot);disarm();if (!host) router.push('/templates')
     }catch(cause){if(current===generation.current)setError(cause instanceof Error?cause.message:'保存できませんでした。もう一度お試しください。')}
-    finally{if(current===generation.current)setBusy(false)}
+    finally{saveLock.current=false;if(current===generation.current)setBusy(false)}
   }
   const fieldError=(field:RichVideoIssue['field'])=>issue?.field===field?<p id={`rv-${field}-error`} className={styles.error}>{issue.message}</p>:null
   const accountName=accounts.find(a=>a.id===selectedAccountId)?.name??'公式アカウント'
@@ -135,7 +165,7 @@ export default function TemplateRichVideoEditor({ id = null, visual = false }: {
   </LinePreview>
   const side=<><div className={styles.previewToggle}><Button onClick={()=>setPreviewOpen(true)}>LINEでの見え方を見る</Button></div><section className={styles.sideCard}><h2 className={styles.sideTitle}>リッチメッセージとの違い</h2><p className={styles.sideText}>リッチビデオはトークで自動で流れる動画です。画像を面に分けて押した所ごとに動かしたいときは、リッチメッセージを使います。</p></section><h2 className={styles.previewHead}>届き方</h2><div className={styles.phone}>{phone}</div></>
   return <>
-    <TemplateEditFrame boardId="oIFk7" title={id?'リッチビデオを編集':'リッチビデオを作る'} description="トーク画面で自動で流れる動画。見終わったらボタンで案内" side={side}
+    <TemplateEditFrame composerHost={host ? { ...host, busy: busy || loading || Boolean(host.busy), onCancel: () => guarded(host.onCancel) } : undefined} onComposerInsert={(alsoSave)=>void save(alsoSave)} boardId="oIFk7" title={id?'リッチビデオを編集':'リッチビデオを作る'} description="トーク画面で自動で流れる動画。見終わったらボタンで案内" side={side}
       band={!canMutate && role ? <p className={styles.readonly} role="status">閲覧のみで見ています。変える操作は管理者に頼んでください。</p>:undefined}
       footerActions={canMutate?<><Button href="/templates">キャンセル</Button><Button variant="primary" onClick={()=>void save()} disabled={busy||loading||loadFailed||mismatch||!selectedAccountId} busy={busy} busyLabel="保存中…">保存する</Button></>:undefined}>
       {error?<p className={styles.error} role="alert">{error}</p>:null}

@@ -57,7 +57,7 @@ import { RowMenu } from '@/components/shared/row-actions'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
-import ListToolbar from '@/components/shared/list-toolbar'
+import ListToolbar, { ListToolbarOptional } from '@/components/shared/list-toolbar'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -1049,7 +1049,7 @@ export default function TemplatesListV8() {
           onChange: onSearch,
         }}
         filters={filterChips}
-        trailing={<>{savedBox(false)}{perPageBox}</>}
+        trailing={<><ListToolbarOptional label="よく使う絞り込み">{savedBox(false)}</ListToolbarOptional>{perPageBox}</>}
       />
     </div>
   )

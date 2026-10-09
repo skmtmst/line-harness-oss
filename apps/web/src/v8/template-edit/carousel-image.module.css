@@ -12,3 +12,7 @@
 .thumb { width: 100%; max-height: var(--tpl-tg2-image-h); object-fit: cover; border-radius: var(--radius-control); }
 .filename { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-caption); }
 .error { color: var(--color-danger); font-size: var(--text-caption); overflow-wrap: anywhere; }
+
+.zone[data-layout='composer'] { height: var(--tpl-carousel-upload-h); position: relative; padding-top: var(--tpl-msg-composer-content-gap); }
+.zone[data-layout='composer'] .thumb { position: absolute; inset: 0; height: var(--tpl-msg-composer-fill); max-height: var(--tpl-msg-composer-image-max-h); opacity: var(--tpl-msg-composer-image-opacity); }
+.zone[data-layout='composer'] > :not(.thumb) { position: relative; }

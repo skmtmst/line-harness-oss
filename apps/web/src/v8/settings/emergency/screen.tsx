@@ -8,10 +8,10 @@
  * アカウント一覧の失敗を黙らせない #518）は今の画面と同じ。動きの一覧は同じ場所の BEHAVIOR.md。
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
-import Link from 'next/link'
 import { RefreshCw } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import { Tabs } from '@/components/shared/tabs'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
@@ -98,11 +98,7 @@ export default function EmergencyScreen({
       description={description}
       actions={actions}
     >
-      <nav className={styles.tabs} aria-label="運用状態の中の切り替え">
-        {TABS.map((item) => (
-          <Link key={item.key} href={TAB_HREF[item.key]} className={styles.tab} aria-current={tab === item.key ? 'page' : undefined}>{item.label}</Link>
-        ))}
-      </nav>
+      <Tabs size="compact" spacing="settings" label="運用状態の中の切り替え" items={TABS.map((item) => ({ label: item.label, href: TAB_HREF[item.key], current: tab === item.key }))} />
       {accountsFailed ? (
         <div className={styles.warnBand} role="alert">
           <p>アカウント一覧を読み込めませんでした。個別のアカウントを選べず、全体が対象になります。</p>

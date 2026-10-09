@@ -23,8 +23,9 @@
    * 角丸の切り抜きは overflow-x:auto でも保たれる。 */
   overflow-x: auto; /* clip: true → 390pxでは送って見せる */
   overflow-y: hidden;
-  border: 1px solid var(--color-hairline); /* stroke: $hairline */
-  border-radius: var(--radius-card); /* cornerRadius: $radius-md */
+  border: 1px solid var(--card-edge); /* stroke: $hairline */
+  border-radius: var(--radius-card); /* cornerRadius: $radius-md */;
+  box-shadow: var(--card-shadow);
 }
 
 .row {
@@ -112,6 +113,7 @@
 [data-theme='v8'] .frame {
   border: 0;
   border-radius: 0;
+  --color-divider: var(--color-hairline);
 }
 
 /*
@@ -202,8 +204,7 @@
 
 /* 連携画面の行の密度。画面からセルの見た目を上書きさせない。 */
 [data-theme='v8'] .frame[data-density='reviews'] {
-  border-radius: var(--tpl-rt-card-radius); outline: 1px solid var(--color-hairline); outline-offset: -1px;
-}
+  border-radius: var(--tpl-rt-card-radius); outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--card-shadow); }
 [data-theme='v8'] .frame[data-density='reviews'] table { display: block; }
 [data-theme='v8'] .frame[data-density='reviews'] :is(thead, tbody) { display: block; }
 [data-theme='v8'] .frame[data-density='reviews'] tr {
@@ -222,7 +223,7 @@
 [data-theme='v8'] .frame[data-density='media'] td { height: var(--tpl-e49-row-h); padding: var(--tpl-e49-row-pad); }
 [data-theme='v8'] .frame[data-density='media'] :is(th, td):first-child { padding-left: var(--tpl-e49-edge); }
 [data-theme='v8'] .frame[data-density='media'] :is(th, td):last-child { padding-right: var(--tpl-e49-edge); }
-[data-theme='v8'] .frame[data-density='sample'] { overflow: hidden; border: 1px solid var(--color-hairline); border-radius: var(--tpl-e1-radius-l); }
+[data-theme='v8'] .frame[data-density='sample'] { overflow: hidden; border: 1px solid var(--card-edge); border-radius: var(--tpl-e1-radius-l); box-shadow: var(--card-shadow); }
 [data-theme='v8'] .frame[data-density='sample'] thead tr { border-top: 0; }
 [data-theme='v8'] .frame[data-density='sample'] :is(th, td) { height: auto; padding: 0; border: 0; box-shadow: none; }
 [data-theme='v8'] .frame[data-density='sample'] tbody tr { border-bottom: 0; box-shadow: var(--shadow-row-line); }
@@ -285,3 +286,158 @@
   [data-theme='v8'] .frame[data-table-presentation='columns'] th[data-cell-collapse='narrow'],
   [data-theme='v8'] .frame[data-table-presentation='columns'] .bodyCell[data-cell-collapse='narrow'] { display: none; }
 }
+/* 設定内の詰めた一覧。指定した表だけに効く（通常の一覧は変えない）。 */
+[data-theme='v8'] .frame[data-table-density] {
+  overflow: hidden;
+  border-radius: var(--tpl-sb-card-radius);
+  outline: 1px solid var(--card-edge);
+  --table-pad: var(--tpl-st2-id-row-pad);
+  box-shadow: var(--card-shadow);
+}
+[data-theme='v8'] .frame[data-table-density='records'] { --table-pad: var(--tpl-sb-ec-row-pad); }
+[data-theme='v8'] .frame[data-table-density] .table,
+[data-theme='v8'] .frame[data-table-density] :is(thead, tbody) { display: block; }
+[data-theme='v8'] .frame[data-table-density] tr {
+  display: grid;
+  grid-template-columns: var(--table-columns);
+  align-items: center;
+  column-gap: var(--tpl-sb-ec-gap);
+  height: auto;
+  padding: var(--table-pad);
+  box-shadow: var(--tpl-sb-line-top);
+}
+[data-theme='v8'] .frame[data-table-density] thead tr {
+  padding: var(--tpl-st2-id-row-pad);
+  border: 0;
+  box-shadow: none;
+  background: var(--color-surface-pearl);
+}
+[data-theme='v8'] .frame[data-table-density='records'] thead tr { padding: var(--tpl-sb-ec-head-pad); }
+[data-theme='v8'] .frame[data-table-density] .table :is(th, td) {
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  font-size: var(--text-caption);
+  line-height: var(--tpl-sb-ec-lh);
+}
+[data-theme='v8'] .frame[data-table-density] .table th {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-sb-row-sub);
+  font-weight: 600;
+  line-height: var(--tpl-sb-row-sub-lh);
+}
+
+[data-theme='v8'] .frame[data-table-density] .table :is(th, td)[data-align='right'] { padding-right: var(--tpl-rest3-ec-row-gap); }
+
+[data-theme='v8'] .frame[data-table-density] .table td[colspan] { grid-column: 1 / -1; }
+/* 指定した列型一覧だけ。行の線・セルの余白を画面CSSで上書きしない。 */
+[data-theme='v8'] .frame[data-column-layout] .table,
+[data-theme='v8'] .frame[data-column-layout] .table tbody {
+  display: flex; flex-direction: column; gap: var(--table-row-gap);
+}
+[data-theme='v8'] .frame[data-column-layout] .table :is(thead, tbody) { width: 100%; }
+[data-theme='v8'] .frame[data-column-layout] .table tr[data-table-layout='columns'] {
+  gap: var(--table-column-gap); padding: var(--table-column-padding); border: 0;
+}
+[data-theme='v8'] .frame[data-column-layout] .table thead tr[data-table-layout='columns'] {
+  height: var(--table-head-height); padding: var(--table-head-padding); border-radius: var(--table-head-radius);
+}
+[data-theme='v8'] .frame[data-column-layout] .table tbody tr[data-table-layout='columns'] { height: var(--table-row-height); box-shadow: var(--shadow-row-line); }
+[data-theme='v8'] .frame[data-column-layout] .table tr[data-table-layout='columns'] > :is(th, td) {
+  height: auto; padding: 0; border: 0; box-shadow: none; line-height: normal; flex-shrink: 1; min-width: 0;
+}
+[data-theme='v8'] .frame[data-column-layout] .table th { font-size: var(--table-head-text-size); }
+[data-theme='v8'] .frame[data-column-layout] .table td { font-size: var(--table-body-text-size); }
+[data-theme='v8'] .frame[data-column-layout] .table tr[data-table-layout='columns'] > [data-cell-grow] {
+  flex: 1 1 0; min-width: 0; padding-inline-end: var(--table-name-inset);
+}
+[data-theme='v8'] .frame[data-column-layout] .table tr[data-table-layout='columns'] > [data-cell-align='right'] {
+  padding-right: var(--table-number-inset); text-align: right;
+}
+
+/* 指定された列組みだけに適用。通常の一覧表の寸法は変えない。 */
+[data-theme='v8'] .frame[data-grid-table] {
+  container-type: inline-size;
+  container-name: shared-grid-table;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--card-edge);
+  outline-offset: -1px;
+  box-shadow: var(--card-shadow);
+}
+[data-theme='v8'] .frame[data-grid-table] .table { display: block; }
+[data-theme='v8'] .frame[data-grid-table] .table :is(thead, tbody) { display: block; }
+[data-theme='v8'] .frame[data-grid-table] .table tr {
+  display: grid;
+  grid-template-columns: var(--table-columns);
+  align-items: center;
+  column-gap: var(--tpl-sb-ec-gap);
+  height: auto;
+  border: 0;
+  padding: var(--table-row-padding);
+  box-shadow: var(--tpl-sb-line-top);
+  font-size: var(--tpl-sb-tbl-head);
+  line-height: var(--tpl-sb-ec-lh);
+}
+[data-theme='v8'] .frame[data-grid-table] .table thead tr {
+  padding: var(--table-head-padding);
+  background: var(--color-surface-pearl);
+  box-shadow: none;
+}
+[data-theme='v8'] .frame[data-grid-table] .table :is(th, td) {
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  color: var(--color-ink-secondary);
+  font-size: inherit;
+  line-height: inherit;
+}
+[data-theme='v8'] .frame[data-grid-table] .table th {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+/* 狭い板では同じ列を保ちながら、指定された比率で収める。 */
+@container shared-grid-table (max-width: 800px) {
+  [data-theme='v8'] .frame[data-grid-table] .table tr {
+    grid-template-columns: var(--table-compact-columns);
+  }
+}
+/* カード内の表。既定の一覧には効かせず、部品側で余白と線を持つ。 */
+[data-theme='v8'] .frame[data-table-presentation='account-list'],
+[data-theme='v8'] .frame[data-table-presentation='account-handover'] {
+  overflow: hidden; border-radius: var(--radius-card); box-shadow: var(--tpl-sa-ring);
+}
+[data-theme='v8'] .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) { display: block; }
+[data-theme='v8'] .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) :is(thead, tbody) { display: block; }
+[data-theme='v8'] .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) tr {
+  display: flex; align-items: center; gap: var(--tpl-sa-acc-gap); height: auto; min-width: 0;
+}
+[data-theme='v8'] .table[data-table-presentation='account-list'] thead tr { padding: var(--tpl-sa-acc-head-pad); }
+[data-theme='v8'] .table[data-table-presentation='account-list'] tbody tr { padding: var(--tpl-sa-acc-row-pad); }
+[data-theme='v8'] .table[data-table-presentation='account-handover'] thead tr { padding: var(--tpl-acd-ho-head-pad); }
+[data-theme='v8'] .table[data-table-presentation='account-handover'] tbody tr { padding: var(--tpl-acd-ho-row-pad); }
+[data-theme='v8'] .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) th {
+  display: block; height: auto; padding: 0; font-size: var(--text-micro); font-weight: 600; line-height: var(--tpl-sa-label-lh);
+}
+[data-theme='v8'] .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) td {
+  display: block; padding: 0; box-shadow: none; font-size: var(--text-caption); line-height: var(--tpl-sa-member-name-lh); min-width: 0;
+}
+[data-theme='v8'] .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) tbody tr { box-shadow: var(--tpl-sa-line-top); }
+[data-theme='v8'] .table[data-table-presentation='account-list'] tbody tr:hover { background: var(--color-canvas-sunken); }
+[data-theme='v8'] .table[data-table-presentation='connection-check'] { border-collapse: collapse; }
+[data-theme='v8'] .table[data-table-presentation='connection-check'] tr { height: var(--tpl-htn-result-row-h); box-shadow: var(--tpl-htn-line-bottom); }
+[data-theme='v8'] .table[data-table-presentation='connection-check'] td {
+  padding: 0; box-shadow: none; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+[data-theme='v8'] .table[data-table-presentation='connection-check'] td:first-child { width: var(--tpl-htn-result-label-w); color: var(--color-ink); font-weight: 700; }
+[data-theme='v8'] .table[data-table-presentation='connection-check'] td:last-child { width: var(--tpl-htn-result-badge-w); text-align: right; }
+
+[data-theme='v8'] .table.table[data-table-presentation='account-list'] :is(th, td):nth-child(4) { padding-right: var(--tpl-sa-acc-friends-pad); }

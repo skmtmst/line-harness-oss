@@ -17,7 +17,7 @@
 import { Suspense, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { CalendarCheck, CalendarPlus, ChevronDown, ClipboardList, Copy, ExternalLink, ImageIcon, MessageSquare, Plus, Send, Trash2, TriangleAlert, Zap, type LucideIcon } from 'lucide-react'
+import { CalendarCheck, CalendarPlus, ChevronDown, ClipboardList, Copy, ExternalLink, MessageSquare, Plus, Send, Trash2, TriangleAlert, Zap, type LucideIcon } from 'lucide-react'
 import type { Folder, MediaItem, MessageTemplateMediaDefinition } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
@@ -45,7 +45,7 @@ import { uploadCarouselImage } from '../template-edit/carousel-image-upload'
 import te from '../template-edit/edit.module.css'
 import {
   MAX_ACTIONS, MAX_COLUMNS, TEXT_MAX_WITH_IMAGE, TEXT_MAX_WITHOUT_IMAGE, TITLE_MAX,
-  MESSAGE_TEXT_MAX, buildCarouselContent, carouselChoiceProblems, carouselSnapshot, choiceFromUri, emptyChoice, emptyPanel,
+  MESSAGE_TEXT_MAX, buildCarouselActions, buildCarouselContent, carouselChoiceProblems, carouselSnapshot, choiceFromUri, emptyChoice, emptyPanel,
   needsLiff, saveCarousel, visualPanels, type ChoiceKind, type Panel,
 } from './carousel-core'
 import styles from './question-new.module.css'
@@ -104,7 +104,7 @@ function hostCarouselInitial(host: TemplateEditHost | undefined) {
   const content = host?.initialContent
   if (!content || content.kind !== 'carousel') return null
   try {
-    const panels = panelsFromContent(content.messageContent)
+    const panels = panelsFromContent(content.messageContent, content.carouselActions ?? null)
     return panels.length ? { name: content.name, panels, tapLimitMode: content.tapLimitMode, tapLimitText: content.tapLimitText ?? '' } : null
   } catch {
     return null
@@ -138,24 +138,26 @@ export function choiceKindOptions(opts: { host: boolean; hasLiff: boolean; curre
 const HOST_ALLOWED: ChoiceKind[] = ['uri', 'message']
 
 function Carousel({ host }: { host?: TemplateEditHost }) {
+  const inline = Boolean(host?.composer)
+  const hqHost = Boolean(host && !host.composer?.accountId)
   const router = useRouter()
   const { selectedAccountId, selectedAccount, accounts } = useAccount()
   const params = useSearchParams()
   /* 統括の入口（host）では店のテンプレートを読まない（新しく作るだけ）。 */
   const id = host ? null : params.get('id')
   const visual = params.get('visual') === '1'
-  usePageTitle(host ? 'テンプレート' : id ? 'カルーセルを編集' : 'カルーセルを作る')
+  usePageTitle(inline ? null : host ? 'テンプレート' : id ? 'カルーセルを編集' : 'カルーセルを作る', !host?.composer)
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'テンプレート', href: '/templates' }], !host)
 
   const [hostInitial] = useState(() => hostCarouselInitial(host))
-  const [name, setName] = useState(hostInitial ? hostInitial.name : visual ? '夏の定番5点' : '')
+  const [name, setName] = useState(hostInitial ? hostInitial.name : inline ? 'カルーセル' : visual ? '夏の定番5点' : '')
   const [panels, setPanels] = useState<Panel[]>(() => hostInitial ? hostInitial.panels : visual ? visualPanels() : [emptyPanel()])
   const [selected, setSelected] = useState(0)
   const [loading, setLoading] = useState(Boolean(id))
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const uploadLock = useRef(false)
-  const [uploadedMedia, setUploadedMedia] = useState<MessageTemplateMediaDefinition[]>([])
+  const [uploadedMedia, setUploadedMedia] = useState<MessageTemplateMediaDefinition[]>(host?.initialContent?.kind === 'carousel' ? host.initialContent.media ?? [] : [])
   const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState('')
   const [loadFailed, setLoadFailed] = useState(false)
@@ -178,13 +180,13 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   const [canMutate] = useState(() => (typeof window === 'undefined' ? true : isOwnerOrAdmin()))
   const actionOptions = useActionOptions()
 
-  const folderAccountId = id ? templateAccountId : selectedAccountId
+  const folderAccountId = host?.composer?.accountId ?? (id ? templateAccountId : selectedAccountId)
   /* 回答フォーム・予約・予約履歴の URL に入れる LIFF ID（テンプレートのアカウントのもの）。統括は使わない。 */
-  const liffId = host ? null : (accounts.find((account) => account.id === folderAccountId)?.liffId ?? null) || null
+  const liffId = hqHost ? null : (accounts.find((account) => account.id === folderAccountId)?.liffId ?? null) || null
   const [forms, setForms] = useState<Array<{ id: string; name: string; isActive: boolean }>>([])
   useEffect(() => {
     setForms([])
-    if (!folderAccountId || host || !liffId) return
+    if (!folderAccountId || hqHost || !liffId) return
     let cancelled = false
     void api.forms.list(folderAccountId).then((res) => {
       if (!cancelled && res.success) setForms(res.data)
@@ -312,17 +314,29 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
     }
   }
   /* 統括の入口：中身を組み立てて呼ぶ側へ渡す。選択肢は URL を開く・テキストを送るだけ（ほかは配った先で動かせない）。 */
-  const hostSave = (distribute: boolean) => {
-    if (!host || uploadLock.current || host.busy) return
+  const hostSave = async (distribute: boolean) => {
+    if (!host || uploadLock.current || host.busy || savingRef.current) return
     if (!name.trim()) { setError('名前を入力してください'); return }
-    if (panels.some((p) => p.actions.some((a) => a.label.trim() && !HOST_ALLOWED.includes(a.kind)))) { setError('統括のカルーセルのボタンは「URLを開く」か「テキストを送る」にしてください'); return }
-    const problems = carouselChoiceProblems(panels, null)
+    if (hqHost && panels.some((p) => p.actions.some((a) => a.label.trim() && !HOST_ALLOWED.includes(a.kind)))) { setError('統括のカルーセルのボタンは「URLを開く」か「テキストを送る」にしてください'); return }
+    const problems = carouselChoiceProblems(panels, liffId)
     if (problems.length > 0) { setError(problems[0]); return }
     if (panels.some((p) => p.thumbnailImageUrl.trim()) && panels.some((p) => !p.thumbnailImageUrl.trim())) { setError('画像は全部のカードに入れるか、全部入れないかにしてください'); return }
     if (panels.some((p) => !p.text.trim())) { setError('すべてのカードに本文を入力してください'); return }
     setError('')
-    disarm()
-    host.onSave({ kind: 'carousel', name: name.trim(), messageContent: buildCarouselContent(panels, 'hq'), tapLimitMode, tapLimitText: tapLimitText.trim() || null, media: uploadedMedia.filter((media) => panels.some((p) => p.thumbnailImageUrl === media.publicUrl)) }, distribute)
+    let backingId = ''
+    if (inline && !distribute && panels.some((p) => p.actions.some((a) => a.kind === 'action'))) { setError('「動きを実行する」を入れるときは、テンプレートとしても保存してください。'); return }
+    if (!hqHost && (distribute || panels.some((p) => p.actions.some((a) => a.kind === 'action')))) {
+      savingRef.current = true; setSaving(true)
+      const saved = await saveCarousel({ templateId: createdId, selectedAccountId: folderAccountId, name: panels[0].title.trim() || name, panels, folderId: null, tapLimitMode, tapLimitText, liffId })
+      savingRef.current = false; setSaving(false)
+      if (!saved.ok) { if (saved.createdId) setCreatedId(saved.createdId); setError(saved.error); return }
+      backingId = saved.id; setCreatedId(saved.id)
+    }
+    savingRef.current = true; setSaving(true)
+    try {
+    const inserted = await host.onSave({ kind: 'carousel', name: inline ? panels[0].title.trim() || name : name.trim(), messageContent: buildCarouselContent(panels, hqHost ? 'hq' : backingId, liffId), tapLimitMode, tapLimitText: tapLimitText.trim() || null, templateId: backingId, carouselActions: buildCarouselActions(panels), media: uploadedMedia.filter((media) => panels.some((p) => p.thumbnailImageUrl === media.publicUrl)) }, distribute)
+    if (inserted !== false) disarm()
+    } finally { savingRef.current = false; setSaving(false) }
   }
   const onSaveDraft = async () => { if (host) { hostSave(false); return } if (await saveNow()) { disarm(); router.push('/templates') } }
   const onPublish = async () => { if (host) { hostSave(true); return } const savedId = await saveNow(); if (savedId) await publishSaved(savedId) }
@@ -394,19 +408,21 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   return (
     <>
       <TemplateEditFrame
+        composerHost={host ? { ...host, busy, onCancel: () => guarded(host.onCancel) } : undefined}
+        onComposerInsert={(alsoSave) => void hostSave(alsoSave)}
         boardId="J60utH"
         title={id ? 'カルーセルを編集' : 'カルーセルを作る'}
         description={`横にめくるカード。最大 ${MAX_COLUMNS} 枚`}
         side={(
           <>
-            <section className={te.sideCard}>
+            {inline ? null : <section className={te.sideCard}>
               <h2 className={te.sideTitle}>気をつけること</h2>
               <div className={own.stats}>
                 <div className={own.stat}><span>カードの数</span><strong>{`${panels.length} / ${MAX_COLUMNS}`}</strong></div>
                 <div className={own.stat}><span>画像</span><strong>{`${panels.length}枚とも同じ比率`}</strong></div>
                 <div className={own.stat}><span>押された数</span><strong>ボタンごとに数える</strong></div>
               </div>
-            </section>
+            </section>}
             <h2 className={te.previewHead}>届き方</h2>
             <div className={te.phone}>{phone}</div>
           </>
@@ -425,7 +441,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
         {saveFailed ? <Notice tone="warn" message="入力した内容はそのまま残っています。もう一度保存を押してください。" /> : null}
         {loading ? <ListState kind="loading" title="カルーセルを読み込んでいます" /> : (
           <>
-            <section className={styles.card} aria-labelledby="cr-name">
+            {inline ? null : <section className={styles.card} aria-labelledby="cr-name">
               <h2 className={styles.cardTitle} id="cr-name">名前とフォルダ</h2>
               <div className={styles.row}>
                 <label className={`${styles.field} ${styles.grow}`}>
@@ -449,7 +465,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                   />
                 </div>
               </div>
-            </section>
+            </section>}
 
             <section className={styles.card} aria-labelledby="cr-cards">
               <div className={styles.cardHead}>
@@ -461,7 +477,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                   <button
                     key={index}
                     type="button"
-                    className={own.chip}
+                    className={own.chip} data-composer={inline || undefined}
                     aria-pressed={index === selectedIndex}
                     draggable={!busy}
                     disabled={busy}
@@ -486,12 +502,12 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
               <section className={styles.card} aria-labelledby="cr-panel">
                 <h2 className={styles.cardTitle} id="cr-panel">{`カード ${selectedIndex + 1} の中身`}</h2>
                 <div className={own.panelRow}>
-                  <CarouselImage
-                    url={panel.thumbnailImageUrl} disabled={busy || loading || loadFailed || (!host && !folderAccountId)} maxMB={host ? 8 : 10}
+                  <CarouselImage layout={inline ? 'composer' : undefined}
+                    url={panel.thumbnailImageUrl} disabled={busy || loading || loadFailed || (!host && !folderAccountId)} maxMB={hqHost ? 8 : 10}
                     scope={`${host ? 'hq' : folderAccountId}-${id ?? 'new'}-${selectedIndex}`}
                     onBusyChange={(value) => { uploadLock.current = value; setUploading(value) }}
                     upload={async (file) => {
-                      if (host) {
+                      if (hqHost && host) {
                         if (!host.uploadCarouselImage) throw new Error('統括の画像の受け取り口を利用できません。')
                         const media = await host.uploadCarouselImage(file)
                         setUploadedMedia((current) => [...current.filter((item) => item.id !== media.id), media])
@@ -502,7 +518,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                       return uploadCarouselImage(file, folderAccountId)
                     }}
                     onUploaded={(url) => update(selectedIndex, { thumbnailImageUrl: url })}
-                    onMediaPick={host ? undefined : () => setPickerOpen(true)}
+                    onMediaPick={hqHost ? undefined : () => setPickerOpen(true)}
                     onUrl={() => setUrlOpen((open) => !open)}
                   />
                   <div className={own.textCol}>
@@ -538,10 +554,10 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                     <div key={ai} className={own.buttonRow}>
                       <input className={`${styles.input} ${own.colLabel}`} value={action.label} placeholder="ボタンの文字" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の文字`} onChange={(event) => setAction({ label: event.target.value })} />
                       <span className={own.colKind}>
-                        <Select size="full" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の動き`} value={action.kind} onChange={(value) => setAction({ kind: value as ChoiceKind })} options={choiceKindOptions({ host: Boolean(host), hasLiff: Boolean(liffId), current: action.kind }).map(({ value, label, icon: Icon }) => ({ value, label, leading: <Icon className={own.kindIcon} /> }))} />
+                        <Select size="full" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の動き`} value={action.kind} onChange={(value) => setAction({ kind: value as ChoiceKind })} options={choiceKindOptions({ host: hqHost, hasLiff: Boolean(liffId), current: action.kind }).map(({ value, label, icon: Icon }) => ({ value, label, leading: <Icon className={own.kindIcon} /> }))} />
                       </span>
                       {action.kind === 'uri' ? (
-                        <input className={`${styles.input} ${own.colBody}`} type="url" value={action.uri} placeholder="https://example.com" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}のURL`} onChange={(event) => setAction({ uri: event.target.value })} />
+                        <input className={`${styles.input} ${own.colBody}`} data-composer={inline || undefined} type="url" value={action.uri} placeholder="https://example.com" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}のURL`} onChange={(event) => setAction({ uri: event.target.value })} />
                       ) : action.kind === 'message' ? (
                         <input className={`${styles.input} ${own.colBody}`} value={action.text} placeholder={`押した人が送る文（${MESSAGE_TEXT_MAX}文字まで）`} aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}の送る文`} aria-invalid={[...action.text].length > MESSAGE_TEXT_MAX || undefined} title={action.text || undefined} onChange={(event) => setAction({ text: event.target.value })} />
                       ) : action.kind === 'form' ? (
@@ -578,7 +594,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
             ) : null}
 
             {/* 絵に無いが今ある設定：押せる回数（「動きを実行する」ボタンだけが対象）。統括の入口は URL だけなので出さない。 */}
-            {host ? null : <section className={styles.card} aria-labelledby="cr-limit">
+            {hqHost || inline ? null : <section className={styles.card} aria-labelledby="cr-limit">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle} id="cr-limit">押せる回数</h2>
                 <p className={styles.note}>「動きを実行する」ボタンだけが対象です。URLを開くボタンはLINEの外へ出るので数えられません。</p>

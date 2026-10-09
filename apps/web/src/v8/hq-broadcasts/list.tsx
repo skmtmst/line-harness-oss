@@ -41,6 +41,7 @@ import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { failedCount, jpDateTime, runBadge, sendTotals } from './model'
 import styles from '../broadcasts/list.module.css'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
 
 type StatusKey = 'all' | 'scheduled' | 'draft' | 'sent' | 'error'
 const STATUS_CHIPS: { key: StatusKey; label: string; icon: typeof List }[] = [
@@ -174,7 +175,7 @@ export default function HqBroadcastList() {
       color: folder.color,
       count: ready ? countIn(folder.id) : null,
       ...(canManage ? {
-        onEdit: () => { setFolderError(''); setFolderName(folder.name); setFolderColor(folder.color ?? null); setFolderDialog({ editing: folder }) },
+        onEdit: () => { setFolderError(''); setFolderName(folder.name); setFolderColor(folderDisplayColor(folder)); setFolderDialog({ editing: folder }) },
         onDelete: () => { setFolderError(''); setDeletingFolder(folder) },
       } : {}),
     })),
@@ -367,7 +368,7 @@ export default function HqBroadcastList() {
       overlays={(
         <>
           <FolderEditorDialog
-            name={folderName} onNameChange={setFolderName} color={folderColor} onColorChange={setFolderColor} allowClear
+            name={folderName} onNameChange={setFolderName} color={folderColor} onColorChange={setFolderColor}
             open={folderDialog !== null}
             title={folderDialog?.editing ? 'フォルダを直す' : 'フォルダを追加'}
             description="一括配信を分けてしまう箱です。消しても、中の配信は未分類に残ります。"

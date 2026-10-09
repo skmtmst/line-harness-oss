@@ -84,13 +84,13 @@ export function usePageChrome(): PageChrome {
  * **読み込み中に空文字を渡さない。** 空にするとタイトルだけ消えて画面が跳ねる。
  * まだ分からないときは `null` を渡し、既定を出したままにする。
  */
-export function usePageTitle(title: string | null | undefined) {
+export function usePageTitle(title: string | null | undefined, enabled = true) {
   const store = useContext(PageChromeContext)
   const setTitle = store?.setTitle
   const next = title && title.length > 0 ? title : null
 
   useEffect(() => {
-    if (!setTitle) return
+    if (!setTitle || !enabled) return
     setTitle(next)
     /*
      * ブラウザのタブの題も「<画面名> | musubo」にする（タブを並べて見分けられるように）。
@@ -100,7 +100,7 @@ export function usePageTitle(title: string | null | undefined) {
     if (next) setDocumentTitle(next)
     // 画面を離れたら既定へ戻す。戻さないと、次の画面に前の名前が残る。
     return () => setTitle(null)
-  }, [next, setTitle])
+  }, [next, setTitle, enabled])
 }
 
 /**

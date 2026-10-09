@@ -1,5 +1,7 @@
 'use client'
 
+import Notice from '@/components/shared/notice'
+
 /*
  * ★V8 LINE通知 運用者へのお知らせ（板 u8xibp）。
  *
@@ -8,10 +10,12 @@
  * 口・動き（公開・止める・自分にテスト・CSV の理由）は今の部品（app/line-notifications/operator-notification-rules.tsx）と同じ。
  */
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Bell, CircleX, Send, Users } from 'lucide-react'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { RowMenu } from '@/components/shared/row-actions'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import StatusBadge from '@/components/shared/status-badge'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import KpiBand from '@/components/shared/kpi-band'
@@ -19,6 +23,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
+import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import ListRange from '@/components/ui/list-range'
 import { ApiError, api, type OperatorNotificationRule } from '@/lib/api'
@@ -72,6 +77,8 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
   const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null)
   const [exportReason, setExportReason] = useState('')
   const [exportError, setExportError] = useState('')
+  const [exportReasonError, setExportReasonError] = useState('')
+  const exportReasonRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     if (!lineAccountId) { setRules([]); setSummary(null); setState('ready'); return }
@@ -125,10 +132,16 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
     } finally { setBusy(null) }
   }
 
-  const closeExport = () => { if (busy === 'csv') return; setExportError(''); onExportClose() }
+  const closeExport = () => { if (busy === 'csv') return; setExportError(''); setExportReasonError(''); onExportClose() }
   const exportCsv = async () => {
     if (!lineAccountId || busy) return
-    if (!exportReason.trim()) { setExportError('書き出す理由を入れてください。'); return }
+    if (!exportReason.trim()) {
+      setExportReasonError('書き出す理由を入れてください。')
+      exportReasonRef.current?.focus()
+      exportReasonRef.current?.scrollIntoView?.({ block: 'center' })
+      return
+    }
+    setExportReasonError('')
     setBusy('csv'); setNotice(null); setExportError('')
     try {
       const blob = await api.lineNotifications.operatorRules.exportCsv(lineAccountId, exportReason.trim())
@@ -151,13 +164,13 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
 
   return <>
     <KpiBand data-kpi-presentation="cards" gridClassName={`${styles.kpis} ${styles.opKpis}`} data-design="KPIs">
-      <KpiCard presentation="card" icon={<Bell size={14} aria-hidden="true" />} title="出しているお知らせ" value={ready ? summary?.published ?? null : null} unit="件" detail={ready ? `止めている ${summary?.stopped ?? '—'}` : '—'} loading={state === 'loading'} />
-      <KpiCard presentation="card" icon={<Send size={14} aria-hidden="true" />} title="今日届いた数" value={ready ? summary?.acceptedToday ?? null : null} unit="件" detail="お店の人へ" loading={state === 'loading'} />
-      <KpiCard presentation="card" icon={<Users size={14} aria-hidden="true" />} title="受け取る人" value={ready ? summary?.recipients ?? null : null} unit="人" detail="LINEログイン済み" loading={state === 'loading'} />
-      <KpiCard presentation="card" icon={<CircleX size={14} aria-hidden="true" />} title="届かなかった" value={ready ? summary?.excludedToday ?? null : null} unit="件" detail="LINE未ログインの人" loading={state === 'loading'} />
+      <KpiCard appearance="notification-operator" presentation="card" icon={<Bell size={14} aria-hidden="true" />} title="出しているお知らせ" value={ready ? summary?.published ?? null : null} unit="件" detail={ready ? `止めている ${summary?.stopped ?? '—'}` : '—'} loading={state === 'loading'} />
+      <KpiCard appearance="notification-operator" presentation="card" icon={<Send size={14} aria-hidden="true" />} title="今日届いた数" value={ready ? summary?.acceptedToday ?? null : null} unit="件" detail="お店の人へ" loading={state === 'loading'} />
+      <KpiCard appearance="notification-operator" presentation="card" icon={<Users size={14} aria-hidden="true" />} title="受け取る人" value={ready ? summary?.recipients ?? null : null} unit="人" detail="LINEログイン済み" loading={state === 'loading'} />
+      <KpiCard appearance="notification-operator" presentation="card" icon={<CircleX size={14} aria-hidden="true" />} title="届かなかった" value={ready ? summary?.excludedToday ?? null : null} unit="件" detail="LINE未ログインの人" loading={state === 'loading'} />
     </KpiBand>
 
-    <p className={`${styles.infoBand} ${styles.opBand}`}>この画面の宛先はお店の人だけです。お客様へ送るものは「顧客へのお知らせ」で設定します。</p>
+    <Notice tone="info" icon={null}>この画面の宛先はお店の人だけです。お客様へ送るものは「顧客へのお知らせ」で設定します。</Notice>
 
     <div className={styles.toolbar}>
       <div className={styles.opSearch}>
@@ -177,35 +190,35 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
         : state === 'forbidden' ? <ListState kind="forbidden" />
         : rules.length === 0 ? <ListState kind="empty" title="運用者へのお知らせがまだありません" action={canManage ? <Button href="/line-notifications/operator/new" variant="primary">運用者へのお知らせを作る</Button> : undefined} />
         : visible.length === 0 ? <ListState kind="empty" emptyPreset="filtered" title="条件に合うお知らせはありません" description="検索語を変えてください。" action={<Button variant="secondary" onClick={() => setQuery('')}>検索を消す</Button>} />
-        : <div role="table" aria-label="運用者へのお知らせ">
-          <div role="rowgroup">
-            <div role="row" className={`${styles.opRow} ${styles.headRow}`}>
-              <span role="columnheader">お知らせ</span>
-              <span role="columnheader">きっかけ</span>
-              <span role="columnheader">受け取る人</span>
-              <span role="columnheader">送る時間</span>
-              <span role="columnheader" className={styles.opNum}>今日</span>
-              <span role="columnheader">状態</span>
-              <span role="columnheader">{canManage ? '操作' : ''}</span>
-            </div>
-          </div>
-          <div role="rowgroup">
+        : <DataTable label="運用者へのお知らせ" grid={{ columns: 'var(--tpl-rest3-op-cols)', compactColumns: 'minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) var(--tpl-sb-ln-col-count) var(--tpl-sb-ln-col-status) var(--tpl-ml-col-ops-wide)', padding: 'var(--tpl-rest3-run-row-pad)', headPadding: 'var(--tpl-rest3-op-head-pad)' }}>
+          <thead>
+            <TableHeadRow>
+              <Th>お知らせ</Th>
+              <Th>きっかけ</Th>
+              <Th>受け取る人</Th>
+              <Th className={styles.opSchedule}>送る時間</Th>
+              <Th><span className={styles.opNum}>今日</span></Th>
+              <Th>状態</Th>
+              <Th>{canManage ? '操作' : ''}</Th>
+            </TableHeadRow>
+          </thead>
+          <tbody>
             {visible.map((rule) => {
               const published = rule.status === 'published'
               const recipients = conditionsOf(rule).recipientLabel ?? (rule.recipientCount > 0 ? `${rule.recipientCount}人` : '受け取れる人なし')
               const schedule = conditionsOf(rule).scheduleLabel ?? 'いつでも'
-              return <div role="row" key={rule.id} className={styles.opRow}>
-                <span role="cell" className={styles.opName}>
+              return <Tr key={rule.id}>
+                <Td className={styles.opName}>
                   {/* 名前から編集画面へ。保存したお知らせを開き直して直せる。 */}
                   <Link href={`/line-notifications/operator/new?id=${encodeURIComponent(rule.id)}`} className={styles.opNameLink} title={rule.name}>{rule.name}</Link>
                   <span className={styles.opSub}>{importanceWords(rule)}</span>
-                </span>
-                <span role="cell" className={styles.cell} title={eventWords(rule.eventType)}>{eventWords(rule.eventType)}</span>
-                <span role="cell" className={styles.cell} title={recipients}>{recipients}</span>
-                <span role="cell" className={styles.cell} title={schedule}>{schedule}</span>
-                <span role="cell" className={`${styles.opNum} ${rule.occurredToday > 0 ? styles.numStrong : styles.numFaint}`}>{rule.occurredToday > 0 ? `${rule.occurredToday}` : '—'}</span>
-                <span role="cell"><span className={styles.status} data-tone={published ? 'good' : 'muted'}><span className={styles.dot} aria-hidden="true" />{published ? '出している' : '止めている'}</span></span>
-                <span role="cell" className={styles.opActions}>
+                </Td>
+                <Td className={styles.cell} title={eventWords(rule.eventType)}>{eventWords(rule.eventType)}</Td>
+                <Td className={styles.cell} title={recipients}>{recipients}</Td>
+                <Td className={`${styles.cell} ${styles.opSchedule}`} title={schedule}>{schedule}</Td>
+                <Td><span className={`${styles.opNum} ${rule.occurredToday > 0 ? styles.numStrong : styles.numFaint}`}>{rule.occurredToday > 0 ? `${rule.occurredToday}` : '—'}</span></Td>
+                <Td><StatusBadge tone={published ? 'success' : 'neutral'}>{published ? '出している' : '止めている'}</StatusBadge></Td>
+                <Td className={styles.opActions}>
                   {canManage ? <>
                     <Button variant="secondary" onClick={() => void testSend(rule)} disabled={busy === rule.id}>自分にテスト</Button>
                     <RowMenu
@@ -217,11 +230,11 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
                         : [{ id: 'stop', label: '止める', disabled: busy === rule.id, onSelect: () => { setOpenMenuId(null); void run(rule, () => api.lineNotifications.operatorRules.stop(rule.id, lineAccountId), `「${rule.name}」を止めました。`, '停止できませんでした。') } }]}
                     />
                   </> : null}
-                </span>
-              </div>
+                </Td>
+              </Tr>
             })}
-          </div>
-        </div>}
+          </tbody>
+        </DataTable>}
     </section>
     {ready && rules.length > 0 ? <ListRange total={summary?.total ?? rules.length} first={1} last={rules.length} /> : null}
 
@@ -235,7 +248,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
       onConfirm={() => void exportCsv()}
       onCancel={closeExport}
     >
-      <TextField aria-label="書き出す理由" value={exportReason} onChange={(event) => setExportReason(event.target.value)} placeholder="例：月次の運用確認" autoFocus />
+      <Field htmlFor="operator-export-reason" label="書き出す理由" error={exportReasonError}><TextField ref={exportReasonRef} id="operator-export-reason" value={exportReason} onChange={(event) => { setExportReasonError(''); setExportReason(event.target.value) }} placeholder="例：月次の運用確認" autoFocus /></Field>
     </ConfirmDialog>
   </>
 }

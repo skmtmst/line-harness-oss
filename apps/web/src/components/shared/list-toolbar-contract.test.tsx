@@ -94,7 +94,7 @@ describe('ListToolbar 一覧の上の道具の並び（★V7 Xn1Mz）', () => {
     expect(src).toContain('<SearchField')
   })
 
-  it('V8 道具の1段（c4n9Kr）：探す欄は幅280で縮まない（狭い板は帯ごと折り返す）', () => {
+  it('V8 道具の1段（c4n9Kr）：幅280を基準にし、段を折り返さない', () => {
     /*
      * 正本 c4n9Kr の検索は width:280px・flex-shrink:0。
      * 中の文（flex:1）が伸び縮みし、外の箱は縮まない。
@@ -110,8 +110,7 @@ describe('ListToolbar 一覧の上の道具の並び（★V7 Xn1Mz）', () => {
     expect(v8Rule![0]).toMatch(/flex:\s*none/)
     expect(v8Rule![0]).not.toContain('min-width: 0')
     expect(v8Rule![0]).not.toMatch(/flex:\s*1(?![\d.])/)
-    // 狭い板では帯ごと折り返す。
-    expect(css).toMatch(/\[data-theme='v8'\]\s*\.toolbar\s*{[^}]*flex-wrap:\s*wrap/s)
+    expect(css).toMatch(/\[data-theme='v8'\]\s*\.toolbar\s*{[^}]*flex-wrap:\s*nowrap/s)
   })
 
   it('日付の範囲の入力はListToolbarの中で狭くそろえる（1440で2行目に収める）', () => {

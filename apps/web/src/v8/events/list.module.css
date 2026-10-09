@@ -2,7 +2,7 @@
  * ★V8 イベント予約の一覧（e2ekFu）。頭・数の帯・フォルダの列・道具の段・本文の置き場は型（ListPage）が持つ。
  * ここは案内の帯の段・表の中身・状態の札・ページ送りの文だけ。値は --tpl-fm-*（回答フォーム一覧と同じ）と --tpl-ev-*。
  */
-:global([data-theme='v8']) .kpiStrip.kpiStrip { border-top: 0; }
+
 .createSpace {
   display: block;
   height: var(--tpl-fm-control-h);

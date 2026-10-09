@@ -21,6 +21,9 @@ import { SettingsPage } from '@/components/templates'
 import { Steps } from '@/components/templates/steps'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import StickyBar from '@/components/shared/sticky-bar'
+import { DataTable, TableHeadRow, Th, Tr, Td, TableStateRow } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -363,7 +366,7 @@ export default function AccountHandoverV8() {
   }
 
   const viewerBand = !canManage ? (
-    <p className={styles.viewerBand} role="status"><Eye size={16} aria-hidden="true" /><span>{NO_MANAGE_NOTE}</span></p>
+    <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />}>{NO_MANAGE_NOTE}</Notice>
   ) : null
 
   // 段1・段2の入口。出す側と受け取る側の両方の口を出す。
@@ -373,15 +376,15 @@ export default function AccountHandoverV8() {
         <HandoverSteps current={1} />
         {viewerBand}
         <div className={styles.duo}>
-          <section className={styles.card}>
+          <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-ho-box-pad)" gap="var(--tpl-acd-ho-list-gap)" className={styles.card}>
             <h3 className={styles.cardTitle}>このアカウントから移す</h3>
             <p className={styles.list}>引き継ぎコードを発行します。コードの期限は72時間で、1回だけ使えます。発行するだけでは何も変わりません。</p>
             {executeError ? <Notice tone="danger" message={executeError} onClose={() => setExecuteError('')} /> : null}
             {canManage ? (
               <span><Button type="button" variant="primary" disabled={issuing} busy={issuing} busyLabel="発行中…" onClick={() => { setExecuteError(''); void issueCode() }}>引き継ぎコードを出す</Button></span>
             ) : null}
-          </section>
-          <section className={styles.card}>
+          </Card>
+          <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-ho-box-pad)" gap="var(--tpl-acd-ho-list-gap)" className={styles.card}>
             <h3 className={styles.cardTitle}>このアカウントへ移す</h3>
             <p className={styles.list}>移し元のアカウントで発行した引き継ぎコードを入れてください。読んだだけでは友だちは動きません。あとで事前確認をします。</p>
             {canManage ? (
@@ -391,7 +394,7 @@ export default function AccountHandoverV8() {
               </div>
             ) : null}
             {linkError ? <p role="alert" className={styles.error}>{linkError}</p> : null}
-          </section>
+          </Card>
         </div>
       </>
     ))
@@ -415,12 +418,12 @@ export default function AccountHandoverV8() {
       {viewerBand}
 
       <div className={styles.duo}>
-        <section className={styles.box}>
+        <Card className={styles.box} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-acd-ho-box-pad)" gap="var(--tpl-acd-ho-box-gap)">
           <p className={styles.boxHead}>
             <span className={styles.boxLabel}>どこからどこへ</span>
             <span className={styles.boxLabel}>
               コード {handover.code}{handover.codeExpiresAt ? `（${formatDateTime(handover.codeExpiresAt)} まで）` : ''}{' '}
-              <button type="button" className={styles.textButton} onClick={() => void copyCode()}>{copyState === 'copied' ? 'コピーしました' : 'コピー'}</button>
+              <Button type="button" variant="text" presentation="account-inline" onClick={() => void copyCode()}>{copyState === 'copied' ? 'コピーしました' : 'コピー'}</Button>
             </span>
           </p>
           <p className={styles.boxValue}>{account.name}（引継ぎ元・元データを残す）→ {destination?.name ?? '—'}（引継ぎ先）</p>
@@ -434,14 +437,14 @@ export default function AccountHandoverV8() {
               action={<Button type="button" variant="secondary" disabled={accountsRetrying} busy={accountsRetrying} busyLabel="読み込んでいます" onClick={() => void retryAccounts()}>一覧だけ読み直す</Button>}
             />
           ) : null}
-        </section>
-        <section className={`${styles.box} ${styles.result}`}>
+        </Card>
+        <Card className={`${styles.box} ${styles.result}`} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-acd-ho-box-pad)" gap="var(--tpl-acd-ho-box-gap)">
           <p className={styles.boxHead}>
             <span className={styles.boxLabel}>事前確認の結果</span>
             {canManage ? (
-              <button type="button" className={styles.textButton} aria-expanded={declaredOpen} onClick={() => setDeclaredOpen((open) => !open)}>
+              <Button type="button" variant="text" presentation="account-inline" aria-expanded={declaredOpen} onClick={() => setDeclaredOpen((open) => !open)}>
                 {handover.declaredFriendTotal != null ? `申告 ${handover.declaredFriendTotal} 人` : '申告の数を入れる'}
-              </button>
+              </Button>
             ) : handover.declaredFriendTotal != null ? (
               <span className={styles.boxLabel}>申告 {handover.declaredFriendTotal} 人</span>
             ) : null}
@@ -459,35 +462,36 @@ export default function AccountHandoverV8() {
           {declaredMismatch ? (
             <p className={styles.boxWarn}>申告の数（{handover.declaredFriendTotal}人）と事前確認の合計（{handover.counts?.sourceTotal ?? '—'}人）が違います。差の理由を確かめてから、数を直すか事前確認をやり直してください。</p>
           ) : null}
-        </section>
+        </Card>
       </div>
 
-      <section className={styles.table} aria-label={`要確認 ${handover.counts?.review ?? '—'}人の判断`}>
-        <div className={styles.headRow} role="row">
-          <span className={styles.colName} role="columnheader">元の友だち</span>
-          <span className={styles.colName} role="columnheader">受け取り先の候補</span>
-          <span className={styles.colEvidence} role="columnheader">つないだ根拠</span>
-          <span className={styles.colChoice} role="columnheader">この人の判断</span>
-        </div>
-        {handover.decisions.length === 0 ? (
-          <p className={styles.empty}>決めた人はまだいません。</p>
+      <DataTable presentation="account-handover" label={`要確認 ${handover.counts?.review ?? '—'}人の判断`}>
+        <thead>
+        <TableHeadRow>
+          <Th className={styles.colName}>元の友だち</Th>
+          <Th className={styles.colName}>受け取り先の候補</Th>
+          <Th className={styles.colEvidence}>つないだ根拠</Th>
+          <Th className={styles.colChoice}>この人の判断</Th>
+        </TableHeadRow></thead>
+        <tbody>{handover.decisions.length === 0 ? (
+          <TableStateRow colSpan={4} kind="empty" title="決めた人はまだいません。" />
         ) : handover.decisions.map((decision) => {
           const shown = decisionEdits[decision.id] ?? decision.decision
           // 人が決める段（X-3）。「要確認」「別人の可能性」の行だけ書き換えられる。見るだけの人には出さない。
           const editable = canManage && (decision.bucket === 'review' || decision.bucket === 'lookalike')
           const name = decision.sourceName ?? decision.from_friend_id
           return (
-            <div key={decision.id} className={styles.row} role="row">
-              <span className={styles.colName}>
+            <Tr key={decision.id}>
+              <Td className={styles.colName}><div className={styles.nameStack}>
                 <span className={styles.name} title={name}>{name}</span>
                 <span className={styles.sub}>元の友だち</span>
-              </span>
-              <span className={styles.colName}>
+              </div></Td>
+              <Td className={styles.colName}><div className={styles.nameStack}>
                 <span className={styles.name}>{decision.candidateName ?? '候補なし'}</span>
                 <span className={styles.sub}>受け取り先の候補</span>
-              </span>
-              <span className={styles.colEvidence}>{decision.evidenceLabel ?? decision.note ?? '—'}</span>
-              <span className={styles.colChoice}>
+              </div></Td>
+              <Td className={styles.colEvidence}>{decision.evidenceLabel ?? decision.note ?? '—'}</Td>
+              <Td className={styles.colChoice}>
                 {editable ? (
                   <Select
                     width={150}
@@ -504,11 +508,11 @@ export default function AccountHandoverV8() {
                 ) : (
                   <span className={styles.fixed}>{decisionLabel(shown)}</span>
                 )}
-              </span>
-            </div>
+              </Td>
+            </Tr>
           )
-        })}
-      </section>
+        })}</tbody>
+      </DataTable>
 
       {canManage && (editCount > 0 || decisionError) ? (
         <div className={styles.pendingBand}>
@@ -523,15 +527,15 @@ export default function AccountHandoverV8() {
       ) : null}
 
       <div className={styles.duo}>
-        <section className={styles.card}>
+        <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-ho-box-pad)" gap="var(--tpl-acd-ho-list-gap)" className={styles.card}>
           <h3 className={styles.cardTitle}>戻せること</h3>
           <p className={styles.list}>{[
             '・7日以内は、今回作った対応付けだけを戻せます',
             '・引継ぎ後に増えた履歴や配信拒否は消しません',
             '・送信済みのメッセージは取り消せません',
           ].join('\n')}</p>
-        </section>
-        <section className={styles.card}>
+        </Card>
+        <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-ho-box-pad)" gap="var(--tpl-acd-ho-list-gap)" className={styles.card}>
           <h3 className={styles.cardTitle}>気をつけること</h3>
           <p className={styles.list}>{[
             '・本実行しても、元のアカウントの友だち・履歴・元のID と所属は残します',
@@ -540,17 +544,16 @@ export default function AccountHandoverV8() {
             '・名前と画像だけが似ている組は、自動では同じ人にしません',
             '・配信元の切り替えは、別に確かめてから行います（この実行では切り替えません）',
           ].join('\n')}</p>
-        </section>
+        </Card>
       </div>
 
       {executeError ? <Notice tone="danger" message={executeError} onClose={() => setExecuteError('')} /> : null}
 
-      <div className={styles.bottom}>
-        <p className={styles.bottomNote}>
+      <StickyBar presentation="account-handover" status={<p className={styles.bottomNote}>
           {unresolved > 0
             ? `未判断が ${unresolved} 人残っています${reviewTotal !== null && decided !== null ? `（要確認 ${reviewTotal} 人のうち ${decided} 人を決めた）` : ''}。全員を決めると本実行できます`
             : ''}
-        </p>
+        </p>} actions={<>
         {/* 取り消しは進行中だけ。変更なので見るだけの人には出さない。 */}
         {canManage && handover.status !== 'completed' && handover.status !== 'failed' && handover.status !== 'cancelled' ? (
           <Button type="button" onClick={() => setCancelOpen(true)}>引き継ぎをやめる</Button>
@@ -560,16 +563,16 @@ export default function AccountHandoverV8() {
             <Play size={14} aria-hidden="true" />本実行する{unresolved > 0 ? `（あと ${unresolved} 人）` : ''}
           </Button>
         ) : null}
-      </div>
+      </>} />
 
       {/* 切り戻し（X-3）。本実行から7日間だけ。変更なので見るだけの人には出さない。 */}
       {canManage && handover.status === 'completed' && !handover.rolledBackAt && handover.rollbackDeadline
         && handover.rollbackDeadline > new Date().toISOString() ? (
-          <section className={styles.card}>
+          <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-ho-box-pad)" gap="var(--tpl-acd-ho-list-gap)" className={styles.card}>
             <h3 className={styles.cardTitle}>移した友だちを元へ戻す</h3>
             <p className={styles.list}>{formatDateTime(handover.rollbackDeadline)} まで切り戻せます。動かした友だちだけを元のアカウントへ戻します。</p>
             <span><Button type="button" variant="danger" onClick={() => { setRollbackError(''); setRollbackOpen(true) }}>切り戻す</Button></span>
-          </section>
+          </Card>
         ) : null}
       {handover.rolledBackAt ? (
         <Notice tone="info" message={`切り戻し済みです（${formatDateTime(handover.rolledBackAt)}）。${handover.rollbackNote ? `理由: ${handover.rollbackNote}` : ''}`} />

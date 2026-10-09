@@ -250,6 +250,7 @@ export function useFileScan() {
     page,
     setPage,
     actionError,
+    setActionError,
     actionDone,
     releaseTarget,
     setReleaseTarget,

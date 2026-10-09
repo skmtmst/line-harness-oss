@@ -74,6 +74,8 @@ export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
    * 既定の描画は変えない（v7 の画素も不変）。
    */
   icon?: ReactNode
+  /** アカウントの短い説明。既定の帯の色・寸法は変えない。 */
+  presentation?: 'account-note'
 }
 
 /**
@@ -97,6 +99,7 @@ export default function Notice({
   helpLabel,
   helpHref,
   icon,
+  presentation,
   role,
   ...props
 }: NoticeProps) {
@@ -115,6 +118,7 @@ export default function Notice({
       data-appearance={appearance}
       data-design-part="notice"
       data-density={density}
+      data-presentation={presentation}
       data-design-node={node}
     >
       {icon === undefined ? (

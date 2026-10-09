@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { PageChromeProvider, usePageTitle } from './page-chrome'
+import { PageChromeProvider, usePageTitle, usePageChrome } from './page-chrome'
 import { formatDocumentTitle } from '@/lib/document-title'
 
 /*
@@ -14,7 +14,24 @@ function Titled({ name }: { name: string | null }) {
   return <p>本文</p>
 }
 
+function NestedEditor({ visible }: { visible: boolean }) {
+  usePageTitle('一斉配信を作成・メッセージ')
+  return <>{visible ? <DisabledTitle /> : null}<ChromeTitle /></>
+}
+function DisabledTitle() { usePageTitle('カルーセルを作る', false); return null }
+function ChromeTitle() { const chrome = usePageChrome(); return <p>{chrome.title}</p> }
+
 describe('タブの題', () => {
+  it('引き出しの編集画面を開閉しても親の画面名を残す', () => {
+    const { rerender, unmount } = render(<PageChromeProvider><NestedEditor visible={false} /></PageChromeProvider>)
+    rerender(<PageChromeProvider><NestedEditor visible /></PageChromeProvider>)
+    expect(screen.getByText('一斉配信を作成・メッセージ')).toBeTruthy()
+    rerender(<PageChromeProvider><NestedEditor visible={false} /></PageChromeProvider>)
+    expect(screen.getByText('一斉配信を作成・メッセージ')).toBeTruthy()
+    expect(document.title).toBe('一斉配信を作成・メッセージ | musubo')
+    unmount()
+  })
+
   it('画面名を渡すと「<画面名> | musubo」になる', () => {
     document.title = ''
     const { unmount } = render(

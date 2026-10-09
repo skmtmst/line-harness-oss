@@ -19,7 +19,7 @@
 .conflictSlot { display: block; margin: var(--tpl-eds-band-mt) 0 var(--tpl-eds-band-mb); }
 
 /* カード：枠1本・角12・余白20・間14。題 15/700・説明 12。 */
-.card { display: flex; flex-direction: column; gap: var(--tpl-eds-tag-card-gap); padding: var(--tpl-eds-card-pad); border-radius: var(--radius-card); outline: 1px solid var(--color-hairline); outline-offset: -1px; background: var(--color-canvas); }
+.card { display: flex; flex-direction: column; gap: var(--tpl-eds-tag-card-gap); padding: var(--tpl-eds-card-pad); border-radius: var(--radius-card); outline: 1px solid var(--card-edge); outline-offset: -1px; background: var(--color-canvas); box-shadow: var(--card-shadow); }
 .cardHead { display: flex; flex-direction: column; }
 .cardTitles { display: flex; flex-direction: column; gap: var(--tpl-eds-title-gap); min-width: 0; }
 .titleRow { display: flex; align-items: center; gap: var(--tpl-eds-field-gap); min-width: 0; }

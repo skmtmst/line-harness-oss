@@ -157,8 +157,12 @@ describe('LINEアカウントの詳細（V8 ihjfd）', () => {
     await click(dialogButtons[dialogButtons.length - 1])
     expect(document.body.textContent).toContain('理由を入れてください')
     expect(sent.filter((s) => s.url.endsWith('/deactivate'))).toHaveLength(0)
+    expect(document.querySelectorAll('[role="alert"]')).toHaveLength(1)
     const input = document.querySelector('[role="dialog"] input') as HTMLInputElement
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(input)
     await type(input, '乗り換えの準備のため')
+    expect(input.getAttribute('aria-invalid')).not.toBe('true')
     const again = buttons('送受信を止める')
     await click(again[again.length - 1])
     expect(sent.find((s) => s.url.endsWith('/deactivate'))?.body).toEqual({ reason: '乗り換えの準備のため' })

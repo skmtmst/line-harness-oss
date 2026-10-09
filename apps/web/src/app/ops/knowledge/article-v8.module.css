@@ -9,6 +9,6 @@
 .fields label:nth-child(2) { order: 2; }
 .fields label:nth-child(3) { order: 3; }
 .fields label:nth-child(4) { order: 4; }
-.evidence { border: 1px solid var(--color-hairline); border-radius: var(--radius-card); padding: 16px; background: var(--color-canvas); }
+.evidence { border: 1px solid var(--card-edge); border-radius: var(--radius-card); padding: 16px; background: var(--color-canvas); box-shadow: var(--card-shadow); }
 .source { font-size: 12px; }
 @container (max-width: 1100px) { .columns { grid-template-columns: minmax(0,1fr); } }

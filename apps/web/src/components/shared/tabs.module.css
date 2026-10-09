@@ -187,6 +187,8 @@
 [data-theme='v8'] .list[data-size='compact'] .tab { min-height: 0; line-height: var(--tpl-tabs-compact-lh); }
 /* 選んだタブの下線は段の線に重ねる（絵の下線は段の高さを足さない）。 */
 [data-theme='v8'] .list[data-size='compact'] .current { margin-bottom: var(--tpl-tabs-compact-line-overlap); }
+[data-theme='v8'] .list[data-spacing='settings'] .items { gap: var(--tpl-sb-tab-gap); }
+[data-theme='v8'] .list[data-spacing='settings'] .tab { padding-bottom: var(--tpl-sb-tab-pad-bottom); }
 [data-theme='v8'] .count[data-tone='warning'] {
   display: inline-flex;
   align-items: center;
@@ -198,6 +200,22 @@
   color: var(--color-status-warn-deep);
   background: var(--color-status-warn-soft);
 }
+[data-theme='v8'] .list[data-size='notification'] .items { gap: var(--tpl-nt-tab-gap); }
+[data-theme='v8'] .list[data-size='notification'] .tab { min-height: 0; padding-bottom: var(--tpl-nt-tab-pad); line-height: var(--tpl-nt-tab-lh); }
 }
 
 [data-theme="v8"] .list[data-spacing="compact"] .items { gap: var(--tpl-rt-tab-gap); }
+/* EC等の設定本文に入る詰めたタブ。 */
+[data-theme='v8'] .list[data-size='settings'] .items { gap: var(--tpl-sb-tab-gap); }
+[data-theme='v8'] .list[data-size='settings'] .tab {
+  padding-bottom: var(--tpl-sb-tab-pad-bottom);
+  line-height: var(--tpl-sb-row-name-lh);
+  border-bottom: var(--tpl-sb-tab-line) solid transparent;
+}
+[data-theme='v8'] .list[data-size='settings'] .current { border-bottom-color: var(--color-ink); }
+[data-theme='v8'] .list[data-size='settings'] .items[data-sliding='true'] .current { border-bottom-color: transparent; }
+/* 文字18＋下の余白10の段。指定したタブだけで使う。 */
+[data-theme='v8'] .list[data-size='short'] .tab {
+  box-sizing: border-box; height: var(--tpl-wh-tab-h); min-height: 0;
+  align-items: flex-start; padding-bottom: 0; line-height: var(--tpl-tabs-text-lh);
+}

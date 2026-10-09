@@ -40,6 +40,8 @@ import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import { AccountArchiveDialogV8, AccountRestoreDialogV8, AccountSettingsDialogV8, accountHandle } from './account-dialogs'
 import { connectionReasonLine } from './connection-reasons'
 import styles from './home.module.css'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
+import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/folder-colors'
 
 type StatusFilter = 'all' | 'ok' | 'warn' | 'archived'
 type View = 'cards' | 'table'
@@ -270,7 +272,7 @@ export default function HqHomeV8() {
 
   const openFolderDialog = (editing: Folder | null) => {
     setFolderName(editing?.name ?? '')
-    setFolderColor(editing?.color ?? null)
+    setFolderColor(editing ? folderDisplayColor(editing) : DEFAULT_TAG_FOLDER_COLOR)
     setFolderError('')
     setFolderDialog({ editing })
   }
@@ -575,7 +577,7 @@ export default function HqHomeV8() {
         <span className={styles.range}>
           {filtered.length === 0 ? '0件' : `${formatNumber(filtered.length)}件中 ${formatNumber((current - 1) * size + 1)}〜${formatNumber((current - 1) * size + shown.length)}件`}
         </span>
-        <p className={styles.footNote}>カードの「設定」から、フォルダの移動・名前・親アカウントを変えられます。アーカイブしたアカウントは「詳細」と「戻す」だけです（戻すのはオーナー・本人確認のあと「停止中」に戻ります）。</p>
+
         {pageCount > 1 ? <Pagination page={current} pageCount={pageCount} onPageChange={setPage} ariaLabel="アカウントのページ送り" /> : null}
       </div>
     </>
@@ -585,6 +587,7 @@ export default function HqHomeV8() {
     <ListPage
       boardId="JKjsE"
       title="統括のアカウント"
+      help="カードの「設定」から、フォルダの移動・名前・親アカウントを変えられます。アーカイブしたアカウントは「詳細」と「戻す」だけです（戻すのはオーナー・本人確認のあと「停止中」に戻ります）。"
       description={`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`}
       folders={folderColumn}
       folderInset
@@ -641,7 +644,7 @@ export default function HqHomeV8() {
         title={folderDialog?.editing ? 'フォルダの名前と色を変える' : 'フォルダを追加'}
         description="アカウントは1つのフォルダに入ります。フォルダを消しても、アカウントは消えません。"
         name={folderName} onNameChange={setFolderName} nameId="hq-account-folder-name" nameLabel="フォルダの名前"
-        color={folderColor} onColorChange={setFolderColor} colors={FOLDER_SELECT_COLORS} allowClear
+        color={folderColor} onColorChange={setFolderColor} colors={FOLDER_SELECT_COLORS}
         placeholder="例: 渋谷エリア" maxLength={100}
         onCancel={() => { if (!folderSaving) setFolderDialog(null) }}
         designNode="JKjsE" busy={folderSaving} error={folderError || undefined}

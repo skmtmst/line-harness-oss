@@ -19,13 +19,15 @@
 :global([data-theme='v8']) .title { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
 :global([data-theme='v8']) .pageTitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
 :global([data-theme='v8']) .description { color: var(--color-ink-secondary); font-size: var(--tpl-desc-size); line-height: var(--tpl-desc-lh); }
+:global([data-theme='v8']) .headingTabs { margin-top: var(--tpl-head-gap); }
 /* compact は間2・説明13/20を維持し、題は標準と同じ22/700/32。 */
 :global([data-theme='v8']) .heading[data-heading-size='compact'] .headingText { gap: var(--tpl-compact-gap); }
 :global([data-theme='v8']) .heading[data-heading-size='compact'] .title { font-size: var(--tpl-compact-title-size); font-weight: var(--tpl-compact-title-weight); line-height: var(--tpl-compact-title-lh); }
 :global([data-theme='v8']) .heading[data-heading-size='compact'] .description { font-size: var(--tpl-desc-size); line-height: var(--tpl-compact-desc-lh); }
 :global([data-theme='v8']) .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; flex-shrink: 0; }
 :global([data-theme='v8']) .tabs { padding: 0 24px; flex-shrink: 0; }
-:global([data-theme='v8']) .stats { border-block: 1px solid var(--color-hairline); flex-shrink: 0; }
+/* 境目は帯が持つ。包みは同じ線を重ねない。 */
+:global([data-theme='v8']) .stats { border: 0; flex-shrink: 0; }
 :global([data-theme='v8']) .notice { padding: 0 24px 16px; }
 :global([data-theme='v8']) .section { padding: var(--tpl-section-pad); min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-section-gap); border-bottom: 1px solid var(--color-hairline); }
 :global([data-theme='v8']) .split { display: flex; flex: 1; min-width: 0; }
@@ -107,7 +109,10 @@
 :global([data-theme='v8']) .dashboardRow[data-row='inbox'] { min-height: 349px; }
 :global([data-theme='v8']) .dashboardRow[data-row='link'] { min-height: 172px; }
 
-:global([data-theme='v8']) [data-page-template='list'] .stats { border-top: 0; }
+/* タブの下線を残し、その直後の数の帯の上線だけ消す。
+   ListPageBody 内と、タブ直後に帯を置く一覧の両方に適用する。 */
+:global([data-theme='v8']) .frame[data-page-template='list'] > .tabs ~ .listBody > .stats :global([data-kpi-strip][data-kpi-presentation='band']),
+:global([data-theme='v8']) .frame[data-page-template='list'] > :has(:global([role='tablist'])) + :global([data-kpi-strip][data-kpi-presentation='band']) { border-top: 0; }
 
 :global([data-theme='v8']) .heading[data-heading-size='large'] .title { font-size: var(--tpl-large-title-size); line-height: var(--tpl-large-title-lh); }
 :global([data-theme='v8']) [data-page-template='create'] .title { font-size: var(--tpl-create-title-size); line-height: var(--tpl-create-title-lh); }
@@ -176,6 +181,7 @@
   /* 画面が詰めた右の列を頼んだとき（CreatePage の previewCompactWhenNarrow・絵 kmTab）。 */
   :global([data-theme='v8']) .preview[data-preview-narrow='compact'] { padding: var(--tpl-r2-rail-compact-pad); }
   :global([data-theme='v8']) .preview[data-preview-narrow='compact'] .previewContent { width: var(--tpl-r2-rail-compact-content-width); }
+  :global([data-theme='v8']) .preview[data-preview-narrow='hidden'] { display: none; }
   :global([data-theme='v8']) .inboxSummary, :global([data-theme='v8']) .analyticsAside, :global([data-theme='v8']) .dashboardAside:not([data-aside-size='column']) { display: none; }
   :global([data-theme='v8']) .dashboardRow[data-row='link'] .dashboardAside:not([data-aside-size='column']) { display: none; }
   :global([data-theme='v8']) .asideToggle { display: block; }
@@ -235,15 +241,30 @@
 .detailColumns[data-detail-columns='restaurant-tables'] { grid-template-columns: minmax(0, 1fr) var(--tpl-rs-table-detail-w); }
 .detailColumns[data-detail-columns^='restaurant-'] .detailColumnMain { gap: var(--tpl-rs-body-gap); }
 .detailColumns[data-detail-columns^='restaurant-'] .detailColumnAside { padding-left: 0; border-left: 0; }
+.detailColumns[data-presentation='notification'] { grid-template-columns: minmax(0, 1fr) var(--tpl-hb2-op-side-w); gap: var(--tpl-hb2-op-gap); margin-right: 0; }
+.detailColumns[data-presentation='notification'] .detailColumnMain { gap: var(--tpl-hb2-op-col-gap); }
+.detailColumns[data-presentation='notification'] .detailColumnAside { display: flex; flex-direction: column; gap: var(--tpl-hb2-op-col-gap); padding-left: 0; border-left: 0; }
 @container v8-page (max-width: 1099px) {
   .detailColumns, .detailColumns[data-detail-columns^='restaurant-'] { grid-template-columns: minmax(0, 1fr); margin-right: 0; gap: var(--tpl-body-pad); }
-  .detailColumns[data-presentation='card'] { grid-template-columns: minmax(0, 1fr); }
+  .detailColumns:is([data-presentation='card'], [data-presentation='notification']) { grid-template-columns: minmax(0, 1fr); }
   .detailColumnToggle { display: block; }
-  .detailColumnAside { display: none; min-height: 0; padding-left: 0; border-left: 0; }
+  .detailColumnAside, .detailColumns[data-presentation='notification'] .detailColumnAside { display: none; min-height: 0; padding-left: 0; border-left: 0; }
   .detailColumnAside[data-expanded] { display: block; }
+  .detailColumns[data-presentation='notification'] .detailColumnAside[data-expanded] { display: flex; }
 }
 
 :global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-spacing='compact'] > .steps { margin-top: var(--tpl-steps-compact-top-gap); }
+/* 広い設定本文の口。画面の CSS から型の余白・幅を上書きしない。 */
+:global([data-theme='v8']) .settings[data-content-layout] { gap: 0; }
+:global([data-theme='v8']) .settingsContent[data-content-layout] { max-width: none; }
+:global([data-theme='v8']) .settingsContent[data-content-layout='wide'] { padding: var(--tpl-sa-content-pad); gap: var(--tpl-sa-gap); }
+:global([data-theme='v8']) .settingsContent[data-content-layout='account-detail'] { padding: var(--tpl-acd-pad); gap: var(--tpl-acd-stack-gap); }
+:global([data-theme='v8']) .settingsContent[data-content-layout='account-handover'] { padding: var(--tpl-acct-handover-content-pad); gap: var(--tpl-acd-gap); }
+@container v8-page (max-width: 1099px) {
+  /* アカウントの本文を設定メニューの下へ押し出さない。移動先は外側の設定メニューにもある。 */
+  :global([data-theme='v8']) .settings[data-content-layout] > .settingsNav { display: none; }
+  :global([data-theme='v8']) .settingsContent[data-content-layout] { width: 100%; padding-left: var(--tpl-head-pad-side); align-self: stretch; }
+}
 /* ページが畳まれても、窓の中のフォルダは窓の寸法で並べる。 */
 :global([data-theme='v8']) .listBody[data-dialog-layout] .folders { display: flex; }
 :global([data-theme='v8']) .listBody[data-dialog-layout] .collapsedFolders { display: none; }
@@ -256,7 +277,7 @@
 :global([data-theme='v8']) .frame:is([data-template-layout='accounts'], [data-template-layout='account-detail'], [data-template-layout='account-handover']) .settings { gap: 0; }
 :global([data-theme='v8']) .frame[data-template-layout='accounts'] .settingsContent { max-width: none; padding: var(--tpl-sa-content-pad); gap: var(--tpl-sa-gap); }
 :global([data-theme='v8']) .frame[data-template-layout='account-detail'] .settingsContent { max-width: none; padding: var(--tpl-acd-pad); gap: var(--tpl-acd-stack-gap); }
-:global([data-theme='v8']) .frame[data-template-layout='account-handover'] .settingsContent { max-width: none; padding: var(--tpl-acd-pad); gap: var(--tpl-acd-gap); }
+:global([data-theme='v8']) .frame[data-template-layout='account-handover'] .settingsContent { max-width: none; padding: var(--tpl-acct-handover-content-pad); gap: var(--tpl-acd-gap); }
 :global([data-theme='v8']) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) { --tpl-setnav-w: var(--tpl-sb-nav-w); --tpl-settings-gap: 0px; }
 :global([data-theme='v8']) .frame[data-template-layout='wide-nav'] { --tpl-head-gap: var(--tpl-sb-head-gap); --tpl-head-pad-bottom: var(--tpl-sb-head-pad-bottom); --tpl-desc-size: var(--tpl-sb-desc-size); --tpl-desc-lh: var(--tpl-sb-desc-lh); }
 :global([data-theme='v8']) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) .settingsContent { max-width: none; }
@@ -265,3 +286,8 @@
 :global([data-theme='v8']) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) > .footer { margin-inline: var(--tpl-sb-footer-side); }
 :global([data-theme='v8']) .frame[data-template-layout='narrow-nav'] { --tpl-setnav-w: var(--tpl-sb-nav-w-narrow); --tpl-settings-content-pad-block: var(--tpl-sb-narrow-pad-top) var(--tpl-sb-narrow-pad-bottom); --tpl-settings-content-pad-side: var(--tpl-sb-narrow-pad-side); --tpl-settings-content-gap: var(--tpl-sb-narrow-gap); }
 :global([data-theme='v8']) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) :global([data-settings-nav='inline'] li > ul) { --tpl-setnav-item-pad: var(--tpl-st2-setnav-child-pad); }
+/* 同じ畳み方を SettingsPage.layout のアカウント3板にも使う（x2dSNv は上24：アカウント担当の測り）。 */
+@container v8-page (max-width: 1099px) {
+  :global([data-theme='v8']) .frame:is([data-template-layout='accounts'], [data-template-layout='account-detail'], [data-template-layout='account-handover']) .settings > .settingsNav { display: none; }
+  :global([data-theme='v8']) .frame:is([data-template-layout='accounts'], [data-template-layout='account-detail'], [data-template-layout='account-handover']) .settingsContent { width: 100%; padding-left: var(--tpl-head-pad-side); align-self: stretch; }
+}
