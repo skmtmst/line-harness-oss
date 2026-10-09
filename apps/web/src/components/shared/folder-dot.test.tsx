@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { FolderDot, FolderDotName } from './folder-dot'
+import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
+import { FolderDot, FolderDotName, folderDisplayColor } from './folder-dot'
 
 /*
  * 一覧の行の名前の前の「フォルダの色の丸」（2026-10-07 オーナー決定）。
@@ -21,6 +22,18 @@ describe('フォルダの色の丸', () => {
     expect(html).toContain('aria-label="フォルダ：VIP"')
     expect(html).toContain('title="フォルダ：VIP"')
     expect(html).toContain('data-folder-dot="filed"')
+  })
+
+  it('色の無いフォルダは名前から9色の1つを決まった形で選ぶ（灰色の丸にしない・B-136）', () => {
+    const palette: string[] = FOLDER_SELECT_COLORS.map((c) => c.value)
+    const a = folderDisplayColor({ name: '会員', color: null })
+    expect(palette).toContain(a)
+    expect(folderDisplayColor({ name: '会員' })).toBe(a)
+    expect(folderDisplayColor({ name: '会員', color: '#123456' })).toBe('#123456')
+    const names = ['購入', '紹介', '配信の反応', 'VIP', '季節', '店頭', '01_キャンペーン', 'セール', '新商品', '定期便']
+    expect(new Set(names.map((name) => folderDisplayColor({ name }))).size).toBeGreaterThan(3)
+    const html = renderToStaticMarkup(<FolderDot folder={{ name: '会員', color: null }} />)
+    expect(html).toContain(`background-color:${a}`)
   })
 
   it('未分類は色の無い輪で、「フォルダ：未分類」と伝える', () => {

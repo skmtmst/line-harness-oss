@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import styles from './folder-dot.module.css'
 
 /*
@@ -9,8 +10,20 @@ import styles from './folder-dot.module.css'
  */
 export interface FolderDotFolder {
   name: string
-  /** フォルダの色（#RRGGBB）。無いフォルダは薄い灰の丸。 */
+  /** フォルダの色（#RRGGBB）。無いフォルダは folderDisplayColor が名前から選ぶ。 */
   color?: string | null
+}
+
+/**
+ * フォルダの見せる色。色を決めていないフォルダは、名前から9色の1つを決まった形で選ぶ
+ * （B-136 2026-10-09：色の無いフォルダが灰色の丸ばかりになり、列と行の丸で見分けがつかなかった）。
+ * 同じ名前はいつも同じ色。左の列の丸と、行の名前の前の丸は同じこの値を使う。
+ */
+export function folderDisplayColor(folder: FolderDotFolder): string {
+  if (folder.color) return folder.color
+  let hash = 0
+  for (const char of folder.name) hash = (hash * 31 + (char.codePointAt(0) ?? 0)) >>> 0
+  return FOLDER_SELECT_COLORS[hash % FOLDER_SELECT_COLORS.length].value
 }
 
 export function FolderDot({ folder }: { folder?: FolderDotFolder | null }) {
@@ -18,7 +31,7 @@ export function FolderDot({ folder }: { folder?: FolderDotFolder | null }) {
   return (
     <span
       className={folder ? styles.dot : `${styles.dot} ${styles.unfiled}`}
-      style={folder?.color ? { backgroundColor: folder.color } : undefined}
+      style={folder ? { backgroundColor: folderDisplayColor(folder) } : undefined}
       role="img"
       aria-label={label}
       title={label}
