@@ -14,6 +14,9 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
+const notifySaved = vi.hoisted(() => vi.fn())
+vi.mock('@/components/shared/toast', () => ({ notifySaved, default: () => null }))
+
 const fetchApi = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const push = vi.hoisted(() => vi.fn())
@@ -94,6 +97,7 @@ describe('V8 会員（src/v8/nen-members）', () => {
     document.documentElement.dataset.theme = 'v8'
     role.value = 'owner'
     fetchApi.mockReset()
+    notifySaved.mockReset()
     push.mockReset()
     fetchApi.mockImplementation(async (path: string) => {
       if (path.startsWith('/api/nen/rank-settings?')) return { success: true, data: SETTINGS }
@@ -177,6 +181,10 @@ describe('V8 会員（src/v8/nen-members）', () => {
     const call = fetchApi.mock.calls.find(([path, options]) => path === '/api/nen/lifetime-milestones' && options?.method === 'PUT')
     expect(call).toBeTruthy()
     expect(JSON.parse(call![1].body).milestones[0]).toEqual({ id: 'm1', thresholdYen: 50000, title: 'はじめまして', notifyOnReach: true })
+    expect(notifySaved).toHaveBeenCalledOnce()
+    expect(notifySaved).toHaveBeenCalledWith('節目を保存しました。')
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('ECへの同期は失敗')
+    expect(host.querySelector('[role="status"]')?.textContent ?? '').not.toContain('節目を保存しました。')
   })
 
   it('B-139 ランク：名前を消して保存すると、口を呼ばずその行の名前の欄が赤くなり、そこへ移る', async () => {
