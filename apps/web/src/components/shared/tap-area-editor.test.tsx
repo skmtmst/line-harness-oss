@@ -74,7 +74,7 @@ describe('画像の上で面を選ぶ（共通部品 TapAreaEditor・採用案 W
     expect(block('.letter {')).toContain('var(--color-ink-secondary)')
     const on = block('.row[data-selected] .letter {')
     expect(on).toContain('var(--color-accent-deep)')
-    expect(on).toContain('#ffffff')
+    expect(on).toContain('var(--color-on-accent)')
     expect(block('.row[data-selected], .row[data-selected]:hover {')).toContain('var(--color-accent-soft)')
     expect(block('.area[data-selected] {')).toContain('var(--color-accent-deep)')
     expect(block('.summary {')).toContain('font-size: 11px')
