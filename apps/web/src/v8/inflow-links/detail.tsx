@@ -124,7 +124,6 @@ function InflowDetailContent() {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [deleteChoice, setDeleteChoice] = useState<DeleteChoice>('stop')
-  const [deleteConfirmationName, setDeleteConfirmationName] = useState('')
   const [canPermanentlyDelete, setCanPermanentlyDelete] = useState(false)
   // 「別の流入リンクへ送る」の転送先。先頭を自動採用しない（#514 重大4）。
   const [redirectTargetId, setRedirectTargetId] = useState('')
@@ -281,7 +280,7 @@ function InflowDetailContent() {
         const result = deleteChoice === 'delete'
           ? await fetchApi<{ success: boolean; error?: string }>(`/api/entry-routes/${encodeURIComponent(route.id)}`, {
               method: 'DELETE',
-              body: JSON.stringify({ confirmationName: deleteConfirmationName }),
+              body: JSON.stringify({ confirmationName: route.name }),
             })
           : await api.entryRoutes.update(route.id, { isActive: false })
         if (!result.success) throw new Error(result.error)
@@ -350,7 +349,6 @@ function InflowDetailContent() {
   const openDelete = (choice: DeleteChoice) => {
     setDeleteError('')
     setDeleteChoice(choice)
-    setDeleteConfirmationName('')
     setRedirectTargetId('')
     setAfterMenuOpen(false)
     setDeleteOpen(true)
@@ -764,7 +762,6 @@ function InflowDetailContent() {
           error={deleteError || undefined}
           confirmLabel={deleteChoice === 'stop' ? '受けるのをやめる' : deleteChoice === 'redirect' ? '別のリンクへ送る' : 'この経路を削除する'}
           onConfirm={() => {
-            if (deleteChoice === 'delete' && deleteConfirmationName !== route.name) return
             return applyDeleteChoice()
           }}
           onCancel={() => { if (!deleting) setDeleteOpen(false) }}
@@ -810,19 +807,7 @@ function InflowDetailContent() {
                 <span className={styles.note}>先頭を自動で選ぶことはしません。必ず選んでください。</span>
               </div>
             ) : null}
-            {deleteChoice === 'delete' ? (
-              <label className={styles.deleteField}>
-                <span className={styles.deleteChoiceTitle}>{`完全削除するには「${route.name}」と入力`}</span>
-                <input
-                  value={deleteConfirmationName}
-                  disabled={deleting}
-                  onChange={(event) => setDeleteConfirmationName(event.target.value)}
-                  autoComplete="off"
-                  className={styles.fieldInput}
-                />
-                <span className={styles.note}>空白や大文字・小文字も含め、現在の経路名と同じ入力が必要です。</span>
-              </label>
-            ) : null}
+
           </div>
         </Dialog>
       ) : null}

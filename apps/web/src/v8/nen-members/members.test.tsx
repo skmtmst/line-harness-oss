@@ -131,10 +131,10 @@ describe('V8 会員（src/v8/nen-members）', () => {
     await render('ranks', onRetry)
     await click(byLabel('ランク「シルバー」のその他操作'))
     await click(byText('ランクを削除する'))
-    expect(document.body.textContent).toContain('ランク「シルバー」を消しますか？')
+    expect(document.body.textContent).toContain('「シルバー」を削除しますか？')
     expect(document.body.textContent).toContain('このランクには会員が 2 人います。')
     fetchApi.mockImplementationOnce(async () => ({ success: true, data: { id: 'r-sv', replacementRankId: 'r-bz', movedMembers: 2, version: 4, operationId: 'op', ecSync: 'synced' } }))
-    await click(byText('2 人を移して消す'))
+    await click(byText('削除する'))
     const call = fetchApi.mock.calls.find(([path, options]) => String(path).startsWith('/api/nen/rank-settings/r-sv') && options?.method === 'DELETE')
     expect(call).toBeTruthy()
     expect(JSON.parse(call![1].body)).toEqual({ accountId: 'acc-1', replacementRankId: 'r-bz', expectedVersion: 3 })
@@ -150,7 +150,7 @@ describe('V8 会員（src/v8/nen-members）', () => {
       if (path.startsWith('/api/nen/rank-settings?')) return { success: true, data: { ...SETTINGS, rules: { ...SETTINGS.rules!, version: 4, updatedAt: '2026-10-01T14:02:00+09:00' } } }
       return { success: true, data: {} }
     })
-    await click(byText('2 人を移して消す'))
+    await click(byText('削除する'))
     expect(host.textContent).toContain('ほかの人が 14:02 にランク設定を保存しました')
     expect(byText('違いを比べる')).toBeTruthy()
     expect(byText('最新を読み込んで続ける')).toBeTruthy()

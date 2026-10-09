@@ -1,5 +1,6 @@
 'use client'
 
+import { isDeleteConfirmation, normalizeDeleteTitle } from './delete-confirmation'
 import React, { useContext, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, X } from 'lucide-react'
@@ -211,7 +212,7 @@ export default function Dialog({
   if (!open && !leaving) return null
 
   const titleNode = (
-    <h2 id={titleId} className={`${styles.title} ${tone === 'destructive' ? styles.destructiveTitle : styles.standardTitle}`}>{title}</h2>
+    <h2 id={titleId} className={`${styles.title} ${tone === 'destructive' ? styles.destructiveTitle : styles.standardTitle}`}>{typeof title === 'string' && tone === 'destructive' && isDeleteConfirmation(confirmLabel) ? normalizeDeleteTitle(title) : title}</h2>
   )
   /* YZ57z 解除の桃箱は「題は箱の外・説明だけ箱の中」のため、題と説明を分けておく。
      かけらは描画に出ない（囲み要素なし）。渡さないときは h2 そのまま。 */
@@ -318,7 +319,7 @@ export default function Dialog({
             onClick={runConfirm}
             disabled={busy || confirmDisabled} busy={busy} busyLabel="処理中…">
             {!busy && confirmIcon ? <span className={styles.buttonIcon} aria-hidden="true">{confirmIcon}</span> : null}
-            {confirmLabel}
+            {tone === 'destructive' && isDeleteConfirmation(confirmLabel) ? '削除する' : confirmLabel}
           </Button>
         </div>
       ) : null)}
