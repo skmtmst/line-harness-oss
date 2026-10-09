@@ -2958,6 +2958,25 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
   return res.json() as Promise<T>
 }
 
+const sharedReads = new Map<string, Promise<unknown>>()
+
+/** 同時に出る請求表示だけ共有する。完了後は捨て、保存後の読み直しは必ず通信する。 */
+function fetchSharedRead<T>(path: string): Promise<T> {
+  const csrf = getCsrfToken()
+  // Cookie だけでセッションの世代が分からない場合は共有しない。
+  if (!csrf) return fetchApi<T>(path)
+  const key = JSON.stringify([path, adminSessionHeaders(), csrf])
+  let pending = sharedReads.get(key)
+  if (!pending) {
+    pending = fetchApi<T>(path)
+    sharedReads.set(key, pending)
+    const forget = () => { if (sharedReads.get(key) === pending) sharedReads.delete(key) }
+    pending.then(forget, forget)
+  }
+  // 呼び出し側で表示用に並べ替え・加工しても、もう一方の表示へ伝えない。
+  return (pending as Promise<T>).then((response) => structuredClone(response))
+}
+
 /**
  * よく開く一覧の取り方（前のデータをすぐ出して裏で取り直す用）。
  *
@@ -9116,7 +9135,7 @@ export const api = {
         amountDueYen: number; prorationDifferenceYen: number; nextBillingAt: string | null;
         estimatedAt: string; isEstimate: true; notice: string }>>(
         `/api/hq/billing/preview?${new URLSearchParams({ planKey, interval })}`),
-    summary: () => fetchApi<ApiResponse<BillingSummary>>('/api/hq/billing/summary'),
+    summary: () => fetchSharedRead<ApiResponse<BillingSummary>>('/api/hq/billing/summary'),
     /** Stripe の申込画面の URL。オーナーだけ。 */
     checkout: (planKey: PlanKey, interval: BillingInterval = 'month') =>
       fetchApi<ApiResponse<{ url: string }>>('/api/hq/billing/checkout', { method: 'POST', body: JSON.stringify({ planKey, interval }) }),
