@@ -1,5 +1,6 @@
 'use client'
 
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -2306,16 +2307,7 @@ export function NewAutomationV8({
     : `${triggerPhrase}、${conditionSummaries.length > 0 ? `${conditionSummaries.join('・')}に、` : ''}${actionPhrases.join('、') || '処理を実行します'}。`
 
   const conflictBand = conflict ? (
-    <div className={styles.conflictBand} role="alert">
-      <TriangleAlert size={16} aria-hidden="true" className={styles.conflictIcon} />
-      <div className={styles.conflictText}>
-        {/* 口が「だれが・いつ」を返さないので、相手を名指ししない。 */}
-        <p className={styles.conflictTitle}>ほかの人が先にこのルールを保存しました</p>
-        <p className={styles.conflictNote}>このまま保存すると、相手の変更が消えます</p>
-      </div>
-      <Button onClick={() => setCompareOpen(true)}><ArrowLeftRight size={15} aria-hidden="true" />違いを比べる</Button>
-      <Button onClick={() => void reloadServerDraft()}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
-    </div>
+    <SaveConflictBand title="ほかの人が先にこのルールを保存しました" description="このまま保存すると、相手の変更が消えます" onCompare={() => setCompareOpen(true)} onReload={() => void reloadServerDraft()} />
   ) : null
 
   const sideColumn = (

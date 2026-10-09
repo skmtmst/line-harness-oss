@@ -14,6 +14,7 @@
  * 409 は板 v5L19Z の帯を出し、「違いを比べる」「最新を読み込んで続ける」
  * 「比べてから保存」で扱う（いきなり上書きしない）。
  */
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
@@ -789,19 +790,7 @@ export default function MenuFormV8() {
 
       {conflict && (
         <div ref={conflictRef} className={styles.conflictRow} data-design="Bar" data-design-node="v5L19Z">
-          <div className={styles.conflictBand} role="alert">
-            <TriangleAlert size={18} className={styles.conflictIcon} aria-hidden="true" />
-            <div className={styles.conflictText}>
-              <strong>
-                {`${conflict.author ? `${conflict.author}さんが` : 'ほかの人が'}${conflict.at ? ` ${conflictTime(conflict.at)} に` : ''}メニュー「${conflict.name}」を保存しました`}
-              </strong>
-              <p>
-                {`あなたが直した所はまだ保存されていません。このまま保存すると、${conflict.author ? `${conflict.author}さん` : 'ほかの人'}の変更が消えます。`}
-              </p>
-            </div>
-            <Button onClick={() => setComparing(true)}><GitCompare size={15} aria-hidden="true" />違いを比べる</Button>
-            <Button variant="primary" onClick={() => void reloadLatest()}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
-          </div>
+          <SaveConflictBand title={`${conflict.author ? `${conflict.author}さんが` : 'ほかの人が'}${conflict.at ? ` ${conflictTime(conflict.at)} に` : ''}メニュー「${conflict.name}」を保存しました`} onCompare={() => setComparing(true)} onReload={() => void reloadLatest()} />
         </div>
       )}
 

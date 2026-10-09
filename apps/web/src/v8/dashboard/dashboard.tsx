@@ -395,6 +395,7 @@ export default function DashboardV8() {
         saving={d.preferenceSaving}
         saveError={d.preferenceSaveError?.message ?? null}
         saveConflict={d.preferenceSaveError?.conflict ?? false}
+        onComparePreferences={d.comparePreferences}
         onReloadPreferences={d.reloadPreferences}
         onCancel={d.closeEditor}
         onApply={d.applyPreferences}

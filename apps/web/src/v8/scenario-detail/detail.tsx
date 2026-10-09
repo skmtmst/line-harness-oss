@@ -13,6 +13,7 @@
  * 閲覧のみの人には、変える操作のボタンを置かない（オーナー決定 2026-10-06）。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
 
 import Link from 'next/link'
@@ -2400,27 +2401,9 @@ export default function ScenarioDetailV8({
       {/* 競合（kz2B6）：ほかの人の保存と食い違った。板の頭のすぐ下に、幅いっぱいで出す。 */}
       {conflict && (
         <div className={styles.conflictWrap}>
-          <div className={styles.conflictBar} data-design-node="kz2B6" role="alert">
-            <CircleAlert className={styles.conflictIcon} aria-hidden />
-            <div className={styles.conflictText}>
-              <p className={styles.conflictTitle}>
-                {conflictLatest
+          <SaveConflictBand title={conflictLatest
                   ? `ほかの人が ${formatClock(conflictLatest.updatedAt)} にシナリオ「${conflictLatest.name}」を保存しました`
-                  : 'ほかの人がこのシナリオを保存しました'}
-              </p>
-              <p className={styles.conflictBody}>
-                あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。
-              </p>
-            </div>
-            <Button type="button" variant="secondary" onClick={() => setCompareOpen(true)} disabled={!conflictLatest}>
-              <GitCompareArrows aria-hidden />
-              違いを比べる
-            </Button>
-            <Button type="button" variant="primary" onClick={() => void acceptLatestAndContinue()}>
-              <RefreshCw aria-hidden />
-              最新を読み込んで続ける
-            </Button>
-          </div>
+                  : 'ほかの人がこのシナリオを保存しました'} description="あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。" onCompare={() => setCompareOpen(true)} compareDisabled={!conflictLatest} onReload={() => void acceptLatestAndContinue()} />
         </div>
       )}
 

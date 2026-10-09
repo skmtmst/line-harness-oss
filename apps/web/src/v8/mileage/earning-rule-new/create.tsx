@@ -9,6 +9,7 @@
  * 聞く項目・保存の口・送る形・失敗の扱いは今の作る画面（app/mileage/earning-rules/new/v8-earning-rule-new.tsx）と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeftRight, Check, Hourglass, RefreshCw, Share2, TriangleAlert, User, Zap } from 'lucide-react'
@@ -249,15 +250,7 @@ export default function EarningRuleCreateV8() {
     ? `${conflict.who}さんが${conflict.at ? ` ${conflict.at} に` : ''}この決めごとを保存しました`
     : `ほかの人が${conflict?.at ? ` ${conflict.at} に` : ''}この決めごとを保存しました`
   const conflictBand = conflict ? (
-    <div className={styles.conflictBand} role="alert" aria-label="ほかの人が先に保存しました">
-      <TriangleAlert size={16} aria-hidden="true" className={styles.conflictIcon} />
-      <div className={styles.conflictText}>
-        <p className={styles.conflictTitle}>{conflictTitle}</p>
-        <p className={styles.conflictNote}>{conflict.who ? `このまま保存すると、${conflict.who}さんの変更が消えます` : 'このまま保存すると、先に保存された変更が消えます'}</p>
-      </div>
-      <Button href={LIST_HREF}><ArrowLeftRight size={15} aria-hidden="true" />違いを比べる</Button>
-      <Button href={LIST_HREF}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
-    </div>
+    <SaveConflictBand title={conflictTitle} description={conflict.who ? `このまま保存すると、${conflict.who}さんの変更が消えます` : 'このまま保存すると、先に保存された変更が消えます'} compareHref={LIST_HREF} reloadHref={LIST_HREF} />
   ) : null
 
   const trialValue = (filled: string) => (trialBusy ? '数えています…' : trial ? filled : '—')

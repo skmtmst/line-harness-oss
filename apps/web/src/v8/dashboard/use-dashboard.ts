@@ -268,6 +268,13 @@ export function useDashboard() {
     }
   }
 
+  const comparePreferences = async (): Promise<DashboardPreferences | null> => {
+    const accountId = selectedAccountId
+    if (!accountId) return null
+    const response = await api.dashboard.preferences.get(accountId)
+    return response.success && selectedAccountIdRef.current === accountId ? normalizeDashboardPreferences(response.data.cards, V8_DASHBOARD_DEFAULT_VISIBILITY) : null
+  }
+
   const reloadPreferences = async (): Promise<DashboardPreferences | null> => {
     const accountId = selectedAccountId
     if (!accountId) return null
@@ -553,6 +560,7 @@ export function useDashboard() {
     applyPreferences,
     resetPreferences,
     reloadPreferences,
+    comparePreferences,
     visibleToday,
     visibleRight,
     handleShipmentSummary,

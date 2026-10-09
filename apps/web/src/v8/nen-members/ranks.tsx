@@ -7,6 +7,7 @@
  * 下の中央に キャンセル・保存して EC へ同期。
  * 競合の帯はタブの下・数の帯の上（型の tabs の段）に出すので、外枠へ渡す（onTopBand）。
  */
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, GitCompareArrows, Plus, RefreshCw, TriangleAlert } from 'lucide-react'
@@ -251,15 +252,7 @@ export default function RankSettingsV8({
   useEffect(() => {
     onTopBand(conflict ? (
       <div className={styles.conflictSlot}>
-        <div className={styles.conflictBand} role="alert">
-          <TriangleAlert size={16} aria-hidden="true" className={styles.conflictIcon} />
-          <div className={styles.conflictText}>
-            <p className={styles.conflictTitle}>{conflictAt ? `ほかの人が ${conflictAt} にランク設定を保存しました` : 'ほかの人がランク設定を保存しました'}</p>
-            <p className={styles.conflictSub}>このまま保存すると、ほかの人の変更が消えます</p>
-          </div>
-          <Button variant="secondary" onClick={() => setComparing(true)}><GitCompareArrows size={15} aria-hidden="true" />違いを比べる</Button>
-          <Button variant="secondary" onClick={reloadLatest}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
-        </div>
+        <SaveConflictBand title={conflictAt ? `ほかの人が ${conflictAt} にランク設定を保存しました` : 'ほかの人がランク設定を保存しました'} description="このまま保存すると、ほかの人の変更が消えます" onCompare={() => setComparing(true)} onReload={reloadLatest} />
       </div>
     ) : null)
     // reloadLatest は conflict だけを読む。帯は conflict が変わったときだけ作り直す。

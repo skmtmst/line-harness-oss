@@ -1,5 +1,6 @@
 'use client'
 
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -513,19 +514,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
    * （notice・noticeSpacing='band'）に入れる。
    */
   const conflictBand = conflict ? (
-    <div className={styles.conflictBand} role="alert">
-      <TriangleAlert size={18} aria-hidden="true" className={styles.conflictIcon} />
-      <div className={styles.conflictText}>
-        <p className={styles.conflictTitle}>ほかの人が先にリマインダ「{subjectSettings.name}」を保存しました</p>
-        <p className={styles.conflictNote}>あなたが直した所はまだ保存されていません。このまま保存すると、相手の変更が消えます。</p>
-      </div>
-      <Button type="button" variant="secondary" onClick={() => void openCompare()} disabled={compareBusy}>
-        <GitCompare size={15} aria-hidden="true" />{compareBusy ? '比べています…' : '違いを比べる'}
-      </Button>
-      <Button type="button" variant="primary" onClick={() => void reloadAfterConflict()}>
-        <RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける
-      </Button>
-    </div>
+    <SaveConflictBand title={<>ほかの人が先にリマインダ「{subjectSettings.name}」を保存しました</>} description="あなたが直した所はまだ保存されていません。このまま保存すると、相手の変更が消えます。" onCompare={() => void openCompare()} compareDisabled={compareBusy} onReload={() => void reloadAfterConflict()} />
   ) : null
 
   const frame: StageFrame = {

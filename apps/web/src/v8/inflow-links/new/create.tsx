@@ -11,6 +11,7 @@
  * - 競合（vWJEm）：発行が 409（見分けるための文字が使用中）で返ったら、板の頭の下に帯を出す
  * - 違いを比べる（E14GFm）：違う項目だけを並べた窓。「最新を取り込んで直す」で保存されている値を入力へ写す
  */
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ArrowLeftRight, Link2, RefreshCw, TriangleAlert } from 'lucide-react'
@@ -307,15 +308,7 @@ function InflowCreate() {
   const conflictSavedAt = conflict ? formatSavedAt(conflict.updatedAt) : ''
 
   const conflictBand = conflict ? (
-    <div className={styles.conflictBand} role="alert" aria-label="文字が重複しています">
-      <TriangleAlert size={16} aria-hidden="true" className={styles.conflictIcon} />
-      <div className={styles.conflictText}>
-        <p className={styles.conflictTitle}>{`「${conflict.refCode}」は${conflictSavedAt ? ` ${conflictSavedAt} に` : ''}「${conflict.name}」で保存されています`}</p>
-        <p className={styles.conflictNote}>同じ文字のまま発行はできません。文字を変えるか、違いを比べてください</p>
-      </div>
-      <Button onClick={() => setShowCompare(true)} aria-expanded={showCompare}><ArrowLeftRight size={15} aria-hidden="true" />違いを比べる</Button>
-      <Button onClick={loadLatestAndContinue}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
-    </div>
+    <SaveConflictBand title={`「${conflict.refCode}」は${conflictSavedAt ? ` ${conflictSavedAt} に` : ''}「${conflict.name}」で保存されています`} description="同じ文字のまま発行はできません。文字を変えるか、違いを比べてください" onCompare={() => setShowCompare(true)} onReload={loadLatestAndContinue} />
   ) : null
 
   const step4 = introTemplate
