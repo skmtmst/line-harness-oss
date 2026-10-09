@@ -23,7 +23,7 @@ import { TextArea } from '@/components/shared/text-field'
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { ApiError } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { errorMessage, formatDate, formatDateTime } from './google-format'
+import { errorMessage, formatDate, formatDateTime, reviewReceivedAt } from './google-format'
 import { ChangeConfirmScreen, HistoryScreen, HoursEditor, PROFILE_DESIGN_NODES, ProfileEditScreen, ProfileTab, type HoursMode } from './google-profile'
 import { POSTS_DESIGN_NODES, PostConfirmScreen, PostEditor, PostsTab } from './google-posts'
 import { PERFORMANCE_DESIGN_NODES, PerformanceTab } from './google-performance'
@@ -120,10 +120,10 @@ function GoogleBusinessInner() {
     const messages: Record<string, { tone: 'info' | 'warn' | 'danger'; text: string }> = {
       connected: { tone: 'info', text: 'Googleアカウントを接続しました。口コミを取得します。' },
       reconnected: { tone: 'info', text: 'Googleアカウントを再接続しました。' },
-      select_location: { tone: 'warn', text: 'このGoogleアカウントは複数の店舗を管理しています。このLINEアカウントに結びつける店舗を1つ選んでください。' },
+      select_location: { tone: 'warn', text: 'このLINEアカウントに結びつける店舗を1つ選んでください。前につないでいた店舗とは別の店舗を選ぶと、切り替える前に確認します。' },
       'error:invalid_state': { tone: 'danger', text: '認可の確認に失敗しました。もう一度「Googleアカウントを接続」からやり直してください。' },
       'error:denied': { tone: 'danger', text: 'Googleでの許可が取り消されました。接続は変更していません。' },
-      'error:location_mismatch': { tone: 'danger', text: '別の店舗が選ばれたため保存しませんでした。店舗を変えるには、先に接続を解除してください。' },
+      'error:location_mismatch': { tone: 'danger', text: '選んだ店舗をGoogleで確認できなかったため保存しませんでした。店舗一覧をもう一度読み込んでから選び直してください。' },
       'error:no_locations': { tone: 'danger', text: 'このGoogleアカウントで管理できる店舗が見つかりませんでした。店舗を管理しているGoogleアカウントでログインしてください。' },
       'error:oauth_not_configured': { tone: 'danger', text: 'この環境にはGoogle接続の設定がありません。' },
       'error:no_permission': { tone: 'danger', text: 'Googleの許可画面で「ビジネス情報の管理」の許可が外れていたため、接続していません。もう一度「Googleアカウントを接続」から進み、この許可を付けたままにしてください。' },
@@ -263,7 +263,11 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
   const [actionError, setActionError] = useState('')
   const [confirmDisconnect, setConfirmDisconnect] = useState(false)
   const [selectedLocation, setSelectedLocation] = useState('')
+  const [confirmSwitch, setConfirmSwitch] = useState(false)
   const { connection } = data
+  // 店舗の選択待ちなのに前の店舗名が残っている＝別の店舗へ切り替えようとしている状態。
+  const previousTitle = connection.status === 'pending_location' ? connection.locationTitle : null
+  const switchingLocation = Boolean(connection.locationName) && selectedLocation !== '' && selectedLocation !== connection.locationName
 
   const startConnect = async () => {
     setBusy(true)
@@ -277,12 +281,13 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
     }
   }
 
-  const selectLocation = async () => {
+  const selectLocation = async (confirmedSwitch = false) => {
     if (!selectedLocation) return
     setBusy(true)
     setActionError('')
     try {
-      await restaurantGoogleApi.selectLocation(accountId, selectedLocation)
+      await restaurantGoogleApi.selectLocation(accountId, selectedLocation, confirmedSwitch)
+      setConfirmSwitch(false)
       onChanged()
     } catch (err) {
       setActionError(errorMessage(err, '店舗を選べませんでした。'))
@@ -350,10 +355,15 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
               <span className="bg-accent-soft flex h-12 w-12 shrink-0 items-center justify-center rounded-card text-accent-deep" aria-hidden="true"><Link2 size={24} /></span>
               <div className="min-w-0">
                 <h3 id="google-location-title" className="text-heading leading-relaxed font-bold">接続する店舗を選ぶ</h3>
-                <p className="text-ink-faint text-label leading-relaxed">Googleアカウントの認証は完了しています</p>
+                <p className="text-ink-faint text-label leading-relaxed">Googleアカウントの認証は完了しています{connection.googleAccountEmail ? `（${connection.googleAccountEmail}）` : ''}</p>
               </div>
             </div>
             <p className="text-ink-secondary text-sm leading-relaxed">このLINEアカウント（{data.store.name}）に接続する店舗を1つ選んでください。接続後は、選んだ店舗だけを表示します。</p>
+            {previousTitle ? (
+              <NoteBar tone="warn">
+                いまは「{previousTitle}」につながっています。同じ店舗を選べばそのまま続けられます。別の店舗を選ぶと切り替わり、「{previousTitle}」で取り込んだ口コミ・下書き・プロフィール・投稿・数値は消えます（切り替える前に確認します）。
+              </NoteBar>
+            ) : null}
             <RadioCardGroup legend="接続するGoogleビジネスプロフィール" className="flex flex-col gap-2">
             {data.candidates.map((candidate) => (
               <RadioCard
@@ -369,12 +379,25 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
             </RadioCardGroup>
             {actionError ? <NoteBar tone="danger">{actionError}</NoteBar> : null}
             <div className="border-hairline flex flex-wrap justify-center gap-2 border-t pt-4">
-              <Button onClick={() => setConfirmDisconnect(true)} disabled={busy || !canManage}>Googleアカウントを選び直す</Button>
-              <Button variant="primary" onClick={() => void selectLocation()} disabled={busy || !selectedLocation || !canManage}>この店舗を接続する</Button>
+              <Button onClick={() => setConfirmDisconnect(true)} disabled={busy || !canManage}>接続を取り消す</Button>
+              <Button onClick={() => void startConnect()} disabled={busy || !canManage}>別のGoogleアカウントでやり直す</Button>
+              <Button variant="primary" onClick={() => (switchingLocation ? setConfirmSwitch(true) : void selectLocation())} disabled={busy || !selectedLocation || !canManage}>
+                {switchingLocation ? 'この店舗に切り替える' : 'この店舗を接続する'}
+              </Button>
             </div>
           </section>
         </div>
         <ConfirmDialog open={confirmDisconnect} title="接続をやり直しますか？" description="いま進めている接続を取り消します。口コミの履歴は残ります。" confirmLabel="取り消す" destructive busy={busy} onConfirm={() => void disconnect()} onCancel={() => setConfirmDisconnect(false)} />
+        <ConfirmDialog
+          open={confirmSwitch}
+          title="接続する店舗を切り替えますか？"
+          description={`「${previousTitle ?? ''}」から切り替えます。これまでに取り込んだ口コミ・返信の下書き・プロフィール・投稿・数値は消え、戻せません。新しい店舗の分はこのあと取り込み直します。`}
+          confirmLabel="切り替える"
+          destructive
+          busy={busy}
+          onConfirm={() => void selectLocation(true)}
+          onCancel={() => setConfirmSwitch(false)}
+        />
       </div>
     )
   }
@@ -557,7 +580,7 @@ function ReviewsTab({ accountId, data, canPublish, onOpen, onSynced }: { account
                 <Tr key={review.id}>
                   <NameCell name={review.reviewerDisplayName ?? '匿名'} sub={<Stars rating={review.starRating} />} />
                   <Td><span className="line-clamp-2 text-sm" title={review.comment ?? undefined}>{review.comment ?? '（本文なし・評価のみ）'}</span></Td>
-                  <Td><span className="text-ink-secondary whitespace-nowrap text-sm">{formatDateTime(review.createTime)}</span></Td>
+                  <Td><span className="text-ink-secondary whitespace-nowrap text-sm">{formatDateTime(reviewReceivedAt(review))}</span></Td>
                   <Td><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></Td>
                   <ActionCell>
                     {actionable ? (
@@ -622,7 +645,8 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, backHref, on
     setActionError('')
     setSaved('')
     try {
-      const response = await restaurantGoogleApi.generateDraft(accountId, reviewId, mode)
+      // 書き換えは、保存前に画面で直した内容をそのまま元にする。
+      const response = await restaurantGoogleApi.generateDraft(accountId, reviewId, mode, text)
       setText(response.draft)
       setAiGenerated(true)
     } catch (err) {
@@ -695,7 +719,7 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, backHref, on
             <p className="text-ink-secondary mb-4 text-sm">返信先と内容を確認してください。公開後、Googleの口コミに表示されます。</p>
             <dl className="gb-confirm-details mb-4 grid grid-cols-1 gap-x-8 gap-y-2 text-sm">
               <dt className="text-ink-secondary">返信先の店舗</dt><dd className="min-w-0 truncate font-semibold" title={data.connection.locationTitle ?? data.store.name}>{data.connection.locationTitle ?? data.store.name}</dd>
-              <dt className="text-ink-secondary">返信する口コミ</dt><dd><span className="font-semibold">{review.reviewerDisplayName ?? '匿名'}</span> <Stars rating={review.starRating} /> <span className="text-ink-faint text-xs">{formatDate(review.createTime)}</span></dd>
+              <dt className="text-ink-secondary">返信する口コミ</dt><dd><span className="font-semibold">{review.reviewerDisplayName ?? '匿名'}</span> <Stars rating={review.starRating} /> <span className="text-ink-faint text-xs">{formatDate(reviewReceivedAt(review))}</span></dd>
               <dt className="text-ink-secondary">公開のタイミング</dt><dd>送信後、Googleの処理を経て表示</dd>
             </dl>
             <div className="border-hairline mb-3 rounded-card border p-4">
@@ -741,7 +765,7 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, backHref, on
               <h2 className="text-base font-bold">返信する口コミ</h2>
               <Stars rating={review.starRating} />
             </div>
-            <p className="text-sm font-semibold">{review.reviewerDisplayName ?? '匿名'} <span className="text-ink-faint text-xs font-normal">{formatDateTime(review.createTime)}</span></p>
+            <p className="text-sm font-semibold">{review.reviewerDisplayName ?? '匿名'} <span className="text-ink-faint text-xs font-normal">{formatDateTime(reviewReceivedAt(review))}</span></p>
             <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed">{review.comment ?? '（本文なし・評価のみ）'}</p>
             <p className="text-ink-faint mt-4 text-xs">Googleの口コミ原文です。投稿者の個人情報や来店履歴を返信に追加しないでください。</p>
             <a href={googleReviewSourceUrl} target="_blank" rel="noreferrer" className="text-action mt-3 inline-flex items-center gap-1 text-xs font-semibold" data-gb3-action="open-google-review">Googleで原文を確認 <ExternalLink size={12} /></a>

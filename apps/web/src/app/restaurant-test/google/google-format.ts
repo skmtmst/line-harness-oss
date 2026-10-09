@@ -25,6 +25,22 @@ export function formatDate(value: string | null | undefined): string {
 }
 
 /**
+ * 口コミの「受信」日時。
+ * Googleは口コミが編集されても createTime（最初の投稿時刻）を変えず、updateTime だけを更新する。
+ * createTime だけを出すと、最近書き直された口コミが何年も前の日付で並んでしまうため、
+ * 新しい方を採用する。
+ */
+export function reviewReceivedAt(review: { createTime?: string | null; updateTime?: string | null }): string | null {
+  const created = review.createTime ?? null
+  const updated = review.updateTime ?? null
+  const createdAt = created ? new Date(created).getTime() : Number.NaN
+  const updatedAt = updated ? new Date(updated).getTime() : Number.NaN
+  if (Number.isNaN(updatedAt)) return created
+  if (Number.isNaN(createdAt)) return updated
+  return updatedAt > createdAt ? updated : created
+}
+
+/**
  * 本文を画面へ渡さない状態のとき `ApiError` が自分で作る既定文（`api.ts` の
  * `new ApiError(...)`）。403・404・5xx は `extractApiErrorMessage` が
  * Workerの日本語本文を捨てるので、`message` がこの形のままになる。
