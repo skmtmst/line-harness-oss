@@ -232,7 +232,7 @@ describe('V8 シナリオの通し：作る→1通目→詳細', () => {
     renderNode(<ScenarioModePage />)
     await flush()
 
-    const nameInput = host.querySelector('input[placeholder="例: 友だち追加ウェルカム"]') as HTMLInputElement
+    const nameInput = host.querySelector("input[placeholder=\"例：友だち追加ウェルカム\"]") as HTMLInputElement
     expect(nameInput, 'シナリオ名の入力が見つかりません').toBeTruthy()
     await act(async () => { setInputValue(nameInput, '流れの型2') })
 

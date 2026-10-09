@@ -281,7 +281,7 @@ describe('V8 登録メディア一覧（O7hUt7）の作り', () => {
     expect(LIST_V8).toContain('削除する')
     expect(LIST_V8).toContain('別のメディアに差し替える')
     expect(LIST_V8).toContain('data-design-node="YfTfJ"')
-    expect(LIST_V8).toContain('理由<RequiredBadge />')
+    expect(LIST_V8).toContain('<Field label="理由（あとから履歴で確認できます）" required')
     expect(LIST_V8).toContain('選択したメディアを削除')
   })
 })

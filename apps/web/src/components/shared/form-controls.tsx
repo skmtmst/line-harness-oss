@@ -120,7 +120,8 @@ export function Field({
   const [autoCount, setAutoCount] = useState<{ value: number; max: number } | undefined>()
   const [autoRequired, setAutoRequired] = useState(false)
   const syncControl = () => {
-    const control = fieldRef.current?.querySelector<HTMLInputElement | HTMLTextAreaElement>('input:not([type=number]),textarea')
+    if (!fieldRef.current || typeof fieldRef.current.querySelector !== 'function') return
+    const control = fieldRef.current.querySelector<HTMLInputElement | HTMLTextAreaElement>('input:not([type=number]):not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=file]),textarea')
     if (control) { if (!control.id) control.id = controlId; setDetectedId(control.id); if (!control.hasAttribute('aria-label') && typeof shownLabel === 'string') control.setAttribute('aria-label', shownLabel) }
     const next = control && control.maxLength >= 0 ? { value: control.value.length, max: control.maxLength } : undefined
     setAutoCount(previous => previous?.value === next?.value && previous?.max === next?.max ? previous : next)

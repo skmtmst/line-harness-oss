@@ -135,7 +135,7 @@ test('名前が空なら保存せず、理由を1回だけ出し、赤い名前�
   await eventually(() => expect(document.activeElement).toBe(name))
   expect(name.getAttribute('aria-invalid')).toBe('true')
   expect(host.querySelectorAll('[role="alert"]')).toHaveLength(1)
-  expect(document.getElementById(name.getAttribute('aria-describedby')!)?.textContent).toBe('設定名を入力してください。')
+  expect(name.getAttribute('aria-describedby')?.split(' ').map(id=>document.getElementById(id)).find(node=>node?.getAttribute('role')==='alert')?.textContent).toBe('設定名を入力してください。')
   expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({ block: 'center' })
   expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
   await act(async () => fireEvent.change(name, { target: { value: '初回案内' } }))

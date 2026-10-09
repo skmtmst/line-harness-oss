@@ -139,14 +139,14 @@ describe('メニュー作成（V8）の読み込みと保存ボタン', () => {
     render(<NewBookingMenuPage />)
     await screen.findByLabelText('予約後に付けるタグ')
 
-    fireEvent.change(screen.getByPlaceholderText('例: トリミング（小型犬）'), { target: { value: 'カット' } })
+    fireEvent.change(screen.getByPlaceholderText("例：トリミング（小型犬）"), { target: { value: 'カット' } })
     fireEvent.click(screen.getByRole('button', { name: /担当A/ }))
     fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
 
     // ボタンの内側だけ保存中に変わり、画面は止めない（入力欄は触れるまま）。
     const savingButton = await screen.findByRole('button', { name: '保存中…' })
     expect(savingButton.getAttribute('aria-busy')).toBe('true')
-    expect(screen.getByPlaceholderText('例: トリミング（小型犬）')).toBeTruthy()
+    expect(screen.getByPlaceholderText("例：トリミング（小型犬）")).toBeTruthy()
 
     await act(async () => { gate.resolve({ id: 'menu-new', version: 1 }) })
     await waitFor(() => { expect(fixture.createMenu).toHaveBeenCalled() })

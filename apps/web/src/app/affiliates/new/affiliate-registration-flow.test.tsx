@@ -237,7 +237,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     expect(hasText('本店の友だち21')).toBe(true)
 
     // 名前で絞り込む。
-    await type(byLabel<HTMLInputElement>('友だちの名前で検索'), '本店の友だち25')
+    await type(byLabel<HTMLInputElement>("友だちの名前で探す"), '本店の友だち25')
     await click(buttonByText('検索'))
     expect(friendsList).toHaveBeenLastCalledWith(
       expect.objectContaining({ accountId: 'account-a', search: '本店の友だち25', offset: '0' }),

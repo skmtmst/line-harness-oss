@@ -32,7 +32,7 @@ describe('リッチビデオ編集',()=>{
  })
  it('読み直した値を表示し、ボタンを外して通知文を更新して保存する',async()=>{
   render(<Editor id="r"/>);await screen.findByDisplayValue('新しい動画です');
-  fireEvent.click(screen.getByRole('switch',{name:'見終わったあとのボタンを出す'}));
+  fireEvent.click(screen.getByRole('checkbox',{name:'見終わったあとのボタンを出す'}));
   expect(screen.queryByLabelText('リンク先URL')).toBeNull();
   fireEvent.change(screen.getByLabelText('通知に出る文'),{target:{value:'新しい通知'}});
   fireEvent.click(screen.getByRole('button',{name:'保存する'}));
@@ -43,7 +43,7 @@ describe('リッチビデオ編集',()=>{
  });
  it('閲覧のみには保存・アップロード・スイッチを出さない',async()=>{
   mocks.role='staff';render(<Editor id="r"/>);await screen.findByDisplayValue('新しい動画です');
-  expect(screen.getByRole('status').textContent).toContain('閲覧のみ');expect(screen.queryByRole('button',{name:'保存する'})).toBeNull();expect(screen.queryByRole('button',{name:'ファイルを選ぶ'})).toBeNull();expect(screen.queryByRole('switch')).toBeNull();
+  expect(screen.getByRole('status').textContent).toContain('閲覧のみ');expect(screen.queryByRole('button',{name:'保存する'})).toBeNull();expect(screen.queryByRole('button',{name:'ファイルを選ぶ'})).toBeNull();expect(screen.queryByRole('checkbox')).toBeNull();
  });
  it('読み込み失敗時に保存せず、別アカウントに切り替えても保存しない',async()=>{
   mocks.get.mockRejectedValue(new Error('failed'));const {unmount}=render(<Editor id="r"/>);await screen.findByRole('alert');expect((screen.getByRole('button',{name:'保存する'}) as HTMLButtonElement).disabled).toBe(true);unmount();

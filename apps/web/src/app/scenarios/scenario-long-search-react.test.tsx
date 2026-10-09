@@ -70,7 +70,7 @@ async function eventually(check: () => void, timeout = 2000) {
   }
 }
 async function typeQuery(value: string) {
-  const input = host.querySelector<HTMLInputElement>('input[aria-label="シナリオ名で検索"]')!
+  const input = host.querySelector<HTMLInputElement>("input[aria-label=\"シナリオ名で探す\"]")!
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
   await act(async () => {
     setter.call(input, value)

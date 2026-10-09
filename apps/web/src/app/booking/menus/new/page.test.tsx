@@ -145,7 +145,7 @@ function deferredTags(): DeferredTags {
 
 /** メニュー名の入力欄。 */
 function nameInput(): HTMLInputElement {
-  return screen.getByPlaceholderText('例: トリミング（小型犬）') as HTMLInputElement
+  return screen.getByPlaceholderText("例: トリミング（小型犬）") as HTMLInputElement
 }
 
 /** 選べる中身。プルダウンの option をそのまま読む。 */
@@ -170,7 +170,7 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
   async function renderNew() {
     render(<NewBookingMenuPage />)
     // 取得が終わるまでは読み込み中の文言を出し、プルダウンは出さない。
-    return screen.findByLabelText('予約後に付けるタグ') as Promise<HTMLSelectElement>
+    return screen.findByRole('combobox', {name:'予約後に付けるタグ'}) as Promise<HTMLSelectElement>
   }
 
   test('タグ取得が遅れて返る間も入力は消えず、返った後に候補が出る', async () => {
@@ -193,7 +193,7 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
 
     // 遅れて返った後も、待っている間の入力はそのまま残る。
     expect(nameInput().value).toBe('トリミング')
-    const select = await screen.findByLabelText('予約後に付けるタグ') as HTMLSelectElement
+    const select = await screen.findByRole('combobox', {name:'予約後に付けるタグ'}) as HTMLSelectElement
     expect(optionLabels(select)).toEqual(['— なし —', '予約中', '常連さん'])
   })
 
@@ -251,7 +251,7 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
 
     switchAccount('account-b')
 
-    const afterSwitch = await screen.findByLabelText('予約後に付けるタグ') as HTMLSelectElement
+    const afterSwitch = await screen.findByRole('combobox', {name:'予約後に付けるタグ'}) as HTMLSelectElement
     expect(afterSwitch.value).toBe('')
     expect(optionLabels(afterSwitch)).toEqual(['— なし —', 'B店のタグ', 'B店だけの分類'])
 
@@ -313,7 +313,7 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
     })
     // 入力は消えない。選び直してもう一度出せる。
     expect(nameInput().value).toBe('トリミング')
-    const again = screen.getByLabelText('予約後に付けるタグ') as HTMLSelectElement
+    const again = screen.getByRole('combobox', {name:'予約後に付けるタグ'}) as HTMLSelectElement
     fireEvent.change(again, { target: { value: 'tag-active-2' } })
     expect(again.value).toBe('tag-active-2')
   })
@@ -323,7 +323,7 @@ describe('R306/R307 予約時マイルの設定リンク', () => {
   async function renderNew() {
     render(<NewBookingMenuPage />)
     // タグ欄が出れば画面の読み込みは終わっている。
-    await screen.findByLabelText('予約後に付けるタグ')
+    await screen.findByRole('combobox', {name:'予約後に付けるタグ'})
   }
 
   function settingsLink(): HTMLAnchorElement {

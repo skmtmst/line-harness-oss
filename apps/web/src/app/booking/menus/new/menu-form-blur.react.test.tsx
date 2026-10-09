@@ -113,7 +113,7 @@ async function renderForm() {
 describe('メニュー作成（V8）の欄を離れたときの確かめ', () => {
   test('空の名前欄を離れると保存前に欄の下へ直し方が出る', async () => {
     await renderForm()
-    const name = screen.getByPlaceholderText('例: トリミング（小型犬）')
+    const name = screen.getByPlaceholderText("例：トリミング（小型犬）")
 
     fireEvent.change(name, { target: { value: '' } })
     fireEvent.blur(name)
@@ -123,7 +123,7 @@ describe('メニュー作成（V8）の欄を離れたときの確かめ', () =>
 
   test('名前を入れ直すと直し方が消える', async () => {
     await renderForm()
-    const name = screen.getByPlaceholderText('例: トリミング（小型犬）')
+    const name = screen.getByPlaceholderText("例：トリミング（小型犬）")
 
     fireEvent.change(name, { target: { value: '' } })
     fireEvent.blur(name)

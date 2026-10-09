@@ -20,3 +20,9 @@ it('必須は札を1つ・任意は出さず、指定された上限と超過を
   expect(container.querySelector('[data-field-count="over"]')?.textContent).toBe('21/20文字')
   expect(screen.getByRole('textbox').getAttribute('aria-required')).toBe('true')
 })
+
+it('複数の選択肢は欄のラベルで上書きせず、それぞれの名前で操作できる', () => {
+  render(<Field label="既定値"><label><input type="checkbox" />A</label><label><input type="checkbox" />B</label></Field>)
+  expect(screen.getByRole('checkbox', { name: 'A' })).toBeTruthy()
+  expect(screen.getByRole('checkbox', { name: 'B' })).toBeTruthy()
+})

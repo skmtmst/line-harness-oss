@@ -109,7 +109,7 @@ async function renderPage(waitForName: string | RegExp = '本文の行') {
   await tableFindText(waitForName)
   return {
     ...rendered,
-    input: screen.getByLabelText('名前・本文・差し込んでいる項目で検索'),
+    input: screen.getByLabelText("名前・本文・差し込んでいる項目で検索"),
     TemplatesPage,
   }
 }
@@ -121,9 +121,9 @@ async function search(input: HTMLElement, query: string) {
 }
 
 describe('テンプレート一覧の検索', () => {
-  test('名前・本文・差し込み項目をNFKC・大小文字非依存・空白正規化で検索する', async () => {
+  test("名前・本文・差し込み項目をNFKC・大小文字非依存・空白正規化で検索する", async () => {
     const { input } = await renderPage()
-    expect(input.getAttribute('placeholder')).toBe('テンプレート名で検索（本文・差し込んでいる項目も対象）')
+    expect(input.getAttribute('placeholder')).toBe("テンプレート名で検索（本文・差し込んでいる項目も対象）")
 
     await search(input, '  welcome vip  ')
     expect(tableText(/ＷＥＬＣＯＭＥ/)).toBeTruthy()
@@ -229,7 +229,7 @@ describe('テンプレート一覧の検索', () => {
     })
     expect(tableText('A社テンプレート')).toBeNull()
 
-    const input = screen.getByLabelText('名前・本文・差し込んでいる項目で検索')
+    const input = screen.getByLabelText("名前・本文・差し込んでいる項目で検索")
     await search(input, '切替後')
     expect(tableText('B社テンプレート')).toBeTruthy()
     expect(mockState.listCalls).toEqual(['account-a', 'account-b'])

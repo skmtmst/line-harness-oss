@@ -17,7 +17,7 @@ test('V8 registration forwards tags, parent, staff and chosen LIFF together',asy
  fireEvent.click(screen.getByRole('button',{name:'次へ'}));
  fireEvent.click(await screen.findByRole('button',{name:'本店'}));fireEvent.click(screen.getByRole('button',{name:'いま決める'}));fireEvent.click(await screen.findByLabelText('担当者'));
  fireEvent.click(screen.getByRole('button',{name:'親アカウント'}));fireEvent.click(screen.getByRole('option',{name:'本部'}).querySelector('button')!);
- fireEvent.change(screen.getByLabelText('既存のLIFF ID（任意）'),{target:{value:'2007123456-existing'}})
+ fireEvent.change(screen.getByLabelText('既存のLIFF ID'),{target:{value:'2007123456-existing'}})
  fireEvent.click(screen.getByRole('button',{name:'次へ'}));fireEvent.click(screen.getByRole('button',{name:'接続して設定する'}));
  await waitFor(()=>expect(calls.connectCheck).toHaveBeenCalledWith(expect.objectContaining({tagIds:['tag'],parentLineAccountId:'parent',staffIds:['member'],liffId:'2007123456-existing'})))
 })
