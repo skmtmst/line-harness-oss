@@ -19,6 +19,8 @@ import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
+import TapActionField from '@/components/shared/tap-action-field'
+import type { TapActionKind } from '@/lib/tap-actions'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
 import { ApiError, fetchApi, webinarApi, type WebinarCtaCard, type WebinarEditor } from '@/lib/api'
 import { ReadValue } from './parts'
@@ -35,6 +37,8 @@ function parseMinSec(text: string): number | null {
   const match = /^(\d{1,4}):([0-5]?\d)$/.exec(text.trim())
   return match ? Number(match[1]) * 60 + Number(match[2]) : null
 }
+/** CTA の押したら：URL を開く・回答フォーム。 */
+const WEBINAR_CTA_KINDS: readonly TapActionKind[] = ['uri', 'form']
 const EMPTY_CARD = (atSeconds: number): WebinarCtaCard => ({ atSeconds, kind: 'form', title: '', body: null, buttonLabel: '', autoOpen: false, formId: null, url: null })
 
 /** 保存前の確かめ（app/webinars/edit/cta-card-validation と同じ）。1件でもあれば保存は呼ばない。 */
@@ -308,23 +312,27 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
                 <label className={form.field}><span className={form.label}>出す時刻（分:秒）</span><TextField value={times[currentIndex] ?? ''} readOnly={readOnly} inputMode="numeric" placeholder="12:00" onChange={(event) => setTimes((prev) => prev.map((value, j) => (j === currentIndex ? event.target.value : value)))} /></label>
               </div>
               <label className={form.field}><span className={form.label}>ボタンの言葉</span><TextField value={current.buttonLabel} readOnly={readOnly} onChange={(event) => update(currentIndex, { buttonLabel: event.target.value })} /></label>
-              <div className={form.pair}>
-                <div className={form.field}>
-                  <span className={form.labelSmall}>リンクの種類</span>
-                  {readOnly
-                    ? <ReadValue label="リンクの種類">{current.kind === 'form' ? '回答フォーム' : 'URL'}</ReadValue>
-                    : <Select aria-label="リンクの種類" size="full" value={current.kind} onChange={(value) => update(currentIndex, { kind: value as 'form' | 'url' })} options={[{ value: 'form', label: '回答フォーム' }, { value: 'url', label: 'URL' }]} />}
-                </div>
-                {current.kind === 'form' ? (
-                  <div className={form.field}>
-                    <span className={form.labelSmall}>使うフォーム</span>
-                    {readOnly
-                      ? <ReadValue label="使うフォーム">{formName(current.formId)}</ReadValue>
-                      : <Select aria-label="使うフォーム" size="full" value={current.formId ?? ''} onChange={(value) => update(currentIndex, { formId: value || null })} options={[{ value: '', label: 'フォームを選ぶ' }, ...published.map((item) => ({ value: item.id, label: `${item.name}（公開中）` }))]} />}
-                  </div>
-                ) : (
-                  <label className={form.field}><span className={form.labelSmall}>開く URL</span><TextField value={current.url ?? ''} readOnly={readOnly} inputMode="url" placeholder="https://" onChange={(event) => update(currentIndex, { url: event.target.value })} /></label>
-                )}
+              <div className={form.field}>
+                <span className={form.labelSmall}>押したら</span>
+                {/*
+                  押したらの共通の欄（TapActionField・YPzmo）。ウェビナーの視聴ページの CTA なので URL と回答フォームの2つだけ
+                  （回答フォームは視聴ページの中で開くので LIFF は要らない）。保存の形（kind・formId・url）は今のまま。
+                */}
+                <TapActionField
+                  name="CTA"
+                  kindLabel="リンクの種類"
+                  value={{ kind: current.kind === 'form' ? 'form' : 'uri', uri: current.url ?? '', text: '', refId: current.formId ?? '' }}
+                  onChange={(patch) => {
+                    /* 種類を変えても、もう一方の値（formId・url）は今までどおり残す。 */
+                    if (patch.kind !== undefined) { update(currentIndex, { kind: patch.kind === 'form' ? 'form' : 'url' }); return }
+                    if (patch.uri !== undefined) update(currentIndex, { url: patch.uri })
+                    if (patch.refId !== undefined) update(currentIndex, { formId: patch.refId || null })
+                  }}
+                  kinds={WEBINAR_CTA_KINDS}
+                  hasLiff
+                  readOnly={readOnly}
+                  sources={forms.state === 'ready' ? { form: forms.items.map((item) => ({ id: item.id, name: item.name, note: item.isActive ? '公開中' : '公開していません', disabled: !item.isActive })) } : undefined}
+                />
               </div>
               <div className={styles.toggleRow}>
                 {readOnly ? null : <Toggle checked={current.autoOpen} label="ボタンを押したら、フォームを自動で開く" onChange={(next) => update(currentIndex, { autoOpen: next })} />}
