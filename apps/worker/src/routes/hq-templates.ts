@@ -1,3 +1,4 @@
+import { swapHqFolderOrder, HqFolderError } from '@line-crm/db';
 import { isFriendAttributeType, preflightFriendAttribute, distributeFriendAttribute, friendAttributeResult } from '../services/hq-templates/friend-attribute-distribution.js';
 import { TEMPLATE_KINDS, type TemplateKindCounts, type TemplateKind } from '@line-crm/shared';
 import { listTemplateFolders, saveTemplateFolder, deleteTemplateFolder, duplicateTemplate } from '../services/hq-templates/folders.js';
@@ -117,6 +118,11 @@ hqTemplates.get('/api/hq/templates', async c => {
 hqTemplates.get('/api/hq/templates/attribute-kind-counts',async c=>{
  const rows=await listTemplates(dbFor(c.env),await authority(c));
  return c.json({success:true,data:{tag:rows.filter(r=>r.template_type==='tag').length,friend_field:rows.filter(r=>r.template_type==='friend_field').length,support_mark:rows.filter(r=>r.template_type==='mark').length}});
+});
+hqTemplates.post('/api/hq/templates/folders/:id/swap-order',async c=>{
+ const a=await authority(c),b=await body(c);
+ try {return c.json({success:true,data:await swapHqFolderOrder(dbFor(c.env),'hq_template_folders',a.tenantId,c.req.param('id'),b as unknown as Parameters<typeof swapHqFolderOrder>[4])});}
+ catch(e) {if(e instanceof HqFolderError)return c.json({success:false,error:e.code},e.status);throw e;}
 });
 hqTemplates.get('/api/hq/templates/folders', async c => c.json({ success:true, data:await listTemplateFolders(dbFor(c.env),await authority(c)) }));
 hqTemplates.post('/api/hq/templates/folders', async c => c.json({ success:true, data:await saveTemplateFolder(dbFor(c.env),await authority(c),await body(c)) },201));

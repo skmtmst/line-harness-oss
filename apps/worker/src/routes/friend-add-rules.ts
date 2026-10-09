@@ -1087,8 +1087,8 @@ friendAddRules.patch('/api/friend-add-rules/folders/:id', requireRole('owner', '
     if (!folder) return c.json({ success: false, error: 'フォルダが見つかりません' }, 404);
     const name = body.name === undefined ? folder.name : body.name.trim();
     await c.env.DB.batch([
-      c.env.DB.prepare("UPDATE friend_add_rules SET folder_name=?,lock_version=lock_version+1,updated_at=strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours') WHERE line_account_id=? AND folder_name=(SELECT name FROM friend_add_rule_folders WHERE id=? AND line_account_id=?) AND folder_name<>?").bind(name, accountId, id, accountId, name),
       c.env.DB.prepare("UPDATE friend_add_rule_folders SET name=?,color=CASE WHEN ? THEN ? ELSE color END,updated_at=strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours') WHERE id=? AND line_account_id=?").bind(name, body.color !== undefined ? 1 : 0, body.color ?? null, id, accountId),
+      c.env.DB.prepare("UPDATE friend_add_rules SET folder_name=?,lock_version=lock_version+1,updated_at=strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours') WHERE line_account_id=? AND folder_name=(SELECT name FROM friend_add_rule_folders WHERE id=? AND line_account_id=?) AND folder_name<>?").bind(name, accountId, id, accountId, name),
     ]);
     const updated = await c.env.DB.prepare('SELECT id,name,color FROM friend_add_rule_folders WHERE id=? AND line_account_id=?').bind(id, accountId).first();
     return c.json({ success: true, data: updated });

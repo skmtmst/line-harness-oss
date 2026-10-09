@@ -169,6 +169,7 @@ export const hqTemplatesApi = {
    */
   list: (type?: TemplateType) => request<HqTemplateListItem[]>(type ? `?type=${type}` : ''),
   folders: {
+    swapOrder: (id:string,withId:string,expectedRevision:number,withExpectedRevision:number) => request<{swapped:[string,string]}>(`/folders/${encodeURIComponent(id)}/swap-order`,'POST',{withId,expectedRevision,withExpectedRevision}),
     list: () => request<import('@line-crm/shared').HqTemplateFolder[]>('/folders'),
     create: (name: string, color?: string | null) => request<import('@line-crm/shared').HqTemplateFolder>('/folders', 'POST', { name, color }),
     update: (id: string, name: string, expectedRevision: number, color?: string | null) => request<import('@line-crm/shared').HqTemplateFolder>(`/folders/${encodeURIComponent(id)}`, 'PATCH', { name, expectedRevision, color }),

@@ -69,6 +69,7 @@ it('アカウント未指定と壊れた本文を400で返す', async () => {
   }, { DB: fixture.db })).status).toBe(400);
 });
 it('読み取り後の改名は409となり未分類への変更は起きない', async () => {
+  const versions = fixture.raw.prepare('SELECT * FROM friend_add_rule_versions').all();
   const batch = fixture.db.batch.bind(fixture.db);
   vi.spyOn(fixture.db, 'batch').mockImplementationOnce((statements) => {
     fixture.raw.exec("UPDATE friend_add_rule_folders SET name='改名' WHERE id='folder-a'");
@@ -77,7 +78,9 @@ it('読み取り後の改名は409となり未分類への変更は起きない'
   const response = await call();
   expect(response.status).toBe(409);
   expect(await response.json()).toMatchObject({ success: false, code: 'VERSION_CONFLICT' });
-  expect(rule()).toMatchObject({ folder_name: '店頭', lock_version: 1 });
+  // 617は別の更新者の改名を設定へ同期する。削除の失敗ではその成功を戻さない。
+  expect(rule()).toEqual({ folder_name: '改名', lock_version: 2, status: 'published' });
+  expect(fixture.raw.prepare('SELECT * FROM friend_add_rule_versions').all()).toEqual(versions);
 });
 it('最後の書き込みの失敗は500で返し、設定の分類と版を戻す', async () => {
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
