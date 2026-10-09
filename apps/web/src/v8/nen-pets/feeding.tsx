@@ -121,7 +121,7 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
   }
 
   const save = async () => {
-    if (status !== 'ready') return
+    if (busy || status !== 'ready') return
     const blank = drafts.find((row) => !row.name.trim())
     if (blank) { setError('商品名が空の行があります。名前を入れるか、行を消してください。'); return }
     const badKcal = drafts.find((row) => !Number.isFinite(Number(row.kcal.replace(/[,，]/g, ''))) || Number(row.kcal.replace(/[,，]/g, '')) <= 0)
@@ -156,7 +156,7 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
   if (status === 'error') return <ListState kind="error" title="主食のカロリー表を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />
   if (!data) return <ListState kind="loading" title="主食のカロリー表を読み込んでいます" />
 
-  const tableProps = { drafts, canEdit, onUpdate: update, onDefault: setDefault, onRemove: remove, addDisabled: drafts.length >= MAX_PRODUCTS }
+  const tableProps = { drafts, canEdit, busy, onUpdate: update, onDefault: setDefault, onRemove: remove, addDisabled: drafts.length >= MAX_PRODUCTS }
 
   return (
     <div className={styles.feeding}>
@@ -182,7 +182,7 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
               <span className={styles.treatRow}>
                 <span className={styles.treatInput}>
                   {canEdit ? (
-                    <TextField id="nen-treat-limit" inputMode="numeric" value={treatLimit} onChange={(event) => { setTreatLimit(event.target.value); touch() }} />
+                    <TextField disabled={busy} id="nen-treat-limit" inputMode="numeric" value={treatLimit} onChange={(event) => { setTreatLimit(event.target.value); touch() }} />
                   ) : (
                     <TextField id="nen-treat-limit" value={treatLimit} readOnly />
                   )}
@@ -242,11 +242,12 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
 }
 
 function ProductTable({
-  kind, drafts, canEdit, defaultHead, defaultChip, makeDefault, addLabel, onUpdate, onDefault, onRemove, onAdd, addDisabled,
+  kind, drafts, canEdit, defaultHead, defaultChip, makeDefault, addLabel, onUpdate, onDefault, onRemove, onAdd, addDisabled, busy,
 }: {
   kind: NenFeedingKind
   drafts: FeedingDraft[]
   canEdit: boolean
+  busy: boolean
   defaultHead: string
   defaultChip: string
   makeDefault: string
@@ -271,9 +272,9 @@ function ProductTable({
           <div key={row.key} className={styles.productRow} role="row">
             <span className={styles.productName} role="cell">
               {row.editing && canEdit ? (
-                <TextField aria-label="商品名" value={row.name} maxLength={40} placeholder={kind === 'nen' ? '例：然 鹿肉ジャーキー' : '例：ドライフード'} onChange={(event) => onUpdate(row.key, { name: event.target.value })} />
+                <TextField disabled={busy} aria-label="商品名" value={row.name} maxLength={40} placeholder={kind === 'nen' ? '例：然 鹿肉ジャーキー' : '例：ドライフード'} onChange={(event) => onUpdate(row.key, { name: event.target.value })} />
               ) : canEdit ? (
-                <button type="button" className={styles.productNameButton} title={`${row.name}を直す`} onClick={() => onUpdate(row.key, { editing: true })}>{row.name}</button>
+                <button type="button" disabled={busy} className={styles.productNameButton} title={`${row.name}を直す`} onClick={() => onUpdate(row.key, { editing: true })}>{row.name}</button>
               ) : (
                 <span className={styles.cell} title={row.name}>{row.name}</span>
               )}
@@ -281,7 +282,7 @@ function ProductTable({
             <span className={styles.productKcal} role="cell">
               {row.editing && canEdit ? (
                 <span className={styles.kcalInput}>
-                  <TextField aria-label={`${row.name || '商品'}の100gあたりのカロリー`} inputMode="decimal" value={row.kcal} placeholder="360" onChange={(event) => onUpdate(row.key, { kcal: event.target.value })} />
+                  <TextField disabled={busy} aria-label={`${row.name || '商品'}の100gあたりのカロリー`} inputMode="decimal" value={row.kcal} placeholder="360" onChange={(event) => onUpdate(row.key, { kcal: event.target.value })} />
                   <span className={styles.sub}>kcal</span>
                 </span>
               ) : (
@@ -292,12 +293,12 @@ function ProductTable({
               {row.isDefault ? (
                 <Pill tone="ok">{defaultChip}</Pill>
               ) : canEdit ? (
-                <Button onClick={() => onDefault(row.key)}>{makeDefault}</Button>
+                <Button disabled={busy} onClick={() => onDefault(row.key)}>{makeDefault}</Button>
               ) : null}
             </span>
             <span className={styles.productTrash} role="cell">
               {canEdit ? (
-                <IconButton aria-label={`${row.name || 'この商品'}を削除する`} title="削除する" onClick={() => onRemove(row.key)}>
+                <IconButton disabled={busy} aria-label={`${row.name || 'この商品'}を削除する`} title="削除する" onClick={() => onRemove(row.key)}>
                   <Trash2 size={16} aria-hidden="true" />
                 </IconButton>
               ) : null}
@@ -306,7 +307,7 @@ function ProductTable({
         ))}
       </div>
       {canEdit ? (
-        <button type="button" className={styles.addLink} onClick={onAdd} disabled={addDisabled}>
+        <button type="button" className={styles.addLink} onClick={onAdd} disabled={busy || addDisabled}>
           {`＋ ${addLabel}`}
         </button>
       ) : null}
