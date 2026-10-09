@@ -247,3 +247,10 @@
 }
 [data-theme='v8'] .button.thumbnail:is(:hover, :focus-visible) { outline: var(--tpl-rt-focus-ring-accent); }
 [data-theme='v8'] .button.thumbnail > img { width: 100%; height: 100%; object-fit: cover; }
+/* 文字だけの行内操作。通常のボタンの見た目は変えない。 */
+[data-theme='v8'] .button.inline.text {
+  height: auto; min-height: 0; padding: 0; border: 0; background: none;
+  color: var(--color-action); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-rs-lh-12);
+}
+
+[data-theme='v8'] .button.inline.text.textInk { color: var(--color-ink); }

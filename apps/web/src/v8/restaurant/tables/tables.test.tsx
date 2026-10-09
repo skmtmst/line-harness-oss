@@ -62,6 +62,31 @@ describe('BERxg 座席・卓管理', () => {
     await waitFor(() => expect(fixture.createTable).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-1', code: 'T5', label: '窓側2人卓', minCapacity: 1, maxCapacity: 2 })))
   })
 
+  it('空の卓番で保存すると欄に理由を出して移動し、APIへ送らない', async () => {
+    render(<TablesPage />)
+    await screen.findByText('フロアマップ')
+    fireEvent.click(screen.getByRole('button', { name: /卓を追加する/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^追加する$/ }))
+    const code = screen.getByLabelText('卓番')
+    await waitFor(() => expect(document.activeElement).toBe(code))
+    expect(code.getAttribute('aria-invalid')).toBe('true')
+    expect(screen.getByText('卓番を入れてください。')).not.toBeNull()
+    expect(fixture.createTable).not.toHaveBeenCalled()
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it('予約の移動で失敗したときは卓を止めず、確認窓を残す', async () => {
+    fixture.updateReservation.mockRejectedValueOnce(new Error('予約を移せませんでした。'))
+    render(<TablesPage />)
+    await screen.findByText('フロアマップ')
+    fireEvent.click(screen.getByRole('button', { name: 'T3・窓側4人卓を停止' }))
+    fireEvent.click(screen.getByRole('button', { name: '予約を移して止める' }))
+    await screen.findByText('予約を移せませんでした。')
+    expect(fixture.updateTable).not.toHaveBeenCalled()
+    expect(within(screen.getByRole('dialog')).getByRole('alert').textContent).toContain('予約を移せませんでした。')
+    expect(document.querySelector('[data-design-node="eY9F3"]')).not.toBeNull()
+  })
+
   it('閲覧のみ（staff）には追加・変更・停止を置かない', async () => {
     role.value = 'staff'
     render(<TablesPage />)

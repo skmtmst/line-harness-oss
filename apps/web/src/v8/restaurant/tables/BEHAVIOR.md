@@ -3,7 +3,7 @@
 対象：`app/restaurant-test/v8/tables.tsx`（今の V8）から写して `tables.tsx` を一から書いた。板 BERxg・卓を止める eY9F3・卓を追加・変更 gBrCz。
 
 ## 入口・受け付ける URL
-- `app/restaurant-test/tables/page.tsx`：`theme === 'v8'` のときだけ V8。v7 は `RestaurantConsole view="tables"` のまま。指定（?）は受け付けない（今と同じ）。
+- `app/restaurant-test/tables/page.tsx`：V8 だけを描く（2026-10-09 オーナー決定）。指定（?）は受け付けない（今と同じ）。
 
 ## 読み込み・送る形（今と同じ口）
 - `restaurantTestApi.snapshot`：卓（`tables`）と予約（`reservations`、止めるときの先の予約に使う）。

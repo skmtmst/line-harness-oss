@@ -34,7 +34,7 @@ export default function CheckCard({
    * `'compact'` は高さ 56・左右 12・間 10・角丸 10・題 13/600・補足 11（★V8 統括の一括配信「送るアカウント」J5DH6o）。
    * 3つ横に並べる小さな選択肢に使う。渡したときだけ効き、既定の見た目は変えない。
    */
-  size?: 'regular' | 'compact'
+  size?: 'regular' | 'compact' | 'row'
   className?: string
 }) {
   return (
@@ -44,7 +44,7 @@ export default function CheckCard({
         checked ? styles.checked : null,
         disabled ? styles.disabled : null,
         invalid ? styles.invalid : null,
-        size === 'compact' ? styles.compact : null,
+        size === 'compact' ? styles.compact : size === 'row' ? styles.row : null,
         className,
       ].filter(Boolean).join(' ')}
     >

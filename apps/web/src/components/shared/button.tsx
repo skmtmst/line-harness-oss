@@ -23,6 +23,8 @@ type CommonProps = {
    */
   size?: 'standard' | 'field' | 'compact' | 'inline' | 'slot' | 'thumbnail'
   align?: 'start'
+  /** 行内の時刻など、リンク色にしない文字操作。 */
+  textTone?: 'action' | 'ink'
   className?: string
   children: ReactNode
 }
@@ -74,10 +76,10 @@ const DONE_FLASH_MS = 1200
 export default function Button(props: ButtonProps) {
   const variant = props.variant ?? 'secondary'
   const size = props.size ?? 'standard'
-  const classes = [styles.button, styles[variant], styles[size], props.className].filter(Boolean).join(' ')
+  const classes = [styles.button, styles[variant], styles[size], props.textTone === 'ink' ? styles.textInk : null, props.className].filter(Boolean).join(' ')
 
   if ('href' in props && props.href !== undefined) {
-    const { children, className: _className, href, size: _size, variant: _variant, align, ...linkProps } = props
+    const { children, className: _className, href, size: _size, variant: _variant, align, textTone: _textTone, ...linkProps } = props
     return (
       <Link href={href} className={classes} data-align={align} {...linkProps}>
         {children}
@@ -96,6 +98,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     variant: _variant,
     size: _size,
     align,
+    textTone: _textTone,
     href: _href,
     type = 'button',
     busy,
