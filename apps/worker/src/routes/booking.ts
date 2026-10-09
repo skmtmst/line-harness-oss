@@ -1,3 +1,4 @@
+import { BOOKING_PERSON_LIMIT_GUARD_SQL, bookingPersonLimitBindings, bookingPersonLimitError } from '../services/booking-person-limit.js';
 import { reorderBookingMenus } from '@line-crm/db';
 import type { BookingMenuReorderRequest } from '@line-crm/shared';
 import { getBookingSyncRules, saveBookingSyncRules, validateBookingSyncRules, listBookingSyncNotices } from '@line-crm/db';
@@ -1068,7 +1069,8 @@ booking.post('/api/liff/booking/requests', async (c) => {
         ) < ?
         ${STORE_CAPACITY_GUARD_SQL}
         ${STORE_SETTINGS_VERSION_GUARD_SQL}
-        ${BOOKING_RESOURCE_CAPACITY_GUARD_SQL}`,
+        ${BOOKING_RESOURCE_CAPACITY_GUARD_SQL}
+        ${BOOKING_PERSON_LIMIT_GUARD_SQL}`,
     )
     .bind(
       bookingId,
@@ -1106,6 +1108,7 @@ booking.post('/api/liff/booking/requests', async (c) => {
         startsAt: startsAt.toISOString(),
         blockEndsAt: blockEndsAt.toISOString(),
       }),
+      ...bookingPersonLimitBindings(accountId, friendId, null),
     );
   let insertResult: { inserted: boolean; consumptionCount: number };
   try {
@@ -1125,15 +1128,16 @@ booking.post('/api/liff/booking/requests', async (c) => {
     throw error;
   }
   if (!insertResult.inserted) {
-    const err = { error: 'slot_conflict' };
+    const limitError = await bookingPersonLimitError(c.env.DB, accountId, friendId, null);
+    const err = limitError ?? { error: 'slot_conflict' };
     await completeIdempotencyResponse(c.env.DB, {
       key: idemKey,
       lineAccountId: accountId,
       friendId,
-      status: 409,
+      status: limitError ? 422 : 409,
       body: err,
     });
-    return c.json(err, 409);
+    return c.json(err, limitError ? 422 : 409);
   }
 
   // N-394: お客様が自分で入れた予約も履歴の起点として残す。
@@ -5929,7 +5933,8 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
         ) < ?
         ${STORE_CAPACITY_GUARD_SQL}
         ${STORE_SETTINGS_VERSION_GUARD_SQL}
-        ${BOOKING_RESOURCE_CAPACITY_GUARD_SQL}`,
+        ${BOOKING_RESOURCE_CAPACITY_GUARD_SQL}
+        ${BOOKING_PERSON_LIMIT_GUARD_SQL}`,
     )
     .bind(
       bookingId,
@@ -5970,6 +5975,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
         startsAt: startsAt.toISOString(),
         blockEndsAt: blockEndsAt.toISOString(),
       }),
+      ...bookingPersonLimitBindings(accountId, friendId, bookingCustomerId),
     );
   let insertResult: { inserted: boolean; consumptionCount: number };
   try {
@@ -5989,6 +5995,12 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     throw error;
   }
   if (!insertResult.inserted) {
+    const limitError = await bookingPersonLimitError(c.env.DB, accountId, friendId, bookingCustomerId);
+    if (limitError) {
+      await completeIdempotencyResponse(c.env.DB, { key: idemKey, lineAccountId: accountId,
+        friendId: idempotencySubject, status: 422, body: limitError });
+      return c.json(limitError, 422);
+    }
     const alternatives = await bookingConflictAlternatives(c.env.DB, c.env, {
       lineAccountId: accountId,
       menuId: body.menu_id,
