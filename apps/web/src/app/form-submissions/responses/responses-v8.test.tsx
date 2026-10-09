@@ -172,3 +172,31 @@ it('WEB-148: 閲覧のみでは編集・後処理を隠し、回答とCSVを残�
   expect([...host.querySelectorAll('button')].some((el) => el.textContent?.includes('後処理をやり直す'))).toBe(false)
   expect(host.textContent).toContain('CSVで書き出す')
  })
+
+it('住所・予約は一覧とCSVでも同じ読める値にし、壊れた旧回答には注を出す', async () => {
+  const values = { address: { postalCode:'1234567',prefecture:'東京都',city:'新宿区',addressLine1:'1-2' }, booking: {menuId:'m',staffId:'s',startsAt:'2026-10-10T01:30:00Z'}, old:'[object Object]' }
+  const blocks = ['address','booking','old'].map(name => ({ id:name,kind:'input',type:name === 'old' ? 'text' : name,name,label:name }))
+  fetchApi.mockImplementation(async (url: string) => ({ success:true,data:url.includes('/submissions')
+    ? {...submissionsPage,items:[{...submissionsPage.items[0],data:values}]}
+    : {...formDetail,fields:blocks,layout:{...formDetail.layout,sections:[{id:'s',blocks}]}} }))
+  const { Blob } = await import('node:buffer')
+  const previousBlob = globalThis.Blob
+  globalThis.Blob = Blob as unknown as typeof globalThis.Blob
+  let blob: Blob | undefined
+  const oldCreate = URL.createObjectURL, oldRevoke = URL.revokeObjectURL
+  URL.createObjectURL = ((value: Blob) => { blob = value; return 'blob:export' }) as typeof URL.createObjectURL
+  URL.revokeObjectURL = () => {}
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+  try {
+    await act(async () => root.render(<FormResponsesPage />)); await settle()
+    await act(async () => tabButton('1件ずつ見る')!.click()); await settle()
+    expect(host.textContent).toContain('〒123-4567 東京都新宿区1-2')
+    const csv = [...host.querySelectorAll('button')].find(b => b.textContent?.includes('CSVで書き出す'))!
+    await act(async () => csv.click()); await settle()
+    const content = await blob!.text()
+    expect(content).toContain('〒123-4567 東京都新宿区1-2')
+    expect(content).toContain('10/10 10:30')
+    expect(content).toContain('以前の保存で内容が失われています')
+    expect(content).not.toContain('[object Object]')
+  } finally { click.mockRestore(); URL.createObjectURL=oldCreate;URL.revokeObjectURL=oldRevoke;globalThis.Blob=previousBlob }
+})

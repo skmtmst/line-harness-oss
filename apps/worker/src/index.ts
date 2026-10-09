@@ -2767,7 +2767,7 @@ async function scheduled(
   const jobs: Promise<unknown>[] = [];
   jobs.push(
     observeDispatch('scenario deliveries',
-      () => processStepDeliveries(env.DB, defaultLineClient, env.WORKER_URL)),
+      () => processStepDeliveries(env.DB, defaultLineClient, env.WORKER_URL, env.LINE_CREDENTIAL_ENCRYPTION_KEY)),
     observeDispatch('broadcast deliveries', async () => {
       await Promise.all([
         processScheduledBroadcasts(env.DB, defaultLineClient, env.WORKER_URL),

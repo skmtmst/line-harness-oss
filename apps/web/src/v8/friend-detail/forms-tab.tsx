@@ -5,6 +5,7 @@
  * 項目名は回答時点の質問定義（fields の label）で出し、定義に無いキーは
  * 「（現在は使われていない項目）」を添える（FRIEND-24）。
  */
+import { formAnswerText } from '@/lib/form-answer'
 import { ClipboardList } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ListRange from '@/components/ui/list-range'
@@ -13,7 +14,7 @@ import type { FriendDetailState } from './use-friend-detail'
 import styles from './detail.module.css'
 import { DetailLoading } from '@/components/templates/detail-page'
 
-const renderValue = (v: unknown) => (Array.isArray(v) ? v.join(', ') : String(v ?? ''))
+const renderValue = formAnswerText
 
 export default function FormsTab({ data }: { data: FriendDetailState }) {
   const { submissions, submissionsStatus, submissionsTotal, submissionsNextCursor, submissionsLoadingMore, submissionsMoreError } = data

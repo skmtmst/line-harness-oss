@@ -914,3 +914,17 @@ describe('POST /webhook — 流入リンクの案内の共通情報 (N-189)', ()
     expect(messages[0].text).not.toContain('{{var.');
   });
 });
+
+
+test('公開した初回のテキストを共通情報を解決して1回だけ送り、送信履歴を残す', async () => {
+  raw.prepare(`UPDATE friend_add_rule_versions SET status='draft' WHERE id='version-1'`).run();
+  raw.prepare(`INSERT INTO friend_add_rule_versions(id,rule_id,version_number,definition_snapshot,status) SELECT 'text-version','rule-1',2,json_set(definition_snapshot,'$.messageType','text','$.messageText','こんにちは {{var.shop}}','$.scenarioId',NULL),'published' FROM friend_add_rule_versions WHERE id='version-1'`).run();
+  raw.prepare(`UPDATE friend_add_rules SET current_version_id='text-version' WHERE id='rule-1'`).run();
+  raw.prepare(`INSERT INTO common_vars(id,line_account_id,name,var_key,type,value) VALUES ('shop','account-1','店名','shop','text','お店')`).run();
+  await postFollow('direct-text');
+  expect(lineClientMocks.pushMessage).toHaveBeenCalledWith('U-1', [{ type: 'text', text: 'こんにちは お店' }], expect.any(String));
+  expect(raw.prepare(`SELECT routing_status,delivery_count FROM friend_add_events WHERE webhook_event_id='direct-text'`).get()).toMatchObject({ routing_status: 'completed', delivery_count: 1 });
+  await postFollow('direct-text');
+  expect(lineClientMocks.pushMessage).toHaveBeenCalledTimes(1);
+  expect(raw.prepare(`SELECT count(*) n FROM friend_scenarios`).get()).toEqual({ n: 0 });
+});

@@ -245,3 +245,19 @@ describe('V8 友だち詳細（src/v8）の動き', () => {
     expect(host.textContent).toContain('もう一度')
   })
 })
+
+it('本名とシステム表示名は情報欄やLINE登録名と別のAPIの値を表示する', async () => {
+  getFriend.mockResolvedValue({ success: true, data: { ...friend, realName: '本名の値', systemDisplayName: '社内の呼び名' } })
+  await render()
+  const group = host.querySelector('[aria-label="顧客情報"]')!
+  expect(group.textContent).toContain('本名の値')
+  expect(group.textContent).toContain('社内の呼び名')
+  expect(group.textContent).not.toContain('山田 花子')
+})
+it('本名が未登録なら本名という情報欄を代わりに表示しない', async () => {
+  getFriend.mockResolvedValue({ success: true, data: { ...friend, realName: null, systemDisplayName: null } })
+  await render()
+  const group = host.querySelector('[aria-label="顧客情報"]')!
+  expect(group.textContent).not.toContain('山田 花子')
+  expect(group.textContent).toContain('未登録')
+})

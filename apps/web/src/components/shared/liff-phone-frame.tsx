@@ -1,11 +1,11 @@
 'use client'
-import type { CSSProperties, ReactNode } from 'react'
+import type { AriaRole, CSSProperties, ReactNode } from 'react'
 import { BatteryFull, Signal, Wifi, X, MoreHorizontal } from 'lucide-react'
 import styles from './liff-phone-frame.module.css'
-export default function LiffPhoneFrame({ children, title = 'ご予約', accountName = '然 - NEN -', caption, step, steps = ['メニュー', '担当', '日時', '確認'], footer, accent, label = 'お客さまの予約画面の見本' }: {
-  children: ReactNode; title?: string; accountName?: string; caption?: string; step?: number; steps?: string[]; footer?: ReactNode; accent?: string | null; label?: string
+export default function LiffPhoneFrame({ children, title = 'ご予約', accountName = '然 - NEN -', caption, role, step, steps = ['メニュー', '担当', '日時', '確認'], footer, accent, label = 'お客さまの予約画面の見本' }: {
+  children: ReactNode; role?: AriaRole; title?: string; accountName?: string; caption?: string; step?: number; steps?: string[]; footer?: ReactNode; accent?: string | null; label?: string
 }) {
-  return <section className={styles.root} aria-label={label} data-liff-phone-frame>
+  return <section role={role} className={styles.root} aria-label={label} data-liff-phone-frame>
     {caption ? <p className={styles.caption}>{caption}</p> : null}
     <div className={styles.phone} style={accent ? { '--fe-phone-main': accent, '--v8-liff-primary': accent } as CSSProperties : undefined}>
       <div className={styles.status}><span className={styles.time}>9:41</span><span className={styles.statusIcons} aria-hidden="true"><Signal size={15}/><Wifi size={15}/><BatteryFull size={20}/></span></div>

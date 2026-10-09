@@ -180,3 +180,19 @@ describe('自動応答の失敗時の止める/続ける (P1-08)', () => {
     expect(actionMocks.runActionRows).toHaveBeenCalledTimes(2);
   });
 });
+
+it.each([
+  ['event_booking_unavailable', '申し込める空きがありません'],
+  ['event_booking_missing', '取り消す申し込みがありません'],
+])('B-179：%sは止める設定でも理由を記録し後続へ進む', async (code, reason) => {
+  actionMocks.runActionRows.mockResolvedValueOnce({ ...okResult, executed: 0, failed: 1, eventBookingFailure: { code, reason } });
+  const db = dbWithRules([rule([
+    { actionType: 'event_booking', config: { eventId: 'e' }, onFailure: 'stop' },
+    { actionType: 'tag', config: { op: 'add', tagIds: ['tag-2'] } },
+  ])]);
+  await matchAndReply(db, { replyMessageWithRequestId: vi.fn() } as unknown as LineClient, friend, '予約したい', 'reply-token', opts());
+  expect(actionMocks.runActionRows).toHaveBeenCalledTimes(2);
+  expect(dbMocks.finishAutoReplyActionRun).toHaveBeenCalledWith(db, expect.objectContaining({
+    errorCode: code, result: expect.objectContaining({ eventBookingFailure: { code, reason } }),
+  }));
+});

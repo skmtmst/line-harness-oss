@@ -58,7 +58,7 @@ describe('HQ form atomic plans', () => {
         const { context } = await preflight('a1', 'overwrite');
         await commit(await plan(context));
         expect(rows()).toHaveLength(1);
-        expect(rows()[0]).toMatchObject({ id, content_revision: 2, is_active: 0, submit_count: 7 });
+        expect(rows()[0]).toMatchObject({ id, content_revision: 2, is_active: 1, submit_count: 7 });
         expect(fixture.raw.prepare('SELECT * FROM form_submissions').get()).toEqual(answer);
         expect(await formTemplatePublicUrl(fixture.db, authority, 'a1', id)).toBe(url);
         expect((await updateForm(fixture.db, id, { description: '古い編集' }, 1)).kind).toBe('conflict');
@@ -237,4 +237,12 @@ describe('HQ form atomic plans', () => {
         await updateForm(fixture.db, id, { name: '変更' }, 1);
         expect(await formTemplateSnapshotToken(await formTemplateSnapshot(fixture.db, 'a1'))).not.toBe(before);
     });
+});
+
+test.each([0, 1])('上書き配布は店の公開状態 %s を保つ', async (isActive) => {
+    const id = await commit(await plan((await preflight('a1')).context));
+    await publishFormVersion(fixture.db, id, 1);
+    fixture.raw.prepare('UPDATE forms SET is_active=? WHERE id=?').run(isActive, id);
+    await commit(await plan((await preflight('a1', 'overwrite')).context));
+    expect(fixture.raw.prepare('SELECT is_active FROM forms WHERE id=?').get(id)).toEqual({ is_active: isActive });
 });

@@ -148,6 +148,19 @@ describe('N-032 friend stats account scope integration (#664)', () => {
     });
   });
 
+  it('詳細条件と保存条件は情報欄の保存値で同じ友だちを選ぶ', async () => {
+    testDb.raw.exec(`INSERT INTO friend_fields(id,name,field_key,type) VALUES ('plan-id','plan','plan-key','text');
+      INSERT INTO friend_field_values(friend_id,field_id,value) VALUES ('friend-a-1','plan-id','契約');
+      UPDATE friends SET metadata='{"plan":"契約"}' WHERE id='friend-a-2';`);
+    for (const suffix of ['metadata.plan=契約', 'conditions=' + encodeURIComponent(JSON.stringify({ all: [{ kind: 'field', key: 'plan', op: 'eq', value: '契約' }] }))]) {
+      const response = await get('/api/friends?lineAccountId=account-a&' + suffix, 'key-all');
+      expect(response.status).toBe(200);
+      expect((await response.json() as FriendListResponse).data.items.map(f => f.id)).toEqual(['friend-a-1']);
+    }
+    const response = await get('/api/friends?lineAccountId=account-a&metadataNot.plan=契約', 'key-all');
+    expect((await response.json() as FriendListResponse).data.items.map(f => f.id)).toEqual(['friend-a-2']);
+  });
+
   it('部分権限で担当店舗を明示しても一覧と4集計口が同じ2人になる', async () => {
     const result = await visibleCounts('key-partial', 'account-a');
     expect(result).toEqual({

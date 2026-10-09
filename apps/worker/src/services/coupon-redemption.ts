@@ -1,8 +1,9 @@
+import { runActionRows, type ScenarioActionRow, type RunActionRowsOptions } from './scenario-actions.js';
 import { couponDate, couponPayloadError } from '@line-crm/shared';
 import { getBroadcastMessageAsset, toJstString, type Friend } from '@line-crm/db';
 
 /** 署名検証済みWebhookだけが呼ぶ。1文で期限・回数・イベント再送を確かめる。 */
-export async function redeemCoupon(db: D1Database, friend: Friend, accountId: string | null, assetId: string, eventId: string, now = new Date()): Promise<{ ok: boolean; message: string; replayed?: boolean }> {
+export async function redeemCoupon(db: D1Database, friend: Friend, accountId: string | null, assetId: string, eventId: string, now = new Date(), runtime: RunActionRowsOptions = {}): Promise<{ ok: boolean; message: string; replayed?: boolean }> {
   if (friend.line_account_id !== accountId) return { ok:false,message:'このクーポンは使えません' };
   const existing = await db.prepare('SELECT id FROM coupon_redemptions WHERE incoming_event_id = ? AND friend_id = ?').bind(eventId,friend.id).first();
   if (existing) return { ok: true, message: 'クーポンの使用を記録しました', replayed: true };
@@ -17,7 +18,19 @@ export async function redeemCoupon(db: D1Database, friend: Friend, accountId: st
     (id,asset_id,friend_id,line_account_id,incoming_event_id,used_at,use_number,payload_snapshot)
     SELECT ?,?,?,?, ?,?, COUNT(*)+1,? FROM coupon_redemptions WHERE asset_id = ? AND friend_id = ?
     HAVING ? IS NULL OR COUNT(*) < ?`).bind(crypto.randomUUID(),asset.id,friend.id,accountId,eventId,toJstString(now),asset.payload_json,asset.id,friend.id,max,max).run();
-  if (Number(result.meta.changes) > 0) return { ok: true, message: 'クーポンの使用を記録しました' };
+  if (Number(result.meta.changes) > 0) {
+    try {
+      const actions = Array.isArray(payload.useActions) ? payload.useActions : [];
+      const rows = actions.map((action: { actionType: string; config?: unknown }, index: number) => ({
+        id: `coupon:${eventId}:${index}`, scenario_id: '', hook: 'choice_selected', step_id: null,
+        choice_index: null, sort_order: index, action_type: action.actionType,
+        config_json: JSON.stringify(action.config ?? {}), condition_json: null, repeat_on_refire: 1,
+      })) as ScenarioActionRow[];
+      const effects = await runActionRows(db, rows, friend.id, { ...runtime, accountId, sourceEventId: eventId });
+      if (effects.failed || effects.skippedIncomplete) return { ok: true, message: 'クーポンの使用を記録しました。使用後の処理に失敗したため、お店に確認してください' };
+      return { ok: true, message: 'クーポンの使用を記録しました' };
+    } catch { return { ok: true, message: 'クーポンの使用を記録しました。使用後の処理に失敗したため、お店に確認してください' }; }
+  }
   const replay = await db.prepare('SELECT id FROM coupon_redemptions WHERE incoming_event_id = ? AND friend_id = ?').bind(eventId,friend.id).first();
   return replay ? { ok: true, message: 'クーポンの使用を記録しました', replayed: true } : { ok: false, message: 'このクーポンは使える回数に達しています' };
 }

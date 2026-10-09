@@ -112,7 +112,7 @@ export default function OverviewTab({
           />
           <dl className={styles.kvList}>
             <Kv label="本名">{realName || <span className={styles.faint}>{emptyValue('unconfigured')}</span>}</Kv>
-            <Kv label="システム表示名">{friend.displayName || <span className={styles.faint}>{emptyValue('unconfigured')}</span>}</Kv>
+            <Kv label="システム表示名">{friend.systemDisplayName || <span className={styles.faint}>{emptyValue('unconfigured')}</span>}</Kv>
           </dl>
         </section>
 

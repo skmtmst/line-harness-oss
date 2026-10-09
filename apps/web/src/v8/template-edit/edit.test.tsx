@@ -393,3 +393,13 @@ describe('V8 クーポン・リサーチを作る', () => {
     expect(results).toEqual([['二問目', '一問目'], ['二問目', '一問目'], ['二問目', '一問目']])
   })
 })
+
+it('リサーチの回答後の処理は未動作と知らせ、設定は保存する', async () => {
+  assetsCreate.mockResolvedValue({success:true,data:{id:'research'}})
+  await mount('kind=research&visual=1')
+  expect(host.textContent).toContain('まだ動きません')
+  expect(host.textContent).toContain('設定は保存できます')
+  fireEvent.click(screen.getByRole('button',{name:'保存して公開'}))
+  await flush()
+  expect(assetsCreate).toHaveBeenCalledWith(expect.objectContaining({kind:'research',payload:expect.objectContaining({answerActions:[]})}))
+})

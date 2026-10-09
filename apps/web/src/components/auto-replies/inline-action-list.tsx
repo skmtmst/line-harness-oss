@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { api } from '@/lib/api'
+import { api, eventsApi } from '@/lib/api'
 import type { ScenarioActionType } from '@/lib/api'
 import { ActionConfigEditor, ACTION_KINDS } from '@/components/scenarios/action-editor'
 import Select from '@/components/shared/select'
@@ -23,6 +23,9 @@ import { useAdminTheme } from '@/lib/use-admin-theme'
 type Option = { id: string; name: string }
 
 export interface ActionOptions {
+  templates?: Option[]
+  reminders?: Option[]
+  events?: Option[]
   notificationRules?: Array<Option & {version:number}>
   tags: Option[]
   fields: Option[]
@@ -54,8 +57,9 @@ export function useActionOptions(): ActionOptions {
       setOptions({ tags: [], fields: [], marks: [], scenarios: [], vars: [] })
       return () => { cancelled = true }
     }
+    setOptions({ tags: [], fields: [], marks: [], scenarios: [], vars: [] })
     void (async () => {
-      const [tags, fields, marks, scenarios, vars, notifications] = await Promise.allSettled([
+      const [tags, fields, marks, scenarios, vars, notifications, templates, reminders, events] = await Promise.allSettled([
         // R23横展開: タグ・シナリオの候補は今のアカウントだけ（別アカウント混入防止）。
         api.tags.list({ accountId: selectedAccountId }),
         api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }),
@@ -63,9 +67,15 @@ export function useActionOptions(): ActionOptions {
         api.scenarios.list({ accountId: selectedAccountId }),
         api.commonVars.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }),
         theme === 'v8' ? Promise.resolve().then(() => api.notifications.operatorRules.list(selectedAccountId)) : Promise.resolve({success:true as const, data:{items:[]}}),
+        Promise.resolve().then(() => api.templates.list(undefined, selectedAccountId)),
+        Promise.resolve().then(() => api.reminders.list({ accountId: selectedAccountId })),
+        Promise.resolve().then(() => eventsApi.listEvents(selectedAccountId, { limit: 100 })),
       ])
       if (cancelled) return
       setOptions({
+        templates: templates.status === 'fulfilled' && templates.value.success ? templates.value.data.map(t => ({id:t.id,name:t.name})) : [],
+        reminders: reminders.status === 'fulfilled' && reminders.value.success ? reminders.value.data.map(r => ({id:r.id,name:r.name})) : [],
+        events: events.status === 'fulfilled' ? events.value.items.map(e => ({id:e.id,name:e.name})) : [],
         notificationRules: notifications.status === 'fulfilled' && notifications.value.success ? notifications.value.data.items.filter(r=>r.isActive&&r.status==='published').map(r=>({id:r.id,name:r.name,version:r.version??1})) : [],
         tags:
           tags.status === 'fulfilled' && tags.value.success
@@ -111,6 +121,9 @@ export default function InlineActionList({
   scenarios,
   vars,
   notificationRules = [],
+  templates = [],
+  reminders = [],
+  events = [],
 }: Props) {
   const { selectedAccountId } = useAccount()
   const theme = useAdminTheme()
@@ -230,6 +243,9 @@ export default function InlineActionList({
               marks={marks}
               scenarios={scenarios}
               vars={vars}
+              templates={templates}
+              reminders={reminders}
+              events={events}
               onChange={(config) => update(action.key, config)}
             />}
             {incompleteReason ? (

@@ -1,3 +1,4 @@
+import { bookingPriceText } from '../lib/booking-price.js';
 import { useState } from 'react';
 import { api, type CreateBookingResponse, type MenuItem, type StaffItem } from '../lib/api.js';
 import { addMinutesHm, formatJpLong, slotStartsAtIso } from '../lib/datetime.js';
@@ -90,7 +91,7 @@ export default function Confirm({
         <Row label="担当" value={staff.display_name} />
         <Row
           label="料金"
-          value={`${staff.price === 0 ? '無料' : `¥${staff.price.toLocaleString()}`}（目安・お店で払う）`}
+          value={`${bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode)}（目安・お店で払う）`}
         />
       </dl>
       <label className="block">

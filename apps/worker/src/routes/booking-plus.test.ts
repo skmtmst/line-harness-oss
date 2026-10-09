@@ -381,6 +381,8 @@ describe('8 無断キャンセルの印と前払いのみ', () => {
   // 前払いの人の代理登録は確定せず案内を付ける。
   it('前払いの人の代理登録は確定せず案内を付ける', async () => {
     seedBase();
+    // 前払いの扱いを調べるため、準備済みの複数予約を許す上限を明示する。
+    sqlite.exec(`INSERT INTO booking_settings(id,line_account_id,max_active_bookings_per_friend) VALUES('prepay-settings','account-a',10)`);
     const plus = staffApp(bookingPlus);
     await plus.request(
       '/api/booking/admin/friends/friend-a/prepay?account_id=account-a',

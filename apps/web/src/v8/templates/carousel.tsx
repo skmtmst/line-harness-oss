@@ -629,6 +629,9 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
             marks={actionOptions.marks}
             scenarios={actionOptions.scenarios}
             vars={actionOptions.vars}
+            templates={actionOptions.templates}
+            reminders={actionOptions.reminders}
+            events={actionOptions.events}
           />
         ) : null}
       </Dialog>

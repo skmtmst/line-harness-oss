@@ -1,3 +1,4 @@
+import { bookingPriceText } from '../lib/booking-price.js';
 import { useEffect, useState } from 'react';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
@@ -56,7 +57,7 @@ export default function StaffList({
         <h2 className="text-xl font-bold text-ink">担当を選んでください</h2>
         <p className="mt-3.5 text-xs leading-[18px] text-liff-sub">
           {`${menu.name}・${menu.duration_minutes}分・${
-            menu.base_price === 0 ? '無料' : `¥${menu.base_price.toLocaleString()}`
+            bookingPriceText(menu.base_price, menu.price_mode)
           }`}
         </p>
       </div>

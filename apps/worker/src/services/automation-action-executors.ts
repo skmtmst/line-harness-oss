@@ -682,6 +682,41 @@ async function notifyStaffExecutor(
   return { output: { notificationRuleId: rule.id, accepted: result.accepted, failed: result.failed } };
 }
 
+async function reminderExecutor(context: AutomationActionContext, operation: 'start' | 'stop'): Promise<void> {
+  const friend = await requireFriend(context);
+  const reminderId = requiredString(context.action.params.reminderId, 'reminder_id_missing', 'リマインダ');
+  const reminder = await context.db.prepare('SELECT id FROM reminders WHERE id = ? AND line_account_id = ?')
+    .bind(reminderId, context.lineAccountId).first();
+  if (!reminder) throw invalid('reminder_not_found', 'リマインダが見つからないか、別のLINE公式アカウントにあります');
+  if (operation === 'stop') {
+    await context.db.prepare(`UPDATE friend_reminders SET status = 'cancelled', updated_at = ?
+      WHERE friend_id = ? AND reminder_id = ? AND status = 'active'`).bind(jstNow(), friend.id, reminderId).run();
+    return;
+  }
+  const sourceEventId = `action:${context.idempotencyKey}`;
+  const existing = () => context.db.prepare('SELECT id FROM friend_reminders WHERE friend_id = ? AND reminder_id = ? AND source_event_id = ?')
+    .bind(friend.id, reminderId, sourceEventId).first();
+  if (await existing()) return;
+  const { enrollFriendInReminder } = await import('@line-crm/db');
+  try {
+    await enrollFriendInReminder(context.db, { friendId: friend.id, reminderId,
+      targetDate: typeof context.action.params.targetDate === 'string' ? context.action.params.targetDate : jstNow().slice(0, 10),
+      sourceKind: 'automation', sourceId: context.action.id, sourceEventId });
+  } catch (error) { if (!await existing()) throw error; }
+}
+
+async function mileageExecutor(context: AutomationActionContext): Promise<void> {
+  const friend = await requireFriend(context);
+  const amount = context.action.params.amount;
+  if (typeof amount !== 'number' || !Number.isInteger(amount) || amount < 1 || amount > 1_000_000) {
+    throw invalid('mileage_amount_invalid', '付与マイルは1から100万の整数で指定してください');
+  }
+  const { postMileageEntry } = await import('@line-crm/db');
+  await postMileageEntry(context.db, { beneficiaryFriendId: friend.id, entryType: 'grant', amount,
+    reason: '設定した処理による付与', source: 'automation', sourceEventId: context.sourceEventId,
+    idempotencyKey: `action:${context.idempotencyKey}` });
+}
+
 export function createAutomationActionExecutors(
   dependencies: AutomationActionExecutorDependencies = {},
 ): Record<string, AutomationActionExecutor> {
@@ -695,6 +730,13 @@ export function createAutomationActionExecutors(
     stop_scenario: (context) => changeScenarioStatus(context, 'stop'),
     resume_scenario: (context) => changeScenarioStatus(context, 'resume'),
     send_message: (context) => sendMessageExecutor(context, dependencies),
+    start_reminder: (context) => reminderExecutor(context, 'start'),
+    stop_reminder: (context) => reminderExecutor(context, 'stop'),
+    event_booking: async (context) => {
+      const { executeEventBookingAction } = await import('./event-booking-actions.js');
+      await executeEventBookingAction(context);
+    },
+    grant_mileage: mileageExecutor,
     send_webhook: (context) => webhookExecutor(context, dependencies),
     switch_rich_menu: (context) => richMenuExecutor(context, dependencies, 'link'),
     remove_rich_menu: (context) => richMenuExecutor(context, dependencies, 'unlink'),

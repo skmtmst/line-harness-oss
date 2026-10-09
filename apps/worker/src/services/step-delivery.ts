@@ -28,7 +28,7 @@ import type { Message } from '@line-crm/line-sdk';
 import { jitterDeliveryTime, addJitter, sleep } from './stealth.js';
 import { getSendPermissionForAccount, type SendPermissionCache } from './send-entitlements.js';
 import { matchesCondition, parseCondition } from './segment-query.js';
-import { runScenarioActions, resumePreviousScenario, runScenarioOp } from './scenario-actions.js';
+import { runScenarioActions, resumePreviousScenario, runScenarioOp, type RunActionRowsOptions } from './scenario-actions.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 import { isOperationCapabilityStopped } from '@line-crm/db';
 import { parseQuestion, buildQuestionMessages } from './scenario-question.js';
@@ -199,6 +199,7 @@ export async function processStepDeliveries(
   db: D1Database,
   lineClient: LineClient,
   workerUrl?: string,
+  credentialKey?: string,
 ): Promise<void> {
   const accountsWithStatus = await listLineAccountsWithTenantStatus(db);
   const tenantStatusByAccount = new Map(
@@ -288,7 +289,7 @@ export async function processStepDeliveries(
       if (i > 0) {
         await sleep(addJitter(50, 200));
       }
-      const sent = await processSingleDelivery(db, lineClient, fs, workerUrl, sendPermissions);
+      const sent = await processSingleDelivery(db, lineClient, fs, workerUrl, sendPermissions, credentialKey);
       if (sent) sendCount++;
     } catch (err) {
       console.error(`Error processing friend_scenario ${fs.id}:`, err);
@@ -359,6 +360,7 @@ async function processSingleDelivery(
   },
   workerUrl?: string,
   sendPermissions?: SendPermissionCache,
+  credentialKey?: string,
 ): Promise<boolean> {
   // 課金の状態（トライアル終了・解約）で配信が止まっている統括は送らない。
   // 予約は触らず（claim もしない）、次の cron でまた確かめる。プランを選べば続きから届く。
@@ -483,7 +485,7 @@ async function processSingleDelivery(
   const currentStep = steps.find((s) => s.step_order > fs.current_step_order);
 
   if (!currentStep) {
-    await finishScenario(db, fs.id, fs.scenario_id, fs.friend_id, onComplete);
+    await finishScenario(db, fs.id, fs.scenario_id, fs.friend_id, onComplete, {executorDependencies:{credentialEncryptionKey:credentialKey}});
     return false;
   }
 
@@ -544,7 +546,7 @@ async function processSingleDelivery(
         jitteredDate.toISOString().slice(0, -1) + '+09:00',
       );
     } else {
-      await finishScenario(db, fs.id, fs.scenario_id, fs.friend_id, onComplete);
+      await finishScenario(db, fs.id, fs.scenario_id, fs.friend_id, onComplete, {executorDependencies:{credentialEncryptionKey:credentialKey}});
     }
     return false;
   }
@@ -638,7 +640,7 @@ async function processSingleDelivery(
   let deliveryClient = lineClient;
   if (deliveryAccountId) {
     const { getLineAccountById } = await import('@line-crm/db');
-    const account = await getLineAccountById(db, deliveryAccountId);
+    const account = await getLineAccountById(db, deliveryAccountId, credentialKey);
     if (!account) {
       await pauseFriendScenarioDelivery(db, fs.id);
       console.warn(
@@ -692,7 +694,7 @@ async function processSingleDelivery(
     await advanceFriendScenario(db, fs.id, currentStep.step_order, jitteredDate.toISOString().slice(0, -1) + '+09:00');
   } else {
     // This was the last step
-    await finishScenario(db, fs.id, fs.scenario_id, fs.friend_id, onComplete);
+    await finishScenario(db, fs.id, fs.scenario_id, fs.friend_id, onComplete, {executorDependencies:{credentialEncryptionKey:credentialKey}});
   }
 
   // 到達タグ付与 (advance / complete の後 = 再送が起きてもタグ付与は影響しない順序)
@@ -718,6 +720,9 @@ async function processSingleDelivery(
     hook: 'step_sent',
     friendId: friend.id,
     stepId: liveStepId ?? currentStep.id,
+    accountId: deliveryAccountId,
+    sourceEventId: `scenario-step:${fs.id}:${currentStep.id}:${fs.next_delivery_at}`,
+    executorDependencies: {resolveLineAccessToken:async()=> 'existing-client',createLineClient:()=>deliveryClient},
   });
 
   return true;
@@ -741,6 +746,7 @@ export async function finishScenario(
   scenarioId: string,
   friendId: string,
   scenario: { on_complete_mode: string | null; on_complete_scenario_id: string | null },
+  runtime: RunActionRowsOptions = {},
 ): Promise<void> {
   const mode = scenario.on_complete_mode ?? 'pause';
 
@@ -764,6 +770,8 @@ export async function finishScenario(
     scenarioId,
     hook: 'scenario_completed',
     friendId,
+    ...runtime,
+    sourceEventId: `scenario-complete:${enrollmentId}`,
   });
 }
 

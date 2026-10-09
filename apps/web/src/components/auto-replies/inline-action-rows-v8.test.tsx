@@ -6,7 +6,7 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAcco
 vi.mock('@/lib/use-feature-visibility', () => ({ useFeatureVisibility: () => ({ enabled: () => true }) }))
 vi.mock('@/components/scenarios/action-editor', () => ({
   ACTION_KINDS: [{ type: 'tag', label: 'タグ操作', make: () => ({ op: 'add', tagIds: [] }) }],
-  ActionConfigEditor: () => <p>中身の編集</p>,
+  ActionConfigEditor: (props: {templates?: {name:string}[];reminders?: {name:string}[];events?: {name:string}[]}) => <p>中身の編集 {JSON.stringify([props.templates,props.reminders,props.events])}</p>,
 }))
 
 import InlineActionRowsV8, { actionRowTitle } from './inline-action-rows-v8'
@@ -57,4 +57,13 @@ it('WEB-019：つまみはマウスと上下キーで同じ順へ動かせる', 
   fireEvent.dragOver(target)
   fireEvent.drop(target)
   expect(onChange).toHaveBeenLastCalledWith([actions[1], actions[0]])
+})
+
+it('編集を開くと送信・リマインダ・イベントの候補が入る', () => {
+  render(<InlineActionRowsV8 actions={[a({})]} onChange={()=>{}} {...opts} templates={[{id:'t',name:'案内'}]} reminders={[{id:'r',name:'翌日'}]} events={[{id:'e',name:'相談会'}]} />)
+  fireEvent.click(screen.getByRole('button',{name:'1つ目の処理の操作'}))
+  fireEvent.click(screen.getByRole('menuitem',{name:'設定を変える'}))
+  expect(screen.getByText(/中身の編集/).textContent).toContain('案内')
+  expect(screen.getByText(/中身の編集/).textContent).toContain('翌日')
+  expect(screen.getByText(/中身の編集/).textContent).toContain('相談会')
 })

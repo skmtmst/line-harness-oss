@@ -366,6 +366,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
   // 予約枠の返事に入っている休みの日（お店・担当が閉めている日）。
   const [slotClosedDates, setSlotClosedDates] = useState<string[]>([])
   const [previewError, setPreviewError] = useState(false)
+  const [previewLoading, setPreviewLoading] = useState(false)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [reloadKey, setReloadKey] = useState(0)
   const [ruleError, setRuleError] = useState<string | null>(null)
@@ -421,6 +422,8 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
 
   const loadAvailability = useCallback(async (accountId: string, activeMenuId: string, zone: string, requestId: number) => {
     const from = todayKey(zone)
+    setPreviewLoading(true)
+    setPreviewError(false)
     try {
       const availability = await bookingApi.getAvailability(accountId, { menuId: activeMenuId, staffId, from, to: addDays(from, 13) })
       if (requestId !== requestRef.current) return
@@ -433,6 +436,8 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       if (requestId !== requestRef.current) return
       setSlots([])
       setPreviewError(true)
+    } finally {
+      if (requestId === requestRef.current) setPreviewLoading(false)
     }
   }, [staffId])
 
@@ -942,11 +947,12 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
     const from = todayKey(timeZone)
     const closed = new Set(closedDates)
     return Array.from({ length: 14 }, (_, index) => addDays(from, index)).map((date) => {
+      if (previewError || previewLoading) return { date, mark: '—' as const }
       if (closed.has(date)) return { date, mark: '休' as const }
       const daySlots = slots.filter((slot) => slot.date === date)
       return { date, mark: daySlots.some((slot) => slot.remaining > 0) ? '○' as const : '×' as const }
     })
-  }, [timeZone, slots, closedDates])
+  }, [timeZone, slots, closedDates, previewError, previewLoading])
 
   /** 「この日だけ」の行（例外日の休み・日ごとのシフト・この日だけの休憩を日付順で1列に）。 */
   const dayRows = useMemo<DayRow[]>(() => {
@@ -1315,7 +1321,8 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
               slots={slots}
               closedDates={closedDates}
               closedWeekdays={closedWeekdays}
-              status={previewError ? 'error' : 'ready'}
+              status={previewLoading ? 'loading' : previewError ? 'error' : 'ready'}
+              onRetry={selectedAccountId && menuId ? () => { void loadAvailability(selectedAccountId, menuId, timeZone, requestRef.current) } : undefined}
             />
           </div>
           {previewUrl ? null : <p className={layout.cardNote}>このアカウントには予約画面のURLがまだありません</p>}

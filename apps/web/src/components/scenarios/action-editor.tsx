@@ -172,7 +172,7 @@ function toDraftActions(actions: ScenarioAction[]): ScenarioDraftActionV6[] {
       return [{ ...common, id: action.id, type: 'start_reminder', params: { reminderId: config.reminderId }, sortOrder: actionIndex * 10 }]
     }
     if (action.actionType === 'event_booking' && typeof config.eventId === 'string' && config.eventId) {
-      return [{ ...common, id: action.id, type: 'common_action', params: { eventId: config.eventId }, sortOrder: actionIndex * 10 }]
+      return [{ ...common, id: action.id, type: 'event_booking', params: config, sortOrder: actionIndex * 10 }]
     }
     return []
   })
@@ -1269,6 +1269,12 @@ export function ActionConfigEditor({
       return (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-ink text-sm font-semibold">イベント予約</span>
+          <Select
+            aria-label="イベント予約の操作"
+            value={c.op === 'cancel' ? 'cancel' : 'register'}
+            options={[{ value: 'register', label: 'イベントに申し込む' }, { value: 'cancel', label: '申し込みを取り消す' }]}
+            onChange={(op) => onChange({ ...c, op })}
+          />
           <TargetSelector
             label="イベント予約"
             kind="event"

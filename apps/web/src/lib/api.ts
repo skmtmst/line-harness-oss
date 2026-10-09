@@ -3221,6 +3221,8 @@ export type FriendFormSubmission = {
   createdAt: string
 }
 export type FriendDetail = FriendWithTags & {
+  realName?: string | null
+  systemDisplayName?: string | null
   formSubmissions: FriendFormSubmission[]
   /** フォーム回答の総数。submissions=0 の軽い応答でも返る（PERF-13）。 */
   formSubmissionTotal?: number | null

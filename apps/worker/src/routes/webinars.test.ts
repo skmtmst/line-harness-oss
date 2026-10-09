@@ -2402,7 +2402,7 @@ describe('R97 視聴後アクションを実行口へ接続する', () => {
 
   test('実行口のない種類は実行せず見送りとして記録する', async () => {
     dbMocks.getWebinarActions.mockResolvedValue([{
-      id: 'action-9', webinar_id: 'w1', trigger: 'completed', action_type: 'send_message',
+      id: 'action-9', webinar_id: 'w1', trigger: 'completed', action_type: 'unsupported_future_action',
       config_json: JSON.stringify({ templateId: 'tmpl-1' }), position: 0, version: 1,
       enabled: 1, created_at: 'x', updated_at: 'x',
     }]);

@@ -20,6 +20,7 @@ export interface MenuItem {
   duration_minutes: number;
   buffer_after_minutes: number;
   base_price: number;
+  price_mode?: 'fixed' | 'free' | 'inquiry';
   sort_order: number;
   /** キャンセル期限 (開始の何時間前まで)。null は期限なし。 */
   cancel_deadline_hours_before?: number | null;
@@ -33,6 +34,7 @@ export interface StaffItem {
   bio: string | null;
   is_designation_optional: number;
   price: number;
+  price_mode?: 'fixed' | 'free' | 'inquiry';
   duration_minutes: number;
 }
 

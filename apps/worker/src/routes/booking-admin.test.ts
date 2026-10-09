@@ -341,7 +341,7 @@ describe('POST /api/booking/admin/bookings', () => {
 
   function happyCustomerDb(insertChanges = 1) {
     return scriptedDb([
-      ['FROM booking_customers', { first: { id: 'customer-1', friend_id: null } }],
+      ['SELECT id, friend_id FROM booking_customers', { first: { id: 'customer-1', friend_id: null } }],
       ['FROM staff WHERE', { first: { ok: 1 } }],
       [
         'FROM menus m',

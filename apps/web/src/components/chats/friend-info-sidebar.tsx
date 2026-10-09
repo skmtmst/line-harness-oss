@@ -1,5 +1,6 @@
 'use client'
 
+import { formAnswerText } from '@/lib/form-answer'
 import { DragHandle } from '@/components/shared/row-actions'
 
 import StatusPill, { StatusDot, SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
@@ -157,6 +158,7 @@ const statusLabels: Record<NonNullable<ChatStatusInfo['status']>, { label: strin
  * 値の中身（URL・長文）はそのまま出し、枠の中で安全に折り返す。
  */
 function renderValue(value: unknown): string {
+  if (typeof value === 'string' && value.includes('[object Object]')) return formAnswerText(value)
   if (value === null || value === undefined || value === '') return '-'
   if (typeof value === 'string') return value
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
@@ -1501,7 +1503,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                             <div key={key}>
                               <dt className="text-nano text-ink-faint">{labels.get(key) ?? key}</dt>
                               <dd className="mt-0.5 whitespace-pre-wrap break-words text-xs text-ink-secondary">
-                                {renderValue(value)}
+                                {formAnswerText(value) || '-'}
                               </dd>
                             </div>
                           ))}
