@@ -6,8 +6,8 @@
  * 選んでいるページを出す。押せない見本（role="img" ではなく読める文で出す）。
  * 予約を入れる欄の日にち・時刻は形を見せるための見本で、実際の空きではない。
  */
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { BatteryFull, ChevronDown, ChevronLeft, Menu, Phone, Search, Signal, Wifi } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import LiffPhoneFrame from '@/components/shared/liff-phone-frame'
 import { PREFECTURES, normalizeRatingValue, FORM_OPTIONS_DEFAULT, type FormBlock, type FormInputBlock, type FormLayout } from '@line-crm/shared'
 import { DateYmdField, AddressControls, BookingControls, FormChoiceRow, FormFileControl, FormSelectControl, FormTextControl, RatingStars } from '../../../../liff/src/components/forms/controls'
 import styles from './edit.module.css'
@@ -37,39 +37,13 @@ export function FormPhone({ layout, pageIndex, accountName, bookingMenus }: Prop
   const firstInput = blocks.findIndex((b) => b.kind === 'input')
   const progressAt = pageIndex === 0 && firstInput > 0 ? firstInput : 0
   // 色を決めたフォームは、その主の色で見せる（決めていなければ LINE の緑）。
-  const phoneRef = useRef<HTMLDivElement>(null)
   const main = layout.options.theme?.main ?? null
-  useEffect(() => {
-    const el = phoneRef.current
-    if (!el) return
-    if (main) el.style.setProperty('--fe-phone-main', main)
-    else el.style.removeProperty('--fe-phone-main')
-  }, [main])
   const nextLabel = last
     ? (options.submitLabel || '送信する')
     : `${options.nextLabel || '次へ'}（${pageIndex + 1} / ${sections.length}）`
 
   return (
-    <section className={styles.phoneWrap} aria-label="お客さまに見える形">
-      <p className={styles.phoneTitle}>お客さまに見える形</p>
-      <div className={styles.phone} ref={phoneRef}>
-        <div className={styles.phoneScreen}>
-          <div className={styles.phoneStatus}>
-            <span className={styles.phoneClock}>9:41</span>
-            <span className={styles.phoneIsland} aria-hidden="true" />
-            <span className={styles.phoneIcons} aria-hidden="true">
-              <Signal size={15} strokeWidth={1.8} />
-              <Wifi size={15} strokeWidth={1.8} />
-              <BatteryFull size={20} strokeWidth={1.8} />
-            </span>
-          </div>
-          <div className={styles.phoneHead}>
-            <ChevronLeft size={20} aria-hidden="true" />
-            <span className={styles.phoneName}>{accountName}</span>
-            <Search size={17} aria-hidden="true" />
-            <Phone size={17} aria-hidden="true" />
-            <Menu size={17} aria-hidden="true" />
-          </div>
+    <LiffPhoneFrame title="回答フォーム" accountName={accountName} caption="お客さまに見える形" label="お客さまに見える形" accent={main}>
           <div className={styles.phoneForm}>
             {blocks.length === 0 ? <p className={styles.phoneEmpty}>このページにはまだブロックがありません</p> : null}
             {blocks.map((block, index) => (
@@ -79,14 +53,7 @@ export function FormPhone({ layout, pageIndex, accountName, bookingMenus }: Prop
             <span className={styles.phoneSpacer} />
             <span className={styles.phoneNext}>{nextLabel}</span>
           </div>
-          <div className={styles.phoneMenu}>
-            <span>メニュー</span>
-            <ChevronDown size={12} aria-hidden="true" />
-          </div>
-          <div className={styles.phoneHome}><span aria-hidden="true" /></div>
-        </div>
-      </div>
-    </section>
+    </LiffPhoneFrame>
   )
 }
 

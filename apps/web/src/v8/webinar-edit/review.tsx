@@ -20,6 +20,7 @@ import { formatNumber } from '@/lib/format'
 import type { EditContext, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './review.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const FLAGS = ['registrationEnabled', 'dayBeforeEnabled', 'hourBeforeEnabled', 'startEnabled', 'missedEnabled', 'completedEnabled'] as const
 
@@ -123,9 +124,9 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
   const summary: Array<[string, string]> = [
     ['開催形式', editor.deliveryKind === 'scheduled' ? '日時指定・開催回あり' : editor.deliveryKind === 'external' ? '外部の動画' : 'オンデマンド・いつでも視聴'],
     ['公開期間', publicationStateLabel(webinar.publicationState, webinar.publicationStartsAt, webinar.publicationEndsAt) ?? '—（公開期間は未設定）'],
-    ['CTA', ctx.ctaCount > 0 ? `${ctx.ctaCount} 件` : '未設定'],
-    ['通知', notifyCount === null ? '—' : `${notifyCount.on} つ${notifyCount.missedOff ? '（見逃し案内は止めている）' : ''}`],
-    ['視聴後の動き', (() => { const check = checks.find((item) => item.key === 'action_dependencies'); return check ? check.detail || check.label : '—' })()],
+    ['CTA', ctx.ctaCount > 0 ? `${ctx.ctaCount}件` : emptyValue('unconfigured')],
+    ['通知', notifyCount === null ? emptyValue('unknown') : `${notifyCount.on} つ${notifyCount.missedOff ? '（見逃し案内は止めている）' : ''}`],
+    ['視聴後の動き', (() => { const check = checks.find((item) => item.key === 'action_dependencies'); return check ? check.detail || check.label : emptyValue('unknown') })()],
   ]
   const chrome = chromeFor(readOnly ? null : (
     <Button variant="primary" disabled={!canPublish} title={canPublish ? undefined : '公開前の確認が全部通ると公開できます'} busy={publishing} busyLabel="公開しています…" onClick={() => void publish()}><Check size={15} aria-hidden="true" />この版を公開</Button>
@@ -138,7 +139,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
       actions={chrome.actions}
       identity={chrome.identity}
       steps={chrome.steps}
-      description="すべての段がそろうと公開できます。公開すると、申込ページと LINE の案内が使えるようになります。"
+      help="すべての段がそろうと公開できます。公開すると、申込ページと LINE の案内が使えるようになります。"
       footerActions={chrome.footerActions}
       status={chrome.status}
       preview={<>
@@ -148,7 +149,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
           <span className={styles.player} aria-hidden="true"><Play size={32} /></span>
         </div>
         <div className={form.previewActions}>
-          {ctx.canOpenPublicPage && ctx.publicUrl ? <Button href={ctx.publicUrl} target="_blank" rel="noreferrer"><ExternalLink size={15} aria-hidden="true" />公開ページを見る</Button> : null}
+          {ctx.canOpenPublicPage && ctx.publicUrl ? <Button external href={ctx.publicUrl}  >公開ページを見る</Button> : null}
           {readOnly ? null : <Button disabled={testing !== false || publishing} onClick={() => setNotifyConfirm(true)}><Send size={15} aria-hidden="true" />テストを送る</Button>}
         </div>
         {!ctx.canOpenPublicPage && ctx.publicPageReason ? <p className={form.previewNote}>{ctx.publicPageReason}</p> : null}

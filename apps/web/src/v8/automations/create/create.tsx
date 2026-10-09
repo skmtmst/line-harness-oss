@@ -60,6 +60,8 @@ import { FriendMultiSelect } from './friend-multi-select'
 import { formatNumber, formatTime } from '@/lib/format'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /**
  * ルールを作る。Pencil ★V6 `Rv8Jv`（25-1-A つくる）。
@@ -1210,7 +1212,7 @@ export function NewAutomationV8({
           setError('指定された下書きは見つかりませんでした。削除された可能性があります。')
         } else if (caught instanceof ApiError && caught.status === 403) {
           setResumeErrorKind('forbidden')
-          setError('指定された下書きを開く権限がありません。')
+          setError(permissionDeniedMessage('store'))
         } else {
           setResumeErrorKind('network')
           setError('下書きを読み込めませんでした。通信状態を確かめて、もう一度お試しください。')
@@ -2340,11 +2342,11 @@ export function NewAutomationV8({
         <dl className={styles.kvList}>
           <div className={styles.kvRow}>
             <dt>友だち全体</dt>
-            <dd>{totalForDraft === null ? '—' : `${formatNumber(totalForDraft)} 人`}</dd>
+            <dd>{totalForDraft === null ? emptyValue('unknown') : `${formatNumber(totalForDraft)} 人`}</dd>
           </div>
           <div className={styles.kvRow}>
             <dt>人数</dt>
-            <dd>{previewCount === null ? '—' : `${formatNumber(previewCount)} 人`}</dd>
+            <dd>{previewCount === null ? emptyValue('unknown') : `${formatNumber(previewCount)} 人`}</dd>
           </div>
         </dl>
         {previewFailed && savedDraft && selectedAccountId ? (
@@ -2369,16 +2371,13 @@ export function NewAutomationV8({
           </div>
           <p className={styles.sideNote}>選んだ友だち1人だけに動かします</p>
         </div>
-        <label className={styles.field} htmlFor="v8-test-friend">
-          <span className={styles.label}>友だち</span>
-          <TextField
+        <Field label="友だち" htmlFor="v8-test-friend"><TextField
             id="v8-test-friend"
             aria-label="1人テストの友だちID"
             value={testFriendId}
             onChange={(event) => setTestFriendId(event.target.value)}
             placeholder="試す友だちのID"
-          />
-        </label>
+          /></Field>
         {canEdit ? (
           <div>
             <Button
@@ -2455,15 +2454,15 @@ export function NewAutomationV8({
         <dl className={styles.kvList}>
           <div className={styles.kvRow}>
             <dt>シナリオ</dt>
-            <dd className={styles.kvLight}>{usedScenarioNames.length > 0 ? usedScenarioNames.join('、') : 'なし'}</dd>
+            <dd className={styles.kvLight}>{usedScenarioNames.length > 0 ? usedScenarioNames.join('、') : emptyValue('none')}</dd>
           </div>
           <div className={styles.kvRow}>
             <dt>タグ</dt>
-            <dd className={styles.kvLight}>{usedTagNames.length > 0 ? usedTagNames.join('、') : 'なし'}</dd>
+            <dd className={styles.kvLight}>{usedTagNames.length > 0 ? usedTagNames.join('、') : emptyValue('none')}</dd>
           </div>
           <div className={styles.kvRow}>
             <dt>共通アクション</dt>
-            <dd className={styles.kvLight}>{usedCommonActionNames.length > 0 ? usedCommonActionNames.join('、') : 'なし'}</dd>
+            <dd className={styles.kvLight}>{usedCommonActionNames.length > 0 ? usedCommonActionNames.join('、') : emptyValue('none')}</dd>
           </div>
         </dl>
       </section>
@@ -2493,7 +2492,7 @@ export function NewAutomationV8({
       boardId={conflict ? 'tJqST' : isDraft ? 'J1VA8' : 'M4torY'}
       title={isDraft ? '下書きを仕上げる' : 'ルールを作る'}
       /* 見本の帯（J1VA8）は頭の中、説明のすぐ下（絵では頭の線より上）。 */
-      description={isDraft
+      help={isDraft
         ? (
           <>
             見本に実データは入っていません。このアカウントで使うタグやシナリオを選び、下書きとして保存します。
@@ -2539,7 +2538,7 @@ export function NewAutomationV8({
       )}
     >
       {canManage === false ? (
-        <p className={styles.viewerBand} role="status">閲覧のみで見ています。ルールを作る操作は管理者に頼んでください。</p>
+        <p className={styles.viewerBand} role="status">閲覧のみで見ています。ルールを作る操作はオーナーか管理者に頼んでください。</p>
       ) : null}
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       {resumeTarget && resumeStatus === 'failed' ? (
@@ -2613,16 +2612,13 @@ export function NewAutomationV8({
           </button>
         ) : null}
         {usesKeyword ? (
-          <label className={styles.field} htmlFor="v8-rule-keyword">
-            <span className={styles.label}>含まれる言葉</span>
-            <TextField
+          <Field label="含まれる言葉" htmlFor="v8-rule-keyword"><TextField
               id="v8-rule-keyword"
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
               placeholder="例：予約（空欄なら、どんな内容でも動きます）"
               maxLength={100}
-            />
-          </label>
+            /></Field>
         ) : null}
         {['tag_change', 'form_submitted', 'link_clicked', 'calendar_booked', 'datetime', 'daily', 'weekly'].includes(eventType) ? (
           <div className={styles.subBox}>
@@ -2768,9 +2764,7 @@ export function NewAutomationV8({
       >
         {editingRow ? (
           <div className={styles.dialogBody}>
-            <label className={styles.field} htmlFor={`v8-action-${editingRow.key}`}>
-              <span className={styles.label}>すること</span>
-              <Select
+            <Field label="すること" htmlFor={`v8-action-${editingRow.key}`}><Select
                 id={`v8-action-${editingRow.key}`}
                 error={inputError?.target === `v8-action-${editingRow.key}` ? inputError.message : undefined}
                 aria-label="すること"
@@ -2779,8 +2773,7 @@ export function NewAutomationV8({
                 options={(editingRow.type === 'notify_staff' ? ACTIONS : EDITABLE_ACTIONS)
                   .map((action) => ({ value: action.value, label: action.label }))}
                 size="full"
-              />
-            </label>
+              /></Field>
             {editingRow.type === 'add_tag' ? (
               <ResourcePick
                 kind="tag"
@@ -2828,17 +2821,14 @@ export function NewAutomationV8({
                 知らせる相手と文面は、見本から作ったときのまま保ちます。変えるときは、することを選び直してください。
               </p>
             ) : (
-              <label className={styles.field} htmlFor={`v8-message-${editingRow.key}`}>
-                <span className={styles.label}>送る文面</span>
-                <TextArea
+              <Field label="送る文面" htmlFor={`v8-message-${editingRow.key}`}><TextArea
                   invalid={inputError?.target === `v8-message-${editingRow.key}`}
                   aria-describedby={inputError?.target === `v8-message-${editingRow.key}` ? 'v8-action-error' : undefined}
                   id={`v8-message-${editingRow.key}`}
                   value={editingRow.message}
                   onChange={(event) => updateAction(editingRow.key, { message: event.target.value })}
                 />
-                {inputError?.target === `v8-message-${editingRow.key}` ? <p id="v8-action-error" className={styles.inputError} role="alert">{inputError.message}</p> : null}
-              </label>
+{inputError?.target === `v8-message-${editingRow.key}` ? <p id="v8-action-error" className={styles.inputError} role="alert">{inputError.message}</p> : null}</Field>
             )}
           </div>
         ) : null}
@@ -2878,7 +2868,7 @@ export function NewAutomationV8({
             <dt>だれに</dt>
             <dd>{targetSummary}{previewCount !== null ? ` 見込み ${formatNumber(previewCount)} 人` : ''}</dd>
           </div>
-          <div className={styles.kvRow}><dt>すること</dt><dd>{actionSummary || '未設定'}</dd></div>
+          <div className={styles.kvRow}><dt>すること</dt><dd>{actionSummary || emptyValue('unconfigured')}</dd></div>
           <div className={styles.kvRow}>
             <dt>最初に動くのは</dt>
             <dd>{['datetime', 'daily', 'weekly'].includes(eventType) ? `次の決めた時刻（${triggerConfigSummary}）` : '次にきっかけが起きたとき'}</dd>

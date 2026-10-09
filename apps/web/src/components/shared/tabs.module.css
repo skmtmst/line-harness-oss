@@ -222,3 +222,5 @@
 
 /* B-152②：役割ごとの文字の段。 */
 [data-theme='v8'] .tab, [data-theme='v8'] .current { font-weight: var(--polish-weight-body); }
+.list[data-wrap='true'] { min-width: 0; max-width: 100%; }
+.list[data-wrap='true'] .items { flex-wrap: wrap; min-width: 0; max-width: 100%; }

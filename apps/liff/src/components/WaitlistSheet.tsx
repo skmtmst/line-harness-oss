@@ -117,11 +117,11 @@ export default function WaitlistSheet({
 
   return (
     <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="空いたら知らせる">
-      <button
+      <Button variant="backdrop"
         type="button"
         aria-label="閉じる"
         onClick={onClose}
-        className="absolute inset-0 bg-ink/40"
+
       />
       <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-md rounded-t-(--liff-radius-lg) bg-canvas p-4 pb-8">
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-liff-line" aria-hidden="true" />

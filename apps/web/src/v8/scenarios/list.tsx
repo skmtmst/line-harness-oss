@@ -1,5 +1,8 @@
 'use client'
 
+import StatusBadge from '@/components/shared/status-badge'
+
+
 /*
  * ★V8 シナリオ配信の一覧（Pencil「★V8 画面の地図」のシナリオ配信の行：
  * 一覧 `axFrW`・狭い板 `wjfLe`・閲覧のみ `X0QrW0`・複製の窓 `Al4Ek`、状態の板は `BxGhV`）。
@@ -83,6 +86,9 @@ import { MoveReferrersNotice } from '@/components/scenarios/scenario-dialogs'
 import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/duplicate-scenario'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -90,10 +96,10 @@ const UNFILED = '__unfiled__'
 /** 1ページに出す件数の選択肢（表示は PageSizeSelect が「N件表示」にする）。 */
 const PAGE_SIZE_OPTIONS = [20, 50, 100]
 
-/** よく使う絞り込み（数えられるものだけ）。札の「停止中のみ」と対になる「稼働中のみ」。 */
+/** よく使う絞り込み（数えられるものだけ）。札の「停止中のみ」と対になる「有効のみ」。 */
 const SAVED_FILTER_OPTIONS = [
   { value: '', label: 'よく使う絞り込み' },
-  { value: 'active', label: '稼働中のみ' },
+  { value: 'active', label: '有効のみ' },
 ]
 
 type ScenarioRow = Scenario & {
@@ -147,7 +153,7 @@ export default function ScenariosListV8() {
   /* 絞り込み・検索語・ページは URL に置く（戻ると同じ一覧に戻る。動きの点検 5 番）。 */
   const [nameQuery, setNameQuery] = useListUrlParam('q')
   const [serverQuery, setServerQuery] = useState(() => clampSearchQuery(readListUrlParam('q').trim()))
-  /** よく使う絞り込み。いま数えられるのは「停止中のみ」「今月作った」「稼働中のみ」。 */
+  /** よく使う絞り込み。いま数えられるのは「停止中のみ」「今月作った」「有効のみ」。 */
   const [stoppedOnly, setStoppedOnly] = useListUrlFlag('stopped')
   const [createdThisMonthOnly, setCreatedThisMonthOnly] = useListUrlFlag('thisMonth')
   const [savedFilter, setSavedFilter] = useListUrlParam('view')
@@ -271,7 +277,7 @@ export default function ScenariosListV8() {
     return () => clearTimeout(timer)
   }, [nameQuery])
 
-  /* 「停止中のみ」と「稼働中のみ」は同時に掛からない（札が勝つ）。 */
+  /* 「停止中のみ」と「有効のみ」は同時に掛からない（札が勝つ）。 */
   const activeParam: 0 | 1 | undefined = stoppedOnly ? 0 : savedFilter === 'active' ? 1 : undefined
 
   const loadScenarioPage = useCallback(async (
@@ -690,7 +696,7 @@ export default function ScenariosListV8() {
       unfiledId={UNFILED}
       allCount={overallTotal}
       unfiledCount={unfiledCount}
-      placeholder="例: 01_新規フォロー"
+      placeholder="例：01_新規フォロー"
     >
       {sharedScenarioCount > 0 ? (
         <p className={styles.folderNote}>
@@ -702,7 +708,7 @@ export default function ScenariosListV8() {
 
   /* ===== 数の帯（4つ） ===== */
 
-  /* 板 `axFrW`：1つ目の補足は「稼働中 3・停止中 2」。止めた数は合計から出す。 */
+  /* 板 `axFrW`：1つ目の補足は「有効 3・停止中 2」。止めた数は合計から出す。 */
   const scenarioStopped = stats ? Math.max(0, stats.scenarios.total - stats.scenarios.active) : null
   const kpis = [
     {
@@ -710,7 +716,7 @@ export default function ScenariosListV8() {
       icon: Workflow,
       value: overallTotal,
       unit: '件',
-      detail: `稼働中 ${stats ? stats.scenarios.active : '—'}・停止中 ${scenarioStopped ?? '—'}`,
+      detail: `有効 ${stats ? stats.scenarios.active : emptyValue('unknown')}・停止中 ${scenarioStopped ?? emptyValue('unknown')}`,
     },
     {
       title: '購読中',
@@ -724,7 +730,7 @@ export default function ScenariosListV8() {
       icon: UserCheck,
       value: statsFailed ? null : stats?.scenarios.completed ?? null,
       unit: '人',
-      detail: stats ? scenarioCompletionDetail(stats.scenarios.subscribers, stats.scenarios.completed) : '—',
+      detail: stats ? scenarioCompletionDetail(stats.scenarios.subscribers, stats.scenarios.completed) : emptyValue('unknown'),
     },
     {
       title: '今週送った数',
@@ -917,7 +923,7 @@ export default function ScenariosListV8() {
                 ].join('・')
                 /* 絵：送り方・通数・フォルダのあとに全角の間を空けて説明。1つの文字列で書く。 */
                 const sub = s.description ? `${meta}　${s.description}` : meta
-                const subscribers = s.subscriberCount === undefined ? '—' : formatNumber(s.subscriberCount)
+                const subscribers = s.subscriberCount === undefined ? emptyValue('unknown') : formatNumber(s.subscriberCount)
                 return (
                   <Tr
                     interactive
@@ -996,7 +1002,7 @@ export default function ScenariosListV8() {
                       <div className={styles.countSub}>{`読み終えた ${formatNumber(s.completedCount ?? 0)} 人`}</div>
                     </Td>
                     <Td>
-                      <SharedStatusPill tone={s.isActive ? 'success' : 'neutral'}>{s.isActive ? '稼働中' : '停止中'}</SharedStatusPill>
+                      <SharedStatusPill tone={s.isActive ? 'success' : 'neutral'}>{s.isActive ? '有効' : '停止中'}</SharedStatusPill>
                     </Td>
                     <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
                       {/* 横並びにして、メニューの位置の目印（空の span）が行を1段増やさないようにする。 */}
@@ -1026,7 +1032,7 @@ export default function ScenariosListV8() {
               type="button"
               variant="secondary"
               disabled={stoppableIds.length === 0}
-              title={stoppableIds.length === 0 ? '稼働中のシナリオが選ばれていません' : undefined}
+              title={stoppableIds.length === 0 ? '有効のシナリオが選ばれていません' : undefined}
               onClick={() => runBulkToggle(false, stoppableIds)}
             >
               <Square size={13} aria-hidden="true" />
@@ -1156,7 +1162,7 @@ export default function ScenariosListV8() {
         <div className={styles.narrowSearch}>
           <SearchField
             placeholder="シナリオ名で探す"
-            aria-label="シナリオ名で検索"
+            aria-label="シナリオ名で探す"
             value={nameQuery}
             onChange={(value) => setNameQuery(clampSearchQuery(value))}
             onClear={() => setNameQuery('')}
@@ -1180,7 +1186,7 @@ export default function ScenariosListV8() {
       <ListToolbar
         search={{
           placeholder: 'シナリオ名で探す',
-          label: 'シナリオ名で検索',
+          label: 'シナリオ名で探す',
           width: 240,
           value: nameQuery,
           onChange: (value) => setNameQuery(clampSearchQuery(value)),
@@ -1211,14 +1217,14 @@ export default function ScenariosListV8() {
       boardId={narrow ? 'wjfLe' : canEdit ? 'axFrW' : 'X0QrW0'}
       headingSize="regular"
       title="シナリオ配信"
-      description="きっかけ（友だち追加・タグ・予約など）から、決めた順と日時でメッセージを送り続けます。"
-      help="左の □ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集、「…」に複製・配信結果・削除。"
+
+      help={<>{"きっかけ（友だち追加・タグ・予約など）から、決めた順と日時でメッセージを送り続けます。"}{"左の □ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集、「…」に複製・配信結果・削除。"}</>}
       stats={<>
         {/* 板 `X0QrW0`：閲覧のみの帯。数の帯の上。 */}
         {!canEdit && (
           <div className={styles.viewerBand} role="status">
             <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+            <span>閲覧のみで見ています。{permissionDeniedMessage('store')}</span>
           </div>
         )}
         <KpiBand data-design="KPIs">
@@ -1282,9 +1288,9 @@ export default function ScenariosListV8() {
             }
           >
             <p>
-              {panelRow.isActive ? '稼働中' : '停止中'} ／ 購読{' '}
-              {panelRow.subscriberCount === undefined ? '—' : formatNumber(panelRow.subscriberCount)} 人 ／
-              読了 {formatNumber(panelRow.completedCount ?? 0)} 人
+              {panelRow.isActive ? '有効' : '停止中'} ／ 購読{' '}
+              {panelRow.subscriberCount === undefined ? emptyValue('unknown') : formatNumber(panelRow.subscriberCount)}人 ／
+              読了 {formatNumber(panelRow.completedCount ?? 0)}人
             </p>
             {panelRow.description && <p>{panelRow.description}</p>}
             {canEdit && (
@@ -1382,16 +1388,13 @@ export default function ScenariosListV8() {
           }}
         >
           <div className={styles.dupBody}>
-            <label className={styles.dupField}>
-              <span className={styles.dupLabel}>新しい名前</span>
-              <TextField
+            <Field label="新しい名前"><TextField
                 value={duplicateName}
                 onChange={(event) => setDuplicateName(event.target.value)}
                 disabled={duplicating}
                 maxLength={80}
                 aria-label="新しい名前"
-              />
-            </label>
+              /></Field>
             <div className={styles.dupBox}>
               <p className={styles.dupBoxTitle}>引き継ぐもの</p>
               <p className={styles.dupBoxText}>{`・${duplicateCarries}`}</p>

@@ -22,7 +22,7 @@ import releaseLog from '@/generated/release-log-summary.json'
 import { api, type OperationHistoryEntry } from '@/lib/api'
 import styles from './history.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Release = { version: string; released: string | null; entries: Array<{ text: string }> }
 type Deployment = NonNullable<OperationHistoryEntry['deployment']>
@@ -75,7 +75,7 @@ export function historyRows(releases: Release[], deployments: Deployment[]) {
   const latest = latestDeploymentPhases(deployments)
   const used = new Set<string>()
   const rows = latest.map((deployment) => {
-    const version = deployment.version?.replace(/^v/, '') ?? '—'
+    const version = deployment.version?.replace(/^v/, '') ?? emptyValue('unknown')
     used.add(version)
     const release = releases.find((item) => item.version.replace(/^v/, '') === version)
       ?? { version, released: deployment.occurredAt, entries: [] }
@@ -155,7 +155,7 @@ export default function UpdateHistoryV8() {
                 <GridRow key={deployment?.deploymentId || `${release.version}|${deployment?.occurredAt ?? release.released}`}>
                   <GridCell role="cell" className={styles.cell}>{shortWhen(deployment?.occurredAt ?? release.released)}</GridCell>
                   <GridCell role="cell" className={`${styles.cell} ${styles.strong}`} title={title}>{title}</GridCell>
-                  <GridCell role="cell" className={styles.cell}>{deployment ? (isAutomatic(deployment) ? '自動' : '手動') : '—'}</GridCell>
+                  <GridCell role="cell" className={styles.cell}>{deployment ? (isAutomatic(deployment) ? '自動' : '手動') : emptyValue('unknown')}</GridCell>
                   <GridCell role="cell" className={`${styles.cell} ${styles.num}`}>—</GridCell>
                   <GridCell role="cell" className={styles.judge}><StatusBadge tone={({ good: 'success', warn: 'warning', danger: 'danger', muted: 'neutral' } as Record<string, StatusBadgeTone>)[result.tone]}>{result.label}</StatusBadge></GridCell>
                 </GridRow>
@@ -167,7 +167,7 @@ export default function UpdateHistoryV8() {
 
       <div className={styles.foot}>
         <p className={styles.footText}>自前でデプロイしている環境では、手動アップデートガイドの手順で更新します。</p>
-        <Button href={MANUAL_UPDATE_GUIDE_URL} target="_blank" rel="noreferrer"><ExternalLink size={15} aria-hidden="true" />手動アップデートガイドを開く</Button>
+        <Button external href={MANUAL_UPDATE_GUIDE_URL}  >手動アップデートガイドを開く</Button>
       </div>
     </div>
   )

@@ -28,6 +28,8 @@ import { formatNumber } from '@/lib/format'
 import { nenRanksApi, type NenRankSettingsData } from '@/lib/nen-ranks-api'
 import { RULE_LABELS, parsePercent, parseYen, shortDateTime, shortTime, yen, type LoadStatus, type SavedHandler } from './parts'
 import styles from './members.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 type RankDraft = { id: string | null; name: string; threshold: string; rate: string; tagId: string | null; tagName: string | null; memberCount: number }
 
@@ -163,7 +165,7 @@ export default function RankSettingsV8({
         await showConflict()
       } else {
         setError(describeApiFailure(caught, 'ランク設定の保存', {
-          forbidden: 'ランク設定を保存する権限がありません。権限を確認してください。',
+          scope: 'store',
         }))
       }
     } finally {
@@ -210,7 +212,7 @@ export default function RankSettingsV8({
         await showConflict()
       } else {
         setError(describeApiFailure(caught, 'ランクの削除', {
-          forbidden: 'ランクを削除する権限がありません。権限を確認してください。',
+          scope: 'store',
         }))
       }
     } finally {
@@ -239,7 +241,7 @@ export default function RankSettingsV8({
       setNotice(res.data.sync?.status === 'synced' ? 'ECへ同期しました。' : `ECへの同期に失敗しました：${res.data.sync?.error ?? ''}`)
     } catch (caught) {
       setError(describeApiFailure(caught, 'ECへの同期', {
-        forbidden: 'ECへ同期する権限がありません。権限を確認してください。',
+        scope: 'store',
       }))
     } finally {
       setBusy(false)
@@ -328,7 +330,7 @@ export default function RankSettingsV8({
                     {isBase ? (
                       <span className={styles.fixedBox} title="いちばん下のランクは ¥0 から（変えられません）">¥0〜（固定）</span>
                     ) : (
-                      <TextField {...fields.bind(`rank-threshold-${index}`)} aria-label={`しきい値 ${index + 1}`} inputMode="numeric" placeholder="¥0〜" value={row.threshold} readOnly={readonly} onChange={(event) => update(index, { threshold: event.target.value })} />
+                      <NumberInput numericText {...fields.bind(`rank-threshold-${index}`)} aria-label={`しきい値 ${index + 1}`} inputMode="numeric" placeholder="¥0〜" value={row.threshold} readOnly={readonly} onChange={(event) => update(index, { threshold: event.target.value })} />
                     )}
                     <FieldError id={`rank-threshold-${index}-error`}>{fields.error(`rank-threshold-${index}`)}</FieldError>
                   </div>
@@ -457,7 +459,7 @@ export default function RankSettingsV8({
         {conflict ? (
           <div className={styles.diffGrid}>
             <div>
-              <p className={styles.diffHead}>最新（{conflict.latest.rules ? shortDateTime(conflict.latest.rules.updatedAt) : '—'}）</p>
+              <p className={styles.diffHead}>最新（{conflict.latest.rules ? shortDateTime(conflict.latest.rules.updatedAt) : emptyValue('unknown')}）</p>
               <ul className={styles.diffList}>
                 {conflict.latest.ranks.map((rank) => (
                   <li key={rank.id}>{rank.name} — {thresholdText(rank.annualThresholdYen)} / {rateText(rank.mileRatePercent)}</li>
@@ -468,7 +470,7 @@ export default function RankSettingsV8({
               <p className={styles.diffHead}>いまの下書き</p>
               <ul className={styles.diffList}>
                 {drafts.map((row, index) => (
-                  <li key={row.id ?? `draft-${index}`}>{row.name || '（名前なし）'} — {row.threshold || '—'} / {row.rate || '—'}</li>
+                  <li key={row.id ?? `draft-${index}`}>{row.name || '（名前なし）'} — {row.threshold || emptyValue('unknown')} / {row.rate || emptyValue('unknown')}</li>
                 ))}
               </ul>
             </div>

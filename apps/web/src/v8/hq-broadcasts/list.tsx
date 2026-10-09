@@ -43,6 +43,7 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { failedCount, jpDateTime, runBadge, sendTotals } from './model'
 import styles from '../broadcasts/list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type StatusKey = 'all' | 'scheduled' | 'draft' | 'sent' | 'error'
 const STATUS_CHIPS: { key: StatusKey; label: string; icon: typeof List }[] = [
@@ -154,10 +155,10 @@ export default function HqBroadcastList() {
   const openReached = sentTargets.reduce((sum, t) => sum + t.successCount, 0)
   const openRate = openKnown && openReached > 0 ? Math.round((sentTargets.reduce((sum, t) => sum + (t.openedCount ?? 0), 0) / openReached) * 1000) / 10 : null
   const kpis = [
-    { key: 'scheduled', title: '予約中', icon: CalendarClock, value: ready ? counts.scheduled : null, unit: '件', detail: ready ? `下書き ${formatNumber(counts.draft)} 件` : '—' },
-    { key: 'sent', title: '送った配信', icon: Send, value: ready ? counts.sent : null, unit: '件', detail: ready ? `${formatNumber(delivered)} 人に届いた` : '—' },
-    { key: 'error', title: 'エラー', icon: AlertCircle, value: ready ? counts.error : null, unit: '件', detail: ready ? `失敗したアカウント ${formatNumber(failedStores)} 件` : '—' },
-    { key: 'open', title: '平均の開封率', icon: MailOpen, value: ready ? openRate : null, unit: '%', detail: ready ? (openRate == null ? 'まだ数えていません' : '送った配信の合計') : '—' },
+    { key: 'scheduled', title: '予約中', icon: CalendarClock, value: ready ? counts.scheduled : null, unit: '件', detail: ready ? `下書き ${formatNumber(counts.draft)}件` : emptyValue('unknown') },
+    { key: 'sent', title: '送った配信', icon: Send, value: ready ? counts.sent : null, unit: '件', detail: ready ? `${formatNumber(delivered)}人に届いた` : emptyValue('unknown') },
+    { key: 'error', title: 'エラー', icon: AlertCircle, value: ready ? counts.error : null, unit: '件', detail: ready ? `失敗したアカウント ${formatNumber(failedStores)}件` : emptyValue('unknown') },
+    { key: 'open', title: '平均の開封率', icon: MailOpen, value: ready ? openRate : null, unit: '%', detail: ready ? (openRate == null ? 'まだ数えていません' : '送った配信の合計') : emptyValue('unknown') },
   ]
 
   const createButton = (full: boolean) => canManage ? (
@@ -273,8 +274,8 @@ export default function HqBroadcastList() {
   )
 
   let content
-  if (error && !runs) content = <ListState kind="error" error={error} onRetry={() => void load()} />
-  else if (!runs) content = <ListState kind="loading" />
+  if (error && !runs) content = <ListState permissionScope="hq" kind="error" error={error} onRetry={() => void load()} />
+  else if (!runs) content = <ListState permissionScope="hq" kind="loading" />
   else if (filtered.length === 0) {
     content = (
       <EmptyList
@@ -327,7 +328,7 @@ export default function HqBroadcastList() {
                   <span className={styles.cellSub}>{audienceText(run)}</span>
                 </Td>
                 <Td>
-                  <span className={styles.cellMain}>{run.scheduledAt ? jpDateTime(run.scheduledAt) : run.status === 'prepared' ? '未設定' : 'すぐ送った'}</span>
+                  <span className={styles.cellMain}>{run.scheduledAt ? jpDateTime(run.scheduledAt) : run.status === 'prepared' ? emptyValue('unconfigured') : 'すぐ送った'}</span>
                   {statusKeyOf(run) === 'scheduled' && run.scheduledAt ? <span className={styles.cellSub}>予約</span> : null}
                 </Td>
                 <Td>
@@ -336,7 +337,7 @@ export default function HqBroadcastList() {
                       <span className={styles.resultMain}>{`${formatNumber(reached)} 人に届いた`}</span>
                       {failed > 0 ? <span className={styles.cellSub}>{`失敗したアカウント ${formatNumber(failed)}`}</span> : rateLine(live, reached) ? <span className={styles.cellSub}>{rateLine(live, reached)}</span> : null}
                     </>
-                  ) : <span className={styles.cellMain}>—</span>}
+                  ) : <span className={styles.cellMain}>{emptyValue('unknown')}</span>}
                 </Td>
                 <Td className={styles.colMenu}>
                   <div className={styles.menuBox}>
@@ -366,7 +367,7 @@ export default function HqBroadcastList() {
       boardId="U4Eep0"
       headingSize="regular"
       title="一括配信"
-      description="選んだアカウントの友だちにまとめて送るメッセージの一覧です。予約・下書き・送った結果をここで見ます。"
+      help="選んだアカウントの友だちにまとめて送るメッセージの一覧です。予約・下書き・送った結果をここで見ます。"
       stats={(
         <KpiBand>
           {kpis.map((kpi) => (

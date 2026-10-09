@@ -1,6 +1,7 @@
 'use client'
 
 import { formatDate as polishFormatDate } from '@/lib/format'
+import SegmentedControl from '@/components/shared/segmented'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Eye, UserPlus, X } from 'lucide-react'
 import Link from 'next/link'
@@ -19,7 +20,6 @@ import { Tabs } from '@/components/shared/tabs'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest as SharedStepUpRequest } from '@/components/step-up-prompt'
@@ -53,6 +53,10 @@ import { CONVERSION_APPROVAL_EDIT_KEY, PERMISSION_LABELS, normalizeStaffPermissi
 import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import { formatDateTime } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Channel = { email: boolean; line: boolean }
 type CopyableAccessUser = AccessUserItem & { roleBundle: Exclude<AccessRoleBundle, 'custom'> }
@@ -136,7 +140,7 @@ function downloadAuditCsv(rows: AuditEventItem[]): void {
   const url = URL.createObjectURL(new Blob([`\uFEFF${body}`], { type: 'text/csv;charset=utf-8' }))
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = 'access-audit.csv'
+  anchor.download = csvFileName("権限の履歴")
   anchor.click()
   URL.revokeObjectURL(url)
 }
@@ -154,10 +158,8 @@ function accessFeatureLabel(user: AccessUserItem): string {
   if (user.featureCount === null) return '機能数を読み込めませんでした'
   return `${user.featureCount}機能`
 }
-function Modal({ children, onClose, wide = false }: { children: React.ReactNode; onClose: () => void; wide?: boolean }) {
-  // Escapeで閉じる・Tabは窓の中・閉じたら起点へ戻す（共通の約束）。
-  const panelRef = useOverlayFocus(true, onClose)
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4" role="dialog" aria-modal="true" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><div ref={panelRef} className={`${styles.modalPanel} w-full overflow-y-auto rounded-card bg-canvas p-6 shadow-float relative ${wide ? 'max-w-3xl' : 'max-w-xl'}`}><button type="button" onClick={onClose} aria-label="閉じる" className="absolute right-4 top-4 rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken"><X aria-hidden="true" className="h-5 w-5" /></button>{children}</div></div>
+function Modal({ children, onClose, wide = false, title }: { children: React.ReactNode; onClose: () => void; wide?: boolean; title: string }) {
+  return <Dialog open title={title} onCancel={onClose} size={wide ? 'large' : 'medium'}>{children}</Dialog>
 }
 
 function LoginHistoryNote({ count, loading, failed = false }: { count: number | null; loading: boolean; failed?: boolean }) {
@@ -460,7 +462,7 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
       }
       // R497-SAVE-WORDING: 見せる範囲の保存だけは既存 helper で言い分ける。
       // 生の API error:<status> を出さない。他の messageOf 呼びは変えない。
-      const message = describeSaveFailure(caught)
+      const message = withPermissionFailure(caught, describeSaveFailure(caught), 'store')
       setSaveError(message)
       setSaveConfirmError(message)
     } finally {
@@ -553,7 +555,7 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
           以前の3列140px固定の表形式は狭い幅で潰れていた。
           各選択肢は触れる高さ（min-h-11）を確保する。
         */}
-        <section className="overflow-hidden rounded-card border content-card bg-canvas"><div className="px-4 py-4"><h2 className="text-base font-bold text-ink">項目ごとに決める</h2><p className="mt-1 text-xs text-ink-faint">「変えられる」「見えるだけ」「出さない」の3つから選びます。「変えられる」は閲覧・編集に加えて配信や返信などの実行も許し、「見えるだけ」は読み取り専用、「出さない」はメニューにも出しません。ただし「個人情報」は機能ではなくメールなどの見せ方を選ぶので、「そのまま見せる」「伏せて見せる」「見せない」の3つになります。行を選び直すとその行だけ置き換わり、触っていない行の一部だけ許可はそのまま残ります。</p></div><div className="divide-y divide-hairline border-t border-hairline">{SCOPE_ROWS.map(([label, note, full, partial, none], index) => { const item = SCOPE_ITEMS[index]; const partialHere = isPartialUntouched(item.id); const level = partialHere ? undefined : (levels[item.id] ?? 'none'); const optionLabels = item.kind === 'email_mask' ? SCOPE_MASK_LEVEL_LABELS : SCOPE_LEVEL_LABELS; return <div key={label} className="px-4 py-3"><div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"><div className="min-w-0"><p className="text-xs font-bold text-ink">{label}{partialHere ? '（一部だけ許可）' : ''}</p><p className="mt-0.5 text-xs text-ink-faint">{note}</p></div>{item.hint ? <p className="text-xs font-semibold text-warning">{item.hint}</p> : null}</div><div className="mt-2 grid grid-cols-3 gap-2" role="group" aria-label={`${label}の見せ方`}>{([full, partial, none] as const).map((text, option) => { const optionLevel: FeatureAccessLevel = option === 0 ? 'edit' : option === 1 ? 'view' : 'none'; const selected = !partialHere && level === optionLevel; const optionLabel = optionLabels[option]; return <button key={`${option}:${text}`} type="button" aria-label={`${label}：${optionLabel}（${text}）`} aria-pressed={selected} disabled={!writable} onClick={() => setLevel(item.id, optionLevel)} className={`min-h-11 rounded-control border px-2 py-2 text-center text-xs leading-tight ${selected ? 'border-accent bg-accent-soft font-semibold text-accent-deep' : 'border-divider-soft bg-canvas text-ink-secondary'} ${writable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}><span className="block font-bold">{optionLabel}</span><span className="mt-0.5 block">{text}</span></button> })}</div>{partialHere ? <p className="mt-2 text-xs font-medium text-ink-secondary">一部だけ許可されています（3つの選択肢では表せません）。許可中のもの：{partialLabelOf(item.id)}。このまま保存すれば残ります。この行を選び直すと、その行は選んだ内容に置き換わります。</p> : null}</div> })}</div></section>
+        <section className="overflow-hidden rounded-card border content-card bg-canvas"><div className="px-4 py-4"><h2 className="text-base font-bold text-ink">項目ごとに決める</h2><p className="mt-1 text-xs text-ink-faint">「変えられる」「見えるだけ」「出さない」の3つから選びます。「変えられる」は閲覧・編集に加えて配信や返信などの実行も許し、「見えるだけ」は読み取り専用、「出さない」はメニューにも出しません。ただし「個人情報」は機能ではなくメールなどの見せ方を選ぶので、「そのまま見せる」「伏せて見せる」「見せない」の3つになります。行を選び直すとその行だけ置き換わり、触っていない行の一部だけ許可はそのまま残ります。</p></div><div className="divide-y divide-hairline border-t border-hairline">{SCOPE_ROWS.map(([label, note, full, partial, none], index) => { const item = SCOPE_ITEMS[index]; const partialHere = isPartialUntouched(item.id); const level = partialHere ? undefined : (levels[item.id] ?? 'none'); const optionLabels = item.kind === 'email_mask' ? SCOPE_MASK_LEVEL_LABELS : SCOPE_LEVEL_LABELS; return <div key={label} className="px-4 py-3"><div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"><div className="min-w-0"><p className="text-xs font-bold text-ink">{label}{partialHere ? '（一部だけ許可）' : ''}</p><p className="mt-0.5 text-xs text-ink-faint">{note}</p></div>{item.hint ? <p className="text-xs font-semibold text-warning">{item.hint}</p> : null}</div><SegmentedControl aria-label={`${label}の見せ方`} disabled={!writable} value={level ?? 'custom'} onChange={next=>setLevel(item.id,next as FeatureAccessLevel)} options={([full,partial,none] as const).map((text,option)=>({value:option===0?'edit':option===1?'view':'none',label:<><span>{optionLabels[option]}</span><span>（{text}）</span></>,ariaLabel:`${label}：${optionLabels[option]}（${text}）`}))} />{partialHere ? <p className="mt-2 text-xs font-medium text-ink-secondary">一部だけ許可されています（3つの選択肢では表せません）。許可中のもの：{partialLabelOf(item.id)}。このまま保存すれば残ります。この行を選び直すと、その行は選んだ内容に置き換わります。</p> : null}</div> })}</div></section>
       </div>
       <aside className="flex flex-col gap-4"><section className="rounded-card border content-card bg-canvas p-4"><div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-bold text-ink">この決め方で、この人にはこう見えます</h2>{dirty ? <span className="rounded-pill bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent-deep">変更後の予定</span> : null}</div><div className="mt-3 space-y-3 text-xs text-ink-secondary"><p><b className="text-ink">◉　メニューに出るのは{visibleItems.length}項目</b><br />　　{visibleItems.length > 0 ? visibleItems.map((item) => item.label).join('・') : '出る項目はありません'}</p><p><b className="text-ink">◉　出さないのは{hiddenItems.length}項目</b><br />　　{hiddenItems.length > 0 ? `${hiddenItems.map((item) => item.label).join('・')}。URLを直に打っても「見る権限がありません」と出ます` : '出さない項目はありません'}</p><p><b className="text-ink">◉　{piiNote}</b></p>{changedItems === null ? <p><b className="text-ink">◉　いまの設定は個別に決められているため、ここから変わる項目の内訳は未確認です</b></p> : changedItems.length > 0 ? <p><b className="text-ink">◉　いまの設定から変わるのは{changedItems.length}項目</b><br />　　{changedItems.map((item) => item.label).join('・')}</p> : <p><b className="text-ink">◉　いまの設定と同じ内容です</b></p>}{partialUntouchedRows.length > 0 ? <p><b className="text-ink">◉　一部だけ許可が{partialUntouchedRows.length} 行あります</b><br />　　{partialUntouchedRows.map((row) => `${SCOPE_ITEMS.find((item) => item.id === row.itemId)?.label ?? row.itemId}（許可中のもの：${row.allowedKeys.map((key) => permissionLabel(key) || key).join('・')}）`).join('、')}。行を触らず保存すれば残ります。かたまり・コピーを選ぶと置き換わります</p> : null}{extraLabels.length > 0 ? <p><b className="text-ink">◉　この表にない権限{extraLabels.length} 件（{extraLabels.join('・')}）は保存してもそのまま残します</b></p> : null}</div></section><section className="rounded-card border content-card bg-canvas p-4"><h2 className="text-sm font-bold text-ink">つながる先</h2>{/* LAY-10: 見た目だけの矢印をやめ、本物のリンクにする。開くと未保存の下書きは捨ててその画面へ移る（キャンセルと同じ扱い）。 */}<div className="mt-3 space-y-3 text-xs"><Link href="/settings" onClick={onClose} className="block font-bold text-action hover:underline">→ 機能設定</Link><Link href="/staff?tab=audit" onClick={onClose} className="block font-bold text-action hover:underline">→ 入った記録</Link><Link href="/emergency" onClick={onClose} className="block font-bold text-action hover:underline">→ 運用状態</Link><Link href="/booking/menus" onClick={onClose} className="block font-bold text-action hover:underline">→ 予約設定</Link></div></section><section className="rounded-card border border-warning bg-warning-bg p-4"><h2 className="text-sm font-bold text-warning">気をつけること</h2><p className="mt-2 text-xs font-bold text-warning">配信を出さないと、受信箱からの返信もできません</p><p className="mt-2 text-xs text-warning">保存すると、対象者はもう一度ログインする必要があります。</p></section></aside>
     </div>
@@ -640,7 +642,7 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
   const unlinkLine = async (stepUpToken?: string) => { if (unlinking) return; setUnlinking(true); setUnlinkError(''); try { const res = await api.staff.update(member.id, { lineLinked: false }, stepUpToken); if (!res.success) throw new Error(res.error); setUnlinkOpen(false); await onSaved(); onClose() } catch (caught) { if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.permissions.change', action: '権限を変更する', retry: unlinkLine }); return } setUnlinkError('LINE連携を解除できませんでした。状態を読み直してから、もう一度お試しください。') } finally { setUnlinking(false) } }
   // R500: 無効化・再有効化の後は行が絞り込みから出し入れされるので、行き先を知らせる。
   const toggleActive = async (stepUpToken?: string) => { if (policy.statusBlockedReason) return; setStatusSaving(true); setError(''); try { await api.staff.update(member.id, { isActive: !member.isActive }, stepUpToken); await onSaved(); notifyToast(member.isActive ? '無効にしました。「利用状態」で「無効のみ」を選ぶと、この人を一覧に戻せます。' : '有効にしました。対象者はもう一度ログインが必要です。'); onClose() } catch (caught) { if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.permissions.change', action: '権限を変更する', retry: toggleActive }); return } setError(messageOf(caught)) } finally { setStatusSaving(false) } }
-  return <Modal onClose={onClose} wide><div data-design-node="EOTS4"><div className="flex items-start justify-between"><div><h2 className="text-xl font-bold text-ink">見せる範囲を決める</h2><p className="mt-1 text-xs text-ink-secondary">役割・表示機能・担当範囲を確認し、このユーザーに必要な範囲だけを設定します。</p></div></div>
+  return <Modal title="見せる範囲を決める" onClose={onClose} wide><div data-design-node="EOTS4"><div className="flex items-start justify-between"><div><p className="mt-1 text-xs text-ink-secondary">役割・表示機能・担当範囲を確認し、このユーザーに必要な範囲だけを設定します。</p></div></div>
     <div className="mt-5 rounded-control bg-canvas-sunken p-3"><p className="font-semibold text-ink">{member.name}</p><p className="text-xs text-ink-secondary">{ROLE_LABEL[member.role]}</p></div>{error && <p className="mt-4 rounded-control bg-danger-bg p-3 text-sm text-danger">{error}</p>}{emailNotice && <p role="status" className="mt-4 rounded-control bg-accent-soft p-3 text-sm text-accent-deep">{emailNotice}</p>}
     {policy.showAccountActions && <section className={`mt-5 rounded-card border p-4 ${member.isActive ? 'border-accent bg-accent-soft' : 'border-warning bg-warning-bg'}`} aria-label="ユーザーの利用状態"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-sm font-semibold text-ink">ログイン状態：{member.isActive ? '有効' : '無効'}</p><p className="mt-1 text-xs leading-5 text-ink-secondary">{member.isActive ? '無効にすると、このユーザーはログインできなくなります。' : '有効にすると、このユーザーは再びログインできます。'}</p><div className="mt-2"><LoginHistoryNote count={loginCount} loading={loginHistoryLoading} failed={loginHistoryFailed} /></div></div><Button variant="primary" className={(`min-w-48 rounded-control px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${member.isActive ? 'border border-warning bg-canvas text-warning hover:bg-warning-bg' : 'bg-accent-deep text-on-accent hover:brightness-90'}`) + ' h-auto whitespace-normal'} type="button" onClick={() => void toggleActive()} disabled={statusSaving || Boolean(policy.statusBlockedReason)}>{statusSaving ? '変更中…' : member.isActive ? 'このユーザーを無効にする' : 'このユーザーを有効にする'}</Button></div>{policy.statusBlockedReason && <p className="mt-3 rounded-control bg-canvas p-3 text-xs font-semibold text-warning">{policy.statusBlockedReason}</p>}</section>}
     <div className="mt-5 grid gap-4 sm:grid-cols-2">{administrator && <Field label="名前" required htmlFor="staff-edit-name" error={fieldErrors.name}><TextField ref={nameRef} id="staff-edit-name" value={name} onChange={(e) => { setName(e.target.value); setFieldErrors((current) => ({ ...current, name: undefined })) }} /></Field>}<Field label="メールアドレス" required htmlFor="staff-edit-email" error={fieldErrors.email}><TextField ref={emailRef} id="staff-edit-email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); setFieldErrors((current) => ({ ...current, email: undefined })) }} /></Field></div>
@@ -671,9 +673,9 @@ function TwoFactorModal({ member, onClose, onSaved }: { member: StaffMember; onC
   useEffect(() => { void (async () => { try { const res = await api.staff.beginTwoFactorSetup(member.id); if (res.success) { setUri(res.data.provisioningUri); setManualKey(res.data.manualKey) } } catch (caught) { setError(messageOf(caught)) } })() }, [member.id])
   useEffect(() => { if (uri) void qrToDataURL(uri, { width: 240, margin: 1, color: qrColors() }).then(setQr) }, [uri])
   const save = async (entered?: string) => { const value = entered ?? code; if (saving) return; if (!/^\d{6}$/.test(value)) return setError('6桁の認証コードを入力してください'); setSaving(true); setError(''); try { await api.staff.confirmTwoFactorSetup(member.id, value); await onSaved(); onClose() } catch (caught) { setError(otpFailureMessage(messageOf(caught))) } finally { setSaving(false) } }
-  return <Modal onClose={onClose} wide><div className="flex items-start justify-between"><div><h2 className="text-xl font-bold text-ink">二段階認証を設定</h2><p className="mt-1 text-xs text-ink-secondary">認証アプリを登録して、ログインを安全にします。</p></div></div>
+  return <Modal title="二段階認証を設定" onClose={onClose} wide><div className="flex items-start justify-between"><div><p className="mt-1 text-xs text-ink-secondary">認証アプリを登録して、ログインを安全にします。</p></div></div>
     <div className="mt-5 grid grid-cols-2 gap-2 text-sm"><div className="rounded-control bg-accent-soft px-4 py-3 font-medium text-accent-deep">1　QRコードを読み取る</div><div className="rounded-control bg-canvas-sunken px-4 py-3 text-ink-secondary">2　6桁コードを入力</div></div>{error && <p className="mt-4 rounded-control bg-danger-bg p-3 text-sm text-danger">{error}</p>}
-    <div className={`mt-5 grid gap-5 ${styles.twoFactorGrid}`}>{qr ? <img src={qr} alt="Authenticator登録用QRコード" className={`${styles.qrImage} rounded-control border border-hairline`} /> : <DelayedSkeleton loading skeleton={<Skeleton width={220} height={220} className="block rounded-control" />} />}<div><h3 className="font-semibold text-ink">認証アプリで読み取る</h3><p className="mt-3 text-sm leading-6 text-ink-secondary">Google Authenticator、Microsoft AuthenticatorなどでQRコードを読み取ってください。</p><div className="mt-4 rounded-control bg-info-bg p-3"><p className="text-xs text-ink-secondary">読み取れない場合はキーを手動入力</p><p className="mt-1 break-all font-mono text-sm font-bold tracking-wider text-ink">{manualKey || '—'}</p></div></div></div>
+    <div className={`mt-5 grid gap-5 ${styles.twoFactorGrid}`}>{qr ? <img src={qr} alt="Authenticator登録用QRコード" className={`${styles.qrImage} rounded-control border border-hairline`} /> : <DelayedSkeleton loading skeleton={<Skeleton width={220} height={220} className="block rounded-control" />} />}<div><h3 className="font-semibold text-ink">認証アプリで読み取る</h3><p className="mt-3 text-sm leading-6 text-ink-secondary">Google Authenticator、Microsoft AuthenticatorなどでQRコードを読み取ってください。</p><div className="mt-4 rounded-control bg-info-bg p-3"><p className="text-xs text-ink-secondary">読み取れない場合はキーを手動入力</p><p className="mt-1 break-all font-mono text-sm font-bold tracking-wider text-ink">{manualKey || emptyValue('unknown')}</p></div></div></div>
     <p id="staff-totp-label" className="mt-5 block text-sm font-medium text-ink">認証アプリに表示された6桁コード</p><div className="mt-2">{/* 共通 OTP入力（Pencil ★V8 RfHCo）。 */}<OtpInput value={code} onChange={setCode} onComplete={(entered) => void save(entered)} labelledBy="staff-totp-label" invalid={Boolean(error)} busy={saving} /></div><p className="mt-4 rounded-control bg-info-bg p-3 text-xs text-ink-secondary">登録後はLINEログインのあとに認証アプリのコード入力が必要です。</p>
     <div className="mt-6 flex justify-end gap-2"><Button variant="secondary" className="px-4 py-2 h-auto whitespace-normal" onClick={onClose}>キャンセル</Button><Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => void save()} disabled={saving || !uri}>✓ {saving ? '確認中…' : '設定を完了'}</Button></div></Modal>
 }
@@ -1028,8 +1030,8 @@ function StaffPageHost() {
         <div className={styles.cardHeadText}>
           <h2 className={styles.cardTitle}>{sectionTitle}</h2>
           <div className={styles.cardSubRow}>
-            <span className={styles.cardSub}>{summaryReady ? `${filteredUsers.length} 人` : '—'}</span>
-            {tab === 'members' && missing > 0 ? <span className={styles.cardWarn} title={`二段階認証が未設定の人が ${missing} 人 います。高い権限の人から設定してください。`}>{`二段階認証が未設定の人が ${missing} 人 います。高い権限の人から設定してください。`}</span> : null}
+            <span className={styles.cardSub}>{summaryReady ? `${filteredUsers.length}人` : emptyValue('unknown')}</span>
+            {tab === 'members' && missing > 0 ? <span className={styles.cardWarn} title={`二段階認証が未設定の人が ${missing}人 います。高い権限の人から設定してください。`}>{`二段階認証が未設定の人が ${missing}人 います。高い権限の人から設定してください。`}</span> : null}
           </div>
         </div>
         <div className={styles.cardTools}>
@@ -1077,12 +1079,12 @@ function StaffPageHost() {
     <PageFrame kind="settings" boardId={administrator ? 'nku0f' : 'A35Gh'}>
       <PageHeading
         title="ログインユーザー"
-        description="管理画面に入る人と、その人ができることを決めます（管理者の設定はここ）"
+        help="管理画面に入る人と、その人ができることを決めます（管理者の設定はここ）"
         tabs={<Tabs size="compact" label="ログインユーザーの切り替え" items={STAFF_TAB_KEYS.map((item) => ({ label: item.label, href: `/staff?tab=${item.key}`, current: tab === item.key }))} />}
       />
       {viewer ? (
         <div className={styles.viewerBandRow}>
-          <Notice tone="info" icon={<Eye size={16} aria-hidden="true" />}>閲覧のみで見ています。変える操作は管理者に頼んでください。</Notice>
+          <Notice tone="info" icon={<Eye size={16} aria-hidden="true" />}>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</Notice>
         </div>
       ) : null}
       <div className={styles.body}>
@@ -1099,8 +1101,8 @@ function StaffPageHost() {
                 <SearchField aria-label="名前・メールで探す" value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="名前・メールで探す" className={styles.search} />
                 {tab === 'members' ? (
                   <div className={styles.chips} role="group" aria-label="利用状態で絞り込む">
-                    <FilterChip selectedIcon={false} selected={statusFilter === 'active'} onChange={(selected) => setStatusFilter(selected ? 'active' : 'all')}>{`有効 ${summaryReady ? activeCount : '—'}`}</FilterChip>
-                    <FilterChip selectedIcon={false} selected={statusFilter === 'suspended'} onChange={(selected) => setStatusFilter(selected ? 'suspended' : 'all')}>{`止めた ${summaryReady ? suspendedCount : '—'}`}</FilterChip>
+                    <FilterChip selectedIcon={false} selected={statusFilter === 'active'} onChange={(selected) => setStatusFilter(selected ? 'active' : 'all')}>{`有効 ${summaryReady ? activeCount : emptyValue('unknown')}`}</FilterChip>
+                    <FilterChip selectedIcon={false} selected={statusFilter === 'suspended'} onChange={(selected) => setStatusFilter(selected ? 'suspended' : 'all')}>{`止めた ${summaryReady ? suspendedCount : emptyValue('unknown')}`}</FilterChip>
                   </div>
                 ) : null}
                 <span className={styles.spacer} />

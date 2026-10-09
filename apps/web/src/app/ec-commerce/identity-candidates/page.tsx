@@ -180,7 +180,7 @@ function EcIdentityCandidatesPageV7() {
           { label: '会員のつき合わせ' },
         ]}
         title="EC連携"
-        description=""
+        help=""
         actions={<Button href="/ec-commerce?tab=connector">つき合わせの決めごと</Button>}
       />
 

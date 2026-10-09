@@ -20,12 +20,12 @@ describe('M012 友だち詳細の失敗表示', () => {
   })
 
   it('対応状況の保存失敗は共通の状態別案内へ渡す', () => {
-    expect(PAGE).toContain('setError(describeSaveFailure(err))')
+    expect(PAGE).toContain("setError(withPermissionFailure(err, describeSaveFailure(err), 'store'))")
     expect(PAGE).not.toContain('setSupportError(err instanceof ApiError ? err.message')
   })
 
   it('シナリオ登録の失敗は共通の状態別案内へ渡す', () => {
-    expect(PAGE).toContain('setError(describeSaveFailure(err))')
+    expect(PAGE).toContain("setError(withPermissionFailure(err, describeSaveFailure(err), 'store'))")
     expect(PAGE).not.toContain('setScenarioError(err instanceof ApiError ? err.message')
   })
 

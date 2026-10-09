@@ -20,6 +20,8 @@ import {
   type WebinarEditor,
   type WebinarScheduleRule,
 } from '@/lib/api'
+import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
 
@@ -292,8 +294,7 @@ export default function VideoV8({
 
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface" aria-label="公開期間">
           <h2 className="text-ink text-base font-bold">公開期間</h2>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <label className="block">
+          <div className="mt-3 grid gap-3 sm:grid-cols-2"><Field label={<>
               <span className="text-ink-secondary mb-1 block text-xs font-medium">公開の開始</span>
               <input
                 type="datetime-local"
@@ -303,8 +304,7 @@ export default function VideoV8({
                 placeholder={webinar.publicationStartsAt ? formatDateTime(webinar.publicationStartsAt) : '2026/10/01 10:00'}
                 className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
               />
-            </label>
-            <div>
+            </>}><div>
               <span className="text-ink-secondary mb-1 block text-xs font-medium">
                 公開の終了 <span className="text-ink-faint">任意</span>
               </span>
@@ -319,9 +319,8 @@ export default function VideoV8({
               <Checkbox checked={noEnd} disabled={!canEdit} onCheckedChange={setNoEnd} className="mt-2 text-xs">
                 終わりを決めない（いつでも見られる）
               </Checkbox>
-            </div>
-          </div>
-          {periodError ? <Notice tone="error" title="公開期間を保存できませんでした">{periodError}</Notice> : null}
+            </div></Field></div>
+          {periodError ? <Notice tone="danger" title="公開期間を保存できませんでした">{periodError}</Notice> : null}
           <div className="mt-3">
             <Button variant="secondary" disabled={!canEdit} busy={periodBusy} busyLabel="保存しています…" onClick={savePeriod}>
               公開期間を保存する
@@ -332,7 +331,7 @@ export default function VideoV8({
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface" aria-label="配信枠">
           <h2 className="text-ink text-base font-bold">{scheduled ? '開催回' : '配信枠'} {webinar.schedule.length}件</h2>
           <p className="text-ink-faint mt-1 text-xs">視聴できる時間の枠です。枠が0だと公開できません。</p>
-          {error ? <Notice tone="error" title="配信枠を保存できませんでした">{error}</Notice> : null}
+          {error ? <Notice tone="danger" title="配信枠を保存できませんでした">{error}</Notice> : null}
           {scheduled ? <table className="mt-3 w-full table-fixed">
             <colgroup><col className="w-1/4" /><col className="w-1/4" /><col className="w-1/6" /><col /><col className="w-12" /></colgroup>
             <thead><TableHeadRow><Th>日時</Th><Th help="空にすると無制限です。満員になると新しい申込は受け付けません。">定員</Th><Th align="right">申込</Th><Th>状態</Th><Th>操作</Th></TableHeadRow></thead>
@@ -401,8 +400,15 @@ export default function VideoV8({
             </div>
           ) : null}
           {adding ? (
-            <div className="border-hairline mt-3 space-y-3 rounded-control border p-3">
-              <Select
+            <div className="border-hairline mt-3 space-y-3 rounded-control border p-3"><Field label={<>
+                <span className="text-ink-secondary mb-1 block text-xs font-medium">時刻</span>
+                <input
+                  type="time"
+                  value={newTime}
+                  onChange={(e) => setNewTime(e.target.value)}
+                  className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
+                />
+              </>}><Select
                 label="枠の種類"
                 aria-label="枠の種類"
                 value={newKind}
@@ -413,7 +419,7 @@ export default function VideoV8({
                   { value: 'once', label: '単発' },
                 ]}
               />
-              {newKind === 'weekly' ? (
+{newKind === 'weekly' ? (
                 <div>
                   <span className="text-ink-secondary mb-1 block text-xs font-medium">曜日</span>
                   <span className="flex flex-wrap gap-1">
@@ -435,67 +441,45 @@ export default function VideoV8({
                   </span>
                 </div>
               ) : null}
-              {newKind === 'once' ? (
-                <label className="block">
-                  <span className="text-ink-secondary mb-1 block text-xs font-medium">日付</span>
-                  <input
+{newKind === 'once' ? (
+                <Field label="日付"><input
                     type="date"
                     value={newDate}
                     onChange={(e) => setNewDate(e.target.value)}
                     className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-                  />
-                </label>
+                  /></Field>
               ) : null}
-              <label className="block">
-                <span className="text-ink-secondary mb-1 block text-xs font-medium">時刻</span>
-                <input
-                  type="time"
-                  value={newTime}
-                  onChange={(e) => setNewTime(e.target.value)}
-                  className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-                />
-              </label>
-              <div className="flex flex-wrap gap-2">
+<div className="flex flex-wrap gap-2">
                 <Button busy={busy} busyLabel="足しています…" onClick={addRule}>
                   枠を足す
                 </Button>
                 <Button variant="secondary" onClick={() => setAdding(false)}>
                   やめる
                 </Button>
-              </div>
-            </div>
+              </div></Field></div>
           ) : null}
           {bulk ? (
             <div className="border-hairline mt-3 space-y-3 rounded-control border p-3">
               <p className="text-ink-secondary text-xs">日付の範囲に、単発の枠を1日1つずつ足します（31日まで）。</p>
               <div className="grid gap-3 sm:grid-cols-3">
-                <label className="block">
-                  <span className="text-ink-secondary mb-1 block text-xs font-medium">始まり</span>
-                  <input
+                <Field label={<><span className="text-ink-secondary mb-1 block text-xs font-medium">始まり</span></>}><input
                     type="date"
                     value={bulkFrom}
                     onChange={(e) => setBulkFrom(e.target.value)}
                     className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-ink-secondary mb-1 block text-xs font-medium">終わり</span>
-                  <input
+                  /></Field>
+                <Field label={<><span className="text-ink-secondary mb-1 block text-xs font-medium">終わり</span></>}><input
                     type="date"
                     value={bulkTo}
                     onChange={(e) => setBulkTo(e.target.value)}
                     className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-ink-secondary mb-1 block text-xs font-medium">時刻</span>
-                  <input
+                  /></Field>
+                <Field label={<><span className="text-ink-secondary mb-1 block text-xs font-medium">時刻</span></>}><input
                     type="time"
                     value={bulkTime}
                     onChange={(e) => setBulkTime(e.target.value)}
                     className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-                  />
-                </label>
+                  /></Field>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button busy={busy} busyLabel="足しています…" onClick={addBulk}>
@@ -514,7 +498,7 @@ export default function VideoV8({
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <div>
               <span className="text-ink-secondary mb-1 block text-xs font-medium">視聴完了とみなす</span>
-              <p className="text-ink text-sm">{completionLabel ?? '—'}</p>
+              <p className="text-ink text-sm">{completionLabel ?? emptyValue('unknown')}</p>
             </div>
             <div>
               <Select

@@ -130,7 +130,7 @@ export default function PoolCreateV8() {
       boardId="D0AOyx"
       layout="narrow-nav"
       title={TITLE}
-      description={DESCRIPTION}
+      help={DESCRIPTION}
       savePlacement="content"
       saveActions={(
         <>
@@ -147,16 +147,16 @@ export default function PoolCreateV8() {
           <section className={styles.card} aria-labelledby="pool-create-what">
             <h2 id="pool-create-what" className={styles.cardTitle}>1. どのプールか</h2>
             <Field label="プール名" htmlFor="pl-name" error={inputError?.target === 'pl-name' ? inputError.message : undefined}>
-              <TextField id="pl-name" value={name} onChange={(event) => { setName(event.target.value); if (inputError?.target === 'pl-name') setInputError(null) }} placeholder="例: 渋谷エリア" maxLength={100} />
+              <TextField id="pl-name" value={name} onChange={(event) => { setName(event.target.value); if (inputError?.target === 'pl-name') setInputError(null) }} placeholder="例：渋谷エリア" maxLength={100} />
             </Field>
-            <Field label="URLに使う名前（あとから変えられません）" htmlFor="pl-slug" error={inputError?.target === 'pl-slug' ? inputError.message : undefined}>
-              <TextField id="pl-slug" value={slug} onChange={(event) => { setSlug(event.target.value); if (inputError?.target === 'pl-slug') setInputError(null) }} placeholder="shibuya" maxLength={32} />
-            </Field>
-            <p className={styles.hint}>
+            <Field note={<>
               {slugValid
                 ? `保存すると、このURLが発行されます：${publicUrl}`
                 : '半角英小文字・数字・ハイフンで2〜32文字。配ったURLが使えなくなるため、あとから変えられません。'}
-            </p>
+            </>} label="URLに使う名前（あとから変えられません）" htmlFor="pl-slug" error={inputError?.target === 'pl-slug' ? inputError.message : undefined}>
+              <TextField id="pl-slug" value={slug} onChange={(event) => { setSlug(event.target.value); if (inputError?.target === 'pl-slug') setInputError(null) }} placeholder="shibuya" maxLength={32} />
+            </Field>
+
           </section>
 
           <section className={styles.card} aria-labelledby="pool-create-where">
@@ -211,7 +211,7 @@ export default function PoolCreateV8() {
               </div>
               <div className={styles.fact}>
                 <dt>現在の受け入れ先</dt>
-                <dd>{selectedAccounts.length > 0 ? `${selectedAccounts.map((account) => account.name).join('・')}（稼働中の所属先からランダムに振り分け）` : '未選択'}</dd>
+                <dd>{selectedAccounts.length > 0 ? `${selectedAccounts.map((account) => account.name).join('・')}（有効の所属先からランダムに振り分け）` : '未選択'}</dd>
               </div>
             </dl>
           </section>

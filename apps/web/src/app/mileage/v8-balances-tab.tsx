@@ -38,6 +38,9 @@ import type { MileageV8TabKey } from './mileage-v8'
 import { mileagePaginationTotal } from './mileage-response-state'
 import { csvCell } from '@/lib/presentation'
 import styles from './mileage-v8.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 function dateOnlyDaysAgo(days: number) {
   const date = new Date()
@@ -270,7 +273,7 @@ export default function V8BalancesTab({
       const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `mileage-balances-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = csvFileName("マイル残高")
       anchor.click()
       URL.revokeObjectURL(url)
     } catch {
@@ -324,12 +327,12 @@ export default function V8BalancesTab({
             <span className={styles.kpiLabel}>友だち</span>
           </div>
           <p className={styles.kpiValue}>
-            {loading || loadError || summary === null ? '—' : formatMileageNumber(summary.totalMembers)}
+            {loading || loadError || summary === null ? emptyValue('unknown') : formatMileageNumber(summary.totalMembers)}
             <span className={styles.kpiUnit}> 人</span>
           </p>
           <p className={styles.kpiSub}>
             {loading || loadError || summary === null
-              ? '—'
+              ? emptyValue('unknown')
               : `マイルを持っている ${formatMileageNumber(summary.withBalanceCount)}人`}
           </p>
         </div>
@@ -338,10 +341,10 @@ export default function V8BalancesTab({
             <span className={styles.kpiIcon}><Users size={14} aria-hidden="true" /></span>
             <span className={styles.kpiLabel}>残高の合計</span>
           </div>
-          <p className={styles.kpiValue}>{loading || loadError || summary === null ? '—' : formatMileageNumber(summary.available)}</p>
+          <p className={styles.kpiValue}>{loading || loadError || summary === null ? emptyValue('unknown') : formatMileageNumber(summary.available)}</p>
           <p className={styles.kpiSub}>
             {loading || loadError || summary === null
-              ? '—'
+              ? emptyValue('unknown')
               : `1人あたり ${formatMileageNumber(summary.totalMembers > 0 ? Math.round(summary.available / summary.totalMembers) : 0)}`}
           </p>
         </div>
@@ -350,7 +353,7 @@ export default function V8BalancesTab({
             <span className={styles.kpiIcon}><TrendingUp size={14} aria-hidden="true" /></span>
             <span className={styles.kpiLabel}>今月 増えた</span>
           </div>
-          <p className={styles.kpiValue}>{loading || loadError ? '—' : formatMileageNumber(grantedMiles ?? 0)}</p>
+          <p className={styles.kpiValue}>{loading || loadError ? emptyValue('unknown') : formatMileageNumber(grantedMiles ?? 0)}</p>
           <p className={styles.kpiSub}>この30日に付いた分</p>
         </div>
         <div className={styles.kpi}>
@@ -358,7 +361,7 @@ export default function V8BalancesTab({
             <span className={styles.kpiIcon}><TrendingDown size={14} aria-hidden="true" /></span>
             <span className={styles.kpiLabel}>今月 減った</span>
           </div>
-          <p className={styles.kpiValue}>{loading || loadError ? '—' : formatMileageNumber(decreasedMiles ?? 0)}</p>
+          <p className={styles.kpiValue}>{loading || loadError ? emptyValue('unknown') : formatMileageNumber(decreasedMiles ?? 0)}</p>
           <p className={styles.kpiSub}>交換・取り消し</p>
         </div>
       </div>
@@ -436,7 +439,7 @@ export default function V8BalancesTab({
           selected={withBalanceOnly}
           onChange={(selected) => { setOffset(0); setWithBalanceOnly(selected) }}
         >
-          残高あり {summary === null ? '—' : formatMileageNumber(summary.withBalanceCount)}
+          残高あり {summary === null ? emptyValue('unknown') : formatMileageNumber(summary.withBalanceCount)}
         </FilterChip>
         <FilterChip
           selected={pendingOnly}
@@ -525,7 +528,7 @@ export default function V8BalancesTab({
                     <p className={styles.cellMain} title={member.displayName}>{member.displayName}</p>
                     <p className={styles.cellSub} title={member.lineAccount.name}>{member.lineAccount.name}</p>
                   </td>
-                  <td><span className={styles.cellSubDark} title={member.rankReason}>{rankLabel(member.rank) ?? '—'}</span></td>
+                  <td><span className={styles.cellSubDark} title={member.rankReason}>{rankLabel(member.rank) ?? emptyValue('unknown')}</span></td>
                   <td>
                     <span className={styles.num}>{formatMileageNumber(member.available)}</span>
                     {member.pending > 0 ? <p className={styles.cellSub}>保留 {formatMileageNumber(member.pending)}</p> : null}
@@ -588,16 +591,13 @@ export default function V8BalancesTab({
         onCancel={() => { if (approvalBusyId === null) setRejectTarget(null) }}
         onConfirm={() => { if (rejectTarget) void decideApproval(rejectTarget.id, 'reject', rejectReason.trim() || undefined) }}
       >
-        <label className={styles.cellSubDark} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          差し戻す理由
-          <textarea
+        <Field label="差し戻す理由"><textarea
             className={styles.dlgTextarea}
             value={rejectReason}
             onChange={(event) => setRejectReason(event.target.value)}
             placeholder="例：調整の根拠となる資料を確認できませんでした"
             rows={3}
-          />
-        </label>
+          /></Field>
       </Dialog>
     </>
   )

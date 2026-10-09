@@ -25,7 +25,9 @@ import MergedProfileDialog from '@/components/merged-person/merged-profile-dialo
 import { useMergedPerson } from '@/components/merged-person/use-merged-person'
 import styles from './person.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-
+import { PageHeading } from '@/components/templates/page-frame'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 9/30（日本時間）。 */
 function shortDate(iso: string): string {
@@ -41,10 +43,8 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
   const canManage = staffRole === null || canManageRole(staffRole)
 
   const head = (title: string, description: string) => (
-    <header className={styles.head}>
-      <h2 className={styles.title}>{title}</h2>
-      <p className={styles.description}>{description}</p>
-    </header>
+    <PageHeading title={title}
+        help={<>{description}</>} />
   )
 
   if (m.phase !== 'ready' || !m.person) {
@@ -195,7 +195,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
               {person.profileValues.map((value) => (
                   <li key={value.fieldKey} className={styles.value} title={value.sourceLabel ? `元：${value.sourceLabel}` : undefined}>
                     <span className={styles.valueLabel}>{FIELD_WORD[value.fieldLabel] ?? value.fieldLabel}</span>
-                    <span className={styles.valueText}>{value.valuePreview ?? '—'}</span>
+                    <span className={styles.valueText}>{value.valuePreview ?? emptyValue('unknown')}</span>
                   </li>
               ))}
             </ul>
@@ -240,10 +240,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
         )}
       >
         <p className={styles.small}>{`解除する友だち：${m.unlinkTarget?.displayName ?? ''}`}</p>
-        <label className={styles.reasonLabel}>
-          <span>解除する理由<RequiredBadge /></span>
-          <TextArea value={m.unlinkReason} onChange={(event) => m.setUnlinkReason(event.target.value)} placeholder="確認した根拠を書いてください" />
-        </label>
+        <Field label="解除する理由" required><TextArea value={m.unlinkReason} onChange={(event) => m.setUnlinkReason(event.target.value)} placeholder="確認した根拠を書いてください" /></Field>
       </Dialog>
     </PageFrame>
   )

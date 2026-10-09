@@ -51,7 +51,7 @@ export default function ManualLinksScreen() {
   } = useManualLinks()
 
   const frame = (children: React.ReactNode) => (
-    <SbSettingsScreen boardId="cIdA2" title={TITLE} description={DESCRIPTION}>
+    <SbSettingsScreen boardId="cIdA2" title={TITLE} help={DESCRIPTION}>
       {children}
     </SbSettingsScreen>
   )

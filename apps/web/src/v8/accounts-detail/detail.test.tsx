@@ -128,6 +128,7 @@ describe('LINEアカウントの詳細（V8 ihjfd）', () => {
   it('管理者には編集・差し替え・止めるを出し、動いているあいだはアーカイブを押せない（理由を書く）', async () => {
     await act(async () => root.render(<AccountDetailV8 />))
     await settle()
+    await act(async () => { (host.querySelector('button[aria-label$="の説明"]') as HTMLButtonElement)?.click() })
     expect(document.body.textContent).toContain('@nen-test・要確認（LINE ID・接続状態を確かめてください）・既定ではない・親アカウントなし')
     expect(buttons('編集する')).toHaveLength(1)
     expect(buttons('差し替える')).toHaveLength(3)

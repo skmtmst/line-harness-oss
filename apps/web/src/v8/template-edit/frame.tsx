@@ -52,7 +52,7 @@ export function TemplateEditFrame({
       {/* 板の頭に戻る（← テンプレートへ）は置かない。戻るのは上の帯のパンくずと下の帯の［キャンセル］（オーナー 2026-10-08）。 */}
       <PageHeading
         title={title}
-        description={description}
+        help={description}
       />
       {band ? <div className={styles.bandRow}>{band}</div> : null}
       <div className={tpl.split} data-template-region="body">

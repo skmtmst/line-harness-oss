@@ -10,7 +10,7 @@
  */
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { BookOpen, GitBranch, History, Link2, Pencil, Upload, Zap } from 'lucide-react'
+import { GitBranch, History, Link2, Pencil, Upload, Zap } from 'lucide-react'
 import { api, ApiError, type CommonActionDetail, type CommonActionStep, type CommonActionSummary } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -28,7 +28,8 @@ import { useAutomationManage } from './shell'
 import { describeVersionChanges } from './version-diff'
 import styles from './versions.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 利用先の種類（今の画面と同じ言葉）。 */
 const CONSUMER_LABELS: Record<string, string> = {
@@ -88,7 +89,6 @@ function VersionsInner() {
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'オートメーション', href: '/automations' }])
   const canManage = useAutomationManage()
   const canEdit = canManage !== false
-  const manualHref = useManualHref('/common-actions/versions')
   const searchParams = useSearchParams()
   const id = searchParams.get('id') ?? ''
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -158,7 +158,7 @@ function VersionsInner() {
         setError('この共通アクションは削除されたか、別のLINEアカウントのものです。')
         setLoadFailure('missing')
       } else if (caught instanceof ApiError && caught.status === 403) {
-        setError('この共通アクションを表示する権限がありません。')
+        setError(permissionDeniedMessage('store'))
         setLoadFailure('forbidden')
       } else {
         setError(caught instanceof Error && caught.message && !caught.message.startsWith('API error:')
@@ -226,9 +226,8 @@ function VersionsInner() {
       boardId="ziSgL"
       headingSize="regular"
       title={`${detail.name}（版と使われている場所）`}
-      description="公開した版は書き換えられません。公開しても、呼び出し元は自動で変わりません。使う場所ごとに新しい版へ更新します。"
+      help="公開した版は書き換えられません。公開しても、呼び出し元は自動で変わりません。使う場所ごとに新しい版へ更新します。"
       actions={<>
-        {manualHref ? <Button href={manualHref}><BookOpen size={15} aria-hidden="true" />マニュアル</Button> : null}
         {canEdit && draft ? (
           <Button href={editHref}><Pencil size={15} aria-hidden="true" />下書きの中身を編集</Button>
         ) : canEdit && published ? (
@@ -250,10 +249,10 @@ function VersionsInner() {
       ) : null}
 
       <div className={`${kpiStyles.strip} ${styles.cards}`}>
-        <KpiCard presentation="cell" title="いまの版" icon={<GitBranch size={13} aria-hidden="true" />} value={null} valueText={published ? `v${published.versionNumber}` : '—'} unit="" detail={published?.publishedAt ? `${monthDay(published.publishedAt)} 公開` : 'まだ公開していません'} />
+        <KpiCard presentation="cell" title="いまの版" icon={<GitBranch size={13} aria-hidden="true" />} value={null} valueText={published ? `v${published.versionNumber}` : emptyValue('unknown')} unit="" detail={published?.publishedAt ? `${monthDay(published.publishedAt)} 公開` : 'まだ公開していません'} />
         <KpiCard presentation="cell" title="呼び出し元" icon={<Link2 size={13} aria-hidden="true" />} value={detail.bindings.length} unit="か所" detail={consumerBreakdown(detail.bindings)} />
         <KpiCard presentation="cell" title="古い版のまま" icon={<History size={13} aria-hidden="true" />} value={outdatedCount} unit="か所" detail={outdatedCount > 0 ? '新版あり' : 'すべて最新の版です'} />
-        <KpiCard presentation="cell" title="今月 動いた回数" icon={<Zap size={13} aria-hidden="true" />} value={summary?.executionCountThisMonth ?? null} unit="回" detail={`失敗 ${summary ? formatNumber(summary.failureCountThisMonth) : '—'}`} />
+        <KpiCard presentation="cell" title="今月 動いた回数" icon={<Zap size={13} aria-hidden="true" />} value={summary?.executionCountThisMonth ?? null} unit="回" detail={`失敗 ${summary ? formatNumber(summary.failureCountThisMonth) : emptyValue('unknown')}`} />
       </div>
 
       {error ? <p className={styles.errorText} role="alert">{error}</p> : null}
@@ -327,11 +326,11 @@ function VersionsInner() {
                     </Td>
                     <Td className={styles.colPinned}><span className={styles.cell}>{`v${binding.versionNumber}`}</span></Td>
                     <Td className={styles.colNum}>
-                      <span className={styles.cell} title={binding.runningCount === null ? '未取得' : undefined}>{binding.runningCount ?? '—'}</span>
+                      <span className={styles.cell} title={binding.runningCount === null ? '未取得' : undefined}>{binding.runningCount ?? emptyValue('unknown')}</span>
                       {binding.olderRunningCount ? <span className={styles.whereSub}>{`旧版 ${binding.olderRunningCount}`}</span> : null}
                     </Td>
                     <Td className={styles.colNum}>
-                      <span className={styles.cell} title={binding.waitingCount === null ? '未取得' : undefined}>{binding.waitingCount ?? '—'}</span>
+                      <span className={styles.cell} title={binding.waitingCount === null ? '未取得' : undefined}>{binding.waitingCount ?? emptyValue('unknown')}</span>
                       {binding.olderWaitingCount ? <span className={styles.whereSub}>{`旧版 ${binding.olderWaitingCount}`}</span> : null}
                     </Td>
                     <Td className={styles.colState}>
@@ -345,7 +344,7 @@ function VersionsInner() {
                         <Button disabled={Boolean(working)} onClick={() => { setPendingBindingId(binding.id); setDialogError('') }}>
                           {`v${published.versionNumber} へ更新する`}
                         </Button>
-                      ) : <span className={styles.cellMuted}>—</span>}
+                      ) : <span className={styles.cellMuted}>{emptyValue('unknown')}</span>}
                     </Td>
                   </Tr>
                 ))}
@@ -380,12 +379,12 @@ function VersionsInner() {
         <div className={styles.compare}>
           <section>
             <p className={styles.compareLabel}>現在の版</p>
-            <p className={styles.compareValue}>{`v${pendingBinding?.versionNumber ?? '—'}・${pendingVersion?.actions.length ?? '—'} 個の処理`}</p>
+            <p className={styles.compareValue}>{`v${pendingBinding?.versionNumber ?? emptyValue('unknown')}・${pendingVersion?.actions.length ?? emptyValue('unknown')}個の処理`}</p>
             <p className={styles.cardLead}>{pendingVersion ? stepChain(pendingVersion.actions) : '未取得'}</p>
           </section>
           <section>
             <p className={styles.compareLabel}>更新後</p>
-            <p className={styles.compareValue}>{`v${published?.versionNumber ?? '—'}・${published?.actions.length ?? '—'} 個の処理`}</p>
+            <p className={styles.compareValue}>{`v${published?.versionNumber ?? emptyValue('unknown')}・${published?.actions.length ?? emptyValue('unknown')}個の処理`}</p>
             <p className={styles.cardLead}>{published ? stepChain(published.actions) : '未取得'}</p>
           </section>
         </div>
@@ -398,7 +397,7 @@ function VersionsInner() {
           </section>
         ) : null}
         <p className={styles.cardLead}>
-          {`影響：実行中 ${pendingBinding?.runningCount ?? '—'} 件、待機中 ${pendingBinding?.waitingCount ?? '—'} 件は現在の版のまま完了します。`}
+          {`影響：実行中 ${pendingBinding?.runningCount ?? emptyValue('unknown')}件、待機中 ${pendingBinding?.waitingCount ?? emptyValue('unknown')}件は現在の版のまま完了します。`}
         </p>
         {dialogError ? <p className={styles.errorText} role="alert">{dialogError}</p> : null}
       </Dialog>

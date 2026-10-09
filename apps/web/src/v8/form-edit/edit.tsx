@@ -71,7 +71,7 @@ import { focusFieldById } from '@/lib/use-form-errors'
 import { FormPhone } from './phone'
 import styles from './edit.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
-
+import TextLink from '@/components/shared/text-link'
 
 const TAB_ITEMS: { key: EditTab; label: string }[] = [
   { key: 'content', label: '中身' },
@@ -702,7 +702,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       }
       if (silent) return false
       setError(describeApiFailure(e, '保存', {
-        forbidden: 'このLINEアカウントや権限では保存できません。選んでいるアカウントと権限を確認してください。',
+        scope: 'store',
       }))
       return false
     } finally {
@@ -834,7 +834,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             ) : null}
             {testError ? <p role="alert" className={styles.urlError}>{testError}</p> : null}
             {testUrl ? (
-              <a href={testUrl} target="_blank" rel="noreferrer" className={styles.urlLink}>試しのURLを開く</a>
+              <TextLink external href={testUrl}   className={styles.urlLink}>試しのURLを開く</TextLink>
             ) : null}
           </>
         ) : (

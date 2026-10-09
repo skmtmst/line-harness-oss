@@ -3,6 +3,7 @@ import liff from '@line/liff';
 import { api } from '../../lib/api.js';
 import { logFailure } from '../../lib/user-message.js';
 import Icon from './Icon.js';
+import Button from './Button.js'
 
 // 店名は画面ごとに読み直さない。最初に取れた値をモジュールに持つ。
 let cachedShopName: string | null = null;
@@ -42,14 +43,14 @@ export default function LiffHeader({ title }: { title: string }) {
   return (
     <header className="sticky top-0 z-10 border-b border-liff-line bg-canvas">
       <div className="mx-auto flex h-(--liff-header-h) w-full max-w-md items-center gap-2 px-3">
-        <button
+        <Button variant="icon"
           type="button"
           aria-label="閉じる"
           onClick={() => liff.closeWindow()}
-          className="liff-hit flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-ink focus-visible:outline-2 focus-visible:outline-ink"
+          className="shrink-0"
         >
           <Icon name="x" className="h-5 w-5" />
-        </button>
+        </Button>
         <div className="flex min-w-0 flex-1 flex-col items-center">
           <p className="max-w-full truncate text-[13px] font-bold text-ink">
             {title}

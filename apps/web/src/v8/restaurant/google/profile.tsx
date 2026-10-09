@@ -21,10 +21,12 @@ import { restaurantGoogleApi, type GoogleHoursProposal, type GoogleProfileAddres
 import { errorMessage, formatPeriods, formatStampFull, formatYmdShort, summarizeWeekly, TIME_OPTIONS } from './format'
 import type { GoogleNav } from './google'
 import styles from './google.module.css'
+import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
 
 function addressText(a: GoogleProfileAddress | null | undefined): string {
   if (!a) return '—'
-  return [a.postalCode ? `〒${a.postalCode}` : '', a.administrativeArea ?? '', a.locality ?? '', ...a.addressLines].filter(Boolean).join('') || '—'
+  return [a.postalCode ? `〒${a.postalCode}` : '', a.administrativeArea ?? '', a.locality ?? '', ...a.addressLines].filter(Boolean).join('') || emptyValue('unknown')
 }
 
 const COMPARABLE = ['regularHours', 'specialHours', 'storefrontAddress', 'phoneNumbers', 'profile', 'title', 'websiteUri']
@@ -87,10 +89,10 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
     ? profile.specialHours.slice(0, 4).map((s) => `${formatYmdShort(s.date)} ${s.closed ? '休業' : formatPeriods(s.periods)}`).join('、') + (profile.specialHours.length > 4 ? ` ほか${profile.specialHours.length - 4} 件` : '')
     : '今後の予定はありません'
   const infoRows: Array<[string, string]> = [
-    ['店名', profile.title ?? '—'],
+    ['店名', profile.title ?? emptyValue('unknown')],
     ['住所', addressText(profile.address)],
-    ['電話', profile.phone ?? '未設定'],
-    ['サイト', profile.websiteUri ?? '未設定'],
+    ['電話', profile.phone ?? emptyValue('unconfigured')],
+    ['サイト', profile.websiteUri ?? emptyValue('unconfigured')],
     ['カテゴリ', '—（未取得）'],
   ]
   const moreRows: Array<[string, string]> = [
@@ -171,18 +173,18 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
                 return (
                   <div key={f.mask} className={styles.diffItem}>
                     <dt className={styles.fieldLabel}>{f.label}</dt>
-                    <dd className={styles.muted}>この項目はこの画面で比較できません。<a href="https://business.google.com/" target="_blank" rel="noreferrer" className={styles.textLink}>Googleの管理画面で確認する</a></dd>
+                    <dd className={styles.muted}>この項目はこの画面で比較できません。<TextLink external href="https://business.google.com/"   className={styles.textLink}>Googleの管理画面で確認する</TextLink></dd>
                   </div>
                 )
               }
               const u = updates.updated
-              const pick = (src: Partial<typeof profile>) => key === 'regularHours' ? (src.regularHours ? summarizeWeekly(src.regularHours) : '—')
-                : key === 'specialHours' ? (src.specialHours ? src.specialHours.map((s) => `${formatYmdShort(s.date)} ${s.closed ? '休業' : formatPeriods(s.periods)}`).join('、') || 'なし' : '—')
+              const pick = (src: Partial<typeof profile>) => key === 'regularHours' ? (src.regularHours ? summarizeWeekly(src.regularHours) : emptyValue('unknown'))
+                : key === 'specialHours' ? (src.specialHours ? src.specialHours.map((s) => `${formatYmdShort(s.date)} ${s.closed ? '休業' : formatPeriods(s.periods)}`).join('、') || emptyValue('none') : emptyValue('unknown'))
                   : key === 'storefrontAddress' ? addressText(src.address)
-                    : key === 'phoneNumbers' ? src.phone ?? '—'
-                      : key === 'profile' ? src.description ?? '—'
-                        : key === 'title' ? src.title ?? '—'
-                          : src.websiteUri ?? '—'
+                    : key === 'phoneNumbers' ? src.phone ?? emptyValue('unknown')
+                      : key === 'profile' ? src.description ?? emptyValue('unknown')
+                        : key === 'title' ? src.title ?? emptyValue('unknown')
+                          : src.websiteUri ?? emptyValue('unknown')
               return (
                 <div key={f.mask} className={styles.diffItem}>
                   <dt className={styles.fieldLabel}>{f.label}</dt>

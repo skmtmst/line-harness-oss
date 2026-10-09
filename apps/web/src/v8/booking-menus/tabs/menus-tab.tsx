@@ -333,7 +333,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
                   <span className={styles.cellNum}>{menu.booking_count_30_days ?? 0} 件</span>
                 </span>
                 <span className={styles.colStatus}>
-                  <SharedStatusPill tone={(visOverride[menu.id] ?? menu.is_active) ? 'success' : 'neutral'}>{(visOverride[menu.id] ?? menu.is_active) ? '公開中' : '止めている'}</SharedStatusPill>
+                  <SharedStatusPill tone={(visOverride[menu.id] ?? menu.is_active) ? 'success' : 'neutral'}>{(visOverride[menu.id] ?? menu.is_active) ? '公開中' : '停止中'}</SharedStatusPill>
                 </span>
                 <span className={styles.colMenu}>
                   <RowMenu

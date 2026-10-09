@@ -9,6 +9,7 @@
  * 「変更」の窓の中へ移した（機能は落とさない）。
  * 閲覧のみ（変える権限が無い人）には、作る・編集・停止・発行のボタンを置かない。動きは BEHAVIOR.md。
  */
+import { Field as SharedField } from '@/components/shared/form-controls'
 import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
 import { Copy, Eye, MailPlus, Plus } from 'lucide-react'
@@ -31,6 +32,8 @@ import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import RestaurantFrame, { type RestaurantContext } from '../common-a/frame'
 import { formatStamp, Panel, StatRow, Status } from '../common-a/parts'
 import styles from './organization.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const roleLabel: Record<RestaurantMembership['role'], string> = {
   super_admin: 'SuperAdmin',
@@ -47,7 +50,7 @@ const MATRIX: [string, boolean, boolean, boolean][] = [
 
 function intakeAddressError(error: unknown): string {
   if (error instanceof ApiError && error.status === 503) return '取り込み用ドメインが未設定です'
-  if (error instanceof ApiError && error.status === 403) return '取り込みアドレスはオーナーまたは管理者だけが確認できます。'
+  if (error instanceof ApiError && error.status === 403) return permissionDeniedMessage('store')
   return '取り込みアドレスを読み込めませんでした。'
 }
 
@@ -55,22 +58,11 @@ function loginSummary(member: RestaurantMembership): string {
   if (!member.staff_id) return 'ログイン未連携'
   const role = member.loginRole === 'owner' ? 'オーナー' : member.loginRole === 'admin' ? '管理者' : 'スタッフ'
   const scope = member.loginAccountScope === 'all' ? '全アカウント' : '担当アカウントのみ'
-  return `${member.loginName || 'ログインメンバー'}・${role}${member.loginAccessLevel === 'read_only' ? '（閲覧のみ）' : ''}・${scope}・版 ${member.loginPolicyVersion ?? '—'}`
+  return `${member.loginName || 'ログインメンバー'}・${role}${member.loginAccessLevel === 'read_only' ? '（閲覧のみ）' : ''}・${scope}・版 ${member.loginPolicyVersion ?? emptyValue('unknown')}`
 }
 
-function Field({ label, name, type = 'text', defaultValue, required = false }: {
-  label: string
-  name: string
-  type?: string
-  defaultValue?: string
-  required?: boolean
-}) {
-  return (
-    <label className={styles.field}>
-      <span className={styles.fieldLabel}>{label}{required ? <span className={styles.fieldRequired}> *</span> : null}</span>
-      <TextField name={name} type={type} defaultValue={defaultValue} required={required} />
-    </label>
-  )
+function Field({ label, name, type = 'text', defaultValue, required = false }: { label: string; name: string; type?: string; defaultValue?: string; required?: boolean }) {
+  return <SharedField label={label} required={required}><TextField name={name} type={type} defaultValue={defaultValue} required={required} /></SharedField>
 }
 
 function DefaultSelect({ name, ariaLabel, defaultValue, options }: {
@@ -90,9 +82,7 @@ function StoreLineAccountSelect({ accounts, stores, currentStore }: {
 }) {
   const usedByAccount = new Map(stores.filter((item) => item.line_account_id).map((item) => [item.line_account_id!, item.id]))
   return (
-    <label className={styles.field}>
-      <span className={styles.fieldLabel}>LINE公式アカウント<span className={styles.fieldRequired}> *</span></span>
-      <DefaultSelect
+    <SharedField label={<><span className={styles.fieldLabel}>LINE公式アカウント<span className={styles.fieldRequired}> *</span></span></>}><DefaultSelect
         name="lineAccountId"
         ariaLabel="LINE公式アカウント"
         defaultValue={currentStore?.line_account_id || ''}
@@ -101,8 +91,7 @@ function StoreLineAccountSelect({ accounts, stores, currentStore }: {
           const usedElsewhere = Boolean(usedStoreId && usedStoreId !== currentStore?.id)
           return { value: account.id, label: `${account.displayName || account.name}${usedElsewhere ? '（他店舗で使用中）' : ''}`, disabled: usedElsewhere }
         })]}
-      />
-    </label>
+      /></SharedField>
   )
 }
 
@@ -128,10 +117,7 @@ function StoreForm({ store, accounts, stores, busy, onSubmit, onCancel }: {
         <Field label="収容人数" name="capacity" type="number" defaultValue={String(store?.capacity ?? 24)} required />
         <div className={styles.field}><span className={styles.fieldLabel}>タイムゾーン</span><span>日本時間（Asia/Tokyo）</span><input type="hidden" name="timezone" value="Asia/Tokyo" /></div>
         {store ? (
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>状態</span>
-            <DefaultSelect name="status" ariaLabel="状態" defaultValue={store.status} options={[{ value: 'active', label: '有効' }, { value: 'paused', label: '一時停止' }, { value: 'archived', label: '保管済' }]} />
-          </label>
+          <SharedField label={<><span className={styles.fieldLabel}>状態</span></>}><DefaultSelect name="status" ariaLabel="状態" defaultValue={store.status} options={[{ value: 'active', label: '有効' }, { value: 'paused', label: '停止中' }, { value: 'archived', label: 'アーカイブ' }]} /></SharedField>
         ) : null}
         <StoreLineAccountSelect accounts={accounts} stores={stores} currentStore={store} />
       </div>
@@ -290,14 +276,8 @@ function MemberForm({ member, stores, busy, onSubmit, onCancel, login }: {
       <div className={`${styles.formGrid} ${styles.memberGrid}`}>
         <Field label="氏名" name="staffName" defaultValue={member?.staff_name} required />
         <Field label="メール" name="email" type="email" defaultValue={member?.email ?? ''} />
-        <label className={styles.field}>
-          <span className={styles.fieldLabel}>役割</span>
-          <DefaultSelect name="role" ariaLabel="役割" defaultValue={member?.role ?? 'staff'} options={[{ value: 'staff', label: 'Staff' }, { value: 'store_manager', label: 'StoreManager' }, { value: 'super_admin', label: 'SuperAdmin' }]} />
-        </label>
-        <label className={styles.field}>
-          <span className={styles.fieldLabel}>担当店舗</span>
-          <DefaultSelect name="storeId" ariaLabel="担当店舗" defaultValue={member?.store_id ?? ''} options={[{ value: '', label: '全店舗' }, ...stores.map((s) => ({ value: s.id, label: s.name }))]} />
-        </label>
+        <SharedField label={<><span className={styles.fieldLabel}>役割</span></>}><DefaultSelect name="role" ariaLabel="役割" defaultValue={member?.role ?? 'staff'} options={[{ value: 'staff', label: 'Staff' }, { value: 'store_manager', label: 'StoreManager' }, { value: 'super_admin', label: 'SuperAdmin' }]} /></SharedField>
+        <SharedField label={<><span className={styles.fieldLabel}>担当店舗</span></>}><DefaultSelect name="storeId" ariaLabel="担当店舗" defaultValue={member?.store_id ?? ''} options={[{ value: '', label: '全店舗' }, ...stores.map((s) => ({ value: s.id, label: s.name }))]} /></SharedField>
         <Field label="LINE通知UID" name="lineUid" defaultValue={member?.line_uid ?? ''} />
         <Field label="Googleメール" name="googleEmail" type="email" defaultValue={member?.google_email ?? ''} />
       </div>
@@ -391,13 +371,13 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
   return (
     <>
       {readOnly ? (
-        <div className={styles.readOnly} role="note"><Eye aria-hidden className={styles.readOnlyIcon} /><span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span></div>
+        <div className={styles.readOnly} role="note"><Eye aria-hidden className={styles.readOnlyIcon} /><span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span></div>
       ) : null}
       <div className={styles.layout}>
         {prompt}
         <Panel title="組織階層" narrow flush>
           <div className={styles.treeBody}>
-          <p className={styles.treeTenant}>{`統括：${data.organization?.tenant_name || '未設定'}`}</p>
+          <p className={styles.treeTenant}>{`統括：${data.organization?.tenant_name || emptyValue('unconfigured')}`}</p>
           <p className={styles.treeRoot}>{data.organization?.name}</p>
           <div className={styles.treeChildren}>
             {data.stores.map((s) => (
@@ -422,7 +402,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
                 <div className={styles.storeText}>
                   <p className={styles.storeName}><span>{s.name}</span><Status value={s.status} /></p>
                   <p className={styles.storeSub}>{`${s.code} · ${s.area || 'エリア未設定'} · ${s.capacity}席`}</p>
-                  <p className={styles.storeLine}>{`LINE: ${s.line_account_name ? `${s.line_account_name} 公式` : '未設定'}`}</p>
+                  <p className={styles.storeLine}>{`LINE: ${s.line_account_name ? `${s.line_account_name} 公式` : emptyValue('unconfigured')}`}</p>
                 </div>
                 {readOnly ? null : <Button onClick={() => { setEditingStoreId(s.id); setShowStoreForm(false) }}>編集</Button>}
               </div>
@@ -474,7 +454,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
                   <span role="cell" className={`${styles.cell} ${styles.colRole}`}>{roleLabel[m.role]}</span>
                   <span role="cell" className={`${styles.cell} ${styles.colRole}`}>{data.stores.find((s) => s.id === m.store_id)?.name || '全店舗'}</span>
                   <span role="cell" className={`${styles.cell} ${styles.colLink}`}>
-                    <span className={styles.linkMain}>{`LINE ${m.line_uid ? '設定済' : '未設定'}`}</span>
+                    <span className={styles.linkMain}>{`LINE ${m.line_uid ? '設定済' : emptyValue('unconfigured')}`}</span>
                     <span className={styles.sub}>{m.google_email || 'Google 未設定'}</span>
                   </span>
                   <span role="cell" className={`${styles.cell} ${styles.colState}`}><Status value={m.status} /></span>
@@ -556,7 +536,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
                   <span role="cell" className={`${styles.cell} ${styles.colName}`}>{label}</span>
                   {values.map((v, i) => (
                     <span key={i} role="cell" className={`${styles.cell} ${styles.colMatrix}`}>
-                      {v ? <span className={styles.matrixYes} aria-label="できる">✓</span> : <span className={styles.matrixNo} aria-label="できない">—</span>}
+                      {v ? <span className={styles.matrixYes} aria-label="できる">✓</span> : <span className={styles.matrixNo} aria-label="できない">{emptyValue('unknown')}</span>}
                     </span>
                   ))}
                 </div>

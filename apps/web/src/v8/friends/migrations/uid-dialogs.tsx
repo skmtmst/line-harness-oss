@@ -14,6 +14,7 @@ import type { StatusBadgeTone } from '@/components/shared/status-badge'
 import { formatNumber } from '@/lib/format'
 import { classLabel, decisionLabel, type UidMigrationDetail } from './use-uid-migration'
 import styles from './migrations.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 interface RunStatusView {
   description: string
@@ -42,7 +43,7 @@ export function runStatusView(run: UidMigrationDetail, unresolved: number | null
       return {
         description: '実データはまだ変更していません。',
         badgeTone: unresolved === 0 ? 'success' : 'warning',
-        badgeLabel: unresolved === 0 ? '確認完了' : `要確認 ${unresolved ?? '—'} 件`,
+        badgeLabel: unresolved === 0 ? '確認完了' : `要確認 ${unresolved ?? emptyValue('unknown')}件`,
       }
   }
 }
@@ -93,11 +94,11 @@ export function MigrationItemDialog({
       {detailItem ? (
         <dl className={styles.detailList}>
           <div><dt>旧UID</dt><dd>{detailItem.oldUid}</dd></div>
-          <div><dt>新UID</dt><dd>{detailItem.newUid ?? '—'}</dd></div>
+          <div><dt>新UID</dt><dd>{detailItem.newUid ?? emptyValue('unknown')}</dd></div>
           <div><dt>候補ユーザー</dt><dd>{detailItem.candidateName ?? '候補なし'}</dd></div>
           <div><dt>一致根拠</dt><dd>{EVIDENCE[detailItem.evidenceType]}</dd></div>
           <div><dt>分類</dt><dd>{classLabel[detailItem.classification]}</dd></div>
-          <div><dt>競合内容</dt><dd>{detailItem.conflictReason ?? '—'}</dd></div>
+          <div><dt>競合内容</dt><dd>{detailItem.conflictReason ?? emptyValue('unknown')}</dd></div>
           <div><dt>現在の判断</dt><dd>{decisionLabel[detailItem.decision]}</dd></div>
           <div><dt>実行結果</dt><dd>{`${RESULT[detailItem.result]}${detailItem.errorMessage ? `（${detailItem.errorMessage}）` : ''}`}</dd></div>
         </dl>
@@ -135,7 +136,7 @@ export function ExecuteConfirmDialog({
     >
       <ul className={styles.bullets}>
         <li>{`対象：${name(active.fromAccountId)} → ${name(active.toAccountId)}`}</li>
-        <li>{`結び付け ${active.decisionCounts?.link ?? '—'} 件・除外 ${active.decisionCounts?.exclude ?? '—'} 件・新規作成の判断 ${active.decisionCounts?.create ?? '—'} 件（自動反映できない行は失敗として記録されます）`}</li>
+        <li>{`結び付け ${active.decisionCounts?.link ?? emptyValue('unknown')} 件・除外 ${active.decisionCounts?.exclude ?? emptyValue('unknown')} 件・新規作成の判断 ${active.decisionCounts?.create ?? emptyValue('unknown')} 件（自動反映できない行は失敗として記録されます）`}</li>
         <li>実行権限：ownerのみ。テスト移行を作成した本人は実行できません。</li>
         <li>復旧：実行後、この履歴から反映済みの分だけ切り戻せます。移行後に別の変更があった行は切り戻しを止めて表示します。</li>
       </ul>

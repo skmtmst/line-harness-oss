@@ -434,13 +434,13 @@ export default function SeatReserve() {
             {busy ? 'お取りしています…' : 'この時刻で進む'}
           </Button>
           {target && (
-            <button
+            <Button variant="text"
               type="button"
               onClick={() => void openMine()}
-              className="self-center text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
+              className="self-center"
             >
               ← 変更をやめる
-            </button>
+            </Button>
           )}
         </BottomBar>
       )}

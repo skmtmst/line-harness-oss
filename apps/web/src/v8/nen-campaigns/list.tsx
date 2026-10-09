@@ -49,7 +49,7 @@ import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import Radio from '@/components/shared/radio'
 import Select from '@/components/shared/select'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -81,6 +81,10 @@ import StatusBadge from '@/components/shared/status-badge'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { formatYen as polishFormatYen } from '@/lib/format'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 export type { NenTab } from './display'
 
@@ -140,7 +144,7 @@ export type NenCampaignsListProps = {
 
 const BOARD: Record<NenTab, string> = { auto: 'MuhWR', paused: 'MuhWR', columns: 'Jxmqh', history: 'Tj7n4' }
 const PAGE_SIZES = [10, 20, 50]
-const NO_MANAGE_NOTE = '閲覧のみのため変えられません。変える操作は管理者に頼んでください。'
+const NO_MANAGE_NOTE = '閲覧のみのため変えられません。変える操作はオーナーか管理者に頼んでください。'
 
 /* 自動配信の CSV（一覧に出ている決めごとをそのまま出す）。 */
 function autoSettingsToCsv(settings: NenCampaignSetting[], sentByKey: Map<string, number>): string {
@@ -149,7 +153,7 @@ function autoSettingsToCsv(settings: NenCampaignSetting[], sentByKey: Map<string
     setting.label,
     formatCampaignTiming(setting),
     formatCampaignAudience(setting),
-    setting.isEnabled ? '動いている' : '止めている',
+    setting.isEnabled ? '有効' : '停止中',
     String(sentByKey.get(setting.campaignKey) ?? 0),
   ].map(csvCell).join(','))
   return `﻿${[header.join(','), ...lines].join('\n')}`
@@ -221,11 +225,11 @@ export default function NenCampaignsList(props: NenCampaignsListProps) {
   )
   const tabError = props.tabError ?? ''
 
-  const exportCsv = () => downloadCsv(autoSettingsToCsv(autoSettings, sentByKey), `nen-auto-${new Date().toISOString().slice(0, 10)}.csv`)
+  const exportCsv = () => downloadCsv(autoSettingsToCsv(autoSettings, sentByKey), csvFileName("NEN配信"))
 
   const actions = tab === 'columns'
     ? (canEdit ? <Button href="/nen-campaigns/columns/new"><PenLine size={15} aria-hidden="true" />コラムを書く</Button> : null)
-    : <Button type="button" onClick={exportCsv} disabled={autoSettings.length === 0}><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
+    : <Button type="button" onClick={exportCsv} disabled={autoSettings.length === 0}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
 
   // 取れていないタブの件数に 0 を出さない。
   const countLabel = (base: string, count: number) => (tabError || (loading && settings.length === 0) ? base : `${base} ${count}`)
@@ -244,7 +248,7 @@ export default function NenCampaignsList(props: NenCampaignsListProps) {
   )
 
   const kpiPending = loading && kpis === null
-  const kpiMissing = props.kpisFailed ? '読み込めませんでした' : kpiPending ? '読み込んでいます' : '—'
+  const kpiMissing = props.kpisFailed ? '読み込めませんでした' : kpiPending ? '読み込んでいます' : emptyValue('unknown')
   const sentDiff = kpis?.sentThisMonth != null && kpis.sentLastMonth != null ? kpis.sentThisMonth - kpis.sentLastMonth : null
   const openDetail = tab === 'history' ? '配信ごとの開封は LINE から取れません' : tab === 'columns' ? 'コラムを開いた割合' : '自動配信は開封を取れません（コラムだけ）'
   const stats = (
@@ -266,7 +270,7 @@ export default function NenCampaignsList(props: NenCampaignsListProps) {
       boardId={BOARD[tab]}
       headingSize="regular"
       title="NEN配信"
-      description="ネットショップの注文や誕生日に合わせて、決まったメッセージやコラムを自動で送ります。"
+      help="ネットショップの注文や誕生日に合わせて、決まったメッセージやコラムを自動で送ります。"
       actions={actions}
       tabs={tabs}
       stats={stats}
@@ -435,14 +439,14 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
                       {canEdit ? (
                         <Link href={`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`} className={styles.name} ><TruncatedText value={String(setting.label ?? '')} /></Link>
                       ) : (
-                        <button type="button" className={styles.name} title={setting.label} onClick={() => props.onPreviewCampaign(setting.campaignKey)}>{setting.label}</button>
+                        <button type="button" className={styles.name} title={setting.label}  onClick={() => props.onPreviewCampaign(setting.campaignKey)}>{setting.label}</button>
                       )}
                     </Td>
                     <Td className={styles.colTrigger}><span className={styles.cell} title={timing}>{timing}</span></Td>
                     <Td className={styles.colTarget}><span className={styles.cell} title={audience}>{audience}</span></Td>
-                    <Td className={styles.colSent}><span className={styles.num}>{sent == null ? '—' : formatNumber(sent)}</span></Td>
-                    <Td className={styles.colOrders}><span className={styles.num} title="配信からの注文は配信ごとに取れていません">—</span></Td>
-                    <Td className={styles.colState}>{props.saving === setting.campaignKey ? <Pill tone="off">切り替え中</Pill> : setting.isEnabled ? <Pill tone="ok">動いている</Pill> : <Pill tone="off">止めている</Pill>}</Td>
+                    <Td className={styles.colSent}><span className={styles.num}>{sent == null ? emptyValue('unknown') : formatNumber(sent)}</span></Td>
+                    <Td className={styles.colOrders}><span className={styles.num} title="配信からの注文は配信ごとに取れていません">{emptyValue('unknown')}</span></Td>
+                    <Td className={styles.colState}>{props.saving === setting.campaignKey ? <Pill tone="off">切り替え中</Pill> : setting.isEnabled ? <Pill tone="ok">有効</Pill> : <Pill tone="off">停止中</Pill>}</Td>
                     <Td className={styles.colMenu}><RowMenu subject={setting.label} items={menuFor(setting)} /></Td>
                   </Tr>
                 )
@@ -560,33 +564,21 @@ function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave
     >
       <div className={styles.couponForm}>
         <div className={styles.couponSwitch}>
-          <Toggle checked={coupon.isEnabled} label="クーポンを付ける" onChange={(next) => onChange({ ...coupon, isEnabled: next })} />
+          <SettingCheckbox checked={coupon.isEnabled} label="クーポンを付ける" onChange={(next) => onChange({ ...coupon, isEnabled: next })} />
           <div className={styles.couponSwitchText}>
             <strong>クーポンを付ける</strong>
             <span>切ると、誕生日のメッセージだけが届きます</span>
           </div>
         </div>
-        <label className={styles.field}>
-          <span className={styles.fieldLabel}>特典の名前</span>
-          <TextField value={coupon.benefitLabel} maxLength={40} onChange={(event) => onChange({ ...coupon, benefitLabel: event.target.value })} />
-        </label>
+        <Field label="特典の名前"><TextField value={coupon.benefitLabel} maxLength={40} onChange={(event) => onChange({ ...coupon, benefitLabel: event.target.value })} /></Field>
         <div className={styles.fieldPair}>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>割引額（円）</span>
-            <TextField {...fields.bind('coupon-discount')} type="number" min={1} max={100000} inputMode="numeric" value={coupon.discountAmount} onChange={(event) => onChange({ ...coupon, discountAmount: Number(event.target.value) })} />
-            <FieldError id="coupon-discount-error">{fields.error('coupon-discount')}</FieldError>
-          </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>使える日数</span>
-            <TextField {...fields.bind('coupon-days')} type="number" min={1} max={365} inputMode="numeric" value={coupon.validityDays} onChange={(event) => onChange({ ...coupon, validityDays: Number(event.target.value) })} />
-            <FieldError id="coupon-days-error">{fields.error('coupon-days')}</FieldError>
-          </label>
+          <Field label="割引額（円）"><NumberInput unit="円" {...fields.bind('coupon-discount')} type="number" min={1} max={100000} inputMode="numeric" value={coupon.discountAmount} onChange={(event) => onChange({ ...coupon, discountAmount: Number(event.target.value) })} />
+<FieldError id="coupon-discount-error">{fields.error('coupon-discount')}</FieldError></Field>
+          <Field label="使える日数"><NumberInput {...fields.bind('coupon-days')} type="number" min={1} max={365} inputMode="numeric" value={coupon.validityDays} onChange={(event) => onChange({ ...coupon, validityDays: Number(event.target.value) })} />
+<FieldError id="coupon-days-error">{fields.error('coupon-days')}</FieldError></Field>
         </div>
-        <label className={styles.field}>
-          <span className={styles.fieldLabel}>コードの頭の文字（10文字まで・大文字）</span>
-          <TextField {...fields.bind('coupon-prefix')} value={coupon.codePrefix} maxLength={10} title="半角大文字・数字・- で3〜10文字" onChange={(event) => onChange({ ...coupon, codePrefix: event.target.value.toUpperCase() })} />
-            <FieldError id="coupon-prefix-error">{fields.error('coupon-prefix')}</FieldError>
-        </label>
+        <Field label="コードの頭の文字（10文字まで・大文字）"><TextField {...fields.bind('coupon-prefix')} value={coupon.codePrefix} maxLength={10} title="半角大文字・数字・- で3〜10文字" onChange={(event) => onChange({ ...coupon, codePrefix: event.target.value.toUpperCase() })} />
+<FieldError id="coupon-prefix-error">{fields.error('coupon-prefix')}</FieldError></Field>
         <div className={styles.field}>
           <span className={styles.fieldLabel}>2月29日生まれの子への平年の扱い</span>
           <Select
@@ -740,14 +732,14 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
                   <Tr key={column.id} className={styles.row} data-table-layout="columns" selected={props.selectedColumnId === column.id}>
                     <Td className={styles.colName}>
                       <span className={styles.nameStack}>
-                        <button type="button" className={styles.name} title={column.title} onClick={() => props.onSelectColumn(column.id)}>{column.title}</button>
+                        <button type="button" className={styles.name} title={column.title}  onClick={() => props.onSelectColumn(column.id)}>{column.title}</button>
                         {draft ? <span className={styles.sub}>下書き</span> : null}
                       </span>
                     </Td>
                     <Td className={styles.colCategory}><span className={styles.cell}>{column.category?.trim() || '分類なし'}</span></Td>
-                    <Td className={styles.colDate}><span className={styles.cell}>{column.publishedAt ? jstMonthDay(column.publishedAt) : column.deliveryAt ? `${jstMonthDay(column.deliveryAt)} 予定` : '—'}</span></Td>
+                    <Td className={styles.colDate}><span className={styles.cell}>{column.publishedAt ? jstMonthDay(column.publishedAt) : column.deliveryAt ? `${jstMonthDay(column.deliveryAt)} 予定` : emptyValue('unknown')}</span></Td>
                     <Td className={styles.colLine}>{columnBadge(column, metric?.sent ?? null)}</Td>
-                    <Td className={styles.colViews}><span className={styles.num}>{views == null ? '—' : formatNumber(views)}</span></Td>
+                    <Td className={styles.colViews}><span className={styles.num}>{views == null ? emptyValue('unknown') : formatNumber(views)}</span></Td>
                     <Td className={styles.colMenu}><RowMenu subject={column.title} items={menuFor(column)} /></Td>
                   </Tr>
                 )
@@ -909,10 +901,10 @@ function HistoryTab(props: NenCampaignsListProps & { canEdit: boolean }) {
           search={{ placeholder: '友だち・配信の名前で探す', width: 240, value: query, onChange: changeQuery }}
           filters={(
             <div role="group" aria-label="送った結果で絞り込む" className={styles.chips}>
-              {chip('sent', `送りました ${summary ? formatNumber(summary.sent) : '—'}`)}
-              {chip('pending', `これから ${summary ? formatNumber(summary.pending + summary.processing) : '—'}`)}
-              {chip('failed', `届きませんでした ${summary ? formatNumber(summary.failed) : '—'}`)}
-              {chip('skipped', `送りませんでした ${summary ? formatNumber(summary.skipped) : '—'}`)}
+              {chip('sent', `送りました ${summary ? formatNumber(summary.sent) : emptyValue('unknown')}`)}
+              {chip('pending', `これから ${summary ? formatNumber(summary.pending + summary.processing) : emptyValue('unknown')}`)}
+              {chip('failed', `届きませんでした ${summary ? formatNumber(summary.failed) : emptyValue('unknown')}`)}
+              {chip('skipped', `送りませんでした ${summary ? formatNumber(summary.skipped) : emptyValue('unknown')}`)}
             </div>
           )}
           trailing={<span className={styles.muted}>送った日が新しい順</span>}
@@ -981,13 +973,10 @@ function HistoryTab(props: NenCampaignsListProps & { canEdit: boolean }) {
                             <span className={styles.sampleText}>{deliveryDetail.content.bodyText || deliveryDetail.content.reason}</span>
                             {deliveryDetail.content.buttonLabel ? <span className={styles.sampleText}>▶ {deliveryDetail.content.buttonLabel}</span> : null}
                             {retryable ? (
-                              <label className={styles.field}>
-                                <span className={styles.fieldLabel}>再送する理由（500文字まで）</span>
-                                <TextArea value={reasons[delivery.id] ?? ''} rows={3} maxLength={500} autoFocus={retryFocusId === delivery.id} onChange={(event) => setReasons((current) => ({ ...current, [delivery.id]: event.target.value }))} />
-                                <span className={styles.buttonRow}>
+                              <Field label="再送する理由（500文字まで）"><TextArea value={reasons[delivery.id] ?? ''} rows={3} maxLength={500} autoFocus={retryFocusId === delivery.id} onChange={(event) => setReasons((current) => ({ ...current, [delivery.id]: event.target.value }))} />
+<span className={styles.buttonRow}>
                                   <Button type="button" variant="primary" disabled={!(reasons[delivery.id] ?? '').trim()} onClick={() => props.onRetryDelivery(delivery.id, delivery.version, reasons[delivery.id] ?? '')}>再送待ちへ戻す</Button>
-                                </span>
-                              </label>
+                                </span></Field>
                             ) : delivery.status === 'skipped' ? (
                               <span className={styles.muted}>{skippedNoRetryNote[delivery.unmetReasonCode ?? ''] ?? 'この記録は再送できません。'}</span>
                             ) : null}

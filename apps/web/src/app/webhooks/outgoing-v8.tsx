@@ -52,6 +52,8 @@ import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import styles from './outgoing-v8.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 type OutgoingFilter = 'all' | 'active' | 'paused' | 'failed'
@@ -141,11 +143,11 @@ export function outgoingKpiCells(args: {
   const sentSuccess = summary ? Math.max(0, summary.outgoing - summary.failed) : null
   const failed = summary?.failed ?? null
   const received = summary?.incoming ?? null
-  const num = (value: number | null) => (value === null ? '—' : formatNumber(value))
+  const num = (value: number | null) => (value === null ? emptyValue('unknown') : formatNumber(value))
   return [
     {
       key: 'destinations', icon: <Send size={14} />, label: '送り先',
-      value: items === null ? '—' : num(items.length), unit: '件',
+      value: items === null ? emptyValue('unknown') : num(items.length), unit: '件',
       sub: active === null || paused === null ? ' ' : `動いている ${active}・止めている ${paused}`,
     },
     {
@@ -160,7 +162,7 @@ export function outgoingKpiCells(args: {
     },
     {
       key: 'incoming', icon: <Link2 size={14} />, label: '受け取り',
-      value: incomingCount === null ? '—' : num(incomingCount), unit: '件',
+      value: incomingCount === null ? emptyValue('unknown') : num(incomingCount), unit: '件',
       sub: received === null ? ' ' : `今月 ${num(received)}回`,
     },
   ]
@@ -191,8 +193,8 @@ export function WebhooksV8Head({ activeTab, outgoingCount, incomingCount }: {
     <>
       <div className={styles.head}>
         <div className={styles.headText}>
-          <h1 className={styles.headTitle}>外部連携</h1>
-          <p className={styles.headDescription}>ほかのシステムと、友だちの動きをやり取りします。送る・受け取る・API・Google Sheets をここで決めます。</p>
+          <PageHeading title="外部連携" help={<> ほかのシステムと、友だちの動きをやり取りします。送る・受け取る・API・Google Sheets をここで決めます。</>} />
+
         </div>
         <Button variant="secondary" href="/webhooks?tab=notify">見本から作る</Button>
       </div>
@@ -553,7 +555,7 @@ function OutgoingV8Inner() {
       }
       if (selectedAccountIdRef.current !== requestAccountId) return
       setError(describeApiFailure(caught, 'シークレットの更新', {
-        forbidden: '合言葉の更新は統括だけができます。必要なときは統括に頼んでください。',
+        scope: 'store',
       }))
     }
   }
@@ -949,11 +951,11 @@ function OutgoingV8Table({ items, canManage, canTest, manageReason, menuId, setM
                   <div className={styles.stateCell}>
                     <div>
                       <span className={`${styles.pill} ${failed ? styles.pillDanger : item.isActive ? styles.pillActive : styles.pillNeutral}`}>
-                        ● {toggling ? '切り替え中' : failed ? '失敗あり' : item.isActive ? '動いている' : '止めている'}
+                        ● {toggling ? '切り替え中' : failed ? '失敗あり' : item.isActive ? '有効' : '停止中'}
                       </span>
                     </div>
                     <div title={completedAt ? `最終 ${formatDateTime(completedAt)}` : undefined}>
-                      {completedAt ? `最終 ${formatDateTime(completedAt)}` : '—'}
+                      {completedAt ? `最終 ${formatDateTime(completedAt)}` : emptyValue('unknown')}
                     </div>
                   </div>
                 </td>

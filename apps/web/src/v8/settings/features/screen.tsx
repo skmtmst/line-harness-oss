@@ -17,7 +17,7 @@ import Dialog from '@/components/shared/dialog'
 import ReorderList from '@/components/shared/reorder-list'
 import { RowMenu } from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import SearchField from '@/components/shared/search-field'
 import Notice from '@/components/shared/notice'
 import { Field } from '@/components/shared/form-controls'
@@ -42,6 +42,7 @@ import {
   type UsageCategory,
 } from './use-feature-settings'
 import styles from './screen.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 const TITLE = '機能設定'
 const DESCRIPTION = '使わない機能をオフにすると、左のメニューから消えます。作ったデータは消えません'
@@ -126,7 +127,7 @@ function FeatureRow({ item, features, usage, featureUsage, usageRetry, sharedSwi
           必須
         </span>
       ) : canManage ? (
-        <Toggle
+        <SettingCheckbox
           checked={enabled}
           label={`${item.label}を${enabled ? 'オフ' : 'オン'}にする`}
           disabled={busy}
@@ -400,7 +401,7 @@ export default function FeatureSettingsScreen() {
     <SbSettingsScreen
       boardId="ywFJT"
       title={TITLE}
-      description={conflictBand ? <>{DESCRIPTION}<span className={styles.conflictSlot}>{conflictBand}</span></> : DESCRIPTION}
+      help={DESCRIPTION}
       saveActions={ready && canManage ? (
         <>
           <Button
@@ -435,6 +436,7 @@ export default function FeatureSettingsScreen() {
         </span>
       ) : undefined}
     >
+      {conflictBand}
       {!canManage && (
         <div className={styles.viewerBand} role="status">
           <Eye className={styles.bandIcon} aria-hidden="true" />
@@ -529,7 +531,7 @@ export default function FeatureSettingsScreen() {
                 aria-required="true"
                 value={reason}
                 onChange={(event) => { setReason(event.target.value); if (reasonError) setError('') }}
-                placeholder="例: マイルを使わないのでオフにする"
+                placeholder="例：マイルを使わないのでオフにする"
                 maxLength={300}
                 disabled={saving}
               />

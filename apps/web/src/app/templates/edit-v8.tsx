@@ -25,7 +25,7 @@ import LinePreview from '@/components/shared/line-preview'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { notifyToast } from '@/components/shared/toast'
 import { Field } from '@/components/shared/form-controls'
-import FlexPreviewComponent from '@/components/flex-preview'
+import { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview'
 import { useAccount } from '@/contexts/account-context'
 import {
   EMPTY_TEMPLATE_REFERENCES,

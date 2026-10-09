@@ -1,5 +1,8 @@
 'use client'
 
+import { statusLabel } from '@/lib/status-labels'
+
+
 /*
  * ★V8 マイペットの小さな部品（CSV・言葉・誕生日の形・行の「…」・件数の文）。
  * 今の画面（app/nen/pets の page.tsx・pet-editor.tsx）から写した。

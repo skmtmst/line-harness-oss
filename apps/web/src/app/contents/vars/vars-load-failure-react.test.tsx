@@ -158,7 +158,7 @@ describe('R590 一覧の403と503を区別する', () => {
     render(<CommonVarsPage />)
 
     expect(await screen.findByText('共通情報を見る権限がありません')).toBeTruthy()
-    expect(screen.getByText(/管理者に権限を申請してください/)).toBeTruthy()
+    expect(screen.getByText(/オーナーか管理者に頼んでください/)).toBeTruthy()
     expect(screen.queryByText('通信が切れたか')).toBeNull()
     expect(screen.queryByRole('button', { name: 'もう一度読み込む' })).toBeNull()
     // 読めていないのに作る口は出さない。

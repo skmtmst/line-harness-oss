@@ -8,6 +8,7 @@ import Button from './ui/Button.js';
 import BottomBar from './ui/BottomBar.js';
 import PrivacyNote from './ui/PrivacyNote.js';
 import type { SlotPick } from './DateTimePicker.js';
+import { LiffTextArea } from './forms/controls.js'
 
 /**
  * 1-d 内容の確認 (★V8・gLReL)。送った中身のカード＋ご要望＋案内の帯。
@@ -96,10 +97,10 @@ export default function Confirm({
         <span className="flex items-baseline gap-1.5 text-[13px] font-bold text-ink">
           ご要望<span className="text-[11px] font-normal text-liff-sub">任意</span>
         </span>
-        <textarea
+        <LiffTextArea
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          className="mt-1.5 h-18 w-full resize-none rounded-(--liff-radius) bg-canvas p-3 text-[13px] text-ink outline outline-1 -outline-offset-1 outline-liff-line-strong placeholder:text-liff-idle focus-visible:outline-2 focus-visible:outline-ink"
+          className="mt-1.5"
           rows={3}
           placeholder="例：前髪は短めにしたい"
         />
@@ -125,13 +126,13 @@ export default function Confirm({
         <Button variant="primary" onClick={handleSubmit} disabled={submitting}>
           {submitting ? '送信中...' : autoConfirm ? 'この内容で予約を確定する' : 'この内容で予約をリクエスト'}
         </Button>
-        <button
+        <Button variant="text"
           type="button"
           onClick={onBack}
-          className="liff-hit self-center text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
+          className="self-center"
         >
           ← 日時を選び直す
-        </button>
+        </Button>
       </BottomBar>
     </div>
   );

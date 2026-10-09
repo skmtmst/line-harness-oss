@@ -25,6 +25,7 @@ import styles from './create.module.css'
 
 /* 絵の9色。保存する値は色コード、読み上げと見出しは名前。既定は緑（基調色）。 */
 import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from './folder-colors'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 export { TAG_FOLDER_COLORS } from './folder-colors'
 const DEFAULT_COLOR = DEFAULT_TAG_FOLDER_COLOR
 
@@ -35,7 +36,7 @@ const sameRequest = (a: RequestKey, b: RequestKey) => a.editId === b.editId && a
 export function folderSaveError(status?: number): string {
   switch (status) {
     case 400: return '入力内容を確認してください。フォルダ名は60文字以内で入力してください。'
-    case 403: return 'フォルダを変更する権限がありません。管理者に確認してください。'
+    case 403: return permissionDeniedMessage('store')
     case 404: return 'フォルダが見つかりません。一覧へ戻って最新の状態を確認してください。'
     case 409: return 'ほかの担当者が先に変更しました。最新の内容を読み直してください。'
     default: return '保存できませんでした。時間を置いて、もう一度お試しください。'
@@ -45,7 +46,7 @@ export function folderSaveError(status?: number): string {
 function folderDeleteError(status?: number): string {
   switch (status) {
     case 400: return '削除できませんでした。フォルダの状態を確認して、もう一度お試しください。'
-    case 403: return 'フォルダを削除する権限がありません。管理者に確認してください。'
+    case 403: return permissionDeniedMessage('store')
     case 404: return '削除しようとしたフォルダが見つかりません。一覧へ戻って最新の状態を確認してください。'
     case 409: return 'ほかの担当者が先に変更したため、削除できませんでした。最新の内容を読み直してください。'
     default: return '削除できませんでした。時間を置いて、もう一度お試しください。'
@@ -168,7 +169,7 @@ function TagFolderPage() {
   const blockedReason =
     loadState === 'loading' ? '読み込んでいます'
       : loadState === 'error' ? '読み込めませんでした'
-        : loadState === 'forbidden' ? '操作する権限がありません'
+        : loadState === 'forbidden' ? permissionDeniedMessage('store')
           : null
   const title = editId ? 'フォルダを直す' : scope === 'friend_field' ? '友だち情報欄のフォルダを追加する' : 'フォルダを追加する'
 
@@ -195,7 +196,7 @@ function TagFolderPage() {
             ) : null}
             <span className={styles.dialogFooterEnd}>
               <Button type="button" disabled={saving} onClick={close}>キャンセル</Button>
-              <Button type="button" variant="primary" disabled={saving || blockedReason !== null} title={blockedReason ?? undefined} onClick={() => void save()} busy={saving}>
+              <Button type="button" variant="primary" disabled={saving || blockedReason !== null} title={blockedReason ?? undefined}  onClick={() => void save()} busy={saving}>
                 {editId ? <FolderCheck size={15} aria-hidden="true" /> : <FolderPlus size={15} aria-hidden="true" />}
                 {editId ? 'フォルダを保存する' : 'フォルダを作る'}
               </Button>
@@ -204,7 +205,7 @@ function TagFolderPage() {
         )}
       >
         <>
-          {loadState === 'forbidden' ? <p className={styles.fieldNote}>見る権限がありません</p> : null}
+          {loadState === 'forbidden' ? <p className={styles.fieldNote}>{permissionDeniedMessage('store')}</p> : null}
           {loadState === 'loading' ? <p className={styles.fieldNote}>読み込んでいます</p> : null}
           {loadState === 'error' ? (
             <div className={styles.inlineRetry}>

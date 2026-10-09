@@ -59,7 +59,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { TextField } from '@/components/shared/text-field'
 import { TimeField } from '@/components/shared/date-time-field'
 import ConditionBuilder, { findConditionDraftIssue, pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
@@ -82,7 +82,8 @@ import styles from './edit.module.css'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import type { InsertTokenSpec } from '@/components/shared/insert-tokens'
 import { formatDate as polishFormatDate } from '@/lib/format'
-
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 /** リマインダの本文で札にする差し込み（{{date}} はリマインダでは予約日時）。 */
 const REMINDER_TOKENS: readonly InsertTokenSpec[] = [
@@ -188,7 +189,7 @@ type StageFrame = {
   title: string
   identity: ReactNode
   steps: ReactNode
-  description: ReactNode
+  help: ReactNode
   /** 頭の線の下に板の幅で置く帯（競合 k32cn）。 */
   notice?: ReactNode
   noticeSpacing?: 'band'
@@ -532,7 +533,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
     title: 'リマインダを作る',
     identity: <BackToReminders />,
     steps: <ReminderV8Stepper current={currentKey} reminderId={reminderId} />,
-    description: (
+    help: (
       <>
         {v8stage === 'basics'
           ? 'いまは下書きとして作ります。最後の「確認」で有効にします。'
@@ -942,8 +943,8 @@ function TargetStageV8({
           <SummaryCardV8
             rows={[
               { key: '基準日', value: reminderTriggerLabel(settings.triggerType) },
-              { key: '対象者', value: matched == null ? '—' : `${formatNumber(matched)} 人に送る予定` },
-              { key: '通知', value: settings.steps.length > 0 ? `${settings.steps.length} 通` : '手順3で作る' },
+              { key: '対象者', value: matched == null ? emptyValue('unknown') : `${formatNumber(matched)}人に送る予定` },
+              { key: '通知', value: settings.steps.length > 0 ? `${settings.steps.length}通` : '手順3で作る' },
               { key: '状態', value: '下書き' },
             ]}
           />
@@ -1000,11 +1001,11 @@ function TargetStageV8({
         <div className={styles.countBand}>
           <div className={styles.countItem}>
             <span className={styles.countLabel}>当てはまる人</span>
-            <strong className={styles.countValue}>{`${counting ? '…' : total == null ? '—' : formatNumber(total)} 人`}</strong>
+            <strong className={styles.countValue}>{`${counting ? '…' : total == null ? emptyValue('unknown') : formatNumber(total)} 人`}</strong>
           </div>
           <div className={styles.countItem}>
             <span className={styles.countLabel}>送る予定（ブロックを除く）</span>
-            <strong className={styles.countValue}>{`${counting ? '…' : matched == null ? '—' : formatNumber(matched)} 人`}</strong>
+            <strong className={styles.countValue}>{`${counting ? '…' : matched == null ? emptyValue('unknown') : formatNumber(matched)} 人`}</strong>
           </div>
           <span className={styles.spacer} aria-hidden="true" />
           <Button type="button" variant="text" onClick={openFaces} disabled={counting}>
@@ -1038,8 +1039,8 @@ function TargetStageV8({
                 <span className={styles.stopNote}>{row.note}</span>
               </span>
               {row.locked
-                ? <Toggle label={row.label} checked locked />
-                : <Toggle label={row.label} checked={row.checked} onChange={(next) => row.onChange?.(next)} />}
+                ? <SettingCheckbox label={row.label} checked locked />
+                : <SettingCheckbox label={row.label} checked={row.checked} onChange={(next) => row.onChange?.(next)} />}
             </div>
           ))}
         </div>
@@ -1401,7 +1402,7 @@ function TimingEditor({
   return (
     <div className={styles.timingRow}>
       <span className={styles.timingWord}>基準日の</span>
-      <TextField
+      <NumberInput
         type="number"
         min={0}
         max={unit === 'day' ? 365 : undefined}
@@ -1492,8 +1493,8 @@ function ScheduleStageV8({
           <SummaryCardV8
             rows={[
               { key: '基準日', value: reminderTriggerLabel(settings.triggerType) },
-              { key: '対象者', value: preview ? countLabel(preview.summary.audience, '人') : '—' },
-              { key: '通知', value: `${settings.steps.length} 通` },
+              { key: '対象者', value: preview ? countLabel(preview.summary.audience, '人') : emptyValue('unknown') },
+              { key: '通知', value: `${settings.steps.length}通` },
               { key: '状態', value: '下書き' },
             ]}
           />
@@ -1688,8 +1689,8 @@ function ConfirmStageV8({
           <SummaryCardV8
             rows={[
               { key: '基準日', value: reminderTriggerLabel(settings.triggerType) },
-              { key: '対象者', value: validation?.audience.matched != null ? `${formatNumber(validation.audience.matched)} 人` : '—' },
-              { key: '通知', value: `${settings.steps.length} 通` },
+              { key: '対象者', value: validation?.audience.matched != null ? `${formatNumber(validation.audience.matched)}人` : emptyValue('unknown') },
+              { key: '通知', value: `${settings.steps.length}通` },
               { key: '状態', value: '下書き → 有効にする' },
             ]}
           />

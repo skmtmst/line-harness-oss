@@ -16,6 +16,8 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { useCanManageAutomations } from '@/components/automations/use-automation-permission'
 import styles from './automation-api-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { PageHeading } from '@/components/templates/page-frame'
 
 /*
  * ★V8 オートメーション見本（板 `c7dxp`）。
@@ -117,18 +119,18 @@ export default function AutomationTemplatesV8() {
   }
 
   const tabs = [
-    { key: 'rules', label: `ルール ${ruleCount ?? '—'}`, href: '/automations' },
-    { key: 'common-actions', label: `共通アクション ${commonActionCount ?? '—'}`, href: '/common-actions' },
+    { key: 'rules', label: `ルール ${ruleCount ?? emptyValue('unknown')}`, href: '/automations' },
+    { key: 'common-actions', label: `共通アクション ${commonActionCount ?? emptyValue('unknown')}`, href: '/common-actions' },
     { key: 'runs', label: '動いた記録', href: '/automations/runs' },
-    { key: 'templates', label: `見本 ${status === 'ready' ? items.length : '—'}` },
+    { key: 'templates', label: `見本 ${status === 'ready' ? items.length : emptyValue('unknown')}` },
   ]
 
   return (
     <div className={styles.board} data-design-node="c7dxp">
       <div className={styles.head}>
         <div>
-          <h1 className={styles.title}>オートメーション</h1>
-          <p className={styles.lead}>「○○したら△△する」を決めておくと、友だちの動きに合わせて自動で動きます。</p>
+          <PageHeading title="オートメーション" help={<> 「○○したら△△する」を決めておくと、友だちの動きに合わせて自動で動きます。</>} />
+
         </div>
         <Button href="/automations?tab=templates" variant="secondary">見本から作る</Button>
       </div>
@@ -137,7 +139,7 @@ export default function AutomationTemplatesV8() {
 
       {status === 'ready' ? (
         <div data-design="KPIs" className={`${kpiStyles.strip} ${styles.kpis}`}>
-          <KpiCard title="ルール" value={ruleCount} unit="件" detail={`動いている ${activeCount ?? '—'}・止めている ${stoppedCount ?? '—'}`} />
+          <KpiCard title="ルール" value={ruleCount} unit="件" detail={`動いている ${activeCount ?? emptyValue('unknown')}・止めている ${stoppedCount ?? emptyValue('unknown')}`} />
           <KpiCard title="今月動いた" value={exec30d} unit="回" detail="この30日の実行回数です" />
           <KpiCard title="失敗" value={fail30d} unit="件" detail="「動いた記録」からやり直せます" />
           <KpiCard title="条件に外れた" value={skipped} unit="回" detail="だれにも当たらないまま終わった回数です" />

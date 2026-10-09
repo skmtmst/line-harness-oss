@@ -8,11 +8,8 @@
  * 共通の窓は変えず、同じ動き（フォーカスを閉じ込める・Esc と背景で閉じる・処理中は閉じない・本文を止める）を
  * 共通の `useOverlayFocus` で持たせた枠をここに置く。
  */
-import { X } from 'lucide-react'
-import { useEffect, useId, useState, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
-import IconButton from '@/components/shared/icon-button'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Dialog from '@/components/shared/dialog'
+import { type ReactNode } from 'react'
 import styles from './frame.module.css'
 
 /** 窓の大きさと上からの位置（絵ごと）。値は globals.css の `--tpl-hb-dialog-*`。 */
@@ -48,45 +45,9 @@ export default function BannerDialogFrame({
   role?: 'dialog' | 'alertdialog'
   children?: ReactNode
 }) {
-  const titleId = useId()
-  const descriptionId = useId()
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
-  const panelRef = useOverlayFocus(open && mounted, onClose, busy)
-  if (!open) return null
-
-  const overlay = (
-    <div
-      className={styles.overlay}
-      role="presentation"
-      data-kind={kind}
-      data-design-node={designNode}
-      onMouseDown={(event) => { if (!busy && event.target === event.currentTarget) onClose() }}
-    >
-      <div
-        ref={panelRef}
-        className={styles.panel}
-        role={role}
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={description ? descriptionId : undefined}
-        aria-busy={busy || undefined}
-        tabIndex={-1}
-      >
-        <div className={styles.head}>
-          <div className={styles.titleRow}>
-            <h2 id={titleId} className={styles.title}>{title}</h2>
-            <IconButton aria-label="閉じる" title="閉じる" onClick={onClose} disabled={busy}>
-              <X aria-hidden="true" className={styles.closeIcon} />
-            </IconButton>
-          </div>
-          {description ? <p id={descriptionId} className={styles.description}>{description}</p> : null}
-        </div>
-        {children}
-        {error ? <p className={styles.error} role="alert">{error}</p> : null}
-        {actions ? <div className={actionsAlign === 'split' ? `${styles.actions} ${styles.actionsSplit}` : styles.actions}>{actions}</div> : null}
-      </div>
-    </div>
-  )
-  return mounted && typeof document !== 'undefined' ? createPortal(overlay, document.body) : overlay
+  return <Dialog open={open} title={title} onCancel={onClose} busy={busy} error={error} designNode={designNode}
+    tone={role === 'alertdialog' ? 'destructive' : 'default'} confirmation footer={actions} footerAlign={actionsAlign === 'center' ? 'center' : 'start'}
+    designWidth={kind === 'detail' || kind === 'reference' ? 960 : kind === 'upload' ? 720 : 560}>
+    {description ? <p>{description}</p> : null}{children}
+  </Dialog>
 }

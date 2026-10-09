@@ -19,8 +19,10 @@ import { petAnimalTypeLabel } from '@/lib/nen-pets-api'
 import { photoReviewReasonLabel, mileStatusLabel, text } from './text'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
 import { formatDay, formatNumber } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
-const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? formatNumber(Number(value)) : '—'
+const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? formatNumber(Number(value)) : emptyValue('unknown')
 
 export function PhotoReviewDetail({
   canEdit = true, photo, position, total, loading, loadKind, reviewing, notice, accountNotice, assetStatus, derivatives, assetsFailed, onReloadAssets, onReloadPhoto, assetProcessing, rotationSaving,
@@ -75,7 +77,7 @@ export function PhotoReviewDetail({
   /* V-1: 2段階認証を使っている人は6桁、無い人はパスワードで確認する。 */
   const stepUpMethod = readSessionSnapshot()?.stepUpMethod ?? 'totp'
   const downloadReady = stepUpMethod === 'password' ? downloadCode.length > 0 : /^\d{6}$/.test(downloadCode)
-  if (loading) return <div><ListState kind="loading" title="写真を読み込んでいます" /></div>
+  if (loading) return <div><DetailLoading label="写真を読み込んでいます" /></div>
   if (loadKind === 'forbidden') return <div><ListState kind="forbidden" /></div>
   if (loadKind === 'error') return <div><ListState kind="error" title="写真を読み込めませんでした" description="通信状態を確認して、もう一度読み込んでください。" onRetry={onReloadPhoto} /></div>
   if (!photo || loadKind === 'empty') return <div><ListState kind="empty" title="確認する写真はありません" /></div>
@@ -125,7 +127,7 @@ export function PhotoReviewDetail({
         <h2 className="mt-1 text-2xl font-extrabold text-ink">{photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender })} の写真</h2>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="mr-2 text-xs font-medium text-ink-secondary">{total > 0 ? `${total} 枚のうち ${position + 1} 枚目` : '—'}</span>
+        <span className="mr-2 text-xs font-medium text-ink-secondary">{total > 0 ? `${total}枚のうち ${position + 1}枚目` : emptyValue('unknown')}</span>
         <Button disabled={position <= 0} onClick={() => onMove(-1)}>前の写真</Button>
         <Button disabled={position >= total - 1} onClick={() => onMove(1)}>次の写真</Button>
         <Button onClick={onBack}>並べて見るへ戻る</Button>

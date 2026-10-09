@@ -26,6 +26,10 @@ import { RequiredBadge } from '@/components/shared/form-controls'
 import { canSave, toSteps } from '../connection-check-view'
 import { isDuplicateChannelError, matchRegisteredAccountId } from './account-recovery'
 import styles from './register-v8.module.css'
+import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 const V8_STEPS = [
   { number: 1, label: 'LINE準備', designNode: 'xj3zz' },
@@ -227,7 +231,7 @@ export default function RegisterV8() {
   const rowsPassed = allV8RowsPassed(checkRows)
   const createdId = connection?.id ?? ''
   const workerBase = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
-  const callbackUrl = workerBase ? `${workerBase}/auth/callback` : '—'
+  const callbackUrl = workerBase ? `${workerBase}/auth/callback` : emptyValue('unknown')
   const importingIds = (importState?.phase ?? connection?.followerImport.phase) === 'importing_ids'
   const selectedTags = tags?.filter((tag) => form.tagIds.includes(tag.id)) ?? []
 
@@ -573,10 +577,10 @@ export default function RegisterV8() {
   return (
     <div className={styles.board}>
       <div className={styles.head}>
-        <h1>LINEアカウントを登録</h1>
-        <p>{currentStep === 4 && !createdId
+        <PageHeading title="LINEアカウントを登録" help={<> {currentStep === 4 && !createdId
           ? '接続確認が5段すべて通るまで登録しません。止まった項目を直して、もう一度「接続して設定する」を押します。'
-          : currentStep === 5 ? '登録が完了しました。' : '画面に出る名前と、だれがこのアカウントを扱うかを決めます。'}</p>
+          : currentStep === 5 ? '登録が完了しました。' : '画面に出る名前と、だれがこのアカウントを扱うかを決めます。'}</>} />
+
       </div>
 
       <ol className={styles.steps} aria-label="登録の進捗">
@@ -618,11 +622,11 @@ export default function RegisterV8() {
                       ? 'LINE Developers で Messaging API と LINE Login のチャネルが同じプロバイダーにあることを確かめます。'
                       : 'LINE公式アカウントを作ってから、同じプロバイダー内に Messaging API と LINE Login のチャネルを用意します。'}
                     <br />
-                    <a href="https://developers.line.biz/console/" target="_blank" rel="noreferrer" className="text-action font-semibold hover:underline">LINE Developers を開く</a>
+                    <TextLink external href="https://developers.line.biz/console/"   className="text-action font-semibold hover:underline">LINE Developers を開く</TextLink>
                     {accountMethod === 'new' && (
-                      <>　<a href="https://manager.line.biz/" target="_blank" rel="noreferrer" className="text-action font-semibold hover:underline">LINE公式アカウントを作る（LINE Official Account Manager）</a></>
+                      <>　<TextLink external href="https://manager.line.biz/"   className="text-action font-semibold hover:underline">LINE公式アカウントを作る（LINE Official Account Manager）</TextLink></>
                     )}
-                    　<a href="/manuals/line-connect/index.html#m1" target="_blank" rel="noreferrer" className="text-action font-semibold hover:underline">マニュアルを見る</a>
+                    　<TextLink external href="/manuals/line-connect/index.html#m1"   className="text-action font-semibold hover:underline">マニュアルを見る</TextLink>
                   </div>
                   <p className={styles.fieldHelp}>3番が終わるまでに、チャネルIDとシークレットが要ります。4番では自動で接続を確かめます。</p>
                 </div>
@@ -636,28 +640,16 @@ export default function RegisterV8() {
                 <h2>チャネル設定</h2>
                 <div className={styles.panelBody}>
                   <div className={styles.twoCol}>
-                    <div>
-                      <label className={styles.fieldLabel} htmlFor="v8-channel-id">Messaging API のチャネルID<RequiredBadge /></label>
-                      <input id="v8-channel-id" className={styles.fieldInput} value={form.channelId} onChange={(event) => update('channelId', event.target.value)} inputMode="numeric" required aria-invalid={fieldErrors.channelId ? true : undefined} />
-                      {fieldErrors.channelId && <p className={styles.fieldError}>{fieldErrors.channelId}</p>}
-                      <p className={styles.fieldHelp}>LINE Developers の Messaging API チャネルで取得　<a href="/manuals/line-connect/index.html#m1" target="_blank" rel="noreferrer" className="text-action font-semibold hover:underline">取得方法を見る</a></p>
-                    </div>
-                    <div>
-                      <label className={styles.fieldLabel} htmlFor="v8-channel-secret">Messaging API のチャネルシークレット<RequiredBadge /></label>
-                      <input id="v8-channel-secret" type="password" autoComplete="new-password" className={styles.fieldInput} value={form.channelSecret} onChange={(event) => update('channelSecret', event.target.value)} required aria-invalid={fieldErrors.channelSecret ? true : undefined} />
-                      {fieldErrors.channelSecret && <p className={styles.fieldError}>{fieldErrors.channelSecret}</p>}
-                    </div>
-                    <div>
-                      <label className={styles.fieldLabel} htmlFor="v8-login-channel-id">LINE Login のチャネルID<RequiredBadge /></label>
-                      <input id="v8-login-channel-id" className={styles.fieldInput} value={form.loginChannelId} onChange={(event) => update('loginChannelId', event.target.value)} inputMode="numeric" required aria-invalid={fieldErrors.loginChannelId ? true : undefined} />
-                      {fieldErrors.loginChannelId && <p className={styles.fieldError}>{fieldErrors.loginChannelId}</p>}
-                      <p className={styles.fieldHelp}>LIFF は自動で作ります。Messaging API と同じプロバイダーのチャネル　<a href="/manuals/line-connect/index.html#m2" target="_blank" rel="noreferrer" className="text-action font-semibold hover:underline">取得方法を見る</a></p>
-                    </div>
-                    <div>
-                      <label className={styles.fieldLabel} htmlFor="v8-login-channel-secret">LINE Login のチャネルシークレット<RequiredBadge /></label>
-                      <input id="v8-login-channel-secret" type="password" autoComplete="new-password" className={styles.fieldInput} value={form.loginChannelSecret} onChange={(event) => update('loginChannelSecret', event.target.value)} required aria-invalid={fieldErrors.loginChannelSecret ? true : undefined} />
-                      {fieldErrors.loginChannelSecret && <p className={styles.fieldError}>{fieldErrors.loginChannelSecret}</p>}
-                    </div>
+                    <div><Field note={<>LINE Developers の Messaging API チャネルで取得　<TextLink external href="/manuals/line-connect/index.html#m1"   className="text-action font-semibold hover:underline">取得方法を見る</TextLink></>} label="Messaging API のチャネルID" htmlFor="v8-channel-id" required><input id="v8-channel-id" className={styles.fieldInput} value={form.channelId} onChange={(event) => update('channelId', event.target.value)} inputMode="numeric" required aria-invalid={fieldErrors.channelId ? true : undefined} />
+{fieldErrors.channelId && <p className={styles.fieldError}>{fieldErrors.channelId}</p>}
+</Field></div>
+                    <div><Field label="Messaging API のチャネルシークレット" htmlFor="v8-channel-secret" required><input id="v8-channel-secret" type="password" autoComplete="new-password" className={styles.fieldInput} value={form.channelSecret} onChange={(event) => update('channelSecret', event.target.value)} required aria-invalid={fieldErrors.channelSecret ? true : undefined} />
+{fieldErrors.channelSecret && <p className={styles.fieldError}>{fieldErrors.channelSecret}</p>}</Field></div>
+                    <div><Field note={<>LIFF は自動で作ります。Messaging API と同じプロバイダーのチャネル　<TextLink external href="/manuals/line-connect/index.html#m2"   className="text-action font-semibold hover:underline">取得方法を見る</TextLink></>} label="LINE Login のチャネルID" htmlFor="v8-login-channel-id" required><input id="v8-login-channel-id" className={styles.fieldInput} value={form.loginChannelId} onChange={(event) => update('loginChannelId', event.target.value)} inputMode="numeric" required aria-invalid={fieldErrors.loginChannelId ? true : undefined} />
+{fieldErrors.loginChannelId && <p className={styles.fieldError}>{fieldErrors.loginChannelId}</p>}
+</Field></div>
+                    <div><Field label="LINE Login のチャネルシークレット" htmlFor="v8-login-channel-secret" required><input id="v8-login-channel-secret" type="password" autoComplete="new-password" className={styles.fieldInput} value={form.loginChannelSecret} onChange={(event) => update('loginChannelSecret', event.target.value)} required aria-invalid={fieldErrors.loginChannelSecret ? true : undefined} />
+{fieldErrors.loginChannelSecret && <p className={styles.fieldError}>{fieldErrors.loginChannelSecret}</p>}</Field></div>
                   </div>
                   <p className={styles.fieldHelp}>検査中は「次へ」を押せません。入力を変えると接続確認はやり直しになります。</p>
                 </div>
@@ -671,18 +663,12 @@ export default function RegisterV8() {
                 <h2>基本情報</h2>
                 <div className={styles.panelBody}>
                   <div className={styles.twoCol}>
-                    <div>
-                      <label className={styles.fieldLabel} htmlFor="v8-display-name">表示名</label>
-                      <input id="v8-display-name" className={styles.fieldInput} value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="未入力なら LINE公式アカウントの名前を使います" aria-invalid={fieldErrors.name ? true : undefined} />
-                      {fieldErrors.name && <p className={styles.fieldError}>{fieldErrors.name}</p>}
-                    </div>
-                    <div>
-                      <label className={styles.fieldLabel} htmlFor="v8-line-id">LINE ID</label>
-                      <div className={styles.endpointRow}>
+                    <div><Field label="表示名" htmlFor="v8-display-name"><input id="v8-display-name" className={styles.fieldInput} value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="未入力なら LINE公式アカウントの名前を使います" aria-invalid={fieldErrors.name ? true : undefined} />
+{fieldErrors.name && <p className={styles.fieldError}>{fieldErrors.name}</p>}</Field></div>
+                    <div><Field label="LINE ID" htmlFor="v8-line-id"><div className={styles.endpointRow}>
                         <input id="v8-line-id" className={styles.fieldInput} value={form.lineId} readOnly placeholder="「LINEから取得」を押すと入ります" aria-readonly />
                         <Button type="button" onClick={() => void fetchLineId()} disabled={busyAction === 'check'} busy={busyAction === 'check'} busyLabel="取得しています…">LINEから取得</Button>
-                      </div>
-                    </div>
+                      </div></Field></div>
                   </div>
                   <div>
                     <span className={styles.fieldLabel}>タグ</span>
@@ -703,7 +689,7 @@ export default function RegisterV8() {
                   </div>
                   <div className={styles.twoCol}>
                     <div><span className={styles.fieldLabel}>親アカウント</span><Select aria-label="親アカウント" value={form.parentId} onChange={value => update('parentId', value)} options={[{value:'',label:'親なし'}, ...parents.map(a => ({value:a.id,label:a.name}))]} /></div>
-                    <div><label className={styles.fieldLabel} htmlFor="v8-existing-liff">既存のLIFF ID（任意）</label><input id="v8-existing-liff" className={styles.fieldInput} value={form.liffId} onChange={e => update('liffId',e.target.value)} placeholder="未入力なら自動で用意します" /></div>
+                    <div><Field label="既存のLIFF ID" htmlFor="v8-existing-liff"><input id="v8-existing-liff" className={styles.fieldInput} value={form.liffId} onChange={e => update('liffId',e.target.value)} placeholder="未入力なら自動で用意します" /></Field></div>
                   </div>
                   <fieldset><legend className={styles.fieldLabel}>このアカウントを担当範囲に追加する人</legend><div className={styles.tagRow}>{staffOptions.map(member => <Checkbox key={member.id} aria-label={member.name} checked={form.staffIds.includes(member.id)} onCheckedChange={checked => update('staffIds',checked ? [...form.staffIds,member.id] : form.staffIds.filter(id => id !== member.id))}>{member.name}</Checkbox>)}</div><p className={styles.fieldHelp}>全アカウント担当者は追加操作なしで閲覧できます。</p></fieldset>
                   {optionsError ? <p role="alert" className={styles.fieldError}>{optionsError}</p> : null}
@@ -713,7 +699,7 @@ export default function RegisterV8() {
                       <p className={styles.endpointValue}>{callbackUrl}</p>
                       <CopyButton value={callbackUrl} />
                     </div>
-                    <p className={styles.fieldHelp}>LINE Login → Callback URL <a href="/manuals/line-connect/index.html#m3" target="_blank" rel="noreferrer" className="text-action font-semibold hover:underline">設定方法を見る</a></p>
+                    <p className={styles.fieldHelp}>LINE Login → Callback URL <TextLink external href="/manuals/line-connect/index.html#m3"   className="text-action font-semibold hover:underline">設定方法を見る</TextLink></p>
                   </div>
                 </div>
               </section>
@@ -746,7 +732,7 @@ export default function RegisterV8() {
                       <dl>
                         <div><dt>表示名</dt><dd>{form.name.trim() || (connection?.displayName ? `${connection.displayName}（LINEから取得）` : 'LINEから取得')}</dd></div>
                         <div><dt>LINE ID</dt><dd>{form.lineId || '接続確認で取得します'}</dd></div>
-                        <div><dt>タグ</dt><dd>{selectedTags.length > 0 ? selectedTags.map((tag) => tag.name).join('・') : 'なし'}</dd></div>
+                        <div><dt>タグ</dt><dd>{selectedTags.length > 0 ? selectedTags.map((tag) => tag.name).join('・') : emptyValue('none')}</dd></div>
                       </dl>
                       <p className={styles.fieldHelp}>タグ・親アカウント・担当者は、登録と一緒に保存します。</p>
                     </aside>

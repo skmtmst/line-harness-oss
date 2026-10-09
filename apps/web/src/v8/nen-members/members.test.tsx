@@ -212,7 +212,7 @@ describe('V8 会員（src/v8/nen-members）', () => {
     for (const text of ['ランクを足す', 'もう一度同期', 'キャンセル', '保存して EC へ同期']) {
       expect(buttons().some((b) => b.textContent?.includes(text))).toBe(false)
     }
-    expect(buttons().some((b) => b.textContent?.includes('CSV で書き出す'))).toBe(true)
+    expect(buttons().some((b) => b.textContent?.includes('CSVで書き出す'))).toBe(true)
     // 欄は読み取りだけ（押せない形ではなく、値は読める）。2026-10-06 オーナー決定。
     const inputs = Array.from(host.querySelectorAll('input'))
     expect(inputs.length).toBeGreaterThan(0)

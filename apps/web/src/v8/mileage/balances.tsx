@@ -43,6 +43,9 @@ import { MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import styles from './mileage.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 function dateOnlyDaysAgo(days: number) {
   const date = new Date()
@@ -259,7 +262,7 @@ export default function BalancesTab() {
       const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `mileage-balances-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = csvFileName("マイル残高")
       anchor.click()
       URL.revokeObjectURL(url)
     } catch {
@@ -298,7 +301,7 @@ export default function BalancesTab() {
         icon={<Users size={14} aria-hidden="true" />}
         value={ready ? summary.totalMembers : null}
         unit="人"
-        detail={ready ? `マイルを持っている ${formatMileageNumber(summary.withBalanceCount)} 人` : '—'}
+        detail={ready ? `マイルを持っている ${formatMileageNumber(summary.withBalanceCount)}人` : emptyValue('unknown')}
       />
       <KpiCard
         presentation="band"
@@ -308,7 +311,7 @@ export default function BalancesTab() {
         unit=""
         detail={ready
           ? `1人あたり ${formatMileageNumber(summary.totalMembers > 0 ? Math.round(summary.available / summary.totalMembers) : 0)}`
-          : '—'}
+          : emptyValue('unknown')}
       />
       <KpiCard
         presentation="band"
@@ -385,7 +388,7 @@ export default function BalancesTab() {
         icon={<CircleDot size={13} aria-hidden="true" />}
         onChange={(selected) => { setOffset(0); setWithBalanceOnly(selected) }}
       >
-        {`残高あり ${summary === null ? '—' : formatMileageNumber(summary.withBalanceCount)}`}
+        {`残高あり ${summary === null ? emptyValue('unknown') : formatMileageNumber(summary.withBalanceCount)}`}
       </FilterChip>
       <FilterChip
         selected={pendingOnly}
@@ -469,7 +472,7 @@ export default function BalancesTab() {
                   <span className={styles.rowName} title={member.displayName}>{member.displayName}</span>
                   <span className={styles.rowSub} ><TruncatedText value={String(member.lineAccount.name ?? '')} /></span>
                 </Td>
-                <Td className={styles.colRank}><span className={styles.cellMain} title={member.rankReason}>{rankLabel(member.rank) ?? '—'}</span></Td>
+                <Td className={styles.colRank}><span className={styles.cellMain} title={member.rankReason}>{rankLabel(member.rank) ?? emptyValue('unknown')}</span></Td>
                 <Td className={`${styles.colBalance} ${styles.num}`}>
                   <span className={styles.cellMain}>{formatMileageNumber(member.available)}</span>
                   {member.pending > 0 ? <span className={styles.cellSub}>{`保留 ${formatMileageNumber(member.pending)}`}</span> : null}
@@ -553,16 +556,13 @@ export default function BalancesTab() {
           onCancel={() => { if (approvalBusyId === null) setRejectTarget(null) }}
           onConfirm={() => { if (rejectTarget) void decideApproval(rejectTarget.id, 'reject', rejectReason.trim() || undefined) }}
         >
-          <label className={styles.fieldLabel}>
-            差し戻す理由
-            <textarea
+          <Field label="差し戻す理由"><textarea
               className={styles.textarea}
               value={rejectReason}
               onChange={(event) => setRejectReason(event.target.value)}
               placeholder="例：調整の根拠となる資料を確認できませんでした"
               rows={3}
-            />
-          </label>
+            /></Field>
         </Dialog>
       }
     >

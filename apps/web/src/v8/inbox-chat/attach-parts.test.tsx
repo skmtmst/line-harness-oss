@@ -18,8 +18,8 @@ describe('左下のクリップ', () => {
     expect(screen.getByRole('menuitem', { name: /画像・動画/ })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: /ファイル/ })).toBeTruthy()
     expect(document.body.textContent).toContain('ダウンロードのリンクとして届く')
-    const media = container.querySelector<HTMLInputElement>('[data-inbox-v8="attach-media-input"]')!
-    const files = container.querySelector<HTMLInputElement>('[data-inbox-v8="attach-file-input"]')!
+    const media = container.querySelector<HTMLInputElement>('input[aria-label="画像・動画を添付（ファイル）"]')!
+    const files = container.querySelector<HTMLInputElement>('input[aria-label="ファイルを添付（ファイル）"]')!
     expect(media.accept).toContain('video/mp4')
     expect(media.accept).not.toContain('application/pdf')
     expect(files.accept).toContain('application/pdf')

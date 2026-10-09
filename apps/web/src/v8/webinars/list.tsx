@@ -88,6 +88,9 @@ import {
 import styles from './list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type SortKey = 'updated' | 'created' | 'name'
 type SavedFilter = '' | 'active' | 'draft' | 'archived'
@@ -132,7 +135,7 @@ function periodSummary(webinar: WebinarListItem): string {
 }
 
 function peopleText(value: number | null | undefined): string {
-  return typeof value === 'number' && Number.isFinite(value) ? `${formatNumber(value)} 人` : '—'
+  return typeof value === 'number' && Number.isFinite(value) ? `${formatNumber(value)}人` : emptyValue('unknown')
 }
 
 function metricValue(metric: WebinarOverviewMetric | undefined): number | null {
@@ -152,19 +155,19 @@ function kpiCells(overview: WebinarOverview | null) {
   return [
     {
       key: 'webinars', title: 'ウェビナー', icon: Video, value: metricValue(m?.webinars), unit: '件',
-      detail: active === null ? '—' : `公開中 ${formatNumber(active)} 件`, help: '登録済みの件数です。',
+      detail: active === null ? emptyValue('unknown') : `公開中 ${formatNumber(active)}件`, help: '登録済みの件数です。',
     },
     {
       key: 'registrations', title: '申込', icon: Users, value: metricValue(m?.registrations), unit: '人',
-      detail: bookings === null ? '—' : `延べ予約 ${formatNumber(bookings)} 件`, help: '全期間の申込人数です。同じ人の複数予約は1人に数えます。',
+      detail: bookings === null ? emptyValue('unknown') : `延べ予約 ${formatNumber(bookings)}件`, help: '全期間の申込人数です。同じ人の複数予約は1人に数えます。',
     },
     {
       key: 'viewers', title: '視聴', icon: CalendarClock, value: metricValue(m?.viewers), unit: '人',
-      detail: rate === null ? '—' : `申込の ${Math.round(rate * 1000) / 10}%`, help: '視聴開始の人数です。視聴完了は一覧の集計では出していません。',
+      detail: rate === null ? emptyValue('unknown') : `申込の ${Math.round(rate * 1000) / 10}%`, help: '視聴開始の人数です。視聴完了は一覧の集計では出していません。',
     },
     {
       key: 'cta', title: 'CTAクリック', icon: MousePointerClick, value: metricValue(m?.ctaTotalClicks), unit: '回',
-      detail: people === null ? '—' : `押した人 ${formatNumber(people)} 人`, help: '全期間にCTAが押された延べ回数です。',
+      detail: people === null ? emptyValue('unknown') : `押した人 ${formatNumber(people)}人`, help: '全期間にCTAが押された延べ回数です。',
     },
   ]
 }
@@ -293,7 +296,7 @@ function FolderForm({
   return <FolderEditorDialog open title={folder ? 'フォルダを直す' : 'フォルダを追加'}
     description="ウェビナーを分けてしまう箱です。消しても、中のウェビナーは未分類に残ります。"
     name={name} onNameChange={setName} color={color} onColorChange={setColor}
-    busy={busy} error={error || undefined} placeholder="例: 商品説明"
+    busy={busy} error={error || undefined} placeholder="例：商品説明"
     onCancel={onCancel} onConfirm={() => onSave(name.trim(), color)} confirmLabel={folder ? '保存する' : '追加する'} />
 }
 
@@ -702,7 +705,7 @@ function WebinarList() {
       const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
       const link = document.createElement('a')
       link.href = url
-      link.download = 'webinars.csv'
+      link.download = csvFileName("動画セミナー")
       link.click()
       URL.revokeObjectURL(url)
     } catch {
@@ -909,7 +912,7 @@ function WebinarList() {
                     </Td>
                     <Td className={styles.colStatus}><StatusPill webinar={w} /></Td>
                     <Td className={styles.colCount}>
-                      <span className={styles.numMain}>{counts ? peopleText(w.registrationCount) : '—'}</span>
+                      <span className={styles.numMain}>{counts ? peopleText(w.registrationCount) : emptyValue('unknown')}</span>
                     </Td>
                     <Td className={styles.colView}>
                       {beforeStart(w) ? (
@@ -920,7 +923,7 @@ function WebinarList() {
                           <span className={styles.numSub}>{`視聴開始 ${peopleText(w.viewerCount)}`}</span>
                         </>
                       ) : (
-                        <span className={styles.numMain} title="公開していないので視聴数はありません">—</span>
+                        <span className={styles.numMain} title="公開していないので視聴数はありません">{emptyValue('unknown')}</span>
                       )}
                     </Td>
                     <Td className={styles.colPeriod}><span className={styles.period} title={period}>{period}</span></Td>
@@ -959,11 +962,11 @@ function WebinarList() {
 
   return (
     <ListPage
-      help="行の「…」から 参加者・分析・コメント演出・アーカイブ。行を押すと右に詳細が出ます（↑↓で次の行へ）。"
+      help={<>{"録画やライブのセミナーをLINEで案内し、申込から視聴・相談までをつなげます。"}{"行の「…」から 参加者・分析・コメント演出・アーカイブ。行を押すと右に詳細が出ます（↑↓で次の行へ）。"}</>}
       boardId="UyUMw"
       headingSize="regular"
       title="ウェビナー"
-      description="録画やライブのセミナーをLINEで案内し、申込から視聴・相談までをつなげます。"
+
       actions={
         <Button
           onClick={() => void exportCsv()}
@@ -979,7 +982,7 @@ function WebinarList() {
         {role !== null && !canEdit ? (
           <div className={styles.viewerBand} role="status">
             <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
           </div>
         ) : null}
         {csvError ? <div className={styles.statsNotice}><Notice tone="info">{csvError}</Notice></div> : null}
@@ -1066,7 +1069,7 @@ function WebinarList() {
               <p className={styles.dialogValue}><StatusPill webinar={active} /></p>
               <p className={styles.dialogLabel}>申込・視聴</p>
               <p className={styles.dialogValue}>
-                申込 {showsCounts(active) ? peopleText(active.registrationCount) : '—'}　視聴開始 {showsCounts(active) ? peopleText(active.viewerCount) : '—'}
+                申込 {showsCounts(active) ? peopleText(active.registrationCount) : emptyValue('unknown')}　視聴開始 {showsCounts(active) ? peopleText(active.viewerCount) : emptyValue('unknown')}
               </p>
               <p className={styles.dialogLabel}>公開ページ</p>
               <p className={styles.dialogValue}>{publicPath(active)}</p>

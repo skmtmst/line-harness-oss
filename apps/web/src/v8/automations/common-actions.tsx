@@ -59,6 +59,7 @@ import {
 } from './shell'
 import styles from './common-actions.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Filter = 'all' | 'published' | 'draft' | 'old_version' | 'unused' | 'archived'
 type Summary = {
@@ -229,7 +230,7 @@ export default function CommonActionsV8() {
   /* ===== 数の帯 ===== */
   const ready = summary !== null && !loadFailed
   const cells: BandCell[] = [
-    { key: 'total', title: '共通アクション', icon: <ListChecks size={13} aria-hidden="true" />, value: ready ? summary.total : null, unit: '件', detail: ready ? `公開中 ${summary.published}・下書き ${summary.draft}` : '—' },
+    { key: 'total', title: '共通アクション', icon: <ListChecks size={13} aria-hidden="true" />, value: ready ? summary.total : null, unit: '件', detail: ready ? `公開中 ${summary.published}・下書き ${summary.draft}` : emptyValue('unknown') },
     { key: 'bindings', title: '使われている所', icon: <Link2 size={13} aria-hidden="true" />, value: ready ? summary.bindings : null, unit: 'か所', detail: ready && summary.outdated > 0 ? `古い版のまま ${summary.outdated}か所` : 'ルール・シナリオなど5機能から' },
     { key: 'executions', title: '今月動いた', icon: <Activity size={13} aria-hidden="true" />, value: ready ? summary.executions : null, unit: '回', detail: '今月（日本時間）の実行回数' },
     { key: 'failures', title: '失敗', icon: <TriangleAlert size={13} aria-hidden="true" />, value: ready ? summary.failures : null, unit: '件', detail: '「動いた記録」からやり直せます' },
@@ -338,7 +339,7 @@ export default function CommonActionsV8() {
                     <Td className={styles.colSteps}><span className={styles.main}>{`${item.actionCount} 個の処理`}</span></Td>
                     <Td className={styles.colUsed}><span className={styles.main}>{`${formatNumber(item.bindingCount)} か所`}</span></Td>
                     <Td className={styles.colVersion}>
-                      <span className={styles.main}>{item.publishedVersion ? `v${item.publishedVersion}` : '—'}</span>
+                      <span className={styles.main}>{item.publishedVersion ? `v${item.publishedVersion}` : emptyValue('unknown')}</span>
                       {versionSub ? <span className={item.oldVersionBindingCount > 0 ? styles.subWarn : styles.sub}>{versionSub}</span> : null}
                     </Td>
                     <Td className={styles.colOps}>
@@ -378,22 +379,22 @@ export default function CommonActionsV8() {
 
   return (
     <ListPage
-      help={canEdit
+      help={<>{AUTOMATIONS_DESCRIPTION}{canEdit
             ? '行の「…」から 版と使われている場所を見る・下書きの中身を編集・複製・保管。'
-            : '行の「…」から 版と使われている場所を見る。'}
+            : '行の「…」から 版と使われている場所を見る。'}</>}
       boardId="LnGNw"
       headingSize="regular"
       title="オートメーション"
-      description={AUTOMATIONS_DESCRIPTION}
+
       actions={canExportCsv && selectedAccountId
         ? csvEmpty
-          ? <Button disabled title="条件に合う共通アクションがないため書き出せません"><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
+          ? <Button disabled title="条件に合う共通アクションがないため書き出せません"><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
           : (
             <Button
               href={api.commonActions.csvUrl({ accountId: selectedAccountId, status: filter === 'all' ? undefined : filter, query: deferredQuery.trim() || undefined })}
               title={csvScoped ? `この条件の${total} 件を書き出します` : `全${total} 件を書き出します`}
             >
-              <Download size={15} aria-hidden="true" />CSV で書き出す
+              <Download size={15} aria-hidden="true" />CSVで書き出す
             </Button>
           )
         : undefined}
@@ -419,7 +420,7 @@ export default function CommonActionsV8() {
           allCount={ready ? summary.total : null}
           unfiledCount={ready ? summary.total : null}
           countOf={() => null}
-          placeholder="例: 購入・予約"
+          placeholder="例：購入・予約"
         />
       </>}
       folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: canEdit ? createButton : undefined }}

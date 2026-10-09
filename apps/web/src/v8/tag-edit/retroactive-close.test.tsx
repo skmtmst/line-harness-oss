@@ -16,7 +16,7 @@ it.each(['×', 'Esc'])('WEB277：%sは保存せず閉じ、編集内容を残す
   else fireEvent.keyDown(document, { key: 'Escape' })
   expect(onSave).not.toHaveBeenCalled()
   expect(screen.queryByRole('alertdialog')).toBeNull()
-  expect((screen.getByPlaceholderText('例: 定期購入者') as HTMLInputElement).value).toBe('購入')
+  expect((screen.getByPlaceholderText('例：定期購入者') as HTMLInputElement).value).toBe('購入')
 })
 it('WEB277：明示した「反映しないで保存する」だけ通常保存する', () => {
   const onSave = mount()

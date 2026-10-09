@@ -32,6 +32,11 @@ import { TextField } from '@/components/shared/text-field'
 import { RowActions } from '@/components/shared/row-actions'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import styles from './ad-integration-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
+import { csvFileName } from '@/lib/csv-file-name'
+import { PageHeading } from '@/components/templates/page-frame'
 
 const LOG_PAGE_SIZE = 20
 
@@ -387,7 +392,7 @@ function useAdV8Model() {
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `広告への送信履歴_${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = csvFileName("広告への送信履歴")
     anchor.click()
     URL.revokeObjectURL(url)
   }, [logs])
@@ -577,19 +582,14 @@ function ManualEntryDialogs({ model }: { model: AdV8Model }) {
         }}
       >
         <div className="space-y-4">
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-label-v8">流入元の名前</label>
-            <TextField
+          <div><Field label="流入元の名前" htmlFor="ad-cost-label-v8"><TextField
               id="ad-cost-label-v8"
               value={model.manualLabel}
               onChange={(event: React.ChangeEvent<HTMLInputElement>) => model.setManualLabel(event.target.value)}
-              placeholder="例: チラシ"
+              placeholder="例：チラシ"
               maxLength={100}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-route-v8">計測リンク（分かれば）</label>
-            <Select
+            /></Field></div>
+          <div><Field note={<>結びつけると友だち追加の人数で「1人あたり」が出ます。</>} label="計測リンク（分かれば）" htmlFor="ad-cost-route-v8"><Select
               id="ad-cost-route-v8"
               aria-label="計測リンク"
               value={model.manualRouteId}
@@ -599,22 +599,15 @@ function ManualEntryDialogs({ model }: { model: AdV8Model }) {
                 ...model.entryRoutes.map((route) => ({ value: route.id, label: route.name })),
               ]}
             />
-            <p className="mt-1 text-xs text-ink-faint">結びつけると友だち追加の人数で「1人あたり」が出ます。</p>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-day-v8">費用の日付</label>
-            <DateField id="ad-cost-day-v8" value={model.manualDay} onChange={model.setManualDay} />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-amount-v8">費用（円）</label>
-            <TextField
+</Field></div>
+          <div><Field label="費用の日付" htmlFor="ad-cost-day-v8"><DateField id="ad-cost-day-v8" value={model.manualDay} onChange={model.setManualDay} /></Field></div>
+          <div><Field label="費用（円）" htmlFor="ad-cost-amount-v8"><NumberInput numericText
               id="ad-cost-amount-v8"
               inputMode="numeric"
               value={model.manualAmount}
               onChange={(event: React.ChangeEvent<HTMLInputElement>) => model.setManualAmount(event.target.value)}
-              placeholder="例: 20000"
-            />
-          </div>
+              placeholder="例：20000"
+            /></Field></div>
         </div>
       </Dialog>
 
@@ -639,16 +632,13 @@ function ManualEntryDialogs({ model }: { model: AdV8Model }) {
                 {formatMinor(model.cancelTarget.amountMinor, model.cancelTarget.currency)}
               </strong>
             </p>
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-cancel-reason-v8">取り消す理由（必須）</label>
-              <TextField
+            <div><Field label="取り消す理由" htmlFor="ad-cost-cancel-reason-v8" required><TextField
                 id="ad-cost-cancel-reason-v8"
                 value={model.cancelReason}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) => model.setCancelReason(event.target.value)}
-                placeholder="例: 金額を間違えた"
+                placeholder="例：金額を間違えた"
                 maxLength={200}
-              />
-            </div>
+              /></Field></div>
           </div>
         ) : null}
       </Dialog>
@@ -679,15 +669,15 @@ export function AdMetricsV8() {
       <div className={styles.board} data-design-node="qSTVR">
         <div className={styles.head}>
           <div className={styles.headText}>
-            <p className={styles.headBack}>
+
+            <PageHeading title="広告連携" help={<>
               <Link href="/inflow-links" className={styles.headBackLink}>
                 ← 流入と計測へ
               </Link>
-            </p>
-            <h1 className={styles.headTitle}>広告連携</h1>
-            <p className={styles.headDescription}>
+
               広告をつなぐと毎日自動で費用を取り込みます。取り込めない分（チラシや看板など）は「費用を手で入れる」から足せます。
-            </p>
+            </>} />
+
           </div>
           <div className={styles.headActions}>
             {canEdit ? (
@@ -757,7 +747,7 @@ export function AdMetricsV8() {
               <BadgeDollarSign size={13} aria-hidden="true" />
               成果1件あたり
             </span>
-            <p className={styles.kpiValue}>—</p>
+            <p className={styles.kpiValue}>{emptyValue('unknown')}</p>
             <p className={styles.kpiDetail}>認めた成果の件数は未接続のため表示できません</p>
           </li>
         </ul>
@@ -786,7 +776,7 @@ export function AdMetricsV8() {
                   </div>
                   <p className={styles.providerSub}>
                     {active
-                      ? `最後の取り込み ${synced ?? '—'}・毎日自動`
+                      ? `最後の取り込み ${synced ?? emptyValue('unknown')}・毎日自動`
                       : 'つなぐと費用とクリックを毎日取り込みます'}
                   </p>
                   {active && platform ? (
@@ -873,12 +863,12 @@ export function AdMetricsV8() {
                         </td>
                         <td>
                           <span className={styles.cellEllipsis}>
-                            {platform ? platformLabel(platform) : row.source === 'manual' ? '手入力' : '—'}
+                            {platform ? platformLabel(platform) : row.source === 'manual' ? '手入力' : emptyValue('unknown')}
                           </span>
                         </td>
                         <td>
                           <span className={styles.cellEllipsis} title={refCode ?? undefined}>
-                            {refCode ?? '—'}
+                            {refCode ?? emptyValue('unknown')}
                           </span>
                         </td>
                         <td className={styles.numeric}>
@@ -886,13 +876,13 @@ export function AdMetricsV8() {
                         </td>
                         <td className={styles.numeric}>
                           <span className={styles.cellValue}>
-                            {row.friendAdds == null ? '—' : `${formatNumber(row.friendAdds)}人`}
+                            {row.friendAdds == null ? emptyValue('unknown') : `${formatNumber(row.friendAdds)}人`}
                           </span>
                         </td>
                         <td className={styles.numeric}>
                           <span className={styles.cellValue}>
                             {row.costPerFriendMinor == null
-                              ? '—'
+                              ? emptyValue('unknown')
                               : formatMinor(row.costPerFriendMinor, row.totals[0]?.currency ?? 'JPY')}
                           </span>
                         </td>
@@ -1034,15 +1024,15 @@ export function AdConnectionsV8() {
       <div className={styles.board} data-design-node="FDBsG">
         <div className={styles.head}>
           <div className={styles.headText}>
-            <p className={styles.headBack}>
+
+            <PageHeading title="広告とのつなぎ" help={<>
               <Link href="/inflow-links" className={styles.headBackLink}>
                 ← 流入と計測へ
               </Link>
-            </p>
-            <h1 className={styles.headTitle}>広告とのつなぎ</h1>
-            <p className={styles.headDescription}>
+
               LINE で出た成果を広告へ返し、広告の配信を賢くします。お客様の名前やメールアドレスは広告へ送りません。
-            </p>
+            </>} />
+
           </div>
           <div className={styles.headActions}>
             <Button variant="secondary" href="/inflow-links?tab=connections&view=history">
@@ -1117,7 +1107,7 @@ export function AdConnectionsV8() {
           </li>
           <li className={styles.kpi}>
             <span className={styles.kpiLabel}>やり直して成功</span>
-            <p className={styles.kpiValue}>—</p>
+            <p className={styles.kpiValue}>{emptyValue('unknown')}</p>
             <p className={styles.kpiDetail}>二重にはなっていません</p>
           </li>
         </ul>
@@ -1161,15 +1151,15 @@ export function AdHistoryV8() {
       <div className={styles.board} data-design-node="p0kA3">
         <div className={styles.head}>
           <div className={styles.headText}>
-            <p className={styles.headBack}>
+
+            <PageHeading title="広告への送信履歴" help={<>
               <Link href="/inflow-links?tab=connections" className={styles.headBackLink}>
                 ← 広告とのつなぎへ戻る
               </Link>
-            </p>
-            <h1 className={styles.headTitle}>広告への送信履歴</h1>
-            <p className={styles.headDescription}>
+
               成果と広告のクリックが結びつき、送信処理が始まるとここに並びます。
-            </p>
+            </>} />
+
           </div>
           <div className={styles.headActions}>
             <Button
@@ -1242,7 +1232,7 @@ export function AdHistoryV8() {
                           </td>
                           <td>
                             <span className={styles.cellEllipsis}>
-                              {platform ? platformLabel(platform) : '—'}
+                              {platform ? platformLabel(platform) : emptyValue('unknown')}
                             </span>
                           </td>
                           <td>
@@ -1262,7 +1252,7 @@ export function AdHistoryV8() {
                                 {expanded ? '理由を閉じる' : 'やり直す'}
                               </Button>
                             ) : (
-                              <span className={styles.cellMuted}>—</span>
+                              <span className={styles.cellMuted}>{emptyValue('unknown')}</span>
                             )}
                           </td>
                         </tr>

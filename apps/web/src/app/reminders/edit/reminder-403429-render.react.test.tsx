@@ -105,7 +105,7 @@ describe('D015 リマインダ編集の取得失敗（実描画）', () => {
     render(<Issue469ReminderStepEditor reminderId="r-1" />)
     const alert = await screen.findByRole('alert')
     expect(within(alert).getByText('リマインダを見る権限がありません')).not.toBeNull()
-    expect(within(alert).getByText(/見るには権限が要ります/)).not.toBeNull()
+    expect(within(alert).getByText(/オーナーか管理者に頼んでください/)).not.toBeNull()
     // 押しても直らないので再試行の口は出ない。保存の口もない。
     expect(within(alert).queryByRole('button')).toBeNull()
     expect(screen.queryByText('リマインダを読み込めませんでした')).toBeNull()

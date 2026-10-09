@@ -81,6 +81,8 @@ import { templateDeleteDescription } from './template-delete-message'
 import { messageTypeText } from './template-message-type'
 import styles from './list-v8.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 一覧のタブ。message/question は同じテンプレートの束を中身で分ける。 */
 type Section = 'message' | 'question' | BroadcastAssetKind
@@ -242,9 +244,9 @@ function publishStateOf(t: Template): { label: string; className: string } {
   return { label: '公開中', className: styles.publishPillLive }
 }
 
-/** 一斉配信の状態の札。予約済みは待っている途中、送信済みは終わり。 */
+/** 一斉配信の状態の札。予約中は待っている途中、送信済みは終わり。 */
 function broadcastStatusText(status: string): string {
-  if (status === 'scheduled') return '予約済み'
+  if (status === 'scheduled') return '予約中'
   if (status === 'sending') return '送信中'
   if (status === 'sent') return '送信済み'
   return '下書き'
@@ -625,7 +627,7 @@ export default function TemplatesListV8() {
       icon: FileText,
       value: ready ? tabItems.length : null,
       unit: '件',
-      detail: ready ? `未公開の変更 ${draftChanges}件` : '—',
+      detail: ready ? `未公開の変更 ${draftChanges}件` : emptyValue('unknown'),
     },
     {
       key: 'usage',
@@ -637,7 +639,7 @@ export default function TemplatesListV8() {
         ? usageTotal === null
           ? '使っている所を確認できません'
           : '一斉配信・自動応答・シナリオなど'
-        : '—',
+        : emptyValue('unknown'),
     },
     {
       key: 'monthly',
@@ -649,7 +651,7 @@ export default function TemplatesListV8() {
         ? monthlyTotal === null
           ? '送信数を確認できません'
           : 'このタブのテンプレートから'
-        : '—',
+        : emptyValue('unknown'),
     },
     {
       key: 'unused',
@@ -657,7 +659,7 @@ export default function TemplatesListV8() {
       icon: Mail,
       value: ready ? unusedCount : null,
       unit: '件',
-      detail: ready ? (unusedCount === null ? '使っている所を確認できません' : '整理の候補') : '—',
+      detail: ready ? (unusedCount === null ? '使っている所を確認できません' : '整理の候補') : emptyValue('unknown'),
     },
   ]
 
@@ -820,7 +822,7 @@ export default function TemplatesListV8() {
     } catch (reason) {
       setMoveError(
         reason instanceof ApiError && reason.status === 403
-          ? 'テンプレートを移すには権限が要ります。オーナーか管理者に頼んでください。'
+          ? permissionDeniedMessage('store')
           : 'フォルダへ移せませんでした。状態を読み直してからお試しください。',
       )
     } finally {
@@ -859,7 +861,7 @@ export default function TemplatesListV8() {
     } catch (reason) {
       setDuplicateError(
         reason instanceof ApiError && reason.status === 403
-          ? 'テンプレートを作るには権限が要ります。オーナーか管理者に頼んでください。'
+          ? permissionDeniedMessage('store')
           : '複製できませんでした。状態を読み直してからお試しください。',
       )
     } finally {
@@ -890,7 +892,7 @@ export default function TemplatesListV8() {
     } catch (reason) {
       setBulkDeleteError(
         reason instanceof ApiError && reason.status === 403
-          ? 'テンプレートを削除するには権限が要ります。オーナーか管理者に頼んでください。'
+          ? permissionDeniedMessage('store')
           : '削除できませんでした。状態を読み直してからお試しください。',
       )
     } finally {
@@ -1231,7 +1233,7 @@ export default function TemplatesListV8() {
                     {typeof t.usageCount !== 'number' ? (
                       <span className={styles.usageNone}>使っている所を確認できません</span>
                     ) : t.usageCount === 0 ? (
-                      <span className={styles.usageNone}>なし</span>
+                      <span className={styles.usageNone}>{emptyValue('none')}</span>
                     ) : (
                       <Link
                         href={detailHref(t)}
@@ -1255,7 +1257,7 @@ export default function TemplatesListV8() {
                         {formatNumber(t.monthlySendCount)}<span className={styles.kpiUnit}>通</span>
                       </span>
                     ) : (
-                      <span className={styles.usageNone}>—</span>
+                      <span className={styles.usageNone}>{emptyValue('unknown')}</span>
                     )}
                   </td>
                   <td className={styles.dateCell} title={formatDateTime(t.updatedAt)}>
@@ -1265,7 +1267,7 @@ export default function TemplatesListV8() {
                     <button
                       type="button"
                       className={styles.menuButton}
-                      title={`テンプレート「${t.name}」の操作`}
+                      title={`テンプレート「${t.name}」の操作`} aria-label={`テンプレート「${t.name}」の操作`}
                       aria-expanded={openMenuId === t.id}
                       onClick={() => setOpenMenuId((current) => (current === t.id ? null : t.id))}
                     >
@@ -1418,7 +1420,7 @@ export default function TemplatesListV8() {
               <div key={kpi.key} className={styles.kpi}>
                 <span className={styles.kpiLabel}><kpi.icon size={13} aria-hidden="true" />{kpi.title}</span>
                 <p className={styles.kpiValue}>
-                  {kpi.value === null ? '—' : formatNumber(kpi.value)}
+                  {kpi.value === null ? emptyValue('unknown') : formatNumber(kpi.value)}
                   <span className={styles.kpiUnit}>{kpi.value === null ? '' : kpi.unit}</span>
                 </p>
                 <p className={styles.kpiDetail}>{kpi.detail}</p>
@@ -1597,7 +1599,7 @@ export default function TemplatesListV8() {
                     {typeof activeTemplate.usageCount !== 'number'
                       ? '使っている所を確認できません'
                       : activeTemplate.usageCount === 0
-                        ? 'なし'
+                        ? emptyValue('none')
                         : `${activeTemplate.usageCount}か所`}
                   </p>
                   {panelMove ? (
@@ -1843,7 +1845,7 @@ export default function TemplatesListV8() {
           kind="template"
           accountId={selectedAccountId}
           note="テンプレートを分けてしまう箱です。削除しても、中のテンプレートは未分類に残ります。"
-          placeholder="例: 01_定期便"
+          placeholder="例：01_定期便"
           onClose={() => setFolderDialogOpen(false)}
           onAdded={() => { setFolderDialogOpen(false); void loadFolders() }}
         />
@@ -1855,7 +1857,7 @@ export default function TemplatesListV8() {
           folder={editingFolder}
           accountId={selectedAccountId}
           note="テンプレートを分けてしまう箱です。削除しても、中のテンプレートは未分類に残ります。"
-          placeholder="例: 01_定期便"
+          placeholder="例：01_定期便"
           onClose={() => setEditingFolder(null)}
           onAdded={() => { setEditingFolder(null); void loadFolders() }}
         />

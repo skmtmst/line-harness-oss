@@ -39,6 +39,8 @@ import {
   earningRuleCancellationEvent,
 } from './rule-fields'
 import styles from './create.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 const DAILY_CAPS = [
   ['', '制限なし'],
@@ -53,7 +55,7 @@ const LIST_HREF = '/mileage?tab=earning-rules'
 
 /** 数を桁区切りで出す。取れていない数は「—」。 */
 const miles = (value: number | null | undefined) =>
-  typeof value === 'number' && Number.isFinite(value) ? formatNumber(value) : '—'
+  typeof value === 'number' && Number.isFinite(value) ? formatNumber(value) : emptyValue('unknown')
 
 /** 競合の帯の「だれが・いつ」。口が返したときだけ使う（無ければ言い切らない）。 */
 function conflictWho(data: unknown): { who: string | null; at: string | null } {
@@ -261,7 +263,7 @@ export default function EarningRuleCreateV8() {
     </div>
   ) : null
 
-  const trialValue = (filled: string) => (trialBusy ? '数えています…' : trial ? filled : '—')
+  const trialValue = (filled: string) => (trialBusy ? '数えています…' : trial ? filled : emptyValue('unknown'))
   const preview = (
     <div className={styles.side}>
       <section className={styles.sideCard} aria-labelledby="er-new-trial">
@@ -290,7 +292,7 @@ export default function EarningRuleCreateV8() {
                 <HelpTip label="倍率の説明">倍率はタグ側の設定で決まります。優先度がいちばん高いタグ1枚だけが効きます。</HelpTip>
               ) : null}
             </dt>
-            <dd>{`${validAmount ? miles(value) : '—'}${dailyCap ? `（1日${dailyCap} 回まで）` : ''}`}</dd>
+            <dd>{`${validAmount ? miles(value) : emptyValue('unknown')}${dailyCap ? `（1日${dailyCap}回まで）` : ''}`}</dd>
           </div>
         </dl>
       </section>
@@ -309,7 +311,7 @@ export default function EarningRuleCreateV8() {
     <CreatePage
       boardId={conflict ? 'BnrQp' : 'ctLwT'}
       title="たまる決めごとを作る"
-      description="どの行動で・何マイル・だれに付けるかを決めます。作った日からの行動に付きます（さかのぼらない）。"
+      help="どの行動で・何マイル・だれに付けるかを決めます。作った日からの行動に付きます（さかのぼらない）。"
       notice={conflictBand}
       preview={preview}
       footerActions={(
@@ -380,7 +382,7 @@ export default function EarningRuleCreateV8() {
         <div className={styles.fieldRow}>
           <div className={styles.field}>
             <Field label="マイル" htmlFor="er-amount" error={errorOf('er-amount')}>
-              <TextField id="er-amount" type="number" min={1} aria-label="マイル" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <NumberInput id="er-amount" type="number" min={1} aria-label="マイル" value={amount} onChange={(e) => setAmount(e.target.value)} />
             </Field>
           </div>
           <div className={styles.field}>
@@ -464,7 +466,7 @@ export default function EarningRuleCreateV8() {
           <div className={styles.detailsBody}>
             <Field label="付いたマイルの有効期限" htmlFor="er-expiry" error={errorOf('er-expiry')}>
               <span className={styles.inlineRow}>
-                <TextField id="er-expiry" type="number" min={1} max={3650} value={expiresAfterDays} onChange={(e) => setExpiresAfterDays(e.target.value)} aria-label="有効期限の日数" />
+                <NumberInput id="er-expiry" type="number" min={1} max={3650} value={expiresAfterDays} onChange={(e) => setExpiresAfterDays(e.target.value)} aria-label="有効期限の日数" />
                 <span className={styles.cardNote}>日後（空欄なら期限なし）</span>
               </span>
             </Field>

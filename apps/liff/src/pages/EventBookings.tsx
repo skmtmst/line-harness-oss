@@ -236,20 +236,16 @@ export default function EventBookings() {
                   { key: 'past', label: 'これまで' },
                 ] as const
               ).map((t) => (
-                <button
+                <Button variant="text"
                   key={t.key}
                   type="button"
                   role="tab"
                   aria-selected={tab === t.key}
                   onClick={() => setTab(t.key)}
-                  className={`liff-hit flex h-8 flex-1 items-center justify-center rounded-lg px-1 text-xs focus-visible:outline-2 focus-visible:outline-ink ${
-                    tab === t.key
-                      ? 'bg-canvas font-bold text-ink'
-                      : 'font-semibold text-liff-sub'
-                  }`}
+                  className="flex-1"
                 >
                   {t.label}
-                </button>
+                </Button>
               ))}
             </div>
             {actionError && (
@@ -300,40 +296,40 @@ export default function EventBookings() {
                             {/* 板 y1bs9A：変える・キャンセルは文の列の下に小さく並べる。 */}
                             {canCancel(b) && (
                               <div className="flex items-center gap-2 pt-1.5">
-                                <button
+                                <Button variant="text"
                                   type="button"
                                   onClick={() => {
                                     void openChange(b);
                                   }}
                                   disabled={busy}
-                                  className="liff-hit inline-flex items-center justify-center rounded-lg border border-hairline bg-canvas px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
+
                                 >
                                   時間を変える
-                                </button>
-                                <button
+                                </Button>
+                                <Button variant="text"
                                   type="button"
                                   onClick={() => {
                                     setActionError(null);
                                     setPendingCancel(b);
                                   }}
                                   disabled={busy}
-                                  className="liff-hit inline-flex items-center justify-center rounded-lg border border-danger/40 bg-canvas px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-danger focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
+
                                 >
                                   キャンセルする
-                                </button>
+                                </Button>
                               </div>
                             )}
                           </div>
-                          <button
+                          <Button variant="secondary"
                             type="button"
                             aria-label={`${b.event_name}のイベントを見る`}
                             onClick={() =>
                               navigate({ pathname: `/events/${b.event_id}`, search })
                             }
-                            className="liff-hit flex h-11 w-[18px] shrink-0 items-center justify-center text-ink-faint focus-visible:outline-2 focus-visible:outline-ink"
+                            className="shrink-0"
                           >
                             <Icon name="chevron-right" className="h-[18px] w-[18px]" />
-                          </button>
+                          </Button>
                         </div>
                       </Card>
                     </li>
@@ -409,7 +405,7 @@ export default function EventBookings() {
                   const selected = pendingChange.selectedSlotId === s.id;
                   return (
                     <li key={s.id}>
-                      <button
+                      <Button variant="slot-row"
                         type="button"
                         disabled={disabled}
                         aria-pressed={selected}
@@ -418,13 +414,7 @@ export default function EventBookings() {
                             prev ? { ...prev, selectedSlotId: s.id, changeError: null } : prev,
                           )
                         }
-                        className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-(--liff-radius) border px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-ink disabled:cursor-not-allowed ${
-                          disabled
-                            ? 'border-hairline bg-shell-gray'
-                            : selected
-                              ? 'border-liff-primary bg-liff-primary'
-                              : 'border-hairline bg-canvas'
-                        }`}
+
                       >
                         <span
                           className={`liff-num text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-(--liff-on-primary)' : 'text-ink'}`}
@@ -437,7 +427,7 @@ export default function EventBookings() {
                         >
                           {current ? '今の時間' : full ? '満席' : '空きあり'}
                         </span>
-                      </button>
+                      </Button>
                     </li>
                   );
                 })}

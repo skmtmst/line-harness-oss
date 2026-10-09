@@ -1,7 +1,7 @@
 import { useSyncExternalStore, type ReactNode } from 'react'
 import { CloudOff, FileSearch, List, RotateCw, SearchX } from 'lucide-react'
 import Button from './button'
-import { loadFailureCopy } from './api-error-message'
+import { loadFailureCopy, type PermissionScope } from './api-error-message'
 import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
 import styles from './target-missing.module.css'
 
@@ -44,6 +44,7 @@ const ICONS = {
 } as const
 
 export type TargetMissingProps = {
+  permissionScope?: PermissionScope
   kind: TargetMissingKind
   /** 「何が」＋「どうなっているか」の1文。 */
   title: string
@@ -73,6 +74,7 @@ export type TargetMissingProps = {
 
 export default function TargetMissing({
   kind,
+  permissionScope = 'store',
   title,
   description,
   backHref,
@@ -94,7 +96,7 @@ export default function TargetMissing({
   const showBack = (kind === 'unspecified' || kind === 'not-found') && backHref && backLabel
   // 403 は押しても直らないので、再試行の口は出さない。
   // 文言は画面の指定どおり（出し分け文言が要るときは ListState の `error` を使う）。
-  const failure = kind === 'error' && error !== undefined ? loadFailureCopy(error, 'この画面') : null
+  const failure = kind === 'error' && error !== undefined ? loadFailureCopy(error, 'この画面', permissionScope) : null
   const showRetry = kind === 'error' && (failure && !failure.retryable ? undefined : onRetry)
   const accountLine =
     kind === 'not-found' && accountName ? `いまの LINE アカウントは「${accountName}」です。` : null
@@ -130,7 +132,7 @@ export default function TargetMissing({
       </div>
       <p className={styles.title}>{shownTitle}</p>
       <p className={styles.description}>
-        {description}
+        {failure && !failure.retryable ? failure.description : description}
         {accountLine ? <span> {accountLine}</span> : null}
       </p>
       {action ? <div className={styles.action}>{action}</div> : null}

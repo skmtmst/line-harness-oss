@@ -48,7 +48,9 @@ import {
 import styles from './accounts.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
-
+import { Field } from '@/components/shared/form-controls'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const TITLE = 'LINEアカウント'
 const DESCRIPTION = 'musubo でつないでいる LINE 公式アカウントです。既定のアカウントと、親子（本店と支店など）を決めます。'
@@ -97,7 +99,7 @@ export default function AccountsV8() {
   const ready = status === 'ready'
   // 未取得（読み込み中・取得失敗）を 0 と出さない。成功した空一覧だけ 0。
   const kpis = ready ? accountKpis(accounts) : null
-  const filterCount = (value: AccountFilter) => (ready ? accounts.filter((a) => matchesFilter(a, value)).length : '—')
+  const filterCount = (value: AccountFilter) => (ready ? accounts.filter((a) => matchesFilter(a, value)).length : emptyValue('unknown'))
 
   /** このアカウントの接続を、新しく確かめ直す。一覧全体を最新で取り直す。 */
   const recheck = useCallback(async (account: LineAccount) => {
@@ -147,7 +149,7 @@ export default function AccountsV8() {
         setStepUp({ purpose: 'line_account.credentials', action: `「${restoreTarget.name}」をアーカイブから戻す`, retry: runRestore })
         return
       }
-      setDialogError(describeSaveFailure(caught))
+      setDialogError(withPermissionFailure(caught, describeSaveFailure(caught), 'store'))
     } finally {
       setBusy(false)
     }
@@ -180,14 +182,14 @@ export default function AccountsV8() {
 
   return (
     <>
-      <SettingsPage layout="accounts" help="行の「…」から 詳細・接続をもう一度確かめる・既定にする・引き継ぎ（UID の移行）・アーカイブ。" boardId="V7vn3" title={TITLE} description={DESCRIPTION} actions={headActions} navigation={<SettingsInnerNav inline />}>
+      <SettingsPage layout="accounts" help={<>{DESCRIPTION}{"行の「…」から 詳細・接続をもう一度確かめる・既定にする・引き継ぎ（UID の移行）・アーカイブ。"}</>} boardId="V7vn3" title={TITLE}  actions={headActions} navigation={<SettingsInnerNav inline />}>
         {notice ? (
           <Notice tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} onClose={() => setNotice(null)} />
         ) : null}
 
         <KpiBand data-design="KPIs">
           <KpiCard title="つないでいる" value={kpis?.connected} unit="アカウント" detail={null} />
-          <KpiCard title="稼働中" value={kpis?.active} unit="件" detail={null} />
+          <KpiCard title="有効" value={kpis?.active} unit="件" detail={null} />
           <KpiCard title="接続に問題" value={kpis?.problem} unit="件" detail={null} valueTone={(kpis?.problem ?? 0) > 0 ? 'warning' : 'default'} />
           <KpiCard title="友だちの合計" value={kpis?.friends} unit="人" detail={null} />
         </KpiBand>
@@ -257,11 +259,11 @@ export default function AccountsV8() {
                   </div></Td>
                   <Td className={styles.colConn}><StatusBadge tone={connection.tone}>{connection.label}</StatusBadge></Td>
                   <Td className={styles.colHook}>
-                    {archived ? <span className={styles.faint}>—</span> : <StatusBadge tone={webhook.tone}>{webhook.label}</StatusBadge>}
+                    {archived ? <span className={styles.faint}>{emptyValue('unknown')}</span> : <StatusBadge tone={webhook.tone}>{webhook.label}</StatusBadge>}
                   </Td>
                   <Td className={`${styles.colFriends} ${friends === '—' ? styles.faint : ''}`}>{friends}</Td>
                   <Td className={`${styles.colDefault} ${account.isDefault ? '' : styles.faint}`}>
-                    {account.isDefault ? <span aria-label="既定のアカウント">★</span> : '—'}
+                    {account.isDefault ? <span aria-label="既定のアカウント">★</span> : emptyValue('unknown')}
                   </Td>
                   <Td className={`${styles.colParent} ${parent === '—' ? styles.faint : ''}`} title={parent}>{parent}</Td>
                   <Td className={styles.colMenu}><div className={styles.menuBox}>
@@ -295,17 +297,14 @@ export default function AccountsV8() {
         onCancel={() => { if (!busy) { setArchiveTarget(null); setArchiveReason(''); setDialogError('') } }}
         onConfirm={() => void runArchive()}
       >
-        <label className={styles.reason}>
-          <span className={styles.reasonLabel}>アーカイブの理由（任意）</span>
-          <TextArea
+        <Field label="アーカイブの理由"><TextArea
             rows={2}
             maxLength={500}
-            placeholder="例: 使わなくなった旧店舗のアカウント"
+            placeholder="例：使わなくなった旧店舗のアカウント"
             value={archiveReason}
             onChange={(e) => setArchiveReason(e.target.value)}
             disabled={busy}
-          />
-        </label>
+          /></Field>
       </ConfirmDialog>
 
       <ConfirmDialog
@@ -333,7 +332,7 @@ function archiveFailureMessage(caught: unknown): string {
     if (messages.length > 0) return messages.join(' / ')
     return 'このアカウントはいまアーカイブできません。止まっているか、既定でないかを確かめてください。'
   }
-  return describeSaveFailure(caught)
+  return withPermissionFailure(caught, describeSaveFailure(caught), 'store')
 }
 
 const ARCHIVE_BLOCKER_MESSAGES: Record<string, string> = {

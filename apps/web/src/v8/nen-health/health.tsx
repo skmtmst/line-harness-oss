@@ -40,6 +40,7 @@ import HealthItemsV8 from './items'
 import SummaryDrawerV8, { SummarySheet } from './summary'
 import { EMPTY_FILTERS, Pill, RowMenu, WeightBars, changeBadges, md, rangeText, type HealthFilters, type HealthTabKey } from './parts'
 import styles from './health.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export type { HealthTabKey } from './parts'
 
@@ -176,7 +177,7 @@ export default function HealthV8({
       boardId={BOARD[tab]}
       headingSize="regular"
       title="健康日記"
-      description="お客さまがマイページで付けたペットの記録（体重・食事・うんち・元気）を見ます。気になる変化を見つけて声をかけられます。"
+      help="お客さまがマイページで付けたペットの記録（体重・食事・うんち・元気）を見ます。気になる変化を見つけて声をかけられます。"
       actions={(
         <Button type="button" onClick={() => window.print()} disabled={!canPrint} title={canPrint ? 'ブラウザの印刷で PDF に保存します' : '一覧の行の「…」から「30日のまとめ」を開くと書き出せます'}>
           <FileText size={15} aria-hidden="true" />獣医師向け PDF を書き出す
@@ -417,10 +418,10 @@ function HealthRow({ row, onOpenSummary, onOpenPdf }: { row: NenHealthRow; onOpe
         </span>
       </Td>
       <Td className={styles.colOwner}><span className={styles.cell} title={row.owner.name}>{row.owner.name || '（名前なし）'}</span></Td>
-      <Td className={styles.colLast}><span className={styles.cell} title={row.lastLoggedLabel}>{row.lastLoggedOn ? md(row.lastLoggedOn) : '—'}</span></Td>
+      <Td className={styles.colLast}><span className={styles.cell} title={row.lastLoggedLabel}>{row.lastLoggedOn ? md(row.lastLoggedOn) : emptyValue('unknown')}</span></Td>
       <Td className={styles.colCount}><span className={styles.num}>{`${row.count30d} 日`}</span></Td>
       <Td className={styles.colWeight}><WeightBars series={row.weightSeries} warn={weightWarn} /></Td>
-      <Td className={styles.colStool}><span className={styles.cell}>{row.latestStool && row.latestAppetite ? `${row.latestStool}・${row.latestAppetite}` : '—'}</span></Td>
+      <Td className={styles.colStool}><span className={styles.cell}>{row.latestStool && row.latestAppetite ? `${row.latestStool}・${row.latestAppetite}` : emptyValue('unknown')}</span></Td>
       <Td className={styles.colChange}>
         <span className={styles.badges}>
           {changeBadges(row).map((badge) => <Pill key={badge.key} tone={badge.tone} title={badge.detail}>{badge.label}</Pill>)}

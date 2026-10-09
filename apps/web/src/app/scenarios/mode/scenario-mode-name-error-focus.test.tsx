@@ -67,7 +67,7 @@ async function mount() {
 }
 
 function nameInput(): HTMLInputElement {
-  const input = host.querySelector('input[placeholder="例: 友だち追加ウェルカム"]') as HTMLInputElement
+  const input = host.querySelector("input[placeholder=\"例：友だち追加ウェルカム\"]") as HTMLInputElement
   expect(input, 'シナリオ名の入力欄が見つかりません').toBeTruthy()
   return input
 }

@@ -27,6 +27,7 @@ import type { FileScanItem } from '@/lib/api'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import { FILE_SCAN_PAGE_SIZE, useFileScan } from './use-file-scan'
 import styles from './screen.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const TITLE = 'ファイルの検査'
 const DESCRIPTION = '上げたファイルに危ないものがないかを確かめます'
@@ -211,7 +212,7 @@ export default function FileScanScreen() {
 
   if (phase === 'loading' || phase === 'error' || phase === 'forbidden' || !selectedAccountId) {
     return (
-      <SbSettingsScreen boardId="PfA4o" title={TITLE} description={DESCRIPTION}>
+      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}>
         {phase === 'loading' ? (
           <ListState kind="loading" />
         ) : phase === 'error' ? (
@@ -241,7 +242,7 @@ export default function FileScanScreen() {
   const externalOn = Boolean(config?.externalProvider && config?.externalEndpointUrl)
 
   return (
-    <SbSettingsScreen boardId="PfA4o" title={TITLE} description={DESCRIPTION}>
+    <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}>
       <Notice tone="info">確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。</Notice>
 
       {actionError && !configServerError ? <Notice tone="danger" message={actionError} /> : null}
@@ -296,7 +297,7 @@ export default function FileScanScreen() {
                   {item.filename}
                   {item.releasedAt ? <span className={styles.released}>戻した</span> : null}
                 </GridCell>
-                <GridCell role="cell" className={styles.cell} title={item.uploaderLabel ?? '—'}>{item.uploaderLabel ?? '—'}</GridCell>
+                <GridCell role="cell" className={styles.cell} title={item.uploaderLabel ?? emptyValue('unknown')}>{item.uploaderLabel ?? emptyValue('unknown')}</GridCell>
                 <GridCell role="cell" className={styles.cell} data-tone={reasonTone(item)} title={item.reasonLabel ?? '確認が必要です'}>
                   {item.reasonLabel ?? '確認が必要です'}
                 </GridCell>
@@ -318,7 +319,7 @@ export default function FileScanScreen() {
                       />
                     </span>
                   ) : (
-                    <span className={styles.muted}>—</span>
+                    <span className={styles.muted}>{emptyValue('unknown')}</span>
                   )}
                 </GridCell>
               </GridRow>

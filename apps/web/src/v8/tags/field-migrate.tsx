@@ -32,6 +32,9 @@ import { FIELD_TYPE_HINTS } from '@/components/friend-fields/field-list'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { FIELD_TYPE_WORDS } from './field-editor'
 import styles from './create.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 const TYPES = Object.keys(FIELD_TYPE_WORDS) as FriendFieldType[]
 
@@ -147,7 +150,7 @@ function FieldMigrate() {
         // ATTR-11: 失敗は loadError へ。項目未発見（!source）と混ぜない。
         if (!active) return
         if (reason instanceof ApiError && reason.status === 403) {
-          setLoadError('友だち情報欄を見る権限がありません。オーナーか管理者に確認してください。')
+          setLoadError(permissionDeniedMessage('store'))
           setLoadForbidden(true)
         } else {
           setLoadError('項目を読み込めませんでした')
@@ -247,7 +250,7 @@ function FieldMigrate() {
       if (status === 409) {
         setError(`同じ差し込み名「${params.fieldKey}」の別の項目があります。一覧を確認してください`)
       } else {
-        setError(describeSaveFailure(reason))
+        setError(withPermissionFailure(reason, describeSaveFailure(reason), 'store'))
       }
       return null
     }
@@ -431,7 +434,7 @@ function FieldMigrate() {
       <ListState
         kind="forbidden"
         title="友だち情報欄を見る権限がありません"
-        description="オーナーか管理者に確認してください。"
+        description={permissionDeniedMessage('store')}
         action={<Button href="/tags?tab=fields">友だち情報欄の一覧へ戻る</Button>}
       />
     )
@@ -471,7 +474,7 @@ function FieldMigrate() {
     <CreatePage
       boardId="GobMd"
       title={`「${source.name}」の種類を変える`}
-      description={`今の種類：${FIELD_TYPE_WORDS[source.type]}・${usage}`}
+      help={`今の種類：${FIELD_TYPE_WORDS[source.type]}・${usage}`}
       identity={back}
       status={status}
       footerActions={<>
@@ -555,14 +558,8 @@ function FieldMigrate() {
             />
             {targetMode === 'new' ? (
               <div className={styles.twoCols}>
-                <label className={styles.field}>
-                  <span className={styles.label}>新しい項目の名前</span>
-                  <input className={styles.input} value={targetName} onChange={(event) => { setTargetName(event.target.value); resetConfirmation() }} />
-                </label>
-                <label className={styles.field}>
-                  <span className={styles.label}>差し込みの名前</span>
-                  <input className={styles.input} value={targetKey} onChange={(event) => { setTargetKey(event.target.value); resetConfirmation() }} />
-                </label>
+                <Field label="新しい項目の名前"><input className={styles.input} value={targetName} onChange={(event) => { setTargetName(event.target.value); resetConfirmation() }} /></Field>
+                <Field label="差し込みの名前"><input className={styles.input} value={targetKey} onChange={(event) => { setTargetKey(event.target.value); resetConfirmation() }} /></Field>
               </div>
             ) : (
               <div className={styles.field}>

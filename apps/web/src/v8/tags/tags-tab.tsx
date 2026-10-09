@@ -74,6 +74,7 @@ import {
 } from '@/components/friend-fields/tags-page-v4'
 import styles from './list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 付け方の呼び名（絵 I1E7Bt の「EC 連携・LINE ログイン・EC 購入・誕生日のきまり」）。v7 の呼び名（tags-page-v4）は触らない。 */
 const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
@@ -84,7 +85,7 @@ const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
   manual: '手動',
   birthday: '誕生日のきまり',
 }
-const sourceLabel = (tag: Tag): string => (tag.assignSource ? SOURCE_LABELS[tag.assignSource] : '—')
+const sourceLabel = (tag: Tag): string => (tag.assignSource ? SOURCE_LABELS[tag.assignSource] : emptyValue('unknown'))
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -119,7 +120,7 @@ export function tagLinkText(tag: Tag): string {
   if (tag.mileageMultiplierBps) main.push(`${tag.mileageMultiplierBps / 10000}倍`)
   const parts = main.length ? [main.join('・')] : []
   if (tag.otherActionCount) parts.push(`他${tag.otherActionCount}`)
-  return parts.length ? parts.join(' ') : '—'
+  return parts.length ? parts.join(' ') : emptyValue('unknown')
 }
 
 /**
@@ -170,7 +171,7 @@ function TagFolderDialog({
       description="タグを分けてしまう箱です。消しても、入っていたタグは未分類として残ります。"
       name={name} onNameChange={setName} color={color} onColorChange={setColor}
       colors={TAG_FOLDER_COLORS}
-      placeholder="例: VIP" busy={saving} error={error || undefined}
+      placeholder="例：VIP" busy={saving} error={error || undefined}
       onCancel={onClose} onConfirm={() => void save()} confirmLabel={group ? '保存する' : 'フォルダを作る'}
     />
   )
@@ -480,7 +481,7 @@ export default function TagsTab({
       { id: 'copy', label: '複製して作る', external: true, onSelect: () => router.push(`/tags/new?copy=${tag.id}`) },
       { id: 'move', label: 'フォルダへ移す', onSelect: () => setMenuMoveFor(tag.id) },
     ]
-    /* 保管済みに戻す口は無いため、同じ確認を繰り返さない（v7 R190）。 */
+    /* アーカイブに戻す口は無いため、同じ確認を繰り返さない（v7 R190）。 */
     if (tag.status !== 'archived') {
       list.push({
         id: 'archive',
@@ -736,7 +737,7 @@ export default function TagsTab({
                         )}
                       </span>
                       <TagPill name={tag.name} color={group ? folderDisplayColor(group) : null} size="sm" compactAtNarrow href={editHref} />
-                      {tag.status === 'archived' ? <StatusBadge size="annotation" dot={false}>保管済み</StatusBadge> : null}
+                      {tag.status === 'archived' ? <StatusBadge size="annotation" dot={false}>アーカイブ</StatusBadge> : null}
                       {tag.cleanupReasons?.includes('duplicate_name') ? (
                         <StatusBadge size="annotation" tone="warning" dot={false} title="正規化した名前がほかのタグと重なっています。整理候補です。">名前が重なっている</StatusBadge>
                       ) : null}

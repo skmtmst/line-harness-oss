@@ -42,7 +42,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { TextArea, TextInput } from '@/components/shared/form-controls'
 import ConditionBuilder, { pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
 import { firstReminderStepMessage, reminderStepTimings, reminderStopSummary, reminderTriggerLabel, renderReminderBodySample } from '@/components/reminders/reminder-labels'
@@ -62,6 +62,8 @@ import { ChoiceCardV8, PhoneAsideV8, SummaryCardV8, WizardFooterV8, WizardHeadV8
 import { describeReminderDiff } from './reminder-conflict-diff'
 import styles from '../wizard-v8.module.css'
 import { formatNumber } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 /*
  * ★V8 リマインダを作る・手順2〜5と完了。
@@ -820,14 +822,14 @@ function TargetStageV8({
               <div className={styles.countItem}>
                 <span className={styles.countLabel}>当てはまる人</span>
                 <strong className={styles.countValue}>
-                  {counting ? '…' : total == null ? '—' : formatNumber(total)}
+                  {counting ? '…' : total == null ? emptyValue('unknown') : formatNumber(total)}
                   <span className={styles.countValueUnit}>人</span>
                 </strong>
               </div>
               <div className={styles.countItem}>
                 <span className={styles.countLabel}>送る予定（ブロックを除く）</span>
                 <strong className={styles.countValue}>
-                  {counting ? '…' : matched == null ? '—' : formatNumber(matched)}
+                  {counting ? '…' : matched == null ? emptyValue('unknown') : formatNumber(matched)}
                   <span className={styles.countValueUnit}>人</span>
                 </strong>
               </div>
@@ -860,7 +862,7 @@ function TargetStageV8({
                   <span className={styles.stopTitle}>予約がキャンセルされた</span>
                   <span className={styles.stopNote}>すぐ止める</span>
                 </span>
-                <Toggle
+                <SettingCheckbox
                   label="予約がキャンセルされたら止める"
                   checked={stop.bookingCancelled}
                   onChange={(next) => onChange({ ...settings, stopConditions: { ...stop, bookingCancelled: next } })}
@@ -871,7 +873,7 @@ function TargetStageV8({
                   <span className={styles.stopTitle}>対応マークが「完了」になった</span>
                   <span className={styles.stopNote}>残りを止める</span>
                 </span>
-                <Toggle
+                <SettingCheckbox
                   label="対応マークが完了になったら止める"
                   checked={stop.supportMarkCompleted}
                   onChange={(next) => onChange({ ...settings, stopConditions: { ...stop, supportMarkCompleted: next } })}
@@ -882,7 +884,7 @@ function TargetStageV8({
                   <span className={styles.stopTitle}>基準日を7日過ぎた</span>
                   <span className={styles.stopNote}>自動で終わる</span>
                 </span>
-                <Toggle
+                <SettingCheckbox
                   label="基準日を7日過ぎたら自動で終わる"
                   checked={stop.daysAfterTarget != null}
                   onChange={(next) => onChange({ ...settings, stopConditions: { ...stop, daysAfterTarget: next ? 7 : null } })}
@@ -894,7 +896,7 @@ function TargetStageV8({
                   <span className={styles.stopNote}>すぐ止める（変えられません）</span>
                 </span>
                 {/* ブロックはLINE側で止まる。切っても届かないので、変えられない入口として出す。 */}
-                <Toggle label="友だちがブロックしたら止める" checked locked />
+                <SettingCheckbox label="友だちがブロックしたら止める" checked locked />
               </div>
             </div>
           </section>
@@ -915,7 +917,7 @@ function TargetStageV8({
           <SummaryCardV8
             rows={[
               { key: '基準日', value: reminderTriggerLabel(settings.triggerType) },
-              { key: '対象者', value: matched == null ? '—' : `${formatNumber(matched)}人に送る予定` },
+              { key: '対象者', value: matched == null ? emptyValue('unknown') : `${formatNumber(matched)}人に送る予定` },
               { key: '通知', value: settings.steps.length > 0 ? `${settings.steps.length}通` : '手順3で作る' },
               { key: '状態', value: '下書き' },
             ]}
@@ -1198,7 +1200,7 @@ function TimingEditor({
     return (
       <div className={styles.timingRow}>
         <span>基準日の</span>
-        <TextInput
+        <NumberInput unit="日"
           type="number"
           min={0}
           max={365}
@@ -1210,7 +1212,7 @@ function TimingEditor({
             if (Number.isInteger(next) && next >= 0) onChange({ offsetDays: after ? next : -next })
           }}
         />
-        <span>日</span>
+
         <Select
           value={after ? 'after' : 'before'}
           onChange={(next) => onChange({ offsetDays: next === 'after' ? days : -days })}
@@ -1244,7 +1246,7 @@ function TimingEditor({
   return (
     <div className={styles.timingRow}>
       <span>基準日の</span>
-      <TextInput
+      <NumberInput
         type="number"
         min={0}
         aria-label="基準日からの時間"
@@ -1391,7 +1393,7 @@ function ScheduleStageV8({
           <SummaryCardV8
             rows={[
               { key: '基準日', value: reminderTriggerLabel(settings.triggerType) },
-              { key: '対象者', value: preview ? countLabel(preview.summary.audience, '人') : '—' },
+              { key: '対象者', value: preview ? countLabel(preview.summary.audience, '人') : emptyValue('unknown') },
               { key: '通知', value: `${settings.steps.length}通` },
               { key: '状態', value: '下書き' },
             ]}
@@ -1621,7 +1623,7 @@ function ConfirmStageV8({
           <SummaryCardV8
             rows={[
               { key: '基準日', value: reminderTriggerLabel(settings.triggerType) },
-              { key: '対象者', value: validation?.audience.matched != null ? `${formatNumber(validation.audience.matched)}人` : '—' },
+              { key: '対象者', value: validation?.audience.matched != null ? `${formatNumber(validation.audience.matched)}人` : emptyValue('unknown') },
               { key: '通知', value: `${settings.steps.length}通` },
               { key: '状態', value: '下書き → 有効にする', strong: true },
             ]}

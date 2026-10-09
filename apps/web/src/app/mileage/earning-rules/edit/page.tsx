@@ -192,7 +192,7 @@ function EditMileageRuleInner() {
     <>
       <CreatePage
         title="たまる決めごとを編集"
-        description="下書きを直します。動いている内容は変わりません——一覧の「公開して反映」でだけ反映されます。"
+        help="下書きを直します。動いている内容は変わりません——一覧の「公開して反映」でだけ反映されます。"
         parent={['マイル', '/mileage?tab=earning-rules']}
         saveLabel="下書きを保存"
         showHeader={false}

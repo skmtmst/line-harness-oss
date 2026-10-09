@@ -147,6 +147,7 @@ describe('V8 ウェビナーの編集', () => {
     nav.search = 'id=webinar-1&pane=participants'
     await render(<WebinarEditV8 />)
     expect(host.textContent).toContain('NEN活用スタートセミナー')
+    await act(async () => { (host.querySelector('button[aria-label$="の説明"]') as HTMLButtonElement)?.click() })
     expect(host.textContent).toContain('オンデマンド・いつでも視聴・公開中（版 3）')
     const tabs = host.querySelector('[data-wc-tabs="true"]')
     expect(tabs?.textContent).toContain('参加者 124')
@@ -157,15 +158,15 @@ describe('V8 ウェビナーの編集', () => {
     expect(host.textContent).toContain('見ていない・見逃し案内の対象')
     const chat = host.querySelector('a[href="/chats?friend=f-1"]')
     expect(chat?.textContent).toContain('チャットを見る')
-    expect(buttonText('CSV で書き出す')).toBeTruthy()
+    expect(buttonText('CSVで書き出す')).toBeTruthy()
   })
 
   it('分析のフォーム送信はAPIの重複を除いた人数として帯と棒の両方に表示する', async () => {
     nav.search = 'id=webinar-1&pane=analytics'
     await render(<WebinarEditV8 />)
     const funnel = host.querySelector('#webinar-analytics-funnel')
-    const row = [...(funnel?.querySelectorAll('li') ?? [])].find((item) => item.textContent?.includes('フォーム送信'))
-    expect(row?.textContent).toContain('9 人')
+    const row = [...(funnel?.querySelectorAll('button') ?? [])].find((item) => item.textContent?.includes('フォーム送信'))
+    expect(row?.textContent).toContain('9人')
     const stats = host.querySelector('[data-template-region="stats"]')
     expect(stats?.textContent).toContain('フォーム送信?9人')
     expect(stats?.textContent).not.toContain('フォーム送信?9件')

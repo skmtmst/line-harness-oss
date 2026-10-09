@@ -19,12 +19,13 @@ import IconButton from '@/components/shared/icon-button'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { restaurantTestApi, type RestaurantReservation, type RestaurantTable } from '@/lib/restaurant-test-api'
 import { STAY_MINUTES, freeTables, openTimes, startOf, tableNote, toYmd } from './slots'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError } from '@/components/shared/form-controls'
 import styles from './front-desk.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 type Friend = { name: string; phone: string; lineUid: string }
 type DayChoice = 'today' | 'tomorrow' | 'pick'
@@ -179,10 +180,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
   return (
     <Drawer open={open} width="narrow" title="電話予約を入れる" dirty={dirty} busy={busy} error={error || undefined} onClose={onClose} footer={footer}>
       <div className={styles.form} data-design-node="wEzuG">
-        <label className={styles.field}>
-          <span className={styles.label}>電話番号</span>
-          <TextField type="tel" inputMode="tel" autoComplete="off" value={phone} onChange={(event) => { setPhone(event.target.value); if (friend) choose(null) }} placeholder="090-1234-5678" />
-        </label>
+        <Field label="電話番号"><TextField type="tel" inputMode="tel" autoComplete="off" value={phone} onChange={(event) => { setPhone(event.target.value); if (friend) choose(null) }} placeholder="090-1234-5678" /></Field>
         {friends.length > 0 ? (
           <div className={styles.friendBox} role="group" aria-label="LINE の友だちの候補">
             <p className={styles.friendTitle}>LINE の友だちが見つかりました</p>
@@ -201,11 +199,8 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
             })}
           </div>
         ) : null}
-        <div className={styles.field}>
-          <label htmlFor="e2-name" className={styles.label}>お名前</label>
-          <TextField {...fields.bind('name')} id="e2-name" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'e2-name-error' : undefined} value={name} onChange={(event) => setName(event.target.value)} autoComplete="off" />
-          <FieldError id="e2-name-error">{fields.error('name')}</FieldError>
-        </div>
+        <div className={styles.field}><Field label="お名前" htmlFor="e2-name"><TextField {...fields.bind('name')} id="e2-name" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'e2-name-error' : undefined} value={name} onChange={(event) => setName(event.target.value)} autoComplete="off" />
+<FieldError id="e2-name-error">{fields.error('name')}</FieldError></Field></div>
         <div className={styles.field}>
           <span className={styles.label} id="e2-guests">人数</span>
           <div className={styles.stepper} role="group" aria-labelledby="e2-guests">
@@ -273,13 +268,10 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
             options={candidates.map((t) => ({ value: t.id, label: `${t.code}（${tableNote(t)}）` }))}
           />
         ) : null}
-        <label className={styles.field}>
-          <span className={styles.label}>メモ <span className={styles.optional}>任意</span></span>
-          <TextField value={memo} onChange={(event) => setMemo(event.target.value)} placeholder="アレルギー・記念日など" />
-        </label>
+        <Field label="メモ"><TextField value={memo} onChange={(event) => setMemo(event.target.value)} placeholder="アレルギー・記念日など" /></Field>
         {friend ? (
           <div className={styles.notifyRow}>
-            <Toggle checked={notify} onChange={setNotify} label="LINE で確認を送る" />
+            <SettingCheckbox checked={notify} onChange={setNotify} label="LINE で確認を送る" />
             <span className={styles.notifyText}>
               <span className={styles.notifyTitle}>LINE で確認を送る</span>
               <span className={styles.notifySub}>友だちのときだけ出ます</span>

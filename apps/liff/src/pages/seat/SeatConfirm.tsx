@@ -1,6 +1,9 @@
+import { LiffFieldLabel } from '../../components/forms/controls.js'
 import { useEffect, useState } from 'react';
 import PrivacyNote from '../../components/ui/PrivacyNote.js';
 import { changeRule, longDate, remainingText, stayText, zonedParts } from '../../lib/seat-reserve.js';
+import Button from '../../components/ui/Button.js'
+import { LiffInput } from '../../components/forms/controls.js'
 
 const FIELD = 'h-9 w-full rounded-(--liff-radius) bg-canvas px-3 text-sm text-ink placeholder:text-liff-sub outline outline-1 -outline-offset-1 outline-liff-line-strong focus-visible:outline-2 focus-visible:outline-ink';
 
@@ -91,13 +94,13 @@ export default function SeatConfirm({
         ))}
         <div className="flex items-start gap-3">
           <dt className="shrink-0 text-[13px] leading-5 text-liff-sub">
-            <label htmlFor="seat-phone">電話</label>
+            <LiffFieldLabel htmlFor="seat-phone" label="電話" optional />
           </dt>
           <dd className="min-w-0 flex-1">
             {reschedule ? (
               <span className="block truncate text-[13px] leading-5 font-semibold text-ink">{phone || '—'}</span>
             ) : (
-              <input
+              <LiffInput
                 id="seat-phone"
                 type="tel"
                 inputMode="tel"
@@ -105,30 +108,28 @@ export default function SeatConfirm({
                 maxLength={50}
                 value={phone}
                 onChange={(e) => onPhone(e.target.value)}
-                placeholder="任意（お店からの連絡用）"
-                className="block w-full bg-transparent text-[13px] leading-5 font-semibold text-ink placeholder:font-normal placeholder:text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
+                placeholder="お店からの連絡用"
+
               />
             )}
           </dd>
         </div>
       </dl>
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="seat-note" className="flex items-center gap-1.5 text-[13px] leading-5 font-bold text-ink">
-          ご要望（任意）<span className="text-[11px] leading-[17px] font-normal text-liff-sub">任意</span>
-        </label>
+        <LiffFieldLabel htmlFor="seat-note" label="ご要望" optional />
         {reschedule ? (
           <p className="flex h-9 items-center truncate rounded-(--liff-radius) bg-canvas px-3 text-sm text-ink outline outline-1 -outline-offset-1 outline-liff-line-strong">
             {note || 'なし'}
           </p>
         ) : (
-          <input
+          <LiffInput
             id="seat-note"
             type="text"
             maxLength={200}
             value={note}
             onChange={(e) => onNote(e.target.value)}
             placeholder="例：記念日です・ベビーカーで行きます"
-            className={FIELD}
+
           />
         )}
       </div>
@@ -150,13 +151,13 @@ export default function SeatConfirm({
       )}
       <PrivacyNote />
       <div className="flex">
-        <button
+        <Button variant="text"
           type="button"
           onClick={onBack}
-          className="liff-hit text-xs leading-[18px] text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
+
         >
           ← 時刻を選び直す
-        </button>
+        </Button>
       </div>
       <div className="pb-40" aria-hidden="true" />
     </div>

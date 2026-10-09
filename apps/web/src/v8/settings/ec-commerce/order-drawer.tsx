@@ -29,7 +29,7 @@ import {
 } from './ec-failure'
 import styles from './order-drawer.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-
+import { emptyValue } from '@/components/shared/empty-value'
 
 type DetailState = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -207,7 +207,7 @@ export default function OrderDrawer({
       onClose={onClose}
       footer={order ? <>
         <Button href="/ec-commerce/identity-candidates"><Link2 size={14} aria-hidden="true" />会員のつき合わせへ</Button>
-        {order.detailUrl ? <Button href={order.detailUrl} target="_blank" rel="noreferrer"><ExternalLink size={14} aria-hidden="true" />ECの管理画面で開く</Button> : null}
+        {order.detailUrl ? <Button external href={order.detailUrl}  >ECの管理画面で開く</Button> : null}
       </> : undefined}
     >
           {state === 'loading' ? (
@@ -225,7 +225,7 @@ export default function OrderDrawer({
                     <dt>中身</dt>
                     <dd>{order.orderLines.length ? order.orderLines.map((line) => `${line.productName} ×${line.quantity}`).join('・') : '商品明細は未取得'}</dd>
                   </div>
-                  <div className={styles.fact}><dt>金額</dt><dd>{amount ?? '—'}</dd></div>
+                  <div className={styles.fact}><dt>金額</dt><dd>{amount ?? emptyValue('unknown')}</dd></div>
                   <div className={styles.fact}>
                     <dt>EC側の注文</dt>
                     <dd>

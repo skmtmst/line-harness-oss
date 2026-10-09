@@ -4,6 +4,7 @@
  * 「中身」のタブ（m1cWEy・ITBAB・ijxur・J1pdB・Z9wXm の左の列）。
  * ページの札、ページのブロック（畳んだ行と開いた設定）、ブロックを足す欄。
  */
+import { Field } from '@/components/shared/form-controls'
 import { useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
@@ -26,7 +27,7 @@ import { TextArea, TextField } from '@/components/shared/text-field'
 import { DragHandle, RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { ADD_GROUPS, blockKindLine, blockTitleLine, inputTypeLabel, isChoiceType } from './model'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import MediaSlot from '@/components/shared/media-slot'
@@ -35,6 +36,7 @@ import UriTapActionField from '@/components/shared/uri-tap-action-field'
 import { FieldError } from '@/components/shared/form-controls'
 import { useFormEditAttempted } from './field-issues'
 import styles from './edit.module.css'
+import TextLink from '@/components/shared/text-link'
 
 type Props = {
   readOnly?: boolean
@@ -271,7 +273,7 @@ function OpenBlock(props: RowProps) {
         {input ? (
           <label className={styles.required}>
             <span className={styles.requiredLabel}>必須</span>
-            <Toggle checked={input.required ?? false} onChange={(required) => patch({ required } as Partial<FormBlock>)} label="必須" />
+            <SettingCheckbox checked={input.required ?? false} onChange={(required) => patch({ required } as Partial<FormBlock>)} label="必須" />
           </label>
         ) : null}
         <RowActions className={styles.more} subjectName={`「${blockTitleLine(block)}」`} menuItems={menuItems} destructiveItem={menu.destructiveItem} />
@@ -291,12 +293,7 @@ function blockTitleKind(block: FormBlock): string {
 }
 
 function Labeled({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) {
-  return (
-    <div className={styles.field}>
-      <label className={styles.fieldLabel} htmlFor={htmlFor}>{label}</label>
-      {children}
-    </div>
-  )
+  return <Field label={label} htmlFor={htmlFor}>{children}</Field>
 }
 
 function InputFields({ block, refs, patch }: { block: FormInputBlock; refs: FormRefs; patch: (next: Partial<FormBlock>) => void }) {
@@ -469,10 +466,10 @@ function BookingFields({ block, refs, set }: { block: FormInputBlock; refs: Form
       <div className={styles.bookingInfo}>
         <CalendarCheck size={16} aria-hidden="true" className={styles.bookingInfoIcon} />
         <p className={styles.bookingInfoText}>空いている枠は「予約」の営業時間と担当の予定から出します。入った予約は予約の一覧に入り、リマインダも動きます。</p>
-        <Link href="/booking/menus" className={styles.bookingLink}>
-          <ExternalLink size={15} aria-hidden="true" />
+        <TextLink external href="/booking/menus" className={styles.bookingLink}>
+
           予約の設定を開く
-        </Link>
+        </TextLink>
       </div>
     </>
   )

@@ -47,6 +47,9 @@ import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, Too
 import { notifyToast } from '@/components/shared/toast'
 import styles from './mileage.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const KIND_LABEL: Record<MileageRewardKind, string> = {
   coupon: 'クーポン',
@@ -449,7 +452,7 @@ export default function RewardsTab() {
     setPage(1)
   }
 
-  /* 頭の「CSV で書き出す」。使い道の書き出し口は無いので、今見えている表の中身をそのまま出す。 */
+  /* 頭の「CSVで書き出す」。使い道の書き出し口は無いので、今見えている表の中身をそのまま出す。 */
   const canExport = !accountLoading && !!accountId && loadedAccountId === accountId && status === 'ready' && shown.length > 0
   const exportCsv = useCallback(() => {
     if (!canExport) return
@@ -469,7 +472,7 @@ export default function RewardsTab() {
       const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `mileage-rewards-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = csvFileName("マイルの特典")
       anchor.click()
       URL.revokeObjectURL(url)
     } catch {
@@ -488,7 +491,7 @@ export default function RewardsTab() {
         icon={<Gift size={14} aria-hidden="true" />}
         value={ready ? rewards.length : null}
         unit="件"
-        detail={ready ? `出している ${formatMileageNumber(publishedCount)}・下書き ${formatMileageNumber(draftCount)}` : '—'}
+        detail={ready ? `出している ${formatMileageNumber(publishedCount)}・下書き ${formatMileageNumber(draftCount)}` : emptyValue('unknown')}
       />
       <KpiCard
         presentation="band"
@@ -496,7 +499,7 @@ export default function RewardsTab() {
         icon={<ArrowLeftRight size={14} aria-hidden="true" />}
         value={ready ? exchangedCount ?? 0 : null}
         unit="件"
-        detail={ready ? `${formatMileageNumber(redeemedMiles ?? 0)} マイル` : '—'}
+        detail={ready ? `${formatMileageNumber(redeemedMiles ?? 0)} マイル` : emptyValue('unknown')}
       />
       <KpiCard
         presentation="band"
@@ -505,7 +508,7 @@ export default function RewardsTab() {
         value={ready && popularName ? 0 : null}
         valueText={ready && popularName ? popularName : undefined}
         unit=""
-        detail={ready ? (popularName ? `今月 ${formatMileageNumber(popularCount ?? 0)} 件` : 'まだ交換されていません') : '—'}
+        detail={ready ? (popularName ? `今月 ${formatMileageNumber(popularCount ?? 0)}件` : 'まだ交換されていません') : emptyValue('unknown')}
       />
       <KpiCard
         presentation="band"
@@ -739,7 +742,7 @@ export default function RewardsTab() {
         <ListState
           kind={redemptionsLoad}
           description={redemptionsLoad === 'forbidden'
-            ? '要対応の交換を見る権限がありません。オーナーか管理者に確認してください。'
+            ? permissionDeniedMessage('store')
             : '要対応の交換を読み込めませんでした。'}
           onRetry={redemptionsLoad === 'error' ? () => void loadFailed(redemptionsPage) : undefined}
         />
@@ -809,7 +812,7 @@ export default function RewardsTab() {
   const body = status === 'loading' ? (
     <ListState kind="loading" title="使い道を読み込んでいます" />
   ) : status === 'forbidden' ? (
-    <StateCard title="使い道を見る権限がありません" description="オーナーか管理者に確認してください。" />
+    <StateCard title="使い道を見る権限がありません" description={permissionDeniedMessage('store')} />
   ) : status === 'error' ? (
     <StateCard tone="error" title="使い道を読み込めませんでした" description="数の帯は「—」にしています。道具はそのまま使えます。" action={<RetryButton onRetry={() => void load()} />} />
   ) : visible.length === 0 ? (
@@ -842,7 +845,7 @@ export default function RewardsTab() {
       help="行の「…」から 編集・自分で交換をテスト・出すのを止める・複製。"
       actions={
         <Button variant="secondary" onClick={exportCsv} disabled={!canExport}>
-          <Download size={15} aria-hidden="true" /> CSV で書き出す
+          <Download size={15} aria-hidden="true" /> CSVで書き出す
         </Button>
       }
       stats={stats}

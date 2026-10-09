@@ -21,6 +21,8 @@ import { restaurantTestApi, type RestaurantLineFlow, type RestaurantStore } from
 import RestaurantFrame, { type RestaurantContext } from '../common-a/frame'
 import { Panel, StatRow } from '../common-a/parts'
 import styles from './line-followup.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /** 数の並びに出す4種（本物の flow_type）と、カードの頭の名前。 */
 const FLOW_KINDS: Record<string, { stat: string; note: string; title: string }> = {
@@ -58,17 +60,10 @@ function FlowCard({ flow, store, ctx, readOnly }: { flow: RestaurantLineFlow; st
       </div>
       <div className={styles.flowBody}>
         <div className={styles.form}>
-          <label className={styles.field}>
-            <span className={styles.label}>タイトル</span>
-            <TextField value={title} onChange={(event) => setTitle(event.target.value)} readOnly={readOnly} />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.label}>本文</span>
-            {/* 絵の本文の枠は高さ56で文を上下の中央に置く。枠は外の箱が持ち、文の高さは中身なり。 */}
-            <span className={styles.bodyBox} onClick={() => bodyRef.current?.focus()}>
+          <Field label="タイトル"><TextField value={title} onChange={(event) => setTitle(event.target.value)} readOnly={readOnly} /></Field>
+          <Field label="本文"><span className={styles.bodyBox} onClick={() => bodyRef.current?.focus()}>
               <textarea ref={bodyRef} value={body} onChange={(event) => setBody(event.target.value)} rows={1} readOnly={readOnly} className={styles.bodyInput} />
-            </span>
-          </label>
+            </span></Field>
           <div className={styles.flowFoot}>
             <span className={styles.timing}>{timingLabel(flow)}</span>
             <span className={styles.spacer} aria-hidden="true" />
@@ -120,7 +115,7 @@ function LineFollowupBoard({ ctx }: { ctx: RestaurantContext }) {
         <span>いまは「確認用」です。保存しても、お客さまへはまだ送りません。本当に送るのは、本送信の準備ができてから（司令塔の確認のあと）切り替えます。</span>
       </div>
       {readOnly ? (
-        <div className={styles.readOnly} role="note"><Eye aria-hidden className={styles.cautionIcon} /><span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span></div>
+        <div className={styles.readOnly} role="note"><Eye aria-hidden className={styles.cautionIcon} /><span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span></div>
       ) : null}
       <StatRow>
         <KpiCard density="compact" title="フロー" valueText={`${flows.length}`} detail="カードテンプレート" icon={null} presentation="band" value={null} unit="" />

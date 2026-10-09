@@ -94,8 +94,8 @@ export function ManualLinksV8() {
         <span className={styles.toolbarSearch}>
           <input
             type="search"
-            aria-label="画面ID・画面名で検索"
-            placeholder="画面ID・画面名で検索"
+            aria-label="画面ID・画面名で探す"
+            placeholder="画面ID・画面名で探す"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />

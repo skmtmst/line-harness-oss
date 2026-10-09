@@ -43,6 +43,10 @@ import EditRouteModal from './edit-route-dialog'
 import QrDialog from './qr-dialog'
 import RefOrdersPanel, { type RefOrdersResult } from './ref-orders'
 import styles from './detail.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 interface MessageTemplate {
   id: string
@@ -335,9 +339,9 @@ function InflowDetailContent() {
 
   const accountName = route?.lineAccountId
     ? (accounts.find((account) => account.id === route.lineAccountId)?.name ?? route.lineAccountId)
-    : '—'
+    : emptyValue('unknown')
   const createdDate = route ? `${Number(route.createdAt.slice(5, 7))}月${Number(route.createdAt.slice(8, 10))}日` : ''
-  const yen = (amount: number | null | undefined) => (amount == null ? '—' : `¥${formatNumber(amount)}`)
+  const yen = (amount: number | null | undefined) => (amount == null ? emptyValue('unknown') : `¥${formatNumber(amount)}`)
 
   // 友だち表の絞り込み。検索・札・期間の3つを重ねる。
   const normalizedFriendSearch = friendSearch.trim().toLocaleLowerCase('ja')
@@ -431,7 +435,7 @@ function InflowDetailContent() {
     <DetailPage
       boardId="Q5le3"
       title={route?.name ?? '読み込み中…'}
-      description={route ? `${route.genre || '未分類'}・${url}・${accountName}・作った日 ${createdDate}` : undefined}
+      help={route ? `${route.genre || '未分類'}・${url}・${accountName}・作った日 ${createdDate}` : undefined}
       identity={back}
       actions={route ? (
         <div className={styles.headActions}>
@@ -444,7 +448,7 @@ function InflowDetailContent() {
       ) : undefined}
     >
       {readonly ? (
-        <p className={styles.viewerBand} role="status"><Eye size={16} aria-hidden="true" />閲覧のみで見ています。変える操作は管理者に頼んでください。</p>
+        <p className={styles.viewerBand} role="status"><Eye size={16} aria-hidden="true" />閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>
       ) : null}
       {copyFailed && url ? (
         <div role="alert" className={styles.copyFallback}>
@@ -461,18 +465,18 @@ function InflowDetailContent() {
       ) : null}
 
       {!route ? (
-        <ListState kind="loading" />
+        <DetailLoading />
       ) : <>
         <div className={styles.kpis}>
           <KpiBand aria-label={`${route.name}の概要`}>
             <KpiCard presentation="band" icon={null} title="今月 友だちになった" value={monthTotal} unit="人"
-              detail={`先月より ${monthDelta == null ? '—' : `${monthDelta >= 0 ? '+' : ''}${formatNumber(monthDelta)}`}`} />
+              detail={`先月より ${monthDelta == null ? emptyValue('unknown') : `${monthDelta >= 0 ? '+' : ''}${formatNumber(monthDelta)}`}`} />
             <KpiCard presentation="band" icon={null} title="累計" value={funnel ? funnel.friend_add_count : null} unit="人"
-              detail={`${createdDate}から・いま残っている ${funnel?.remainingCount == null ? '—' : formatNumber(funnel.remainingCount)} 人`} />
+              detail={`${createdDate}から・いま残っている ${funnel?.remainingCount == null ? emptyValue('unknown') : formatNumber(funnel.remainingCount)}人`} />
             <KpiCard presentation="band" icon={null} title="ブロック" value={funnel?.blockedCount ?? null} unit="人"
               detail={blockRate == null ? '割合は集計できません' : `友だちになった人の ${blockRate}%`} />
             <KpiCard presentation="band" icon={null} title="成果（コンバージョン）" value={funnel ? funnel.cv_count : null} unit="件"
-              detail={`累計・1人あたり ${funnel?.valuePerFriend == null ? '—' : yen(Math.round(funnel.valuePerFriend))}`} />
+              detail={`累計・1人あたり ${funnel?.valuePerFriend == null ? emptyValue('unknown') : yen(Math.round(funnel.valuePerFriend))}`} />
           </KpiBand>
         </div>
 
@@ -507,7 +511,7 @@ function InflowDetailContent() {
                 <div className={styles.mini}>
                   <span className={styles.miniTitle}>友だち追加</span>
                   <span className={styles.miniValue}>{formatNumber(funnel.friend_add_count)}</span>
-                  <span className={styles.miniSub}>{`追加率 ${addRate ?? '—'}%`}</span>
+                  <span className={styles.miniSub}>{`追加率 ${addRate ?? emptyValue('unknown')}%`}</span>
                 </div>
                 <div className={styles.mini}>
                   <span className={styles.miniTitle}>フォーム</span>
@@ -516,15 +520,15 @@ function InflowDetailContent() {
                 </div>
                 <div className={styles.mini}>
                   <span className={styles.miniTitle}>購入</span>
-                  <span className={styles.miniValue}>{ordersSummary ? formatNumber(ordersSummary.total) : '—'}</span>
+                  <span className={styles.miniValue}>{ordersSummary ? formatNumber(ordersSummary.total) : emptyValue('unknown')}</span>
                   <span className={styles.miniSub}>{ordersSummary ? yen(ordersSummary.totalAmount) : '集計を取得できていません'}</span>
                 </div>
                 <div className={styles.mini}>
                   <span className={styles.miniTitle}>返金・取消</span>
-                  <span className={styles.miniValue}>{ordersSummary ? formatNumber(ordersSummary.refunded + ordersSummary.cancelled) : '—'}</span>
+                  <span className={styles.miniValue}>{ordersSummary ? formatNumber(ordersSummary.refunded + ordersSummary.cancelled) : emptyValue('unknown')}</span>
                   <span className={styles.miniSub}>
                     {ordersSummary
-                      ? (ordersSummary.refundedAmount == null ? '—' : `−${yen(ordersSummary.refundedAmount)}`)
+                      ? (ordersSummary.refundedAmount == null ? emptyValue('unknown') : `−${yen(ordersSummary.refundedAmount)}`)
                       : '集計を取得できていません'}
                   </span>
                 </div>
@@ -535,7 +539,7 @@ function InflowDetailContent() {
                 <Button onClick={() => setFunnelAttempt((n) => n + 1)}>段階を再読み込み</Button>
               </div>
             ) : (
-              <ListState kind="loading" />
+              <DetailLoading />
             )}
             {funnel?.monthly && funnel.monthly.length > 0 ? (
               <section aria-label="月別内訳">
@@ -555,7 +559,7 @@ function InflowDetailContent() {
               </section>
             ) : null}
             <div className={styles.ordersRow}>
-              <h3 className={styles.ordersTitle}>{`注文の明細 ${ordersSummary ? formatNumber(ordersSummary.total) : '—'} 件`}</h3>
+              <h3 className={styles.ordersTitle}>{`注文の明細 ${ordersSummary ? formatNumber(ordersSummary.total) : emptyValue('unknown')}件`}</h3>
               <Button onClick={() => setShowOrders((current) => !current)} aria-expanded={showOrders}>注文を見る</Button>
             </div>
             {showOrders ? <RefOrdersPanel refCode={route.refCode} onSummaryChange={setOrdersSummary} /> : null}
@@ -635,7 +639,7 @@ function InflowDetailContent() {
               onRetry={() => setFriendsAttempt((n) => n + 1)}
             />
           ) : friendsState === 'loading' ? (
-            <ListState kind="loading" title="この経路から来た友だちを読み込んでいます" />
+            <DetailLoading label="この経路から来た友だちを読み込んでいます" />
           ) : friendRows.length === 0 ? (
             <ListState
               kind="empty"
@@ -678,12 +682,12 @@ function InflowDetailContent() {
                         ) : friend.currentStatus === '友だち中' ? (
                           <StatusBadge tone="success" size="compact">友だち</StatusBadge>
                         ) : (
-                          <span className={styles.cellSub}>{friend.currentStatus ?? '—'}</span>
+                          <span className={styles.cellSub}>{friend.currentStatus ?? emptyValue('unknown')}</span>
                         )}
                       </Td>
                       {/* 経路の設定タグは、個々の友だちへ付いたタグの実績ではない。口が返すまで代用しない。 */}
-                      <Td className={styles.colTags}><span className={styles.cellSub}>—</span></Td>
-                      <Td className={styles.colResult}><span className={styles.cellFaint}>{friend.conversion ?? '—'}</span></Td>
+                      <Td className={styles.colTags}><span className={styles.cellSub}>{emptyValue('unknown')}</span></Td>
+                      <Td className={styles.colResult}><span className={styles.cellFaint}>{friend.conversion ?? emptyValue('unknown')}</span></Td>
                       <Td className={styles.colMenu}>
                         <div className={styles.menuBox}>
                           <RowMenu
@@ -719,9 +723,9 @@ function InflowDetailContent() {
           <section className={styles.box} aria-labelledby="inflow-links-to">
             <h2 className={styles.boxTitle} id="inflow-links-to">この経路のつながる先</h2>
             <dl className={styles.kv}>
-              <div className={styles.kvRow}><dt>コンバージョン</dt><dd>{funnel ? `${formatNumber(funnel.cv_count)} 件` : '—'}</dd></div>
-              <div className={styles.kvRow}><dt>シナリオ配信</dt><dd>{scenarioName ?? 'なし'}</dd></div>
-              <div className={styles.kvRow}><dt>マイル</dt><dd>なし</dd></div>
+              <div className={styles.kvRow}><dt>コンバージョン</dt><dd>{funnel ? `${formatNumber(funnel.cv_count)}件` : emptyValue('unknown')}</dd></div>
+              <div className={styles.kvRow}><dt>シナリオ配信</dt><dd>{scenarioName ?? emptyValue('none')}</dd></div>
+              <div className={styles.kvRow}><dt>マイル</dt><dd>{emptyValue('none')}</dd></div>
             </dl>
           </section>
           <section className={styles.box} aria-labelledby="inflow-qr">
@@ -819,17 +823,14 @@ function InflowDetailContent() {
               </div>
             ) : null}
             {deleteChoice === 'delete' ? (
-              <label className={styles.deleteField}>
-                <span className={styles.deleteChoiceTitle}>{`完全削除するには「${route.name}」と入力`}</span>
-                <input
+              <Field note={<>空白や大文字・小文字も含め、現在の経路名と同じ入力が必要です。</>} label={<><span className={styles.deleteChoiceTitle}>{`完全削除するには「${route.name}」と入力`}</span></>}><input
                   value={deleteConfirmationName}
                   disabled={deleting}
                   onChange={(event) => setDeleteConfirmationName(event.target.value)}
                   autoComplete="off"
                   className={styles.fieldInput}
                 />
-                <span className={styles.note}>空白や大文字・小文字も含め、現在の経路名と同じ入力が必要です。</span>
-              </label>
+</Field>
             ) : null}
           </div>
         </Dialog>
@@ -841,7 +842,7 @@ function InflowDetailContent() {
 export default function InflowDetailV8() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
-    <Suspense fallback={<ListState kind="loading" />}>
+    <Suspense fallback={<DetailLoading />}>
       <InflowDetailContent />
     </Suspense>
   )

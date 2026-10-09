@@ -1,5 +1,7 @@
 'use client'
 
+import SegmentedControl from '@/components/shared/segmented'
+
 /*
  * ★V8 友だち追加時の配信の実行結果（Pencil `REIxB`）。
  *
@@ -42,6 +44,8 @@ import { describeFriendAddFailure } from '@/v8/friend-add/failure'
 import { useCursorStack } from '@/v8/friend-add/use-cursor-stack'
 import { csvCell, elapsedText, formatJstDateTime, jstTime, routingAction, routingLabel } from './status'
 import styles from './runs.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type KindFilter = 'all' | FriendAddEventKind
 type AttributionFilter = 'all' | FriendAddEventAttributionStatus
@@ -370,7 +374,7 @@ function FriendAddRunsInner() {
       const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = 'friend-add-runs.csv'
+      anchor.download = csvFileName("友だち追加の実行履歴")
       anchor.click()
       URL.revokeObjectURL(url)
       setMessage(exportCursor
@@ -462,7 +466,7 @@ function FriendAddRunsInner() {
       <div className={styles.kpis}>
         <KpiBand data-design="KPIs">
           <KpiCard presentation="band" icon={null} title="直近28日の友だち追加" value={summary ? summary.recentFriends ?? null : null} unit="人"
-            detail={`追加の記録 ${summary?.recentEvents == null ? '—' : formatNumber(summary.recentEvents)} 件`} />
+            detail={`追加の記録 ${summary?.recentEvents == null ? emptyValue('unknown') : formatNumber(summary.recentEvents)}件`} />
           <KpiCard presentation="band" icon={null} title="送った案内" value={summary ? summary.cumulativeDeliveries : null} unit="通" detail={successRate} />
           <KpiCard presentation="band" icon={null} title="失敗した処理" value={summary ? summary.failed : null} unit="通"
             detail={failedCount > 0 ? '理由を見て、もう一度実行できます' : '記録を始めてからの合計です'} />
@@ -498,13 +502,7 @@ function FriendAddRunsInner() {
               onClear={() => setSearch('')}
             />
           </div>
-          <div className={styles.chips} role="group" aria-label="結果で絞り込む">
-            {chips.map((chip) => (
-              <button key={chip.key} type="button" className={styles.chip} aria-pressed={activeChip === chip.key} onClick={() => pickChip(chip.key)}>
-                {chip.label}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl aria-label="結果で絞り込む" value={activeChip} onChange={pickChip} options={chips.map(chip=>({value:chip.key,label:chip.label}))} />
           <span className={styles.toolsSpacer} aria-hidden="true" />
           <div className={styles.sizeBox}>
             <Select
@@ -612,15 +610,15 @@ function FriendAddRunsInner() {
           <dl className={styles.kv}>
             <div className={styles.kvRow}>
               <dt>二重送信を防ぐ</dt>
-              <dd>{!ruleState || ruleState.resendSuppressionHours === null ? '—' : ruleState.resendSuppressionHours > 0 ? '有効' : '無効'}</dd>
+              <dd>{!ruleState || ruleState.resendSuppressionHours === null ? emptyValue('unknown') : ruleState.resendSuppressionHours > 0 ? '有効' : '無効'}</dd>
             </div>
             <div className={styles.kvRow}>
               <dt>失敗の知らせ</dt>
-              <dd>—</dd>
+              <dd>{emptyValue('unknown')}</dd>
             </div>
             <div className={styles.kvRow}>
               <dt>最後に送った</dt>
-              <dd title={summary?.lastDeliveryAt ? formatJstDateTime(summary.lastDeliveryAt) : undefined}>{summary?.lastDeliveryAt ? jstTime(summary.lastDeliveryAt) : '—'}</dd>
+              <dd title={summary?.lastDeliveryAt ? formatJstDateTime(summary.lastDeliveryAt) : undefined}>{summary?.lastDeliveryAt ? jstTime(summary.lastDeliveryAt) : emptyValue('unknown')}</dd>
             </div>
           </dl>
           <div className={styles.boxFoot}>

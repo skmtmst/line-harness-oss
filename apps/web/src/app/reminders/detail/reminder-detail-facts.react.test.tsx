@@ -104,7 +104,7 @@ describe('リマインダ詳細の停止予定', () => {
     await waitFor(() => expect(apiMock.update).toHaveBeenCalledWith('rem-1', { isActive: true }))
   })
 
-  it('稼働中は一時停止ボタンが実際にAPIを呼ぶ', async () => {
+  it('有効は一時停止ボタンが実際にAPIを呼ぶ', async () => {
     apiMock.runs.mockResolvedValue({ success: true, data: RESPONSE() })
     render(<ReminderRunsPage />)
     const pause = await screen.findByText('一時停止する')

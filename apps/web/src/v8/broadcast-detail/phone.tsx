@@ -1,4 +1,5 @@
-import { BatteryFull, ChevronDown, ChevronLeft, ImageIcon, Menu, Phone as PhoneIcon, Search, Signal, Wifi } from 'lucide-react'
+import { ImageIcon } from 'lucide-react'
+import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import BroadcastMessagePreview from '@/components/broadcasts/broadcast-message-preview'
 import type { BroadcastBubble, BroadcastMessageButton } from '@/lib/api'
 import styles from './phone.module.css'
@@ -35,31 +36,8 @@ export default function BroadcastPhone({
   /* 写真1枚は絵の「画像」（200×200・角丸16）。URL が読めないときは枠と「写真」だけ。 */
   const photo = broadcast.messageType === 'image' && single ? { url: imageUrlOf(broadcast.messageContent) } : null
   return (
-    <figure className={styles.phone} aria-label="届いたときの見え方の見本">
-      <div className={styles.screen}>
-        <div className={styles.statusBar}>
-          <span className={styles.clock}>9:41</span>
-          <span className={styles.island} aria-hidden="true" />
-          <span className={styles.statusIcons} aria-hidden="true">
-            <Signal size={15} strokeWidth={1.8} />
-            <Wifi size={15} strokeWidth={1.8} />
-            <BatteryFull size={20} strokeWidth={1.8} />
-          </span>
-        </div>
-        <div className={styles.talkHead}>
-          <ChevronLeft size={20} aria-hidden="true" />
-          <span className={styles.talkName}>{accountName}</span>
-          <Search size={17} aria-hidden="true" />
-          <PhoneIcon size={17} aria-hidden="true" />
-          <Menu size={17} aria-hidden="true" />
-        </div>
-        <div className={styles.talk}>
-          {chip ? <p className={styles.dateRow}><span className={styles.dateChip}>{chip}</span></p> : null}
-          <div className={styles.row}>
-            <span className={styles.avatar} aria-hidden="true">{initial}</span>
-            <div className={styles.sender}>
-              <span className={styles.senderName}>{accountName}</span>
-              <div className={styles.bodyRow}>
+    <LinePreview title={null} accountName={accountName} caption={chip}>
+      <LinePreviewMessage accountName={accountName} avatar={initial} time={time}>
                 {plainText ? (
                   <p className={styles.bubble}>{broadcast.messageContent}</p>
                 ) : photo ? (
@@ -82,18 +60,8 @@ export default function BroadcastPhone({
                     />
                   </div>
                 )}
-                <span className={styles.time}>{time}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className={styles.menuBar}>
-          <span>メニュー</span>
-          <ChevronDown size={12} aria-hidden="true" />
-        </div>
-        <div className={styles.homeBar}><span className={styles.homeLine} aria-hidden="true" /></div>
-      </div>
-    </figure>
+      </LinePreviewMessage>
+    </LinePreview>
   )
 }
 

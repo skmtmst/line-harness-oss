@@ -103,6 +103,8 @@ export function BarChart({
    */
   legend?: { label: string; tone: 'added' | 'removed' }[]
 }) {
+  const addedLabel = legend.find(item=>item.tone==='added')?.label ?? '増えた'
+  const removedLabel = legend.find(item=>item.tone==='removed')?.label ?? '減った'
   const max = Math.max(1, ...items.flatMap((item) => [item.added, item.removed]))
   const ticks = barChartTicks(max)
   const top = ticks[ticks.length - 1] || 1
@@ -135,7 +137,7 @@ export function BarChart({
           {items.map((item, index) => {
             const selected = selectedKey !== undefined && item.key === selectedKey
             const name =
-              `${item.tooltipTitle} 増えた${item.added}人・減った${item.removed}人` +
+              `${item.tooltipTitle} ${addedLabel}${item.added}人・${removedLabel}${item.removed}人` +
               (item.note ? `・${item.note}` : '')
             return (
               <div key={item.key} className={styles.column}>
@@ -160,7 +162,7 @@ export function BarChart({
                   <span aria-hidden="true" className={styles.tooltip}>
                     <span className={styles.tooltipTitle}>{item.tooltipTitle}</span>
                     <span>
-                      増えた {item.added}人・減った {item.removed}人
+                      {addedLabel} {item.added}人・{removedLabel} {item.removed}人
                     </span>
                   </span>
                 </button>

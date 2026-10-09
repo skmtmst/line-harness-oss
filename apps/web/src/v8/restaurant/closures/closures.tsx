@@ -29,6 +29,8 @@ import {
   scopeText, shiftMonth, statusLine, tablesText, tasksFor, timeText, upcoming,
 } from './format'
 import styles from './closures.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 type MediaLink = { code: string; name: string; loginUrl: string | null; closeOnBooking: boolean }
 
@@ -48,8 +50,8 @@ function inGoogle(closure: RestaurantClosure, special: GoogleSpecialDay[]): bool
 
 function deleteMessage(error: unknown): string {
   if (error instanceof ApiError && error.code === 'version_conflict') return 'ほかの人が先に変えました。読み直したので、もう一度確かめてください。'
-  if (error instanceof ApiError && error.status === 403) return 'この店舗の予約枠を変える権限がありません。'
-  return describeSaveFailure(error)
+  if (error instanceof ApiError && error.status === 403) return permissionDeniedMessage('store')
+  return withPermissionFailure(error, describeSaveFailure(error), 'store')
 }
 
 export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoogle, dialog, onDialog }: {
@@ -180,7 +182,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
       await restaurantTestApi.completeChannelCloseTask(accountId, task.id)
       notifyToast(`${nameOf(task.channel)}の枠を閉じた印を付けました。`)
     } catch (caught) {
-      notifyToast(describeSaveFailure(caught), { tone: 'error' })
+      notifyToast(withPermissionFailure(caught, describeSaveFailure(caught), 'store'), { tone: 'error' })
     } finally {
       await loadTasks()
       setBusy('')
@@ -253,7 +255,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
               </p>
             </div>
             {firstMedium?.loginUrl ? (
-              <Button href={firstMedium.loginUrl} target="_blank" rel="noopener noreferrer">{`${firstMedium.name}の管理画面を開く ↗`}</Button>
+              <Button external href={firstMedium.loginUrl}  >{`${firstMedium.name}の管理画面を開く`}</Button>
             ) : null}
             {canWrite ? (
               <Button onClick={() => void closeOne(firstItem)} disabled={busy === firstItem.id} aria-label={`${nameOf(firstItem.channel)}の枠を閉じた`}>

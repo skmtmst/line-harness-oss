@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import Header from '@/components/layout/header'
+import { PageHeading } from '@/components/templates/page-frame'
 import styles from './create-page.module.css'
 import Button from '@/components/shared/button'
 import HelpTip from '@/components/shared/help-tip'
@@ -63,7 +63,7 @@ const VariantContext = createContext<CreatePageVariant>('default')
  */
 export interface CreatePageProps {
   title: string
-  description?: string
+  help?: ReactNode
   /** パンくずの親。[表示名, ルート] */
   parent: [string, string]
   /** 保存する。作ったもののIDを返すと、一覧で目立たせる */
@@ -107,7 +107,7 @@ export interface CreatePageProps {
 
 export default function CreatePage({
   title,
-  description,
+  help,
   parent,
   onSave,
   successHref,
@@ -252,7 +252,7 @@ export default function CreatePage({
       {showHeader ? (
         <div data-design="Head" className={styles.head}>
           {crumb}
-          <Header title={title} description={description} />
+          <PageHeading title={title} help={help} />
         </div>
       ) : crumb}
 

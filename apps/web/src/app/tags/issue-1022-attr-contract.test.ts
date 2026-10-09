@@ -86,7 +86,7 @@ describe('IDEA-04（issue #1022）タグの分類説明・重複候補・変更�
     expect(source).toContain('savedSearchSummary(original.conditions')
     expect(source).toContain('savedSearchSummary(conditions')
     // 未計算を推定で埋めない。人数は previewCount が無ければ —（監査6 #674: MetricValue が出す）。
-    expect(source).toContain('previewCount === null ? <span className={styles.countNum}>—</span>')
+    expect(source).toContain("previewCount === null ? <span className={styles.countNum}>{emptyValue('unknown')}</span>")
   })
 
   it('条件の言語化は編集画面が作れる演算子をすべて正しく説明する', () => {

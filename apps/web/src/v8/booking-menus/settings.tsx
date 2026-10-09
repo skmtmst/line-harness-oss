@@ -81,6 +81,8 @@ import {
 } from './tabs/shared'
 import styles from './settings.module.css'
 import ChannelsTabV8 from './channels-tab'
+import { PageHeading } from '@/components/templates/page-frame'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /*
  * 速さのため、使わないタブの中身は後から読む（動的 import）。
@@ -505,24 +507,20 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
   return (
     <V8TabEditContext.Provider value={registerTabEdit}>
       <div className={styles.shell} data-design-node="owaS3">
-        <header className={styles.boardHead} data-design="Head">
-          <h1 className={styles.headTitle}>予約設定</h1>
-          <p className={styles.headNote}>お客さまの予約画面に出るメニュー・時間・ルールを決めます</p>
-          <div data-design="Tabs">
-            <Tabs
+        <PageHeading title={<>予約設定</>}
+        help={<>お客さまの予約画面に出るメニュー・時間・ルールを決めます</>}
+        tabs={<><Tabs
               label="予約設定のタブ"
               items={V8_TABS.map((item) => ({
                 label: item.label,
                 current: item.key === tab,
                 onClick: () => requestTab(item.key),
               }))}
-            />
-          </div>
-        </header>
+            /></>} />
 
         {accountId && tabReadOnly ? (
           <div className={styles.readOnlyRow} data-design="Bar">
-            <Band tone="hint">閲覧のみで見ています。変える操作は管理者に頼んでください。</Band>
+            <Band tone="hint">閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</Band>
           </div>
         ) : null}
 

@@ -31,6 +31,8 @@ import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { EVENT_OPTIONS } from '../../line-notifications/operator-words'
 import styles from './screen.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadState = 'loading' | 'ready' | 'error' | 'forbidden'
 type DraftConditions = { recipientLabel?: string; scheduleLabel?: string }
@@ -149,7 +151,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `operator-notifications-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = csvFileName("担当者へのお知らせ")
       anchor.click()
       URL.revokeObjectURL(url)
       setNotice({ text: '実行記録をCSVで書き出しました。', error: false })
@@ -217,8 +219,8 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
                 <Td className={styles.cell} title={eventWords(rule.eventType)}>{eventWords(rule.eventType)}</Td>
                 <Td className={styles.cell} title={recipients}>{recipients}</Td>
                 <Td className={`${styles.cell} ${styles.opSchedule}`} title={schedule}>{schedule}</Td>
-                <Td><span className={`${styles.opNum} ${rule.occurredToday > 0 ? styles.numStrong : styles.numFaint}`}>{rule.occurredToday > 0 ? `${rule.occurredToday}` : '—'}</span></Td>
-                <Td><StatusBadge tone={published ? 'success' : 'neutral'}>{published ? '出している' : '止めている'}</StatusBadge></Td>
+                <Td><span className={`${styles.opNum} ${rule.occurredToday > 0 ? styles.numStrong : styles.numFaint}`}>{rule.occurredToday > 0 ? `${rule.occurredToday}` : emptyValue('unknown')}</span></Td>
+                <Td><StatusBadge tone={published ? 'success' : 'neutral'}>{published ? '出している' : '停止中'}</StatusBadge></Td>
                 <Td className={styles.opActions}>
                   {canManage ? <>
                     <Button variant="secondary" onClick={() => void testSend(rule)} disabled={busy === rule.id}>自分にテスト</Button>
@@ -241,7 +243,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
 
     <ConfirmDialog
       open={exportOpen && canManage}
-      title="CSVを書き出す理由"
+      title="CSVで書き出す理由"
       description="個人情報を含むため、確認した目的を記録します。"
       confirmLabel="書き出す"
       busy={busy === 'csv'}

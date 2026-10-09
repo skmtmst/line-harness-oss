@@ -223,7 +223,7 @@ export default function WebhooksApiTokensV8() {
       }
       if (selectedAccountIdRef.current !== requestAccountId) return
       setCreateError(describeApiFailure(caught, '発行', {
-        forbidden: '鍵の発行は統括だけができます。必要なときは統括に頼んでください。',
+        scope: 'store',
       }))
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setCreating(false)
@@ -264,7 +264,7 @@ export default function WebhooksApiTokensV8() {
         return
       }
       setDialogError(describeApiFailure(caught, '入れ替え', {
-        forbidden: '鍵の入れ替えは統括だけができます。必要なときは統括に頼んでください。',
+        scope: 'store',
       }))
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setMutating(false)
@@ -297,7 +297,7 @@ export default function WebhooksApiTokensV8() {
       }
       if (selectedAccountIdRef.current !== requestAccountId) return
       setDialogError(describeApiFailure(caught, '停止', {
-        forbidden: '鍵の停止は統括だけができます。必要なときは統括に頼んでください。',
+        scope: 'store',
       }))
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setMutating(false)
@@ -316,11 +316,11 @@ export default function WebhooksApiTokensV8() {
 
   return (
     <ListPage
-      help="行の「…」から止める。止めても、すでに付けたタグは残ります。"
+      help={<>{WEBHOOKS_DESCRIPTION}{"行の「…」から止める。止めても、すでに付けたタグは残ります。"}</>}
       boardId="ralAc"
       headingSize="regular"
       title="外部連携"
-      description={WEBHOOKS_DESCRIPTION}
+
       actions={canManage ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={15} aria-hidden="true" />見本から作る</Button> : undefined}
       tabs={<WebhookTabs active="api-tokens" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>

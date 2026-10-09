@@ -100,7 +100,7 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
   })
 
   it('処理エラーと配信自体の稼働状態を混同しない', () => {
-    // 稼働状況は実状態から出す。固定表示では停止中も稼働中に見える。
+    // 稼働状況は実状態から出す。固定表示では停止中も有効に見える。
     expect(PAGE).toContain("ruleState?.status")
     expect(PAGE).toContain("ruleState.resendSuppressionHours")
   })

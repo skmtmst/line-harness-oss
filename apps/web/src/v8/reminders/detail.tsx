@@ -61,7 +61,10 @@ import { reminderTriggerLabel, reminderStopSummary, renderReminderBodySample } f
 import SheetDialog from './sheet-dialog'
 import styles from './detail.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-
+import { PageHeading } from '@/components/templates/page-frame'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 const PAGE_SIZE = 20
 /** 書き出しの上限。実行結果が多いとき、手元に全部ため込むと固まる。 */
@@ -106,13 +109,13 @@ function jstParts(value: string | null) {
 /** 「10/1（水）18:00」（日本時間）。 */
 function formatMd(value: string | null): string {
   const p = jstParts(value)
-  return p ? `${p.month}/${p.day}（${p.weekday}）${p.time}` : '—'
+  return p ? `${p.month}/${p.day}（${p.weekday}）${p.time}` : emptyValue('unknown')
 }
 
 /** 「9/30 18:00」（日本時間）。 */
 function formatShort(value: string | null): string {
   const p = jstParts(value)
-  return p ? `${p.month}/${p.day} ${p.time}` : '—'
+  return p ? `${p.month}/${p.day} ${p.time}` : emptyValue('unknown')
 }
 
 /** 「9月28日」（日本時間）。 */
@@ -179,7 +182,7 @@ function csvFor(items: ReminderDeliveryRun[]): string {
       formatJst(item.completedAt ?? item.startedAt),
       item.attemptCount,
       formatJst(item.nextRetryAt),
-      item.lineRequestId ?? '—',
+      item.lineRequestId ?? emptyValue('unknown'),
       item.lastErrorMessage ?? '',
     ]),
   ]
@@ -195,7 +198,7 @@ function StatusPill({ tone, children }: { tone: 'ok' | 'warn' | 'muted'; childre
 export default function ReminderDetailV8Page() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
-    <Suspense fallback={<ListState kind="loading" />}>
+    <Suspense fallback={<DetailLoading />}>
       <ReminderDetailV8 />
     </Suspense>
   )
@@ -349,7 +352,7 @@ function ReminderDetailV8() {
       const url = URL.createObjectURL(new Blob([csvFor(all)], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `reminder-runs-${reminderId}.csv`
+      anchor.download = csvFileName("リマインダの実行履歴")
       anchor.click()
       URL.revokeObjectURL(url)
     } catch {
@@ -459,7 +462,7 @@ function ReminderDetailV8() {
       <ListState kind="empty" title="リマインダが指定されていません" description="一覧から選び直してください。" action={<Button href="/reminders">リマインダ一覧へ戻る</Button>} />
     )
   }
-  if (loading) return <ListState kind="loading" title="リマインダの詳細を読み込んでいます" />
+  if (loading) return <DetailLoading label="リマインダの詳細を読み込んでいます" />
   if (missing) {
     return (
       <ListState kind="empty" title="このリマインダは見つかりません" description="削除されたか、別の記録です。一覧から選び直してください。" action={<Button href="/reminders">リマインダ一覧へ戻る</Button>} />
@@ -471,7 +474,7 @@ function ReminderDetailV8() {
 
   const hasErrors = data.summary.errors > 0
   const firstStep = data.steps[0] ?? null
-  const statusLabel = !data.reminder.hasPublishedVersion ? '下書き' : data.reminder.isActive ? '稼働中' : '停止中'
+  const statusLabel = !data.reminder.hasPublishedVersion ? '下書き' : data.reminder.isActive ? '有効' : '停止中'
   const nextTime = jstParts(data.summary.nextScheduledAt)?.time ?? ''
   const accountName = selectedAccount?.name ?? 'LINE公式アカウント'
   const meta = [
@@ -482,10 +485,9 @@ function ReminderDetailV8() {
 
   return (
     <PageFrame kind="detail" boardId={tab === 'registrants' ? 'loVfW' : 'rbAig'}>
-      <header className={styles.head} data-template-region="heading">
-        <h1 className={styles.title} title={data.reminder.name}>{data.reminder.name}</h1>
-        <p className={styles.meta}>{meta}</p>
-        <Tabs
+      <PageHeading title={data.reminder.name}
+        crumbs={<><p className={styles.meta}>{meta}</p></>}
+        tabs={<><Tabs
           label="リマインダの詳細"
           items={[
             { label: '概要', current: tab === 'overview', onClick: () => selectTab('overview') },
@@ -493,8 +495,7 @@ function ReminderDetailV8() {
             { label: '実行結果', current: tab === 'runs', onClick: () => selectTab('runs') },
             { label: '登録者', current: tab === 'registrants', onClick: () => selectTab('registrants') },
           ]}
-        />
-      </header>
+        /></>} />
 
       <div className={styles.split}>
         <div className={styles.main}>
@@ -560,11 +561,11 @@ function ReminderDetailV8() {
           <CreateSummaryCard
             title="いまの状態"
             rows={[
-              { key: 'state', label: '状態', value: <span className={styles.valueState} title={reminderStopSummary(data.reminder.stopConditions)} data-tone={statusLabel === '稼働中' ? 'ok' : undefined}>{statusLabel}</span> },
-              { key: 'registrants', label: '登録者', value: `${formatNumber(data.summary.targetCount)} 人` },
-              { key: 'next7', label: 'これから送る（今後7日）', value: `${formatNumber(data.summary.scheduledNext7Days ?? 0)} 通` },
-              { key: 'month', label: '今月送った', value: `${formatNumber(data.summary.sentThisMonth ?? 0)} 通` },
-              { key: 'errors', label: '失敗', value: <span className={hasErrors ? styles.valueDanger : undefined}>{`${formatNumber(data.summary.errors)} 通`}</span> },
+              { key: 'state', label: '状態', value: <span className={styles.valueState} title={reminderStopSummary(data.reminder.stopConditions)} data-tone={statusLabel === '有効' ? 'ok' : undefined}>{statusLabel}</span> },
+              { key: 'registrants', label: '登録者', value: `${formatNumber(data.summary.targetCount)}人` },
+              { key: 'next7', label: 'これから送る（今後7日）', value: `${formatNumber(data.summary.scheduledNext7Days ?? 0)}通` },
+              { key: 'month', label: '今月送った', value: `${formatNumber(data.summary.sentThisMonth ?? 0)}通` },
+              { key: 'errors', label: '失敗', value: <span className={hasErrors ? styles.valueDanger : undefined}>{`${formatNumber(data.summary.errors)}通`}</span> },
             ]}
           />
 
@@ -675,9 +676,9 @@ function OverviewTab({
             <div key={step.id} role="row" className={styles.row}>
               <span role="cell" className={styles.colNum}>{step.stepNumber}</span>
               <span role="cell" className={styles.colFlex} title={stepLabel(step)}>{stepTiming(step, detailSteps[index], reminder?.deliveryMode)}</span>
-              <span role="cell" className={styles.colSent}>{formatNumber(step.sent)} 通</span>
-              <span role="cell" className={styles.colFail} data-danger={step.errors > 0 || undefined}>{formatNumber(step.errors)} 通</span>
-              <span role="cell" className={styles.colNext}>{nextByStep ? formatMd(nextByStep[step.stepNumber] ?? null) : '—'}</span>
+              <span role="cell" className={styles.colSent}>{formatNumber(step.sent)}通</span>
+              <span role="cell" className={styles.colFail} data-danger={step.errors > 0 || undefined}>{formatNumber(step.errors)}通</span>
+              <span role="cell" className={styles.colNext}>{nextByStep ? formatMd(nextByStep[step.stepNumber] ?? null) : emptyValue('unknown')}</span>
             </div>
           ))}
         </div>
@@ -766,7 +767,7 @@ function ScheduleTab({ reminderId, steps }: { reminderId: string; steps: Reminde
         <p className={styles.cardNote}>これから送る通知を予定の近い順に並べています。</p>
       </div>
       {state === 'loading' ? (
-        <ListState kind="loading" title="配信予定を読み込んでいます" />
+        <DetailLoading label="配信予定を読み込んでいます" />
       ) : state === 'error' ? (
         <ListState kind="error" title="配信予定を読み込めませんでした" onRetry={() => void load()} />
       ) : items.length === 0 ? (
@@ -894,7 +895,7 @@ function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string;
         <Button onClick={() => { setAppliedSearch(search.trim()); setPage(1) }}>探す</Button>
       </div>
       {state === 'loading' ? (
-        <ListState kind="loading" title="実行結果を読み込んでいます" />
+        <DetailLoading label="実行結果を読み込んでいます" />
       ) : state === 'error' ? (
         <ListState kind="error" title="実行結果を読み込めませんでした" onRetry={() => void load()} />
       ) : items.length === 0 ? (
@@ -1082,7 +1083,7 @@ function RegistrantsTab({ reminderId, canManage }: { reminderId: string; canMana
         </div>
 
         {loading ? (
-          <ListState kind="loading" title="登録者を読み込んでいます" />
+          <DetailLoading label="登録者を読み込んでいます" />
         ) : error ? (
           <ListState kind="error" title="登録者を表示できませんでした" description={error} onRetry={() => void load()} />
         ) : items.length === 0 ? (

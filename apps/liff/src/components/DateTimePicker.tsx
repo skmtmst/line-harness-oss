@@ -246,35 +246,29 @@ function DaySlots({
           {times.map((t) => {
             const active = selected?.date === day && selected?.start === t.start;
             const timeButton = (
-              <button
+              <Button variant="choice"
                 key={t.start}
                 type="button"
                 onClick={() => onSelect(pickOf(day, t))}
                 disabled={!t.open}
                 aria-pressed={active}
-                className={`liff-press liff-num h-11 w-full rounded-(--liff-radius) px-1 text-[15px] focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
-                  active
-                    ? 'bg-liff-primary font-bold text-(--liff-on-primary)'
-                    : t.open
-                      ? 'bg-canvas font-medium text-ink outline -outline-offset-1 outline-liff-line-strong'
-                      : 'bg-liff-off-bg font-medium text-liff-off-ink'
-                }`}
+
               >
                 {t.start}
-              </button>
+              </Button>
             );
             if (t.open || !onWaitlist) return timeButton;
             return (
               <span key={t.start} className="relative block">
                 {timeButton}
-                <button
+                <Button variant="overlay-bell"
                   type="button"
                   onClick={() => onWaitlist(pickOf(day, t))}
                   aria-label={`${t.start}に空いたら知らせる`}
-                  className="liff-hit liff-press absolute -top-1.5 -right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-canvas text-liff-primary shadow outline-1 -outline-offset-1 outline-liff-line-strong focus-visible:outline-2 focus-visible:outline-ink"
+
                 >
                   <Icon name="bell" className="h-[14px] w-[14px]" />
-                </button>
+                </Button>
               </span>
             );
           })}
@@ -662,19 +656,17 @@ export default function DateTimePicker({
   const toggleButton = (target: DateView, label: string) => {
     const active = view === target;
     return (
-      <button
+      <Button variant="segment"
         key={target}
         ref={target === 'list' ? listButtonRef : calendarButtonRef}
         type="button"
         role="radio"
         aria-checked={active}
         onClick={() => switchView(target)}
-        className={`liff-hit flex h-8 flex-1 items-center justify-center rounded-lg px-1 text-xs focus-visible:outline-2 focus-visible:outline-ink ${
-          active ? 'bg-canvas font-bold text-ink' : 'font-semibold text-liff-sub'
-        }`}
+        className="flex-1"
       >
         {label}
-      </button>
+      </Button>
     );
   };
 
@@ -702,15 +694,15 @@ export default function DateTimePicker({
         </Button>
       )}
       {view === 'list' && settings?.calendarMode === 'month-only' ? (
-        <button type="button" className="liff-hit self-center text-xs text-liff-sub" onClick={() => switchView('calendar')}>日を選び直す</button>
+        <Button variant="text" type="button" className="self-center" onClick={() => switchView('calendar')}>日を選び直す</Button>
       ) : null}
-      <button
+      <Button variant="text"
         type="button"
         onClick={onBackToStaff}
-        className="liff-hit self-center text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
+        className="self-center"
       >
         ← 担当を選び直す
-      </button>
+      </Button>
     </BottomBar>
   );
 
@@ -767,15 +759,15 @@ export default function DateTimePicker({
         ) : (
           <>
             <div className="flex items-center gap-[5px]" role="group" aria-label="週をえらぶ">
-              <button
+              <Button variant="icon"
                 type="button"
                 onClick={() => moveWeek(-1)}
                 disabled={!canPrevWeek}
                 aria-label="前の週"
-                className="liff-hit flex h-10 w-[18px] shrink-0 items-center justify-center text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:text-liff-off-ink"
+                className="shrink-0"
               >
                 <Icon name="chevron-left" className="h-[18px] w-[18px]" />
-              </button>
+              </Button>
               <div ref={stripRef} className="grid flex-1 grid-cols-5 gap-[5px]" role="group" aria-label="日付">
                 {weekDays.map((d) => {
                   const state = stateOf(
@@ -794,7 +786,7 @@ export default function DateTimePicker({
                   const pressable = selectable || state === 'full';
                   const active = d === listDay;
                   return (
-                    <button
+                    <Button variant="weekday"
                       key={d}
                       type="button"
                       onClick={() => {
@@ -805,13 +797,7 @@ export default function DateTimePicker({
                       aria-pressed={active}
                       aria-label={dayStateLabel(d, state)}
                       title={dayStateLabel(d, state)}
-                      className={`liff-press flex flex-col items-center gap-0.5 rounded-(--liff-radius) py-2 outline -outline-offset-1 focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
-                        active
-                          ? 'bg-liff-soft outline-2 outline-liff-primary'
-                          : state === 'closed' || state === 'empty'
-                            ? 'bg-liff-off-bg outline-1 outline-liff-line'
-                            : 'bg-canvas outline-1 outline-liff-line'
-                      }`}
+
                     >
                       <span className="text-[10px] text-liff-sub">{formatWeekday(d)}</span>
                       <span
@@ -835,19 +821,19 @@ export default function DateTimePicker({
                           {weekMark(state)}
                         </span>
                       )}
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
-              <button
+              <Button variant="icon"
                 type="button"
                 onClick={() => moveWeek(1)}
                 disabled={!canNextWeek}
                 aria-label="次の週"
-                className="liff-hit flex h-10 w-[18px] shrink-0 items-center justify-center text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:text-liff-off-ink"
+                className="shrink-0"
               >
                 <Icon name="chevron-right" className="h-[18px] w-[18px]" />
-              </button>
+              </Button>
             </div>
             {listDay && (
               <>
@@ -895,27 +881,27 @@ export default function DateTimePicker({
           <div>
             {/* 板 k3aJKU：月・曜日・各週・凡例の間は 14。行の高さは月の名前の字の高さ (押す所は 36 のまま上下へはみ出す)。 */}
             <div aria-label="月をえらぶ" className="mb-3.5 flex h-[22px] items-center justify-between">
-              <button
+              <Button variant="icon"
                 type="button"
                 onClick={() => setMonth(addMonths(month, -1))}
                 disabled={!canPrevMonth}
                 aria-label="前の月"
-                className="liff-hit flex h-9 w-9 items-center justify-center text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:text-liff-off-ink"
+
               >
                 <Icon name="chevron-left" className="h-[18px] w-[18px]" />
-              </button>
+              </Button>
               <p aria-live="polite" className="text-[15px] font-bold text-ink">
                 {monthLabel}
               </p>
-              <button
+              <Button variant="icon"
                 type="button"
                 onClick={() => setMonth(addMonths(month, 1))}
                 disabled={!canNextMonth}
                 aria-label="次の月"
-                className="liff-hit flex h-9 w-9 items-center justify-center text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:text-liff-off-ink"
+
               >
                 <Icon name="chevron-right" className="h-[18px] w-[18px]" />
-              </button>
+              </Button>
             </div>
             {!monthLoaded ? (
               <LoadingView />
@@ -952,7 +938,7 @@ export default function DateTimePicker({
                     const pressable = selectable || state === 'full';
                     const active = d === calDay;
                     return (
-                      <button
+                      <Button variant="calendar" full={state === 'full'}
                         key={d}
                         type="button"
                         onClick={() => {
@@ -962,15 +948,7 @@ export default function DateTimePicker({
                         disabled={!pressable}
                         aria-pressed={active}
                         aria-label={dayStateLabel(d, state)}
-                        className={`liff-press flex h-11 flex-col items-center justify-center gap-0.5 rounded-(--liff-radius) focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
-                          active
-                            ? 'bg-liff-primary font-semibold text-(--liff-on-primary)'
-                            : selectable
-                              ? 'font-semibold text-ink'
-                              : state === 'full'
-                                ? 'font-semibold text-liff-full'
-                                : 'font-semibold text-liff-off-ink'
-                        }`}
+
                       >
                         <span className="liff-num text-sm leading-tight">{dayNum}</span>
                         <span className="flex h-1.5 items-center leading-none">
@@ -982,7 +960,7 @@ export default function DateTimePicker({
                             />
                           )}
                         </span>
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>

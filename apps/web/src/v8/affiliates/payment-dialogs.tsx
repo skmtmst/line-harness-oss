@@ -22,6 +22,7 @@ import Dialog from '@/components/shared/dialog'
 import OtpInput from '@/components/shared/otp-input'
 import { formatDate, formatYen, periodText } from './display'
 import styles from './affiliates.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 export function SettlementCloseDialog({
   preview,
@@ -206,9 +207,7 @@ export function PayoutStepUpDialog({
             : '銀行用 CSV には口座情報が入ります。認証アプリの 6 桁コードで本人確認したときだけ書き出せます。ファイルは 15 分で期限切れになります。'}
         </p>
         {usePassword ? (
-          <label className={styles.stepField} htmlFor="affiliate-payout-step-up">
-            パスワード
-            <input
+          <Field label="パスワード" htmlFor="affiliate-payout-step-up"><input
               id="affiliate-payout-step-up"
               type="password"
               value={code}
@@ -216,8 +215,7 @@ export function PayoutStepUpDialog({
               autoFocus
               autoComplete="current-password"
               className={styles.stepInput}
-            />
-          </label>
+            /></Field>
         ) : stepUpMethod === 'totp' ? (
           <OtpInput
             id="affiliate-payout-step-up"

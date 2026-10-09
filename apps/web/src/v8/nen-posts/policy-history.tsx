@@ -16,9 +16,11 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { formatPhotoReceivedAt } from './time'
 import styles from './review.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
-
-const policyContent = (version: PhotoRewardPolicyVersion) => `採用 ${version.points}・公式サイト掲載 ${version.publicationPoints ? `さらに ${version.publicationPoints}` : 'なし'}`
+const policyContent = (version: PhotoRewardPolicyVersion) => `採用 ${version.points}・公式サイト掲載 ${version.publicationPoints ? `さらに ${version.publicationPoints}` : emptyValue('none')}`
 
 /** 版の日時は「9/20 10:00」の短い形（日本時間）。全文は title で読める。 */
 function shortWhen(value: string | null | undefined): string {
@@ -94,7 +96,7 @@ export default function PhotoPolicyHistoryV8({ open, canEdit, onClose, onChanged
       {loading ? <ListState kind="loading" title="版を読み込んでいます" /> : error ? <ListState kind="error" title={error} onRetry={() => void load()} /> : <>
         <div className={styles.historyTable}><DataTable><thead><TableHeadRow><Th>版</Th><Th>保存日時</Th><Th>保存した人</Th><Th>内容</Th><Th><span className="sr-only">操作</span></Th></TableHeadRow></thead><tbody>
           {versions.filter((version) => version.status !== 'reserved').map((version) => <Tr key={version.versionNumber}>
-            <Td>{`v${version.versionNumber}`}</Td><Td><span title={formatPhotoReceivedAt(version.createdAt)}>{shortWhen(version.createdAt)}</span></Td><Td>{version.createdBy || '—'}</Td><Td>{policyContent(version)}</Td>
+            <Td>{`v${version.versionNumber}`}</Td><Td><span title={formatPhotoReceivedAt(version.createdAt)}>{shortWhen(version.createdAt)}</span></Td><Td>{version.createdBy || emptyValue('unknown')}</Td><Td>{policyContent(version)}</Td>
             <Td>{version.status === 'in_use' ? <StatusBadge tone="success">いま使っている版</StatusBadge> : <Button variant="secondary" onClick={() => setSelected(version)}>比べる</Button>}</Td>
           </Tr>)}
         </tbody></DataTable></div>
@@ -104,16 +106,18 @@ export default function PhotoPolicyHistoryV8({ open, canEdit, onClose, onChanged
           <section className={styles.historyCard}>
             <h3 className={styles.railTitle}>予約中の版</h3>
             {reserved.length ? reserved.map((version) => <div key={version.versionNumber} className={styles.historyReserved}>
-              <p className={styles.historyReservedHead}><strong>{`v${version.versionNumber}`}</strong><StatusBadge tone="info">予約</StatusBadge><span className={styles.historyReservedWhen} title={version.effectiveFrom ? formatPhotoReceivedAt(version.effectiveFrom) : undefined}>{version.effectiveFrom ? `${shortWhen(version.effectiveFrom)} から` : '—'}</span></p>
+              <p className={styles.historyReservedHead}><strong>{`v${version.versionNumber}`}</strong><StatusBadge tone="info">予約</StatusBadge><span className={styles.historyReservedWhen} title={version.effectiveFrom ? formatPhotoReceivedAt(version.effectiveFrom) : undefined}>{version.effectiveFrom ? `${shortWhen(version.effectiveFrom)} から` : emptyValue('unknown')}</span></p>
               <p className={styles.historyReservedBody}>{policyContent(version)}</p>
             </div>) : <p className={styles.railNote}>予約中の版はありません</p>}
           </section>
           {canEdit ? <form className={styles.historyCard} onSubmit={(event) => { event.preventDefault(); void save() }}>
             <h3 className={styles.railTitle}>引き出し：新しい版を作る</h3>
             <p className={styles.historyLead}>保存しても、使い始めの日時までは今の版のままです。</p>
-            <div className={styles.historyFields}><label className={styles.inputLabel}>採用したら（マイル）<TextField {...fields.bind('photo-policy-points')} aria-label="採用したら（マイル）" inputMode="numeric" value={points} onChange={(event) => setPoints(event.target.value.replace(/[^0-9]/g, '').slice(0, 6))} disabled={saving} /><FieldError id="photo-policy-points-error">{fields.error('photo-policy-points')}</FieldError></label>
-              <label className={styles.inputLabel} title="掲載時の追加報酬は、同じ写真に一度だけ付与します。">掲載されたら（さらに）<TextField {...fields.bind('photo-policy-publication')} aria-label="掲載されたら（さらに）" inputMode="numeric" value={publicationPoints} onChange={(event) => setPublicationPoints(event.target.value.replace(/[^0-9]/g, '').slice(0, 6))} disabled={saving} /><FieldError id="photo-policy-publication-error">{fields.error('photo-policy-publication')}</FieldError></label></div>
-            <label className={styles.inputLabel}>ひとこと（なぜ変えるか）<TextField value={summary} maxLength={200} disabled={saving} onChange={(event) => setSummary(event.target.value)} /></label>
+            <div className={styles.historyFields}><Field label="採用したら（マイル）"><NumberInput numericText unit="マイル" {...fields.bind('photo-policy-points')} aria-label="採用したら（マイル）" inputMode="numeric" value={points} onChange={(event) => setPoints(event.target.value.replace(/[^0-9]/g, '').slice(0, 6))} disabled={saving} />
+<FieldError id="photo-policy-points-error">{fields.error('photo-policy-points')}</FieldError></Field>
+              <Field label="掲載されたら（さらに）"><NumberInput numericText {...fields.bind('photo-policy-publication')} aria-label="掲載されたら（さらに）" inputMode="numeric" value={publicationPoints} onChange={(event) => setPublicationPoints(event.target.value.replace(/[^0-9]/g, '').slice(0, 6))} disabled={saving} />
+<FieldError id="photo-policy-publication-error">{fields.error('photo-policy-publication')}</FieldError></Field></div>
+            <Field label="ひとこと（なぜ変えるか）"><TextField value={summary} maxLength={200} disabled={saving} onChange={(event) => setSummary(event.target.value)} /></Field>
             <div className={styles.inputLabel} title="日本時間。空ならすぐ使い始めます。"><span aria-hidden="true">使い始め</span><DateTimeField id="photo-policy-effective" aria-describedby={fields.error('photo-policy-effective') ? 'photo-policy-effective-error' : undefined} invalid={Boolean(fields.error('photo-policy-effective'))} aria-label="使い始め（日本時間・空ならすぐ）" placeholder="空ならすぐ" value={effective} disabled={saving} onChange={setEffective} /><FieldError id="photo-policy-effective-error">{fields.error('photo-policy-effective')}</FieldError></div>
             {saveError ? <p role="alert" className={styles.errorText}>{saveError}</p> : null}
             <div className={styles.historyActions}><Button variant="secondary" disabled={saving} onClick={() => { setPoints(''); setPublicationPoints('0'); setSummary(''); setEffective(''); setSaveError(''); fields.reset() }}>キャンセル</Button><Button type="submit" variant="primary" busy={saving} disabled={saving}>{effective ? '版を予約する' : '版を保存する'}</Button></div>

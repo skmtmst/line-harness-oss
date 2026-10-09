@@ -23,6 +23,10 @@ import { api, ApiError, type AnalyticsCrossAxis, type AnalyticsCrossResult } fro
 import { formatNumber, formatTime } from '@/lib/format'
 import { downloadCsv, periodCaption, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
+import PeriodPicker, { useReportPeriod } from '@/components/shared/period-picker'
+import { Field } from '@/components/shared/form-controls'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type CrossQueueStatus = { state: 'pending' | 'running' | 'available' | 'partial' | 'unavailable' | 'failed'; queuePosition: number | null; pendingAhead: number; estimatedWaitMs: number | null; nextTickAt: string | null }
 export type CrossSaveSlot = (props: { sourceResultId: string; defaultName: string }) => ReactNode
@@ -95,7 +99,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
   const [measureEventType, setMeasureEventType] = useState(MEASURE_EVENTS[0].value)
   const [rowAxis, setRowAxis] = useState<string>('tag')
   const [columnAxis, setColumnAxis] = useState<string>('route')
-  const [crossDays, setCrossDays] = useState(30)
+  const { days: crossDays, setDays: setCrossDays, customRange, setRange } = useReportPeriod()
   const [crossResult, setCrossResult] = useState<AnalyticsCrossResult | null>(null)
   const [crossRunId, setCrossRunId] = useState('')
   const [crossResultId, setCrossResultId] = useState('')
@@ -230,8 +234,8 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
         columnAxis: axisOf(columnAxis),
         measure: measureKind === 'events' ? { kind: 'events', eventType: measureEventType } : { kind: 'unique_friends' },
         filters: [],
-        periodFrom: from.toISOString(),
-        periodTo: now.toISOString(),
+        periodFrom: customRange ? `${customRange.from}T00:00:00+09:00` : from.toISOString(),
+        periodTo: customRange ? new Date(Math.min(Date.now(), Date.parse(`${customRange.to}T23:59:59.999+09:00`))).toISOString() : now.toISOString(),
       })
       if (!response.success) throw new Error(response.error)
       if (viewGeneration.current !== generation) return
@@ -290,7 +294,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
 
   const exportCross = () => {
     if (!crossResult) return
-    downloadCsv('analytics-cross.csv', [
+    downloadCsv(csvFileName("掛け合わせ集計"), [
       [`${resultAxes?.row ?? 'たて'} ＼ ${resultAxes?.column ?? 'よこ'}`, ...cols.map((column) => column.label), '合計'],
       ...rows.map((row) => [row.label, ...cols.map((column) => lookup.get(`${row.key}\u0000${column.key}`)?.value ?? 0), rowTotals.get(row.key) ?? 0]),
       ['合計', ...cols.map((column) => colTotals.get(column.key) ?? 0), grandTotal],
@@ -318,7 +322,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
   const kpis = <KpiBand className={styles.band}>
     {/* 表の合計は延べ人数。集計対象は口が数えた実際の人数（重複なし）。 */}
     <KpiCard presentation="band" title="集計対象" icon={<Users size={13} aria-hidden="true" />} value={crossResult ? crossResult.totalFriends : null} unit="人" detail={crossResult ? `表の延べ ${formatNumber(grandTotal)} ${unit}` : '結果が出ると数えます'} loading={loading} />
-    <KpiCard presentation="band" title="いちばん多い組み合わせ" icon={<Grid2x2 size={13} aria-hidden="true" />} value={summary?.top.value ?? null} unit={unit} detail={summary ? `${summary.top.rowLabel} × ${summary.top.columnLabel}` : '—'} loading={loading} />
+    <KpiCard presentation="band" title="いちばん多い組み合わせ" icon={<Grid2x2 size={13} aria-hidden="true" />} value={summary?.top.value ?? null} unit={unit} detail={summary ? `${summary.top.rowLabel} × ${summary.top.columnLabel}` : emptyValue('unknown')} loading={loading} />
     <KpiCard presentation="band" title="空のマス" icon={<Square size={13} aria-hidden="true" />} value={summary?.empty ?? null} unit="マス" detail={summary ? (summary.emptyLabels.slice(0, 2).join('・') || '該当者なし') : '該当者なし'} loading={loading} />
     {/* その項目に値が入っていない人は集計が数えていない。 */}
     <KpiCard presentation="band" title="未入力" icon={<HelpCircle size={13} aria-hidden="true" />} value={null} unit="人" detail="値がまだ無い人（表に出ない）" />
@@ -337,21 +341,11 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
     {kpis}
     <div className={styles.body} data-gap="tab">
       <div className={styles.controls}>
-        <label className={styles.field} data-w="measure"><span className={styles.fieldLabel}>数えるもの</span>
-          <Select id="cross-measure" value={measureKind} onChange={(value) => setMeasureKind(value as 'unique_friends' | 'events')} aria-label="数えるもの" size="full" options={[{ value: 'unique_friends', label: '友だちの人数（重複なし）' }, { value: 'events', label: 'イベントの回数' }]} />
-        </label>
-        {measureKind === 'events' ? <label className={styles.field} data-w="axis"><span className={styles.fieldLabel}>数えるイベント</span>
-          <Select id="cross-measure-event" value={measureEventType} onChange={setMeasureEventType} aria-label="数えるイベント" size="full" options={MEASURE_EVENTS} />
-        </label> : null}
-        <label className={styles.field} data-w="axis"><span className={styles.fieldLabel}>たての軸</span>
-          <Select aria-label="たての軸" value={rowAxis} onChange={setRowAxis} size="full" options={axisOptions(ROW_AXES)} />
-        </label>
-        <label className={styles.field} data-w="axis"><span className={styles.fieldLabel}>よこの軸</span>
-          <Select id="cross-field" aria-label="よこの軸" value={columnAxis} onChange={setColumnAxis} size="full" options={axisOptions(COLUMN_AXES)} />
-        </label>
-        <label className={styles.field} data-w="period"><span className={styles.fieldLabel}>期間</span>
-          <Select aria-label="期間" value={String(crossDays)} onChange={(value) => setCrossDays(Number(value))} size="full" options={PERIODS.map((days) => ({ value: String(days), label: `この${days}日` }))} />
-        </label>
+        <Field label="数えるもの"><Select id="cross-measure" value={measureKind} onChange={(value) => setMeasureKind(value as 'unique_friends' | 'events')} aria-label="数えるもの" size="full" options={[{ value: 'unique_friends', label: '友だちの人数（重複なし）' }, { value: 'events', label: 'イベントの回数' }]} /></Field>
+        {measureKind === 'events' ? <Field label="数えるイベント"><Select id="cross-measure-event" value={measureEventType} onChange={setMeasureEventType} aria-label="数えるイベント" size="full" options={MEASURE_EVENTS} /></Field> : null}
+        <Field label="たての軸"><Select aria-label="たての軸" value={rowAxis} onChange={setRowAxis} size="full" options={axisOptions(ROW_AXES)} /></Field>
+        <Field label="よこの軸"><Select id="cross-field" aria-label="よこの軸" value={columnAxis} onChange={setColumnAxis} size="full" options={axisOptions(COLUMN_AXES)} /></Field>
+        <PeriodPicker days={crossDays} onChange={setCrossDays} customRange={customRange} onRangeChange={setRange} />
         <Button variant="primary" onClick={() => void runCross()} disabled={loading || !crossStorageRestored || sameAxis || Boolean(crossRunId)} busy={loading} busyLabel="集計中" title={sameAxis ? 'たてとよこに同じ軸は選べません' : '期間や軸を変えた場合は、新しい結果として集計します'}>集計する</Button>
         <span className={styles.spacer} />
         {crossResult && crossResultId && canManage && renderSave ? <span title="条件の定義と、いま表示している結果を別々に固定して残します">{renderSave({ sourceResultId: crossResultId, defaultName: `クロス分析 ${resultAxes?.row ?? ''} × ${resultAxes?.column ?? ''}` })}</span> : null}

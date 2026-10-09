@@ -45,6 +45,7 @@ import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/folder-colors'
 import StatusPill from '@/components/shared/status-pill'
 import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type StatusFilter = 'all' | 'ok' | 'warn' | 'archived'
 type View = 'cards' | 'table'
@@ -422,13 +423,13 @@ export default function HqHomeV8() {
   const body = loadError ? (
     <Notice
       tone="danger"
-      message={loadFailureNotice(loadError, '統括のアカウント情報')}
+      message={loadFailureNotice(loadError, '統括のアカウント情報', 'hq')}
       action={classifyApiFailure(loadError) === 'forbidden' ? undefined : (
         <Button type="button" onClick={() => { setLoading(true); setReloadKey((key) => key + 1) }}>再読み込み</Button>
       )}
     />
   ) : loading ? (
-    <ListState kind="loading" loadingShape={view === 'cards' ? 'cards' : 'list'} title="アカウントを読み込んでいます" />
+    <ListState permissionScope="hq" kind="loading" loadingShape={view === 'cards' ? 'cards' : 'list'} title="アカウントを読み込んでいます" />
   ) : accounts.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */
     <EmptyList
@@ -525,7 +526,7 @@ export default function HqHomeV8() {
                 <dl className={styles.stats}>
                   <div className={styles.stat}>
                     <dt>友だち</dt>
-                    <dd>{isArchived(account) && !account.stats?.friendCount ? '—' : formatNumber(account.stats?.friendCount ?? 0)}</dd>
+                    <dd>{isArchived(account) && !account.stats?.friendCount ? emptyValue('unknown') : formatNumber(account.stats?.friendCount ?? 0)}</dd>
                   </div>
                   <div className={styles.stat}>
                     <dt>今月の配信</dt>
@@ -590,8 +591,8 @@ export default function HqHomeV8() {
     <ListPage
       boardId="JKjsE"
       title="統括のアカウント"
-      help="カードの「設定」から、フォルダの移動・名前・親アカウントを変えられます。アーカイブしたアカウントは「詳細」と「戻す」だけです（戻すのはオーナー・本人確認のあと「停止中」に戻ります）。"
-      description={`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`}
+      help={<>{`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`}{"カードの「設定」から、フォルダの移動・名前・親アカウントを変えられます。アーカイブしたアカウントは「詳細」と「戻す」だけです（戻すのはオーナー・本人確認のあと「停止中」に戻ります）。"}</>}
+
       folders={folderColumn}
       folderInset
       folderWidth={200}
@@ -648,7 +649,7 @@ export default function HqHomeV8() {
         description="アカウントは1つのフォルダに入ります。フォルダを消しても、アカウントは消えません。"
         name={folderName} onNameChange={setFolderName} nameId="hq-account-folder-name" nameLabel="フォルダの名前"
         color={folderColor} onColorChange={setFolderColor} colors={FOLDER_SELECT_COLORS}
-        placeholder="例: 渋谷エリア" maxLength={100}
+        placeholder="例：渋谷エリア" maxLength={100}
         onCancel={() => { if (!folderSaving) setFolderDialog(null) }}
         designNode="JKjsE" busy={folderSaving} error={folderError || undefined}
         confirmLabel={folderDialog?.editing ? '保存する' : '追加する'} cancelLabel="やめる"

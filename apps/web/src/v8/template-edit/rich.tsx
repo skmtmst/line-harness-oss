@@ -42,6 +42,7 @@ import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
 import type { TemplateEditHost } from './host'
 import styles from './edit.module.css'
 import rich from './rich.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 /* ── 形と面（template-asset-editor.tsx と同じ値） ── */
 export interface RichArea { label: string; x: number; y: number; width: number; height: number }
@@ -440,7 +441,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
             <Button type="button" onClick={() => void onSaveDraft()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined} busy={saving && !publishing} busyLabel="保存中…">
               下書きを保存
             </Button>
-            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined} busy={publishing || Boolean(host?.busy)} busyLabel="保存中…">
+            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined}  busy={publishing || Boolean(host?.busy)} busyLabel="保存中…">
               {host ? null : <Send size={15} aria-hidden="true" />}
               {host ? host.primaryLabel ?? '保存する' : '保存して公開'}
             </Button>
@@ -456,14 +457,9 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
             <h2 className={styles.cardTitle}>名前とフォルダ</h2>
           </div>
           <div className={styles.pair}>
-            <div className={`${styles.field} ${styles.grow}`}>
-              <label htmlFor="te-rich-name" className={styles.label}>テンプレート名</label>
-              <TextField {...fields.bind('name')} id="te-rich-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：夏のキャンペーン告知" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-rich-name-error' : undefined} />
-              <FieldError id="te-rich-name-error">{fields.error('name')}</FieldError>
-            </div>
-            <div className={`${styles.field} ${styles.folderField}`}>
-              <label htmlFor="te-rich-folder" className={styles.labelSmall}>フォルダ</label>
-              <FolderSelect
+            <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor="te-rich-name"><TextField {...fields.bind('name')} id="te-rich-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：夏のキャンペーン告知" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-rich-name-error' : undefined} />
+<FieldError id="te-rich-name-error">{fields.error('name')}</FieldError></Field></div>
+            <div className={`${styles.field} ${styles.folderField}`}><Field label="フォルダ" htmlFor="te-rich-folder"><FolderSelect
                 id="te-rich-folder"
                 aria-label="フォルダ"
                 value={host ? host.folder : folder}
@@ -475,8 +471,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                   : canMutate && selectedAccountId
                     ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: selectedAccountId }), folderByName, (created) => setFolders((current) => [...current, created]))
                     : undefined}
-              />
-            </div>
+              /></Field></div>
           </div>
         </Card>}
 
@@ -506,7 +501,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                 previewAlt="リッチメッセージの画像"
                 value={imageSet ? imageUrl.trim() : null}
                 accept="image/png,image/jpeg"
-                limitText={hqHost ? '8MB 以内' : '10MB 以内'}
+                maxBytes={(hqHost ? 8 : 10) * 1024 * 1024}
                 busy={hqHost ? uploading : undefined}
                 onBusyChange={hqHost ? undefined : setUploading}
                 disabled={busy && !uploading}

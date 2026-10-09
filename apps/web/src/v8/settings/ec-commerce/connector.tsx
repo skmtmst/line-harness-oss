@@ -31,7 +31,8 @@ import KpiCard from '@/components/shared/kpi-card'
 import { Field } from '@/components/shared/form-controls'
 import StatusBadge from '@/components/shared/status-badge'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
-
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /* 絵の並び（注文完了・発送完了・入金確認完了・返金完了・注文キャンセル・ペット情報更新）。 */
 const CONNECTOR_EVENT_TYPES = [
@@ -81,10 +82,10 @@ function toForm(connector: EcConnector | null): Form {
 function when(value: string | null | undefined): string {
   if (!value) return '—'
   const date = new Date(value)
-  return Number.isNaN(date.valueOf()) ? '—' : formatDateTime(date)
+  return Number.isNaN(date.valueOf()) ? emptyValue('unknown') : formatDateTime(date)
 }
 
-const READONLY_REASON = '見るだけの権限では設定を変えられません。変えるにはオーナーか管理者に頼んでください。'
+const READONLY_REASON = permissionDeniedMessage('store')
 
 export default function EcConnector({ accountId, canEdit = true }: { accountId: string | null; canEdit?: boolean }) {
   const [data, setData] = useState<EcConnectorOverview | null>(null)
@@ -226,7 +227,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
               <TextField ref={secretRef} id="ec-connector-secret" type="password" autoComplete="new-password" value={form.inboundSecret} onChange={(event) => setForm({ ...form, inboundSecret: event.target.value })} placeholder="32文字以上" />
             ) : (
               <div className={styles.keyRow}>
-                <span className={styles.keyMask} id="ec-connector-secret" title={connector?.secretUpdatedAt ? `${when(connector.secretUpdatedAt)} に更新` : undefined}>{connector?.secretConfigured ? `●●●●●●●●●●●●  ${connector.secretLastFour ?? '----'}` : '未設定'}</span>
+                <span className={styles.keyMask} id="ec-connector-secret" title={connector?.secretUpdatedAt ? `${when(connector.secretUpdatedAt)} に更新` : undefined}>{connector?.secretConfigured ? `●●●●●●●●●●●●  ${connector.secretLastFour ?? '----'}` : emptyValue('unconfigured')}</span>
                 {canEdit ? <Button type="button" onClick={() => setReplacingSecret(true)}>差し替える</Button> : null}
               </div>
             )}
@@ -248,7 +249,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
         <h2 id="ec-connector-status" className={styles.cardTitle}>取り込みの状態</h2>
         <p className={styles.desc}>止めると、ネットショップからの出来事を受け取らなくなります。「設定を保存する」で効きます。</p>
         <div className={styles.statusRow}>
-          <StatusBadge tone={connector?.status === 'paused' ? 'neutral' : 'success'} size="compact">{connector?.status === 'paused' ? '止めている' : '取り込み中'}</StatusBadge>
+          <StatusBadge tone={connector?.status === 'paused' ? 'neutral' : 'success'} size="compact">{connector?.status === 'paused' ? '停止中' : '取り込み中'}</StatusBadge>
           <span className={styles.statusText}>{`最後に受け取った ${when(data?.health.lastReceivedAt ?? null)}`}</span>
           {connector && canEdit ? (
             <Button type="button" onClick={() => setForm({ ...form, status: paused ? 'connected' : 'paused' })}>{paused ? '取り込みを再開する' : '取り込みを止める'}</Button>

@@ -34,6 +34,7 @@ import { withViewTransition } from '@/components/shared/view-transition'
 import { ViewerBand, WEBHOOKS_DESCRIPTION, WebhookBand, WebhookTabs, useWebhookOverview, type BandCell } from './shell'
 import { eventWord, shortDateTime } from './words'
 import styles from './interactions.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Direction = 'all' | 'outgoing' | 'incoming'
 type Status = 'all' | 'failed'
@@ -65,8 +66,8 @@ function bodyLines(item: WebhookInteraction): { main: string; sub: string } {
   const tail = rest.join('・')
   const retried = item.retryOfId
     ? '前の失敗をやり直した記録'
-    : item.status === 'failed' && item.attemptCount > 1 ? `${item.attemptCount} 回やり直して失敗` : ''
-  return { main: head || '—', sub: [tail, retried].filter(Boolean).join('・') }
+    : item.status === 'failed' && item.attemptCount > 1 ? `${item.attemptCount}回やり直して失敗` : ''
+  return { main: head || emptyValue('unknown'), sub: [tail, retried].filter(Boolean).join('・') }
 }
 
 function replyLabel(item: WebhookInteraction): { text: string; failed: boolean } {
@@ -76,7 +77,7 @@ function replyLabel(item: WebhookInteraction): { text: string; failed: boolean }
 }
 
 function seconds(ms: number | null): string {
-  return ms == null ? '—' : `${(Math.round(ms / 100) / 10).toFixed(1)} 秒`
+  return ms == null ? emptyValue('unknown') : `${(Math.round(ms / 100) / 10).toFixed(1)} 秒`
 }
 
 /* その記録をここからやり直せるかを業務の言葉で説明する（v7 と同じ定義）。 */
@@ -398,11 +399,11 @@ export default function WebhooksInteractionsV8() {
 
   return (
     <ListPage
-      help="行の「中身を見る」から 送った中身と返事・もう一度送る（失敗のとき）。"
+      help={<>{WEBHOOKS_DESCRIPTION}{"行の「中身を見る」から 送った中身と返事・もう一度送る（失敗のとき）。"}</>}
       boardId="Uv9AA"
       headingSize="regular"
       title="外部連携"
-      description={WEBHOOKS_DESCRIPTION}
+
       tabs={<WebhookTabs active="interactions" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
         {!isOwner && !canRetry ? <ViewerBand /> : null}
@@ -551,12 +552,12 @@ function InteractionDialog({ item, accountId, techOpen, setTechOpen, canRetry, r
           <div className={styles.dialogRow}><dt>返事</dt><dd>{item.responseLabel}{item.responseStatus !== null ? `（相手の応答番号 ${item.responseStatus}）` : ''}</dd></div>
           {item.failureReason ? <div className={styles.dialogRow}><dt>失敗した理由</dt><dd className={styles.danger}>{item.failureReason}</dd></div> : null}
           <div className={styles.dialogRow}><dt>試した回数</dt><dd>{`${item.attemptCount} 回（1分・5分・30分あけて）`}</dd></div>
-          <div className={styles.dialogRow}><dt>かかった時間</dt><dd>{item.durationMs == null ? '—' : `返事まで ${seconds(item.durationMs)}`}</dd></div>
+          <div className={styles.dialogRow}><dt>かかった時間</dt><dd>{item.durationMs == null ? emptyValue('unknown') : `返事まで ${seconds(item.durationMs)}`}</dd></div>
           <div className={styles.dialogRow}><dt>記録の番号</dt><dd>{item.id}</dd></div>
           {techOpen ? (
             <>
               <div className={styles.dialogRow}><dt>状態の記号</dt><dd>{item.status}</dd></div>
-              <div className={styles.dialogRow}><dt>やり直し元の記録</dt><dd>{item.retryOfId ?? '—'}</dd></div>
+              <div className={styles.dialogRow}><dt>やり直し元の記録</dt><dd>{item.retryOfId ?? emptyValue('unknown')}</dd></div>
             </>
           ) : null}
           <div className={`${styles.dialogRow} ${styles.dialogRowPill}`}>

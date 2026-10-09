@@ -21,7 +21,7 @@ import Notice from '@/components/shared/notice'
 import SectionHeader from '@/components/shared/section-header'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import Checkbox from '@/components/shared/checkbox'
 import Radio from '@/components/shared/radio'
 import { Field } from '@/components/shared/form-controls'
@@ -39,6 +39,10 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './screen.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
+import StoreFilterTabs from '@/components/shared/store-filter-tabs'
 
 export type MediaRow = {
   code: string
@@ -125,11 +129,11 @@ export function withSavedVersion(list: MediaRow[], code: string, version: number
 }
 
 function UrlCell({ url }: { url: string | null }) {
-  if (!url) return <span className={styles.none}>—</span>
+  if (!url) return <span className={styles.none}>{emptyValue('unknown')}</span>
   return (
-    <a className={styles.url} href={url} target="_blank" rel="noopener noreferrer" title={url}>
-      {`${shortUrl(url)} ↗`}
-    </a>
+    <TextLink external className={styles.url} href={url}   title={url}>
+      {`${shortUrl(url)}`}
+    </TextLink>
   )
 }
 
@@ -355,7 +359,7 @@ export default function BookingMediaPage() {
       await Promise.all([load(), loadNotice()])
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 409) setConflict(true)
-      else setSaveError(caught instanceof ApiError && caught.status === 400 ? 'URL は https:// で始まるものだけ保存できます。行の「…」から直してください。' : describeSaveFailure(caught))
+      else setSaveError(caught instanceof ApiError && caught.status === 400 ? 'URL は https:// で始まるものだけ保存できます。行の「…」から直してください。' : withPermissionFailure(caught, describeSaveFailure(caught), 'store'))
       /* 途中まで保存できた行があるので、版を読み直す（入力は残す）。 */
     } finally {
       setSaving(false)
@@ -439,8 +443,8 @@ export default function BookingMediaPage() {
           actions={(
             <span className={styles.headActions}>
               {stores.length > 1 ? (
-                <span className={styles.storeSelect}>
-                  <Select aria-label="店舗" value={storeId} onChange={(value) => { if (value === storeId) return; if (changes > 0) setPendingStoreId(value); else setStoreId(value) }} options={stores.map((s) => ({ value: s.id, label: s.name }))} />
+                <span>
+                  <StoreFilterTabs  value={storeId} onChange={(value) => { if (value === storeId) return; if (changes > 0) setPendingStoreId(value); else setStoreId(value) }} options={stores.map((s) => ({ value: s.id, label: s.name }))} />
                 </span>
               ) : null}
               {canManage ? <Button onClick={() => { setAdding(true); setAddName(''); setAddError(''); setAddNameError('') }}><Plus size={15} aria-hidden="true" />媒体を足す</Button> : null}
@@ -514,7 +518,7 @@ export default function BookingMediaPage() {
             <div className={styles.switchRow}>
               {/* 閲覧のみには押せる形のスイッチを置かない。オン・オフは札で見せる。 */}
               {canManage ? (
-                <Toggle checked={closeOn} label="LINE・電話で予約が入ったら、他のサイトの枠を閉じる知らせを出す" onChange={(next) => setAllClose(next)} />
+                <SettingCheckbox checked={closeOn} label="LINE・電話で予約が入ったら、他のサイトの枠を閉じる知らせを出す" onChange={(next) => setAllClose(next)} />
               ) : <StatusBadge tone={closeOn ? 'success' : 'neutral'}>{closeOn ? 'オン' : 'オフ'}</StatusBadge>}
               <span className={styles.switchText}>
                 <span className={styles.switchTitle}>LINE・電話で予約が入ったら、他のサイトの枠を閉じる知らせを出す</span>
@@ -524,7 +528,7 @@ export default function BookingMediaPage() {
             <div className={styles.switchRow}>
               {/* オフにすると LINE の知らせだけ止める（管理画面の「もう開けてよい」は残る）。閲覧のみは札。 */}
               {canManage && notice ? (
-                <Toggle checked={notice.notifyReopen} label="キャンセルで席が空いたら「もう開けてよい」を知らせる" onChange={(next) => setNotice({ ...notice, notifyReopen: next })} />
+                <SettingCheckbox checked={notice.notifyReopen} label="キャンセルで席が空いたら「もう開けてよい」を知らせる" onChange={(next) => setNotice({ ...notice, notifyReopen: next })} />
               ) : <StatusBadge tone={notice?.notifyReopen === false ? 'neutral' : 'success'}>{notice?.notifyReopen === false ? 'オフ' : 'オン'}</StatusBadge>}
               <span className={styles.switchText}>
                 <span className={styles.switchTitle}>キャンセルで席が空いたら「もう開けてよい」を知らせる</span>

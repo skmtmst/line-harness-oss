@@ -55,6 +55,8 @@ import {
 } from './parts'
 import styles from './affiliates.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type FilterKey = 'open' | 'draft'
 type FolderKey = 'all' | 'tag' | 'scenario' | 'miles' | 'none'
@@ -325,7 +327,7 @@ export default function OffersTab() {
   }
 
   const exportCsv = () => {
-    downloadCsv(`affiliate-offers-${new Date().toISOString().slice(0, 10)}.csv`, [
+    downloadCsv(csvFileName("アフィリエイト案件"), [
       ['案件名', '説明', '報酬（円）', 'マイル', '対象アカウント', '成果時のタグ', '開始するシナリオ', '状態', '作成日'],
       ...shown.map((offer) => [
         offer.name,
@@ -368,7 +370,7 @@ export default function OffersTab() {
         title="平均報酬"
         icon={<Banknote size={14} aria-hidden="true" />}
         value={null}
-        valueText={approvalState === 'ready' && !approvalsTruncated && averageReward != null ? formatYen(averageReward) : '—'}
+        valueText={approvalState === 'ready' && !approvalsTruncated && averageReward != null ? formatYen(averageReward) : emptyValue('unknown')}
         unit=""
         detail={approvalState === 'ready'
           ? (approvalsTruncated ? '件数が多く、全部は数えられませんでした' : averageReward == null ? '今月はまだ認めた成果がありません' : '1件あたり')
@@ -482,7 +484,7 @@ export default function OffersTab() {
                       {readonly ? (
                         <span className={styles.rowNameText} ><TruncatedText value={String(offer.name ?? '')} /></span>
                       ) : (
-                        <button type="button" className={styles.rowName} title={offer.name} onClick={() => { setEditTarget(offer); setFormOpen(true) }}>{offer.name}</button>
+                        <button type="button" className={styles.rowName} title={offer.name}  onClick={() => { setEditTarget(offer); setFormOpen(true) }}>{offer.name}</button>
                       )}
                     </FolderDotName>
                     <span className={styles.rowPlan} title={offer.description ?? undefined}>{offer.description ?? '説明はありません'}</span>
@@ -498,11 +500,11 @@ export default function OffersTab() {
                   <span className={styles.cellNum} title={actionText(offer)}>{actionText(offer)}</span>
                 </Td>
                 <Td className={`${styles.colOfferPeople} ${styles.num}`}>
-                  <span className={styles.cellNum}>{approvalState === 'ready' ? `${formatNumber(stat?.people.size ?? 0)} 人${approvalsTruncated ? '以上' : ''}` : '—'}</span>
+                  <span className={styles.cellNum}>{approvalState === 'ready' ? `${formatNumber(stat?.people.size ?? 0)}人${approvalsTruncated ? '以上' : ''}` : emptyValue('unknown')}</span>
                 </Td>
                 <Td className={`${styles.colOfferConv} ${styles.num}`}>
                   <span className={styles.stackEnd}>
-                    <span className={styles.cellNum}>{approvalState === 'ready' ? (stat ? `${formatNumber(stat.conversions)} 件${approvalsTruncated ? '以上' : ''}` : '—') : '—'}</span>
+                    <span className={styles.cellNum}>{approvalState === 'ready' ? (stat ? `${formatNumber(stat.conversions)}件${approvalsTruncated ? '以上' : ''}` : emptyValue('unknown')) : emptyValue('unknown')}</span>
                     {stat ? <span className={styles.rowPlan}>{`確定 ${formatYen(stat.reward)}`}</span> : null}
                   </span>
                 </Td>
@@ -564,7 +566,7 @@ export default function OffersTab() {
   return (
     <AffiliateFrame
       help={readonly ? '行の「…」から 決まり（受付期間・上限・数える期間）を見る。' : '行の「…」から 編集・決まり・公開を止める・複製。'}
-      actions={<Button onClick={exportCsv} disabled={shown.length === 0}><Download size={15} aria-hidden="true" /> CSV で書き出す</Button>}
+      actions={<Button onClick={exportCsv} disabled={shown.length === 0}><Download size={15} aria-hidden="true" /> CSVで書き出す</Button>}
       stats={stats}
       folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => undefined, createAction: readonly ? undefined : createButton(false) }}
       folders={narrow ? undefined : <>{createButton(true)}{folderPanel}</>}

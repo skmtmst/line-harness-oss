@@ -167,6 +167,7 @@ describe('V8 リマインダを作る②〜⑤', () => {
     await render('target')
     const frame = host.querySelector('[data-page-template="create"]')
     expect(frame?.getAttribute('data-design-node')).toBe('YChR6')
+    await act(async () => { buttonByText('?')!.click() })
     expect(host.textContent).toContain('名前：予約前日のご案内・いまは下書きです')
     expect(host.textContent).toContain('186 人')
     expect(host.textContent).toContain('172 人')

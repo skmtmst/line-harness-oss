@@ -26,6 +26,9 @@ import {
   useChangeReview,
 } from './change-review-model'
 import styles from './change-review-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
 
 /** datetime-local の入力値（壁時計）を見やすく出す。 */
 function formatLocalInput(local: string): string {
@@ -131,7 +134,7 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
       bits.push(`${formatLocalInput(isoToLocalInput(slot.starts_at))}〜${formatLocalInput(isoToLocalInput(slot.ends_at)).split(' ')[1] ?? ''} → ${formatLocalInput(edit.startsAt)}〜${formatLocalInput(edit.endsAt).split(' ')[1] ?? ''}`)
     }
     if (edit.capacity.trim() !== (slot.capacity == null ? '' : String(slot.capacity))) {
-      bits.push(`定員 ${slot.capacity == null ? 'なし' : `${slot.capacity}人`} → ${edit.capacity.trim() === '' ? 'なし' : `${edit.capacity.trim()}人`}`)
+      bits.push(`定員 ${slot.capacity == null ? emptyValue('none') : `${slot.capacity}人`} → ${edit.capacity.trim() === '' ? emptyValue('none') : `${edit.capacity.trim()}人`}`)
     }
     if ((edit.isActive ? 1 : 0) !== slot.is_active) {
       bits.push(`受付 ${slot.is_active === 1 ? 'する' : '止める'} → ${edit.isActive ? 'する' : '止める'}`)
@@ -212,9 +215,9 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
                             />
                           </Td>
                           <Td className="whitespace-nowrap text-sm tabular-nums">{formatJp(slot.starts_at)}</Td>
-                          <Td align="right" className="tabular-nums">{slot.capacity ?? '—'}</Td>
-                          <Td align="right" className="tabular-nums">{impact ? impact.confirmed_seats : '—'}</Td>
-                          <Td align="right" className="tabular-nums">{impact ? impact.waiting_seats : '—'}</Td>
+                          <Td align="right" className="tabular-nums">{slot.capacity ?? emptyValue('unknown')}</Td>
+                          <Td align="right" className="tabular-nums">{impact ? impact.confirmed_seats : emptyValue('unknown')}</Td>
+                          <Td align="right" className="tabular-nums">{impact ? impact.waiting_seats : emptyValue('unknown')}</Td>
                           <Td align="right">
                             <span className={receiving ? 'bg-success-bg text-success rounded-pill px-2 py-0.5 text-xs' : 'bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-xs'}>
                               {receiving ? '● 受付する' : '● 終了'}
@@ -235,38 +238,29 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
               <>
                 <p className={styles.cardNote}>{formatJp(activeSlot.starts_at)} の回</p>
                 <div className={`${styles.fieldGrid} mt-3`}>
-                  <label className="grid gap-1 text-xs font-medium text-ink-secondary">
-                    開始日時
-                    <input
+                  <Field label="開始日時"><input
                       type="datetime-local"
                       value={activeEdit?.startsAt ?? ''}
                       onChange={(e) => updateActiveEdit({ startsAt: e.target.value })}
                       aria-label="開始日時"
                       className="border-hairline rounded-control w-full border px-3 py-2 text-sm font-normal"
-                    />
-                  </label>
-                  <label className="grid gap-1 text-xs font-medium text-ink-secondary">
-                    終了日時
-                    <input
+                    /></Field>
+                  <Field label="終了日時"><input
                       type="datetime-local"
                       value={activeEdit?.endsAt ?? ''}
                       onChange={(e) => updateActiveEdit({ endsAt: e.target.value })}
                       aria-label="終了日時"
                       className="border-hairline rounded-control w-full border px-3 py-2 text-sm font-normal"
-                    />
-                  </label>
-                  <label className="grid gap-1 text-xs font-medium text-ink-secondary">
-                    定員
-                    <input
+                    /></Field>
+                  <Field label="定員"><NumberInput
                       type="number"
                       min={1}
                       value={activeEdit?.capacity ?? ''}
-                      placeholder={activeSlot.capacity == null ? 'なし' : String(activeSlot.capacity)}
+                      placeholder={activeSlot.capacity == null ? emptyValue('none') : String(activeSlot.capacity)}
                       onChange={(e) => updateActiveEdit({ capacity: e.target.value })}
                       aria-label="定員"
                       className="border-hairline rounded-control w-full border px-3 py-2 text-sm font-normal"
-                    />
-                  </label>
+                    /></Field>
                   <div className="grid gap-1 text-xs font-medium text-ink-secondary">
                     受付の有無
                     <Select
@@ -281,46 +275,34 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
                   </div>
                 </div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <label className="grid gap-1 text-xs font-medium text-ink-secondary">
-                    会場
-                    <input
+                  <Field label="会場"><input
                       value={venueName}
                       onChange={(e) => {
                         setVenueName(e.target.value)
                         touchEdits()
                       }}
-                      placeholder={event.venue_name ?? '未設定'}
+                      placeholder={event.venue_name ?? emptyValue('unconfigured')}
                       className="border-hairline rounded-control border px-3 py-2 text-sm font-normal"
-                    />
-                  </label>
-                  <label className="grid gap-1 text-xs font-medium text-ink-secondary">
-                    オンラインのURL（確定した申込にだけ見せます）
-                    <input
+                    /></Field>
+                  <Field label="オンラインのURL（確定した申込にだけ見せます）"><input
                       value={venueUrl}
                       onChange={(e) => {
                         setVenueUrl(e.target.value)
                         touchEdits()
                       }}
-                      placeholder={event.venue_url ?? '未設定'}
+                      placeholder={event.venue_url ?? emptyValue('unconfigured')}
                       inputMode="url"
                       className="border-hairline rounded-control border px-3 py-2 text-sm font-normal"
-                    />
-                  </label>
+                    /></Field>
                 </div>
-                <div className="mt-3">
-                  <label className="grid gap-1 text-xs font-medium text-ink-secondary">
-                    変える理由{isPublished ? '（必須）' : '（任意）'}
-                    <textarea
+                <div className="mt-3"><Field note={<>理由は変更の記録に残ります。友だちには送りません。</>} label="変える理由" required={isPublished}><textarea
                       value={reason}
                       onChange={(e) => setReason(e.target.value)}
                       rows={2}
                       placeholder="例：会場の都合で時間を30分遅らせます"
                       aria-label="変える理由"
                       className="border-hairline rounded-control border px-3 py-2 text-sm font-normal"
-                    />
-                  </label>
-                  <p className="text-ink-faint mt-1 text-xs">理由は変更の記録に残ります。友だちには送りません。</p>
-                </div>
+                    /></Field></div>
                 <div className="mt-3">
                   <Button variant="secondary" onClick={() => void runPreview()} disabled={previewBusy} busy={previewBusy} busyLabel="確かめています…">
                     影響を確かめる

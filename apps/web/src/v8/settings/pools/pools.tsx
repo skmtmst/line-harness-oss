@@ -28,12 +28,12 @@ import frame from '../sa-frame.module.css'
 import styles from './pools.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
-
+import { emptyValue } from '@/components/shared/empty-value'
 
 type AccountWithStats = LineAccount & { stats?: { friendCount: number } }
 
 const TITLE = 'プール管理'
-const DESCRIPTION = '来たお客さまを振り分ける LINE アカウントをまとめる入れ物です。公開 URL から来た人を、稼働中の所属アカウントからランダムに振り分けます。'
+const DESCRIPTION = '来たお客さまを振り分ける LINE アカウントをまとめる入れ物です。公開 URL から来た人を、有効の所属アカウントからランダムに振り分けます。'
 
 /** 既定のプール（main）を先頭に、あとは作った順。 */
 export function orderPools(pools: readonly TrafficPool[]): TrafficPool[] {
@@ -88,7 +88,7 @@ export default function PoolsV8() {
   if (featureOff) {
     return (
       <div className={frame.screen}>
-        <SettingsPage layout="accounts" boardId="u3iab3" title={TITLE} description={DESCRIPTION} navigation={<SettingsInnerNav inline />}>
+        <SettingsPage layout="accounts" boardId="u3iab3" title={TITLE} help={DESCRIPTION} navigation={<SettingsInnerNav inline />}>
           <FeatureDisabledScreen featureId="multi_store_hierarchy" />
         </SettingsPage>
       </div>
@@ -109,7 +109,7 @@ export default function PoolsV8() {
       <SettingsPage layout="accounts"
         boardId="u3iab3"
         title={TITLE}
-        description={DESCRIPTION}
+        help={DESCRIPTION}
         actions={canManage && !isEmpty ? createButton : undefined}
         navigation={<SettingsInnerNav inline />}
       >

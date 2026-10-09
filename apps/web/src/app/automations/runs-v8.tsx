@@ -27,6 +27,9 @@ import { useAutomationRunPermissions } from '@/components/automations/use-can-ma
 import { formatDateTime, formatNumber } from '@/lib/format'
 import type { AutoV8Counts, AutoV8Model } from './automations-v8'
 import styles from './automations-v8.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 type RunStatus = 'queued' | 'claimed' | 'succeeded' | 'skipped' | 'waiting' | 'retry_wait' | 'partial' | 'permanent_failed' | 'cancelled'
 
@@ -334,7 +337,7 @@ export function V8RunsTab({
       search: query.trim() || undefined,
       status: resultFilter !== 'all' ? resultFilter : undefined,
       includeTest,
-    }), 'automation-runs.csv')
+    }), csvFileName("オートメーションの実行履歴"))
       .then((result) => {
         if (result.truncated && result.totalCount !== null) {
           const rest = result.totalCount - (result.returnedCount ?? 0)
@@ -436,7 +439,7 @@ export function V8RunsTab({
         </div>
         <div className={styles.kpi}>
           <p className={styles.kpiLabel}>いちばん動いた</p>
-          <p className={styles.kpiValue}>{data?.summary.mostRunName ?? '—'}</p>
+          <p className={styles.kpiValue}>{data?.summary.mostRunName ?? emptyValue('unknown')}</p>
           <p className={styles.kpiSub}>
             {data?.summary.mostRunCount !== null && data?.summary.mostRunCount !== undefined
               ? `${formatNumber(data.summary.mostRunCount)}回`
@@ -453,23 +456,20 @@ export function V8RunsTab({
       <p className={styles.footnote}>オートメーションが動いた記録です。条件に外れて動かなかったものも並びます。</p>
       {retryNotice ? <p role="status" className={styles.footnote}>{retryNotice}</p> : null}
 
-      <div className={styles.toolbar}>
-        <TextField
-          aria-label="友だちの名前・オートメーションの名前で検索"
-          placeholder="友だちの名前・オートメーションの名前で検索"
-          value={query}
-          onChange={(event) => changeQuery(event.target.value)}
-          className={styles.toolsSearch}
-        />
-        <label className={styles.checkLabel}>
+      <div className={styles.toolbar}><Field note={<>この30日・20件表示</>} label={<>
           <Checkbox
             checked={includeTest}
             onCheckedChange={(checked) => changeIncludeTest(checked)}
           />
           テスト実行も見る
-        </label>
-        <p className={styles.footnote}>この30日・20件表示</p>
-      </div>
+        </>}><TextField
+          aria-label="友だちの名前・オートメーションの名前で探す"
+          placeholder="友だちの名前・オートメーションの名前で探す"
+          value={query}
+          onChange={(event) => changeQuery(event.target.value)}
+          className={styles.toolsSearch}
+        />
+</Field></div>
 
       <div className={styles.toolbar}>
         <SegmentedControl
@@ -477,10 +477,10 @@ export function V8RunsTab({
           value={resultFilter}
           onChange={(value) => changeResultFilter(value)}
           options={[
-            { value: 'all', label: `すべて ${data ? formatNumber(data.summary.total) : '—'}` },
-            { value: 'executed', label: `動いた ${data ? formatNumber(data.summary.executed) : '—'}` },
-            { value: 'skipped', label: `条件に外れた ${data ? formatNumber(data.summary.skipped) : '—'}` },
-            { value: 'problems', label: `失敗 ${data ? formatNumber(data.summary.failed) : '—'}` },
+            { value: 'all', label: `すべて ${data ? formatNumber(data.summary.total) : emptyValue('unknown')}` },
+            { value: 'executed', label: `動いた ${data ? formatNumber(data.summary.executed) : emptyValue('unknown')}` },
+            { value: 'skipped', label: `条件に外れた ${data ? formatNumber(data.summary.skipped) : emptyValue('unknown')}` },
+            { value: 'problems', label: `失敗 ${data ? formatNumber(data.summary.failed) : emptyValue('unknown')}` },
           ]}
         />
       </div>

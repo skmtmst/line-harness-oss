@@ -67,7 +67,7 @@ import {
 import styles from './list.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
-
+import { emptyValue } from '@/components/shared/empty-value'
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -359,10 +359,10 @@ export default function AutomationListV8() {
   /* ===== 数の帯（4つ） ===== */
   const ready = loadStatus === 'ready'
   const cells: BandCell[] = [
-    { key: 'rules', title: 'ルール', icon: <ListChecks size={13} aria-hidden="true" />, value: ready ? items.length : null, unit: '件', detail: ready ? `動いている ${activeCount}・止めている ${stoppedCount}` : '—' },
+    { key: 'rules', title: 'ルール', icon: <ListChecks size={13} aria-hidden="true" />, value: ready ? items.length : null, unit: '件', detail: ready ? `動いている ${activeCount}・止めている ${stoppedCount}` : emptyValue('unknown') },
     { key: 'runs', title: '今月動いた', icon: <Activity size={13} aria-hidden="true" />, value: summary?.executionCount30d ?? null, unit: '回', detail: 'この30日に動いた回数' },
     { key: 'failed', title: '失敗', icon: <FileWarning size={13} aria-hidden="true" />, value: summary?.failureCount30d ?? null, unit: '件', detail: '「動いた記録」からやり直せます' },
-    { key: 'skipped', title: '条件に外れた', icon: <Filter size={13} aria-hidden="true" />, value: skipped, unit: '回', detail: ready ? `だれにも当たらないルール ${neverRunCount}` : '—' },
+    { key: 'skipped', title: '条件に外れた', icon: <Filter size={13} aria-hidden="true" />, value: skipped, unit: '回', detail: ready ? `だれにも当たらないルール ${neverRunCount}` : emptyValue('unknown') },
   ]
 
   /* ===== フォルダ ===== */
@@ -385,10 +385,10 @@ export default function AutomationListV8() {
   const filterChips = (
     <div role="group" aria-label="状態で絞り込む" className={styles.chipGroup}>
       <FilterChip selected={onlyActive} onChange={(next) => { setOnlyActive(next); if (next) setOnlyStopped(false) }} icon={<Play size={13} aria-hidden="true" />}>
-        {`動いている ${ready ? activeCount : '—'}`}
+        {`動いている ${ready ? activeCount : emptyValue('unknown')}`}
       </FilterChip>
       <FilterChip selected={onlyStopped} onChange={(next) => { setOnlyStopped(next); if (next) setOnlyActive(false) }} icon={<Pause size={13} aria-hidden="true" />}>
-        {`止めている ${ready ? stoppedCount : '—'}`}
+        {`止めている ${ready ? stoppedCount : emptyValue('unknown')}`}
       </FilterChip>
     </div>
   )
@@ -554,13 +554,13 @@ export default function AutomationListV8() {
 
   return (
     <ListPage
-      help={canEdit
+      help={<>{AUTOMATIONS_DESCRIPTION}{canEdit
             ? '行の「…」から 編集・複製・1人で試す・止める・動いた記録を見る・削除。'
-            : '行の「…」から 動いた記録を見る。'}
+            : '行の「…」から 動いた記録を見る。'}</>}
       boardId={narrow ? 'En14p' : viewerOnly ? 'nH9L8' : 'LWQXd'}
       headingSize="regular"
       title="オートメーション"
-      description={AUTOMATIONS_DESCRIPTION}
+
       actions={canEdit
         ? <Button href={automationTabHref('templates')}><LayoutTemplate size={15} aria-hidden="true" />見本から作る</Button>
         : <span className={styles.createSpaceInline} aria-hidden="true" />}
@@ -586,7 +586,7 @@ export default function AutomationListV8() {
           allCount={ready ? items.length : null}
           unfiledCount={ready ? items.length : null}
           countOf={() => null}
-          placeholder="例: 予約・購入"
+          placeholder="例：予約・購入"
         />
       </>}
       collapsedFolders={narrow ? undefined : <>{createButton(false)}{folderSelect}</>}
@@ -624,7 +624,9 @@ export default function AutomationListV8() {
         >
           {testing ? (
             <div className={styles.testBody}>
-              <Field label="試す友だちのID">
+              <Field note={<>
+                すること：{testing.actions.map((action) => automationActionLabel(action.type)).join('・') || '登録した処理'}
+              </>} label="試す友だちのID">
                 <TextField
                   aria-label="試す友だちのID"
                   value={testFriendId}
@@ -633,9 +635,7 @@ export default function AutomationListV8() {
                   disabled={testBusy || testDone}
                 />
               </Field>
-              <p className={styles.testNote}>
-                すること：{testing.actions.map((action) => automationActionLabel(action.type)).join('・') || '登録した処理'}
-              </p>
+
               {testError ? <Notice tone="danger">{testError}</Notice> : null}
               {testDone ? <Notice tone="info">試しに動かしました。「動いた記録」で結果を確かめてください。</Notice> : null}
             </div>

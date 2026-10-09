@@ -13,6 +13,9 @@ import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import { loadOperators } from '@/lib/operators-cache'
 import type { PanelStatus } from './use-friend-detail'
 import styles from './detail.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 export function useSupportEditor(friendId: string, onSaved: (notice: string) => void, onConflict: (message: string) => void, accountId: string | null = null) {
   const scopeRef = useRef({ friendId, accountId })
@@ -111,7 +114,7 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
           setError('最新の内容を読み直せませんでした。入力は残っています。もう一度お試しください。')
         }
       } else {
-        setError(describeSaveFailure(err))
+        setError(withPermissionFailure(err, describeSaveFailure(err), 'store'))
       }
     } finally {
       if (gen === genRef.current) setBusy(false)
@@ -130,9 +133,7 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
       onCancel={() => setOpen(false)}
     >
       <div className={styles.dialogBody} data-support-editor>
-        <label className={styles.dialogLabel}>
-          対応状況
-          <Select
+        <Field label="対応状況"><Select
             size="full"
             value={status}
             disabled={busy}
@@ -144,19 +145,15 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
               { value: 'on_hold', label: '保留' },
               { value: 'resolved', label: '対応済み' },
             ]}
-          />
-        </label>
-        <label className={styles.dialogLabel}>
-          担当者
-          <Select
+          /></Field>
+        <Field label="担当者"><Select
             size="full"
             value={operatorId}
             disabled={busy}
             onChange={(value) => setOperatorId(value)}
             aria-label="担当者を変える"
             options={[{ value: '', label: '未割り当て' }, ...operators.map((o) => ({ value: o.id, label: o.name }))]}
-          />
-        </label>
+          /></Field>
       </div>
     </Dialog>
   )
@@ -246,7 +243,7 @@ export function useScenarioPicker(
       }
     } catch (err) {
       if (req !== reqRef.current || scope !== scopeRef.current) return
-      setError(describeSaveFailure(err))
+      setError(withPermissionFailure(err, describeSaveFailure(err), 'store'))
     } finally {
       if (req === reqRef.current && scope === scopeRef.current) setBusy(false)
     }
@@ -267,7 +264,7 @@ export function useScenarioPicker(
     >
       <div className={styles.dialogBody} data-scenario-picker>
         {listStatus === 'loading' || listStatus === 'idle' ? (
-          <p className={styles.secNote}>シナリオを読み込んでいます…</p>
+          <DetailLoading />
         ) : listStatus === 'error' ? (
           <p className={styles.secNote}>
             シナリオの選択肢を読み込めませんでした

@@ -41,7 +41,7 @@ import { billingFailureMessage } from './billing-failure'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import styles from './billing.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -171,16 +171,16 @@ function BillingInner() {
   const invoiceUnreachable = invoiceError instanceof ApiError && invoiceError.status === 502
 
   const frame = (body: React.ReactNode) => (
-    <ListPage boardId="JB8V1" title={TITLE} description={DESCRIPTION} folders={<HqSettingsNavV8 active="billing" />} folderNav={settingsNav}>
+    <ListPage boardId="JB8V1" title={TITLE} help={DESCRIPTION} folders={<HqSettingsNavV8 active="billing" />} folderNav={settingsNav}>
       <div className={styles.body}>{body}</div>
     </ListPage>
   )
 
-  if (status === 'loading') return frame(<ListState kind="loading" title="契約状況を読み込んでいます" />)
+  if (status === 'loading') return frame(<ListState permissionScope="hq" kind="loading" title="契約状況を読み込んでいます" />)
   // 担当者は見られない（権限表: 課金プランは担当者 不可。閲覧のみは閲覧できる）。
-  if (status === 'forbidden' || role === 'staff') return frame(<ListState kind="forbidden" />)
+  if (status === 'forbidden' || role === 'staff') return frame(<ListState permissionScope="hq" kind="forbidden" />)
   if (status === 'error' || !summary) {
-    return frame(<ListState kind="error" title="契約状況を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />)
+    return frame(<ListState permissionScope="hq" kind="error" title="契約状況を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />)
   }
 
   const banner = billingBanner(summary)
@@ -324,7 +324,7 @@ function BillingInner() {
       <section className={styles.history} data-design="History">
         <h2 className={styles.historyTitle}>支払い履歴</h2>
         {invoiceFailed ? (
-          <ListState
+          <ListState permissionScope="hq"
             kind="error"
             title={invoiceUnreachable ? '決済サービスにつながりませんでした' : '支払い履歴を読み込めませんでした'}
             description={invoiceUnreachable ? '少し待って、もう一度読み込んでください。' : undefined}
@@ -345,18 +345,18 @@ function BillingInner() {
             {invoices.map((inv) => (
               <div key={inv.id} className={styles.row} role="row">
                 <span role="cell">{invoiceDate(inv.createdAt)}</span>
-                <span role="cell" className={styles.cell} title={inv.description ?? inv.number ?? ''}>{inv.description ?? inv.number ?? '—'}</span>
+                <span role="cell" className={styles.cell} title={inv.description ?? inv.number ?? ''}>{inv.description ?? inv.number ?? emptyValue('unknown')}</span>
                 <span role="cell" className={styles.amount}>{yen(inv.amountYen)}</span>
                 <span role="cell">
-                  <span className={inv.status === 'paid' ? `${styles.pill} ${styles.pillOk}` : inv.status === 'open' || inv.status === 'draft' ? `${styles.pill} ${styles.pillInfo}` : `${styles.pill} ${styles.pillIdle}`}><span className={styles.dot} aria-hidden="true" />{INVOICE_WORDS[inv.status ?? ''] ?? inv.status ?? '—'}</span>
+                  <span className={inv.status === 'paid' ? `${styles.pill} ${styles.pillOk}` : inv.status === 'open' || inv.status === 'draft' ? `${styles.pill} ${styles.pillInfo}` : `${styles.pill} ${styles.pillIdle}`}><span className={styles.dot} aria-hidden="true" />{INVOICE_WORDS[inv.status ?? ''] ?? inv.status ?? emptyValue('unknown')}</span>
                 </span>
                 <span role="cell">
                   {inv.hostedUrl ? (
-                    <Button href={inv.hostedUrl} target="_blank" rel="noreferrer">
+                    <Button external href={inv.hostedUrl}  >
                       <Download aria-hidden="true" className={styles.buttonIcon} />領収書
                     </Button>
                   ) : (
-                    <span className={styles.faint}>—</span>
+                    <span className={styles.faint}>{emptyValue('unknown')}</span>
                   )}
                 </span>
               </div>

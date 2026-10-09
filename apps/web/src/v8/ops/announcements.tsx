@@ -36,7 +36,8 @@ import { FieldError } from '@/components/shared/form-controls'
 import parts from './parts.module.css'
 import styles from './announcements.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /**
  * 運営のお知らせ配信 V8（絵 `tQ2MJ`・送る前の確認 `TJUUl`）。
@@ -321,16 +322,10 @@ export default function OpsAnnouncementsV8() {
             <h2 className={parts.panelTitle}>{editingId ? 'お知らせを直す' : '作成'}</h2>
             {formError && !confirmSend ? <p role="alert" className={parts.alert}>{formError}</p> : null}
             <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
-            <div className={styles.field}>
-              <label htmlFor="ann-subject" className={styles.label}>件名</label>
-              <TextField {...fields.bind('subject')} id="ann-subject" invalid={fields.invalid('subject')} aria-describedby={describedBy('subject')} value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：9月20日 深夜のメンテナンスのお知らせ" maxLength={120} disabled={busy} />
-              <FieldError id="ann-subject-error">{fields.error('subject')}</FieldError>
-            </div>
-            <div className={styles.field}>
-              <label htmlFor="ann-body" className={styles.smallLabel}>本文</label>
-              <TextArea {...fields.bind('body')} id="ann-body" invalid={fields.invalid('body')} aria-describedby={describedBy('body')} rows={4} className={styles.body} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="お客様各位　いつも musubo をご利用いただきありがとうございます。…" maxLength={4000} disabled={busy} />
-              <FieldError id="ann-body-error">{fields.error('body')}</FieldError>
-            </div>
+            <div className={styles.field}><Field label="件名" htmlFor="ann-subject"><TextField {...fields.bind('subject')} id="ann-subject" invalid={fields.invalid('subject')} aria-describedby={describedBy('subject')} value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：9月20日 深夜のメンテナンスのお知らせ" maxLength={120} disabled={busy} />
+<FieldError id="ann-subject-error">{fields.error('subject')}</FieldError></Field></div>
+            <div className={styles.field}><Field label="本文" htmlFor="ann-body"><TextArea {...fields.bind('body')} id="ann-body" invalid={fields.invalid('body')} aria-describedby={describedBy('body')} rows={4} className={styles.body} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="お客様各位　いつも musubo をご利用いただきありがとうございます。…" maxLength={4000} disabled={busy} />
+<FieldError id="ann-body-error">{fields.error('body')}</FieldError></Field></div>
             <fieldset className={styles.field} {...fields.bind('audience')} aria-invalid={fields.invalid('audience') || undefined} aria-describedby={describedBy('audience')}>
               <legend className={`${styles.smallLabel} ${styles.legend}`}>
                 宛先
@@ -390,14 +385,14 @@ export default function OpsAnnouncementsV8() {
             <HelpTip label="契約者専用LINEの登録状況">{linked ? `契約者専用LINEの登録 ${linked.linked} 人 / ${linked.total} 人` : '登録状況を読み込んでいます'}</HelpTip>
           </div>
           {!loaded ? (
-            <ListState kind="loading" title="読み込んでいます" />
+            <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />
           ) : loadError ? (
             <div className={parts.panel}>
-              <ListState kind="error" title="お知らせを表示できませんでした" description={loadDescription(loadError)} error={loadError ?? undefined} onRetry={() => void load()} />
+              <ListState permissionScope="hq" kind="error" title="お知らせを表示できませんでした" description={loadDescription(loadError)} error={loadError ?? undefined} onRetry={() => void load()} />
             </div>
           ) : rows.length === 0 ? (
             <div className={parts.panel}>
-              <ListState kind="empty" title="まだお知らせはありません" description="左で作って「今すぐ送る」か「配信を予約する」を押すと、ここに並びます。" />
+              <ListState permissionScope="hq" kind="empty" title="まだお知らせはありません" description="左で作って「今すぐ送る」か「配信を予約する」を押すと、ここに並びます。" />
             </div>
           ) : (
             <div className={parts.mini} role="table" aria-label="配信済み・予約・下書き">
@@ -419,11 +414,11 @@ export default function OpsAnnouncementsV8() {
                   </span>
                   <span className={`${parts.fixed} ${styles.colTo}`} role="cell" title={a.audienceLabel}>{a.audienceKind === 'all' ? 'すべて' : a.audienceLabel}</span>
                   <span className={`${parts.fixed} ${styles.colState}`} role="cell"><StatusBadge tone={STATUS_TONE[a.status]}>{a.statusLabel}</StatusBadge></span>
-                  <span className={`${parts.num} ${styles.colRead}`} role="cell">{a.channels.includes('screen') && a.status === 'sent' ? `${a.screenRead}/${a.screenTotal}` : '—'}</span>
-                  <span className={`${parts.num} ${styles.colLine}`} role="cell">{a.channels.includes('line') && a.status === 'sent' ? `${a.lineSent}/${a.recipientsTotal}` : '—'}</span>
+                  <span className={`${parts.num} ${styles.colRead}`} role="cell">{a.channels.includes('screen') && a.status === 'sent' ? `${a.screenRead}/${a.screenTotal}` : emptyValue('unknown')}</span>
+                  <span className={`${parts.num} ${styles.colLine}`} role="cell">{a.channels.includes('line') && a.status === 'sent' ? `${a.lineSent}/${a.recipientsTotal}` : emptyValue('unknown')}</span>
                   <span className={`${parts.fixed} ${styles.colOps}`} role="cell">
                     {readOnly || a.status === 'sending'
-                      ? <span className={styles.faint}>—</span>
+                      ? <span className={styles.faint}>{emptyValue('unknown')}</span>
                       : a.status === 'draft' || a.status === 'scheduled'
                         ? <Button onClick={() => edit(a)} disabled={busy} aria-label={`「${a.subject}」を直す`}>直す</Button>
                         : <Button onClick={() => copyAsNew(a)} disabled={busy} aria-label={`「${a.subject}」を元に新しく作る`} title="送ったものは直せないので、中身を写して新しいお知らせを作ります">直す</Button>}
@@ -457,7 +452,7 @@ export default function OpsAnnouncementsV8() {
             <div className={styles.fact}><dt>送る日時</dt><dd>{scheduled ? `${longPublishAt(form.publishAt)}（予約）` : '今すぐ'}</dd></div>
           </dl>
           <div className={styles.letter}>
-            <p className={styles.letterSubject}>{`件名：${form.subject.trim() || '（未入力）'}`}</p>
+            <p className={styles.letterSubject}>{`件名：${form.subject.trim() || emptyValue('unconfigured')}`}</p>
             <p className={styles.letterBody}>{form.body.trim().length > 80 ? `${form.body.trim().slice(0, 80)}…` : form.body.trim() || '（本文が未入力です）'}</p>
           </div>
           <p className={styles.after}>送ったあとは本文を直せません。画面のお知らせは取り下げられます（メール・LINE は取り消せません）。</p>

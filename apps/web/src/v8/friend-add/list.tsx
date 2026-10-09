@@ -70,6 +70,8 @@ import { useCursorStack } from './use-cursor-stack'
 import styles from './list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const KIND_LABELS: Record<FriendAddRuleKind, string> = {
   first_time: 'はじめて友だち追加した人',
@@ -91,7 +93,7 @@ const STATUS_CHIPS: Array<{ key: FriendAddRuleStatus; label: string; icon: typeo
 ]
 
 function countText(value: number | null | undefined, unit: string) {
-  return value === null || value === undefined ? '—' : `${formatNumber(value)} ${unit}`
+  return value === null || value === undefined ? emptyValue('unknown') : `${formatNumber(value)}${unit}`
 }
 
 function successRate(delivered: number | null, failed: number | null) {
@@ -513,7 +515,7 @@ function FriendAddList() {
   const kpis = [
     {
       key: 'rules', icon: MessageSquareMore, title: '初回案内', value: error ? null : summary?.rules ?? null, unit: '件',
-      detail: summary ? `有効 ${formatNumber(summary.active)} 件` : '—',
+      detail: summary ? `有効 ${formatNumber(summary.active)}件` : emptyValue('unknown'),
       help: 'いまある初回案内の設定数です。右の3つ（直近7日）とは期間がちがいます。',
     },
     {
@@ -760,7 +762,7 @@ function FriendAddList() {
                   {sendCell(rule)}
                   <Td className={styles.colStatus}><StatusPill rule={rule} /></Td>
                   <Td className={styles.colRecent}>
-                    <span className={styles.num}>{rule.status === 'draft' ? '—' : countText(rule.matchedLast7Days, '人')}</span>
+                    <span className={styles.num}>{rule.status === 'draft' ? emptyValue('unknown') : countText(rule.matchedLast7Days, '人')}</span>
                   </Td>
                   {menuCell(rule)}
                 </Tr>
@@ -806,11 +808,11 @@ function FriendAddList() {
 
   return (
     <ListPage
-      help={ORDER_NOTE}
+      help={<>{"友だち追加されたときに、来た経路（流入リンク）ごとに初回の案内を送り、タグ付けやシナリオを始めます。"}{ORDER_NOTE}</>}
       boardId={canEdit ? 'MRhef' : 'LEwkJ'}
       headingSize="regular"
       title="友だち追加時の配信"
-      description="友だち追加されたときに、来た経路（流入リンク）ごとに初回の案内を送り、タグ付けやシナリオを始めます。"
+
       actions={
         <Button href="/friend-add-settings/runs">
           <Activity size={15} aria-hidden="true" />実行結果を見る
@@ -821,7 +823,7 @@ function FriendAddList() {
         {role !== null && !canEdit ? (
           <div className={styles.viewerBand} role="status">
             <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
           </div>
         ) : null}
         <div className={styles.kindTabs} data-design="KindTabs">

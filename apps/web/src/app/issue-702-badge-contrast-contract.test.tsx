@@ -141,7 +141,7 @@ describe('Issue #702: 4画面の札・タブはトークンで書く', () => {
 describe('Issue #702: 共通バッジは5つの調子すべて実Reactで描ける', () => {
   it.each([
     ['neutral', '下書き'],
-    ['info', '配信待ち'],
+    ['info', '予約中'],
     ['warning', '停止中'],
     ['success', '配信中'],
     ['danger', '設定不足'],

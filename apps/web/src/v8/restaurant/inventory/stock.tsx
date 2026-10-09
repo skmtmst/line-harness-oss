@@ -25,7 +25,7 @@ import { TextField } from '@/components/shared/text-field'
 import DateField from '@/components/shared/date-field'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import TimeField from '@/components/shared/time-field-v8'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { useAccount } from '@/contexts/account-context'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -36,6 +36,9 @@ import { DialogNote, RsDialog } from '../booking-kit/parts'
 import { dayLabel, formatTime, joinTableCodes, sanName, slotTimeLabel, tableOrder, WEEK_ORDER, WEEKDAY_LABEL } from './format'
 import type { RestaurantChannel } from './channels'
 import styles from './inventory.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 type Alloc = { ota: number; line: number; walkin: number }
 type Hours = RestaurantOpeningDay[]
@@ -71,7 +74,7 @@ function storeToday(timezone: string | undefined): string {
 
 function NumberField({ label, value, onChange, canEdit, invalid = false }: { label: string; value: number; onChange: (value: number) => void; canEdit: boolean; invalid?: boolean }) {
   return (
-    <TextField
+    <NumberInput
       type="number"
       min={0}
       aria-label={label}
@@ -379,25 +382,19 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
       )}>
         <div className={styles.mainColumn}>
           <Card layout="vertical" padding="spacious" gap="tight" surface="standard" aria-labelledby="rs-alloc-title">
-            <CardHeader size="stacked" titleId="rs-alloc-title" title="席と枠の配分（卓とつながる）" meta="総数は「座席・卓管理」の稼働中の卓から自動で決まります。ここで入れた配分を全部の時間帯に入れ、時間帯ごとに直すときは下の表の行を押します。" />
+            <CardHeader size="stacked" titleId="rs-alloc-title" title="席と枠の配分（卓とつながる）" meta="総数は「座席・卓管理」の有効の卓から自動で決まります。ここで入れた配分を全部の時間帯に入れ、時間帯ごとに直すときは下の表の行を押します。" />
             <div className={styles.totalLine}>
               <Armchair size={16} aria-hidden="true" className={styles.totalIcon} />
               <div className={styles.totalText}>
                 <p className={styles.totalValue}>{`1つの時間帯の総数 ${totalSeats}席`}</p>
-                <p className={styles.totalSub}>{`稼働中の卓 ${activeTables.length} つ${stoppedTables.length > 0 ? `（${stoppedTables.map((item) => item.code).join('・')} は停止中のため除く）` : ''}`}</p>
+                <p className={styles.totalSub}>{`有効の卓 ${activeTables.length} つ${stoppedTables.length > 0 ? `（${stoppedTables.map((item) => item.code).join('・')} は停止中のため除く）` : ''}`}</p>
               </div>
               <Button variant="text" size="inline" href="/restaurant-test/tables">座席・卓管理で変える →</Button>
             </div>
             <div className={styles.allocGrid}>
-              <label className={styles.allocField}><span className={styles.allocLabel}>OTA（予約媒体）</span>
-                <NumberField canEdit={canEdit} invalid={allocInvalid} label="OTA（予約媒体）" value={alloc.ota} onChange={(ota) => updateAlloc({ ...alloc, ota })} />
-              </label>
-              <label className={styles.allocField}><span className={styles.allocLabel}>LINE 専用</span>
-                <NumberField canEdit={canEdit} invalid={allocInvalid} label="LINE 専用" value={alloc.line} onChange={(line) => updateAlloc({ ...alloc, line })} />
-              </label>
-              <label className={styles.allocField}><span className={styles.allocLabel}>当日（ウォークイン）</span>
-                <NumberField canEdit={canEdit} invalid={allocInvalid} label="当日（ウォークイン）" value={alloc.walkin} onChange={(walkin) => updateAlloc({ ...alloc, walkin })} />
-              </label>
+              <Field label={<><span className={styles.allocLabel}>OTA（予約媒体）</span></>}><NumberField canEdit={canEdit} invalid={allocInvalid} label="OTA（予約媒体）" value={alloc.ota} onChange={(ota) => updateAlloc({ ...alloc, ota })} /></Field>
+              <Field label={<><span className={styles.allocLabel}>LINE 専用</span></>}><NumberField canEdit={canEdit} invalid={allocInvalid} label="LINE 専用" value={alloc.line} onChange={(line) => updateAlloc({ ...alloc, line })} /></Field>
+              <Field label={<><span className={styles.allocLabel}>当日（ウォークイン）</span></>}><NumberField canEdit={canEdit} invalid={allocInvalid} label="当日（ウォークイン）" value={alloc.walkin} onChange={(walkin) => updateAlloc({ ...alloc, walkin })} /></Field>
               <div className={styles.allocField}><span className={styles.allocLabel}>店頭・電話</span>
                 <span className={styles.remainder}>{`${remainder}（残り）`}</span>
               </div>
@@ -465,7 +462,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
                         </svg>
                       </Td>
                       <Td className={`${styles.colSeats} ${styles.strong}`} align="right">{`${slot.seats}席`}</Td>
-                      <Td className={styles.tablesCell}><span title={joinTableCodes(slot.tables)}>{joinTableCodes(slot.tables) || '—'}</span></Td>
+                      <Td className={styles.tablesCell}><span title={joinTableCodes(slot.tables)}>{joinTableCodes(slot.tables) || emptyValue('unknown')}</span></Td>
                       <Td className={`${styles.colFree} ${styles.bold}`} align="right"><span className={lowSlot(slot) ? styles.freeLow : undefined}>{`${slot.free}席`}</span></Td>
                     </Tr>
                   ))}
@@ -478,15 +475,9 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
               <Card layout="vertical" padding="default" gap="tight" surface="inset" aria-label={`${selected.time} の配分だけ直す`}>
                 <h3 className={styles.sectionTitle}>{`行を押したとき：${selected.time} の配分だけ直す`}</h3>
                 <div className={styles.slotGrid}>
-                  <label className={styles.slotField}><span className={styles.slotLabel}>OTA（予約媒体）</span>
-                    <NumberField canEdit={canEdit} invalid={slotInvalid} label={`${selected.time}のOTA`} value={currentSlotAlloc.ota} onChange={(ota) => updateSlot({ ...currentSlotAlloc, ota })} />
-                  </label>
-                  <label className={styles.slotField}><span className={styles.slotLabel}>LINE 専用</span>
-                    <NumberField canEdit={canEdit} invalid={slotInvalid} label={`${selected.time}のLINE`} value={currentSlotAlloc.line} onChange={(line) => updateSlot({ ...currentSlotAlloc, line })} />
-                  </label>
-                  <label className={styles.slotField}><span className={styles.slotLabel}>当日（ウォークイン）</span>
-                    <NumberField canEdit={canEdit} invalid={slotInvalid} label={`${selected.time}の当日`} value={currentSlotAlloc.walkin} onChange={(walkin) => updateSlot({ ...currentSlotAlloc, walkin })} />
-                  </label>
+                  <Field label={<><span className={styles.slotLabel}>OTA（予約媒体）</span></>}><NumberField canEdit={canEdit} invalid={slotInvalid} label={`${selected.time}のOTA`} value={currentSlotAlloc.ota} onChange={(ota) => updateSlot({ ...currentSlotAlloc, ota })} /></Field>
+                  <Field label={<><span className={styles.slotLabel}>LINE 専用</span></>}><NumberField canEdit={canEdit} invalid={slotInvalid} label={`${selected.time}のLINE`} value={currentSlotAlloc.line} onChange={(line) => updateSlot({ ...currentSlotAlloc, line })} /></Field>
+                  <Field label={<><span className={styles.slotLabel}>当日（ウォークイン）</span></>}><NumberField canEdit={canEdit} invalid={slotInvalid} label={`${selected.time}の当日`} value={currentSlotAlloc.walkin} onChange={(walkin) => updateSlot({ ...currentSlotAlloc, walkin })} /></Field>
                 </div>
                 <div className={styles.slotActions}>
                   <span className={styles.slotBase}>{`全部の時間帯の配分：OTA ${alloc.ota}・LINE ${alloc.line}・当日 ${alloc.walkin}（上で入れた数）`}</span>
@@ -510,7 +501,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
                   <div className={styles.dayHead}>
                     {/* 閲覧のみ：つまみ・時刻を選ぶ部品は置かず、いまの時間を文字で見せる（2026-10-06 オーナー決定）。 */}
                     {canEdit ? (
-                      <Toggle
+                      <SettingCheckbox
                         checked={open}
                         label={`${name}曜日に予約を受ける`}
                         onChange={(next) => setDay(weekday, next ? [{ opensAt: '17:00', closesAt: '22:00' }] : [])}

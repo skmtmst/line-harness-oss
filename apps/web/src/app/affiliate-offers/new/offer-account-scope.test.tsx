@@ -76,16 +76,16 @@ describe('N-211 案件作成の選択肢は選択accountで絞る', () => {
   })
 
   /*
-   * R193: 保管済みタグ・停止中シナリオは成果承認時に実行できない。
+   * R193: アーカイブタグ・停止中シナリオは成果承認時に実行できない。
    * 作成画面の候補から外す（案件編集モーダルの #798 と同じ決まり）。
    */
-  it('保管済みタグと停止中シナリオは候補に出さない', async () => {
+  it('アーカイブタグと停止中シナリオは候補に出さない', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: unknown) => {
       const text = String(url)
       if (text.includes('/api/tags')) {
         return { ok: true, status: 200, json: async () => ({ success: true, data: [
           { id: 't1', name: '有効タグ', lineAccountId: 'acc-1', status: 'active' },
-          { id: 't2', name: '保管済みタグ', lineAccountId: 'acc-1', status: 'archived' },
+          { id: 't2', name: 'アーカイブタグ', lineAccountId: 'acc-1', status: 'archived' },
         ] }) }
       }
       if (text.includes('/api/scenarios')) {
@@ -103,8 +103,8 @@ describe('N-211 案件作成の選択肢は選択accountで絞る', () => {
 
     const optionLabels = async (buttonId: string) => {
       const switchName = buttonId === 'of-tag' ? 'タグを付ける' : 'シナリオ配信を始める'
-  const toggle = host.querySelector<HTMLButtonElement>(`[role=switch][aria-label="${switchName}"]`)
-  if (toggle?.getAttribute('aria-checked') === 'false') await act(async () => { toggle.click() })
+  const toggle = host.querySelector<HTMLInputElement>(`input[type=checkbox][aria-label="${switchName}"]`)
+  if (toggle && !toggle.checked) await act(async () => { toggle.click() })
   // タグは選ぶ窓（dJZ7Q）。欄の［選ぶ］で開き、窓の候補（radio）の名前を読む。
   const button = host.querySelector<HTMLButtonElement>(`#${buttonId} button[aria-haspopup="dialog"]`)
       expect(button).toBeTruthy()
@@ -116,15 +116,15 @@ describe('N-211 案件作成の選択肢は選択accountで絞る', () => {
 
     const tagLabels = await optionLabels('of-tag')
     expect(tagLabels.some((text) => text.includes('有効タグ'))).toBe(true)
-    expect(tagLabels.some((text) => text.includes('保管済みタグ'))).toBe(false)
+    expect(tagLabels.some((text) => text.includes('アーカイブタグ'))).toBe(false)
 
     // 開いているメニューを閉じてからシナリオ側を開く。
     await act(async () => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     })
     // シナリオは選ぶ窓。欄の［選ぶ］で開き、窓の候補（radio）の名前を読む。
-    const scenarioToggle = host.querySelector<HTMLButtonElement>('[role=switch][aria-label="シナリオ配信を始める"]')
-    if (scenarioToggle?.getAttribute('aria-checked') === 'false') await act(async () => { scenarioToggle.click() })
+    const scenarioToggle = host.querySelector<HTMLInputElement>('input[type=checkbox][aria-label="シナリオ配信を始める"]')
+    if (scenarioToggle && !scenarioToggle.checked) await act(async () => { scenarioToggle.click() })
     const scenarioOpen = host.querySelector<HTMLButtonElement>('button[aria-label="開始するシナリオ：選ぶ"]')
     expect(scenarioOpen).toBeTruthy()
     await act(async () => { scenarioOpen!.click() })

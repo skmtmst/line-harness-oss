@@ -135,9 +135,9 @@ export function OfferTermsFields({ values, onChange, disabled = false, errors = 
 }) {
   const fieldId = useId()
   const fields = [
-    { key: 'windowDays', label: '数える期間（日）', type: 'number', min: 1, max: 365, placeholder: '例: 30（空は今のまま）', help: 'リンクを開いてから数える期間です。既定は30日です。' },
-    { key: 'capTotal', label: '全体の上限（件）', type: 'number', min: 1, placeholder: '例: 200（空は上限なし）', help: 'この案件で付ける成果の数の上限です。上限に達したら受付を自動で止めます。' },
-    { key: 'capMonthly', label: '1人あたり月の上限（件）', type: 'number', min: 1, placeholder: '例: 10（空は上限なし）', help: '1人の紹介者に1か月で付ける数の上限です。上限に達したらその人の受付を止めます。' },
+    { key: 'windowDays', label: '数える期間（日）', type: 'number', min: 1, max: 365, placeholder: '例：30（空は今のまま）', help: 'リンクを開いてから数える期間です。既定は30日です。' },
+    { key: 'capTotal', label: '全体の上限（件）', type: 'number', min: 1, placeholder: '例：200（空は上限なし）', help: 'この案件で付ける成果の数の上限です。上限に達したら受付を自動で止めます。' },
+    { key: 'capMonthly', label: '1人あたり月の上限（件）', type: 'number', min: 1, placeholder: '例：10（空は上限なし）', help: '1人の紹介者に1か月で付ける数の上限です。上限に達したらその人の受付を止めます。' },
     { key: 'receptionFrom', label: '受付の始め', type: 'date' },
     { key: 'receptionTo', label: '受付の終わり', type: 'date' },
   ] as const

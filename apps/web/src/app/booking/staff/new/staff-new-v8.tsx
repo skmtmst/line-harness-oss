@@ -23,7 +23,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import Select from '@/components/shared/select'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
@@ -35,6 +35,9 @@ import { menuPriceLabel } from '../../lib/menu-price'
 import { LiffPhoneStaffStep } from '../../menus/liff-phone-v8'
 import shell from '../../menus/settings-v8.module.css'
 import styles from './staff-new-v8.module.css'
+import TextLink from '@/components/shared/text-link'
+import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 export default function StaffNewV8() {
   const { selectedAccountId, selectedAccount } = useAccount()
@@ -309,8 +312,8 @@ export default function StaffNewV8() {
     <div className={shell.shell} data-design-node="CcA4k">
       <header className={shell.boardHead} data-design="Head">
         <Link href="/booking/menus?tab=staff" className={shell.backLink}>← 担当スタッフへ</Link>
-        <h1 className={shell.headTitle}>予約スタッフを登録</h1>
-        <p className={shell.headNote}>お客さまが予約するときに指名できる担当者を登録します。</p>
+        <PageHeading title="予約スタッフを登録" help={<> お客さまが予約するときに指名できる担当者を登録します。</>} />
+
       </header>
 
       <div className={shell.body} data-design="Body">
@@ -321,9 +324,7 @@ export default function StaffNewV8() {
               <h2 className={shell.sectionTitle}>お客さまに見える情報</h2>
             </div>
             <div className={styles.fieldGrid}>
-              <label className={styles.field}>
-                <span className={styles.label}>スタッフ名（管理画面での呼び名）</span>
-                <input
+              <Field label="スタッフ名（管理画面での呼び名）"><input
                   id="bs-name"
                   type="text"
                   value={name}
@@ -337,41 +338,32 @@ export default function StaffNewV8() {
                     setFieldErrors({ name: nameFieldError(name) ?? undefined })
                   }}
                   maxLength={BOOKING_STAFF_LIMITS.name}
-                  placeholder="例: 田中 美咲"
+                  placeholder="例：田中 美咲"
                   className={styles.input}
                   aria-invalid={fieldErrors.name !== undefined}
                 />
-                {fieldErrors.name !== undefined ? (
+{fieldErrors.name !== undefined ? (
                   <span className={styles.formError} role="alert">{fieldErrors.name}</span>
-                ) : null}
-              </label>
-              <label className={styles.field}>
-                <span className={styles.label}>お客さま向けの表示名（空欄なら上の名前）</span>
-                <input
+                ) : null}</Field>
+              <Field label="お客さま向けの表示名（空欄なら上の名前）"><input
                   id="bs-display"
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   maxLength={BOOKING_STAFF_LIMITS.displayName}
-                  placeholder="例: みさき"
+                  placeholder="例：みさき"
                   className={styles.input}
-                />
-              </label>
-              <label className={styles.field}>
-                <span className={styles.label}>肩書き</span>
-                <input
+                /></Field>
+              <Field label="肩書き"><input
                   id="bs-role"
                   type="text"
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
                   maxLength={BOOKING_STAFF_LIMITS.role}
-                  placeholder="例: トリミング担当"
+                  placeholder="例：トリミング担当"
                   className={styles.input}
-                />
-              </label>
-              <label className={styles.field}>
-                <span className={styles.label}>顔写真（正方形・1MB まで）</span>
-                <input
+                /></Field>
+              <Field label="顔写真（正方形・1MB まで）"><input
                   id="bs-image"
                   type="url"
                   value={imageUrl}
@@ -379,20 +371,16 @@ export default function StaffNewV8() {
                   maxLength={BOOKING_STAFF_LIMITS.profileImageUrl}
                   placeholder="https://…/misaki.jpg"
                   className={styles.input}
-                />
-              </label>
-              <label className={`${styles.field} ${styles.fieldFull}`}>
-                <span className={styles.label}>紹介文</span>
-                <textarea
+                /></Field>
+              <Field label="紹介文"><textarea
                   id="bs-bio"
                   rows={3}
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
                   maxLength={BOOKING_STAFF_LIMITS.bio}
-                  placeholder="例: トリミング歴10年。小型犬が得意です。"
+                  placeholder="例：トリミング歴10年。小型犬が得意です。"
                   className={styles.input}
-                />
-              </label>
+                /></Field>
             </div>
           </section>
 
@@ -459,7 +447,7 @@ export default function StaffNewV8() {
             </div>
             <div className={styles.toggleList}>
               <div className={styles.switchRow}>
-                <Toggle
+                <SettingCheckbox
                   label="店舗の営業時間に合わせる"
                   checked
                   locked
@@ -470,7 +458,7 @@ export default function StaffNewV8() {
                 </span>
               </div>
               <div className={styles.switchRow}>
-                <Toggle
+                <SettingCheckbox
                   label="「指名なし」の枠にも含める"
                   checked={isDesignationOptional}
                   onChange={setIsDesignationOptional}
@@ -481,7 +469,7 @@ export default function StaffNewV8() {
                 </span>
               </div>
               <div className={styles.switchRow}>
-                <Toggle
+                <SettingCheckbox
                   label="登録したらすぐ予約を受ける"
                   checked={isActive}
                   onChange={setIsActive}
@@ -526,9 +514,7 @@ export default function StaffNewV8() {
                 onRetry={() => setMembersReloadKey((value) => value + 1)}
               />
             ) : (
-              <label className={styles.field}>
-                <span className={styles.label}>ログインユーザー</span>
-                <Select
+              <Field label="ログインユーザー"><Select
                   aria-label="ログインユーザーとの紐づけ"
                   id="bs-member"
                   size="full"
@@ -538,8 +524,7 @@ export default function StaffNewV8() {
                     { value: '', label: '紐づけない' },
                     ...members.map((m) => ({ value: m.id, label: `${m.name}${m.email ? `（${m.email}）` : ''}` })),
                   ]}
-                />
-              </label>
+                /></Field>
             )}
           </section>
 
@@ -580,7 +565,7 @@ export default function StaffNewV8() {
           </div>
           <p className={shell.sideLineLink}>
             {previewUrl
-              ? <a href={previewUrl} target="_blank" rel="noreferrer">実際の画面で確かめる ↗</a>
+              ? <TextLink external href={previewUrl}  >実際の画面で確かめる</TextLink>
               : 'このアカウントには予約画面のURLがまだありません'}
           </p>
         </aside>

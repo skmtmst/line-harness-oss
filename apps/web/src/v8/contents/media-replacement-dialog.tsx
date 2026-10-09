@@ -12,6 +12,7 @@ import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import ListState from '@/components/shared/list-state'
 import { checkedAtText, referenceKindText, referenceNameText } from './media-delete-impact'
+import { Field } from '@/components/shared/form-controls'
 
 export default function MediaReplacementDialog({
   source,
@@ -168,13 +169,7 @@ export default function MediaReplacementDialog({
       )}
     >
       <div className="space-y-4">
-        <div>
-          <label className="text-ink-secondary mb-1 block text-xs font-semibold">差し替え先</label>
-          {/*
-            N-205: 候補が多いと一覧から探せない。名前で絞り込み、
-            絞り込んだ結果をそのままページ送りできる（検索とページングの併用）。
-          */}
-          <form
+        <div><Field label="差し替え先"><form
             className="mb-2 flex gap-2"
             onSubmit={(event) => {
               event.preventDefault()
@@ -184,7 +179,7 @@ export default function MediaReplacementDialog({
           >
             <input
               type="text"
-              aria-label="差し替え候補を名前で検索"
+              aria-label="差し替え候補を名前で探す"
               placeholder="名前で探す"
               value={candidateQueryInput}
               onChange={(event) => setCandidateQueryInput(event.target.value)}
@@ -192,7 +187,7 @@ export default function MediaReplacementDialog({
             />
             <Button type="submit">検索</Button>
           </form>
-          {candidatePhase === 'loading' ? (
+{candidatePhase === 'loading' ? (
             <ListState kind="loading" title="差し替え候補を読み込んでいます" />
           ) : candidatePhase === 'error' ? (
             <ListState
@@ -234,8 +229,7 @@ export default function MediaReplacementDialog({
                 <p className="text-ink-faint mt-2 text-xs">「{candidateQuery}」で絞り込み中（{candidateTotal} 件）</p>
               ) : null}
             </>
-          )}
-        </div>
+          )}</Field></div>
 
         {phase === 'loading' ? (
           <p className="text-ink-faint text-xs">差し替わる場所を確認しています…</p>

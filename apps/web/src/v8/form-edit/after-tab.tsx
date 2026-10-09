@@ -18,6 +18,7 @@ import Segmented from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import { ACTION_ADDERS, describeAfterAction, emptyAction } from './model'
 import styles from './edit.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 const ADDER_ICON: Record<FormAction['kind'], typeof Tag> = {
   send_text: MessageSquare,
@@ -77,10 +78,7 @@ export function AfterTab({ readOnly, options, refs, onSubmitTagId, onChangeOptio
     <>
       <section className={styles.card} aria-labelledby="fe-thanks-title">
         <h2 id="fe-thanks-title" className={styles.cardTitle}>答え終わったときの画面</h2>
-        <div className={styles.field}>
-          <label className={styles.fieldLabel} htmlFor="fe-thanks-text">お礼の文</label>
-          <TextField id="fe-thanks-text" value={options.thanksText ?? ''} placeholder="ご回答ありがとうございました。" onChange={(e) => onChangeOptions({ thanksText: e.target.value })} />
-        </div>
+        <div className={styles.field}><Field label="お礼の文" htmlFor="fe-thanks-text"><TextField id="fe-thanks-text" value={options.thanksText ?? ''} placeholder="ご回答ありがとうございました。" onChange={(e) => onChangeOptions({ thanksText: e.target.value })} /></Field></div>
         <div className={styles.endingRow}>
           <span className={styles.endingLabel}>終わったあと</span>
           <Segmented
@@ -94,9 +92,7 @@ export function AfterTab({ readOnly, options, refs, onSubmitTagId, onChangeOptio
           />
         </div>
         {ending === 'url' ? (
-          <div className={styles.field}>
-            <label className={styles.fieldLabel} htmlFor="fe-thanks-url">開くURL</label>
-            <TextField
+          <div className={styles.field}><Field label="開くURL" htmlFor="fe-thanks-url"><TextField
               id="fe-thanks-url"
               type="url"
               value={options.thanksUrl ?? ''}
@@ -105,8 +101,7 @@ export function AfterTab({ readOnly, options, refs, onSubmitTagId, onChangeOptio
                 setUrlDraft(e.target.value)
                 onChangeOptions({ thanksUrl: e.target.value || 'https://' })
               }}
-            />
-          </div>
+            /></Field></div>
         ) : null}
       </section>
 
@@ -131,7 +126,7 @@ export function AfterTab({ readOnly, options, refs, onSubmitTagId, onChangeOptio
                 {...reorder.handleProps(slot)}
               />
               <span className={styles.actionNum}>{position + 1}</span>
-              <button type="button" className={styles.actionText} title={text} onClick={() => setEditing(actions)}>{text}</button>
+              <button type="button" className={styles.actionText} title={text}  onClick={() => setEditing(actions)}>{text}</button>
               <RowActions
                 className={styles.more}
                 subjectName={`「${text}」`}

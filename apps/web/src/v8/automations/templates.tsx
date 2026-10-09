@@ -30,6 +30,7 @@ import {
   type BandCell,
 } from './shell'
 import styles from './templates.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -146,10 +147,10 @@ export default function AutomationTemplatesV8() {
   const stoppedCount = rules ? rules.length - activeCount : 0
   const neverRunCount = rules ? rules.filter((rule) => rule.isActive && rule.executionCount30d === 0).length : 0
   const cells: BandCell[] = [
-    { key: 'rules', title: 'ルール', icon: <ListChecks size={13} aria-hidden="true" />, value: rules ? rules.length : null, unit: '件', detail: rules ? `動いている ${activeCount}・止めている ${stoppedCount}` : '—' },
+    { key: 'rules', title: 'ルール', icon: <ListChecks size={13} aria-hidden="true" />, value: rules ? rules.length : null, unit: '件', detail: rules ? `動いている ${activeCount}・止めている ${stoppedCount}` : emptyValue('unknown') },
     { key: 'runs', title: '今月動いた', icon: <Activity size={13} aria-hidden="true" />, value: summary?.executionCount30d ?? null, unit: '回', detail: 'この30日に動いた回数' },
     { key: 'failed', title: '失敗', icon: <FileWarning size={13} aria-hidden="true" />, value: summary?.failureCount30d ?? null, unit: '件', detail: '「動いた記録」からやり直せます' },
-    { key: 'skipped', title: '条件に外れた', icon: <Filter size={13} aria-hidden="true" />, value: skipped, unit: '回', detail: rules ? `だれにも当たらないルール ${neverRunCount}` : '—' },
+    { key: 'skipped', title: '条件に外れた', icon: <Filter size={13} aria-hidden="true" />, value: skipped, unit: '回', detail: rules ? `だれにも当たらないルール ${neverRunCount}` : emptyValue('unknown') },
   ]
 
   /* ===== 本文 ===== */
@@ -240,7 +241,7 @@ export default function AutomationTemplatesV8() {
       boardId="c7dxp"
       headingSize="regular"
       title="オートメーション"
-      description={AUTOMATIONS_DESCRIPTION}
+      help={AUTOMATIONS_DESCRIPTION}
       actions={canEdit
         ? <Button href={automationTabHref('templates')}><LayoutTemplate size={15} aria-hidden="true" />見本から作る</Button>
         : null}

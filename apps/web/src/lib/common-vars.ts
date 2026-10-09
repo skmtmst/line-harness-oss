@@ -138,7 +138,7 @@ export function isSecretLikeVarValue(value: string): boolean {
 /** Q: 共通情報の状態の呼び名。一覧と編集で同じ言葉を使う。 */
 export const COMMON_VAR_STATE_LABELS: Record<string, string> = {
   draft: '下書き',
-  active: '使用中',
-  stopped: '止めた',
+  active: '有効',
+  stopped: '停止中',
   expired: '期限切れ',
 }

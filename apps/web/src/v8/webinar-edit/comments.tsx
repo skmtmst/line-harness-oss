@@ -20,6 +20,7 @@ import { DetailHead } from './chrome'
 import { fmtSec, parseSec } from './helpers'
 import type { DetailChrome, EditContext, PaneSaveProps } from './types'
 import styles from './comments.module.css'
+import NumberInput from '@/components/shared/number-field'
 
 /** 1行の中身を確かめる。直せないときは理由の文を返す。 */
 function validateRow(raw: unknown): WebinarSakuraComment | string {
@@ -41,7 +42,7 @@ function SecondsInput({ value, label, disabled, onChange }: { value: number; lab
   const [draft, setDraft] = useState(fmtSec(value))
   useEffect(() => { setDraft(fmtSec(value)) }, [value])
   return (
-    <input
+    <NumberInput numericText
       className={`${styles.cell} ${styles.cellSec}`}
       value={draft}
       aria-label={label}

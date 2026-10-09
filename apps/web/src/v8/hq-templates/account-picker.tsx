@@ -9,6 +9,7 @@ import { HqAccountPickerField } from '@/components/shared/hq-account-picker'
 import { api } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import styles from '../hq-broadcasts/create.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export default function HqAccountPicker({ title, allowed, selected, onChange, note, disabled }: {
   title: string
@@ -34,7 +35,7 @@ export default function HqAccountPicker({ title, allowed, selected, onChange, no
     <div className={styles.accounts} data-design-node="gQabc-accounts">
       <h3>{title}</h3>
       <HqAccountPickerField label={title} accounts={accounts} value={selected} onChange={onChange} disabled={disabled}
-        meta={(account) => `友だち ${account.friendCount == null ? '—' : formatNumber(account.friendCount)}`} />
+        meta={(account) => `友だち ${account.friendCount == null ? emptyValue('unknown') : formatNumber(account.friendCount)}`} />
       <p className={styles.accountsNote} aria-live="polite">{selected.length === 0 ? `アカウントを選んでください。${note}` : `${formatNumber(selected.length)} アカウントを選んでいます。${note}`}</p>
     </div>
   )

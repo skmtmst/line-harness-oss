@@ -24,6 +24,9 @@ import { slashDateTime } from '../duplicates/words'
 import { csvExportLine } from '../list/csv-export'
 import { formatImportBytes, JOB_STATUS_LABELS, MANAGE_FORBIDDEN, useFriendMigrations } from './use-friend-migrations'
 import styles from './migrations.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const COLUMN_CHOICES = [
   ['basic', '基本（LINEユーザーID・表示名・本名・登録日）', false],
@@ -52,7 +55,7 @@ export default function CsvMigrationsV8() {
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `friend-migration-history-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = csvFileName("友だちの移行履歴")
     anchor.click()
     URL.revokeObjectURL(url)
   }
@@ -60,7 +63,7 @@ export default function CsvMigrationsV8() {
   const body = m.status === 'loading' ? (
     <ListState kind="loading" title="書き出し・取り込みを読み込んでいます" />
   ) : m.status === 'forbidden' ? (
-    <ListState kind="forbidden" title="書き出し・取り込みを見る権限がありません" description="見るには権限が要ります。オーナーか管理者の方に確認してください。" />
+    <ListState kind="forbidden" title="書き出し・取り込みを見る権限がありません" description={permissionDeniedMessage('store')} />
   ) : m.status === 'error' ? (
     <ListState kind="error" title="書き出し・取り込みを表示できませんでした" description="履歴は消えていません。" onRetry={() => void m.load()} />
   ) : (
@@ -99,7 +102,7 @@ export default function CsvMigrationsV8() {
           <div className={styles.cardFoot}>
             {m.exportResult ? (
               <a className={styles.link} href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}${m.exportResult.downloadUrl}`}>
-                {`CSVをダウンロード（${m.exportResult.rowCount ?? '—'} 件）`}
+                {`CSVで書き出す（${m.exportResult.rowCount ?? emptyValue('unknown')}件）`}
               </a>
             ) : null}
             {/* 変えられない人には押せないボタンを置かない（理由は上の1行）。 */}
@@ -215,7 +218,7 @@ export default function CsvMigrationsV8() {
                   <Tr key={`${job.kind}-${job.id}`} className={styles.row}>
                     <Td className={styles.td}>{slashDateTime(job.created_at)}</Td>
                     <Td className={styles.td}><span title={account ? `対象：${account}` : undefined}>{job.kind === 'export' ? '書き出し' : '取り込み'}</span></Td>
-                    <Td className={styles.td}>{count == null ? '—' : formatNumber(count)}</Td>
+                    <Td className={styles.td}>{count == null ? emptyValue('unknown') : formatNumber(count)}</Td>
                     <Td className={styles.td}>{job.created_by_name}</Td>
                     <Td className={styles.td}>
                       <span className={styles.stateCell}>
@@ -223,7 +226,7 @@ export default function CsvMigrationsV8() {
                           {JOB_STATUS_LABELS[job.status] ?? '確認中'}
                         </span>
                         {downloadable ? (
-                          <a className={styles.link} href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/friends/exports/${job.id}/download`}>CSVをダウンロード</a>
+                          <a className={styles.link} href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/friends/exports/${job.id}/download`}>CSVで書き出す</a>
                         ) : null}
                       </span>
                     </Td>

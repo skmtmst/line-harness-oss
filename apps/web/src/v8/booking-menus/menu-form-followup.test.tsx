@@ -71,7 +71,7 @@ describe('予約メニューを作る・直す（WEB062/063/064）', () => {
     net.putStaffMenus.mockRejectedValueOnce(new Error('network')).mockResolvedValue({ ok: true })
     render(<MenuFormV8 />)
     await settle()
-    fireEvent.change(screen.getByPlaceholderText('例: トリミング（小型犬）'), { target: { value: 'カット' } })
+    fireEvent.change(screen.getByPlaceholderText('例：トリミング（小型犬）'), { target: { value: 'カット' } })
     fireEvent.click(screen.getByRole('button', { name: /高田/ }))
     const publish = () => screen.getAllByRole('button').find((b) => b.className.includes('primary') || b.textContent?.includes('公開')) as HTMLButtonElement
     await act(async () => { publish().click() })
@@ -116,12 +116,12 @@ describe('予約メニューを作る・直す（WEB062/063/064）', () => {
 it('入力した後のキャンセルでは移動を止め、続けると入力を残す', async () => {
   render(<MenuFormV8 />)
   await settle()
-  fireEvent.change(screen.getByPlaceholderText('例: トリミング（小型犬）'), {target: {value: '編集中'}})
+  fireEvent.change(screen.getByPlaceholderText('例：トリミング（小型犬）'), {target: {value: '編集中'}})
   fireEvent.click(screen.getByRole('button', {name: 'キャンセル'}))
   expect(screen.getByText('保存していない変更があります')).toBeTruthy()
   expect(nav.push).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', {name: '編集を続ける'}))
-  expect((screen.getByPlaceholderText('例: トリミング（小型犬）') as HTMLInputElement).value).toBe('編集中')
+  expect((screen.getByPlaceholderText('例：トリミング（小型犬）') as HTMLInputElement).value).toBe('編集中')
 })
 
 it('担当の一覧に新しいメニューがまだなくても、割当を明示して保存する', async () => {
@@ -129,7 +129,7 @@ it('担当の一覧に新しいメニューがまだなくても、割当を明�
   net.putStaffMenus.mockResolvedValue({ok: true})
   render(<MenuFormV8 />)
   await settle()
-  fireEvent.change(screen.getByPlaceholderText('例: トリミング（小型犬）'), {target: {value: 'カット'}})
+  fireEvent.change(screen.getByPlaceholderText('例：トリミング（小型犬）'), {target: {value: 'カット'}})
   fireEvent.click(screen.getByRole('button', {name: /高田/}))
   fireEvent.click(screen.getByRole('button', {name: '保存して公開'}))
   await settle()

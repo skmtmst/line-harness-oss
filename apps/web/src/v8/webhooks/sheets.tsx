@@ -37,6 +37,9 @@ import {
 } from './shell'
 import { shortDateTime } from './words'
 import styles from './sheets.module.css'
+import { Field } from '@/components/shared/form-controls'
+import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -308,7 +311,7 @@ export default function WebhooksSheetsV8() {
   const lastKind = runs.find((run) => run.startedAt === connection?.lastSyncedAt)?.kind
   const lastSyncText = connection?.lastSyncedAt
     ? `${shortDateTime(connection.lastSyncedAt)}${lastKind ? ` ${RUN_KIND_LABEL[lastKind]}` : ''}・${connection.lastSyncStatus === 'partial' ? '一部だけ完了' : connection.lastSyncStatus === 'error' ? '失敗' : '完了'}`
-    : '—'
+    : emptyValue('unknown')
 
   /* ===== 左：書き出しのカード ===== */
   let mainCard
@@ -340,15 +343,15 @@ export default function WebhooksSheetsV8() {
         <div className={styles.statusRow}>
           <span className={styles.statusLabel}>接続しているGoogleアカウント</span>
           <span className={styles.spacer} aria-hidden="true" />
-          <span className={styles.statusValue}>{connection?.googleAccountEmail ?? '—'}</span>
+          <span className={styles.statusValue}>{connection?.googleAccountEmail ?? emptyValue('unknown')}</span>
         </div>
         <div className={styles.statusRow}>
           <span className={styles.statusLabel}>書き出し先</span>
           <span className={styles.spacer} aria-hidden="true" />
           {connection?.spreadsheetUrl ? (
-            <a href={connection.spreadsheetUrl} target="_blank" rel="noopener noreferrer" className={styles.statusValue}>
+            <TextLink external href={connection.spreadsheetUrl}   className={styles.statusValue}>
               {`${connection.spreadsheetTitle ?? connection.spreadsheetUrl}（シート：友だち・フォーム回答）`}
-            </a>
+            </TextLink>
           ) : (
             <span className={styles.statusValue}>まだ決めていません</span>
           )}
@@ -397,12 +400,12 @@ export default function WebhooksSheetsV8() {
         )}
         {showTargetForm && canManage && connStatus !== 'expired' ? (
           <form onSubmit={handleSaveTarget} className={styles.targetForm}>
-            <label className={styles.fieldLabel} htmlFor="wh-sheets-target">スプレッドシートのURLまたはID</label>
+
             <p className={styles.cardNote}>
               共有設定で「{connection?.googleAccountEmail ?? '接続したGoogleアカウント'}」に編集権限を付けたシートを指定してください。指定したシート内に「友だち」「フォーム回答」のタブを自動で作ります。
             </p>
             <div className={styles.targetRow}>
-              <TextField id="wh-sheets-target" value={targetInput} onChange={(event) => setTargetInput(event.target.value)}  placeholder="https://docs.google.com/spreadsheets/d/…" required />
+              <Field label="スプレッドシートのURLまたはID" htmlFor="wh-sheets-target"><TextField id="wh-sheets-target" value={targetInput} onChange={(event) => setTargetInput(event.target.value)}  placeholder="https://docs.google.com/spreadsheets/d/…" required /></Field>
               <Button type="submit" variant="primary" disabled={busy !== null} busy={busy === 'target'} busyLabel="確認しています…">保存する</Button>
             </div>
           </form>
@@ -477,7 +480,7 @@ export default function WebhooksSheetsV8() {
                   <Tr key={group.key} data-table-layout="columns">
                     <Td className={styles.colWhen}>{shortDateTime(group.startedAt)}</Td>
                     <Td className={styles.colKind}>{RUN_KIND_LABEL[group.kind] ?? group.kind}</Td>
-                    <Td className={styles.colWhat} title={group.parts.join('・')}>{group.parts.join('・') || '—'}</Td>
+                    <Td className={styles.colWhat} title={group.parts.join('・')}>{group.parts.join('・') || emptyValue('unknown')}</Td>
                     <Td className={styles.colResult}>
                       <StatusBadge tone={group.status === 'ok' ? 'success' : group.status === 'partial' ? 'warning' : group.status === 'running' ? 'neutral' : 'danger'}>{RUN_STATUS_LABEL[group.status] ?? group.status}</StatusBadge>
                     </Td>
@@ -498,7 +501,7 @@ export default function WebhooksSheetsV8() {
       boardId="DxAAA"
       headingSize="regular"
       title="外部連携"
-      description={WEBHOOKS_DESCRIPTION}
+      help={WEBHOOKS_DESCRIPTION}
       actions={isOwner ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={15} aria-hidden="true" />見本から作る</Button> : undefined}
       tabs={<WebhookTabs active="sheets" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>

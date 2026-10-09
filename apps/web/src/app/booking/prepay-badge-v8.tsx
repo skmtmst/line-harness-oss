@@ -8,6 +8,7 @@ import {
   type BookingPrepayDecision,
 } from '@/lib/api'
 import styles from './prepay-badge-v8.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 function jstMonthDay(iso: string): string {
   const date = new Date(iso)
@@ -129,16 +130,13 @@ export default function PrepayBadgeV8({ accountId, friendId, canEdit = true, onC
         onConfirm={() => void clearPrepay()}
         onCancel={() => setDialogOpen(false)}
       >
-        <label className={styles.reasonLabel}>
-          外す理由（1行）
-          <input
+        <Field label="外す理由（1行）"><input
             aria-label="外す理由"
             value={reason}
             maxLength={200}
             onChange={(event) => setReason(event.target.value)}
             placeholder="例：電話で確認が取れた"
-          />
-        </label>
+          /></Field>
       </Dialog>
     </div>
   )

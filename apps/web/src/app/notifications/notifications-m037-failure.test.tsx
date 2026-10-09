@@ -85,7 +85,7 @@ describe('M037 一覧の403は汎用文＋再試行にしない', () => {
     fixture.list.mockRejectedValueOnce(new ApiError(403))
     render(<NotificationsPage />)
 
-    await waitFor(() => expect(screen.getByText(/権限がありません/)).toBeTruthy())
+    await waitFor(() => expect(screen.getAllByRole('alert').some(el => el.textContent?.includes('オーナーか管理者に頼んでください'))).toBe(true))
     expect(screen.queryByRole('button', { name: /もう一度読み込む/ })).toBeNull()
     // 失敗を「まだありません」と混ぜない。
     expect(screen.queryByText('通知はまだありません')).toBeNull()

@@ -190,7 +190,7 @@ export default function NotificationsV8() {
     <ListPage
       boardId="y8QQV"
       title="通知"
-      description="musubo からのお知らせです。エラーやメンテナンス、新しい版のお知らせが届きます。"
+      help="musubo からのお知らせです。エラーやメンテナンス、新しい版のお知らせが届きます。"
       actions={(
         <Button variant="secondary" onClick={() => { void markAllRead() }} disabled={!counts || counts.unread === 0}>
           <CheckCheck aria-hidden="true" className={styles.buttonIcon} />

@@ -152,6 +152,7 @@ describe('V8 リマインダの詳細', () => {
     await act(async () => { confirm.click() })
     await act(async () => {})
     expect(state.updates).toEqual([{ isActive: false }])
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 250)) })
     expect(document.querySelector('[data-design-node="RwVo5"]')).toBeNull()
   })
 

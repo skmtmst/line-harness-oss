@@ -19,6 +19,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { ListPage } from '@/components/templates'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
+import MediaSlot from '@/components/shared/media-slot'
 import { RowMenu } from '@/components/shared/row-actions'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
@@ -60,6 +61,7 @@ import { BANNER_UPLOAD_ACCEPT, BannerConfirmDialogV8, CreateProjectDialogV8, upl
 import { bannerLimitKind } from './limit-notice'
 import { bannerFailureMessage, tileLabel } from './words'
 import styles from './project.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'notfound' | 'missing'
 type Filter = 'all' | 'favorite' | 'delivered'
@@ -491,7 +493,7 @@ function ProjectInner() {
     [images, filter],
   )
 
-  if (status === 'loading') return <ListState kind="loading" title="プロジェクトを読み込んでいます" />
+  if (status === 'loading') return <ListState permissionScope="hq" kind="loading" title="プロジェクトを読み込んでいます" />
   if (status === 'missing') {
     return <TargetMissing kind="unspecified" title="開くプロジェクトが指定されていません" description="一覧から、開きたいプロジェクトを選び直してください。" backHref="/hq/banners" backLabel="プロジェクト一覧へ戻る" />
   }
@@ -499,7 +501,7 @@ function ProjectInner() {
     return <TargetMissing kind="not-found" title="プロジェクトが見つかりません" description="アーカイブされたか、別の統括のものかもしれません。一覧から選び直してください。" backHref="/hq/banners" backLabel="プロジェクト一覧へ戻る" />
   }
   if (status === 'forbidden') {
-    return <ListState kind="forbidden" description="バナー生成は統括の管理者・オーナーだけが使えます。" action={<Button href="/hq/banners">プロジェクト一覧へ戻る</Button>} />
+    return <ListState permissionScope="hq" kind="forbidden" description="バナー生成は統括の管理者・オーナーだけが使えます。" action={<Button href="/hq/banners">プロジェクト一覧へ戻る</Button>} />
   }
   if (status === 'error' || !project) {
     return <TargetMissing kind="error" title="プロジェクトを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void load()} />
@@ -526,18 +528,9 @@ function ProjectInner() {
         { id: 'distribute-project', label: 'このプロジェクトの画像を配る', icon: <Send size={15} aria-hidden="true" />, emphasis: true,
           onSelect: () => { setSelectedImages(images.map((image) => image.id)); openDistribution() } },
       ]} /> : null}
-      <Button onClick={() => fileRef.current?.click()} disabled={busy || archived || uploading} busy={uploading} busyLabel="取り込み中…">
-        <Upload aria-hidden="true" className={styles.icon} />画像を取り込む
-      </Button>
-      <input
-        ref={fileRef}
-        type="file"
-        accept={BANNER_UPLOAD_ACCEPT.join(',')}
-        className={styles.hiddenInput}
-        tabIndex={-1}
-        aria-hidden="true"
-        onChange={(event) => { void takeIn(event.target.files?.[0]); event.target.value = '' }}
-      />
+      <MediaSlot title="画像を取り込む" accept={BANNER_UPLOAD_ACCEPT.join(',')} fileInputRef={fileRef} busy={uploading} disabled={busy || archived}
+        renderTrigger={(choose) => <Button onClick={choose} disabled={busy || archived || uploading} busy={uploading} busyLabel="取り込み中…"><Upload aria-hidden="true" className={styles.icon} />画像を取り込む</Button>}
+        onFile={(file) => { void takeIn(file) }} />
       <Button onClick={() => void patchProject('お気に入り', { isFavorite: !project.isFavorite })} disabled={busy}>
         <Star aria-hidden="true" className={project.isFavorite ? styles.starOn : styles.icon} />{project.isFavorite ? 'お気に入りから外す' : 'お気に入り'}
       </Button>
@@ -560,7 +553,7 @@ function ProjectInner() {
   ) : undefined
 
   return (
-    <ListPage boardId={boardId} title={project.name} description={description} actions={actions}
+    <ListPage boardId={boardId} title={project.name} help={description} actions={actions}
       crumbs={<Breadcrumb appearance="banner" items={[{ label: 'プロジェクト一覧', href: '/hq/banners' }, { label: project.name }]} />}>
       <div className={styles.body}>
         {actionError ? <Notice tone="danger" message={actionError} onClose={() => setActionError('')} /> : null}
@@ -602,13 +595,13 @@ function ProjectInner() {
             {sizeNotice ? <Notice tone="info" message="大きさの調整は検証環境で確認してください。この画像は生成時の大きさのまま保存されています。" onClose={() => setSizeNotice(false)} /> : null}
 
             {images.length === 0 && pendingCount === 0 ? (
-              <ListState
+              <ListState permissionScope="hq"
                 kind="empty"
                 title="まだ画像がありません"
                 description="右の生成パネルで用途とテキストを決めて「生成する」を押すと、ここに並びます。手持ちの画像は「画像を取り込む」から入れられます。"
               />
             ) : visible.length === 0 && pendingCount === 0 ? (
-              <ListState kind="empty" emptyPreset="filtered" action={<Button onClick={() => setFilter('all')}>条件を外す</Button>} />
+              <ListState permissionScope="hq" kind="empty" emptyPreset="filtered" action={<Button onClick={() => setFilter('all')}>条件を外す</Button>} />
             ) : (
               <div className={styles.grid}>
                 {/* 絵 p03ImY：いま作っている生成でできた画像 → 作っている1枚 → 待っている枚 → それより前の画像。 */}
@@ -674,7 +667,7 @@ function ProjectInner() {
               <Button variant="primary" disabled={busy || archived} onClick={openDistribution}><Send aria-hidden="true" className={styles.icon} />{`${selectedImages.length} 枚をアカウントへ配る`}</Button>
             </> : undefined }}
             info={<span className={styles.generationInfo}>
-              <span>{`今日の残り ${usage?.today.remaining ?? '—'} 枚`}</span>
+              <span>{`今日の残り ${usage?.today.remaining ?? emptyValue('unknown')}枚`}</span>
               {exportSizeText(presets, input.presetKey) ? <ExportSizeChip text={exportSizeText(presets, input.presetKey)} /> : <span>寸法 —</span>}
             </span>}
             actions={
@@ -711,7 +704,7 @@ function ProjectInner() {
         accountState={(id) => {
           const selected = images.filter((image) => selectedImages.includes(image.id))
           const count = selected.filter((image) => image.deliveredAccountIds.includes(id)).length
-          return <span className={styles.hint}>{selected.length > 0 ? `${selected.length} 枚中 ${count} 枚を配布済み` : '—'}</span>
+          return <span className={styles.hint}>{selected.length > 0 ? `${selected.length}枚中 ${count}枚を配布済み` : emptyValue('unknown')}</span>
         }}
         notice={distributionProgress ? <p className={styles.distributionProgress} role="status" aria-live="polite">{distributionProgress}</p> : null}
         canDistribute={selectedImages.length > 0}

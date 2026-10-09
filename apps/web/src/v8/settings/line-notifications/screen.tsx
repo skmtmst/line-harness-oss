@@ -56,10 +56,12 @@ import {
   isForbiddenOrRateLimited,
   loadFailureNotice,
 } from '@/components/shared/api-error-message'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 const customerFilters = [
   ['all', 'すべて'],
   ['enabled', '出している'],
-  ['stopped', '止めている'],
+  ['stopped', '停止中'],
   ['incomplete', '文面が未設定'],
 ] as const
 type CustomerFilter = typeof customerFilters[number][0]
@@ -586,7 +588,7 @@ function CustomerNotificationEditor({
       <div>
         <p className="text-xs font-semibold text-ink-faint">LINE通知　›　お知らせの種類</p>
         <p className="mt-2 text-xl font-bold text-ink">「{setting.title?.trim() || setting.label}」を編集する</p>
-        <p className="mt-1 text-xs text-ink-faint">{definition ? `公開版 ${definition.currentVersionNumber ? `v${definition.currentVersionNumber}` : 'なし'} ／ 編集中の下書き` : '公開中の内容を編集します。保存した内容は次の通知から使われます。'}</p>
+        <p className="mt-1 text-xs text-ink-faint">{definition ? `公開版 ${definition.currentVersionNumber ? `v${definition.currentVersionNumber}` : emptyValue('none')} ／ 編集中の下書き` : '公開中の内容を編集します。保存した内容は次の通知から使われます。'}</p>
         {hasUnsaved ? <p className="mt-1 text-xs font-semibold text-warning">未保存の変更があります</p> : null}
       </div>
       <Button onClick={onTestSend} disabled={busy}>テスト受信者に送る</Button>
@@ -632,7 +634,7 @@ function CustomerNotificationEditor({
               previewAlt="カード画像"
               value={setting.imageUrl || null}
               accept="image/jpeg,image/png"
-              limitText="1ファイル10メガバイト以内・JPEG・PNG"
+
               maxBytes={10 * 1024 * 1024}
               upload={uploadImageFile}
               onChange={(url) => onChange({ imageUrl: url ?? '' })}
@@ -983,7 +985,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
     ? kpis.map((kpi) => kpi.label === '今日 送った' ? { ...kpi, note: '送信件数を読み込めませんでした' } : kpi)
     : kpis
   const tabsWithCounts = TABS.map((item) => {
-    if (item.key === 'customer') return { ...item, label: `${item.label} ${loadState === 'ready' ? settings.length : '—'}` }
+    if (item.key === 'customer') return { ...item, label: `${item.label} ${loadState === 'ready' ? settings.length : emptyValue('unknown')}` }
     // N-341: 運用者タブの件数は実データ。取れなかったときは「取得失敗」と区別する。
     if (item.key === 'operator') return { ...item, label: `${item.label} ${operatorTabCountLabel(operatorState, operatorCount)}` }
     // WEB198：EC の取り込み失敗の数を「送れなかった」の件数として出さない。
@@ -1193,7 +1195,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
   }
   const statusOf = (setting: EcNotificationSetting): { label: string; tone: 'good' | 'muted' | 'warn' } => setting.isEnabled
     ? { label: '出している', tone: 'good' }
-    : isIncomplete(setting) ? { label: '文面が未設定', tone: 'warn' } : { label: '止めている', tone: 'muted' }
+    : isIncomplete(setting) ? { label: '文面が未設定', tone: 'warn' } : { label: '停止中', tone: 'muted' }
 
   return <SbSettingsScreen
     boardId={expandedSetting === null ? ({ customer: 'g3iDs', operator: 'u8xibp', failures: 'DrwMm', history: 'PZBVb' } as Record<string, string>)[tab] : undefined}
@@ -1203,7 +1205,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
       <Button href="/line-notifications/operator/new" variant="primary"><Plus aria-hidden="true" size={16} />運用者へのお知らせを作る</Button>
     </> : undefined}
     title="LINE通知"
-    description="注文・入金・発送・返金・定期便など、取引に必要なお知らせを LINE で送ります。"
+    help="注文・入金・発送・返金・定期便など、取引に必要なお知らせを LINE で送ります。"
   >
     {expandedSetting === null ? <Tabs label="LINE通知の中の切り替え" size="notification" items={tabsWithCounts.map(item => ({ label: item.label, href: tabHref[item.key], current: tab === item.key }))} /> : null}
     {/*
@@ -1312,7 +1314,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
 
     {/* 板 g3iDs：絞り込みは共通の札。並びは送った数が多い順のまま。 */}
     <div className={styles.toolbar} aria-label="お知らせの絞り込み">
-      {customerFilters.map(([value, label]) => <FilterChip key={value} selected={filter === value} icon={value === 'all' ? <CircleDot size={13} aria-hidden="true" /> : <Star size={13} aria-hidden="true" />} onChange={() => setFilter(value)}>{`${label} ${loadState === 'ready' ? filterCount(value) : '—'}`}</FilterChip>)}
+      {customerFilters.map(([value, label]) => <FilterChip key={value} selected={filter === value} icon={value === 'all' ? <CircleDot size={13} aria-hidden="true" /> : <Star size={13} aria-hidden="true" />} onChange={() => setFilter(value)}>{`${label} ${loadState === 'ready' ? filterCount(value) : emptyValue('unknown')}`}</FilterChip>)}
     </div>
 
     {notice && <Notice tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />}
@@ -1361,7 +1363,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
                 <Td><span className={styles.name} title={`${name}（${deliveryWords(setting).trigger}）`}>{deliveryWords(setting).trigger || name}</span></Td>
                 <Td className={styles.cell} title={timingLabel(setting)}>{timingLabel(setting)}</Td>
                 <Td className={styles.cell} title={audienceLabel(setting)}>{audienceLabel(setting)}</Td>
-                <Td><span className={`${styles.num} ${sent ? styles.numStrong : styles.numFaint}`} title={sendCountsFailed ? '送信件数を読み込めませんでした' : undefined}>{sendCountsFailed ? '取得失敗' : sent ? formatNumber(sent) : '—'}</span></Td>
+                <Td><span className={`${styles.num} ${sent ? styles.numStrong : styles.numFaint}`} title={sendCountsFailed ? '送信件数を読み込めませんでした' : undefined}>{sendCountsFailed ? '取得失敗' : sent ? formatNumber(sent) : emptyValue('unknown')}</span></Td>
                 <Td><StatusBadge tone={status.tone === 'good' ? 'success' : status.tone === 'warn' ? 'warning' : 'neutral'}>{status.label}</StatusBadge></Td>
                 <Td>{canManage ? <NotificationToggle setting={setting} busy={busy === setting.eventType} onToggle={() => setPendingToggle(setting)} /> : <span className={styles.minor}>{setting.isEnabled ? 'オン' : 'オフ'}</span>}</Td>
                 <Td className={styles.actions}>{canManage ? <Button variant="secondary" onClick={() => setExpanded(setting.eventType)} aria-label={`${name}の内容を編集`}>内容を編集</Button> : null}</Td>

@@ -1,5 +1,7 @@
 'use client'
 
+import { dialogWidth } from './panel-sizes'
+
 import React, { useContext, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, X } from 'lucide-react'
@@ -12,9 +14,9 @@ import { useStepMotion } from './use-step-motion'
 export type DialogProps = {
   open: boolean
   /** V8 の幅。v7 の寸法は維持する。 */
-  size?: 'medium' | 'large'
+  size?: 'small' | 'medium' | 'large' | 'wide'
   /**
-   * ★V8：絵の窓の幅（px）。絵ごとに 480〜720 とばらばらなので、画面が絵の値を渡す。
+   * ★V8：480・560・720・960の4段。旧指定は共通部品で段へそろえる。
    * 渡さなければ size の幅のまま。v7 では効かない。
    */
   /** 頭・説明・本文・操作を同じ余白で積む小窓（i8F12 等）。 */
@@ -214,18 +216,18 @@ export default function Dialog({
       data-design-footer-gap={designFooterGap !== undefined || undefined}
       data-footer-divider={footerDivider ? undefined : 'none'}
       data-footer-lead={footerLeadFlexible ? undefined : 'fixed'}
-      data-design-width={designWidth ? '' : undefined}
+      data-design-width=""
       data-design-header-padding={designHeaderPadding ? '' : undefined}
       data-design-header-height={designHeaderHeight ? '' : undefined}
       data-design-content-padding={designContentPadding ? '' : undefined}
-      style={designWidth || designHeaderPadding || designHeaderHeight || designContentPadding || designFooterPadding || designFooterGap !== undefined ? ({
+      style={({
         ...(designFooterGap !== undefined ? { '--dialog-footer-gap': `${designFooterGap}px` } : {}),
-        ...(designWidth ? { '--dialog-design-width': `${designWidth}px` } : {}),
+        '--dialog-design-width': `${dialogWidth(designWidth ?? ({ small: 480, medium: 560, large: 720, wide: 960 } as const)[size])}px`,
         ...(designHeaderPadding ? { '--dialog-design-header-padding': designHeaderPadding } : {}),
         ...(designHeaderHeight ? { '--dialog-design-header-height': `${designHeaderHeight}px` } : {}),
         ...(designContentPadding ? { '--dialog-design-content-padding': designContentPadding } : {}),
         ...(designFooterPadding ? { '--dialog-design-footer-padding': designFooterPadding } : {}),
-      } as CSSProperties) : undefined}
+      } as CSSProperties)}
       data-design-part="dialog"
       data-design-node={tone === 'destructive' ? 'H2S1T4' : 'J6x4Q'}
     >

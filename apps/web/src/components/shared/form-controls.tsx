@@ -1,6 +1,6 @@
 'use client'
 
-import React, { forwardRef, useEffect, useId, useState } from 'react'
+import React, { forwardRef, useEffect, useId, useState, useRef } from 'react'
 import type {
   ComponentPropsWithoutRef,
   ReactNode,
@@ -26,7 +26,7 @@ import styles from './form-controls.module.css'
  * （legend や行内のラベル）ではこの部品を直接置く。
  */
 export function RequiredBadge({ appearance = 'badge' }: { appearance?: 'badge' | 'text' }) {
-  return <span className={appearance === 'text' ? styles.optional : styles.required}>必須</span>
+  return <span aria-hidden="true" className={styles.required}>必須</span>
 }
 
 /**
@@ -34,13 +34,22 @@ export function RequiredBadge({ appearance = 'badge' }: { appearance?: 'badge' |
  * 必須のような丸い地は付けず、薄い灰の文字だけ。
  */
 export function OptionalBadge() {
-  return <span className={styles.optional}>任意</span>
+  return <span aria-hidden="true" className={styles.optional}>任意</span>
 }
 
 /** 複合入力欄の下にも、Field と同じ誤りの文を置く（中身が無ければ何も出さない）。 */
 export function FieldError({ id, children }: { id: string; children: ReactNode }) {
   return children ? <p id={id} className={styles.error} role="alert">{children}</p> : null
 }
+
+/** 補足は1行。長い説明と改行を含む説明はラベル横の「？」へ。 */
+export function fieldNoteText(node: ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(fieldNoteText).join('')
+  if (React.isValidElement<{ children?: ReactNode }>(node)) return fieldNoteText(node.props.children)
+  return ''
+}
+export function fieldNoteIsLong(node: ReactNode): boolean { const text = fieldNoteText(node).trim(); return /\n/.test(text) || [...text].length > 32 }
 
 /** 1行の入力欄。ラベルと説明の付け方を全画面でそろえる。 */
 export function Field({
@@ -65,7 +74,7 @@ export function Field({
   fill,
   children,
 }: {
-  label?: string
+  label?: ReactNode
   /** 小さな連携フォームのラベルと間隔。 */
   density?: 'compact' | 'input'
   grow?: boolean
@@ -104,7 +113,27 @@ export function Field({
   count?: { value: number; max: number }
   children: ReactNode
 }) {
-  const hasHelp = help !== undefined && help !== null
+  const baseId = useId()
+  const [detectedId, setDetectedId] = useState<string>()
+  const controlId = htmlFor ?? detectedId ?? baseId
+  const fieldRef = useRef<HTMLDivElement>(null)
+  const [autoCount, setAutoCount] = useState<{ value: number; max: number } | undefined>()
+  const [autoRequired, setAutoRequired] = useState(false)
+  const syncControl = () => {
+    if (!fieldRef.current || typeof fieldRef.current.querySelector !== 'function') return
+    const control = fieldRef.current.querySelector<HTMLInputElement | HTMLTextAreaElement>('input:not([type=number]):not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=file]),textarea')
+    if (control) { if (!control.id) control.id = controlId; setDetectedId(control.id); if (!control.hasAttribute('aria-label') && typeof shownLabel === 'string') control.setAttribute('aria-label', shownLabel) }
+    const next = control && control.maxLength >= 0 ? { value: control.value.length, max: control.maxLength } : undefined
+    setAutoCount(previous => previous?.value === next?.value && previous?.max === next?.max ? previous : next)
+    setAutoRequired(Boolean(control?.required || control?.getAttribute('aria-required') === 'true'))
+  }
+  useEffect(syncControl)
+  const actualCount = count ?? autoCount
+  const actualRequired = required || autoRequired || Boolean(typeof label === 'string' && label.match(/[（(]必須[）)]/u))
+  const shownLabel = typeof label === 'string' ? label.replace(/\s*[（(](任意|必須)[）)]/gu, '').replace(/\s*[*＊]$/, '') : label
+  const longNote = fieldNoteIsLong(note)
+  const actualHelp = longNote ? <>{help}{help ? <br /> : null}{note}</> : help
+  const hasHelp = actualHelp !== undefined && actualHelp !== null
   /*
    * 誤りの見せ方を全画面でそろえる（動きの点検・8）。
    * - 誤りが出た欄で打ち直し始めたら、その場で赤と文を引っ込める（直している最中に赤くし続けない）。
@@ -121,16 +150,16 @@ export function Field({
    * 中の入力欄（TextField・TextArea・TextInput）へ aria-describedby / aria-invalid /
    * aria-required として渡す。画面ごとに書かない。
    */
-  const baseId = useId()
   const noteId = `${baseId}-note`
   const errorId = `${baseId}-error`
   const countId = `${baseId}-count`
-  const showNote = !shownError && Boolean(note)
-  const over = count ? count.value > count.max : false
-  const describedBy = [shownError ? errorId : null, showNote ? noteId : null, count ? countId : null].filter(Boolean).join(' ') || undefined
+  const showNote = !shownError && Boolean(note) && !longNote
+  const over = actualCount ? actualCount.value > actualCount.max : false
+  const describedBy = [shownError ? errorId : null, showNote ? noteId : null, actualCount ? countId : null].filter(Boolean).join(' ') || undefined
   return (
-    <FieldContext.Provider value={{ controlId: htmlFor, describedBy, invalid: Boolean(shownError), required: Boolean(required) }}>
+    <FieldContext.Provider value={{ label: typeof shownLabel === 'string' ? shownLabel : undefined, controlId, describedBy, invalid: Boolean(shownError), required: Boolean(actualRequired) }}>
     <div
+      ref={fieldRef}
       className={styles.field}
       data-label-size={labelSize}
       data-grow={grow || undefined}
@@ -139,22 +168,22 @@ export function Field({
       data-field-size={size}
       data-field-fill={fill || undefined}
       data-field-quiet={quiet && error ? '' : undefined}
-      onInput={error ? () => { if (!quiet) setQuiet(true) } : undefined}
+      onInput={() => { syncControl(); if (error && !quiet) setQuiet(true) }}
       onBlur={quiet ? () => setQuiet(false) : undefined}
     >
       {/* 「？」は label の外に置く。中に入れるとラベルがボタンを指してしまい、
           入力欄との結びつき（htmlFor・読み上げ）が壊れる。 */}
       {label && !labelHidden ? <div className={styles.labelRow}>
-        <label htmlFor={htmlFor} className={styles.label}>
-          {label}
+        <label htmlFor={controlId} className={styles.label}>
+          {shownLabel}
           {/* 設計は「必須」と字で書いている。* だけだと、色が見えない人には
               何も伝わらない。 */}
-          {required && <RequiredBadge appearance={requiredAppearance} />}
-          {optional && !required && <OptionalBadge />}
         </label>
+        {actualRequired && <RequiredBadge />}
+        {optional !== false && !actualRequired && <OptionalBadge />}
         {hasHelp ? (
-          <HelpTip label={`${helpLabel ?? label}の説明`}>
-            {help}
+          <HelpTip label={`${helpLabel ?? (typeof shownLabel === 'string' ? shownLabel : 'この欄')}の説明`}>
+            {actualHelp}
             {helpHref ? <a href={helpHref} className={styles.helpLink}>くわしく</a> : null}
           </HelpTip>
         ) : null}
@@ -162,9 +191,9 @@ export function Field({
       {errorFrame ? <div className={styles.errorFrame} data-invalid={Boolean(shownError) || undefined} role="group" aria-invalid={Boolean(shownError) || undefined} aria-describedby={describedBy}>{children}</div> : children}
       {shownError ? <p id={errorId} className={styles.error} role="alert">{shownError}</p> : null}
       {showNote ? <p id={noteId} className={styles.note}>{note}</p> : null}
-      {count ? (
+      {actualCount ? (
         <p id={countId} className={[styles.count, over && styles.countOver].filter(Boolean).join(' ')} data-field-count={over ? 'over' : ''}>
-          {count.value.toLocaleString('ja-JP')}/{count.max.toLocaleString('ja-JP')}文字
+          {actualCount.value.toLocaleString('ja-JP')}/{actualCount.max.toLocaleString('ja-JP')}文字
         </p>
       ) : null}
     </div>

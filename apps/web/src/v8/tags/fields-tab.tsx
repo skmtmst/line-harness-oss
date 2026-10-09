@@ -48,6 +48,7 @@ import styles from './list.module.css'
 
 import type { AttributeListHost } from './attribute-host'
 import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -442,13 +443,13 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
                   </ContextMenu>
                 </Td>
                 <Td className={styles.fieldColType}><span className={styles.cellText}>{fieldTypeWord(field.type)}</span></Td>
-                <Td className={styles.fieldColType}><span className={styles.cellText}>{usage === null ? '—' : `${usage} 人`}</span></Td>
+                <Td className={styles.fieldColType}><span className={styles.cellText}>{usage === null ? emptyValue('unknown') : `${usage}人`}</span></Td>
                 <Td className={styles.fieldColType}>
                   <span className={styles.cellText} title={field.formUsageCount === undefined ? '回答フォームの使用数は未集計' : undefined}>
-                    {field.formUsageCount === undefined || field.formUsageCount === 0 ? '—' : `${field.formUsageCount}つ`}
+                    {field.formUsageCount === undefined || field.formUsageCount === 0 ? emptyValue('unknown') : `${field.formUsageCount}つ`}
                   </span>
                 </Td>
-                <Td className={styles.fieldColPlace}><span className={styles.cellText} title={host ? undefined : destinationLabel(field)}>{host ? '—' : destinationLabel(field)}</span></Td>
+                <Td className={styles.fieldColPlace}><span className={styles.cellText} title={host ? undefined : destinationLabel(field)}>{host ? emptyValue('unknown') : destinationLabel(field)}</span></Td>
                 {host && canEdit ? <Td className={styles.colDistribute} onClick={(event) => event.stopPropagation()}><RowQuickAction label="配る" ariaLabel={`${field.name}を配る`} icon={<Send />} disabled={host.busy} onClick={() => host.onDistribute(field.id)} /></Td> : null}
                 <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
                   <span className={styles.menuAnchor}>
@@ -600,8 +601,8 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
             </div>
             <div><dt>差し込み名</dt><dd>{`{{field.${activeField.fieldKey}}}`}</dd></div>
             <div><dt>種類</dt><dd>{fieldTypeWord(activeField.type)}</dd></div>
-            <div><dt>入っている人</dt><dd>{knownUsageCount(activeField) === null ? '—' : `${knownUsageCount(activeField)} 人`}</dd></div>
-            <div><dt>回答フォーム</dt><dd>{activeField.formUsageCount === undefined ? '—' : `${activeField.formUsageCount}つ`}</dd></div>
+            <div><dt>入っている人</dt><dd>{knownUsageCount(activeField) === null ? emptyValue('unknown') : `${knownUsageCount(activeField)}人`}</dd></div>
+            <div><dt>回答フォーム</dt><dd>{activeField.formUsageCount === undefined ? emptyValue('unknown') : `${activeField.formUsageCount}つ`}</dd></div>
             <div><dt>出す場所</dt><dd>{destinationLabel(activeField)}</dd></div>
           </dl>
         ) : null}
@@ -613,7 +614,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
           folder={folderDialog === 'new' ? undefined : folderDialog}
           accountId={accountId}
           note="項目を分けてしまう箱です。消しても、入っていた項目は未分類として残ります。"
-          placeholder="例: 基本情報"
+          placeholder="例：基本情報"
           onClose={() => setFolderDialog(null)}
           onAdded={() => { setFolderDialog(null); void loadFolders() }}
         />

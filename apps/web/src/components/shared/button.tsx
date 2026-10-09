@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import type { LinkProps } from 'next/link'
-import { Check, LoaderCircle } from 'lucide-react'
+import { Check, LoaderCircle, ArrowUpRight } from 'lucide-react'
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type {
   AnchorHTMLAttributes,
@@ -59,6 +59,7 @@ type NativeButtonProps = CommonProps &
 
 type LinkButtonProps = CommonProps &
   Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'aria-disabled' | 'children' | 'className' | 'disabled' | 'href'> & {
+    external?: boolean
     href: LinkProps['href']
     disabled?: never
     'aria-disabled'?: never
@@ -76,16 +77,31 @@ const DONE_FLASH_MS = 1200
  * 見た目は部品が固定し、呼び出し側は幅と外側余白だけを `className` で決める。
  * 表示制御にはTailwindのdisplayクラスではなくHTMLの `hidden` 属性を使う。
  */
+/** 図柄だけの操作には title と同じ読み上げ名を付ける。文字の操作の名前は保つ。 */
+function hasButtonText(children: ReactNode): boolean {
+  return React.Children.toArray(children).some((child) => {
+    if (typeof child === 'string') return child.trim().length > 0
+    if (typeof child === 'number') return true
+    if (!React.isValidElement<{children?:ReactNode; 'aria-hidden'?: boolean | 'true' | 'false'}>(child)) return false
+    if (child.type === 'svg' || child.props['aria-hidden'] === true || child.props['aria-hidden'] === 'true') return false
+    return hasButtonText(child.props.children)
+  })
+}
+function iconButtonLabel(props: {children:ReactNode;title?:string;'aria-label'?:string;'aria-labelledby'?:string}) {
+  return props['aria-label'] ?? (!props['aria-labelledby'] && !hasButtonText(props.children) ? props.title : undefined)
+}
+
 export default function Button(props: ButtonProps) {
   const variant = props.variant ?? 'secondary'
   const size = props.size ?? 'standard'
   const classes = [styles.button, styles[variant], styles[size], props.textTone === 'ink' ? styles.textInk : null, props.className].filter(Boolean).join(' ')
 
   if ('href' in props && props.href !== undefined) {
-    const { children, className: _className, href, size: _size, variant: _variant, align, textTone: _textTone, presentation, ...linkProps } = props
+    const { children, className: _className, href, external, size: _size, variant: _variant, align, textTone: _textTone, presentation, ...linkProps } = props
     return (
-      <Link href={href} className={classes} data-align={align} data-presentation={presentation} {...linkProps}>
+      <Link href={href} className={classes} data-align={align} data-presentation={presentation} {...linkProps} target={external ? '_blank' : linkProps.target} rel={external ? 'noreferrer' : linkProps.rel} aria-label={iconButtonLabel(props)}>
         {children}
+        {external ? <ArrowUpRight size={13} aria-hidden="true" data-external-icon /> : null}
       </Link>
     )
   }
@@ -179,6 +195,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
       disabled={disabled || busyNow}
       aria-busy={busyNow ? true : undefined}
       {...buttonProps}
+      aria-label={iconButtonLabel(props)}
     >
       {busyNow ? <LoaderCircle className={styles.spin} size={15} aria-hidden="true" /> : null}
       {shownDone ? <Check size={15} aria-hidden="true" /> : null}

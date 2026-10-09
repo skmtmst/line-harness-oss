@@ -44,6 +44,8 @@ import { daysUntilIso, eventRowState, isLowApplication, summarizeEventAttention 
 import { formatDateTime, formatDay } from '@/lib/format'
 import styles from './events-list-v8.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 /*
  * R601: 読み込みの失敗は「権限不足」と「通信失敗」を分ける。
@@ -155,11 +157,7 @@ function EventFolderPanelForm({
   return (
     <div>
       <p className="text-ink-faint mt-1 text-xs leading-relaxed">イベントを整理するフォルダです。</p>
-      <label className="mt-4 block">
-        <span className="text-ink-secondary mb-1 block text-xs font-medium">
-          フォルダ名 <span className="text-danger">*</span>
-        </span>
-        <input
+      <Field label="フォルダ名" required><input
           type="text"
           value={name}
           onChange={(event) => setName(event.target.value)}
@@ -168,8 +166,7 @@ function EventFolderPanelForm({
           }}
           placeholder="例：教室"
           className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
-        />
-      </label>
+        /></Field>
       <div className="mt-3">
         <span className="text-ink-secondary mb-1 block text-xs font-medium">色</span>
         <div className="flex flex-wrap gap-2">
@@ -520,7 +517,7 @@ export default function EventsListV8() {
             <span className={styles.kpiLabel}>これからの回</span>
           </div>
           <span className={styles.kpiValue}>
-            {dataReady ? kpi.upcoming_slots : '—'}<span className={styles.kpiUnit}>回</span>
+            {dataReady ? kpi.upcoming_slots : emptyValue('unknown')}<span className={styles.kpiUnit}>回</span>
           </span>
           <span className={styles.kpiDetail}>
             {loadDetail(
@@ -536,7 +533,7 @@ export default function EventsListV8() {
             <span className={styles.kpiLabel}>申込</span>
           </div>
           <span className={styles.kpiValue}>
-            {dataReady ? kpi.upcoming_active : '—'}<span className={styles.kpiUnit}>人</span>
+            {dataReady ? kpi.upcoming_active : emptyValue('unknown')}<span className={styles.kpiUnit}>人</span>
           </span>
           <span className={styles.kpiDetail}>
             {loadDetail(
@@ -552,7 +549,7 @@ export default function EventsListV8() {
             <span className={styles.kpiLabel}>あと少しで満席</span>
           </div>
           <span className={styles.kpiValue}>
-            {dataReady ? kpi.nearly_full : '—'}<span className={styles.kpiUnit}>回</span>
+            {dataReady ? kpi.nearly_full : emptyValue('unknown')}<span className={styles.kpiUnit}>回</span>
           </span>
           <span className={styles.kpiDetail}>
             {loadDetail(Boolean(selectedAccountId), loadStatus, kpi.nearly_full > 0 ? '残り1〜3席' : '該当する回はありません')}
@@ -564,14 +561,14 @@ export default function EventsListV8() {
             <span className={styles.kpiLabel}>申し込みが少ない</span>
           </div>
           <span className={styles.kpiValue}>
-            {dataReady ? kpi.low_applications : '—'}<span className={styles.kpiUnit}>回</span>
+            {dataReady ? kpi.low_applications : emptyValue('unknown')}<span className={styles.kpiUnit}>回</span>
           </span>
           <span className={styles.kpiDetail}>
             {loadDetail(
               Boolean(selectedAccountId),
               loadStatus,
               kpi.nearest_low_starts_at
-                ? `${formatShortJpDate(kpi.nearest_low_starts_at)}の回。あと${daysUntilIso(kpi.nearest_low_starts_at) ?? '—'}日です`
+                ? `${formatShortJpDate(kpi.nearest_low_starts_at)}の回。あと${daysUntilIso(kpi.nearest_low_starts_at) ?? emptyValue('unknown')}日です`
                 : '該当する回はありません',
             )}
           </span>
@@ -716,7 +713,7 @@ export default function EventsListV8() {
                           </td>
                           <td className="px-2 py-3 text-right tabular-nums">
                             {e.total_active}
-                            <span className="text-ink-faint"> / {e.total_capacity ?? '—'}</span>
+                            <span className="text-ink-faint"> / {e.total_capacity ?? emptyValue('unknown')}</span>
                           </td>
                           <td className="px-2 py-3 text-right tabular-nums">
                             {e.pending_count > 0 ? (
@@ -724,7 +721,7 @@ export default function EventsListV8() {
                                 {e.pending_count}
                               </Link>
                             ) : (
-                              <span className="text-ink-faint">—</span>
+                              <span className="text-ink-faint">{emptyValue('unknown')}</span>
                             )}
                           </td>
                           <td className="px-2 py-3">
@@ -742,7 +739,7 @@ export default function EventsListV8() {
                               {state === 'draft'
                                 ? '下書き'
                                 : state === 'paused'
-                                  ? '一時停止'
+                                  ? '停止中'
                                   : state === 'cancelled'
                                     ? '中止'
                                     : state === 'ended'
@@ -797,9 +794,9 @@ export default function EventsListV8() {
           <div className={styles.footer} data-design="tf">
             <span className={styles.footerCount}>
               {!selectedAccountId || loadStatus === 'error' || loadStatus === 'forbidden'
-                ? '—'
+                ? emptyValue('unknown')
                 : loadStatus === 'loading'
-                  ? '—'
+                  ? emptyValue('unknown')
                   : listTotal === 0
                     ? '0件'
                     : `${(current - 1) * perPage + 1}〜${Math.min(current * perPage, listTotal)}件 / 全${listTotal}件`}
@@ -857,7 +854,7 @@ export default function EventsListV8() {
                 {activeState === 'draft'
                   ? '下書き'
                   : activeState === 'paused'
-                    ? '一時停止'
+                    ? '停止中'
                     : activeState === 'cancelled'
                       ? '中止'
                       : activeState === 'ended'
@@ -869,7 +866,7 @@ export default function EventsListV8() {
             </p>
             <p className="text-ink-secondary mb-1 mt-4 block text-xs font-medium">予約・承認待ち</p>
             <p className="text-ink text-sm tabular-nums">
-              予約 {active.total_active} / {active.total_capacity ?? '—'}　承認待ち {active.pending_count > 0 ? active.pending_count : '—'}
+              予約 {active.total_active} / {active.total_capacity ?? emptyValue('unknown')}　承認待ち {active.pending_count > 0 ? active.pending_count : emptyValue('unknown')}
             </p>
             <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
               <Button variant="secondary" onClick={() => router.push(`/events/bookings?id=${active.id}`)}>申込者を見る</Button>

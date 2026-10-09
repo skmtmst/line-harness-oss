@@ -23,7 +23,7 @@ export function downloadCsv(filename: string, rows: Array<Array<string | number 
   URL.revokeObjectURL(url)
 }
 
-/** 板の頭の「CSV で書き出す」へ、いま開いている見かたの書き出しを登録する。 */
+/** 板の頭の「CSVで書き出す」へ、いま開いている見かたの書き出しを登録する。 */
 export type ExportAction = { onClick: () => void; disabled: boolean }
 export const AnalyticsExportContextV8 = createContext<((action: ExportAction | null) => void) | null>(null)
 

@@ -10,6 +10,7 @@ import NoteBar from '@/components/shared/note-bar'
 import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import Toggle from '@/components/shared/toggle'
 import { notifyToast } from '@/components/shared/toast'
 import { describeApiFailure } from '@/components/shared/api-error-message'
@@ -20,6 +21,7 @@ import {
   type BookingChannelsData,
   type BookingConflict,
 } from '../lib/booking-channels'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -168,7 +170,7 @@ export function ConflictDialog({
             ...targets.map((t) => ({ value: t.staffId, label: `${t.displayName}へ移す` })),
           ]}
         />
-        <Toggle label="移したことを、お客さまに知らせる" checked={notify} onChange={setNotify} />
+        <SettingCheckbox label="移したことを、お客さまに知らせる" checked={notify} onChange={setNotify} />
       </Dialog>
     </div>
   )
@@ -283,9 +285,9 @@ export default function ChannelsTabV8({ accountId, canEdit }: { accountId: strin
             {data.staff.map((person) => (
               <Tr key={person.staffId}>
                 <Td>{person.displayName}</Td>
-                <Td>{calendars[person.staffId] ?? '—'}</Td>
+                <Td>{calendars[person.staffId] ?? emptyValue('unknown')}</Td>
                 <Td><StaffStatusChip status={person.status} /></Td>
-                <Td align="right">{person.externalEventsThisWeek == null ? '—' : `${person.externalEventsThisWeek}件`}</Td>
+                <Td align="right">{person.externalEventsThisWeek == null ? emptyValue('unknown') : `${person.externalEventsThisWeek}件`}</Td>
                 <Td>{formatReadAt(person.lastReadAt)}</Td>
                 <Td>
                   {canEdit ? (
@@ -323,10 +325,10 @@ export default function ChannelsTabV8({ accountId, canEdit }: { accountId: strin
                     <span className="block font-semibold text-ink">{label.name}</span>
                     {label.sub ? <span className="block text-xs text-ink-secondary">{label.sub}</span> : null}
                   </Td>
-                  <Td>{label.how || '—'}</Td>
+                  <Td>{label.how || emptyValue('unknown')}</Td>
                   <Td><ChannelStatusChip channel={channel} /></Td>
-                  <Td align="right">{channel.todayCount == null ? '—' : `${channel.todayCount}件`}</Td>
-                  <Td>—</Td>
+                  <Td align="right">{channel.todayCount == null ? emptyValue('unknown') : `${channel.todayCount}件`}</Td>
+                  <Td>{emptyValue('unknown')}</Td>
                   <Td>
                     {channel.status === 'active' && (channel.key === 'line' || channel.key === 'manual') ? (
                       <Button href="/booking/bookings" size="compact">予約管理へ</Button>

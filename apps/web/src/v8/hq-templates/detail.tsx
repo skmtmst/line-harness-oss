@@ -24,7 +24,9 @@ import { KIND_TABS, sentLabel } from './store-list'
 import styles from '../template-detail/detail.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
-
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 /** 「8月21日 18:02」（日本時間）。 */
 function stamp(iso: string): string {
@@ -159,7 +161,7 @@ export default function HqTemplateDetail({
           <div className={styles.aboutRow}><dt>種類</dt><dd>{kindLabel}</dd></div>
           <div className={styles.aboutRow}><dt>フォルダ</dt><dd>{folderName}</dd></div>
           <div className={styles.aboutRow}><dt>今月送った数</dt><dd title={row?.this_month_sent_count == null ? '今月送った数は、この種類では数えていません' : '配った先の合計'}>{sentLabel(row?.this_month_sent_count)}</dd></div>
-          <div className={styles.aboutRow}><dt>差し込み</dt><dd title={words.join('・')}>{words.length > 0 ? words.join('・') : 'なし'}</dd></div>
+          <div className={styles.aboutRow}><dt>差し込み</dt><dd title={words.join('・')}>{words.length > 0 ? words.join('・') : emptyValue('none')}</dd></div>
         </dl>
       </section>
       <LinePreview accountName="公式アカウント" note="受け取る人のLINEでの見え方です。{ } の差し込みは、配った先のアカウントで送るときに、受け取る人ごとの値に変わります。">
@@ -189,7 +191,7 @@ export default function HqTemplateDetail({
   const enterButton = (accountId: string | null) => accountId
     ? <button type="button" className={styles.ghostButton} onClick={() => onEnterAccount(accountId)} aria-label="このアカウントへ入る"><LogIn size={14} aria-hidden="true" />入る</button>
     : <span className={styles.ghostSpacer} aria-hidden="true" />
-  const creator = (version: HqTemplateVersionDisplay) => `${version.creator_name ?? '—'}・${stamp(version.created_at)}`
+  const creator = (version: HqTemplateVersionDisplay) => `${version.creator_name ?? emptyValue('unknown')}・${stamp(version.created_at)}`
   const sortedVersions = [...(versions ?? [])].sort((a, b) => b.version - a.version)
 
   const restore = async () => {
@@ -215,7 +217,7 @@ export default function HqTemplateDetail({
         description={[kindLabel, folderName, current?.creator_name ? `作った人 ${current.creator_name}` : null, `更新 ${stamp(detail.template.updated_at)}`].filter(Boolean).join('・')}
         preview={side}
       >
-        {canEdit ? null : <p className={styles.roBand} role="note">閲覧のみで見ています。編集・配る操作は管理者に頼んでください。</p>}
+        {canEdit ? null : <p className={styles.roBand} role="note">閲覧のみで見ています。編集・配る操作は統括の管理者に頼んでください。</p>}
         {notices}
         {canEdit ? (
           <div className={styles.draftBand} role="status">
@@ -304,7 +306,7 @@ export default function HqTemplateDetail({
             <h2 className={styles.cardTitle}>版の履歴</h2>
             <p className={styles.cardNote}>戻すと、その版を下書きとして作り直します。配るまで配った先は変わりません</p>
           </div>
-          {versions === null && !versionsError ? <p className={styles.empty} role="status">読み込み中…</p> : versionsError ? (
+          {versions === null && !versionsError ? <DetailLoading /> : versionsError ? (
             <div className={styles.versionError}>
               <p className={styles.errorText}>版の履歴を読み込めませんでした。もう一度お試しください。</p>
               <Button variant="secondary" onClick={onReloadVersions}>もう一度読み込む</Button>

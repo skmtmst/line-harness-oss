@@ -20,7 +20,7 @@ import LinePreview, { LinePreviewMessage } from '@/components/shared/line-previe
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { TimeField } from '@/components/shared/date-time-field'
 import { TextField } from '@/components/shared/text-field'
 import { notifyToast } from '@/components/shared/toast'
@@ -39,6 +39,8 @@ import { ReadValue } from './parts'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './notifications.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const SETTINGS_KEYS = [
   'registrationEnabled', 'dayBeforeEnabled', 'dayBeforeTime',
@@ -239,7 +241,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
   const [previewKey, setPreviewKey] = useState<RowKey>('dayBefore')
 
   const available = overview !== null
-  const count = (value: number | undefined) => (available && typeof value === 'number' ? formatNumber(value) : '—')
+  const count = (value: number | undefined) => (available && typeof value === 'number' ? formatNumber(value) : emptyValue('unknown'))
 
   const timeBox = (value: string, label: string, onChange: (next: string) => void) => (readOnly
     ? <ReadValue compact label={label}>{value}</ReadValue>
@@ -276,11 +278,11 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
       <ul className={styles.rows}>
         {rows.map((row) => (
           <li key={row.key} className={styles.row} data-selected={row.key === previewKey || undefined}>
-            <button type="button" className={styles.rowLabel} onClick={() => setPreviewKey(row.key)} title="右の見え方に出す">{row.label}</button>
+            <button type="button" className={styles.rowLabel} onClick={() => setPreviewKey(row.key)} title="右の見え方に出す" >{row.label}</button>
             <div className={styles.rowExtra}>{row.extra}</div>
             {readOnly
               ? <span className={styles.state}>{row.on ? '送る' : '送らない'}</span>
-              : <Toggle checked={row.on} onChange={row.toggle} label={row.label} />}
+              : <SettingCheckbox checked={row.on} onChange={row.toggle} label={row.label} />}
           </li>
         ))}
       </ul>
@@ -290,7 +292,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
         </ul>
       ) : null}
       {readOnly ? null : (
-        <div><Button onClick={() => setTestOpen(true)} disabled={testing || saving || testDone} title={testDone ? 'テスト済みです' : undefined} busy={testing} busyLabel="送信中…"><Send size={15} aria-hidden="true" />{testDone ? 'テスト送信済み（全部）' : 'テストを送る（全部）'}</Button></div>
+        <div><Button onClick={() => setTestOpen(true)} disabled={testing || saving || testDone} title={testDone ? 'テスト済みです' : undefined}  busy={testing} busyLabel="送信中…"><Send size={15} aria-hidden="true" />{testDone ? 'テスト送信済み（全部）' : 'テストを送る（全部）'}</Button></div>
       )}
     </>
   }
@@ -302,7 +304,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
       actions={chrome.actions}
       identity={chrome.identity}
       steps={chrome.steps}
-      description="いつ LINE で知らせるかと、見た人・見なかった人に何をするかを決めます。"
+      help="いつ LINE で知らせるかと、見た人・見なかった人に何をするかを決めます。"
       footerActions={chrome.footerActions}
       status={chrome.status}
       preview={<>
@@ -313,7 +315,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
         </LinePreview>
         <div className={form.previewActions}>
           {readOnly ? null : <Button onClick={() => setTestOpen(true)} disabled={testing || saving || testDone || !settings} busy={testing} busyLabel="送信中…">{testDone ? 'テスト送信済み' : 'テストを送る'}</Button>}
-          {ctx.canOpenPublicPage && ctx.publicUrl ? <Button href={ctx.publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : null}
+          {ctx.canOpenPublicPage && ctx.publicUrl ? <Button external href={ctx.publicUrl}  >公開ページを見る</Button> : null}
         </div>
         {!ctx.canOpenPublicPage && ctx.publicPageReason ? <p className={form.previewNote}>{ctx.publicPageReason}</p> : null}
       </>}
@@ -321,7 +323,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
       <section className={form.card} data-gap="tight" aria-labelledby="webinar-notify-title" data-wc-pane="notifications">
         <div className={form.cardHeadRow}>
           <h2 id="webinar-notify-title" className={form.cardTitle}>通知とリマインド</h2>
-          <HelpTip label="送った数と通知の対象">{`予定 ${count(overview?.pending)} 件・取消 ${count(overview?.cancelled)} 件・合計 ${count(overview?.total)} 件。通知の対象：${overview?.audience ? `${formatNumber(overview.audience.people)} 人（取消を除いた有効な申込。延べ予約は${formatNumber(overview.audience.bookings)} 件）` : '—'}`}</HelpTip>
+          <HelpTip label="送った数と通知の対象">{`予定 ${count(overview?.pending)}件・取消 ${count(overview?.cancelled)}件・合計 ${count(overview?.total)}件。通知の対象：${overview?.audience ? `${formatNumber(overview.audience.people)}人（取消を除いた有効な申込。延べ予約は${formatNumber(overview.audience.bookings)}件）` : emptyValue('unknown')}`}</HelpTip>
         </div>
         <p className={styles.desc}>LINE で送るお知らせです。テストは全部をまとめて自分に送ります。</p>
         {notificationBody}
@@ -357,18 +359,12 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
             })}
           </ul>
         )}
-        <div className={form.field}>
-          <label className={form.label} htmlFor="webinar-action-message">視聴完了のメッセージ</label>
-          <TextField id="webinar-action-message" aria-label="視聴完了メッセージ本文" value={templateBody} readOnly={readOnly} disabled={saving} onChange={(event) => setTemplateBody(event.target.value)} />
-        </div>
-        <div className={form.field}>
-          <label className={form.labelSmall} htmlFor="webinar-missing-policy">結果が取れないとき</label>
-          <div className={styles.policy}>
+        <div className={form.field}><Field label="視聴完了のメッセージ" htmlFor="webinar-action-message"><TextField id="webinar-action-message" aria-label="視聴完了メッセージ本文" value={templateBody} readOnly={readOnly} disabled={saving} onChange={(event) => setTemplateBody(event.target.value)} /></Field></div>
+        <div className={form.field}><Field label="結果が取れないとき" htmlFor="webinar-missing-policy"><div className={styles.policy}>
             {readOnly
               ? <ReadValue label="視聴結果を取得できない場合">{policy === 'escalate' ? '要対応へ追加' : '翌日に取り直す'}</ReadValue>
               : <Select id="webinar-missing-policy" aria-label="視聴結果を取得できない場合" size="full" value={policy} disabled={saving} onChange={(value) => setPolicy(value as typeof policy)} options={[{ value: 'escalate', label: '要対応へ追加' }, { value: 'retry_next_day', label: '翌日に取り直す' }]} />}
-          </div>
-        </div>
+          </div></Field></div>
         {readOnly ? null : <div><Button onClick={() => setActionsOpen('completed')}><Plus size={15} aria-hidden="true" />条件を足す</Button></div>}
       </section>
       {error ? <Notice tone="danger">{error}</Notice> : null}

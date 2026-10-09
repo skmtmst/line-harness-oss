@@ -145,7 +145,7 @@ describe('ダッシュボードの写真審査カード(#666)', () => {
     })
     await render()
     const text = photoCard().textContent ?? ''
-    expect(text).toContain('写真を見る権限がありません')
+    expect(text).toContain('この操作の権限がありません')
     expect(text).not.toContain('読み込み中')
   })
 

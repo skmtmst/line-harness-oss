@@ -31,9 +31,9 @@ import LinePreview, { LinePreviewMessage } from '@/components/shared/line-previe
 import Notice from '@/components/shared/notice'
 import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { notifyToast } from '@/components/shared/toast'
-import FlexPreview from '@/components/flex-preview'
+import { LinePreviewFlex as FlexPreview } from '@/components/shared/line-preview'
 import { buildTemplatePreview, extractMessageUrls, LEGACY_MESSAGE_NOTICE } from '@/components/templates/message-template-editor'
 import {
   ACCOUNT_MISMATCH_MESSAGE,
@@ -66,6 +66,7 @@ import { referenceTokenNames } from '@/components/shared/insert-tokens'
 import { loadTemplateExamples } from '@/v8/templates/examples'
 import styles from './edit.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
 
 const snapshot = (draft: TemplateDraft) => JSON.stringify(draft)
 
@@ -570,14 +571,9 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                 <p className={styles.cardNote}>一覧に出る名前です。友だちには見えません。</p>
               </div>
               <div className={styles.pair}>
-                <div className={`${styles.field} ${styles.grow}`}>
-                  <label htmlFor="te-name" className={styles.label}>テンプレート名</label>
-                  <TextField {...fields.bind('name')} id="te-name" value={name} onChange={(event) => updateDraft({ name: event.target.value })} placeholder="例：予約前日のご案内" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-name-error' : undefined} />
-                  <FieldError id="te-name-error">{fields.error('name')}</FieldError>
-                </div>
-                <div className={`${styles.field} ${styles.folderField}`}>
-                  <label htmlFor="te-folder" className={styles.labelSmall}>フォルダ</label>
-                  <FolderSelect
+                <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor="te-name"><TextField {...fields.bind('name')} id="te-name" value={name} onChange={(event) => updateDraft({ name: event.target.value })} placeholder="例：予約前日のご案内" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-name-error' : undefined} />
+<FieldError id="te-name-error">{fields.error('name')}</FieldError></Field></div>
+                <div className={`${styles.field} ${styles.folderField}`}><Field label="フォルダ" htmlFor="te-folder"><FolderSelect
                     id="te-folder"
                     aria-label="フォルダ"
                     value={host ? host.folder : folderId ?? ''}
@@ -589,8 +585,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                       : canMutate && editorAccountId
                         ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: editorAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
                         : undefined}
-                  />
-                </div>
+                  /></Field></div>
               </div>
             </Card>
 
@@ -649,7 +644,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                       <Link2 size={14} aria-hidden="true" className={styles.urlIcon} />
                       <span className={styles.urlText} ><TruncatedText value={String(url ?? '')} url /></span>
                       <span className={styles.urlNote}>短縮して、押された数を数える</span>
-                      <Toggle checked locked label={`${url}を短縮して数える（いつもオン）`} />
+                      <SettingCheckbox checked locked label={`${url}を短縮して数える（いつもオン）`} />
                     </div>
                   ))}
                   <p className={styles.hint}>リンク名（計測に出る名前）と短縮URLは、配信のときに自動で付きます。</p>

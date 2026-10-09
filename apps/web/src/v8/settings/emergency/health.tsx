@@ -31,7 +31,8 @@ import { onlyWhenVisible } from '@/lib/visible-polling'
 import releaseLog from '@/generated/release-log-summary.json'
 import styles from './screen.module.css'
 import { formatTime as polishFormatTime, formatDate as polishFormatDate } from '@/lib/format'
-
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type ReleaseSummary = { version: string; released: string | null }
 
@@ -226,22 +227,19 @@ function OpenAlerts({
                   </Button>
                 ) : null}
                 {canManage ? (
-                  <Button variant="secondary" disabled={busy || !canRetry} title={canRetry ? undefined : 'やり直せる通知はありません'} onClick={() => void onRetry(alert)}>
+                  <Button variant="secondary" disabled={busy || !canRetry} title={canRetry ? undefined : 'やり直せる通知はありません'}  onClick={() => void onRetry(alert)}>
                     {alert.notification.unconfigured > 0 ? '通知先を再確認する' : '通知をやり直す'}
                   </Button>
                 ) : null}
               </div>
               {openNoteId === alert.id && alert.status === 'open' ? (
-                <label className={styles.noteField} htmlFor={`operation-alert-note-${alert.id}`}>
-                  受領メモ（任意）。「受領を記録する」で記録します。
-                  <input
+                <Field label="受領メモ。「受領を記録する」で記録します。" htmlFor={`operation-alert-note-${alert.id}`}><input
                     id={`operation-alert-note-${alert.id}`}
                     value={notes[alert.id] ?? ''}
                     maxLength={500}
                     onChange={(event) => setNotes((current) => ({ ...current, [alert.id]: event.target.value }))}
                     disabled={busy}
-                  />
-                </label>
+                  /></Field>
               ) : null}
             </div>
           )
@@ -331,8 +329,8 @@ export function HealthPanelV8({
       const releases = (releaseLog as { releases?: ReleaseSummary[] }).releases ?? []
       const version = deployments.find((item) => item.deployment?.phase === 'succeeded' && item.deployment.version)?.deployment?.version
         ?? releases.find((item) => item.released)?.version
-        ?? '—'
-      setStats({ stops: recent.length, longest: longest > 0 ? formatMinutesRough(longest) : '—', version })
+        ?? emptyValue('unknown')
+      setStats({ stops: recent.length, longest: longest > 0 ? formatMinutesRough(longest) : emptyValue('unknown'), version })
       setStatsNote('この30日')
     } catch {
       setStats(null)

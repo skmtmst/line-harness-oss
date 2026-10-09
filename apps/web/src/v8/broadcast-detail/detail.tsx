@@ -65,12 +65,15 @@ import {
 } from './display'
 import styles from './detail.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { PageHeading } from '@/components/templates/page-frame'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 送るまでの6段階。承認が絡まない・予約しない配信はその段を省く。 */
 const DELIVERY_STEPS: ReadonlyArray<{ key: string; label: string }> = [
   { key: 'draft', label: '下書き' },
   { key: 'pending_approval', label: '承認待ち' },
-  { key: 'scheduled', label: '予約済み' },
+  { key: 'scheduled', label: '予約中' },
   { key: 'preparing', label: '送信準備' },
   { key: 'sending', label: '送信中' },
   { key: 'sent', label: '送信済み' },
@@ -79,7 +82,7 @@ const DELIVERY_STEPS: ReadonlyArray<{ key: string; label: string }> = [
 const BRANCH_LABELS: Record<string, string> = {
   partial_failed: '一部失敗',
   failed: '失敗',
-  stopped: '停止',
+  stopped: '停止中',
   expired: '期限切れ',
 }
 
@@ -258,22 +261,16 @@ export default function BroadcastDetail({
 
   return (
     <PageFrame kind="detail" boardId="cgiGB pNiUk F3X1Mo Q28Gb dK1aE wfHIE tPm3e">
-      <header className={styles.head}>
-        <div className={styles.name}>
-          <div className={styles.titleRow}>
-            <h2 className={styles.title} title={broadcast.title}>{broadcast.title}</h2>
-            <span className={styles.badge} data-tone={BADGE_TONE[displayStatus]}>
+      <PageHeading title={broadcast.title}
+        crumbs={<><p className={styles.meta}>{metaLine(broadcast, audienceLabel)}</p></>}
+        steps={<>{isDraft
+            ? <DraftStepRail broadcastId={broadcast.id} draftStep={broadcast.draftStep} canEdit={canEdit} />
+            : <DeliveryRail broadcast={broadcast} approvalInvolved={approvalInvolved(broadcast, approval.state)} />}</>}
+        titleAccessory={<><span className={styles.badge} data-tone={BADGE_TONE[displayStatus]}>
               <span className={styles.dot} aria-hidden="true" />
               {statusLabel}
-            </span>
-          </div>
-          <p className={styles.meta}>{metaLine(broadcast, audienceLabel)}</p>
-          {isDraft
-            ? <DraftStepRail broadcastId={broadcast.id} draftStep={broadcast.draftStep} canEdit={canEdit} />
-            : <DeliveryRail broadcast={broadcast} approvalInvolved={approvalInvolved(broadcast, approval.state)} />}
-        </div>
-        <div className={styles.actions}>
-          {canEdit ? (
+            </span></>}
+        actions={<>{canEdit ? (
             <>
               <RowMenu
                 className={styles.iconButton}
@@ -281,38 +278,30 @@ export default function BroadcastDetail({
                 items={menuItems}
               />
             </>
-          ) : null}
-          {/* CSV は見るだけの操作。閲覧のみにも出す。 */}
-          <Button size="field" onClick={onExportCsv}>
+          ) : null}{/* CSV は見るだけの操作。閲覧のみにも出す。 */}<Button size="field" onClick={onExportCsv}>
             <Download aria-hidden="true" />
             CSVで書き出す
-          </Button>
-          {canEdit && !isSent && broadcast.status !== 'sending' ? (
+          </Button>{canEdit && !isSent && broadcast.status !== 'sending' ? (
             <Button size="field" onClick={() => void sendTest()} disabled={testing} busy={testing} busyLabel="テスト送信中…">
               <Send aria-hidden="true" />
               テストを送る
             </Button>
-          ) : null}
-          {canEdit && isDraft ? (
+          ) : null}{canEdit && isDraft ? (
             <Button size="field" variant="primary" href={`${editHref}&step=${resumeStep.key}`}>
               <Pencil aria-hidden="true" />
               {resumeStep.order} {resumeStep.label}から続ける
             </Button>
-          ) : null}
-          {canEdit && isScheduled ? (
+          ) : null}{canEdit && isScheduled ? (
             <Button size="field" href={editHref}>
               <Pencil aria-hidden="true" />
               編集を続ける
             </Button>
-          ) : null}
-          {canEdit && isSent ? (
+          ) : null}{canEdit && isSent ? (
             <Button size="field" variant="primary" href={duplicateHref}>
               <Copy aria-hidden="true" />
               複製して作る
             </Button>
-          ) : null}
-        </div>
-      </header>
+          ) : null}</>} />
 
       {conflict ? (
         <div className={styles.conflictWrap} data-design-node="Q28Gb">
@@ -492,7 +481,7 @@ function metaLine(broadcast: ApiBroadcast, audienceLabel: string): string {
 
 function timeOf(value: string | null | undefined): string {
   const short = formatShortDateTime(value)
-  return short ? short.slice(short.indexOf('）') + 1) : '—'
+  return short ? short.slice(short.indexOf('）') + 1) : emptyValue('unknown')
 }
 
 /** 承認が絡む配信か（承認の段を進みの帯に出すか）。 */
@@ -821,7 +810,7 @@ function ApprovalBox({
           <p className={styles.boxTitle}>{status === 'rejected' ? '差し戻されました' : '期限切れです'}</p>
           <p className={styles.desc}>
             {status === 'rejected'
-              ? `理由：${rejectReason || '—'}。内容を直して、もう一度承認を依頼してください。`
+              ? `理由：${rejectReason || emptyValue('unknown')}。内容を直して、もう一度承認を依頼してください。`
               : '承認されないまま予約の時刻を過ぎたため、送っていません。送るには作り直してください。'}
           </p>
         </div>
@@ -831,7 +820,7 @@ function ApprovalBox({
   if (status !== 'pending') return null
   const mine = state.viewer.isApprover
   const request = [
-    `依頼：${approval.requesterName ?? '—'}・${formatBroadcastDateTime(requestedAt)}`,
+    `依頼：${approval.requesterName ?? emptyValue('unknown')}・${formatBroadcastDateTime(requestedAt)}`,
     note ? `ひとこと「${note}」` : '',
   ].filter(Boolean).join('　')
   return (
@@ -848,16 +837,13 @@ function ApprovalBox({
       </dl>
       {mine ? (
         <>
-          <div className={styles.field}>
-            <label htmlFor="approval-reject-reason" className={styles.fieldLabel}>差し戻すときの理由</label>
-            <TextField
+          <div className={styles.field}><Field label="差し戻すときの理由" htmlFor="approval-reject-reason"><TextField
               id="approval-reject-reason"
               maxLength={1000}
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               placeholder="例：日時を 10 月にずらしてください"
-            />
-          </div>
+            /></Field></div>
           {approval.message ? <p className={styles.error}>{approval.message}</p> : null}
           <div className={styles.approvalButtons}>
             <Button

@@ -1,5 +1,8 @@
 'use client'
 
+import SharedStatusBadge from '@/components/shared/status-badge'
+
+
 /*
  * ★V8 一斉配信の一覧（Pencil `l5V9a`・1152 は `jjFNi`・閲覧のみは `NtCE3`）。
  *
@@ -69,7 +72,8 @@ import { formatDateTime, formatNumber } from '@/lib/format'
 import QuickSendV8 from './quick-send'
 import styles from './list.module.css'
 import { formatListDateTime as polishFormatListDateTime } from '@/lib/format'
-
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -640,7 +644,7 @@ export default function BroadcastListV8() {
       icon: Send,
       value: kpiPending ? null : (listKpis?.thisMonth ?? null),
       unit: '件',
-      detail: `${listKpis?.delivered == null ? '—' : `${formatNumber(listKpis.delivered)} 人`}に届いた`,
+      detail: `${listKpis?.delivered == null ? emptyValue('unknown') : `${formatNumber(listKpis.delivered)}人`}に届いた`,
     },
     {
       key: 'openRate',
@@ -1023,7 +1027,7 @@ export default function BroadcastListV8() {
       <DelayedSkeleton loading skeleton={loadingSkeleton} />
     </div>
   ) : forbidden ? (
-    stateCard(<AlertCircle size={20} aria-hidden="true" />, '配信を見る権限がありません', '見るには権限が要ります。オーナーか管理者に追加を依頼してください。', null, true)
+    stateCard(<AlertCircle size={20} aria-hidden="true" />, '配信を見る権限がありません', permissionDeniedMessage('store'), null, true)
   ) : error ? (
     stateCard(<AlertCircle size={20} aria-hidden="true" />, '一斉配信を読み込めませんでした', error,
       <Button type="button" onClick={() => void loadList((page - 1) * pageSize)}>もう一度試す</Button>, true)
@@ -1097,7 +1101,7 @@ export default function BroadcastListV8() {
               </Td>
               <Td>
                 {broadcast.status !== 'sent' ? (
-                  <span className={styles.cellMain}>—</span>
+                  <span className={styles.cellMain}>{emptyValue('unknown')}</span>
                 ) : (
                   <>
                     <span className={styles.resultMain}>{formatNumber(insight?.delivered ?? broadcast.successCount)} 人に届いた</span>
@@ -1166,12 +1170,12 @@ export default function BroadcastListV8() {
       boardId={boardId}
       headingSize="compact"
       title="一斉配信"
-      description="友だちにまとめて送るメッセージの一覧です。予約・下書き・送った結果をここで見ます。"
+      help="友だちにまとめて送るメッセージの一覧です。予約・下書き・送った結果をここで見ます。"
       stats={<>
         {canEdit ? null : (
           <div className={styles.viewerBand} role="status">
             <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+            <span>閲覧のみで見ています。{permissionDeniedMessage('store')}</span>
           </div>
         )}
         <KpiBand>
@@ -1236,7 +1240,7 @@ export default function BroadcastListV8() {
           <FolderAddDialog
             kind="broadcast"
             note="配信を分けてしまう箱です。消しても、入っていた配信は未分類として残ります。"
-            placeholder="例: 01_キャンペーン"
+            placeholder="例：01_キャンペーン"
             onClose={() => setFolderDialogOpen(false)}
             onAdded={() => void loadFolders()}
           />
@@ -1246,7 +1250,7 @@ export default function BroadcastListV8() {
             kind="broadcast"
             folder={editingFolder}
             note="配信を分けてしまう箱です。削除しても、中の配信は未分類に残ります。"
-            placeholder="例: 01_キャンペーン"
+            placeholder="例：01_キャンペーン"
             onClose={() => setEditingFolder(null)}
             onAdded={() => { setEditingFolder(null); void loadFolders() }}
           />

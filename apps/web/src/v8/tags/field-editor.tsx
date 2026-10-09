@@ -287,9 +287,7 @@ export default function FieldEditor({
           <p className={styles.sideNote}>{`「${FIELD_TYPE_WORDS.select}」「${FIELD_TYPE_WORDS.multi_select}」のときは選択肢を並べます。`}</p>
           <div className={styles.optionStack}>
             {optionRows.map((value, index) => (
-              <label key={index} className={styles.field}>
-                <span className={styles.label}>選択肢</span>
-                <TextField
+              <Field key={index} label="選択肢"><TextField
                   ref={index === 0 ? (element) => { validationRefs.current.options = element } : undefined}
                   invalid={index === 0 && validationTarget === 'options' && Boolean(validationError)}
                   aria-describedby={index === 0 && validationTarget === 'options' && validationError ? 'ff-error-options' : undefined}
@@ -298,8 +296,7 @@ export default function FieldEditor({
                   aria-label={`選択肢 ${index + 1}`}
                   placeholder={OPTION_EXAMPLES[index] ?? undefined}
                   onChange={(event) => setOption(index, event.target.value)}
-                />
-              </label>
+                /></Field>
             ))}
             {fieldError('options')}
             <span>
@@ -331,11 +328,8 @@ export default function FieldEditor({
           <Checkbox checked={isStarred} onCheckedChange={setIsStarred} disabled={locked || saving}>友だち一覧の列に出す</Checkbox>
           <Checkbox checked={ecIsMaster} onCheckedChange={setEcIsMaster} disabled={locked || saving}>EC側の値を正とする（EC連携で上書き）</Checkbox>
           {ecIsMaster ? (
-            <label className={styles.field} data-field="ec">
-              <span className={styles.label}>EC側の項目名</span>
-              <TextField ref={(element) => { validationRefs.current.ec = element }} invalid={validationTarget === 'ec' && Boolean(validationError)} aria-describedby={validationTarget === 'ec' && validationError ? 'ff-error-ec' : undefined} value={ecFieldPath} disabled={locked || saving} onChange={(event) => setEcFieldPath(event.target.value)} placeholder="customer.phone" />
-              {fieldError('ec')}
-            </label>
+            <Field label="EC側の項目名"><TextField ref={(element) => { validationRefs.current.ec = element }} invalid={validationTarget === 'ec' && Boolean(validationError)} aria-describedby={validationTarget === 'ec' && validationError ? 'ff-error-ec' : undefined} value={ecFieldPath} disabled={locked || saving} onChange={(event) => setEcFieldPath(event.target.value)} placeholder="customer.phone" />
+{fieldError('ec')}</Field>
           ) : null}
         </section>
       </div>
@@ -368,8 +362,8 @@ export default function FieldEditor({
       <CreatePage
         boardId="w9zY5"
         title={host ? host.title : mode === 'create' ? '項目を作る' : (field?.name ?? '項目を編集')}
-        description={host ? '各アカウントへ配る情報欄のひな形を作ります。種類と差し込みの名前は作ったあと変えられません。' : mode === 'create' ? '友だち1人ひとりに持たせる情報欄を作ります。種類は作ったあと「移行」でだけ変えられます' : '名前・フォルダ・値の扱いを変えられます。種類は「移行」でだけ変えられます'}
-        help={help}
+
+        help={<>{host ? '各アカウントへ配る情報欄のひな形を作ります。種類と差し込みの名前は作ったあと変えられません。' : mode === 'create' ? '友だち1人ひとりに持たせる情報欄を作ります。種類は作ったあと「移行」でだけ変えられます' : '名前・フォルダ・値の扱いを変えられます。種類は「移行」でだけ変えられます'}{help}</>}
         identity={host ? undefined : back}
         notice={host?.notice}
         preview={aside}
@@ -394,9 +388,7 @@ export default function FieldEditor({
 
         <section className={styles.card} aria-labelledby="ff-basic">
           <div className={styles.cardHead}><h2 className={styles.cardTitle} id="ff-basic">基本</h2></div>
-          <label className={styles.field} data-field="name">
-            <span className={styles.label}>項目名</span>
-            <TextField
+          <Field label="項目名"><TextField
               ref={(element) => { validationRefs.current.name = element }}
               invalid={validationTarget === 'name' && Boolean(validationError)}
               aria-describedby={validationTarget === 'name' && validationError ? 'ff-error-name' : undefined}
@@ -406,9 +398,8 @@ export default function FieldEditor({
               placeholder="例：愛犬のお名前"
               onChange={(event) => { setName(event.target.value); if (mode === 'create' && !keyTouched) setFieldKey(suggestKey(event.target.value)) }}
             />
-            {fieldError('name')}
-            <DuplicateNameNote duplicates={nameDuplicates} kindLabel="項目" />
-          </label>
+{fieldError('name')}
+<DuplicateNameNote duplicates={nameDuplicates} kindLabel="項目" /></Field>
           <div className={styles.field} data-field="key">
             <span className={styles.labelStrong} id="ff-key">{mode === 'create' ? '差し込みの名前（英字）' : '差し込みの名前（変えられません）'}</span>
             <span className={styles.keyRow}>

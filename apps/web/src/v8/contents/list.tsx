@@ -60,6 +60,9 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type MediaSort = 'newest' | 'oldest' | 'name' | 'size' | 'usage'
 const UNGROUPED = '__ungrouped__'
@@ -969,13 +972,13 @@ export default function MediaLibraryListV8() {
   const folderForbidden = folderFailure != null && classifyApiFailure(folderFailure) === 'forbidden'
 
   /* 数の帯の文言。失敗・未取得は「—」で出し、偽ゼロを置かない。 */
-  const kpiTotalText = !listKnown || loadFailed ? '—' : formatNumber(overallTotal ?? total)
+  const kpiTotalText = !listKnown || loadFailed ? emptyValue('unknown') : formatNumber(overallTotal ?? total)
   const kindBreakdown = KINDS
     .map((kind) => (kpis.kindTotals[kind.key] == null ? null : `${kind.label}${formatNumber(kpis.kindTotals[kind.key] as number)}`))
     .filter((text): text is string => text !== null)
     .join('・')
-  const unusedText = kpis.unusedTotal == null ? '—' : formatNumber(kpis.unusedTotal)
-  const archivedText = kpis.archivedTotal == null ? '—' : formatNumber(kpis.archivedTotal)
+  const unusedText = kpis.unusedTotal == null ? emptyValue('unknown') : formatNumber(kpis.unusedTotal)
+  const archivedText = kpis.archivedTotal == null ? emptyValue('unknown') : formatNumber(kpis.archivedTotal)
   const quotaPercent = quota && quota.limitBytes > 0
     ? Math.round((quota.usageBytes / quota.limitBytes) * 100)
     : null
@@ -991,7 +994,7 @@ export default function MediaLibraryListV8() {
         <ListState
           kind="forbidden"
           title="メディアの詳細を見る権限がありません"
-          description="見るには権限が要ります。オーナーか管理者に追加を依頼してください。"
+          description={permissionDeniedMessage('store')}
           action={<Button type="button" onClick={() => setDetailUrl(null)}>登録メディア一覧へ戻る</Button>}
         />
       )
@@ -1098,7 +1101,7 @@ export default function MediaLibraryListV8() {
       boardId="O7hUt7"
       headingSize="regular"
       title="登録メディア一覧"
-      description="配信で使う画像・動画・音声・ファイルの置き場です。LINE アカウントごとに管理します。"
+      help="配信で使う画像・動画・音声・ファイルの置き場です。LINE アカウントごとに管理します。"
       tabs={!canManageMedia ? (
         <p className={styles.roBand} role="note">
           <Eye size={16} aria-hidden="true" />
@@ -1143,13 +1146,13 @@ export default function MediaLibraryListV8() {
             allCount={mediaFolderRows[0].count}
             unfiledCount={unfiledCount}
             onAdded={(created) => setFolderFilter(created.id)}
-            placeholder="例: 01_商品写真"
+            placeholder="例：01_商品写真"
           >
             {folderFailure ? (
               <div role="alert">
                 <p>
                   {folderForbidden
-                    ? 'フォルダを見る権限がありません。オーナーか管理者に追加を依頼してください。'
+                    ? permissionDeniedMessage('store')
                     : 'フォルダを読み込めませんでした。登録したメディアは消えていません。'}
                 </p>
                 {folderForbidden ? null : (
@@ -1490,17 +1493,14 @@ export default function MediaLibraryListV8() {
           </div>
         }
       >
-        <label>
-          <span>理由<RequiredBadge /><span>（あとから履歴で確認できます）</span></span>
-          <input
+        <Field label="理由（あとから履歴で確認できます）" required><input
             type="text"
             autoFocus
             value={archiveReason}
             onChange={(event) => setArchiveReason(event.target.value)}
             placeholder={archiveTarget?.mode === 'archive' ? '例：古いキャンペーンの素材のため' : '例：再び使うため'}
             aria-label="理由"
-          />
-        </label>
+          /></Field>
       </Dialog>
 
       {/*

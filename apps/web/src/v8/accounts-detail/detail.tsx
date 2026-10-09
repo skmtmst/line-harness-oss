@@ -48,6 +48,9 @@ import {
   type AccountDetailView,
 } from './view'
 import styles from './detail.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 type Skipped = Array<{ id: string; kind: string; title: string | null; skippedAt: string }>
 
@@ -195,7 +198,7 @@ export default function AccountDetailV8() {
       />,
     )
   }
-  if (status === 'loading' || (account !== null && account.id !== id)) return frame(<ListState kind="loading" />)
+  if (status === 'loading' || (account !== null && account.id !== id)) return frame(<DetailLoading />)
   if (missing || (status === 'ready' && !account)) {
     return frame(
       <TargetMissing
@@ -226,9 +229,9 @@ export default function AccountDetailV8() {
   const lastReceived = account.connection?.lastReceivedAt ?? account.lastWebhookReceivedAt ?? null
 
   const parentValue = !account.parentLineAccountId
-    ? 'なし'
+    ? emptyValue('none')
     : allState === 'ready'
-      ? parent?.name ?? '—'
+      ? parent?.name ?? emptyValue('unknown')
       : allState === 'loading'
         ? '読み込んでいます'
         : null
@@ -237,7 +240,7 @@ export default function AccountDetailV8() {
     ? '読み込んでいます'
     : recipients === 'error'
       ? '読み込めませんでした'
-      : recipients.length === 0 ? '未設定' : recipients.join('、')
+      : recipients.length === 0 ? emptyValue('unconfigured') : recipients.join('、')
 
   const headActions = (
     <div className={styles.headActions}>
@@ -257,7 +260,7 @@ export default function AccountDetailV8() {
       <SettingsPage layout="account-detail"
         boardId="ihjfd"
         title={account.name}
-        description={summaryLine(account, parent?.name ?? null)}
+        help={summaryLine(account, parent?.name ?? null)}
         actions={headActions}
         navigation={<SettingsInnerNav inline />}
       >
@@ -294,8 +297,8 @@ export default function AccountDetailV8() {
                 <h3 className={styles.cardTitle}>登録の内容（つづき）</h3>
                 <Pair label="友だち数">{friendsLine(account)}</Pair>
                 <Pair label="状態"><span className={styles.end}><StatusBadge tone={state.tone}>{state.label}</StatusBadge></span></Pair>
-                <Pair label="国・地域">{account.country ?? '未設定'}</Pair>
-                <Pair label="役割メモ">{account.role ?? '未設定'}</Pair>
+                <Pair label="国・地域">{account.country ?? emptyValue('unconfigured')}</Pair>
+                <Pair label="役割メモ">{account.role ?? emptyValue('unconfigured')}</Pair>
               </Card>
               <div className={styles.cardHead} id="acd-credentials-head">
                 <h3 id="acd-credentials" className={styles.cardTitle}>資格情報</h3>
@@ -327,7 +330,7 @@ export default function AccountDetailV8() {
                 </span>
               </Row>
               <Row label="このシステムが待っているURL">
-                <span className={styles.truncate} title={account.webhook?.expectedUrl ?? undefined}>{account.webhook?.expectedUrl ?? '—'}</span>
+                <span className={styles.truncate} title={account.webhook?.expectedUrl ?? undefined}>{account.webhook?.expectedUrl ?? emptyValue('unknown')}</span>
               </Row>
               <Row label="LINE側に登録したURL">
                 <span className={styles.inline}>
@@ -348,7 +351,7 @@ export default function AccountDetailV8() {
                   ) : null}
                 </div>
                 {skipped === null ? (
-                  <ListState kind="loading" />
+                  <DetailLoading />
                 ) : skipped === 'error' ? (
                   <p className={styles.muted}>送らなかった配信の一覧を読み込めませんでした。詳細のほかの欄はそのまま使えます。</p>
                 ) : skipped.length === 0 ? (

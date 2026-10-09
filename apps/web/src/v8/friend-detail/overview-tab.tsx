@@ -31,6 +31,8 @@ import { inboxHrefForFriend, timelineSourceHref, timelineTypeLabel, timelineKey,
 import { SUPPORT_LABELS, SUPPORT_TONES } from './support'
 import styles from './detail.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 function GroupHead({ title, action }: { title: string; action?: React.ReactNode }) {
   return (
@@ -63,7 +65,7 @@ function recentIcon(type: string) {
 /** 最後のやりとり。履歴の中のいちばん新しいメッセージの時刻（無ければ —）。 */
 export function lastContactText(items: FriendTimelineItem[]) {
   const latest = items.find((item) => item.type === 'message_received' || item.type === 'message_sent')
-  return latest ? formatRelative(latest.occurredAt) : '—'
+  return latest ? formatRelative(latest.occurredAt) : emptyValue('unknown')
 }
 
 export default function OverviewTab({
@@ -109,8 +111,8 @@ export default function OverviewTab({
             action={perms.saveFields ? <Link className={styles.groupLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=info`}>編集</Link> : null}
           />
           <dl className={styles.kvList}>
-            <Kv label="本名">{realName || <span className={styles.faint}>未登録</span>}</Kv>
-            <Kv label="システム表示名">{friend.displayName || <span className={styles.faint}>未登録</span>}</Kv>
+            <Kv label="本名">{realName || <span className={styles.faint}>{emptyValue('unconfigured')}</span>}</Kv>
+            <Kv label="システム表示名">{friend.displayName || <span className={styles.faint}>{emptyValue('unconfigured')}</span>}</Kv>
           </dl>
         </section>
 
@@ -122,7 +124,7 @@ export default function OverviewTab({
           <dl className={styles.kvList}>
             <Kv label="状況">{support ? <StatusPill tone={SUPPORT_TONES[support.status]}>{SUPPORT_LABELS[support.status]}</StatusPill> : <span className={styles.faint}>やり取りなし</span>}</Kv>
             <Kv label="担当">{support?.operatorName ?? <span className={styles.faint}>未割り当て</span>}</Kv>
-            <Kv label="最後のやりとり">{data.historyStatus === 'ready' ? lastContactText(data.historyItems) : '—'}</Kv>
+            <Kv label="最後のやりとり">{data.historyStatus === 'ready' ? lastContactText(data.historyItems) : emptyValue('unknown')}</Kv>
           </dl>
         </section>
 
@@ -146,7 +148,7 @@ export default function OverviewTab({
             </p>
           ) : (
             <div className={styles.mile}>
-              <span className={styles.mileNum}>{mileageStatus === 'ready' && mileage ? formatNumber(mileage.available) : '—'}</span>
+              <span className={styles.mileNum}>{mileageStatus === 'ready' && mileage ? formatNumber(mileage.available) : emptyValue('unknown')}</span>
               <span className={styles.mileUnit}>
                 mile 使える{mileage && mileage.pending > 0 ? `・確定待ち ${formatNumber(mileage.pending)}` : ''}
               </span>
@@ -165,7 +167,7 @@ export default function OverviewTab({
             <p className={styles.value} title={richMenu?.name ?? undefined}>
               {richMenuStatus === 'ready'
                 ? <>{richMenu?.name ?? '既定のメニュー'}{richMenu?.isDefault ? <span className={styles.faint}>（全員に出しているもの）</span> : null}</>
-                : '—'}
+                : emptyValue('unknown')}
             </p>
           )}
         </section>
@@ -187,7 +189,7 @@ export default function OverviewTab({
               <section className={styles.group} aria-label="★つき友だち情報">
                 <GroupHead title="★つき友だち情報" action={<Link className={styles.groupLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=info`}>すべて見る</Link>} />
                 <dl className={styles.kvList}>
-                  {starred.map((f) => <Kv key={f.id} label={f.name}>{values[f.id] || <span className={styles.faint}>未入力</span>}</Kv>)}
+                  {starred.map((f) => <Kv key={f.id} label={f.name}>{values[f.id] || <span className={styles.faint}>{emptyValue('unconfigured')}</span>}</Kv>)}
                 </dl>
               </section>
             ) : null}
@@ -200,7 +202,7 @@ export default function OverviewTab({
             <section className={styles.group} aria-label="友だち情報">
               <GroupHead title="友だち情報" />
               <dl className={styles.kvList}>
-                <Kv label="追加日">{friend.createdAt ? formatDay(friend.createdAt) : '—'}</Kv>
+                <Kv label="追加日">{friend.createdAt ? formatDay(friend.createdAt) : emptyValue('unknown')}</Kv>
                 <Kv label="流入元">{friend.firstTrackedLinkName ?? '不明'}</Kv>
               </dl>
             </section>
@@ -260,7 +262,7 @@ export default function OverviewTab({
             <Link className={styles.secLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=scenario`}>すべてを見る<ArrowRight size={12} aria-hidden /></Link>
           </div>
           {upcomingStatus === 'loading' || upcomingStatus === 'idle' ? (
-            <p className={styles.secNote}>読み込んでいます…</p>
+            <DetailLoading />
           ) : deliveryFailed ? (
             <p className={styles.secNote} role="alert">
               配信予定を読み込めませんでした
@@ -323,7 +325,7 @@ export default function OverviewTab({
             <Link className={styles.secLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=history`}>すべて見る<ArrowRight size={12} aria-hidden /></Link>
           </div>
           {data.historyStatus === 'loading' || data.historyStatus === 'idle' ? (
-            <p className={styles.secNote}>履歴を読み込んでいます…</p>
+            <DetailLoading />
           ) : data.historyStatus === 'error' ? (
             <p className={styles.secNote}>
               履歴を読み込めませんでした
@@ -356,7 +358,7 @@ export default function OverviewTab({
                     <span className={styles.recentTitle}>友だちに追加されました</span>
                     <span className={styles.recentSub}>{friend.firstTrackedLinkName ?? 'システム'}・ほかの活動履歴はまだありません</span>
                   </span>
-                  <span className={styles.time}>{friend.createdAt ? formatDay(friend.createdAt) : '—'}</span>
+                  <span className={styles.time}>{friend.createdAt ? formatDay(friend.createdAt) : emptyValue('unknown')}</span>
                 </div>
               ) : null}
             </div>

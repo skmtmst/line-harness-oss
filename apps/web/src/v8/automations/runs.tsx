@@ -41,7 +41,9 @@ import {
 } from './shell'
 import styles from './runs.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type RunStatus = AutomationRunDetail['status']
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
@@ -359,7 +361,7 @@ export default function AutomationRunsV8() {
       search: query.trim() || undefined,
       status: resultFilter !== 'all' ? resultFilter : undefined,
       includeTest,
-    }), 'automation-runs.csv')
+    }), csvFileName("オートメーションの実行履歴"))
       .then((result) => {
         if (result.truncated && result.totalCount !== null) {
           const rest = result.totalCount - (result.returnedCount ?? 0)
@@ -436,7 +438,7 @@ export default function AutomationRunsV8() {
   ]
 
   /* ===== 道具の段 ===== */
-  const chipCount = (value: number | undefined) => (value === undefined ? '—' : formatNumber(value))
+  const chipCount = (value: number | undefined) => (value === undefined ? emptyValue('unknown') : formatNumber(value))
   const filterChips = (
     <div role="group" aria-label="結果で絞り込む" className={styles.chipGroup}>
       <FilterChip selected={resultFilter === 'executed'} onChange={(next) => toggleResult('executed', next)} icon={<Activity size={13} aria-hidden="true" />}>{`動いた ${chipCount(summary?.executed)}`}</FilterChip>
@@ -465,7 +467,7 @@ export default function AutomationRunsV8() {
       </div>
       {notice ? <div className={styles.noticeRow}><Notice tone="info" role="status">{notice}</Notice></div> : null}
       <ListToolbar
-        search={{ placeholder: '友だち・ルールの名前で探す', label: '友だちの名前・オートメーションの名前で検索', width: 240, value: query, onChange: changeQuery }}
+        search={{ placeholder: '友だち・ルールの名前で探す', label: '友だちの名前・オートメーションの名前で探す', width: 240, value: query, onChange: changeQuery }}
         filters={filterChips}
         trailing={<>{savedBox}<PageSizeSelect value={pageSize} onChange={setPageSize} options={[10, 20, 50]} label={null} /></>}
       />
@@ -526,7 +528,7 @@ export default function AutomationRunsV8() {
                       {reason ? <span className={styles.sub} title={reason}>{reason}</span> : null}
                     </Td>
                     <Td className={styles.colDone}>
-                      <span className={styles.main} title={done.join('・') || run.detail || ''}>{done.length > 0 ? done.join('・') : '—'}</span>
+                      <span className={styles.main} title={done.join('・') || run.detail || ''}>{done.length > 0 ? done.join('・') : emptyValue('unknown')}</span>
                       {done.length > 0 ? <span className={styles.sub}>{`${done.length} つ`}</span> : null}
                     </Td>
                     <Td className={styles.colTime}><span className={styles.main}>{durationText(run.durationMs)}</span></Td>
@@ -568,19 +570,19 @@ export default function AutomationRunsV8() {
   const runDetail = selectedDetail
   const deepLinkMessage = !run && deepLinkRunId
     ? deepLinkLoading ? '読み込んでいます'
-      : deepLinkError === 'forbidden' ? 'この実行を見る権限がありません。'
+      : deepLinkError === 'forbidden' ? permissionDeniedMessage('store')
         : deepLinkError === 'error' ? '詳細を読み込めませんでした。記録は消えていません。' : null
     : null
 
   return (
     <ListPage
-      help="行の「…」から 中身を見る・もう一度やる（失敗のとき）・ルールを開く・トークを開く。"
+      help={<>{AUTOMATIONS_DESCRIPTION}{"行の「…」から 中身を見る・もう一度やる（失敗のとき）・ルールを開く・トークを開く。"}</>}
       boardId="g98F9"
       headingSize="regular"
       title="オートメーション"
-      description={AUTOMATIONS_DESCRIPTION}
+
       actions={canExport
-        ? <Button onClick={downloadRunsCsv} disabled={csvBusy} busy={csvBusy} busyLabel="書き出しています…" title="いまの検索・絞り込みの行が出ます（5,000件まで）"><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
+        ? <Button onClick={downloadRunsCsv} disabled={csvBusy} busy={csvBusy} busyLabel="書き出しています…" title="いまの検索・絞り込みの行が出ます（5,000件まで）"><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
         : undefined}
       tabs={<AutomationTabs active="runs" counts={tabCounts} />}
       stats={<AutomationBand label="動いた記録の数の帯" cells={cells} />}

@@ -15,9 +15,9 @@ const css = src('index.css');
 describe('押す手応え (0.96・80ms・離すとばね160ms)', () => {
   it('ボタン・選ぶ行・日時の枠が共通の押しを通す', () => {
     expect(src('components', 'ui', 'Button.tsx')).toContain('liff-press');
-    expect(src('components', 'MenuList.tsx')).toContain('liff-press');
-    expect(src('components', 'StaffList.tsx')).toContain('liff-press');
-    expect(src('components', 'DateTimePicker.tsx')).toContain('liff-press');
+    expect(src('components', 'MenuList.tsx')).toContain('<Button');
+    expect(src('components', 'StaffList.tsx')).toContain('<Button');
+    expect(src('components', 'DateTimePicker.tsx')).toContain('<Button');
   });
 
   it('押しの値は指示どおり (80ms・0.96・ばね160ms)', () => {

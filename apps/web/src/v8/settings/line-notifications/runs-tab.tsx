@@ -40,7 +40,7 @@ import { api, fetchApi, type EcNotificationRun } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import styles from './screen.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-
+import { emptyValue } from '@/components/shared/empty-value'
 
 const PAGE_SIZE = 20
 
@@ -78,7 +78,7 @@ function shortJst(value: string | null | undefined): string {
 function reasonWords(item: RunItem): string {
   const reason = item.reason?.trim() || ''
   if (item.nextRetryAt && !reason.includes('再試行')) return `${reason || '一時的なエラー'} → 次の再試行 ${shortJst(item.nextRetryAt)}`
-  return reason || '—'
+  return reason || emptyValue('unknown')
 }
 
 export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string | null; mode: 'history' | 'failures' }) {
@@ -190,7 +190,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
 
     <div className={styles.toolbar}>
       <div className={styles.runSearch}>
-        <SearchField aria-label="お客様の名前・注文番号で検索" placeholder="お客様の名前・注文番号で検索" value={query} onChange={setQuery} onClear={() => setQuery('')} />
+        <SearchField aria-label="お客様の名前・注文番号で探す" placeholder="お客様の名前・注文番号で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
       </div>
       <div className={styles.runRecipient}>
         <Select aria-label="対象を絞り込み" label="対象" value={recipientFilter} onChange={(value) => setRecipientFilter(value as RecipientFilter)} options={[
@@ -233,7 +233,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
               return <Tr key={item.id}>
                 <Td className={`${styles.cell} ${styles.runWhen}`}><span className={styles.runWhen}>{shortJst(item.receivedAt)}</span></Td>
                 <Td className={styles.cell}>
-                  <button type="button" className={styles.runOpen} onClick={() => setDetailId(item.id)} title={`${item.notificationName}の記録の詳細を開く`}>{item.notificationName}</button>
+                  <button type="button" className={styles.runOpen} onClick={() => setDetailId(item.id)} title={`${item.notificationName}の記録の詳細を開く`} >{item.notificationName}</button>
                 </Td>
                 <Td className={styles.runWhoCell}>
                   <span className={`${styles.cell} ${styles.runWho}`}>{item.friendName || '名前は未取得'}</span>
@@ -241,7 +241,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
                 </Td>
                 <Td><StatusBadge tone={status.tone === 'good' ? 'success' : status.tone === 'muted' ? 'neutral' : status.tone}>{status.label}</StatusBadge></Td>
                 <Td className={styles.cell} title={reason}>{item.resolved ? `対応済み・${reason}` : reason}</Td>
-                <Td className={styles.cell}>{`${item.attemptCount == null ? '—' : `${item.attemptCount} 回`}・${item.clickedAt ? 'クリックあり' : '—'}`}</Td>
+                <Td className={styles.cell}>{`${item.attemptCount == null ? emptyValue('unknown') : `${item.attemptCount}回`}・${item.clickedAt ? 'クリックあり' : emptyValue('unknown')}`}</Td>
               </Tr>
             })}
           </tbody>

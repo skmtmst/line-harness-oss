@@ -75,6 +75,9 @@ import HqTagEditorV8 from './tag-editor'
 import HqTemplateDetail, { inUseVersionOf } from './detail'
 import styles from './console.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const PAGE_TITLES: Record<TemplateType, string> = { tag: 'タグ', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム', scenario: 'シナリオ' }
 /** 一覧の段の住所（上の帯のパンくずの行き先）。シナリオのひな形はテンプレートの住所の中にある。 */
@@ -592,7 +595,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const tagColor = colorFolder ? folderDisplayColor(colorFolder) : null
 
   const notices = <>
-    {!canEdit && stage === 'list' ? <p className={styles.readonlyBand} role="note">閲覧のみで見ています。変える操作は管理者に頼んでください。</p> : null}
+    {!canEdit && stage === 'list' ? <p className={styles.readonlyBand} role="note">閲覧のみで見ています。変える操作は統括の管理者に頼んでください。</p> : null}
     {error && stage !== 'saved' ? <Notice tone="danger" message={error} action={conflict && detail ? <Button disabled={busy} onClick={() => open(detail.template.id, 'edit')}>最新の内容を読み込む</Button> : undefined} /> : null}
     {message ? <Notice tone="success" message={message} onClose={() => setMessage('')} /> : null}
   </>
@@ -907,7 +910,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       </>
     return (
       <PageFrame kind="wizard" boardId="X4JcOf">
-        <PageHeading title={type === 'template' ? editTitle : editTitle} description="保存したひな形は、一覧の「配る」で各 LINE アカウントへ配ります。" />
+        <PageHeading title={type === 'template' ? editTitle : editTitle} help="保存したひな形は、一覧の「配る」で各 LINE アカウントへ配ります。" />
         <div className={styles.body}>
           {notices}
           {type === 'template' && 'template' in definition ? (
@@ -934,7 +937,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
             <section className={styles.editPanel} aria-label="ひな形の中身">
               <div className={styles.twoCol}>
                 {(createUncertain || !canonicalEditorOwnsSave) && type !== 'rich_menu' ? (
-                  <label className={styles.field}><span className={styles.label}>ひな形の名前</span><input aria-label="ひな形の名前" className={styles.input} value={name} maxLength={200} disabled={busy || createUncertain} onChange={(event) => setName(event.target.value)} /></label>
+                  <Field label="ひな形の名前"><input aria-label="ひな形の名前" className={styles.input} value={name} maxLength={200} disabled={busy || createUncertain} onChange={(event) => setName(event.target.value)} /></Field>
                 ) : null}
                 {/* タグは中の「所属フォルダ」で分けるので、上のフォルダは出さない（同じ物が2つに見える・オーナー 10-08）。一覧での分けは「…」の「フォルダへ移す」。 */}
                 {type !== 'tag' ? <div className={styles.field}>
@@ -943,7 +946,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                 </div> : null}
               </div>
               {(createUncertain || !canonicalEditorOwnsSave) && type !== 'rich_menu' ? (
-                <label className={styles.field}><span className={styles.label}>説明</span><textarea className={styles.textarea} value={description} maxLength={2000} rows={2} disabled={busy || createUncertain} onChange={(event) => setDescription(event.target.value)} /></label>
+                <Field label="説明"><textarea className={styles.textarea} value={description} maxLength={2000} rows={2} disabled={busy || createUncertain} onChange={(event) => setDescription(event.target.value)} /></Field>
               ) : null}
               {catalogFailed ? <Notice tone="warn" message="参照先の候補を読み込めませんでした。タグ・テンプレート・回答フォームは選べません。" action={<Button onClick={reloadCatalog}>もう一度読み込む</Button>} /> : null}
               {canonicalEditorOwnsSave && createUncertain ? uncertainNotice : DefinitionEditor ? (
@@ -1023,10 +1026,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         toolbar={<div className={styles.toolbar}>
           <span className={styles.selectedTools}>
             <strong className={styles.selectedCount}>{`選んだ ${selected.length} アカウント`}</strong>
-          <label className={styles.search} data-size="account">
-            <Search size={14} aria-hidden="true" />
-            <input aria-label="アカウントを検索" placeholder="アカウント名で探す" value={search} onChange={(event) => setSearch(event.target.value)} />
-          </label>
+          <Field label={<><Search size={14} aria-hidden="true" /></>}><input aria-label="アカウントを検索" placeholder="アカウント名で探す" value={search} onChange={(event) => setSearch(event.target.value)} /></Field>
           </span>
           <span className={styles.bulkPick}>
             <Select
@@ -1072,11 +1072,11 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                       {on ? <span className={styles.cellLine}>
                         <span className={styles.cell}>{type === 'tag' ? <TagPill name={name} color={tagColor} size="sm" /> : `${summary}（${textOverrides[account.id] !== undefined || store?.textOverride !== undefined ? '個別の本文' : '一括と同じ'}）`}</span>
                         {textMessage && stage === 'accounts' ? <Button size="compact" variant="text" disabled={busy} onClick={() => setOverrideOpen(overrideOpen === account.id ? null : account.id)}>本文を変える</Button> : null}
-                      </span> : <span className={`${styles.cell} ${styles.cellEmpty}`}>—</span>}
+                      </span> : <span className={`${styles.cell} ${styles.cellEmpty}`}>{emptyValue('unknown')}</span>}
                     </td>
-                    <td><span className={on ? styles.cell : `${styles.cell} ${styles.cellEmpty}`}>{on ? storeVersion(account.id) : '—'}</span></td>
+                    <td><span className={on ? styles.cell : `${styles.cell} ${styles.cellEmpty}`}>{on ? storeVersion(account.id) : emptyValue('unknown')}</span></td>
                     <td>
-                      {!on ? <span className={`${styles.cell} ${styles.cellEmpty}`}>—</span> : !store ? <span className={styles.cell}>確認のあとで選ぶ</span>
+                      {!on ? <span className={`${styles.cell} ${styles.cellEmpty}`}>{emptyValue('unknown')}</span> : !store ? <span className={styles.cell}>確認のあとで選ぶ</span>
                         : allowed.length === 0 ? <span className={styles.modePick}><Select aria-label={`${account.name}の配布方法`} size="full" disabled value="create" onChange={() => undefined} options={[{ value: 'create', label: MODE_LABELS.create }]} /></span>
                         : <span className={styles.modePick}><Select
                           aria-label={`${account.name}の配布方法`}
@@ -1090,9 +1090,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                   </tr>,
                   overrideOpen === account.id && on && textMessage && stage === 'accounts' ? (
                     <tr key={`${account.id}-text`} className={styles.subRow}><td /><td colSpan={4}>
-                      <label className={styles.field}><span className={styles.label}>{`${account.name}に配る本文`}</span>
-                        <textarea aria-label={`${account.name}に配る本文`} className={styles.textarea} disabled={busy} maxLength={5000} value={textOverrides[account.id] ?? ('template' in definition ? definition.template.messageContent : '')} onChange={(event) => setTextOverrides((current) => ({ ...current, [account.id]: event.target.value }))} />
-                      </label>
+                      <Field label={<><span className={styles.label}>{`${account.name}に配る本文`}</span></>}><textarea aria-label={`${account.name}に配る本文`} className={styles.textarea} disabled={busy} maxLength={5000} value={textOverrides[account.id] ?? ('template' in definition ? definition.template.messageContent : '')} onChange={(event) => setTextOverrides((current) => ({ ...current, [account.id]: event.target.value }))} /></Field>
                     </td></tr>
                   ) : null,
                   ...extraItems.map((item) => (
@@ -1119,7 +1117,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
             </div>
             <p className={styles.note}>{stage === 'duplicates'
               ? '配布直前に版を再確認します。配布先で編集があれば、そのアカウントの変更を取り消します。成功したアカウントは保持され、失敗分だけ再確認できます。'
-              : (result ? result.stores.map((store) => `${shortName(store.accountName ?? accountName(accounts, store.accountId))}：${store.status === 'succeeded' ? '完了' : failures.includes(store) ? '失敗' : '作成中'}`).join(' ・ ') : `配布番号：${pendingRun ?? '—'} の結果を確認しています。確認できるまでは再配布しません。`)}</p>
+              : (result ? result.stores.map((store) => `${shortName(store.accountName ?? accountName(accounts, store.accountId))}：${store.status === 'succeeded' ? '完了' : failures.includes(store) ? '失敗' : '作成中'}`).join(' ・ ') : `配布番号：${pendingRun ?? emptyValue('unknown')} の結果を確認しています。確認できるまでは再配布しません。`)}</p>
             {result && failures.length ? failures.map((store) => <Notice key={store.accountId} tone="danger" message={`${store.accountName ?? accountName(accounts, store.accountId)}：${store.reason || '配布できませんでした。アカウントの現在版を再確認してください。'}${store.cleanupPending ? '（画像の後片付けを自動で再試行中です）' : ''}`} action={done ? <Button disabled={busy} onClick={() => checkStores([store.accountId])}>このアカウントだけ再確認して配布</Button> : undefined} />) : null}
             {result && done ? <p className={styles.note}>{`新規 ${formatNumber(successes.reduce((sum, s) => sum + s.counts.created, 0))} 件・上書き ${formatNumber(successes.reduce((sum, s) => sum + s.counts.overwritten, 0))} 件・別名 ${formatNumber(successes.reduce((sum, s) => sum + s.counts.aliased, 0))} 件`}</p> : null}
           </section>

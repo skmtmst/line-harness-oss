@@ -35,6 +35,10 @@ import AdConnectionDialog from './ad-connection-dialog'
 import { DetailPage } from '@/components/templates'
 import { focusField } from './focus-field'
 import styles from './ads.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 const PROVIDERS = [
   { key: 'google', label: 'Google広告', icon: Search },
@@ -325,12 +329,12 @@ export default function AdsV8() {
   }
 
   return (
-    <DetailPage boardId="qSTVR" title="広告連携" description="広告をつなぐと毎日自動で費用を取り込みます。取り込めない分（チラシや看板など）は「費用を手で入れる」から足せます。"
+    <DetailPage boardId="qSTVR" title="広告連携" help="広告をつなぐと毎日自動で費用を取り込みます。取り込めない分（チラシや看板など）は「費用を手で入れる」から足せます。"
       contentPadding="0 var(--tpl-head-pad-side)"
       actions={manage ? <Button onClick={openManualEntry}><Plus size={15} aria-hidden="true" />費用を手で入れる</Button> : null}>
       <div className={styles.body}>
         {readonly ? (
-          <p className={styles.viewerBand} role="status"><Eye size={16} aria-hidden="true" />閲覧のみで見ています。変える操作は管理者に頼んでください。</p>
+          <p className={styles.viewerBand} role="status"><Eye size={16} aria-hidden="true" />閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>
         ) : null}
         {loading && platforms.length === 0 ? (
           <ListState kind="loading" title="広告連携を読み込んでいます" />
@@ -346,16 +350,16 @@ export default function AdsV8() {
           <KpiBand aria-label="広告連携の概要">
               <KpiCard icon={<Wallet size={13} aria-hidden="true" />} title="この30日の広告費"
                 value={null} unit=""
-                valueText={jpyTotal != null ? `¥${formatNumber(jpyTotal)}` : otherTotal ? formatMinor(otherTotal[1], otherTotal[0]) : '—'}
+                valueText={jpyTotal != null ? `¥${formatNumber(jpyTotal)}` : otherTotal ? formatMinor(otherTotal[1], otherTotal[0]) : emptyValue('unknown')}
                 detail="選んだ LINE アカウントの分だけ" />
               <KpiCard icon={<Plug size={13} aria-hidden="true" />} title="つないだ広告" value={connected.length} unit="件"
                 detail={connected.length > 0 ? connected.map(platformLabel).join('・') : 'まだ接続がありません'} />
               <KpiCard icon={<UserPlus size={13} aria-hidden="true" />} title="友だち1人あたり"
-                value={null} unit="" valueText={avgCostPerFriend != null ? `¥${formatNumber(avgCostPerFriend)}` : '—'}
+                value={null} unit="" valueText={avgCostPerFriend != null ? `¥${formatNumber(avgCostPerFriend)}` : emptyValue('unknown')}
                 detail={`友だち追加 ${formatNumber(linkedFriendAdds)} 人`} />
               <KpiCard icon={<Target size={13} aria-hidden="true" />} title="成果1件あたり"
                 value={null} unit=""
-                valueText={conversionCost?.costPerConversionMinor != null && conversionCost.currency ? formatMinor(conversionCost.costPerConversionMinor, conversionCost.currency) : '—'}
+                valueText={conversionCost?.costPerConversionMinor != null && conversionCost.currency ? formatMinor(conversionCost.costPerConversionMinor, conversionCost.currency) : emptyValue('unknown')}
                 detail={conversionCost ? `成果 ${formatNumber(conversionCost.confirmedConversionCount)} 件` : '成果の件数を読み込めませんでした'} />
           </KpiBand>
 
@@ -376,7 +380,7 @@ export default function AdsV8() {
                       : <StatusBadge tone="neutral" size="compact">未接続</StatusBadge>}
                   </div>
                   <p className={styles.providerSub} title={status?.lastRunStatus === 'failed' && status.lastError ? `直近は取り込めませんでした（${status.lastError}）` : undefined}>
-                    {active ? `最後の取り込み ${synced ?? '—'}・毎日自動` : 'つなぐと費用とクリックを毎日取り込みます'}
+                    {active ? `最後の取り込み ${synced ?? emptyValue('unknown')}・毎日自動` : 'つなぐと費用とクリックを毎日取り込みます'}
                   </p>
                   {manage ? (
                     <span>
@@ -431,17 +435,17 @@ export default function AdsV8() {
                 const platform = platforms.find((item) => item.id === row.adPlatformId)
                 const route = row.entryRouteId ? routeById.get(row.entryRouteId) : undefined
                 const link = route ? `${workerHost}/r/${route.refCode}` : null
-                const cost = row.totals.length === 0 ? '—' : row.totals.map((total) => formatMinor(total.amountMinor, total.currency)).join(' ')
+                const cost = row.totals.length === 0 ? emptyValue('unknown') : row.totals.map((total) => formatMinor(total.amountMinor, total.currency)).join(' ')
                 return (
                   <div key={`${row.sourceLabel}|${row.adPlatformId ?? ''}|${row.entryRouteId ?? ''}`} className={styles.tableRow} role="row">
                     <span className={styles.colSource} role="cell"><span className={styles.cell} title={route ? `${route.name}（${row.sourceLabel}）` : row.sourceLabel}>{route?.name ?? row.sourceLabel}</span></span>
-                    <span className={styles.colMedia} role="cell"><span className={styles.cell}>{platform ? platformLabel(platform) : row.source === 'manual' ? '手入力' : '—'}</span></span>
-                    <span className={styles.colLink} role="cell"><span className={styles.cell} title={link ?? undefined}>{link ?? '—'}</span></span>
+                    <span className={styles.colMedia} role="cell"><span className={styles.cell}>{platform ? platformLabel(platform) : row.source === 'manual' ? '手入力' : emptyValue('unknown')}</span></span>
+                    <span className={styles.colLink} role="cell"><span className={styles.cell} title={link ?? undefined}>{link ?? emptyValue('unknown')}</span></span>
                     <span className={styles.colCost} role="cell"><span className={row.totals.length === 0 ? styles.faint : undefined}>{cost}</span></span>
-                    <span className={styles.colNum} role="cell">{row.friendAdds == null ? '—' : formatNumber(row.friendAdds)}</span>
+                    <span className={styles.colNum} role="cell">{row.friendAdds == null ? emptyValue('unknown') : formatNumber(row.friendAdds)}</span>
                     <span className={styles.colNum} role="cell">
                       <span className={row.costPerFriendMinor == null ? styles.faint : undefined}>
-                        {row.costPerFriendMinor == null ? '—' : formatMinor(row.costPerFriendMinor, row.totals[0]?.currency ?? 'JPY')}
+                        {row.costPerFriendMinor == null ? emptyValue('unknown') : formatMinor(row.costPerFriendMinor, row.totals[0]?.currency ?? 'JPY')}
                       </span>
                     </span>
                     <span className={styles.colImport} role="cell">
@@ -471,7 +475,7 @@ export default function AdsV8() {
                     </span>
                     <span className={styles.entrySource} title={entry.sourceLabel}>{route?.name ?? entry.sourceLabel}</span>
                     <span className={styles.entryAmount}>{formatMinor(entry.amountMinor, entry.currency)}</span>
-                    <span className={styles.entryWho} title={`記録した日時 ${shortJst(entry.createdAt) ?? '—'}`}>{`記録 ${shortJst(entry.createdAt)?.split(' ')[0] ?? '—'}`}</span>
+                    <span className={styles.entryWho} title={`記録した日時 ${shortJst(entry.createdAt) ?? emptyValue('unknown')}`}>{`記録 ${shortJst(entry.createdAt)?.split(' ')[0] ?? emptyValue('unknown')}`}</span>
                     <span className={styles.entryMenu}>
                       {manage && !cancelled ? (
                         <IconButton
@@ -516,11 +520,8 @@ export default function AdsV8() {
         onCancel={() => { if (!manualBusy) setManualOpen(false) }}
       >
         <div className={styles.dialogBody}>
-          <label className={styles.field}>
-            <span className={styles.label}>流入元の名前</span>
-            <TextField id="ad-cost-name" aria-invalid={Boolean(manualFieldErrors['ad-cost-name'])} aria-describedby={manualFieldErrors['ad-cost-name'] ? 'ad-cost-name-error' : undefined} value={manualLabel} onChange={(event) => { setManualLabel(event.target.value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-name': '' })) }} placeholder="例: 駅前の看板" maxLength={100} title="同じ流入元・同じ日に入れ直すと上書きになります" />
-            {manualFieldErrors['ad-cost-name'] ? <span id="ad-cost-name-error" className={styles.error} role="alert">{manualFieldErrors['ad-cost-name']}</span> : null}
-          </label>
+          <Field label="流入元の名前"><TextField id="ad-cost-name" aria-invalid={Boolean(manualFieldErrors['ad-cost-name'])} aria-describedby={manualFieldErrors['ad-cost-name'] ? 'ad-cost-name-error' : undefined} value={manualLabel} onChange={(event) => { setManualLabel(event.target.value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-name': '' })) }} placeholder="例：駅前の看板" maxLength={100} title="同じ流入元・同じ日に入れ直すと上書きになります" />
+{manualFieldErrors['ad-cost-name'] ? <span id="ad-cost-name-error" className={styles.error} role="alert">{manualFieldErrors['ad-cost-name']}</span> : null}</Field>
           <div className={styles.field}>
             <span className={styles.pickLabel}>計測リンク（分かれば）</span>
             <Select
@@ -541,11 +542,8 @@ export default function AdsV8() {
               <DateField id="ad-cost-day" invalid={Boolean(manualFieldErrors['ad-cost-day'])} aria-describedby={manualFieldErrors['ad-cost-day'] ? 'ad-cost-day-error' : undefined} value={manualDay} onChange={(value) => { setManualDay(value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-day': '' })) }} aria-label="費用の日付" />
               {manualFieldErrors['ad-cost-day'] ? <span id="ad-cost-day-error" className={styles.error} role="alert">{manualFieldErrors['ad-cost-day']}</span> : null}
             </div>
-            <label className={styles.field}>
-              <span className={styles.label}>費用（円）</span>
-              <TextField id="ad-cost-amount" aria-invalid={Boolean(manualFieldErrors['ad-cost-amount'])} aria-describedby={manualFieldErrors['ad-cost-amount'] ? 'ad-cost-amount-error' : undefined} inputMode="numeric" value={manualAmount} onChange={(event) => { setManualAmount(event.target.value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-amount': '' })) }} placeholder="例: 30000" />
-              {manualFieldErrors['ad-cost-amount'] ? <span id="ad-cost-amount-error" className={styles.error} role="alert">{manualFieldErrors['ad-cost-amount']}</span> : null}
-            </label>
+            <Field label="費用（円）"><NumberInput numericText unit="円" id="ad-cost-amount" aria-invalid={Boolean(manualFieldErrors['ad-cost-amount'])} aria-describedby={manualFieldErrors['ad-cost-amount'] ? 'ad-cost-amount-error' : undefined} inputMode="numeric" value={manualAmount} onChange={(event) => { setManualAmount(event.target.value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-amount': '' })) }} placeholder="例：30000" />
+{manualFieldErrors['ad-cost-amount'] ? <span id="ad-cost-amount-error" className={styles.error} role="alert">{manualFieldErrors['ad-cost-amount']}</span> : null}</Field>
           </div>
         </div>
       </Dialog>
@@ -563,11 +561,8 @@ export default function AdsV8() {
         {cancelTarget ? (
           <div className={styles.dialogBody}>
             <p className={styles.dialogLead}>{`対象: ${cancelTarget.day} ／ ${cancelTarget.sourceLabel} ／ ${formatMinor(cancelTarget.amountMinor, cancelTarget.currency)}`}</p>
-            <label className={styles.field}>
-              <span className={styles.label}>取り消す理由（必須）</span>
-              <TextField id="ad-cancel-reason" aria-invalid={Boolean(cancelReasonError)} aria-describedby={cancelReasonError ? 'ad-cancel-reason-error' : undefined} value={cancelReason} onChange={(event) => { setCancelReason(event.target.value); setCancelReasonError('') }} placeholder="例: 金額を間違えた" maxLength={200} />
-              {cancelReasonError ? <span id="ad-cancel-reason-error" className={styles.error} role="alert">{cancelReasonError}</span> : null}
-            </label>
+            <Field label="取り消す理由" required><TextField id="ad-cancel-reason" aria-invalid={Boolean(cancelReasonError)} aria-describedby={cancelReasonError ? 'ad-cancel-reason-error' : undefined} value={cancelReason} onChange={(event) => { setCancelReason(event.target.value); setCancelReasonError('') }} placeholder="例：金額を間違えた" maxLength={200} />
+{cancelReasonError ? <span id="ad-cancel-reason-error" className={styles.error} role="alert">{cancelReasonError}</span> : null}</Field>
           </div>
         ) : null}
       </Dialog>

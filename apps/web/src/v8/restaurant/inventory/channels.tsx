@@ -26,6 +26,8 @@ import { DialogNote, RsDialog } from '../booking-kit/parts'
 import { dayLabelParen, formatAt } from './format'
 import styles from './inventory.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 export type RestaurantChannel = {
   id: string
@@ -226,9 +228,9 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
                 </Td>
                 <Td>{preparing && channel.receiveMethod === 'email_forward' ? 'メール転送（未設定）' : METHOD_LABEL[channel.receiveMethod]}</Td>
                 <Td><Status value={state.value} label={state.label} /></Td>
-                <Td align="right">{preparing || channel.todayCount === null ? '—' : `${channel.todayCount} 件`}</Td>
-                <Td>{preparing ? '—' : formatAt(channel.lastReceivedAt, timezone)}</Td>
-                <Td align="right">{preparing || channel.receiveMethod === 'manual' ? '—' : channel.unreadableCount ?? '—'}</Td>
+                <Td align="right">{preparing || channel.todayCount === null ? emptyValue('unknown') : `${channel.todayCount}件`}</Td>
+                <Td>{preparing ? emptyValue('unknown') : formatAt(channel.lastReceivedAt, timezone)}</Td>
+                <Td align="right">{preparing || channel.receiveMethod === 'manual' ? emptyValue('unknown') : channel.unreadableCount ?? emptyValue('unknown')}</Td>
                 <Td>
                   {channel.receiveMethod === 'manual' ? (
                     <Button href="/restaurant-test/reservations">台帳へ</Button>
@@ -316,7 +318,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
         </Field>
         <div className={styles.pair}>
           <Field label="人数" htmlFor="rs-import-guests" error={fieldErrors.guestCount}>
-            <TextField id="rs-import-guests" type="number" min={1} max={100} required value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} />
+            <NumberInput id="rs-import-guests" type="number" min={1} max={100} required value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} />
           </Field>
           <Field label="来店の日時" htmlFor="rs-import-at" error={fieldErrors.startsAt}>
             <DateTimeField id="rs-import-at" invalid={Boolean(fieldErrors.startsAt)} required value={draft.startsAt} onChange={(next) => setDraft({ ...draft, startsAt: next })} />

@@ -73,6 +73,9 @@ import { csvExportLine } from './csv-export'
 import { readFriendsListSnapshot, writeFriendsListSnapshot } from './list-state'
 import { lastContactOf, monthDay, monthDayTime, statusOf, messageWord, splitTags } from './words'
 import styles from './list.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
 type PageSize = (typeof PAGE_SIZE_OPTIONS)[number]
@@ -91,7 +94,7 @@ const COLUMNS: Array<{ key: Column; label: string }> = [
   { key: 'last', label: '最終接触' },
 ]
 
-const VIEWER_NOTE = '閲覧のみで見ています。変える操作は管理者に頼んでください。'
+const VIEWER_NOTE = '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'
 
 function scoreBoundary(raw: string | null) {
   if (raw === null || !/^-?\d+$/.test(raw)) return undefined
@@ -447,7 +450,7 @@ export default function FriendsListV8() {
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `friends-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = csvFileName("友だち")
     anchor.click()
     URL.revokeObjectURL(url)
   }, [friends])
@@ -498,25 +501,25 @@ export default function FriendsListV8() {
   const kpis = [
     {
       key: 'active', title: '有効な友だち', icon: Users, value: stats?.active ?? null,
-      detail: stats ? `総友だち ${formatNumber(stats.total)}` : statsFailed ? '読み込めませんでした' : '—',
+      detail: stats ? `総友だち ${formatNumber(stats.total)}` : statsFailed ? '読み込めませんでした' : emptyValue('unknown'),
       delta: activeDelta != null ? { text: `${activeDelta >= 0 ? '+' : ''}${formatNumber(activeDelta)}`, tone: activeDelta < 0 ? 'neutral' : 'up' } : null,
       href: '/chats',
     },
     {
       key: 'blocked', title: 'ブロック・非表示', icon: UserRoundX, value: stats ? stats.blockedByThem + stats.hiddenByUs : null,
-      detail: stats ? `相手から ${stats.blockedByThem}・自分から ${stats.hiddenByUs}` : statsFailed ? '読み込めませんでした' : '—',
+      detail: stats ? `相手から ${stats.blockedByThem}・自分から ${stats.hiddenByUs}` : statsFailed ? '読み込めませんでした' : emptyValue('unknown'),
       delta: null,
       href: '/chats',
     },
     {
       key: 'unanswered', title: '未対応', icon: MessageSquare, value: stats?.unanswered ?? null,
-      detail: stats ? `対応済み ${formatNumber(stats.resolved)}` : statsFailed ? '読み込めませんでした' : '—',
+      detail: stats ? `対応済み ${formatNumber(stats.resolved)}` : statsFailed ? '読み込めませんでした' : emptyValue('unknown'),
       delta: stats && stats.unanswered > 0 ? { text: '要確認', tone: 'warn' } : null,
       href: '/chats?status=unread',
     },
     {
       key: 'added', title: '今月の追加', icon: UserPlus, value: stats?.addedThisMonth ?? null,
-      detail: stats ? `前月 ${formatNumber(stats.addedLastMonth)} 人` : statsFailed ? '読み込めませんでした' : '—',
+      detail: stats ? `前月 ${formatNumber(stats.addedLastMonth)}人` : statsFailed ? '読み込めませんでした' : emptyValue('unknown'),
       delta: stats ? { text: `${addedDiff >= 0 ? '+' : ''}${addedDiff}`, tone: addedDiff < 0 ? 'neutral' : 'up' } : null,
       href: '/chats',
     },
@@ -632,7 +635,7 @@ export default function FriendsListV8() {
             注目のみ
           </FilterChip>
         </div>
-        <span className={styles.count}>{loadStatus === 'ready' && !refreshing ? `${formatNumber(total)} 件` : '—'}</span>
+        <span className={styles.count}>{loadStatus === 'ready' && !refreshing ? `${formatNumber(total)}件` : emptyValue('unknown')}</span>
         {broadcastHandoffHref ? (
           <Link href={broadcastHandoffHref} data-broadcast-handoff className={styles.handoff} title="今の絞り込み条件を対象に一斉配信を作ります。人数は送信時に最新の友だちへ計算し直します。">
             <Megaphone size={14} aria-hidden="true" />
@@ -828,7 +831,7 @@ export default function FriendsListV8() {
                   </Td>
                 ) : null}
                 {visible.has('scenario') ? (
-                  <Td className={styles.td}><span className={styles.cellText} title={friend.activeScenario?.name}>{friend.activeScenario?.name ?? 'なし'}</span></Td>
+                  <Td className={styles.td}><span className={styles.cellText} title={friend.activeScenario?.name}>{friend.activeScenario?.name ?? emptyValue('none')}</span></Td>
                 ) : null}
                 {visible.has('latest') ? (
                   <Td className={styles.td}>
@@ -845,7 +848,7 @@ export default function FriendsListV8() {
                     <div className={styles.tags} title={friend.tags.map((tag) => tag.name).join('・') || undefined}>
                       {tags.shown.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="sm" />)}
                       {tags.rest > 0 ? <span className={styles.tagRest}>+{tags.rest}</span> : null}
-                      {friend.tags.length === 0 ? <span className={styles.faint}>—</span> : null}
+                      {friend.tags.length === 0 ? <span className={styles.faint}>{emptyValue('unknown')}</span> : null}
                     </div>
                   </Td>
                 ) : null}
@@ -879,7 +882,7 @@ export default function FriendsListV8() {
   const pager = (
     <div className={styles.pager}>
       <span className={styles.pagerCount}>
-        {loadStatus === 'ready' ? `${formatNumber(total)} 人中 ${formatNumber(rangeStart)}〜${formatNumber(rangeEnd)} 人` : '—'}
+        {loadStatus === 'ready' ? `${formatNumber(total)}人中 ${formatNumber(rangeStart)}〜${formatNumber(rangeEnd)}人` : emptyValue('unknown')}
       </span>
       <Pagination page={page} pageCount={totalPages} onPageChange={setPage} disabled={loadStatus !== 'ready'} ariaLabel="友だち一覧のページ" />
     </div>
@@ -890,7 +893,7 @@ export default function FriendsListV8() {
       boardId="x6QsVz"
       headingSize="compact"
       title="友だち"
-      description="LINE でつながっている人の一覧です。タグと対応の状態で絞り込めます。"
+      help="LINE でつながっている人の一覧です。タグと対応の状態で絞り込めます。"
       actions={headActions}
       tabs={(
         <>

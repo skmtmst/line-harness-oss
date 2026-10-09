@@ -21,6 +21,7 @@ import { ApprovalRequestFields, ApproverSection, formatApprovalDateTime } from '
 import { ApiError } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export type HqApproval = {
   state: BroadcastApprovalState | null
@@ -137,8 +138,8 @@ export function HqApprovalBlock({
       ) : gate === 'needsRequest' ? (
         <Notice tone="warn">
           {state.approval.status === 'rejected'
-            ? `差し戻されました（理由：${state.approval.rejectReason || '—'}）。内容を直して、もう一度承認を依頼してください。`
-            : `送る人数が ${formatNumber(state.gate.threshold)} 通以上なので、もう1人の承認が要ります。承認されるまで送られません。`}
+            ? `差し戻されました（理由：${state.approval.rejectReason || emptyValue('unknown')}）。内容を直して、もう一度承認を依頼してください。`
+            : `送る人数が ${formatNumber(state.gate.threshold)}通以上なので、もう1人の承認が要ります。承認されるまで送られません。`}
         </Notice>
       ) : gate === 'pending' ? (
         <Notice

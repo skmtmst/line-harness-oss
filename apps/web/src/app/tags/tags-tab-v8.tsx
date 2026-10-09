@@ -55,6 +55,8 @@ import {
 } from '@/components/friend-fields/tags-page-v4'
 import styles from './list-v8.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -136,11 +138,9 @@ function TagFolderDialog({
         </>
       }
     >
-      <label className="mt-1 block">
-        <span className="text-ink-secondary mb-1 block text-xs font-medium">
+      <Field label={<><span className="text-ink-secondary mb-1 block text-xs font-medium">
           フォルダ名 <span className="text-danger">*</span>
-        </span>
-        <input
+        </span></>}><input
           type="text"
           autoFocus
           value={name}
@@ -148,10 +148,9 @@ function TagFolderDialog({
           onKeyDown={(event) => {
             if (event.key === 'Enter' && name.trim()) void save()
           }}
-          placeholder="例: VIP"
+          placeholder="例：VIP"
           className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
-        />
-      </label>
+        /></Field>
       <div className="mt-3">
         <span className="text-ink-secondary mb-1 block text-xs font-medium">色</span>
         <div className="flex flex-wrap gap-2">
@@ -503,7 +502,7 @@ export default function TagsTabV8({
       { id: 'copy', label: '複製して作る', external: true, disabled: readonly, disabledReason: readonly ? readonlyReason : undefined, onSelect: () => router.push(`/tags/new?copy=${tag.id}`) },
       { id: 'move', label: 'フォルダへ移す', disabled: readonly, disabledReason: readonly ? readonlyReason : undefined, onSelect: () => setMenuMoveFor(tag.id) },
     ]
-    /* 保管済みに戻す口は無いため、同じ確認を繰り返さない（v7 R190）。 */
+    /* アーカイブに戻す口は無いため、同じ確認を繰り返さない（v7 R190）。 */
     if (tag.status !== 'archived') {
       items_.push({
         id: 'archive',
@@ -588,7 +587,7 @@ export default function TagsTabV8({
         {kpis.map((kpi) => (
           <div key={kpi.title} className={styles.kpi}>
             <span className={styles.kpiLabel}><kpi.icon size={13} aria-hidden="true" />{kpi.title}</span>
-            <p className={styles.kpiValue}>{kpi.value ?? '—'}<span className={styles.kpiUnit}>{kpi.value === null ? '' : kpi.unit}</span></p>
+            <p className={styles.kpiValue}>{kpi.value ?? emptyValue('unknown')}<span className={styles.kpiUnit}>{kpi.value === null ? '' : kpi.unit}</span></p>
             <p className={styles.kpiDetail}>{kpi.detail}</p>
           </div>
         ))}
@@ -611,7 +610,7 @@ export default function TagsTabV8({
             rows={folderRows}
           >
             <p className={styles.folderNote}>
-              フォルダを削除しても、中のタグは未分類として残ります。件数には保管済みのタグも含みます。
+              フォルダを削除しても、中のタグは未分類として残ります。件数にはアーカイブのタグも含みます。
             </p>
             {folderError ? (
               <p role="alert" className={styles.folderNote}>
@@ -644,8 +643,8 @@ export default function TagsTabV8({
             </div>
             <div className={styles.searchWrap}>
               <SearchField
-                aria-label="タグ名・用途で検索"
-                placeholder="タグ名・用途で検索"
+                aria-label="タグ名・用途で探す"
+                placeholder="タグ名・用途で探す"
                 value={query}
                 onChange={setQuery}
                 onClear={() => setQuery('')}
@@ -776,7 +775,7 @@ export default function TagsTabV8({
                               <div className={styles.nameRow}>
                                 <FolderDot folder={group} />
                                 <Link href={editHref} className={styles.cellTitle}  onClick={(event) => event.stopPropagation()}><TruncatedText value={String(tag.name ?? '')} /></Link>
-                                {tag.status === 'archived' && <span className={styles.miniBadge}>保管済み</span>}
+                                {tag.status === 'archived' && <span className={styles.miniBadge}>アーカイブ</span>}
                                 {tag.cleanupReasons?.includes('duplicate_name') && <span className={`${styles.miniBadge} ${styles.miniBadgeWarn}`} title="正規化した名前がほかのタグと重なっています。整理候補です。">重複名</span>}
                               </div>
                               <p className={styles.cellSub}>{formatDate(tag.createdAt)} 登録</p>
@@ -793,7 +792,7 @@ export default function TagsTabV8({
                           <td>
                             <div className={styles.linkChips}>
                               {chips.length === 0
-                                ? <span className={styles.cellMuted}>—</span>
+                                ? <span className={styles.cellMuted}>{emptyValue('unknown')}</span>
                                 : chips.map((chip) => <span key={chip.label} className={`${styles.linkChip} ${chip.className}`}>{chip.label}</span>)}
                             </div>
                           </td>
@@ -912,7 +911,7 @@ export default function TagsTabV8({
               <div>
                 <dt className={styles.cellMuted}>連動</dt>
                 <dd className={styles.cellText}>
-                  {tagLinkChips(activeTag).length === 0 ? '—' : tagLinkChips(activeTag).map((chip) => chip.label).join('・')}
+                  {tagLinkChips(activeTag).length === 0 ? emptyValue('unknown') : tagLinkChips(activeTag).map((chip) => chip.label).join('・')}
                 </dd>
               </div>
               <div>

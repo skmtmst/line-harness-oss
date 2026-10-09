@@ -1,5 +1,7 @@
 'use client'
 
+import { useUrlTab } from '@/lib/use-url-tab'
+
 /*
  * ★V8 予約枠・在庫（板 `Y8SjT2`・媒体を閉じる知らせ `Yyw6i`・予約経路の連携 `hQQlt`・競合 `qf3ky`・
  * 休業日・貸切 `UVnvR`／足す窓 `nVvXy`）。
@@ -87,28 +89,19 @@ function InventoryTabs({ ctx, tab, onTab, dialog, onDialog }: {
   )
 }
 
-/** 「然-NEN 本店 ・ 1つの時間帯の総数 26席（稼働中の卓 8）」。 */
+/** 「然-NEN 本店 ・ 1つの時間帯の総数 26席（有効の卓 8）」。 */
 function closuresDescription(ctx: RestaurantV8Context | null): string {
   if (!ctx?.store) return '日付を選んで、席の予約を閉じます。'
   const active = ctx.data.tables.filter((t) => t.store_id === ctx.selectedStoreId && t.is_active)
   const seats = active.reduce((sum, t) => sum + t.max_capacity, 0)
-  return `${ctx.store.name} ・ 1つの時間帯の総数 ${seats}席（稼働中の卓 ${active.length}）`
+  return `${ctx.store.name} ・ 1つの時間帯の総数 ${seats}席（有効の卓 ${active.length}）`
 }
 
 export default function InventoryPage() {
-  const [tab, setTab] = useState<InventoryTab>('stock')
+  const [tab, setTab] = useUrlTab(['stock', 'channels', 'closures'] as const, 'stock')
   const [dialog, setDialog] = useState<ClosureDialogTarget | null>(null)
   const role = useStaffRole()
-  /* useSearchParams は組み立て時に Suspense を求めるので、開いたあとに読む。 */
-  useEffect(() => { setTab(readTab()) }, [])
-  const changeTab = (next: InventoryTab) => {
-    setTab(next)
-    const url = new URL(window.location.href)
-    const param = TAB_PARAM[next]
-    if (param) url.searchParams.set('tab', param)
-    else url.searchParams.delete('tab')
-    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
-  }
+  const changeTab = setTab
   const closures = tab === 'closures'
   return (
     <RestaurantShell templateHeading

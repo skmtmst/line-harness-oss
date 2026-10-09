@@ -48,6 +48,10 @@ import {
 import { WeekdaySelect } from './weekday-select'
 import { FriendMultiSelect } from './friend-multi-select'
 import { formatNumber, formatTime } from '@/lib/format'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 /**
  * ルールを作る。Pencil ★V6 `Rv8Jv`（25-1-A つくる）。
@@ -727,11 +731,9 @@ function ResourcePickRow(props: {
 }) {
   const { title, id, selectLabel, value, onPick, options, tagsLoading, tagsFailed, failedNote } = props
   return (
-    <div className="space-y-2">
-      <label className={styles.fieldLabel} htmlFor={id}>
-        {title}<RequiredBadge />
-      </label>
-      <div className="space-y-2">
+    <div className="space-y-2"><Field label={<>
+        {title}
+      </>} htmlFor={id} required><div className="space-y-2">
         <Select
           id={id}
           value={value}
@@ -750,8 +752,7 @@ function ResourcePickRow(props: {
             {failedNote}
           </p>
         ) : null}
-      </div>
-    </div>
+      </div></Field></div>
   )
 }
 
@@ -1197,7 +1198,7 @@ export function NewAutomationV8({
           setError('指定された下書きは見つかりませんでした。削除された可能性があります。')
         } else if (caught instanceof ApiError && caught.status === 403) {
           setResumeErrorKind('forbidden')
-          setError('指定された下書きを開く権限がありません。')
+          setError(permissionDeniedMessage('store'))
         } else {
           setResumeErrorKind('network')
           setError('下書きを読み込めませんでした。通信状態を確かめて、もう一度お試しください。')
@@ -2186,8 +2187,8 @@ export function NewAutomationV8({
       <div className={styles.head}>
         <div className={styles.headText}>
           <Link href={backHref} className={styles.backLink}>{backLabel}</Link>
-          <h1 className={styles.headTitle}>{chrome === 'draft' ? '下書きを仕上げる' : 'ルールを作る'}</h1>
-          <p className={styles.headDescription}>{headDescription}</p>
+          <PageHeading title={chrome === 'draft' ? '下書きを仕上げる' : 'ルールを作る'} help={<> {headDescription}</>} />
+
         </div>
       </div>
 
@@ -2226,16 +2227,13 @@ export function NewAutomationV8({
           <section className={styles.formCard} aria-label="名前">
             <h2 className={styles.formTitle}>{stepNo(1)}名前</h2>
             <p className={styles.footnote}>一覧で見分けるための名前。お客さまには見えません</p>
-            <label className={styles.fieldLabel} htmlFor="v8-rule-name">
-              名前
-              <TextField
+            <Field label="名前" htmlFor="v8-rule-name"><TextField
                 id="v8-rule-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="例：「予約」と送られたら担当へ知らせる"
                 maxLength={120}
-              />
-            </label>
+              /></Field>
           </section>
 
           <section className={styles.formCard} aria-label="どんなときに動かしますか">
@@ -2317,16 +2315,13 @@ export function NewAutomationV8({
             <h2 className={styles.formTitle}>{stepNo(2)}だれに動かしますか</h2>
             <p className={styles.footnote}>条件を付けないと、きっかけに当てはまった人全員に動きます。</p>
             {usesKeyword ? (
-              <label className={styles.fieldLabel} htmlFor="v8-rule-keyword">
-                含まれる言葉
-                <TextField
+              <Field label="含まれる言葉" htmlFor="v8-rule-keyword"><TextField
                   id="v8-rule-keyword"
                   value={keyword}
                   onChange={(event) => setKeyword(event.target.value)}
                   placeholder="例：予約"
                   maxLength={100}
-                />
-              </label>
+                /></Field>
             ) : null}
             {usesKeyword && keyword.trim() ? (
               <p className={styles.footnote}>空欄なら、どんな内容でも動きます。</p>
@@ -2375,8 +2370,9 @@ export function NewAutomationV8({
               {actions.map((row, index) => (
                 <li key={row.key} className={styles.actionRow}>
                   <span className={styles.actionNum}>{index + 1}</span>
-                  <div className={styles.actionBody}>
-                    <label className={styles.fieldLabel} htmlFor={`v8-action-${row.key}`}>
+                  <div className={styles.actionBody}><Field note={<>
+                      失敗したとき：現在はここで止まります。「次の処理へ進む」は実行基盤の接続後に選べます。
+                    </>} label={<>
                       {actionRowTitle(row.type)}
                       <Select
                         id={`v8-action-${row.key}`}
@@ -2386,8 +2382,7 @@ export function NewAutomationV8({
                         options={ACTIONS.map((action) => ({ value: action.value, label: action.label }))}
                         size="standard"
                       />
-                    </label>
-                    {row.type === 'add_tag' ? (
+                    </>} htmlFor={`v8-action-${row.key}`}>{row.type === 'add_tag' ? (
                       <V8ResourcePickRow
                         title="付けるタグ"
                         id={`v8-tag-${row.key}`}
@@ -2424,19 +2419,13 @@ export function NewAutomationV8({
                         failedNote="共通アクションを読み込めませんでした。画面を再読み込みしてください。"
                       />
                     ) : (
-                      <label className={styles.fieldLabel} htmlFor={`v8-message-${row.key}`}>
-                        送る文面
-                        <TextArea
+                      <Field label="送る文面" htmlFor={`v8-message-${row.key}`}><TextArea
                           id={`v8-message-${row.key}`}
                           value={row.message}
                           onChange={(event) => updateAction(row.key, { message: event.target.value })}
-                        />
-                      </label>
+                        /></Field>
                     )}
-                    <p className={styles.footnote}>
-                      失敗したとき：現在はここで止まります。「次の処理へ進む」は実行基盤の接続後に選べます。
-                    </p>
-                  </div>
+</Field></div>
                   <button
                     type="button"
                     className={styles.miniMenuButton}
@@ -2495,7 +2484,7 @@ export function NewAutomationV8({
             <dl className={styles.kvList}>
               <div className={styles.kvRow}>
                 <dt className={styles.kvKey}>人数</dt>
-                <dd className={styles.kvValue}>{previewCount === null ? '—' : `${formatNumber(previewCount)}人`}</dd>
+                <dd className={styles.kvValue}>{previewCount === null ? emptyValue('unknown') : `${formatNumber(previewCount)}人`}</dd>
               </div>
             </dl>
             <p className={styles.footnote}>
@@ -2616,15 +2605,15 @@ export function NewAutomationV8({
             <dl className={styles.kvList}>
               <div className={styles.kvRow}>
                 <dt className={styles.kvKey}>タグ</dt>
-                <dd className={styles.kvValue}>{usedTagNames.length > 0 ? usedTagNames.join('、') : 'なし'}</dd>
+                <dd className={styles.kvValue}>{usedTagNames.length > 0 ? usedTagNames.join('、') : emptyValue('none')}</dd>
               </div>
               <div className={styles.kvRow}>
                 <dt className={styles.kvKey}>シナリオ</dt>
-                <dd className={styles.kvValue}>{usedScenarioNames.length > 0 ? usedScenarioNames.join('、') : 'なし'}</dd>
+                <dd className={styles.kvValue}>{usedScenarioNames.length > 0 ? usedScenarioNames.join('、') : emptyValue('none')}</dd>
               </div>
               <div className={styles.kvRow}>
                 <dt className={styles.kvKey}>共通アクション</dt>
-                <dd className={styles.kvValue}>{usedCommonActionNames.length > 0 ? usedCommonActionNames.join('、') : 'なし'}</dd>
+                <dd className={styles.kvValue}>{usedCommonActionNames.length > 0 ? usedCommonActionNames.join('、') : emptyValue('none')}</dd>
               </div>
             </dl>
           </section>
@@ -2701,7 +2690,7 @@ export function NewAutomationV8({
           </div>
           <div className={styles.kvRow}>
             <dt className={styles.kvKey}>すること</dt>
-            <dd className={styles.kvValue}>{actionSummary || '未設定'}</dd>
+            <dd className={styles.kvValue}>{actionSummary || emptyValue('unconfigured')}</dd>
           </div>
           <div className={styles.kvRow}>
             <dt className={styles.kvKey}>最初に動くのは</dt>
@@ -2783,8 +2772,7 @@ function V8ResourcePickRow(props: {
 }) {
   const { title, id, selectLabel, value, onPick, options, loading, failed, failedNote } = props
   return (
-    <div className={styles.formGrid}>
-      <label className={styles.fieldLabel} htmlFor={id}>
+    <div className={styles.formGrid}><Field label={<>
         {title}
         <Select
           id={id}
@@ -2798,9 +2786,7 @@ function V8ResourcePickRow(props: {
             ...options.map((option) => ({ value: option.value, label: option.label })),
           ]}
         />
-      </label>
-      {loading ? <p className={styles.footnote}>読み込んでいます</p> : null}
-      {failed ? <p className={styles.footnote}>{failedNote}</p> : null}
-    </div>
+      </>} htmlFor={id}>{loading ? <p className={styles.footnote}>読み込んでいます</p> : null}
+{failed ? <p className={styles.footnote}>{failedNote}</p> : null}</Field></div>
   )
 }

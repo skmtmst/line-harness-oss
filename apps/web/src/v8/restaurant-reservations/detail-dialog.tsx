@@ -23,7 +23,7 @@ import { INACTIVE_STATUSES, hm, mdWeek, sourceName } from '../restaurant/reserva
 import styles from './detail-dialog.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
 import { formatYen as polishFormatYen } from '@/lib/format'
-
+import { emptyValue } from '@/components/shared/empty-value'
 
 type History = { state: 'loading' } | { state: 'none' } | { state: 'error' } | { state: 'ready'; count: number; last: string | null }
 
@@ -123,7 +123,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
       <div className={styles.facts}>
         <p className={styles.fact}>{detailWhen(reservation, table)}</p>
         <p className={styles.fact}>{detailCourse(reservation, course)}</p>
-        <p className={`${styles.fact} ${styles.allergy}`}>{`アレルギー：${reservation.allergy_note || 'なし'}`}</p>
+        <p className={`${styles.fact} ${styles.allergy}`}>{`アレルギー：${reservation.allergy_note || emptyValue('none')}`}</p>
         <p className={styles.fact}>{historyText(history)}</p>
         {inactive ? <p className={styles.fact}>{reservation.status === 'no_show' ? '無断で来なかった予約です' : '取り消した予約です'}</p> : null}
       </div>

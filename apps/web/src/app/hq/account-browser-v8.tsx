@@ -19,6 +19,7 @@ import { formatNumber } from '@/lib/format'
 import { Folder, LayoutGrid, List as ListIcon, LogIn, Plus, Settings } from 'lucide-react'
 import './readonly-v8.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
 
 type StatusFilter = 'all' | 'ok' | 'warn' | 'archived'
 type TagFilter = string | null
@@ -317,7 +318,7 @@ export default function AccountBrowser({
         </div>
 
         {shown.length === 0 ? (
-          <ListState kind="empty" title="該当するアカウントがありません" description="検索の言葉や絞り込みを変えてください。" />
+          <ListState permissionScope="hq" kind="empty" title="該当するアカウントがありません" description="検索の言葉や絞り込みを変えてください。" />
         ) : view === 'cards' ? (
           <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
             {shown.map((account) => {
@@ -414,21 +415,18 @@ export default function AccountBrowser({
           </div>
         }
       >
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="hq-account-tag-name" className="text-label font-medium text-ink">タグの名前</label>
-          <TextField
+        <div className="flex flex-col gap-1.5"><Field label="タグの名前" htmlFor="hq-account-tag-name"><TextField
             id="hq-account-tag-name"
             value={tagName}
             maxLength={100}
             disabled={tagSaving}
-            placeholder="例: 渋谷エリア"
+            placeholder="例：渋谷エリア"
             onChange={(event) => setTagName(event.target.value)}
             className="w-full"
           />
-          <Select aria-label="タグの色" value={tagColor} onChange={setTagColor} disabled={tagSaving} options={[{value:'',label:'なし'},{value:'--color-status-info',label:'青'},{value:'--color-accent-deep',label:'緑'},{value:'--color-status-warn-deep',label:'橙'},{value:'--color-status-danger',label:'赤'},{value:'--color-chip-alt',label:'紫'}]} />
-          {tags.map(item => <div key={item.id} className="flex items-center justify-between gap-2 text-label"><span>{item.name}</span>{deleteTagId === item.id ? <div className="flex gap-2"><span>消しますか？</span><Button size="compact" disabled={tagSaving} onClick={() => void removeTag(item.id)}>消す</Button><Button size="compact" onClick={() => setDeleteTagId(null)}>やめる</Button></div> : <Button size="compact" disabled={tagSaving} onClick={() => setDeleteTagId(item.id)}>削除</Button>}</div>)}
-          {tagError ? <p className="text-label text-danger" role="alert">{tagError}</p> : null}
-        </div>
+<Select aria-label="タグの色" value={tagColor} onChange={setTagColor} disabled={tagSaving} options={[{value:'',label:'なし'},{value:'--color-status-info',label:'青'},{value:'--color-accent-deep',label:'緑'},{value:'--color-status-warn-deep',label:'橙'},{value:'--color-status-danger',label:'赤'},{value:'--color-chip-alt',label:'紫'}]} />
+{tags.map(item => <div key={item.id} className="flex items-center justify-between gap-2 text-label"><span>{item.name}</span>{deleteTagId === item.id ? <div className="flex gap-2"><span>消しますか？</span><Button size="compact" disabled={tagSaving} onClick={() => void removeTag(item.id)}>消す</Button><Button size="compact" onClick={() => setDeleteTagId(null)}>やめる</Button></div> : <Button size="compact" disabled={tagSaving} onClick={() => setDeleteTagId(item.id)}>削除</Button>}</div>)}
+{tagError ? <p className="text-label text-danger" role="alert">{tagError}</p> : null}</Field></div>
       </Dialog>
     </div>
   )

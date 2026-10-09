@@ -2,7 +2,7 @@
 /*
  * 統括の一括配信の一覧（U4Eep0）と送ったあとの詳細（M2tJM）を絵に合わせた所の動き。
  * 一覧：並び順（新しい順／古い順）・数の帯の平均の開封率（数えていない店があれば「—」）。
- * 詳細：送るまでの段の帯（予約しない配信は「予約済み」を省く・分かれ道の札）・配信した設定の「送り方」。
+ * 詳細：送るまでの段の帯（予約しない配信は「予約中」を省く・分かれ道の札）・配信した設定の「送り方」。
  */
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -69,7 +69,7 @@ describe('統括の一括配信の一覧（U4Eep0）', () => {
 })
 
 describe('統括の一括配信の詳細（M2tJM）', () => {
-  it('送ったあとは 下書き・送信中・送信済み の帯（予約しない配信は予約済みを省く）と、一部の店が失敗した札', async () => {
+  it('送ったあとは 下書き・送信中・送信済み の帯（予約しない配信は予約中を省く）と、一部の店が失敗した札', async () => {
     params.value = new URLSearchParams('id=r1')
     hq.get.mockResolvedValue({ data: run('r1', '送った配信', [target('a', 'sent', 100, 50), target('b', 'failed', 0, 0)]) })
     render(<HqBroadcastDetail />)
@@ -80,12 +80,12 @@ describe('統括の一括配信の詳細（M2tJM）', () => {
     await waitFor(() => expect(screen.getByText('すぐに全員へ（分けて送らない）')).toBeTruthy())
   })
 
-  it('予約した配信は予約済みの段を出す', async () => {
+  it('予約した配信は予約中の段を出す', async () => {
     params.value = new URLSearchParams('id=r2')
     hq.get.mockResolvedValue({ data: run('r2', '予約した配信', [target('a', 'scheduled', 0, null)], { scheduledAt: '2026-01-15T02:00:00.000Z' }) })
     render(<HqBroadcastDetail />)
     const rail = await screen.findByRole('list', { name: '配信の状態' })
-    expect(within(rail).getByText('予約済み').getAttribute('aria-current')).toBe('step')
+    expect(within(rail).getByText('予約中').getAttribute('aria-current')).toBe('step')
   })
 
   it('送り方：分けて送る分数があればその分数', () => {

@@ -30,6 +30,7 @@ import BranchEditors, { newBranchStep, updateBranchStep, type BranchPatch } from
 import { stepNumbers } from './action-order'
 import { ACTION_LABELS } from './version-diff'
 import styles from './common-action-new.module.css'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 const EMPTY_RESOURCES: CommonActionResources = {
   tags: [], scenarios: [], templates: [], webhooks: [], richMenus: [], commonActions: [],
@@ -168,7 +169,7 @@ export function CommonActionNew() {
       if (!response.success) throw new Error(response.error)
       router.push(`/common-actions/versions?id=${encodeURIComponent(response.data.id)}`)
     } catch (caught) {
-      setError(describeSaveFailure(caught))
+      setError(withPermissionFailure(caught, describeSaveFailure(caught), 'store'))
     } finally {
       setSaving(false)
     }
@@ -253,7 +254,7 @@ export function CommonActionNew() {
     <CreatePage
       boardId="j2hfkS"
       title="共通アクションを作る"
-      description="いくつもの所から呼び出せる「処理のまとまり」を作ります。ここでは下書きを保存し、公開は版の画面から行います。使う所はいまの版のまま。使う所ごとに新しい版へ更新します。"
+      help="いくつもの所から呼び出せる「処理のまとまり」を作ります。ここでは下書きを保存し、公開は版の画面から行います。使う所はいまの版のまま。使う所ごとに新しい版へ更新します。"
       preview={aside}
       footerActions={<>
         <Button href="/common-actions">キャンセル</Button>
@@ -276,10 +277,7 @@ export function CommonActionNew() {
         <Field label="名前" htmlFor="ca-name" error={inputError?.target === 'ca-name' ? inputError.message : undefined}>
           <TextField id="ca-name" value={name} maxLength={120} placeholder="例：購入のお礼" onChange={(event) => { setName(event.target.value); if (inputError?.target === 'ca-name') setInputError(null) }} />
         </Field>
-        <label className={styles.field}>
-          <span className={styles.label}>説明<OptionalBadge /></span>
-          <TextField value={description} maxLength={200} placeholder="使う場面や目的を書きます" onChange={(event) => setDescription(event.target.value)} />
-        </label>
+        <Field label="説明"><TextField value={description} maxLength={200} placeholder="使う場面や目的を書きます" onChange={(event) => setDescription(event.target.value)} /></Field>
       </section>
 
       <section className={styles.card} aria-labelledby="ca-steps">

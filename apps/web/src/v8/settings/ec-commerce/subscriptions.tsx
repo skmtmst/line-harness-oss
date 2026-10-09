@@ -24,6 +24,8 @@ import styles from './subscriptions.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
 
 
+import { emptyValue } from '@/components/shared/empty-value'
+
 function shortDate(value: string | null): string {
   return polishFormatDate(value, { style: 'list-day', fallback: '—' })
 }
@@ -117,16 +119,16 @@ export default function EcSubscriptions({ accountId, canEdit = true }: { account
       <KpiCard title="支払いを確認" icon={<CreditCard size={13} />} value={summary?.atRisk} unit="件" detail="ECから届いた決済状態" />
     </KpiBand>
     <div className={styles.toolbar}>
-      <SearchField className={styles.search} value={search} onChange={setSearch} placeholder="お客様の名前・ペット名・契約番号・中身で検索" aria-label="定期便を検索" />
+      <SearchField className={styles.search} value={search} onChange={setSearch} placeholder="お客様の名前・ペット名・契約番号・中身で探す" aria-label="定期便を検索" />
       {FILTERS.map((item) => <FilterChip key={item.key} selected={filter === item.key} icon={item.key === 'all' ? <CircleDot size={13} /> : <Star size={13} />} onChange={() => setFilter(item.key)}>{item.label}</FilterChip>)}
     </div>
     {shown.length === 0 ? <ListState kind="empty" title="条件に合う定期便はありません" description="検索する言葉か表示条件を変えてください。" action={filter !== 'all' || search ? <Button onClick={() => { setFilter('all'); setSearch('') }}>条件を外す</Button> : undefined} /> : <DataTable label="定期便" density="compact" columns="var(--tpl-ecc-sub-columns)">
       <thead><TableHeadRow><Th>お客様と中身</Th><Th align="right">1回の金額</Th><Th>次の発送</Th><Th align="right">続いた回数</Th><Th>ようす</Th><Th>操作</Th></TableHeadRow></thead>
       <tbody>{shown.map((item) => <Tr key={item.id}>
         <Td><span className={shared.stack}><span className={shared.main} title={item.ownerName ?? undefined}>{item.ownerName ?? 'お客様名 —'}{item.petName ? `（${item.petName}）` : ''}</span><span className={shared.sub} title={item.items ?? undefined}>{[item.items ?? '中身 未取得', item.cycle].filter(Boolean).join('・')}</span></span></Td>
-        <Td align="right">{item.amount == null ? '—' : `¥${formatNumber(item.amount)}`}</Td>
+        <Td align="right">{item.amount == null ? emptyValue('unknown') : `¥${formatNumber(item.amount)}`}</Td>
         <Td>{shortDate(item.nextShippingAt)}</Td>
-        <Td align="right">{item.continuedCount == null ? '—' : `${item.continuedCount} 回`}</Td>
+        <Td align="right">{item.continuedCount == null ? emptyValue('unknown') : `${item.continuedCount}回`}</Td>
         <Td><span className={shared.stack}><StatusBadge tone={STATUS_TONE[item.status]} size="compact">{FILTERS.find((f) => f.key === item.status)?.label ?? item.statusLabel}</StatusBadge>{item.riskReason || item.cancellationReason ? <span className={shared.sub} title={item.riskReason ?? item.cancellationReason ?? undefined}>{item.riskReason ?? `理由「${item.cancellationReason}」`}</span> : null}</span></Td>
         <Td><span className={styles.ops}><Button href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`} variant="secondary">中身を見る</Button>{item.manageUrl ? <RowMenu label={`${item.ownerName ?? 'お客様'}のその他操作`} menuLabel="定期便の操作" open={openMenuId === item.id} onOpenChange={(open) => setOpenMenuId(open ? item.id : null)} items={[{ id: 'manage', label: 'ECで変更', onSelect: () => window.open(item.manageUrl!, '_blank', 'noopener,noreferrer') }]} /> : null}</span></Td>
       </Tr>)}</tbody>

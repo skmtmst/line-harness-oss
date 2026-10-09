@@ -49,7 +49,7 @@ export default function CompanyContactCard({ canEdit }: { canEdit: boolean }) {
       setRevision(next)
     } catch (caught) {
       if (sequence !== loadSequence.current) return
-      setError(japaneseDetailOf(caught) || describeApiFailure(caught, '会社と連絡先の読み込み'))
+      setError(japaneseDetailOf(caught) || describeApiFailure(caught, '会社と連絡先の読み込み', { scope: 'hq' }))
     } finally { if (sequence === loadSequence.current) setLoading(false) }
   }
   useEffect(() => { void load(); return () => { loadSequence.current += 1 } }, [])
@@ -92,7 +92,7 @@ export default function CompanyContactCard({ canEdit }: { canEdit: boolean }) {
       setSaved(true)
     } catch (caught) {
       // 通信失敗・権限不足・409でも入力と期待する版をそのまま残す。
-      setError(japaneseDetailOf(caught) || describeApiFailure(caught, '会社と連絡先の保存'))
+      setError(japaneseDetailOf(caught) || describeApiFailure(caught, '会社と連絡先の保存', { scope: 'hq' }))
     } finally { setSaving(false) }
   }
 
@@ -115,7 +115,7 @@ export default function CompanyContactCard({ canEdit }: { canEdit: boolean }) {
         : response.data.readiness.fullDataset ? '住所が見つかりませんでした。住所を手入力してください。'
         : '郵便番号の全データが未登録です。住所を手入力してください。')
     } catch (caught) {
-      if (valuesRef.current.postalCode === postal) setPostalNote(japaneseDetailOf(caught) || describeApiFailure(caught, '住所の検索'))
+      if (valuesRef.current.postalCode === postal) setPostalNote(japaneseDetailOf(caught) || describeApiFailure(caught, '住所の検索', { scope: 'hq' }))
     } finally { setFinding(false) }
   }
 

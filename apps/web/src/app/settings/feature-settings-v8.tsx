@@ -7,7 +7,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import {
   groupEnabledCount,
@@ -29,6 +29,7 @@ import {
   type UsageCategory,
 } from './use-feature-settings'
 import styles from './settings-v8.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 /**
  * 機能設定の V8 画面（★V8-B `ywFJT`）。
@@ -163,7 +164,7 @@ function FeatureRowV8({ item, features, usage, featureUsage, usageRetry, sharedS
             必須
           </span>
         ) : (
-          <Toggle
+          <SettingCheckbox
             checked={enabled}
             label={`${item.label}を${enabled ? 'オフ' : 'オン'}にする`}
             onChange={(next) => onToggle(item, next)}
@@ -515,20 +516,18 @@ export function FeatureSettingsV8() {
             </div>
           )}
 
-          {dirty && <div className={styles.reasonBand}>
-            <label htmlFor="feature-settings-reason">
-              変更理由（必須）
-            </label>
-            <input
+          {dirty && <div className={styles.reasonBand}><Field note={<>保存の記録に残ります。空のままでは保存できません。</>} label={<>
+
+              変更理由
+            </>} htmlFor="feature-settings-reason" required><input
               id="feature-settings-reason"
               value={reason}
               onChange={(event) => setReason(event.target.value)}
-              placeholder="例: マイルを使わないのでオフにする"
+              placeholder="例：マイルを使わないのでオフにする"
               maxLength={300}
               disabled={saving}
             />
-            <p className={styles.reasonHint}>保存の記録に残ります。空のままでは保存できません。</p>
-          </div>}
+</Field></div>}
 
         </>
       )}

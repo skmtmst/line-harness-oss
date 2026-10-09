@@ -90,7 +90,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
 import NewBookingMenuPage from './page'
 
 const TAGS = [
-  { id: 'tag-1', name: '予約済み', lineAccountId: 'account-a', status: 'active' },
+  { id: 'tag-1', name: '予約中', lineAccountId: 'account-a', status: 'active' },
   { id: 'tag-2', name: '常連さん', lineAccountId: 'account-a', status: 'active' },
 ]
 
@@ -130,7 +130,7 @@ describe('メニュー作成（V8）の読み込みと保存ボタン', () => {
     fireEvent.click(screen.getByRole('button', { name: '候補を開く' }))
     const listbox = await screen.findByRole('listbox', { name: '予約後に付けるタグの候補' })
     const options = within(listbox).getAllByRole('option')
-    expect(options.map((o) => o.textContent)).toEqual(['付けるタグ：予約済み', '付けるタグ：常連さん'])
+    expect(options.map((o) => o.textContent)).toEqual(['付けるタグ：予約中', '付けるタグ：常連さん'])
   })
 
   test('保存を押すとボタンの内側だけ「保存中…」になり成功したら一覧へ戻る', async () => {
@@ -139,14 +139,14 @@ describe('メニュー作成（V8）の読み込みと保存ボタン', () => {
     render(<NewBookingMenuPage />)
     await screen.findByLabelText('予約後に付けるタグ')
 
-    fireEvent.change(screen.getByPlaceholderText('例: トリミング（小型犬）'), { target: { value: 'カット' } })
+    fireEvent.change(screen.getByPlaceholderText("例：トリミング（小型犬）"), { target: { value: 'カット' } })
     fireEvent.click(screen.getByRole('button', { name: /担当A/ }))
     fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
 
     // ボタンの内側だけ保存中に変わり、画面は止めない（入力欄は触れるまま）。
     const savingButton = await screen.findByRole('button', { name: '保存中…' })
     expect(savingButton.getAttribute('aria-busy')).toBe('true')
-    expect(screen.getByPlaceholderText('例: トリミング（小型犬）')).toBeTruthy()
+    expect(screen.getByPlaceholderText("例：トリミング（小型犬）")).toBeTruthy()
 
     await act(async () => { gate.resolve({ id: 'menu-new', version: 1 }) })
     await waitFor(() => { expect(fixture.createMenu).toHaveBeenCalled() })

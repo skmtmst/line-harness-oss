@@ -16,7 +16,8 @@ import parts from './parts.module.css'
 import styles from './audit.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
-
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /**
  * 運営の監査ログ V8（絵 `e7ljE`）。
@@ -104,7 +105,7 @@ export default function OpsAuditV8() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `musubo-audit-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = csvFileName("運営の操作履歴")
     a.click()
     URL.revokeObjectURL(url)
     setExportNote(truncated
@@ -123,7 +124,7 @@ export default function OpsAuditV8() {
         environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
         actions={(
           <Button onClick={() => void exportCsv()} disabled={exporting || total === 0} busy={exporting} busyLabel="書き出しています…">
-            <Download aria-hidden="true" />CSV で書き出す
+            <Download aria-hidden="true" />CSVで書き出す
           </Button>
         )}
       />
@@ -150,14 +151,14 @@ export default function OpsAuditV8() {
         {error && rows.length > 0 ? <p role="alert" className={parts.alert}>{error}</p> : null}
 
         {loading && rows.length === 0 ? (
-          <ListState kind="loading" title="記録を読み込んでいます" />
+          <ListState permissionScope="hq" kind="loading" title="記録を読み込んでいます" />
         ) : error && rows.length === 0 ? (
           <div className={parts.panel}>
-            <ListState kind="error" title="記録を表示できませんでした" description={error} onRetry={() => void load()} />
+            <ListState permissionScope="hq" kind="error" title="記録を表示できませんでした" description={error} onRetry={() => void load()} />
           </div>
         ) : rows.length === 0 ? (
           <div className={parts.panel}>
-            <ListState kind="empty" title="記録がありません" description="運営が操作を行うと、ここに残ります。" />
+            <ListState permissionScope="hq" kind="empty" title="記録がありません" description="運営が操作を行うと、ここに残ります。" />
           </div>
         ) : (
           <div className={parts.mini} role="table" aria-label="監査ログ">
@@ -173,8 +174,8 @@ export default function OpsAuditV8() {
                 <span className={`${parts.fixed} ${styles.colAt}`} role="cell" title={formatDateTime(row.created_at)}>{shortDateTime(row.created_at)}</span>
                 <span className={`${parts.fixed} ${styles.colWho}`} role="cell" ><TruncatedText value={String(row.staff_name ?? '')} /></span>
                 <span className={`${parts.fixed} ${styles.colWhat}`} role="cell">{actionWord(row.action)}</span>
-                <span className={`${parts.fixed} ${styles.colTenant}`} role="cell" title={row.tenant_name ?? ''}>{row.tenant_name ?? '—'}</span>
-                <span className={parts.grow} role="cell" title={row.reason ?? ''}>{row.reason ?? '—'}</span>
+                <span className={`${parts.fixed} ${styles.colTenant}`} role="cell" title={row.tenant_name ?? ''}>{row.tenant_name ?? emptyValue('unknown')}</span>
+                <span className={parts.grow} role="cell" title={row.reason ?? ''}>{row.reason ?? emptyValue('unknown')}</span>
               </div>
             ))}
           </div>

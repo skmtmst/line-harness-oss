@@ -1,5 +1,7 @@
 'use client'
 
+import { HorizontalBarChart } from '@/components/shared/charts'
+
 /*
  * ★V8 回答フォーム「集まった回答」（Pencil まとめて見る `v0SbYR`・1件ずつ見る `MKQyJ`）。
  *
@@ -37,7 +39,9 @@ import {
 } from './summary'
 import styles from './responses.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-
+import { Field } from '@/components/shared/form-controls'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Submission = {
   id: string
@@ -59,7 +63,7 @@ const EXPORT_PAGE_LIMIT = 200
 
 function valueText(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—'
-  if (Array.isArray(value)) return value.length ? value.map(String).join('、') : '—'
+  if (Array.isArray(value)) return value.length ? value.map(String).join('、') : emptyValue('unknown')
   if (typeof value === 'object') return JSON.stringify(value)
   return String(value)
 }
@@ -88,7 +92,7 @@ function saveCsv(filename: string, rows: Submission[], fieldKeys: string[], labe
 function retryEffectsFailureText(error: unknown): string {
   if (error instanceof ApiError) {
     return describeApiFailure(error, '後処理の再実行', {
-      forbidden: '後処理を再実行する権限がありません。選んでいるアカウントと権限を確認してください。',
+      scope: 'store',
     })
   }
   if (error instanceof Error && error.message && error.message !== 'retry_failed' && /[ぁ-んァ-ヶ一-龠]/u.test(error.message)) {
@@ -283,7 +287,7 @@ function Responses() {
       } while (all.length < expected && currentPage <= 1001)
       if (all.length < expected) throw new Error('export_incomplete')
       const keys = [...new Set([...fieldKeys, ...all.flatMap((item) => Object.keys(item.data as Record<string, unknown>))])]
-      saveCsv(`${form.name}-回答.csv`, all, keys, labels)
+      saveCsv(csvFileName("フォーム回答"), all, keys, labels)
     } catch (caught) {
       setExportError(caught instanceof Error && caught.message === 'export_too_many'
         ? `回答が一度に書き出せる上限（${formatNumber(MAX_EXPORT_ROWS)} 件）を超えています。`
@@ -365,7 +369,7 @@ function Responses() {
   const pageCount = Math.max(1, Math.ceil((total ?? 0) / pageSize))
   const firstKey = fieldKeys[0]
   const headLine = [
-    total === null ? '—' : `${formatNumber(total)} 件`,
+    total === null ? emptyValue('unknown') : `${formatNumber(total)}件`,
     rate != null ? `答え終えた割合 ${formatNumber(rate)}%` : null,
   ].filter(Boolean).join('・')
   const longKey = fieldKeys.find((key) => blockByKey(key)?.type === 'textarea'
@@ -429,17 +433,14 @@ function Responses() {
       {exporting && exportProgress ? <p className={styles.railNote} role="status">{exportProgress}</p> : null}
       <section className={styles.railCard} aria-labelledby="fr-filter">
         <h2 className={styles.railTitle} id="fr-filter">絞り込み</h2>
-        <p className={styles.railNote}>{total === null ? '—' : `全 ${formatNumber(total)} 件から、名前と答えで探します`}</p>
-        <label className={styles.search}>
-          <Search size={15} aria-hidden="true" />
-          <input
+        <p className={styles.railNote}>{total === null ? emptyValue('unknown') : `全 ${formatNumber(total)}件から、名前と答えで探します`}</p>
+        <Field label={<><Search size={15} aria-hidden="true" /></>}><input
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="名前・答えで探す（全件から）"
             aria-label="名前・答えで探す（全件から）"
-          />
-        </label>
+          /></Field>
       </section>
     </div>
   )
@@ -450,7 +451,7 @@ function Responses() {
       tabSpacing="compact"
       identity={<Link href="/form-submissions" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />回答フォームへ</Link>}
       title={`集まった回答：${form.name}`}
-      description={headLine}
+      help={headLine}
       tabs={(
         <Tabs
           className={styles.tabsPlain}
@@ -504,17 +505,7 @@ function Responses() {
                       <p className={styles.cardNote}>{sub}</p>
                     </div>
                     {answered > 0 ? (
-                      <dl className={styles.bars}>
-                        {top.map(([value, count]) => (
-                          <div key={value} className={styles.barRow}>
-                            <dt title={value}>{block?.type === 'rating' ? `★${value}` : value}</dt>
-                            <dd className={styles.barTrack} aria-hidden="true">
-                              <meter className={styles.meter} min={0} max={Math.max(1, max)} value={count} />
-                            </dd>
-                            <dd className={styles.barCount}>{`${formatNumber(count)} 件（${formatNumber(Math.round((count / answered) * 100))}%）`}</dd>
-                          </div>
-                        ))}
-                      </dl>
+                      <HorizontalBarChart label={labels[fieldSummary.key] ?? fieldSummary.key} unit="件" items={top.map(([value,count])=>({key:value,label:block?.type==='rating'?`★${value}`:value,value:count,detail:<span>{`${formatNumber(Math.round(count/answered*100))}%`}</span>}))} />
                     ) : null}
                   </section>
                 )
@@ -555,7 +546,7 @@ function Responses() {
             <section className={styles.card} aria-labelledby="fr-rows">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle} id="fr-rows">回答</h2>
-                <p className={styles.cardNote}>{total === null ? '—' : `全 ${formatNumber(total)} 件`}</p>
+                <p className={styles.cardNote}>{total === null ? emptyValue('unknown') : `全 ${formatNumber(total)}件`}</p>
               </div>
               <table className={styles.table}>
                 <thead>
@@ -569,7 +560,7 @@ function Responses() {
                 <tbody>
                   {items.map((item) => {
                     const incomplete = incompleteOf(item)
-                    const first = firstKey ? valueText((item.data as Record<string, unknown>)[firstKey]) : '—'
+                    const first = firstKey ? valueText((item.data as Record<string, unknown>)[firstKey]) : emptyValue('unknown')
                     const isSelected = selected?.id === item.id
                     return (
                       <tr
@@ -580,13 +571,13 @@ function Responses() {
                       >
                         <td className={styles.when}>{shortWhen(item.createdAt)}</td>
                         <td>
-                          <button type="button" className={styles.who} title={item.friendName ?? '不明'} onClick={() => selectAnswer(item.id)}>
+                          <button type="button" className={styles.who} title={item.friendName ?? '不明'}  onClick={() => selectAnswer(item.id)}>
                             {item.friendName ?? '不明'}
                           </button>
                         </td>
                         <td className={styles.ellipsis} title={first}>{first}</td>
                         <td>
-                          {incomplete === null ? <span className={styles.faint}>—</span>
+                          {incomplete === null ? <span className={styles.faint}>{emptyValue('unknown')}</span>
                             : incomplete ? <span className={`${styles.chip} ${styles.chipNg}`}>未完</span>
                               : <span className={`${styles.chip} ${styles.chipOk}`}>済み</span>}
                         </td>
@@ -597,7 +588,7 @@ function Responses() {
               </table>
               <div className={styles.pager}>
                 <span className={styles.range}>
-                  {total === null ? '—' : <ListRange total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={Math.min(page * pageSize, total)} />}
+                  {total === null ? emptyValue('unknown') : <ListRange total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={Math.min(page * pageSize, total)} />}
                 </span>
                 <Pagination page={page} pageCount={pageCount} disabled={loading} ariaLabel="回答一覧のページ送り" onPageChange={(next) => void load(next, pageSize)} />
               </div>

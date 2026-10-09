@@ -57,6 +57,7 @@ import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import { shortDateTime } from './words'
 import styles from './incoming.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -338,7 +339,7 @@ export default function WebhooksIncomingV8() {
       if (!isCurrent()) return
       const forbidden = caught instanceof ApiError && caught.status === 403
       fail(forbidden
-        ? `「${item.name}」は統括だけが切り替えできます。必要なときは統括に頼んでください。状態は変わっていません。`
+        ? permissionDeniedMessage('store')
         : `「${item.name}」は切り替えに失敗しました。状態は変わっていません。時間をおいて、もう一度お試しください。`)
     } finally {
       if (isCurrent()) {
@@ -368,7 +369,7 @@ export default function WebhooksIncomingV8() {
       if (accountRef.current !== accountId) return
       const forbidden = caught instanceof ApiError && caught.status === 403
       setDeleteError(forbidden
-        ? 'この受け取り口の削除は統括だけができます。必要なときは統括に頼んでください。'
+        ? permissionDeniedMessage('store')
         : 'この受け取り口を削除できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
       setDeleting(false)
@@ -407,7 +408,7 @@ export default function WebhooksIncomingV8() {
       }
       if (accountRef.current !== accountId) return
       setRotateError(describeApiFailure(caught, 'シークレットの更新', {
-        forbidden: '合言葉の更新は統括だけができます。必要なときは統括に頼んでください。',
+        scope: 'store',
       }))
     } finally {
       setRotating(false)
@@ -466,7 +467,7 @@ export default function WebhooksIncomingV8() {
       if (accountRef.current !== accountId) return
       setCreateFieldError({
         form: describeApiFailure(caught, '作成', {
-          forbidden: '受け取り口の作成は統括だけができます。必要なときは統括に頼んでください。',
+          scope: 'store',
         }),
       })
     } finally {
@@ -504,7 +505,7 @@ export default function WebhooksIncomingV8() {
         setUnmatchedActionError({
           id: item.id,
           message: describeApiFailure(caught, '確認', {
-            forbidden: 'この操作は統括または管理者だけができます。必要なときは統括に頼んでください。',
+            scope: 'store',
           }),
         })
         return
@@ -538,7 +539,7 @@ export default function WebhooksIncomingV8() {
       }
       setTestResult(res.data)
     } catch (caught) {
-      setTestError(describeApiFailure(caught, '試し', { forbidden: 'この操作を行う権限がありません。統括に頼んでください。' }))
+      setTestError(describeApiFailure(caught, '試し', { scope: 'store' }))
       setTestResult(null)
     } finally {
       setTestBusy(false)
@@ -601,7 +602,7 @@ export default function WebhooksIncomingV8() {
             <span className={styles.inletRow}>
               <span className={styles.inletName}>{item.name}</span>
               <span className={styles.spacer} aria-hidden="true" />
-              <span className={styles.inletState}>{item.isActive ? '動いている' : '止めている'}</span>
+              <span className={styles.inletState}>{item.isActive ? '有効' : '停止中'}</span>
             </span>
             <span className={styles.inletSub}>{sourceName(item.sourceType)}から</span>
           </button>
@@ -836,7 +837,7 @@ export default function WebhooksIncomingV8() {
       boardId="gW0F2"
       headingSize="regular"
       title="外部連携"
-      description={WEBHOOKS_DESCRIPTION}
+      help={WEBHOOKS_DESCRIPTION}
       actions={canManage ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={15} aria-hidden="true" />見本から作る</Button> : undefined}
       tabs={<WebhookTabs active="incoming" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
@@ -919,10 +920,7 @@ export default function WebhooksIncomingV8() {
           busy={testBusy}
           confirmLabel="試す"
         >
-          <label className={styles.formField}>
-            <span className={styles.fieldLabel}>届いたつもりのJSON</span>
-            <TextArea value={testJson} onChange={(event) => setTestJson(event.target.value)} placeholder='{"friendId": "…"}' />
-          </label>
+          <Field label="届いたつもりのJSON"><TextArea value={testJson} onChange={(event) => setTestJson(event.target.value)} placeholder='{"friendId": "…"}' /></Field>
           {testError ? <p className={styles.fieldError} role="alert">{testError}</p> : null}
           {testResult ? (
             <div className={styles.form}>

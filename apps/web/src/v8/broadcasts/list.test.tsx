@@ -97,7 +97,7 @@ const base = {
   targetTagId: null,
   status: 'scheduled',
   displayStatus: 'scheduled',
-  displayStatusLabel: '予約済み',
+  displayStatusLabel: '予約中',
   scheduledAt: '2026-08-24T01:00:00.000Z',
   sentAt: null,
   successCount: 0,
@@ -216,7 +216,7 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
     expect(routerPush).toHaveBeenCalledWith('/broadcasts/new')
   })
 
-  it('下書きの削除は窓を出さずに行を外し、5秒は送らない。予約済みは今までどおり確かめの窓', async () => {
+  it('下書きの削除は窓を出さずに行を外し、5秒は送らない。予約中は今までどおり確かめの窓', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     try {
       deleteBroadcast.mockClear()

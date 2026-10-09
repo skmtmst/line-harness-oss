@@ -56,6 +56,8 @@ import { mileageRewardedActions } from '../../mileage-response-state'
 import { formatDay, formatNumber } from '@/lib/format'
 import V8MileageAdjustDialog from './v8-mileage-adjust-dialog'
 import styles from '../../mileage-v8.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type MileageDetail = {
   summary: MileageSummary
@@ -349,11 +351,11 @@ function FriendDetailInner() {
       <div className={styles.head}>
         <div className={styles.headText}>
           <Link href="/mileage?tab=balances" style={{ color: 'var(--color-action)', fontSize: 13 }}>← マイルへ</Link>
-          <h1 className={styles.headTitle}>{displayName}</h1>
-          <p className={styles.headDescription}>
+          <PageHeading title={displayName} help={<>
             {[joinedAt ? `友だちになった日 ${joinedAt}` : null, `会員ランク ${rankLabel}`, lastActive ? `最後に動いた日 ${lastActive}` : null]
               .filter(Boolean).join('・')}
-          </p>
+          </>} />
+
         </div>
         <div className={styles.headActions}>
           <Button href={`/friends/detail?id=${encodeURIComponent(friend.id)}`}>
@@ -410,7 +412,7 @@ function FriendDetailInner() {
             <span className={styles.kpiLabel}>期限が近い</span>
           </div>
           <p className={styles.kpiValue}>
-            {expiring == null ? '—' : formatMileageNumber(expiring)}
+            {expiring == null ? emptyValue('unknown') : formatMileageNumber(expiring)}
             <span className={styles.kpiUnit}> マイル</span>
           </p>
           <p className={styles.kpiSub}>{expiringSub || expiringLabel}</p>

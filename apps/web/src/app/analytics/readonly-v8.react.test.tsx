@@ -42,14 +42,14 @@ describe('V8の閲覧と実測値の保護', () => {
     // 閲覧のみの人には作るボタンを置かない（オーナー決定 2026-10-06）。帯で閲覧のみと伝える。
     expect([...host.querySelectorAll('a, button')].some((el) => el.textContent?.includes('レポートを作る'))).toBe(false)
     expect(host.textContent).toContain('閲覧のみで見ています')
-    expect(host.querySelector('nav[aria-label="分析の組"] a[aria-current]')?.textContent).toBe('ふだん見る')
+    expect(host.querySelector('[role="tablist"][aria-label="分析の組"] [aria-selected="true"]')?.textContent).toBe('ふだん見る')
     expect(host.querySelector('a[href="/analytics?tab=routes"]')).not.toBeNull()
     expect(host.textContent).toContain('37')
     expect(host.textContent).not.toContain('+47')
   })
   it('期間を変えると選択中アカウントの集計を取得し直す', async () => {
     await render()
-    const range = [...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === '7日')!
+    const range = [...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === '過去7日')!
     await act(async () => range.click())
     expect(state.calls.length).toBe(2)
     expect(state.calls.every((call) => call.startsWith('account-a:'))).toBe(true)

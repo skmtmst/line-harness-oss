@@ -22,6 +22,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
+import { Field as SharedField } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import TermsBody from './terms-body'
 import { canSubmitTerms, formatAgreedAt, hasReadTerms, initialWizardStep, STEP } from './terms-state'
@@ -49,23 +50,14 @@ function Field({ label, required, help, error, children }: { label: string; requ
   const field = isValidElement<{ id?: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean; 'aria-required'?: boolean }>(children)
     ? cloneElement(children, { id: inputId, 'aria-describedby': describedBy, 'aria-required': required || undefined, ...(error ? { 'aria-invalid': true as const } : null) })
     : children
-  return (
-    <div className={styles.fieldBlock}>
-      <div className={styles.field}>
-        <label htmlFor={inputId} className={styles.label}>{label}</label>
-        {field}
-      </div>
-      {help ? <p id={helpId} className={styles.help}>{help}</p> : null}
-      {error ? <p id={errorId} role="alert" className={styles.error}>{error}</p> : null}
-    </div>
-  )
+  return <SharedField label={label} htmlFor={inputId} required={required} help={help}>{field}{error ? <p id={errorId} role="alert" className={styles.error}>{error}</p> : null}</SharedField>
 }
 
 /** マニュアルへの道。URL が決まるまで（空文字）は押せない形で出す（今の画面は出さなかった）。 */
 function ManualButton({ href, children }: { href: string; children: ReactNode }) {
   return href
-    ? <Button href={href} target="_blank" rel="noreferrer" className={styles.helpButton}><BookOpen aria-hidden className={styles.icon15} />{children}</Button>
-    : <Button disabled title="マニュアルの場所はまだ決まっていません" className={styles.helpButton}><BookOpen aria-hidden className={styles.icon15} />{children}</Button>
+    ? <Button external href={href}   className={styles.helpButton}><BookOpen aria-hidden className={styles.icon15} />{children}</Button>
+    : <Button disabled title="マニュアルの場所はまだ決まっていません"  className={styles.helpButton}><BookOpen aria-hidden className={styles.icon15} />{children}</Button>
 }
 
 function HelpPanel({ step }: { step: number }) {
@@ -239,7 +231,7 @@ export default function StoreNewV8() {
     <PageFrame kind="list" boardId={step === STEP.TERMS ? 'ao15G' : step === STEP.BASICS ? 'faGn4' : undefined}>
       <PageHeading
         title="店舗を追加"
-        description={`LINEへ接続し、店舗を登録します。ステップ ${step} / 5`}
+        help={`LINEへ接続し、店舗を登録します。ステップ ${step} / 5`}
         steps={(
           <Steps
             label="店舗を追加する手順"
@@ -275,7 +267,7 @@ export default function StoreNewV8() {
                 <div className={styles.termsRow}>
                   {disabledReason ? <p className={styles.reason}>{disabledReason}</p> : null}
                   <span className={styles.spacer} aria-hidden="true" />
-                  <Button href="/restaurant-test/terms"><ExternalLink aria-hidden className={styles.icon15} />利用規約を別画面で読む</Button>
+                  <Button external href="/restaurant-test/terms">利用規約を別画面で読む</Button>
                 </div>
                 <Checkbox checked={termsChecked} disabled={!readToEnd || agreeing} onCheckedChange={setTermsChecked}>上記の利用規約および個人情報の取扱いに同意します</Checkbox>
                 {agreeError ? <p role="alert" className={styles.error}>{agreeError}</p> : null}

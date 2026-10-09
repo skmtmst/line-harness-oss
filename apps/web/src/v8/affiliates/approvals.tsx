@@ -53,6 +53,8 @@ import {
   ToolbarNotices,
 } from './parts'
 import styles from './affiliates.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 type BulkOutcome = 'approved' | 'rejected'
@@ -290,15 +292,15 @@ export default function ApprovalsTab() {
   }
 
   const exportCsv = () => {
-    downloadCsv(`conversion-approvals-${new Date().toISOString().slice(0, 10)}.csv`, [
+    downloadCsv(csvFileName("成果の承認"), [
       ['日時', '友だち', 'アフィリエイター', 'アカウント', '案件', '成果地点', '注文番号', '金額', '確認状態'],
       ...shownItems.map((item) => [
         formatMonthDayTime(item.createdAt),
         personName(item.friendName),
         item.affiliateName ?? '名前を読み込めませんでした',
         item.lineAccountName ?? 'アカウント未設定',
-        item.offerName ?? '未設定',
-        item.conversionPointName ?? '未設定',
+        item.offerName ?? emptyValue('unconfigured'),
+        item.conversionPointName ?? emptyValue('unconfigured'),
         item.orderNumber ?? '',
         item.value ?? '',
         approvalReviewReasons(item).join('・') || '問題なし',
@@ -456,7 +458,7 @@ export default function ApprovalsTab() {
                 </Td>
                 <Td className={styles.colName}>
                   <span className={styles.stack}>
-                    <button type="button" className={styles.rowName} title={personName(item.friendName)} onClick={() => setDetailItem(item)}>{personName(item.friendName)}</button>
+                    <button type="button" className={styles.rowName} title={personName(item.friendName)}  onClick={() => setDetailItem(item)}>{personName(item.friendName)}</button>
                     <span className={styles.rowPlan}>{`${formatMonthDayTime(item.createdAt)} に成果`}</span>
                   </span>
                 </Td>
@@ -572,7 +574,7 @@ export default function ApprovalsTab() {
       help={readonly
           ? '行の「…」から 詳細と成果の付け方を見る。'
           : '行の「…」から 認める・認めない・詳細を見る。左のチェックで選ぶと、画面の下から一括バーが出ます。「操作を選ぶ」→ 認める／認めない → 確かめる → 結果 の順。却下の理由はまだ記録できません。'}
-      actions={<Button onClick={exportCsv} disabled={shownItems.length === 0}><Download size={15} aria-hidden="true" /> CSV で書き出す</Button>}
+      actions={<Button onClick={exportCsv} disabled={shownItems.length === 0}><Download size={15} aria-hidden="true" /> CSVで書き出す</Button>}
       stats={stats}
       toolbar={toolbar}
       pagination={pager}

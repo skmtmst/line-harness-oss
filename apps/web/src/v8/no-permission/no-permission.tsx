@@ -6,9 +6,11 @@
  * 呼ぶ側が知っている表示名だけを渡す（分からない役割を断定しない）。
  * app/no-permission/no-permission-v8.tsx（一覧の中に置く版）を写して、板全体の形にした。
  */
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { BookOpen, CircleHelp, Lock } from 'lucide-react'
 import Button from '@/components/shared/button'
 import styles from './no-permission.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
 
 export type NoPermissionBoardProps = {
   /** 機能名。題と「○○を開く権限がありません」になる。 */
@@ -38,8 +40,8 @@ export default function NoPermissionBoard({
   return (
     <div data-design-node="O5tUeE" className={styles.board}>
       <div className={styles.head}>
-        <h1 className={styles.title}>{featureName}</h1>
-        <p className={styles.description}>この機能は、あなたの役割では開けません。</p>
+        <PageHeading title={featureName} help={<> この機能は、あなたの役割では開けません。</>} />
+
       </div>
       <div className={styles.center}>
         <section className={styles.card} role="alert">
@@ -48,7 +50,7 @@ export default function NoPermissionBoard({
           <p className={styles.cardText}>
             {roleLabel ? `いまの役割は「${roleLabel}」です。` : 'この画面を開く権限がありません。'}
             {requiredRoleLabel ? `${featureName}は「${requiredRoleLabel}」以上の役割で使えます。` : ''}
-            必要なら、管理者に役割の変更を頼んでください。
+            {permissionDeniedMessage('store')}
           </p>
           {roleLabel || adminName ? (
             <p className={styles.roleRow}>

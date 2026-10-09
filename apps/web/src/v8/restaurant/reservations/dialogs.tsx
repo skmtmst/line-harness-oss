@@ -17,7 +17,8 @@ import { INACTIVE_STATUSES, hm, isHold, pad2 } from './format'
 import styles from './reservations.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
 import { formatYen as polishFormatYen } from '@/lib/format'
-
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 function toLocalInput(iso: string): string {
   const date = new Date(iso)
@@ -127,7 +128,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
       )}
     >
       {hold ? (
-        <DialogNote>{`${reservation.note || '仮押さえ'}・解除の期限 ${reservation.hold_expires_at ? hm(reservation.hold_expires_at) : '—'}。期限を過ぎると空き卓に戻ります。台帳には履歴が残ります。`}</DialogNote>
+        <DialogNote>{`${reservation.note || '仮押さえ'}・解除の期限 ${reservation.hold_expires_at ? hm(reservation.hold_expires_at) : emptyValue('unknown')}。期限を過ぎると空き卓に戻ります。台帳には履歴が残ります。`}</DialogNote>
       ) : (
         <>
           <div className={styles.pair}>
@@ -140,7 +141,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
           </div>
           <div className={styles.pair}>
             <Field label="人数" htmlFor="rs-edit-guests" error={fields.error('count')}>
-              <TextField id="rs-edit-guests" invalid={fields.invalid('count')} type="number" min={1} max={100} required readOnly={!canWrite} value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} />
+              <NumberInput id="rs-edit-guests" invalid={fields.invalid('count')} type="number" min={1} max={100} required readOnly={!canWrite} value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} />
             </Field>
             <Field labelSize="compact" label="卓">
               {canWrite ? (
@@ -254,7 +255,7 @@ export function InboundTrialDialog({ open, busy, onClose, onSubmit }: {
           <TextField id="rs-trial-name" invalid={fields.invalid('name')} required value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} />
         </Field>
         <Field label="人数" htmlFor="rs-trial-guests" error={fields.error('count')}>
-          <TextField id="rs-trial-guests" invalid={fields.invalid('count')} type="number" min={1} max={100} required value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} />
+          <NumberInput id="rs-trial-guests" invalid={fields.invalid('count')} type="number" min={1} max={100} required value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} />
         </Field>
       </div>
       <Field label="開始日時" htmlFor="rs-trial-start" error={fields.error('start')}>

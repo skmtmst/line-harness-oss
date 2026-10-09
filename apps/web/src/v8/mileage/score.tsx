@@ -55,7 +55,11 @@ import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError } from '@/components/shared/form-controls'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
-
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 const BAND_LABELS: Record<ActionScoreBand, string> = {
   high: '点が高い',
@@ -124,7 +128,7 @@ type FriendsItem = ActionScoreOverview['items'][number]
 function actionScoreAdjustmentErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 400) return error.message
-    if (error.status === 403) return '点数を変更する権限がありません。'
+    if (error.status === 403) return permissionDeniedMessage('store')
     if (error.status === 404) return '対象の友だちまたはLINEアカウントを確認できませんでした。'
     if (error.status === 405) return 'この環境では点数を変更できません。'
     if (error.status === 409) return '同じ操作がすでに記録されています。画面を読み直してからやり直してください。'
@@ -223,7 +227,7 @@ export default function ScoreTab() {
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `action-scores-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = csvFileName("行動の点数")
     anchor.click()
     URL.revokeObjectURL(url)
   }
@@ -429,9 +433,9 @@ export default function ScoreTab() {
         title="公開中のルール"
         icon={<Settings2 size={14} aria-hidden="true" />}
         value={rulesLoading || rulesError ? null : 0}
-        valueText={rulesLoading || rulesError ? undefined : publishedVersionNo === null ? 'なし' : `版 ${formatMileageNumber(publishedVersionNo)}`}
+        valueText={rulesLoading || rulesError ? undefined : publishedVersionNo === null ? emptyValue('none') : `版 ${formatMileageNumber(publishedVersionNo)}`}
         unit=""
-        detail={rulesLoading ? '—' : hasDraftChanges ? '下書きの変更あり' : '下書きとの差はありません'}
+        detail={rulesLoading ? emptyValue('unknown') : hasDraftChanges ? '下書きの変更あり' : '下書きとの差はありません'}
       />
     </KpiBand>
   )
@@ -523,7 +527,7 @@ export default function ScoreTab() {
                 </Td>
                 <Td className={styles.colTrend}>
                   <span className={styles.scoreNum} data-score-delta={change === null || change === 0 ? 'zero' : change > 0 ? 'positive' : 'negative'}>
-                    {change === null ? '—' : formatMileageChange(change)}
+                    {change === null ? emptyValue('unknown') : formatMileageChange(change)}
                   </span>
                 </Td>
                 <Td className={styles.colReact}>
@@ -660,7 +664,7 @@ export default function ScoreTab() {
                     <Td className={styles.colStateWide}>
                       <span className={styles.pill} data-tone={stopped ? 'neutral' : changed ? 'warn' : 'active'}>
                         <span className={styles.pillDot} aria-hidden="true" />
-                        {stopped ? '止めている' : changed ? '下書きで変更' : '公開中'}
+                        {stopped ? '停止中' : changed ? '下書きで変更' : '公開中'}
                       </span>
                     </Td>
                     <Td className={styles.colOpsMenu}>
@@ -943,9 +947,7 @@ export function ScoreAdjustDialog({
           </div>
         </div>
 
-        <div className={styles.dlgGroup}>
-          <label className={styles.dlgFieldLabel} htmlFor="ml-score-amount">点数</label>
-          <input
+        <div className={styles.dlgGroup}><Field label="点数" htmlFor="ml-score-amount"><NumberInput numericText
             id="ml-score-amount"
             className={styles.dlgInput}
             inputMode="numeric"
@@ -955,12 +957,9 @@ export function ScoreAdjustDialog({
             aria-invalid={fields.invalid('amount') || undefined}
             aria-describedby={fields.invalid('amount') ? 'ml-score-amount-error' : undefined}
           />
-          <FieldError id="ml-score-amount-error">{fields.error('amount')}</FieldError>
-        </div>
+<FieldError id="ml-score-amount-error">{fields.error('amount')}</FieldError></Field></div>
 
-        <div className={styles.dlgGroup}>
-          <label className={styles.dlgCaption} htmlFor="ml-score-reason">理由</label>
-          <textarea
+        <div className={styles.dlgGroup}><Field label="理由" htmlFor="ml-score-reason"><textarea
             id="ml-score-reason"
             className={styles.dlgTextarea}
             value={reason}
@@ -970,8 +969,7 @@ export function ScoreAdjustDialog({
             aria-invalid={fields.invalid('reason') || undefined}
             aria-describedby={fields.invalid('reason') ? 'ml-score-reason-error' : undefined}
           />
-          <FieldError id="ml-score-reason-error">{fields.error('reason')}</FieldError>
-        </div>
+<FieldError id="ml-score-reason-error">{fields.error('reason')}</FieldError></Field></div>
 
         <p className={styles.dlgCaption}>この変更で起きること</p>
         <div className={styles.delta3}>
@@ -981,11 +979,11 @@ export function ScoreAdjustDialog({
           </div>
           <div className={styles.deltaCell}>
             <p className={styles.deltaLabel}>変更量</p>
-            <p className={styles.deltaValue}>{validAmount ? `${formatMileageChange(delta)} 点` : '—'}</p>
+            <p className={styles.deltaValue}>{validAmount ? `${formatMileageChange(delta)} 点` : emptyValue('unknown')}</p>
           </div>
           <div className={styles.deltaCell}>
             <p className={styles.deltaLabel}>変更後</p>
-            <p className={styles.deltaValue}>{validAmount ? `${formatMileageNumber(scoreAfter)} 点` : '—'}</p>
+            <p className={styles.deltaValue}>{validAmount ? `${formatMileageNumber(scoreAfter)} 点` : emptyValue('unknown')}</p>
           </div>
         </div>
 
@@ -1076,7 +1074,7 @@ function ScoreHistoryDialog({
         <span className={styles.dlgAvatar} aria-hidden="true">{friendName.slice(0, 1)}</span>
         <div className={styles.dlgPersonText}>
           <span className={styles.dlgPersonName}>{friendName}</span>
-          <span className={styles.dlgPersonSub}>{`いま ${score != null ? formatMileageNumber(score) : '—'} 点・${bandName(band, highMin, normalMin)}`}</span>
+          <span className={styles.dlgPersonSub}>{`いま ${score != null ? formatMileageNumber(score) : emptyValue('unknown')} 点・${bandName(band, highMin, normalMin)}`}</span>
         </div>
       </div>
 
@@ -1112,7 +1110,7 @@ function ScoreHistoryDialog({
                     {formatMileageChange(item.scoreChange)}
                   </span>
                 </td>
-                <td className={styles.miniNum}>{item.scoreAfter === null ? '—' : formatMileageNumber(item.scoreAfter)}</td>
+                <td className={styles.miniNum}>{item.scoreAfter === null ? emptyValue('unknown') : formatMileageNumber(item.scoreAfter)}</td>
               </tr>
             ))}
           </tbody>

@@ -199,20 +199,16 @@ export default function BookingHistory() {
                   { key: 'past', label: 'これまで' },
                 ] as const
               ).map((t) => (
-                <button
+                <Button variant="text"
                   key={t.key}
                   type="button"
                   role="tab"
                   aria-selected={tab === t.key}
                   onClick={() => setTab(t.key)}
-                  className={`liff-hit flex h-8 flex-1 items-center justify-center rounded-lg text-xs focus-visible:outline-2 focus-visible:outline-ink ${
-                    tab === t.key
-                      ? 'bg-canvas font-bold text-ink'
-                      : 'font-semibold text-liff-sub'
-                  }`}
+                  className="flex-1"
                 >
                   {t.label}
-                </button>
+                </Button>
               ))}
             </div>
             {actionError && (
@@ -319,16 +315,14 @@ export default function BookingHistory() {
                     pendingChange.selected?.date === slot.date && pendingChange.selected?.start === slot.start;
                   return (
                     <li key={`${slot.date}-${slot.start}`}>
-                      <button
+                      <Button variant="slot-row"
                         type="button"
                         disabled={busy}
                         aria-pressed={selected}
                         onClick={() =>
                           setPendingChange((prev) => (prev ? { ...prev, selected: slot, error: null } : prev))
                         }
-                        className={`flex min-h-11 w-full items-center justify-between gap-3 rounded-(--liff-radius) border px-4 py-2.5 text-left focus-visible:outline-2 focus-visible:outline-ink disabled:cursor-not-allowed ${
-                          selected ? 'border-liff-primary bg-liff-primary' : 'border-hairline bg-canvas'
-                        }`}
+
                       >
                         <span
                           className={`liff-num text-sm font-semibold whitespace-nowrap ${selected ? 'text-(--liff-on-primary)' : 'text-ink'}`}
@@ -340,7 +334,7 @@ export default function BookingHistory() {
                         >
                           {selected ? 'この日時' : '空きあり'}
                         </span>
-                      </button>
+                      </Button>
                     </li>
                   );
                 })}

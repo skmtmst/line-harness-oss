@@ -38,7 +38,8 @@ import { INACTIVE_STATUSES, dayTitle, floorOrder, slotLabel, toYmd } from './for
 import styles from './reservations.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
 import { formatYen as polishFormatYen } from '@/lib/format'
-
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 const STAY_MINUTES = 120
 const FALLBACK_START = 17 * 60
@@ -263,8 +264,8 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
         {history ? (
           <>
             <p className={styles.breakRow}><span>これまでの来店</span><strong>{`${history.visitCount} 回`}</strong></p>
-            <p className={styles.breakRow}><span>前回</span><strong>{lastVisit ? `${new Date(lastVisit.starts_at).getMonth() + 1}/${new Date(lastVisit.starts_at).getDate()}・${lastVisit.guest_count}名・${lastVisit.table_label || '未配席'}` : '—'}</strong></p>
-            <p className={styles.breakRow}><span>アレルギー（前回）</span><strong className={lastAllergy ? styles.alertText : undefined}>{lastAllergy || '—'}</strong></p>
+            <p className={styles.breakRow}><span>前回</span><strong>{lastVisit ? `${new Date(lastVisit.starts_at).getMonth() + 1}/${new Date(lastVisit.starts_at).getDate()}・${lastVisit.guest_count}名・${lastVisit.table_label || '未配席'}` : emptyValue('unknown')}</strong></p>
+            <p className={styles.breakRow}><span>アレルギー（前回）</span><strong className={lastAllergy ? styles.alertText : undefined}>{lastAllergy || emptyValue('unknown')}</strong></p>
           </>
         ) : (
           historyError ? <ListState kind="error" title={historyError} /> : contactUid || contactPhone ? <ListState kind="loading" title="来店履歴を読み込んでいます。" /> : <p className={styles.sideText}>お客さまを選ぶと、来店回数と前回が出ます。</p>
@@ -278,7 +279,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
       <CreatePage
         boardId="rm92Y"
         title="電話の予約を入れる"
-        description="電話・店頭で受けた予約を台帳に入れます。空いている卓は自動で選びます。枠だけ押さえることもできます。"
+        help="電話・店頭で受けた予約を台帳に入れます。空いている卓は自動で選びます。枠だけ押さえることもできます。"
         tabs={<StoreTabs current="reservations" flush />}
         preview={preview}
         footerActions={(
@@ -299,7 +300,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
             </RadioCardGroup>
             {kind === 'hold' ? (
               <Field label="仮押さえの期限（分）" htmlFor="rs-phone-hold" error={fields.error('hold')}>
-                <TextField id="rs-phone-hold" aria-label="仮押さえの期限（分）" type="number" min={1} max={120} value={holdMinutes} onChange={(event) => setHoldMinutes(event.target.value)} />
+                <NumberInput unit="分" id="rs-phone-hold" aria-label="仮押さえの期限（分）" type="number" min={1} max={120} value={holdMinutes} onChange={(event) => setHoldMinutes(event.target.value)} />
               </Field>
             ) : null}
           </Card>
@@ -364,7 +365,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
                 <DateField size="compact" id="rs-phone-date" invalid={fields.invalid('date')} value={date} onChange={(next) => { setDate(next); setTime('') }} />
               </Field>
               <Field label="人数" htmlFor="rs-phone-count" error={fields.error('count')}>
-                <TextField id="rs-phone-count" type="number" min={1} max={100} required value={count} onChange={(event) => setCount(event.target.value)} />
+                <NumberInput id="rs-phone-count" type="number" min={1} max={100} required value={count} onChange={(event) => setCount(event.target.value)} />
               </Field>
             </div>
             <div className={styles.timeBlock}>

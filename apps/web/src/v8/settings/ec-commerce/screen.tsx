@@ -48,6 +48,8 @@ import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-ba
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import OrderDrawer from './order-drawer'
 import styles from './screen.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export type EcTabKey = 'events' | 'identity' | 'subscriptions' | 'connector'
 
@@ -129,7 +131,7 @@ function dateTime(value: string | null): string {
 function longDateTime(value: string | null): string {
   if (!value) return '—'
   const date = new Date(value)
-  return Number.isNaN(date.valueOf()) ? '—' : formatDateTime(date)
+  return Number.isNaN(date.valueOf()) ? emptyValue('unknown') : formatDateTime(date)
 }
 
 const ACTION_PAGE_SIZE = 20
@@ -355,7 +357,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
       {kpiDetailMissing ? (
         <p className={styles.minor} role="status">
           {overviewState === 'forbidden'
-            ? '集計を表示する権限がありません。一覧は取得できた範囲で表示しています。'
+            ? permissionDeniedMessage('store')
             : '集計だけを読み込めませんでした。一覧は取得できた範囲で表示しています。'}
           {overviewState === 'error' ? <Button variant="text" onClick={() => void loadOverview(false)}>集計をもう一度読む</Button> : null}
         </p>
@@ -488,7 +490,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
         <div className={styles.pager}>
           <span className={styles.minorText}>
             <ListRange label="取り込みの記録" total={actionTotal} first={(page - 1) * ACTION_PAGE_SIZE + 1} last={(page - 1) * ACTION_PAGE_SIZE + actions.length} />
-            {` 最後に届いた ${longDateTime(overview?.lastReceivedAt ?? null)}・今日 ${overview ? formatNumber(overview.last24h) : '—'} 件。注文の本文や接続用の秘密値は表示しません。`}
+            {` 最後に届いた ${longDateTime(overview?.lastReceivedAt ?? null)}・今日 ${overview ? formatNumber(overview.last24h) : emptyValue('unknown')}件。注文の本文や接続用の秘密値は表示しません。`}
           </span>
           {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} /> : null}
         </div>
@@ -552,7 +554,7 @@ export default function EcCommerceScreen({
       boardId={tab === 'subscriptions' ? 'wqC8x' : tab === 'connector' ? 'iLJmw' : 'GmVR5'}
       layout="narrow-nav"
       title="EC連携"
-      description="ネットショップから注文・発送・定期便の出来事を取り込み、LINE の友だちと結びつけます。"
+      help="ネットショップから注文・発送・定期便の出来事を取り込み、LINE の友だちと結びつけます。"
       actions={actions}
     >
       <EcTabsV8 accountId={selectedAccountId} active={tab} />

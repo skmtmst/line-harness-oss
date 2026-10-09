@@ -29,7 +29,9 @@ import {
 import { formatDateTime } from '@/lib/format'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
-
+import { Field } from '@/components/shared/form-controls'
+import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 版追加を止めた理由を、互換基準ごとに運用者へ説明する。 */
 function versionBlockerText(blockers: MediaVersionBlocker[]): string {
@@ -451,7 +453,7 @@ export default function MediaDetailDialog({
             ) : item.kind === 'audio' ? (
               <audio src={displaySrc} controls />
             ) : (
-              <a href={displaySrc} target="_blank" rel="noreferrer" className="text-action text-sm font-semibold">PDFを開く</a>
+              <TextLink external href={displaySrc}   className="text-action text-sm font-semibold">PDFを開く</TextLink>
             )}
           </div>
 
@@ -468,7 +470,7 @@ export default function MediaDetailDialog({
                 kind={item.kind}
                 title={`新しい${item.kind === 'image' ? '画像' : item.kind === 'video' ? '動画' : item.kind === 'audio' ? '音声' : 'ファイル'}を追加`}
                 accept={mediaAcceptForKind(item.kind)}
-                limitText="いまのメディアと同じ種類"
+                help="いまのメディアと同じ種類"
                 busy={versionPhase === 'uploading'}
                 progress={versionPhase === 'uploading' ? versionProgress : undefined}
                 onFile={(file) => chooseVersionFile(file)}
@@ -483,10 +485,7 @@ export default function MediaDetailDialog({
               </div>
             ) : null}
             {versionPreview?.canReplace ? (
-              <div className="mt-3">
-                <label htmlFor={`${fileInputId}-reason`} className="text-ink-secondary block text-xs font-semibold">変更理由</label>
-                <input id={`${fileInputId}-reason`} value={changeReason} onChange={(event) => setChangeReason(event.target.value)} maxLength={500} className="border-hairline rounded-control mt-1 min-h-10 w-full border px-3 text-sm" placeholder="例：秋の写真へ更新" />
-              </div>
+              <div className="mt-3"><Field label="変更理由" htmlFor={`${fileInputId}-reason`}><input id={`${fileInputId}-reason`} value={changeReason} onChange={(event) => setChangeReason(event.target.value)} maxLength={500} className="border-hairline rounded-control mt-1 min-h-10 w-full border px-3 text-sm" placeholder="例：秋の写真へ更新" /></Field></div>
             ) : null}
             {versionError ? <Notice tone="danger" message={versionError} className="mt-3" /> : null}
             {impact && impact.usageCount > 0 ? (
@@ -558,18 +557,13 @@ export default function MediaDetailDialog({
             </p>
             {termsEditing ? (
               <div className="border-hairline mt-3 space-y-3 border-t pt-3">
-                <div>
-                  <label htmlFor={`${fileInputId}-expires`} className="text-ink-secondary block text-xs font-semibold">利用期限（分かる場合だけ）</label>
-                  <DateField
+                <div><Field label="利用期限（分かる場合だけ）" htmlFor={`${fileInputId}-expires`}><DateField
                     id={`${fileInputId}-expires`}
                     value={termsExpiresAt}
                     onChange={setTermsExpiresAt}
                     className="mt-1"
-                  />
-                </div>
-                <div>
-                  <label htmlFor={`${fileInputId}-consent`} className="text-ink-secondary block text-xs font-semibold">同意・権利の記録（確認した内容だけ）</label>
-                  <input
+                  /></Field></div>
+                <div><Field label="同意・権利の記録（確認した内容だけ）" htmlFor={`${fileInputId}-consent`}><input
                     id={`${fileInputId}-consent`}
                     type="text"
                     value={termsConsentNote}
@@ -577,8 +571,7 @@ export default function MediaDetailDialog({
                     maxLength={500}
                     className="border-hairline rounded-control mt-1 w-full border px-3 py-2 text-sm"
                     placeholder="例：出演者の同意書を確認済み（2026-01-10）"
-                  />
-                </div>
+                  /></Field></div>
                 {termsError ? <Notice tone="danger" message={termsError} /> : null}
                 <div className="flex justify-end gap-2">
                   <Button type="button" onClick={() => setTermsEditing(false)} disabled={termsBusy}>キャンセル</Button>
@@ -596,7 +589,7 @@ export default function MediaDetailDialog({
               <span className="text-action text-xs font-medium">
                 {impact && (impact.verified !== false || impact.references.length > 0)
                   ? `${impact.usageCount}か所`
-                  : '—'}
+                  : emptyValue('unknown')}
               </span>
             </div>
             {phase === 'loading' ? (

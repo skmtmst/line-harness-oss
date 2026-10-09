@@ -99,7 +99,7 @@ function reservedProps(overrides: Partial<ReservedProps> = {}): ReservedProps {
   return {
     broadcast: broadcast({
       id: 'broadcast-0', title: '8月キャンペーンのお知らせ', status: 'scheduled', messageType: 'image',
-      scheduledAt: '2026-08-24T01:00:00.000Z', displayStatus: 'scheduled', displayStatusLabel: '予約済み', draftStep: null,
+      scheduledAt: '2026-08-24T01:00:00.000Z', displayStatus: 'scheduled', displayStatusLabel: '予約中', draftStep: null,
     }),
     estimate: { audienceCount: 1213, hiddenExcluded: 12, warnings: [] },
     audienceLabel: 'このアカウントの友だち全員',

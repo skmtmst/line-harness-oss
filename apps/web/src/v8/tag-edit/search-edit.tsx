@@ -50,7 +50,7 @@ import { formatDateTime } from '@/lib/format'
 import { optionsWithCurrent, usageRowsOf, headUsageText } from './search-model'
 import styles from './search-edit.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
-
+import { emptyValue } from '@/components/shared/empty-value'
 
 /*
  * R185: 友だち画面で作れる条件はここでも編集できるようにする。実行側
@@ -192,17 +192,11 @@ function DateRangeEditor({
     <div className={styles.grow}>
       <div className={styles.dateRow}>
         <Select aria-label="日付の比べ方" value={op} onChange={setOp} options={[{ value: 'between', label: '期間' }, { value: 'after', label: '以降' }, { value: 'before', label: '以前' }]} width={120} />
-        <label className={styles.dateLabel}>
-          {op === 'before' ? '終了日' : '開始日'}
-          <DateField aria-label={op === 'before' ? '終了日' : '開始日'} value={op === 'before' ? to : from} onChange={op === 'before' ? setTo : setFrom} />
-        </label>
+        <Field label={<>{op === 'before' ? '終了日' : '開始日'}</>}><DateField aria-label={op === 'before' ? '終了日' : '開始日'} value={op === 'before' ? to : from} onChange={op === 'before' ? setTo : setFrom} /></Field>
         {op === 'between' ? (
           <>
             <span className={styles.dateDash} aria-hidden="true">〜</span>
-            <label className={styles.dateLabel}>
-              終了日
-              <DateField aria-label="終了日" value={to} onChange={setTo} />
-            </label>
+            <Field label="終了日"><DateField aria-label="終了日" value={to} onChange={setTo} /></Field>
           </>
         ) : null}
       </div>
@@ -832,7 +826,7 @@ export default function SavedSearchEditV8() {
   const countNote = previewError || preview?.error
     ? '人数をまだ数えていません。数え直してください。'
     : preview?.calculatedAt
-      ? `${formatDateTime(preview.calculatedAt)} に数えた数（LINE ${preview.byChannel.line ?? '—'} 人・MAIL ${preview.byChannel.mail ?? '—'} 人）。数え直している間は古い数を出しません`
+      ? `${formatDateTime(preview.calculatedAt)} に数えた数（LINE ${preview.byChannel.line ?? emptyValue('unknown')}人・MAIL ${preview.byChannel.mail ?? emptyValue('unknown')}人）。数え直している間は古い数を出しません`
       : '保存した条件でまだ数えていません。数え直すと出ます'
   const deleteReason = original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使っている所を確かめられないため削除できません' : original.usedIn.length > 0 ? `使っている所があるため削除できません（${original.usedIn.length} 件）` : '削除できるか確かめられません'
 
@@ -881,7 +875,7 @@ export default function SavedSearchEditV8() {
       <CreatePage
         title={original.name}
         identity={<Link href="/tags?tab=searches" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />保存した検索へ</Link>}
-        description={[
+        help={[
           previewCount === null ? '人数はまだ数えていません' : `${polishFormatNumber(previewCount)} 人が当てはまる`,
           original.isShared ? '全員に共有' : '自分だけ',
           headUsageText(original.usedIn),
@@ -902,16 +896,9 @@ export default function SavedSearchEditV8() {
         {error ? <Notice tone="danger" message={error} /> : null}
         <section className={styles.card} aria-label="名前と共有">
           <h2 className={styles.cardTitle}>名前と共有</h2>
-          <label className={styles.field}>
-            <span className={styles.labelStrong}>条件名</span>
-            <Field error={nameError}><TextField ref={nameRef} value={name} maxLength={80} onChange={(event) => { setName(event.target.value); setNameError('') }} aria-label="条件名" /></Field>
-            {/* IDEA-04：同名の検索がすでにあるとき、保存する前に知らせる。 */}
-            <DuplicateNameNote duplicates={nameDuplicates} kindLabel="保存した検索" />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.labelStrong}>説明</span>
-            <TextField value={conditions.description ?? ''} maxLength={300} onChange={(event) => patchConditions({ ...conditions, description: event.target.value })} placeholder="この検索を使う目的" aria-label="説明" className={styles.input} />
-          </label>
+          <Field label="条件名"><Field error={nameError}><TextField ref={nameRef} value={name} maxLength={80} onChange={(event) => { setName(event.target.value); setNameError('') }} aria-label="条件名" /></Field>
+<DuplicateNameNote duplicates={nameDuplicates} kindLabel="保存した検索" /></Field>
+          <Field label="説明"><TextField value={conditions.description ?? ''} maxLength={300} onChange={(event) => patchConditions({ ...conditions, description: event.target.value })} placeholder="この検索を使う目的" aria-label="説明" className={styles.input} /></Field>
           <div className={styles.field}>
             <span className={styles.labelRow}>
               <span className={styles.label}>共有</span>

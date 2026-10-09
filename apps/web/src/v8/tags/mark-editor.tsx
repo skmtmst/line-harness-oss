@@ -45,6 +45,8 @@ import { AttributeKindGuide, findDuplicateNames } from '@/components/friend-fiel
 import { ArchiveMarkDialog } from '@/components/friend-fields/mark-list'
 import MarkBasicFields from './mark-basic-fields'
 import styles from './create.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 const COLORS = [
   { value: '#EF4B55', name: '赤' },
@@ -304,7 +306,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
       const code = (reason as { code?: string } | null)?.code
       if (status === 403) {
         setSaveForbidden(true)
-        setError(describeSaveFailure(reason))
+        setError(withPermissionFailure(reason, describeSaveFailure(reason), 'store'))
         return
       }
       if (status === 409 && code === 'SUPPORT_MARK_VERSION_CONFLICT') {
@@ -325,7 +327,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         setError('ほかの担当者が先に変更しました。最新の内容を確認してから保存し直してください。')
         return
       }
-      setError(describeSaveFailure(reason))
+      setError(withPermissionFailure(reason, describeSaveFailure(reason), 'store'))
     } finally {
       setSaving(false)
     }
@@ -377,7 +379,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
 
   const blockedReason =
     loadState === 'error' ? '一覧を読み込めませんでした。再読み込みしてください'
-      : loadState === 'forbidden' ? '対応マークを見る権限がありません'
+      : loadState === 'forbidden' ? permissionDeniedMessage('store')
         : roleBlocked ? '対応マークを作る権限がありません'
           : saveForbidden ? '対応マークを保存する権限がありません'
             : loadState === 'ready' && loadedAccountRef.current !== selectedAccountId ? 'アカウントを切り替えています。一覧を読み込むまでお待ちください'
@@ -428,8 +430,8 @@ function MarkEditorBody({ markId }: { markId?: string }) {
       <CreatePage
         boardId="ulq9Y"
         title={editing ? (selected?.name ?? '対応マークを編集') : '対応マークを作る'}
-        description={description}
-        help={<AttributeKindGuide current="mark" />}
+
+        help={<>{description}{<AttributeKindGuide current="mark" />}</>}
         identity={back}
         preview={aside}
         destructive={editing && selected && !hideForm ? (
@@ -439,7 +441,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         ) : undefined}
         footerActions={hideForm ? <Button href="/tags?tab=marks">一覧へ戻る</Button> : <>
           <Button type="button" onClick={() => guarded(() => router.push('/tags?tab=marks'))}>キャンセル</Button>
-          <Button type="button" variant="primary" disabled={saveDisabled} title={blockedReason ?? undefined} onClick={() => void save()} busy={saving}>
+          <Button type="button" variant="primary" disabled={saveDisabled} title={blockedReason ?? undefined}  onClick={() => void save()} busy={saving}>
             <Check size={15} aria-hidden="true" />{editing ? '保存する' : '対応マークを作る'}
           </Button>
         </>}
@@ -447,7 +449,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         {hideForm ? (
           <ListState
             kind="forbidden"
-            description={editing ? '対応マークを編集する権限がありません。オーナーか管理者に確認してください。' : '対応マークを作る権限がありません。オーナーか管理者に確認してください。'}
+            description={editing ? permissionDeniedMessage('store') : permissionDeniedMessage('store')}
           />
         ) : null}
         {!hideForm && loadState === 'error' ? (
@@ -472,7 +474,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
               {editing ? (
                 <>
                   {rulesState === 'not-connected' ? <p className={styles.fieldNote}>自動で変えるきまりは、まだこの環境で使えません。</p> : null}
-                  {rulesState === 'forbidden' ? <p className={styles.fieldNote}>きまりを見る権限がありません。オーナーか管理者に確認してください。</p> : null}
+                  {rulesState === 'forbidden' ? <p className={styles.fieldNote}>{permissionDeniedMessage('store')}</p> : null}
                   {rulesState === 'error' ? (
                     <div className={styles.inlineRetry}>
                       <p className={styles.fieldError} role="alert">きまりを読み込めませんでした。</p>
@@ -502,14 +504,9 @@ function MarkEditorBody({ markId }: { markId?: string }) {
                 </>
               ) : createRule ? (
                 <div className={styles.ruleForm}>
-                  <label className={styles.field}>
-                    <span className={styles.label}>きっかけ</span>
-                    <Select aria-label="きっかけ" value={ruleEvent} onChange={(value) => setRuleEvent(value as SupportMarkAutomationEvent)} options={EVENT_LABELS.map((item) => ({ value: item.value, label: item.label }))} size="full" />
-                  </label>
-                  <p className={styles.fieldNote}>{`→ 「${name || 'このマーク'}」に変える`}</p>
-                  <label className={styles.field}>
-                    <span className={styles.label}>手動で変更した直後の保護</span>
-                    <Select
+                  <Field note={<>{`→ 「${name || 'このマーク'}」に変える`}</>} label="きっかけ"><Select aria-label="きっかけ" value={ruleEvent} onChange={(value) => setRuleEvent(value as SupportMarkAutomationEvent)} options={EVENT_LABELS.map((item) => ({ value: item.value, label: item.label }))} size="full" /></Field>
+
+                  <Field label="手動で変更した直後の保護"><Select
                       aria-label="手動変更の保護時間"
                       value={String(ruleProtectionMinutes)}
                       onChange={(value) => setRuleProtectionMinutes(Number(value))}
@@ -520,8 +517,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
                         { value: '1440', label: '1日は手動の変更を守る' },
                       ]}
                       size="full"
-                    />
-                  </label>
+                    /></Field>
                   <Checkbox checked={ruleActive} onCheckedChange={setRuleActive}>このきまりを有効にして登録する</Checkbox>
                   <span><Button type="button" onClick={() => setCreateRule(false)}>きまりを外す</Button></span>
                 </div>

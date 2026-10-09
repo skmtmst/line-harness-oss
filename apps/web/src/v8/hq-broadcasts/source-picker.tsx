@@ -11,7 +11,7 @@ import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api'
 import { hqTemplatesApi, type HqTemplateListItem } from '@/lib/hq-templates-api'
 import { bubbleFromTemplate, previewBubbleOf } from './bubbles'
 import { formatDate as polishFormatDate } from '@/lib/format'
-
+import { emptyValue } from '@/components/shared/empty-value'
 
 const KINDS = [
   { id: 'message', label: 'テキスト' }, { id: 'carousel', label: 'カルーセル' },
@@ -31,7 +31,7 @@ export function templatePickerItem(item: HqTemplateListItem): SourcePickerItem {
 
 export function broadcastPickerItem(item: HqBroadcastRun): SourcePickerItem {
   const category = item.status === 'prepared' ? 'prepared' : item.status === 'scheduled' ? 'scheduled' : item.status
-  return { id: item.id, name: item.title, category, categoryLabel: STATES.find((state) => state.id === category)?.label ?? ({ sending: '送信中', failed: '失敗', cancelled: '取り消し済み', stopped: '停止中' }[category] ?? '—'), folderId: item.input.folderId, updatedLabel: '更新 —', tone: category === 'sent' ? 'success' : category === 'scheduled' ? 'info' : 'neutral' }
+  return { id: item.id, name: item.title, category, categoryLabel: STATES.find((state) => state.id === category)?.label ?? ({ sending: '送信中', failed: '失敗', cancelled: '取り消し済み', stopped: '停止中' }[category] ?? emptyValue('unknown')), folderId: item.input.folderId, updatedLabel: '更新 —', tone: category === 'sent' ? 'success' : category === 'scheduled' ? 'info' : 'neutral' }
 }
 
 /** ①の2つの入口。共通の窓には候補・分類・見え方だけを渡す。 */
@@ -110,9 +110,9 @@ export default function HqBroadcastSourcePicker({ mode, initialId, onTemplate, o
     description={mode === 'template' ? '統括のテンプレートから1つ選びます。選ぶと右に LINE での見え方が出ます。' : '過去の配信から1つ選びます。中身を写し、宛先と日時は写しません。'}
     confirmLabel={mode === 'template' ? 'このテンプレートを使う' : 'この配信を写す'}
     initialId={initialId} items={items} folders={folders} categories={mode === 'template' ? KINDS : STATES}
-    state={loading ? <ListState kind="loading" /> : loadError ? <ListState kind="error" error={loadError} onRetry={() => setAttempt((value) => value + 1)} /> : undefined}
+    state={loading ? <ListState permissionScope="hq" kind="loading" /> : loadError ? <ListState permissionScope="hq" kind="error" error={loadError} onRetry={() => setAttempt((value) => value + 1)} /> : undefined}
     preview={<LinePreview fit empty={!selected ? '候補を選ぶと見え方が出ます' : false}>
-      {mode === 'template' ? previewLoading ? <ListState kind="loading" /> : previewError ? previewBlocked ? <Notice tone="warn">{previewError}</Notice> : <ListState kind="error" error={previewError} onRetry={() => setPreviewAttempt((value) => value + 1)} /> : preview
+      {mode === 'template' ? previewLoading ? <ListState permissionScope="hq" kind="loading" /> : previewError ? previewBlocked ? <Notice tone="warn">{previewError}</Notice> : <ListState permissionScope="hq" kind="error" error={previewError} onRetry={() => setPreviewAttempt((value) => value + 1)} /> : preview
         : selectedRun ? renderBroadcast(selectedRun) : null}
     </LinePreview>}
     confirmDisabled={mode === 'template' && (previewLoading || Boolean(previewError) || !preview)} busy={busy} error={error}

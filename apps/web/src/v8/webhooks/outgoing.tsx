@@ -61,6 +61,7 @@ import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import { eventLabel, isHttpsUrl, maskedUrl, payloadLabel, shortDateTime, urlHost } from './words'
 import styles from './outgoing.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 type SavedFilter = '' | 'active' | 'paused' | 'failed'
 type SortKey = 'volume' | 'name'
@@ -242,7 +243,7 @@ export default function WebhooksOutgoingV8() {
       if (!forbidden) await reload().catch(() => {})
       if (!isCurrent()) return
       fail(forbidden
-        ? `「${item.name}」は統括だけが切り替えできます。必要なときは統括に頼んでください。状態は変わっていません。`
+        ? permissionDeniedMessage('store')
         : `「${item.name}」は切り替えの応答を受け取れませんでした。一覧の表示を確かめてください。変わっている可能性があります。`)
     } finally {
       if (isCurrent()) {
@@ -306,7 +307,7 @@ export default function WebhooksOutgoingV8() {
       if (accountRef.current !== accountId) return
       const forbidden = caught instanceof ApiError && caught.status === 403
       setDeleteError(forbidden
-        ? 'この送り先の削除は統括だけができます。必要なときは統括に頼んでください。'
+        ? permissionDeniedMessage('store')
         : 'この送り先を削除できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
       setDeleting(false)
@@ -351,7 +352,7 @@ export default function WebhooksOutgoingV8() {
       }
       if (accountRef.current !== accountId) return
       setRotateError(describeApiFailure(caught, 'シークレットの更新', {
-        forbidden: '合言葉の更新は統括だけができます。必要なときは統括に頼んでください。',
+        scope: 'store',
       }))
     } finally {
       setRotating(false)
@@ -416,10 +417,10 @@ export default function WebhooksOutgoingV8() {
   const chips = (
     <div role="group" aria-label="状態で絞り込む" className={styles.chips}>
       <FilterChip selected={chip === 'active'} onChange={(next) => setChip(next ? 'active' : '')} icon={<Pause size={13} aria-hidden="true" />}>
-        {ready ? `動いている ${activeCount}` : '動いている'}
+        {ready ? `動いている ${activeCount}` : '有効'}
       </FilterChip>
       <FilterChip selected={chip === 'paused'} onChange={(next) => setChip(next ? 'paused' : '')} icon={<Play size={13} aria-hidden="true" />}>
-        {ready ? `止めている ${pausedCount}` : '止めている'}
+        {ready ? `止めている ${pausedCount}` : '停止中'}
       </FilterChip>
     </div>
   )
@@ -590,7 +591,7 @@ export default function WebhooksOutgoingV8() {
                 const menuItems = menuItemsFor(item)
                 const showMenu = canManage || canTest
                 const tone = toggling ? 'neutral' : failing ? 'danger' : item.isActive ? 'active' : 'neutral'
-                const stateWord = toggling ? '切り替え中' : failing ? '失敗あり' : item.isActive ? '動いている' : '止めている'
+                const stateWord = toggling ? '切り替え中' : failing ? '失敗あり' : item.isActive ? '有効' : '停止中'
                 const nameNode = (
                   <FolderDotName folder={folderDotFor(folders, item.folderId)}>
                     {canManage ? (
@@ -717,13 +718,13 @@ export default function WebhooksOutgoingV8() {
 
   return (
     <ListPage
-      help={narrow
+      help={<>{WEBHOOKS_DESCRIPTION}{narrow
           ? '行の「…」から 中身を見る・試しに送る・失敗をやり直す・鍵を作り直す・止める・削除。'
-          : '行の「設定」から 直す・止める・鍵を作り直す・試しに送る・削除。「中身を見る」で送った中身と返事を見られます。'}
+          : '行の「設定」から 直す・止める・鍵を作り直す・試しに送る・削除。「中身を見る」で送った中身と返事を見られます。'}</>}
       boardId={narrow ? 'AsfFB' : 'ZSbFY'}
       headingSize="regular"
       title="外部連携"
-      description={WEBHOOKS_DESCRIPTION}
+
       actions={canManage ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={15} aria-hidden="true" />見本から作る</Button> : undefined}
       tabs={<WebhookTabs active="outgoing" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
@@ -752,7 +753,7 @@ export default function WebhooksOutgoingV8() {
           allCount={ready ? displayed.length : null}
           unfiledCount={ready ? displayed.filter((item) => !item.folderId).length : null}
           countOf={folderCountOf}
-          placeholder="例: 顧客・会員"
+          placeholder="例：顧客・会員"
         />
       </>}
       collapsedFolders={narrow ? undefined : <>{createButton}{folderSelect}</>}

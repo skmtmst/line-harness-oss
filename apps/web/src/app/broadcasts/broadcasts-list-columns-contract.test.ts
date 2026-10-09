@@ -29,7 +29,7 @@ describe('一斉配信の一覧の列（設計 q76C35）', () => {
   it('送信済みでない行の結果は — で、数や単位を作らない', () => {
     const stats = SOURCE.slice(SOURCE.indexOf("{broadcast.status !== 'sent' ?"), SOURCE.indexOf("<span className={styles.resultMain}"))
     expect(stats).toContain("broadcast.status !== 'sent'")
-    expect(stats).toContain('—')
+    expect(stats).toContain("emptyValue('unknown')")
     expect(stats).not.toMatch(/0\s*件/)
     expect(stats).not.toMatch(/0\s*人/)
   })
@@ -46,6 +46,6 @@ describe('一斉配信の一覧の列（設計 q76C35）', () => {
 
   /** 取れない日時に `-` ではなく、理由の読める言葉を出す。 */
   it('日時が無い配信は「未設定」と出す', () => {
-    expect(SOURCE).toContain("'未設定'")
+    expect(SOURCE).toContain("emptyValue('unconfigured')")
   })
 })

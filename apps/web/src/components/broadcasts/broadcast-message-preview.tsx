@@ -1,3 +1,4 @@
+import { LinePreviewFlex } from '@/components/shared/line-preview'
 import { MapPin } from 'lucide-react'
 
 import type { BroadcastBubble, BroadcastMessageButton } from '@/lib/api'
@@ -49,7 +50,7 @@ export default function BroadcastMessagePreview({
             <p className="whitespace-pre-wrap rounded-card rounded-tl-mini bg-canvas px-3 py-2 text-sm leading-6 text-ink shadow-card">
               {item.text || 'テキストを入力すると表示されます'}
             </p>
-          ) : item.location ? (
+          ) : item.type === 'flex' ? <LinePreviewFlex content={item.text} /> : item.location ? (
             <div className="rounded-card bg-canvas p-3 text-sm shadow-card">
               <p className="flex items-center gap-1 font-bold text-ink">
                 <MapPin size={14} aria-hidden />
@@ -106,6 +107,7 @@ function bubbleView(key: string, bubble: BroadcastBubble): {
   location: LocationView | null
 } {
   const content = bubble.content as Record<string, unknown>
+  if (bubble.type === 'flex') return { key, type: bubble.type, text: typeof content.flexJson === 'string' ? content.flexJson : JSON.stringify(content), location: null }
   if (bubble.type === 'text') {
     return { key, type: bubble.type, text: String(content.text ?? ''), location: null }
   }

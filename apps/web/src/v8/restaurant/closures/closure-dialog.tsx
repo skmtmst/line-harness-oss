@@ -27,6 +27,8 @@ import {
   KIND_LABEL, KIND_ORDER, clock, conflictsOf, dayOfIso, dayShort, emptyInput, inputError, inputOf, overlapMessage, overlapping, sourceLabel,
 } from './format'
 import styles from './closures.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 export type ClosureDialogTarget = { mode: 'add'; day: string } | { mode: 'edit'; closure: RestaurantClosure }
 
@@ -51,9 +53,9 @@ function saveMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.code === 'closure_overlap') return overlapMessage(conflictsOf(error.data))
     if (error.code === 'version_conflict') return 'ほかの人が先に変えました。閉じて、読み直してからもう一度変えてください。'
-    if (error.status === 403) return 'この店舗の予約枠を変える権限がありません。'
+    if (error.status === 403) return permissionDeniedMessage('store')
   }
-  return describeSaveFailure(error)
+  return withPermissionFailure(error, describeSaveFailure(error), 'store')
 }
 
 export default function ClosureDialog({
@@ -259,10 +261,7 @@ export default function ClosureDialog({
           </div>
         </Field>
 
-        <label className={styles.field}>
-          <span className={styles.label}>メモ<OptionalBadge /></span>
-          <TextField value={input.memo ?? ''} maxLength={200} placeholder="例：設備点検のため" onChange={(event) => set({ memo: event.target.value })} />
-        </label>
+        <Field label="メモ"><TextField value={input.memo ?? ''} maxLength={200} placeholder="例：設備点検のため" onChange={(event) => set({ memo: event.target.value })} /></Field>
 
         {problem ? null : preview === null ? (
           <p className={styles.hint} aria-live="polite">{`${days}の予約を調べています。`}</p>

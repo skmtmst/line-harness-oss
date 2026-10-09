@@ -37,6 +37,10 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { DIFFERENT_PROVIDER_DETAIL, DIFFERENT_PROVIDER_LEAD, HANDOVER_PILLS, countsLine, decisionLabel, handoverPill, totalsMatch } from './handover-view'
 import styles from './handover.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 type HandoverDecisionView = AccountHandoverDecision & {
   sourceName?: string
@@ -325,7 +329,7 @@ export default function AccountHandoverV8() {
 
   const frame = (title: string, description: string | undefined, children: ReactNode) => (
     <div className={styles.screen}>
-      <SettingsPage layout="account-handover" boardId="x2dSNv" title={title} description={description} navigation={<SettingsInnerNav inline />}>
+      <SettingsPage layout="account-handover" boardId="x2dSNv" title={title} help={description} navigation={<SettingsInnerNav inline />}>
         {children}
       </SettingsPage>
       {stepUpPrompt}
@@ -343,7 +347,7 @@ export default function AccountHandoverV8() {
       />
     ))
   }
-  if (status === 'loading') return frame('乗り換え', undefined, <ListState kind="loading" />)
+  if (status === 'loading') return frame('乗り換え', undefined, <DetailLoading />)
   if (missing || (status === 'ready' && !account)) {
     return frame('乗り換え', undefined, (
       <TargetMissing
@@ -413,7 +417,7 @@ export default function AccountHandoverV8() {
   const executeDisabled = unresolved > 0 || handover.status === 'completed' || editCount > 0 || declaredMismatch
   const destinationName = destination?.name ?? '受け取り先'
 
-  return frame(`乗り換え（${account.name} → ${destination?.name ?? '—'}）`, '引き継ぎコードで両方のアカウントをつなぎました。「要確認」を全部決めるまで本実行できません。', (
+  return frame(`乗り換え（${account.name} → ${destination?.name ?? emptyValue('unknown')}）`, '引き継ぎコードで両方のアカウントをつなぎました。「要確認」を全部決めるまで本実行できません。', (
     <>
       <HandoverSteps current={pill} />
       {viewerBand}
@@ -427,7 +431,7 @@ export default function AccountHandoverV8() {
               <Button type="button" variant="text" presentation="account-inline" onClick={() => void copyCode()}>{copyState === 'copied' ? 'コピーしました' : 'コピー'}</Button>
             </span>
           </p>
-          <p className={styles.boxValue}>{account.name}（引継ぎ元・元データを残す）→ {destination?.name ?? '—'}（引継ぎ先）</p>
+          <p className={styles.boxValue}>{account.name}（引継ぎ元・元データを残す）→ {destination?.name ?? emptyValue('unknown')}（引継ぎ先）</p>
           {handover.providerMatch === 'different' ? (
             <p className={styles.boxWarn}>{DIFFERENT_PROVIDER_LEAD}。{DIFFERENT_PROVIDER_DETAIL}</p>
           ) : null}
@@ -452,21 +456,18 @@ export default function AccountHandoverV8() {
           </p>
           <p className={styles.boxValue}>{countsAreComplete && handover.counts ? countsLine(handover.counts) : '事前確認の合計が元の友だちの数と合わないので、数を出していません'}</p>
           {canManage && declaredOpen ? (
-            <div className={styles.declared}>
-              <label className={styles.boxLabel} htmlFor="acd-declared">移し元のシステムが言う友だちの数（分からなければ空欄）。違うままでは本実行しません。</label>
-              <div className={styles.inlineForm}>
-                <TextField id="acd-declared" type="number" min={0} placeholder="例: 14" value={declaredTotalInput} onChange={(event) => setDeclaredTotalInput(event.target.value)} disabled={refreshing || !handover.counts} />
+            <div className={styles.declared}><Field label="移し元のシステムが言う友だちの数（分からなければ空欄）。違うままでは本実行しません。" htmlFor="acd-declared"><div className={styles.inlineForm}>
+                <NumberInput id="acd-declared" type="number" min={0} placeholder="例：14" value={declaredTotalInput} onChange={(event) => setDeclaredTotalInput(event.target.value)} disabled={refreshing || !handover.counts} />
                 <Button type="button" disabled={refreshing || !countsAreComplete} busy={refreshing} busyLabel="確認中…" onClick={() => void rerunPreview()}>事前確認をやり直す</Button>
-              </div>
-            </div>
+              </div></Field></div>
           ) : null}
           {declaredMismatch ? (
-            <p className={styles.boxWarn}>申告の数（{handover.declaredFriendTotal} 人）と事前確認の合計（{handover.counts?.sourceTotal ?? '—'} 人）が違います。差の理由を確かめてから、数を直すか事前確認をやり直してください。</p>
+            <p className={styles.boxWarn}>申告の数（{handover.declaredFriendTotal}人）と事前確認の合計（{handover.counts?.sourceTotal ?? emptyValue('unknown')}人）が違います。差の理由を確かめてから、数を直すか事前確認をやり直してください。</p>
           ) : null}
         </Card>
       </div>
 
-      <DataTable presentation="account-handover" label={`要確認 ${handover.counts?.review ?? '—'} 人の判断`}>
+      <DataTable presentation="account-handover" label={`要確認 ${handover.counts?.review ?? emptyValue('unknown')}人の判断`}>
         <thead>
         <TableHeadRow>
           <Th className={styles.colName}>元の友だち</Th>
@@ -491,7 +492,7 @@ export default function AccountHandoverV8() {
                 <span className={styles.name}>{decision.candidateName ?? '候補なし'}</span>
                 <span className={styles.sub}>受け取り先の候補</span>
               </div></Td>
-              <Td className={styles.colEvidence}>{decision.evidenceLabel ?? decision.note ?? '—'}</Td>
+              <Td className={styles.colEvidence}>{decision.evidenceLabel ?? decision.note ?? emptyValue('unknown')}</Td>
               <Td className={styles.colChoice}>
                 {editable ? (
                   <Select

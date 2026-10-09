@@ -4,7 +4,7 @@ import React from 'react'
 import type { ReactNode } from 'react'
 import { Inbox, Loader, Lock } from 'lucide-react'
 import TargetMissing from './target-missing'
-import { loadFailureCopy } from './api-error-message'
+import { loadFailureCopy, permissionDeniedMessage, type PermissionScope } from './api-error-message'
 import styles from './list-state.module.css'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { DelayedSkeleton, ListSkeleton } from './skeleton'
@@ -60,7 +60,7 @@ export const PRESETS: Record<ListStateKind, { title: string; description: string
   loading: { title: '読み込んでいます', description: 'このまま少しお待ちください。' },
   empty: { title: 'データがありません', description: '条件を変えるか、新しく作成してください。' },
   error: { title: '表示できませんでした', description: '再読み込みしても直らない場合はエラー報告へ。' },
-  forbidden: { title: '表示する権限がありません', description: '見るには権限が要ります。オーナーか管理者に追加を依頼してください。' },
+  forbidden: { title: '表示する権限がありません', description: permissionDeniedMessage() },
 }
 
 export const EMPTY_PRESETS: Record<EmptyListPreset, { title: string; description: string }> = {
@@ -73,8 +73,10 @@ export const EMPTY_PRESETS: Record<EmptyListPreset, { title: string; description
 
 export default function ListState({
   kind,
+  permissionScope = 'store',
   title,
   description,
+  permissionReason,
   action,
   onRetry,
   retrying = false,
@@ -86,12 +88,15 @@ export default function ListState({
   loadingShape = 'list',
 }: {
   loadingShape?: 'list' | 'cards'
+  permissionScope?: PermissionScope
   kind: ListStateKind
   /** 空の表示で、その機能の印を渡す。 */
   icon?: ReactNode
   /** 設計どおりの文言で足りないとき（「まだタグがありません」など）だけ渡す。 */
   title?: string
   description?: string
+  /** 権限以外にも分かっている制約。頼む先の文は部品が出す。 */
+  permissionReason?: string
   /** 作成導線つきの空状態（設計 `fRgeK`）。押せる操作が画面の他所にあるなら渡さない。 */
   action?: ReactNode
   /** もう一度読み込む。`error` のときだけ押し口を出す。 */
@@ -120,13 +125,13 @@ export default function ListState({
   // 見た目が2か所でずれないように、ここで組み立て直さない。
   // className は付けない（見た目は TargetMissing が持つ。余白は親で付ける）。
   if (kind === 'error') {
-    const failure = error === undefined ? null : loadFailureCopy(error, 'この画面')
+    const failure = error === undefined ? null : loadFailureCopy(error, 'この画面', permissionScope)
     return (
       <div data-list-state="error" role="alert" data-design={dataDesign}>
         <TargetMissing
           kind="error"
           title={title ?? failure?.title ?? preset.title}
-          description={description ?? failure?.description ?? preset.description}
+          description={failure && !failure.retryable ? failure.description : description ?? failure?.description ?? preset.description}
           onRetry={failure && !failure.retryable ? undefined : onRetry}
           retrying={retrying}
         />
@@ -155,7 +160,7 @@ export default function ListState({
     >
       <span className={styles.iconWrap} aria-hidden="true">{icon ?? <Icon aria-hidden="true" size={24} className={iconClass} />}</span>
       <p className={styles.title}>{title ?? preset.title}</p>
-      <p className={styles.description}>{description ?? preset.description}</p>
+      <p className={styles.description}>{kind === 'forbidden' ? `${permissionReason ? `${permissionReason} ` : ''}${permissionDeniedMessage(permissionScope)}` : description ?? preset.description}</p>
       {action ? <div className={styles.action}>{action}</div> : null}
     </div>
   )

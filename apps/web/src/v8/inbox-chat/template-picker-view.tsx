@@ -16,7 +16,7 @@ import { CornerDownLeft, FolderOpen, Send } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
 import Button from '@/components/shared/button'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import SearchField from '@/components/shared/search-field'
 import styles from './inbox-chat.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -154,7 +154,7 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
             <div className={styles.tpFootLead}>
               {props.canPack ? (
                 <>
-                  <Toggle checked={packMode} label="2通以上を続けて送る" onChange={props.onPackMode} />
+                  <SettingCheckbox checked={packMode} label="2通以上を続けて送る" onChange={props.onPackMode} />
                   <span className={styles.tpFootText}>
                     <span className={styles.tpFootTitle}>2通以上を続けて送る</span>
                     <span className={styles.tpFootSub}>最大5通・選んだ順に送る</span>

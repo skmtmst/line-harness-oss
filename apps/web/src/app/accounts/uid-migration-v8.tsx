@@ -40,6 +40,7 @@ import {
   type UidMigrationState,
 } from './use-uid-migration'
 import styles from '@/app/friends/friends-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const PRE_EXECUTE_STATUSES = ['dry_run', 'review', 'ready']
 
@@ -344,7 +345,7 @@ function HistoryRow({
           ? onRollback
             ? <button type="button" className={styles.linkAction} onClick={onRollback}>切り戻す</button>
             : <span className={styles.pairCellSub}>切り戻しはownerのみ</span>
-          : <span className={styles.pairCellSub}>—</span>}
+          : <span className={styles.pairCellSub}>{emptyValue('unknown')}</span>}
       </td>
     </tr>
   )
@@ -450,7 +451,7 @@ function MigrationReviewBoard({
                   <tr key={item.id}>
                     <td className={`${styles.nowrap} ${styles.mono}`} title={item.oldUid}>{item.oldUid}</td>
                     <td>
-                      <span className={styles.mono}>{item.newUid ?? '—'}</span>
+                      <span className={styles.mono}>{item.newUid ?? emptyValue('unknown')}</span>
                       {item.candidateName && <span className={styles.pairCellSub}>{item.candidateName}</span>}
                       {item.conflictReason && <span className={styles.pairCellSub}>{item.conflictReason}</span>}
                     </td>

@@ -23,9 +23,11 @@ import { StatePill, shortDateTime, shortDay } from './common'
 import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const SAVED_STATE_LABELS: Record<SavedAnalyticsSnapshot['state'], string> = { available: '利用可能', partial: '一部集計', unavailable: '未取得', failed: '失敗' }
-const REPORT_STATUS_LABELS: Record<AnalyticsReportSchedule['status'], string> = { active: '動いている', paused: '止めている', archived: 'しまった' }
+const REPORT_STATUS_LABELS: Record<AnalyticsReportSchedule['status'], string> = { active: '有効', paused: '停止中', archived: 'アーカイブ' }
 const RUN_STATE_LABELS: Record<AnalyticsReportRun['state'], string> = { running: '送信中', available: '送信済み', partial: '一部だけ送信', unavailable: '未取得', failed: '失敗' }
 
 function runErrorLabel(errorCode: string | null, state: AnalyticsReportRun['state']): string | null {
@@ -65,7 +67,7 @@ function summarizeSnapshotResult(result: unknown, limit = 12): Array<{ path: str
 
 function latestPill(item: SavedAnalyticsSummary) {
   const latest = item.latestSnapshot
-  if (!latest) return <span className={styles.faint}>—</span>
+  if (!latest) return <span className={styles.faint}>{emptyValue('unknown')}</span>
   // 版ずれ（定義が古い）は集計状態とは別の軸。版ずれを先に出す。
   if (latest.definitionStale) return <StatePill tone="info">更新後未集計</StatePill>
   if (latest.state === 'available') return <StatePill tone="ok">最新の期間</StatePill>
@@ -198,7 +200,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
   }, [visibleItems, selectedId])
   // 「定義が古い」は版ずれだけを数える（未取得・失敗とは別の軸）。
   const staleCount = items.filter((item) => item.latestSnapshot?.definitionStale).length
-  const exportSaved = () => downloadCsv('analytics-saved.csv', [
+  const exportSaved = () => downloadCsv(csvFileName("保存したレポート"), [
     ['分析名', '種類', '作った人', '定義版', '更新日時', '集計状態', '保存結果数'],
     ...visibleItems.map((item) => [
       item.name, kindLabel(item.kind), item.createdByName, item.currentVersionNumber, item.updatedAt,
@@ -208,7 +210,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
   ])
   const exportSnapshots = () => {
     if (!selected) return
-    downloadCsv(`analytics-saved-${selected.id}.csv`, [
+    downloadCsv(csvFileName("保存したレポート"), [
       ['対象期間', 'データ締切', '集計状態', '結果の要約'],
       ...snapshots.map((snapshot) => [
         `${snapshot.periodFrom}〜${snapshot.periodTo}`, snapshot.dataCutoffAt, SAVED_STATE_LABELS[snapshot.state],
@@ -252,7 +254,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
                 : visibleItems.map((item) => {
                   const active = selectedId === item.id
                   return <div key={item.id} className={styles.trow} role="row" data-h="pill" data-selected={active || undefined}>
-                    <span role="cell" className={styles.colMain}><button type="button" className={styles.rowButton} onClick={() => setSelectedId(item.id)} title={`${item.name}（第${item.currentVersionNumber}版・保存結果 ${item.snapshotCount} 件）`} aria-pressed={active}>{item.name}</button></span>
+                    <span role="cell" className={styles.colMain}><button type="button" className={styles.rowButton} onClick={() => setSelectedId(item.id)} title={`${item.name}（第${item.currentVersionNumber}版・保存結果 ${item.snapshotCount}件）`}  aria-pressed={active}>{item.name}</button></span>
                     <span role="cell" className={styles.colType} data-w="90"><span>{kindLabel(item.kind)}</span></span>
                     <span role="cell" className={styles.colType} data-w="80"><span className={styles.cellText} title={item.createdByName}>{item.createdByName}</span></span>
                     <span role="cell" className={styles.colType} data-w="100"><span>{shortDateTime(item.updatedAt)}</span></span>
@@ -262,7 +264,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
             </div>
           </div>
           <section className={styles.historyCard} aria-labelledby="saved-history-title">
-            <h2 id="saved-history-title" className={styles.hoursTitle} title={selected ? `定期レポート ${schedulesLoading ? '確認中' : schedulesError ? '—' : `${schedules.filter((schedule) => schedule.savedAnalysisIds.includes(selected.id)).length} 件`}` : undefined}>{selected ? `選んだ分析の履歴：${selected.name}` : '選んだ分析の履歴'}</h2>
+            <h2 id="saved-history-title" className={styles.hoursTitle} title={selected ? `定期レポート ${schedulesLoading ? '確認中' : schedulesError ? emptyValue('unknown') : `${schedules.filter((schedule) => schedule.savedAnalysisIds.includes(selected.id)).length}件`}` : undefined}>{selected ? `選んだ分析の履歴：${selected.name}` : '選んだ分析の履歴'}</h2>
             {/* 履歴だけ取れないときは、その場所に小さく1行。一覧の失敗とは分ける。 */}
             {snapshotError ? <p className={styles.caption} role="alert">結果の履歴を読み込めませんでした。<button type="button" className={styles.linkButton} onClick={() => setSnapshotReload((n) => n + 1)}>もう一度</button></p> : null}
             {snapshotLoading ? <p className={styles.caption}>結果を読み込んでいます</p>
@@ -283,7 +285,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
                 </div>)}
               </div>}
             {selected ? <div className={styles.rowActions} data-gap="wide">
-              <Button variant="secondary" disabled={snapshots.length === 0} onClick={exportSnapshots}><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
+              <Button variant="secondary" disabled={snapshots.length === 0} onClick={exportSnapshots}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
               {canManage ? <Button variant="secondary" href={`/analytics?tab=${selected.kind}`} title="条件を変えるときは、元の分析で集計し直してから保存します"><FilePen size={15} aria-hidden="true" />内容を変える</Button> : null}
             </div> : null}
             <p className={styles.caption}>保存時点の固定結果です。いま集計し直しても変わりません。</p>
@@ -312,7 +314,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
           {schedules.map((schedule) => <div key={schedule.id} className={styles.trow} role="row" data-h="button">
             <span role="cell" className={styles.colMain}><span className={styles.cellText} ><TruncatedText value={String(schedule.name ?? '')} /></span></span>
             <span role="cell" className={styles.colType} data-w="90"><span>{schedule.isOneTime ? '1回だけ' : cadenceLabel(schedule)}</span></span>
-            <span role="cell" className={styles.colType} data-w="130"><span>{schedule.status === 'paused' ? '—' : shortDateTime(schedule.nextRunAt).replace(/ 0(\d):/, ' $1:')}</span></span>
+            <span role="cell" className={styles.colType} data-w="130"><span>{schedule.status === 'paused' ? emptyValue('unknown') : shortDateTime(schedule.nextRunAt).replace(/ 0(\d):/, ' $1:')}</span></span>
             <span role="cell" className={styles.colType} data-w="90"><span><StatePill tone={schedule.status === 'active' ? 'ok' : 'neutral'}>{REPORT_STATUS_LABELS[schedule.status]}</StatePill></span></span>
             <span role="cell" className={styles.colOps}>{canManage ? <span className={styles.rowActions}>
               {schedule.status === 'active' && !schedule.isOneTime ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => void changeScheduleStatus(schedule, 'paused')}>止める</Button> : null}

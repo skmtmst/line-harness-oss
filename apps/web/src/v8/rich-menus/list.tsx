@@ -81,6 +81,8 @@ import { richMenuError, richMenuErrorAll } from './errors'
 import BlockedDeleteDialog, { type BlockedRow } from './blocked-dialog'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** フォルダに入れていないものを選ぶための、内部だけの値。 */
 const UNFILED = '__unfiled__'
@@ -821,7 +823,7 @@ export default function RichMenusListV8() {
       allCount={groupFacets?.total ?? groupTotal}
       unfiledCount={groupFacets?.folderCounts[UNFILED] ?? 0}
       countOf={(f) => groupFacets?.folderCounts[f.id] ?? 0}
-      placeholder="例: 01_会員向け"
+      placeholder="例：01_会員向け"
     />
   )
 
@@ -895,7 +897,7 @@ export default function RichMenusListV8() {
         <div className={styles.narrowSearch}>
           <SearchField
             placeholder="メニュー名・ボタン名"
-            aria-label="メニュー名・ボタン名で検索"
+            aria-label="メニュー名・ボタン名で探す"
             value={query}
             onChange={(value) => {
               setQuery(clampSearchQuery(value))
@@ -918,7 +920,7 @@ export default function RichMenusListV8() {
       <ListToolbar
         search={{
           placeholder: 'メニュー名・ボタン名',
-          label: 'メニュー名・ボタン名で検索',
+          label: 'メニュー名・ボタン名で探す',
           width: 200,
           value: query,
           onChange: (value) => {
@@ -1123,7 +1125,7 @@ export default function RichMenusListV8() {
                         ? `のべ${formatNumber(g.monthlyStats.uniqueAudience.value)} 人${g.monthlyStats.uniqueAudience.state === 'partial' ? '（記録開始後）' : ''}`
                         : undefined}
                     >
-                      {taps == null ? '—' : `${formatNumber(taps)} 回`}
+                      {taps == null ? emptyValue('unknown') : `${formatNumber(taps)}回`}
                     </Td>
                   <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
                     <div className={styles.menuBox}>
@@ -1294,7 +1296,7 @@ export default function RichMenusListV8() {
       boardId={!canEdit ? 'ZoKow' : narrow ? 'Y9ASp' : 'rZEGN'}
       headingSize="regular"
       title="リッチメニュー"
-      description="トーク画面の下に出るボタンのメニューです。友だちの条件ごとに出し分けられます。"
+      help="トーク画面の下に出るボタンのメニューです。友だちの条件ごとに出し分けられます。"
       actions={
         <Button
           type="button"
@@ -1311,7 +1313,7 @@ export default function RichMenusListV8() {
         {!canEdit ? (
           <div className={styles.viewerBand} role="status">
             <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
           </div>
         ) : null}
         <KpiBand data-design="KPIs" className={styles.kpis}>
@@ -1341,7 +1343,7 @@ export default function RichMenusListV8() {
             icon={<Trophy size={13} aria-hidden="true" />}
             value={null}
             unit=""
-            valueText={topArea ? topArea.label || '名前のないボタン' : '—'}
+            valueText={topArea ? topArea.label || '名前のないボタン' : emptyValue('unknown')}
             detail={topArea
               ? `${topAreaGroupName ? `${topAreaGroupName}・` : ''}${formatNumber(topArea.taps)} 回`
               : tapKpiReady

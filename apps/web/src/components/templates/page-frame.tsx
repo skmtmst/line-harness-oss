@@ -5,14 +5,19 @@ import styles from './page-templates.module.css'
 
 export interface PageHeadingProps {
   title: ReactNode
+  /** 認証画面では h1。管理画面内では外側の h1 に続く h2。 */
+  titleAs?: 'h1' | 'h2'
+  titleId?: string
+  titleTabIndex?: number
   /** 既存の枠が外側の余白を持つときだけ指定。 */
   inset?: 'none'
   /** 題はすべて22/700/32。compact は題の周りの余白・間隔だけを詰める。 */
   headingSize?: 'regular' | 'compact' | 'large'
   /** 詳細の説明とタブを詰める口。指定しない画面には効かない。 */
   bottomSpacing?: 'compact'
-  description?: ReactNode
   help?: ReactNode
+  /** 題の隣の状態の札・名前を変える操作。 */
+  titleAccessory?: ReactNode
   /**
    * @deprecated ★V8 では描かない（オーナー 2026-10-08「全部消す」）。
    * 板の頭の「← 〇〇へ」は、上の帯のパンくず（usePageCrumbs）と下の帯の［キャンセル］に任せる。
@@ -41,14 +46,13 @@ export function PageTitle({ children, as: Tag = 'h2', className }: {
 }
 
 /** 板の頭の寸法は型が持つ。操作・意味の説明は画面から渡す。 */
-export function PageHeading({ title, description, help, actions, crumbs, steps, tabs, headingSize, bottomSpacing, inset, stepsSpacing }: PageHeadingProps) {
+export function PageHeading({ title, titleAs: HeadingTag = 'h2', titleId, titleTabIndex, help, titleAccessory, actions, crumbs, steps, tabs, headingSize, bottomSpacing, inset, stepsSpacing }: PageHeadingProps) {
   /* 戻る（identity）は描かない。戻るのは上の帯のパンくずと下の帯の［キャンセル］だけ（オーナー 2026-10-08）。 */
   return <header className={styles.heading} data-template-region="heading" data-heading-inset={inset} data-heading-size={headingSize} data-bottom-spacing={bottomSpacing} data-has-steps={!!steps || undefined} data-steps-spacing={stepsSpacing} data-has-crumbs={!!crumbs || undefined}>
     <div className={styles.headingText}>
-      <div className={styles.titleRow}><h2 className={styles.title} title={typeof title === 'string' ? title : undefined}>{title}</h2>
+      <div className={styles.titleRow}><HeadingTag id={titleId} tabIndex={titleTabIndex} className={styles.title} title={typeof title === 'string' ? title : undefined}>{title}</HeadingTag>{titleAccessory}
         {help ? <HelpTip label={typeof title === 'string' ? `${title}の説明` : '画面の説明'}>{help}</HelpTip> : null}
       </div>
-      {description ? <div className={styles.description}>{description}</div> : null}
       {tabs ? <div className={styles.headingTabs} data-template-region="heading-tabs">{tabs}</div> : null}
     </div>
     {crumbs ? <div className={styles.crumbs} data-template-region="crumbs">{crumbs}</div> : null}

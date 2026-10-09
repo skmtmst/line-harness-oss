@@ -237,7 +237,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     expect(hasText('本店の友だち21')).toBe(true)
 
     // 名前で絞り込む。
-    await type(byLabel<HTMLInputElement>('友だちの名前で検索'), '本店の友だち25')
+    await type(byLabel<HTMLInputElement>("友だちの名前で探す"), '本店の友だち25')
     await click(buttonByText('検索'))
     expect(friendsList).toHaveBeenLastCalledWith(
       expect.objectContaining({ accountId: 'account-a', search: '本店の友だち25', offset: '0' }),
@@ -309,7 +309,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     // やり直しの前にオフへ変えても、保存済みの真実は変わらない。
     // 知らせは「既に始まっています」のまま、再開の送り先だけを言う。
     // 「まだ始まっていない」とは言わない（R525残部）。
-    const tracking = container.querySelector<HTMLButtonElement>('[role=switch][aria-label="すぐに計測を始める"]')
+    const tracking = container.querySelector<HTMLInputElement>('input[type=checkbox][aria-label="すぐに計測を始める"]')
     if (!tracking) throw new Error('「すぐに計測を始める」が見つかりません')
     await act(async () => { fireEvent.click(tracking) })
     expect(hasText('計測は既に始まっています')).toBe(true)
@@ -331,7 +331,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     affiliatesUpdate.mockRejectedValueOnce(new Error('一時的に保存できません'))
     await mount(<NewAffiliatePage />)
 
-    const tracking = container.querySelector<HTMLButtonElement>('[role=switch][aria-label="すぐに計測を始める"]')
+    const tracking = container.querySelector<HTMLInputElement>('input[type=checkbox][aria-label="すぐに計測を始める"]')
     if (!tracking) throw new Error('「すぐに計測を始める」が見つかりません')
     await act(async () => { fireEvent.click(tracking) })
 

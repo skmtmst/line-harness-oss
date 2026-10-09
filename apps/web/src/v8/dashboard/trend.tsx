@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import type { DashboardFriendTrendPoint } from '@/lib/api'
 import SegmentedControl from '@/components/shared/segmented'
-import { barChartTicks } from '@/components/shared/bar-chart'
+import { BarChart, toBarChartItems, barChartTicks } from '@/components/shared/bar-chart'
 import FriendTrendTable from '@/components/dashboard/friend-trend-table'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { STATE_TEXT } from '@/components/shared/not-connected'
@@ -49,12 +49,7 @@ export function FriendTrend({ trend, loading }: { trend: DashboardFriendTrendPoi
           onChange={setView}
           options={[{ value: 'chart', label: 'グラフ' }, { value: 'table', label: '表' }]}
         />
-        {view === 'chart' ? (
-          <ul className={styles.legend} aria-label="凡例">
-            <li><span className={`${styles.swatch} ${styles.swatchAdded}`} aria-hidden="true" />登録</li>
-            <li><span className={`${styles.swatch} ${styles.swatchBlocked}`} aria-hidden="true" />ブロック</li>
-          </ul>
-        ) : null}
+
       </div>
       {view === 'table' ? (
         <div className={styles.trendTable}><FriendTrendTable trend={trend} loading={loading} /></div>
@@ -63,31 +58,7 @@ export function FriendTrend({ trend, loading }: { trend: DashboardFriendTrendPoi
           <span className="sr-only">{STATE_TEXT.loading}</span>
         </DelayedSkeleton>
       ) : (
-        <div className={styles.chart} role="group" aria-label="日ごとの登録とブロック">
-          <div className={styles.plot} aria-hidden="true">
-            {ticks.slice().reverse().map((tick) => (
-              <div key={tick} className={styles.gridline} style={{ bottom: pct(tick) }}>
-                <span className={styles.tick}>{tick}</span>
-              </div>
-            ))}
-          </div>
-          <div className={styles.columns}>
-            {trend.map((day, index) => {
-              const label = trendDay(day.date)
-              const latest = index === trend.length - 1
-              const name = `${label.jp}（${label.week}） 登録${day.added} 人・ブロック${day.blocked} 人`
-              return (
-                <div key={day.date} className={styles.column} title={name} aria-label={name} role="img">
-                  <div className={styles.bars}>
-                    <span className={latest ? styles.barLatest : styles.barAdded} style={{ height: pct(day.added) }} />
-                    <span className={styles.barBlocked} style={{ height: pct(day.blocked) }} />
-                  </div>
-                  <span className={latest ? styles.dayLatest : styles.day}>{`${label.md}（${label.week}）`}</span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
+        <BarChart items={toBarChartItems(trend.map(day=>({date:day.date, added:day.added, removed:day.blocked})), {formatTitle:date=>`${trendDay(date).jp}（${trendDay(date).week}）`})} label="日ごとの登録とブロック" legend={[{label:'登録',tone:'added'},{label:'ブロック',tone:'removed'}]} />
       )}
     </>
   )

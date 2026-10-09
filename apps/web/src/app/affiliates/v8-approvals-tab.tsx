@@ -36,6 +36,8 @@ import { csvCell, pageCountOf, pageOf } from './offer-list-view'
 import { formatDateTime, formatYenNullable, listAllConversionApprovals } from './tabs'
 import { KpiStrip, KpiCell, NoticeBar, EmptyState, ZeroResultState, LoadingRows, LoadError } from './v8-shared'
 import './list-v8.css'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 type BulkOutcome = 'approved' | 'rejected'
@@ -322,8 +324,8 @@ export default function ApprovalsTabV8({
       personNameText(item.friendName),
       item.affiliateName ?? '名前を読み込めませんでした',
       item.lineAccountName ?? 'アカウント未設定',
-      item.offerName ?? '未設定',
-      item.conversionPointName ?? '未設定',
+      item.offerName ?? emptyValue('unconfigured'),
+      item.conversionPointName ?? emptyValue('unconfigured'),
       item.orderNumber ?? '',
       item.value ?? '',
       approvalReviewReasons(item).join('・') || '問題なし',
@@ -332,7 +334,7 @@ export default function ApprovalsTabV8({
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `conversion-approvals-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = csvFileName("成果の承認")
     anchor.click()
     URL.revokeObjectURL(url)
   }, [shownItems])
@@ -340,7 +342,7 @@ export default function ApprovalsTabV8({
   useEffect(() => {
     registerHeaderActions(
       <Button key="csv" type="button" onClick={exportCsv} disabled={shownItems.length === 0}>
-        <Download size={15} aria-hidden="true" /> CSV で書き出す
+        <Download size={15} aria-hidden="true" /> CSVで書き出す
       </Button>,
     )
     return () => registerHeaderActions(null)
@@ -548,7 +550,7 @@ export default function ApprovalsTabV8({
                       <td><span className="af-list-cellMain">{item.affiliateName ?? '名前を読み込めませんでした'}</span></td>
                       <td><span className="af-list-cellMain" style={{ color: 'var(--color-ink-secondary)' }}>{item.lineAccountName ?? 'アカウント未設定'}</span></td>
                       <td>
-                        <span className="af-list-cellMain">{item.offerName ?? '未設定'}</span>
+                        <span className="af-list-cellMain">{item.offerName ?? emptyValue('unconfigured')}</span>
                         <span className="af-list-cellSub">{item.conversionPointName ?? '成果地点は未設定'}</span>
                         <span className="af-list-cellSub">成果額 {formatYenNullable(item.value)}</span>
                       </td>

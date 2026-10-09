@@ -33,6 +33,7 @@ import { TodayTable } from './today-table'
 import { canWriteRole, groupCloseTasks, openItems, reasonText, slotTitle, summarizeToday } from './summarize'
 import { useStoreToday } from './use-store-today'
 import styles from './dashboard.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 function daysAgo(iso: string, now: number): string {
   const days = Math.max(0, Math.floor((now - Date.parse(iso)) / 86_400_000))
@@ -150,7 +151,7 @@ function TodayStore() {
                 </p>
               </div>
               {firstMedium?.adminUrl ? (
-                <Button href={firstMedium.adminUrl} target="_blank" rel="noopener noreferrer">{`${firstMedium.name}の管理画面を開く ↗`}</Button>
+                <Button external href={firstMedium.adminUrl}  >{`${firstMedium.name}の管理画面を開く`}</Button>
               ) : null}
               {canWrite && firstItem ? (
                 <Button onClick={() => void closeOne(firstItem.id, firstItem.name)} disabled={busyId === firstItem.id} aria-label={`${firstItem.name}の枠を閉じた`}>
@@ -202,7 +203,7 @@ function TodayStore() {
               unit="件"
               delta={googleConnected && d.oldestReview ? <Chip tone="warn">{`最長 ${daysAgo(d.oldestReview.createTime, now)}`}</Chip> : null}
               detail={googleConnected
-                ? `Google ★${google.connection.averageRating ?? '—'}（${google.connection.totalReviewCount ?? 0} 件）`
+                ? `Google ★${google.connection.averageRating ?? emptyValue('unknown')}（${google.connection.totalReviewCount ?? 0}件）`
                 : google ? 'Google ビジネスとつないでいません' : '読み込めませんでした'}
               action={googleConnected ? { label: '返信する', href: '/restaurant-test/google' } : { label: 'つなぐ', href: '/settings/sns' }}
             />
@@ -229,7 +230,7 @@ function TodayStore() {
       boardId="hKRRF"
       headingSize="compact"
       title="今日のお店"
-      description={d.store ? headDescription(d.hours, d.updatedAt) : undefined}
+      help={d.store ? headDescription(d.hours, d.updatedAt) : undefined}
       actions={actions}
       tabs={<StoreTabs current="dashboard" flush />}
     >

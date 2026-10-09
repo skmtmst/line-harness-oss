@@ -1,5 +1,7 @@
 'use client'
 
+import { useUrlTab } from '@/lib/use-url-tab'
+
 import { Eye, LogIn, Send, Users } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, type OpsMember, type OpsMemberSummary } from '@/lib/api'
@@ -18,7 +20,7 @@ import { OpsHead } from './shell'
 import parts from './parts.module.css'
 import styles from './members.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-
+import { emptyValue } from '@/components/shared/empty-value'
 
 /**
  * 運営のメンバー管理 V8（絵 `FvbHW`・停止の窓 `VUyYu`）。
@@ -34,7 +36,7 @@ export default function OpsMembersV8() {
   const [members, setMembers] = useState<OpsMember[]>([])
   const [summary, setSummary] = useState<OpsMemberSummary | null>(null)
   const [loaded, setLoaded] = useState(false)
-  const [tab, setTab] = useState<'members' | 'info'>('members')
+  const [tab, setTab] = useUrlTab(['members', 'info'] as const, 'members')
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
   const [listFailed, setListFailed] = useState(false)
@@ -117,7 +119,7 @@ export default function OpsMembersV8() {
         {tab === 'members' ? (
           <>
             <div className={`${parts.kpis} ${styles.kpis3} ${kpiStyles.strip}`}>
-              <KpiCard presentation="cell" icon={<Users size={13} aria-hidden="true" />} title="運営メンバー" value={summary ? summary.members : null} unit="人" detail={summary ? `有効 ${active}・招待中 ${summary.invited}` : '—'} loading={!loaded} />
+              <KpiCard presentation="cell" icon={<Users size={13} aria-hidden="true" />} title="運営メンバー" value={summary ? summary.members : null} unit="人" detail={summary ? `有効 ${active}・招待中 ${summary.invited}` : emptyValue('unknown')} loading={!loaded} />
               <KpiCard presentation="cell" icon={<LogIn size={13} aria-hidden="true" />} title="今月の代理ログイン" value={summary ? summary.impersonationsThisMonth : null} unit="回" detail="監査ログに記録" loading={!loaded} />
               <KpiCard presentation="cell" icon={<Eye size={13} aria-hidden="true" />} title="今月の個人情報の表示" value={summary ? summary.piiRevealsThisMonth : null} unit="回" detail="監査ログに記録" loading={!loaded} />
             </div>
@@ -144,14 +146,14 @@ export default function OpsMembersV8() {
             {error && !listFailed ? <p role="alert" className={parts.alert}>{error}</p> : null}
 
             {!loaded ? (
-              <ListState kind="loading" title="運営メンバーを読み込んでいます" />
+              <ListState permissionScope="hq" kind="loading" title="運営メンバーを読み込んでいます" />
             ) : listFailed ? (
               <div className={parts.panel}>
-                <ListState kind="error" title="運営メンバーを表示できませんでした" description={error} onRetry={() => void load()} />
+                <ListState permissionScope="hq" kind="error" title="運営メンバーを表示できませんでした" description={error} onRetry={() => void load()} />
               </div>
             ) : members.length === 0 ? (
               <div className={parts.panel}>
-                <ListState kind="empty" title="運営メンバーがいません" description="最初の 1 人は、自分のメールアドレスを入れて「招待メールを送る」を押して登録します。" />
+                <ListState permissionScope="hq" kind="empty" title="運営メンバーがいません" description="最初の 1 人は、自分のメールアドレスを入れて「招待メールを送る」を押して登録します。" />
               </div>
             ) : (
               <div className={parts.mini} role="table" aria-label="運営メンバー">
@@ -169,13 +171,13 @@ export default function OpsMembersV8() {
                   return (
                     <div key={m.staffId} className={`${parts.miniRow} ${self ? styles.selfRow : styles.memberRow}`} role="row">
                       <span className={parts.grow} role="cell" title={m.name}>{m.name}{self ? '（自分）' : ''}</span>
-                      <span className={`${parts.fixed} ${styles.colMail}`} role="cell" title={m.email ?? ''}>{m.email ?? '—'}</span>
+                      <span className={`${parts.fixed} ${styles.colMail}`} role="cell" title={m.email ?? ''}>{m.email ?? emptyValue('unknown')}</span>
                       <span className={`${parts.fixed} ${styles.colTotp}`} role="cell">{totpChip(m)}</span>
                       <span className={`${parts.fixed} ${styles.colState}`} role="cell">{stateChip(m)}</span>
                       <span className={`${parts.fixed} ${styles.colLogin} ${m.lastLoginAt ? '' : styles.faint}`} role="cell">{shortDateTime(m.lastLoginAt)}</span>
                       <span className={`${styles.colOps} ${styles.ops}`} role="cell">
                         {self || readOnly ? (
-                          <span className={styles.faint}>—</span>
+                          <span className={styles.faint}>{emptyValue('unknown')}</span>
                         ) : invited ? (
                           <>
                             <Button onClick={() => setPending({ member: m, kind: 'cancel' })} disabled={busy}>取り消す</Button>

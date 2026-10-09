@@ -17,6 +17,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { folderById, folderCreator } from '@/components/shared/folder-select'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import FieldEditor, { type FieldEditorValues } from './field-editor'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 export default function FieldNew() {
   const router = useRouter()
@@ -96,7 +97,7 @@ export default function FieldNew() {
       notifyToast(`「${values.name.trim()}」を作りました`)
       router.push(back ?? `/tags?tab=fields&highlight=${res.data.id}`)
     } catch (reason) {
-      setError(describeSaveFailure(reason))
+      setError(withPermissionFailure(reason, describeSaveFailure(reason), 'store'))
     } finally {
       setSaving(false)
     }

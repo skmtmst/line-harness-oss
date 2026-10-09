@@ -20,6 +20,8 @@ import { webinarApi, describeSaveFailure, type WebinarFolder } from '@/lib/api'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { STEPS } from '@/app/webinars/edit/edit-steps'
 import styles from './new-v8.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type DeliveryKind = 'on-demand' | 'scheduled'
 
@@ -182,9 +184,9 @@ function NewWebinarV8Inner() {
       <nav data-design="Crumb" className={styles.crumb} aria-label="パンくず">
         <Link href="/webinars" className={styles.crumbLink}>← ウェビナーへ</Link>
       </nav>
-      <h1 data-design="Head" className={styles.headTitle}>ウェビナーを作る</h1>
+      <div data-design="Head"><PageHeading title="ウェビナーを作る" help={<> 管理名と公開ページの基本、開催形式を決めます。保存しても、まだ誰にも公開されません。</>} /></div>
       <StepBand current={0} />
-      <p className={styles.headDescription}>管理名と公開ページの基本、開催形式を決めます。保存しても、まだ誰にも公開されません。</p>
+
 
       {error ? (
         <Notice tone="danger">{error}</Notice>
@@ -195,9 +197,7 @@ function NewWebinarV8Inner() {
           <section className={styles.card} aria-labelledby="webinar-v8-basic">
             <h2 className={styles.cardTitle} id="webinar-v8-basic">基本設定</h2>
             <div className={styles.fieldGrid}>
-              <div className={styles.fieldFull}>
-                <label className={styles.label} htmlFor="webinar-v8-title">名前 <RequiredBadge /></label>
-                <input
+              <div className={styles.fieldFull}><Field label={<>名前 </>} htmlFor="webinar-v8-title" required><input
                   id="webinar-v8-title"
                   value={title}
                   onChange={(event) => {
@@ -214,13 +214,10 @@ function NewWebinarV8Inner() {
                   className={styles.input}
                   aria-invalid={fieldErrors.title !== undefined}
                 />
-                {fieldErrors.title !== undefined ? (
+{fieldErrors.title !== undefined ? (
                   <p className={styles.fieldError} role="alert">{fieldErrors.title}</p>
-                ) : null}
-              </div>
-              <div>
-                <label className={styles.label} htmlFor="webinar-v8-slug">公開ページのURL</label>
-                <input
+                ) : null}</Field></div>
+              <div><Field note={<>アドレスの最後の部分です。空のままなら自動で付けます。</>} label={<>公開ページのURL</>} htmlFor="webinar-v8-slug"><input
                   id="webinar-v8-slug"
                   value={slug}
                   onChange={(event) => {
@@ -238,14 +235,11 @@ function NewWebinarV8Inner() {
                   className={styles.input}
                   aria-invalid={fieldErrors.slug !== undefined}
                 />
-                {fieldErrors.slug !== undefined ? (
+{fieldErrors.slug !== undefined ? (
                   <p className={styles.fieldError} role="alert">{fieldErrors.slug}</p>
                 ) : null}
-                <p className={styles.fieldHelp}>アドレスの最後の部分です。空のままなら自動で付けます。</p>
-              </div>
-              <div>
-                <label className={styles.label} htmlFor="webinar-v8-folder">フォルダ</label>
-                <Select
+</Field></div>
+              <div><Field label={<>フォルダ</>} htmlFor="webinar-v8-folder"><Select
                   id="webinar-v8-folder"
                   aria-label="フォルダ"
                   value={folderId}
@@ -256,25 +250,21 @@ function NewWebinarV8Inner() {
                     ...folders.map((folder) => ({ value: folder.id, label: `${folder.name}（${folder.count}件）` })),
                   ]}
                 />
-                {foldersState === 'error' ? (
+{foldersState === 'error' ? (
                   <p className={styles.fieldHelp}>
                     フォルダを読み込めませんでした。{' '}
                     <button type="button" onClick={() => void loadFolders()} className={styles.crumbLink}>
                       もう一度読み込む
                     </button>
                   </p>
-                ) : null}
-              </div>
-              <div className={styles.fieldFull}>
-                <label className={styles.label} htmlFor="webinar-v8-description">案内文</label>
-                <input
+                ) : null}</Field></div>
+              <div className={styles.fieldFull}><Field label={<>案内文</>} htmlFor="webinar-v8-description"><input
                   id="webinar-v8-description"
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
                   placeholder="15分で NEN の使い方がわかる無料セミナーです"
                   className={styles.input}
-                />
-              </div>
+                /></Field></div>
             </div>
           </section>
 

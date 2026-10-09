@@ -25,6 +25,7 @@ import { api } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import styles from './sns.module.css'
 import { formatDate } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const GOOGLE_STATE: Record<string, string> = {
   connected: '接続しています',
@@ -214,7 +215,7 @@ export default function SnsSettingsPage() {
                 <>
                   <Row
                     label="接続しているアカウント"
-                    value={igConnection.username ? `@${igConnection.username}（ビジネス）` : igConnection.pageName || '—'}
+                    value={igConnection.username ? `@${igConnection.username}（ビジネス）` : igConnection.pageName || emptyValue('unknown')}
                   />
                   <Row label="できること" value="写真つき投稿の同時公開" />
                 </>

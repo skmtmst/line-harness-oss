@@ -86,7 +86,7 @@ function renderPage() {
   })
 }
 
-test('再開は押した瞬間に稼働中になり、元に戻すで送らずに戻る', async () => {
+test('再開は押した瞬間に有効になり、元に戻すで送らずに戻る', async () => {
   renderPage()
   await eventually(() => {
     if (!host.textContent?.includes('止まっている方')) throw new Error('no rows yet')
@@ -98,9 +98,9 @@ test('再開は押した瞬間に稼働中になり、元に戻すで送らず�
   const resume = [...host.querySelectorAll('button')].find((b) => b.textContent === '再開') as HTMLElement
   expect(resume).toBeTruthy()
   await act(async () => { resume.click() })
-  // 押した瞬間に稼働中の札へ（裏の保存を待たない）。
+  // 押した瞬間に有効の札へ（裏の保存を待たない）。
   await eventually(() => {
-    const pills = [...host.querySelectorAll('span')].filter((s) => s.textContent === '稼働中')
+    const pills = [...host.querySelectorAll('span')].filter((s) => s.textContent === '有効')
     if (pills.length < 2) throw new Error('not yet optimistic')
   })
   // 知らせの「元に戻す」で送らずに戻せる。

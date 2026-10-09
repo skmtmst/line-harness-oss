@@ -127,14 +127,14 @@ describe('V8 テンプレートの一覧', () => {
   it('サーバの役割が staff なら閲覧のみの帯が出て、作るボタンと選ぶチェックは出さない', async () => {
     role.value = 'staff'
     await renderList()
-    expect(screen.getByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')).toBeTruthy()
+    expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
     expect(screen.queryAllByRole('button', { name: /テンプレートを作る/ })).toHaveLength(0)
     expect(screen.queryAllByRole('checkbox', { name: /を選択$/ })).toHaveLength(0)
   })
 
   it('オーナーには閲覧のみの帯を出さない', async () => {
     await renderList()
-    expect(screen.queryByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')).toBeNull()
+    expect(screen.queryByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeNull()
   })
 
   it('使っていない（0か所と分かっている）ものは窓を出さずに一覧から外し、5秒たってから消す', async () => {

@@ -74,7 +74,8 @@ describe('UVnvR 休業日・貸切', () => {
       return found as HTMLElement
     })
     const board = document.querySelector('[data-design-node="UVnvR"]')!
-    expect(board.textContent).toContain('渋谷店 ・ 1つの時間帯の総数 20席（稼働中の卓 5）')
+    fireEvent.click(screen.getByRole('button', { name: '予約枠・在庫の説明' }))
+    expect(screen.getByText('渋谷店 ・ 1つの時間帯の総数 20席（有効の卓 5）')).toBeTruthy()
     expect(board.textContent).not.toContain('検証環境専用')
     expect(screen.getByRole('tab', { name: '休業日・貸切' }).getAttribute('aria-selected')).toBe('true')
     expect(card.textContent).toContain('終日・全卓')
@@ -87,7 +88,7 @@ describe('UVnvR 休業日・貸切', () => {
     const band = document.querySelector('[data-closure-band]') as HTMLElement
     expect(band.textContent).toContain('他の予約サイトの枠を閉じてください（未対応 2 件）')
     expect(band.textContent).toContain('ホットペッパー・食べログの')
-    expect(within(band).getByRole('link', { name: 'ホットペッパーの管理画面を開く ↗' }).getAttribute('href')).toBe('https://cms.example.jp/')
+    expect(within(band).getByRole('link', { name: 'ホットペッパーの管理画面を開く' }).getAttribute('href')).toBe('https://cms.example.jp/')
     fireEvent.click(within(band).getByRole('button', { name: 'ホットペッパーの枠を閉じた' }))
     await waitFor(() => expect(fixture.completeChannelCloseTask).toHaveBeenCalledWith('account-1', 'k1'))
   })

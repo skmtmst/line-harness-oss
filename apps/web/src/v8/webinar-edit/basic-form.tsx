@@ -17,6 +17,7 @@ import { TextField } from '@/components/shared/text-field'
 import type { WebinarFolder } from '@/lib/api'
 import { ReadValue } from './parts'
 import styles from './form.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 export type BasicValues = {
   title: string
@@ -70,9 +71,7 @@ export function BasicForm({
         <div className={styles.cardHead}>
           <h2 id={`${idPrefix}-basic`} className={styles.cardTitle}>基本設定</h2>
         </div>
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor={`${idPrefix}-title`}>名前<RequiredBadge /></label>
-          <TextField
+        <div className={styles.field}><Field label="名前" htmlFor={`${idPrefix}-title`} required><TextField
             id={`${idPrefix}-title`}
             value={values.title}
             disabled={disabled}
@@ -82,15 +81,14 @@ export function BasicForm({
             onChange={(event) => onChange({ title: event.target.value })}
             onBlur={onBlurTitle}
           />
-          {fieldErrors.title ? <p className={styles.fieldError} role="alert">{fieldErrors.title}</p> : null}
-        </div>
+{fieldErrors.title ? <p className={styles.fieldError} role="alert">{fieldErrors.title}</p> : null}</Field></div>
         <div className={styles.pair}>
           <div className={styles.field}>
             <span className={styles.label}>
-              <label htmlFor={`${idPrefix}-slug`}>公開ページの URL</label>
+
               <HelpTip label="公開ページの URL の説明">アドレスの最後の部分です。半角の英小文字・数字・ハイフンで入れます。作るときに空のままなら自動で付けます。</HelpTip>
             </span>
-            <TextField
+            <Field label="公開ページの URL" htmlFor={`${idPrefix}-slug`}><TextField
               id={`${idPrefix}-slug`}
               value={values.slug}
               disabled={disabled}
@@ -100,30 +98,24 @@ export function BasicForm({
               invalid={Boolean(fieldErrors.slug)}
               onChange={(event) => onChange({ slug: event.target.value })}
               onBlur={onBlurSlug}
-            />
+            /></Field>
             {fieldErrors.slug ? <p className={styles.fieldError} role="alert">{fieldErrors.slug}</p> : null}
           </div>
-          <div className={styles.field}>
-            <label className={styles.labelSmall} htmlFor={`${idPrefix}-folder`}>フォルダ</label>
-            {readOnly
+          <div className={styles.field}><Field label="フォルダ" htmlFor={`${idPrefix}-folder`}>{readOnly
               ? <ReadValue label="フォルダ">{folderOptions.find((option) => option.value === values.folderId)?.label ?? '未分類'}</ReadValue>
               : <FolderSelect id={`${idPrefix}-folder`} aria-label="フォルダ" size="full" value={values.folderId} disabled={disabled || folderState !== 'ready'} onChange={(value) => onChange({ folderId: value })} folders={folderOptions.slice(1).map((option) => ({ ...option, color: folders.find((folder) => folder.id === option.value)?.color ?? null }))} onCreate={onCreateFolder} />}
-            {folderState === 'error' ? (
+{folderState === 'error' ? (
               <p className={styles.help}>フォルダを読み込めませんでした。<Button size="compact" onClick={onReloadFolders}>もう一度読み込む</Button></p>
-            ) : null}
-          </div>
+            ) : null}</Field></div>
         </div>
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor={`${idPrefix}-description`}>案内文</label>
-          <TextField
+        <div className={styles.field}><Field label="案内文" htmlFor={`${idPrefix}-description`}><TextField
             id={`${idPrefix}-description`}
             value={values.description}
             disabled={disabled}
             readOnly={readOnly}
             placeholder="15分で NEN の使い方がわかる無料セミナーです"
             onChange={(event) => onChange({ description: event.target.value })}
-          />
-        </div>
+          /></Field></div>
       </section>
 
       <section className={styles.card} aria-labelledby={`${idPrefix}-kind`}>
@@ -147,13 +139,10 @@ export function BasicForm({
         <div className={styles.cardHead}>
           <h2 id={`${idPrefix}-audience`} className={styles.cardTitle}>だれに案内するか</h2>
         </div>
-        <div className={styles.field}>
-          <label className={styles.labelSmall} htmlFor={`${idPrefix}-audience-select`}>案内する相手</label>
-          {readOnly
+        <div className={styles.field}><Field note={<>タグ「配信済み」は確認の段で足せます</>} label="案内する相手" htmlFor={`${idPrefix}-audience-select`}>{readOnly
             ? <ReadValue label="案内する相手">{audienceLabel}</ReadValue>
             : <Select id={`${idPrefix}-audience-select`} aria-label="案内する相手" size="full" value="registered" disabled={disabled} onChange={() => {}} options={[{ value: 'registered', label: audienceLabel }]} />}
-          <p className={styles.help}>タグ「配信済み」は確認の段で足せます</p>
-        </div>
+</Field></div>
       </section>
     </>
   )

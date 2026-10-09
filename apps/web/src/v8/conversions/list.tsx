@@ -93,7 +93,10 @@ import { notifyToast } from '@/components/shared/toast'
 import { focusConversionField, type ConversionFieldIssue } from './field-issue'
 import styles from './list.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type StatusFilter = 'all' | ConversionDefinitionFilter
 /** フォルダの列の「未分類」（`?folder=unfiled`）。 */
@@ -117,8 +120,8 @@ const SORT_TO_API: Record<PointSort, 'count_desc' | 'value_desc' | 'name_asc'> =
 
 /* 状態の札（絵 r6dJFy の並び）。件数は口の stateCounts。 */
 const CHIPS: Array<{ value: ConversionDefinitionFilter; label: string; icon: ReactNode }> = [
-  { value: 'active', label: '動いている', icon: <Play size={13} aria-hidden="true" /> },
-  { value: 'stopped', label: '止めている', icon: <Pause size={13} aria-hidden="true" /> },
+  { value: 'active', label: '有効', icon: <Play size={13} aria-hidden="true" /> },
+  { value: 'stopped', label: '停止中', icon: <Pause size={13} aria-hidden="true" /> },
   { value: 'draft', label: '下書き', icon: <FilePen size={13} aria-hidden="true" /> },
   { value: 'invalid', label: '入力不良', icon: <TriangleAlert size={13} aria-hidden="true" /> },
   { value: 'sourceStopped', label: '起点停止', icon: <CirclePause size={13} aria-hidden="true" /> },
@@ -507,7 +510,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       const message = error instanceof Error ? error.message : ''
       setEditError(message.includes('更新されています')
         ? 'ほかの人がこの成果地点を先に直しました。上書きしていません。画面を閉じて読み直してから、もう一度お試しください。'
-        : describeSaveFailure(error))
+        : withPermissionFailure(error, describeSaveFailure(error), 'store'))
     } finally {
       setEditSaving(false)
     }
@@ -722,7 +725,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
     setExportError('')
     try {
       const blob = await api.conversions.exportDefinitions({ ...definitionRange(30), lineAccountId: accountId ?? undefined })
-      downloadCsvBlob(blob, `conversion-definitions-${definitionRange(1).to}.csv`)
+      downloadCsvBlob(blob, csvFileName("成果地点"))
     } catch {
       setExportError('CSVを書き出せませんでした。権限を確認して、もう一度お試しください。')
     } finally {
@@ -1100,7 +1103,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
                     </Td>
                     <Td className={styles.colCount}><span className={styles.num}>{`${formatNumber(point.metrics.netCount)} 件`}</span></Td>
                     <Td className={styles.colValue}>
-                      <span className={styles.num}>{point.metrics.netValue > 0 ? `¥${formatNumber(point.metrics.netValue)}` : '—'}</span>
+                      <span className={styles.num}>{point.metrics.netValue > 0 ? `¥${formatNumber(point.metrics.netValue)}` : emptyValue('unknown')}</span>
                     </Td>
                     <Td className={styles.colUsage}>
                       <span className={styles.usageMain} title={usageLabel(point)}>{usage.main}</span>
@@ -1145,23 +1148,23 @@ function ConversionList({ accountId }: { accountId: string | null }) {
 
   return (
     <ListPage
-      help={canEdit
+      help={<>{"成果として数えるできごと（成果地点）を決めます。配信・流入・アフィリエイトの成果は、ここの数え方で集計します。"}{canEdit
             ? '行の「…」から 編集・使う場所を見る・使う場所を足す・止める・複製。止めると、使っている配信や流入リンクでも数えなくなります。'
-            : '行の「…」から 中身と使う場所を見られます。止めると、使っている配信や流入リンクでも数えなくなります。'}
+            : '行の「…」から 中身と使う場所を見られます。止めると、使っている配信や流入リンクでも数えなくなります。'}</>}
       boardId="r6dJFy"
       headingSize="regular"
       title="コンバージョン"
-      description="成果として数えるできごと（成果地点）を決めます。配信・流入・アフィリエイトの成果は、ここの数え方で集計します。"
+
       actions={
         <Button onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています…">
-          <Download size={15} aria-hidden="true" />CSV で書き出す
+          <Download size={15} aria-hidden="true" />CSVで書き出す
         </Button>
       }
       stats={<>
         {!canEdit && role !== null ? (
           <div className={styles.viewerBand} role="status">
             <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
           </div>
         ) : null}
         {exportError ? <div className={styles.statsNotice}><Notice tone="warn">{exportError}</Notice></div> : null}
@@ -1181,7 +1184,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
             help="登録している成果地点の数です。"
             value={listUnavailable ? null : total}
             unit="件"
-            detail={stateCounts ? `動いている ${formatNumber(stateCounts.active)}・止めている ${formatNumber(stateCounts.stopped)}` : '—'}
+            detail={stateCounts ? `動いている ${formatNumber(stateCounts.active)}・止めている ${formatNumber(stateCounts.stopped)}` : emptyValue('unknown')}
           />
           <KpiCard
             presentation="band"
@@ -1190,7 +1193,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
             help="この30日に数えた成果の件数です（取り消しを引いた数）。"
             value={reportUnavailable ? null : kpi.currentCount}
             unit="件"
-            detail={delta === null || reportUnavailable ? '—' : `その前の30日より ${delta >= 0 ? '+' : ''}${formatNumber(delta)}`}
+            detail={delta === null || reportUnavailable ? emptyValue('unknown') : `その前の30日より ${delta >= 0 ? '+' : ''}${formatNumber(delta)}`}
           />
           <KpiCard
             presentation="band"

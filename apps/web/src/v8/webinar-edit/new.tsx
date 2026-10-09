@@ -21,6 +21,7 @@ import { describeSaveFailure, webinarApi, type WebinarFolder } from '@/lib/api'
 import { BackLink, WizardSteps } from './chrome'
 import { folderById, folderCreator } from '@/components/shared/folder-select'
 import { BasicForm, BasicPreview, SLUG_PATTERN, type BasicValues } from './basic-form'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 const FOLDERS_BLOCKED = 'フォルダを読み込めていないため、下書きを保存できません。フォルダをもう一度読み込んでください。'
 const TITLE_EMPTY = 'ウェビナー名を入力してください'
@@ -116,7 +117,7 @@ function NewInner() {
       })
       router.push(next === 'video' ? `/webinars/edit?id=${created.data.id}&pane=video` : '/webinars')
     } catch (cause) {
-      setError(describeSaveFailure(cause))
+      setError(withPermissionFailure(cause, describeSaveFailure(cause), 'store'))
       savingRef.current = false
       setSaving(false)
     }
@@ -133,7 +134,7 @@ function NewInner() {
         title="ウェビナーを作る"
         identity={<BackLink />}
         steps={<WizardSteps current="basic" stateOf={(key) => (key === 'basic' ? 'current' : 'todo')} />}
-        description="管理名と公開ページの基本、開催形式を決めます。保存しても、まだ誰にも公開されません。"
+        help="管理名と公開ページの基本、開催形式を決めます。保存しても、まだ誰にも公開されません。"
         status="下書き（まだ誰にも公開されません）"
         footerActions={<>
           <Button href="/webinars">キャンセル</Button>

@@ -24,6 +24,8 @@ import type {
   Scenario,
   Tag,
 } from '@line-crm/shared'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 interface MessageTemplate {
   id: string
@@ -89,7 +91,7 @@ export default function EditRouteModal({
       if (!cancelled && result.success) {
         setPoolMembers(Object.fromEntries(result.data.map(({ poolId, accounts }) => [
           poolId,
-          accounts.filter((account) => account.isActive).map((account) => account.accountName ?? '—'),
+          accounts.filter((account) => account.isActive).map((account) => account.accountName ?? emptyValue('unknown')),
         ])))
       }
     })()
@@ -160,7 +162,7 @@ export default function EditRouteModal({
       else setError(res.error ?? '保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } catch (err) {
       // 400系はAPIの理由、403・5xxは運用の言葉へ写す（WRITE-01）。
-      setError(describeSaveFailure(err))
+      setError(withPermissionFailure(err, describeSaveFailure(err), 'store'))
     } finally {
       // 失敗時に「保存中…」のまま固まらないよう、必ず戻す。
       setSubmitting(false)
@@ -200,7 +202,11 @@ export default function EditRouteModal({
       }
     >
       <div className="space-y-3">
-        <Field label="フォルダ（任意）">
+        <Field note={<>
+            {genreLocked
+              ? '左側で選択したフォルダへ登録されます。'
+              : '同じ協力会社や媒体を同じフォルダ名にすると、一覧でまとめて管理できます。空欄のまま保存すると未分類になります。'}
+          </>} label="フォルダ（任意）">
           <TextField
             list={genreLocked ? undefined : 'referral-genre-options'}
             value={form.genre ?? ''}
@@ -208,24 +214,20 @@ export default function EditRouteModal({
             // 口が400ではじくため、ここで null に寄せる。
             onChange={(e) => setForm({ ...form, genre: e.target.value.trim() ? e.target.value : null })}
             readOnly={genreLocked}
-            placeholder="例: SNS（空欄なら未分類）"
+            placeholder="例：SNS（空欄なら未分類）"
             maxLength={80}
           />
           <datalist id="referral-genre-options">
             {existingGenres.map((genre) => <option key={genre} value={genre} />)}
           </datalist>
-          <p className="text-ink-faint mt-1 text-xs">
-            {genreLocked
-              ? '左側で選択したフォルダへ登録されます。'
-              : '同じ協力会社や媒体を同じフォルダ名にすると、一覧でまとめて管理できます。空欄のまま保存すると未分類になります。'}
-          </p>
+
         </Field>
 
         <Field label="流入元の名前" htmlFor="route-name" error={fieldErrors['route-name']}>
           <TextField
             value={form.name}
             onChange={(e) => { setForm({ ...form, name: e.target.value }); setFieldErrors((old) => ({ ...old, 'route-name': '' })) }}
-            placeholder="例: Instagram プロフィール"
+            placeholder="例：Instagram プロフィール"
             maxLength={120}
           />
         </Field>
@@ -237,7 +239,7 @@ export default function EditRouteModal({
             // R271: 作成済みの識別子は口も変更を拒否する。保存時にはじめて
             // 拒否せず、欄自体を読み取り専用にして理由を近くに出す。
             disabled={refCodeLocked || !isNew}
-            placeholder="例: youtube"
+            placeholder="例：youtube"
           />
           {refCodeLocked && (
             <p className="text-ink-faint mt-1 text-xs">
@@ -251,7 +253,9 @@ export default function EditRouteModal({
           )}
         </Field>
 
-        <Field label="自動付与タグ（任意）">
+        <Field note={<>
+            友だち追加時にこのタグを自動付与します。タグ未作成の場合は先にタグを作成してください。
+          </>} label="自動付与タグ（任意）">
           <Combobox
             aria-label="自動付与タグ（任意）"
             placeholder="— 設定なし —"
@@ -260,9 +264,7 @@ export default function EditRouteModal({
             options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
             className="w-full"
           />
-          <p className="text-ink-faint mt-1 text-xs">
-            友だち追加時にこのタグを自動付与します。タグ未作成の場合は先にタグを作成してください。
-          </p>
+
         </Field>
 
         <Field label="送り先 Pool">

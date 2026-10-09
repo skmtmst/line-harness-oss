@@ -345,7 +345,7 @@ describe('R588 詳細の失敗は理由で案内を分ける', () => {
     fixture.detailBehavior = 'fail403'
     await renderPage()
     await waitForText('権限がありません')
-    expect(host.textContent).toContain('オーナーか管理者に追加を依頼してください')
+    expect(host.textContent).toContain('オーナーか管理者に頼んでください')
     expect(host.textContent).not.toContain('存在しないか、このLINEアカウントでは表示できません')
     const retry = [...host.querySelectorAll<HTMLButtonElement>('button')]
       .find((button) => button.textContent === 'もう一度読み込む')

@@ -20,18 +20,21 @@ import DateField from '@/components/shared/date-field'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { ApiError, api, type MileageAdjustmentPolicy } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { FieldError } from '@/components/shared/form-controls'
 import { useFormErrors } from '@/lib/use-form-errors'
 import styles from './mileage.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 /** 手でマイルを動かすときの失敗の言葉（app/mileage/friends/detail/mileage-adjustment-dialog.tsx から写した）。 */
 export function mileageAdjustmentErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 400) return error.message
-    if (error.status === 403) return 'マイルを変更する権限がありません。'
+    if (error.status === 403) return permissionDeniedMessage('store')
     if (error.status === 404) return '対象の友だちまたはLINEアカウントを確認できませんでした。'
     if (error.status === 405) return 'この環境ではマイル変更を実行できません。'
     if (error.status === 409) return '同じ操作との競合を確認しました。画面を読み直してからやり直してください。'
@@ -381,7 +384,7 @@ export default function MileageAdjustDialog({
           <div className={`${styles.dlgGrid2} ${styles.dateGrid}`}>
             <div>
               <p className={styles.dlgFieldLabel}>マイル数</p>
-              <input
+              <NumberInput numericText
                 {...fields.bind('amount')}
                 className={styles.dlgInput}
                 inputMode="numeric"
@@ -453,7 +456,7 @@ export default function MileageAdjustDialog({
 
           {/* 絵 M8zhjL：スイッチ＋題と説明の2行。 */}
           <div className={styles.notifyRow}>
-            <Toggle checked={notifyFriend} onChange={setNotifyFriend} label="友だちに知らせる（LINE通知）" />
+            <SettingCheckbox checked={notifyFriend} onChange={setNotifyFriend} label="友だちに知らせる（LINE通知）" />
             <div className={styles.dlgPersonText}>
               <span className={styles.dlgPersonName}>友だちに知らせる（LINE通知）</span>
               <span className={styles.dlgPersonSub}>増減したマイルと変更後の残高をLINEで知らせます。</span>
@@ -465,7 +468,7 @@ export default function MileageAdjustDialog({
               <p className={styles.dlgPersonName}>高額調整の承認境界が未設定です</p>
               <p className={styles.dlgPersonSub}>この値以上は、この画面では実行せず、別のオーナー承認を必要とします。</p>
               <div className={styles.policyRow}>
-                <input
+                <NumberInput numericText
                   className={styles.dlgInput}
                   inputMode="numeric"
                   value={policyThresholdText}
@@ -486,12 +489,12 @@ export default function MileageAdjustDialog({
             <div className={styles.deltaCell}>
               <p className={styles.deltaLabel}>変更量</p>
               <p className={styles.deltaValue}>
-                {valid ? `${delta > 0 ? '+' : ''}${formatNumber(delta)}` : '—'}
+                {valid ? `${delta > 0 ? '+' : ''}${formatNumber(delta)}` : emptyValue('unknown')}
               </p>
             </div>
             <div className={styles.deltaCell}>
               <p className={styles.deltaLabel}>変更後の残高</p>
-              <p className={styles.deltaValue}>{valid ? formatNumber(balanceAfter) : '—'}</p>
+              <p className={styles.deltaValue}>{valid ? formatNumber(balanceAfter) : emptyValue('unknown')}</p>
             </div>
           </div>
 

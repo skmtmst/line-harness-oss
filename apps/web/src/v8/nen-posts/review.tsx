@@ -41,7 +41,9 @@ import PhotoPolicyHistoryV8 from './policy-history'
 import styles from './review.module.css'
 import { formatListDay as polishFormatListDay } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
-
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type PhotoStatus = 'pending' | 'adopted' | 'rejected'
 type PhotoView = 'list' | 'detail' | 'publications'
@@ -183,7 +185,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
         setHasMorePhotos(false)
         const forbidden = error instanceof ApiError && error.status === 403
         setLoadForbidden(forbidden)
-        setLoadError(forbidden ? '写真を見る権限がありません。' : '写真を読み込めませんでした。')
+        setLoadError(forbidden ? permissionDeniedMessage('store') : '写真を読み込めませんでした。')
       }
     } finally {
       if (sequence === loadSequence.current) setLoading(false)
@@ -266,7 +268,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
   })()
   const topReason = reasonCounts[0]?.[0]
     ? REVIEW_REASONS.find((reason) => reason.value === reasonCounts[0][0])?.label ?? '理由未記録'
-    : '—'
+    : emptyValue('unknown')
 
   const [publicationCandidate, setPublicationCandidate] = useState<{id: string; version: number; key: string} | null>(null)
   const preparePublication = async (id: string) => {
@@ -500,7 +502,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       boardId={boardNode(view, status, canEdit)}
       headingSize="regular"
       title="投稿"
-      description="お客さまが送ってくれたペットの写真を確かめて、公式サイトに載せるかを決めます。"
+      help="お客さまが送ってくれたペットの写真を確かめて、公式サイトに載せるかを決めます。"
       actions={<Button type="button" variant="secondary" onClick={() => setHistoryOpen(true)}><History size={15} aria-hidden="true" />版の履歴を見る</Button>}
       tabs={
         <div className={styles.tabs} data-design-node="photo-tabs-v8">
@@ -525,7 +527,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
           <div className={styles.stats}>
             <KpiBand data-design="KPIs" aria-label="投稿の数の帯">
               <KpiCard presentation="band" title="審査待ち" icon={<History size={13} aria-hidden="true" />}
-                menu={kpiHelp('審査待ち', `まだ決めていない写真の枚数です。注意候補 ${reviewMetrics?.attentionCount ?? '—'} 件・投稿から審査までの日数：${reviewMetrics?.averageReviewMinutes == null ? '—' : formatMinutesRough(reviewMetrics.averageReviewMinutes)}`)}
+                menu={kpiHelp('審査待ち', `まだ決めていない写真の枚数です。注意候補 ${reviewMetrics?.attentionCount ?? emptyValue('unknown')}件・投稿から審査までの日数：${reviewMetrics?.averageReviewMinutes == null ? emptyValue('unknown') : formatMinutesRough(reviewMetrics.averageReviewMinutes)}`)}
                 value={countsReady ? reviewMetrics?.pendingCount ?? counts.pending : null} unit="枚"
                 detail={reviewMetrics?.oldestPendingAt ? `いちばん古いもの ${formatWaitRough((Date.now() - Date.parse(reviewMetrics.oldestPendingAt)) / 60000)}` : 'いちばん古いもの —'} />
               <KpiCard presentation="band" title="今月 採用" icon={<HelpCircle size={13} aria-hidden="true" />}
@@ -569,8 +571,8 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
 
           <Dialog open={bulkApproveOpen} title={`${selectedPendingPhotos.length} 枚をまとめて採用`} description="選択した写真の件数、マイル、公開範囲を確認してください。" busy={bulkReviewing} confirmLabel="まとめて採用" cancelLabel="審査へ戻る" onCancel={() => setBulkApproveOpen(false)} onConfirm={() => void bulkReview('approve')}>
             <dl className={styles.bulkSummary}>
-              <div><dt>写真</dt><dd>{selectedPendingPhotos.length} 枚</dd></div>
-              <div><dt>付与するマイル</dt><dd>合計 {policyPoints == null ? '—' : `${formatNumber(selectedPendingPhotos.length * policyPoints)} マイル`}</dd></div>
+              <div><dt>写真</dt><dd>{selectedPendingPhotos.length}枚</dd></div>
+              <div><dt>付与するマイル</dt><dd>合計 {policyPoints == null ? emptyValue('unknown') : `${formatNumber(selectedPendingPhotos.length * policyPoints)} マイル`}</dd></div>
               <div><dt>公開範囲</dt><dd>公開しない</dd></div>
             </dl>
             <p className={styles.railNote}>写真を採用しても自動公開しません。本人の公開同意を確認したあと、公式サイト掲載画面で公開先を選びます。</p>
@@ -584,11 +586,8 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
                 <Radio key={reason.value} name="photo-reject-reason" checked={reasonCode === reason.value} onChange={() => { setReasonCode(reason.value); setReasonError(''); setReasonFieldError('') }}>{reason.label}</Radio>
               ))}
             </div>
-            <label className={styles.fieldLabel}>
-              投稿者に届く補足（直せます）
-              <TextArea id="photo-reject-note" size="short" invalid={Boolean(reasonFieldError)} aria-describedby={reasonFieldError ? 'photo-reject-note-error' : undefined} value={reasonNote} onChange={(event) => { setReasonNote(event.target.value.slice(0, 500)); setReasonError(''); setReasonFieldError('') }} rows={3} placeholder={reasonCode === 'other' ? '理由を入力してください' : '必要な場合だけ入力します'} />
-          <FieldError id="photo-reject-note-error">{reasonFieldError}</FieldError>
-            </label>
+            <Field label="投稿者に届く補足（直せます）"><TextArea id="photo-reject-note" size="short" invalid={Boolean(reasonFieldError)} aria-describedby={reasonFieldError ? 'photo-reject-note-error' : undefined} value={reasonNote} onChange={(event) => { setReasonNote(event.target.value.slice(0, 500)); setReasonError(''); setReasonFieldError('') }} rows={3} placeholder={reasonCode === 'other' ? '理由を入力してください' : '必要な場合だけ入力します'} />
+<FieldError id="photo-reject-note-error">{reasonFieldError}</FieldError></Field>
           </Dialog>
 
           <Dialog open={Boolean(publicationCandidate)} title="公式サイトに掲載しますか？"
@@ -799,8 +798,8 @@ function ReviewListV8(props: ReviewListV8Props) {
           <aside className={styles.rail} data-design="Right" data-design-node="photo-rail-v8">
             <section className={styles.railCard} aria-label="報酬の決まり">
               <h2 className={styles.railTitle}>報酬の決まり</h2>
-              <p className={styles.railRow}><span>採用したら</span><strong>{props.policyPoints == null ? '—' : `${formatNumber(props.policyPoints)} マイル`}</strong></p>
-              <p className={styles.railRow}><span>公式サイトに載ったら</span><strong title={props.publicationPoints == null ? '掲載時の追加報酬は決まっていません' : undefined}>{props.publicationPoints == null ? '—' : props.publicationPoints === 0 ? 'なし' : `さらに ${formatNumber(props.publicationPoints)} マイル`}</strong></p>
+              <p className={styles.railRow}><span>採用したら</span><strong>{props.policyPoints == null ? emptyValue('unknown') : `${formatNumber(props.policyPoints)} マイル`}</strong></p>
+              <p className={styles.railRow}><span>公式サイトに載ったら</span><strong title={props.publicationPoints == null ? '掲載時の追加報酬は決まっていません' : undefined}>{props.publicationPoints == null ? emptyValue('unknown') : props.publicationPoints === 0 ? emptyValue('none') : `さらに ${formatNumber(props.publicationPoints)} マイル`}</strong></p>
               <p className={styles.railNote}>採用すると、投稿した人に LINE でお知らせします</p>
             </section>
             <section className={styles.railCard} aria-label="確認する順">
@@ -1004,11 +1003,8 @@ function RejectDialogV8({
             <Radio key={reason.value} name="photo-reject-reason" checked={reasonCode === reason.value} onChange={() => { onReasonCode(reason.value); onReasonNote(reason.value === 'other' ? '' : reason.message) }}>{reason.label}</Radio>
           ))}
         </div>
-        <label className={styles.fieldLabel}>
-          お客様に届く補足（直せます）
-          <TextArea id="photo-reject-note" size="short" invalid={Boolean(reasonFieldError)} aria-describedby={reasonFieldError ? 'photo-reject-note-error' : undefined} aria-label="お客様に届く補足" value={reasonNote} maxLength={500} rows={2} placeholder={reasonCode === 'other' ? 'お客様に送る文章を書いてください' : '必要な場合だけ補足します'} onChange={(event) => onReasonNote(event.target.value)} />
-          <FieldError id="photo-reject-note-error">{reasonFieldError}</FieldError>
-        </label>
+        <Field label="お客様に届く補足（直せます）"><TextArea id="photo-reject-note" size="short" invalid={Boolean(reasonFieldError)} aria-describedby={reasonFieldError ? 'photo-reject-note-error' : undefined} aria-label="お客様に届く補足" value={reasonNote} maxLength={500} rows={2} placeholder={reasonCode === 'other' ? 'お客様に送る文章を書いてください' : '必要な場合だけ補足します'} onChange={(event) => onReasonNote(event.target.value)} />
+<FieldError id="photo-reject-note-error">{reasonFieldError}</FieldError></Field>
         {/* 絵に無い「次の投稿は人が見る」は、同じ行の右に小さく置く（行を増やさない）。 */}
         <div className={styles.checkLine}>
           <Checkbox checked={resubmitInvite} onCheckedChange={onResubmitInvite}>もう一度 送ってもらえるようお願いする</Checkbox>
@@ -1033,7 +1029,7 @@ function placementLabels(item: PublicationItem): string {
 }
 
 function viewsText(value: unknown): string {
-  return value == null ? '—' : `${formatNumber(Number(value))}`
+  return value == null ? emptyValue('unknown') : `${formatNumber(Number(value))}`
 }
 
 /**
@@ -1250,10 +1246,10 @@ function PublicationsV8({
                 </tbody>
               </DataTable>
             </div>
-            <p className={styles.listHint}>{`公式サイト掲載中 ${publishedCount ?? '—'} 枚のうち ${items.length} 枚を表示（使っている場所で絞る：サイト・NENコラム・リッチメニュー・回答フォーム・登録メディア）`}</p>
-            <details className={styles.publicationHistory}><summary>掲載の整理と外した履歴（{pendingWithdrawals.length + withdrawnItems.length} 件）</summary>
+            <p className={styles.listHint}>{`公式サイト掲載中 ${publishedCount ?? emptyValue('unknown')}枚のうち ${items.length}枚を表示（使っている場所で絞る：サイト・NENコラム・リッチメニュー・回答フォーム・登録メディア）`}</p>
+            <details className={styles.publicationHistory}><summary>掲載の整理と外した履歴（{pendingWithdrawals.length + withdrawnItems.length}件）</summary>
               {pendingWithdrawals.map((item) => <div key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>{text(item.publication_withdrawn_at) ? 'ご本人が公開の同意を撤回しました' : '公開の同意と採用状態を確認してください'}</p><p>まだ残っている掲載先：{placementLabels(item)}</p>{canEdit ? <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => void withdraw(item)}>掲載先から外す</Button> : null}</div>)}
-              {withdrawnItems.map((item) => <div key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>外した日時：{formatPhotoReceivedAt(item.withdrawn_at)}・{text(item.withdrawn_by_name) || '—'}</p>{(item.placements ?? []).map((placement) => <p key={text(placement.id)}>{text(placement.placement_label)}・{text(placement.removed_at) ? `${formatPhotoReceivedAt(placement.removed_at)}に外しました` : '記録あり'}</p>)}</div>)}
+              {withdrawnItems.map((item) => <div key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>外した日時：{formatPhotoReceivedAt(item.withdrawn_at)}・{text(item.withdrawn_by_name) || emptyValue('unknown')}</p>{(item.placements ?? []).map((placement) => <p key={text(placement.id)}>{text(placement.placement_label)}・{text(placement.removed_at) ? `${formatPhotoReceivedAt(placement.removed_at)}に外しました` : '記録あり'}</p>)}</div>)}
             </details>
           </section>
           <div className={styles.rail} data-design="Right" data-design-node="photo-pubs-rail-v8">

@@ -27,7 +27,7 @@ import LinePreview from '@/components/shared/line-preview'
 import { MoreAction } from '@/components/shared/row-actions'
 import TargetMissing from '@/components/shared/target-missing'
 import VersionCompare from '@/components/shared/version-compare'
-import FlexPreviewComponent from '@/components/flex-preview'
+import { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview'
 import { validateFlexContent } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
@@ -38,6 +38,9 @@ import { messageTypeText } from '../template-message-type'
 import { isTemplateDetailData, type TemplateDetailData } from '../template-detail-data'
 import styles from './detail-v8.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
+import { PageHeading } from '@/components/templates/page-frame'
 
 type Usage = NonNullable<TemplateDetailData['usedBy']>
 
@@ -54,7 +57,7 @@ function versionText(version: number | null): string {
   return version === null || version === undefined ? 'いまの版' : `版${version}で固定`
 }
 
-/** 一斉配信の状態の札。予約済みは待っている途中、送信済みは終わり。 */
+/** 一斉配信の状態の札。予約中は待っている途中、送信済みは終わり。 */
 function broadcastStatusText(status: string): string {
   if (status === 'scheduled') return '予約中'
   if (status === 'sending') return '送信中'
@@ -452,14 +455,12 @@ export default function TemplateDetailV8() {
 
       {loading || !template ? (
         <div className={styles.card} role="status">
-          <p className="text-ink-faint" style={{ margin: 0, fontSize: 13, textAlign: 'center', padding: '24px 0' }}>
-            読み込み中...
-          </p>
+          <DetailLoading />
         </div>
       ) : (
         <>
           <header data-design="Head" className={styles.head}>
-            <h1 className={styles.headTitle}>{template.name}</h1>
+            <PageHeading title={template.name} />
             <p className={styles.headMeta}>
               {[messageTypeText(template.messageType), folderName ?? template.category ?? '未分類']
                 .filter(Boolean)
@@ -560,12 +561,12 @@ export default function TemplateDetailV8() {
                             <td className={`${styles.usageVersion} ${row.fixed ? styles.usageVersionFixed : ''}`}>
                               {row.version}
                             </td>
-                            <td className={styles.usageCellText}>{row.status ?? '—'}</td>
+                            <td className={styles.usageCellText}>{row.status ?? emptyValue('unknown')}</td>
                             <td className={styles.usageOpen}>
                               {row.href ? (
                                 <Link href={row.href} className={styles.usageNameLink}>開く</Link>
                               ) : (
-                                <span className="text-ink-faint" style={{ fontSize: 12 }}>—</span>
+                                <span className="text-ink-faint" style={{ fontSize: 12 }}>{emptyValue('unknown')}</span>
                               )}
                             </td>
                           </tr>
@@ -591,7 +592,7 @@ export default function TemplateDetailV8() {
                   戻すと、その版を下書きとして作り直します。公開するまで使っている所は変わりません。
                 </p>
                 {versions === null && !versionsError ? (
-                  <p className="text-ink-faint" style={{ fontSize: 13, margin: '8px 0 0' }}>読み込み中...</p>
+                  <DetailLoading />
                 ) : versionsError ? (
                   <div>
                     <p className="text-ink-secondary" style={{ fontSize: 13, margin: '8px 0' }}>{versionsError}</p>
@@ -708,12 +709,12 @@ export default function TemplateDetailV8() {
                   <div className={styles.aboutRow}>
                     <dt className={styles.aboutLabel}>今月送った数</dt>
                     <dd className={styles.aboutValue}>
-                      {monthlySends === undefined ? '読み込み中…' : monthlySends === null ? '—' : `${monthlySends.toLocaleString('ja-JP')}通`}
+                      {monthlySends === undefined ? '読み込み中…' : monthlySends === null ? emptyValue('unknown') : `${monthlySends.toLocaleString('ja-JP')}通`}
                     </dd>
                   </div>
                   <div className={styles.aboutRow}>
                     <dt className={styles.aboutLabel}>差し込み</dt>
-                    <dd className={styles.aboutValue}>{insertions.length > 0 ? insertions.join('・') : 'なし'}</dd>
+                    <dd className={styles.aboutValue}>{insertions.length > 0 ? insertions.join('・') : emptyValue('none')}</dd>
                   </div>
                   <div className={styles.aboutRow}>
                     <dt className={styles.aboutLabel}>使われている数</dt>
@@ -862,7 +863,7 @@ export default function TemplateDetailV8() {
       <ConfirmDialog
         open={revertTarget !== null}
         title={`版${revertTarget}の内容で下書きを作り直しますか？`}
-        description="過去の版は変わりません。その中身で新しい下書きを作ります。予約済み・送信中の配信は、いま使っている版のままです。"
+        description="過去の版は変わりません。その中身で新しい下書きを作ります。予約中・送信中の配信は、いま使っている版のままです。"
         confirmLabel="この版に戻す"
         busy={reverting}
         error={revertError}

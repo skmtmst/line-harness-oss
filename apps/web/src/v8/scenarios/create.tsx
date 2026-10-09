@@ -44,6 +44,7 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import styles from './create.module.css'
 import DeliveryModeDiagram from './delivery-mode-diagram'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 export default function ScenarioCreateV8() {
   usePageTitle('シナリオを作成')
@@ -399,7 +400,7 @@ export default function ScenarioCreateV8() {
     >
       <div className={styles.notices} data-list-state={scenarioState} aria-busy={scenarioState === 'loading'}>
         {!canEdit ? (
-          <p className={styles.viewerBand} role="status">閲覧のみで見ています。シナリオを作る操作は管理者に頼んでください。</p>
+          <p className={styles.viewerBand} role="status">閲覧のみで見ています。シナリオを作る操作はオーナーか管理者に頼んでください。</p>
         ) : null}
         {scenarioState === 'loading' ? <Notice tone="info">シナリオを読み込んでいます。</Notice> : null}
         {scenarioState === 'ready' && scenario ? (
@@ -438,7 +439,7 @@ export default function ScenarioCreateV8() {
               disabled={fieldsDisabled}
               onChange={(e) => { setName(e.target.value); if (nameError) setNameError('') }}
               onBlur={() => void saveDetails()}
-              placeholder="例: 友だち追加ウェルカム"
+              placeholder="例：友だち追加ウェルカム"
               invalid={Boolean(nameError)}
               aria-label="シナリオ名"
               aria-describedby={nameError ? 'scenario-name-error' : undefined}
@@ -524,7 +525,7 @@ export default function ScenarioCreateV8() {
 
 function scenarioSaveError(cause: unknown): string {
   if (cause instanceof ApiError) {
-    if (cause.status === 403) return 'シナリオ情報を変更する権限がありません。'
+    if (cause.status === 403) return permissionDeniedMessage('store')
     if (cause.status === 404) return 'シナリオが見つかりませんでした。一覧から開き直してください。'
   }
   return 'シナリオ情報を保存できませんでした。時間をおいてもう一度お試しください。'
@@ -533,7 +534,7 @@ function scenarioSaveError(cause: unknown): string {
 function scenarioModeError(cause: unknown): string {
   if (cause instanceof ApiError) {
     if (cause.status === 400 && !cause.message.startsWith('API error:')) return cause.message
-    if (cause.status === 403) return '配信方式を変更する権限がありません。'
+    if (cause.status === 403) return permissionDeniedMessage('store')
     if (cause.status === 404) return 'シナリオが見つかりませんでした。一覧から開き直してください。'
   }
   return '配信方式を保存できませんでした。時間をおいてもう一度お試しください。'

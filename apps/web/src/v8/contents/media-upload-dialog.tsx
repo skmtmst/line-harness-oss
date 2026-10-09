@@ -9,14 +9,16 @@ import type { Folder } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
-import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
+import { AttachmentRow } from '@/components/shared/file-drop'
+import MediaSlot from '@/components/shared/media-slot'
 import Notice from '@/components/shared/notice'
 import Progress from '@/components/shared/progress'
 import FolderSelect, { folderById, type FolderSelectCreate } from '@/components/shared/folder-select'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Dialog from '@/components/shared/dialog'
 import { MEDIA_ACCEPT, extractMediaMetadata, putMediaFile, validateMediaFile } from './media-direct-upload'
 import { formatMediaSize } from './media-usage-display'
 import { formatNumber } from '@/lib/format'
+import { Field } from '@/components/shared/form-controls'
 
 type UploadState = 'ready' | 'preparing' | 'uploading' | 'verifying' | 'done' | 'error'
 
@@ -64,14 +66,11 @@ export default function MediaUploadDialog({
   onComplete: () => void
 }) {
   const inputId = useId()
-  const [mounted, setMounted] = useState(false)
   const [entries, setEntries] = useState<UploadEntry[]>([])
   const [folderId, setFolderId] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const panelRef = useOverlayFocus(open, onClose, busy)
 
-  useEffect(() => setMounted(true), [])
 
   useEffect(() => {
     if (!open) return
@@ -197,44 +196,24 @@ export default function MediaUploadDialog({
 
   if (!open) return null
 
-  const overlay = (
-    <div
-      className="bg-ink/40 fixed inset-0 z-90 flex items-center justify-center overflow-y-auto p-4"
-      data-design-node="eXAJP"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (!busy && event.target === event.currentTarget) onClose()
-      }}
-    >
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={`${inputId}-title`}
-        aria-busy={busy || undefined}
-        tabIndex={-1}
-        className="border-hairline max-h-screen w-full max-w-2xl overflow-y-auto rounded-card border bg-canvas shadow-float"
-      >
-        <div className="border-hairline flex items-center justify-between gap-3 border-b px-6 py-4">
-          <h2 id={`${inputId}-title`} className="text-ink text-xl font-bold">ファイルを入れる</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={busy}
-            aria-label="閉じる"
-            className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"
-          >
-            <X aria-hidden="true" className="h-5 w-5" />
-          </button>
+  return <Dialog open={open} title="ファイルを入れる" onCancel={onClose} busy={busy} error={error || undefined} designNode="eXAJP" designWidth={720} footer={(
+        <div className="border-hairline flex flex-wrap items-center justify-between gap-3 border-t px-6 py-4">
+          <p className={errorCount > 0 ? 'text-danger text-xs font-semibold' : 'text-ink-faint text-xs'}>
+            {errorCount > 0 ? `${errorCount}件は登録できません` : `${entries.length}件を選択中`}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="primary" onClick={() => void uploadReady()} disabled={busy || readyCount === 0 || !accountId} busy={busy} busyLabel="登録しています…">
+              {`${readyCount}件を登録する`}
+            </Button>
+          </div>
         </div>
+  )}>{}
         <div className="space-y-4 p-6">
-        <FileDropzone
+        <MediaSlot kind="file"
           title="ここにファイルをドラッグ、または押して選ぶ"
-          hint="いちどに20件まで"
+          help="いちどに20件まで"
           accept={MEDIA_ACCEPT}
-          multiple
           busy={busy}
-          busyTitle="登録しています…"
           onFiles={stage}
         />
 
@@ -345,31 +324,13 @@ export default function MediaUploadDialog({
           </div>
         ) : null}
 
-        <div>
-          <label htmlFor={`${inputId}-folder`} className="text-ink-secondary mb-1 block text-xs font-semibold">入れるフォルダ</label>
-          <FolderSelect
+        <div><Field label="入れるフォルダ" htmlFor={`${inputId}-folder`}><FolderSelect
             aria-label="入れるフォルダ"
             value={folderId}
             folders={folders.map(folderById)}
             onCreate={onCreateFolder}
             onChange={setFolderId}
-          />
+          /></Field></div>
         </div>
-        </div>
-        {error ? <Notice tone="danger" message={error} className="mx-6 mb-4" /> : null}
-        <div className="border-hairline flex flex-wrap items-center justify-between gap-3 border-t px-6 py-4">
-          <p className={errorCount > 0 ? 'text-danger text-xs font-semibold' : 'text-ink-faint text-xs'}>
-            {errorCount > 0 ? `${errorCount} 件は登録できません` : `${entries.length} 件を選択中`}
-          </p>
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="primary" onClick={() => void uploadReady()} disabled={busy || readyCount === 0 || !accountId} busy={busy} busyLabel="登録しています…">
-              {`${readyCount} 件を登録する`}
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-
-  return mounted && typeof document !== 'undefined' ? createPortal(overlay, document.body) : overlay
+  </Dialog>
 }

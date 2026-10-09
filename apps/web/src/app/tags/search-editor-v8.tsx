@@ -49,6 +49,8 @@ import MetricValue from '@/components/ui/metric-value'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 import { formatDateTime } from '@/lib/format'
 import styles from './search-editor-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 /*
  * R185: 友だち画面で作れる条件はここでも編集できるようにする。実行側
@@ -196,8 +198,10 @@ function DateRangeEditor({
   const reversed = Boolean(from && to && from > to)
   return (
     <div className="min-w-0 flex-1">
-      <div className="flex min-w-0 flex-wrap items-end gap-2">
-        <Select
+      <div className="flex min-w-0 flex-wrap items-end gap-2"><Field label={<>
+          {op === 'before' ? '終了日' : '開始日'}
+          <DateField aria-label={op === 'before' ? '終了日' : '開始日'} value={op === 'before' ? to : from} onChange={op === 'before' ? setTo : setFrom} className="mt-1" />
+        </>}><Select
           aria-label="日付の比べ方"
           value={op}
           onChange={setOp}
@@ -208,20 +212,12 @@ function DateRangeEditor({
           ]}
           className="w-28"
         />
-        <label className="min-w-40 flex-1 text-xs font-semibold text-ink-faint">
-          {op === 'before' ? '終了日' : '開始日'}
-          <DateField aria-label={op === 'before' ? '終了日' : '開始日'} value={op === 'before' ? to : from} onChange={op === 'before' ? setTo : setFrom} className="mt-1" />
-        </label>
-        {op === 'between' ? (
+{op === 'between' ? (
           <>
             <span className="pb-2 text-ink-faint" aria-hidden="true">〜</span>
-            <label className="min-w-40 flex-1 text-xs font-semibold text-ink-faint">
-              終了日
-              <DateField aria-label="終了日" value={to} onChange={setTo} className="mt-1" />
-            </label>
+            <Field label="終了日"><DateField aria-label="終了日" value={to} onChange={setTo} className="mt-1" /></Field>
           </>
-        ) : null}
-      </div>
+        ) : null}</Field></div>
       {reversed ? (
         <p role="alert" className="mt-1 text-xs text-danger">開始日が終了日より後になっています。入れ替えてください。</p>
       ) : null}
@@ -982,7 +978,7 @@ function SearchEditorV8Inner() {
                 <p className="mt-1 text-xs"><span className="font-semibold">変更後：</span>{afterSummary.length ? afterSummary.join('・') : '条件なし'}</p>
               </Notice>
             ) : (
-              <p className={`${styles.noteText} mt-2`}>{preview ? `LINE ${preview.byChannel.line ?? '—'}人・MAIL ${preview.byChannel.mail ?? '—'}人` : '保存済み条件で集計'}</p>
+              <p className={`${styles.noteText} mt-2`}>{preview ? `LINE ${preview.byChannel.line ?? emptyValue('unknown')}人・MAIL ${preview.byChannel.mail ?? emptyValue('unknown')}人` : '保存済み条件で集計'}</p>
             )}
             <div className="mt-3 flex flex-wrap gap-2">
               <Button type="button" onClick={() => void recount()}>数え直す</Button>
@@ -1003,7 +999,7 @@ function SearchEditorV8Inner() {
             <h2 className={styles.sectionTitle}>この条件の使用先</h2>
             <div className={styles.sectionBody}>
               {original.usedIn === undefined ? (
-                <p className={styles.noteText}>—</p>
+                <p className={styles.noteText}>{emptyValue('unknown')}</p>
               ) : original.usedIn.length === 0 ? (
                 <p className={styles.noteText} style={{ fontWeight: 600 }}>使用先はありません</p>
               ) : (

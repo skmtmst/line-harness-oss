@@ -58,6 +58,7 @@ import {
 import { PerPageSelect } from './parts'
 import MileageAdjustDialog from './adjust-dialog'
 import styles from './mileage.module.css'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 type MileageDetail = {
   summary: MileageSummary
@@ -256,7 +257,7 @@ function FriendDetailInner() {
   }), [displayedHistory])
 
   if (accountLoading || loading) {
-    return <div data-design-node="R6kIG"><ListState kind="loading" title="マイル明細を読み込んでいます" /></div>
+    return <div data-design-node="R6kIG"><DetailLoading label="マイル明細を読み込んでいます" /></div>
   }
   if (!friendId) {
     return (
@@ -361,7 +362,7 @@ function FriendDetailInner() {
     <DetailPage
       boardId="R6kIG"
       title={displayName}
-      description={[joinedAt ? `友だちになった日 ${joinedAt}` : null, `会員ランク ${rankLabel}`, lastActive ? `最後に動いた日 ${lastActive}` : null].filter(Boolean).join('・')}
+      help={[joinedAt ? `友だちになった日 ${joinedAt}` : null, `会員ランク ${rankLabel}`, lastActive ? `最後に動いた日 ${lastActive}` : null].filter(Boolean).join('・')}
       actions={<div className={styles.headActions}>
         <Button href={`/friends/detail?id=${encodeURIComponent(friend.id)}`}>
           <MessageCircle size={15} aria-hidden="true" /> トークを開く
@@ -601,7 +602,7 @@ function FriendDetailInner() {
 
 export default function FriendDetailV8() {
   return (
-    <Suspense fallback={<div data-design-node="R6kIG"><ListState kind="loading" title="マイル明細を読み込んでいます" /></div>}>
+    <Suspense fallback={<div data-design-node="R6kIG"><DetailLoading label="マイル明細を読み込んでいます" /></div>}>
       <FriendDetailInner />
     </Suspense>
   )

@@ -80,6 +80,8 @@ import {
 } from './rows'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 interface MessageTemplate {
   id: string
@@ -326,7 +328,7 @@ export default function InflowListV8({
           ])))
           setPoolMemberNames(Object.fromEntries(batch.data.map(({ poolId, accounts }) => [
             poolId,
-            accounts.filter((account) => account.isActive).map((account) => account.accountName ?? '—'),
+            accounts.filter((account) => account.isActive).map((account) => account.accountName ?? emptyValue('unknown')),
           ])))
         }
       }
@@ -364,7 +366,7 @@ export default function InflowListV8({
     } catch (cause) {
       setActive(!nextActive)
       notifyToast(
-        cause instanceof ApiError && cause.status === 403 ? 'この操作を行う権限がありません' : '受付を切り替えられませんでした。',
+        cause instanceof ApiError && cause.status === 403 ? permissionDeniedMessage('store') : '受付を切り替えられませんでした。',
         { tone: 'error', actionLabel: 'もう一度', onAction: () => { void toggleRouteActive(entryRouteId, nextActive, name) } },
       )
     }
@@ -747,7 +749,7 @@ export default function InflowListV8({
                               : '受付を止めています。このURLを開いても友だち追加できません。'}
                         >
                           <span className={styles.pillDot} aria-hidden="true" />
-                          {status === 'measured' ? '計測済' : status === 'unregistered' ? '未登録' : '停止中'}
+                          {status === 'measured' ? '計測済' : status === 'unregistered' ? emptyValue('unconfigured') : '停止中'}
                         </span>
                       ) : null}
                     </Td>
@@ -755,9 +757,9 @@ export default function InflowListV8({
                       {pool ? (
                         <span className={styles.cellMain} ><TruncatedText value={String(pool.name ?? '')} /></span>
                       ) : r.source === 'tracked_link' ? (
-                        <span className={styles.cellMain} title="追加先の振り分けは全体設定に従います。">—</span>
+                        <span className={styles.cellMain} title="追加先の振り分けは全体設定に従います。">{emptyValue('unknown')}</span>
                       ) : (
-                        <span className={styles.cellMain} title="追加先が設定されていません。">未設定</span>
+                        <span className={styles.cellMain} title="追加先が設定されていません。">{emptyValue('unconfigured')}</span>
                       )}
                     </Td>
                     <Td className={styles.colBecame}>
@@ -771,14 +773,14 @@ export default function InflowListV8({
                           <span className={styles.cellSub}>{`累計 ${formatNumber(r.stats.friendCount)} 人`}</span>
                         </>
                       ) : (
-                        <span className={styles.cellMain}>—</span>
+                        <span className={styles.cellMain}>{emptyValue('unknown')}</span>
                       )}
                     </Td>
                     <Td className={styles.colClicks}>
-                      <span className={styles.cellMain}>{summaryAvailable && r.stats ? formatNumber(r.stats.clickCount) : '—'}</span>
+                      <span className={styles.cellMain}>{summaryAvailable && r.stats ? formatNumber(r.stats.clickCount) : emptyValue('unknown')}</span>
                     </Td>
                     <Td className={styles.colLatest}>
-                      <span className={styles.cellMain}>{summaryAvailable ? formatLatest(r.stats?.latestAt) : '—'}</span>
+                      <span className={styles.cellMain}>{summaryAvailable ? formatLatest(r.stats?.latestAt) : emptyValue('unknown')}</span>
                     </Td>
                     <Td className={styles.colUrl}>
                       <div className={styles.opsBox}>
@@ -807,7 +809,7 @@ export default function InflowListV8({
                           </Button>
                         ) : r.source === 'tracked_link' ? (
                           // tracked_links は別管理（画面に編集の口が無い）。昇格登録は上書きになるので出さない。
-                          <span className={styles.cellMain} title="この経路は別の仕組み（クリック計測）で管理しています">—</span>
+                          <span className={styles.cellMain} title="この経路は別の仕組み（クリック計測）で管理しています">{emptyValue('unknown')}</span>
                         ) : (
                           <Button
                             onClick={() => setEditing({ register: r.refCode })}
@@ -845,13 +847,13 @@ export default function InflowListV8({
 
   return (
     <ListPage
-      help={readonly
+      help={<>{"QRコード・URLごとに、どこから友だちになったかを数えます。友だちになったときに、タグ・メッセージ・シナリオを自動で動かせます。"}{readonly
             ? '行の「…」から QRコードを表示・URLをコピーできます。'
-            : '行の「…」から QRコードを表示・URLをコピー・リンクを編集・止める。左のチェックで、まとめて操作できます。'}
+            : '行の「…」から QRコードを表示・URLをコピー・リンクを編集・止める。左のチェックで、まとめて操作できます。'}</>}
       boardId="xbHxg"
       headingSize="regular"
       title="流入と計測"
-      description="QRコード・URLごとに、どこから友だちになったかを数えます。友だちになったときに、タグ・メッセージ・シナリオを自動で動かせます。"
+
       actions={<div className={styles.headActions}>
         <Button href="/inflow-links?tab=connections"><Megaphone size={15} aria-hidden="true" />広告とのつなぎ</Button>
         {/* #859: site_tracking が切れているときは口を出さない。直 URL はホスト側の停止画面が出す。 */}
@@ -863,7 +865,7 @@ export default function InflowListV8({
         {readonly ? (
           <div className={styles.viewerBand} role="status">
             <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
           </div>
         ) : null}
         <KpiBand>

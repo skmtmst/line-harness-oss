@@ -83,8 +83,8 @@ async function flush() {
   }
 }
 
-function webinarSwitch(): HTMLButtonElement {
-  const found = [...host.querySelectorAll<HTMLButtonElement>('[role="switch"]')]
+function webinarSwitch(): HTMLInputElement {
+  const found = [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]
     .find((button) => button.getAttribute('aria-label')?.includes('ウェビナー'))
   if (!found) throw new Error('ウェビナーのスイッチが無い')
   return found
@@ -110,7 +110,7 @@ describe('機能設定の保存の世代（WEB190/191）', () => {
     await act(async () => { root.render(<FeatureSettingsScreen />) })
     await flush()
     // ウェビナーの区分が畳まれていたら開く。
-    if (![...host.querySelectorAll('[role="switch"]')].some((b) => b.getAttribute('aria-label')?.includes('ウェビナー'))) {
+    if (![...host.querySelectorAll('input[type="checkbox"]')].some((b) => b.getAttribute('aria-label')?.includes('ウェビナー'))) {
       for (const button of [...host.querySelectorAll<HTMLButtonElement>('button[aria-expanded="false"]')]) {
         await act(async () => { button.click() })
       }

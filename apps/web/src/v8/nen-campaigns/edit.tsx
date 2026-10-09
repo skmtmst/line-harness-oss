@@ -40,6 +40,8 @@ import { FieldError } from '@/components/shared/form-controls'
 import { useFieldValidation } from '@/lib/use-field-validation'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import { tapActionLiffUrl } from '@/lib/tap-actions'
+import { Field } from '@/components/shared/form-controls'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 /** きっかけの短い言い方（配信フローの札・日数の選ぶ欄）。 */
 const TRIGGER_SHORT: Record<string, string> = {
@@ -315,7 +317,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
         setError('ほかの人が先に保存しました。最新の内容を確認してから、もう一度保存してください。入力した内容はそのまま残っています。')
         return
       }
-      setError(describeSaveFailure(caught))
+      setError(withPermissionFailure(caught, describeSaveFailure(caught), 'store'))
     } finally {
       setSaving(false)
     }
@@ -365,7 +367,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
             onKeyDown={(event) => { if (event.key === 'Enter') void searchFriends() }}
           />
           <span className={styles.fullButton}>
-            <Button type="button" disabled={testing || !testTarget} busy={testing} busyLabel="送っています…" title={testTarget ? undefined : '先に相手を名前で探してください'} onClick={() => void sendTest()}>
+            <Button type="button" disabled={testing || !testTarget} busy={testing} busyLabel="送っています…" title={testTarget ? undefined : '先に相手を名前で探してください'}  onClick={() => void sendTest()}>
               <Send size={15} aria-hidden="true" />{testCandidates.length === 1 ? `${testCandidates[0].displayName ?? '名前なし'}へテストを送る` : 'テストを送る'}
             </Button>
           </span>
@@ -382,7 +384,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
     <CreatePage
       boardId="w5pwG"
       title={`${setting.label}（配信を直す）`}
-      description={`${timing}。保存した新しい中身は次のきっかけから使われ、すでに配信待ちの分は予約したときの中身のまま届きます。`}
+      help={`${timing}。保存した新しい中身は次のきっかけから使われ、すでに配信待ちの分は予約したときの中身のまま届きます。`}
       preview={previewOpen ? undefined : preview}
       hidePreviewWhenNarrow
       previewToggle={<Button type="button" onClick={() => setPreviewOpen(true)}>プレビューを見る</Button>}
@@ -488,11 +490,11 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
         </div>
         <div className={styles.field}>
           <span className={styles.labelRow}>
-            <label className={styles.labelSmall} htmlFor="nen-edit-body">配信本文</label>
+
             <span className={styles.labelNote}>差し込み：友だち情報欄「ペットの名前」・注文の「商品名」</span>
             {canEdit ? <button type="button" className={styles.labelAside} aria-expanded={insertOpen} onClick={() => setInsertOpen((current) => !current)}>{insertOpen ? '差し込みを閉じる' : '差し込む'}</button> : null}
           </span>
-          <InsertTextField
+          <Field label="配信本文" htmlFor="nen-edit-body"><InsertTextField
             id="nen-edit-body"
             aria-invalid={Boolean((validationSubmitted || !bodyCheck.fits) && bodyError)}
             aria-describedby={(validationSubmitted || !bodyCheck.fits) && bodyError ? 'nen-edit-body-error' : undefined}
@@ -502,7 +504,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
             onValueChange={(next) => setDraft((previous) => ({ ...previous, bodyText: next }))}
             aria-label="配信本文"
             compact
-          />
+          /></Field>
           {insertOpen && canEdit ? (
             <InsertToolbar targetRef={bodyRef} value={merged.bodyText} onChange={(bodyText) => setDraft((previous) => ({ ...previous, bodyText }))} />
           ) : null}

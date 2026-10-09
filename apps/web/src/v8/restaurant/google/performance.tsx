@@ -1,5 +1,7 @@
 'use client'
 
+import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
+
 /*
  * ★V8 Googleビジネス パフォーマンス（`SrmVs`）。
  * 数4（共通の KpiCard）→ 飲食店向け指標 → 注。期間は 7／28／90 日（今の画面と同じ口・既定28日）。
@@ -12,6 +14,8 @@ import Card from '@/components/shared/card'
 import SectionHeader from '@/components/shared/section-header'
 import KpiBand from '@/components/shared/kpi-band'
 import SegmentedControl from '@/components/shared/segmented'
+import { RowMenu } from '@/components/shared/row-actions'
+import PeriodPicker from '@/components/shared/period-picker'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -70,19 +74,7 @@ function ImpressionsChart({ data }: { data: GooglePerformanceData }) {
   if (!buckets.some((bucket) => bucket.total !== null)) {
     return <ListState kind="empty" title="表示数のデータがまだありません" description="夜間の自動取得のあとに表示されます。" />
   }
-  const summary = buckets.filter((b) => b.total !== null).map((b) => `${shortDate(b.startDate)}〜 ${b.total} 回`).join('、')
-  return (
-    <svg className={styles.chart} viewBox={`0 0 ${buckets.length * 10} 100`} preserveAspectRatio="none" role="img" aria-label={`プロフィール表示の推移（${BUCKET_LABELS[data.days]}の合計）: ${summary}`}>
-      {buckets.map((bucket, index) => {
-        const height = ((bucket.total ?? 0) / max) * 100
-        return (
-          <rect key={bucket.startDate} className={styles.chartBar} x={index * 10 + 1.5} width={7} y={100 - height} height={height}>
-            <title>{`${shortDate(bucket.startDate)}〜: ${bucket.total ?? '—'}`}</title>
-          </rect>
-        )
-      })}
-    </svg>
-  )
+  return <ValueBarChart label={`プロフィール表示の推移（${BUCKET_LABELS[data.days]}の合計）`} unit="回" items={buckets.map(bucket=>({key:bucket.startDate,label:bucket.startDate,value:bucket.total}))} />
 }
 
 export default function PerformanceBoard({ accountId }: { accountId: string }) {
@@ -113,7 +105,7 @@ export default function PerformanceBoard({ accountId }: { accountId: string }) {
     <>
       <div className={styles.toolbar}>
         <p className={styles.toolbarText} title={range ? `集計期間 ${range}（日本時間）` : undefined}>Google の検索・地図でどれだけ見られたか</p>
-        <SegmentedControl aria-label="集計期間" value={String(days)} onChange={(value) => setDays(Number(value) as GooglePerformanceDays)} options={DAYS.map((d) => ({ value: String(d), label: `直近${d}日` }))} />
+        <PeriodPicker days={days} onChange={(value) => setDays(value as GooglePerformanceDays)} supportedDays={DAYS} />
       </div>
       {loading && !data ? <div className={styles.stateBox}><ListState kind="loading" title="パフォーマンスを読み込んでいます" /></div> : null}
       {loadError ? <ListState kind="error" title="パフォーマンスを表示できませんでした" description={loadError} onRetry={() => void load()} /> : null}

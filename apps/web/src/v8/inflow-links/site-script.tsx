@@ -34,7 +34,9 @@ import { DetailPage } from '@/components/templates'
 import { focusField } from './focus-field'
 import styles from './site-script.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type PageRow = { host: string | null; path: string; views: number; visitors: number }
 type TrackingSummary = {
@@ -315,15 +317,15 @@ export default function SiteScriptV8() {
         return (
           <div key={site.id} className={styles.siteRow} role="row" data-selected={selectedSiteId === site.id || undefined}>
             <span className={styles.colSite} role="cell"><span className={styles.siteName} title={site.label}>{site.label}</span></span>
-            <span className={styles.colDomain} role="cell"><span className={styles.cellText} title={site.domains.join('\n')}>{site.domains.join('、') || '—'}</span></span>
+            <span className={styles.colDomain} role="cell"><span className={styles.cellText} title={site.domains.join('\n')}>{site.domains.join('、') || emptyValue('unknown')}</span></span>
             <span className={styles.colState} role="cell">
               {stopped ? (
-                <StatusBadge tone="neutral" size="compact">止めている</StatusBadge>
+                <StatusBadge tone="neutral" size="compact">停止中</StatusBadge>
               ) : (
                 <StatusBadge tone="success" size="compact">{site.lastReceivedAt ? '届いている' : '受信待ち'}</StatusBadge>
               )}
             </span>
-            <span className={styles.colLast} role="cell"><span className={styles.cellText}>{last ?? '—'}</span></span>
+            <span className={styles.colLast} role="cell"><span className={styles.cellText}>{last ?? emptyValue('unknown')}</span></span>
             <span className={styles.colMenu} role="cell">
               {manage ? (
                 <IconButton
@@ -362,12 +364,12 @@ export default function SiteScriptV8() {
   )
 
   return (
-    <DetailPage boardId="XjOte" title="サイトスクリプト" description="ホームページに1行貼ると、サイトを見た人と LINE の友だちを結びつけ、成果も数えられます。"
+    <DetailPage boardId="XjOte" title="サイトスクリプト" help="ホームページに1行貼ると、サイトを見た人と LINE の友だちを結びつけ、成果も数えられます。"
       contentPadding="var(--tpl-detail-head-pad-bottom) var(--tpl-head-pad-side)"
       actions={<Button onClick={() => setHelpOpen(true)}><CircleHelp size={15} aria-hidden="true" />貼りかたが分からないときは</Button>}>
       <div className={styles.body}>
         {readonly ? (
-          <p className={styles.viewerBand} role="status"><Eye size={16} aria-hidden="true" />閲覧のみで見ています。変える操作は管理者に頼んでください。</p>
+          <p className={styles.viewerBand} role="status"><Eye size={16} aria-hidden="true" />閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>
         ) : null}
 
         {loading && summary == null && !failed ? (
@@ -447,7 +449,7 @@ export default function SiteScriptV8() {
                   {receiving ? (
                     <>
                       <span><StatusBadge tone="success" size="compact">届いている</StatusBadge></span>
-                      <p className={styles.faint}>{`最後に届いたのは ${lastSeen ?? '—'}`}</p>
+                      <p className={styles.faint}>{`最後に届いたのは ${lastSeen ?? emptyValue('unknown')}`}</p>
                     </>
                   ) : (
                     <>
@@ -473,8 +475,8 @@ export default function SiteScriptV8() {
                   {pages.length === 0 ? (
                     <div className={styles.pageRow} role="row">
                       <span className={styles.pageCol} role="cell">同意なし</span>
-                      <span className={styles.numCol} role="cell">—</span>
-                      <span className={styles.numColNarrow} role="cell">—</span>
+                      <span className={styles.numCol} role="cell">{emptyValue('unknown')}</span>
+                      <span className={styles.numColNarrow} role="cell">{emptyValue('unknown')}</span>
                     </div>
                   ) : null}
                 </div>
@@ -513,7 +515,7 @@ export default function SiteScriptV8() {
         open={siteDialog !== null}
         initialFocusId={Object.entries(siteFieldErrors).find(([, error]) => Boolean(error))?.[0]}
         title={siteDialog?.mode === 'edit' ? '計測サイトを直す' : '計測サイトを追加'}
-        description="このサイトから届いた成果だけを数えます。ドメインは1行に1つずつ書きます（例: shop.example.com）。www の有無は同じサイトとして扱います。"
+        description="このサイトから届いた成果だけを数えます。ドメインは1行に1つずつ書きます（例：shop.example.com）。www の有無は同じサイトとして扱います。"
         busy={siteBusy}
         error={siteDialog?.error ?? undefined}
         confirmLabel={siteDialog?.mode === 'edit' ? '保存する' : '追加する'}
@@ -522,16 +524,10 @@ export default function SiteScriptV8() {
       >
         {siteDialog ? (
           <div className={styles.dialogFields}>
-            <label className={styles.dialogField}>
-              <span className={styles.dialogLabel}>サイトの名前</span>
-              <TextField id="site-name" aria-invalid={Boolean(siteFieldErrors['site-name'])} aria-describedby={siteFieldErrors['site-name'] ? 'site-name-error' : undefined} value={siteDialog.label} maxLength={100} placeholder="例: 公式ショップ" onChange={(e) => { setSiteDialog({ ...siteDialog, label: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-name': '' })) }} />
-              {siteFieldErrors['site-name'] ? <span id="site-name-error" className={styles.fieldError} role="alert">{siteFieldErrors['site-name']}</span> : null}
-            </label>
-            <label className={styles.dialogField}>
-              <span className={styles.dialogLabel}>計測を許可するドメイン</span>
-              <TextArea id="site-domains" aria-invalid={Boolean(siteFieldErrors['site-domains'])} aria-describedby={siteFieldErrors['site-domains'] ? 'site-domains-error' : undefined} rows={4} value={siteDialog.domainsText} placeholder={'example.com\nshop.example.com'} onChange={(e) => { setSiteDialog({ ...siteDialog, domainsText: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-domains': '' })) }} />
-              {siteFieldErrors['site-domains'] ? <span id="site-domains-error" className={styles.fieldError} role="alert">{siteFieldErrors['site-domains']}</span> : null}
-            </label>
+            <Field label="サイトの名前"><TextField id="site-name" aria-invalid={Boolean(siteFieldErrors['site-name'])} aria-describedby={siteFieldErrors['site-name'] ? 'site-name-error' : undefined} value={siteDialog.label} maxLength={100} placeholder="例：公式ショップ" onChange={(e) => { setSiteDialog({ ...siteDialog, label: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-name': '' })) }} />
+{siteFieldErrors['site-name'] ? <span id="site-name-error" className={styles.fieldError} role="alert">{siteFieldErrors['site-name']}</span> : null}</Field>
+            <Field label="計測を許可するドメイン"><TextArea id="site-domains" aria-invalid={Boolean(siteFieldErrors['site-domains'])} aria-describedby={siteFieldErrors['site-domains'] ? 'site-domains-error' : undefined} rows={4} value={siteDialog.domainsText} placeholder={'example.com\nshop.example.com'} onChange={(e) => { setSiteDialog({ ...siteDialog, domainsText: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-domains': '' })) }} />
+{siteFieldErrors['site-domains'] ? <span id="site-domains-error" className={styles.fieldError} role="alert">{siteFieldErrors['site-domains']}</span> : null}</Field>
           </div>
         ) : null}
       </Dialog>
@@ -549,11 +545,8 @@ export default function SiteScriptV8() {
         {stopDialog ? (
           <div className={styles.dialogFields}>
             <p className={styles.small}>{`対象: ${stopDialog.site.label}`}</p>
-            <label className={styles.dialogField}>
-              <span className={styles.dialogLabel}>止める理由（必須）</span>
-              <TextField id="site-stop-reason" aria-invalid={Boolean(stopReasonError)} aria-describedby={stopReasonError ? 'site-stop-reason-error' : undefined} value={stopDialog.reason} maxLength={200} placeholder="例: サイトを閉じたため" onChange={(e) => { setStopDialog({ ...stopDialog, reason: e.target.value }); setStopReasonError('') }} />
-              {stopReasonError ? <span id="site-stop-reason-error" className={styles.fieldError} role="alert">{stopReasonError}</span> : null}
-            </label>
+            <Field label="止める理由" required><TextField id="site-stop-reason" aria-invalid={Boolean(stopReasonError)} aria-describedby={stopReasonError ? 'site-stop-reason-error' : undefined} value={stopDialog.reason} maxLength={200} placeholder="例：サイトを閉じたため" onChange={(e) => { setStopDialog({ ...stopDialog, reason: e.target.value }); setStopReasonError('') }} />
+{stopReasonError ? <span id="site-stop-reason-error" className={styles.fieldError} role="alert">{stopReasonError}</span> : null}</Field>
           </div>
         ) : null}
       </Dialog>

@@ -316,7 +316,7 @@ describe('保存500は日本語の再試行案内を出す（T05/T08）', () => 
   })
 })
 
-describe('保管済みタグの保存500も日本語案内を出す', () => {
+describe('アーカイブタグの保存500も日本語案内を出す', () => {
   it('入力を保持し、再送で保存する', async () => {
     const archivedTag = { ...tag, status: 'archived', description: '説明前' } as unknown as Tag
     apiCalls.definition.mockResolvedValue({ success: true, data: { tag: archivedTag, automation: null } })

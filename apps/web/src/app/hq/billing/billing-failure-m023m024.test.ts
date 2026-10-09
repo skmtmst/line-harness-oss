@@ -17,7 +17,7 @@ describe('M023/M024 課金の失敗表示', () => {
 
   it('403 は権限の案内になる', () => {
     expect(billingFailureMessage(new ApiError(403, 'API error: 403'), '支払い方法の管理画面の表示', 'forbidden-text'))
-      .toBe('forbidden-text')
+      .toBe('この操作の権限がありません。統括の管理者に頼んでください。')
   })
 
   it('通信断は再試行の言葉つきの案内になる', () => {

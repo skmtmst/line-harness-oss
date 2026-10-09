@@ -13,9 +13,9 @@ import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-ba
 import styles from './parts.module.css'
 
 const statusLabel: Record<string, string> = {
-  connected: '正常', active: '有効', invited: '招待中', suspended: '停止中', archived: '保管済', approved: '承認済', completed: '完了', visited: '来店済',
+  connected: '正常', active: '有効', invited: '招待中', suspended: '停止中', archived: 'アーカイブ', approved: '承認済', completed: '完了', visited: '来店済',
   confirmed: '予約確定', warning: '要確認', pending: '承認待ち', draft: '下書き', scheduled: '予約済',
-  unreplied: '未返信', unconfigured: '未設定', disabled: '無効', error: 'エラー', returned: '差戻し',
+  unreplied: '未返信', unconfigured: '未設定', disabled: '停止中', error: 'エラー', returned: '差戻し',
   seated: '来店中', cancelled: '取消', no_show: '無断キャンセル', preview_only: 'プレビューのみ',
 }
 

@@ -28,6 +28,8 @@ import {
   type ParticipantRow,
 } from './participants-shared'
 import TruncatedText from '@/components/shared/truncated-text'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export type ParticipantExport = { download: () => void; busy: boolean; available: boolean }
 
@@ -109,7 +111,7 @@ export default function ParticipantsV8({
     const request = generation.current
     setCsvBusy(true)
     setCsvError('')
-    void downloadApiFile(webinarApi.participantsCsvUrl(webinarId, selected), 'webinar-participants.csv')
+    void downloadApiFile(webinarApi.participantsCsvUrl(webinarId, selected), csvFileName("動画セミナー"))
       .catch(() => { if (request === generation.current) setCsvError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。') })
       .finally(() => { csvLock.current = false; setCsvBusy(false) })
   }, [webinarId])
@@ -352,7 +354,7 @@ export default function ParticipantsV8({
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-ink block tabular-nums">
-                          {participant.maxWatchedSeconds > 0 ? `${fmtSec(participant.maxWatchedSeconds)}（${rate}%）` : '—'}
+                          {participant.maxWatchedSeconds > 0 ? `${fmtSec(participant.maxWatchedSeconds)}（${rate}%）` : emptyValue('unknown')}
                         </span>
                         <span className="text-ink-faint block text-xs">{participantStateLabel(participant, durationSeconds)}</span>
                       </td>

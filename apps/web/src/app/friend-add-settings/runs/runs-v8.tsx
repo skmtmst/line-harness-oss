@@ -33,6 +33,7 @@ import ListState from '@/components/shared/list-state'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import { formatNumber } from '@/lib/format'
 import styles from './runs-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type KindFilter = 'all' | FriendAddEventKind
 type AttributionFilter = 'all' | FriendAddEventAttributionStatus
@@ -408,22 +409,22 @@ function FriendAddRunsV8Inner() {
       <div className={styles.kpis} aria-label="直近28日の実行結果">
         <div className={styles.kpi}>
           <span className={styles.kpiLabel}>直近28日の友だち追加</span>
-          <p className={styles.kpiValue}>{summary === null ? '—' : formatNumber(summary.recentFriends)}<span className={styles.kpiUnit}>{summary === null ? '' : '人'}</span></p>
+          <p className={styles.kpiValue}>{summary === null ? emptyValue('unknown') : formatNumber(summary.recentFriends)}<span className={styles.kpiUnit}>{summary === null ? '' : '人'}</span></p>
           <p className={styles.kpiDetail}>経路が取れた —人</p>
         </div>
         <div className={styles.kpi}>
           <span className={styles.kpiLabel}>送った案内</span>
-          <p className={styles.kpiValue}>{summary === null ? '—' : formatNumber(summary.cumulativeDeliveries)}<span className={styles.kpiUnit}>{summary === null ? '' : '通'}</span></p>
+          <p className={styles.kpiValue}>{summary === null ? emptyValue('unknown') : formatNumber(summary.cumulativeDeliveries)}<span className={styles.kpiUnit}>{summary === null ? '' : '通'}</span></p>
           <p className={styles.kpiDetail}>{successRate}</p>
         </div>
         <div className={styles.kpi}>
           <span className={styles.kpiLabel}>失敗した処理</span>
-          <p className={styles.kpiValue}>{summary === null ? '—' : formatNumber(summary.failed)}<span className={styles.kpiUnit}>{summary === null ? '' : '通'}</span></p>
+          <p className={styles.kpiValue}>{summary === null ? emptyValue('unknown') : formatNumber(summary.failed)}<span className={styles.kpiUnit}>{summary === null ? '' : '通'}</span></p>
           <p className={styles.kpiDetail}>理由を見て、もう一度実行できます</p>
         </div>
         <div className={styles.kpi}>
           <span className={styles.kpiLabel}>シナリオを始めた</span>
-          <p className={styles.kpiValue}>{summary === null ? '—' : formatNumber(summary.scenarioStarts)}<span className={styles.kpiUnit}>{summary === null ? '' : '件'}</span></p>
+          <p className={styles.kpiValue}>{summary === null ? emptyValue('unknown') : formatNumber(summary.scenarioStarts)}<span className={styles.kpiUnit}>{summary === null ? '' : '件'}</span></p>
           <p className={styles.kpiDetail}>直近28日</p>
         </div>
       </div>
@@ -595,15 +596,15 @@ function FriendAddRunsV8Inner() {
           <dl className={styles.bottomRows}>
             <div className={styles.bottomRow}>
               <dt>二重送信を防ぐ</dt>
-              <dd>{!ruleState || ruleState.resendSuppressionHours === null ? '—' : ruleState.resendSuppressionHours > 0 ? '有効' : '無効'}</dd>
+              <dd>{!ruleState || ruleState.resendSuppressionHours === null ? emptyValue('unknown') : ruleState.resendSuppressionHours > 0 ? '有効' : '無効'}</dd>
             </div>
             <div className={styles.bottomRow}>
               <dt>失敗の知らせ</dt>
-              <dd>—</dd>
+              <dd>{emptyValue('unknown')}</dd>
             </div>
             <div className={styles.bottomRow}>
               <dt>最後に送った</dt>
-              <dd>{summary?.lastDeliveryAt ? formatJstDateTime(summary.lastDeliveryAt).slice(5) : '—'}</dd>
+              <dd>{summary?.lastDeliveryAt ? formatJstDateTime(summary.lastDeliveryAt).slice(5) : emptyValue('unknown')}</dd>
             </div>
           </dl>
           <Link href="/inflow-links" className={styles.bottomLink}>→ 流入リンクを見る</Link>

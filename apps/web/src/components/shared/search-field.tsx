@@ -1,7 +1,7 @@
 'use client'
 
 import { LoaderCircle, Search, X } from 'lucide-react'
-import React, { forwardRef, useEffect, useRef } from 'react'
+import React, { forwardRef, useRef } from 'react'
 import type { InputHTMLAttributes } from 'react'
 import styles from './search-field.module.css'
 
@@ -16,37 +16,17 @@ export interface SearchFieldProps
   loading?: boolean
   onChange: (value: string) => void
   onClear?: () => void
-  /**
-   * 箱の右端に出す近道の印（例 '⌘K'。x6QsVz・v19Ivv・I1E7Bt の絵どおり）。
-   * 渡すとその押し合わせでこの欄へ飛ぶ。v8 だけで見せ、v7 は変えない。
-   */
+  /** @deprecated ⌘K は探す窓専用。古い呼び出しでも印や合図を出さない。 */
   shortcut?: string
 }
 
 /** Pencil V5 `phlR1` を正本にした検索欄。 */
 const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(function SearchField(
-  { className, disabled, hidden, loading = false, onChange, onClear, shortcut, value, ...props },
+  { className, disabled, hidden, loading = false, onChange, onClear, shortcut: _shortcut, value, ...props },
   ref,
 ) {
   const hasValue = String(value ?? '').length > 0
   const innerRef = useRef<HTMLInputElement>(null)
-  /*
-   * 近道の印は飾りで終わらせない：押したらこの欄へ飛ぶ。
-   * 文字を書いている最中の ⌘K は奪わない。
-   */
-  useEffect(() => {
-    if (!shortcut || disabled || hidden) return
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() !== 'k' || !(event.metaKey || event.ctrlKey)) return
-      const target = event.target as HTMLElement | null
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
-      event.preventDefault()
-      const el = innerRef.current ?? (typeof ref === 'object' && ref ? ref.current : null)
-      el?.focus()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [shortcut, disabled, hidden, ref])
   const setRefs = (node: HTMLInputElement | null) => {
     innerRef.current = node
     if (typeof ref === 'function') ref(node)
@@ -71,11 +51,6 @@ const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(function Sear
         onChange={(event) => onChange(event.target.value)}
         {...props}
       />
-      {shortcut ? (
-        <kbd className={styles.shortcut} aria-hidden="true">
-          {shortcut}
-        </kbd>
-      ) : null}
       {loading ? (
         <LoaderCircle className={styles.loadingIcon} aria-label="検索中" />
       ) : hasValue && onClear ? (

@@ -143,7 +143,7 @@ describe('V8 オートメーションのルール一覧（LWQXd）', () => {
     await render(<AutomationListV8 />)
     await waitFor(() => host.textContent?.includes('問い合わせを担当へ知らせる') ?? false, 'ルールの行')
     expect(host.querySelector('[data-design-node="nH9L8"]')).not.toBeNull()
-    expect(host.textContent).toContain('閲覧のみで見ています。変える操作は管理者に頼んでください。')
+    expect(host.textContent).toContain('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')
     expect(named('編集する')).toHaveLength(0)
     expect(named('ルールを作る')).toHaveLength(0)
     expect(named('フォルダを追加')).toHaveLength(0)

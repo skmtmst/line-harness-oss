@@ -43,6 +43,9 @@ import {
 import { MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import styles from './mileage.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 function viewName(item: MileageAdminHistoryItem) {
   return item.displayName || '名前未取得'
@@ -188,7 +191,7 @@ export default function HistoryTab() {
       const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `mileage-history-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = csvFileName("マイル履歴")
       anchor.click()
       URL.revokeObjectURL(url)
     } catch {
@@ -246,7 +249,7 @@ export default function HistoryTab() {
         icon={<History size={14} aria-hidden="true" />}
         value={ready ? mileagePaginationTotal(periodResult) : null}
         unit="件"
-        detail={ready ? `付けた ${formatNumber(grantedCount)}・使った ${formatNumber(countOf('spend'))}・取り消し ${formatNumber(reversalCount)}` : '—'}
+        detail={ready ? `付けた ${formatNumber(grantedCount)}・使った ${formatNumber(countOf('spend'))}・取り消し ${formatNumber(reversalCount)}` : emptyValue('unknown')}
       />
       <KpiCard
         presentation="band"
@@ -370,7 +373,7 @@ export default function HistoryTab() {
                   <span className={styles.cellSub}>{`${mileageEntryTypeLabel(item.entryType)}・${mileageStatusLabel(item.status)}`}</span>
                 </Td>
                 <Td className={`${styles.colAfter} ${styles.num}`}>
-                  <span className={styles.cellMain}>{item.balanceAfter === null ? '—' : formatNumber(item.balanceAfter)}</span>
+                  <span className={styles.cellMain}>{item.balanceAfter === null ? emptyValue('unknown') : formatNumber(item.balanceAfter)}</span>
                 </Td>
                 <Td className={styles.colWho}>
                   <span className={styles.cellMain}>
@@ -445,7 +448,7 @@ export default function HistoryTab() {
       help="行を押すと、その友だちのマイルの詳細を開きます。「増やす・減らす」は理由を書いて明細を足します（オーナー・管理者だけ）。"
       actions={<div className={styles.headActions}>
         <Button onClick={exportCsv} disabled={!canExport}>
-          <Download size={15} aria-hidden="true" /> CSV で書き出す
+          <Download size={15} aria-hidden="true" /> CSVで書き出す
         </Button>
         {/* 閲覧のみの人には出さない。 */}
         {!readonly ? (
@@ -471,16 +474,13 @@ export default function HistoryTab() {
           onCancel={() => { if (!pendingBusy) setPendingAction(null) }}
           onConfirm={() => void runPendingAction()}
         >
-          <label className={styles.fieldLabel}>
-            理由（必須）
-            <textarea
+          <Field label="理由" required><textarea
               className={styles.textarea}
               value={pendingReason}
               onChange={(event) => setPendingReason(event.target.value)}
               placeholder={pendingAction?.kind === 'confirm' ? '例：入金を確認しました' : '例：予約がキャンセルされました'}
               rows={3}
-            />
-          </label>
+            /></Field>
         </Dialog>
       }
     >

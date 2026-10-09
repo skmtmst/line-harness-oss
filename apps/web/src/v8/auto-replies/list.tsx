@@ -102,6 +102,8 @@ import {
 import QuickCreateV8 from './quick-create'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -564,7 +566,7 @@ export default function AutoRepliesListV8() {
           : `${ids.length} 件の自動応答を停止しました`
     const failedMessage = (targetKind: 'stop' | 'resume', forbidden: boolean) =>
       forbidden
-        ? `${NO_WRITE_PERMISSION.label}。自動応答を止めたり動かしたりするには権限が要ります。`
+        ? permissionDeniedMessage('store')
         : targetKind === 'stop'
           ? '自動応答を停止できませんでした。状態を読み直してからお試しください。'
           : '自動応答を再開できませんでした。状態を読み直してからお試しください。'
@@ -992,7 +994,7 @@ export default function AutoRepliesListV8() {
       unfiledId={UNFILED}
       allCount={rules.length}
       unfiledCount={unfiledCount}
-      placeholder="例: 01_営業時間外"
+      placeholder="例：01_営業時間外"
     />
   )
 
@@ -1026,7 +1028,7 @@ export default function AutoRepliesListV8() {
       detail: ready
         ? monthlyHits === null
           ? '実行結果を読み込めませんでした'
-          : `累計 ${totalHits === null ? '—' : formatNumber(totalHits)} 回`
+          : `累計 ${totalHits === null ? emptyValue('unknown') : formatNumber(totalHits)}回`
         : LOAD_STATE_WORDS[visibleLoadState].label,
     },
     {
@@ -1283,18 +1285,18 @@ export default function AutoRepliesListV8() {
                           ? `テンプレート「${tpl.label}」`
                           : `${responseTypeWord(r.responseType).label}で返す`}
                     </span>
-                    <span className={styles.cellSub} title={actions.join('・') || 'なし'}>
-                      {actions.length > 0 ? `＋${actions.join('・')}` : 'なし'}
+                    <span className={styles.cellSub} title={actions.join('・') || emptyValue('none')}>
+                      {actions.length > 0 ? `＋${actions.join('・')}` : emptyValue('none')}
                     </span>
                   </Td>
                   {!narrow && (
                     <Td
                       className={styles.countCell}
-                      title={`今月 ${r.hits?.period ?? '—'} 回 ／ 累計 ${r.hits?.total ?? '—'} 回`}
+                      title={`今月 ${r.hits?.period ?? emptyValue('unknown')}回 ／ 累計 ${r.hits?.total ?? emptyValue('unknown')}回`}
                     >
                       {/* 数えられていないものを 0 と書かない。0 は「当たらなかった」の意味。 */}
-                      <div className={styles.countMain}>{r.hits?.period ?? '—'}<span className={styles.kpiUnit}>回</span></div>
-                      <div className={styles.countSub}>累計 {r.hits?.total == null ? '—' : formatNumber(r.hits.total)} 回</div>
+                      <div className={styles.countMain}>{r.hits?.period ?? emptyValue('unknown')}<span className={styles.kpiUnit}>回</span></div>
+                      <div className={styles.countSub}>累計 {r.hits?.total == null ? emptyValue('unknown') : formatNumber(r.hits.total)}回</div>
                     </Td>
                   )}
                   <Td>
@@ -1392,8 +1394,8 @@ export default function AutoRepliesListV8() {
               }
             >
               <p>
-                {panelRow.isActive ? '有効' : '停止中'} ／ 今月 {panelRow.hits?.period ?? '—'} 回 ／
-                累計 {panelRow.hits?.total ?? '—'} 回
+                {panelRow.isActive ? '有効' : '停止中'} ／ 今月 {panelRow.hits?.period ?? emptyValue('unknown')}回 ／
+                累計 {panelRow.hits?.total ?? emptyValue('unknown')}回
               </p>
             </DetailPanel>
           )
@@ -1608,15 +1610,15 @@ export default function AutoRepliesListV8() {
   return (
     <ListPage boardId={narrow ? 'WPrd5' : 'uE9gf'} headingSize="regular" title={<>
         自動応答
-      </>} help="□ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集。「…」に 停止・複製・実行結果・削除。「重なり」の札は、同じ受信に先に当たるルールがあるという印（押すと重なりのあるルールだけを表示します）。" description={<>
+      </>} help={<>{<>
         届いたメッセージに、決めた言葉・曜日・時間帯で自動で返します。上のルールから順に、最初に当たった1つだけが動きます。
-      </>}
+      </>}{"□ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集。「…」に 停止・複製・実行結果・削除。「重なり」の札は、同じ受信に先に当たるルールがあるという印（押すと重なりのあるルールだけを表示します）。"}</>}
       stats={<>
         {/* 見るだけの人への帯（`Q5lOCc`）。数の帯の上。 */}
         {!canEdit && (
           <div className={styles.viewerBand} role="status" data-design-node="Q5lOCc">
             <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
           </div>
         )}
         {/* 数の帯 4つ。並びと間は共有の帯（KpiStrip）に任せ、画面CSSで書かない。 */}

@@ -38,3 +38,15 @@
 .ymdPart .input { text-align: center; }
 
 .wrap:focus-within .temporalHint { display: none; }
+
+.labelRow { display: flex; align-items: center; gap: 6px; }
+.label { color: var(--color-ink); font-size: 13px; line-height: 20px; font-weight: 700; }
+.required { background: var(--color-liff-required-bg, var(--color-canvas-sunken)); color: var(--color-liff-sun, var(--color-ink)); padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.optional { color: var(--color-liff-sub, var(--color-ink-faint)); font-size: 11px; font-weight: 400; white-space: nowrap; }
+.choiceInput { width: 18px; height: 18px; accent-color: var(--color-liff-primary, var(--color-accent)); flex-shrink: 0; }
+
+.nightInput { width: 100%; min-width: 0; height: 44px; border: 0; border-radius: 999px; padding: 0 16px; background: var(--color-night-panel); color: white; font-size: 13px; }
+.nightInput::placeholder { color: var(--color-night-dim); }
+
+.concealedInput { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; padding: 0; border: 0; }
+.pinInput { position: absolute; inset-inline: 0; bottom: 0; height: 48px; width: 100%; cursor: text; opacity: 0; }

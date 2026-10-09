@@ -27,6 +27,7 @@ import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import StoreTabs, { type StoreTabKey } from '../store-tabs/store-tabs'
 import styles from './shell.module.css'
+import StoreFilterTabs from '@/components/shared/store-filter-tabs'
 
 export interface RestaurantV8Context {
   data: RestaurantSnapshot
@@ -46,9 +47,9 @@ export interface RestaurantV8Context {
 export class QuietError extends Error {}
 
 const statusLabel: Record<string, string> = {
-  connected: '正常', active: '有効', invited: '招待中', suspended: '停止中', archived: '保管済', approved: '承認済', completed: '完了', visited: '来店済',
+  connected: '正常', active: '有効', invited: '招待中', suspended: '停止中', archived: 'アーカイブ', approved: '承認済', completed: '完了', visited: '来店済',
   confirmed: '予約確定', warning: '要確認', pending: '承認待ち', draft: '下書き', scheduled: '予約済', paused: '停止中',
-  unreplied: '未返信', unconfigured: '未設定', disabled: '無効', error: 'エラー', returned: '差戻し',
+  unreplied: '未返信', unconfigured: '未設定', disabled: '停止中', error: 'エラー', returned: '差戻し',
   seated: '来店中', cancelled: '取消', no_show: '無断キャンセル', preview_only: 'プレビューのみ',
 }
 
@@ -209,10 +210,10 @@ export default function RestaurantShell({ boardId, title, description, query, he
     children(ctx)
   )
   const storePicker = snapshot && snapshot.stores.length > 0 ? (
-    <span className={`${styles.storePicker} ${layout === 'standard' ? '' : styles.storeLedger}`}>
-      <Select
-        aria-label="店舗を選ぶ"
-        size="full"
+    <span>
+      <StoreFilterTabs
+
+
         value={selectedStoreId}
         onChange={setSelectedStoreId}
         options={snapshot.stores.map((item) => ({ value: item.id, label: `店舗：${item.name}` }))}
@@ -237,13 +238,13 @@ export default function RestaurantShell({ boardId, title, description, query, he
       {templateHeading ? <PageHeading
         inset="none"
         title={title}
-        description={typeof description === 'function' ? description(ctx) : description}
+        help={typeof description === 'function' ? description(ctx) : description}
         actions={headAfter ? headAfter(ctx, storePicker) : storePicker}
       /> : (
       <div className={`${styles.head} ${layout === 'standard' ? '' : styles.headLedger}`}>
         <div className={styles.headText}>
-          <h1 className={`${styles.headTitle} ${headSize === 'compact' ? styles.headTitleCompact : ''}`}>{title}</h1>
-          <p className={`${styles.headDescription} ${headSize === 'compact' ? styles.headDescriptionCompact : ''}`}>{typeof description === 'function' ? description(ctx) : description}</p>
+          <PageHeading title={title} help={<> {typeof description === 'function' ? description(ctx) : description}</>} />
+
         </div>
         {headAfter ? headAfter(ctx, storePicker) : storePicker}
       </div>
