@@ -1,8 +1,9 @@
 'use client'
 
 import { useCallback, useRef, useState } from 'react'
-import { api } from '@/lib/api'
-import FileDropzone from './file-drop'
+import MediaSlot from './media-slot'
+import { uploadImageFile } from './media-library-upload'
+import { TextField } from './text-field'
 
 export type ImageUploaderMode = 'url' | 'line-image'
 
@@ -14,203 +15,98 @@ export interface ImageUploaderProps {
   mode: ImageUploaderMode
   value: ImageUploaderValue | null
   onChange: (next: ImageUploaderValue | null) => void
+  /** 欄の上の見出し。 */
   label?: string
+  /** 枠の真ん中の太字の題（「メイン画像を追加」など）。 */
+  title?: string
+  /** 渡すと「登録メディアから選ぶ」を出す。 */
+  onMediaPick?: () => void
+  readOnly?: boolean
+  disabled?: boolean
+  size?: 'regular' | 'compact'
+  /** url の形の上限（MB）。既定 10。 */
+  maxMB?: number
 }
 
 /**
- * 汎用画像アップローダー: ボタン + D&D + クリップボードペースト + プレビュー。
+ * 画像を入れる所（共通の MediaSlot・Z7vd2）に、今までの送り先（api.uploads.image）と
+ * 形式・大きさの検査をつないだもの。
  *
  * mode='url' は単一 URL を返す (Event / Staff など)。
  * mode='line-image' は {originalContentUrl, previewImageUrl} を返す (Broadcast / Auto-reply / Template / Chats)。
  * 初版は preview = original の同 URL。後段で本格 resize が必要になれば worker 側で対応。
+ * 「URL で入れる」で URL の欄を開ける。貼り付け（Cmd+V）でも受ける。
  */
-export default function ImageUploader({ mode, value, onChange, label }: ImageUploaderProps) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
+export default function ImageUploader({
+  mode,
+  value,
+  onChange,
+  label,
+  title = '画像を追加',
+  onMediaPick,
+  readOnly = false,
+  disabled = false,
+  size = 'regular',
+  maxMB = 10,
+}: ImageUploaderProps) {
   const [manualUrlMode, setManualUrlMode] = useState(false)
-  /*
-   * 送り出した取り込みの世代。新しい画像を選ぶ・取り消す・URL を手で入れると進める。
-   * 遅れて返った前の取り込みで、あとから選んだ画像や取り消しを上書きしない（監査 WEB-026）。
-   */
-  const uploadGenRef = useRef(0)
-  const invalidateUpload = useCallback(() => {
-    uploadGenRef.current += 1
-    setBusy(false)
-  }, [])
+  const lineImage = mode === 'line-image'
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
 
-  const upload = useCallback(
-    async (file: File) => {
-      if (!file.type.startsWith('image/')) {
-        setError('画像ファイルのみアップロードできます')
-        return
-      }
-      if (mode === 'line-image' && !['image/jpeg', 'image/png'].includes(file.type)) {
-        setError('LINE 送信用は JPEG または PNG のみ対応')
-        return
-      }
-      if (mode === 'line-image' && file.size > 1024 * 1024) {
-        setError('LINE 送信用は 1MB 以下にしてください (preview サイズ制限)')
-        return
-      }
-      if (file.size > 10 * 1024 * 1024) {
-        setError('10MB 以下にしてください')
-        return
-      }
-      const gen = ++uploadGenRef.current
-      setBusy(true)
-      setError('')
-      try {
-        const res = await api.uploads.image(file)
-        if (gen !== uploadGenRef.current) return
-        if (!res.success) {
-          setError(res.error ?? 'アップロード失敗')
-          return
-        }
-        const url = res.data.url
-        if (mode === 'url') {
-          onChange({ mode: 'url', url })
-        } else {
-          onChange({ mode: 'line-image', originalContentUrl: url, previewImageUrl: url })
-        }
-      } catch {
-        if (gen !== uploadGenRef.current) return
-        setError('アップロード失敗')
-      } finally {
-        if (gen === uploadGenRef.current) setBusy(false)
-      }
-    },
-    [mode, onChange],
+  const toValue = useCallback(
+    (url: string): ImageUploaderValue =>
+      lineImage ? { mode: 'line-image', originalContentUrl: url, previewImageUrl: url } : { mode: 'url', url },
+    [lineImage],
   )
 
-  const handleFiles = useCallback(
-    (files: FileList | null) => {
-      const f = files?.[0]
-      if (f) void upload(f)
+  const validate = useCallback(
+    (file: File) => {
+      if (!file.type.startsWith('image/')) return '画像ファイルのみアップロードできます'
+      if (lineImage && !['image/jpeg', 'image/png'].includes(file.type)) return 'LINE 送信用は JPEG または PNG のみ対応'
+      if (lineImage && file.size > 1024 * 1024) return 'LINE 送信用は 1MB 以下にしてください (preview サイズ制限)'
+      if (file.size > maxMB * 1024 * 1024) return `${maxMB}MB 以下にしてください`
+      return ''
     },
-    [upload],
+    [lineImage, maxMB],
   )
 
-  const onDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault()
-      handleFiles(e.dataTransfer.files)
-    },
-    [handleFiles],
-  )
 
-  const onPaste = useCallback(
-    (e: React.ClipboardEvent) => {
-      const item = [...e.clipboardData.items].find((i) => i.type.startsWith('image/'))
-      const file = item?.getAsFile()
-      if (file) void upload(file)
-    },
-    [upload],
-  )
-
-  const previewUrl =
-    value === null
-      ? null
-      : value.mode === 'url'
-        ? value.url
-        : value.previewImageUrl
+  const url = value === null ? '' : value.mode === 'url' ? value.url : value.originalContentUrl
+  const previewUrl = value === null ? '' : value.mode === 'url' ? value.url : value.previewImageUrl
 
   return (
     <div className="space-y-2">
       {label && <div className="text-sm font-medium text-ink-secondary">{label}</div>}
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={() => setManualUrlMode((v) => !v)}
-          className="text-xs text-action underline"
-        >
-          {manualUrlMode ? '画像アップロードに戻す' : 'URL を直接入力'}
-        </button>
-      </div>
-      {manualUrlMode ? (
-        <input
-          type="url"
-          value={
-            value === null
-              ? ''
-              : value.mode === 'url'
-                ? value.url
-                : value.originalContentUrl
-          }
-          onChange={(e) => {
-            invalidateUpload()
-            const url = e.target.value
-            if (!url) {
-              onChange(null)
-              return
-            }
-            if (mode === 'url') {
-              onChange({ mode: 'url', url })
-            } else {
-              onChange({ mode: 'line-image', originalContentUrl: url, previewImageUrl: url })
-            }
-          }}
-          placeholder="https://... (外部 CDN / R2 URL)"
-          className="w-full rounded-mini border border-hairline px-3 py-2 text-sm"
-        />
-      ) : previewUrl ? (
-        <div
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={onDrop}
-          onPaste={onPaste}
-          tabIndex={0}
-          className="rounded-control border-2 border-dashed border-hairline bg-canvas p-4 transition-colors hover:border-ink-disabled focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
-        >
-          <div className="flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={previewUrl} alt="" className="h-24 w-24 rounded-mini object-cover ring-1 ring-hairline" />
-            <div className="flex-1 space-y-2">
-              <button
-                type="button"
-                onClick={() => inputRef.current?.click()}
-                className="text-xs font-medium text-ink-secondary underline"
-              >
-                差し替え
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  invalidateUpload()
-                  onChange(null)
-                }}
-                className="ml-3 text-xs font-medium text-status-danger underline"
-              >
-                取り消し
-              </button>
-            </div>
-          </div>
-          <input
-            ref={inputRef}
-            type="file"
-            accept={mode === 'line-image' ? 'image/jpeg,image/png' : 'image/*'}
-            className="hidden"
-            onChange={(e) => handleFiles(e.target.files)}
-          />
-        </div>
-      ) : (
-        // ★V7 `NQMnx` の落とす場所。押す・落とす・貼り付けの動きはそのまま。
-        <div onPaste={onPaste}>
-          <FileDropzone
-            title="ここに画像を落とす"
-            hint={mode === 'line-image' ? 'JPEG・PNG、10MB まで' : '画像ファイル、10MB まで'}
-            accept={mode === 'line-image' ? 'image/jpeg,image/png' : 'image/*'}
-            busy={busy}
-            busyTitle="取り込んでいます…"
-            rejectTitle="この画像は追加できません"
-            rejectHint={mode === 'line-image' ? 'JPEG・PNG だけ選んでください' : '画像ファイルを選んでください'}
-            onFiles={(files) => {
-              const first = files[0]
-              if (first) void upload(first)
+      <MediaSlot
+        title={title}
+        value={previewUrl || null}
+        accept={lineImage ? 'image/jpeg,image/png' : 'image/*'}
+        limitText={lineImage ? '1ファイル1メガバイト以内・JPEG・PNG' : `1ファイル${maxMB}メガバイト以内・画像`}
+        validate={validate}
+        upload={uploadImageFile}
+        onChange={(next) => onChangeRef.current(next ? toValue(next) : null)}
+        onUrl={readOnly ? undefined : () => setManualUrlMode((open) => !open)}
+        onMediaPick={readOnly ? undefined : onMediaPick}
+        readOnly={readOnly}
+        disabled={disabled}
+        size={size}
+        acceptPaste
+      >
+        {manualUrlMode && !readOnly ? (
+          <TextField
+            type="url"
+            aria-label={`${title.replace(/を追加$/, '')}の URL`}
+            value={url}
+            disabled={disabled}
+            onChange={(event) => {
+              const next = event.target.value
+              onChangeRef.current(next ? toValue(next) : null)
             }}
+            placeholder="https://... (外部 CDN / R2 URL)"
           />
-        </div>
-      )}
-      {error && <div className="text-xs text-status-danger">{error}</div>}
+        ) : null}
+      </MediaSlot>
     </div>
   )
 }

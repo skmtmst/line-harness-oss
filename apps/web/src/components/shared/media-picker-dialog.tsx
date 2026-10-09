@@ -22,11 +22,10 @@ const KIND_LABEL: Record<MediaItem['kind'], string> = {
 type Phase = 'loading' | 'ready' | 'empty' | 'error'
 
 /**
- * 登録メディアから選ぶ窓（app/contents/media-picker-dialog.tsx の写し）。
- * src/v8 から古い画面ファイルを import できないため、同じ中身をここに持つ。
- * 回答フォームの背景画像・リンクのカード画像を選ぶのに使う。
+ * 登録メディアを別の機能から選ぶ共通の窓（N-193 / N-205）。
  *
- * もとの説明：登録メディアを別の機能から選ぶ共通の窓（N-193 / N-205）。
+ * 今まで app/contents・v8/template-edit・v8/form-edit に3つの写しがあったのを、
+ * ここ1つにまとめた（B-128）。画像を入れる所（media-slot）の「登録メディアから選ぶ」から開く。
  *
  * - 名前検索とページ送りを併用できる（検索すると1ページ目へ戻る）。
  * - 読込中・0件・失敗を分けて出す。失敗は「読み直す」でやり直せる。
@@ -185,7 +184,7 @@ export default function MediaPickerDialog({
                     type="button"
                     role="option"
                     aria-selected={false}
-                    className="hover:bg-canvas-sunken focus:bg-canvas-sunken flex w-full items-center gap-3 px-3 py-2 text-left focus:outline-none"
+                    className="hover:bg-canvas-sunken focus:bg-canvas-sunken flex w-full items-center gap-3 px-3 py-2 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-action"
                     onClick={() => onSelect(item)}
                   >
                     {item.kind === 'image' && accountId ? (

@@ -31,7 +31,6 @@ import {
   Clock,
   Copy,
   Folder as FolderIcon,
-  Inbox,
   Layers,
   MessageSquare,
   Pause,
@@ -70,9 +69,7 @@ import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import SortSelect from '@/components/ui/sort-select'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
-import FolderAddDialog from '@/components/shared/folder-add-dialog'
-import { useFolderRowActions } from '@/components/shared/folder-row-actions'
+import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import { Field } from '@/components/shared/form-controls'
@@ -265,7 +262,6 @@ export default function AutoRepliesListV8() {
   const [folders, setFolders] = useState<Folder[]>([])
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   const [folderFilter, setFolderFilter] = useListUrlParam('folder')
-  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [sortKey, setSortKey] = useState<SortKey>('priority')
   const [savedFilter, setSavedFilter] = useListUrlParam('view')
   const [stoppedOnly, setStoppedOnly] = useListUrlFlag('stopped')
@@ -370,17 +366,6 @@ export default function AutoRepliesListV8() {
     }
   }, [])
 
-  /* フォルダの「…」：名前を変える・色を変える・並べ替える・消す（共通部品・B-35）。 */
-  const folderActions = useFolderRowActions({
-    kind: 'auto_reply',
-    folders,
-    accountId: null,
-    enabled: canEdit,
-    itemLabel: '自動応答',
-    countOf: (id) => folders.find((f) => f.id === id)?.itemCount ?? null,
-    onChanged: () => loadFolders(),
-    onDeleted: (id) => { if (folderFilter === id) setFolderFilter('') },
-  })
 
   useEffect(() => { load() }, [load])
   useEffect(() => { void loadFolders() }, [loadFolders])
@@ -983,17 +968,6 @@ export default function AutoRepliesListV8() {
     const folder = folders.find((f) => f.id === r.folderId)
     return folder ? { name: folder.name, color: folder.color } : null
   }
-  const folderRows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: '', label: 'すべて', count: rules.length, icon: <Inbox size={15} aria-hidden="true" /> },
-    ...folders.map((f, index) => ({ kind: 'folder' as const, ...folderActions.rowActions(f, index),
-      id: f.id,
-      label: f.name,
-      // フォルダ件数は API(itemCount) をそのまま出す。来ないときは null（出さない）。
-      count: f.itemCount ?? null,
-      color: f.color,
-    })),
-    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
-  ]
   const folderSelectOptions = [
     { value: '', label: 'フォルダ：すべて' },
     ...folders.map((f) => ({ value: f.id, label: f.name })),
@@ -1001,20 +975,23 @@ export default function AutoRepliesListV8() {
   ]
 
   const folderPanel = (
-    <FolderPanel
+    <ManagedFolderPanel
+      kind="auto_reply"
+      folders={folders}
+      onChanged={loadFolders}
+      canManage={canEdit}
+      itemLabel="ルール"
       activeId={folderFilter}
       onSelect={(id) => {
         setFolderFilter(id)
         setPage(1)
       }}
-      onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}
-      addFolderLabel="フォルダを追加"
-      rows={folderRows}
-    >
-      <p className={styles.folderNote}>
-        フォルダを消しても、中のルールは未分類に残ります。
-      </p>
-    </FolderPanel>
+      allId=""
+      unfiledId={UNFILED}
+      allCount={rules.length}
+      unfiledCount={unfiledCount}
+      placeholder="例: 01_営業時間外"
+    />
   )
 
   /* ===== 数の帯 ===== */
@@ -1660,16 +1637,6 @@ export default function AutoRepliesListV8() {
         V7＋V8 の和集合で見えてしまい、どちらの設計とも一致しなくなる。
         KPIs は V7 と同じ節名なので残す。
       */}
-      {folderActions.dialogs}
-      {folderDialogOpen && (
-        <FolderAddDialog
-          kind="auto_reply"
-          note="自動応答を分けてしまう箱です。消しても、入っていた応答は未分類として残ります。"
-          placeholder="例: 01_営業時間外"
-          onClose={() => setFolderDialogOpen(false)}
-          onAdded={() => void loadFolders()}
-        />
-      )}
 
       {/* 止める・再開の確認窓（`i8F12`：理由つき）。単体でもまとめてでも同じ形。 */}
       <Dialog

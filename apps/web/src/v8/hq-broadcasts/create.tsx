@@ -12,12 +12,13 @@
  * 除くタグ・詳細条件）は統括の口に無いので出さない（BEHAVIOR.md の「今の口で出せないもの」）。
  */
 import BroadcastAccountPicker, { type BroadcastAccount } from './account-picker'
+import { EntityPickerField, EntityPickerSummary } from '@/components/shared/entity-picker'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Steps } from '@/components/templates/steps'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { AlertTriangle, ArrowDown, ArrowRight, CheckCircle2, Eye, Send } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowRight, Building2, CheckCircle2, Eye, Send, Tag as TagIcon, Workflow } from 'lucide-react'
 import type { Folder, HqBroadcastInput, HqBroadcastPreflight, HqBroadcastRun, MessageTemplateDefinition, SegmentCondition } from '@line-crm/shared'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import Dialog from '@/components/shared/dialog'
@@ -28,7 +29,6 @@ import { pruneCondition } from '@/lib/segment-condition'
 import { HqApprovalBlock, HqTestSendDialog, approvalGate, useHqApproval } from './approval'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import Combobox from '@/components/shared/combobox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
@@ -43,6 +43,7 @@ import Select from '@/components/shared/select'
 import FolderSelect from '@/components/shared/folder-select'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
+import { useFormErrors } from '@/lib/use-form-errors'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
@@ -471,6 +472,18 @@ export default function HqBroadcastCreate() {
     return result?.run.id ?? null
   }
 
+  /*
+   * 吹き出しの不備（B-139・店の一斉配信と同じ）：帯ではなく吹き出しの中身の下に理由、頭に赤い丸、
+   * メッセージの段を開いて1つ目の吹き出しへ移る。配信名・送り先・日時は段の帯（［〇〇へ移動］つき）のまま。
+   */
+  const fields = useFormErrors()
+  bubbles.forEach((item, index) => {
+    fields.define(`bubble-${index}`, `${index + 1}通目`, () => hqBubbleProblem(item) || null, {
+      reveal: () => { if (step !== 'message') changeStep('message'); setOpenBubble(index) },
+      group: `bubble-${index}`,
+    })
+  })
+
   /** 入れていない所と、その欄のある段（店の一斉配信の「保存を押した段で理由を示す」と同じ）。 */
   const problem = (): { message: string; step: BroadcastStepKey } | null => {
     if (!title.trim()) return { message: '配信名を入れてください', step: 'basic' }
@@ -491,7 +504,10 @@ export default function HqBroadcastCreate() {
   /** 作る（下書きを固定）→ 確かめる → 問題のある店を外す。中身が変わったら同じ下書きを直す（版つき・依頼番号はそのまま）。 */
   const check = async (): Promise<{ run: HqBroadcastRun; checks: HqBroadcastPreflight[] } | null> => {
     const why = problem()
-    if (why) { setError(why.message); setErrorStep(why.step); return null }
+    if (why) {
+      if (why.step === 'message' && fields.submit().length > 0) { setError(''); setErrorStep(null); return null }
+      setError(why.message); setErrorStep(why.step); return null
+    }
     setChecking(true); setError(''); setErrorStep(null)
     try {
       let current = run
@@ -669,7 +685,9 @@ export default function HqBroadcastCreate() {
 
   const sendableChosen = chosen.filter((s) => !excluded.includes(s.id))
   const friendTotal = sendableChosen.some((s) => s.friendCount == null) ? null : sendableChosen.reduce((sum, s) => sum + (s.friendCount ?? 0), 0)
-  const accountSummary = chosen.length === 0 ? 'まだ選んでいません' : `${formatNumber(chosen.length)} アカウント：${chosen.slice(0, 2).map((account) => account.name).join('・')}${chosen.length > 2 ? ` ほか${chosen.length - 2}` : ''}`
+  const accountSummary = `${chosen.slice(0, 2).map((account) => account.name).join('・')}${chosen.length > 2 ? ` ほか${chosen.length - 2}` : ''}`
+  /** 統括のタグ・シナリオは名前で送る（API-18）。窓の候補も名前を ID にする。 */
+  const byName = (rows: Array<{ name: string; accounts: number }> | null | undefined) => (rows ?? []).map((t) => ({ id: t.name, name: t.name, meta: `${t.accounts}/${chosen.length}アカウント` }))
   const closeAccountPicker = () => { setAccountPickerOpen(false); requestAnimationFrame(() => accountPickerTrigger.current?.focus()) }
   const totals = checks && !stale ? sendTotals(checks) : null
   const peopleLabel = totals ? `${formatNumber(totals.sendPeople)}人` : audience === 'all' && chosen.length > 0 && friendTotal != null ? `${formatNumber(friendTotal)}人` : '—人'
@@ -848,9 +866,9 @@ export default function HqBroadcastCreate() {
                 <div className={styles.accounts} data-design-node="J5DH6o">
                   <h3>送るアカウント</h3>
                   {loadError && !stores ? <ListState kind="error" error={loadError} onRetry={() => window.location.reload()} /> : !stores ? <ListState kind="loading" /> : (
-                    <div className={styles.accountSelection}>
-                      <p className={styles.accountSummary} title={accountSummary} aria-live="polite">{accountSummary}</p>
-                      {canManage ? <Button ref={accountPickerTrigger} onClick={() => setAccountPickerOpen(true)}>{chosen.length ? '選び直す' : 'アカウントを選ぶ'}</Button> : null}
+                    <div className={styles.accountSelection} aria-live="polite">
+                      <EntityPickerSummary label="送るアカウント" noun="送るアカウント" icon={Building2} name={chosen.length ? `${formatNumber(chosen.length)} アカウント` : ''} meta={accountSummary}
+                        readOnly={!canManage} buttonRef={accountPickerTrigger} onOpen={() => setAccountPickerOpen(true)} />
                     </div>
                   )}
                 </div>
@@ -882,17 +900,9 @@ export default function HqBroadcastCreate() {
                 ) : null}
                 {audience === 'scenario' ? (
                   <div className="border-hairline border-t pt-4">
-                    <label className="text-ink-secondary block text-xs font-semibold">どのシナリオ</label>
-                    <Combobox
-                      aria-label="どのシナリオ"
-                      placeholder="すべてのシナリオ（どれか1つでも購読中）"
-                      value={scenarioName}
-                      onChange={setScenarioName}
-                      options={(scenarioOptions ?? []).map((t) => ({ value: t.name, label: `${t.name}（${t.accounts}/${chosen.length}アカウント）` }))}
-                      loading={tagStatus === 'loading'}
-                      disabled={tagStatus !== 'ready' || chosen.length === 0}
-                      className="mt-1 w-full sm:max-w-sm"
-                    />
+                    <p className="text-ink-secondary mb-1 block text-xs font-semibold">どのシナリオ</p>
+                    <EntityPickerField label="どのシナリオ" noun="シナリオ" icon={Workflow} items={byName(scenarioOptions)} value={scenarioName} onChange={setScenarioName}
+                      clearable placeholder="（すべてのシナリオ：どれか1つでも購読中）" disabled={tagStatus !== 'ready' || chosen.length === 0} />
                     {scenarioName && (scenarioOptions ?? []).some((t) => t.name === scenarioName && t.accounts < chosen.length) ? (
                       <p className="mt-1 text-xs text-warning">このシナリオが無いアカウントには送りません（最終確認で外します）。</p>
                     ) : null}
@@ -900,17 +910,9 @@ export default function HqBroadcastCreate() {
                 ) : null}
                 {audience === 'tag' ? (
                   <div className="border-hairline border-t pt-4">
-                    <label className="text-ink-secondary block text-xs font-semibold">含めるタグ</label>
-                    <Combobox
-                      aria-label="含めるタグ"
-                      placeholder="タグを選んでください"
-                      value={tagName}
-                      onChange={setTagName}
-                      options={(tagOptions ?? []).map((t) => ({ value: t.name, label: `${t.name}（${t.accounts}/${chosen.length}アカウント）` }))}
-                      loading={tagStatus === 'loading'}
-                      disabled={tagStatus !== 'ready' || chosen.length === 0}
-                      className="mt-1 w-full sm:max-w-sm"
-                    />
+                    <p className="text-ink-secondary mb-1 block text-xs font-semibold">含めるタグ</p>
+                    <EntityPickerField label="含めるタグ" noun="タグ" icon={TagIcon} items={byName(tagOptions)} value={tagName} onChange={setTagName}
+                      disabled={tagStatus !== 'ready' || chosen.length === 0} />
                     {tagStatus === 'ready' && chosen.length > 0 && (tagOptions ?? []).length === 0 ? <p className="mt-1 text-xs text-ink-faint">選んだアカウントにタグがありません。</p> : null}
                     {tagName && (tagOptions ?? []).some((t) => t.name === tagName && t.accounts < chosen.length) ? (
                       <p className="mt-1 text-xs text-warning">このタグが無いアカウントには送りません（最終確認で外します）。</p>
@@ -945,7 +947,7 @@ export default function HqBroadcastCreate() {
                   <Checkbox checked onCheckedChange={() => {}} disabled>ブロック中の人を除く</Checkbox>
                   <small>ブロック中・非表示・宛先不明の友だちには送りません</small>
                 </div>
-                <label className={formStyles.excludeTag}><span className={formStyles.labelRow}>除くタグ <span className="text-xs text-ink-faint">任意</span></span><Select aria-label="除くタグ" value={excludeTag} onChange={setExcludeTag} disabled={tagStatus !== 'ready' || chosen.length === 0} options={[{ value: '', label: '除外なし' }, ...(tagOptions ?? []).map((t) => ({ value: t.name, label: `${t.name}（${t.accounts}/${chosen.length}アカウント）` }))]} size="full" /></label>
+                <div className={formStyles.excludeTag}><span className={formStyles.labelRow}>除くタグ <span className="text-xs text-ink-faint">任意</span></span><EntityPickerField label="除くタグ" noun="タグ" icon={TagIcon} items={byName(tagOptions)} value={excludeTag} onChange={setExcludeTag} clearable placeholder="（除外なし）" disabled={tagStatus !== 'ready' || chosen.length === 0} /></div>
                 <div className={formStyles.exclusion}>
                   <Checkbox checked={false} onCheckedChange={() => {}} disabled>この1週間に送った人を除く</Checkbox>
                   <small>最近送った人を除く機能は、まだ使えません</small>
@@ -960,6 +962,8 @@ export default function HqBroadcastCreate() {
             {shows('message') ? (
               <section id="broadcast-step-message" className={formStyles.section}>
                 <MessageComposer
+                  bubbleErrors={bubbles.map((_, index) => fields.error(`bubble-${index}`))}
+                  bubbleFieldProps={(index) => fields.bind(`bubble-${index}`)}
                   bubbles={bubbles.map((item) => item.kind === 'text' ? { id: item.id, type: 'text', content: { text: item.body } } : toApiBubble(item, item.id) ?? { id: item.id, type: 'research', content: item.content })}
                   accountId={null}
                   busy={composerBusy} onBusyChange={setComposerBusy}

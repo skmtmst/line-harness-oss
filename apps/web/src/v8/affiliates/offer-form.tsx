@@ -10,6 +10,7 @@ import type { LineAccount, Scenario, Tag } from '@line-crm/shared'
 import { api, type AffiliateOffer } from '@/lib/api'
 import Dialog from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import Toggle from '@/components/shared/toggle'
 import { Field } from '@/components/shared/form-controls'
 import { TextField, TextArea } from '@/components/shared/text-field'
@@ -279,34 +280,36 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
         </div>
 
         <div>
-          <label className="text-ink-secondary mb-1 block text-xs font-medium">タグ</label>
-          <Select
-            aria-label="タグ"
+          <span className="text-ink-secondary mb-1 block text-xs font-medium">タグ</span>
+          <EntityKindField
+            kind="tag"
+            label="タグ"
+            accountId={lineAccountId || null}
             value={tagId}
             onChange={(value) => setTagId(value)}
+            clearable
+            placeholder="（選択しない）"
             options={[
-              { value: '', label: '— 選択しない —' },
-              ...accountTags.map((tag) => ({ value: tag.id, label: tag.name })),
-              ...(tagIdStale ? [{ value: tagId, label: `${staleTagName ?? tagId}（このアカウントでは使えません）` }] : []),
+              ...accountTags,
+              ...(tagIdStale ? [{ id: tagId, name: `${staleTagName ?? tagId}（このアカウントでは使えません）` }] : []),
             ]}
-            className="w-full"
-            size="full"
           />
         </div>
 
         <div>
-          <label className="text-ink-secondary mb-1 block text-xs font-medium">シナリオ</label>
-          <Select
-            aria-label="シナリオ"
+          <span className="text-ink-secondary mb-1 block text-xs font-medium">シナリオ</span>
+          <EntityKindField
+            kind="scenario"
+            label="シナリオ"
+            accountId={lineAccountId || null}
             value={scenarioId}
             onChange={(value) => setScenarioId(value)}
+            clearable
+            placeholder="（選択しない）"
             options={[
-              { value: '', label: '— 選択しない —' },
-              ...accountScenarios.map((s) => ({ value: s.id, label: s.name })),
-              ...(scenarioIdStale ? [{ value: scenarioId, label: `${staleScenarioName ?? scenarioId}（このアカウントでは使えません）` }] : []),
+              ...accountScenarios,
+              ...(scenarioIdStale ? [{ id: scenarioId, name: `${staleScenarioName ?? scenarioId}（このアカウントでは使えません）` }] : []),
             ]}
-            className="w-full"
-            size="full"
           />
         </div>
 

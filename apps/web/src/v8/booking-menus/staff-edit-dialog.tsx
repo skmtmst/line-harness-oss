@@ -122,6 +122,7 @@ export function StaffEditModal({
             value={form.profile_image_url ? { mode: 'url', url: form.profile_image_url } : null}
             onChange={(v) => set('profile_image_url', v?.mode === 'url' ? v.url : '')}
             label="プロフィール画像"
+            title="プロフィール画像を追加"
           />
           <p className="text-ink-faint -mt-3 text-xs">
             http:// または https:// で始まるURLを入力してください。

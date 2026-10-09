@@ -152,6 +152,19 @@ describe('V8 NEN配信「配信を直す」（w5pwG）', () => {
     expect(host.textContent).toContain('配信内容を保存しました')
   })
 
+  it('B-139：本文が空のまま保存すると、口を呼ばず本文の欄が赤くなり、真下に理由が出て、本文へ移る', async () => {
+    calls.settings.mockResolvedValue({ success: true, data: [{ ...REVIEW, bodyText: '' }] })
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) })
+    await flush()
+    await act(async () => { fireEvent.click(button('配信内容を保存する')!) })
+    await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    expect(calls.updateSetting).not.toHaveBeenCalled()
+    const body = document.getElementById('nen-edit-body')!
+    expect(body.getAttribute('aria-invalid')).toBe('true')
+    expect(document.getElementById('nen-edit-body-error')?.textContent).toBe('本文を入力してください')
+    expect(body.contains(document.activeElement) || document.activeElement === body).toBe(true)
+  })
+
   it('閲覧のみの人には帯を出し、保存・テスト送信・押せない選ぶ欄を置かない', async () => {
     role.value = 'staff'
     await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) })
@@ -173,7 +186,11 @@ describe('V8 NEN配信「コラムを書く」（yRDwW）', () => {
     const input = (label: string) => host.querySelector(`input[aria-label="${label}"]`) as HTMLInputElement
     await act(async () => { fireEvent.change(input('題名'), { target: { value: '秋の食事、量はどれくらい？' } }) })
     await act(async () => { fireEvent.change(input('記事の URL'), { target: { value: 'https://nen.example.jp/columns/autumn-food' } }) })
-    await pick('配信対象', 'タグで絞る：ペット登録あり')
+    // 配信対象は選ぶ窓の1つの欄。空＝友だち全員、タグを選ぶとそのタグで絞る。
+    await act(async () => { document.querySelector<HTMLButtonElement>('button[aria-label="配信対象：選ぶ"]')!.click() })
+    const picker = [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].at(-1)!
+    await act(async () => { picker.querySelector<HTMLInputElement>('input[type="radio"][aria-label="ペット登録あり"]')!.click() })
+    await act(async () => { [...picker.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === '選ぶ')!.click() })
     await flush()
     expect(host.textContent).toContain('1,240人に届きます')
     await act(async () => { fireEvent.click(button('下書きを保存')!) })

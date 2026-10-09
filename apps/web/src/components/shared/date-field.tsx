@@ -4,6 +4,7 @@ import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import MenuPortal from './menu-portal'
 import styles from './date-field.module.css'
+import { joinDescribedBy, useFieldContext } from './field-context'
 
 /**
  * 日付の選択。Pencil ★V8（V8.pen）「日付の入力（カレンダー）」。
@@ -48,8 +49,11 @@ export default function DateField({
   'aria-labelledby'?: string
   'aria-describedby'?: string
 }) {
+  // Field の中に置くと、欄の誤り（赤）と説明の読み上げを受け取る（B-139）。
+  const field = useFieldContext()
+  invalid = invalid || Boolean(field?.invalid)
   const autoId = useId()
-  const fieldId = id ?? autoId
+  const fieldId = id ?? field?.controlId ?? autoId
   const dialogId = `${fieldId}-calendar`
   const selected = parseDate(value)
   const [open, setOpen] = useState(false)
@@ -165,7 +169,8 @@ export default function DateField({
         aria-controls={open ? dialogId : undefined}
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledBy}
-        aria-describedby={ariaDescribedBy}
+        aria-invalid={invalid || undefined}
+        aria-describedby={joinDescribedBy(ariaDescribedBy, field?.describedBy)}
         data-open={open || undefined}
         onClick={() => (open ? setOpen(false) : openCalendar())}
         onKeyDown={(event) => {

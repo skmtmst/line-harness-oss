@@ -20,7 +20,8 @@ import ConditionBuilder, {
   pruneCondition,
   type SegmentCondition,
 } from '@/components/shared/condition-builder'
-import { TextInput } from '@/components/shared/form-controls'
+import { FieldError, TextInput } from '@/components/shared/form-controls'
+import { useFormErrors } from '@/lib/use-form-errors'
 import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -158,22 +159,18 @@ function EditInner() {
   const dirty = state === 'ready' && JSON.stringify(draftPayload) !== originalDraft
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
+  /* 保存で落ちた欄は、その欄の真下に理由を出して移る（B-139）。 */
+  const fields = useFormErrors()
+  fields.define('name', 'ルール名', () => (name.trim() ? null : 'ルール名を入力してください'))
+  fields.define('amount', '付与マイル', () => (validAmount ? null : '付与マイルは1以上の整数で入力してください'))
+  fields.define('period', '開始日・終了日', () => (validFrom && validUntil && validFrom > validUntil ? '終了日は開始日より後にしてください' : null))
+  fields.define('expiry', '有効期限の日数', () => (expiryDays !== null && (!Number.isInteger(expiryDays) || expiryDays < 1 || expiryDays > 3650) ? '有効期限は1〜3650日で入力してください' : null))
+  const describedBy = (key: string) => (fields.invalid(key) ? `er-${key}-error` : undefined)
+
   const save = async () => {
     if (!rule || !selectedAccountId || rule.id !== ruleId) return
-    if (!name.trim()) {
-      setSaveError('ルール名を入力してください')
-      return
-    }
-    if (!validAmount) {
-      setSaveError('付与マイルは1以上の整数で入力してください')
-      return
-    }
-    if (expiryDays !== null && (!Number.isInteger(expiryDays) || expiryDays < 1 || expiryDays > 3650)) {
-      setSaveError('有効期限は1〜3650日で入力してください')
-      return
-    }
-    if (validFrom && validUntil && validFrom > validUntil) {
-      setSaveError('終了日は開始日より後にしてください')
+    if (fields.submit().length > 0) {
+      setSaveError('')
       return
     }
     setSaving(true)
@@ -261,11 +258,12 @@ function EditInner() {
           <section className={formStyles.card} aria-label="どのルールか">
             <h2 className={formStyles.cardTitle}>どのルールか</h2>
             <p className={formStyles.cardNote}>きっかけになる行動を選びます</p>
-            <label className={formStyles.field}>
+            <div className={formStyles.field}>
               <span className={formStyles.label}>ルール名 <span className={formStyles.required}>必須</span></span>
-              <TextInput type="text" value={name} onChange={(e) => setName(e.target.value)} aria-label="ルール名" />
+              <TextInput {...fields.bind('name')} invalid={fields.invalid('name')} aria-describedby={describedBy('name')} type="text" value={name} onChange={(e) => setName(e.target.value)} aria-label="ルール名" />
+              <FieldError id="er-name-error">{fields.error('name')}</FieldError>
               <span className={formStyles.hint}>一覧に表示される名前です。お客様には見えません。</span>
-            </label>
+            </div>
             <div className={formStyles.grid2}>
               <label className={formStyles.field}>
                 <span className={formStyles.label}>きっかけ <span className={formStyles.required}>必須</span></span>
@@ -305,11 +303,12 @@ function EditInner() {
           <section className={formStyles.card} aria-label="何マイル付けるか">
             <h2 className={formStyles.cardTitle}>何マイル付けるか</h2>
             <div className={formStyles.grid2}>
-              <label className={formStyles.field}>
+              <div className={formStyles.field}>
                 <span className={formStyles.label}>付与マイル <span className={formStyles.required}>必須</span></span>
-                <TextInput type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="付与マイル" />
+                <TextInput {...fields.bind('amount')} invalid={fields.invalid('amount')} aria-describedby={describedBy('amount')} type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="付与マイル" />
+                <FieldError id="er-amount-error">{fields.error('amount')}</FieldError>
                 <span className={formStyles.hint}>1以上で入力してください。</span>
-              </label>
+              </div>
               <div className={formStyles.field}>
                 <span className={formStyles.label}>付与のされ方</span>
                 <div className={formStyles.grid2} role="group" aria-label="付与のされ方">
@@ -351,20 +350,22 @@ function EditInner() {
             <div className={formStyles.grid2}>
               <div className={formStyles.field}>
                 <span className={formStyles.label}>開始日・終了日</span>
-                <span className={formStyles.inlineRow}>
-                  <DateField value={validFrom} onChange={setValidFrom} aria-label="開始日" />
+                <span className={formStyles.inlineRow} {...fields.bind('period')}>
+                  <DateField value={validFrom} onChange={setValidFrom} aria-label="開始日" invalid={fields.invalid('period')} aria-describedby={describedBy('period')} />
                   <span aria-hidden="true">〜</span>
-                  <DateField value={validUntil} onChange={setValidUntil} aria-label="終了日" />
+                  <DateField value={validUntil} onChange={setValidUntil} aria-label="終了日" invalid={fields.invalid('period')} aria-describedby={describedBy('period')} />
                 </span>
+                <FieldError id="er-period-error">{fields.error('period')}</FieldError>
                 <span className={formStyles.hint}>空欄なら期限なしです。</span>
               </div>
-              <label className={formStyles.field}>
+              <div className={formStyles.field}>
                 <span className={formStyles.label}>付いたマイルの有効期限</span>
                 <span className={formStyles.inlineRow}>
-                  <TextInput type="number" min={1} max={3650} value={expiresAfterDays} onChange={(e) => setExpiresAfterDays(e.target.value)} aria-label="有効期限の日数" />
+                  <TextInput {...fields.bind('expiry')} invalid={fields.invalid('expiry')} aria-describedby={describedBy('expiry')} type="number" min={1} max={3650} value={expiresAfterDays} onChange={(e) => setExpiresAfterDays(e.target.value)} aria-label="有効期限の日数" />
                   <span className={formStyles.hint}>日後（空欄なら期限なし）</span>
                 </span>
-              </label>
+                <FieldError id="er-expiry-error">{fields.error('expiry')}</FieldError>
+              </div>
             </div>
             {cancellationEvent ? (
               <Checkbox

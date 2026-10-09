@@ -133,6 +133,11 @@
   min-width: 0;
 }
 
+/* タグは選ぶ窓の欄（選んだ名前＋［選ぶ］の1行）。札の残りの幅を使う。 */
+.tagPick {
+  flex: 1 1 auto;
+}
+
 /* 日時の欄は札と同じ段に並ぶので、絵の高さ（31）にそろえる。 */
 .whenPick :global(button) {
   height: var(--tpl-ms-qs-when-h);

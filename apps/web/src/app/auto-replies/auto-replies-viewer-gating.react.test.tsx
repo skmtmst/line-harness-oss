@@ -169,7 +169,8 @@ describe('R527 一覧の出し分け契約', () => {
 
   it('作成・フォルダ追加・行の変更操作を権限で守る', () => {
     expect(PAGE).toContain('canManageRole(staffRole)')
-    expect(PAGE).toContain('onAddFolder={canEdit ?')
+    // フォルダ追加と「…」は共通のフォルダの列が canManage で出し分ける（B-136）。
+    expect(PAGE).toMatch(/<ManagedFolderPanel[\s\S]*?canManage=\{canEdit\}/)
     expect(PAGE).toContain('canEdit && <CreateRuleButton')
     expect(PAGE).toContain('const readonly = !canEdit')
   })

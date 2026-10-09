@@ -36,7 +36,7 @@ import type { LucideIcon } from 'lucide-react'
 import styles from './action-editor.module.css'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import Combobox from '@/components/shared/combobox'
+import { EntityKindField, type EntityKind } from '@/components/shared/entity-picker-sources'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import {
@@ -987,8 +987,10 @@ const inputClass = 'border-hairline rounded-control text-ink h-9 border px-3 tex
  * R245: テンプレート・リマインダ・イベント予約の対象は、アカウントで絞った
  * 候補から名前で選ぶ。IDの直入力では運用者が選べず、内容も確かめられない。
  */
+/** 作ってあるものを選ぶ欄（共通の選ぶ窓・dJZ7Q）。保存する値は今と同じ ID。 */
 function TargetSelector({
   label,
+  kind,
   kindName,
   value,
   options,
@@ -997,6 +999,7 @@ function TargetSelector({
 }: {
   /** 欄の名前（読み上げ用）。 */
   label: string
+  kind: EntityKind
   /** 「選べる○○がありません」の○○。 */
   kindName: string
   value: string
@@ -1004,20 +1007,10 @@ function TargetSelector({
   loading: boolean
   onChange: (value: string) => void
 }) {
-  const missing = value !== '' && !options.some((o) => o.id === value)
+  const missing = !loading && value !== '' && !options.some((o) => o.id === value)
   return (
     <div className="min-w-0 flex-1">
-      <Combobox
-        aria-label={label}
-        value={value}
-        onChange={onChange}
-        options={[
-          ...options.map((o) => ({ value: o.id, label: o.name, hint: o.hint })),
-          ...(missing ? [{ value, label: '現在の保存値' }] : []),
-        ]}
-        loading={loading}
-        placeholder="名前で探す"
-      />
+      <EntityKindField kind={kind} label={label} options={options} meta={(row) => (row as ActionTargetOption).hint ?? undefined} value={value} onChange={onChange} />
       {!loading && options.length === 0 && !missing && (
         <p className="text-ink-secondary mt-1.5 text-xs">選べる{kindName}がありません。</p>
       )}
@@ -1162,15 +1155,11 @@ export function ActionConfigEditor({
               ]}
             />
             {c.op !== 'resume_previous' && (
-              <Select
-                aria-label="対象のシナリオ"
-                value={String(c.scenarioId ?? '')}
-                onChange={(value) => onChange({ ...c, scenarioId: value })}
-                options={[
-                  { value: '', label: c.op === 'stop' ? 'このシナリオ' : 'シナリオを選ぶ' },
-                  ...scenarios.map((s) => ({ value: s.id, label: s.name })),
-                ]}
-              />
+              <div className="min-w-0 flex-1">
+                <EntityKindField kind="scenario" label="対象のシナリオ" options={scenarios} value={String(c.scenarioId ?? '')}
+                  placeholder={c.op === 'stop' ? '（このシナリオ）' : undefined} clearable={c.op === 'stop'}
+                  onChange={(value) => onChange({ ...c, scenarioId: value })} />
+              </div>
             )}
           </div>
           {c.op === 'start' && (
@@ -1247,6 +1236,7 @@ export function ActionConfigEditor({
             <span className="text-ink text-sm font-semibold">テンプレート</span>
             <TargetSelector
               label="テンプレート"
+              kind="template"
               kindName="テンプレート"
               value={templateId}
               options={templates}
@@ -1266,6 +1256,7 @@ export function ActionConfigEditor({
           <span className="text-ink text-sm font-semibold">リマインダ</span>
           <TargetSelector
             label="リマインダ"
+            kind="reminder"
             kindName="リマインダ"
             value={typeof c.reminderId === 'string' ? c.reminderId : ''}
             options={reminders}
@@ -1280,6 +1271,7 @@ export function ActionConfigEditor({
           <span className="text-ink text-sm font-semibold">イベント予約</span>
           <TargetSelector
             label="イベント予約"
+            kind="event"
             kindName="イベント予約"
             value={typeof c.eventId === 'string' ? c.eventId : ''}
             options={events}

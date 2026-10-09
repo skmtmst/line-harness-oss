@@ -372,16 +372,20 @@
   min-width: 0;
 }
 
-.imageRow {
+/* 投稿の画像は画像を入れる所（MediaSlot・Z7vd2）の小さい形。 */
+.imageSlot {
   display: flex;
-  align-items: center;
-  gap: var(--tpl-rt-section-gap);
+  flex-direction: column;
+  gap: var(--tpl-slot-gap);
+  width: var(--tpl-slot-w-compact);
 }
 
 .imageName {
+  overflow: hidden;
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
-  line-height: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ★V8-B `U1X7T2`（2026-10-07 承認）Instagram 同時投稿の区画 */

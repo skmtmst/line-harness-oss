@@ -27,6 +27,7 @@ import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import NoteBar from '@/components/shared/note-bar'
 import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -714,23 +715,18 @@ export default function ScenarioResultsV8() {
             </button>
           </p>
         ) : (
-          <Select
+          <EntityKindField
+            kind="scenario"
+            label="移し先のシナリオ"
             value={moveScenarioId}
             disabled={moveOptions === null || moveChoices.length === 0 || opBusy !== null}
             onChange={(value) => setMoveScenarioId(value)}
-            aria-label="移し先のシナリオ"
-            size="full"
-            options={[
-              {
-                value: '',
-                label: moveOptions === null
-                  ? '読み込んでいます'
-                  : moveChoices.length === 0
-                    ? '稼働中の他のシナリオがありません'
-                    : 'シナリオを選んでください',
-              },
-              ...moveChoices.map((item) => ({ value: item.id, label: item.name })),
-            ]}
+            placeholder={moveOptions === null
+              ? '（読み込んでいます）'
+              : moveChoices.length === 0
+                ? '（稼働中の他のシナリオがありません）'
+                : '（シナリオを選んでください）'}
+            options={moveChoices}
           />
         )}
       </Dialog>

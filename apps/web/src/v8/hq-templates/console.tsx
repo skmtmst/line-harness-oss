@@ -45,6 +45,7 @@ import {
   uploadedKeysIn, type TemplateMedia,
 } from './definition'
 import MessageForm from './message-form'
+import { useFormErrors } from '@/lib/use-form-errors'
 import TemplateMessageEditor from '@/v8/template-edit/message'
 import TemplateAssetEditor from '@/v8/template-edit/asset'
 import TemplateRichEditor from '@/v8/template-edit/rich'
@@ -313,7 +314,13 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     createAttempt.current = null; sessionUploads.current = []; setMenuTargets([])
     setDetail(null); setFolderId(folderFilter !== 'all' && folderFilter !== 'none' ? folderFilter : null); setName(''); setDescription(''); setDefinition(freshDefinition(type)); setStage('edit'); setError(''); setConflict(false)
   }
-  const save = (distribute: boolean, sourceDefinition = definition, sourceName = name, sourceDescription = description, andAnother = false, options: { folderId?: string | null; preselect?: string[] } = {}) => perform(async () => {
+  /* 店のひな形（テキスト・カード）の保存で落ちた欄（B-139）。MessageForm が欄ごとに検査し、1つ目へ移る。 */
+  const messageFields = useFormErrors()
+  /** 今の画面（X4JcOf）の MessageForm で作っているか。店の作る画面（共通）のときは、その画面が欄を検査する。 */
+  const sharedEditorRef = useRef(false)
+  const sharedEditorNow = () => sharedEditorRef.current
+  const usesMessageForm = () => stage === 'edit' && type === 'template' && 'template' in definition && !sharedEditorNow()
+  const save = (distribute: boolean, sourceDefinition = definition, sourceName = name, sourceDescription = description, andAnother = false, options: { folderId?: string | null; preselect?: string[] } = {}) => (usesMessageForm() && messageFields.submit().length > 0 ? Promise.resolve() : perform(async () => {
     const preparedDefinition = definitionForName(type, sourceDefinition, sourceName.trim(), sourceDescription.trim())
     const validation = !sourceName.trim() ? 'ひな形の名前を入力してください。' : definitionError(type, preparedDefinition, creationScope.current?.tenantId)
     if (validation) throw new Error(validation)
@@ -382,7 +389,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     // R561: 「保存して続けて作る」は新規作成のときだけ、空の新規入力へ戻る。
     else if (andAnother && isNew) { setDetail(null); setFolderId(null); setName(''); setDescription(''); setDefinition(freshDefinition(type)); setFormKey((current) => current + 1); setStage('edit') }
     else setStage('list')
-  })
+  }))
   const textMessage = type === 'template' && 'template' in definition && definition.template.messageType === 'text'
   const batchStorageKey = () => creationScope.current ? `hq-folder-distribution:${creationScope.current.tenantId}:${creationScope.current.actorId}:${type}` : null
   const rememberBatch = (batch: NonNullable<typeof folderBatch>) => {
@@ -617,6 +624,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         onFolderFilter={setFolderFilter}
         onAddFolder={async (folderName, color) => { await hqTemplatesApi.folders.create(folderName, color); await reloadFolders() }}
         onRenameFolder={async (folder, folderName, color) => { await hqTemplatesApi.folders.update(folder.id, folderName, folder.revision, color); await reloadFolders() }}
+        onReloadFolders={reloadFolders}
         onDeleteFolder={async (folder) => {
           await hqTemplatesApi.folders.remove(folder.id, folder.revision)
           await reloadFolders(); setTemplates(await hqTemplatesApi.list(type)); await reloadKind(); setFolderFilter('all')
@@ -722,6 +730,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const editContent = detail && type === 'template' && editKind !== 'message' ? hostContentOf(editKind, name, current) : undefined
   const sharedEditor = type === 'template' && !createUncertain && ['message', 'coupon', 'research', 'carousel', 'question', 'rich_message'].includes(editKind)
     && (!detail || editKind === 'message' || Boolean(editContent))
+  sharedEditorRef.current = sharedEditor
   if (stage === 'edit' && sharedEditor) {
     const host: TemplateEditHost = {
       backHref: '/hq/templates',
@@ -888,8 +897,9 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       ? <Button variant="primary" disabled={busy} onClick={() => save(false)}>前回の保存を再確認</Button>
       : canonicalEditorOwnsSave ? null : <>
         <Button disabled={busy} onClick={toList}>キャンセル</Button>
-        <Button disabled={busy || Boolean(validation)} onClick={() => save(false)}>下書きを保存</Button>
-        <Button variant="primary" disabled={busy || Boolean(validation)} onClick={() => save(true)}>保存する</Button>
+        {/* テキスト・カードは押せるままにし、足りない欄は保存で欄ごとに知らせる（B-139）。 */}
+        <Button disabled={busy || (Boolean(validation) && !usesMessageForm())} onClick={() => save(false)}>下書きを保存</Button>
+        <Button variant="primary" disabled={busy || (Boolean(validation) && !usesMessageForm())} onClick={() => save(true)}>保存する</Button>
       </>
     return (
       <PageFrame kind="wizard" boardId="X4JcOf">
@@ -914,6 +924,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
               onBusyChange={setUploadBusy}
               onReceipt={noteSessionUpload}
               notice={uncertainNotice}
+              fields={messageFields}
             />
           ) : (
             <section className={styles.editPanel} aria-label="ひな形の中身">
@@ -1003,7 +1014,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         folders={<DistributionFolderPanel rows={accountFolderRows} activeId={accountFolder} onSelect={setAccountFolder} failed={accountFolders.failed} />}
         collapsedFolders={<>
           <Select aria-label="アカウントのフォルダ" value={accountFolder} onChange={setAccountFolder} options={accountFolderRows.map((row) => ({ value: row.id, label: row.label }))} />
-          {accountFolderRows.find((row) => row.id === accountFolder)?.trailing}
+          {accountFolderRows.find((row) => row.id === accountFolder)?.leading}
         </>}
         toolbar={<div className={styles.toolbar}>
           <span className={styles.selectedTools}>

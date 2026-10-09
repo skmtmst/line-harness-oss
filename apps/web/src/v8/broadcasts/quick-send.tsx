@@ -17,6 +17,7 @@ import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import { SingleOperatorFields } from '@/components/broadcasts/broadcast-approval'
 import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import DateTimeField from '@/components/shared/date-time-field'
 import { formatNumber } from '@/lib/format'
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
@@ -295,13 +296,7 @@ export default function QuickSendV8({
           ))}
           {target === 'tag' ? (
             <div className={styles.tagPick}>
-              <Select
-                aria-label="タグ"
-                disabled={busy || pending}
-                value={tagId}
-                onChange={setTagId}
-                options={[{ value: '', label: 'タグを選ぶ' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]}
-              />
+              <EntityKindField kind="tag" label="タグ" disabled={busy || pending} value={tagId} onChange={setTagId} options={tags} />
             </div>
           ) : null}
         </div>

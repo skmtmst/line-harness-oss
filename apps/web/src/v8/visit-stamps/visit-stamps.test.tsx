@@ -258,7 +258,7 @@ describe('来店スタンプ（管理画面）', () => {
   it('画像は既存のアップロードを使い、3MBを越える画像は預けない', async () => {
     render(<VisitStampsV8 />)
     await screen.findByDisplayValue('然 来店スタンプカード')
-    const input = screen.getByLabelText('背景画像を選ぶ')
+    const input = screen.getByLabelText('背景画像を追加（ファイル）')
     fireEvent.change(input, { target: { files: [new File([new Uint8Array(3 * 1024 * 1024 + 1)], 'large.png', { type: 'image/png' })] } })
     expect(fx.uploadImage).not.toHaveBeenCalled()
     fireEvent.change(input, { target: { files: [new File(['image'], 'card.png', { type: 'image/png' })] } })

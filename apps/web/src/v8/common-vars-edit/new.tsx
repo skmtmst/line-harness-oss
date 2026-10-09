@@ -43,6 +43,7 @@ import Select from '@/components/shared/select'
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './new.module.css'
+import { focusFieldById } from '@/lib/use-form-errors'
 
 /*
  * 種別8つ。板 `p82v9` のカードの並び（標準・長文・数値・URL／
@@ -94,8 +95,9 @@ function sensitiveFieldLabels(value: string, memo: string): string[] {
   ]
 }
 
+/* 欄へ移る。閉じた段は開き、スクロールしてからフォーカスする（B-139）。 */
 function focusField(id: string) {
-  document.getElementById(id)?.focus()
+  focusFieldById(id)
 }
 
 function focusTargetForReason(message: string): string | null {
@@ -179,6 +181,7 @@ export default function NewCommonVarV8() {
   /* 名前・差し込み名は欄から離れたとき（blur）に確かめ、直したらその場で消す。 */
   const [nameFieldError, setNameFieldError] = useState('')
   const [keyFieldError, setKeyFieldError] = useState('')
+  const [periodFieldError, setPeriodFieldError] = useState('')
   const [secretWarningFields, setSecretWarningFields] = useState<string[] | null>(null)
   const valueRef = useRef<HTMLInputElement>(null)
   const memoRef = useRef<HTMLTextAreaElement>(null)
@@ -265,34 +268,31 @@ export default function NewCommonVarV8() {
       return
     }
     const accountAtRequest = selectedAccountId
-    if (!name.trim()) {
-      setError('共通情報名を入力してください')
-      focusField('cv-name')
-      return
-    }
-    if (!varKey.trim()) {
-      setError('差し込み名を入力してください')
-      focusField('cv-key')
-      return
-    }
-    const valueError = commonVarValueError(type, value)
-    if (valueError) {
-      setError(valueError)
-      setValueFieldError(valueError)
-      valueErrorMessageRef.current = valueError
-      focusField('cv-value')
-      return
-    }
-    if (validFrom && validUntil && validFrom >= validUntil) {
-      setError('有効終了は有効開始より後にしてください')
+    /*
+     * 欄の誤りは下の帯ではなく、その欄の真下に全部出し、上から1つ目へ移る（B-139）。
+     * 帯に残すのはアカウントの選び直しなど欄に結び付かないものだけ。
+     */
+    const nameProblem = validateVarName(name) ?? ''
+    const keyProblem = validateVarKey(varKey) ?? ''
+    const valueProblem = commonVarValueError(type, value) ?? ''
+    const periodProblem = validFrom && validUntil && validFrom >= validUntil ? '有効終了は有効開始より後にしてください' : ''
+    const fallbackProblem = expiryBehavior !== 'fallback' ? ''
+      : !fallbackValue ? '期限切れ時に使う代替値を入力してください'
+        : commonVarValueError(type, fallbackValue, '代替値') ?? ''
+    setNameFieldError(nameProblem)
+    setKeyFieldError(keyProblem)
+    setValueFieldError(valueProblem)
+    valueErrorMessageRef.current = ''
+    setPeriodFieldError(periodProblem)
+    setFallbackFieldError(fallbackProblem)
+    fallbackErrorMessageRef.current = ''
+    const firstProblem = nameProblem ? 'cv-name' : keyProblem ? 'cv-key' : valueProblem ? 'cv-value' : periodProblem ? 'cv-valid-from' : fallbackProblem ? 'cv-fallback-value' : null
+    if (firstProblem) {
+      setError('')
+      focusField(firstProblem)
       return
     }
     if (expiryBehavior === 'fallback') {
-      if (!fallbackValue) {
-        setError('期限切れ時に使う代替値を入力してください')
-        focusField('cv-fallback-value')
-        return
-      }
       const fallbackError = commonVarValueError(type, fallbackValue, '代替値')
       if (fallbackError) {
         setError(fallbackError)
@@ -588,7 +588,7 @@ export default function NewCommonVarV8() {
             中身 {COMMON_VAR_VALUE_REQUIRED.has(type) && <span className={styles.required}>*</span>}
           </label>
           {type === 'boolean' ? (
-            <Select size="full" aria-label="中身" id="cv-value" value={value} onChange={(next) => { setValue(next); setSecretWarningFields(null) }} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
+            <Select size="full" aria-label="中身" id="cv-value" error={valueFieldError || undefined} value={value} onChange={(next) => { setValue(next); setSecretWarningFields(null) }} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
           ) : type === 'long_text' ? (
             <textarea
               id="cv-value"
@@ -600,18 +600,21 @@ export default function NewCommonVarV8() {
               }}
               placeholder={spec.placeholder}
               className={styles.fieldArea}
+              aria-invalid={valueFieldError ? true : undefined}
               rows={3}
               title={`${value.length}/10000文字`}
             />
           ) : type === 'date' ? (
             <DateField
               id="cv-value"
+              invalid={Boolean(valueFieldError)}
               value={value}
               onChange={(v) => { setValue(v); setSecretWarningFields(null) }}
             />
           ) : type === 'datetime' ? (
             <DateTimeField
               id="cv-value"
+              invalid={Boolean(valueFieldError)}
               value={value}
               onChange={(v) => { setValue(v); setSecretWarningFields(null) }}
             />
@@ -625,6 +628,7 @@ export default function NewCommonVarV8() {
               onChange={(e) => { setValue(e.target.value); setSecretWarningFields(null) }}
               placeholder={spec.placeholder}
               className={styles.fieldInput}
+              aria-invalid={valueFieldError ? true : undefined}
               title={type === 'number' ? undefined : `${value.length}/${VALUE_MAX}文字`}
             />
           )}
@@ -641,21 +645,22 @@ export default function NewCommonVarV8() {
           <label htmlFor="cv-valid-from" className={styles.fieldLabel}>始まり</label>
           <label htmlFor="cv-valid-until" className={styles.fieldLabel}>終わり</label>
           <label htmlFor="cv-expiry-behavior" className={styles.fieldLabel}>期間の外では</label>
-          <DateTimeField id="cv-valid-from" value={validFrom} onChange={setValidFrom} />
-          <DateTimeField id="cv-valid-until" value={validUntil} onChange={setValidUntil} />
+          <DateTimeField id="cv-valid-from" value={validFrom} onChange={(next) => { setValidFrom(next); setPeriodFieldError('') }} invalid={Boolean(periodFieldError)} />
+          <DateTimeField id="cv-valid-until" value={validUntil} onChange={(next) => { setValidUntil(next); setPeriodFieldError('') }} invalid={Boolean(periodFieldError)} />
           <div className={styles.selectBox}>
             <Select size="full" aria-label="期間の外では" id="cv-expiry-behavior" value={expiryBehavior} onChange={(next) => setExpiryBehavior(next as 'stop' | 'fallback')} options={[{ value: 'stop', label: '配信を止める' }, { value: 'fallback', label: '代替値を使う' }]} />
           </div>
         </div>
+        <VarFieldError message={periodFieldError} />
         {expiryBehavior === 'fallback' && (
           <div className={styles.field}>
             <label htmlFor="cv-fallback-value" className={styles.fieldLabel}>代替値</label>
             {type === 'boolean' ? (
-              <Select size="full" aria-label="代替値" id="cv-fallback-value" value={fallbackValue} onChange={(next) => setFallbackValue(next)} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
+              <Select size="full" aria-label="代替値" id="cv-fallback-value" error={fallbackFieldError || undefined} value={fallbackValue} onChange={(next) => setFallbackValue(next)} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
             ) : type === 'date' ? (
-              <DateField id="cv-fallback-value" value={fallbackValue} onChange={setFallbackValue} />
+              <DateField id="cv-fallback-value" invalid={Boolean(fallbackFieldError)} value={fallbackValue} onChange={setFallbackValue} />
             ) : type === 'datetime' ? (
-              <DateTimeField id="cv-fallback-value" value={fallbackValue} onChange={setFallbackValue} />
+              <DateTimeField id="cv-fallback-value" invalid={Boolean(fallbackFieldError)} value={fallbackValue} onChange={setFallbackValue} />
             ) : (
               <input
                 id="cv-fallback-value"
@@ -663,6 +668,7 @@ export default function NewCommonVarV8() {
                 value={fallbackValue}
                 onChange={(e) => setFallbackValue(e.target.value)}
                 className={styles.fieldInput}
+                aria-invalid={fallbackFieldError ? true : undefined}
               />
             )}
             <VarFieldError message={fallbackFieldError} />

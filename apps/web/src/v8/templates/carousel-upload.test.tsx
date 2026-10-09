@@ -20,7 +20,7 @@ vi.mock('@/components/auto-replies/inline-action-list', () => ({ useActionOption
 import Carousel from './carousel'
 
 const file = (type = 'image/png', name = 'card.png') => new File(['image'], name, { type })
-const choose = (chosen: File) => fireEvent.change(screen.getByLabelText('カードの画像ファイル'), { target: { files: [chosen] } })
+const choose = (chosen: File) => fireEvent.change(screen.getByLabelText('画像を追加（ファイル）'), { target: { files: [chosen] } })
 const fill = () => {
   fireEvent.change(screen.getByPlaceholderText('例：夏の定番5点'), { target: { value: '手元の画像' } })
   fireEvent.change(screen.getByLabelText('タイトル（40文字まで）'), { target: { value: 'カードの題' } })
@@ -52,7 +52,7 @@ describe('カルーセルに手元の画像を入れる', () => {
     let finish!: (value: string) => void
     calls.put.mockReturnValue(new Promise<string>((resolve) => { finish = resolve }))
     render(<Carousel />); fill()
-    fireEvent.drop(screen.getByRole('group', { name: 'カードの画像' }), { dataTransfer: { files: [file()] } })
+    fireEvent.drop(screen.getByRole('group', { name: '画像を追加' }), { dataTransfer: { files: [file()] } })
     await waitFor(() => expect(calls.put).toHaveBeenCalled())
     for (const name of ['下書きを保存', '保存して公開', 'このカードを複製', 'カードを足す']) expect((screen.getByRole('button', { name }) as HTMLButtonElement).disabled).toBe(true)
     expect((screen.getByRole('button', { name: '1 カードの題' }) as HTMLButtonElement).disabled).toBe(true)

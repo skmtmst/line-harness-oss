@@ -8,6 +8,8 @@
  * アカウント切替の見張り）は同じ。運用者へのお知らせの一覧は今の部品を入口（page.tsx）から差し込む。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import MediaSlot from '@/components/shared/media-slot'
+import { uploadImageFile } from '@/components/shared/media-library-upload'
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useMergedTab } from '@/components/layout/merged-tabs'
@@ -31,6 +33,7 @@ import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { withViewTransition } from '@/components/shared/view-transition'
 import Notice from '@/components/shared/notice'
+import UriTapActionField from '@/components/shared/uri-tap-action-field'
 import {
   ApiError,
   api,
@@ -620,9 +623,23 @@ function CustomerNotificationEditor({
           <h2 className="font-bold text-ink">ボタン</h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <Field htmlFor="customer-notification-button" label="ボタンの文字"><TextField id="customer-notification-button" value={setting.buttonLabel} maxLength={20} onChange={(event) => onChange({ buttonLabel: event.target.value })} /></Field>
-            <Field htmlFor="customer-notification-url" label="押したときに開く先"><TextField id="customer-notification-url" value={setting.buttonUrl} placeholder="注文情報のURLを使う場合は空欄" onChange={(event) => onChange({ buttonUrl: event.target.value })} /></Field>
+            {/* 押したら（共通の欄・YPzmo・B-129）。保存は今のまま開く URL の文字（空欄＝注文情報の URL）。 */}
+            <div className="block text-sm font-semibold text-ink-secondary sm:col-span-2">押したときに開く先<div className="mt-1.5 font-normal"><UriTapActionField name="通知のボタン" kindLabel="押したときに開く先" url={setting.buttonUrl} uriPlaceholder="注文情報のURLを使う場合は空欄" onChange={(buttonUrl) => onChange({ buttonUrl })} /></div></div>
           </div>
-          <Field htmlFor="customer-notification-image" label="カード画像URL"><TextField id="customer-notification-image" value={setting.imageUrl} placeholder="未設定の場合はロゴ中心のカード" onChange={(event) => onChange({ imageUrl: event.target.value })} /></Field>
+          <div className="mt-3">
+            <p className="mb-1.5 text-sm font-semibold text-ink-secondary">カード画像（未設定の場合はロゴ中心のカード）</p>
+            <MediaSlot
+              title="カード画像を追加"
+              previewAlt="カード画像"
+              value={setting.imageUrl || null}
+              accept="image/jpeg,image/png"
+              limitText="1ファイル10メガバイト以内・JPEG・PNG"
+              maxBytes={10 * 1024 * 1024}
+              upload={uploadImageFile}
+              onChange={(url) => onChange({ imageUrl: url ?? '' })}
+              urlEntry={{ value: setting.imageUrl, onChange: (url) => onChange({ imageUrl: url }), label: 'カード画像URL', placeholder: 'https://…' }}
+            />
+          </div>
         </section>
 
         <section className="rounded-card border border-hairline bg-canvas p-4">
