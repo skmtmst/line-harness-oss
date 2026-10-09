@@ -50,6 +50,8 @@ import {
   readConditions,
 } from './operator-words'
 import styles from './operator-edit.module.css'
+import { useFormErrors } from '@/lib/use-form-errors'
+import { FieldError } from '@/components/shared/form-controls'
 
 function OperatorEditInner() {
   const editId = useSearchParams().get('id')
@@ -280,6 +282,13 @@ function OperatorEditInner() {
     busy: saving || publishing,
   })
 
+  /* 保存で落ちた欄は、その欄の真下に理由を出して移る（B-139）。受け取る人の読み込みの失敗は帯のまま。 */
+  const fields = useFormErrors()
+  fields.define('name', 'お知らせの名前', () => (name.trim() ? null : 'お知らせの名前を入力してください。'))
+  fields.define('staff', '受け取るスタッフ', () => (
+    recipientIds.length === 0 && recipientsError === null && recipients !== null && recipients.items.length > 0 ? '受け取るスタッフを1人以上選んでください。' : null
+  ))
+
   const saveDraft = async (): Promise<string | null> => {
     // 読み込み中に保存すると、未復元の項目が初期値で上書きされる。
     if (saving || ruleLoading) return null
@@ -287,8 +296,8 @@ function OperatorEditInner() {
       setError('LINEアカウントを選択してください。')
       return null
     }
-    if (!name.trim()) {
-      setError('お知らせの名前を入力してください。')
+    if (fields.submit().length > 0) {
+      setError('')
       return null
     }
     if (recipientIds.length === 0) {
@@ -449,7 +458,11 @@ function OperatorEditInner() {
                     maxLength={80}
                     readOnly={!canWrite}
                     className={styles.input}
+                    {...fields.bind('name')}
+                    aria-invalid={fields.invalid('name') || undefined}
+                    aria-describedby={fields.invalid('name') ? 'operator-name-error' : undefined}
                   />
+                  <FieldError id="operator-name-error">{fields.error('name')}</FieldError>
                 </div>
                 <div className={styles.pair}>
                   <Field id="operator-event" label="きっかけ" value={eventType} onChange={setEventType} options={[...EVENT_OPTIONS]} readOnly={!canWrite} />
@@ -500,6 +513,7 @@ function OperatorEditInner() {
                       </button>
                     ) : null}
                   </div>
+                  <FieldError id="operator-staff-error">{fields.error('staff')}</FieldError>
                   {recipients
                     ? (items.length === 0 ? (
                       <div className={styles.emptyRecipients}>
@@ -508,7 +522,7 @@ function OperatorEditInner() {
                         <Link href="/staff" className={styles.linkItem}>ログインユーザーでスタッフを確認する</Link>
                       </div>
                     ) : (
-                      <ul className={styles.staffList}>
+                      <ul className={styles.staffList} {...fields.bind('staff')} aria-invalid={fields.invalid('staff') || undefined} aria-describedby={fields.invalid('staff') ? 'operator-staff-error' : undefined}>
                         {/* 閲覧のみ：選ぶチェックは置かず、受け取る人の名前だけを並べる（2026-10-06 オーナー決定）。 */}
                         {(canWrite ? items : items.filter((recipient) => recipientIds.includes(recipient.id))).map((recipient) => (
                           <li key={recipient.id} className={styles.staffRow}>
