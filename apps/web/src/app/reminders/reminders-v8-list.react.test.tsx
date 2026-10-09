@@ -280,3 +280,17 @@ test('下書きの削除も確認前には送信せず、元に戻すで延期�
   await act(async () => confirm.click())
   expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(true)
 })
+
+test('停止中のリマインダーの再開は確認も延期もせず送る', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  handler = url => url.pathname === '/api/reminders'
+    ? response({ success: true, data: { items: [{ ...reminder, isActive: false, lifecycleStatus: 'stopped' }], total: 1, limit: 20 } })
+    : base(url)
+  await act(async () => root.render(<RemindersPage />))
+  await eventually(() => expect(host.querySelector('tbody tr')).toBeTruthy())
+  await act(async () => (host.querySelector('tbody button[aria-label*="操作"]') as HTMLElement).click())
+  await eventually(() => expect(document.querySelector('[role="menuitem"]')).toBeTruthy())
+  await act(async () => ([...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.trim() === '再開する') as HTMLElement).click())
+  expect(vi.mocked(fetch).mock.calls.some(([url, init]) => String(url).includes('/api/reminders/r-1') && init?.method === 'PUT')).toBe(true)
+  expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull()
+})

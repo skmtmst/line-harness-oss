@@ -20,7 +20,7 @@ import { PageFrame, PageHeading } from '@/components/templates/page-frame'
  * まとめての帯（止める・再開・フォルダへ移す）。
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
  */
-import { useCallback, useDeferredValue, useEffect, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -75,7 +75,7 @@ import SheetDialog from '@/v8/reminders/sheet-dialog'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { DataTable, TableHeadRow, Tr, Td, Th, NameCell } from '@/components/shared/table'
 import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
-import { runUndoable } from '@/lib/undoable'
+import { runUndoable, runOptimistic } from '@/lib/undoable'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import { completeReorder } from '@/lib/complete-reorder'
@@ -215,6 +215,7 @@ export default function RemindersListV8() {
   const [statsFailed, setStatsFailed] = useState(false)
 
   /* 窓・まとめての帯の状態。 */
+  const [bulkPauseIds, setBulkPauseIds] = useState<string[] | null>(null)
   const [pauseTarget, setPauseTarget] = useState<ReminderRow | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ReminderRow | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -315,6 +316,8 @@ export default function RemindersListV8() {
     sort,
     page: reminderList.page,
   })
+  const currentListContext = useRef(listContextKey)
+  currentListContext.current = listContextKey
   const listedReminders = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : reminderList.items
   const reminders = listedReminders
   const detailHref = (id: string) => `/reminders/detail?id=${encodeURIComponent(id)}`
@@ -324,8 +327,7 @@ export default function RemindersListV8() {
 
   /*
    * 1件の「一時停止／再開」は押した瞬間に描き換え、裏で保存する
-   * （★V8 サクサク感 B）。5秒のあいだ知らせの「元に戻す」で
-   * 送らずに戻せる。一時停止の窓（`RwVo5`）は残し、確定で即反映する。
+   * （B-157・決まり3）。失敗したら元に戻して知らせる。一時停止の窓（`RwVo5`）は残し、確定で即反映する。
    */
   const runToggle = (row: ReminderRow, next: boolean) => {
     setActionError('')
@@ -338,17 +340,17 @@ export default function RemindersListV8() {
           : item,
       ),
     })
-    runUndoable({
-      message: next ? `「${row.name}」を再開しました` : `「${row.name}」を一時停止しました`,
-      commit: async () => {
+    runOptimistic({
+      isCurrent: () => key === currentListContext.current,
+      request: async () => {
         const res = await api.reminders.update(row.id, { isActive: next })
         if (!res.success) throw new Error(res.error)
       },
-      undo: () => setOptimisticRows(null),
+      revert: () => setOptimisticRows(null),
       failureMessage: next
         ? `「${row.name}」を再開できませんでした。`
         : `「${row.name}」を一時停止できませんでした。`,
-      onCommitted: () => {
+      onSuccess: () => {
         setOptimisticRows(null)
         reminderList.retry()
         void loadStats()
@@ -511,18 +513,18 @@ export default function RemindersListV8() {
           : row,
       ),
     })
-    runUndoable({
-      message: next ? `${ids.length}件を再開しました` : `${ids.length}件を一時停止しました`,
-      commit: async () => {
+    runOptimistic({
+      isCurrent: () => key === currentListContext.current,
+      request: async () => {
         const results = await Promise.all(
           ids.map((id) => api.reminders.update(id, { isActive: next }).catch(() => null)),
         )
         const failed = results.filter((res) => !res || !res.success).length
         if (failed > 0) throw new Error(`${failed}件の保存に失敗しました`)
       },
-      undo: () => setOptimisticRows(null),
+      revert: () => setOptimisticRows(null),
       failureMessage: next ? '再開できませんでした。' : '一時停止できませんでした。',
-      onCommitted: () => {
+      onSuccess: () => {
         setOptimisticRows(null)
         setSelectedIds(new Set())
         reminderList.retry()
@@ -1069,7 +1071,7 @@ export default function RemindersListV8() {
               variant="secondary"
               disabled={stoppableIds.length === 0}
               title={stoppableIds.length === 0 ? '有効なリマインダが選ばれていません' : undefined}
-              onClick={() => runBulkToggle(false, stoppableIds)}
+              onClick={() => setBulkPauseIds(stoppableIds)}
             >
               <Square size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
               止める
@@ -1159,6 +1161,17 @@ export default function RemindersListV8() {
       </KpiBand>
 
 
+      <ConfirmDialog
+        open={bulkPauseIds !== null}
+        title={`${bulkPauseIds?.length ?? 0}件のリマインダーを停止しますか？`}
+        description="再開するまで、選んだリマインダーの通知は送られません。"
+        confirmLabel="停止する"
+        onCancel={() => setBulkPauseIds(null)}
+        onConfirm={() => {
+          if (bulkPauseIds) runBulkToggle(false, bulkPauseIds)
+          setBulkPauseIds(null)
+        }}
+      />
       {/* 一時停止の窓（★V8 `RwVo5`）。確定で即反映し、裏で保存する。 */}
       <ConfirmDialog
         open={pauseTarget !== null}
