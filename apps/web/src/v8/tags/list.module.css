@@ -138,7 +138,6 @@
   table-layout: fixed;
 }
 
-.colStar { width: var(--tpl-tag-col-star); }
 .colName { width: auto; }
 .colFolder { width: var(--tpl-tag-col-folder); }
 .colCount { width: var(--tpl-tag-col-count); }
@@ -147,53 +146,12 @@
 .colUsage { width: var(--tpl-tag-col-usage); }
 .colMenu { width: var(--tpl-tag-col-menu); text-align: right; }
 
-.headStar {
-  width: var(--tpl-tag-star-head);
-  height: var(--tpl-tag-star-head);
-  color: var(--color-ink-faint);
-  vertical-align: middle;
-}
-
 .row {
   cursor: pointer;
 }
 /* 1152 の板は1行61。札が28高でも行を押し広げない余白。 */
 @container v8-page (max-width: 1099px) {
   .row > td { height: var(--tpl-tag-narrow-row-h); padding-block: 0; }
-}
-
-.starButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--tpl-tag-menu-btn);
-  height: var(--tpl-tag-menu-btn);
-  margin: 0 calc((var(--tpl-tag-star) - var(--tpl-tag-menu-btn)) / 2);
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-ink-secondary);
-  cursor: pointer;
-  vertical-align: middle;
-}
-
-.starButton:disabled {
-  cursor: not-allowed;
-}
-
-.starIcon {
-  width: var(--tpl-tag-star);
-  height: var(--tpl-tag-star);
-  fill: none;
-}
-
-.starButton[data-on='true'] .starIcon {
-  fill: var(--color-star-on);
-  stroke: var(--color-star-on-edge);
-}
-
-.starButton:disabled .starIcon {
-  opacity: 0.6;
 }
 
 .nameRow {

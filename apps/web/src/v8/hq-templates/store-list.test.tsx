@@ -61,6 +61,19 @@ afterEach(() => {
 const buttons = () => [...document.querySelectorAll('button')]
 
 describe('統括のひな形の一覧（店と同じ形）', () => {
+  for (const canEdit of [true, false]) {
+    it(`タグ一覧はタグ名から始まり、星・注目の操作と絞り込みを出さない（編集=${canEdit}）`, async () => {
+      await render({ type: 'tag', kind: undefined, canEdit })
+      const heads = [...host.querySelectorAll('thead th')].map((th) => th.textContent?.trim())
+      expect(heads).toEqual(canEdit ? ['タグ', '人数', '付け方', '配布先', '', ''] : ['タグ', '人数', '付け方', '配布先', ''])
+      expect(host.querySelector('tbody tr td')?.textContent).toContain(ROWS[0].name)
+      expect(host.querySelector('svg.lucide-star')).toBeNull()
+      expect(host.querySelector('[aria-label*="友だち一覧に表示"]')).toBeNull()
+      expect(host.textContent).not.toMatch(/☆|★|注目のみ|★のみ表示/)
+      expect(buttons().some((button) => /注目|一覧に出す/.test(button.getAttribute('aria-label') ?? ''))).toBe(false)
+    })
+  }
+
   it('フォルダの保存色を左の列と名前の前に表示する', async () => {
     await render({ folders: [{ id: 'f-1', name: 'お問い合わせ', revision: 1, color: '#8b5cf6' }] })
     const dot = host.querySelector('[data-folder-dot="filed"]') as HTMLElement
