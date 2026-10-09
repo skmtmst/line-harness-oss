@@ -105,8 +105,9 @@
   display: flex; flex-direction: column; gap: var(--tpl-side-card-gap); align-self: stretch;
   padding: var(--tpl-side-card-pad);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline); outline-offset: -1px;
+  outline: 1px solid var(--card-edge); outline-offset: -1px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 .sideTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-side-title-lh); }
 .sideText { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-side-title-lh); }
@@ -180,7 +181,8 @@
   display: flex; flex-direction: column; gap: var(--tpl-te-url-gap); width: 100%;
   padding: var(--tpl-body-pad);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline); outline-offset: -1px;
+  outline: 1px solid var(--card-edge); outline-offset: -1px;
+  box-shadow: var(--card-shadow);
 }
 .grip { display: inline-flex; align-items: center; padding: 0; border: 0; background: transparent; color: var(--color-ink-faint); cursor: pointer; }
 .grip:disabled { cursor: default; opacity: 0.5; }
@@ -224,3 +226,15 @@
 .dateBox > button:first-child { height: var(--tpl-chip-h); }
 /* 「消す」は切り替えから離す（絵：切り替えの右に 33）。 */
 .questionRemove { margin-left: var(--tpl-te-q-remove-shift); }
+
+.composerSplit { display: grid; grid-template-columns: minmax(0, 1fr) var(--tpl-msg-composer-drawer-side-w); min-height: var(--tpl-msg-composer-fill); }
+.composerContent { min-width: 0; padding: var(--tpl-msg-composer-drawer-content-pad); display: flex; flex-direction: column; gap: var(--tpl-msg-composer-gap); }
+.composerSide { display: flex; flex-direction: column; gap: var(--tpl-msg-composer-gap); min-width: 0; padding: var(--tpl-msg-composer-drawer-content-pad); border-left: 1px solid var(--color-hairline); }
+.composerFooter { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-msg-composer-gap); flex-wrap: wrap; }
+.composerFooterActions { display: flex; gap: var(--tpl-msg-composer-drawer-actions-gap); }
+@media (width < 1152px) { .composerSplit { grid-template-columns: minmax(0, 1fr); } .composerSide { display: none; } }
+
+.composerFooter > :first-child { flex: 1; }
+.composerFooter::after { content: ''; flex: 1; }
+
+.composerTitleAccessories { display: flex; align-items: center; gap: var(--tpl-msg-composer-gap-s); }

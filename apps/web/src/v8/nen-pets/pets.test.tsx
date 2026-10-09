@@ -118,6 +118,25 @@ describe('V8 マイペット（src/v8/nen-pets）', () => {
     expect(host.textContent).toContain('06/12')
   })
 
+  it('名前が空なら保存せず、欄を赤くしてそこへ移動し、直すと理由が消える', async () => {
+    await render('pets')
+    await click(byLabel('「こむぎ」の操作'))
+    await click(byText('ペットの情報を直す'))
+    const name = document.querySelector<HTMLInputElement>('input[aria-label="ペットの名前"]')!
+    const update = vi.spyOn(api.nenCampaigns, 'updatePet')
+    await act(async () => { fireEvent.change(name, { target: { value: '' } }) })
+    await click(byText('保存する'))
+    await settle(40)
+    expect(update).not.toHaveBeenCalled()
+    expect(name.getAttribute('aria-invalid')).toBe('true')
+    expect(name.getAttribute('aria-describedby')).toContain('pet-edit-name-error')
+    expect(document.activeElement).toBe(name)
+    expect(document.querySelectorAll('[role="alert"]')).toHaveLength(1)
+    await act(async () => { fireEvent.change(name, { target: { value: 'こむぎ' } }) })
+    expect(name.getAttribute('aria-invalid')).not.toBe('true')
+    expect(document.getElementById('pet-edit-name-error')).toBeNull()
+  })
+
   it('「…」→ペットの情報を直す：版つきで保存し、体重の「kg」は外して数で送る', async () => {
     await render('pets')
     await click(byLabel('「こむぎ」の操作'))

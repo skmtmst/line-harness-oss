@@ -9,6 +9,7 @@ export default function IconButton({
   'aria-label': ariaLabel,
   ref,
   size,
+  variant,
   ...props
 }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'className' | 'aria-label'> & {
   children: ReactNode
@@ -21,6 +22,8 @@ export default function IconButton({
    * 'row' は行の右端の「…」の 28×28（印 14・押せる所は 36。★V8 i0Ao0R ほか）。どちらも v8 だけで効く。
    */
   size?: 'small' | 'row'
+  /** 枠のない行内操作。既定の枠つきボタンには効かない。 */
+  variant?: 'plain'
 }) {
   return (
     <button
@@ -30,6 +33,7 @@ export default function IconButton({
       aria-label={ariaLabel}
       data-design-node="H0V8EK"
       data-size={size}
+      data-variant={variant}
       {...props}
     >
       {children}

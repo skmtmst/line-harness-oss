@@ -29,6 +29,8 @@ export interface PageHeadingProps {
   steps?: ReactNode
   /** 説明が無い板で、題のすぐ下へ手順を詰める。 */
   stepsSpacing?: 'compact'
+  /** 題と説明に続くタブ。渡した画面だけ頭の中へ置く。 */
+  tabs?: ReactNode
 }
 
 /** 型の外に残るページの題も同じ文字の決まりを使う。窓・カードには使わない。 */
@@ -39,7 +41,7 @@ export function PageTitle({ children, as: Tag = 'h2', className }: {
 }
 
 /** 板の頭の寸法は型が持つ。操作・意味の説明は画面から渡す。 */
-export function PageHeading({ title, description, help, actions, crumbs, steps, headingSize, bottomSpacing, inset, stepsSpacing }: PageHeadingProps) {
+export function PageHeading({ title, description, help, actions, crumbs, steps, tabs, headingSize, bottomSpacing, inset, stepsSpacing }: PageHeadingProps) {
   /* 戻る（identity）は描かない。戻るのは上の帯のパンくずと下の帯の［キャンセル］だけ（オーナー 2026-10-08）。 */
   return <header className={styles.heading} data-template-region="heading" data-heading-inset={inset} data-heading-size={headingSize} data-bottom-spacing={bottomSpacing} data-has-steps={!!steps || undefined} data-steps-spacing={stepsSpacing} data-has-crumbs={!!crumbs || undefined}>
     <div className={styles.headingText}>
@@ -47,6 +49,7 @@ export function PageHeading({ title, description, help, actions, crumbs, steps, 
         {help ? <HelpTip label={typeof title === 'string' ? `${title}の説明` : '画面の説明'}>{help}</HelpTip> : null}
       </div>
       {description ? <div className={styles.description}>{description}</div> : null}
+      {tabs ? <div className={styles.headingTabs} data-template-region="heading-tabs">{tabs}</div> : null}
     </div>
     {crumbs ? <div className={styles.crumbs} data-template-region="crumbs">{crumbs}</div> : null}
     {steps ? <div className={styles.steps} data-template-region="steps">{steps}</div> : null}

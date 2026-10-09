@@ -74,3 +74,10 @@ it('WEB193：やり直しの間に別の注文へ移ったら、前の注文を�
   expect(screen.getByRole('heading', { name: '注文 B-2' })).toBeTruthy()
   expect(fixture.orderDetail.mock.calls.filter(([id]) => id === 'order-1')).toHaveLength(1)
 })
+
+it('閲覧のみでは失敗理由を読めるが、もう一度やる操作は隠す', async () => {
+  fixture.orderDetail.mockResolvedValue({ success: true, data: detail(true) })
+  render(<OrderDrawer orderId="order-1" accountId="account-1" onClose={() => undefined} onRetryAction={async () => undefined} retryingId={null} canEdit={false} />)
+  expect(await screen.findByText(/LINEが送信を受け付けませんでした/)).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'もう一度やる' })).toBeNull()
+})

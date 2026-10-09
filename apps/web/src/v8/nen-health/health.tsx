@@ -171,7 +171,7 @@ export default function HealthV8({
   const pending = kpis === null
   const kpiMenu = (title: string, items: ActionMenuItem[]) => <KpiMenu title={title} items={items} />
   const stats = accountId ? (
-    <KpiBand data-design="KPIs" className={styles.band} aria-label="健康日記の数の帯">
+    <KpiBand data-design="KPIs" aria-label="健康日記の数の帯">
       <KpiCard presentation="band" title="記録のあるペット" icon={<History size={13} aria-hidden="true" />} menu={kpiMenu('記録のあるペット', [{ id: 'all', label: 'すべてのペットを出す', onSelect: () => applyFilter(EMPTY_FILTERS) }])} value={pending ? null : kpis.petsWithRecords} unit="匹" loading={pending} detail={pending ? '読み込んでいます' : `登録 ${kpis.petsTotal} 匹のうち`} />
       <KpiCard presentation="band" title="気になる変化" icon={<Activity size={13} aria-hidden="true" />} menu={kpiMenu('気になる変化', [{ id: 'concern', label: '気になる変化だけ出す', onSelect: () => applyFilter({ change: 'concern', last: '' }) }])} value={pending ? null : kpis.concerning} unit="匹" loading={pending} detail="体重 ±10%（8週）など" />
       <KpiCard presentation="band" title="今週の記録" icon={<CalendarCheck size={13} aria-hidden="true" />} menu={kpiMenu('今週の記録', [{ id: 'week', label: '今週 記録のあるペットを出す', onSelect: () => applyFilter({ last: '7' }) }])} value={pending ? null : kpis.recordsThisWeek} unit="件" loading={pending} detail="直近7日に付いた記録" />

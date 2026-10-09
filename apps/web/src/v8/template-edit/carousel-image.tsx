@@ -13,7 +13,8 @@ function uploadReasonOf(caught: unknown): string {
 }
 
 /** J60utHの小さな画像の枠。店と統括で送る口だけ替える。失敗しても元の画像・選んだファイルを残す。 */
-export default function CarouselImage({ url, disabled, maxMB = 10, upload, onUploaded, onBusyChange, onMediaPick, onUrl, scope }: {
+export default function CarouselImage({ url, disabled, maxMB = 10, upload, onUploaded, onBusyChange, onMediaPick, onUrl, scope, layout }: {
+  layout?: 'composer'
   url: string; disabled: boolean; maxMB?: number; scope: string
   upload: (file: File) => Promise<string>
   onUploaded: (url: string) => void
@@ -54,11 +55,12 @@ export default function CarouselImage({ url, disabled, maxMB = 10, upload, onUpl
   }
   return (
     <div className={styles.column}>
-      <div className={styles.zone} role="group" aria-label="カードの画像" aria-busy={busy} data-drag={dragging || undefined}
+      <div className={styles.zone} data-layout={layout} role="group" aria-label="カードの画像" aria-busy={busy} data-drag={dragging || undefined}
         onDragOver={(event) => { event.preventDefault(); if (!disabled && !busy) setDragging(true) }}
         onDragLeave={() => setDragging(false)}
         onDrop={(event) => { event.preventDefault(); setDragging(false); const chosen = event.dataTransfer.files[0]; if (chosen) void send(chosen) }}>
-        {url ? <img className={styles.thumb} src={url} alt="カードの画像" /> : <ImagePlus className={styles.icon} aria-hidden="true" />}
+        {url ? <img className={styles.thumb} src={url} alt="カードの画像" /> : null}
+        {!url || layout === 'composer' ? <ImagePlus className={styles.icon} aria-hidden="true" /> : null}
         <span>{dragging ? '離すと追加します' : 'ここへドラッグ、または'}</span>
         <input ref={input} className={styles.input} aria-label="カードの画像ファイル" type="file" accept="image/jpeg,image/png" disabled={disabled || busy}
           onChange={(event) => { const chosen = event.target.files?.[0]; event.target.value = ''; if (chosen) void send(chosen) }} />

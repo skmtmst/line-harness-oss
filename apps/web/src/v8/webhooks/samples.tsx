@@ -50,7 +50,7 @@ export default function WebhooksSamplesV8() {
   const canManage = staffRole === null || staffRole === 'owner'
   const overview = useWebhookOverview()
   return (
-    <ListPage
+    <ListPage help="見本に書いたことだけを送ります。「すべての出来事を送る」設定は見本からは作られません。"
       boardId="SAUCs"
       headingSize="regular"
       title="外部連携"
@@ -118,7 +118,6 @@ export default function WebhooksSamplesV8() {
           </ul>
         </section>
         {!canManage ? <p className={styles.askNote}>見本から作るのは統括だけができます。必要なときは統括に頼んでください。</p> : null}
-        <p className={styles.footNote}>見本に書いたことだけを送ります。「すべての出来事を送る」設定は見本からは作られません。</p>
       </div>
     </ListPage>
   )

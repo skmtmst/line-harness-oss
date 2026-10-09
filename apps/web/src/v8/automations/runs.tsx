@@ -565,7 +565,6 @@ export default function AutomationRunsV8() {
         </span>
         {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="動いた記録のページ送り" /> : null}
       </div>
-      <p className={styles.footNote}>行の「…」から 中身を見る・もう一度やる（失敗のとき）・ルールを開く・トークを開く。</p>
     </>
   ) : null
 
@@ -579,6 +578,7 @@ export default function AutomationRunsV8() {
 
   return (
     <ListPage
+      help="行の「…」から 中身を見る・もう一度やる（失敗のとき）・ルールを開く・トークを開く。"
       boardId="g98F9"
       headingSize="regular"
       title="オートメーション"

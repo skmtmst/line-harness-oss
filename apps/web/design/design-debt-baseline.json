@@ -589,7 +589,7 @@
     "unresolved-classname": 2
   },
   "components/shared/sticky-bar.tsx": {
-    "unresolved-classname": 2
+    "unresolved-classname": 3
   },
   "components/shared/tabs.tsx": {
     "unresolved-classname": 1

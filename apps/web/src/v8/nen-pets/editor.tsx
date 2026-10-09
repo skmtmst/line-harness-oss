@@ -12,6 +12,8 @@ import { Check } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
 import Radio from '@/components/shared/radio'
 import { TextField } from '@/components/shared/text-field'
+import { FieldError } from '@/components/shared/form-controls'
+import { useFieldValidation } from '@/lib/use-field-validation'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { ApiError, api } from '@/lib/api'
 import type { NenPetRow } from '@/lib/nen-pets-api'
@@ -45,23 +47,20 @@ export default function PetEditorV8({ accountId, pet, onClose, onSaved }: {
   const [error, setError] = useState('')
   const [version, setVersion] = useState<string>(pet.updatedAt)
 
+  const normalized = normalizeBirthdayInput(birthday)
+  const weightText = weight.replace(/kg/i, '').trim()
+  const weightKg = weightText === '' ? null : Number(weightText)
+  const fields = useFieldValidation([
+    ...(!name.trim() ? [{ id: 'pet-edit-name', message: 'ペットの名前を入れてください。' }] : []),
+    ...(normalized === 'invalid' ? [{ id: 'pet-edit-birthday', message: '誕生日は「2020-03-15」か「03-15」（月日だけ）で入力してください。' }] : []),
+    ...(weightKg !== null && (!Number.isFinite(weightKg) || weightKg < 0.01 || weightKg > 200)
+      ? [{ id: 'pet-edit-weight', message: '体重は 0.01〜200kg で入力してください。' }] : []),
+  ])
+
   const save = async () => {
     if (saving) return
-    if (!name.trim()) {
-      setError('ペットの名前を入れてください。')
-      return
-    }
-    const normalized = normalizeBirthdayInput(birthday)
-    if (normalized === 'invalid') {
-      setError('誕生日は「2020-03-15」か「03-15」（月日だけ）で入力してください。')
-      return
-    }
-    const weightText = weight.replace(/kg/i, '').trim()
-    const weightKg = weightText === '' ? null : Number(weightText)
-    if (weightKg !== null && (!Number.isFinite(weightKg) || weightKg < 0.01 || weightKg > 200)) {
-      setError('体重は 0.01〜200kg で入力してください。')
-      return
-    }
+    setError('')
+    if (!fields.submit()) return
     setSaving(true)
     setError('')
     try {
@@ -128,7 +127,8 @@ export default function PetEditorV8({ accountId, pet, onClose, onSaved }: {
         <div className={styles.editorPair}>
           <label className={styles.editorField}>
             <span className={styles.fieldLabel}>ペットの名前</span>
-            <TextField aria-label="ペットの名前" value={name} maxLength={80} onChange={(event) => setName(event.target.value)} />
+            <TextField {...fields.bind('pet-edit-name')} aria-label="ペットの名前" value={name} maxLength={80} onChange={(event) => setName(event.target.value)} />
+            <FieldError id="pet-edit-name-error">{fields.error('pet-edit-name')}</FieldError>
           </label>
           <label className={styles.editorField}>
             <span className={styles.fieldLabel}>品種</span>
@@ -146,11 +146,13 @@ export default function PetEditorV8({ accountId, pet, onClose, onSaved }: {
         <div className={styles.editorPair}>
           <label className={styles.editorField}>
             <span className={styles.fieldLabel}>誕生日</span>
-            <TextField aria-label="誕生日" placeholder="2022-04-03" value={birthday} onChange={(event) => setBirthday(event.target.value)} />
+            <TextField {...fields.bind('pet-edit-birthday')} aria-label="誕生日" placeholder="2022-04-03" value={birthday} onChange={(event) => setBirthday(event.target.value)} />
+            <FieldError id="pet-edit-birthday-error">{fields.error('pet-edit-birthday')}</FieldError>
           </label>
           <label className={styles.editorField}>
             <span className={styles.fieldLabel}>体重</span>
-            <TextField aria-label="体重" inputMode="decimal" placeholder="9.2 kg" value={weight} onChange={(event) => setWeight(event.target.value)} />
+            <TextField {...fields.bind('pet-edit-weight')} aria-label="体重" inputMode="decimal" placeholder="9.2 kg" value={weight} onChange={(event) => setWeight(event.target.value)} />
+            <FieldError id="pet-edit-weight-error">{fields.error('pet-edit-weight')}</FieldError>
           </label>
         </div>
         <p className={styles.editorHint}>生まれた年が分からないときは「03-15」のように月日だけを入れます。空欄は未登録です。</p>

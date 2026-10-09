@@ -44,7 +44,7 @@ export default function FileDropzone({
   /** 見本・検証用にドラッグ状態を固定する。指定時はドラッグ操作で見た目が変わらない。 */
   icon?: ReactNode
   invalid?: boolean
-  variant?: 'default' | 'video'
+  variant?: 'default' | 'video' | 'composer'
   previewState?: 'active' | 'reject'
   /** 見出し（「ここに画像を落とす」など）。 */
   title: string
@@ -113,7 +113,7 @@ export default function FileDropzone({
 
   return (
     <div
-      role="group"
+      role={variant === 'composer' ? 'button' : 'group'}
       aria-label={ariaLabel ?? title}
       aria-busy={busy || undefined}
       aria-invalid={invalid || undefined}
@@ -124,6 +124,8 @@ export default function FileDropzone({
       data-busy={busy || undefined}
       data-disabled={disabled || undefined}
       className={[styles.zone, className].filter(Boolean).join(' ')}
+      tabIndex={variant === 'composer' && interactive ? 0 : undefined}
+      onKeyDown={(event) => { if (variant === 'composer' && ['Enter', ' '].includes(event.key)) { event.preventDefault(); openPicker() } }}
       onClick={(event) => {
         // input 自身の click はここへ泡立ってくる。拾うと input.click() が再帰する。
         if ((event.target as HTMLElement | null)?.closest('input[type="file"]')) return
@@ -154,7 +156,7 @@ export default function FileDropzone({
             {shown === 'active' ? '離すと追加します' : title}
           </p>
           {shown === 'active' || variant === 'video' ? null : hint ? <p className={styles.zoneHint}>{hint}</p> : null}
-          {shown === 'active' ? null : (
+          {shown === 'active' || variant === 'composer' ? null : (
             <Button
               type="button"
               disabled={!interactive}

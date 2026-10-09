@@ -427,9 +427,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
         </div>
       ) : null}
 
-      <p className={styles.footNote}>
-        {canEdit ? `保存は最大 ${MAX_SAVED} 件。行の「…」に：編集・複製して保存・削除` : `保存は最大 ${MAX_SAVED} 件。`}
-      </p>
+
     </DelayedSkeleton>
   )
 
@@ -457,6 +455,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
       </div>
 
       <ListPageBody
+        listHelp={canEdit ? `保存は最大 ${MAX_SAVED} 件。行の「…」に：編集・複製して保存・削除。` : `保存は最大 ${MAX_SAVED} 件。`}
         toolbar={<>
           <span className={styles.search}>
             <SearchField aria-label="条件名で探す" placeholder="条件名で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />

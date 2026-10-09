@@ -89,6 +89,7 @@ export function CreateButton({
 
 export interface MileageFrameProps {
   /** 板の頭の右（CSV など）。 */
+  help?: ReactNode
   actions?: ReactNode
   stats?: ReactNode
   folders?: ReactNode
@@ -102,7 +103,7 @@ export interface MileageFrameProps {
 }
 
 /** 5つのタブの共通の外側。題・説明・タブの段・閲覧のみの帯をここで持つ。 */
-export function MileageFrame({ actions, stats, folders, collapsedFolders, folderNav, toolbar, pagination, overlays, children }: MileageFrameProps) {
+export function MileageFrame({ help, actions, stats, folders, collapsedFolders, folderNav, toolbar, pagination, overlays, children }: MileageFrameProps) {
   const { tab, readonly, narrow, counts } = useMileageShell()
   const board = tab === 'earning-rules' && narrow
     ? 'ZJIyl'
@@ -111,6 +112,7 @@ export function MileageFrame({ actions, stats, folders, collapsedFolders, folder
       : MILEAGE_TABS.find((item) => item.key === tab)?.board
   return (
     <ListPage
+      help={help}
       boardId={board}
       headingSize="regular"
       title="マイル"

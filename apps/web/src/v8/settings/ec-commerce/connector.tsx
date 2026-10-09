@@ -25,6 +25,11 @@ import { formatDateTime } from '@/lib/format'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import styles from './connector.module.css'
+import Card from '@/components/shared/card'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import { Field } from '@/components/shared/form-controls'
+import StatusBadge from '@/components/shared/status-badge'
 
 /* 絵の並び（注文完了・発送完了・入金確認完了・返金完了・注文キャンセル・ペット情報更新）。 */
 const CONNECTOR_EVENT_TYPES = [
@@ -84,6 +89,9 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
   const [form, setForm] = useState<Form>(EMPTY_FORM)
   const [state, setState] = useState<'loading' | 'ready' | 'empty' | 'error' | 'forbidden'>('loading')
   const [saving, setSaving] = useState(false)
+  const [errors, setErrors] = useState<{ domain?: string; secret?: string }>({})
+  const domainRef = useRef<HTMLInputElement>(null)
+  const secretRef = useRef<HTMLInputElement>(null)
   const [replacingSecret, setReplacingSecret] = useState(false)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
   /* 全部外すこと自体は止めない。保存の直前に確認を1枚だけ挟む。 */
@@ -100,6 +108,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
     const token = gate.begin()
     if (!accountId) { setData(null); setForm(EMPTY_FORM); setState('empty'); return }
     setState('loading')
+    setErrors({})
     setData(null)
     setForm(EMPTY_FORM)
     try {
@@ -141,14 +150,27 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
     } catch (error) {
       if (accountRef.current !== accountAtSave) return
       if (error instanceof ApiError && error.status === 409) await load()
-      setNotice({ tone: 'error', text: error instanceof ApiError && error.status === 409 ? 'ほかの担当者が先に変更しました。最新の内容を読み直しました。' : '設定を保存できませんでした。入力内容を確認してください。' })
+      setNotice({ tone: 'error', text: error instanceof ApiError && error.status === 409 ? 'ほかの担当者が先に変更しました。最新の内容を読み直しました。' : '設定を保存できませんでした。通信の状態を確認して、もう一度お試しください。' })
     } finally {
       setSaving(false)
     }
   }
 
   const requestSave = () => {
-    if (!accountId || saving) return
+    if (!accountId || saving || !canEdit) return
+    const domain = form.shopDomain.trim().toLowerCase()
+    const next = {
+      domain: /^(?=.{3,253}$)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])$/.test(domain) ? undefined : 'ショップのドメインを入れてください（例：shop.nen.example）。https:// や / は含めません。',
+      secret: (!connector?.secretConfigured || form.inboundSecret.trim().length > 0 || replacingSecret) && form.inboundSecret.trim().length < 32 ? '32文字以上の鍵を入れてください。' : undefined,
+    }
+    setErrors(next)
+    setNotice(null)
+    if (next.domain || next.secret) {
+      const field = next.domain ? domainRef.current : secretRef.current
+      field?.focus()
+      field?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+      return
+    }
     const events = form.eventTypes.length === 0
     const rules = form.identityRules.length === 0
     if (events || rules) { setEmptyConfirm({ events, rules }); return }
@@ -164,12 +186,6 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
     return form.inboundSecret.length > 0 || JSON.stringify(current) !== JSON.stringify(baseline)
   })()
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
-  /* 保存できない理由は、押せない条件と同じ順で最初の1つだけ。 */
-  const saveBlockReason = saving ? null
-    : !form.shopDomain ? 'ショップのアドレスを入れると保存できます。'
-      : !connector?.secretConfigured && form.inboundSecret.length < 32 ? 'はじめてつなぐときは、32文字以上の鍵を入れてください。'
-        : null
-
   if (state !== 'ready') {
     return (
       <ListState
@@ -193,51 +209,44 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
       {notice ? <p className={notice.tone === 'success' ? styles.noticeGood : styles.noticeBad} role={notice.tone === 'success' ? 'status' : 'alert'}>{notice.text}</p> : null}
 
       <div className={styles.top}>
-        <section className={styles.card} aria-labelledby="ec-connector-info">
+        <Card spacing="settings" aria-labelledby="ec-connector-info">
           <h2 id="ec-connector-info" className={styles.cardTitle}>つなぎ先の情報</h2>
-          <div className={styles.field}>
-            <span className={styles.label} id="ec-connector-provider">ネットショップの種類</span>
+          <Field size="compact" label="ネットショップの種類" htmlFor="ec-connector-provider">
             {canEdit ? (
-              <Select aria-label="ネットショップの種類" value={form.provider} onChange={(value) => setForm({ ...form, provider: value as Form['provider'] })} options={[{ value: 'shopify', label: 'Shopify' }, { value: 'ec_cube', label: 'EC-CUBE' }]} size="full" />
+              <Select id="ec-connector-provider" aria-label="ネットショップの種類" value={form.provider} onChange={(value) => setForm({ ...form, provider: value as Form['provider'] })} options={[{ value: 'shopify', label: 'Shopify' }, { value: 'ec_cube', label: 'EC-CUBE' }]} size="full" />
             ) : <TextField aria-label="ネットショップの種類" value={form.provider === 'ec_cube' ? 'EC-CUBE' : 'Shopify'} readOnly aria-readonly="true" />}
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="ec-connector-domain">ショップのアドレス</label>
-            <TextField id="ec-connector-domain" value={form.shopDomain} onChange={(event) => setForm({ ...form, shopDomain: event.target.value })} placeholder="nen-store.myshopify.com" readOnly={!canEdit} />
-          </div>
-          <div className={`${styles.field} ${styles.keyField}`}>
-            <label className={styles.label} htmlFor="ec-connector-secret">つなぐための鍵</label>
+          </Field>
+          <Field label="ショップのアドレス" htmlFor="ec-connector-domain" error={errors.domain}>
+            <TextField ref={domainRef} id="ec-connector-domain" value={form.shopDomain} onChange={(event) => setForm({ ...form, shopDomain: event.target.value })} placeholder="nen-store.myshopify.com" readOnly={!canEdit} />
+          </Field>
+          <Field size="compact" label="つなぐための鍵" htmlFor="ec-connector-secret" error={errors.secret} note="鍵は保存後に読み戻せません。画面には最後の4文字だけを出します。">
             {showSecretInput ? (
-              <TextField id="ec-connector-secret" type="password" autoComplete="new-password" value={form.inboundSecret} onChange={(event) => setForm({ ...form, inboundSecret: event.target.value })} placeholder="32文字以上" />
+              <TextField ref={secretRef} id="ec-connector-secret" type="password" autoComplete="new-password" value={form.inboundSecret} onChange={(event) => setForm({ ...form, inboundSecret: event.target.value })} placeholder="32文字以上" />
             ) : (
               <div className={styles.keyRow}>
                 <span className={styles.keyMask} id="ec-connector-secret" title={connector?.secretUpdatedAt ? `${when(connector.secretUpdatedAt)} に更新` : undefined}>{connector?.secretConfigured ? `●●●●●●●●●●●●  ${connector.secretLastFour ?? '----'}` : '未設定'}</span>
                 {canEdit ? <Button type="button" onClick={() => setReplacingSecret(true)}>差し替える</Button> : null}
               </div>
             )}
-            <p className={styles.note}>鍵は保存後に読み戻せません。画面には最後の4文字だけを出します。</p>
-          </div>
-        </section>
+          </Field>
+        </Card>
 
-        <section className={styles.card} aria-labelledby="ec-connector-health">
+        <Card spacing="settings" aria-labelledby="ec-connector-health">
           <h2 id="ec-connector-health" className={styles.cardTitle}>取り込みのようす</h2>
-          <div className={styles.minis}>
-            {([['今日', data?.health.today, '今日届いた出来事の件数です'], ['この30日', data?.health.last30Days, 'この30日に届いた出来事の件数です'], ['失敗', data?.health.failed, '確認が必要な失敗の件数です']] as const).map(([label, value, help]) => (
-              <div key={label} className={styles.mini} title={help}>
-                <span className={styles.miniLabel}>{label}</span>
-                <span className={`${styles.miniValue} ${label === '失敗' && typeof value === 'number' && value > 0 ? styles.miniWarn : ''}`}>{typeof value === 'number' ? `${value.toLocaleString()} 件` : '—'}</span>
-              </div>
+          <KpiBand data-kpi-presentation="cards" gridClassName={styles.minis}>
+            {([['今日', data?.health.today], ['この30日', data?.health.last30Days], ['失敗', data?.health.failed]] as const).map(([label, value]) => (
+              <KpiCard key={label} density="mini" icon={null} title={label} value={null} unit="" valueText={typeof value === 'number' ? `${value.toLocaleString()} 件` : '—'} detail="" valueTone={label === '失敗' && typeof value === 'number' && value > 0 ? 'warning' : 'default'} />
             ))}
-          </div>
+          </KpiBand>
           <p className={styles.note}>{`最後に成功 ${when(data?.health.lastSucceededAt ?? null)}`}</p>
-        </section>
+        </Card>
       </div>
 
-      <section className={`${styles.card} ${styles.cardWide}`} aria-labelledby="ec-connector-status">
+      <Card spacing="settings" aria-labelledby="ec-connector-status">
         <h2 id="ec-connector-status" className={styles.cardTitle}>取り込みの状態</h2>
         <p className={styles.desc}>止めると、ネットショップからの出来事を受け取らなくなります。「設定を保存する」で効きます。</p>
         <div className={styles.statusRow}>
-          <span className={styles.status} data-tone={connector?.status === 'paused' ? 'muted' : 'good'}><span className={styles.dot} aria-hidden="true" />{connector?.status === 'paused' ? '止めている' : '取り込み中'}</span>
+          <StatusBadge tone={connector?.status === 'paused' ? 'neutral' : 'success'} size="compact">{connector?.status === 'paused' ? '止めている' : '取り込み中'}</StatusBadge>
           <span className={styles.statusText}>{`最後に受け取った ${when(data?.health.lastReceivedAt ?? null)}`}</span>
           {connector && canEdit ? (
             <Button type="button" onClick={() => setForm({ ...form, status: paused ? 'connected' : 'paused' })}>{paused ? '取り込みを再開する' : '取り込みを止める'}</Button>
@@ -251,9 +260,9 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
               : (paused ? '取り込みを再開します。保存すると再開します。保存済みの設定は残っています。' : '取り込みを止めます。保存すると止まります。保存せずに離れると確認が出ます。')}
           </span>
         </div>
-      </section>
+      </Card>
 
-      <section className={`${styles.card} ${styles.cardWide}`} aria-labelledby="ec-connector-events">
+      <Card spacing="settings" aria-labelledby="ec-connector-events">
         <h2 id="ec-connector-events" className={styles.cardTitle}>どこの出来事を取り込むか</h2>
         <div className={styles.checks}>
           {/* 閲覧のみは押せるチェックを置かず、いまの選び方を文字で見せる。 */}
@@ -262,9 +271,9 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
             : <span key={value} className={styles.readValue}>{`${EC_EVENT_LABELS[value]}：${form.eventTypes.includes(value) ? '取り込む' : '取り込まない'}`}</span>)}
         </div>
         <p className={styles.note}>チェックを外すと、その出来事を起点にした配信や集計も止まります。</p>
-      </section>
+      </Card>
 
-      <section className={`${styles.card} ${styles.cardWide}`} aria-labelledby="ec-connector-identity">
+      <Card spacing="settings" aria-labelledby="ec-connector-identity">
         <h2 id="ec-connector-identity" className={styles.cardTitle}>どうやって人を見分けるか</h2>
         <p className={styles.note}>上から照らし合わせます。名前だけで自動では結びつけません。</p>
         <div className={styles.rules}>
@@ -276,7 +285,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
             </span>
           ))}
         </div>
-      </section>
+      </Card>
 
       <div className={styles.foot}>
         {/* つながる先：止めると止まるもの（ECの出来事がきっかけ）の数は title で見せる。 */}
@@ -289,8 +298,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
         </p>
         {canEdit ? (
           <div className={styles.saveBox}>
-            {saveBlockReason ? <p className={styles.note} role="note">{saveBlockReason}</p> : null}
-            <Button type="button" variant="primary" disabled={saving || !form.shopDomain || (!connector?.secretConfigured && form.inboundSecret.length < 32)} onClick={requestSave} busy={saving} busyLabel="保存しています…">設定を保存する</Button>
+            <Button type="button" variant="primary" disabled={saving} onClick={requestSave} busy={saving} busyLabel="保存しています…">設定を保存する</Button>
           </div>
         ) : null}
       </div>

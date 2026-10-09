@@ -811,7 +811,6 @@ export default function RewardsTab() {
   ) : (
     <>
       {table}
-      <p className={styles.footNote}>行の「…」から 編集・自分で交換をテスト・出すのを止める・複製。</p>
     </>
   )
 
@@ -824,6 +823,7 @@ export default function RewardsTab() {
 
   return (
     <MileageFrame
+      help="行の「…」から 編集・自分で交換をテスト・出すのを止める・複製。"
       actions={
         <Button variant="secondary" onClick={exportCsv} disabled={!canExport}>
           <Download size={15} aria-hidden="true" /> CSV で書き出す

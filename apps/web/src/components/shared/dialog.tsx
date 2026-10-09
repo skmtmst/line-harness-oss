@@ -36,10 +36,16 @@ export type DialogProps = {
   designHeaderHeight?: number
   /** 指定した窓だけ本文の余白を変える（フォルダ付きの選択窓など）。 */
   designContentPadding?: string
+  /** 指定した窓だけ下の操作段の余白を変える。 */
+  designFooterPadding?: string
+  /** 本文と操作が続く窓では区切り線を省く。既定は線あり。 */
+  footerDivider?: boolean
+  /** 左の操作で残り幅を埋めるか。既定は埋める。 */
+  footerLeadFlexible?: boolean
   /** 題の隣の補足。ほかの窓の題の並びは変えない。 */
   titleHelp?: ReactNode
-  /** 段の帯を使わず、題・手順・本文・操作を1枚に続ける窓（hadfk）。既定の窓は変えない。 */
-  layout?: 'continuous'
+  /** 段の帯を使わず続ける窓（hadfk）、またはアカウントの窓の余白。既定の窓は変えない。 */
+  layout?: 'continuous' | 'account-inset'
   /** 手順の帯。本文のスクロールから独立させる。 */
   steps?: ReactNode
   /** 手順の本文を閉じずに切り替える鍵。StepsのcurrentKeyは自動で読む。 */
@@ -105,6 +111,9 @@ export default function Dialog({
   designHeaderPadding,
   designHeaderHeight,
   designContentPadding,
+  designFooterPadding,
+  footerDivider = true,
+  footerLeadFlexible = true,
   titleHelp,
   layout,
   steps,
@@ -203,16 +212,19 @@ export default function Dialog({
       data-layout={layout}
       data-footer-align={footerAlign}
       data-design-footer-gap={designFooterGap !== undefined || undefined}
+      data-footer-divider={footerDivider ? undefined : 'none'}
+      data-footer-lead={footerLeadFlexible ? undefined : 'fixed'}
       data-design-width={designWidth ? '' : undefined}
       data-design-header-padding={designHeaderPadding ? '' : undefined}
       data-design-header-height={designHeaderHeight ? '' : undefined}
       data-design-content-padding={designContentPadding ? '' : undefined}
-      style={designWidth || designHeaderPadding || designHeaderHeight || designContentPadding || designFooterGap !== undefined ? ({
+      style={designWidth || designHeaderPadding || designHeaderHeight || designContentPadding || designFooterPadding || designFooterGap !== undefined ? ({
         ...(designFooterGap !== undefined ? { '--dialog-footer-gap': `${designFooterGap}px` } : {}),
         ...(designWidth ? { '--dialog-design-width': `${designWidth}px` } : {}),
         ...(designHeaderPadding ? { '--dialog-design-header-padding': designHeaderPadding } : {}),
         ...(designHeaderHeight ? { '--dialog-design-header-height': `${designHeaderHeight}px` } : {}),
         ...(designContentPadding ? { '--dialog-design-content-padding': designContentPadding } : {}),
+        ...(designFooterPadding ? { '--dialog-design-footer-padding': designFooterPadding } : {}),
       } as CSSProperties) : undefined}
       data-design-part="dialog"
       data-design-node={tone === 'destructive' ? 'H2S1T4' : 'J6x4Q'}
@@ -236,7 +248,7 @@ export default function Dialog({
       {children ? <div className={styles.content} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       <div className={styles.footer}>
-      {footer ?? (onConfirm ? (
+      {footer != null ? (layout === 'account-inset' ? <div className={styles.insetActions}>{footer}</div> : footer) : (onConfirm ? (
         /*
          * 実行・取消は共通Buttonの役割（primary/danger/secondary）をそのまま
          * 使う（#976 U077/U083/U084）。ここで赤や緑を自前で持つと、コントラストが

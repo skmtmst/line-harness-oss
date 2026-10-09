@@ -140,7 +140,8 @@
 .table {
   overflow: hidden;
   border-radius: var(--tpl-sb-card-radius);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
 }
 
 .alerts {
@@ -149,8 +150,9 @@
   gap: var(--tpl-sb-group-gap);
   padding: var(--tpl-sb-ext-pad);
   border-radius: var(--tpl-sb-card-radius);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   background: var(--color-status-warn-soft);
+  box-shadow: var(--card-shadow);
 }
 
 .alertsTitle {
@@ -264,6 +266,8 @@
   font-size: var(--tpl-sb-chip-text);
   white-space: nowrap;
 }
+
+.judge { display: flex; align-items: center; }
 
 .how {
   font-size: var(--tpl-sb-row-sub);

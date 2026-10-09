@@ -271,3 +271,18 @@ describe('イメージマップのAPIと編集用データの往復',()=>{
     expect(JSON.parse(bubbleLegacyMessage(loaded).messageContent)).toMatchObject(payload)
   })
 })
+
+describe('composer でテンプレートを読み戻す', () => {
+  it('カルーセルのボタンの動きを落とさない', () => {
+    const actions = { '0': { '0': [{ type: 'tag_add', config: { tagId: 'tag' } }] } }
+    const columns = [{ title: 'お知らせ', text: '本文', actions: [{ type: 'postback', label: '選ぶ', data: 'ctpl=t&c=0&a=0' }] }]
+    const selected = messageTemplateToBubble({ id: 't', name: 'お知らせ', category: 'general', messageType: 'carousel', messageContent: JSON.stringify(columns), carouselActions: actions })!
+    expect(selected.type).toBe('carousel'); expect(selected.content.carouselActions).toEqual(actions)
+    expect(JSON.parse(bubbleLegacyMessage(selected).messageContent)).toEqual(columns)
+  })
+  it('音声のミリ秒を編集用の秒へ戻し、保存時に元の長さへ戻す', () => {
+    const content = { originalContentUrl: 'https://example.com/a.m4a', duration: 42000 }
+    const selected = messageTemplateToBubble({ id: 'a', name: '音声', category: 'general', messageType: 'audio', messageContent: JSON.stringify(content) })!
+    expect(JSON.parse(bubbleLegacyMessage(selected).messageContent)).toEqual(content)
+  })
+})

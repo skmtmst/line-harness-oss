@@ -703,8 +703,9 @@
   margin-bottom: var(--tpl-ml-kpi-pull);
   overflow: hidden;
   border-radius: var(--tpl-ml-card-radius);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
+  box-shadow: var(--card-shadow);
 }
 .historyBox,
 .summaryBox {
@@ -712,9 +713,10 @@
   flex-direction: column;
   min-width: 0;
   border-radius: var(--tpl-ml-card-radius);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 .historyBox { overflow: hidden; }
 .historyTools {

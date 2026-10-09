@@ -46,20 +46,7 @@
   font-size: var(--text-caption);
 }
 .viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ro-band-gap);
   margin: var(--tpl-mb-ro-margin);
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-ro-band-lh);
-}
-.viewerBand > svg {
-  flex-shrink: 0;
-  color: var(--color-action);
 }
 
 /* 競合の帯（e5yBLx）：タブの下に、琥珀の地・左に注意の印・右に2つのボタン。 */
@@ -134,17 +121,6 @@
   flex-direction: column;
   gap: var(--tpl-mb-gap);
   min-width: 0;
-}
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-mb-gap);
-  min-width: 0;
-  padding: var(--tpl-mb-card-pad);
-  border-radius: var(--tpl-mb-card-radius);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  background: var(--color-canvas);
 }
 .sideCard {
   flex-shrink: 0;

@@ -214,7 +214,7 @@ it.each(['template', 'rich_menu', 'form', 'tag', 'scenario'] as const)('%s の�
   const h = await render({ type })
   await act(async () => (host.querySelector('[aria-label="フォルダ「お問い合わせ」の操作"]') as HTMLButtonElement).click())
   await act(async () => ([...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent === '色を変える') as HTMLElement).click())
-  await act(async () => (document.querySelector('[aria-label="フォルダの色：色なし"]') as HTMLButtonElement).click())
+  await act(async () => (document.querySelector('[aria-label^="フォルダの色："]') as HTMLButtonElement).click())
   await act(async () => (document.querySelector('[role="radio"][aria-label="ピンク"]') as HTMLButtonElement).click())
   await act(async () => (buttons().find((el) => el.textContent === '保存する') as HTMLButtonElement).click())
   expect(h.onRenameFolder).toHaveBeenCalledWith(expect.objectContaining({ id: 'f-1', revision: 1 }), 'お問い合わせ', '#ec4899')

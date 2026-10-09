@@ -38,10 +38,11 @@
   flex-direction: column;
   gap: var(--tpl-am-ver-history-gap);
   padding: var(--tpl-am-ver-history-pad);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   border-radius: var(--radius-card);
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 .cardTitle {
   margin: 0;

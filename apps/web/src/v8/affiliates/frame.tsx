@@ -95,6 +95,7 @@ export function CreateButton({
 
 export interface AffiliateFrameProps {
   /** 板の頭の右（CSV など）。 */
+  help?: ReactNode
   actions?: ReactNode
   stats?: ReactNode
   folders?: ReactNode
@@ -107,7 +108,7 @@ export interface AffiliateFrameProps {
 }
 
 /** 5つのタブの共通の外側。題・説明・タブの段・閲覧のみの帯をここで持つ。 */
-export function AffiliateFrame({ actions, stats, folders, folderNav, toolbar, pagination, overlays, children }: AffiliateFrameProps) {
+export function AffiliateFrame({ help, actions, stats, folders, folderNav, toolbar, pagination, overlays, children }: AffiliateFrameProps) {
   const { tab, readonly, narrow, counts } = useAffiliateShell()
   const board = tab === 'affiliates' && narrow
     ? 'KdFRI'
@@ -116,6 +117,7 @@ export function AffiliateFrame({ actions, stats, folders, folderNav, toolbar, pa
       : AFFILIATE_TABS.find((item) => item.key === tab)?.board
   return (
     <ListPage
+      help={help}
       boardId={board}
       headingSize="regular"
       title="成果とアフィリエイト"

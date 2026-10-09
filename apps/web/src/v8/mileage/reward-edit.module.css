@@ -10,10 +10,11 @@
   gap: var(--tpl-ml-card-gap);
   padding: var(--tpl-ml-card-pad);
   /* 枠は外へ場所を取らない線（絵の outline と同じ。高さを足さない）。 */
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   border-radius: var(--tpl-ml-card-radius);
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 .cardTitle {
   margin: 0;
@@ -81,10 +82,11 @@
   gap: var(--tpl-ml-side-inner-gap);
   padding: var(--tpl-ml-side-pad);
   /* 枠は外へ場所を取らない線（絵の outline と同じ。高さを足さない）。 */
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   border-radius: var(--tpl-ml-card-radius);
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 .sideTitle {
   line-height: normal;

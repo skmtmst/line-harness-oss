@@ -8,9 +8,10 @@
   gap: var(--tpl-rule-row-gap);
   padding: var(--tpl-ev-card-pad);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 .card:first-of-type {
   gap: var(--tpl-toolbar-gap);
@@ -187,9 +188,10 @@
   gap: var(--tpl-rule-row-gap);
   padding: var(--tpl-side-card-pad);
   border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
+  outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
 }
 .impactCard {
   min-height: var(--tpl-ev-impact-h);

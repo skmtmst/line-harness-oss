@@ -386,6 +386,10 @@
 .stepCurrent { background: var(--color-ink); color: var(--color-canvas); }
 .stepLine { width: 28px; height: 1.5px; background: var(--color-accent-deep); }
 [data-theme='v8'] .error { margin: 0 24px 12px; }
+[data-theme='v8'] .panel[style*='--dialog-design-footer-padding'] .actions { padding: var(--dialog-design-footer-padding); }
+[data-theme='v8'] .panel[data-footer-align='start'] .actions { justify-content: flex-start; }
+[data-theme='v8'] .panel[data-footer-divider='none'] .actions { border-top: 0; }
+[data-theme='v8'] .panel[data-footer-lead='fixed'] .footerLead { flex: none; margin-right: var(--tpl-sb-group-gap); }
 
 [data-theme='v8'] .headerContent { align-items: flex-start; }
 [data-theme='v8'] .steps { display: flex; align-items: center; gap: 10px; }
@@ -417,3 +421,10 @@
 [data-theme='v8'] .panel[data-layout='continuous'] > .steps { padding: 0; border: 0; background: transparent; }
 [data-theme='v8'] .panel[data-layout='continuous'] > .content { padding: 0; }
 [data-theme='v8'] .panel[data-layout='continuous'] .actions { padding: 6px 0 0; border: 0; }
+
+/* アカウントの窓は頭・本文・操作を同じ余白で続ける。既定の窓は変えない。 */
+[data-theme='v8'] .panel[data-layout='account-inset'] { padding: var(--tpl-acd-dlg-pad); gap: var(--tpl-acd-dlg-gap); }
+[data-theme='v8'] .panel[data-layout='account-inset'] > .headerRow,
+[data-theme='v8'] .panel[data-layout='account-inset'] > .content { padding: 0; }
+[data-theme='v8'] .panel[data-layout='account-inset'] .title { font-size: var(--tpl-acd-dlg-title-size); line-height: var(--tpl-acd-dlg-title-lh); }
+[data-theme='v8'] .panel[data-layout='account-inset'] .insetActions { display: flex; justify-content: flex-end; align-items: center; gap: var(--tpl-acd-actions-gap); padding: var(--tpl-acd-dlg-foot-pad); box-shadow: var(--tpl-acd-line-top); }

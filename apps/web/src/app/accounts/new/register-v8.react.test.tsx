@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import RegisterV8, { allV8RowsPassed, toV8CheckRows } from './register-v8'
+import RegisterV8 from '@/v8/account-new/register'
+import { allV8RowsPassed, toV8CheckRows } from '@/v8/account-new/logic'
 import type { LineAccountConnectData } from '@/lib/api'
 
 const calls = vi.hoisted(() => ({
@@ -92,6 +93,11 @@ describe('V8 登録ウィザードの gated 進行', () => {
     next()
     next()
     expect(screen.getByText('チャネルIDを入力してください。')).toBeTruthy()
+    const channel = document.getElementById('v8-channel-id')!
+    expect(channel.getAttribute('aria-invalid')).toBe('true')
+    await waitFor(() => expect(document.activeElement).toBe(channel))
+    expect(screen.queryByText('入力内容を確認してください。')).toBeNull()
+    expect(calls.connectCheck).not.toHaveBeenCalled()
     expect(screen.queryByText('LINE ID')).toBeNull()
   })
 
@@ -150,7 +156,8 @@ describe('V8 登録ウィザードの gated 進行', () => {
     })
     await enterCheckStep()
     fireEvent.click(screen.getByRole('button', { name: '接続して設定する' }))
-    expect(await screen.findByText('止まった項目を直して、もう一度「接続して設定する」を押してください。')).toBeTruthy()
+    const failedRow = (await screen.findByText('LINE Developers で「Webhook の利用」がオフです。オンにしてから押し直してください')).closest('li')
+    expect(failedRow?.getAttribute('data-state')).toBe('failed')
     expect(screen.queryByText('接続を確かめた結果')).toBeNull()
     expect(calls.connect).not.toHaveBeenCalled()
   })

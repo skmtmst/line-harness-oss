@@ -122,32 +122,6 @@
   font-weight: 700;
   line-height: var(--tpl-wh-in-title-lh);
 }
-.pill {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: var(--tpl-wb-pill-gap);
-  padding: var(--tpl-wb-pill-pad);
-  border-radius: var(--radius-pill);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-wb-pill-lh);
-  white-space: nowrap;
-}
-.pillDot {
-  width: var(--tpl-badge-dot);
-  height: var(--tpl-badge-dot);
-  border-radius: var(--radius-pill);
-  background: currentColor;
-}
-.pill[data-tone='active'] {
-  background: var(--color-success-bg);
-  color: var(--color-success);
-}
-.pill[data-tone='neutral'] {
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-secondary);
-}
 .toggleLabel {
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
@@ -158,16 +132,6 @@
 }
 
 /* 設定のカード（枠1・角12・余白20・間12）。 */
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-wh-card-gap);
-  padding: var(--tpl-wh-card-pad);
-  border-radius: var(--radius-card);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-}
 .cardHead {
   display: flex;
   flex-direction: column;
@@ -287,29 +251,6 @@
 }
 
 /* 人が見つからなかった届物の小さな表。 */
-.miniHead,
-.miniRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--tpl-rule-row-gap);
-}
-.miniHead {
-  padding: var(--tpl-wh-mini-head-pad);
-  border-radius: var(--radius-segment);
-  background: var(--color-surface-pearl);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-micro);
-  font-weight: 600;
-  line-height: var(--tpl-row-sub-lh);
-}
-.miniRow {
-  min-height: var(--tpl-wh-mini-row-h);
-  padding: var(--tpl-wh-mini-row-pad);
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-wh-cell-lh);
-}
 .miniWhen { width: var(--tpl-wh-mini-when); }
 .miniValue {
   width: var(--tpl-wh-mini-value);
@@ -357,27 +298,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--tpl-wh-ops-gap);
-}
-.input {
-  width: 100%;
-  min-width: 0;
-  height: var(--tpl-chip-h);
-  padding: var(--tpl-kw-input-pad);
-  border: 0;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-control-border);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--text-body);
-}
-.textarea {
-  height: auto;
-  min-height: var(--tpl-wh-textarea-h);
-  padding: var(--tpl-wh-textarea-pad);
-}
-.mono {
-  font-family: ui-monospace, monospace;
 }
 .noteBox {
   margin: 0;

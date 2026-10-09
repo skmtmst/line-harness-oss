@@ -12,12 +12,13 @@
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
 import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import { CalendarClock, ChevronLeft, ClipboardList, Coins, Eye, MessageSquare, Package, Save, Send } from 'lucide-react'
+import { CalendarClock, ClipboardList, Coins, Eye, MessageSquare, Package, Save, Send } from 'lucide-react'
 import { checkNenCampaignBodyLength, NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared'
 import { ApiError, api, describeSaveFailure, type NenCampaignAfterAction, type NenCampaignSetting } from '@/lib/api'
 import { CreatePage } from '@/components/templates'
+import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
+import Drawer from '@/components/shared/drawer'
 import Checkbox from '@/components/shared/checkbox'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
@@ -25,6 +26,7 @@ import Notice from '@/components/shared/notice'
 import Radio from '@/components/shared/radio'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
+import TimeField from '@/components/shared/time-field-v8'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import { useAccount } from '@/contexts/account-context'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
@@ -33,6 +35,8 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { formatNumber } from '@/lib/format'
 import { formatCampaignTiming } from './display'
 import styles from './form.module.css'
+import { FieldError } from '@/components/shared/form-controls'
+import { useFieldValidation } from '@/lib/use-field-validation'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 
 /** きっかけの短い言い方（配信フローの札・日数の選ぶ欄）。 */
@@ -56,13 +60,6 @@ function triggerShort(setting: NenCampaignSetting): string {
   if (setting.campaignKey === 'birthday_coupon') return 'ペットの誕生日'
   if (!setting.triggerEvent) return '手動で送る'
   return TRIGGER_SHORT[setting.triggerEvent] ?? '登録済みのきっかけ'
-}
-
-/** 30分ごとの時刻（今の値が並びに無ければ足す）。 */
-function timeChoices(current: string): string[] {
-  const list: string[] = []
-  for (let h = 6; h <= 22; h += 1) for (const m of ['00', '30']) list.push(`${String(h).padStart(2, '0')}:${m}`)
-  return list.includes(current) ? list : [...list, current].sort()
 }
 
 function withCurrent(choices: number[], current: number): number[] {
@@ -96,12 +93,14 @@ export function withoutVersion<T extends object | null>(value: T): Omit<NonNulla
 }
 
 export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
+  const [previewOpen, setPreviewOpen] = useState(false)
   const [setting, setSetting] = useState<NenCampaignSetting | null>(null)
   const [draft, setDraft] = useState<Partial<NenCampaignSetting>>({})
   const [forms, setForms] = useState<FormOption[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [validationSubmitted, setValidationSubmitted] = useState(false)
   const [notice, setNotice] = useState('')
   const [testSearch, setTestSearch] = useState('')
   const [testCandidates, setTestCandidates] = useState<Candidate[]>([])
@@ -260,24 +259,21 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   const bodyLimitLabel = formatNumber(NEN_CAMPAIGN_BODY_MAX_LENGTH)
   const bodyRemaining = NEN_CAMPAIGN_BODY_MAX_LENGTH - bodyCheck.length
 
+  const bodyError = !merged.bodyText?.trim() ? '本文を入力してください'
+    : !bodyCheck.fits ? `${bodyLimitLabel}字を超えています（現在${formatNumber(bodyCheck.length)}字）。短くしてください。` : undefined
+  const mileageError = mileageAction && (!Number.isInteger(mileageAction.amount) || mileageAction.amount < 1 || mileageAction.amount > 1_000_000)
+    ? '付けるマイルは1〜1,000,000の整数で入力してください' : undefined
+  const fields = useFieldValidation([
+    ...(bodyError ? [{ id: 'nen-edit-body', message: bodyError }] : []),
+    ...(formIssueMessage ? [{ id: 'nen-edit-form', message: formIssueMessage }] : []),
+    ...(mileageError ? [{ id: 'nen-edit-mileage', message: mileageError }] : []),
+  ])
+
   const save = async () => {
     if (!setting || !selectedAccountId) return
-    if (!merged.bodyText?.trim()) {
-      setError('本文を入力してください')
-      return
-    }
-    if (!bodyCheck.fits) {
-      setError(`本文が長すぎます（現在${formatNumber(bodyCheck.length)}字・上限${bodyLimitLabel}字）。短くしてから保存してください。入力内容はそのまま残っています。`)
-      return
-    }
-    if (formIssueMessage) {
-      setError(`${formIssueMessage}。フォームを外して選び直してから保存してください`)
-      return
-    }
-    if (mileageAction && (!Number.isInteger(mileageAction.amount) || mileageAction.amount < 1 || mileageAction.amount > 1_000_000)) {
-      setError('付けるマイルは1〜1,000,000の整数で入力してください')
-      return
-    }
+    setError('')
+    setValidationSubmitted(true)
+    if (!fields.submit()) return
     setSaving(true)
     setError('')
     setNotice('')
@@ -328,7 +324,6 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   const time = merged.deliveryTime.slice(0, 5)
   const timing = `${formatCampaignTiming({ campaignKey, delayDays: merged.delayDays, deliveryTime: time })} に届きます`
   const trigger = triggerShort(setting)
-  const back = <Link href="/nen-campaigns" className={styles.backLink}><ChevronLeft size={14} aria-hidden="true" />NEN配信へ</Link>
   const accountName = selectedAccount?.displayName || selectedAccount?.name || '公式アカウント'
   const kindIsRich = Boolean(merged.imageUrl)
   // 下の帯の左は短く（長いと折り返して帯が高くなる）。くわしい決めごとは見出しの説明に書く。
@@ -343,20 +338,20 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
           <span className={styles.bubbleText}>{`${previewBody(merged.bodyText)}${merged.buttonLabel ? `\n▶ ${merged.buttonLabel}` : ''}`}</span>
         </LinePreviewMessage>
       </LinePreview>
-      <section className={styles.sideCard} aria-labelledby="nen-edit-tips">
+      <Card role="region" layout="vertical" padding="compact" surface="inset" spacing="tight" aria-labelledby="nen-edit-tips">
         <h2 className={styles.sideTitle} id="nen-edit-tips">気をつけること（一般的な目安）</h2>
         <ul className={styles.sideText}>
           <li>・吹き出しは少なめが安心です</li>
           <li>・届く時間は「配信の反応」で確かめられます</li>
           <li>・誕生日配信は 10:00 に固定です</li>
         </ul>
-      </section>
-      <section className={styles.sideCard} aria-labelledby="nen-edit-cannot">
+      </Card>
+      <Card role="region" layout="vertical" padding="compact" surface="inset" spacing="tight" aria-labelledby="nen-edit-cannot">
         <h2 className={styles.sideTitle} id="nen-edit-cannot">この画面でできないこと</h2>
         <p className={`${styles.sideText} ${styles.sideTextTight}`}>記事の本文を書く（外部サイトで書きます）・出しかたの細かい設定（一斉配信と同じ）</p>
-      </section>
+      </Card>
       {canEdit ? (
-        <section className={`${styles.sideCard} ${styles.sideCardTest}`} aria-labelledby="nen-edit-test">
+        <Card role="region" layout="vertical" padding="compact" surface="inset" spacing="controls" aria-labelledby="nen-edit-test">
           <h2 className={`${styles.sideTitle} ${styles.sideTitleSmall}`} id="nen-edit-test">自分にテストを送る</h2>
           <SearchField
             aria-label="テスト送信の相手を名前で探す"
@@ -375,7 +370,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
           {testCandidates.length > 1 ? (
             <Select aria-label="テスト送信の相手" size="full" value={testTarget} onChange={setTestTarget} options={testCandidates.map((candidate) => ({ value: candidate.id, label: `送る相手：${candidate.displayName ?? '名前なし'}` }))} />
           ) : null}
-        </section>
+        </Card>
       ) : null}
     </div>
   )
@@ -385,27 +380,24 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       boardId="w5pwG"
       title={`${setting.label}（配信を直す）`}
       description={`${timing}。保存した新しい中身は次のきっかけから使われ、すでに配信待ちの分は予約したときの中身のまま届きます。`}
-      identity={back}
-      preview={preview}
+      preview={previewOpen ? undefined : preview}
+      hidePreviewWhenNarrow
+      previewToggle={<Button type="button" onClick={() => setPreviewOpen(true)}>プレビューを見る</Button>}
       status={status}
       footerActions={canEdit ? (
         <>
           <Button href="/nen-campaigns">キャンセル</Button>
-          <Button type="button" variant="primary" onClick={() => void save()} disabled={saving || !bodyCheck.fits} busy={saving} busyLabel="保存しています…"><Save size={15} aria-hidden="true" />配信内容を保存する</Button>
+          <Button type="button" variant="primary" onClick={() => void save()} disabled={saving} busy={saving} busyLabel="保存しています…"><Save size={15} aria-hidden="true" />配信内容を保存する</Button>
         </>
       ) : <Button href="/nen-campaigns">一覧へ戻る</Button>}
     >
       {!canEdit ? (
-        <div className={styles.viewerBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。配信を直すのは管理者に頼んでください。</span>
-        </div>
+        <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />} message="閲覧のみで見ています。配信を直すのは管理者に頼んでください。" />
       ) : null}
       {error ? <Notice tone="danger" message={error} /> : null}
       {notice ? <Notice tone="success" message={notice} /> : null}
-      {formIssueBanner ? <Notice tone="warn" message={formIssueBanner} /> : null}
 
-      <section className={styles.card} aria-labelledby="nen-edit-flow">
+      <Card layout="vertical" padding="spacious" surface="inset" spacing="normal" aria-labelledby="nen-edit-flow">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="nen-edit-flow">配信フロー</h2>
           <p className={styles.cardNote}>{formAction && mileageAction ? '回答フォームへの送信をきっかけにマイルを付けます' : 'きっかけから届くまでの流れです'}</p>
@@ -417,9 +409,9 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
           {formAction ? <li className={styles.flowStep}><ClipboardList size={13} aria-hidden="true" />フォームに答えた</li> : null}
           {mileageAction?.kind === 'award_mileage' ? <li className={styles.flowStep}><Coins size={13} aria-hidden="true" />{`${formatNumber(mileageAction.amount)} マイル`}</li> : null}
         </ol>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="nen-edit-when">
+      <Card layout="vertical" padding="spacious" surface="inset" spacing="normal" aria-labelledby="nen-edit-when">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="nen-edit-when">いつ送りますか</h2>
           <p className={styles.cardNote}>このアカウントでの反応がいい時間帯は、分析の「配信の反応」で見られます</p>
@@ -448,7 +440,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
             ) : !canEdit ? (
               <StaticBox label="送る時刻" value={time} />
             ) : (
-              <Select aria-label="送る時刻" size="full" value={time} onChange={(value) => setDraft((previous) => ({ ...previous, deliveryTime: value }))} options={timeChoices(time).map((value) => ({ value, label: value }))} />
+              <TimeField aria-label="送る時刻" value={time} minuteStep={30} onChange={(value) => setDraft((previous) => ({ ...previous, deliveryTime: value }))} />
             )}
           </div>
           <div className={styles.field}>
@@ -479,9 +471,9 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
             </>}
           </div>
         )}
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="nen-edit-what">
+      <Card layout="vertical" padding="spacious" surface="inset" spacing="normal" aria-labelledby="nen-edit-what">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="nen-edit-what">送るもの</h2>
           <p className={styles.cardNote}>この配信は1通で届きます</p>
@@ -499,27 +491,27 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
           </span>
           <InsertTextField
             id="nen-edit-body"
+            aria-invalid={Boolean((validationSubmitted || !bodyCheck.fits) && bodyError)}
+            aria-describedby={(validationSubmitted || !bodyCheck.fits) && bodyError ? 'nen-edit-body-error' : undefined}
             ref={bodyRef}
-            rows={3}
             value={merged.bodyText}
             readOnly={!canEdit}
             onValueChange={(next) => setDraft((previous) => ({ ...previous, bodyText: next }))}
             aria-label="配信本文"
-            className={styles.textarea}
+            compact
           />
           {insertOpen && canEdit ? (
             <InsertToolbar targetRef={bodyRef} value={merged.bodyText} onChange={(bodyText) => setDraft((previous) => ({ ...previous, bodyText }))} />
           ) : null}
-          {!bodyCheck.fits ? (
-            <p className={styles.error} role="alert">{bodyLimitLabel}字を超えています（現在{formatNumber(bodyCheck.length)}字）。短くしてください。</p>
-          ) : bodyRemaining <= BODY_NOTICE_REMAINING ? (
+          <FieldError id="nen-edit-body-error">{(validationSubmitted || !bodyCheck.fits) ? bodyError : undefined}</FieldError>
+          {!bodyError && bodyRemaining <= BODY_NOTICE_REMAINING ? (
             <p className={styles.muted}>あと{formatNumber(bodyRemaining)}字（上限{bodyLimitLabel}字。長すぎるとLINEで送れません）</p>
           ) : null}
         </div>
         <p className={styles.caution}>差し込む名前が長いと、送るときに長すぎる場合があります。1回にたくさんの吹き出しを送るとブロックされやすい傾向があります（一般的な目安）。</p>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="nen-edit-after">
+      <Card layout="vertical" padding="spacious" surface="inset" spacing="normal" aria-labelledby="nen-edit-after">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="nen-edit-after">押されたあとにすること</h2>
           <p className={styles.cardNote}>{`メッセージの「${merged.buttonLabel?.replace(/（.*?）/, '') || 'ボタン'}」を押した人に何をするかです`}</p>
@@ -528,6 +520,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
           <div className={styles.field}>
             <span className={styles.labelSmall}>回答フォームを開かせる（任意）</span>
             {!canEdit ? <StaticBox label="回答フォーム" value={formAction?.formName ?? '開かせない'} /> : <Select
+              id="nen-edit-form"
               aria-label="回答フォームを開かせる（任意）"
               size="full"
               value={formAction?.formId ?? ''}
@@ -539,10 +532,13 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
                 ...forms.map((form) => ({ value: form.id, label: form.isActive ? form.name : `${form.name}（公開されていません）`, disabled: !form.isActive })),
               ]}
             />}
+            {formIssueBanner && !formIssueMessage ? <p className={styles.muted}>{formIssueBanner}</p> : null}
           </div>
           <div className={styles.field}>
             <span className={styles.labelSmall}>回答後にマイルを付ける</span>
             {!canEdit ? <StaticBox label="回答後のマイル" value={mileageAction?.kind === 'award_mileage' ? `${formatNumber(mileageAction.amount)} マイル` : '付けない'} /> : <Select
+              id="nen-edit-mileage"
+              error={fields.error('nen-edit-mileage')}
               aria-label="回答後にマイルを付ける"
               size="full"
               value={mileageAction?.kind === 'award_mileage' ? String(mileageAction.amount) : ''}
@@ -555,7 +551,8 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
           </div>
         </div>
         <p className={styles.chain}>つながる先：→ 回答フォーム　→ マイル　→ EC連携　→ タグ</p>
-      </section>
+      </Card>
+      <Drawer open={previewOpen} title="配信のプレビュー" width="narrow" onClose={() => setPreviewOpen(false)}>{preview}</Drawer>
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage>
   )

@@ -194,6 +194,8 @@ describe('V8 NEN配信の一覧', () => {
     await render(props)
     expect(host.querySelector('[data-design-node="Tj7n4"]')).not.toBeNull()
     expect(host.querySelector('tbody')?.textContent).toContain('取得不可')
+    // コラムの記事を開いた割合を、取得できないLINE開封率として流用しない。
+    expect(host.querySelectorAll('[data-kpi-number]')[2]?.textContent).toBe('—')
     await act(async () => { fireEvent.click(button('届きませんでした 1')!) })
     expect(props.onChangeDeliveryView).toHaveBeenCalledWith('failed', undefined, '')
   })

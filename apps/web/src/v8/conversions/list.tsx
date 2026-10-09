@@ -1113,11 +1113,6 @@ function ConversionList({ accountId }: { accountId: string | null }) {
           </DataTable>
         </div>
         {detailCard || stopCard ? <div className={styles.panels}>{detailCard}{stopCard}</div> : null}
-        <p className={`${styles.footNote} ${narrow ? styles.footNoteNarrow : ''}`}>
-          {canEdit
-            ? '行の「…」から 編集・使う場所を見る・使う場所を足す・止める・複製。止めると、使っている配信や流入リンクでも数えなくなります。'
-            : '行の「…」から 中身と使う場所を見られます。止めると、使っている配信や流入リンクでも数えなくなります。'}
-        </p>
       </>
     )
   }
@@ -1137,6 +1132,9 @@ function ConversionList({ accountId }: { accountId: string | null }) {
 
   return (
     <ListPage
+      help={canEdit
+            ? '行の「…」から 編集・使う場所を見る・使う場所を足す・止める・複製。止めると、使っている配信や流入リンクでも数えなくなります。'
+            : '行の「…」から 中身と使う場所を見られます。止めると、使っている配信や流入リンクでも数えなくなります。'}
       boardId="r6dJFy"
       headingSize="regular"
       title="コンバージョン"

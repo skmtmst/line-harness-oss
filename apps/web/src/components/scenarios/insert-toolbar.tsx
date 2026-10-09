@@ -43,6 +43,7 @@ interface Option {
 }
 
 export interface InsertToolbarProps {
+  compact?: boolean
   /** 差し込み先。入力欄そのものを渡す。 */
   targetRef: React.RefObject<HTMLTextAreaElement | HTMLInputElement | InsertTextTarget | null>
   value: string
@@ -51,7 +52,7 @@ export interface InsertToolbarProps {
   includeAnswerForm?: boolean
 }
 
-export default function InsertToolbar({ targetRef, value, onChange, includeAnswerForm = false }: InsertToolbarProps) {
+export default function InsertToolbar({ targetRef, value, onChange, includeAnswerForm = false, compact = false }: InsertToolbarProps) {
   const { selectedAccountId } = useAccount()
   // 友だち情報・共通情報は任意機能。オフのaccountでは差し込み口ごと出さない。
   const featureVisibility = useFeatureVisibility(selectedAccountId)
@@ -117,7 +118,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
   }
 
   const menuButton = (key: string, label: string, token?: string) => v8 ? (
-    <InsertButton
+    <InsertButton size={compact ? 'compact' : undefined}
       ref={(element) => { buttonRefs.current[key] = element }}
       icon={key === 'other' ? 'more' : 'plus'}
       label={label}
@@ -169,7 +170,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
     <div className="relative flex flex-wrap items-center gap-1.5 v8:gap-x-3 v8:gap-y-2">
       <span className="text-ink-faint text-xs v8:text-micro">差し込み</span>
 
-      {v8 ? <InsertButton label="名前" onClick={() => insert('{{name}}')} /> : (
+      {v8 ? <InsertButton size={compact ? 'compact' : undefined} label="名前" onClick={() => insert('{{name}}')} /> : (
         <Button variant="secondary" className="text-ink-secondary v7:h-8 px-2.5 text-xs whitespace-normal" type="button" onClick={() => insert('{{name}}')}>
           名前
         </Button>

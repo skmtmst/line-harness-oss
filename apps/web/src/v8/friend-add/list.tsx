@@ -67,6 +67,7 @@ import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
 import { describeFriendAddFailure } from './failure'
 import { useCursorStack } from './use-cursor-stack'
 import styles from './list.module.css'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
 
 const KIND_LABELS: Record<FriendAddRuleKind, string> = {
   first_time: 'はじめて友だち追加した人',
@@ -540,7 +541,7 @@ function FriendAddList() {
   const folderRows = [
     { kind: 'all' as const, id: '', label: 'すべて', count: data?.total ?? items.length },
     ...folders.map((entry) => ({ kind: entry.key === UNFILED ? 'unfiled' as const : 'folder' as const, id: entry.key, label: entry.name, color: entry.color, count: entry.count,
-      onEdit: canEdit && entry.id && entry.key !== UNFILED ? () => { setFolderName(entry.name); setFolderColor(entry.color ?? null); setEditingFolder({ id: entry.id!, name: entry.name, color: entry.color }); setFolderError(''); setFolderDialogOpen(true) } : undefined })),
+      onEdit: canEdit && entry.id && entry.key !== UNFILED ? () => { setFolderName(entry.name); setFolderColor(folderDisplayColor(entry)); setEditingFolder({ id: entry.id!, name: entry.name, color: entry.color }); setFolderError(''); setFolderDialogOpen(true) } : undefined })),
   ]
   const createButton = canEdit ? (
     <Button variant="primary" href="/friend-add-settings?view=new" className={styles.createButton}>
@@ -790,7 +791,6 @@ function FriendAddList() {
             </tbody>
           </DataTable>
         </div>
-        <p className={styles.footNote}>{ORDER_NOTE}</p>
       </>
     )
   }
@@ -807,6 +807,7 @@ function FriendAddList() {
 
   return (
     <ListPage
+      help={ORDER_NOTE}
       boardId={canEdit ? 'MRhef' : 'LEwkJ'}
       headingSize="regular"
       title="友だち追加時の配信"
@@ -926,7 +927,7 @@ function FriendAddList() {
         />
         <FolderEditorDialog open={folderDialogOpen} title={editingFolder ? 'フォルダを直す' : 'フォルダを追加'}
           description="設定を分けてしまう箱です。"
-          name={folderName} onNameChange={setFolderName} color={folderColor} onColorChange={setFolderColor} allowClear maxLength={50}
+          name={folderName} onNameChange={setFolderName} color={folderColor} onColorChange={setFolderColor} maxLength={50}
           confirmLabel={editingFolder ? '保存する' : '追加する'} busy={folderBusy} error={folderError || undefined}
           onCancel={() => { if (!folderBusy) { setFolderDialogOpen(false); setFolderName(''); setEditingFolder(null) } }}
           onConfirm={() => void createFolder()} />

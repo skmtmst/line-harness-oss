@@ -1,5 +1,17 @@
 import type { ReactNode } from 'react'
+import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import styles from './folder-dot.module.css'
+
+/**
+ * フォルダの見せる色。色が空のフォルダ（色の仕組みより前に作ったもの）は、名前から9色の1つを決まった形で選ぶ
+ * （2026-10-09 オーナー「フォルダで色がつくように」）。左の列と表の丸が同じ色になるよう、どちらもこれを使う。
+ */
+export function folderDisplayColor(folder: { name: string; color?: string | null }): string {
+  if (folder.color) return folder.color
+  let hash = 0
+  for (const char of folder.name) hash = (hash * 31 + (char.codePointAt(0) ?? 0)) >>> 0
+  return FOLDER_SELECT_COLORS[hash % FOLDER_SELECT_COLORS.length].value
+}
 
 /*
  * ★V8 一覧の行の名前の前に置く「フォルダの色の丸」（2026-10-07 オーナー決定）。
@@ -9,7 +21,7 @@ import styles from './folder-dot.module.css'
  */
 export interface FolderDotFolder {
   name: string
-  /** フォルダの色（#RRGGBB）。無いフォルダは薄い灰の丸。 */
+  /** フォルダの色（#RRGGBB）。無いフォルダは folderDisplayColor の自動の色。 */
   color?: string | null
 }
 
@@ -18,7 +30,7 @@ export function FolderDot({ folder }: { folder?: FolderDotFolder | null }) {
   return (
     <span
       className={folder ? styles.dot : `${styles.dot} ${styles.unfiled}`}
-      style={folder?.color ? { backgroundColor: folder.color } : undefined}
+      style={folder ? { backgroundColor: folderDisplayColor(folder) } : undefined}
       role="img"
       aria-label={label}
       title={label}

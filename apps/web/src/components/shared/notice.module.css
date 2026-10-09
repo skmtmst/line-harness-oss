@@ -148,3 +148,9 @@
   text-overflow: ellipsis;
 }
 [data-theme='v8'] .notice[data-appearance='soft'] { border-color: transparent; }
+[data-theme='v8'] .notice[data-presentation='account-note'] {
+  width: 100%; margin: 0; padding: var(--tpl-acd-dlg-band-pad); border: 0;
+  border-radius: var(--tpl-acd-dlg-band-radius); font-size: var(--tpl-acd-dlg-band-size); line-height: var(--tpl-acd-dlg-band-lh);
+}
+[data-theme='v8'] .info[data-presentation='account-note'] { background: var(--color-surface-pearl); }
+[data-theme='v8'] .warn[data-presentation='account-note'] { background: var(--tpl-acd-warn-bg); color: var(--tpl-acd-warn-ink); }
