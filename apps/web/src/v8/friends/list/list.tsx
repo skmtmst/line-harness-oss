@@ -828,7 +828,7 @@ export default function FriendsListV8() {
                   </Td>
                 ) : null}
                 {visible.has('scenario') ? (
-                  <Td className={styles.td}><span className={styles.cellText} title={friend.activeScenario?.name}>{friend.activeScenario?.name ?? 'なし'}</span></Td>
+                  <Td className={`${styles.td} ${styles.fixedContent}`}><span className={styles.cellText} title={friend.activeScenario?.name}>{friend.activeScenario?.name ?? 'なし'}</span></Td>
                 ) : null}
                 {visible.has('latest') ? (
                   <Td className={styles.td}>
@@ -841,7 +841,7 @@ export default function FriendsListV8() {
                   </Td>
                 ) : null}
                 {visible.has('tags') ? (
-                  <Td className={styles.td}>
+                  <Td className={`${styles.td} ${styles.fixedContent}`}>
                     <div className={styles.tags} title={friend.tags.map((tag) => tag.name).join('・') || undefined}>
                       {tags.shown.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="sm" />)}
                       {tags.rest > 0 ? <span className={styles.tagRest}>+{tags.rest}</span> : null}
@@ -850,10 +850,10 @@ export default function FriendsListV8() {
                   </Td>
                 ) : null}
                 {visible.has('source') ? (
-                  <Td className={styles.td}><span className={styles.cellText} title={friend.firstTrackedLinkName || '不明'}>{friend.firstTrackedLinkName || '不明'}</span></Td>
+                  <Td className={`${styles.td} ${styles.fixedContent}`}><span className={styles.cellText} title={friend.firstTrackedLinkName || '不明'}>{friend.firstTrackedLinkName || '不明'}</span></Td>
                 ) : null}
                 {visible.has('last') ? (
-                  <Td className={styles.td}><span className={styles.cellText} title={monthDayTime(lastContact)}>{monthDay(lastContact)}</span></Td>
+                  <Td className={`${styles.td} ${styles.fixedContent}`}><span className={styles.cellText} title={monthDayTime(lastContact)}>{monthDay(lastContact)}</span></Td>
                 ) : null}
                 <Td className={styles.tdMenu}>
                   <div className={styles.menuBox}>
