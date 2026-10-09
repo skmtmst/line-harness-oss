@@ -22,6 +22,7 @@ import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import HelpTip from '@/components/shared/help-tip'
 import styles from './broadcast-form-v8.module.css'
 import StickyBar from '@/components/shared/sticky-bar'
+import { useFormErrors } from '@/lib/use-form-errors'
 import LinePreview from '@/components/shared/line-preview'
 import BroadcastTextBubble from './broadcast-text-bubble'
 import TapActionField from '@/components/shared/tap-action-field'
@@ -1281,6 +1282,29 @@ export default function BroadcastForm({
     setConditionDraft(condition)
     setConditionDialogOpen(true)
   }
+  /*
+   * 保存・確認・テストで落ちた吹き出し（B-139）。帯ではなく吹き出しの中身の下に理由を出し、
+   * 吹き出しの頭に赤い丸、メッセージの段を開いて1つ目の吹き出しへ移る。ボタンは「ほかの設定」を開いて移る。
+   * 配信名・対象者は段の帯（［〇〇へ移動］）のまま。
+   */
+  const fields = useFormErrors()
+  const buttonsRef = useRef<HTMLDetailsElement>(null)
+  const revealMessage = () => { if (currentStep && currentStep !== 'message') goToStep('message') }
+  bubbles.forEach((bubble, index) => {
+    fields.define(`bubble-${index}`, `${index + 1}通目`, () => {
+      const problem = bubblesError([bubble])
+      return problem ? problem.replace(/^吹き出し1(の|：)?/, '') : null
+    }, { reveal: revealMessage, group: `bubble-${index}` })
+  })
+  fields.define('buttons', 'ボタン', () => messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) }) || null, {
+    reveal: () => { revealMessage(); if (buttonsRef.current) buttonsRef.current.open = true },
+  })
+  /** 検査で落ちたとき。メッセージの段の不備は欄で知らせて移り、ほかの段は帯（［〇〇へ移動］つき）。 */
+  const rejectValidation = (validationError: string) => {
+    if (validationStep() === 'message' && fields.submit().length > 0) { setError(''); return }
+    setError(validationError)
+  }
+
   const validate = () => {
     if (!title.trim()) return '管理用タイトルを入力してください'
     if (title.trim().length > TITLE_MAX) return `配信名は${TITLE_MAX}文字までにしてください`
@@ -1673,7 +1697,7 @@ export default function BroadcastForm({
      */
     const validationError = validate()
     if (validationError) {
-      setError(validationError)
+      rejectValidation(validationError)
       return false
     }
     setSaving(true)
@@ -1719,7 +1743,7 @@ export default function BroadcastForm({
   const handleTestSend = async () => {
     const validationError = validate()
     if (validationError) {
-      setError(validationError)
+      rejectValidation(validationError)
       return
     }
     setTestSending(true)
@@ -1763,7 +1787,7 @@ export default function BroadcastForm({
   const openTestDialog = async () => {
     const generation = ++testRecipientsGeneration.current
     const validationError = validate()
-    if (validationError) { setError(validationError); return }
+    if (validationError) { rejectValidation(validationError); return }
     setTestDialogOpen(true)
     setTestRecipientState('loading')
     setTestRecipients([])
@@ -1880,7 +1904,7 @@ export default function BroadcastForm({
    */
   const openConfirm = () => {
     const validationError = validate()
-    if (validationError) { setError(validationError); return }
+    if (validationError) { rejectValidation(validationError); return }
     setError('')
     setConfirmOpen(true)
   }
@@ -2073,7 +2097,7 @@ export default function BroadcastForm({
   const save = async () => {
     if (saving || submittingRef.current) return
     if (currentStep && approvalConfigState !== 'ready') { setError('承認の設定を確認できません。確認画面を開き直してください'); return }
-    const validationError = validate(); if (validationError) { setError(validationError); return }
+    const validationError = validate(); if (validationError) { rejectValidation(validationError); return }
     if (needsApproval && !needsApprovalSingle && approverId === '') {
       setError('承認をお願いする人を選んでください')
       return
@@ -2404,7 +2428,7 @@ export default function BroadcastForm({
         </section>
         <div className={shows('message') ? 'contents' : 'hidden'}>
         <section id="broadcast-step-message" className={showTemplatePicker ? 'hidden' : styles.section}>
-          <MessageComposer bubbles={bubbles} accountId={selectedAccountId} busy={composerBusy} onBusyChange={(value) => { if (selectedAccountIdRef.current === selectedAccountId) setComposerBusy(value) }}
+          <MessageComposer bubbleErrors={bubbles.map((_, index) => fields.error(`bubble-${index}`))} bubbleFieldProps={(index) => fields.bind(`bubble-${index}`)} bubbles={bubbles} accountId={selectedAccountId} busy={composerBusy} onBusyChange={(value) => { if (selectedAccountIdRef.current === selectedAccountId) setComposerBusy(value) }}
             unavailable={{ intro: '紹介メッセージは現在利用できません。', research: UNSENDABLE_TYPES.research }}
             onChange={updateBubble} onMove={moveBubble} onDelete={(index) => setBubbles((items) => items.filter((_, i) => i !== index))}
             onAdd={() => setBubbles((items) => [...items, emptyBubble()])}
@@ -2493,7 +2517,7 @@ export default function BroadcastForm({
           {!afterActionVersionId && <p className="mt-2 text-xs text-ink-faint">実行しない</p>}
           {afterActionVersionId && <p className="mt-2 text-xs text-success">✓ 配信完了後に、選んだ公開版を実行します。</p>}
         </section>}
-        {!showTemplatePicker && bubbles.some(bubble => bubble.type === 'text') ? <details><summary>ほかの設定</summary><Checkbox checked={trackLinks} onCheckedChange={setTrackLinks}>URLを短縮してクリックを数える</Checkbox><MessageButtonsSection buttons={messageButtons} error={messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })} onChange={setMessageButtons} liffId={selectedAccount?.liffId ?? null} accountId={selectedAccountId ?? null} /></details> : null}
+        {!showTemplatePicker && bubbles.some(bubble => bubble.type === 'text') ? <details ref={(el) => { buttonsRef.current = el; fields.bind('buttons').ref(el) }} onBlur={fields.bind('buttons').onBlur}><summary>ほかの設定</summary><Checkbox checked={trackLinks} onCheckedChange={setTrackLinks}>URLを短縮してクリックを数える</Checkbox><MessageButtonsSection buttons={messageButtons} error={messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })} onChange={setMessageButtons} liffId={selectedAccount?.liffId ?? null} accountId={selectedAccountId ?? null} /></details> : null}
         {!currentStep && error && <Notice tone="danger" message={error} />}
         </div>
         <section id="broadcast-step-schedule" className={shows('schedule') ? styles.section : 'hidden'}>
