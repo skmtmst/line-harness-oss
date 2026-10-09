@@ -230,7 +230,7 @@
 [data-theme='v8'] .button[data-presentation='account-inline'] { color: var(--color-accent-deep); font-size: var(--tpl-acd-label-size); }
 [data-theme='v8'] .button[data-presentation='registration-inline'] { color: var(--color-action); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); }
 [data-theme='v8'] .button[data-presentation]:hover:not(:disabled) { text-decoration: underline; }
-[data-theme='v8'] .button > svg { width: 15px; height: 15px; flex: none; }
+[data-theme='v8'] .button > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); flex: none; }
 /* 一覧から取消の確認を開く副ボタン。確定の danger はそのまま。 */
 .danger-outline { border-color: var(--color-hairline); background: var(--color-canvas); color: var(--color-danger); }
 [data-theme='v8'] .danger-outline { background: var(--color-canvas); color: var(--color-danger); outline: 1px solid var(--color-control-border); outline-offset: -0.5px; box-shadow: var(--control-shadow); }

@@ -164,3 +164,5 @@
 
 [data-theme='v8'] .search:has(.input[aria-invalid='true']) { outline-color: var(--color-danger); }
 }
+/* B-152・仕上げ5 */
+[data-theme='v8'] .searchIcon { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); color: var(--color-ink-secondary); }
