@@ -7,6 +7,8 @@
  */
 import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent, screen } from '@testing-library/react'
+import WizardV8 from './wizard-v8'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AutoReplyEditPage from './page'
 
@@ -14,6 +16,9 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams('step=trigger'),
 }))
+const accountState = vi.hoisted(() => ({ selectedAccountId: 'a', accounts: [] }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => accountState }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
 vi.mock('@/lib/api', () => ({
   api: {
@@ -86,4 +91,16 @@ describe('U049: 自動応答編集の手順表示を共通化', () => {
     // 1段目は完了（✓）、3段目以降は未着手
     expect(trail!.textContent).toContain('✓')
   })
+})
+
+it('WEB290：曜日の最後の1つは外せず、その欄で理由を伝える', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  await act(async () => { root.render(<WizardV8 />) })
+  await flush()
+  const days = [...host.querySelectorAll('[aria-label="反応する曜日"] button')]
+  expect(days).toHaveLength(7)
+  for (const day of days.slice(0, 6)) await act(async () => fireEvent.click(day))
+  await act(async () => fireEvent.click(days[6]))
+  expect(days[6].getAttribute('aria-pressed')).toBe('true')
+  expect(screen.getByText('反応する曜日を1つ以上選んでください。')).toBeTruthy()
 })
