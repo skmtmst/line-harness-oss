@@ -6,6 +6,7 @@
  * 読み込み・版の衝突（R517）・共通項目の保護・保存の動きは今の入口（app/tags/edit-field-page-v8.tsx）と同じ。
  * 中身は src/v8 の FieldEditor。受け付ける URL：`/tags/fields/edit?id=<項目>`。
  */
+import Notice from '@/components/shared/notice'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { notifySaved } from '@/components/shared/toast'
 import { useCallback, useEffect, useRef, useState } from 'react'
