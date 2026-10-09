@@ -16,6 +16,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import LinePreview from '@/components/shared/line-preview'
 import TagPill from '@/components/shared/tag-pill'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { ChangeBox, DetailFrame } from '@/v8/template-detail/detail'
 import type { HqAccount, HqTemplateListItem, TemplateDetail } from '@/lib/hq-templates-api'
@@ -105,7 +106,7 @@ export default function HqTemplateDetail({
   const kind = 'template' in definition ? templateKind(definition) : 'message'
   const tag = 'tag' in detail.definition ? detail.definition.tag : null
   const tagFolder = tag && 'folders' in detail.definition ? detail.definition.folders.find((folder) => folder.id === tag.folderId) : null
-  const tagColor = tagFolder ? tagFolder.color ?? null : folderColor
+  const tagColor = tagFolder ? folderDisplayColor(tagFolder) : folderColor
   const kindLabel = tag ? 'タグ' : KIND_TABS.find((tab) => tab.kind === kind)?.label ?? 'メッセージ'
   const content = 'template' in definition ? definition.template.messageContent : ''
   const summary = row?.content_summary ?? null

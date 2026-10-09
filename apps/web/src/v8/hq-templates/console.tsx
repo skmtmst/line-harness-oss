@@ -29,6 +29,7 @@ import Dialog from '@/components/shared/dialog'
 import StatusBadge from '@/components/shared/status-badge'
 import Notice from '@/components/shared/notice'
 import TagPill from '@/components/shared/tag-pill'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
 import Select from '@/components/shared/select'
 import FolderSelect from '@/components/shared/folder-select'
 import { Th } from '@/components/shared/table'
@@ -588,7 +589,9 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const tagFolder = 'tag' in definition
     ? definition.folders.find((folder) => folder.id === definition.tag.folderId)
     : null
-  const tagColor = tagFolder ? tagFolder.color ?? null : folders.find((folder) => folder.id === folderId)?.color
+  const templateFolder = folders.find((folder) => folder.id === (detail?.template.folder_id ?? folderId))
+  const colorFolder = folders.find((folder) => folder.id === tagFolder?.id) ?? tagFolder ?? templateFolder
+  const tagColor = colorFolder ? folderDisplayColor(colorFolder) : null
 
   const notices = <>
     {!canEdit && stage === 'list' ? <p className={styles.readonlyBand} role="note">閲覧のみで見ています。変える操作は統括の管理者に頼んでください。</p> : null}
@@ -690,7 +693,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         row={listRow}
         accounts={accounts}
         folderName={folders.find((folder) => folder.id === detail.template.folder_id)?.name ?? '未分類'}
-        folderColor={folders.find((folder) => folder.id === detail.template.folder_id)?.color}
+        folderColor={templateFolder ? folderDisplayColor(templateFolder) : null}
         canEdit={canEdit}
         busy={busy}
         notices={notices}

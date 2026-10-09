@@ -4,7 +4,7 @@
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--card-shadow);
 }
 
 /* 枠を内側に引く段の箱。既定のカードの影・寸法は変えない。 */

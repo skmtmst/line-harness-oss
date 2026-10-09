@@ -28,7 +28,7 @@
   height: 190px;
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-panel);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--card-shadow);
 }
 
 .panel:focus-visible,

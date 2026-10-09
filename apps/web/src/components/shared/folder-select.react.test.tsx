@@ -8,6 +8,10 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import FolderSelect, { FolderCreateError, folderCreateResult, type FolderSelectCreate, type FolderSelectFolder } from './folder-select'
 import { ApiError } from '@/lib/api'
+import FolderPanel from './folder-panel'
+import { FolderDotName, folderDisplayColor } from './folder-dot'
+import { folderById, folderByName } from './folder-select'
+import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 
 const FOLDERS: FolderSelectFolder[] = [
   { value: 'f-1', label: 'お問い合わせ', color: '#3b82f6' },
@@ -56,7 +60,7 @@ describe('開いた中身（dLffh）', () => {
     await openMenu({ onCreate: vi.fn() })
     const options = screen.getAllByRole('option')
     expect(options.map((option) => option.textContent)).toEqual(['未分類', 'お問い合わせ', '予約'])
-    const dots = options.map((option) => option.querySelector('[data-folder-select-dot]') as HTMLElement | null)
+    const dots = options.map((option) => option.querySelector('[data-folder-dot]') as HTMLElement | null)
     expect(dots.every(Boolean)).toBe(true)
     expect(dots[1]!.style.backgroundColor).toBeTruthy()
     expect(createRow()).toBeTruthy()
@@ -273,5 +277,60 @@ describe('folderCreateResult', () => {
     // 英語・内部の文は理由に出さない（板は「作れませんでした」の案内にする）。
     expect(new FolderCreateError('Internal server error').reason).toBe('')
     expect(folderCreateResult({ success: true, data: { id: 'x', name: 'A' } }, (folder) => ({ value: folder.id, label: folder.name }))).toEqual({ value: 'x', label: 'A' })
+  })
+})
+
+
+describe('左の列・選ぶ欄・閉じた欄・表でフォルダの丸をそろえる', () => {
+  it.each([null, undefined, '', '#123456'])('色 %s のフォルダは名前からの色か保存色を全箇所へ出す', async (color) => {
+    const folder = { id: 'folder-test', name: 'テスト', color }
+    function ColorHost() {
+      const [value, setValue] = useState('')
+      return <>
+        <FolderPanel rows={[{ id: folder.id, kind: 'folder', label: folder.name, color, count: 1 }]} activeId={folder.id} onSelect={() => {}} />
+        <FolderSelect aria-label="所属フォルダ" folders={[folderById(folder)]} value={value} onChange={setValue} />
+        <div data-testid="table-name"><FolderDotName folder={folder}>行の名前</FolderDotName></div>
+      </>
+    }
+    render(<ColorHost />)
+    const readDot = (element: Element) => element.querySelector<HTMLElement>('[data-folder-dot]')!
+    const rail = readDot(screen.getByRole('navigation'))
+    const row = readDot(screen.getByTestId('table-name'))
+    expect(rail.style.backgroundColor).toBe(row.style.backgroundColor)
+    if (!color) {
+      const probe = document.createElement('span')
+      probe.style.backgroundColor = folderDisplayColor(folder)
+      expect(FOLDER_SELECT_COLORS.map((entry) => entry.value)).toContain(folderDisplayColor(folder))
+      expect(rail.style.backgroundColor).toBe(probe.style.backgroundColor)
+    } else {
+      const probe = document.createElement('span')
+      probe.style.backgroundColor = color
+      expect(rail.style.backgroundColor).toBe(probe.style.backgroundColor)
+    }
+    const trigger = screen.getByRole('button', { name: '所属フォルダ' })
+    fireEvent.click(trigger)
+    const options = screen.getAllByRole('option')
+    expect(readDot(options[0]).dataset.folderDot).toBe('unfiled')
+    expect(readDot(options[0]).className).toContain('unfiled')
+    expect(readDot(options[0]).style.backgroundColor).toBe('')
+    expect(readDot(options[1]).style.backgroundColor).toBe(rail.style.backgroundColor)
+    fireEvent.click(options[1].querySelector('button')!)
+    expect(screen.queryByRole('listbox')).toBeNull()
+    expect(readDot(trigger).style.backgroundColor).toBe(rail.style.backgroundColor)
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getAllByRole('option')[0].querySelector('button')!)
+    expect(readDot(trigger).dataset.folderDot).toBe('unfiled')
+    expect(readDot(trigger).className).toContain('unfiled')
+    expect(readDot(trigger).style.backgroundColor).toBe('')
+  })
+
+  it('未分類の値と名前を変えても輪を保ち、同じ名前のフォルダはID保存と名前保存で同じ色', () => {
+    const folder = { id: 'other-id', name: 'テスト1', color: null }
+    const view = render(<FolderSelect aria-label="所属フォルダ" folders={[folderById(folder)]} value={folder.id} onChange={vi.fn()} />)
+    const color = screen.getByRole('button', { name: '所属フォルダ' }).querySelector<HTMLElement>('[data-folder-dot]')!.style.backgroundColor
+    view.rerender(<FolderSelect aria-label="所属フォルダ" folders={[folderByName(folder)]} value={folder.name} onChange={vi.fn()} />)
+    expect(screen.getByRole('button', { name: '所属フォルダ' }).querySelector<HTMLElement>('[data-folder-dot]')!.style.backgroundColor).toBe(color)
+    view.rerender(<FolderSelect aria-label="所属フォルダ" folders={[]} value="none" unfiled={{ value: 'none', label: '分けない' }} onChange={vi.fn()} />)
+    expect(screen.getByRole('button', { name: '所属フォルダ' }).querySelector<HTMLElement>('[data-folder-dot]')!.dataset.folderDot).toBe('unfiled')
   })
 })

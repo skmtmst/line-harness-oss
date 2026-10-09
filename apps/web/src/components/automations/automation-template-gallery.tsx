@@ -146,7 +146,7 @@ export default function AutomationTemplateGallery({
         {visibleItems.map((item, index) => {
           const Icon = ICONS[index % ICONS.length]
           return (
-            <article key={item.key} className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
+            <article key={item.key} className="rounded-card border border-hairline bg-canvas p-5 shadow-card-surface">
               <div className="mb-4 flex items-start gap-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-action-soft text-action">
                   <Icon aria-hidden="true" size={20} strokeWidth={1.8} />

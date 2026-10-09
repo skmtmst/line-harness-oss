@@ -45,6 +45,7 @@ const FONT_LABEL: Record<FormFontFamily, string> = { sans: 'ゴシック', serif
 const RADIUS_LABEL: Record<FormCornerRadius, string> = { none: '角ばった', medium: 'やや丸い', round: '丸い' }
 
 type Props = {
+  readOnly?: boolean
   options: FormOptions
   accountId: string | null
   /** 統括のひな形（host.ts）：背景の画像・リンクの見え方は置き場が無い（配った先で決める）。 */
@@ -73,6 +74,35 @@ export function AppearanceTab(props: Props) {
   const deadlineOn = options.deadline?.enabled ?? false
   const ogImageError = ogImageUrlError(props.ogImageUrl)
   const linkSummary = [props.ogTitle.trim() ? '見出し' : null, props.ogDescription.trim() ? '説明' : null, props.ogImageUrl.trim() ? '画像' : null].filter(Boolean).join('・') || '自動で作る'
+
+  if (props.readOnly) {
+    const rows = [
+      ['受付の開始', '公開したときから'],
+      ['受付の終了', deadlineOn ? options.deadline?.endsAt || '期限なし' : '期限なし'],
+      ['1人1回だけ答えられる', options.oncePerFriend?.enabled ? 'オン' : 'オフ'],
+      ['答えの数の上限', options.totalLimit?.enabled ? String(options.totalLimit.max ?? '—') : '制限なし'],
+      ['前回の答えを最初から入れておく', options.restorePrevious ? 'オン' : 'オフ'],
+      ['送る前に確認の画面', options.confirmDialog?.enabled ? 'オン' : 'オフ'],
+      ['期限を過ぎた人に出す文', options.deadline?.message || '受付は終了しました'],
+      ['ページの題名', options.pageTitle || '回答フォーム'],
+      ['書体', FONT_LABEL[theme.fontFamily]],
+      ['角の丸み', RADIUS_LABEL[theme.cornerRadius]],
+      ...COLOR_ROLES.map(({ key, label }) => [label, theme[key]]),
+      ['背景の画像', theme.backgroundImageUrl || 'なし'],
+      ['カードの見出し', props.ogTitle || '自動で作る'],
+      ['カードの説明', props.ogDescription || '自動で作る'],
+      ['カードの画像', props.ogImageUrl || '自動で作る'],
+      ['前へ', options.prevLabel || '前へ'],
+      ['次へ', options.nextLabel || '次へ'],
+      ['送る', options.submitLabel || '送信する'],
+      ['フォーム名', props.name],
+      ['覚え書き', props.description || 'なし'],
+    ]
+    return <section className={styles.card}>
+      <h2 className={styles.cardTitle}>受付と見た目</h2>
+      <dl>{rows.map(([label, value]) => <div className={styles.field} key={label}><dt className={styles.fieldLabel}>{label}</dt><dd>{value}</dd></div>)}</dl>
+    </section>
+  }
 
   return (
     <>

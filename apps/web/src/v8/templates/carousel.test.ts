@@ -27,7 +27,7 @@ describe('カルーセルのボタンの押したら（JkLOF）：保存の形',
     const content = buildCarouselContent([panelWith([
       choice({ kind: 'uri', uri: ' https://nen.example/a ' }),
       choice({ kind: 'message', text: ' 予約したい ' }),
-      choice({ kind: 'form', formId: 'form 1' }),
+      choice({ kind: 'form', formId: 'form-1' }),
     ]), panelWith([
       choice({ kind: 'booking' }),
       choice({ kind: 'booking_history' }),
@@ -37,7 +37,7 @@ describe('カルーセルのボタンの押したら（JkLOF）：保存の形',
     expect(columns[0].actions).toEqual([
       { type: 'uri', label: 'ボタン', uri: 'https://nen.example/a' },
       { type: 'message', label: 'ボタン', text: '予約したい' },
-      { type: 'uri', label: 'ボタン', uri: `https://liff.line.me/${LIFF}/?page=form&id=form%201` },
+      { type: 'uri', label: 'ボタン', uri: `https://liff.line.me/${LIFF}/?page=form&id=form-1` },
     ])
     expect(columns[1].actions).toEqual([
       { type: 'uri', label: 'ボタン', uri: `https://liff.line.me/${LIFF}/?page=salon-book` },
@@ -102,7 +102,7 @@ describe('カルーセルのボタンの押したら（YPzmo）：出す候補',
 describe('来店スタンプ・予約メニューの URL（仮の形・lib/tap-actions）', () => {
   it('組み立てと読み戻しが行って戻る', () => {
     const content = JSON.parse(buildCarouselContent([panelWith([choice({ kind: 'visit_stamp', formId: 'c1' }), choice({ kind: 'booking', formId: 'm1' })])], 't1', 'L-1'))
-    expect(content[0].actions.map((a: { uri: string }) => a.uri)).toEqual(['https://liff.line.me/L-1/?page=visit-stamps&card=c1', 'https://liff.line.me/L-1/?page=salon-book&menu=m1'])
+    expect(content[0].actions.map((a: { uri: string }) => a.uri)).toEqual(['https://liff.line.me/L-1/?page=visit-stamps&card=c1', 'https://liff.line.me/L-1/?page=salon-book&menu_id=m1'])
     const back = panelsFromContent(JSON.stringify(content))
     expect(back[0].actions.map((a) => [a.kind, a.formId])).toEqual([['visit_stamp', 'c1'], ['booking', 'm1']])
   })

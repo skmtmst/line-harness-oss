@@ -287,7 +287,7 @@ export default function CtaV8({
 
     <div className="min-w-0" data-webinar-pane="cta" data-design-node="Q0Jrk">
       <fieldset className="min-w-0 space-y-3" disabled={saving || savingRegistrationForm}>
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card" aria-label="CTAカード">
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface" aria-label="CTAカード">
           <h2 className="text-ink text-base font-bold">
             CTAカード {ctas === null ? '' : `${ctas.length}枚`}
           </h2>
@@ -399,7 +399,7 @@ export default function CtaV8({
           )}
         </section>
 
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card" aria-label="申込に使う回答フォーム">
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface" aria-label="申込に使う回答フォーム">
           <h2 className="text-ink text-base font-bold">申込に使う回答フォーム</h2>
           <p className="text-ink-faint mt-1 text-xs">申し込みのときに答えてもらうフォームです。公開中のフォームから1つ選びます。</p>
           <p className="text-ink-faint mt-2 text-xs">CTAボタンで使うフォームとは別です。保存済み：{editor.publicPage?.form?.name ?? emptyValue('unconfigured')}</p>
@@ -427,7 +427,7 @@ export default function CtaV8({
       </fieldset>
 
       <aside className="min-w-0" aria-label="カードの見え方">
-        <div className="border-hairline bg-canvas rounded-card border p-4 shadow-card xl:sticky xl:top-4">
+        <div className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface xl:sticky xl:top-4">
           <h2 className="text-ink text-base font-bold">カードの見え方</h2>
           <span className="bg-ink mt-2 flex aspect-video w-full items-center justify-center rounded-control" aria-hidden="true">
             <span className="text-canvas text-2xl">▶</span>

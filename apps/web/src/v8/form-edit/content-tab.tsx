@@ -39,6 +39,7 @@ import styles from './edit.module.css'
 import TextLink from '@/components/shared/text-link'
 
 type Props = {
+  readOnly?: boolean
   layout: FormLayout
   page: number
   blocks: FormBlock[]
@@ -75,7 +76,7 @@ export function ContentTab(props: Props) {
             <h2 id="fe-pages-title" className={styles.cardTitle}>ページ</h2>
             <p className={styles.cardNote}>ページごとに「次へ」で進みます</p>
           </span>
-          <RowActions
+          {props.readOnly ? null : <RowActions
             subjectName={`ページ「${section?.name ?? ''}」`}
             menuItems={[
               { id: 'rename', label: '名前を変える', onSelect: () => setRenaming(section?.name ?? '') },
@@ -86,7 +87,7 @@ export function ContentTab(props: Props) {
               label: 'このページを消す',
               onSelect: () => setRemoving(true),
             } : undefined}
-          />
+          />}
         </div>
         <div className={styles.pageChips}>
           {layout.sections.map((s, index) => (
@@ -101,10 +102,10 @@ export function ContentTab(props: Props) {
               {index + 1} {s.name}
             </button>
           ))}
-          <Button variant="text" onClick={props.onAddPage}>
+          {props.readOnly ? null : <Button variant="text" onClick={props.onAddPage}>
             <Plus size={15} aria-hidden="true" />
             ページを足す
-          </Button>
+          </Button>}
         </div>
       </section>
 
@@ -117,25 +118,32 @@ export function ContentTab(props: Props) {
           <p className={styles.emptyBlocks}>下の「ブロックを足す」から作ってください</p>
         ) : (
           blocks.map((block, index) =>
-            block.id === props.selectedBlockId ? (
+            props.readOnly ? (
+              <div key={block.id} className={styles.blockRow}>
+                <span className={styles.blockText}>
+                  <span className={styles.blockTitle}>{blockTitleLine(block)}</span>
+                  <span className={styles.blockKind}>{blockKindLine(block)}</span>
+                </span>
+              </div>
+            ) : block.id === props.selectedBlockId ? (
               <OpenBlock key={block.id} block={block} index={index} {...props} />
             ) : (
               <BlockRow key={block.id} block={block} index={index} {...props} />
             ),
           )
         )}
-        <AddGrid hide={props.portable ? PORTABLE_HIDDEN_CARDS : undefined} onAdd={(make) => props.onAddBlock(make(props.inputCount))} />
+        {props.readOnly ? null : <AddGrid hide={props.portable ? PORTABLE_HIDDEN_CARDS : undefined} onAdd={(make) => props.onAddBlock(make(props.inputCount))} />}
       </section>
 
       <RenameDialog
-        value={renaming}
+        value={props.readOnly ? null : renaming}
         onCancel={() => setRenaming(null)}
         onSave={(next) => {
           if (props.onRenamePage(page, next)) setRenaming(null)
         }}
       />
       <Dialog
-        open={removing}
+        open={!props.readOnly && removing}
         title="このページを消す"
         description={`「${section?.name ?? ''}」と、その中のブロック${section?.blocks.length ?? 0}個を消します。この操作は元に戻せません。`}
         confirmLabel="消す"

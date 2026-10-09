@@ -19,6 +19,7 @@ import { api, type CommonActionResources, type TagRetroactivePreview } from '@/l
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import TagPill from '@/components/shared/tag-pill'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
@@ -181,7 +182,8 @@ export default function TagEditorV8({
     [siblingNames, name, tag?.id],
   )
 
-  const previewColor = groups.find((group) => group.id === groupId)?.color ?? 'var(--color-accent)'
+  const previewGroup = groups.find((group) => group.id === groupId)
+  const previewColor = previewGroup ? folderDisplayColor(previewGroup) : null
   const groupName = groups.find((group) => group.id === groupId)?.name ?? '未分類'
   const values = useMemo<TagEditorValues>(() => ({
     name: name.trim(), groupId, isStarred, linked,

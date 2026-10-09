@@ -75,7 +75,7 @@ export default function AnalyticsFunnelV8({
         ))}
       </section>
 
-      <section id="webinar-analytics-funnel" aria-labelledby="webinar-analytics-funnel-title" className="border-hairline bg-canvas rounded-card scroll-mt-4 border p-4 shadow-card">
+      <section id="webinar-analytics-funnel" aria-labelledby="webinar-analytics-funnel-title" className="border-hairline bg-canvas rounded-card scroll-mt-4 border p-4 shadow-card-surface">
         <h2 id="webinar-analytics-funnel-title" className="text-ink text-base font-semibold">
           どこで人数が減っているか
         </h2>

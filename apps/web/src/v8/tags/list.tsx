@@ -99,7 +99,7 @@ export default function TagsList({
     canEdit ? (
       <Button href="/tags/marks/new" variant="primary"><Plus size={15} aria-hidden="true" />マークを作る</Button>
     ) : null
-  ) : tab === 'searches' ? (
+  ) : tab === 'searches' && canEdit ? (
     <Button href="/friends" variant="primary"><Plus size={15} aria-hidden="true" />友だち一覧で条件を作る</Button>
   ) : null
 

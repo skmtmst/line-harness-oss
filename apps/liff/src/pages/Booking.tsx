@@ -1,5 +1,5 @@
 import WaitlistOfferSheet from '../components/WaitlistOfferSheet.js';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import MenuList from '../components/MenuList.js';
 import RepeatCard from '../components/RepeatCard.js';
@@ -29,6 +29,8 @@ export default function Booking() {
   const navigate = useNavigate();
   const isPeek = params.get('mode') === 'peek';
 
+  const [initialMenuId] = useState(params.get('menu_id'));
+  const menuTouched = useRef(false);
   const [step, setStep] = useState<Step>('menu');
   const [menu, setMenu] = useState<MenuItem | null>(null);
   const [staff, setStaff] = useState<StaffItem | null>(null);
@@ -39,6 +41,16 @@ export default function Booking() {
   const [doneStatus, setDoneStatus] = useState('requested');
   // 予約のルール「お店が承認してから確定する」。読めなければ承認あり扱い。
   const [autoConfirm, setAutoConfirm] = useState(false);
+  useEffect(() => {
+    if (!initialMenuId) return;
+    let alive = true;
+    api.menus().then(({ menus }) => {
+      if (!alive || menuTouched.current) return;
+      const selected = menus.find(item => item.id === initialMenuId);
+      if (selected) { setMenu(selected); setStep('staff'); }
+    }).catch(() => { /* 非公開・削除済み・取得失敗は通常の選択へ戻す。 */ });
+    return () => { alive = false; };
+  }, [initialMenuId]);
   useEffect(() => {
     let alive = true;
     api
@@ -68,6 +80,7 @@ export default function Booking() {
   }
 
   function pickMenu(m: MenuItem) {
+    menuTouched.current = true;
     // 選び直したら後の選択は捨てる (古い担当・日時のまま送らない)。
     if (m.id !== menu?.id) {
       setStaff(null);

@@ -19,6 +19,7 @@ import { api, ApiError, type ListStats } from '@/lib/api'
 import { useRowLeaving } from '@/lib/use-row-leaving'
 import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import FolderDot, { folderDisplayColor } from '@/components/shared/folder-dot'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
@@ -38,7 +39,6 @@ import { mergeVisibleOrder } from '@/components/friend-fields/reorder-utils'
 import TagCsvImportDialog from '@/components/friend-fields/tag-csv-import-dialog'
 import { isCurrentTagListRequest, type TagListRequestKey } from '@/components/friend-fields/tag-list-state'
 import {
-  FOLDER_FALLBACK_COLOR,
   DeleteTagDialog,
   GripIcon,
   QUICK_FILTERS,
@@ -93,7 +93,7 @@ function TagFolderDialog({
   onSaved: () => void
 }) {
   const [name, setName] = useState(group?.name ?? '')
-  const [color, setColor] = useState(group?.color ?? FOLDER_COLORS[0])
+  const [color, setColor] = useState(group ? folderDisplayColor(group) : FOLDER_COLORS[0])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -554,7 +554,7 @@ export default function TagsTabV8({
       id: group.id,
       label: group.name,
       count: ready ? items.filter((tag) => tag.groupId === group.id).length : null,
-      color: group.color ?? FOLDER_FALLBACK_COLOR,
+      color: group.color,
       onEdit: canEdit ? () => setFolderDialog(group) : undefined,
       onMoveUp: canEdit && index > 0 ? () => void moveGroupOrder(group, -1) : undefined,
       onMoveDown: canEdit && index < groups.length - 1 ? () => void moveGroupOrder(group, 1) : undefined,
@@ -772,7 +772,7 @@ export default function TagsTabV8({
                           <td>
                             <ContextMenu label={`タグ「${tag.name}」の操作`} items={tagContextItems(tag)}>
                               <div className={styles.nameRow}>
-                                <span className={styles.folderDot} style={{ backgroundColor: group?.color ?? FOLDER_FALLBACK_COLOR }} />
+                                <FolderDot folder={group} />
                                 <Link href={editHref} className={styles.cellTitle} title={tag.name} onClick={(event) => event.stopPropagation()}>{tag.name}</Link>
                                 {tag.status === 'archived' && <span className={styles.miniBadge}>アーカイブ</span>}
                                 {tag.cleanupReasons?.includes('duplicate_name') && <span className={`${styles.miniBadge} ${styles.miniBadgeWarn}`} title="正規化した名前がほかのタグと重なっています。整理候補です。">重複名</span>}

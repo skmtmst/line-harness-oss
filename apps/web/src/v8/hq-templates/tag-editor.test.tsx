@@ -8,6 +8,7 @@ const store = vi.hoisted(() => ({ list: vi.fn(), retroactivePreview: vi.fn() }))
 vi.mock('@/lib/api', () => ({ api: { tags: store } }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/hq/friend-attributes' }))
 import HqTagEditorV8 from './tag-editor'
+import { folderDisplayColor } from '@/components/shared/folder-dot'
 
 const definition: TagDefinition = {
   schemaVersion: 1,
@@ -83,4 +84,24 @@ describe('統括の V8 タグ編集と保存先', () => {
     render(<HqTagEditorV8 definition={definition} folders={[{ id: 'f-test', name: 'テスト', revision: 1 }]} onCreateFolder={vi.fn()} readOnly editing={false} saving={false} onCancel={() => {}} onSave={vi.fn(async () => {})} />)
     expect(screen.queryByText('新しいフォルダを作る')).toBeNull()
   })
+})
+
+
+it.each([null, '#ef4444'])('統括のタグひな形は所属フォルダの色 %s を選ぶ欄・閉じた欄・タグの札へ出す', (color) => {
+  document.documentElement.dataset.theme = 'v8'
+  const folder = { id: 'f-test', name: 'テスト', color, revision: 1 }
+  const { container } = render(<HqTagEditorV8 definition={{ ...definition, tag: { name: '定期', folderId: null }, folders: [] }} folders={[folder]}
+    editing={false} saving={false} onCancel={() => {}} onSave={vi.fn(async () => {})} />)
+  const trigger = screen.getByRole('button', { name: '所属フォルダ' })
+  fireEvent.click(trigger)
+  const option = screen.getAllByRole('option').find((row) => row.textContent === 'テスト')!
+  const expected = document.createElement('span')
+  expected.style.backgroundColor = folderDisplayColor(folder)
+  expect(option.querySelector<HTMLElement>('[data-folder-dot]')!.style.backgroundColor).toBe(expected.style.backgroundColor)
+  fireEvent.click(option.querySelector('button')!)
+  expect(trigger.querySelector<HTMLElement>('[data-folder-dot]')!.style.backgroundColor).toBe(expected.style.backgroundColor)
+  const pill = screen.getByRole('group', { name: 'タグ「定期」' })
+  expect(pill.querySelector<HTMLElement>('span')!.style.backgroundColor).toBe(expected.style.backgroundColor)
+  expect(container.textContent).toContain('テスト')
+  delete document.documentElement.dataset.theme
 })

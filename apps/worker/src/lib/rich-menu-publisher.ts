@@ -11,7 +11,7 @@
 // 最後に isDefaultForAll なら 1 ページ目を全友だち default に。
 
 import { buildTapPostbackData } from './rich-menu-tap.js';
-import { RICH_MENU_DIMENSIONS, RICH_MENU_MAX_PAGES, richMenuUriError } from '@line-crm/shared';
+import { RICH_MENU_DIMENSIONS, RICH_MENU_MAX_PAGES, richMenuUriError, liffActionUrl, type LiffAction } from '@line-crm/shared';
 
 export type Bounds = { x: number; y: number; width: number; height: number };
 
@@ -36,6 +36,9 @@ export type AreaIntent =
   | 'tel'
   | 'text'
   | 'template'
+  | 'booking'
+  | 'booking_history'
+  | 'visit_stamp'
   | 'form'
   | 'switch'
   | 'postback'
@@ -351,16 +354,19 @@ function validateAreaByIntent(area: AreaInput, prefix: string, group: GroupInput
       }
       return;
     }
+    case 'booking':
+    case 'booking_history':
+    case 'visit_stamp':
     case 'form': {
       const formId = area.formId ?? String(data.formId ?? '');
-      if (!requiredString(formId)) {
+      if (area.intent === 'form' && !requiredString(formId)) {
         throw new RichMenuValidationError(`${prefix}: 開く回答フォームを選んでください`);
       }
       if (!requiredString(group.formBaseUrl ?? '')) {
-        throw new RichMenuValidationError(
-          `${prefix}: このLINEアカウントにLIFFが設定されていないため、回答フォームを開くボタンは使えません`,
-        );
+        throw new RichMenuValidationError(`${prefix}: このLINEアカウントにLIFFが設定されていないため、この画面を開くボタンは使えません`);
       }
+      try { buildAreaLiffUri(area, group.formBaseUrl!); }
+      catch { throw new RichMenuValidationError(`${prefix}: LIFFまたは開くメニュー・カードの指定を確認してください`); }
       return;
     }
     case 'template': {
@@ -600,8 +606,18 @@ export function normalizeTelUri(raw: string): string {
 
 /** 「回答フォームを開く」の飛び先を組み立てる。 */
 export function buildFormUri(base: string, formId: string): string {
-  const sep = base.includes('?') ? '&' : '?';
-  return `${base}${sep}form=${encodeURIComponent(formId)}`;
+  return buildAreaLiffUri({ bounds: { x: 0, y: 0, width: 1, height: 1 }, actionType: 'uri', intent: 'form', formId, actionData: {} }, base);
+}
+
+function buildAreaLiffUri(area: AreaInput, base: string): string {
+  const url = new URL(base);
+  if (url.origin !== 'https://liff.line.me' || url.username || url.password || !/^\/[A-Za-z0-9_-]{1,128}\/?$/.test(url.pathname)) throw new Error('INVALID_LIFF');
+  const data = area.actionData;
+  const spec: LiffAction = area.intent === 'form' ? { kind: 'form', formId: area.formId ?? String(data.formId ?? '') }
+    : area.intent === 'booking' ? { kind: 'booking', ...(data.menuId ? { menuId: String(data.menuId) } : {}) }
+    : area.intent === 'visit_stamp' ? { kind: 'visit_stamp', ...(data.cardId ? { cardId: String(data.cardId) } : {}) }
+    : { kind: 'booking_history' };
+  return liffActionUrl({ liffId: url.pathname.replace(/\//g, ''), ...spec });
 }
 
 function toLineAction(area: AreaInput, group: GroupInput): Record<string, unknown> {
@@ -623,10 +639,10 @@ function toLineAction(area: AreaInput, group: GroupInput): Record<string, unknow
       return { type: 'uri', uri: normalizeTelUri(String(data.tel ?? data.uri ?? '')) };
 
     case 'form':
-      return {
-        type: 'uri',
-        uri: buildFormUri(group.formBaseUrl ?? '', area.formId ?? String(data.formId ?? '')),
-      };
+    case 'booking':
+    case 'booking_history':
+    case 'visit_stamp':
+      return { type: 'uri', uri: buildAreaLiffUri(area, group.formBaseUrl ?? '') };
 
     case 'url':
       // 計測リンクを選んでいればそちらを開く。クリック数もタグ付けも、

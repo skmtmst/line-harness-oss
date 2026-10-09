@@ -184,7 +184,7 @@ export default function ParticipantsV8({
 
   if (state === 'denied') {
     return (
-      <div className="border-hairline bg-canvas rounded-card border p-8 text-center shadow-card" role="note">
+      <div className="border-hairline bg-canvas rounded-card border p-8 text-center shadow-card-surface" role="note">
         <p className="text-ink text-sm font-bold">個人の参加履歴はオーナーと管理者だけが確認できます。</p>
         <p className="text-ink-faint mt-2 text-xs">友だちごとの視聴・申込の記録を出す権限がないため、この段は表示できません。集計だけは「分析」から確認できます。</p>
       </div>

@@ -4052,5 +4052,197 @@
       "by": "workflow",
       "column": "scope_id"
     }
+  },
+  "_617_backup_auto_replies": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "folder_id",
+      "parent": "_617_backup_folders",
+      "parentColumn": "id"
+    }
+  },
+  "_617_backup_automation_definitions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "folder_id",
+      "parent": "_617_backup_folders",
+      "parentColumn": "id"
+    }
+  },
+  "_617_backup_broadcasts": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "folder_id",
+      "parent": "_617_backup_folders",
+      "parentColumn": "id"
+    }
+  },
+  "_617_backup_common_actions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "folder_id",
+      "parent": "_617_backup_folders",
+      "parentColumn": "id"
+    }
+  },
+  "_617_backup_common_vars": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "folder_id",
+      "parent": "_617_backup_folders",
+      "parentColumn": "id"
+    }
+  },
+  "_617_backup_conversion_points": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "folder_id",
+      "parent": "_617_backup_folders",
+      "parentColumn": "id"
+    }
+  },
+  "_617_backup_forms": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "folder_id",
+      "parent": "_617_backup_folders",
+      "parentColumn": "id"
+    }
+  },
+  "_617_backup_friend_fields": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "folder_id",
+      "parent": "_617_backup_folders",
+      "parentColumn": "id"
+    }
+  },
+  "_617_backup_incoming_webhooks": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "folder_id",
+      "parent": "_617_backup_folders",
+      "parentColumn": "id"
+    }
+  },
+  "_617_backup_media": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "folder_id",
+      "parent": "_617_backup_folders",
+      "parentColumn": "id"
+    }
+  },
+  "_617_backup_media_upload_sessions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "folder_id",
+      "parent": "_617_backup_folders",
+      "parentColumn": "id"
+    }
+  },
+  "_617_backup_outgoing_webhooks": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "folder_id",
+      "parent": "_617_backup_folders",
+      "parentColumn": "id"
+    }
+  },
+  "_617_backup_reminders": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "folder_id",
+      "parent": "_617_backup_folders",
+      "parentColumn": "id"
+    }
+  },
+  "_617_backup_rich_menu_groups": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "folder_id",
+      "parent": "_617_backup_folders",
+      "parentColumn": "id"
+    }
+  },
+  "_617_backup_scenarios": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "folder_id",
+      "parent": "_617_backup_folders",
+      "parentColumn": "id"
+    }
+  },
+  "_617_backup_tags": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "folder_id",
+      "parent": "_617_backup_folders",
+      "parentColumn": "id"
+    }
+  },
+  "_617_backup_templates": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "folder_id",
+      "parent": "_617_backup_folders",
+      "parentColumn": "id"
+    }
+  },
+  "_617_backup_webinars": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "folder_id",
+      "parent": "_617_backup_folders",
+      "parentColumn": "id"
+    }
+  },
+  "_617_backup_folder_parents": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "id",
+      "parent": "_617_backup_folders",
+      "parentColumn": "id"
+    }
+  },
+  "_617_backup_folders": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "_617_backup_mileage_rewards": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "hq_banner_folders": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
   }
 }

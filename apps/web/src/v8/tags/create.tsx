@@ -190,6 +190,8 @@ function TagCreate() {
 
   if (loading) return <ListState kind="loading" title="複製元を読み込んでいます…" />
 
+  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+
   const back = <Link href="/tags" className={styles.backLink}>← タグへ</Link>
   const groupFolders = groups.map((group) => ({ value: group.id, label: group.name, color: group.color }))
   // その場でタグのフォルダを作る（dLffh）。左の列の「フォルダを追加」と同じ受け口・同じ権限。

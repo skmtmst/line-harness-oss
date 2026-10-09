@@ -116,7 +116,7 @@ export async function assembleRichMenuGroupInput(
   }
   const formBaseUrl = account?.liff_id
     ? `https://liff.line.me/${account.liff_id}`
-    : (options.liffUrl ?? null);
+    : null;
   return {
     id: typeof snapshot.id === 'string' ? snapshot.id : options.fallbackGroupId,
     size: snapshot.size ?? 'large',

@@ -37,7 +37,10 @@ import { emptyValue } from '@/components/shared/empty-value'
 type CardAction = HqMessageCard['buttons'][number]['action']
 const CARD_TAP_KINDS: readonly TapActionKind[] = ['uri', 'message', 'form']
 const SCENARIO_KIND = [{ value: 'scenario', label: 'シナリオを始める', description: '作ってあるシナリオを始める', icon: PlayCircle }] as const
-const TAP_OF: Record<CardAction, string> = { url: 'uri', message: 'message', form: 'form', scenario: 'scenario' }
+const TAP_OF: Record<CardAction, string> = {
+  url: 'uri', message: 'message', form: 'form', scenario: 'scenario',
+  booking: 'booking', booking_history: 'booking_history', visit_stamp: 'visit_stamp',
+}
 const ACTION_OF: Record<string, CardAction> = { uri: 'url', message: 'message', form: 'form', scenario: 'scenario' }
 function cardTapValue(button: HqMessageCard['buttons'][number]): TapActionValue {
   return {

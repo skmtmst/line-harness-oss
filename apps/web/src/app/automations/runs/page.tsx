@@ -544,7 +544,7 @@ function AutomationRunsPageV7() {
           <ListState kind="empty" title={query || resultFilter !== 'all' ? '条件に合う記録はありません' : '動いた記録はまだありません'} description={query || resultFilter !== 'all' ? '検索語や絞り込みを変えてください。' : 'オートメーションが動くと、結果がここに残ります。'} />
         </div>
       ) : (
-        <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
+        <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card-surface">
           <div className="grid grid-cols-6 gap-3 bg-canvas-sunken px-4 py-3 text-xs font-semibold text-ink-faint">
             <span>いつ・だれに</span><span>オートメーション</span><span>結果</span><span>したこと</span><span>かかった時間</span><span aria-hidden />
           </div>
@@ -587,15 +587,15 @@ function AutomationRunsPageV7() {
 
       {!selectedRun && deepLinkRunId ? (
         deepLinkLoading ? (
-          <section data-design="run-detail" className="rounded-card border border-hairline bg-canvas p-5 shadow-card" aria-label="実行記録の中身">
+          <section data-design="run-detail" className="rounded-card border border-hairline bg-canvas p-5 shadow-card-surface" aria-label="実行記録の中身">
             <p className="text-sm text-ink-faint">読み込んでいます</p>
           </section>
         ) : deepLinkError === 'forbidden' ? (
-          <section data-design="run-detail" className="rounded-card border border-hairline bg-canvas p-5 shadow-card" aria-label="実行記録の中身">
+          <section data-design="run-detail" className="rounded-card border border-hairline bg-canvas p-5 shadow-card-surface" aria-label="実行記録の中身">
             <p className="text-sm text-ink-secondary">この実行を見る権限がありません。</p>
           </section>
         ) : deepLinkError === 'error' ? (
-          <section data-design="run-detail" className="rounded-card border border-hairline bg-canvas p-5 shadow-card" aria-label="実行記録の中身">
+          <section data-design="run-detail" className="rounded-card border border-hairline bg-canvas p-5 shadow-card-surface" aria-label="実行記録の中身">
             <div className="flex flex-wrap items-center gap-3">
               <p className="text-sm text-ink-secondary">詳細を読み込めませんでした。記録は消えていません。</p>
               <Button onClick={() => setDeepLinkReloadKey((key) => key + 1)}>もう一度読む</Button>
@@ -605,7 +605,7 @@ function AutomationRunsPageV7() {
       ) : null}
 
       {selectedRun ? (
-        <section data-design="run-detail" className="rounded-card border border-hairline bg-canvas p-5 shadow-card" aria-label="実行記録の中身">
+        <section data-design="run-detail" className="rounded-card border border-hairline bg-canvas p-5 shadow-card-surface" aria-label="実行記録の中身">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold text-info">実行記録の中身</p>
@@ -716,7 +716,7 @@ function RunDetail({ label, value }: { label: string; value: string }) {
 
 function Metric({ label, value, note }: { label: string; value: string; note: string }) {
   return (
-    <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
+    <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card-surface">
       <p className="text-xs font-semibold text-ink-faint">{label}</p>
       <p className="mt-1 truncate text-xl font-bold text-ink" title={value}>{value}</p>
       <p className="mt-1 truncate text-xs text-ink-faint" title={note}>{note}</p>

@@ -126,7 +126,7 @@ export function definitionsForSave(actions: LinkedAction[]): TagDefinitionAction
 }
 
 const cardClass =
-  'rounded-card border border-hairline bg-canvas p-5 shadow-card'
+  'rounded-card border border-hairline bg-canvas p-5 shadow-card-surface'
 const inputClass =
   'w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink'
 

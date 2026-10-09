@@ -161,6 +161,15 @@ async function measurePress(page) {
   return Date.now() - start
 }
 
+/* fetchApi は credentials: include。差し替えでも * ではなく要求元を返す。
+   file 直開きの Origin は null。ログイン情報付きの通信をブラウザに拒否させない。 */
+function apiCorsHeaders(route) {
+  return {
+    'Access-Control-Allow-Origin': route.request().headers().origin ?? 'null',
+    'Access-Control-Allow-Credentials': 'true',
+  }
+}
+
 /* 偽APIの答えをそのまま運ぶ（待ち受けなし方式の差し替え）。 */
 export async function stubApi(page, mockFetch) {
   await page.route('**/api/**', async (route) => {
@@ -170,7 +179,7 @@ export async function stubApi(page, mockFetch) {
     await route.fulfill({
       status: answered.status,
       contentType: 'application/json; charset=utf-8',
-      headers: { 'Access-Control-Allow-Origin': '*' },
+      headers: apiCorsHeaders(route),
       body: answered.body,
     })
   })
@@ -241,7 +250,7 @@ export async function installStressApi(page, target) {
       const big = expandFriends(answered.body)
       if (!big) throw new Error('2,000行の元になる友だちを取得できませんでした')
       state.rows = (JSON.parse(big).data ?? JSON.parse(big)).items.length
-      await route.fulfill({ status: 200, contentType: 'application/json; charset=utf-8', headers: { 'Access-Control-Allow-Origin': '*' }, body: big })
+      await route.fulfill({ status: 200, contentType: 'application/json; charset=utf-8', headers: apiCorsHeaders(route), body: big })
     } catch (error) {
       state.error = error
       await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ success: false, error: error.message }) })

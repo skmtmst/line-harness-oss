@@ -413,7 +413,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
                 </Td>
                 <Td className={styles.markColName}>
                   <ContextMenu label={`対応マーク「${mark.name}」の操作`} items={markContextItems(mark)}>
-                    {host && !canEdit ? <span className={styles.markPill} style={{ '--mark-color': mark.color } as CSSProperties} title={mark.name}>
+                    {!canEdit ? <span className={styles.markPill} style={{ '--mark-color': mark.color } as CSSProperties} title={mark.name}>
                       <span className={styles.markPillDot} aria-hidden="true" />
                       <span className={styles.truncate}>{mark.name}</span>
                     </span> : <Link
