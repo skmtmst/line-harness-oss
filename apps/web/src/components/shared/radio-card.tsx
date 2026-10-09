@@ -85,6 +85,8 @@ export interface RadioCardProps {
    * 画面の絵で行で並んでいる選択肢には `'row'` を使う。箱の合格は変えない。
    */
   variant?: 'card' | 'row' | 'compact' | 'form'
+  /** 統括の生成パネルの小さい箱（題12/700、補足11）。 */
+  compactTypography?: 'default' | 'banner'
   /**
    * 箱（card）の高さ。既定は絵の「選ぶカード」の 98。
    * `'short'` は高さ 90 の箱（★V8 E-3 ウォークインの卓のカード PUWyq：上に印・右上に丸・題・説明）。
@@ -110,6 +112,7 @@ export default function RadioCard({
   className,
   icon,
   variant = 'card',
+  compactTypography = 'default',
   height = 'default',
   size = 'default',
 }: RadioCardProps) {
@@ -127,6 +130,7 @@ export default function RadioCard({
         className,
       ].filter(Boolean).join(' ')}
       data-variant={variant}
+      data-compact-typography={variant === 'compact' ? compactTypography : undefined}
       onClick={disabled ? undefined : onClick}
     >
       {icon && variant !== 'form' ? <span className={styles.topIcon} aria-hidden="true">{icon}</span> : null}

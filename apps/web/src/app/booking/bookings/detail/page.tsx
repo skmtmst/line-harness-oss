@@ -31,7 +31,8 @@ import Select from '@/components/shared/select'
 import TargetMissing from '@/components/shared/target-missing'
 import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { useAdminTheme } from '@/lib/use-admin-theme'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
 
 type BookingAction = 'approve' | 'reject' | 'cancel' | 'complete' | 'no_show'
@@ -337,18 +338,20 @@ function BookingDetailInner() {
     : null
   usePageTitle(detail ? `${detail.customer.displayName} ／ ${detail.menuName}` : '予約の詳細')
   /* ★V8 は本文の「予約管理 / 予約の詳細」を置かない（オーナー 2026-10-08）。一覧へは上の帯のパンくずで戻る。v7 は今までどおり。 */
-  const showBodyCrumb = useAdminTheme() !== 'v8'
   /**
    * R322: 保存・再試行・承認を始めた対象を覚える。今見ている対象と
    * 違う操作の完了では、現在の表示・編集中の内容を変えない。
    * 世代番号（loadGeneration）と同じ考え方で、操作ごとに対象を照合する。
    */
   const targetRef = useRef({ accountId: selectedAccountId, bookingId: id })
+  const targetGeneration = useRef(0)
+  if (targetRef.current.accountId !== selectedAccountId || targetRef.current.bookingId !== id) targetGeneration.current += 1
   targetRef.current = { accountId: selectedAccountId, bookingId: id }
   const isCurrentTarget = useCallback(
-    (target: { accountId: string; bookingId: string }) =>
+    (target: { accountId: string; bookingId: string; generation?: number }) =>
       targetRef.current.accountId === target.accountId
-      && targetRef.current.bookingId === target.bookingId,
+      && targetRef.current.bookingId === target.bookingId
+      && (target.generation === undefined || targetGeneration.current === target.generation),
     [],
   )
 
@@ -379,6 +382,15 @@ function BookingDetailInner() {
    */
   const [editBase, setEditBase] = useState<EditBase | null>(null)
   const [saving, setSaving] = useState(false)
+  const editDirty = editing && editBase !== null && (
+    editMenuId !== editBase.menuId || editStaffId !== editBase.staffId
+    || editDate !== editBase.date || editTime !== editBase.time
+    || editPrice !== String(editBase.price) || editCustomerNote !== editBase.customerNote
+    || editInternalNote !== editBase.internalNote || editReason.trim() !== ''
+    || !editSendNotice || JSON.stringify(editPolicy) !== JSON.stringify(editBase.policy)
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: editDirty })
+
   const [retrying, setRetrying] = useState<string | null>(null)
   /**
    * IDEA-27: 変更履歴の初回応答は要点分だけ。残りは「あとN件を読み込む」で
@@ -411,6 +423,8 @@ function BookingDetailInner() {
    * 古い応答・対象外の応答のときは null を返す。
    */
   const load = useCallback(async (): Promise<BookingAdminDetail | null> => {
+    if (!selectedAccountId || !isCurrentTarget({ accountId: selectedAccountId, bookingId: id })) return null
+    const target = { accountId: selectedAccountId, bookingId: id, generation: targetGeneration.current }
     const generation = ++loadGeneration.current
     const accountId = selectedAccountId
     const bookingId = id
@@ -434,11 +448,11 @@ function BookingDetailInner() {
       const res = await bookingApi.getBooking(accountId, bookingId)
       // あとから始めた取得が先に返っている場合、この応答は古い。
       // 遅い応答で今の対象を上書きしない（世代の確認）。
-      if (loadGeneration.current !== generation) return null
+      if (loadGeneration.current !== generation || !isCurrentTarget(target)) return null
       setDetailState({ key: { accountId, bookingId }, booking: res.booking })
       return res.booking
     } catch (caught) {
-      if (loadGeneration.current !== generation) return null
+      if (loadGeneration.current !== generation || !isCurrentTarget(target)) return null
       // 失敗時は前の予約を「今の予約」として残さない。
       setDetailState(null)
       if (caught instanceof ApiError && caught.status === 404) {
@@ -449,7 +463,7 @@ function BookingDetailInner() {
       }
       return null
     } finally {
-      if (loadGeneration.current === generation) setLoading(false)
+      if (loadGeneration.current === generation && isCurrentTarget(target)) setLoading(false)
     }
   }, [id, selectedAccountId])
 
@@ -461,6 +475,8 @@ function BookingDetailInner() {
   // 確認窓・メッセージも前の対象のものを残さない。
   useEffect(() => {
     setEditing(false)
+    setSaving(false)
+    setRetrying(null)
     // R318: 前の予約の編集基準も残さない。
     setEditBase(null)
     setDecideTarget(null)
@@ -577,23 +593,24 @@ function BookingDetailInner() {
     // 対象の切替で始まる load() と同じ世代番号で、遅れて返った
     // 別予約の履歴が今の画面へ混ざらないようにする（DEEP-18 と同じ仕組み）。
     const generation = loadGeneration.current
+    const target = { accountId: selectedAccountId, bookingId: detail.id, generation: targetGeneration.current }
     setAuditLoading(true)
     setAuditError('')
     try {
       const res = await bookingApi.getAuditLogs(selectedAccountId, detail.id, 200)
-      if (loadGeneration.current !== generation) return
+      if (loadGeneration.current !== generation || !isCurrentTarget(target)) return
       setExtraAuditLogs(res.audit_logs)
     } catch {
-      if (loadGeneration.current !== generation) return
+      if (loadGeneration.current !== generation || !isCurrentTarget(target)) return
       setAuditError('記録を読み込めませんでした。もう一度お試しください。')
     } finally {
-      if (loadGeneration.current === generation) setAuditLoading(false)
+      if (loadGeneration.current === generation && isCurrentTarget(target)) setAuditLoading(false)
     }
   }
 
   const decide = async (action: BookingAction) => {
     if (!selectedAccountId) return
-    const actionTarget = { accountId: selectedAccountId, bookingId: id }
+    const actionTarget = { accountId: selectedAccountId, bookingId: id, generation: targetGeneration.current }
     setActing(true)
     setError('')
     try {
@@ -694,7 +711,7 @@ function BookingDetailInner() {
     // R318: 差分は編集開始時の値（editBase）と比べる。読み直し後の
     // 最新値と比べると、触っていない欄まで「変更あり」に見えてしまう。
     if (!selectedAccountId || !detail || !editBase) return
-    const saveTarget = { accountId: selectedAccountId, bookingId: id }
+    const saveTarget = { accountId: selectedAccountId, bookingId: id, generation: targetGeneration.current }
     const base = editBase
     const patch: Parameters<typeof bookingApi.updateBooking>[2] = {
       lock_version: detail.lockVersion,
@@ -755,6 +772,7 @@ function BookingDetailInner() {
       notifyToast(`${['予約を変更しました', ...effects].join('。')}。`)
       await load()
     } catch (cause) {
+      if (!isCurrentTarget(saveTarget)) return
       if (cause instanceof ApiError && cause.code === 'version_conflict') {
         // R318: 競合時は読み直して警告を残す。触っていない欄は最新値に
         // 戻し、自分が変えた欄は残す。再試行は差分だけを新しい版で送る。
@@ -794,7 +812,7 @@ function BookingDetailInner() {
         setError('予約を変更できませんでした。内容を確認して、もう一度お試しください。')
       }
     } finally {
-      setSaving(false)
+      if (isCurrentTarget(saveTarget)) setSaving(false)
     }
   }
 
@@ -802,7 +820,7 @@ function BookingDetailInner() {
 
   const retryCalendar = async () => {
     if (!selectedAccountId) return
-    const retryTarget = { accountId: selectedAccountId, bookingId: id }
+    const retryTarget = { accountId: selectedAccountId, bookingId: id, generation: targetGeneration.current }
     setRetrying('calendar')
     setError('')
     try {
@@ -812,6 +830,7 @@ function BookingDetailInner() {
       notifyToast(result.status === 'succeeded' ? 'Googleカレンダーへ反映しました' : '反映を再試行しました（まだ失敗している場合は時間をおいて再度お試しください）', result.status === 'succeeded' ? undefined : { tone: 'error' })
       await load()
     } catch (cause) {
+      if (!isCurrentTarget(retryTarget)) return
       // R319: 再試行の失敗理由は読み直しで消さない。先に読み直してから
       // 文を置く（load は文を空にするため）。R322: 対象外なら置かない。
       await load()
@@ -820,13 +839,13 @@ function BookingDetailInner() {
         ? '再試行できる失敗はありません'
         : '再試行できませんでした')
     } finally {
-      setRetrying(null)
+      if (isCurrentTarget(retryTarget)) setRetrying(null)
     }
   }
 
   const retryNotification = async (runId: string) => {
     if (!selectedAccountId) return
-    const retryTarget = { accountId: selectedAccountId, bookingId: id }
+    const retryTarget = { accountId: selectedAccountId, bookingId: id, generation: targetGeneration.current }
     setRetrying(runId)
     setError('')
     try {
@@ -836,6 +855,7 @@ function BookingDetailInner() {
       notifyToast(result.status === 'succeeded' ? 'お知らせを送りました' : 'お知らせの送信に失敗しました。通信を確かめて、もう一度お試しください。', result.status === 'succeeded' ? undefined : { tone: 'error' })
       await load()
     } catch (cause) {
+      if (!isCurrentTarget(retryTarget)) return
       // R319: 再試行の失敗理由は読み直しで消さない。先に読み直してから文を置く（load は文を空にするため）。
       // R322: 対象外なら置かない。R323/R324: 処理中と失効は理由を分けて出す。
       await load()
@@ -847,7 +867,7 @@ function BookingDetailInner() {
           ? 'ほかの担当者が再送中のため送れません。しばらくしてからお試しください'
           : 'お知らせを再送できませんでした')
     } finally {
-      setRetrying(null)
+      if (isCurrentTarget(retryTarget)) setRetrying(null)
     }
   }
 
@@ -898,15 +918,6 @@ function BookingDetailInner() {
     <div className="flex flex-col gap-4" data-design-node="If9Mh">
       <div className="v8-only"><PageHeading title={detail ? `${detail.customer.displayName} ／ ${detail.menuName}` : '予約の詳細'} /></div>
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-      {showBodyCrumb ? (
-        <nav className="text-ink-faint text-xs" aria-label="パンくず">
-          <Link href="/booking/bookings" className="hover:underline">
-            予約管理
-          </Link>
-          <span className="mx-1.5">/</span>
-          <span>予約の詳細</span>
-        </nav>
-      ) : null}
 
       {error && detail && (
         <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />
@@ -1000,6 +1011,7 @@ function BookingDetailInner() {
             {/* ---- 予約内容の変更 (N-389) ---- */}
             {editing ? (
               <section className="bg-canvas rounded-card border-hairline border p-5" data-design-node="YXrF6">
+                <fieldset disabled={saving} className="contents">
                 <h2 className="text-ink mb-3 text-sm font-semibold">予約内容を変更する</h2>
                 <div className="grid gap-3 md:grid-cols-2">
                   <EditField label="予約メニュー">
@@ -1090,6 +1102,7 @@ function BookingDetailInner() {
                     キャンセル
                   </Button>
                 </div>
+                </fieldset>
               </section>
             ) : (
               <section id="sec-answer" className="bg-canvas rounded-card border-hairline border p-5">
@@ -1144,15 +1157,8 @@ function BookingDetailInner() {
               {detail.customer.tags.length > 0 ? (
                 <Row label="タグ">
                   <span className="flex flex-wrap gap-1">
-                    {detail.customer.tags.map((tag) => !showBodyCrumb ? (
+                    {detail.customer.tags.map((tag) => (
                       <TagPill key={tag.id} name={tag.name} />
-                    ) : (
-                      <span
-                        key={tag.id}
-                        className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-xs"
-                      >
-                        {tag.name}
-                      </span>
                     ))}
                   </span>
                 </Row>
@@ -1493,6 +1499,7 @@ function BookingDetailInner() {
         </div>
       )}
 
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="予約の変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
       {/* DEEP-18: 対象の詳細が確定していない間は確認窓を開かない。
           DEEP-20: 説明は操作と通知方針ごとの実処理に合わせる。 */}
       <ConfirmDialog

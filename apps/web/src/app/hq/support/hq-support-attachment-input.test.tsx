@@ -2,7 +2,7 @@
 /**
  * 問い合わせの画像添付の裏の input（sr-only = 1px）は、見えない入力欄
  * として検出される。裏の input は出さない（hidden）。
- * 開くのは「クリックして画像を選ぶ」ボタンからのまま変えないことが約束。
+ * 開くのは「画像を添える」ボタンからのまま変えないことが約束。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -22,7 +22,7 @@ const calls = vi.hoisted(() => ({
 }))
 
 vi.mock('@/lib/api', () => ({ api: { hqSupport: calls } }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageChrome: () => ({}) }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined, usePageChrome: () => ({}) }))
 vi.mock('@/components/tenant-access-context', () => ({ useTenantStatus: () => 'active' }))
 vi.mock('@/components/hq/notice-line-register-dialog', () => ({ default: () => <div data-line-guide /> }))
 
@@ -56,12 +56,14 @@ describe('問い合わせの添付 input は出さない（m22a）', () => {
     await settle()
     const input = host.querySelector('input[type="file"]') as HTMLInputElement | null
     if (!input) throw new Error('file input がありません')
-    expect(input.className).toMatch(/(^|\s)hidden(\s|$)/)
+    expect(input.className).toMatch(/hiddenInput/)
     expect(input.getAttribute('aria-hidden')).toBe('true')
     expect(
       [...host.querySelectorAll('button')].some((button) =>
-        (button.textContent ?? '').includes('クリックして画像を選ぶ'),
+        (button.textContent ?? '').includes('画像を添える'),
       ),
     ).toBe(true)
   })
 })
+
+vi.mock('next/navigation', () => ({ usePathname: () => window.location.pathname, useSearchParams: () => new URLSearchParams(window.location.search), useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }))

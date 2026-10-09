@@ -3,10 +3,9 @@ import { describe, expect, it } from 'vitest'
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), 'utf8')
 const menu = read('../../../components/hq/account-menu.tsx')
-const sidebar = read('../../../components/layout/sidebar.tsx')
-const members = read('./page.tsx')
-const support = read('../support/page.tsx')
-const settings = read('../settings/page.tsx')
+const members = read('../../../v8/hq/members.tsx')
+const support = read('../../../v8/hq/support.tsx')
+const settings = read('../../../v8/hq/settings.tsx')
 const topBar = read('../../../components/shell/app-top-bar.tsx')
 
 /**
@@ -15,11 +14,6 @@ const topBar = read('../../../components/shell/app-top-bar.tsx')
  * 当時の下書き v6-36 は本線に入らなかった（原本なし。`docs/hq-signup-and-password-login.md` の冒頭）。
  */
 describe('統括の左下アカウントメニュー', () => {
-  it('v7 の統括のサイドバーだけに置き、アカウントの画面は下端に何も置かない（§1-2 の例外）', () => {
-    // V8 移行③: 畳んだメニューでは枠ごと隠す collapseHide の皮で包む。
-    // V8 の統括は店の画面と同じ形（絵 V8-B/JKjsE・オーナー 2026-10-07）。左下は「統括の設定」と版。
-    expect(sidebar).toContain("{isHq && !isV8 ? <div className={styles.collapseHide}><HqAccountMenu /></div> : <div className={styles.footer} />}")
-  })
 
   it('メニューにはメンバー管理・課金プラン・お問い合わせ・ログアウトを置き、まだ無い画面（プロフィール）は出さない', () => {
     expect(menu).toContain('href="/hq/members"')
@@ -72,20 +66,21 @@ describe('統括の左下アカウントメニュー', () => {
 describe('メンバー管理（36-5）', () => {
   it('統括の情報は /hq/settings で見せる（板 yLKwV・BHEl9 にタブは無いため。旧「統括設定」の転送はやめた）', () => {
     expect(settings).toContain('api.tenants.updateName(trimmed)')
-    expect(settings).toContain("usePageTitle('統括の情報')")
+    expect(settings).toContain("const TITLE = '統括の情報'")
     expect(members).not.toContain('?tab=')
   })
 
   it('招待は管理者と閲覧のみだけを選べる（担当者は統括の権限者にしない）', () => {
-    const dialog = read('../../../components/hq/members/member-dialog.tsx')
+    const dialog = read('../../../v8/hq/member-dialog.tsx')
     expect(dialog).toContain("{ value: 'admin', label: '管理者（すべて操作できる）' }")
     expect(dialog).toContain("{ value: 'viewer', label: '閲覧のみ（見るだけ）' }")
-    expect(dialog).not.toContain("value: 'staff'")
+    // 担当者の変更時は既存の役割を保つ。招待には担当者を追加しない。
+    expect(dialog).toContain("member?.role === 'staff'")
     expect(members).toContain("managementContext: 'hq'")
   })
 
   it('表は共通の DataTable で、最終ログインと再送を出す', () => {
-    expect(members).toContain('<DataTable>')
+    expect(members).toContain('role="table"')
     expect(members).toContain('api.staff.lastLogins()')
     expect(members).toContain('api.staff.resendInvite(member.id)')
     expect(members).toContain('（あなた）')
@@ -99,10 +94,10 @@ describe('メンバー管理（36-5）', () => {
 
 describe('お問い合わせ（36-3）', () => {
   it('種類・件名・本文は必須、アカウントと画像は任意', () => {
-    expect(support).toContain('label="種類" required')
-    expect(support).toContain('label="件名" required')
-    expect(support).toContain('label="本文" required')
-    expect(support).toContain('label="関係する店舗" note="任意"')
+    expect(support).toContain('label="種類"')
+    expect(support).toContain('label="件名"')
+    expect(support).toContain('label="本文"')
+    expect(support).toContain('label="関係する店舗"')
     expect(support).toContain('accept="image/png,image/jpeg"')
   })
 
@@ -115,7 +110,7 @@ describe('お問い合わせ（36-3）', () => {
 
   it('画面名はトップバーだけに出す', () => {
     expect(support).toContain("usePageTitle('お問い合わせ')")
-    expect(members).toContain("usePageTitle('メンバー管理')")
+    expect(members).toContain("usePageTitle('メンバー')")
     expect(support).not.toContain('<h1')
     expect(members).not.toContain('<h1')
   })

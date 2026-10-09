@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKe
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { X } from 'lucide-react'
-import { api, bookingApi, type BookingAdminDetail, type BookingMenu, type BookingRequest, type BookingStaff } from '@/lib/api'
+import { api, bookingApi, ApiError, type BookingAdminDetail, type BookingMenu, type BookingRequest, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
@@ -23,7 +23,6 @@ import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import BookingDetailV8 from './booking-detail-v8'
 import { canOperateBookings } from '../lib/booking-permissions'
 import { fetchAllPages } from './fetch-all-pages'
@@ -265,6 +264,7 @@ export default function BookingsPage() {
   const [items, setItems] = useState<BookingRequest[]>([])
   const [total, setTotal] = useState(0)
   const [calendarItems, setCalendarItems] = useState<BookingRequest[]>([])
+  const [calendarLoad, setCalendarLoad] = useState<{ key: string; status: 'loading' | 'ready' | 'error'; error?: unknown }>({ key: '', status: 'loading' })
   /*
    * BOOKING-01: カレンダーが実際に表示している日・週の基点。以前は内部で
    * 持ち、取得範囲は常に「今日起点」だったため、翌週へ進んでも予約が
@@ -338,8 +338,6 @@ export default function BookingsPage() {
   // 詳細パネルは行の実体ではなく id を保持する。承認などで再読み込みしたあとも
   // 最新の行を引き直せるので、パネルに古い状態が残らない。
   const [detailId, setDetailId] = useState<string | null>(null)
-  const adminTheme = useAdminTheme()
-  const isV8 = adminTheme === 'v8'
   /*
    * V8「サクサク感」C①：一覧（表）の行の詳細パネル。URL に ?booking=<id> を残す。
    * 行を押すとつながる移り変わり（E）で右から出て、↑↓で前・次へ。
@@ -546,6 +544,9 @@ export default function BookingsPage() {
     }
   }, [selectedAccountId, summarySeq])
 
+  const calendarKey = [selectedAccountId, view, calendarFrom, calendarTo, calendarSeq].join('|')
+  const calendarStatus = calendarLoad.key === calendarKey ? calendarLoad.status : 'loading'
+
   // カレンダーは表示中の日/週の範囲だけをページごとに読み、100件を越えても
   // 欠落させない。BOOKING-01: 取得範囲はカレンダーの表示範囲（anchor）と
   // 一致させる。前へ・次へで動いた週の予約も読み直し、読んでいない週を
@@ -556,6 +557,8 @@ export default function BookingsPage() {
     // 切り替わっても、前のアカウントの行を集め続けない。
     const requestedAccountId = selectedAccountId
     let alive = true
+    setCalendarLoad({ key: calendarKey, status: 'loading' })
+    setCalendarItems([])
     void (async () => {
       const range = {
         from: new Date(`${calendarFrom}T00:00:00+09:00`).toISOString(),
@@ -568,12 +571,15 @@ export default function BookingsPage() {
         () => alive && listAccountRef.current === requestedAccountId,
       )
       if (collected === null) return
-      if (alive && listAccountRef.current === requestedAccountId) setCalendarItems(collected)
-    })().catch(() => {
-      if (alive && listAccountRef.current === requestedAccountId) setError('カレンダーの読み込みに失敗しました。もう一度読み込んでください。')
+      if (alive && listAccountRef.current === requestedAccountId) {
+        setCalendarItems(collected)
+        setCalendarLoad({ key: calendarKey, status: 'ready' })
+      }
+    })().catch((error: unknown) => {
+      if (alive && listAccountRef.current === requestedAccountId) setCalendarLoad({ key: calendarKey, status: 'error', error })
     })
     return () => { alive = false }
-  }, [selectedAccountId, view, calendarFrom, calendarTo, calendarSeq])
+  }, [selectedAccountId, view, calendarFrom, calendarTo, calendarSeq, calendarKey])
 
   /*
    * BOOKING-01: 空き枠の実績を空き枠APIから取る。受付可能な時間は
@@ -623,7 +629,8 @@ export default function BookingsPage() {
               }
             }
           }
-        } catch {
+        } catch (cause) {
+          if (!(cause instanceof ApiError) || ![400, 404].includes(cause.status)) throw cause
           const responses = await Promise.all(
             activeMenus.map((menu) =>
               bookingApi.getAvailability(requestedAccountId, {
@@ -899,7 +906,7 @@ export default function BookingsPage() {
 
   const dialogs = (
     <>
-      {detail && (adminTheme === 'v8' ? (
+      {detail && ((
         /*
          * ★V8-B 予約の詳細（`AjZhH`）。v7 の引き出しは残し、
          * `data-theme="v8"` のときだけ小窓にする。
@@ -911,14 +918,6 @@ export default function BookingsPage() {
           onClose={() => setDetailId(null)}
           onCancel={() => handleDecide(detail.id, 'cancel')}
           detailHref={`/booking/bookings/detail?id=${encodeURIComponent(detail.id)}`}
-        />
-      ) : (
-        <BookingDetailPanel
-          booking={detail}
-          accountId={selectedAccountId}
-          canOperate={canOperate}
-          onClose={() => setDetailId(null)}
-          onAction={(a) => handleDecide(detail.id, a)}
         />
       ))}
       <ConfirmDialog
@@ -951,27 +950,27 @@ export default function BookingsPage() {
           ★V7 `x63W5x`：同じ失敗を1画面に1つへ。失敗の1枚はカレンダーの場所に
           出す（#634 の読み直す口は保つ）。一覧が読めている間はカレンダーを出す。
         */}
-        {error ? (
+        {error || calendarStatus === 'error' ? (
           <ListState
             kind="error"
             title="予約を読み込めませんでした"
             // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
             // それ以外は画面の文のまま。
             description={isForbiddenOrRateLimited(loadError) ? undefined : '通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。'}
-            error={loadError ?? undefined}
-            onRetry={() => void load()}
+            error={calendarStatus === 'error' ? calendarLoad.error : loadError ?? undefined}
+            onRetry={() => { setError(''); setCalendarSeq((n) => n + 1); void load() }}
           />
         ) : (
           <BookingCalendar
             mode={view}
-            items={calendarItems}
+            items={calendarStatus === 'ready' ? calendarItems : []}
             onOpen={setDetailId}
             staffNames={staffList.map((item) => item.display_name)}
             canCreate={canOperate}
             anchorDay={calendarAnchor}
             onAnchorChange={setCalendarAnchor}
             availability={availability}
-            dataState={loading ? 'loading' : 'ready'}
+            dataState={calendarStatus === 'ready' ? 'ready' : 'loading'}
             /*
              * #634: 空き枠の失敗からその場で読み直す。空き枠は集計・メニュー・
              * 担当の候補が先に要るので、同じ取得列（summarySeq）を回し直す。
@@ -1193,8 +1192,7 @@ export default function BookingsPage() {
                         key={b.id}
                         interactive
                         className="group"
-                        {...(isV8
-                          ? {
+                        {...({
                               tabIndex: 0,
                               onClick: () => openBookingDetail(b.id),
                               onKeyDown: (event: ReactKeyboardEvent<HTMLTableRowElement>) => {
@@ -1204,24 +1202,19 @@ export default function BookingsPage() {
                                   openBookingDetail(b.id)
                                 }
                               },
-                            }
-                          : {})}
+                            })}
                       >
                         <Td className="whitespace-nowrap">
                           {formatShort(b.starts_at)}
                         </Td>
                         <Td>
                           {/* R11: 行の物は予約のため、お客さま名から別画面へ飛ばさない。名前は黒文字。 */}
-                          {isV8 ? (
+                          {(
                             <ContextMenu label={`予約「${b.friend_name ?? 'お客様'}」の操作`} items={bookingContextItems(b)}>
                               <span className="text-ink" title={b.friend_name ?? undefined}>
                                 {b.friend_name ?? (b.friend_id ? '-' : 'LINE未連携のお客さま')}
                               </span>
                             </ContextMenu>
-                          ) : (
-                            <span className="text-ink" title={b.friend_name ?? undefined}>
-                              {b.friend_name ?? (b.friend_id ? '-' : 'LINE未連携のお客さま')}
-                            </span>
                           )}
                         </Td>
                         <Td>{b.menu_name}</Td>
@@ -1246,9 +1239,9 @@ export default function BookingsPage() {
                         </Td>
                         <ActionCell className="sticky right-0 bg-canvas group-hover:bg-canvas-sunken">
                           {/* V8では行全体が詳細パネルを開くので、操作列の押下は行へ伝えない。v7は今のまま。 */}
-                          <div className="inline-flex items-center gap-1" onClick={isV8 ? (event) => event.stopPropagation() : undefined}>
+                          <div className="inline-flex items-center gap-1" onClick={(event) => event.stopPropagation()}>
                             <button
-                              onClick={() => (isV8 ? openBookingDetail(b.id) : setDetailId(b.id))}
+                              onClick={() => (openBookingDetail(b.id))}
                               className="text-ink-secondary bg-canvas-sunken rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
                             >
                               詳細
@@ -1347,7 +1340,7 @@ export default function BookingsPage() {
       </div>
 
       {/* V8「サクサク感」C①・E：表の行の詳細パネル。確認の窓は残す。v7は引き出しのまま。 */}
-      {isV8 ? (
+      {(
         <DetailPanel
           open={activeBooking !== null}
           title={activeBooking ? `${activeBooking.friend_name ?? 'お客様'} ／ ${activeBooking.menu_name}` : ''}
@@ -1406,7 +1399,7 @@ export default function BookingsPage() {
             </div>
           ) : null}
         </DetailPanel>
-      ) : null}
+      )}
 
       {dialogs}
     </div>

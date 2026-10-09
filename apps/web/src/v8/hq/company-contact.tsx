@@ -28,6 +28,7 @@ export default function CompanyContactCard({ canEdit }: { canEdit: boolean }) {
   const [saving, setSaving] = useState(false)
   const [finding, setFinding] = useState(false)
   const [error, setError] = useState('')
+  const [fieldError, setFieldError] = useState<{ key: keyof TenantCompanyContact; message: string } | null>(null)
   const [saved, setSaved] = useState(false)
   const [postalNote, setPostalNote] = useState('')
   const [candidates, setCandidates] = useState<Candidate[]>([])
@@ -37,6 +38,7 @@ export default function CompanyContactCard({ canEdit }: { canEdit: boolean }) {
     const sequence = ++loadSequence.current
     setLoading(true)
     setError('')
+    setFieldError(null)
     try {
       const response = await api.tenants.companyContact()
       if (sequence !== loadSequence.current) return
@@ -57,6 +59,7 @@ export default function CompanyContactCard({ canEdit }: { canEdit: boolean }) {
     setValues(valuesRef.current)
     setSaved(false)
     setError('')
+    if (fieldError?.key === key) setFieldError(null)
     if (key === 'postalCode') { setCandidates([]); setPostalNote('') }
   }
 
@@ -65,7 +68,18 @@ export default function CompanyContactCard({ canEdit }: { canEdit: boolean }) {
     if (!canEdit || saving || loading || revision === null) return
     setSaved(false)
     const parsed = parseTenantCompanyContact(values)
-    if (parsed.error) { setError(parsed.error); return }
+    if (parsed.error) {
+      const target = COMPANY_CONTACT_FIELDS.find(field => parsed.error.startsWith(field.label))
+      if (target) {
+        setError('')
+        setFieldError({ key: target.key, message: parsed.error })
+        const input = document.getElementById(`${uid}-${target.key}`)
+        input?.focus()
+        input?.scrollIntoView?.({ block: 'center' })
+      } else setError(parsed.error)
+      return
+    }
+    setFieldError(null)
     setSaving(true)
     setError('')
     try {
@@ -107,7 +121,8 @@ export default function CompanyContactCard({ canEdit }: { canEdit: boolean }) {
 
   const field = (key: keyof TenantCompanyContact) => {
     const meta = COMPANY_CONTACT_FIELDS.find(item => item.key === key)!
-    return <Field key={key} label={meta.label} htmlFor={`${uid}-${key}`} required={meta.required} optional={!meta.required}>
+    return <Field key={key} label={meta.label} htmlFor={`${uid}-${key}`} required={meta.required} requiredAppearance="text" optional={!meta.required}
+      error={fieldError?.key === key ? fieldError.message : undefined}>
       <TextField id={`${uid}-${key}`} value={values[key] ?? ''} maxLength={meta.max}
         type={key === 'contactEmail' ? 'email' : key === 'phone' ? 'tel' : 'text'}
         inputMode={key === 'postalCode' ? 'numeric' : undefined}

@@ -40,7 +40,7 @@ const m = vi.hoisted(() => {
 
 const ApiErrorMock = m.ApiErrorMock
 
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => undefined,  usePageTitle: vi.fn() }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: m.account }),
 }))
@@ -310,3 +310,39 @@ describe('R320/R321: 申し送りの入口と履歴の件数', () => {
     expect(screen.queryByText(/最新.*件を表示/)).toBeNull()
   })
 })
+
+ describe('WEB298〜300：編集中の離脱・対象・保存入力', () => {
+   it('WEB298：編集したメモがある間は離脱を防ぐ', async () => {
+     m.get.mockResolvedValue({ booking: booking('A') })
+     render(<Page />); await flush()
+     fireEvent.click(screen.getByRole('button', { name: '内容を変更する' })); await flush()
+     fireEvent.change(screen.getByLabelText('店内メモ（お客様には見えません）'), { target: { value: '未保存のメモ' } })
+     const event = new Event('beforeunload', { cancelable: true })
+     window.dispatchEvent(event)
+     expect(event.defaultPrevented).toBe(true)
+   })
+   it('WEB299：予約Bへ移った後の予約Aの競合はAを再取得しない', async () => {
+     let reject!: (reason: unknown) => void
+     m.get.mockImplementation(async (_account: string, id: string) => ({ booking: booking(id) }))
+     m.update.mockImplementationOnce(() => new Promise((_resolve, failure) => { reject = failure }))
+     const view = render(<Page />); await flush()
+     fireEvent.click(screen.getByRole('button', { name: '内容を変更する' })); await flush()
+     fireEvent.change(screen.getByLabelText('店内メモ（お客様には見えません）'), { target: { value: '修正' } })
+     fireEvent.click(screen.getByRole('button', { name: 'この内容で変更する' })); await flush()
+     m.id = 'B'; view.rerender(<Page />); await flush()
+     m.get.mockClear()
+     await act(async () => { reject(new ApiErrorMock(409, 'conflict', 'version_conflict')) }); await flush()
+     expect(m.get).not.toHaveBeenCalled()
+     expect(screen.getByText('Bメニュー')).toBeTruthy()
+   })
+   it('WEB300：保存中は入力を止め、追加入力を消さない', async () => {
+     m.get.mockResolvedValue({ booking: booking('A') })
+     m.update.mockImplementationOnce(() => new Promise(() => {}))
+     render(<Page />); await flush()
+     fireEvent.click(screen.getByRole('button', { name: '内容を変更する' })); await flush()
+     const note = screen.getByLabelText('店内メモ（お客様には見えません）') as HTMLTextAreaElement
+     fireEvent.change(note, { target: { value: '保存するメモ' } })
+     fireEvent.click(screen.getByRole('button', { name: 'この内容で変更する' })); await flush()
+     expect(note.matches(':disabled')).toBe(true)
+   })
+ })

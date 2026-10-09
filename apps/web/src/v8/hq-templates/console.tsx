@@ -870,7 +870,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     return <HqTagEditorV8 key={formKey} definition={definition} editing={Boolean(detail)} saving={busy} readOnly={!canEdit}
       onSaveDraft={async (next) => { const nextName = definitionName(type, next); setDefinition(next); setName(nextName); await save(false, next, nextName) }}
       conflict={conflict} onReloadLatest={detail ? () => { void open(detail.template.id, 'edit') } : undefined}
-      error={error} onCancel={toList} onSave={async (next) => { const nextName = definitionName(type, next); setDefinition(next); setName(nextName); await save(true, next, nextName) }} />
+      error={error} notice={message || undefined} onCancel={toList} onSave={async (next) => { const nextName = definitionName(type, next); setDefinition(next); setName(nextName); await save(true, next, nextName) }} />
   }
 
   if (stage === 'edit') {
@@ -909,7 +909,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           ) : (
             <section className={styles.editPanel} aria-label="ひな形の中身">
               <div className={styles.twoCol}>
-                {!canonicalEditorOwnsSave && type !== 'rich_menu' ? (
+                {(createUncertain || !canonicalEditorOwnsSave) && type !== 'rich_menu' ? (
                   <label className={styles.field}><span className={styles.label}>ひな形の名前</span><input aria-label="ひな形の名前" className={styles.input} value={name} maxLength={200} disabled={busy || createUncertain} onChange={(event) => setName(event.target.value)} /></label>
                 ) : null}
                 {/* タグは中の「所属フォルダ」で分けるので、上のフォルダは出さない（同じ物が2つに見える・オーナー 10-08）。一覧での分けは「…」の「フォルダへ移す」。 */}
@@ -918,7 +918,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                   <FolderSelect aria-label="フォルダ" size="full" value={folderId ?? ''} disabled={busy || createUncertain || folderLoadFailed} onChange={(next) => setFolderId(next || null)} folders={folders.map((folder) => ({ value: folder.id, label: folder.name, color: folder.color }))} onCreate={canEdit ? createFolder : undefined} />
                 </div> : null}
               </div>
-              {!canonicalEditorOwnsSave && type !== 'rich_menu' ? (
+              {(createUncertain || !canonicalEditorOwnsSave) && type !== 'rich_menu' ? (
                 <label className={styles.field}><span className={styles.label}>説明</span><textarea className={styles.textarea} value={description} maxLength={2000} rows={2} disabled={busy || createUncertain} onChange={(event) => setDescription(event.target.value)} /></label>
               ) : null}
               {catalogFailed ? <Notice tone="warn" message="参照先の候補を読み込めませんでした。タグ・テンプレート・回答フォームは選べません。" action={<Button onClick={reloadCatalog}>もう一度読み込む</Button>} /> : null}

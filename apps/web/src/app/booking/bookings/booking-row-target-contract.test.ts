@@ -17,7 +17,7 @@ describe('予約一覧の行の行き先（R11）', () => {
   })
 
   it('予約の詳細はその場のパネルで開く', () => {
-    expect(PAGE).toContain('setDetailId(b.id)')
+    expect(PAGE).toContain('openBookingDetail(b.id)')
     expect(PAGE).toContain('BookingDetailPanel')
   })
 

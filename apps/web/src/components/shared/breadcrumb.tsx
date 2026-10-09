@@ -13,14 +13,14 @@ export interface Crumb {
  *
  * 最後の1つが「いま開いている場所」。ここにリンクを張らない。
  */
-export default function Breadcrumb({ items, className }: { items: Crumb[]; className?: string }) {
+export default function Breadcrumb({ items, className, appearance = 'default' }: { items: Crumb[]; className?: string; appearance?: 'default' | 'banner' }) {
   return (
-    <nav aria-label="現在の場所" className={[styles.list, className].filter(Boolean).join(' ')}>
+    <nav aria-label="現在の場所" className={[styles.list, className].filter(Boolean).join(' ')} data-appearance={appearance}>
       {items.map((item, index) => {
         const last = index === items.length - 1
         return (
           <Fragment key={`${item.label}-${index}`}>
-            {index > 0 ? <ChevronRight /> : null}
+            {index > 0 ? (appearance === 'banner' ? <span className={styles.separator} aria-hidden>›</span> : <ChevronRight />) : null}
             {item.href && !last ? (
               <Link href={item.href} className={styles.link}>
                 {item.label}

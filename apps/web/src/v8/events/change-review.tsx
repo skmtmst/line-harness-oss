@@ -284,12 +284,12 @@ function ChangeReview({ eventId }: { eventId: string }) {
           <div className={`${styles.pair} ${styles.datePair}`}>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="ev-cr-start">開始日時</label>
-              <DateTimeField id="ev-cr-start" invalid={Boolean(startError)} aria-describedby={startError ? 'ev-cr-start-error' : undefined} value={activeEdit.startsAt} onChange={(next) => updateActive({ startsAt: next })} />
+              <DateTimeField size="compact" id="ev-cr-start" invalid={Boolean(startError)} aria-describedby={startError ? 'ev-cr-start-error' : undefined} value={activeEdit.startsAt} onChange={(next) => updateActive({ startsAt: next })} />
               {startError ? <p id="ev-cr-start-error" className={styles.fieldError} role="alert">{startError}</p> : null}
             </div>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="ev-cr-end">終了日時</label>
-              <DateTimeField id="ev-cr-end" invalid={Boolean(endError)} aria-describedby={endError ? 'ev-cr-end-error' : undefined} value={activeEdit.endsAt} onChange={(next) => updateActive({ endsAt: next })} />
+              <DateTimeField size="compact" id="ev-cr-end" invalid={Boolean(endError)} aria-describedby={endError ? 'ev-cr-end-error' : undefined} value={activeEdit.endsAt} onChange={(next) => updateActive({ endsAt: next })} />
               {endError ? <p id="ev-cr-end-error" className={styles.fieldError} role="alert">{endError}</p> : null}
             </div>
           </div>

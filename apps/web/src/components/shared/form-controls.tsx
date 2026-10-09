@@ -25,8 +25,8 @@ import styles from './form-controls.module.css'
  * `<Field required>` を使えば自動で付く。Field を組めない場所
  * （legend や行内のラベル）ではこの部品を直接置く。
  */
-export function RequiredBadge() {
-  return <span className={styles.required}>必須</span>
+export function RequiredBadge({ appearance = 'badge' }: { appearance?: 'badge' | 'text' }) {
+  return <span className={appearance === 'text' ? styles.optional : styles.required}>必須</span>
 }
 
 /**
@@ -47,6 +47,7 @@ export function Field({
   label,
   htmlFor,
   required,
+  requiredAppearance,
   optional,
   note,
   error,
@@ -59,6 +60,8 @@ export function Field({
   label: string
   htmlFor?: string
   required?: boolean
+  /** 設定カードの絵で、必須を任意と同じ薄い文字で示す。 */
+  requiredAppearance?: 'badge' | 'text'
   /** 任意の入力欄。既存の OptionalBadge をラベルの横に置く。 */
   optional?: boolean
   note?: ReactNode
@@ -118,7 +121,7 @@ export function Field({
           {label}
           {/* 設計は「必須」と字で書いている。* だけだと、色が見えない人には
               何も伝わらない。 */}
-          {required && <RequiredBadge />}
+          {required && <RequiredBadge appearance={requiredAppearance} />}
           {optional && !required && <OptionalBadge />}
         </label>
         {hasHelp ? (
