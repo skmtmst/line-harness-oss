@@ -589,7 +589,7 @@ function ManualEntryDialogs({ model }: { model: AdV8Model }) {
               placeholder="例：チラシ"
               maxLength={100}
             /></Field></div>
-          <div><Field label="計測リンク（分かれば）" htmlFor="ad-cost-route-v8"><Select
+          <div><Field note={<>結びつけると友だち追加の人数で「1人あたり」が出ます。</>} label="計測リンク（分かれば）" htmlFor="ad-cost-route-v8"><Select
               id="ad-cost-route-v8"
               aria-label="計測リンク"
               value={model.manualRouteId}
@@ -599,7 +599,7 @@ function ManualEntryDialogs({ model }: { model: AdV8Model }) {
                 ...model.entryRoutes.map((route) => ({ value: route.id, label: route.name })),
               ]}
             />
-<p className="mt-1 text-xs text-ink-faint">結びつけると友だち追加の人数で「1人あたり」が出ます。</p></Field></div>
+</Field></div>
           <div><Field label="費用の日付" htmlFor="ad-cost-day-v8"><DateField id="ad-cost-day-v8" value={model.manualDay} onChange={model.setManualDay} /></Field></div>
           <div><Field label="費用（円）" htmlFor="ad-cost-amount-v8"><NumberInput numericText
               id="ad-cost-amount-v8"

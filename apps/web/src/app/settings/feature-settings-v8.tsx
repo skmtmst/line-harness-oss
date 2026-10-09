@@ -517,7 +517,7 @@ export function FeatureSettingsV8() {
             </div>
           )}
 
-          {dirty && <div className={styles.reasonBand}><Field label={<>
+          {dirty && <div className={styles.reasonBand}><Field note={<>保存の記録に残ります。空のままでは保存できません。</>} label={<>
 
               変更理由
             </>} htmlFor="feature-settings-reason" required><input
@@ -528,7 +528,7 @@ export function FeatureSettingsV8() {
               maxLength={300}
               disabled={saving}
             />
-<p className={styles.reasonHint}>保存の記録に残ります。空のままでは保存できません。</p></Field></div>}
+</Field></div>}
 
         </>
       )}

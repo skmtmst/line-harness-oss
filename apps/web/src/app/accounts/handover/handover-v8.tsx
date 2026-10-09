@@ -588,7 +588,9 @@ export default function HandoverV8() {
             {MATCH_BUCKETS.map((bucket) => `${bucket.label} ${countsAreComplete ? `${handover.counts?.[bucket.key]}人` : emptyValue('unknown')}`).join('・')}
           </p>
           {canManage && (
-            <div className="mt-3"><Field label="移し元システムが言う友だち数（申告。分からなければ空欄）"><NumberInput
+            <div className="mt-3"><Field note={<>
+                申告の数と事前確認の合計が違うままでは、本実行しません。
+              </>} label="移し元システムが言う友だち数（申告。分からなければ空欄）"><NumberInput
                   type="number"
                   min={0}
                   className="mt-1 w-40"
@@ -596,9 +598,7 @@ export default function HandoverV8() {
                   value={declaredTotalInput}
                   onChange={(e) => setDeclaredTotalInput(e.target.value)}
                   disabled={refreshing || !handover.counts}
-                /><p className="text-ink-faint mt-1 text-xs leading-relaxed">
-                申告の数と事前確認の合計が違うままでは、本実行しません。
-              </p></Field></div>
+                /></Field></div>
           )}
           {declaredMismatch && (
             <Notice tone="warn" className="mt-3">

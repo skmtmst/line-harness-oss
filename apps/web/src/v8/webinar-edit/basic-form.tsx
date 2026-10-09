@@ -139,10 +139,10 @@ export function BasicForm({
         <div className={styles.cardHead}>
           <h2 id={`${idPrefix}-audience`} className={styles.cardTitle}>だれに案内するか</h2>
         </div>
-        <div className={styles.field}><Field label="案内する相手" htmlFor={`${idPrefix}-audience-select`}>{readOnly
+        <div className={styles.field}><Field note={<>タグ「配信済み」は確認の段で足せます</>} label="案内する相手" htmlFor={`${idPrefix}-audience-select`}>{readOnly
             ? <ReadValue label="案内する相手">{audienceLabel}</ReadValue>
             : <Select id={`${idPrefix}-audience-select`} aria-label="案内する相手" size="full" value="registered" disabled={disabled} onChange={() => {}} options={[{ value: 'registered', label: audienceLabel }]} />}
-<p className={styles.help}>タグ「配信済み」は確認の段で足せます</p></Field></div>
+</Field></div>
       </section>
     </>
   )

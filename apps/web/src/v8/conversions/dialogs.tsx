@@ -614,7 +614,10 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
               />
             </Field>
           </div>
-          <Field label="数えない条件のメモ（任意）" htmlFor="cv-edit-memo" error={editFieldIssue?.field === 'cv-edit-memo' ? editFieldIssue.message : undefined}>
+          <Field note={<>
+            いま使っている場所（{usageLabel(editTarget!)}）は、この成果地点のまま次の版へ引き継がれます。
+            過去の成果は数えたときの金額のままなので、集計額は変わりません。
+          </>} label="数えない条件のメモ（任意）" htmlFor="cv-edit-memo" error={editFieldIssue?.field === 'cv-edit-memo' ? editFieldIssue.message : undefined}>
             <TextField
               aria-label="数えない条件のメモ"
               value={editForm.exclusionMemo}
@@ -622,10 +625,7 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
               onChange={(event) => setEditForm({ ...editForm, exclusionMemo: event.target.value })}
             />
           </Field>
-          <p className="text-ink-faint text-xs leading-5">
-            いま使っている場所（{usageLabel(editTarget!)}）は、この成果地点のまま次の版へ引き継がれます。
-            過去の成果は数えたときの金額のままなので、集計額は変わりません。
-          </p>
+
           {editError ? <Notice tone="danger">{editError}</Notice> : null}
         </div>
       ) : null}

@@ -202,7 +202,11 @@ export default function EditRouteModal({
       }
     >
       <div className="space-y-3">
-        <Field label="フォルダ（任意）">
+        <Field note={<>
+            {genreLocked
+              ? '左側で選択したフォルダへ登録されます。'
+              : '同じ協力会社や媒体を同じフォルダ名にすると、一覧でまとめて管理できます。空欄のまま保存すると未分類になります。'}
+          </>} label="フォルダ（任意）">
           <TextField
             list={genreLocked ? undefined : 'referral-genre-options'}
             value={form.genre ?? ''}
@@ -216,11 +220,7 @@ export default function EditRouteModal({
           <datalist id="referral-genre-options">
             {existingGenres.map((genre) => <option key={genre} value={genre} />)}
           </datalist>
-          <p className="text-ink-faint mt-1 text-xs">
-            {genreLocked
-              ? '左側で選択したフォルダへ登録されます。'
-              : '同じ協力会社や媒体を同じフォルダ名にすると、一覧でまとめて管理できます。空欄のまま保存すると未分類になります。'}
-          </p>
+
         </Field>
 
         <Field label="流入元の名前" htmlFor="route-name" error={fieldErrors['route-name']}>
@@ -253,7 +253,9 @@ export default function EditRouteModal({
           )}
         </Field>
 
-        <Field label="自動付与タグ（任意）">
+        <Field note={<>
+            友だち追加時にこのタグを自動付与します。タグ未作成の場合は先にタグを作成してください。
+          </>} label="自動付与タグ（任意）">
           <Combobox
             aria-label="自動付与タグ（任意）"
             placeholder="— 設定なし —"
@@ -262,9 +264,7 @@ export default function EditRouteModal({
             options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
             className="w-full"
           />
-          <p className="text-ink-faint mt-1 text-xs">
-            友だち追加時にこのタグを自動付与します。タグ未作成の場合は先にタグを作成してください。
-          </p>
+
         </Field>
 
         <Field label="送り先 Pool">

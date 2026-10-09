@@ -641,7 +641,7 @@ function FeedingV8({ accountId }: { accountId: string }) {
               onAdd={() => add('nen')}
               disabledAdd={drafts.length >= MAX_PRODUCTS}
             />
-            <div className={styles.treatRow}><Field label="おやつの上限"><NumberInput unit="%" aria-label="おやつの上限（%）" inputMode="numeric" numericText value={treatLimit} onChange={(event) => { setTreatLimit(event.target.value); setDirty(true); setNotice('') }} /><p className={styles.treatNote}>1日の必要カロリーのうち、おやつに回す割合</p></Field></div>
+            <div className={styles.treatRow}><Field note={<>1日の必要カロリーのうち、おやつに回す割合</>} label="おやつの上限"><NumberInput unit="%" aria-label="おやつの上限（%）" inputMode="numeric" numericText value={treatLimit} onChange={(event) => { setTreatLimit(event.target.value); setDirty(true); setNotice('') }} /></Field></div>
           </section>
         </div>
 

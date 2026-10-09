@@ -137,7 +137,9 @@ export function StaffEditModal({
             checked={Boolean(form.is_active)}
             onCheckedChange={(checked) => set('is_active', checked ? 1 : 0)}
           >有効（顧客に表示する）</Checkbox>
-          <Field label="ログインユーザー（本人の勤務）">
+          <Field note={<>
+              紐づけると、そのログインユーザーが「本人の勤務」としてこの担当者のシフト・休憩・外部連携を管理できます。
+            </>} label="ログインユーザー（本人の勤務）">
             <Select
               aria-label="ログインユーザーとの紐づけ"
               size="full"
@@ -148,9 +150,7 @@ export function StaffEditModal({
                 ...members.map((m) => ({ value: m.id, label: `${m.name}${m.email ? `（${m.email}）` : ''}` })),
               ]}
             />
-            <span className="text-ink-faint mt-1 block text-xs">
-              紐づけると、そのログインユーザーが「本人の勤務」としてこの担当者のシフト・休憩・外部連携を管理できます。
-            </span>
+
           </Field>
           {err && <p className="text-xs text-danger">{err}</p>}
         </div>

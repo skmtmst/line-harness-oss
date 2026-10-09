@@ -168,7 +168,7 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
               ...accounts.filter((item) => item.id !== account.id && item.id !== currentParent).map((item) => ({ value: item.id, label: item.displayName || item.name })),
             ]}
           /></Field></div>
-        <div className={styles.field}><Field label="フォルダ" htmlFor="hq-account-folder"><FolderSelect
+        <div className={styles.field}><Field note={<>アカウントは1つのフォルダに入ります。アカウント一覧の左の列で絞り込みに使います</>} label="フォルダ" htmlFor="hq-account-folder"><FolderSelect
             id="hq-account-folder"
             aria-label="フォルダ"
             size="full"
@@ -183,7 +183,7 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
               })
               : undefined}
           />
-<p className={styles.note}>アカウントは1つのフォルダに入ります。アカウント一覧の左の列で絞り込みに使います</p></Field></div>
+</Field></div>
         {!archived && account.connection?.status === 'warn' ? (
           /* 要確認のときだけ：引っかかった確認ごとの理由（URL は折り返して全文）。 */
           <div className={styles.field}>

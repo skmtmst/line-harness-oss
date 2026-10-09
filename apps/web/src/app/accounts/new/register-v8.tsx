@@ -640,14 +640,14 @@ export default function RegisterV8() {
                 <h2>チャネル設定</h2>
                 <div className={styles.panelBody}>
                   <div className={styles.twoCol}>
-                    <div><Field label="Messaging API のチャネルID" htmlFor="v8-channel-id" required><input id="v8-channel-id" className={styles.fieldInput} value={form.channelId} onChange={(event) => update('channelId', event.target.value)} inputMode="numeric" required aria-invalid={fieldErrors.channelId ? true : undefined} />
+                    <div><Field note={<>LINE Developers の Messaging API チャネルで取得　<TextLink external href="/manuals/line-connect/index.html#m1"   className="text-action font-semibold hover:underline">取得方法を見る</TextLink></>} label="Messaging API のチャネルID" htmlFor="v8-channel-id" required><input id="v8-channel-id" className={styles.fieldInput} value={form.channelId} onChange={(event) => update('channelId', event.target.value)} inputMode="numeric" required aria-invalid={fieldErrors.channelId ? true : undefined} />
 {fieldErrors.channelId && <p className={styles.fieldError}>{fieldErrors.channelId}</p>}
-<p className={styles.fieldHelp}>LINE Developers の Messaging API チャネルで取得　<TextLink external href="/manuals/line-connect/index.html#m1"   className="text-action font-semibold hover:underline">取得方法を見る</TextLink></p></Field></div>
+</Field></div>
                     <div><Field label="Messaging API のチャネルシークレット" htmlFor="v8-channel-secret" required><input id="v8-channel-secret" type="password" autoComplete="new-password" className={styles.fieldInput} value={form.channelSecret} onChange={(event) => update('channelSecret', event.target.value)} required aria-invalid={fieldErrors.channelSecret ? true : undefined} />
 {fieldErrors.channelSecret && <p className={styles.fieldError}>{fieldErrors.channelSecret}</p>}</Field></div>
-                    <div><Field label="LINE Login のチャネルID" htmlFor="v8-login-channel-id" required><input id="v8-login-channel-id" className={styles.fieldInput} value={form.loginChannelId} onChange={(event) => update('loginChannelId', event.target.value)} inputMode="numeric" required aria-invalid={fieldErrors.loginChannelId ? true : undefined} />
+                    <div><Field note={<>LIFF は自動で作ります。Messaging API と同じプロバイダーのチャネル　<TextLink external href="/manuals/line-connect/index.html#m2"   className="text-action font-semibold hover:underline">取得方法を見る</TextLink></>} label="LINE Login のチャネルID" htmlFor="v8-login-channel-id" required><input id="v8-login-channel-id" className={styles.fieldInput} value={form.loginChannelId} onChange={(event) => update('loginChannelId', event.target.value)} inputMode="numeric" required aria-invalid={fieldErrors.loginChannelId ? true : undefined} />
 {fieldErrors.loginChannelId && <p className={styles.fieldError}>{fieldErrors.loginChannelId}</p>}
-<p className={styles.fieldHelp}>LIFF は自動で作ります。Messaging API と同じプロバイダーのチャネル　<TextLink external href="/manuals/line-connect/index.html#m2"   className="text-action font-semibold hover:underline">取得方法を見る</TextLink></p></Field></div>
+</Field></div>
                     <div><Field label="LINE Login のチャネルシークレット" htmlFor="v8-login-channel-secret" required><input id="v8-login-channel-secret" type="password" autoComplete="new-password" className={styles.fieldInput} value={form.loginChannelSecret} onChange={(event) => update('loginChannelSecret', event.target.value)} required aria-invalid={fieldErrors.loginChannelSecret ? true : undefined} />
 {fieldErrors.loginChannelSecret && <p className={styles.fieldError}>{fieldErrors.loginChannelSecret}</p>}</Field></div>
                   </div>

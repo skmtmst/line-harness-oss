@@ -1775,7 +1775,9 @@ export default function ScenarioDetailV8({
           以前は画面のいちばん下、到達タグと同じ束に置いていたので、
           「いつ送るか」を決めているときに目に入らなかった。
         */}
-        <div><Field label="送信後"><Select
+        <div><Field note={<>
+            一時停止にすると、この通を送ったところで止まります。再開するまで次は届きません。
+          </>} label="送信後"><Select
             aria-label="送信後"
             value={stepForm.afterSend}
             onChange={(value) =>
@@ -1787,9 +1789,7 @@ export default function ScenarioDetailV8({
             ]}
             size="full"
           />
-<p className="text-xs text-ink-faint mt-0.5">
-            一時停止にすると、この通を送ったところで止まります。再開するまで次は届きません。
-          </p></Field></div>
+</Field></div>
           </div>
         </FormSection>
 
@@ -2017,7 +2017,9 @@ export default function ScenarioDetailV8({
           }
         >
           <div className="space-y-3">
-            <div><Field label="到達したらタグ付与"><Select
+            <div><Field note={<>
+                このステップが配信完了したら、選んだタグを友だちに付与します
+              </>} label="到達したらタグ付与"><Select
                 aria-label="到達したらタグ付与"
                 value={stepForm.onReachTagId ?? ''}
                 onChange={(value) => setStepForm({ ...stepForm, onReachTagId: value || null })}
@@ -2027,9 +2029,7 @@ export default function ScenarioDetailV8({
                 ]}
                 size="full"
               />
-<p className="text-xs text-ink-faint mt-0.5">
-                このステップが配信完了したら、選んだタグを友だちに付与します
-              </p></Field></div>
+</Field></div>
             {!editingStepId && (
               <p className="text-ink-faint text-xs">
                 そのほかのアクションは、この通を保存してから設定できます。

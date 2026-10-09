@@ -627,7 +627,9 @@ export default function AutomationListV8() {
         >
           {testing ? (
             <div className={styles.testBody}>
-              <Field label="試す友だちのID">
+              <Field note={<>
+                すること：{testing.actions.map((action) => automationActionLabel(action.type)).join('・') || '登録した処理'}
+              </>} label="試す友だちのID">
                 <TextField
                   aria-label="試す友だちのID"
                   value={testFriendId}
@@ -636,9 +638,7 @@ export default function AutomationListV8() {
                   disabled={testBusy || testDone}
                 />
               </Field>
-              <p className={styles.testNote}>
-                すること：{testing.actions.map((action) => automationActionLabel(action.type)).join('・') || '登録した処理'}
-              </p>
+
               {testError ? <Notice tone="danger">{testError}</Notice> : null}
               {testDone ? <Notice tone="info">試しに動かしました。「動いた記録」で結果を確かめてください。</Notice> : null}
             </div>

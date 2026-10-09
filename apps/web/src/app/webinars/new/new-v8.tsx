@@ -217,7 +217,7 @@ function NewWebinarV8Inner() {
 {fieldErrors.title !== undefined ? (
                   <p className={styles.fieldError} role="alert">{fieldErrors.title}</p>
                 ) : null}</Field></div>
-              <div><Field label={<>公開ページのURL</>} htmlFor="webinar-v8-slug"><input
+              <div><Field note={<>アドレスの最後の部分です。空のままなら自動で付けます。</>} label={<>公開ページのURL</>} htmlFor="webinar-v8-slug"><input
                   id="webinar-v8-slug"
                   value={slug}
                   onChange={(event) => {
@@ -238,7 +238,7 @@ function NewWebinarV8Inner() {
 {fieldErrors.slug !== undefined ? (
                   <p className={styles.fieldError} role="alert">{fieldErrors.slug}</p>
                 ) : null}
-<p className={styles.fieldHelp}>アドレスの最後の部分です。空のままなら自動で付けます。</p></Field></div>
+</Field></div>
               <div><Field label={<>フォルダ</>} htmlFor="webinar-v8-folder"><Select
                   id="webinar-v8-folder"
                   aria-label="フォルダ"

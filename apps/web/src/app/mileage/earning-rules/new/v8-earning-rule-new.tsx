@@ -290,7 +290,7 @@ export default function V8EarningRuleNew() {
                 placeholder="例：リンクをクリック"
               /></Field>
             <div className={formStyles.grid2}>
-              <Field label="きっかけ" required><Select
+              <Field note={<>{selected.note}</>} label="きっかけ" required><Select
                   aria-label="きっかけ"
                   value={eventType}
                   onChange={(next) => {
@@ -300,7 +300,7 @@ export default function V8EarningRuleNew() {
                   options={EVENT_TYPES.map((t) => ({ value: t.value, label: t.label }))}
                   size="full"
                 />
-<span className={formStyles.hint}>{selected.note}</span></Field>
+</Field>
               <Field label="行動の出どころ"><Select
                   aria-label="行動の出どころ"
                   value={source}

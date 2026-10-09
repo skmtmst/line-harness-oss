@@ -1641,7 +1641,9 @@ function CommonVarsListV8Inner() {
                 使用先を確認できませんでした。読み直してから、もう一度お試しください。
               </p>
             ) : deleteImpact ? (
-              <div><Field label={<>
+              <div><Field note={<>
+                  {checkedAtText(deleteImpact.checkedAt)} 時点で、テンプレート・一斉配信・シナリオ・リマインダ・自動応答・回答フォーム・オートメーション・友だち追加時・共通アクションの9種類を確認しました。
+                </>} label={<>
                   <span className={styles.dialogLabel}>
                     {deleteImpact.canDelete ? '消した理由（記録に残ります）' : '消した理由・止める理由（記録に残ります）'}
                   </span>
@@ -1763,9 +1765,7 @@ function CommonVarsListV8Inner() {
 {deleteImpact.canDelete && blockedReason({ impact: deleteImpact, typedKey, reason: deleteReason }) ? (
                   <p className={styles.dialogHint}>{blockedReason({ impact: deleteImpact, typedKey, reason: deleteReason })}</p>
                 ) : null}
-<p className={styles.dialogHint}>
-                  {checkedAtText(deleteImpact.checkedAt)} 時点で、テンプレート・一斉配信・シナリオ・リマインダ・自動応答・回答フォーム・オートメーション・友だち追加時・共通アクションの9種類を確認しました。
-                </p></Field></div>
+</Field></div>
             ) : null}
           </div>
         ) : null}

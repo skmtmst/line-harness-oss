@@ -823,14 +823,14 @@ function InflowDetailContent() {
               </div>
             ) : null}
             {deleteChoice === 'delete' ? (
-              <Field label={<><span className={styles.deleteChoiceTitle}>{`完全削除するには「${route.name}」と入力`}</span></>}><input
+              <Field note={<>空白や大文字・小文字も含め、現在の経路名と同じ入力が必要です。</>} label={<><span className={styles.deleteChoiceTitle}>{`完全削除するには「${route.name}」と入力`}</span></>}><input
                   value={deleteConfirmationName}
                   disabled={deleting}
                   onChange={(event) => setDeleteConfirmationName(event.target.value)}
                   autoComplete="off"
                   className={styles.fieldInput}
                 />
-<span className={styles.note}>空白や大文字・小文字も含め、現在の経路名と同じ入力が必要です。</span></Field>
+</Field>
             ) : null}
           </div>
         </Dialog>

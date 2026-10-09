@@ -963,13 +963,13 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
               </span>
             </p>
           ) : (
-            <div className={styles.switcherRow}><Field label="担当者を切り替える"><Select
+            <div className={styles.switcherRow}><Field note={<>保存すると、右の予約画面にすぐ出ます。</>} label="担当者を切り替える"><Select
                   aria-label="担当者を切り替える"
                   size="full"
                   value={staffId}
                   onChange={(value) => router.push(`/booking/staff/shifts?staff_id=${value}`)}
                   options={staffList.map((item) => ({ value: item.id, label: item.display_name }))}
-                /><p className={styles.switcherNote}>保存すると、右の予約画面にすぐ出ます。</p></Field></div>
+                /></Field></div>
           )}
 
           {/* N-411: 本人勤務が閲覧のみのときは全編集部品をまとめて無効化する。

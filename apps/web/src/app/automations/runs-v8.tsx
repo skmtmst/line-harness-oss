@@ -456,7 +456,7 @@ export function V8RunsTab({
       <p className={styles.footnote}>オートメーションが動いた記録です。条件に外れて動かなかったものも並びます。</p>
       {retryNotice ? <p role="status" className={styles.footnote}>{retryNotice}</p> : null}
 
-      <div className={styles.toolbar}><Field label={<>
+      <div className={styles.toolbar}><Field note={<>この30日・20件表示</>} label={<>
           <Checkbox
             checked={includeTest}
             onCheckedChange={(checked) => changeIncludeTest(checked)}
@@ -469,7 +469,7 @@ export function V8RunsTab({
           onChange={(event) => changeQuery(event.target.value)}
           className={styles.toolsSearch}
         />
-<p className={styles.footnote}>この30日・20件表示</p></Field></div>
+</Field></div>
 
       <div className={styles.toolbar}>
         <SegmentedControl

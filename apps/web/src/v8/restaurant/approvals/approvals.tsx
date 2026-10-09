@@ -167,14 +167,14 @@ function ReturnDialog({ item, store, busy, onCancel, onSubmit }: {
             </p>
             <p className={styles.dialogSummaryMain}>{approvalSummary(item)}</p>
           </div>
-          <Field label="差し戻す理由（・申請者に届きます）" required><TextArea
+          <Field note={<>差し戻すと、申請は「差戻し」になり、直して出し直すまで公開されません。</>} label="差し戻す理由（・申請者に届きます）" required><TextArea
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               placeholder="例：原価の根拠（仕入れ値の表）を添えてください"
               rows={3}
               disabled={busy}
             /></Field>
-          <p className={styles.dialogNote}>差し戻すと、申請は「差戻し」になり、直して出し直すまで公開されません。</p>
+
         </div>
       ) : null}
     </Dialog>

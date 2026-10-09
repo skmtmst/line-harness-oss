@@ -2370,7 +2370,9 @@ export function NewAutomationV8({
               {actions.map((row, index) => (
                 <li key={row.key} className={styles.actionRow}>
                   <span className={styles.actionNum}>{index + 1}</span>
-                  <div className={styles.actionBody}><Field label={<>
+                  <div className={styles.actionBody}><Field note={<>
+                      失敗したとき：現在はここで止まります。「次の処理へ進む」は実行基盤の接続後に選べます。
+                    </>} label={<>
                       {actionRowTitle(row.type)}
                       <Select
                         id={`v8-action-${row.key}`}
@@ -2423,9 +2425,7 @@ export function NewAutomationV8({
                           onChange={(event) => updateAction(row.key, { message: event.target.value })}
                         /></Field>
                     )}
-<p className={styles.footnote}>
-                      失敗したとき：現在はここで止まります。「次の処理へ進む」は実行基盤の接続後に選べます。
-                    </p></Field></div>
+</Field></div>
                   <button
                     type="button"
                     className={styles.miniMenuButton}
