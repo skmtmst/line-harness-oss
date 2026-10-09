@@ -1,5 +1,6 @@
 'use client'
 
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -584,6 +585,24 @@ export default function BroadcastForm({
   const appliedDraftFrom = useRef<string | null>(null)
   const [editingDraft, setEditingDraft] = useState<ApiBroadcast | null>(null)
   const [draftError, setDraftError] = useState('')
+  const [draftReloadKey, setDraftReloadKey] = useState(0)
+  const [draftReloadId, setDraftReloadId] = useState<string | null>(null)
+  const saveConflict = useSaveConflict<ApiBroadcast>({
+    fetchLatest: async () => {
+      const accountId = selectedAccountIdRef.current
+      const id = draftSession.current.draftId
+      if (!id) return null
+      const result = await api.broadcasts.get(id)
+      return result.success && accountId === selectedAccountIdRef.current ? result.data : null
+    },
+    reload: () => {
+      appliedDraftFrom.current = null
+      setDraftReloadId(draftSession.current.draftId)
+      setDraftReloadKey((key) => key + 1)
+    },
+  })
+  useEffect(() => { saveConflict.clear(); setDraftReloadId(null) }, [selectedAccountId, saveConflict.clear])
+
   const [title, setTitle] = useState(visualQaAugustCampaign ? '8月キャンペーンのお知らせ' : '')
   const [internalMemo, setInternalMemo] = useState('')
   const [deliveryMethod, setDeliveryMethod] = useState<'new' | 'template' | 'duplicate'>('new')
@@ -817,7 +836,7 @@ export default function BroadcastForm({
   useEffect(() => {
     // アカウントが確定する前に照合すると「別アカウントの下書き」と誤判定する。
     if (accountLoading) return
-    const draftId = searchParams.get('draft')?.trim()
+    const draftId = searchParams.get('draft')?.trim() || draftReloadId
     if (!draftId) return
     const restoreKey = `${draftId}:${selectedAccountId}`
     if (appliedDraftFrom.current === restoreKey) return
@@ -924,13 +943,14 @@ export default function BroadcastForm({
       }
       draftSessionsByAccount.current.set(draftSession.current.accountId, draftSession.current)
       setEditingDraft(draft)
+      saveConflict.clear()
       // 読み込んだ下書きの形を「保存ずみ」の基準にし直す（★V7 §5 未保存判定）。
       cleanFingerprintRef.current = null
     }).catch(() => {
       if (generation !== accountGenerationRef.current) return
       setDraftError('下書きを読み込めませんでした。一覧から開き直してください。')
     })
-  }, [searchParams, accountLoading, selectedAccountId])
+  }, [searchParams, accountLoading, selectedAccountId, draftReloadKey, draftReloadId])
 
   // 本文や届く時刻を変えたあとは、前の見た目に対する確認を引き継がない。
   useEffect(() => {
@@ -1548,17 +1568,8 @@ export default function BroadcastForm({
           settleInFlight(null)
           return null
         }
-        const current = await api.broadcasts.get(sessionForAccount.draftId)
-        if (current.success && (selectedAccountIdRef.current || null) === accountId) {
-          const refreshed = { ...sessionForAccount, version: current.data.version ?? null }
-          draftSessionsByAccount.current.set(accountId, refreshed)
-          draftSession.current = refreshed
-        }
-        if ((selectedAccountIdRef.current || null) !== accountId) {
-          settleInFlight(null)
-          return null
-        }
-        setError('別の画面で更新されたため読み直しました')
+        saveConflict.mark()
+        setError('')
         settleInFlight(null)
         return null
       }
@@ -1594,7 +1605,7 @@ export default function BroadcastForm({
   const draftAutosave = useDraftAutosave({
     fingerprint: `${selectedAccountId}:${formFingerprint}`,
     dirty,
-    enabled: Boolean(selectedAccountId) && !validate(),
+    enabled: Boolean(selectedAccountId) && !saveConflict.conflict && !validate(),
     paused: saving || testSending || leaveTarget !== null,
     save: async () => {
       if (!selectedAccountId || validate()) return false
@@ -2117,6 +2128,12 @@ export default function BroadcastForm({
       段ごとに分かれているときはここだけに出し、メッセージの段の中の帯は
       段分けなしの従来フォームのときだけ出す（下の `{!currentStep && ...}`）。
     */}
+    {saveConflict.conflict ? <SaveConflictBand title="ほかの担当者が先に配信を保存しました" onCompare={() => void saveConflict.compare()} compareBusy={saveConflict.compareBusy} onReload={() => void saveConflict.reloadLatest()} /> : null}
+    <SaveConflictCompareDialog open={saveConflict.compareOpen} busy={saveConflict.compareBusy} error={saveConflict.compareError} onCancel={saveConflict.closeCompare} onReload={() => void saveConflict.reloadLatest()} lines={saveConflict.latest ? [
+      { text: `名前：入力 ${title} ／ 最新 ${saveConflict.latest.title}`, kind: title === saveConflict.latest.title ? undefined : 'change' },
+      { text: `本文：入力 ${bubbles.map((bubble) => String(bubble.content.text ?? '')).join(' / ')} ／ 最新 ${saveConflict.latest.messageContent}`, kind: 'change' },
+      { text: `配信時刻：入力 ${scheduledDate} ${scheduledTime} ／ 最新 ${saveConflict.latest.scheduledAt ?? '今すぐ'}`, kind: 'change' },
+    ] : null} />
     {currentStep && error ? (
       <Notice
         tone="danger"

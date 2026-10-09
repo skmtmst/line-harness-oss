@@ -197,7 +197,7 @@ describe('V8 NEN配信「コラムを書く」（yRDwW）', () => {
     await act(async () => { fireEvent.click(button('下書きを保存')!) })
     await flush()
     expect(calls.createColumn).toHaveBeenCalledWith('account-a', expect.objectContaining({ title: '秋の食事、量はどれくらい？', targetMode: 'tag', targetTagId: 'tag-pet' }))
-    expect(calls.push).toHaveBeenCalledWith('/nen-campaigns?tab=columns')
+    expect(calls.push).toHaveBeenCalledWith('/nen-campaigns?tab=columns&highlight=c-new')
   })
 
   it('題名と記事の URL が無いまま押すと、保存せずに理由を出す', async () => {
@@ -229,4 +229,26 @@ describe('V8 NEN配信「コラムを書く」（yRDwW）', () => {
     expect(host.querySelector('input[aria-label="題名"]')).toBeNull()
     expect([...document.querySelectorAll('button[disabled]')].map((b) => b.textContent)).toEqual([])
   })
+})
+
+it('保存のぶつかりでは入力を残し、比較では変えず、読み直すときだけ最新を入れる', async () => {
+  const { ApiError } = await import('@/lib/api')
+  await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) })
+  await flush()
+  const input = document.getElementById('nen-edit-body') as HTMLElement
+  await act(async () => { input.textContent = '自分の入力'; fireEvent.input(input) })
+  calls.updateSetting.mockRejectedValueOnce(new ApiError(409, '競合', 'VERSION_CONFLICT'))
+  calls.settings.mockResolvedValue({ success: true, data: [{ ...REVIEW, bodyText: 'ほかの担当者の入力', updatedAt: '2026-10-09T08:00:00Z' }] })
+  await act(async () => { fireEvent.click(button('配信内容を保存する')!) })
+  await flush()
+  expect(input.textContent).toBe('自分の入力')
+  expect(button('違いを比べる')).toBeTruthy()
+  await act(async () => { fireEvent.click(button('違いを比べる')!) })
+  await flush()
+  expect(input.textContent).toBe('自分の入力')
+  expect(document.body.textContent).toContain('ほかの担当者の入力')
+  const reload = [...document.querySelectorAll('button')].find((item) => item.textContent?.includes('最新を読み込んで続ける'))!
+  await act(async () => { fireEvent.click(reload) })
+  await flush()
+  expect((document.getElementById('nen-edit-body') as HTMLElement).textContent).toBe('ほかの担当者の入力')
 })

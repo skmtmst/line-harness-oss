@@ -155,11 +155,15 @@ describe('作成画面の下書き保存の版(#772)', () => {
     try {
       await fillMinimum()
       await clickSave()
+      getApi.mockClear()
       await clickSave()
       await flush()
 
       expect(updateApi).toHaveBeenCalledTimes(1)
-      expect(container.textContent).toContain('別の画面で更新されたため読み直しました')
+      expect(container.textContent).toContain('ほかの担当者が先に配信を保存しました')
+      expect(getApi).not.toHaveBeenCalled()
+      await act(async () => { const compare = [...container.querySelectorAll('button')].find((button) => button.textContent?.includes('違いを比べる'))!; compare.click() })
+      await flush()
       // 読み直している（作成時以外の取得がある）。
       expect(getApi).toHaveBeenCalledWith('draft-1')
     } finally {
