@@ -228,7 +228,7 @@ export default function MemberDialogV8({
             <Radio name={`${uid}-scope`} value="accounts" checked={value.accountScope === 'accounts'} disabled={busy} onChange={() => set('accountScope', 'accounts')}>指定したアカウントだけ</Radio>
           </div>
           {value.accountScope === 'accounts' ? (
-            <div id={`${uid}-scope`} className={styles.checks} role="group" aria-label="担当するアカウント" aria-invalid={Boolean(fieldErrors.scope) || undefined} aria-describedby={fieldErrors.scope ? `${uid}-scope-error` : undefined}>
+            <div id={`${uid}-scope`} className={styles.checks} role="group" aria-label="担当するアカウント" aria-describedby={fieldErrors.scope ? `${uid}-scope-error` : undefined}>
               {scopeAccounts.map((account) => (
                 <Checkbox key={account.id} checked={value.scopedLineAccountIds.includes(account.id)} disabled={busy} onCheckedChange={() => toggleAccount(account.id)}>{account.name}</Checkbox>
               ))}

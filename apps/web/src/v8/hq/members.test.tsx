@@ -118,7 +118,7 @@ describe('V8 統括のメンバーの窓', () => {
     expect(create).not.toHaveBeenCalled()
     expect(dialog.textContent).toContain('名前を入力してください')
     const scope = dialog.querySelector('[aria-label="担当するアカウント"]')!
-    expect(scope.getAttribute('aria-invalid')).toBe('true')
+    expect(scope.getAttribute('aria-describedby')).toMatch(/-scope-error$/)
     expect(dialog.textContent).toContain('担当するアカウントを1つ以上選んでください')
     expect((document.activeElement as HTMLInputElement | null)?.id).toMatch(/-name$/)
   })

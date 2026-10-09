@@ -522,7 +522,7 @@ function OperatorEditInner() {
                         <Link href="/staff" className={styles.linkItem}>ログインユーザーでスタッフを確認する</Link>
                       </div>
                     ) : (
-                      <ul className={styles.staffList} {...fields.bind('staff')} aria-invalid={fields.invalid('staff') || undefined} aria-describedby={fields.invalid('staff') ? 'operator-staff-error' : undefined}>
+                      <ul className={styles.staffList} {...fields.bind('staff')} aria-describedby={fields.invalid('staff') ? 'operator-staff-error' : undefined}>
                         {/* 閲覧のみ：選ぶチェックは置かず、受け取る人の名前だけを並べる（2026-10-06 オーナー決定）。 */}
                         {(canWrite ? items : items.filter((recipient) => recipientIds.includes(recipient.id))).map((recipient) => (
                           <li key={recipient.id} className={styles.staffRow}>
