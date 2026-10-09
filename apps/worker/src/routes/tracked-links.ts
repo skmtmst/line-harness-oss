@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { recordTrackedClick, processTrackedClick } from '../services/tracked-click-steps.js';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
@@ -159,7 +160,7 @@ trackedLinks.get('/api/tracked-links/:id', requireVisibleTrackedLink, async (c) 
 });
 
 // POST /api/tracked-links — create
-trackedLinks.post('/api/tracked-links', requireRole('owner', 'admin'), async (c) => {
+trackedLinks.post('/api/tracked-links', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"originalUrl":["string"],"tagId":["null","string"],"scenarioId":["null","string"],"introTemplateId":["null","string"],"rewardTemplateId":["null","string"],"lineAccountId":["null","string"],"ogTitle":["null","string"],"ogDescription":["null","string"],"ogImageUrl":["null","string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       name: string;
@@ -175,7 +176,7 @@ trackedLinks.post('/api/tracked-links', requireRole('owner', 'admin'), async (c)
     }>();
 
     if (!body.name || !body.originalUrl) {
-      return c.json({ success: false, error: 'name and originalUrl are required' }, 400);
+      return inputError(c, { success: false, error: 'name and originalUrl are required' }, 400, ["name","originalUrl"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId ?? null])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
@@ -203,7 +204,7 @@ trackedLinks.post('/api/tracked-links', requireRole('owner', 'admin'), async (c)
 });
 
 // PATCH /api/tracked-links/:id — update mutable fields
-trackedLinks.patch('/api/tracked-links/:id', requireRole('owner', 'admin'), requireVisibleTrackedLink, async (c) => {
+trackedLinks.patch('/api/tracked-links/:id', requireRole('owner', 'admin'), requireVisibleTrackedLink, inputJsonBoundary({"name":["string"],"tagId":["null","string"],"scenarioId":["null","string"],"introTemplateId":["null","string"],"rewardTemplateId":["null","string"],"lineAccountId":["null","string"],"isActive":["boolean"],"ogTitle":["null","string"],"ogDescription":["null","string"],"ogImageUrl":["null","string"]}), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<{

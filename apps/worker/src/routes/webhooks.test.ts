@@ -485,11 +485,7 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
     );
     expect(res.status).toBe(400);
     expect(updateOutgoingWebhook).not.toHaveBeenCalled();
-    expect(getOutgoingWebhookById).toHaveBeenCalledWith(
-      baseEnv.DB,
-      'wh-legacy',
-      ACCOUNT_ID,
-    );
+    expect(getOutgoingWebhookById).not.toHaveBeenCalled();
   });
 
   test('rejects re-activating webhook whose stored secret is too short (migration bypass)', async () => {

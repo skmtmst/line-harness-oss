@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context, type Next } from 'hono';
 import {
   getEcOrderDetail,
@@ -158,14 +159,14 @@ ecOperations.post(
   '/api/ec-commerce/action-executions/:id/retry',
   requireRole('owner', 'admin', 'staff'),
   requireEcPermission('ec.action.retry'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     type RetryBody = { lineAccountId?: unknown; expectedVersion?: unknown };
     const body = await c.req.json<RetryBody>().catch((): RetryBody => ({}));
     const key = c.req.header('Idempotency-Key')?.trim() ?? '';
     if (typeof body.lineAccountId !== 'string' || !body.lineAccountId.trim()
       || !Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 1
       || key.length < 8 || key.length > 200) {
-      return c.json({ success: false, error: '対象アカウント、版、再実行キーを確認してください' }, 400);
+      return inputError(c, { success: false, error: '対象アカウント、版、再実行キーを確認してください' }, 400, ["lineAccountId","expectedVersion"]);
     }
     const accountId = body.lineAccountId.trim();
     if (!await visible(c, accountId)) {

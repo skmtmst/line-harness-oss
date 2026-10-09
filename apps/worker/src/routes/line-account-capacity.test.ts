@@ -187,7 +187,7 @@ describe('レスポンスの中身', () => {
     expect(mocks.updateLineAccount).not.toHaveBeenCalled();
   });
   it('rejects invalid input before saving', async () => {
-    for (const timezone of ['', null, 12, 'Invalid/zone']) expect((await put({ timezone })).status).toBe(422);
+    for (const timezone of ['', null, 12, 'Invalid/zone']) expect((await put({ timezone })).status).toBe(typeof timezone === 'string' ? 422 : 400);
     expect(mocks.updateLineAccountFields).not.toHaveBeenCalled();
   });
  });

@@ -238,7 +238,7 @@ describe('候補の startUtc が欠落・不正なら予約を作らない（実
     respondWithSlot(value);
     const res = await liffCreate(`liff-broken-${key}`);
     expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toEqual({ error: 'slot_not_available' });
+    await expect(res.json()).resolves.toMatchObject({ code: 'slot_not_available' , fields: expect.any(Object), error: expect.any(String) });
     expect(bookingCount()).toBe(0);
   });
 

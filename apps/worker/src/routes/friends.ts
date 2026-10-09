@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { getFriendSummary } from '@line-crm/db';
 import { getFriendUpcomingItems } from '../services/friend-upcoming-items.js';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
@@ -177,7 +178,7 @@ function serializeTag(row: DbTag) {
 async function friendSavedViewAccess(c: Context<Env>): Promise<SavedSearchAccess | Response> {
   const lineAccountId = c.req.query('lineAccountId');
   if (!lineAccountId) {
-    return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+    return inputError(c, { success: false, error: 'LINE公式アカウントを選んでください' }, 400, ["lineAccountId"]);
   }
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   if (!scope.allowedAccountIds.includes(lineAccountId)) {
@@ -245,22 +246,22 @@ friends.get('/api/friends/saved-views', requireRole('owner', 'admin', 'staff'), 
   }
 });
 
-friends.post('/api/friends/saved-views', requireRole('owner', 'admin', 'staff'), async (c) => {
+friends.post('/api/friends/saved-views', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   try {
     const access = await friendSavedViewAccess(c);
     if (access instanceof Response) return access;
     const body = await c.req.json<Record<string, unknown>>();
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name || name.length > 40) {
-      return c.json({ success: false, error: '名前は1文字以上40文字以内で入力してください' }, 422);
+      return inputError(c, { success: false, error: '名前は1文字以上40文字以内で入力してください' }, 422, ["name"]);
     }
     if (body.isShared === true && !access.canManageAll) {
       return c.json({ success: false, error: '共有の検索を作る権限がありません' }, 403);
     }
     const validated = validateSearchConditions(body.conditions);
-    if (!validated.ok) return c.json({ success: false, error: validated.error }, 422);
+    if (!validated.ok) return inputError(c, { success: false, error: validated.error }, 422, ["conditions"]);
     const compiled = compileSavedSearch(validated.value);
-    if (!compiled.ok) return c.json({ success: false, error: compiled.error }, 422);
+    if (!compiled.ok) return inputError(c, { success: false, error: compiled.error }, 422, ["conditions"]);
     const duplicate = await c.env.DB.prepare(
       `SELECT id FROM saved_searches
         WHERE scope = 'friends' AND condition_format = 'search_v1'
@@ -278,7 +279,7 @@ friends.post('/api/friends/saved-views', requireRole('owner', 'admin', 'staff'),
       lineAccountId: access.lineAccountId,
     });
     if (count >= SAVED_SEARCH_LIMIT) {
-      return c.json({ success: false, error: `保存できる検索は${SAVED_SEARCH_LIMIT}件までです` }, 422);
+      return inputError(c, { success: false, error: `保存できる検索は${SAVED_SEARCH_LIMIT}件までです` }, 422, []);
     }
     const saved = await createSavedSearch(c.env.DB, {
       name,
@@ -296,7 +297,7 @@ friends.post('/api/friends/saved-views', requireRole('owner', 'admin', 'staff'),
       return c.json({ success: false, error: '同じ名前の保存した検索があります' }, 409);
     }
     if (error instanceof SyntaxError) {
-      return c.json({ success: false, error: '送信内容のJSONが正しくありません' }, 400);
+      return inputError(c, { success: false, error: '送信内容のJSONが正しくありません' }, 400, []);
     }
     console.error('POST /api/friends/saved-views error:', error);
     return c.json({ success: false, error: '保存した検索を作成できませんでした' }, 500);
@@ -1303,13 +1304,13 @@ friends.get('/api/friends/:id/form-submissions', requireVisibleFriend, async (c)
 });
 
 // POST /api/friends/:id/tags - add tag
-friends.post('/api/friends/:id/tags', requireRole('owner', 'admin', 'staff'), requireVisibleFriend, async (c) => {
+friends.post('/api/friends/:id/tags', requireRole('owner', 'admin', 'staff'), requireVisibleFriend, inputJsonBoundary({"tagId":["string"]}), async (c) => {
   try {
     const friendId = c.req.param('id');
     const body = await c.req.json<{ tagId: string }>();
 
     if (!body.tagId) {
-      return c.json({ success: false, error: 'tagId is required' }, 400);
+      return inputError(c, { success: false, error: 'tagId is required' }, 400, ["tagId"]);
     }
 
     const db = c.env.DB;
@@ -1409,7 +1410,7 @@ friends.delete('/api/friends/:id/tags/:tagId', requireRole('owner', 'admin', 'st
 });
 
 // PUT /api/friends/:id/metadata - merge metadata fields
-friends.put('/api/friends/:id/metadata', requireRole('owner', 'admin', 'staff'), requireVisibleFriend, async (c) => {
+friends.put('/api/friends/:id/metadata', requireRole('owner', 'admin', 'staff'), requireVisibleFriend, inputJsonBoundary(), async (c) => {
   try {
     const friendId = c.req.param('id');
     const db = c.env.DB;
@@ -1424,7 +1425,7 @@ friends.put('/api/friends/:id/metadata', requireRole('owner', 'admin', 'staff'),
     for (const [key, value] of Object.entries(body)) {
       if (value === null) delete merged[key];
       else if (typeof value === 'string') merged[key] = value;
-      else return c.json({ success: false, error: 'metadata values must be string or null' }, 400);
+      else return inputError(c, { success: false, error: 'metadata values must be string or null' }, 400, ["value"]);
     }
     const now = jstNow();
 
@@ -1661,12 +1662,12 @@ friends.get(
 );
 
 // POST /api/friends/:id/messages - send message to friend
-friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff'), requireIdempotencyKey, requireVisibleFriend, async (c) => {
+friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff'), requireIdempotencyKey, requireVisibleFriend, inputJsonBoundary({"messageType":["string"],"content":["string"],"altText":["string"],"trackLinks":["boolean"]}), async (c) => {
   try {
     const friendId = c.req.param('id');
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
     if (!isValidIdempotencyKey(idempotencyKey)) {
-      return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+      return inputError(c, { success: false, error: '有効なIdempotency-Keyが必要です' }, 400, []);
     }
     const body = await c.req.json<{
       messageType?: string;
@@ -1676,7 +1677,7 @@ friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff')
     }>();
 
     if (!body.content) {
-      return c.json({ success: false, error: 'content is required' }, 400);
+      return inputError(c, { success: false, error: 'content is required' }, 400, ["content"]);
     }
 
     const db = c.env.DB;
@@ -1703,12 +1704,12 @@ friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff')
       );
     } catch (error) {
       if (error instanceof CommonVarResolutionFailedError) {
-        return c.json({
+        return inputError(c, {
           success: false,
           error: `共通情報を解決できません: ${error.failures.map((f) => `{{var.${f.varKey}}}`).join(', ')}`,
           code: 'UNRESOLVED_TEMPLATE_VARIABLES',
           data: { variables: error.failures.map((f) => `var.${f.varKey}`) },
-        }, 422);
+        }, 422, ["content"]);
       }
       throw error;
     }
@@ -1839,14 +1840,14 @@ friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff')
         nextRetryAt: failure.nextRetryAt,
         now: failedAt,
       });
-      return c.json({
+      return inputError(c, {
         success: false,
         error: failure.status === 'unknown'
           ? 'LINEへの送達結果を確認できないため、自動再送を停止しました'
           : 'LINEへ送信できませんでした',
         code: failure.code,
         data: { retryable: failure.retryable, nextRetryAt: failure.nextRetryAt },
-      }, failure.httpStatus);
+      }, failure.httpStatus, []);
     }
 
     // Log outgoing message

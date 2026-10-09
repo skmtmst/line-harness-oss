@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
   cancelAdCostEntry,
@@ -46,7 +47,7 @@ async function resolveAccountId(
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   return scope.allowedAccountIds.length === 1
     ? scope.allowedAccountIds[0]
-    : c.json({ success: false, error: 'accountId required' }, 400);
+    : inputError(c, { success: false, error: 'accountId required' }, 400, ["accountId"]);
 }
 
 // GET /api/ad-costs — 流入元ごとの費用と取込状況
@@ -135,7 +136,7 @@ adCosts.get('/api/ad-costs', requireRole('owner', 'admin', 'staff'), async (c) =
 //
 // 媒体から取り込めない分(チラシ・看板など)を日ごとに足す。
 // 同じ流入元・同じ日が来たら上書きになる。
-adCosts.post('/api/ad-costs', requireRole('owner', 'admin'), async (c) => {
+adCosts.post('/api/ad-costs', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{
       lineAccountId?: unknown;
@@ -154,18 +155,18 @@ adCosts.post('/api/ad-costs', requireRole('owner', 'admin'), async (c) => {
 
     const sourceLabel = typeof body.sourceLabel === 'string' ? body.sourceLabel.trim() : '';
     if (!sourceLabel || sourceLabel.length > 100) {
-      return c.json({ success: false, error: '流入元の名前を100字以内で入れてください' }, 400);
+      return inputError(c, { success: false, error: '流入元の名前を100字以内で入れてください' }, 400, ["sourceLabel"]);
     }
     if (!isValidCostDay(body.day)) {
-      return c.json({ success: false, error: '日付は 2026-08-01 の形で指定してください' }, 400);
+      return inputError(c, { success: false, error: '日付は 2026-08-01 の形で指定してください' }, 400, ["day"]);
     }
     const amountMinor = body.amountMinor;
     if (typeof amountMinor !== 'number' || !Number.isInteger(amountMinor) || amountMinor < 0) {
-      return c.json({ success: false, error: '費用は0以上の整数で入れてください' }, 400);
+      return inputError(c, { success: false, error: '費用は0以上の整数で入れてください' }, 400, ["amountMinor"]);
     }
     const currency = body.currency == null ? 'JPY' : normalizeCostCurrency(body.currency);
     if (!currency) {
-      return c.json({ success: false, error: '通貨は JPY のような3文字のコードで指定してください' }, 400);
+      return inputError(c, { success: false, error: '通貨は JPY のような3文字のコードで指定してください' }, 400, ["currency"]);
     }
 
     let entryRouteId: string | null = null;
@@ -204,7 +205,7 @@ adCosts.post('/api/ad-costs', requireRole('owner', 'admin'), async (c) => {
  * 日付・名前・金額を間違えて入れた記録を集計から外す。行は消さず、
  * 取消した日時と理由を残す。取込分は媒体側の記録なので対象外。
  */
-adCosts.post('/api/ad-costs/:id/cancel', requireRole('owner', 'admin'), async (c) => {
+adCosts.post('/api/ad-costs/:id/cancel', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const entry = await c.env.DB
       .prepare(`SELECT id, line_account_id FROM ad_cost_entries WHERE id = ?`)
@@ -217,7 +218,7 @@ adCosts.post('/api/ad-costs/:id/cancel', requireRole('owner', 'admin'), async (c
     const body = await c.req.json<{ reason?: unknown }>().catch(() => ({}) as { reason?: unknown });
     const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
     if (!reason || reason.length > 200) {
-      return c.json({ success: false, error: '取り消す理由を200字以内で入れてください' }, 400);
+      return inputError(c, { success: false, error: '取り消す理由を200字以内で入れてください' }, 400, ["reason"]);
     }
 
     const result = await cancelAdCostEntry(c.env.DB, { entryId: entry.id, reason });
@@ -236,7 +237,7 @@ adCosts.post('/api/ad-costs/:id/cancel', requireRole('owner', 'admin'), async (c
 });
 
 // POST /api/ad-platforms/:id/cost-import — その連携の前日分をいま取り直す
-adCosts.post('/api/ad-platforms/:id/cost-import', requireRole('owner', 'admin'), async (c) => {
+adCosts.post('/api/ad-platforms/:id/cost-import', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const platform = await getAdPlatformById(c.env.DB, c.req.param('id'));
     if (!platform || !platform.line_account_id

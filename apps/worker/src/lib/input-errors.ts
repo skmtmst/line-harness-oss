@@ -1,0 +1,117 @@
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
+import type { Context, MiddlewareHandler } from 'hono';
+import type { ApiFieldErrors } from '@line-crm/shared';
+
+/** JSONの鍵を使う。欄を特定できない本文全体の誤りは fields を空にする。 */
+export function inputError<T extends Record<string, unknown>>(
+  c: Context,
+  payload: T,
+  status: ContentfulStatusCode,
+  keys: readonly string[] = [],
+) {
+  if (!['POST', 'PUT', 'PATCH'].includes(c.req.method) || (status !== 400 && status !== 422)) return c.json(payload, status);
+  const legacyError = typeof payload.error === 'string' ? payload.error : '入力内容を確認してください';
+  const isCode = /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(legacyError);
+  const error = isCode ? inputErrorMessage(legacyError) : legacyError;
+  const explicitFields = typeof payload.field === 'string'
+    || (payload.fields && typeof payload.fields === 'object' && !Array.isArray(payload.fields))
+    || (payload.errors && typeof payload.errors === 'object' && !Array.isArray(payload.errors));
+  // 必須欄が複数ある検査でも、すでに入っている欄は赤にしない。
+  const body = c.get('validatedInputBody') as Record<string, unknown> | undefined;
+  const missingKeys = body && /required|必須/i.test(legacyError)
+    ? keys.filter(key => body[key] === undefined || body[key] === null || body[key] === '')
+    : [];
+  const affectedKeys = missingKeys.length ? missingKeys : keys;
+  const fields: ApiFieldErrors = Object.fromEntries((explicitFields ? [] : affectedKeys).map(key => [key, error]));
+  if (typeof payload.field === 'string') fields[payload.field] = error;
+  if (payload.errors && typeof payload.errors === 'object' && !Array.isArray(payload.errors)) {
+    for (const [key, reason] of Object.entries(payload.errors)) {
+      if (typeof reason === 'string') fields[key] = /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(reason) ? inputErrorMessage(reason) : reason;
+    }
+  }
+  if (payload.fields && typeof payload.fields === 'object' && !Array.isArray(payload.fields)) {
+    for (const [key, reason] of Object.entries(payload.fields)) {
+      if (typeof reason === 'string') fields[key] = /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(reason) ? inputErrorMessage(reason) : reason;
+    }
+  }
+  return c.json({ ...payload, ...(isCode && payload.code === undefined ? { code: legacyError } : {}), error, fields }, status);
+}
+
+/** パーサー例外が各ルートの500に飲み込まれる前に、壊れたJSONを400にする。 */
+export function inputJsonBoundary(shape: InputShape = {}): MiddlewareHandler {
+  return async (c, next) => {
+    if (['POST', 'PUT', 'PATCH'].includes(c.req.method)
+      && c.req.raw.body !== null
+      && !/\/(receive|webhook|callback|ingest)(?:\/|$)|^\/api\/integrations\/(eccube|ai-loop|codex-slack|slack|stripe)(?:\/|$)/.test(c.req.path)
+      && /^application\/(?:[\w.+-]+\+)?json(?:\s*;|$)/i.test(c.req.header('content-type') ?? '')) {
+      try {
+        const body = await c.req.raw.clone().json();
+        if (!body || typeof body !== 'object' || Array.isArray(body)) {
+          return inputError(c, { success: false, error: '入力内容はJSONのオブジェクトで指定してください' }, 400);
+        }
+        c.set('validatedInputBody', body);
+        const fields = inputShapeErrors(body as Record<string, unknown>, shape);
+        if (Object.keys(fields).length) return inputError(c, { success: false, error: '入力内容の形式を確認してください', fields }, 400);
+      } catch {
+        return inputError(c, { success: false, code: 'INVALID_JSON', error: '送信内容のJSONが正しくありません' }, 400);
+      }
+    }
+    await next();
+  };
+}
+
+export type InputKind = 'string' | 'number' | 'boolean' | 'object' | 'array' | 'null';
+export type InputShape = Record<string, readonly InputKind[]>;
+
+/** 型の違う値を .trim() 等へ渡して500にしない。必須・範囲・相関の検証は各ルートで行う。 */
+export function inputShapeErrors(body: Record<string, unknown>, shape: InputShape): ApiFieldErrors {
+  const fields: ApiFieldErrors = {};
+  for (const [key, kinds] of Object.entries(shape)) {
+    if (!(key in body) || body[key] === undefined) continue;
+    const value = body[key];
+    const kind = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
+    if (!kinds.includes(kind as InputKind)) fields[key] = '入力内容の形式を確認してください';
+  }
+  return fields;
+}
+
+/** 旧来の error に入っていた機械コードは code に残し、本文は人向けの文にする。 */
+function inputErrorMessage(code: string): string {
+  const messages: Record<string, string> = {
+    missing_account_id: 'LINE公式アカウントを選んでください',
+    account_id_required: 'LINE公式アカウントを選んでください',
+    invalid_starts_at: '開始日時の形式を確認してください',
+    past_datetime: '日時は現在より先を指定してください',
+    slot_not_available: '選んだ日時では予約できません。別の日時を選んでください',
+    invalid_auto_tag_id: '予約時に付けるタグの指定を確認してください',
+    tag_not_found: '利用できるタグを選んでください',
+    menu_not_offered: '受付中の予約メニューを選んでください',
+    missing_lock_version: '読み込んだ版の番号を指定してください',
+    invalid_time: '時刻の形式を確認してください',
+    invalid_hour_before: 'お知らせを送る時間を確認してください',
+    invalid_duration_seconds: '視聴時間は0より大きい秒数で指定してください',
+    invalid_json: '送信内容のJSONが正しくありません',
+    break_overlap: '休憩時間が重ならないように指定してください',
+    break_outside_working_hours: '休憩時間は勤務時間の中で指定してください',
+    invalid_time_range: '開始と終了の時刻を確認してください',
+    invalid_params: '入力内容の形式を確認してください',
+    missing_params: '必要な項目を入力してください',
+    missing_idempotency_key: '操作を確認するキーがありません。画面を開き直してください',
+    line_notification_unavailable: 'LINE連携済みの予約だけLINE通知を送れます',
+    invalid_duration: '視聴時間は0より大きい秒数で指定してください',
+    invalid_version: '読み込んだ版の番号を指定してください',
+    scheduled_at_invalid: '配信日時の形式を確認してください',
+    title_required: 'タイトルを入力してください',
+    title_invalid: 'タイトルの長さと形式を確認してください',
+    invalid_slug: 'ページの識別名は使用できる文字で指定してください',
+    invalid_settings: '設定内容を確認してください',
+    invalid_comment: 'コメントの時刻、名前、本文を確認してください',
+    invalid_cta: '案内ボタンの内容を確認してください',
+    invalid_url: 'リンク先のURLを確認してください',
+    video_media_not_video: '動画ファイルを選んでください',
+    video_media_not_found: 'このアカウントで利用できる動画を選んでください',
+    ambiguous_video_source: '動画の指定方法は1つにしてください',
+    dst_gap: '夏時間への切り替えで存在しない時刻です。別の時刻を選んでください',
+  };
+  return messages[code] ?? '入力内容を確認してください';
+}

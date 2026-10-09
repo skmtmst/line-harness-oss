@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { FolderAssignmentError } from '@line-crm/db';
 import { Hono, type Context } from 'hono';
 import {
@@ -176,7 +177,7 @@ async function incomingActionDisplayName(db: D1Database, action: IncomingWebhook
 
 function readIncomingConfig(body: unknown):
   | { ok: true; expectedVersion: number; identityMatching: IncomingWebhookIdentityMatch; actions: IncomingWebhookActionRef[] }
-  | { ok: false; error: string } {
+  | { ok: false; error: string; field?: string } {
   if (!body || typeof body !== 'object') return { ok: false, error: 'JSON本文が正しくありません' };
   const input = body as Record<string, unknown>;
   const expectedVersion = Number(input.expectedVersion);
@@ -184,21 +185,21 @@ function readIncomingConfig(body: unknown):
   const methods = identity?.methods;
   const onNotFound = identity?.onNotFound;
   if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
-    return { ok: false, error: 'expectedVersionは1以上の整数で指定してください' };
+    return { ok: false, error: 'expectedVersionは1以上の整数で指定してください' , field: "expectedVersion" };
   }
   if (!Array.isArray(methods) || methods.length > 4 || !NOT_FOUND_ACTIONS.has(String(onNotFound))) {
-    return { ok: false, error: '人の照合方法または未照合時の扱いが正しくありません' };
+    return { ok: false, field: 'identityMatching', error: '人の照合方法または未照合時の扱いが正しくありません' };
   }
   const normalizedMethods: IncomingWebhookIdentityMatch['methods'] = [];
   const seenKinds = new Set<string>();
   for (const raw of methods) {
-    if (!raw || typeof raw !== 'object') return { ok: false, error: '人の照合方法が正しくありません' };
+    if (!raw || typeof raw !== 'object') return { ok: false, field: 'identityMatching', error: '人の照合方法が正しくありません' };
     const item = raw as Record<string, unknown>;
     const kind = String(item.kind);
     const path = typeof item.path === 'string' ? item.path.trim() : '';
     if (!MATCH_KINDS.has(kind) || seenKinds.has(kind)
       || path.length > 200 || !/^\$(?:\.[A-Za-z_][A-Za-z0-9_-]*|\[\d+\])+$/.test(path)) {
-      return { ok: false, error: '名前照合は使わず、許可された識別子とJSONPathを指定してください' };
+      return { ok: false, field: 'identityMatching', error: '名前照合は使わず、許可された識別子とJSONPathを指定してください' };
     }
     seenKinds.add(kind);
     normalizedMethods.push({
@@ -206,11 +207,11 @@ function readIncomingConfig(body: unknown):
     });
   }
   if (!Array.isArray(input.actions) || input.actions.length > 20) {
-    return { ok: false, error: '実行処理は20件以内で指定してください' };
+    return { ok: false, field: 'actions', error: '実行処理は20件以内で指定してください' };
   }
   const actions: IncomingWebhookActionRef[] = [];
   for (const raw of input.actions) {
-    if (!raw || typeof raw !== 'object') return { ok: false, error: '実行処理が正しくありません' };
+    if (!raw || typeof raw !== 'object') return { ok: false, field: 'actions', error: '実行処理が正しくありません' };
     const item = raw as Record<string, unknown>;
     const refKind = String(item.refKind);
     const refId = typeof item.refId === 'string' ? item.refId.trim() : '';
@@ -218,11 +219,11 @@ function readIncomingConfig(body: unknown):
       ? null : typeof item.refVersionId === 'string' ? item.refVersionId.trim() : '';
     if (!INCOMING_ACTION_KINDS.has(refKind) || !refId || refId.length > 200
       || (refVersionId !== null && (!refVersionId || refVersionId.length > 200))) {
-      return { ok: false, error: '実行処理は許可された種類と構造化IDで指定してください' };
+      return { ok: false, field: 'actions', error: '実行処理は許可された種類と構造化IDで指定してください' };
     }
     // R404: 直接実行できない種類は保存200にしない。試しも実実行も必ず失敗するため。
     const unexecutable = incomingUnexecutableReason(refKind);
-    if (unexecutable) return { ok: false, error: unexecutable };
+    if (unexecutable) return { ok: false, field: 'actions', error: unexecutable };
     actions.push({ refKind, refId, refVersionId });
   }
   return {
@@ -510,15 +511,15 @@ webhooks.get('/api/webhooks/incoming/:id', requireRole('owner', 'admin', 'staff'
   }
 });
 
-webhooks.patch('/api/webhooks/incoming/:id/config', requireRole('owner'), async (c) => {
+webhooks.patch('/api/webhooks/incoming/:id/config', requireRole('owner'), inputJsonBoundary(), async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId')?.trim();
-    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
     const parsed = readIncomingConfig(await c.req.json<unknown>().catch(() => null));
-    if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+    if (!parsed.ok) return inputError(c, { success: false, error: parsed.error, field: parsed.field }, 400, []);
     const result = await updateIncomingWebhookConfig(c.env.DB, {
       id: c.req.param('id'),
       lineAccountId,
@@ -546,7 +547,7 @@ webhooks.patch('/api/webhooks/incoming/:id/config', requireRole('owner'), async 
   }
 });
 
-webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
+webhooks.post('/api/webhooks/incoming', requireRole('owner'), inputJsonBoundary({"name":["string"],"sourceType":["string"],"secret":["string"],"lineAccountId":["string"],"isActive":["boolean"]}), async (c) => {
   try {
     // 受信フックの登録は秘密値を扱う大事な操作（V）。
     if (!await sensitiveStepUpSatisfied(c, 'webhook.secret')) {
@@ -554,18 +555,18 @@ webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
     }
     const body = await c.req.json<{ name: string; sourceType?: string; secret?: string; lineAccountId: string; folderId?: unknown; isActive?: boolean }>();
     if (body.isActive !== undefined && typeof body.isActive !== 'boolean') {
-      return c.json({ success: false, error: 'isActive must be a boolean' }, 400);
+      return inputError(c, { success: false, error: 'isActive must be a boolean' }, 400, ["isActive"]);
     }
     const nameError = validateWebhookName(body.name);
     if (nameError) {
-      return c.json({ success: false, error: nameError }, 400);
+      return inputError(c, { success: false, error: nameError }, 400, ["name"]);
     }
     const secretError = validateSecret(body.secret);
     if (secretError) {
-      return c.json({ success: false, error: secretError }, 400);
+      return inputError(c, { success: false, error: secretError }, 400, ["secret"]);
     }
     const lineAccountId = body.lineAccountId?.trim();
-    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
@@ -596,7 +597,7 @@ webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
       201,
     );
   } catch (err) {
-    if (err instanceof FolderAssignmentError) return c.json({ success: false, code: err.code, error: err.message }, 422);
+    if (err instanceof FolderAssignmentError) return inputError(c, { success: false, code: err.code, error: err.message }, 422, ["folderId"]);
     if (isEncryptionKeyError(err)) {
       return c.json({ success: false, error: 'secret を安全に保存できませんでした' }, 503);
     }
@@ -605,11 +606,11 @@ webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
   }
 });
 
-webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
+webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), inputJsonBoundary({"name":["string"],"sourceType":["string"],"secret":["string"],"isActive":["boolean"]}), async (c) => {
   try {
     const id = c.req.param('id');
     const lineAccountId = c.req.query('lineAccountId')?.trim();
-    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
@@ -623,16 +624,16 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
     if (body.name !== undefined) {
       const nameError = validateWebhookName(body.name);
       if (nameError) {
-        return c.json({ success: false, error: nameError }, 400);
+        return inputError(c, { success: false, error: nameError }, 400, ["name"]);
       }
     }
     if (body.isActive !== undefined && typeof body.isActive !== 'boolean') {
-      return c.json({ success: false, error: 'isActive must be a boolean' }, 400);
+      return inputError(c, { success: false, error: 'isActive must be a boolean' }, 400, ["isActive"]);
     }
     if (body.secret !== undefined) {
       const secretError = validateSecret(body.secret);
       if (secretError) {
-        return c.json({ success: false, error: secretError }, 400);
+        return inputError(c, { success: false, error: secretError }, 400, ["secret"]);
       }
     }
     // Activation gate: never re-enable a webhook whose post-update secret
@@ -650,13 +651,10 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
         }
       }
       if (!effectiveSecret || effectiveSecret.length < MIN_SECRET_LENGTH) {
-        return c.json(
-          {
+        return inputError(c, {
             success: false,
             error: `Cannot activate webhook: secret must be at least ${MIN_SECRET_LENGTH} characters. Update the secret first.`,
-          },
-          400,
-        );
+          }, 400, ["secret"]);
       }
     }
     await updateIncomingWebhook(c.env.DB, id, lineAccountId, body, webhookKeysOf(c));
@@ -686,7 +684,7 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
       },
     });
   } catch (err) {
-    if (err instanceof FolderAssignmentError) return c.json({ success: false, code: err.code, error: err.message }, 422);
+    if (err instanceof FolderAssignmentError) return inputError(c, { success: false, code: err.code, error: err.message }, 422, ["folderId"]);
     if (isEncryptionKeyError(err)) {
       return c.json({ success: false, error: 'secret を安全に保存できませんでした' }, 503);
     }
@@ -720,11 +718,11 @@ webhooks.delete('/api/webhooks/incoming/:id', requireRole('owner'), async (c) =>
  * 消した受信Webhookだけを戻す。戻した直後は止めたまま。消していない
  * 行・無い行・権限の無いアカウントは 404/403。
  */
-webhooks.post('/api/webhooks/incoming/:id/restore', requireRole('owner'), async (c) => {
+webhooks.post('/api/webhooks/incoming/:id/restore', requireRole('owner'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const lineAccountId = c.req.query('lineAccountId')?.trim();
-    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
@@ -830,10 +828,10 @@ webhooks.get('/api/webhooks/incoming/:id/unmatched', requireRole('owner', 'admin
  * 試して結果を返す。届物の受領・行動の実行・箱への記録は一切行わない。
  * 結果だけはやり取り台帳へ「試し」として分けて残す(v6-26 §9)。
  */
-webhooks.post('/api/webhooks/incoming/:id/test', requireRole('owner', 'admin', 'staff'), async (c) => {
+webhooks.post('/api/webhooks/incoming/:id/test', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId')?.trim();
-    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     const staff = c.get('staff');
     if (staff?.role === 'staff' && !staff.permissionKeys?.includes('/webhooks')) {
       return c.json({ success: false, error: 'この機能を表示する権限がありません' }, 403);
@@ -847,7 +845,7 @@ webhooks.post('/api/webhooks/incoming/:id/test', requireRole('owner', 'admin', '
     }
     const body = await c.req.json<{ payload?: unknown }>().catch(() => null);
     if (!body || body.payload === undefined) {
-      return c.json({ success: false, error: '試すJSONを payload に入れてください' }, 400);
+      return inputError(c, { success: false, error: '試すJSONを payload に入れてください' }, 400, ["payload"]);
     }
     const webhook = await getIncomingWebhookById(c.env.DB, c.req.param('id'), lineAccountId);
     if (!webhook) return c.json({ success: false, error: 'Not found' }, 404);
@@ -931,24 +929,24 @@ webhooks.post('/api/webhooks/incoming/:id/test', requireRole('owner', 'admin', '
  * `{action:'link', friendId}` は既存の友だちに結び付けて閉じる。
  * 友だちの所属はアカウント境界で確かめる。
  */
-webhooks.post('/api/webhooks/unmatched/:id/resolve', requireRole('owner', 'admin'), async (c) => {
+webhooks.post('/api/webhooks/unmatched/:id/resolve', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId')?.trim();
-    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
     const body = await c.req.json<{ action?: unknown; friendId?: unknown }>().catch(() => null);
     const action = body?.action;
     if (action !== 'dismiss' && action !== 'link') {
-      return c.json({ success: false, error: 'action は dismiss か link を指定してください' }, 400);
+      return inputError(c, { success: false, error: 'action は dismiss か link を指定してください' }, 400, ["action"]);
     }
     const item = await getIncomingWebhookUnmatchedById(c.env.DB, c.req.param('id'), lineAccountId);
     if (!item) return c.json({ success: false, error: 'Not found' }, 404);
     let friendId: string | undefined;
     if (action === 'link') {
       if (typeof body?.friendId !== 'string' || !body.friendId.trim()) {
-        return c.json({ success: false, error: '結び付ける友だちを指定してください' }, 400);
+        return inputError(c, { success: false, error: '結び付ける友だちを指定してください' }, 400, ["friendId"]);
       }
       friendId = body.friendId.trim();
       const friend = await c.env.DB.prepare(
@@ -1074,7 +1072,7 @@ webhooks.get('/api/webhooks/outgoing/:id', requireRole('owner', 'admin', 'staff'
   }
 });
 
-webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
+webhooks.post('/api/webhooks/outgoing', requireRole('owner'), inputJsonBoundary({"name":["string"],"url":["string"],"eventTypes":["array"],"secret":["string"],"isActive":["boolean"],"lineAccountId":["string"]}), async (c) => {
   try {
     // 送信フックの登録は署名用の秘密値を扱う大事な操作（V）。
     if (!await sensitiveStepUpSatisfied(c, 'webhook.secret')) {
@@ -1091,34 +1089,34 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
       lineAccountId: string;
     }>();
     if (body.isActive !== undefined && typeof body.isActive !== 'boolean') {
-      return c.json({ success: false, error: 'isActive must be a boolean' }, 400);
+      return inputError(c, { success: false, error: 'isActive must be a boolean' }, 400, ["isActive"]);
     }
     const nameError = validateWebhookName(body.name);
     if (nameError) {
-      return c.json({ success: false, error: nameError }, 400);
+      return inputError(c, { success: false, error: nameError }, 400, ["name"]);
     }
     const eventTypesError = validateEventTypes(body.eventTypes);
     if (eventTypesError) {
-      return c.json({ success: false, error: eventTypesError }, 400);
+      return inputError(c, { success: false, error: eventTypesError }, 400, ["eventTypes"]);
     }
     const urlError = validateHttpsUrl(body.url);
     if (urlError) {
-      return c.json({ success: false, error: urlError }, 400);
+      return inputError(c, { success: false, error: urlError }, 400, ["url"]);
     }
     const secretError = validateSecret(body.secret);
     if (secretError) {
-      return c.json({ success: false, error: secretError }, 400);
+      return inputError(c, { success: false, error: secretError }, 400, ["secret"]);
     }
     let maxRetries = 0;
     if (body.maxRetries !== undefined) {
       const parsed = readMaxRetries(body.maxRetries);
       if (!parsed.ok) {
-        return c.json({ success: false, error: 'maxRetries must be an integer between 0 and 7' }, 400);
+        return inputError(c, { success: false, error: 'maxRetries must be an integer between 0 and 7' }, 400, ["maxRetries"]);
       }
       maxRetries = parsed.value;
     }
     const lineAccountId = body.lineAccountId?.trim();
-    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
@@ -1152,7 +1150,7 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
       201,
     );
   } catch (err) {
-    if (err instanceof FolderAssignmentError) return c.json({ success: false, code: err.code, error: err.message }, 422);
+    if (err instanceof FolderAssignmentError) return inputError(c, { success: false, code: err.code, error: err.message }, 422, ["folderId"]);
     if (isEncryptionKeyError(err)) {
       return c.json({ success: false, error: 'secret を安全に保存できませんでした' }, 503);
     }
@@ -1161,11 +1159,11 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
   }
 });
 
-webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
+webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), inputJsonBoundary({"name":["string"],"url":["string"],"eventTypes":["array"],"secret":["string"],"isActive":["boolean"],"expectedVersion":["number"]}), async (c) => {
   try {
     const id = c.req.param('id');
     const lineAccountId = c.req.query('lineAccountId')?.trim();
-    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
@@ -1183,7 +1181,7 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
     }>();
     if (body.expectedVersion !== undefined &&
         (!Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1)) {
-      return c.json({ success: false, error: 'expectedVersion は1以上の整数を指定してください' }, 400);
+      return inputError(c, { success: false, error: 'expectedVersion は1以上の整数を指定してください' }, 400, ["expectedVersion"]);
     }
     const conflict = (current: typeof existing) => c.json({
       success: false, code: 'VERSION_CONFLICT', error: '送り先が更新されています。読み直してください',
@@ -1203,33 +1201,33 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
     if (body.maxRetries !== undefined) {
       const parsed = readMaxRetries(body.maxRetries);
       if (!parsed.ok) {
-        return c.json({ success: false, error: 'maxRetries must be an integer between 0 and 7' }, 400);
+        return inputError(c, { success: false, error: 'maxRetries must be an integer between 0 and 7' }, 400, ["maxRetries"]);
       }
       maxRetries = parsed.value;
     }
     if (body.name !== undefined) {
       const nameError = validateWebhookName(body.name);
       if (nameError) {
-        return c.json({ success: false, error: nameError }, 400);
+        return inputError(c, { success: false, error: nameError }, 400, ["name"]);
       }
     }
     const eventTypesError = validateEventTypes(body.eventTypes);
     if (eventTypesError) {
-      return c.json({ success: false, error: eventTypesError }, 400);
+      return inputError(c, { success: false, error: eventTypesError }, 400, ["eventTypes"]);
     }
     if (body.isActive !== undefined && typeof body.isActive !== 'boolean') {
-      return c.json({ success: false, error: 'isActive must be a boolean' }, 400);
+      return inputError(c, { success: false, error: 'isActive must be a boolean' }, 400, ["isActive"]);
     }
     if (body.url !== undefined) {
       const urlError = validateHttpsUrl(body.url);
       if (urlError) {
-        return c.json({ success: false, error: urlError }, 400);
+        return inputError(c, { success: false, error: urlError }, 400, ["url"]);
       }
     }
     if (body.secret !== undefined) {
       const secretError = validateSecret(body.secret);
       if (secretError) {
-        return c.json({ success: false, error: secretError }, 400);
+        return inputError(c, { success: false, error: secretError }, 400, ["secret"]);
       }
     }
     // Activation gate: a PUT that re-enables an outgoing webhook must leave
@@ -1249,20 +1247,14 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
       }
       const effectiveUrl = body.url ?? existing.url;
       if (!effectiveSecret || effectiveSecret.length < MIN_SECRET_LENGTH) {
-        return c.json(
-          {
+        return inputError(c, {
             success: false,
             error: `Cannot activate webhook: secret must be at least ${MIN_SECRET_LENGTH} characters. Update the secret first.`,
-          },
-          400,
-        );
+          }, 400, ["secret"]);
       }
       const urlError = validateHttpsUrl(effectiveUrl);
       if (urlError) {
-        return c.json(
-          { success: false, error: `Cannot activate webhook: ${urlError}` },
-          400,
-        );
+        return inputError(c, { success: false, error: `Cannot activate webhook: ${urlError}` }, 400, ["url","lineAccountId"]);
       }
     }
     const saved = await updateOutgoingWebhook(c.env.DB, id, lineAccountId, {
@@ -1305,7 +1297,7 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
       },
     });
   } catch (err) {
-    if (err instanceof FolderAssignmentError) return c.json({ success: false, code: err.code, error: err.message }, 422);
+    if (err instanceof FolderAssignmentError) return inputError(c, { success: false, code: err.code, error: err.message }, 422, ["folderId"]);
     if (isEncryptionKeyError(err)) {
       return c.json({ success: false, error: 'secret を安全に保存できませんでした' }, 503);
     }
@@ -1314,10 +1306,10 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
   }
 });
 
-webhooks.post('/api/webhooks/outgoing/:id/test', requireRole('owner', 'admin'), async (c) => {
+webhooks.post('/api/webhooks/outgoing/:id/test', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId')?.trim();
-    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
@@ -1408,11 +1400,11 @@ webhooks.delete('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) =>
  * 消した送信Webhookだけを戻す。戻した直後は止めたまま。消していない
  * 行・無い行・権限の無いアカウントは 404/403。
  */
-webhooks.post('/api/webhooks/outgoing/:id/restore', requireRole('owner'), async (c) => {
+webhooks.post('/api/webhooks/outgoing/:id/restore', requireRole('owner'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const lineAccountId = c.req.query('lineAccountId')?.trim();
-    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
@@ -1500,7 +1492,7 @@ function retryBlockFields(row: WebhookInteractionRow) {
 
 async function requireInteractionAccount(c: Context<Env>) {
   const lineAccountId = c.req.query('lineAccountId')?.trim();
-  if (!lineAccountId) return { error: c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400) };
+  if (!lineAccountId) return { error: inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]) };
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
     return { error: c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403) };
   }
@@ -1558,7 +1550,7 @@ webhooks.get('/api/webhooks/interactions/:id/payload', requireRole('owner', 'adm
   }
 });
 
-webhooks.post('/api/webhooks/interactions/:id/retry', requireRole('owner', 'admin'), async (c) => {
+webhooks.post('/api/webhooks/interactions/:id/retry', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const access = await requireInteractionAccount(c);
     if ('error' in access) return access.error;
@@ -1609,14 +1601,14 @@ webhooks.post('/api/webhooks/interactions/:id/retry', requireRole('owner', 'admi
     }
     if (code === 'webhook_not_found') return c.json({ success: false, error: code }, 404);
     if (code === 'webhook_inactive' || code === 'payload_unavailable') {
-      return c.json({ success: false, error: code }, 400);
+      return inputError(c, { success: false, error: code }, 400, []);
     }
     console.error('POST /api/webhooks/interactions/:id/retry error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
 
-webhooks.post('/api/webhooks/interactions/retry-failed', requireRole('owner', 'admin'), async (c) => {
+webhooks.post('/api/webhooks/interactions/retry-failed', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const access = await requireInteractionAccount(c);
     if ('error' in access) return access.error;
@@ -1673,7 +1665,7 @@ webhooks.post('/api/webhooks/interactions/retry-failed', requireRole('owner', 'a
  * - 1行ごとに復号照合してから平文を消す。失敗行は残して報告に積む。
  * - 秘密値は要求にも応答にもログにも出さない。件数と成否だけ返す。
  */
-webhooks.post('/api/webhooks/maintenance/secret-backfill', requireRole('owner'), async (c) => {
+webhooks.post('/api/webhooks/maintenance/secret-backfill', requireRole('owner'), inputJsonBoundary({"lineAccountId":["string"],"dryRun":["boolean"]}), async (c) => {
   try {
     // 秘密値の一括補完は鍵・トークンの操作（V）。
     if (!await sensitiveStepUpSatisfied(c, 'webhook.secret')) {
@@ -1683,7 +1675,7 @@ webhooks.post('/api/webhooks/maintenance/secret-backfill', requireRole('owner'),
       lineAccountId?: string; dryRun?: boolean; batchSize?: unknown;
     }>().catch(() => null);
     const lineAccountId = body?.lineAccountId?.trim();
-    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
@@ -1691,7 +1683,7 @@ webhooks.post('/api/webhooks/maintenance/secret-backfill', requireRole('owner'),
     if (body?.batchSize !== undefined) {
       const parsed = Number(body.batchSize);
       if (!Number.isInteger(parsed) || parsed < 1 || parsed > 500) {
-        return c.json({ success: false, error: 'batchSize must be an integer between 1 and 500' }, 400);
+        return inputError(c, { success: false, error: 'batchSize must be an integer between 1 and 500' }, 400, ["batchSize"]);
       }
       batchSize = parsed;
     }
@@ -1703,7 +1695,7 @@ webhooks.post('/api/webhooks/maintenance/secret-backfill', requireRole('owner'),
     });
     return c.json({ success: true, data: report });
   } catch (err) {
-    if (err instanceof FolderAssignmentError) return c.json({ success: false, code: err.code, error: err.message }, 422);
+    if (err instanceof FolderAssignmentError) return inputError(c, { success: false, code: err.code, error: err.message }, 422, ["folderId"]);
     if (isEncryptionKeyError(err)) {
       return c.json({ success: false, error: 'secret の移行に必要な鍵がありません' }, 503);
     }
@@ -1717,7 +1709,7 @@ webhooks.post('/api/webhooks/maintenance/secret-backfill', requireRole('owner'),
 
 // ========== 受信Webhookエンドポイント (外部システムからの受信) ==========
 
-webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
+webhooks.post('/api/webhooks/incoming/:id/receive', inputJsonBoundary(), async (c) => {
   let execution: IncomingWebhookExecution | undefined;
   try {
     const id = c.req.param('id');
@@ -1804,7 +1796,7 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
     const timestampState = receiveTimestampState(c.req.header('X-Webhook-Timestamp'));
     if (timestampState.checked) {
       if (timestampState.timeMs === null) {
-        return c.json({ success: false, error: 'X-Webhook-Timestamp の形式が正しくありません' }, 400);
+        return inputError(c, { success: false, error: 'X-Webhook-Timestamp の形式が正しくありません' }, 400, []);
       }
       const skew = Date.now() - timestampState.timeMs;
       if (skew > RECEIVE_TIMESTAMP_PAST_MS || skew < -RECEIVE_TIMESTAMP_FUTURE_MS) {
@@ -1816,7 +1808,7 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
     try {
       payload = JSON.parse(rawBody);
     } catch {
-      return c.json({ success: false, error: 'Invalid JSON body' }, 400);
+      return inputError(c, { success: false, error: 'Invalid JSON body' }, 400, []);
     }
 
     /*
@@ -2044,7 +2036,7 @@ webhooks.get('/api/webhooks/api-tokens', requireRole('owner', 'admin', 'staff'),
   }
 });
 
-webhooks.post('/api/webhooks/api-tokens', requireRole('owner'), async (c) => {
+webhooks.post('/api/webhooks/api-tokens', requireRole('owner'), inputJsonBoundary(), async (c) => {
   try {
     // 連携APIトークンの発行は鍵・トークンの操作（V）。
     if (!await sensitiveStepUpSatisfied(c, 'webhook.api_token')) {
@@ -2054,17 +2046,17 @@ webhooks.post('/api/webhooks/api-tokens', requireRole('owner'), async (c) => {
       .catch(() => null);
     const name = typeof body?.name === 'string' ? body.name.trim() : '';
     if (!name || name.length > MAX_WEBHOOK_NAME_LENGTH) {
-      return c.json({ success: false, error: `name must be 1-${MAX_WEBHOOK_NAME_LENGTH} characters` }, 400);
+      return inputError(c, { success: false, error: `name must be 1-${MAX_WEBHOOK_NAME_LENGTH} characters` }, 400, ["name"]);
     }
     if (!Array.isArray(body?.scopes) || body.scopes.length === 0
       || body.scopes.some((scope) => !INTEGRATION_API_SCOPES.includes(scope as never))) {
-      return c.json({
+      return inputError(c, {
         success: false,
         error: `scopes must be a non-empty subset of: ${INTEGRATION_API_SCOPES.join(', ')}`,
-      }, 400);
+      }, 400, ["scopes"]);
     }
     const lineAccountId = typeof body?.lineAccountId === 'string' ? body.lineAccountId.trim() : '';
-    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
@@ -2089,10 +2081,10 @@ webhooks.post('/api/webhooks/api-tokens', requireRole('owner'), async (c) => {
   }
 });
 
-webhooks.post('/api/webhooks/api-tokens/:id/revoke', requireRole('owner'), async (c) => {
+webhooks.post('/api/webhooks/api-tokens/:id/revoke', requireRole('owner'), inputJsonBoundary(), async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId')?.trim();
-    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
@@ -2111,10 +2103,10 @@ webhooks.post('/api/webhooks/api-tokens/:id/revoke', requireRole('owner'), async
   }
 });
 
-webhooks.post('/api/webhooks/api-tokens/:id/reactivate', requireRole('owner'), async (c) => {
+webhooks.post('/api/webhooks/api-tokens/:id/reactivate', requireRole('owner'), inputJsonBoundary(), async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId')?.trim();
-    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
@@ -2139,10 +2131,10 @@ webhooks.post('/api/webhooks/api-tokens/:id/reactivate', requireRole('owner'), a
   }
 });
 
-webhooks.post('/api/webhooks/api-tokens/:id/rotate', requireRole('owner'), async (c) => {
+webhooks.post('/api/webhooks/api-tokens/:id/rotate', requireRole('owner'), inputJsonBoundary(), async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId')?.trim();
-    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }

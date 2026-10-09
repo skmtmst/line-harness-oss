@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import type { Env } from '../index.js';
 import type {
@@ -27,13 +28,10 @@ import {
 } from '../services/instagram.js';
 export const instagram = new Hono<Env>();
 instagram.onError((e, c) =>
-  c.json(
-    {
+  inputError(c, {
       success: false,
       error: e instanceof InstagramError ? e.code : 'instagram_failed',
-    },
-    e instanceof InstagramError ? e.status : 500,
-  ),
+    }, e instanceof InstagramError ? e.status : 500),
 );
 type Connection = {
   line_account_id: string;
@@ -136,7 +134,7 @@ instagram.get('/api/instagram/connection', async (c) => {
 instagram.post(
   '/api/instagram/oauth/start',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const id = await account(c),
       cfg = ready(c),
       state = crypto.randomUUID() + crypto.randomUUID(),
@@ -256,7 +254,7 @@ instagram.get(
 instagram.post(
   '/api/instagram/oauth/connect',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const id = await account(c),
       cfg = ready(c),
       b = await c.req
@@ -379,7 +377,7 @@ instagram.post(
 instagram.post(
   '/api/instagram/refresh',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const id = await account(c),
       cfg = ready(c),
       r = await connection(c, id);
@@ -452,7 +450,7 @@ instagram.delete(
 instagram.post(
   '/api/instagram/sync',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const id = await account(c),
       cfg = ready(c),
       r = await connection(c, id);
@@ -563,7 +561,7 @@ instagram.get('/api/instagram/messages', async (c) => {
     },
   });
 });
-instagram.post('/api/instagram/messages/:id/reply', async (c) => {
+instagram.post('/api/instagram/messages/:id/reply', inputJsonBoundary(), async (c) => {
   await account(c);
   return c.json(
     { success: false, error: 'meta_review_required', enabled: false },

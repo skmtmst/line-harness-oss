@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
@@ -423,7 +424,7 @@ staff.get('/api/staff/last-logins', requireRole('owner', 'admin'), async (c) => 
  * 招待メールを送り直す。まだメールを確認していない人だけ。
  * 前の URL は使えなくなり、有効期限は送り直した時点から数え直す。
  */
-staff.post('/api/staff/:id/resend-invite', requireRole('owner', 'admin'), async (c) => {
+staff.post('/api/staff/:id/resend-invite', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const member = await getStaffById(c.env.DB, id);
@@ -464,7 +465,7 @@ staff.get('/api/staff/:id', requireRole('owner', 'admin', 'staff'), async (c) =>
     : c.json({ success: false, error: 'Staff member not found' }, 404);
 });
 
-staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
+staff.post('/api/staff', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"email":["string"],"role":["string"],"permissionKeys":["array"],"notificationPreferences":["object"],"assignedLineAccountId":["null","string"],"canAccessDescendantAccounts":["boolean"],"accountScope":["string"],"scopedLineAccountIds":["array"],"managementContext":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       name?: string; email?: string; role?: 'admin' | 'staff' | 'viewer'; permissionKeys?: string[];
@@ -474,18 +475,18 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
       accountScope?: 'all' | 'accounts'; scopedLineAccountIds?: string[]; managementContext?: 'hq';
     }>();
     const keyError = invalidPermissionKeys(body.permissionKeys) ?? invalidNotificationPreferences(body.notificationPreferences);
-    if (keyError) return c.json({ success: false, error: keyError }, 400);
+    if (keyError) return inputError(c, { success: false, error: keyError }, 400, ["permissionKeys","notificationPreferences"]);
     const accountScope = normalizeAccountScopeInput(body);
-    if ('error' in accountScope) return c.json({ success: false, error: accountScope.error }, 400);
-    if (accountScope.accountScope === undefined) return c.json({ success: false, error: '担当範囲を選んでください' }, 400);
+    if ('error' in accountScope) return inputError(c, { success: false, error: accountScope.error }, 400, ["accountScope","scopedLineAccountIds"]);
+    if (accountScope.accountScope === undefined) return inputError(c, { success: false, error: '担当範囲を選んでください' }, 400, ["accountScope","scopedLineAccountIds"]);
     const name = body.name?.trim();
     const email = body.email?.trim().toLowerCase();
-    if (!name) return c.json({ success: false, error: '名前を入力してください' }, 400);
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return c.json({ success: false, error: '正しいメールアドレスを入力してください' }, 400);
-    if (emailTooLong(email)) return c.json({ success: false, error: 'メールアドレスは254文字以内で入力してください' }, 400);
-    if (!body.role || !['admin', 'staff', 'viewer'].includes(body.role)) return c.json({ success: false, error: '役割を選択してください' }, 400);
+    if (!name) return inputError(c, { success: false, error: '名前を入力してください' }, 400, ["name"]);
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return inputError(c, { success: false, error: '正しいメールアドレスを入力してください' }, 400, ["email"]);
+    if (emailTooLong(email)) return inputError(c, { success: false, error: 'メールアドレスは254文字以内で入力してください' }, 400, ["email"]);
+    if (!body.role || !['admin', 'staff', 'viewer'].includes(body.role)) return inputError(c, { success: false, error: '役割を選択してください' }, 400, ["role"]);
     if (!body.assignedLineAccountId) {
-      return c.json({ success: false, error: '担当するLINEアカウントを選択してください' }, 400);
+      return inputError(c, { success: false, error: '担当するLINEアカウントを選択してください' }, 400, ["assignedLineAccountId"]);
     }
     const visibleAccounts = (await getVisibleLineAccountScope(c.env.DB, c.get('staff'))).accounts;
     if (!visibleAccounts.some((account) => account.id === body.assignedLineAccountId)) {
@@ -580,11 +581,11 @@ staff.get('/api/staff/invitations/:token/verify', async (c) => {
   return c.redirect(invitationConfirmationUrl(c, token), 302);
 });
 
-staff.post('/api/staff/invitations/confirm/verify', async (c) => {
+staff.post('/api/staff/invitations/confirm/verify', inputJsonBoundary({"token":["string"]}), async (c) => {
   const body = await c.req.json<{ token?: string }>().catch(() => ({} as { token?: string }));
   const token = body.token?.trim() ?? '';
   if (!token || token.length > 512) {
-    return c.json({ success: false, error: '招待情報が正しくありません' }, 400);
+    return inputError(c, { success: false, error: '招待情報が正しくありません' }, 400, ["token"]);
   }
   const member = await getStaffByInviteTokenHash(c.env.DB, await sha256Hex(token));
   if (!member || !member.email || !member.invite_expires_at || Date.parse(member.invite_expires_at) < Date.now()) {
@@ -607,7 +608,7 @@ staff.post('/api/staff/invitations/confirm/verify', async (c) => {
  * 生き残るのは最後に発行した1つだけ。旧リンクの受諾は410で再発行を案内する。
  * 自動再送はしない(要件 v6-30 §9-2)。管理者が対象を確かめて押す運用にする。
  */
-staff.post('/api/staff/:id/resend-invitation', requireRole('owner', 'admin'), async (c) => {
+staff.post('/api/staff/:id/resend-invitation', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const id = c.req.param('id');
   const target = await getStaffById(c.env.DB, id);
   if (!target || !isInCurrentTenant(c, target)) return c.json({ success: false, error: 'Staff member not found' }, 404);
@@ -615,7 +616,7 @@ staff.post('/api/staff/:id/resend-invitation', requireRole('owner', 'admin'), as
     return c.json({ success: false, error: 'このユーザーはすでに利用を開始しています。招待の再送はできません。' }, 409);
   }
   if (!target.email) {
-    return c.json({ success: false, error: 'メールアドレスがないため招待を再送できません。' }, 400);
+    return inputError(c, { success: false, error: 'メールアドレスがないため招待を再送できません。' }, 400, []);
   }
   try {
     const token = randomToken();
@@ -672,26 +673,26 @@ export async function updateStaffPolicy(c: Context<Env>, id: string, body: Staff
   }
   const expectedPolicyVersion = parseExpectedPolicyVersion(body.expectedPolicyVersion);
   if (expectedPolicyVersion === null) {
-    return c.json({ success: false, error: '保存の版の形式が正しくありません' }, 400);
+    return inputError(c, { success: false, error: '保存の版の形式が正しくありません' }, 400, ["expectedPolicyVersion"]);
   }
   const keyError = invalidPermissionKeys(body.permissionKeys)
     ?? invalidPermissionKeys(body.permissionViewKeys)
     ?? invalidNotificationPreferences(body.notificationPreferences);
-  if (keyError) return c.json({ success: false, error: keyError }, 400);
+  if (keyError) return inputError(c, { success: false, error: keyError }, 400, ["permissionKeys","permissionViewKeys","notificationPreferences"]);
   const bundle = body.roleBundle === undefined ? undefined : parseRoleBundle(body.roleBundle);
   if (body.roleBundle !== undefined && !bundle) {
-    return c.json({ success: false, error: '役割バンドルが正しくありません' }, 400);
+    return inputError(c, { success: false, error: '役割バンドルが正しくありません' }, 400, ["roleBundle"]);
   }
   const scope = parseScope(body.permissionScope);
   if (scope === null) {
-    return c.json({ success: false, error: '機能の権限範囲が正しくありません' }, 400);
+    return inputError(c, { success: false, error: '機能の権限範囲が正しくありません' }, 400, ["permissionScope"]);
   }
   const emailMask = parseEmailMask(body.emailMask);
   if (emailMask === null) {
-    return c.json({ success: false, error: 'メールの見せ方が正しくありません' }, 400);
+    return inputError(c, { success: false, error: 'メールの見せ方が正しくありません' }, 400, ["emailMask"]);
   }
   const accountScope = normalizeAccountScopeInput(body);
-  if ('error' in accountScope) return c.json({ success: false, error: accountScope.error }, 400);
+  if ('error' in accountScope) return inputError(c, { success: false, error: accountScope.error }, 400, ["accountScope","scopedLineAccountIds"]);
 
   const target = await getStaffById(c.env.DB, id);
   if (!target || !isInCurrentTenant(c, target)) return c.json({ success: false, error: 'Staff member not found' }, 404);
@@ -713,10 +714,10 @@ export async function updateStaffPolicy(c: Context<Env>, id: string, body: Staff
   if (body.email !== undefined && body.email !== null) {
     const email = body.email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return c.json({ success: false, error: '正しいメールアドレスを入力してください' }, 400);
+      return inputError(c, { success: false, error: '正しいメールアドレスを入力してください' }, 400, ["email"]);
     }
     if (emailTooLong(email)) {
-      return c.json({ success: false, error: 'メールアドレスは254文字以内で入力してください' }, 400);
+      return inputError(c, { success: false, error: 'メールアドレスは254文字以内で入力してください' }, 400, ["email"]);
     }
     const duplicate = (await getStaffMembers(c.env.DB, currentTenantId(c))).some((member) => member.id !== id && member.email?.toLowerCase() === email);
     if (duplicate) return c.json({ success: false, error: 'このメールアドレスは登録済みです' }, 409);
@@ -724,7 +725,7 @@ export async function updateStaffPolicy(c: Context<Env>, id: string, body: Staff
   }
   if (body.email === null && id === current.id) {
     // 自分のメールを空にすると連絡口と確認口の両方が消えるので、本人からの空書き込みは受けない。
-    return c.json({ success: false, error: '自分のメールアドレスは空にできません' }, 400);
+    return inputError(c, { success: false, error: '自分のメールアドレスは空にできません' }, 400, ["email"]);
   }
 
   /*
@@ -750,11 +751,11 @@ export async function updateStaffPolicy(c: Context<Env>, id: string, body: Staff
     role: effectiveRole,
     self: id === c.get('staff').id,
   });
-  if (guard) return c.json({ success: false, error: guard }, 400);
+  if (guard) return inputError(c, { success: false, error: guard }, 400, ["isActive","roleBundle","role"]);
 
   if (administrator && body.assignedLineAccountId !== undefined) {
     if (!body.assignedLineAccountId) {
-      return c.json({ success: false, error: '担当するLINEアカウントを選択してください' }, 400);
+      return inputError(c, { success: false, error: '担当するLINEアカウントを選択してください' }, 400, ["assignedLineAccountId"]);
     }
     const visibleAccounts = (await getVisibleLineAccountScope(c.env.DB, current)).accounts;
     if (!visibleAccounts.some((account) => account.id === body.assignedLineAccountId)) {
@@ -798,7 +799,7 @@ export async function updateStaffPolicy(c: Context<Env>, id: string, body: Staff
     const receipt = await getStaffPermissionReceipt(c.env.DB, id, idempotencyKey);
     if (receipt) {
       if (receipt.request_hash !== requestHash) {
-        return c.json({ success: false, error: '同じ要求キーで内容が異なる保存は受け付けません' }, 422);
+        return inputError(c, { success: false, error: '同じ要求キーで内容が異なる保存は受け付けません' }, 422, ["idempotencyKey","name","email","role","isActive","lineLinked","permissionKeys","notificationPreferences","assignedLineAccountId","canAccessDescendantAccounts","accountScope","scopedLineAccountIds","roleBundle","permissionScope","permissionViewKeys","emailMask","expectedPolicyVersion"]);
       }
       return c.json(JSON.parse(receipt.result) as { success: boolean; data: unknown });
     }
@@ -986,7 +987,7 @@ export async function updateStaffPolicy(c: Context<Env>, id: string, body: Staff
   return c.json(payload);
 }
 
-staff.patch('/api/staff/:id', async c => updateStaffPolicy(c, c.req.param('id'), await c.req.json<StaffPolicyInput>()));
+staff.patch('/api/staff/:id', inputJsonBoundary({"name":["string"],"email":["null","string"],"role":["string"],"isActive":["boolean"],"lineLinked":["boolean"],"permissionKeys":["array"],"notificationPreferences":["object"],"assignedLineAccountId":["null","string"],"canAccessDescendantAccounts":["boolean"],"accountScope":["string"],"scopedLineAccountIds":["array"],"managementContext":["string"],"roleBundle":["string"],"permissionScope":["object"],"permissionViewKeys":["array"],"emailMask":["string"],"idempotencyKey":["string"],"expectedPolicyVersion":["number"]}), async c => updateStaffPolicy(c, c.req.param('id'), await c.req.json<StaffPolicyInput>()));
 
 /*
  * N-433: メール変更の確定。メール内リンクは fragment にトークンを乗せて
@@ -994,12 +995,12 @@ staff.patch('/api/staff/:id', async c => updateStaffPolicy(c, c.req.param('id'),
  * POST だけが行う。GET だけでは確定しないので、メールの先読みで勝手に
  * 変わることはない。
  */
-staff.post('/api/staff/email-change/confirm', async (c) => {
+staff.post('/api/staff/email-change/confirm', inputJsonBoundary({"token":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{ token?: string }>().catch(() => ({} as { token?: string }));
     const token = body.token?.trim() ?? '';
     if (!token || token.length > 512) {
-      return c.json({ success: false, error: '確認情報が正しくありません' }, 400);
+      return inputError(c, { success: false, error: '確認情報が正しくありません' }, 400, ["token"]);
     }
     const member = await getStaffByEmailChangeTokenHash(c.env.DB, await sha256Hex(token));
     if (!member || !member.email_change_new || !member.email_change_expires_at || Date.parse(member.email_change_expires_at) < Date.now()) {
@@ -1048,7 +1049,7 @@ function totpMasterKey(c: { env: Env['Bindings'] }): string | null {
   return c.env.TOTP_ENCRYPTION_KEY?.trim() || null;
 }
 
-staff.post('/api/staff/:id/two-factor/setup', async (c) => {
+staff.post('/api/staff/:id/two-factor/setup', inputJsonBoundary(), async (c) => {
   const id = c.req.param('id');
   const member = await getStaffById(c.env.DB, id);
   if (!member || !isInCurrentTenant(c, member)) return c.json({ success: false, error: 'Staff member not found' }, 404);
@@ -1069,24 +1070,21 @@ staff.post('/api/staff/:id/two-factor/setup', async (c) => {
   });
 });
 
-staff.post('/api/staff/:id/two-factor/confirm', async (c) => {
+staff.post('/api/staff/:id/two-factor/confirm', inputJsonBoundary({"code":["string"]}), async (c) => {
   const id = c.req.param('id');
   const member = await getStaffById(c.env.DB, id);
   if (!member || !isInCurrentTenant(c, member)) return c.json({ success: false, error: 'Staff member not found' }, 404);
   if (c.get('staff').id !== id) return c.json({ success: false, error: '自分の二段階認証だけ設定できます' }, 403);
   const key = totpMasterKey(c);
   if (!key) return c.json({ success: false, error: '二段階認証の暗号鍵が設定されていません' }, 503);
-  if (!member?.totp_pending_secret_enc) return c.json({ success: false, error: '先にQRコードを表示してください' }, 400);
+  if (!member?.totp_pending_secret_enc) return inputError(c, { success: false, error: '先にQRコードを表示してください' }, 400, []);
   const body = await c.req.json<{ code?: string }>().catch(() => ({} as { code?: string }));
   const attempt = await reserveTwoFactorSetupAttempt(c.env.DB, id);
   if (!attempt) return c.json({ success: false, error: TWO_FACTOR_ATTEMPT_LIMIT_ERROR }, 429);
   const encrypted = member.totp_pending_secret_enc;
   const result = await verifyTotp(await decryptTotpSecret(encrypted, key), body.code ?? '');
   if (!result.valid) {
-    return c.json(
-      { success: false, error: attempt.attempts >= attempt.maxAttempts ? TWO_FACTOR_ATTEMPT_LIMIT_ERROR : '認証コードが正しくありません' },
-      attempt.attempts >= attempt.maxAttempts ? 429 : 400,
-    );
+    return inputError(c, { success: false, error: attempt.attempts >= attempt.maxAttempts ? TWO_FACTOR_ATTEMPT_LIMIT_ERROR : '認証コードが正しくありません' }, attempt.attempts >= attempt.maxAttempts ? 429 : 400, []);
   }
   const updated = await updateStaffMember(c.env.DB, id, {
     totp_secret_enc: encrypted,

@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
   countBroken,
@@ -44,7 +45,7 @@ function serialize(row: Awaited<ReturnType<typeof getManualLink>>) {
 }
 
 async function lookup(c: AppContext, key: string | undefined) {
-  if (!key) return c.json({ success: false, error: 'screen が要ります', code: 'INVALID_INPUT' }, 400);
+  if (!key) return inputError(c, { success: false, error: 'screen が要ります', code: 'INVALID_INPUT' }, 400, []);
   const row = await getManualLink(c.env.DB, key);
   const screenRow = row?.key_kind === 'screen' ? row : null;
   return c.json({
@@ -107,22 +108,22 @@ async function update(c: AppContext, pathKey?: string) {
     const body = await c.req.json<UpdateBody>();
     const key = pathKey ?? body.key;
     if (!key || !/^[A-Za-z0-9_-]{1,80}$/.test(key)) {
-      return c.json({ success: false, error: '画面IDまたは作業IDを確認してください', code: 'INVALID_INPUT' }, 400);
+      return inputError(c, { success: false, error: '画面IDまたは作業IDを確認してください', code: 'INVALID_INPUT' }, 400, ["key"]);
     }
     if (!Number.isInteger(body.expectedVersion) || body.expectedVersion! < 0) {
-      return c.json({ success: false, error: 'expectedVersion が要ります', code: 'INVALID_INPUT' }, 400);
+      return inputError(c, { success: false, error: 'expectedVersion が要ります', code: 'INVALID_INPUT' }, 400, ["expectedVersion"]);
     }
     const existing = await getManualLink(c.env.DB, key);
     const name = body.name ?? existing?.name;
-    if (!name) return c.json({ success: false, error: '画面名が要ります' }, 400);
+    if (!name) return inputError(c, { success: false, error: '画面名が要ります' }, 400, ["name","key"]);
     const keyKind = body.keyKind ?? existing?.key_kind ?? 'screen';
     if (body.url !== undefined && body.url !== null && body.url !== '') {
       if (!isSafePublicHttpsUrl(body.url)) {
-        return c.json({
+        return inputError(c, {
           success: false,
           error: '公開された安全な https URL を指定してください',
           code: 'UNSAFE_URL',
-        }, 422);
+        }, 422, ["url"]);
       }
     }
     const row = await upsertManualLink(c.env.DB, {
@@ -147,8 +148,8 @@ async function update(c: AppContext, pathKey?: string) {
   }
 }
 
-manualLinks.put('/api/manual-links', requireRole('owner', 'admin', 'staff'), (c) => update(c));
-manualLinks.put('/api/manual-links/:key', requireRole('owner', 'admin', 'staff'), (c) =>
+manualLinks.put('/api/manual-links', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), (c) => update(c));
+manualLinks.put('/api/manual-links/:key', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), (c) =>
   update(c, c.req.param('key')));
 
 /**
@@ -157,7 +158,7 @@ manualLinks.put('/api/manual-links/:key', requireRole('owner', 'admin', 'staff')
  * **開けたかどうかを、確かめて初めて言う。** URL が入っているだけでは
  * 「開けます」と書かない。読めなかったものは `broken` にして手がかりを残す。
  */
-manualLinks.post('/api/manual-links/check', requireRole('owner', 'admin', 'staff'), async (c) => {
+manualLinks.post('/api/manual-links/check', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   try {
     if (!canOperate(c)) return forbidden(c);
     const result = await checkAllManualLinks(c.env.DB, {

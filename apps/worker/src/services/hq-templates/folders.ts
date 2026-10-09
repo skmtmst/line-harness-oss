@@ -11,7 +11,7 @@ export async function listTemplateFolders(db: D1Database, auth: HqTemplateAuthor
 }
 export async function saveTemplateFolder(db: D1Database, auth: HqTemplateAuthority, input: Record<string, unknown>, id?: string) {
   if (input.color !== undefined && !isFolderSelectColor(input.color)) throw new HqTemplateError('INVALID_FOLDER_COLOR', 422);
-  const name = boundedText(input.name, 100), folderId = id ?? crypto.randomUUID();
+  const name = boundedText(input.name, 100, 'name'), folderId = id ?? crypto.randomUUID();
   if (id) {
     const current = await db.prepare('SELECT revision FROM hq_template_folders WHERE id=? AND tenant_id=? AND archived_at IS NULL').bind(id, auth.tenantId).first<{revision:number}>();
     if (!current) throw new HqTemplateError('NOT_FOUND', 404);
@@ -41,6 +41,6 @@ export async function deleteTemplateFolder(db: D1Database, auth: HqTemplateAutho
 export async function duplicateTemplate(db: D1Database, auth: HqTemplateAuthority, id: string, input: Record<string, unknown>) {
   const original = await templateDetail(db,auth,id);
   if (!Number.isSafeInteger(input.expectedRevision) || input.expectedRevision !== original.template.revision) throw new HqTemplateError('VERSION_CONFLICT',409);
-  return saveTemplate(db,auth,{ type:original.template.template_type, name:boundedText(input.name), description:original.template.description,
+  return saveTemplate(db,auth,{ type:original.template.template_type, name:boundedText(input.name, 200, 'name'), description:original.template.description,
     definition:original.definition, folderId:original.template.folder_id, requestId:templateCreationRequestId(input.requestId) });
 }

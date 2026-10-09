@@ -1,3 +1,5 @@
+import type { ApiFieldErrors } from './api-field-errors.js';
+
 // =============================================================================
 // LINE OSS CRM - 共有型定義
 // Cloudflare D1 の挙動:
@@ -1938,6 +1940,8 @@ export type ApiResponse<T> =
   | {
       success: false;
       error: string;
+      /** 入力欄の名前と、人に表示する理由。旧APIでは省略される。 */
+      fields?: ApiFieldErrors;
       /** バリデーションエラー等の詳細 (任意) */
       details?: Record<string, string[]>;
     };

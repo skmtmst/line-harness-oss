@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
@@ -198,7 +199,7 @@ ops.get('/api/ops/tenants/:id', async (c) => {
   });
 });
 
-ops.patch('/api/ops/tenants/:id/status', requirePlatformAdminWrite(), async (c) => {
+ops.patch('/api/ops/tenants/:id/status', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   const db = dbFor(c.env);
   const tenant = await tenantById(c, c.req.param('id'));
@@ -206,13 +207,13 @@ ops.patch('/api/ops/tenants/:id/status', requirePlatformAdminWrite(), async (c) 
   const body = await c.req.json<{ status?: unknown; reason?: unknown; confirmName?: unknown }>().catch(() => null);
   const status = body?.status;
   if (typeof status !== 'string' || !TENANT_STATUSES.has(status as TenantStatus)) {
-    return c.json({ success: false, error: '利用できない状態です' }, 400);
+    return inputError(c, { success: false, error: '利用できない状態です' }, 400, ["status"]);
   }
   const reason = reasonFrom(body);
-  if (!reason) return c.json({ success: false, error: '理由を4文字以上で入力してください' }, 400);
+  if (!reason) return inputError(c, { success: false, error: '理由を4文字以上で入力してください' }, 400, ["reason"]);
   // 停止・アーカイブは契約先の名前を手で入力させる（要件 §3 37-4）。
   if (status !== 'active' && body?.confirmName !== tenant.name) {
-    return c.json({ success: false, error: '確認のため、契約先の名前をそのまま入力してください' }, 400);
+    return inputError(c, { success: false, error: '確認のため、契約先の名前をそのまま入力してください' }, 400, ["status","confirmName"]);
   }
   await db
     .prepare(`UPDATE tenants SET status = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours') WHERE id = ?`)
@@ -238,7 +239,7 @@ ops.patch('/api/ops/tenants/:id/status', requirePlatformAdminWrite(), async (c) 
  * 停止・アーカイブと違い破壊的ではないため、確認ダイアログや理由入力は
  * 求めない（member.activate と同じ即時トグル）。監査だけは自動で残す。
  */
-ops.patch('/api/ops/tenants/:id/feature-packs', requirePlatformAdminWrite(), async (c) => {
+ops.patch('/api/ops/tenants/:id/feature-packs', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   const db = dbFor(c.env);
   const tenant = await tenantById(c, c.req.param('id'));
@@ -246,7 +247,7 @@ ops.patch('/api/ops/tenants/:id/feature-packs', requirePlatformAdminWrite(), asy
   const body = await c.req.json<{ featurePacks?: unknown }>().catch(() => null);
   const featurePacks = parseFeaturePacks(body?.featurePacks);
   if (!featurePacks) {
-    return c.json({ success: false, error: '利用できない機能パックが含まれています' }, 400);
+    return inputError(c, { success: false, error: '利用できない機能パックが含まれています' }, 400, ["featurePacks"]);
   }
   await db
     .prepare(`UPDATE tenants SET feature_packs = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours') WHERE id = ?`)
@@ -280,7 +281,7 @@ ops.get('/api/ops/impersonation/current', async (c) => {
   });
 });
 
-ops.post('/api/ops/impersonation/start', requirePlatformAdminWrite(), async (c) => {
+ops.post('/api/ops/impersonation/start', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   const db = dbFor(c.env);
   const body = await c.req.json<{ tenantId?: unknown }>().catch(() => null);
@@ -288,7 +289,7 @@ ops.post('/api/ops/impersonation/start', requirePlatformAdminWrite(), async (c) 
   const tenant = tenantId ? await tenantById(c, tenantId) : null;
   if (!tenant) return c.json({ success: false, error: '契約先が見つかりません' }, 404);
   if (tenant.status === 'archived') {
-    return c.json({ success: false, error: 'アーカイブ済みの契約先には入れません' }, 400);
+    return inputError(c, { success: false, error: 'アーカイブ済みの契約先には入れません' }, 400, ["tenantId"]);
   }
   const session = await startImpersonation(db, { staffId: staff.id, tenantId: tenant.id });
   // 閲覧だけの代理ログインは契約先には見せない（要件 §3 37-5）。運営側の記録にだけ残す。
@@ -305,14 +306,14 @@ ops.post('/api/ops/impersonation/start', requirePlatformAdminWrite(), async (c) 
   return c.json({ success: true, data: { ...toImpersonationContext(session), tenantName: tenant.name } });
 });
 
-ops.post('/api/ops/impersonation/write', requirePlatformAdminWrite(), async (c) => {
+ops.post('/api/ops/impersonation/write', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   const db = dbFor(c.env);
   const session = await getActiveImpersonation(db, staff.id);
-  if (!session) return c.json({ success: false, error: '代理ログイン中ではありません' }, 400);
+  if (!session) return inputError(c, { success: false, error: '代理ログイン中ではありません' }, 400, []);
   const body = await c.req.json().catch(() => null);
   const reason = reasonFrom(body);
-  if (!reason) return c.json({ success: false, error: '理由を4文字以上で入力してください' }, 400);
+  if (!reason) return inputError(c, { success: false, error: '理由を4文字以上で入力してください' }, 400, ["reason"]);
   await switchImpersonationToWrite(db, session.id, reason);
   const tenant = await tenantById(c, session.tenant_id);
   // 書き込みに切り替えたら、契約先の画面にも履歴を残す（要件 §3 37-5）。
@@ -330,23 +331,23 @@ ops.post('/api/ops/impersonation/write', requirePlatformAdminWrite(), async (c) 
   return c.json({ success: true, data: { ...toImpersonationContext({ ...session, mode: 'write', write_reason: reason }), tenantName: tenant?.name ?? null } });
 });
 
-ops.post('/api/ops/impersonation/read', requirePlatformAdminWrite(), async (c) => {
+ops.post('/api/ops/impersonation/read', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   const db = dbFor(c.env);
   const session = await getActiveImpersonation(db, staff.id);
-  if (!session) return c.json({ success: false, error: '代理ログイン中ではありません' }, 400);
+  if (!session) return inputError(c, { success: false, error: '代理ログイン中ではありません' }, 400, []);
   await switchImpersonationToRead(db, session.id);
   return c.json({ success: true, data: toImpersonationContext({ ...session, mode: 'read' }) });
 });
 
-ops.post('/api/ops/impersonation/pii-reveal', requirePlatformAdminWrite(), async (c) => {
+ops.post('/api/ops/impersonation/pii-reveal', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   const db = dbFor(c.env);
   const session = await getActiveImpersonation(db, staff.id);
-  if (!session) return c.json({ success: false, error: '代理ログイン中ではありません' }, 400);
+  if (!session) return inputError(c, { success: false, error: '代理ログイン中ではありません' }, 400, []);
   const body = await c.req.json().catch(() => null);
   const reason = reasonFrom(body);
-  if (!reason) return c.json({ success: false, error: '理由を4文字以上で入力してください' }, 400);
+  if (!reason) return inputError(c, { success: false, error: '理由を4文字以上で入力してください' }, 400, ["reason"]);
   await revealPiiForImpersonation(db, {
     impersonationSessionId: session.id,
     staffId: staff.id,
@@ -368,7 +369,7 @@ ops.post('/api/ops/impersonation/pii-reveal', requirePlatformAdminWrite(), async
   return c.json({ success: true, data: toImpersonationContext({ ...session, pii_revealed: 1 }) });
 });
 
-ops.post('/api/ops/impersonation/end', requirePlatformAdminWrite(), async (c) => {
+ops.post('/api/ops/impersonation/end', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   const db = dbFor(c.env);
   const session = await getActiveImpersonation(db, staff.id);
@@ -462,7 +463,7 @@ ops.get('/api/ops/members', async (c) => {
  * - 自分自身は加えられない。例外は最初の 1 人だけ（platform_admins が空の間の互換判定で
  *   入っている人が自分を登録して初期化する。要件 §6-2「登録 → 確認 → 旧判定を外す」）
  */
-ops.post('/api/ops/members', requirePlatformAdminWrite(), async (c) => {
+ops.post('/api/ops/members', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   const db = dbFor(c.env);
   const body = await c.req.json<{ staffId?: unknown; email?: unknown }>().catch(() => null);
@@ -474,7 +475,7 @@ ops.post('/api/ops/members', requirePlatformAdminWrite(), async (c) => {
   const isSelfEmail = Boolean(email) && (selfRow?.email ?? '').toLowerCase() === email;
   if (selfBootstrap || isSelfEmail) {
     if ((await countActivePlatformAdmins(db)) > 0) {
-      return c.json({ success: false, error: '自分自身を運営メンバーに加えることはできません。ほかの運営メンバーに依頼してください' }, 400);
+      return inputError(c, { success: false, error: '自分自身を運営メンバーに加えることはできません。ほかの運営メンバーに依頼してください' }, 400, []);
     }
     await createPlatformAdmin(db, { staffId: staff.id, approvedBy: null });
     await recordPlatformAudit(db, {
@@ -485,7 +486,7 @@ ops.post('/api/ops/members', requirePlatformAdminWrite(), async (c) => {
   }
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return c.json({ success: false, error: '正しいメールアドレスを入力してください' }, 400);
+    return inputError(c, { success: false, error: '正しいメールアドレスを入力してください' }, 400, ["email"]);
   }
 
   // 同じメールの権限者を探す（統括を問わず）。
@@ -545,14 +546,14 @@ ops.post('/api/ops/members', requirePlatformAdminWrite(), async (c) => {
 });
 
 /** 招待メールを送り直す（招待中・2要素認証待ちの人だけ）。 */
-ops.post('/api/ops/members/:staffId/resend-invite', requirePlatformAdminWrite(), async (c) => {
+ops.post('/api/ops/members/:staffId/resend-invite', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   const db = dbFor(c.env);
   const targetId = c.req.param('staffId');
   const target = await getStaffById(db, targetId);
   const record = await getPlatformAdminRecord(db, targetId);
   if (!target?.email || !record || record.is_active !== 1) return c.json({ success: false, error: '対象の招待が見つかりません' }, 404);
-  if (record.activation_state === 'active') return c.json({ success: false, error: 'この人は登録が完了しています' }, 400);
+  if (record.activation_state === 'active') return inputError(c, { success: false, error: 'この人は登録が完了しています' }, 400, []);
   const token = randomToken();
   const expiresAt = new Date(Date.now() + OPS_INVITE_TTL_MS).toISOString();
   await upsertPlatformAdminInvite(db, { staffId: targetId, invitedBy: staff.id, tokenHash: await sha256Hex(token), email: target.email, expiresAt });
@@ -570,16 +571,16 @@ ops.post('/api/ops/members/:staffId/resend-invite', requirePlatformAdminWrite(),
   return c.json({ success: true, data: { staffId: targetId, activationState: 'invited' } });
 });
 
-ops.patch('/api/ops/members/:staffId', requirePlatformAdminWrite(), async (c) => {
+ops.patch('/api/ops/members/:staffId', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   const db = dbFor(c.env);
   const targetId = c.req.param('staffId');
   const body = await c.req.json<{ isActive?: unknown }>().catch(() => null);
-  if (typeof body?.isActive !== 'boolean') return c.json({ success: false, error: 'isActive を指定してください' }, 400);
-  if (targetId === staff.id) return c.json({ success: false, error: '自分自身の運営権限は変えられません' }, 400);
+  if (typeof body?.isActive !== 'boolean') return inputError(c, { success: false, error: 'isActive を指定してください' }, 400, ["isActive"]);
+  if (targetId === staff.id) return inputError(c, { success: false, error: '自分自身の運営権限は変えられません' }, 400, []);
   if (!body.isActive) {
     const active = await countActivePlatformAdmins(db);
-    if (active <= 1) return c.json({ success: false, error: '最後の運営メンバーは停止できません' }, 400);
+    if (active <= 1) return inputError(c, { success: false, error: '最後の運営メンバーは停止できません' }, 400, []);
   }
   const target = await getStaffById(db, targetId);
   if (!target) return c.json({ success: false, error: '対象の権限者が見つかりません' }, 404);

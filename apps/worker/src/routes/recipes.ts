@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
   cloneCounts,
@@ -300,7 +301,7 @@ recipes.get('/api/recipes', requireRole('owner', 'admin', 'staff'), async (c) =>
  * 組織レシピを作る（§7-5）。`recipe.definition.create` を持つ
  * owner/admin だけ。**レシピは静的な見本**——ここでは定義を作らない。
  */
-recipes.post('/api/recipes', requireRole('owner', 'admin'), async (c) => {
+recipes.post('/api/recipes', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"purpose":["string"],"createsSummary":["string"],"requiredFeatures":["array"],"items":["null","array"],"accountId":["string"]}), async (c) => {
   try {
     const staff = c.get('staff');
     const body = await c.req.json<{
@@ -316,17 +317,17 @@ recipes.post('/api/recipes', requireRole('owner', 'admin'), async (c) => {
     const createsSummary = body.createsSummary?.trim();
     const accountId = body.accountId;
     if (!name || !purpose || !createsSummary || !accountId) {
-      return c.json({
+      return inputError(c, {
         success: false,
         error: '名前・目的・作られるものの説明・対象アカウントが要ります',
         code: 'INVALID_INPUT',
-      }, 400);
+      }, 400, ["name","purpose","createsSummary","accountId"]);
     }
     if (!(await canAccessAllLineAccounts(c.env.DB, staff, [accountId]))) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
     if (body.items != null && !Array.isArray(body.items)) {
-      return c.json({ success: false, error: 'items は配列で渡してください', code: 'INVALID_INPUT' }, 400);
+      return inputError(c, { success: false, error: 'items は配列で渡してください', code: 'INVALID_INPUT' }, 400, ["items"]);
     }
     const recipe = await createRecipe(c.env.DB, {
       name,
@@ -369,11 +370,11 @@ recipes.get('/api/recipes/:id', requireRole('owner', 'admin', 'staff'), async (c
  * **冪等キーが要る。** 同じキーで2回呼ばれても2回作らない。
  * 押し直しや再送で、下書きが二重にできるのを防ぐ。
  */
-recipes.post('/api/recipes/:id/clone', requireRole('owner', 'admin', 'staff'), async (c) => {
+recipes.post('/api/recipes/:id/clone', requireRole('owner', 'admin', 'staff'), inputJsonBoundary({"accountId":["string"],"namePrefix":["null","string"],"expectedVersion":["number"]}), async (c) => {
   try {
     const idempotencyKey = c.req.header('Idempotency-Key');
     if (!idempotencyKey || idempotencyKey.length > 128) {
-      return c.json({ success: false, error: 'Idempotency-Key が要ります', code: 'INVALID_INPUT' }, 400);
+      return inputError(c, { success: false, error: 'Idempotency-Key が要ります', code: 'INVALID_INPUT' }, 400, []);
     }
     const body = await c.req.json<{
       accountId?: string;
@@ -381,7 +382,7 @@ recipes.post('/api/recipes/:id/clone', requireRole('owner', 'admin', 'staff'), a
       expectedVersion?: number;
     }>();
     if (!body.accountId || !Number.isInteger(body.expectedVersion)) {
-      return c.json({ success: false, error: 'accountId が要ります' }, 400);
+      return inputError(c, { success: false, error: 'accountId が要ります' }, 400, ["accountId","expectedVersion"]);
     }
     /*
       **組織レシピは持ち主のアカウントへだけ複製できる**（§7-5）。
@@ -435,10 +436,7 @@ recipes.post('/api/recipes/:id/clone', requireRole('owner', 'admin', 'staff'), a
     const features = await readFeatures(c.env.DB, body.accountId);
     const missing = missingFeatures(parseFeatures(recipe), features);
     if (missing.length > 0) {
-      return c.json(
-        { success: false, error: `${missing.join('と')}がオフです。機能設定でオンにしてください`, missingFeatures: missing },
-        422,
-      );
+      return inputError(c, { success: false, error: `${missing.join('と')}がオフです。機能設定でオンにしてください`, missingFeatures: missing }, 422, ["accountId"]);
     }
 
     /*
@@ -447,27 +445,24 @@ recipes.post('/api/recipes/:id/clone', requireRole('owner', 'admin', 'staff'), a
     */
     const items = parseItems(recipe);
     if (!items || items.length === 0) {
-      return c.json(
-        { success: false, error: '作られるものの内訳が、まだ決まっていません' },
-        422,
-      );
+      return inputError(c, { success: false, error: '作られるものの内訳が、まだ決まっていません' }, 422, ["accountId"]);
     }
     if (recipe.item_count !== null && recipe.item_count !== items.length) {
-      return c.json({
+      return inputError(c, {
         success: false,
         error: '作られるものの内訳が、まだ全部そろっていません',
         code: 'RECIPE_ITEMS_INCOMPLETE',
-      }, 422);
+      }, 422, ["accountId"]);
     }
 
     const prepared = prepareItems(items, body.namePrefix);
     if (!prepared.ok) {
-      return c.json({
+      return inputError(c, {
         success: false,
         error: 'このレシピには、まだ複製できない種類が含まれています',
         code: 'UNSUPPORTED_RECIPE_ITEM',
         unsupportedKinds: prepared.unsupported,
-      }, 422);
+      }, 422, ["accountId","namePrefix"]);
     }
     const missingPermissions = missingEditPermissions(c.get('staff'), prepared.items);
     if (missingPermissions.length > 0) {

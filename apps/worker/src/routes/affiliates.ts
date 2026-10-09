@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getAffiliates,
@@ -230,7 +231,7 @@ affiliates.get('/api/affiliates/:id/archive-impact', requireRole('owner', 'admin
 });
 
 // POST /api/affiliates/:id/archive - 記録を残したまま紹介を止める
-affiliates.post('/api/affiliates/:id/archive', requireRole('owner', 'admin'), async (c) => {
+affiliates.post('/api/affiliates/:id/archive', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   auditLog(c, 'affiliate.archive', { kind: 'affiliate', id: c.req.param('id') });
   try {
     const { scope } = await getAffiliateScope(c);
@@ -243,10 +244,10 @@ affiliates.post('/api/affiliates/:id/archive', requireRole('owner', 'admin'), as
       confirmationName?: unknown;
     }>();
     if (body.mode !== 'pause' && body.mode !== 'archive') {
-      return c.json({ success: false, error: '停止方法を選んでください' }, 400);
+      return inputError(c, { success: false, error: '停止方法を選んでください' }, 400, ["mode"]);
     }
     if (body.mode === 'archive' && body.confirmationName !== affiliate.name) {
-      return c.json({ success: false, error: '確認用の名前が一致しません' }, 400);
+      return inputError(c, { success: false, error: '確認用の名前が一致しません' }, 400, ["mode","confirmationName"]);
     }
     const updated = await updateAffiliateLifecycle(c.env.DB, {
       tenantId: scope.tenantId,
@@ -299,7 +300,7 @@ affiliates.get('/api/affiliate-payments/:id/preview', requireRole('owner', 'admi
 });
 
 // POST /api/affiliate-payments/:id/confirm - 承認済み報酬を追記台帳へ固定する
-affiliates.post('/api/affiliate-payments/:id/confirm', requireRole('owner', 'admin'), async (c) => {
+affiliates.post('/api/affiliate-payments/:id/confirm', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   auditLog(c, 'affiliate.settlement.close', { kind: 'affiliate', id: c.req.param('id') });
   try {
     const body = await c.req.json<{
@@ -308,13 +309,13 @@ affiliates.post('/api/affiliate-payments/:id/confirm', requireRole('owner', 'adm
       idempotencyKey?: unknown;
     }>();
     if (typeof body.lineAccountId !== 'string' || !body.lineAccountId) {
-      return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+      return inputError(c, { success: false, error: 'LINE公式アカウントを選んでください' }, 400, ["lineAccountId"]);
     }
     if (!Number.isInteger(body.expectedAmount) || Number(body.expectedAmount) < 0) {
-      return c.json({ success: false, error: '確定額が正しくありません' }, 400);
+      return inputError(c, { success: false, error: '確定額が正しくありません' }, 400, ["expectedAmount"]);
     }
     if (typeof body.idempotencyKey !== 'string' || body.idempotencyKey.length < 8 || body.idempotencyKey.length > 200) {
-      return c.json({ success: false, error: 'もう一度、確定内容を開き直してください' }, 400);
+      return inputError(c, { success: false, error: 'もう一度、確定内容を開き直してください' }, 400, []);
     }
     const { visible, scope } = await getAffiliateScope(c);
     if (!visible.allowedAccountIds.includes(body.lineAccountId)) {
@@ -384,7 +385,7 @@ affiliates.get('/api/affiliates/:id', async (c) => {
 //        - OSS back-compat. `code` must be >= 4 chars, alphanumeric only.
 const CODE_RE = /^[A-Za-z0-9]{4,}$/;
 
-affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
+affiliates.post('/api/affiliates', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"code":["string"],"rewardMode":["string"],"friendId":["string"],"issueInitialLink":["boolean"],"lineAccountId":["string"],"operationId":["string"],"isActive":["boolean"]}), async (c) => {
   auditLog(c, 'affiliate.create', { kind: 'affiliate' });
   try {
     const body = await c.req.json<{
@@ -410,16 +411,13 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
     // packages/db 側が同じIDで既存行を回収するため二重登録にならない。
     const operationId = typeof body.operationId === 'string' ? body.operationId.trim() : '';
     if (operationId && (operationId.length < 8 || operationId.length > 200)) {
-      return c.json({ success: false, error: 'もう一度、最初からやり直してください' }, 400);
+      return inputError(c, { success: false, error: 'もう一度、最初からやり直してください' }, 400, ["operationId"]);
     }
     const { visible, scope } = await getAffiliateScope(c);
 
     // Require at least one of name / code / friendId to identify the affiliate.
     if (!name && !code && !friendId) {
-      return c.json(
-        { success: false, error: 'name, code, or friendId is required' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'name, code, or friendId is required' }, 400, ["name","code","friendId"]);
     }
 
     // Resolve the friend (if binding) up front: 404 on unknown friend, and use
@@ -443,33 +441,30 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
       [lineAccountId] = visible.allowedAccountIds;
     }
     if (!lineAccountId) {
-      return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+      return inputError(c, { success: false, error: 'lineAccountId is required' }, 400, ["lineAccountId"]);
     }
     if (!visible.allowedAccountIds.includes(lineAccountId)) {
       return c.json({ success: false, error: 'Affiliate not found' }, 404);
     }
     if (body.rewardMode !== undefined && !['none', 'fixed', 'rate'].includes(body.rewardMode)) {
-      return c.json({ success: false, error: 'rewardMode must be none, fixed or rate' }, 400);
+      return inputError(c, { success: false, error: 'rewardMode must be none, fixed or rate' }, 400, ["rewardMode"]);
     }
     const rateError = commissionRateError(body.commissionRate);
     if (rateError) {
-      return c.json({ success: false, error: rateError }, 400);
+      return inputError(c, { success: false, error: rateError }, 400, ["commissionRate"]);
     }
 
     // ── Legacy explicit-code path (OSS back-compat) ─────────────────────────
     // Only taken when a code was supplied AND no friend binding is requested.
     if (code && !friendId) {
       if (!CODE_RE.test(code)) {
-        return c.json(
-          {
+        return inputError(c, {
             success: false,
             error: 'code must be at least 4 alphanumeric characters',
-          },
-          400,
-        );
+          }, 400, ["code"]);
       }
       if (!resolvedName) {
-        return c.json({ success: false, error: 'name is required' }, 400);
+        return inputError(c, { success: false, error: 'name is required' }, 400, ["name"]);
       }
       try {
         const item = await createAffiliate(c.env.DB, {
@@ -562,7 +557,7 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
 });
 
 // PUT /api/affiliates/:id - update
-affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), async (c) => {
+affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"rewardMode":["string"],"isActive":["boolean"]}), async (c) => {
   auditLog(c, 'affiliate.update', { kind: 'affiliate', id: c.req.param('id') });
   try {
     const id = c.req.param('id');
@@ -575,12 +570,12 @@ affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), async (c) =
     } & Record<string, unknown>>();
 
     const settlement = readAffiliateSettlement(body);
-    if (!settlement.ok) return c.json({ success: false, error: settlement.error }, 400);
+    if (!settlement.ok) return inputError(c, { success: false, error: settlement.error }, 400, ["email","holdDays","payoutCycle","notifyOnConversion"]);
     if (body.rewardMode !== undefined && !['none', 'fixed', 'rate'].includes(body.rewardMode)) {
-      return c.json({ success: false, error: 'rewardMode must be none, fixed or rate' }, 400);
+      return inputError(c, { success: false, error: 'rewardMode must be none, fixed or rate' }, 400, ["rewardMode"]);
     }
     const rateError = commissionRateError(body.commissionRate);
-    if (rateError) return c.json({ success: false, error: rateError }, 400);
+    if (rateError) return inputError(c, { success: false, error: rateError }, 400, ["commissionRate"]);
 
     const updated = await updateAffiliate(c.env.DB, id, {
       name: body.name,
@@ -715,7 +710,7 @@ affiliates.get('/api/friends/:id/journey', async (c) => {
 });
 
 // POST /api/affiliates/click - record click (public endpoint tracked by ref param)
-affiliates.post('/api/affiliates/click', async (c) => {
+affiliates.post('/api/affiliates/click', inputJsonBoundary({"code":["string"],"url":["null","string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       code: string;
@@ -723,7 +718,7 @@ affiliates.post('/api/affiliates/click', async (c) => {
     }>();
 
     if (!body.code) {
-      return c.json({ success: false, error: 'code is required' }, 400);
+      return inputError(c, { success: false, error: 'code is required' }, 400, ["code"]);
     }
 
     const affiliate = await getAffiliateByCode(c.env.DB, body.code);

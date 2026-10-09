@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
   COMMON_VAR_EXPORT_MAX_BYTES,
@@ -175,17 +176,17 @@ commonVarExports.get('/api/common-vars/exports', requireRole('owner', 'admin', '
   }
 });
 
-commonVarExports.post('/api/common-vars/exports', requireRole('owner', 'admin'), async (c) => {
+commonVarExports.post('/api/common-vars/exports', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"folderId":["null","string"],"ungrouped":["boolean"]}), async (c) => {
   try {
     const body = await c.req.json<{ accountId?: string; folderId?: string | null; ungrouped?: boolean }>();
     const accountId = body.accountId?.trim();
     const folderId = typeof body.folderId === 'string' && body.folderId ? body.folderId : undefined;
     const ungrouped = body.ungrouped === true;
     if (!accountId) {
-      return c.json({ success: false, error: '対象アカウントを選んでください' }, 400);
+      return inputError(c, { success: false, error: '対象アカウントを選んでください' }, 400, ["accountId"]);
     }
     if (folderId && ungrouped) {
-      return c.json({ success: false, error: 'フォルダと未分類は同時に選べません' }, 400);
+      return inputError(c, { success: false, error: 'フォルダと未分類は同時に選べません' }, 400, ["folderId","ungrouped"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
@@ -194,7 +195,7 @@ commonVarExports.post('/api/common-vars/exports', requireRole('owner', 'admin'),
       const folder = await getFolderById(c.env.DB, folderId);
       if (!folder || folder.kind !== 'common_var'
         || (folder.account_id !== null && folder.account_id !== accountId)) {
-        return c.json({ success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400);
+        return inputError(c, { success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400, ["folderId","accountId"]);
       }
     }
     const staff = c.get('staff');
@@ -271,7 +272,7 @@ commonVarExports.get('/api/common-vars/exports/:id/download', requireRole('owner
   });
 });
 
-commonVarExports.post('/api/common-vars/exports/:id/regenerate', requireRole('owner', 'admin'), async (c) => {
+commonVarExports.post('/api/common-vars/exports/:id/regenerate', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const job = await accessibleExportJob(c.env.DB, c.get('staff'), c.req.param('id'));
     if (!job) return c.json({ success: false, error: 'Not found' }, 404);

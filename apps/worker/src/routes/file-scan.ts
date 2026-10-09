@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -284,10 +285,10 @@ fileScan.get('/api/file-scans/health', requireRole('owner', 'admin', 'staff'), a
   });
 });
 
-fileScan.post('/api/file-scans/:id/retry', requireRole('owner', 'admin'), async (c) => {
+fileScan.post('/api/file-scans/:id/retry', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const body = await c.req.json<{ accountId?: unknown }>().catch(() => null);
   const accountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
-  if (!accountId) return c.json({ success: false, error: 'accountId が必要です' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'accountId が必要です' }, 400, ["accountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
@@ -315,12 +316,12 @@ fileScan.post('/api/file-scans/:id/retry', requireRole('owner', 'admin'), async 
 });
 
 /** 誤りなので戻す。理由の記録は必須。quarantined だけ戻せる。 */
-fileScan.post('/api/file-scans/:id/release', requireRole('owner', 'admin'), async (c) => {
+fileScan.post('/api/file-scans/:id/release', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const body = await c.req.json<{ accountId?: unknown; reason?: unknown }>().catch(() => null);
   const accountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
   const reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
   if (!accountId || !reason) {
-    return c.json({ success: false, error: 'accountId と理由が必要です' }, 400);
+    return inputError(c, { success: false, error: 'accountId と理由が必要です' }, 400, ["accountId","reason"]);
   }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
@@ -414,7 +415,7 @@ fileScan.get('/api/file-scans/config', requireRole('owner', 'admin'), async (c) 
   });
 });
 
-fileScan.put('/api/file-scans/config', requireRole('owner', 'admin'), async (c) => {
+fileScan.put('/api/file-scans/config', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const body = await c.req.json<{
     accountId?: unknown;
     externalProvider?: unknown;
@@ -425,7 +426,7 @@ fileScan.put('/api/file-scans/config', requireRole('owner', 'admin'), async (c) 
     maxPixelsOverride?: unknown;
   }>().catch(() => null);
   const accountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
-  if (!accountId) return c.json({ success: false, error: 'accountId が必要です' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'accountId が必要です' }, 400, ["accountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
@@ -437,10 +438,10 @@ fileScan.put('/api/file-scans/config', requireRole('owner', 'admin'), async (c) 
   const endpoint = text(body?.externalEndpointUrl, 500);
   const secretRef = text(body?.externalSecretRef, 120);
   if (endpoint && !/^https:\/\//.test(endpoint)) {
-    return c.json({ success: false, error: '外の検査の宛先は https にしてください' }, 400);
+    return inputError(c, { success: false, error: '外の検査の宛先は https にしてください' }, 400, ["externalEndpointUrl"]);
   }
   if ((provider || endpoint || secretRef) && !(provider && endpoint)) {
-    return c.json({ success: false, error: '外の検査を使う時は提供元と宛先の両方が必要です' }, 400);
+    return inputError(c, { success: false, error: '外の検査を使う時は提供元と宛先の両方が必要です' }, 400, ["externalProvider","externalEndpointUrl","externalSecretRef"]);
   }
   const timeoutMs = Number(body?.externalTimeoutMs);
   const numOrNull = (v: unknown): number | null => {

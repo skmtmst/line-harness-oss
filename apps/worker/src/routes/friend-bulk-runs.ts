@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { DEFAULT_TENANT_ID, getFriendBulkRunDetail } from '@line-crm/db';
@@ -18,12 +19,16 @@ import { approveBulkMessage, getBulkMessageApproval } from '../services/friend-b
 
 export const friendBulkRuns = new Hono<Env>();
 
+function bulkErrorFields(code: string): string[] {
+  if (['invalid_selection', 'selection_empty', 'saved_search_invalid', 'conditions_invalid', 'no_targets'].includes(code)) return ['selection'];
+  if (code === 'invalid_operation' || code === 'invalid_datetime' || code.startsWith('common_action_')) return ['operation'];
+  if (code.startsWith('preview_')) return ['previewToken'];
+  return [];
+}
+
 function errorResponse(c: Context<Env>, error: unknown) {
   if (error instanceof FriendBulkRunError) {
-    return c.json(
-      { success: false, error: error.message, code: error.code },
-      error.status as ContentfulStatusCode,
-    );
+    return inputError(c, { success: false, error: error.message, code: error.code }, error.status as ContentfulStatusCode, bulkErrorFields(error.code));
   }
   console.error('friend bulk run error:', error);
   return c.json({ success: false, error: '一括操作を処理できませんでした' }, 500);
@@ -57,7 +62,7 @@ async function parseJsonBody<T>(c: Context<Env>): Promise<T> {
   }
 }
 
-friendBulkRuns.post('/api/friends/bulk-runs/preview', requireRole('owner', 'admin'), async (c) => {
+friendBulkRuns.post('/api/friends/bulk-runs/preview', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await parseJsonBody<{ selection?: unknown; operation?: unknown }>(c);
     const result = await previewFriendBulkRun(c.env.DB, c.get('staff')!, body.selection, body.operation);
@@ -67,7 +72,7 @@ friendBulkRuns.post('/api/friends/bulk-runs/preview', requireRole('owner', 'admi
   }
 });
 
-friendBulkRuns.post('/api/friends/bulk-runs', requireRole('owner', 'admin'), async (c) => {
+friendBulkRuns.post('/api/friends/bulk-runs', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await parseJsonBody<{ selection?: unknown; operation?: unknown; scheduledAt?: unknown }>(c);
     const result = await startFriendBulkRun(c.env.DB, c.get('staff')!, {
@@ -108,7 +113,7 @@ friendBulkRuns.get('/api/friends/bulk-runs/:id', requireRole('owner', 'admin'), 
   }
 });
 
-friendBulkRuns.post('/api/friends/bulk-runs/:id/retry', requireRole('owner', 'admin'), async (c) => {
+friendBulkRuns.post('/api/friends/bulk-runs/:id/retry', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const staff = c.get('staff')!;
     const count = await retryFriendBulkRun(
@@ -125,7 +130,7 @@ friendBulkRuns.post('/api/friends/bulk-runs/:id/retry', requireRole('owner', 'ad
   }
 });
 
-friendBulkRuns.post('/api/friends/bulk-runs/:id/undo', requireRole('owner', 'admin'), async (c) => {
+friendBulkRuns.post('/api/friends/bulk-runs/:id/undo', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const result = await createFriendBulkUndoRun(
       c.env.DB,
@@ -140,7 +145,7 @@ friendBulkRuns.post('/api/friends/bulk-runs/:id/undo', requireRole('owner', 'adm
   }
 });
 
-friendBulkRuns.post('/api/friends/bulk-runs/:id/approve', requireRole('owner', 'admin'), async (c) => {
+friendBulkRuns.post('/api/friends/bulk-runs/:id/approve', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await parseJsonBody<{ confirmedRecipientCount?: unknown }>(c);
     const approval = await approveBulkMessage(c.env.DB, c.get('staff')!, c.req.param('id'), body.confirmedRecipientCount);

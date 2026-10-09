@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { prepareImagemapImages, IMAGEMAP_WIDTHS } from '../services/imagemap-images.js';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
@@ -265,9 +266,9 @@ broadcastMessageAssets.get('/api/broadcast-message-assets/folders', async (c) =>
   });
 });
 
-broadcastMessageAssets.post('/api/broadcast-message-assets/folders', requireRole('owner', 'admin'), async (c) => {
+broadcastMessageAssets.post('/api/broadcast-message-assets/folders', requireRole('owner', 'admin'), inputJsonBoundary({"lineAccountId":["null","string"],"name":["string"]}), async (c) => {
   const body = await c.req.json<{ lineAccountId?: string | null; name?: string }>();
-  if (!body.name?.trim()) return c.json({ success: false, error: 'name is required' }, 400);
+  if (!body.name?.trim()) return inputError(c, { success: false, error: 'name is required' }, 400, ["name"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId ?? null])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
@@ -287,22 +288,22 @@ broadcastMessageAssets.post('/api/broadcast-message-assets/folders', requireRole
   }, 201);
 });
 
-broadcastMessageAssets.post('/api/broadcast-message-assets', requireRole('owner', 'admin'), async (c) => {
+broadcastMessageAssets.post('/api/broadcast-message-assets', requireRole('owner', 'admin'), inputJsonBoundary({"lineAccountId":["null","string"],"kind":["string"],"name":["string"],"folderId":["null","string"]}), async (c) => {
   const body = await c.req.json<{ lineAccountId?: string | null; kind?: BroadcastMessageAssetKind; name?: string; payload?: unknown; folderId?: string | null }>();
   if (!body.kind || !ASSET_KINDS.has(body.kind) || !body.name?.trim()) {
-    return c.json({ success: false, error: 'kind and name are required' }, 400);
+    return inputError(c, { success: false, error: 'kind and name are required' }, 400, ["kind","name"]);
   }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId ?? null])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
   const payloadError = validatePayload(body.kind, body.payload);
-  if (payloadError) return c.json({ success: false, error: payloadError }, 400);
+  if (payloadError) return inputError(c, { success: false, error: payloadError }, 400, ["kind","payload"]);
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   const folder = await readAssetFolderId(c.env.DB, body as unknown as Record<string, unknown>, body.lineAccountId ?? null, scope.canSeeUnassigned);
-  if (!folder.ok) return c.json({ success: false, error: folder.error }, 422);
+  if (!folder.ok) return inputError(c, { success: false, error: folder.error }, 422, ["folderId"]);
   if (body.kind === 'rich_message') {
     try { body.payload = await prepareImagemapImages(c.env, body.payload as Record<string,unknown>, body.lineAccountId ?? null, c.env.WORKER_URL || new URL(c.req.url).origin); }
-    catch (error) { return c.json({success:false,error:error instanceof Error ? error.message : '画像を準備できませんでした'},422); }
+    catch (error) { return inputError(c, {success:false,error:error instanceof Error ? error.message : '画像を準備できませんでした'}, 422, ["kind"]); }
   }
   const row = await createBroadcastMessageAsset(c.env.DB, {
     lineAccountId: body.lineAccountId,
@@ -314,13 +315,13 @@ broadcastMessageAssets.post('/api/broadcast-message-assets', requireRole('owner'
   return c.json({ success: true, data: row ? serialize(row) : null }, 201);
 });
 
-broadcastMessageAssets.put('/api/broadcast-message-assets/:id', requireRole('owner', 'admin'), requireVisibleAsset, async (c) => {
+broadcastMessageAssets.put('/api/broadcast-message-assets/:id', requireRole('owner', 'admin'), requireVisibleAsset, inputJsonBoundary({"name":["string"],"folderId":["null","string"]}), async (c) => {
   const existing = await getBroadcastMessageAsset(c.env.DB, c.req.param('id'));
   if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
   const body = await c.req.json<{ name?: string; payload?: unknown; folderId?: string | null; expectedVersion?: unknown; expectedDraftRevision?: unknown }>();
-  if (!body.name?.trim()) return c.json({ success: false, error: 'name is required' }, 400);
+  if (!body.name?.trim()) return inputError(c, { success: false, error: 'name is required' }, 400, ["name"]);
   const payloadError = validatePayload(existing.kind, body.payload);
-  if (payloadError) return c.json({ success: false, error: payloadError }, 400);
+  if (payloadError) return inputError(c, { success: false, error: payloadError }, 400, ["payload"]);
   // 呼び出し側の期待版。指定があれば古い期待を409で拒否する。
   // 指定がなければ読直し時点の版でCASする（テンプレートPUTと同契約）。
   let expectedVersion: number | undefined;
@@ -328,22 +329,22 @@ broadcastMessageAssets.put('/api/broadcast-message-assets/:id', requireRole('own
   if (body.expectedVersion !== undefined && body.expectedVersion !== null) {
     expectedVersion = Number(body.expectedVersion);
     if (!Number.isInteger(expectedVersion)) {
-      return c.json({ success: false, error: '版の番号を確認してください' }, 400);
+      return inputError(c, { success: false, error: '版の番号を確認してください' }, 400, ["expectedVersion"]);
     }
   }
   if (body.expectedDraftRevision !== undefined && body.expectedDraftRevision !== null) {
     expectedDraftRevision = Number(body.expectedDraftRevision);
     if (!Number.isInteger(expectedDraftRevision)) {
-      return c.json({ success: false, error: '下書きの版を確認してください' }, 400);
+      return inputError(c, { success: false, error: '下書きの版を確認してください' }, 400, ["expectedDraftRevision"]);
     }
   }
   try {
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const folder = await readAssetFolderId(c.env.DB, body as unknown as Record<string, unknown>, existing.line_account_id, scope.canSeeUnassigned);
-    if (!folder.ok) return c.json({ success: false, error: folder.error }, 422);
+    if (!folder.ok) return inputError(c, { success: false, error: folder.error }, 422, ["folderId"]);
     if (existing.kind === 'rich_message') {
       try { body.payload = await prepareImagemapImages(c.env, body.payload as Record<string,unknown>, existing.line_account_id, c.env.WORKER_URL || new URL(c.req.url).origin); }
-      catch (error) { return c.json({success:false,error:error instanceof Error ? error.message : '画像を準備できませんでした'},422); }
+      catch (error) { return inputError(c, {success:false,error:error instanceof Error ? error.message : '画像を準備できませんでした'}, 422, ["payload"]); }
     }
     // 名前・置き場・下書き本文を1文で書く。CAS敗北時は全面不変。
     const row = await saveBroadcastMessageAssetDraft(c.env.DB, existing.id, {
@@ -365,12 +366,12 @@ broadcastMessageAssets.put('/api/broadcast-message-assets/:id', requireRole('own
   }
 });
 
-broadcastMessageAssets.post('/api/broadcast-message-assets/:id/publish', requireRole('owner', 'admin'), requireVisibleAsset, async (c) => {
+broadcastMessageAssets.post('/api/broadcast-message-assets/:id/publish', requireRole('owner', 'admin'), requireVisibleAsset, inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const requestKey = c.req.header('Idempotency-Key');
     if (!validPublishKey(requestKey)) {
-      return c.json({ success: false, error: '公開操作の確認キーが必要です' }, 400);
+      return inputError(c, { success: false, error: '公開操作の確認キーが必要です' }, 400, []);
     }
     const existing = await getBroadcastMessageAsset(c.env.DB, id);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
@@ -380,17 +381,17 @@ broadcastMessageAssets.post('/api/broadcast-message-assets/:id/publish', require
       ? undefined
       : Number(body.expectedVersion);
     if (expectedVersion === undefined || !Number.isInteger(expectedVersion)) {
-      return c.json({ success: false, error: '版の番号を確認してください' }, 400);
+      return inputError(c, { success: false, error: '版の番号を確認してください' }, 400, ["expectedVersion"]);
     }
     const expectedDraftRevision = body.expectedDraftRevision === undefined || body.expectedDraftRevision === null
       ? undefined
       : Number(body.expectedDraftRevision);
     if (expectedDraftRevision === undefined || !Number.isInteger(expectedDraftRevision)) {
-      return c.json({ success: false, error: '下書きの版を確認してください' }, 400);
+      return inputError(c, { success: false, error: '下書きの版を確認してください' }, 400, ["expectedDraftRevision"]);
     }
     const draftPayload = existing.draft_payload_json ?? existing.payload_json;
     const payloadError = validatePayload(existing.kind, JSON.parse(draftPayload) as unknown);
-    if (payloadError) return c.json({ success: false, error: payloadError }, 422);
+    if (payloadError) return inputError(c, { success: false, error: payloadError }, 422, ["payload"]);
     const staff = c.get('staff') as unknown as { id?: string };
     const result = await publishBroadcastMessageAsset(c.env.DB, id, {
       expectedVersion,
@@ -503,20 +504,20 @@ broadcastMessageAssets.get('/images/broadcast-media/:filename', async (c) => {
   });
 });
 
-broadcastMessageAssets.post('/api/broadcast-message-assets/upload', requireRole('owner', 'admin'), async (c) => {
+broadcastMessageAssets.post('/api/broadcast-message-assets/upload', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const declaredType = (c.req.header('Content-Type') ?? '').split(';')[0];
   const contentLength = Number(c.req.header('Content-Length'));
   const maxBytes = declaredType === 'video/mp4' ? 200 * 1024 * 1024 : 10 * 1024 * 1024;
   if (!(declaredType in BROADCAST_MEDIA_TYPES)) {
-    return c.json({ success: false, error: 'JPEG・PNG・MP4のみアップロードできます' }, 400);
+    return inputError(c, { success: false, error: 'JPEG・PNG・MP4のみアップロードできます' }, 400, []);
   }
   if (!Number.isFinite(contentLength) || contentLength <= 0) {
     return c.json({ success: false, error: 'Content-Length is required' }, 411);
   }
   if (contentLength > maxBytes) {
-    return c.json({ success: false, error: declaredType === 'video/mp4' ? '動画は200MB以下にしてください' : '画像は10MB以下にしてください' }, 400);
+    return inputError(c, { success: false, error: declaredType === 'video/mp4' ? '動画は200MB以下にしてください' : '画像は10MB以下にしてください' }, 400, []);
   }
-  if (!c.req.raw.body) return c.json({ success: false, error: 'File body is required' }, 400);
+  if (!c.req.raw.body) return inputError(c, { success: false, error: 'File body is required' }, 400, []);
   const [inspectionBody, storageBody] = c.req.raw.body.tee();
   const prefix = await readPrefix(inspectionBody, 16);
   const validation = validateBroadcastMediaUpload(
@@ -526,7 +527,7 @@ broadcastMessageAssets.post('/api/broadcast-message-assets/upload', requireRole(
   );
   if (!validation.ok) {
     await storageBody.cancel().catch(() => undefined);
-    return c.json({ success: false, error: validation.error }, 400);
+    return inputError(c, { success: false, error: validation.error }, 400, ["inspectionBody"]);
   }
   // 先頭だけでも分かる脅威（実行ファイルの印）は保存の前に落とす。
   const prefixCheck = builtinFileScan(prefix, {
@@ -539,7 +540,7 @@ broadcastMessageAssets.post('/api/broadcast-message-assets/upload', requireRole(
   if (prefixCheck.verdict === 'quarantined'
     && (prefixCheck.reasonCode === 'executable_signature' || prefixCheck.reasonCode === 'office_macro')) {
     await storageBody.cancel().catch(() => undefined);
-    return c.json({ success: false, code: 'file_scan_blocked', error: '確認のため受け付けできません' }, 422);
+    return inputError(c, { success: false, code: 'file_scan_blocked', error: '確認のため受け付けできません' }, 422, ["inspectionBody"]);
   }
   const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
   let stored: Awaited<ReturnType<typeof storeBroadcastMedia>>;

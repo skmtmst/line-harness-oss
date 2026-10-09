@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { computeDedupBroadcastPreview } from '../services/dedup-broadcast.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -9,20 +10,20 @@ const dedupPreview = new Hono<Env>();
 dedupPreview.post(
   '/api/broadcasts/dedup-preview',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const body = await c.req.json<{ accountIds: unknown; dedupPriority: unknown; targetTagId?: unknown }>();
     if (!Array.isArray(body.accountIds) || !body.accountIds.every((x) => typeof x === 'string')) {
-      return c.json({ success: false, error: 'accountIds: array of strings required' }, 400);
+      return inputError(c, { success: false, error: 'accountIds: array of strings required' }, 400, ["accountIds"]);
     }
     if (!Array.isArray(body.dedupPriority) || !body.dedupPriority.every((x) => typeof x === 'string')) {
-      return c.json({ success: false, error: 'dedupPriority: array of strings required' }, 400);
+      return inputError(c, { success: false, error: 'dedupPriority: array of strings required' }, 400, ["dedupPriority"]);
     }
     if (
       body.targetTagId !== undefined &&
       body.targetTagId !== null &&
       typeof body.targetTagId !== 'string'
     ) {
-      return c.json({ success: false, error: 'targetTagId: string or null' }, 400);
+      return inputError(c, { success: false, error: 'targetTagId: string or null' }, 400, ["targetTagId"]);
     }
     const accountIds = body.accountIds as string[];
     const dedupPriority = body.dedupPriority as string[];

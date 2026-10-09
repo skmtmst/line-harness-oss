@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
   getFriendByLineUserIdForAccount,
@@ -316,15 +317,15 @@ affiliateSelfRoutes.get('/api/liff/mileage/rewards', async (c) => {
   }
 });
 
-affiliateSelfRoutes.post('/api/liff/mileage/rewards/:id/redeem', async (c) => {
+affiliateSelfRoutes.post('/api/liff/mileage/rewards/:id/redeem', inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ lineAccessToken?: unknown }>()
       .catch((): { lineAccessToken?: unknown } => ({}));
     const token = typeof body.lineAccessToken === 'string' ? body.lineAccessToken : '';
-    if (!token) return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
+    if (!token) return inputError(c, { success: false, error: 'lineAccessToken is required' }, 400, ["lineAccessToken"]);
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
     if (!isValidIdempotencyKey(idempotencyKey)) {
-      return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+      return inputError(c, { success: false, error: '有効なIdempotency-Keyが必要です' }, 400, ["accountId","expectedVersion"]);
     }
     const resolved = await resolveFriendFromLineToken(c.env, token);
     if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
@@ -353,7 +354,7 @@ affiliateSelfRoutes.post('/api/liff/mileage/rewards/:id/redeem', async (c) => {
     }, delivery.status === 'succeeded' ? 200 : 202);
   } catch (error) {
     if (error instanceof MileageRewardError) {
-      return c.json({ success: false, error: error.message, code: error.code }, error.status as 400);
+      return inputError(c, { success: false, error: error.message, code: error.code }, error.status as 400, []);
     }
     console.error('POST /api/liff/mileage/rewards/:id/redeem error:', error);
     return c.json({ success: false, error: '交換を受け付けられませんでした' }, 500);
@@ -365,14 +366,14 @@ affiliateSelfRoutes.post('/api/liff/mileage/rewards/:id/redeem', async (c) => {
  * Body: { lineAccessToken }. If already registered, returns the existing
  * affiliate + links. On first registration, auto-issues one link.
  */
-affiliateSelfRoutes.post('/api/liff/affiliate/register', async (c) => {
+affiliateSelfRoutes.post('/api/liff/affiliate/register', inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req
       .json<{ lineAccessToken?: string }>()
       .catch((): { lineAccessToken?: string } => ({}));
     const token = body.lineAccessToken;
     if (!token) {
-      return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
+      return inputError(c, { success: false, error: 'lineAccessToken is required' }, 400, ["lineAccessToken"]);
     }
 
     const db = c.env.DB;
@@ -508,7 +509,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/bank', async (c) => {
 });
 
 /** LINEへtokenを再照合した本人だけが振込先を登録・変更できる。 */
-affiliateSelfRoutes.put('/api/liff/affiliate/bank', async (c) => {
+affiliateSelfRoutes.put('/api/liff/affiliate/bank', inputJsonBoundary(), async (c) => {
   try {
     const key = c.req.header('Idempotency-Key')?.trim() ?? '';
     type BankBody = {
@@ -527,7 +528,7 @@ affiliateSelfRoutes.put('/api/liff/affiliate/bank', async (c) => {
       || typeof body.accountHolderName !== 'string' || !body.accountHolderName.trim()
       || body.accountHolderName.length > 64 || !Number.isInteger(body.expectedVersion)
       || Number(body.expectedVersion) < 0) {
-      return c.json({ success: false, error: '振込先、版、再実行キーを確認してください' }, 400);
+      return inputError(c, { success: false, error: '振込先、版、再実行キーを確認してください' }, 400, ["accountId","expectedVersion"]);
     }
     const resolved = await resolveFriendFromLineToken(c.env, body.lineAccessToken);
     if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
@@ -642,14 +643,14 @@ affiliateSelfRoutes.get('/api/liff/affiliate/statements/:id/download', async (c)
  *
  * Omitting `offerId` keeps the existing generic-link behaviour untouched.
  */
-affiliateSelfRoutes.post('/api/liff/affiliate/links', async (c) => {
+affiliateSelfRoutes.post('/api/liff/affiliate/links', inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req
       .json<{ lineAccessToken?: string; label?: string | null; offerId?: string | null }>()
       .catch((): { lineAccessToken?: string; label?: string | null; offerId?: string | null } => ({}));
     const token = body.lineAccessToken;
     if (!token) {
-      return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
+      return inputError(c, { success: false, error: 'lineAccessToken is required' }, 400, ["lineAccessToken"]);
     }
 
     const db = c.env.DB;
@@ -669,10 +670,7 @@ affiliateSelfRoutes.post('/api/liff/affiliate/links', async (c) => {
 
     const count = await countAffiliateLinks(db, affiliate.id);
     if (count >= MAX_SELF_LINKS) {
-      return c.json(
-        { success: false, error: `Link limit reached (max ${MAX_SELF_LINKS})` },
-        400,
-      );
+      return inputError(c, { success: false, error: `Link limit reached (max ${MAX_SELF_LINKS})` }, 400, ["lineAccessToken"]);
     }
 
     // offerId is optional. When present, gate issuance on an active offer the
@@ -694,7 +692,7 @@ affiliateSelfRoutes.post('/api/liff/affiliate/links', async (c) => {
       });
       const enrolled = existingLinks.some((l) => l.offer_id === offerId);
       if (!enrolled) {
-        return c.json({ success: false, error: '先に案件に参加してください' }, 400);
+        return inputError(c, { success: false, error: '先に案件に参加してください' }, 400, ["offerId","lineAccessToken"]);
       }
       offerLineAccountId = offer.line_account_id ?? null;
     }
@@ -803,14 +801,14 @@ affiliateSelfRoutes.get('/api/liff/affiliate/offers', async (c) => {
  * existing link). Inactive/unknown offers → 404.
  * Body: { lineAccessToken }.
  */
-affiliateSelfRoutes.post('/api/liff/affiliate/offers/:id/enroll', async (c) => {
+affiliateSelfRoutes.post('/api/liff/affiliate/offers/:id/enroll', inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req
       .json<{ lineAccessToken?: string }>()
       .catch((): { lineAccessToken?: string } => ({}));
     const token = body.lineAccessToken;
     if (!token) {
-      return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
+      return inputError(c, { success: false, error: 'lineAccessToken is required' }, 400, ["lineAccessToken"]);
     }
 
     const db = c.env.DB;
