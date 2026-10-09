@@ -41,7 +41,7 @@ import {
   getActiveStopSuppressionSafe,
 } from '../services/entry-route-stop.js';
 import { applyFriendAddRouting } from '../services/friend-add-routing.js';
-import { fireEvent } from '../services/event-bus.js';
+import { fireEvent, logOutgoingMessage } from '../services/event-bus.js';
 import { matchAndReply } from '../services/auto-reply.js';
 import { buildMessage } from '../services/step-delivery.js';
 import { pushImmediateFirstStep } from '../services/immediate-first-step.js';
@@ -839,6 +839,27 @@ async function handleEvent(
     }
     let scenarioEnrollmentId = routing?.enrollments[0]?.enrollment.id ?? null;
     let friendAddDeliveryCount = 0;
+
+    if (routing?.messageText && !routing.suppressed && sendRight) {
+      try {
+        const { expandSendCommonVars } = await import('../services/interpolation-context.js');
+        const content = await expandSendCommonVars(db, routing.messageText,
+          { kind: 'notification', id: routing.ruleId ?? friend.id },
+          { lineAccountId, friendId: friend.id, messageType: 'text' });
+        if (await holdSendRight({ external: true })) {
+          try {
+            await lineClient.pushMessage(userId, [buildMessage('text', content)], sendRetryKey(`rule-text:${routing.ruleVersionId}`));
+          } catch (error) {
+            noteSendOutcome(classifyFollowSendFailure(error));
+            throw error;
+          }
+          noteSendOutcome('delivered');
+          friendAddDeliveryCount += 1;
+          await logOutgoingMessage(db, { friendId: friend.id, messageType: 'text', content,
+            deliveryType: 'push', source: 'friend_add', lineAccountId });
+        }
+      } catch (error) { logWebhookStepFailure('friend_add_rule_text', error, lineAccountId, event); }
+    }
 
     if (routing?.routed) {
       // 送信権を取れなかった実行は送らずに引く（予約を取った側が送る）。
