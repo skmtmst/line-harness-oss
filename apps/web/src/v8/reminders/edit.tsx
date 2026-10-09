@@ -791,7 +791,7 @@ function BasicsStageV8({
           onNext={() => onSave(value)}
           nextDisabled={candidatesPending || busy || !value.name.trim()}
         />
-      )}
+      )} dirty={false}
     >
       {notice}
       <ReminderBasicsFormV8
@@ -956,7 +956,7 @@ function TargetStageV8({
           onNext={onNext}
           nextDisabled={busy}
         />
-      )}
+      )} dirty={false}
     >
       {notice}
       <section className={styles.card} aria-labelledby="rm-target-title">
@@ -1221,7 +1221,7 @@ function MessagesStageV8({
             onNext={onNext}
             nextDisabled={busy || !allStepsHaveContent}
           />
-        )}
+        )} dirty={false}
       >
         {notice}
         <section className={styles.card} aria-labelledby="rm-steps-title">
@@ -1506,7 +1506,7 @@ function ScheduleStageV8({
           onNext={onNext}
           nextDisabled={busy || settings.steps.length === 0}
         />
-      )}
+      )} dirty={false}
     >
       {notice}
       <section className={styles.card} aria-labelledby="rm-schedule-title">
@@ -1704,7 +1704,7 @@ function ConfirmStageV8({
           nextDisabled={busy || !publishReady}
           nextBusy={busy}
         />
-      )}
+      )} dirty={false}
     >
       {notice}
       <section className={styles.card} aria-labelledby="rm-confirm-title">

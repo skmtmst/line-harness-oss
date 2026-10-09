@@ -113,7 +113,7 @@ export default function ColumnNew() {
         boardId="yRDwW"
         title="コラムを書く"
         description="外部サイトの記事へつなぐ下書きを作ります。記事本文は外部サイトで管理します。"
-        footerActions={<Button href="/nen-campaigns?tab=columns">一覧へ戻る</Button>}
+        footerActions={<Button href="/nen-campaigns?tab=columns">一覧へ戻る</Button>} dirty={false}
       >
         <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />} message="閲覧のみで見ています。コラムを書くのは管理者に頼んでください。" />
       </CreatePage>
@@ -192,7 +192,7 @@ export default function ColumnNew() {
             <Save size={15} aria-hidden="true" />下書きを保存
           </Button>
         </>
-      )}
+      )} dirty={false}
     >
       {failure ? <Notice tone="danger" message={failure.message} data-failure-kind={failure.kind} /> : null}
       {tagPruneNotice ? <Notice tone="warn" message={tagPruneNotice} onClose={() => setTagPruneNotice(null)} /> : null}

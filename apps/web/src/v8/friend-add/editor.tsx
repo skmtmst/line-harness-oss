@@ -726,7 +726,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       ) : (
         /* 閲覧のみ：変える操作（保存・次へ・有効にする）は置かない。 */
         <Button href="/friend-add-settings">一覧へ戻る</Button>
-      )}
+      )} dirty={false}
     >
       {!canEdit ? (
         <p className={styles.viewerBand} role="status">閲覧のみで見ています。変える操作は管理者に頼んでください。</p>

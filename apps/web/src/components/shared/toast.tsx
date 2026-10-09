@@ -187,6 +187,7 @@ export function notifyToast(message: string, options?: NotifyToastOptions): () =
 
 /** 保存成功の知らせはこの口から1つだけ出す。 */
 export function notifySaved(message = '保存しました', options?: Omit<NotifyToastOptions, 'tone'>): () => void {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('lh:form-saved'))
   return notifyToast(message, { ...options, tone: 'success' })
 }
 

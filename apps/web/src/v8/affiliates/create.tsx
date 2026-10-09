@@ -342,7 +342,7 @@ export default function CreateAffiliateV8() {
         <Button variant="primary" disabled={saving} busy={saving} busyLabel="登録しています" onClick={() => void runSave('finish')}>
           <Check size={15} aria-hidden="true" /> 登録して紹介リンクを発行する
         </Button>
-      </>}
+      </>} dirty={false}
     >
 
       {partialSave && createdId ? (

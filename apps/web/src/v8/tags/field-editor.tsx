@@ -386,7 +386,7 @@ export default function FieldEditor({
             <Check size={15} aria-hidden="true" />
             {mode === 'create' ? '項目を作る' : '保存する'}
           </Button>
-        </>}
+        </>} dirty={false}
       >
         {notices}
         {error ? <Notice tone="danger" message={error} /> : null}

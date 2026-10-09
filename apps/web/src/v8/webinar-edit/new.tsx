@@ -143,7 +143,7 @@ function NewInner() {
             <Button variant="primary" disabled={blocked} title={blockedReason} busy={saving === 'video'} onClick={() => void save('video')}><ArrowRight size={15} aria-hidden="true" />動画の設定へ</Button>
           </>}
         </>}
-        preview={<BasicPreview title={values.title} description={values.description} accountName={accountName} />}
+        preview={<BasicPreview title={values.title} description={values.description} accountName={accountName} />} dirty={false}
       >
         {readOnly ? <Notice tone="info">閲覧のみで見ています。ウェビナーを作るのはオーナーか管理者です。</Notice> : null}
         {error ? <Notice tone="danger">{error}</Notice> : null}

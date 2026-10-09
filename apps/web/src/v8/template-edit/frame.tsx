@@ -43,7 +43,7 @@ export function TemplateEditFrame({
   status?: ReactNode
 }) {
   const [alsoSave, setAlsoSave] = useState(false)
-  if (composerHost?.composer) return <Drawer open width="composer" title={title} titleAccessory={<span className={styles.composerTitleAccessories}><HelpTip label="この画面の使い方">テンプレートと同じ編集画面です。作ったものをこの吹き出しに入れます。</HelpTip><StatusBadge tone="neutral" dot={false}>{`吹き出し ${composerHost.composer.index + 1} に入ります`}</StatusBadge></span>} onClose={composerHost.onCancel} busy={composerHost.busy} footer={<div className={styles.composerFooter}>
+  if (composerHost?.composer) return <Drawer open dirty={false} width="composer" title={title} titleAccessory={<span className={styles.composerTitleAccessories}><HelpTip label="この画面の使い方">テンプレートと同じ編集画面です。作ったものをこの吹き出しに入れます。</HelpTip><StatusBadge tone="neutral" dot={false}>{`吹き出し ${composerHost.composer.index + 1} に入ります`}</StatusBadge></span>} onClose={composerHost.onCancel} busy={composerHost.busy} footer={<div className={styles.composerFooter}>
     {composerHost.composer.canSaveTemplate !== false ? <Checkbox disabled={composerHost.busy} checked={alsoSave} onCheckedChange={setAlsoSave}>テンプレートとしても保存する</Checkbox> : <span />}
     <span className={styles.composerFooterActions}><Button disabled={composerHost.busy} onClick={composerHost.onCancel}>キャンセル</Button><Button variant="primary" disabled={composerHost.busy} busy={composerHost.busy} onClick={() => onComposerInsert?.(alsoSave)}>この吹き出しに入れる</Button></span>
   </div>}><div className={styles.composerSplit}><div className={styles.composerContent}>{band}{children}</div><aside className={styles.composerSide}>{side}</aside></div></Drawer>

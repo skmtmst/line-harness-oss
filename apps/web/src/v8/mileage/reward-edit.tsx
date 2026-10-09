@@ -389,7 +389,7 @@ function RewardEditorInner() {
         <Button variant="primary" onClick={requestPublish} disabled={saving || testing}>
           <Check size={15} aria-hidden="true" /> 保存して出す
         </Button>
-      </>}
+      </>} dirty={false}
     >
       {failure ? <Notice tone="danger" message={failure} /> : null}
       {testResult ? (

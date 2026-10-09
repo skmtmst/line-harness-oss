@@ -267,7 +267,7 @@ export default function AffiliateOfferCreateV8() {
             </>
           ) : null}
         </>
-      )}
+      )} dirty={false}
     >
       {canEdit ? null : <p className={styles.viewerBand} role="status">閲覧のみで見ています。案件を作るのは管理者に頼んでください。</p>}
       {saveError ? <p className={styles.error} role="alert">{saveError}</p> : null}

@@ -447,7 +447,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
           <Button type="button" variant="primary" disabled={saveDisabled} title={blockedReason ?? undefined} onClick={() => void save()} busy={saving}>
             <Check size={15} aria-hidden="true" />{editing ? '保存する' : '対応マークを作る'}
           </Button>
-        </>}
+        </>} dirty={false}
       >
         {hideForm ? (
           <ListState

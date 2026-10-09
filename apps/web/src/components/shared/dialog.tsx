@@ -7,6 +7,7 @@ import Button from './button'
 import IconButton from './icon-button'
 import { OverlayDepthContext, useOverlayFocus, useV8Leave } from './overlay-utils'
 import styles from './dialog.module.css'
+import { useFormInputDirty } from './form-input-dirty'
 import { useOverlayDiscard } from './overlay-discard'
 import { useStepMotion } from './use-step-motion'
 
@@ -125,7 +126,7 @@ export default function Dialog({
   description,
   tone = 'default',
   descriptionBand,
-  dirty = false,
+  dirty,
   busy = false,
   initialFocusId,
   error,
@@ -146,7 +147,9 @@ export default function Dialog({
   footerAlign,
   designFooterGap,
 }: DialogProps) {
-  const discard = useOverlayDiscard(open, dirty, busy, onCancel)
+  const formInput = useFormInputDirty(open)
+  const isDirty = dirty ?? (confirmation ? false : formInput.dirty)
+  const discard = useOverlayDiscard(open, isDirty, busy, onCancel)
   const depth = useContext(OverlayDepthContext)
   const titleId = useId()
   const descriptionId = useId()
@@ -201,7 +204,10 @@ export default function Dialog({
   )
   const panel = (
     <div
-      ref={panelRef}
+      ref={(element) => { panelRef.current = element; formInput.ref.current = element }}
+      onChangeCapture={formInput.onChangeCapture}
+      onInputCapture={formInput.onChangeCapture}
+      onClickCapture={formInput.onClickCapture}
       className={`${styles.panel} ${styles.standardPanel} ${confirmation ? styles.confirmationPanel : ''} ${confirmationSizeClass}`}
       role={tone === 'destructive' ? 'alertdialog' : 'dialog'}
       aria-modal={modal || undefined}
@@ -253,7 +259,7 @@ export default function Dialog({
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       <div className={styles.footer} onClickCapture={(event) => {
         const button = (event.target as Element).closest?.('button')
-        if (dirty && button && /^(閉じる|キャンセル)$/.test(button.textContent?.trim() ?? '')) {
+        if (isDirty && button && /^(閉じる|キャンセル)$/.test(button.textContent?.trim() ?? '')) {
           event.preventDefault(); event.stopPropagation(); discard.requestClose()
         }
       }}>

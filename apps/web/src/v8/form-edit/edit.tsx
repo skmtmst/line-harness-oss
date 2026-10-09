@@ -920,7 +920,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       footerActions={footerActions}
       status={host ? (dirty ? '保存していない変更があります' : undefined) : autosave.label
         ? <span aria-live="polite" data-autosave-status>{autosave.label}</span>
-        : dirty ? '保存していない変更があります' : undefined}
+        : dirty ? '保存していない変更があります' : undefined} dirty={false}
     >
       <FormEditAttemptContext.Provider value={attempted}>
       <div className={styles.root} data-fe-root>

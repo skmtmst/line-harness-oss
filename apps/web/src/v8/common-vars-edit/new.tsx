@@ -444,7 +444,7 @@ export default function NewCommonVarV8() {
             </>
           ) : null}
         </>
-      )}
+      )} dirty={false}
     >
       {canWrite ? null : (
         <div className={styles.roBand} role="status">

@@ -548,7 +548,7 @@ function ConversionCreate() {
       /* 競合の帯は型の notice に渡し、入力欄と右の列の上に置く。 */
       notice={conflictBand}
       preview={viewerOnly ? undefined : previewColumn}
-      footerActions={footerActions}
+      footerActions={footerActions} dirty={false}
     >
       {viewerOnly ? (
         <div className={styles.viewerBand} role="status">閲覧のみで見ています。作る操作は管理者に頼んでください。</div>

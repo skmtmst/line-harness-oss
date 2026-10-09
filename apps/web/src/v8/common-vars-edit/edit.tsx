@@ -1125,7 +1125,7 @@ function EditCommonVarV8Inner() {
             )
           ) : null}
         </>
-      )}
+      )} dirty={false}
     >
       {canWrite ? null : (
         <div className={styles.roBand} role="status">

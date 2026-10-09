@@ -300,7 +300,7 @@ function WebhooksCreateV8Inner() {
         boardId="hsD8e"
         title="送り先を作る"
         description="友だちの動きを、決めたタイミングでほかのシステムへ送ります。試しに送ってから動かすと安心です。"
-        footerActions={<Button href="/webhooks">一覧へ戻る</Button>}
+        footerActions={<Button href="/webhooks">一覧へ戻る</Button>} dirty={false}
       >
         <Notice tone="info">送り先の作成は統括だけができます。必要なときは統括に頼んでください。</Notice>
       </CreatePage>
@@ -347,7 +347,7 @@ function WebhooksCreateV8Inner() {
           <Button disabled={saving} onClick={() => void save('draft')} busy={saving}>下書きを保存</Button>
           <Button variant="primary" disabled={saving} onClick={() => void save('active')} busy={saving}>つくって動かす</Button>
         </>
-      )}
+      )} dirty={false}
     >
       {error ? <Notice tone="danger">{error}</Notice> : null}
 

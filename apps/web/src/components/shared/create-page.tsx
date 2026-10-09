@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/layout/header'
 import styles from './create-page.module.css'
+import { AutoFormLeaveGuard } from './form-leave-guard'
 import Button from '@/components/shared/button'
 import { notifySaved } from '@/components/shared/toast'
 import HelpTip from '@/components/shared/help-tip'
@@ -251,6 +252,7 @@ export default function CreatePage({
   return (
     <VariantContext.Provider value={variant}>
     <div data-design-node={designNode} data-create-variant={variant}>
+      <AutoFormLeaveGuard busy={saving} />
       {showHeader ? (
         <div data-design="Head" className={styles.head}>
           {crumb}

@@ -382,7 +382,7 @@ function InflowCreate() {
             </Button>
           )}
         </>
-      )}
+      )} dirty={false}
     >
       {pruneNotice ? <Notice tone="warn" message={pruneNotice} onClose={() => setPruneNotice(null)} /> : null}
       {saveError ? <Notice tone="error" message={saveError} onClose={() => setSaveError(null)} /> : null}

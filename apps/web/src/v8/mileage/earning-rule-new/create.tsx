@@ -315,7 +315,7 @@ export default function EarningRuleCreateV8() {
             <Check size={15} aria-hidden="true" />{conflict ? '比べてから保存' : '保存して動かす'}
           </Button>
         </>
-      )}
+      )} dirty={false}
     >
       {saveError ? <Notice tone="danger" message={saveError} onClose={() => setSaveError('')} /> : null}
 

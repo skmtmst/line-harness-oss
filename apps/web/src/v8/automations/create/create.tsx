@@ -2529,7 +2529,7 @@ export function NewAutomationV8({
             </>
           ) : null}
         </>
-      )}
+      )} dirty={false}
     >
       {canManage === false ? (
         <p className={styles.viewerBand} role="status">閲覧のみで見ています。ルールを作る操作は管理者に頼んでください。</p>
