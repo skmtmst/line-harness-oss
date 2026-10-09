@@ -100,9 +100,10 @@ async function matchRichReference(b:R2RuntimeBinding,ref:RichReference,account:s
   if (['mark','reminder','notification_rule','event','folder'].includes(ref.kind)) {
     const table = { mark: 'support_marks', reminder: 'reminders', notification_rule: 'notification_rules', event: 'events', folder: 'folders' }[ref.kind as 'mark'|'reminder'|'notification_rule'|'event'|'folder'];
     const active = { mark: 'r.archived_at IS NULL', reminder: "r.deleted_at IS NULL AND r.lifecycle_status='published'", notification_rule: 'r.is_active=1', event: "r.deleted_at IS NULL AND r.lifecycle_status='published'", folder: '1=1' }[ref.kind as 'mark'|'reminder'|'notification_rule'|'event'|'folder'];
-    const joins = ref.kind === 'mark' ? 'LEFT JOIN support_mark_scopes scope ON scope.mark_id=r.id' : 'JOIN line_accounts a ON a.id=r.line_account_id';
+    const accountColumn = ref.kind === 'folder' ? 'account_id' : 'line_account_id';
+    const joins = ref.kind === 'mark' ? 'LEFT JOIN support_mark_scopes scope ON scope.mark_id=r.id' : `JOIN line_accounts a ON a.id=r.${accountColumn}`;
     const sourceWhere = ref.kind === 'mark' ? "COALESCE(scope.tenant_id,'00000000-0000-4000-8000-000000000001')=?" : 'a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL';
-    const targetWhere = ref.kind === 'mark' ? "COALESCE(scope.tenant_id,'00000000-0000-4000-8000-000000000001')=? AND (scope.line_account_id=? OR scope.line_account_id IS NULL)" : 'a.tenant_id=? AND r.line_account_id=?';
+    const targetWhere = ref.kind === 'mark' ? "COALESCE(scope.tenant_id,'00000000-0000-4000-8000-000000000001')=? AND (scope.line_account_id=? OR scope.line_account_id IS NULL)" : `a.tenant_id=? AND r.${accountColumn}=?`;
     const source = await b.db.prepare(`SELECT r.* FROM ${table} r ${joins} WHERE r.id=? AND ${sourceWhere} AND ${active}`).bind(ref.sourceId,b.authority.tenantId).first<DbRow>();
     if (!source) unavailable();
     const listSql = `SELECT json_group_array(json_object('id',r.id,'name',r.name)) FROM ${table} r ${joins} WHERE ${targetWhere} AND ${active} ORDER BY r.id`;
@@ -112,6 +113,7 @@ async function matchRichReference(b:R2RuntimeBinding,ref:RichReference,account:s
     const target = await b.db.prepare(`SELECT * FROM ${table} WHERE id=?`).bind(matches[0].id).first<DbRow>();
     if (!target || (ref.kind === 'folder' && target.kind !== source!.kind) || (ref.kind === 'notification_rule' && target.version !== source!.version)) unavailable();
     const dbCommit = [exactRowGuard(table,source!),exactRowGuard(table,target!),targetListGuard(listSql,[b.authority.tenantId,account],list)];
+    if (ref.kind !== 'mark') dbCommit.push(activeAccountGuard(String(source![accountColumn]),b.authority.tenantId));
     if (ref.kind === 'mark') for (const id of [ref.sourceId, matches[0].id]) {
       const scope = await b.db.prepare('SELECT tenant_id,line_account_id FROM support_mark_scopes WHERE mark_id=?').bind(id).first<DbRow>();
       dbCommit.push(guard("COALESCE((SELECT json_array(tenant_id,line_account_id) FROM support_mark_scopes WHERE mark_id=?),'null') IS ?",[id,scope?JSON.stringify([scope.tenant_id,scope.line_account_id]):'null']));

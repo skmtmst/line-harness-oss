@@ -1,13 +1,20 @@
 import { getBroadcastMessageAsset, getFriendFieldByIdForScope, getSupportMarkById, getFormById, jstNow, publishFormVersion } from '@line-crm/db';
-import { layoutToFields, researchFormLayout, type FormAction, type ResearchGate } from '@line-crm/shared';
+import { DEFAULT_TENANT_ID, layoutToFields, researchFormLayout, type FormAction, type ResearchGate } from '@line-crm/shared';
 import { isScenarioActionComplete, runActionRows, type ScenarioActionRow } from './scenario-actions.js';
 import { runAutoReplyAction, validateAutoReplyOperatorAction, type AutoReplyExecutionAction } from './auto-reply-operator-action.js';
 import type { Env } from '../index.js';
 
+async function researchBelongsToAccount(db: D1Database, ownerId: string | null, accountId: string | null): Promise<boolean> {
+  if (!accountId) return false;
+  if (ownerId !== null) return ownerId === accountId;
+  const account = await db.prepare('SELECT tenant_id FROM line_accounts WHERE id=?').bind(accountId).first<{ tenant_id: string | null }>();
+  return Boolean(account && (account.tenant_id ?? DEFAULT_TENANT_ID) === DEFAULT_TENANT_ID);
+}
+
 /** 版とアカウントごとに固定する。新しい公開版でも入力中の質問と後処理を変えない。 */
 export async function ensureResearchForm(db: D1Database, assetId: string, accountId: string): Promise<string> {
   const asset = await getBroadcastMessageAsset(db, assetId);
-  if (!asset || asset.kind !== 'research' || asset.published_version < 1 || (asset.line_account_id !== null && asset.line_account_id !== accountId)) throw new Error('RESEARCH_NOT_FOUND');
+  if (!asset || asset.kind !== 'research' || asset.published_version < 1 || !await researchBelongsToAccount(db, asset.line_account_id, accountId)) throw new Error('RESEARCH_NOT_FOUND');
   const layout = researchFormLayout(asset.id, asset.published_version, asset.name, JSON.parse(asset.payload_json));
   for (const action of layout.options.afterActions ?? []) {
     if (action.kind === 'research_action' && action.actionType === 'event_booking') throw new Error('イベント予約操作は、日時の選び方を確認するまで実行できません');
@@ -32,7 +39,7 @@ export async function ensureResearchForm(db: D1Database, assetId: string, accoun
 export async function researchGateProblem(db: D1Database, gate: ResearchGate, friendId: string, now: Date): Promise<string | null> {
   const asset = await getBroadcastMessageAsset(db, gate.assetId);
   const friend = await db.prepare('SELECT line_account_id FROM friends WHERE id = ?').bind(friendId).first<{ line_account_id: string | null }>();
-  if (!asset || asset.kind !== 'research' || asset.published_version < gate.version || !friend || (asset.line_account_id !== null && asset.line_account_id !== friend.line_account_id)) return 'いま回答を受け付けていません';
+  if (!asset || asset.kind !== 'research' || asset.published_version < gate.version || !friend || !await researchBelongsToAccount(db, asset.line_account_id, friend.line_account_id)) return 'いま回答を受け付けていません';
   if (gate.startsAt && now.getTime() < Date.parse(gate.startsAt)) return 'まだ回答の受付が始まっていません';
   if (gate.endsAt && now.getTime() >= Date.parse(gate.endsAt)) return '回答の受付が終了しました';
   if (gate.targetTagId) {
@@ -65,8 +72,9 @@ export async function runResearchAnswerAction(db: D1Database, action: Extract<Fo
 export async function validateResearchActionScope(db: D1Database, action: Extract<FormAction, { kind: 'research_action' }>, accountId: string): Promise<void> {
   const requireResource = async (table: string, id: unknown, published = false) => {
     if (typeof id !== 'string' || !id) throw new Error('回答後に行うことの対象を選んでください');
-    const row = await db.prepare(`SELECT line_account_id${published ? ',published_version' : ''} FROM ${table} WHERE id=?`).bind(id).first<{ line_account_id: string | null; published_version?: number }>();
-    if (!row || (row.line_account_id !== null && row.line_account_id !== accountId) || (published && !row.published_version)) throw new Error('このアカウントで使える公開済みの対象を選んでください');
+    const accountColumn = table === 'folders' ? 'account_id' : 'line_account_id';
+    const row = await db.prepare(`SELECT ${accountColumn} AS line_account_id${published ? ',published_version' : ''} FROM ${table} WHERE id=?${table === 'folders' ? " AND kind='tag'" : ''}`).bind(id).first<{ line_account_id: string | null; published_version?: number }>();
+    if (!row || !await researchBelongsToAccount(db, row.line_account_id, accountId) || (published && !row.published_version)) throw new Error('このアカウントで使える公開済みの対象を選んでください');
   };
   const c = action.config;
   switch (action.actionType) {
@@ -76,9 +84,9 @@ export async function validateResearchActionScope(db: D1Database, action: Extrac
       break;
     case 'friend_field': case 'support_mark': {
       if (action.actionType === 'support_mark' && c.markId === null) break;
-      const account = await db.prepare('SELECT tenant_id FROM line_accounts WHERE id=?').bind(accountId).first<{ tenant_id: string }>();
+      const account = await db.prepare('SELECT tenant_id FROM line_accounts WHERE id=?').bind(accountId).first<{ tenant_id: string | null }>();
       if (!account) throw new Error('アカウントを確認できませんでした');
-      const scope = { tenantId: account.tenant_id, lineAccountId: accountId };
+      const scope = { tenantId: account.tenant_id ?? DEFAULT_TENANT_ID, lineAccountId: accountId };
       const resource = action.actionType === 'friend_field' ? await getFriendFieldByIdForScope(db, String(c.fieldId), scope) : await getSupportMarkById(db, String(c.markId), scope);
       if (!resource) throw new Error('このアカウントで使える情報欄・対応マークを選んでください');
       break;

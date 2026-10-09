@@ -44,6 +44,7 @@ export function researchFormLayout(assetId: string, version: number, name: strin
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('回答後に行うことを確認してください');
     const action = raw as Record<string, unknown>;
     if (!['tag','friend_field','support_mark','scenario','common_var','send_message','send_template','reminder','event_booking','notify_staff'].includes(String(action.actionType)) || !action.config || typeof action.config !== 'object' || Array.isArray(action.config) || (action.onFailure !== undefined && !['stop','continue'].includes(String(action.onFailure)))) throw new Error('回答後に行うことを確認してください');
+    if (action.actionType === 'event_booking') throw new Error('イベント予約操作は、日時の選び方を確認するまで実行できません');
     return { kind: 'research_action', actionType: action.actionType as ResearchAnswerAction['actionType'], config: action.config as Record<string, unknown>, onFailure: action.onFailure === 'stop' ? 'stop' : 'continue' };
   });
   return layout;

@@ -510,3 +510,14 @@ test('B-173: リサーチの配布先の通知先が別店へ移ったら事前�
  const ctx=await f.preflight('a','overwrite');f.raw.exec("UPDATE notification_rules SET line_account_id='foreign' WHERE id='target-notice'");
  expect(await f.execute(ctx)).toMatchObject({status:'version_conflict'});expect(f.raw.prepare("SELECT id FROM broadcast_message_assets").all()).toEqual([]);
 });
+test('B-173: リサーチで指定したタグフォルダを店舗の同名フォルダへ付け替える', async () => {
+  const f=await fixture('template');
+  for(const [id,account] of [['source-folder','source'],['target-folder','a']]) f.raw.prepare("INSERT INTO folders(id,kind,name,account_id) VALUES (?,'tag','回答済み',?)").run(id,account);
+  const definition={...f.message,media:[],asset:{kind:'research',payload:{questions:[{text:'質問',format:'free',required:true}],answerActions:[{actionType:'tag',config:{op:'add',folderId:'source-folder'}}]}}};
+  const json=JSON.stringify(definition);f.raw.prepare("UPDATE hq_template_versions SET definition_json=?,content_hash=? WHERE id='v'").run(json,await digest(json));
+  const ctx=await f.preflight('a','overwrite');
+  expect(ctx.resolutions).toEqual(expect.arrayContaining([expect.objectContaining({itemKind:'folder',targetId:'target-folder'})]));
+  expect(await f.execute(ctx)).toMatchObject({status:'succeeded'});
+  const row=f.raw.prepare("SELECT payload_json FROM broadcast_message_assets WHERE line_account_id='a'").get() as {payload_json:string};
+  expect(JSON.parse(row.payload_json).answerActions[0].config.folderId).toBe('target-folder');
+});

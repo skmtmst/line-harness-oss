@@ -6,7 +6,7 @@ import { ensureResearchForm } from '../services/research-forms.js';
 
 const research = new Hono<Env>();
 research.get('/api/liff/research/:id/form', async c => {
-  const account = (await getLineAccounts(c.env.DB)).find(row => row.liff_id === c.req.query('liffId'));
+  const account = (await getLineAccounts(c.env.DB)).find(row => row.is_active === 1 && row.archived_at === null && row.liff_id === c.req.query('liffId'));
   if (!account) return c.json({ success: false, error: '回答画面が見つかりませんでした' }, 404);
   const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env, account.id);
   if (!identity?.lineAccountId || identity.lineAccountId !== account.id) return c.json({ success: false, error: 'LINEでログインしてください' }, 401);

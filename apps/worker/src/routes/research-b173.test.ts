@@ -59,6 +59,13 @@ describe('B-173 リサーチを既存の回答フォームへ接続', () => {
     expect(db.raw.prepare('SELECT tag_id FROM friend_tags').all()).toEqual([{ tag_id: 't1' }]);
     expect(db.raw.prepare('SELECT layout FROM forms WHERE id=?').get(id)).toEqual({ layout: expect.stringContaining('ペット') });
   });
+  test('停止・保管したアカウントのリサーチは開かせない', async () => {
+    db.raw.exec("UPDATE line_accounts SET is_active=0 WHERE id='a1'");
+    expect((await open()).status).toBe(404);
+    db.raw.exec("UPDATE line_accounts SET is_active=1,archived_at='2026-10-09' WHERE id='a1'");
+    expect((await open()).status).toBe(404);
+    expect(db.raw.prepare('SELECT COUNT(*) AS n FROM forms').get()).toEqual({ n: 0 });
+  });
   test('必須・選択肢・受付期間・対象タグを既存の回答口でも守る', async () => {
     for (const data of [{}, { question_1: '選択肢にない値' }]) {
       const id = await ensureResearchForm(db.db, 'r1', 'a1'); expect((await submit(id, data)).status).toBe(400);
@@ -84,8 +91,34 @@ describe('B-173 リサーチを既存の回答フォームへ接続', () => {
     expect(db.raw.prepare('SELECT tag_id FROM friend_tags ORDER BY tag_id').all()).toEqual([{ tag_id: 't1' }, { tag_id: 't2' }]);
     expect(db.raw.prepare('SELECT COUNT(*) AS n FROM form_submissions').get()).toEqual({ n: 1 });
   });
+  test('他の統括の旧タグを回答後の処理へ指定しても追加しない', async () => {
+    db.raw.exec("UPDATE tags SET line_account_id=NULL WHERE id='t1'");
+    const id = await ensureResearchForm(db.db, 'r1', 'a1');
+    expect((await submit(id)).status).toBe(202);
+    expect(db.raw.prepare('SELECT tag_id FROM friend_tags').all()).toEqual([]);
+    expect(db.raw.prepare('SELECT status FROM form_submit_claims').get()).toEqual({ status: 'failed' });
+  });
   test('同時に開いても同じ公開版は1つのフォームになる', async () => {
     const result = await Promise.all([ensureResearchForm(db.db, 'r1', 'a1'), ensureResearchForm(db.db, 'r1', 'a1')]);
     expect(result[0]).toBe(result[1]); expect(db.raw.prepare('SELECT COUNT(*) AS n FROM forms').get()).toEqual({ n: 1 });
   });
+  test('店舗のタグフォルダを指定した回答後の操作を実行する', async () => {
+    db.raw.exec("INSERT INTO folders(id,kind,name,account_id) VALUES ('folder1','tag','回答済み','a1'); UPDATE tags SET folder_id='folder1' WHERE id='t1'");
+    update({ answerActions: [{ actionType: 'tag', config: { op: 'add', folderId: 'folder1' }, onFailure: 'stop' }] });
+    const id = await ensureResearchForm(db.db, 'r1', 'a1');
+    expect((await submit(id)).status).toBe(201);
+    expect(db.raw.prepare('SELECT tag_id FROM friend_tags').all()).toEqual([{ tag_id: 't1' }]);
+  });
+});
+
+test('未割当の旧素材は既定統括だけに公開し、別統括へ読ませない', async () => {
+  db.raw.exec("UPDATE broadcast_message_assets SET line_account_id=NULL");
+  expect((await open()).status).toBe(404);
+  db.raw.exec("UPDATE line_accounts SET tenant_id='00000000-0000-4000-8000-000000000001' WHERE id='a1'");
+  const opened = await open();
+  expect(opened.status).toBe(200);
+  const { data: { formId } } = await opened.json() as { data: { formId: string } };
+  db.raw.exec("UPDATE line_accounts SET tenant_id='tenant1' WHERE id='a1'");
+  expect((await submit(formId)).status).toBe(400);
+  expect(db.raw.prepare('SELECT COUNT(*) AS n FROM form_submissions').get()).toEqual({ n: 0 });
 });

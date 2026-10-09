@@ -122,6 +122,13 @@ describe('クーポン・リサーチの変換', () => {
     expect(convertBroadcastAsset('research', '案内', { description: '旧設定' }).ok).toBe(false);
     expect(convertBroadcastAsset('research', '案内', { assetId: 'r1', description: '旧設定' }).ok).toBe(false);
   });
+  it('日時の決め方が未確定のイベント予約を含むリサーチは送信前に止める', () => {
+    const result = convertBroadcastAsset('research', '案内', {
+      assetId: 'r1', questions: [{ text: 'お名前', format: 'free', required: true }],
+      answerActions: [{ actionType: 'event_booking', config: { eventId: 'e1' } }],
+    });
+    expect(result).toEqual({ ok: false, error: expect.stringContaining('日時の選び方') });
+  });
 
   it('空のクーポンは作り直し方で止める', () => {
     expect(convertBroadcastAsset('coupon', '案内', {}).ok).toBe(false);
