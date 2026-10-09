@@ -295,6 +295,7 @@ export interface Folder {
 
 /** 対応マーク */
 export interface SupportMark {
+  archivedAt?: string | null;
   id: string;
   name: string;
   color: string;

@@ -13,7 +13,7 @@ import {
   type AutomationRunDomainStatus,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { requireRole, denyReadOnly } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import {
   AutomationDraftError,
@@ -32,6 +32,7 @@ import {
   previewAutomationAudience,
   runAutomationTest,
   updateAutomationDefinitionStatus,
+  restoreAutomationDefinition,
 } from '../services/automation-definitions.js';
 import {
   AutomationRunCancelError,
@@ -628,9 +629,7 @@ automations.get(
     const result = await listAutomationDefinitions(
       c.env.DB,
       requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
-      limit === undefined && offset === undefined
-        ? undefined
-        : { limit, offset },
+      { limit, offset, includeArchived: c.req.query('includeArchived') === '1' },
     );
     return c.json({
       success: true,
@@ -958,7 +957,7 @@ automations.post(
  * #942 N-352: 一覧の稼働切替と「保管」。
  *
  * body は `{ status: 'active' | 'stopped' | 'archived' }`。
- * 保管は一方通行（戻すときは複製）。実行記録は残る。
+ * 保管から戻せる。戻すだけでは動かさず、実行記録は残る。
  */
 automations.post(
   '/api/automations/:id/status',
@@ -983,6 +982,14 @@ automations.post(
     }));
   },
 );
+
+automations.post('/api/automations/:id/restore', requireAutomationPermission, requireRole('owner', 'admin', 'staff'), denyReadOnly(), async (c) => {
+  const accountId = await definitionAccountId(c);
+  if (typeof accountId !== 'string') return accountId;
+  const requested = c.req.query('lineAccountId') ?? c.req.query('account_id');
+  if (requested && requested !== accountId) return c.json({ success: false, error: 'ルールが見つかりません' }, 404);
+  return definitionEndpoint(c, () => restoreAutomationDefinition(c.env.DB, { id: c.req.param('id'), lineAccountId: accountId }));
+});
 
 // 詳細・ログは一覧より機微度が高い（friendId・eventDataを含む）ため、
 // アカウント範囲の検査に加えて機能の権限キー検査も直接付ける。

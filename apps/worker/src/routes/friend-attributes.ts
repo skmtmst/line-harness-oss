@@ -1,5 +1,7 @@
 import { Hono, type Context } from 'hono';
 import {
+  restoreSupportMark,
+  ArchiveRestoreError,
   getSupportMarksWithUsage,
   getSupportMarkArchiveImpact,
   getSupportMarkById,
@@ -52,7 +54,7 @@ import {
   type Folder,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { requireRole, denyReadOnly } from '../middleware/role-guard.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import {
@@ -100,6 +102,7 @@ function serializeMark(
     updatedAt: row.updated_at ?? row.created_at,
     version: Number(row.version ?? 1),
     isInherited: Boolean(row.is_inherited),
+    archivedAt: row.archived_at,
     automationRules,
     displayTargets: SUPPORT_MARK_DISPLAY_TARGETS,
   };
@@ -402,7 +405,7 @@ friendAttributes.get('/api/support-marks', async (c) => {
     const scope = await supportMarkAccess(c);
     if (scope instanceof Response) return scope;
     const [marks, rules] = await Promise.all([
-      getSupportMarksWithUsage(c.env.DB, scope),
+      getSupportMarksWithUsage(c.env.DB, scope, c.req.query('includeArchived') === '1'),
       listSupportMarkAutomationRulesForAccount(c.env.DB, scope),
     ]);
     const rulesByMark = new Map<string, typeof rules>();
@@ -424,6 +427,23 @@ friendAttributes.get('/api/support-marks', async (c) => {
   } catch (err) {
     console.error('GET /api/support-marks error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+friendAttributes.post('/api/support-marks/:id/restore', requireRole('owner', 'admin'), denyReadOnly(), async (c) => {
+  try {
+    const scope = await supportMarkAccess(c);
+    if (scope instanceof Response) return scope;
+    const body = await c.req.json<Record<string, unknown>>().catch((): Record<string, unknown> => ({}));
+    const expectedVersion = body.expectedVersion;
+    if (typeof expectedVersion !== 'number' || !Number.isInteger(expectedVersion) || expectedVersion < 1) {
+      return c.json({ success: false, error: 'expectedVersion is required', fields: { expectedVersion: '最新の版を読み込んでください' } }, 400);
+    }
+    return c.json({ success: true, data: await restoreSupportMark(c.env.DB, scope, { id: c.req.param('id'), expectedVersion, actorId: c.get('staff').id }) });
+  } catch (error) {
+    if (error instanceof ArchiveRestoreError) return c.json({ success: false, code: error.code, error: error.code === 'not_found' ? '対象が見つかりません' : '状態が変わりました。もう一度読み込んでください' }, error.code === 'not_found' ? 404 : 409);
+    console.error('POST /api/support-marks/:id/restore error:', error);
+    return c.json({ success: false, error: '保管から戻せませんでした' }, 500);
   }
 });
 
