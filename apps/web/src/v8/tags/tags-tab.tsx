@@ -30,7 +30,6 @@ import {
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError, type ListStats } from '@/lib/api'
 import { useRowLeaving } from '@/lib/use-row-leaving'
-import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { ListPageBody } from '@/components/templates'
 import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from './folder-colors'
@@ -227,7 +226,6 @@ export default function TagsTab({
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null)
   const { leavingId, leave } = useRowLeaving()
   // 使っている所が0のタグは窓なしで保管し、5秒は「元に戻す」で取り消せる（動きの点検 17 番・旧い一覧と同じ）。
-  const deferredDelete = useDeferredDelete()
   const [folderDialog, setFolderDialog] = useState<'new' | TagGroup | null>(null)
   const [deletingGroup, setDeletingGroup] = useState<TagGroup | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
@@ -294,7 +292,6 @@ export default function TagsTab({
 
   const filtered = useMemo(() => items.filter((tag) => {
     // 保管して「元に戻す」を待っている行は出さない。
-    if (deferredDelete.isHidden(tag.id)) return false
     if (query && !tag.name.toLowerCase().includes(query.toLowerCase())) return false
     if (folder === UNGROUPED && tag.groupId) return false
     if (folder && folder !== UNGROUPED && tag.groupId !== folder) return false
@@ -310,7 +307,7 @@ export default function TagsTab({
       if (key === 'linked' && !linked) return false
     }
     return true
-  }), [items, query, folder, usageFilter, sourceFilter, quick, deferredDelete])
+  }), [items, query, folder, usageFilter, sourceFilter, quick])
   const pages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const currentPage = Math.min(page, pages)
   const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
@@ -493,25 +490,8 @@ export default function TagsTab({
     return list
   }
 
-  /*
-   * 保管の入口。使っている所が0（友だち0人・どこからも使われていない）と分かっているタグは、
-   * 確かめの窓を出さずに一覧から外し、5秒は「元に戻す」で取り消せる。送る直前に影響を読み直し、
-   * その間に使われ始めていたら保管せずに行を戻す。それ以外は今までどおり確かめの窓。
-   */
-  const requestArchive = (tag: Tag) => {
-    if (!isUnused(tag) || !accountId) {
-      setDeleteTarget(tag)
-      return
-    }
-    if (activeTagId === tag.id) setActiveTagId(null)
-    deferredDelete.schedule({
-      ids: [tag.id],
-      message: `タグ「${tag.name}」を保管しました`,
-      commit: () => archiveIfStillUnused(tag.id, accountId),
-      onCommitted: () => load(),
-      failureMessage: 'タグを保管できませんでした。使われ始めていないか確かめて、もう一度お試しください。',
-    })
-  }
+  /* 削除は、利用状況にかかわらず確認してから実行する。 */
+  const requestArchive = (tag: Tag) => { setDeleteTarget(tag) }
 
   /* 右クリックのメニュー。行の「…」と同じ操作。移し先はそのまま並べる。 */
   const tagContextItems = (tag: Tag): ContextMenuItem[] => {

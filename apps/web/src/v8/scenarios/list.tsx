@@ -49,7 +49,6 @@ import NoPermissionBoard from '@/v8/no-permission/no-permission'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import { runUndoable } from '@/lib/undoable'
-import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { useLiveReorder } from '@/lib/use-live-reorder'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -321,11 +320,10 @@ export default function ScenariosListV8() {
     page: scenarioList.page,
   })
   /* 取り消し待ちの削除（5秒）の行は一覧から外して描く（動きの点検 17 番）。 */
-  const deferredDelete = useDeferredDelete()
   const shownRows = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : scenarioList.items
   const scenarios = useMemo(
-    () => (deferredDelete.hiddenCount === 0 ? shownRows : shownRows.filter((s) => !deferredDelete.isHidden(s.id))),
-    [deferredDelete, shownRows],
+    () => shownRows,
+    [shownRows],
   )
   /* 戻ってきたら前のスクロール位置へ（中身が描けてから）。 */
   useListScrollMemory(scenarioList.loaded)
@@ -403,41 +401,8 @@ export default function ScenariosListV8() {
     }
   }
 
-  /*
-   * 影響の無い削除だけ、確かめの窓を出さずに一覧から外し、5秒は「元に戻す」で取り消せる
-   * （動きの点検 17 番）。止まっていて・購読中が 0 人で・このアカウントだけのもので・
-   * ほかのシナリオの終了後の移動先になっていないもの。どれか分からないときは今までどおり窓。
-   */
-  const requestDelete = async (s: ScenarioRow) => {
-    setDeleteError('')
-    const candidate = !s.isActive && s.subscriberCount === 0 && s.lineAccountId !== null
-    let unreferenced = false
-    if (candidate) {
-      try {
-        const res = await api.scenarios.moveReferrers(s.id)
-        unreferenced = res.success && res.data.items.length === 0
-      } catch {
-        unreferenced = false
-      }
-    }
-    if (!unreferenced) {
-      setDeleteTarget(s)
-      return
-    }
-    if (panelId === s.id) setPanelId(null)
-    deferredDelete.schedule({
-      ids: [s.id],
-      message: `シナリオ「${s.name}」を削除しました`,
-      commit: () => api.scenarios.delete(s.id),
-      onCommitted: () => {
-        void loadFolders()
-        void loadOverallTotal()
-        void loadStats()
-        return loadScenarios()
-      },
-      failureMessage: 'シナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。',
-    })
-  }
+  /* 削除は、利用状況にかかわらず確認してから実行する。 */
+  const requestDelete = (s: ScenarioRow) => { setDeleteError(''); setDeleteTarget(s) }
 
   /* ===== まとめて「止める／再開」 ===== */
 

@@ -7,6 +7,8 @@ import Dialog from './dialog'
 interface ConfirmDialogProps {
   open: boolean
   title: string
+  /** 削除の対象名。削除の題と実行ボタンの文言は共通部品が持つ。 */
+  deleteName?: string
   description: string
   confirmLabel?: string
   cancelLabel?: string
@@ -70,6 +72,7 @@ interface ConfirmDialogProps {
 export default function ConfirmDialog({
   open,
   title,
+  deleteName,
   description,
   confirmLabel = '実行する',
   cancelLabel = 'キャンセル',
@@ -110,11 +113,11 @@ export default function ConfirmDialog({
   return (
     <Dialog
       open={open}
-      title={title}
+      title={deleteName !== undefined ? `「${deleteName}」を削除しますか？` : title}
       description={description}
       tone={destructive ? 'destructive' : 'default'}
       descriptionBand={dangerBand ? 'danger' : warning ? 'warning' : undefined}
-      confirmLabel={confirmLabel}
+      confirmLabel={deleteName !== undefined ? '削除する' : confirmLabel}
       cancelLabel={cancelLabel}
       busy={busy}
       confirmDisabled={confirmDisabled}

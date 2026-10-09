@@ -216,7 +216,7 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
     expect(routerPush).toHaveBeenCalledWith('/broadcasts/new')
   })
 
-  it('下書きの削除は窓を出さずに行を外し、5秒は送らない。予約済みは今までどおり確かめの窓', async () => {
+  it('決まり2：下書きも予約済みも確認してから削除する', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     try {
       deleteBroadcast.mockClear()
@@ -237,10 +237,12 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
       openMenuOf('未購入者フォロー')
       clickMenuItem('削除する')
       await flush()
-      expect(document.querySelector('[role="dialog"],[role="alertdialog"]'), '下書きなのに確かめの窓が出ました').toBeNull()
-      expect([...host.querySelectorAll('tr')].some((tr) => tr.textContent?.includes('未購入者フォロー')), '行が外れていません').toBe(false)
-      expect(deleteBroadcast).not.toHaveBeenCalled()
+      expect(document.body.textContent).toContain('「未購入者フォロー」を削除しますか？')
+      expect([...host.querySelectorAll('tr')].some((tr) => tr.textContent?.includes('未購入者フォロー'))).toBe(true)
       await act(async () => { vi.advanceTimersByTime(5100) })
+      expect(deleteBroadcast).not.toHaveBeenCalled()
+      const confirm = [...document.querySelectorAll('[role="alertdialog"] button')].find((el) => el.textContent?.trim() === '削除する') as HTMLButtonElement
+      act(() => confirm.click())
       await flush()
       expect(deleteBroadcast).toHaveBeenCalledWith('bc-2')
 

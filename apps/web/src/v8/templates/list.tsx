@@ -80,7 +80,6 @@ import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manag
 import StaffAssetList from './staff-asset-list'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
-import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import {
   DELETE_UNUSED_DESCRIPTION,
   blockedDeleteDescription,
@@ -452,7 +451,6 @@ export default function TemplatesListV8() {
   const normalizedTemplateQuery = useMemo(() => normalizeTemplateSearchText(templateQuery), [templateQuery])
 
   // 使われていないテンプレートは窓なしで消し、5秒は「元に戻す」で取り消せる（動きの点検 17 番）。
-  const deferredDelete = useDeferredDelete()
   const filteredTemplates = useMemo(() => templateSearchIndex.flatMap(({ template: t, normalizedSearchText }) => {
     if (normalizedTemplateQuery && !normalizedSearchText.includes(normalizedTemplateQuery)) return []
     /* フォルダで絞る。`category` の文字列ではなく `folderId` で見る。 */
@@ -467,9 +465,8 @@ export default function TemplatesListV8() {
     if (savedFilter === 'draft-changes' && !(t.hasDraft && t.publishedAt != null)) return []
     if (savedFilter === 'draft-only' && t.publishedAt != null) return []
     // 消して「元に戻す」を待っている行は出さない。
-    if (deferredDelete.isHidden(t.id)) return []
     return [t]
-  }), [normalizedTemplateQuery, selectedCategory, templateSearchIndex, chips, savedFilter, deferredDelete])
+  }), [normalizedTemplateQuery, selectedCategory, templateSearchIndex, chips, savedFilter])
 
   const filterActive = Boolean(
     normalizedTemplateQuery
@@ -630,27 +627,7 @@ export default function TemplatesListV8() {
    */
   const handleDelete = (t: Template) => {
     setDeleteError('')
-    if (t.usageCount > 0) {
-      setBlockedDelete({ item: t, accountId: selectedAccountId })
-      return
-    }
-    if (t.usageCount === 0) {
-      if (activeId === t.id) setActiveId(null)
-      setSelectedIds((current) => {
-        if (!current.has(t.id)) return current
-        const next = new Set(current)
-        next.delete(t.id)
-        return next
-      })
-      deferredDelete.schedule({
-        ids: [t.id],
-        message: `テンプレート「${t.name}」を削除しました`,
-        commit: () => api.templates.delete(t.id),
-        onCommitted: () => Promise.all([load(), loadFolders()]),
-        failureMessage: 'テンプレートを削除できませんでした。もう一度お試しください。',
-      })
-      return
-    }
+    if (t.usageCount > 0) { setBlockedDelete({ item: t, accountId: selectedAccountId }); return }
     setPendingDelete({ item: t, accountId: selectedAccountId })
   }
 
@@ -1406,56 +1383,20 @@ export default function TemplatesListV8() {
         削除の確認窓（`V6JFnd`：使っていないテンプレート）。
         危ないボタンは左端、キャンセルは真ん中（V8 の窓の決まり）。
       */}
-      <Dialog
+      <ConfirmDialog
         open={pendingDelete !== null}
-        title={`「${pendingDelete?.item.name ?? ''}」を削除する`}
+        title={`「${pendingDelete?.item.name ?? ''}」を削除しますか？`}
+        deleteName={pendingDelete?.item.name ?? ''}
         description={DELETE_UNUSED_DESCRIPTION}
-        busy={deleting}
-        error={deleteError}
+        destructive busy={deleting} error={deleteError}
         designNode="V6JFnd"
-        onCancel={() => {
-          if (deleting) return
-          setPendingDelete(null)
-          setDeleteError('')
-        }}
-        footer={
-          <div className={styles.dangerFooter}>
-            <span className={styles.footerLeft}>
-              <Button
-                type="button"
-                variant="danger"
-                disabled={deleting || (pendingDelete !== null && pendingDelete.accountId !== selectedAccountId)}
-                busy={deleting}
-                busyLabel="削除中…"
-                onClick={() => void confirmDelete()}
-              >
-                削除する
-              </Button>
-            </span>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={deleting}
-              onClick={() => {
-                setPendingDelete(null)
-                setDeleteError('')
-              }}
-            >
-              キャンセル
-            </Button>
-            <span className={styles.footerRight} aria-hidden="true" />
-          </div>
-        }
+        confirmDisabled={pendingDelete !== null && pendingDelete.accountId !== selectedAccountId}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => { if (!deleting) { setPendingDelete(null); setDeleteError('') } }}
       >
-        <div className={styles.fullWidth}>
-          <Notice tone="danger" message="削除は元に戻せません。" />
-        </div>
-        {pendingDelete !== null && pendingDelete.accountId !== selectedAccountId ? (
-          <p className={styles.alertText} role="alert">
-            アカウントが切り替わりました。削除するテンプレートを選び直してください。
-          </p>
-        ) : null}
-      </Dialog>
+        <Notice tone="danger" message="削除は元に戻せません。" />
+        {pendingDelete !== null && pendingDelete.accountId !== selectedAccountId ? <p className={styles.alertText} role="alert">アカウントが切り替わりました。削除するテンプレートを選び直してください。</p> : null}
+      </ConfirmDialog>
 
       {/* まとめて削除の確認窓。対象は「使っていない」ものだけ。 */}
       <ConfirmDialog
