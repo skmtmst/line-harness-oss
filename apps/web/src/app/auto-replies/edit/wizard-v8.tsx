@@ -1257,7 +1257,8 @@ function AutoReplyWizardV8Inner() {
             </span>
             <PageHeading title={`「${published!.name}」を有効にしました`} titleId="auto-reply-done-title" help={<>
               これから届くメッセージで動き始めます。止めているあいだに届いた分には、さかのぼって返しません。止めたいときは、一覧の「…」から止められます。
-            </p>
+            </>} />
+
             <dl className={styles.doneRows}>
               <div className={styles.doneRow}>
                 <dt>動く順番</dt>
@@ -1499,7 +1500,7 @@ function AutoReplyWizardV8Inner() {
   )
 
   return (
-    <CreatePage boardId={step === 'trigger' && narrow ? 'Z2LIUx' : STEP_DESIGN_NODES[step]} title={<>{autoReplyId && lifecycleStatus !== 'draft' ? 'ルールを編集' : 'ルールを作る'}</>} help={<>
+    <CreatePage boardId={step === 'trigger' && narrow ? 'Z2LIUx' : STEP_DESIGN_NODES[step]} title={autoReplyId && lifecycleStatus !== 'draft' ? 'ルールを編集' : 'ルールを作る'} help={<>
           {step === 'basic' ? (
             'いまは停止中として作ります。最後の「確認」で有効にします。'
           ) : (
@@ -1611,16 +1612,14 @@ function AutoReplyWizardV8Inner() {
                       onCreate={canManage
                         ? folderCreator((name, color) => api.folders.create({ kind: 'auto_reply', name, color }), folderById, (created) => setFolders((current) => [...current, { id: created.id, name: created.name, color: created.color }]))
                         : undefined}
-                    />
-                  </div>
+                    /></Field></div>
                 </div>
                 <div className={styles.field}><Field label="社内メモ" htmlFor="wiz-memo"><TextField
                     id="wiz-memo"
                     value={form.internalMemo}
                     onChange={(e) => patch({ internalMemo: e.target.value })}
                     placeholder="例：キャンペーン中だけ使う"
-                  />
-                </div>
+                  /></Field></div>
               </Card>
 
               <Notice tone="info">
@@ -1940,8 +1939,7 @@ function AutoReplyWizardV8Inner() {
                       value={form.holidayRule}
                       onChange={(v) => patch({ holidayRule: v as HolidayRuleValue })}
                       options={HOLIDAY_RULE_LABELS.map((o) => ({ value: o.value, label: o.label }))}
-                    />
-                  </label>
+                    /></Field>
                   </div>
                   {form.timeMode === 'custom' && (
                     <div className={styles.chips}>
@@ -2082,8 +2080,7 @@ function AutoReplyWizardV8Inner() {
                       onChange={(e) => patch({ responseContent: e.target.value })}
                       placeholder='{"type":"bubble", ...}'
                     />
-                    {fieldError('wiz-flex') ? <FieldError id="wiz-flex-error">{fieldError('wiz-flex')}</FieldError> : null}
-                  </div>
+{fieldError('wiz-flex') ? <FieldError id="wiz-flex-error">{fieldError('wiz-flex')}</FieldError> : null}</Field></div>
                 )}
 
                 {form.mode === 'inline-image' && (
@@ -2587,8 +2584,7 @@ function KeywordInput({ onAdd, error }: { onAdd: (word: string) => void; error?:
           }
         }}
         onBlur={commit}
-      />
-    </label>
+      /></Field>
   )
 }
 

@@ -950,7 +950,8 @@ function CommonVarsListV8Inner() {
         <div className={styles.headText}>
           <PageHeading title="共通情報" help={<>
             会社名・営業時間・電話番号など、何度も使う文字をここで持ち、テンプレートや配信に差し込みます。ここを変えると、差し込んだ所がまとめて変わります。
-          </p>
+          </>} />
+
         </div>
         <div className={styles.headActions}>
           <VarsExportPanel
@@ -1549,8 +1550,15 @@ function CommonVarsListV8Inner() {
                 placeholder={statusAction === 'stop' ? '例：キャンペーンが終わったため' : '例：新しい期間の案内を始めるため'}
                 className={styles.dialogInput}
               />
-            </label>
-            {statusAction === 'stop' && statusScheduled.length > 0 ? (
+            </>}>{statusAction === 'stop' && statusTarget.nextSchedule ? (
+              <p className={styles.dialogWarn} role="note">
+                <TriangleAlert size={14} aria-hidden="true" />
+                <span>
+                  決めた日時に変わる予約（{formatStamp(statusTarget.nextSchedule.effectiveFrom)}に「{statusTarget.nextSchedule.value || '（空）'}」へ）があります。止める前に予定も見直してください。
+                </span>
+              </p>
+            ) : null}
+{statusAction === 'stop' && statusScheduled.length > 0 ? (
               <p className={styles.dialogWarn} role="note">
                 <TriangleAlert size={14} aria-hidden="true" />
                 <span>
@@ -1558,8 +1566,7 @@ function CommonVarsListV8Inner() {
                   {statusScheduled.length > 1 ? `ほか${formatNumber(statusScheduled.length - 1)}件` : ''}
                 </span>
               </p>
-            ) : null}
-          </div>
+            ) : null}</Field></div>
         ) : null}
       </Dialog>
 
@@ -1647,11 +1654,10 @@ function CommonVarsListV8Inner() {
                 </>}><p className={deleteImpact.total > 0 ? styles.dialogError : styles.dialogLead}>
                   {usageText(deleteImpact)}
                 </p>
-                {consequenceText(deleteImpact) ? (
+{consequenceText(deleteImpact) ? (
                   <p className={styles.dialogLead}>{consequenceText(deleteImpact)}</p>
                 ) : null}
-
-                {(() => {
+{(() => {
                   const blocking = splitItems(deleteImpact.items).blocking
                   const visible = usageExpanded ? blocking : blocking.slice(0, 2)
                   return blocking.length > 0 ? (
@@ -1678,8 +1684,7 @@ function CommonVarsListV8Inner() {
                     </div>
                   ) : null
                 })()}
-
-                {!deleteImpact.canDelete ? (
+{!deleteImpact.canDelete ? (
                   <div>
                     <p className={styles.dialogLabel} style={{ marginTop: 12 }}>どうしますか</p>
                     <div
@@ -1711,8 +1716,7 @@ function CommonVarsListV8Inner() {
                               label: `${placeholderText(candidate.varKey)} — ${candidate.value || '（空）'}`,
                             }))
                             : [{ value: '', label: replacementPhase === 'loading' ? '候補を読み込んでいます' : '差し替えられる候補がありません' }]}
-                        />
-                      </label>
+                        /></Field>
                       {replacementPhase === 'loading' ? (
                         <p className={styles.dialogHint}>差し替え後の影響を確認しています…</p>
                       ) : replacementPhase === 'error' ? (
@@ -1745,8 +1749,7 @@ function CommonVarsListV8Inner() {
                     </div>
                   </div>
                 ) : null}
-
-                {unavailableText(deleteImpact) ? (
+{unavailableText(deleteImpact) ? (
                   <p className={styles.dialogHint}>{unavailableText(deleteImpact)}</p>
                 ) : null}
 {deleteImpact.canDelete ? (
@@ -1755,18 +1758,14 @@ function CommonVarsListV8Inner() {
                       onChange={(e) => setTypedKey(e.target.value)}
                       placeholder={placeholderText(deleteImpact.variable.varKey)}
                       className={styles.dialogInput}
-                    />
-                  </label>
+                    /></Field>
                 ) : null}
-
-                {deleteImpact.canDelete && blockedReason({ impact: deleteImpact, typedKey, reason: deleteReason }) ? (
+{deleteImpact.canDelete && blockedReason({ impact: deleteImpact, typedKey, reason: deleteReason }) ? (
                   <p className={styles.dialogHint}>{blockedReason({ impact: deleteImpact, typedKey, reason: deleteReason })}</p>
                 ) : null}
-
-                <p className={styles.dialogHint}>
+<p className={styles.dialogHint}>
                   {checkedAtText(deleteImpact.checkedAt)} 時点で、テンプレート・一斉配信・シナリオ・リマインダ・自動応答・回答フォーム・オートメーション・友だち追加時・共通アクションの9種類を確認しました。
-                </p>
-              </div>
+                </p></Field></div>
             ) : null}
           </div>
         ) : null}
@@ -1799,8 +1798,7 @@ function CommonVarsListV8Inner() {
             onChange={(e) => setBatchReason(e.target.value)}
             placeholder="例：店舗情報の変更のため"
             className="border-hairline rounded-control bg-canvas text-ink mt-1 w-full border px-3 py-2 text-sm"
-          />
-        </label>
+          /></Field>
       </ConfirmDialog>
 
       {editingFolder && (

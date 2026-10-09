@@ -352,7 +352,8 @@ function FriendDetailInner() {
           <PageHeading title={displayName} help={<>
             {[joinedAt ? `友だちになった日 ${joinedAt}` : null, `会員ランク ${rankLabel}`, lastActive ? `最後に動いた日 ${lastActive}` : null]
               .filter(Boolean).join('・')}
-          </p>
+          </>} />
+
         </div>
         <div className={styles.headActions}>
           <Button href={`/friends/detail?id=${encodeURIComponent(friend.id)}`}>

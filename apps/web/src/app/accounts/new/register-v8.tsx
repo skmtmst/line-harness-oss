@@ -579,7 +579,8 @@ export default function RegisterV8() {
       <div className={styles.head}>
         <PageHeading title="LINEアカウントを登録" help={<> {currentStep === 4 && !createdId
           ? '接続確認が5段すべて通るまで登録しません。止まった項目を直して、もう一度「接続して設定する」を押します。'
-          : currentStep === 5 ? '登録が完了しました。' : '画面に出る名前と、だれがこのアカウントを扱うかを決めます。'}</p>
+          : currentStep === 5 ? '登録が完了しました。' : '画面に出る名前と、だれがこのアカウントを扱うかを決めます。'}</>} />
+
       </div>
 
       <ol className={styles.steps} aria-label="登録の進捗">
@@ -667,8 +668,7 @@ export default function RegisterV8() {
                     <div><Field label="LINE ID" htmlFor="v8-line-id"><div className={styles.endpointRow}>
                         <input id="v8-line-id" className={styles.fieldInput} value={form.lineId} readOnly placeholder="「LINEから取得」を押すと入ります" aria-readonly />
                         <Button type="button" onClick={() => void fetchLineId()} disabled={busyAction === 'check'} busy={busyAction === 'check'} busyLabel="取得しています…">LINEから取得</Button>
-                      </div>
-                    </div>
+                      </div></Field></div>
                   </div>
                   <div>
                     <span className={styles.fieldLabel}>タグ</span>

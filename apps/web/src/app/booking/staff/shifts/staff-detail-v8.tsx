@@ -1233,8 +1233,7 @@ export default function StaffDetailV8({ staffId }: { staffId: string }) {
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="5" /><path d="M3.8 6.2l1.4 1.4 3-3.2" /></svg>
                     つながっている
                   </span>
-                ) : null}
-              </div>
+                ) : null}</Field></div>
               {calendarId ? (
                 <p className={styles.calendarMeta}>
                   最後に読んだ {calendarVerifiedAt ? formatDay(calendarVerifiedAt) : emptyValue('unknown')}

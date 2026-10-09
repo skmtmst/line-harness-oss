@@ -110,7 +110,8 @@ export default function MembersPageV8({
         <div className={styles.headText}>
           <PageHeading title="会員" help={<>
             ネットショップの会員と LINE の友だちを結びつけて、ランクやペットの情報を見ます。
-          </p>
+          </>} />
+
         </div>
         {/* fb9NJ・e5yBLx：ランク設定の板にも「CSVで書き出す」がある。 */}
         {(tab === 'members' || tab === 'ranks') && accountId ? <CsvExportButton accountId={accountId} /> : null}

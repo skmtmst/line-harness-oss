@@ -233,7 +233,8 @@ function EditInner() {
       <div className={formStyles.head}>
         <PageHeading title="たまる決めごとを編集" help={<>
           下書きを直します。動いている内容は変わりません——一覧の「公開して反映」でだけ反映されます。
-        </p>
+        </>} />
+
       </div>
 
       {conflict ? (
@@ -290,8 +291,7 @@ function EditInner() {
                       ? [{ value: source, label: '今の出どころ（この画面では選び直せません）' }]
                       : []),
                   ]}
-                />
-              </label>
+                /></Field>
             </div>
           </section>
 

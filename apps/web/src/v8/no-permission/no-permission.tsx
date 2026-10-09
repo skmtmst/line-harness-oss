@@ -9,9 +9,9 @@
 import { BookOpen, CircleHelp, Lock } from 'lucide-react'
 import Button from '@/components/shared/button'
 import styles from './no-permission.module.css'
-
 import { PageHeading } from '@/components/templates/page-frame'
 export type NoPermissionBoardProps = {
+
   /** 機能名。題と「○○を開く権限がありません」になる。 */
   featureName: string
   /** いまの役割の表示名。分からなければ出さない。 */

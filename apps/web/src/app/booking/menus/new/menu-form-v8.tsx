@@ -762,7 +762,8 @@ export default function MenuFormV8() {
         <Link href="/booking/menus" className={shell.backLink}>← 予約へ</Link>
         <PageHeading title={editTarget ? '予約メニューを直す' : '予約メニューを作る'} help={<>
           {editTarget ? '保存すると、お客さまの画面にすぐ出ます' : 'まだお客さまの画面には出ていません'}
-        </p>
+        </>} />
+
       </header>
 
       {conflict && (
@@ -807,10 +808,9 @@ export default function MenuFormV8() {
                   placeholder="例：トリミング（小型犬）"
                   aria-invalid={fieldErrors.name !== undefined}
                 />
-                {fieldErrors.name !== undefined ? (
+{fieldErrors.name !== undefined ? (
                   <span className="text-danger mt-1 text-xs" role="alert">{fieldErrors.name}</span>
-                ) : null}
-              </label>
+                ) : null}</Field>
               <span className={styles.field}>
                 <span className={styles.label}>分類</span>
                 <Select
@@ -845,8 +845,7 @@ export default function MenuFormV8() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="例：シャンプー・カット・爪切り"
-                />
-              </label>
+                /></Field>
             </div>
             <div className={`${styles.fieldGrid} ${styles.fieldGrid3}`}>
               <Field label="かかる時間"><span className={styles.unitField}>
@@ -868,7 +867,7 @@ export default function MenuFormV8() {
                   />
 
                 </span>
-                {fieldErrors.duration !== undefined ? (
+{fieldErrors.duration !== undefined ? (
                   <span className="text-danger mt-1 text-xs" role="alert">{fieldErrors.duration}</span>
                 ) : null}</Field>
               <Field label="金額（空なら「お問い合わせ」）"><span className={styles.unitField}>
@@ -881,8 +880,7 @@ export default function MenuFormV8() {
                     placeholder="8,400"
                     aria-label="金額（円）"
                   />
-                </span>
-              </label>
+                </span></Field>
               <span className={styles.field}>
                 <span className={styles.label}>予約したときのマイル</span>
                 <span className={styles.unitField}>
@@ -1057,10 +1055,9 @@ export default function MenuFormV8() {
                   />
 
                 </span>
-                {fieldErrors.buffer !== undefined ? (
+{fieldErrors.buffer !== undefined ? (
                   <span className="text-danger mt-1 text-xs" role="alert">{fieldErrors.buffer}</span>
-                ) : null}
-              </label>
+                ) : null}</Field>
             </div>
           </section>
 
@@ -1125,8 +1122,7 @@ export default function MenuFormV8() {
                     onChange={(e) => setIntakeQuestion(e.target.value)}
                     placeholder="例：気になるところ・アレルギーがあれば教えてください"
                     maxLength={200}
-                  />
-                </label>
+                  /></Field>
               )}
             </div>
           </section>

@@ -244,7 +244,8 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
         <div className={styles.headText}>
           <PageHeading title="コンバージョン" help={<>
             成果として数えるできごと（成果地点）を決めます。配信・流入・アフィリエイトの成果は、この数え方で集計します。
-          </p>
+          </>} />
+
         </div>
         <Button
           onClick={() => model.onExportCsv()}
@@ -736,8 +737,7 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
                   maxLength={500}
                   placeholder="計測の仕方を変えるため"
                   onChange={(event) => model.onStopReasonChange(event.target.value)}
-                />
-              </label>
+                /></Field>
               {model.stopError ? <p className={styles.panelError} role="alert">{model.stopError}</p> : null}
               <div className={styles.panelButtons}>
                 <Button variant="secondary" onClick={() => model.onCancelStop()} disabled={model.stopping}>

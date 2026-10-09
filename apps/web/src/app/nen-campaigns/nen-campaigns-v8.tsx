@@ -676,8 +676,7 @@ function SelectedColumnV8(props: NenOverviewProps) {
           だれに
           <p className={styles.selectDesc}>{selected.targetMode === 'tag' ? `タグで絞り込み（${audienceCount == null ? emptyValue('unknown') : num(audienceCount)}人）` : `友だち 全員（${audienceCount == null ? emptyValue('unknown') : num(audienceCount)}人）`}</p>
           <p className={styles.selectDesc}>送る相手はコラムを作るときに決めます。友だち解除・ブロックの人には送られません。</p>
-        </div>
-      </div>
+        </div></Field></div>
       <div className={styles.fieldLabel}>
         いつ
         <RadioCardGroup legend="いつ">
@@ -877,7 +876,7 @@ function HistoryV8(props: NenOverviewProps) {
                                     maxLength={500}
                                     autoFocus={retryFocusId === delivery.id}
                                   />
-                                  <span className={styles.selectFoot}>
+<span className={styles.selectFoot}>
                                     <Button
                                       type="button"
                                       variant="primary"
@@ -886,8 +885,7 @@ function HistoryV8(props: NenOverviewProps) {
                                     >
                                       再送待ちへ戻す
                                     </Button>
-                                  </span>
-                                </label>
+                                  </span></Field>
                               ) : delivery.status === 'skipped' ? (
                                 <p className={styles.selectDesc}>{skippedNoRetryNote[delivery.unmetReasonCode ?? ''] ?? 'この記録は再送できません。'}</p>
                               ) : (

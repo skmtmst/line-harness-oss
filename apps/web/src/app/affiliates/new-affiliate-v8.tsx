@@ -369,8 +369,7 @@ export function NewAffiliateV8() {
                   onChange={(event) => setCode(event.target.value)}
                   placeholder="petlife2026"
                   maxLength={64}
-                />
-              </label>
+                /></Field>
             </div>
             <Field label="連絡先メール" htmlFor="af-email"><TextField
                 id="af-email"
@@ -379,8 +378,7 @@ export function NewAffiliateV8() {
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="contact@example.com"
                 maxLength={200}
-              />
-            </label>
+              /></Field>
             <div>
               <div className="af-create-toolbar">
                 <Button type="button" variant="secondary" aria-expanded={friendPickerOpen} onClick={() => setFriendPickerOpen((open) => !open)}>
@@ -481,8 +479,7 @@ export function NewAffiliateV8() {
                     placeholder="10"
                   />
 
-                </span>
-              </label>
+                </span></Field>
             ) : null}
             <div className="af-create-grid2">
               <Field label="締めと支払い" htmlFor="af-cycle"><TextField
@@ -502,8 +499,7 @@ export function NewAffiliateV8() {
                     onChange={(event) => setHoldDays(event.target.value)}
                   />
                   <span className="af-create-footnote">日（取り消しを待つ）</span>
-                </span>
-              </label>
+                </span></Field>
             </div>
           </section>
 

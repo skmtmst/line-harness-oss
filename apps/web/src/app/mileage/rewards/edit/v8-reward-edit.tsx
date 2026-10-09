@@ -444,8 +444,7 @@ function RewardEditorInner() {
                   { value: 'all', label: 'すべての友だち' },
                   { value: 'conditioned', label: '条件で絞る（タグ・会員ランクなど）' },
                 ]}
-              />
-            </label>
+              /></Field>
             {audience === 'conditioned' ? (
               <div className={formStyles.conditionBox}>
                 <ConditionBuilder

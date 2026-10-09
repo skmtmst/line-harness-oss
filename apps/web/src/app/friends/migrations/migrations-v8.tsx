@@ -91,10 +91,9 @@ export default function FriendMigrationsV8() {
                 </Checkbox>
               ))}
             </fieldset>
-            <p className={styles.sectionDesc} style={{ margin: 0 }}>
+<p className={styles.sectionDesc} style={{ margin: 0 }}>
               文字コード：UTF-8（Shift_JISの書き出しはまだ使えません）
-            </p>
-          </div>
+            </p></Field></div>
           <div className={styles.cardCenter}>
             <Button
               variant="primary"

@@ -186,7 +186,7 @@ function NewWebinarV8Inner() {
       </nav>
       <PageHeading title="ウェビナーを作る" help={<> 管理名と公開ページの基本、開催形式を決めます。保存しても、まだ誰にも公開されません。</>} />
       <StepBand current={0} />
-      <p className={styles.headDescription}>管理名と公開ページの基本、開催形式を決めます。保存しても、まだ誰にも公開されません。</p>
+
 
       {error ? (
         <Notice tone="danger">{error}</Notice>
@@ -214,7 +214,7 @@ function NewWebinarV8Inner() {
                   className={styles.input}
                   aria-invalid={fieldErrors.title !== undefined}
                 />
-                {fieldErrors.title !== undefined ? (
+{fieldErrors.title !== undefined ? (
                   <p className={styles.fieldError} role="alert">{fieldErrors.title}</p>
                 ) : null}</Field></div>
               <div><Field label={<>公開ページのURL</>} htmlFor="webinar-v8-slug"><input
@@ -235,7 +235,7 @@ function NewWebinarV8Inner() {
                   className={styles.input}
                   aria-invalid={fieldErrors.slug !== undefined}
                 />
-                {fieldErrors.slug !== undefined ? (
+{fieldErrors.slug !== undefined ? (
                   <p className={styles.fieldError} role="alert">{fieldErrors.slug}</p>
                 ) : null}
 <p className={styles.fieldHelp}>アドレスの最後の部分です。空のままなら自動で付けます。</p></Field></div>
@@ -250,7 +250,7 @@ function NewWebinarV8Inner() {
                     ...folders.map((folder) => ({ value: folder.id, label: `${folder.name}（${folder.count}件）` })),
                   ]}
                 />
-                {foldersState === 'error' ? (
+{foldersState === 'error' ? (
                   <p className={styles.fieldHelp}>
                     フォルダを読み込めませんでした。{' '}
                     <button type="button" onClick={() => void loadFolders()} className={styles.crumbLink}>
@@ -264,8 +264,7 @@ function NewWebinarV8Inner() {
                   onChange={(event) => setDescription(event.target.value)}
                   placeholder="15分で NEN の使い方がわかる無料セミナーです"
                   className={styles.input}
-                />
-              </div>
+                /></Field></div>
             </div>
           </section>
 

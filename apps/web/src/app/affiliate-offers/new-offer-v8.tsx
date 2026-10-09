@@ -238,8 +238,7 @@ export function NewOfferV8() {
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
                 placeholder="例：初回の定期便をお申し込みいただいた方が対象です。"
-              />
-            </label>
+              /></Field>
           </section>
 
           {/*
@@ -258,8 +257,7 @@ export function NewOfferV8() {
                 options={[{ value: '', label: 'この画面では選べません' }]}
                 disabled
                 size="standard"
-              />
-            </label>
+              /></Field>
             <p className="af-create-footnote">成果地点と案件をつなぐ操作にはまだ対応していません。</p>
           </section>
 
@@ -284,8 +282,7 @@ export function NewOfferV8() {
                   value={rewardMiles}
                   onChange={(event) => setRewardMiles(event.target.value)}
                   placeholder="200"
-                />
-              </label>
+                /></Field>
             </div>
             <p className="af-create-footnote">現金とマイルは併用できます。マイルは標準プログラムで付けます。</p>
             <div className="af-create-staticBox">

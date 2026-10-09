@@ -469,15 +469,7 @@ export function V8RunsTab({
           onChange={(event) => changeQuery(event.target.value)}
           className={styles.toolsSearch}
         />
-        <label className={styles.checkLabel}>
-          <Checkbox
-            checked={includeTest}
-            onCheckedChange={(checked) => changeIncludeTest(checked)}
-          />
-          テスト実行も見る
-        </label>
-        <p className={styles.footnote}>この30日・20件表示</p>
-      </div>
+<p className={styles.footnote}>この30日・20件表示</p></Field></div>
 
       <div className={styles.toolbar}>
         <SegmentedControl

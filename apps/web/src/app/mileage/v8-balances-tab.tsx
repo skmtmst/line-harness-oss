@@ -596,8 +596,7 @@ export default function V8BalancesTab({
             onChange={(event) => setRejectReason(event.target.value)}
             placeholder="例：調整の根拠となる資料を確認できませんでした"
             rows={3}
-          />
-        </label>
+          /></Field>
       </Dialog>
     </>
   )

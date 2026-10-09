@@ -186,8 +186,7 @@ export default function ColumnNewV8() {
                     { value: 'tag', label: 'タグで絞る' },
                   ]}
                   onChange={(value) => set({ targetMode: value as 'all' | 'tag' })}
-                />
-              </label>
+                /></Field>
             </div>
             {draft.targetMode === 'tag' ? (
               <Field label="対象タグ"><Select
@@ -198,8 +197,7 @@ export default function ColumnNewV8() {
                     ...accountTags.map((tag) => ({ value: tag.id, label: tag.name })),
                   ]}
                   onChange={(value) => set({ targetTagId: value })}
-                />
-              </label>
+                /></Field>
             ) : null}
             <p className={styles.note}>この条件では {audienceCount == null ? emptyValue('unknown') : formatNumber(audienceCount)}人に届きます。</p>
             <Disclosure title="公開日時も記録する（任意）" size="compact">
@@ -220,8 +218,7 @@ export default function ColumnNewV8() {
                     ...accountTags.map((tag) => ({ value: tag.id, label: tag.name })),
                   ]}
                   onChange={(value) => set({ completionTagId: value })}
-                />
-              </label>
+                /></Field>
             </div>
           </section>
         </div>

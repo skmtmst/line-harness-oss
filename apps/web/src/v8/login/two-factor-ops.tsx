@@ -140,7 +140,7 @@ export default function OpsTwoFactorV8() {
         >
           <LogIn aria-hidden="true" className={styles.icon} />ログイン
         </Button>
-        <p className={styles.foot}>認証アプリが使えないときは、運営のオーナーに連絡してください。</p>
+
       </section>
     </main>
   )

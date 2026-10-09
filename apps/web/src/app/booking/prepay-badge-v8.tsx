@@ -136,8 +136,7 @@ export default function PrepayBadgeV8({ accountId, friendId, canEdit = true, onC
             maxLength={200}
             onChange={(event) => setReason(event.target.value)}
             placeholder="例：電話で確認が取れた"
-          />
-        </label>
+          /></Field>
       </Dialog>
     </div>
   )

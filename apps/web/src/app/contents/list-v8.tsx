@@ -1667,8 +1667,7 @@ export default function MediaLibraryListV8() {
             onChange={(event) => setArchiveReason(event.target.value)}
             placeholder={archiveTarget?.mode === 'archive' ? '例：古いキャンペーンの素材のため' : '例：再び使うため'}
             aria-label="理由"
-          />
-        </label>
+          /></Field>
       </Dialog>
 
       {/*

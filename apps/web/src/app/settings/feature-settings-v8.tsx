@@ -528,8 +528,7 @@ export function FeatureSettingsV8() {
               maxLength={300}
               disabled={saving}
             />
-            <p className={styles.reasonHint}>保存の記録に残ります。空のままでは保存できません。</p>
-          </div>}
+<p className={styles.reasonHint}>保存の記録に残ります。空のままでは保存できません。</p></Field></div>}
 
         </>
       )}

@@ -752,8 +752,7 @@ function ResourcePickRow(props: {
             {failedNote}
           </p>
         ) : null}
-      </div>
-    </div>
+      </div></Field></div>
   )
 }
 
@@ -2234,8 +2233,7 @@ export function NewAutomationV8({
                 onChange={(event) => setName(event.target.value)}
                 placeholder="例：「予約」と送られたら担当へ知らせる"
                 maxLength={120}
-              />
-            </label>
+              /></Field>
           </section>
 
           <section className={styles.formCard} aria-label="どんなときに動かしますか">
@@ -2323,8 +2321,7 @@ export function NewAutomationV8({
                   onChange={(event) => setKeyword(event.target.value)}
                   placeholder="例：予約"
                   maxLength={100}
-                />
-              </label>
+                /></Field>
             ) : null}
             {usesKeyword && keyword.trim() ? (
               <p className={styles.footnote}>空欄なら、どんな内容でも動きます。</p>
@@ -2383,8 +2380,7 @@ export function NewAutomationV8({
                         options={ACTIONS.map((action) => ({ value: action.value, label: action.label }))}
                         size="standard"
                       />
-                    </label>
-                    {row.type === 'add_tag' ? (
+                    </>} htmlFor={`v8-action-${row.key}`}>{row.type === 'add_tag' ? (
                       <V8ResourcePickRow
                         title="付けるタグ"
                         id={`v8-tag-${row.key}`}
@@ -2425,13 +2421,11 @@ export function NewAutomationV8({
                           id={`v8-message-${row.key}`}
                           value={row.message}
                           onChange={(event) => updateAction(row.key, { message: event.target.value })}
-                        />
-                      </label>
+                        /></Field>
                     )}
-                    <p className={styles.footnote}>
+<p className={styles.footnote}>
                       失敗したとき：現在はここで止まります。「次の処理へ進む」は実行基盤の接続後に選べます。
-                    </p>
-                  </div>
+                    </p></Field></div>
                   <button
                     type="button"
                     className={styles.miniMenuButton}
@@ -2792,9 +2786,7 @@ function V8ResourcePickRow(props: {
             ...options.map((option) => ({ value: option.value, label: option.label })),
           ]}
         />
-      </label>
-      {loading ? <p className={styles.footnote}>読み込んでいます</p> : null}
-      {failed ? <p className={styles.footnote}>{failedNote}</p> : null}
-    </div>
+      </>} htmlFor={id}>{loading ? <p className={styles.footnote}>読み込んでいます</p> : null}
+{failed ? <p className={styles.footnote}>{failedNote}</p> : null}</Field></div>
   )
 }

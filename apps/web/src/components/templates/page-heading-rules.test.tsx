@@ -10,3 +10,11 @@ it('B-158 決まり2：説明は？を開いたときだけ読み、本文への
   fireEvent.click(screen.getByRole('button', { name: '配信の説明' }))
   expect(screen.getByText('送る相手と日時を決めます。')).toBeTruthy()
 })
+
+it('認証画面の見出し段と、フォーカス先のIDを共通部品でも保つ', () => {
+  render(<PageHeading title="ログイン" titleAs="h1" titleId="login-heading" titleTabIndex={-1} />)
+  const title=screen.getByRole('heading', {name:'ログイン',level:1})
+  expect(title.id).toBe('login-heading')
+  title.focus()
+  expect(document.activeElement).toBe(title)
+})

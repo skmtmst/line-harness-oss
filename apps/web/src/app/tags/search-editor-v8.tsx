@@ -212,17 +212,12 @@ function DateRangeEditor({
           ]}
           className="w-28"
         />
-        <label className="min-w-40 flex-1 text-xs font-semibold text-ink-faint">
-          {op === 'before' ? '終了日' : '開始日'}
-          <DateField aria-label={op === 'before' ? '終了日' : '開始日'} value={op === 'before' ? to : from} onChange={op === 'before' ? setTo : setFrom} className="mt-1" />
-        </label>
-        {op === 'between' ? (
+{op === 'between' ? (
           <>
             <span className="pb-2 text-ink-faint" aria-hidden="true">〜</span>
             <Field label="終了日"><DateField aria-label="終了日" value={to} onChange={setTo} className="mt-1" /></Field>
           </>
-        ) : null}
-      </div>
+        ) : null}</Field></div>
       {reversed ? (
         <p role="alert" className="mt-1 text-xs text-danger">開始日が終了日より後になっています。入れ替えてください。</p>
       ) : null}

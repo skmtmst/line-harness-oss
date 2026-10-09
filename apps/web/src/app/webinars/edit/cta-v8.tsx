@@ -349,18 +349,9 @@ export default function CtaV8({
                         inputMode="numeric"
                         placeholder="12:00"
                         className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm tabular-nums"
-                      />
-                    </label>
+                      /></Field>
                   </div>
-                  <label className="block">
-                    <span className="text-ink-secondary mb-1 block text-xs font-medium">ボタンの言葉</span>
-                    <input
-                      value={current.buttonLabel}
-                      onChange={(e) => update(currentIndex, { buttonLabel: e.target.value })}
-                      className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-                    />
-                  </label>
-                  <div className="grid gap-3 sm:grid-cols-2">
+<div className="grid gap-3 sm:grid-cols-2">
                     <Select
                       label="リンクの種類"
                       aria-label="リンクの種類"
@@ -389,17 +380,15 @@ export default function CtaV8({
                           inputMode="url"
                           placeholder="https://"
                           className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-                        />
-                      </label>
+                        /></Field>
                     )}
                   </div>
-                  <Checkbox
+<Checkbox
                     checked={current.autoOpen}
                     onCheckedChange={(checked) => update(currentIndex, { autoOpen: checked })}
                   >
                     ボタンを押したら、フォームを自動で開く
-                  </Checkbox>
-                </div>
+                  </Checkbox></Field></div>
               ) : null}
               <div className="mt-3">
                 <Button disabled={saving || ctas === null} busy={saving} busyLabel="保存しています…" onClick={save}>

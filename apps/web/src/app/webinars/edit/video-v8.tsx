@@ -304,8 +304,7 @@ export default function VideoV8({
                 placeholder={webinar.publicationStartsAt ? formatDateTime(webinar.publicationStartsAt) : '2026/10/01 10:00'}
                 className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
               />
-            </label>
-            <div>
+            </>}><div>
               <span className="text-ink-secondary mb-1 block text-xs font-medium">
                 公開の終了 <span className="text-ink-faint">任意</span>
               </span>
@@ -320,8 +319,7 @@ export default function VideoV8({
               <Checkbox checked={noEnd} disabled={!canEdit} onCheckedChange={setNoEnd} className="mt-2 text-xs">
                 終わりを決めない（いつでも見られる）
               </Checkbox>
-            </div>
-          </div>
+            </div></Field></div>
           {periodError ? <Notice tone="danger" title="公開期間を保存できませんでした">{periodError}</Notice> : null}
           <div className="mt-3">
             <Button variant="secondary" disabled={!canEdit} busy={periodBusy} busyLabel="保存しています…" onClick={savePeriod}>
@@ -421,7 +419,7 @@ export default function VideoV8({
                   { value: 'once', label: '単発' },
                 ]}
               />
-              {newKind === 'weekly' ? (
+{newKind === 'weekly' ? (
                 <div>
                   <span className="text-ink-secondary mb-1 block text-xs font-medium">曜日</span>
                   <span className="flex flex-wrap gap-1">
@@ -449,27 +447,16 @@ export default function VideoV8({
                     value={newDate}
                     onChange={(e) => setNewDate(e.target.value)}
                     className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-                  />
-                </label>
+                  /></Field>
               ) : null}
-              <label className="block">
-                <span className="text-ink-secondary mb-1 block text-xs font-medium">時刻</span>
-                <input
-                  type="time"
-                  value={newTime}
-                  onChange={(e) => setNewTime(e.target.value)}
-                  className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-                />
-              </label>
-              <div className="flex flex-wrap gap-2">
+<div className="flex flex-wrap gap-2">
                 <Button busy={busy} busyLabel="足しています…" onClick={addRule}>
                   枠を足す
                 </Button>
                 <Button variant="secondary" onClick={() => setAdding(false)}>
                   やめる
                 </Button>
-              </div>
-            </div>
+              </div></Field></div>
           ) : null}
           {bulk ? (
             <div className="border-hairline mt-3 space-y-3 rounded-control border p-3">
@@ -492,8 +479,7 @@ export default function VideoV8({
                     value={bulkTime}
                     onChange={(e) => setBulkTime(e.target.value)}
                     className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-                  />
-                </label>
+                  /></Field>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button busy={busy} busyLabel="足しています…" onClick={addBulk}>

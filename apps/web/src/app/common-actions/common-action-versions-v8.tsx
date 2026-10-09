@@ -255,7 +255,8 @@ function VersionsV8Inner() {
           <Link href="/common-actions" className={styles.backLink}>← 共通アクション一覧へ戻る</Link>
           <PageHeading title={<>{detail.name}（版と使われている場所）</>} help={<>
             公開した版は書き換えられません。公開しても、呼び出し元は自動で変わりません。使う場所ごとに新しい版へ更新します。
-          </p>
+          </>} />
+
         </div>
         <div className={styles.headActions}>
           {manualHref ? <Button href={manualHref}>マニュアル</Button> : null}

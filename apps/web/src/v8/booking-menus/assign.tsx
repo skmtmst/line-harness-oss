@@ -492,8 +492,7 @@ export default function AssignMatrixV8() {
                           placeholder={formatNumber(selectedMenu.base_price)}
                           aria-label={`${staffLabel(selectedStaff)} の ${selectedMenu.name} の料金`}
                         />
-                        <span className={styles.unitSuffix}>（メニューは {menuPriceLabel(selectedMenu)}）</span>
-                      </span></Field>
+                        </Field>
                     <span className={styles.overrideClear}>
                       <Button
                         disabled={!canEditMenus || !selectedOverridden}

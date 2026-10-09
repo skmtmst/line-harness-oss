@@ -325,8 +325,8 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
                 {!isBirthday ? <label className={styles.delay}>
                   <NumberInput aria-label="きっかけからの日数" type="number" min={0} max={365}
                     value={String(merged.delayDays)} onChange={(event) => setDraft((previous) => ({ ...previous, delayDays: Number(event.target.value) }))} />
-                  <span>日後</span>
-                </label> : null}
+
+                </div> : null}
               </div>
               <div className={styles.fieldLabel}>
                 送る時刻
@@ -374,16 +374,14 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
             <Field label={<>配信本文
               <span className={styles.note}>差し込み：友だち情報欄「ペットの名前」・注文の「商品名」</span><span className={styles.toolbar}>
                 <InsertToolbar targetRef={bodyRef} value={merged.bodyText} onChange={(bodyText) => setDraft((previous) => ({ ...previous, bodyText }))} />
-              </span>
-              <textarea
+              </span></>}><textarea
                 ref={bodyRef}
                 rows={5}
                 value={merged.bodyText}
                 onChange={(event) => setDraft((previous) => ({ ...previous, bodyText: event.target.value }))}
                 aria-label="配信本文"
                 className={styles.textarea}
-              />
-            </label>
+              /></Field>
             {bodyCheck.fits ? (
               <p className={styles.note}>あと{formatNumber(NEN_CAMPAIGN_BODY_MAX_LENGTH - bodyCheck.length)}字（上限{bodyLimitLabel}字。長すぎるとLINEで送れません）</p>
             ) : (
@@ -458,8 +456,7 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
                 value={testSearch}
                 onChange={(event) => setTestSearch(event.target.value)}
                 onKeyDown={(event) => { if (event.key === 'Enter') void searchFriends() }}
-              />
-            </label>
+              /></Field>
             <span className={styles.selectFoot}>
               <Button type="button" variant="secondary" onClick={() => void searchFriends()}>探す</Button>
               {testCandidates.slice(0, 3).map((candidate) => (

@@ -152,7 +152,7 @@ export default function OpsLoginV8() {
           <MessageCircle aria-hidden="true" />LINE でログイン
         </Button>
         <Link href="/password/forgot" className={styles.forgot}>パスワードを忘れた方はこちら</Link>
-        <p className={styles.note}>運営メンバーの招待を受けた方は、招待メールのリンクから設定してください</p>
+
       </section>
       <p className={styles.foot}>この画面は運営メンバーだけが開けます。操作はすべて記録されます。</p>
     </main>

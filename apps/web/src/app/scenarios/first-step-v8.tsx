@@ -716,11 +716,10 @@ export default function ScenarioFirstStepV8() {
                           {kind === 'text' && (
                             <div><Field label={<>
                                 本文
-                              </label>
-                              <div className="mb-2">
+                              </>} htmlFor="first-step-body"><div className="mb-2">
                                 <InsertToolbar targetRef={bodyRef} value={body} onChange={editBody} />
                               </div>
-                              <textarea
+<textarea
                                 id="first-step-body"
                                 ref={bodyRef}
                                 value={body}
@@ -728,8 +727,7 @@ export default function ScenarioFirstStepV8() {
                                 placeholder="はじめまして。友だち追加ありがとうございます。"
                                 className={`${styles.bodyField} border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none`}
                               />
-                              <CharCounter length={bodyLength} />
-                            </div>
+<CharCounter length={bodyLength} /></Field></div>
                           )}
 
                           {kind === 'image' && (

@@ -163,8 +163,7 @@ export default function PaymentTabV8({ accountId, menus, canEdit }: {
               value={draft.holdMinutes}
               onChange={(event) => setDraft((current) => ({ ...current, holdMinutes: Number(event.target.value) }))}
               disabled={!canEdit}
-            />
-          </label>
+            /></Field>
         )}
         <div>
           <span>{config.keyConfigured ? '鍵：入っている' : '鍵：入っていない'}</span>

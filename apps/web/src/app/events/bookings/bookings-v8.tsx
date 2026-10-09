@@ -742,8 +742,7 @@ export default function BookingsV8({ eventId }: { eventId: string }) {
               onChange={(e) => setRejectReason(e.target.value)}
               rows={2}
               className="border-hairline rounded-control border px-3 py-2 text-sm font-normal"
-            />
-          </label>
+            /></Field>
         ) : null}
       </ConfirmDialog>
 
@@ -825,8 +824,7 @@ export default function BookingsV8({ eventId }: { eventId: string }) {
                 onChange={(e) => setWaitlistReason(e.target.value)}
                 rows={2}
                 className="border-hairline rounded-control border px-3 py-2 text-sm font-normal"
-              />
-            </label>
+              /></Field>
           </>
         ) : null}
       </ConfirmDialog>

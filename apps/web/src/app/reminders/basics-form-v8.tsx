@@ -265,8 +265,7 @@ export function ReminderBasicsFormV8({
               maxLength={60}
               placeholder="例：予約前日のご案内"
               onChange={(event) => patch({ name: event.target.value })}
-            />
-          </div>
+            /></Field></div>
           <div className={styles.field}>
             <span className={styles.label}>フォルダ</span>
             <div className={styles.testRow}>
@@ -294,8 +293,7 @@ export function ReminderBasicsFormV8({
             ) : (
               <TextField id="v8-reminder-memo" value={value.description}
                 placeholder="運用の目的や注意点" onChange={(event) => patch({ description: event.target.value })} />
-            )}
-          </div>
+            )}</Field></div>
         </div>
       </Card>
 

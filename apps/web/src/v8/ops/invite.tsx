@@ -113,7 +113,8 @@ export default function OpsInviteV8() {
           {check && !check.needsPassword
             ? '運営コンソールに招待されました（有効期限は24時間）。続けると 2要素認証の設定に進みます。'
             : '運営コンソールに招待されました（有効期限は24時間）。名前とパスワードを決めると、次に2要素認証を設定します。'}
-        </p>
+        </>} />
+
         {state === 'loading' ? (
           <ListState permissionScope="hq" kind="loading" title="招待を確認しています" />
         ) : state === 'invalid' ? (

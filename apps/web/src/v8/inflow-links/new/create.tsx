@@ -442,7 +442,7 @@ function InflowCreate() {
         ) : null}
         <Field label={<><span className={styles.labelRow}>
             <span className={styles.label}>転送先（入れると友だち追加へ進みません）</span>
-            <span className={styles.optional}>任意</span>
+
           </span></>}><TextField
             id="ir-redirect"
             type="url"

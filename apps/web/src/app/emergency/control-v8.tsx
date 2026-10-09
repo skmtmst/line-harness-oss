@@ -634,8 +634,7 @@ const EmergencyControlV8 = (
                 ...accounts.map((account) => ({ value: account.id, label: `${account.name}（いまのアカウント）` })),
               ]}
             />
-            </span>
-          </div>
+            </span></Field></div>
           {canControl ? <Button
             type="button"
             variant="danger"
@@ -861,8 +860,7 @@ const EmergencyControlV8 = (
                   placeholder="例：宛先の絞り込みを間違えた"
                   className={styles.dialogInput}
                   style={{ maxWidth: '100%' }}
-                />
-              </div>
+                /></Field></div>
               <div className={styles.detailBlock}>
                 <div className={styles.detailHead}>
                   <label htmlFor="emergency-detail-v8" className={styles.dialogLabel}>補足（任意）</label>
@@ -902,8 +900,7 @@ const EmergencyControlV8 = (
               disabled={mutationLocked || running}
               aria-label="確認の言葉"
               className={styles.dialogInput}
-            />
-          </label>
+            /></Field>
           {confirmMode === 'stop' && stepUpMethod !== 'none' ? (
             <div className={styles.dialogField}>
               <span className={styles.dialogLabel} id="emergency-stepup-label">

@@ -260,8 +260,7 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
                       onChange={(e) => updateActiveEdit({ capacity: e.target.value })}
                       aria-label="定員"
                       className="border-hairline rounded-control w-full border px-3 py-2 text-sm font-normal"
-                    />
-                  </label>
+                    /></Field>
                   <div className="grid gap-1 text-xs font-medium text-ink-secondary">
                     受付の有無
                     <Select
@@ -295,8 +294,8 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
                       inputMode="url"
                       className="border-hairline rounded-control border px-3 py-2 text-sm font-normal"
                     /></Field>
-                <div className="mt-3"><Field label="変える理由"><p className="text-ink-faint mt-1 text-xs">理由は変更の記録に残ります。友だちには送りません。</p></Field></div>
                 </div>
+                <div className="mt-3"><Field label="変える理由"><p className="text-ink-faint mt-1 text-xs">理由は変更の記録に残ります。友だちには送りません。</p></Field></div>
                 <div className="mt-3">
                   <Button variant="secondary" onClick={() => void runPreview()} disabled={previewBusy} busy={previewBusy} busyLabel="確かめています…">
                     影響を確かめる

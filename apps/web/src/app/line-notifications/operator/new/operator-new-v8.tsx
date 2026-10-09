@@ -433,7 +433,8 @@ function NewOperatorNotificationV8Inner() {
       <div>
         <PageHeading title={<>運用者へのお知らせを{editId ? 'なおす' : '作る'}</>} help={<>
           宛先はお店の人です。あとから顧客向けへは変えられません。顧客へ送るものは「顧客へのお知らせ」で作ります。
-        </p>
+        </>} />
+
       </div>
 
       {canWrite ? null : (
@@ -454,8 +455,7 @@ function NewOperatorNotificationV8Inner() {
                 placeholder="新しい予約が入りました"
                 maxLength={80}
                 className={styles.fieldInput}
-              />
-            </div>
+              /></Field></div>
             <div className={styles.fieldGrid}>
               <div><Field label="きっかけ" htmlFor="operator-event"><Select
                   aria-label="きっかけ"
@@ -488,8 +488,7 @@ function NewOperatorNotificationV8Inner() {
                   value={dedupeMinutes}
                   onChange={(value) => setDedupeMinutes(value)}
                   options={DEDUPE_OPTIONS}
-                />
-              </div>
+                /></Field></div>
             </div>
           </section>
 
@@ -517,9 +516,9 @@ function NewOperatorNotificationV8Inner() {
                     else setTeamName('')
                   }}
                   options={[{ value: '', label: 'スタッフを選んでチームを作る' }, ...teams.map(team => ({ value: team.id, label: `${team.name}（${team.staffIds.length}人）` }))]}
-            <div className={styles.fieldGrid}><Field label="チーム名"><Button variant="secondary" disabled={!canWrite || teamBusy} onClick={() => void saveTeam()}>{teamId ? 'チームを更新する' : 'チームを作る'}</Button></Field></div>
                 /></Field></div>
             </div>
+            <div className={styles.fieldGrid}><Field label="チーム名"><Button variant="secondary" disabled={!canWrite || teamBusy} onClick={() => void saveTeam()}>{teamId ? 'チームを更新する' : 'チームを作る'}</Button></Field></div>
             {teamError && <div><p role="alert">{teamError}</p><Button variant="secondary" onClick={loadTeams}>チームをもう一度読み込む</Button></div>}
             <div className={styles.recipientList}>
               {recipients
@@ -591,8 +590,7 @@ function NewOperatorNotificationV8Inner() {
                 value={schedule}
                 onChange={(value) => setSchedule(value)}
                 options={SCHEDULE_OPTIONS}
-              />
-            </div>
+              /></Field></div>
             <p className={styles.fieldHint}>営業時間外のものは翌朝10:00にまとめて送ります。</p>
           </section>
 

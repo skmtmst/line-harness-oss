@@ -285,8 +285,7 @@ export default function V8EarningRuleNew() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="例：リンクをクリック"
-              />
-            </label>
+              /></Field>
             <div className={formStyles.grid2}>
               <Field label="きっかけ" required><Select
                   aria-label="きっかけ"
@@ -305,8 +304,7 @@ export default function V8EarningRuleNew() {
                   onChange={(next) => setSource(next)}
                   size="full"
                   options={selected.sources.map(([optionValue, label]) => ({ value: optionValue, label }))}
-                />
-              </label>
+                /></Field>
             </div>
             <button type="button" className={formStyles.linkButton} onClick={() => setShowConditions((v) => !v)} aria-expanded={showConditions}>
               ＋ 条件を足す（タグ・友だち情報など）
@@ -335,8 +333,7 @@ export default function V8EarningRuleNew() {
                   size="full"
                   options={[{ value: '決まった数', label: '決まった数' }]}
                   disabled
-                />
-              </label>
+                /></Field>
             </div>
           </section>
 
@@ -386,8 +383,7 @@ export default function V8EarningRuleNew() {
                     { value: 'subject', label: '同じ対象は1回' },
                     { value: 'subjectPerDay', label: '同じURLは1回' },
                   ]}
-                />
-              </label>
+                /></Field>
             </div>
             <div className={formStyles.grid2}>
               <Field label="開始日"><DateField value={validFrom} onChange={setValidFrom} aria-label="開始日" /></Field>
@@ -398,8 +394,7 @@ export default function V8EarningRuleNew() {
                 <Field label="付いたマイルの有効期限"><span className={formStyles.inlineRow}>
                     <TextInput type="number" min={1} max={3650} value={expiresAfterDays} onChange={(e) => setExpiresAfterDays(e.target.value)} aria-label="有効期限の日数" />
                     <span className={formStyles.hint}>日後（空欄なら期限なし）</span>
-                  </span>
-                </label>
+                  </span></Field>
                 <Checkbox
                   checked={ignoreMultiplier}
                   onCheckedChange={setIgnoreMultiplier}

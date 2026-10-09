@@ -607,8 +607,7 @@ function ManualEntryDialogs({ model }: { model: AdV8Model }) {
               value={model.manualAmount}
               onChange={(event: React.ChangeEvent<HTMLInputElement>) => model.setManualAmount(event.target.value)}
               placeholder="例：20000"
-            />
-          </div>
+            /></Field></div>
         </div>
       </Dialog>
 
@@ -639,8 +638,7 @@ function ManualEntryDialogs({ model }: { model: AdV8Model }) {
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) => model.setCancelReason(event.target.value)}
                 placeholder="例：金額を間違えた"
                 maxLength={200}
-              />
-            </div>
+              /></Field></div>
           </div>
         ) : null}
       </Dialog>
@@ -676,11 +674,10 @@ export function AdMetricsV8() {
               <Link href="/inflow-links" className={styles.headBackLink}>
                 ← 流入と計測へ
               </Link>
-            </p>
-            <h1 className={styles.headTitle}>広告連携</h1>
-            <p className={styles.headDescription}>
+
               広告をつなぐと毎日自動で費用を取り込みます。取り込めない分（チラシや看板など）は「費用を手で入れる」から足せます。
-            </p>
+            </>} />
+
           </div>
           <div className={styles.headActions}>
             {canEdit ? (
@@ -1032,11 +1029,10 @@ export function AdConnectionsV8() {
               <Link href="/inflow-links" className={styles.headBackLink}>
                 ← 流入と計測へ
               </Link>
-            </p>
-            <h1 className={styles.headTitle}>広告とのつなぎ</h1>
-            <p className={styles.headDescription}>
+
               LINE で出た成果を広告へ返し、広告の配信を賢くします。お客様の名前やメールアドレスは広告へ送りません。
-            </p>
+            </>} />
+
           </div>
           <div className={styles.headActions}>
             <Button variant="secondary" href="/inflow-links?tab=connections&view=history">
@@ -1160,11 +1156,10 @@ export function AdHistoryV8() {
               <Link href="/inflow-links?tab=connections" className={styles.headBackLink}>
                 ← 広告とのつなぎへ戻る
               </Link>
-            </p>
-            <h1 className={styles.headTitle}>広告への送信履歴</h1>
-            <p className={styles.headDescription}>
+
               成果と広告のクリックが結びつき、送信処理が始まるとここに並びます。
-            </p>
+            </>} />
+
           </div>
           <div className={styles.headActions}>
             <Button

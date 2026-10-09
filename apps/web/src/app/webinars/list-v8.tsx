@@ -212,13 +212,12 @@ function WebinarFolderPanelForm({
         className="border-hairline rounded-control focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
         placeholder="例：商品説明"
       />
-      {error ? <p className="text-danger mt-2 text-sm">{error}</p> : null}
-      <div className="mt-5 flex justify-end gap-2">
+{error ? <p className="text-danger mt-2 text-sm">{error}</p> : null}
+<div className="mt-5 flex justify-end gap-2">
         <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
         <Button variant="primary" onClick={() => onSave(name.trim())} disabled={!name.trim() || busy} busy={busy}>保存する
         </Button>
-      </div>
-    </div>
+      </div></Field></div>
   )
 }
 

@@ -1299,8 +1299,7 @@ export default function RemindersListV8() {
                 { value: '', label: '未分類' },
                 ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
               ]}
-            />
-          </label>
+            /></Field>
         </div>
       </ConfirmDialog>
 

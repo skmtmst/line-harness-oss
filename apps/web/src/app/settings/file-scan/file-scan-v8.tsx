@@ -102,8 +102,7 @@ export function FileScanV8() {
               value={releaseReason}
               onChange={(event) => { setReleaseReason(event.target.value); setReleaseError('') }}
               placeholder="例：社内の画像と確認できたため"
-            />
-          </div>
+            /></Field></div>
         </ConfirmDialog>
       ) : null}
 
@@ -335,8 +334,7 @@ export function FileScanV8() {
                   value={secretRef}
                   onChange={(event) => setSecretRef(event.target.value)}
                   placeholder="例：FILE_SCAN_API_KEY"
-                />
-              </div>
+                /></Field></div>
               <div className={styles.formSubmit}>
                 <Button type="button" variant="primary" disabled={configBusy} onClick={() => void saveConfig()} busy={configBusy} busyLabel="保存しています…">
                   外の検査の設定を保存する

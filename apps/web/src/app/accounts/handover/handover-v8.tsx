@@ -590,8 +590,7 @@ export default function HandoverV8() {
           {canManage && (
             <div className="mt-3"><Field label="移し元システムが言う友だち数（申告。分からなければ空欄）"><p className="text-ink-faint mt-1 text-xs leading-relaxed">
                 申告の数と事前確認の合計が違うままでは、本実行しません。
-              </p>
-            </div>
+              </p></Field></div>
           )}
           {declaredMismatch && (
             <Notice tone="warn" className="mt-3">

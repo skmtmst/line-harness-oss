@@ -528,8 +528,7 @@ export default function V8HistoryTab({
             onChange={(event) => setPendingReason(event.target.value)}
             placeholder={pendingAction?.kind === 'confirm' ? '例：入金を確認しました' : '例：予約がキャンセルされました'}
             rows={3}
-          />
-        </label>
+          /></Field>
       </Dialog>
     </>
   )

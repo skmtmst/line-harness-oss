@@ -342,7 +342,7 @@ export default function StaffNewV8() {
                   className={styles.input}
                   aria-invalid={fieldErrors.name !== undefined}
                 />
-                {fieldErrors.name !== undefined ? (
+{fieldErrors.name !== undefined ? (
                   <span className={styles.formError} role="alert">{fieldErrors.name}</span>
                 ) : null}</Field>
               <Field label="お客さま向けの表示名（空欄なら上の名前）"><input
@@ -380,8 +380,7 @@ export default function StaffNewV8() {
                   maxLength={BOOKING_STAFF_LIMITS.bio}
                   placeholder="例：トリミング歴10年。小型犬が得意です。"
                   className={styles.input}
-                />
-              </label>
+                /></Field>
             </div>
           </section>
 
@@ -525,8 +524,7 @@ export default function StaffNewV8() {
                     { value: '', label: '紐づけない' },
                     ...members.map((m) => ({ value: m.id, label: `${m.name}${m.email ? `（${m.email}）` : ''}` })),
                   ]}
-                />
-              </label>
+                /></Field>
             )}
           </section>
 

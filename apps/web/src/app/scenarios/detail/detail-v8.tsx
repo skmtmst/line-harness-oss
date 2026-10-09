@@ -1596,8 +1596,7 @@ export default function ScenarioDetailV8({
             className="w-32 border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
             value={stepForm.stepOrder}
             onChange={(e) => setStepForm({ ...stepForm, stepOrder: Number(e.target.value) })}
-          />
-        </div>
+          /></Field></div>
         <ScheduleInput
           mode={deliveryMode}
           value={stepForm.schedule}
@@ -1623,10 +1622,9 @@ export default function ScenarioDetailV8({
             ]}
             size="full"
           />
-          <p className="text-xs text-ink-faint mt-0.5">
+<p className="text-xs text-ink-faint mt-0.5">
             一時停止にすると、この通を送ったところで止まります。再開するまで次は届きません。
-          </p>
-        </div>
+          </p></Field></div>
           </div>
         </FormSection>
 
@@ -1717,10 +1715,9 @@ export default function ScenarioDetailV8({
               ]}
               size="full"
             />
-            <p className="text-xs text-warning mt-1">
+<p className="text-xs text-warning mt-1">
               ⓘ テンプレートが修正されると、このステップの内容も自動で同期されます
-            </p>
-          </div>
+            </p></Field></div>
         )}
 
         {!stepForm.question && stepForm.inputMode === 'direct' && (
@@ -1731,8 +1728,7 @@ export default function ScenarioDetailV8({
                 onChange={(value) => setStepForm({ ...stepForm, messageType: value as MessageType })}
                 options={messageTypeOptions}
                 size="full"
-              />
-            </div>
+              /></Field></div>
             {/*
               位置情報・動画・音声・スタンプは、本文ではなく専用の欄で書く。
               中身は JSON なので、生のまま書かせると必ず壊れる。
@@ -1771,15 +1767,14 @@ export default function ScenarioDetailV8({
                     />
                   </div>
                 )}
-                <textarea
+<textarea
                   ref={stepBodyRef}
                   className="w-full border-hairline rounded-control bg-canvas text-ink resize-none border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                   rows={4}
                   placeholder="メッセージ内容を入力..."
                   value={stepForm.messageContent}
                   onChange={(e) => setStepForm({ ...stepForm, messageContent: e.target.value })}
-                />
-              </div>
+                /></Field></div>
             )}
           </>
         )}
@@ -1852,10 +1847,9 @@ export default function ScenarioDetailV8({
                 ]}
                 size="full"
               />
-              <p className="text-xs text-ink-faint mt-0.5">
+<p className="text-xs text-ink-faint mt-0.5">
                 このステップが配信完了したら、選んだタグを友だちに付与します
-              </p>
-            </div>
+              </p></Field></div>
             {!editingStepId && (
               <p className="text-ink-faint text-xs">
                 そのほかのアクションは、この通を保存してから設定できます。
@@ -2834,8 +2828,7 @@ export default function ScenarioDetailV8({
               rows={3}
               maxLength={500}
               aria-label="説明"
-            />
-          </label>
+            /></Field>
           <div className="flex flex-col gap-1">
             <span className="text-ink-secondary text-xs font-semibold">置き場（フォルダ）</span>
             <Select
@@ -3028,8 +3021,7 @@ export default function ScenarioDetailV8({
               maxLength={80}
               required
               aria-label="複製の名前"
-            />
-          </label>
+            /></Field>
         </div>
       </ConfirmDialog>
 

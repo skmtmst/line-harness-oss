@@ -322,8 +322,7 @@ function ApiTokensV8Inner() {
                 placeholder="例：予約システム連携"
                 className={styles.input}
               />
-              {nameError ? <p className={styles.fieldError} role="alert">{nameError}</p> : null}
-            </div>
+{nameError ? <p className={styles.fieldError} role="alert">{nameError}</p> : null}</Field></div>
             <fieldset>
               <legend className={styles.label}>できること</legend>
               <div className={styles.checkRow}>
