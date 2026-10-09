@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDateOffset } from '@/lib/jst-datetime'
+
 /*
  * ★V8-B 分析「ファネルを作る」（板 `VDPz5`）と「ファネルを直す」（同じ形）。
  *
@@ -100,8 +102,7 @@ const TARGET_LABEL: Record<Target['kind'], string> = { conversion: '成果', tag
 const EMPTY_LABEL: Record<Target['kind'], string> = { conversion: '成果（成果地点を選ぶ）', tag: 'タグ（タグを選ぶ）', form: 'フォーム（フォームを選ぶ）' }
 
 function isoDay(offsetDays: number): string {
-  const d = new Date(Date.now() + offsetDays * 86400000)
-  return d.toISOString().slice(0, 10)
+  return jstDateOffset(offsetDays)
 }
 
 export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, presetConversion }: {

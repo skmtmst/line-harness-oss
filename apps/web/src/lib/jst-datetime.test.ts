@@ -1,3 +1,4 @@
+import { jstDateOffset } from './jst-datetime'
 import { describe, expect, test } from 'vitest'
 import { datetimeLocalJstToUtcIso, jstDate } from './jst-datetime'
 
@@ -27,3 +28,10 @@ test("今日の境目は日本の午前0時", () => {
   expect(jstDate(new Date("2026-10-09T14:59:59Z"))).toBe("2026-10-09")
   expect(jstDate(new Date("2026-10-09T15:00:00Z"))).toBe("2026-10-10")
 })
+
+ test('日本の月末の午前0時を基準に前後の日付を出す', () => {
+  const now = new Date('2026-09-30T15:00:00Z')
+  expect(jstDateOffset(0, now)).toBe('2026-10-01')
+  expect(jstDateOffset(-1, now)).toBe('2026-09-30')
+  expect(jstDateOffset(31, now)).toBe('2026-11-01')
+ })

@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDateOffset } from '@/lib/jst-datetime'
+
 /*
  * ★V8 マイル「友だちの残高」（板 `CJlf4`、状態は見本帳 `zaqP9`）。
  *
@@ -46,9 +48,7 @@ import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, Too
 import styles from './mileage.module.css'
 
 function dateOnlyDaysAgo(days: number) {
-  const date = new Date()
-  date.setDate(date.getDate() - days)
-  return date.toISOString().slice(0, 10)
+  return jstDateOffset(-days)
 }
 
 function expiringText(member: MileageFriendV6): string {

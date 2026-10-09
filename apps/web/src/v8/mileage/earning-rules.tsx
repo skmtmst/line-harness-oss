@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDateOffset } from '@/lib/jst-datetime'
+
 /*
  * ★V8 マイル「たまる決めごと」（板 `OC0gy`・1152 `ZJIyl`・閲覧のみ `E2Any`、
  * 状態は見本帳 `zaqP9`）。
@@ -128,9 +130,7 @@ function isOverview(value: unknown): value is MileageEarningRulesV6Overview {
 }
 
 function dateOnlyDaysAgo(days: number) {
-  const date = new Date()
-  date.setDate(date.getDate() - days)
-  return date.toISOString().slice(0, 10)
+  return jstDateOffset(-days)
 }
 
 function grantedMiles30d(rule: MileageEarningRuleV6) {

@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDateOffset, jstDate } from '@/lib/jst-datetime'
+
 /*
  * ★V8 マイル「履歴」（板 `oRbJi`、状態は見本帳 `zaqP9`）。
  *
@@ -10,7 +12,6 @@
  * 種類・方法・期間の絞り込みは「よく使う絞り込み」の見方として残す。
  */
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CalendarRange, CircleDot, Download, History, Plus, TrendingDown, TrendingUp, Undo2 } from 'lucide-react'
@@ -65,14 +66,11 @@ const PRESETS: Array<{ value: string; label: string }> = [
 ]
 
 function monthStart(): string {
-  const date = new Date()
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`
+  return jstDate().slice(0, 7) + '-01'
 }
 
 function daysAgo(days: number) {
-  const date = new Date()
-  date.setDate(date.getDate() - days)
-  return date.toISOString().slice(0, 10)
+  return jstDateOffset(-days)
 }
 
 export default function HistoryTab() {

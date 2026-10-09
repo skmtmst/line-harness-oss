@@ -24,3 +24,8 @@ export function scheduledJstIso(date: string, time: string): string | null {
   const shifted = new Date(parsed.getTime() + 9 * 3_600_000).toISOString()
   return shifted.slice(0, 16) === `${date}T${time}` ? parsed.toISOString() : null
 }
+
+/** 日本時間で、今日から指定した日数だけ前後の日付。 */
+export function jstDateOffset(days: number, now: Date = new Date()): string {
+  return jstDate(new Date(now.getTime() + days * 86_400_000))
+}
