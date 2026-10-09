@@ -30,8 +30,8 @@
   outline-color: transparent;
   box-shadow: none;
 }
-[data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version] + [data-design-version] {
-  border-left: 1px solid var(--color-hairline);
+[data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'] > :not(:last-child) {
+  border-right: 1px solid var(--color-hairline);
 }
 [data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'][data-kpi-density='compact'] > * {
   padding: 10px 16px;
@@ -48,9 +48,9 @@
     grid-auto-flow: row;
     grid-template-columns: minmax(0, 1fr);
   }
-  [data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version] + [data-design-version] {
-    border-left: 0;
-    border-top: 1px solid var(--color-hairline);
+  [data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'] > :not(:last-child) {
+    border-right: 0;
+    border-bottom: 1px solid var(--color-hairline);
   }
 }
 

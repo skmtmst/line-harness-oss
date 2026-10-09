@@ -35,6 +35,8 @@
   transition: outline-color var(--motion-fast) var(--motion-ease-out);
 }
 
+.field:not([data-open]):not([data-invalid]):not(:focus-within) { box-shadow: var(--control-shadow); }
+
 /* 日付の欄と横に並ぶとき・日時の欄の中（絵 FU2aU・BBRDb・ZU4Ae）は日付の欄と同じ 40。 */
 .field[data-size='field'] {
   height: 40px;

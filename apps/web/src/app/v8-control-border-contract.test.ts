@@ -1,5 +1,5 @@
 /*
- * ★V8「枠線の色」`--color-control-border`（#c9ced6・絵の変数）の固定。
+ * ★V8「枠線の色」`--color-control-border`（B-150 案1：黒12%＋薄い影）の固定。
  *
  *   - V8（`[data-theme="v8"]`）のときだけ効くトークンであること
  *   - 操作する部品（入力・選ぶ欄・探す欄・チェック・ラジオ・
@@ -21,7 +21,9 @@ const V8 = String.raw`\[data-theme=['"]?v8['"]?\]`
 describe('★V8 枠線の色（--color-control-border）', () => {
   it('トークンが v8 の下にだけ定義されている', () => {
     const v8Block = globals.match(/\[data-theme="v8"\]\s*\{([^}]*)\}/)
-    expect(v8Block?.[1]).toContain('--color-control-border: #c9ced6')
+    expect(v8Block?.[1]).toContain('--color-control-border: rgba(29, 29, 31, 0.12)')
+    expect(v8Block?.[1]).toContain('--control-shadow: 0 1px 2px rgba(29, 29, 31, 0.06)')
+    expect(v8Block?.[1]).toContain('--color-choice-border: #c9ced6')
     const rootBlock = globals.slice(0, globals.indexOf('[data-theme'))
     expect(rootBlock).not.toContain('--color-control-border')
   })
@@ -30,14 +32,28 @@ describe('★V8 枠線の色（--color-control-border）', () => {
     ['入力欄', 'text-field.module.css', 'field'],
     ['選ぶ欄', 'select.module.css', 'trigger'],
     ['探す欄', 'search-field.module.css', 'search'],
-    ['チェックの箱', 'checkbox.module.css', 'box'],
     ['OTPのマス', 'otp-input.module.css', 'slot'],
-    ['選ぶカードの○', 'radio-card.module.css', 'radio'],
-    ['チェックのカードの箱', 'check-card.module.css', 'box'],
   ])('%s の枠が v8 で control-border になる', (_name, file, cls) => {
     const source = css(file)
     const re = new RegExp(`${V8}[^}]*\\.${cls}[^}]*\\{[^}]*border-color:\\s*var\\(--color-control-border\\)`)
     expect(source).toMatch(re)
+  })
+
+  it.each([
+    ['チェック', 'checkbox.module.css', 'box'],
+    ['ラジオ', 'radio-card.module.css', 'radio'],
+    ['チェックのカード', 'check-card.module.css', 'box'],
+  ])('%s の枠は元の色を保つ', (_name, file, cls) => {
+    expect(css(file)).toMatch(new RegExp(`${V8}[^}]*\\.${cls}[^}]*\\{[^}]*border-color:\\s*var\\(--color-choice-border\\)`))
+    expect(css(file)).not.toContain('var(--color-control-border)')
+  })
+
+  it.each([
+    'text-field.module.css', 'select.module.css', 'search-field.module.css',
+    'combobox.module.css', 'multi-select.module.css', 'date-field.module.css',
+    'time-field-v8.module.css', 'button.module.css', 'filter-chip.css',
+  ])('%s の基本の器は共通の薄い影を読む', (file) => {
+    expect(css(file)).toContain('box-shadow: var(--control-shadow)')
   })
 
   it('色を選ぶの器と十六進の欄が v8 で control-border になる', () => {
@@ -49,13 +65,13 @@ describe('★V8 枠線の色（--color-control-border）', () => {
     )
   })
 
-  it('トグルのオフの地が v8 で control-border になる（消せない項目は灰のまま）', () => {
+  it('トグルのオフの地は choice-border のまま保つ（消せない項目は灰のまま）', () => {
     const source = css('toggle.module.css')
     expect(source).toMatch(
-      new RegExp(`${V8} \\.toggle[^}]*\\{[^}]*background:\\s*var\\(--color-control-border\\)`),
+      new RegExp(`${V8} \\.toggle[^}]*\\{[^}]*background:\\s*var\\(--color-choice-border\\)`),
     )
     expect(source).toMatch(
-      new RegExp(`${V8} \\.locked[^}]*\\{[^}]*background:\\s*var\\(--color-hairline\\)`),
+      new RegExp(`${V8} \\.locked[^}]*\\{[^}]*background:\\s*var\\(--color-toggle-locked\\)`),
     )
   })
 
