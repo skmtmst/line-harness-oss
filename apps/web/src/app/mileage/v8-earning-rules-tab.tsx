@@ -323,7 +323,7 @@ export default function V8EarningRulesTab({
   useEffect(() => {
     registerHeaderActions(
       <Button onClick={() => void exportCsv()} disabled={exporting || rules.length === 0}>
-        <Download size={14} aria-hidden="true" /> CSV で書き出す
+        <Download size={14} aria-hidden="true" /> CSVで書き出す
       </Button>,
     )
     return () => registerHeaderActions(null)

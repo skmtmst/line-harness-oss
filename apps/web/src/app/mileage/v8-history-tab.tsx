@@ -212,7 +212,7 @@ export default function V8HistoryTab({
     registerHeaderActions(
       <>
         <Button onClick={exportCsv} disabled={!canExport}>
-          <Download size={14} aria-hidden="true" /> CSV で書き出す
+          <Download size={14} aria-hidden="true" /> CSVで書き出す
         </Button>
         {!readonly ? (
           <Button href="/mileage?tab=balances" title="友だちを選んで増減します">

@@ -435,7 +435,7 @@ export default function V8RewardsTab({
   const failedTotal = redemptionsTotal
 
   /*
-   * 頭の「CSV で書き出す」。使い道の書き出し口は無いので、
+   * 頭の「CSVで書き出す」。使い道の書き出し口は無いので、
    * 今見えている表の中身をそのまま出す（本物の読み物）。
    */
   const canExport = !accountLoading && !!accountId && loadedAccountId === accountId
@@ -471,7 +471,7 @@ export default function V8RewardsTab({
   useEffect(() => {
     registerHeaderActions(
       <Button variant="secondary" onClick={exportCsv} disabled={!canExport}>
-        <Download size={14} aria-hidden="true" /> CSV で書き出す
+        <Download size={14} aria-hidden="true" /> CSVで書き出す
       </Button>,
     )
     return () => registerHeaderActions(null)

@@ -200,7 +200,7 @@ export default function OffersTabV8({
   useEffect(() => {
     registerHeaderActions(
       <Button key="csv" type="button" onClick={exportCsv} disabled={shown.length === 0}>
-        <Download size={15} aria-hidden="true" /> CSV で書き出す
+        <Download size={15} aria-hidden="true" /> CSVで書き出す
       </Button>,
     )
     return () => registerHeaderActions(null)

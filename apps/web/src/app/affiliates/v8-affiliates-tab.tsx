@@ -271,7 +271,7 @@ export default function AffiliatesTabV8({
   }, [loadList, loadApprovals, loadMonthly])
   useEffect(() => { void loadPayment() }, [loadPayment])
 
-  // ── 板の頭の操作（CSV で書き出す） ──────────────────────────────────────────
+  // ── 板の頭の操作（CSVで書き出す） ──────────────────────────────────────────
   const shownRows = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('ja-JP')
     return rows
@@ -314,7 +314,7 @@ export default function AffiliatesTabV8({
         onClick={exportCsv}
         disabled={shownRows.length === 0}
       >
-        <Download size={15} aria-hidden="true" /> CSV で書き出す
+        <Download size={15} aria-hidden="true" /> CSVで書き出す
       </Button>,
     )
     return () => registerHeaderActions(null)
