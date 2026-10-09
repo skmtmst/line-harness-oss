@@ -22,7 +22,7 @@ import { PageFrame, PageHeading } from '@/components/templates/page-frame'
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
  */
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
-import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
+import { useListScrollMemory, useListUrlParam, useListUrlValue } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -201,7 +201,7 @@ export default function RemindersListV8() {
   const deferredNameQuery = useDeferredValue(nameQuery.trim())
   const [folderFilter, setFolderFilter] = useListUrlParam('folder')
   const [statusFilter, setStatusFilter] = useListUrlParam('status')
-  const [perPage, setPerPage] = useState(20)
+  const [perPage, setPerPage] = useListUrlValue('limit', 20)
   // apLqS・Iffil の一覧は、次に送る予定が近いものから確認する。
   const [sort, setSort] = useListUrlParam('sort', 'next')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())

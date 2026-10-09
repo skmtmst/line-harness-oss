@@ -1,5 +1,6 @@
 'use client'
 
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -72,7 +73,7 @@ export default function OpsTenantsV8() {
   const [rows, setRows] = useState<OpsTenantRow[]>([])
   const [summary, setSummary] = useState<OpsTenantSummary | null>(null)
   const [q, setQ] = useState('')
-  const [filter, setFilter] = useState('')
+  const [filter, setFilter] = useListUrlValue('filter', '')
   const [loading, setLoading] = useState(true)
   const [listLoadError, setListLoadError] = useState<unknown>(null)
   const readOnly = useOpsReadOnly()

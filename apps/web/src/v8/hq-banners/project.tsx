@@ -96,7 +96,7 @@ function ProjectInner() {
   const [selectedImages, setSelectedImages] = useState<string[]>([])
   const [distributionOpen, setDistributionOpen] = useState(false)
   const [distributionAccounts, setDistributionAccounts] = useState<string[]>([])
-  const [distributionFilter, setDistributionFilter] = useState('all')
+  const [distributionFilter, setDistributionFilter] = useListUrlValue('distributionFilter', 'all')
   const [distributionSearch, setDistributionSearch] = useState('')
   const [distributionBusy, setDistributionBusy] = useState(false)
   const [distributionError, setDistributionError] = useState('')

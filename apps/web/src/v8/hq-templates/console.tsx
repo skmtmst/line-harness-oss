@@ -134,7 +134,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const [folders, setFolders] = useState<HqTemplateFolder[]>([])
   const [folderLoadFailed, setFolderLoadFailed] = useState(false)
   const [folderId, setFolderId] = useState<string | null>(null)
-  const [folderFilter, setFolderFilter] = useState<string>('all')
+  const [folderFilter, setFolderFilter] = useListUrlValue<string>('folderFilter', 'all')
   const [textOverrides, setTextOverrides] = useState<Record<string, string>>({})
   const [overrideOpen, setOverrideOpen] = useState<string | null>(null)
   const duplicateAttempts = useRef(new Map<string, string>())

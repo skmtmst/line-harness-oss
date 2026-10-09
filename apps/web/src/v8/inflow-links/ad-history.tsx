@@ -8,6 +8,7 @@
  * 呼ぶ口：媒体の一覧・送信記録のページ（今と同じ）、断られた1件のやり直し `POST /api/ad-platforms/logs/:id/retry`（F-22・owner）。
  * BEHAVIOR.md の「広告への送信履歴」。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useMemo, useState } from 'react'
 import { Download, RotateCw } from 'lucide-react'
@@ -55,9 +56,9 @@ export default function AdHistoryV8() {
   const role = useStaffRole()
   /* やり直し（POST …/retry）は owner だけ。ほかの人には押せない「やり直す」を置かない。 */
   const canRetry = role === 'owner'
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [status, setStatus] = useState('all')
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [media, setMedia] = useState('all')
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [retryError, setRetryError] = useState('')

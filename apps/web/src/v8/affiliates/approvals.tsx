@@ -84,7 +84,7 @@ export default function ApprovalsTab() {
   const { readonly, narrow, setCount, focusAffiliateId, accountId } = useAffiliateShell()
 
   const [status, setStatus] = useState<ApprovalStatus>('pending')
-  const [affiliateFilter, setAffiliateFilter] = useState<string | null>(focusAffiliateId)
+  const [affiliateFilter, setAffiliateFilter] = useListUrlValue<string | null>('affiliateFilter', focusAffiliateId)
   const [items, setItems] = useState<ConversionApprovalItem[]>([])
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [holdDays, setHoldDays] = useState<number | null>(null)

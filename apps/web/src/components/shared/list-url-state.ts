@@ -323,17 +323,18 @@ export function useListUrlValue<T>(key: string, initial: T | (() => T)): [T, (ne
 }
 
 /** 複数の条件・選択した条件の組をURLへ残す。壊れた値は初期値で開く。 */
-export function useListUrlJsonValue<T>(key: string, initial: T): [T, (next: T | ((current: T) => T)) => void] {
+export function useListUrlJsonValue<T>(key: string, initial: T, validate?: (value: unknown) => value is T): [T, (next: T | ((current: T) => T)) => void] {
   const [fallback] = useState(initial)
   const decode = useCallback((raw: string): T => {
     try {
       const value: unknown = JSON.parse(raw)
+      if (validate) return validate(value) ? value : fallback
       if (Array.isArray(fallback)) return (Array.isArray(value) && value.every((item) => typeof item === 'string') ? value : fallback) as T
       if (!value || typeof value !== 'object' || Array.isArray(value)) return fallback
       const valid = Object.entries(fallback as object).every(([field, expected]) => expected === null || expected === undefined || (Array.isArray(expected) ? Array.isArray((value as Record<string, unknown>)[field]) : typeof (value as Record<string, unknown>)[field] === typeof expected))
       return valid ? value as T : fallback
     } catch { return fallback }
-  }, [fallback])
+  }, [fallback, validate])
   const initialRaw = JSON.stringify(fallback)
   const [raw, setRaw] = useListUrlParam(key, initialRaw)
   const setValue = useCallback((next: T | ((current: T) => T)) => {

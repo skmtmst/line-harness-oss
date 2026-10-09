@@ -60,6 +60,7 @@ vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('
 })
 
 import HqBannersListV8 from './list'
+import { flushListUrlState } from '@/components/shared/list-url-state'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -78,6 +79,8 @@ const image = (n: number) => ({
 })
 
 beforeEach(() => {
+  flushListUrlState()
+  window.history.replaceState(null, '', '/hq/banners')
   document.documentElement.dataset.theme = 'v8'
   nav.query = ''
   roleBox.role = 'owner'

@@ -759,9 +759,9 @@ function StaffPageHost() {
   const [me, setMe] = useState<StaffMember | null>(null)
   const [audits, setAudits] = useState<AuditEventItem[]>([])
   const [query, setQuery] = useListUrlValue('q', '')
-  const [roleFilter, setRoleFilter] = useState<AccessRoleBundle | 'all'>('all')
+  const [roleFilter, setRoleFilter] = useListUrlValue<AccessRoleBundle | 'all'>('roleFilter', 'all')
   const [statusFilter, setStatusFilter] = useListUrlValue<'active' | 'suspended' | 'all'>('statusFilter', 'active')
-  const [sort, setSort] = useState('recent')
+  const [sort, setSort] = useListUrlValue('sort', 'recent')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   // ★V7 `x63W5x`：集計が取れていない間、KPI に 0 を出さない。「—」と出す。

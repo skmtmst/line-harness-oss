@@ -11,7 +11,7 @@
  */
 import { collectListRows } from '@/components/shared/collect-list-rows'
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
-import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useListUrlJsonValue, useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import StatusPill, { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -122,6 +122,14 @@ function KpiMenu({ title, href, onOpen }: { title: string; href: string; onOpen:
   )
 }
 
+function validAdvancedSearch(value: unknown): value is AdvancedSearchResult | null {
+  if (value === null) return true
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const result = value as Partial<AdvancedSearchResult>
+  return !!result.params && typeof result.params === 'object' && !Array.isArray(result.params)
+    && Array.isArray(result.summary) && result.summary.every(item => typeof item === 'string')
+}
+
 export default function FriendsListV8() {
   usePageTitle('友だち')
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -159,7 +167,7 @@ export default function FriendsListV8() {
   const [marks, setMarks] = useState<SupportMarkListItem[]>([])
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [savedOpen, setSavedOpen] = useState(false)
-  const [advanced, setAdvanced] = useState<AdvancedSearchResult | null>(null)
+  const [advanced, setAdvanced] = useListUrlJsonValue<AdvancedSearchResult | null>('advanced', null, validAdvancedSearch)
   const [total, setTotal] = useState(0)
   const [page, setPage] = useListUrlValue('page', 1)
   const [pageSize, setPageSize] = useListUrlValue<PageSize>('pageSize', 20)
@@ -235,7 +243,7 @@ export default function FriendsListV8() {
   const restoredRef = useRef<string | null>(null)
   const [restoredAccount, setRestoredAccount] = useState<string | null>(null)
   const restored = !accountLoading && Boolean(selectedAccountId) && restoredAccount === selectedAccountId
-  const hasExplicitUrlFilters = ['q', 'tag', 'sortMode', 'responseFilter', 'operatorId', 'scenarioId', 'attentionOnly', 'page', 'pageSize'].some((key) => searchParams.has(key)) || hasScoreRange || audienceId !== '' || Boolean(directSavedSearchId) || directTagId !== '' || directQuery !== ''
+  const hasExplicitUrlFilters = ['advanced', 'q', 'tag', 'sortMode', 'responseFilter', 'operatorId', 'scenarioId', 'attentionOnly', 'page', 'pageSize'].some((key) => searchParams.has(key)) || hasScoreRange || audienceId !== '' || Boolean(directSavedSearchId) || directTagId !== '' || directQuery !== ''
   useEffect(() => {
     if (accountLoading || !selectedAccountId || restoredRef.current === selectedAccountId) return
     restoredRef.current = selectedAccountId

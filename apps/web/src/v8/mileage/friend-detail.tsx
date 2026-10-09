@@ -116,7 +116,7 @@ function FriendDetailInner() {
   const [notificationRetryError, setNotificationRetryError] = useState('')
   const [searchInput, setSearchInput] = useListUrlValue('q', '')
   const [search, setSearch] = useListUrlValue('q', '')
-  const [kindFilter, setKindFilter] = useState<'all' | Kind>('all')
+  const [kindFilter, setKindFilter] = useListUrlValue<'all' | Kind>('kindFilter', 'all')
   const [period, setPeriod] = useListUrlValue('period', 'all')
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [page, setPage] = useListUrlValue('page', 1)

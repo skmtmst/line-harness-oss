@@ -1,5 +1,6 @@
 'use client'
 
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { notifySaved } from '@/components/shared/toast'
 import StatusPill from '@/components/shared/status-pill'
 import { Building2, Check, CircleDot, LogIn, Paperclip, Plus, RefreshCw, Send, Sparkles, Star } from 'lucide-react'
@@ -98,7 +99,7 @@ export default function OpsSupportV8() {
   const [loading, setLoading] = useState(true)
   const [stage, setStage] = useState<OpsSupportStage | 'all'>('all')
   const [priority, setPriority] = useState<'' | OpsSupportPriority>('')
-  const [sort, setSort] = useState<'newest' | 'oldest' | 'priority'>('priority')
+  const [sort, setSort] = useListUrlValue<'newest' | 'oldest' | 'priority'>('sort', 'priority')
   const [q, setQ] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<OpsSupportDetail | null>(null)
