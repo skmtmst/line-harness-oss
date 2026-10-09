@@ -135,7 +135,7 @@ export function AppearanceTab(props: Props) {
         <div className={styles.subBox}>
           <h3 className={styles.subTitle}>色と文字</h3>
           <p className={styles.fieldLabelPlain}>色（5つの役割）</p>
-          <div className={styles.wells}>
+          <div id="fe-colors" className={styles.wells}>
             {COLOR_ROLES.map((role) => (
               <span key={role.key} className={styles.well}>
                 <ColorWell value={theme[role.key]} allowAlpha={false} allowClear={false} label={`${role.label}の色`} onChange={(color) => color && patchTheme({ [role.key]: color.slice(0, 7).toLowerCase() })} />

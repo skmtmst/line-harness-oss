@@ -28,6 +28,8 @@ import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import { ADD_GROUPS, blockKindLine, blockTitleLine, inputTypeLabel, isChoiceType } from './model'
 import MediaPickerDialog from './media-picker'
+import { FieldError } from '@/components/shared/form-controls'
+import { useFormEditAttempted } from './field-issues'
 import styles from './edit.module.css'
 
 type Props = {
@@ -288,10 +290,13 @@ function Labeled({ label, htmlFor, children }: { label: string; htmlFor?: string
 function InputFields({ block, refs, patch }: { block: FormInputBlock; refs: FormRefs; patch: (next: Partial<FormBlock>) => void }) {
   const set = (next: Partial<FormInputBlock>) => patch(next as Partial<FormBlock>)
   const labelId = `fe-q-${block.id}`
+  /* 保存を押したあと、質問文が空なら欄を赤くして真下に理由を出す（B-139）。 */
+  const labelError = useFormEditAttempted() && !block.label.trim() ? '質問文を入れてください' : null
   return (
     <>
       <Labeled label="質問文" htmlFor={labelId}>
-        <TextField id={labelId} value={block.label} placeholder="質問の文" onChange={(e) => set({ label: e.target.value })} />
+        <TextField id={labelId} value={block.label} placeholder="質問の文" invalid={Boolean(labelError)} aria-describedby={labelError ? `${labelId}-error` : undefined} onChange={(e) => set({ label: e.target.value })} />
+        <FieldError id={`${labelId}-error`}>{labelError}</FieldError>
       </Labeled>
       {['text', 'textarea', 'address', 'date'].includes(block.type) ? (
         <Labeled label="参考の文字（入力欄の中に薄く出る）" htmlFor={`${labelId}-placeholder`}>
