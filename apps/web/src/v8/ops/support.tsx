@@ -26,6 +26,8 @@ import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-ba
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { OpsHead } from './shell'
 import { useOpsReadOnly } from './use-ops-read-only'
+import { useFormErrors } from '@/lib/use-form-errors'
+import { FieldError } from '@/components/shared/form-controls'
 import parts from './parts.module.css'
 import styles from './support.module.css'
 
@@ -325,10 +327,15 @@ export default function OpsSupportV8() {
     await refreshAll()
   }
 
+  /* 起票の窓で落ちた欄は、その欄の真下に理由を出して移る（B-139）。 */
+  const createFields = useFormErrors()
+  createFields.define('tenant', '契約先', () => (form.tenantId ? null : '契約先を選んでください'))
+  createFields.define('subject', '件名', () => (form.subject.trim() ? null : '件名を入れてください'))
+  createFields.define('body', '内容', () => (form.body.trim() ? null : '内容を入れてください'))
+
   const create = async () => {
     if (busy) return
-    if (!form.tenantId) { setCreateError('契約先を選んでください'); return }
-    if (!form.subject.trim() || !form.body.trim()) { setCreateError('件名と内容を入れてください'); return }
+    if (createFields.submit().length > 0) { setCreateError(''); return }
     setBusy(true)
     setCreateError('')
     const res = await opsCall(api.ops.support.create({ tenantId: form.tenantId, subject: form.subject.trim(), body: form.body.trim(), kind: form.kind, priority: form.priority }))
@@ -363,7 +370,7 @@ export default function OpsSupportV8() {
         description="統括の管理画面「お問い合わせ」から送られたものが新規として並びます。電話や LINE で受けた相談は、運営が代わりに起票できます"
         environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
         actions={readOnly ? null : (
-          <Button onClick={() => { setCreateError(''); setCreating(true) }}><Plus aria-hidden="true" />代わりに起票する</Button>
+          <Button onClick={() => { setCreateError(''); createFields.reset(); setCreating(true) }}><Plus aria-hidden="true" />代わりに起票する</Button>
         )}
       />
       {notice ? <p role="status" className={`${parts.status} ${styles.notice}`}>{notice}</p> : null}
@@ -524,9 +531,10 @@ export default function OpsSupportV8() {
         <div className={parts.dialogBody}>
           <div className={styles.field}>
             <span className={styles.smallLabel}>契約先</span>
-            <div className={styles.fullSelect}>
-              <Select size="full" aria-label="契約先" value={form.tenantId} onChange={(value) => setForm((f) => ({ ...f, tenantId: value }))} options={[{ value: '', label: '契約先を選ぶ' }, ...tenants.map((t) => ({ value: t.id, label: t.name }))]} />
+            <div className={styles.fullSelect} {...createFields.bind('tenant')}>
+              <Select size="full" aria-label="契約先" error={createFields.error('tenant') ?? undefined} value={form.tenantId} onChange={(value) => setForm((f) => ({ ...f, tenantId: value }))} options={[{ value: '', label: '契約先を選ぶ' }, ...tenants.map((t) => ({ value: t.id, label: t.name }))]} />
             </div>
+            <FieldError id="sup-tenant-error">{createFields.error('tenant')}</FieldError>
           </div>
           <div className={styles.pair}>
             <div className={styles.field}>
@@ -542,14 +550,16 @@ export default function OpsSupportV8() {
               </div>
             </div>
           </div>
-          <label className={styles.field}>
-            <span className={styles.label}>件名</span>
-            <TextField value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：電話で受けた配信の相談" maxLength={120} aria-label="件名" />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.smallLabel}>内容</span>
-            <TextArea className={styles.createBody} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="相手から聞いた内容をそのまま書きます" maxLength={4000} aria-label="内容" />
-          </label>
+          <div className={styles.field}>
+            <label htmlFor="sup-subject" className={styles.label}>件名</label>
+            <TextField {...createFields.bind('subject')} id="sup-subject" invalid={createFields.invalid('subject')} aria-describedby={createFields.invalid('subject') ? 'sup-subject-error' : undefined} value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：電話で受けた配信の相談" maxLength={120} aria-label="件名" />
+            <FieldError id="sup-subject-error">{createFields.error('subject')}</FieldError>
+          </div>
+          <div className={styles.field}>
+            <label htmlFor="sup-body" className={styles.smallLabel}>内容</label>
+            <TextArea {...createFields.bind('body')} id="sup-body" invalid={createFields.invalid('body')} aria-describedby={createFields.invalid('body') ? 'sup-body-error' : undefined} className={styles.createBody} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="相手から聞いた内容をそのまま書きます" maxLength={4000} aria-label="内容" />
+            <FieldError id="sup-body-error">{createFields.error('body')}</FieldError>
+          </div>
           <p className={parts.dialogNote}>電話や LINE で受けた相談を、運営が代わりに起票します。相手にはメールは届きません。</p>
         </div>
       </Dialog>

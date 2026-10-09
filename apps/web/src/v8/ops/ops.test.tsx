@@ -26,6 +26,8 @@ import OpsMembersV8 from './members'
 import OpsTenantsV8 from './tenants'
 import OpsAnnouncementsV8 from './announcements'
 import OpsTenantDetailV8 from './tenant-detail'
+import KnowledgeArticleV8 from './knowledge-article'
+import type { OpsKnowledgeArticle } from '@/lib/api'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -165,5 +167,24 @@ describe('送る・止める前に確かめる', () => {
     await settle()
     expect(text()).toContain('契約先の名前をそのまま入力してください')
     expect(calls.some((c) => c.method !== 'GET' && c.url.includes('/status'))).toBe(false)
+  })
+})
+
+describe('B-139 欄で知らせて移る', () => {
+  it('ナレッジの記事：題名を消して保存すると、口を呼ばず題名の欄が赤くなり理由が出て、その欄へ移る', async () => {
+    const article = {
+      id: 'k1', version: 1, sourceRequestId: 'r1', ticketNo: 12, sourceCurrent: true, articleKind: 'verified', reviewState: 'approved', status: 'active',
+      reviewReason: '', evidence: [], usedCount: 0, helpfulCount: 0, unhelpfulCount: 0, updatedAt: '2026-10-01T00:00:00Z',
+      title: '配信の止め方', question: '止めたい', answer: '一時停止を押す', kind: 'usage', keywords: [],
+    } as unknown as OpsKnowledgeArticle
+    await act(async () => { root.render(<KnowledgeArticleV8 article={article} onClose={() => {}} onSaved={() => {}} />) })
+    const title = document.querySelector('#ka-title') as HTMLInputElement
+    fireEvent.change(title, { target: { value: '' } })
+    await act(async () => { (buttons('承認待ちで保存する')[0] as HTMLButtonElement).click() })
+    await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
+    expect(title.getAttribute('aria-invalid')).toBe('true')
+    expect(document.querySelector('#ka-title-error')?.textContent).toBe('題名を入力してください')
+    expect(document.activeElement).toBe(title)
+    expect(calls.some((c) => c.method !== 'GET' && c.url.includes('/knowledge'))).toBe(false)
   })
 })
