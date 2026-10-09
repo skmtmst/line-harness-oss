@@ -11,6 +11,7 @@
  * きまりの中身を変える・作るは、今の自動変更ルールの部品（SupportMarkRulesPanel）を窓で開く。
  */
 import { createPageReturnHref } from '@/components/shared/create-page'
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { notifySaved } from '@/components/shared/toast'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -322,10 +323,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
             version: typeof latest.version === 'number' ? latest.version : (selected?.version ?? 1),
           }
           setConflict(next)
-          setItems((prev) => prev.map((mark) => mark.id === markId
-            ? { ...mark, name: next.name, color: next.color, displayOrder: next.displayOrder, version: next.version }
-            : mark))
-          setBaseline({ name: next.name, color: next.color, displayOrder: next.displayOrder, isDefault: selected?.isDefault ?? isDefault })
+          collision.mark()
         }
         setError('ほかの担当者が先に変更しました。最新の内容を確認してから保存し直してください。')
         return
@@ -393,11 +391,18 @@ function MarkEditorBody({ markId }: { markId?: string }) {
 
   const applyLatest = () => {
     if (!conflict) return
+    setItems((rows) => rows.map(mark => mark.id === markId ? { ...mark, ...conflict } : mark))
+    setBaseline({ name: conflict.name, color: conflict.color, displayOrder: conflict.displayOrder, isDefault })
     setName(conflict.name)
     setColor(conflict.color)
     setDisplayOrder(conflict.displayOrder)
     setConflict(null)
+    setError('')
+    collision.clear()
   }
+
+  const collision = useSaveConflict<NonNullable<typeof conflict>>({ fetchLatest: async () => conflict, reload: applyLatest })
+  const comparison = collision.latest ? [['名前', name, collision.latest.name], ['色', color, collision.latest.color], ['並び順', displayOrder, collision.latest.displayOrder]].flatMap(([label, current, latest]) => current === latest ? [] : [{ text: `${label}：編集中 ${current} → 最新 ${latest}` }]) : null
 
   if (loadState === 'loading') return <ListState kind="loading" />
 
@@ -460,9 +465,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         ) : null}
         {error ? <Notice tone="danger">{error}</Notice> : null}
         {conflict ? (
-          <Notice tone="warn" action={<Button type="button" onClick={applyLatest}>最新の内容を取り込む</Button>}>
-            {`最新の保存内容は名前「${conflict.name}」・並び順${conflict.displayOrder}です。入力内容はそのまま残しています。入力のまま保存し直すか、最新の内容を取り込んでください。`}
-          </Notice>
+          <SaveConflictBand title={`ほかの人が先に対応マーク「${conflict.name}」を保存しました`} compareBusy={collision.compareBusy} onCompare={collision.compare} onReload={collision.reloadLatest} />
         ) : null}
 
         {hideForm ? null : (
@@ -539,6 +542,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
           </>
         )}
       </CreatePage>
+      <SaveConflictCompareDialog open={collision.compareOpen} busy={collision.compareBusy} error={collision.compareError} lines={comparison} onReload={collision.reloadLatest} onCancel={collision.closeCompare} />
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="マークへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
       {archiveOpen && selected ? (

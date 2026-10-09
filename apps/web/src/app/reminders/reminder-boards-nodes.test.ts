@@ -38,8 +38,8 @@ describe('リマインダの残りの板ID', () => {
   it('編集の競合に k32cn の帯と比較み・読み込みが出る', () => {
     // 帯・比べる窓は共通の save-conflict（動きの点検 16 番）。押した動きは reminder-save-conflict.react.test.tsx。
     expect(EDIT).toMatch(/const designNode = conflict \? 'k32cn'/)
-    expect(EDIT).toContain('onClick={() => void openCompare()}')
-    expect(EDIT).toContain('onClick={() => void reloadAfterConflict()}')
+    expect(EDIT).toContain('onCompare={() => void openCompare()}')
+    expect(EDIT).toContain('onReload={() => void reloadAfterConflict()}')
     expect(EDIT).toContain('<Dialog')
     expect(EDIT).toContain('describeReminderDiff')
   })

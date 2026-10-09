@@ -2401,7 +2401,7 @@ export default function ScenarioDetailV8({
       {/* 競合（kz2B6）：ほかの人の保存と食い違った。板の頭のすぐ下に、幅いっぱいで出す。 */}
       {conflict && (
         <div className={styles.conflictWrap}>
-          <SaveConflictBand title={conflictLatest
+          <SaveConflictBand designNode="kz2B6" title={conflictLatest
                   ? `ほかの人が ${formatClock(conflictLatest.updatedAt)} にシナリオ「${conflictLatest.name}」を保存しました`
                   : 'ほかの人がこのシナリオを保存しました'} description="あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。" onCompare={() => setCompareOpen(true)} compareDisabled={!conflictLatest} onReload={() => void acceptLatestAndContinue()} />
         </div>
