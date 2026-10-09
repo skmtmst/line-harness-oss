@@ -571,8 +571,8 @@
  *
  * `<html data-theme="v8">` のときだけ効く、V7 と値の違うトークン。
  * ここに無いトークンは :root（＝V7）の値がそのまま効く。
- * 既定は v7。検証環境は環境変数 NEXT_PUBLIC_ADMIN_THEME=v8、担当者は
- * 設定画面の「画面の見た目（試作）」で切り替える（layout.tsx 参照）。
+ * 画面は常に v8（2026-10-09 V8 固定。layout.tsx が `<html data-theme="v8">` を出す）。
+ * :root の共通の値と旧画面用の値は、機能ごとの書き換えまで残す。
  *
  * 値の出どころは Pencil ★V8（~/Downloads/LINE-Harness-V8.pen）と
  * lh-work/design/v8/COMPONENT-MAP.md。部品ごとの移行（④）で、部品が

@@ -125,7 +125,6 @@ if [ "$SKIP_ADMIN" -eq 1 ]; then
 else
   step "4/4 管理画面 ビルド＋デプロイ"
   NEXT_PUBLIC_API_URL="$STAGING_API_URL" \
-    NEXT_PUBLIC_ADMIN_THEME="v8" \
     NEXT_PUBLIC_TURNSTILE_SITE_KEY="${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-}" \
     NEXT_PUBLIC_RESTAURANT_TEST_ENABLED="true" \
     pnpm --filter web build

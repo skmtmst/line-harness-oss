@@ -22,8 +22,6 @@ import SearchField from '@/components/shared/search-field'
 import Notice from '@/components/shared/notice'
 import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
-import SegmentedControl from '@/components/shared/segmented'
-import { applyAdminTheme } from '@/components/theme-preview-switch'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import {
@@ -259,31 +257,6 @@ export function ReorderDialog({ groups, initialOrder, onCancel, onApply }: {
         <ReorderList items={group.items} visibleRows={5} onChange={(ids) => setDraft((current) => ({ ...current, [group.id]: ids }))} />
       </> : null}
     </Dialog>
-  )
-}
-
-/** 画面の見た目（いまの見た目／新しい見た目）。このブラウザだけで切り替える。 */
-function ThemeCard() {
-  const [theme, setTheme] = useState<'v7' | 'v8' | null>(null)
-  useEffect(() => {
-    setTheme(document.documentElement.dataset.theme === 'v8' ? 'v8' : 'v7')
-  }, [])
-  if (theme === null) return null
-  return (
-    <section className={styles.themeCard} data-design="theme-preview" aria-label="画面の見た目">
-      <p className={styles.themeTitle}>画面の見た目</p>
-      <p className={styles.themeDesc}>新しい見た目（V8）を試せます。このブラウザだけで、ほかの人には影響しません。</p>
-      <SegmentedControl
-        aria-label="画面の見た目"
-        value={theme}
-        options={[{ value: 'v7', label: 'いまの見た目' }, { value: 'v8', label: '新しい見た目（試す）' }]}
-        onChange={(next) => {
-          applyAdminTheme(next)
-          setTheme(next)
-        }}
-        className={styles.themeSeg}
-      />
-    </section>
   )
 }
 
@@ -546,8 +519,6 @@ export default function FeatureSettingsScreen() {
               ))}
             </div>
           )}
-
-          <ThemeCard />
 
           {/* N-444：変更があるときだけ理由の欄を出す。 */}
           {canManage && dirty && (
