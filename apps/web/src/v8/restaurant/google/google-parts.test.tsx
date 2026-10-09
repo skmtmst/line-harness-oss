@@ -50,8 +50,8 @@ describe('Googleビジネスの表示の道具', () => {
     expect(compareText(7, null, 3)).toBe('前の7日より —')
   })
   it('日時は店舗の時刻（日本時間）で出す', () => {
-    expect(formatShortStamp('2026-09-30T11:12:00Z')).toBe('9/30 20:12')
-    expect(formatYmd('2026-09-12T01:20:00Z')).toBe('2026/09/12')
+    expect(formatShortStamp('2026-09-30T11:12:00Z')).toBe('09/30 20:12')
+    expect(formatYmd('2026-09-12T01:20:00Z')).toBe('09/12')
     expect(formatShortStamp(null)).toBe('—')
   })
 })

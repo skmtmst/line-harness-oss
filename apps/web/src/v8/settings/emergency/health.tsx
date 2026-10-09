@@ -127,7 +127,7 @@ function formatCheckedAt(iso: string | null | undefined, now = Date.now()): stri
 }
 
 function formatMonthDayTime(iso: string | null | undefined): string {
-  return polishFormatDate(iso, { style: 'list', fallback: '' })
+  return polishFormatDate(iso, { style: 'detail', fallback: '' })
 }
 
 function formatDetectedSince(iso: string | null | undefined): string {

@@ -1,6 +1,7 @@
 'use client'
 
 
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
@@ -160,23 +161,7 @@ const NEXT_SEND_WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as 
 
 /** 「次に送る」の表示（板 `apLqS`：`10/1（水）18:00`）。店舗時間帯（JST）で出す。 */
 function formatNextSend(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    month: 'numeric',
-    day: 'numeric',
-    weekday: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  const weekday = NEXT_SEND_WEEKDAYS.includes(get('weekday') as (typeof NEXT_SEND_WEEKDAYS)[number])
-    ? get('weekday')
-    : ''
-  return `${get('month')}/${get('day')}（${weekday}）${get('hour')}:${get('minute')}`
+  return polishFormatDate(iso, { style: 'list' })
 }
 
 /** 閲覧のみでも出す行の「…」の項目（見るだけのもの）。 */

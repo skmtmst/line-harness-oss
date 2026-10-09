@@ -9,6 +9,7 @@
  * 定期便・つなぎ先・注文の状況のパネルは今の部品を入口（page.tsx）から差し込む。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { CircleDot, Plug, Star } from 'lucide-react'
@@ -117,15 +118,11 @@ function actionDone(action: EcActionExecution): string {
   return ACTION_LABEL[action.eventType] ?? `未対応の出来事（${action.eventType}）`
 }
 
-const SHORT_DATE_TIME = new Intl.DateTimeFormat('ja-JP', {
-  timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
-})
+
 
 /** 一覧の日時（年なし・例 9/30 10:12、日本時間）。壊れた値は「—」。 */
 function dateTime(value: string | null): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  return Number.isNaN(date.valueOf()) ? '—' : SHORT_DATE_TIME.format(date)
+  return polishFormatDate(value, { style: 'list' })
 }
 
 /** 補足の日時（年なし・曜日つき）。 */

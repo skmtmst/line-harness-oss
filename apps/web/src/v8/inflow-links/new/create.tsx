@@ -11,6 +11,7 @@
  * - 競合（vWJEm）：発行が 409（見分けるための文字が使用中）で返ったら、板の頭の下に帯を出す
  * - 違いを比べる（E14GFm）：違う項目だけを並べた窓。「最新を取り込んで直す」で保存されている値を入力へ写す
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ArrowLeftRight, Link2, RefreshCw, TriangleAlert } from 'lucide-react'
@@ -53,10 +54,7 @@ function suggestRef(name: string): string {
 
 /** 保存日時（実データ）を「M月d日 H:mm」にする。壊れていたら出さない。 */
 function formatSavedAt(value: string): string {
-  const time = new Date(value).getTime()
-  if (Number.isNaN(time)) return ''
-  const date = new Date(time)
-  return `${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  return polishFormatDate(value, { style: 'detail', fallback: '' })
 }
 
 export default function InflowCreateV8() {

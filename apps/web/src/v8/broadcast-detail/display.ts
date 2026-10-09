@@ -59,24 +59,16 @@ export function formatBroadcastDateTime(value: string | null | undefined): strin
   return polishFormatDate(value, { style: 'detail', fallback: '—' })
 }
 
-const SHORT = new Intl.DateTimeFormat('ja-JP', {
-  timeZone: 'Asia/Tokyo',
-  month: 'numeric',
-  day: 'numeric',
-  weekday: 'short',
-  hour: 'numeric',
-  minute: '2-digit',
-  hourCycle: 'h23',
-})
+
 
 /** スマホの札の短い日時「8/24（月）10:00」（絵 `pNiUk`・`cdZBf`）。 */
 export function formatShortDateTime(value: string | null | undefined): string {
   return polishFormatDate(value, { style: 'list', fallback: '' })
 }
 
-const MONTH_DAY = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' })
+
 
 /** 「8月19日」（承認した日など、曜日も時刻も要らない日付）。 */
 export function formatMonthDay(value: string | null | undefined): string {
-  return polishFormatDate(value, { style: 'list', fallback: '—' })
+  return polishFormatDate(value, { style: 'day' })
 }

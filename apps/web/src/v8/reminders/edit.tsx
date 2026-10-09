@@ -134,12 +134,12 @@ function formatMd(value: Date | string | null): string {
 
 /** 「10/1 18:00」の形（例の文の短い日時）。 */
 function formatShort(value: Date): string {
-  return polishFormatDate(value, { style: 'list', fallback: '—' })
+  return polishFormatDate(value, { style: 'detail' })
 }
 
 /** 「10月2日(木) 14:00」の形。 */
 function formatJpDay(value: Date): string {
-  return `${value.getMonth() + 1}月${value.getDate()}日(${WEEKDAYS_JA[value.getDay()]}) ${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`
+  return polishFormatDate(value, { style: 'detail' })
 }
 
 /** 届く日時の例に使う見本の基準日。3日後の14:00（端末の時計）。 */

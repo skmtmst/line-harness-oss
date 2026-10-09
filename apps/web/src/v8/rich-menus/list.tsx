@@ -8,6 +8,7 @@
  * 直さず、型（ListPage）と共通部品で一から書いた。データの口・権限・失敗時の
  * 扱いは古い一覧と同じ（BEHAVIOR.md）。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import Link from 'next/link'
@@ -159,9 +160,7 @@ function audienceSubText(g: RichMenuGroupListItem): string | null {
 
 /** 「10/5」の形（予約の札・「から既定」）。 */
 const shortDay = (value: string): string => {
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' }).format(d)
+  return polishFormatDate(value, { style: 'list-day' })
 }
 
 /** 消せない理由の短い言い方（yOyCg：「何になっているか」だけ。外し方は右の操作）。 */

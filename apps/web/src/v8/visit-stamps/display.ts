@@ -68,7 +68,7 @@ export function previewExpiry(months: number | null, basis: VisitStampSettings['
   const date = new Date(at.getTime() + 9 * 3_600_000), day = date.getUTCDate()
   date.setUTCDate(1); date.setUTCMonth(date.getUTCMonth() + months)
   date.setUTCDate(Math.min(day, new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate()))
-  const label = new Intl.DateTimeFormat('ja-JP', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(date.getTime() - 9 * 3_600_000))
+  const label = polishFormatDate(new Date(date.getTime() - 9 * 3_600_000), { style: 'list-day' })
   return `有効期限 ${label}（${expiryLabel(months, basis)}）`
 }
 
@@ -87,9 +87,7 @@ const pad = (n: number) => String(n).padStart(2, '0')
 export const minuteLabel = (m: number) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`
 
 function monthDay(iso: string, minusDay = false): string {
-  const d = new Date(Date.parse(iso) - (minusDay ? 86_400_000 : 0))
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: TZ, month: 'numeric', day: 'numeric' }).formatToParts(d)
-  return `${parts.find((p) => p.type === 'month')?.value}/${parts.find((p) => p.type === 'day')?.value}`
+  return polishFormatDate(new Date(Date.parse(iso) - (minusDay ? 86_400_000 : 0)), { style: 'list-day' })
 }
 
 /** 倍率の名前。付けた名前があればそれ。無ければ「2倍デー」（曜日か時間）・「2倍の期間」（期間だけ）・「いつも 2倍」。 */

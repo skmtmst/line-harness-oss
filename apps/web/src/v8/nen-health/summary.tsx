@@ -6,6 +6,7 @@
  * 引き出しの枠は共通の Drawer。診察時に獣医師へ見せる前提なので、記録の事実だけを並べ、判断は書かない。
  * 印刷面（SummarySheet）は画面に出ず、印刷のときだけ紙になる（今の画面と同じ data-print-sheet）。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '@/components/shared/button'
@@ -28,7 +29,7 @@ function petLine(summary: NenHealthSummaryData): string {
   const parts = [kind, summary.pet.breed, summary.pet.ageLabel === '—' ? '' : summary.pet.ageLabel].filter(Boolean).join('・')
   const end = new Date(summary.generatedAt)
   const start = new Date(end.getTime() - (summary.summary.days - 1) * 86_400_000)
-  const range = Number.isNaN(end.getTime()) ? '' : `・${start.getMonth() + 1}/${start.getDate()}〜${end.getMonth() + 1}/${end.getDate()}`
+  const range = Number.isNaN(end.getTime()) ? '' : `・${polishFormatDate(start, { style: 'list-day' })}〜${polishFormatDate(end, { style: 'list-day' })}`
   return `${summary.pet.name || summary.pet.callName}（${parts}）・${summary.owner.name}さん${range}`
 }
 

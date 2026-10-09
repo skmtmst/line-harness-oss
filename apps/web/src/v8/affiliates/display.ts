@@ -125,7 +125,7 @@ export function formatMonthDayTime(iso: string | null | undefined): string {
 
 /** 「10/31」（日本時間）。 */
 export function formatMonthDay(iso: string | null | undefined): string {
-  return polishFormatDate(iso, { style: 'list', fallback: '—' })
+  return polishFormatDate(iso, { style: 'list-day' })
 }
 
 /*

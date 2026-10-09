@@ -37,8 +37,8 @@ describe('テンプレートの詳細の計算', () => {
 
   it('差し込みは同じ物を1つにまとめる・時刻は日本時間の「M月D日 H:MM」', () => {
     expect(insertionNames('{名前}さん {予約日時} {名前}')).toEqual(['名前', '予約日時'])
-    expect(shortStamp('2026-08-21T09:02:00Z', new Date('2026-10-01T00:00:00Z'))).toBe('8月21日 18:02')
-    expect(shortStamp('2025-08-21T09:02:00Z', new Date('2026-10-01T00:00:00Z'))).toBe('2025年8月21日 18:02')
+    expect(shortStamp('2026-08-21T09:02:00Z', new Date('2026-10-01T00:00:00Z'))).toBe('8月21日（金）18:02')
+    expect(shortStamp('2025-08-21T09:02:00Z', new Date('2026-10-01T00:00:00Z'))).toBe('2025年8月21日（木）18:02')
     expect(shortStamp(null)).toBe('—')
   })
 })

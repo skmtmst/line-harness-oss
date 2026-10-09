@@ -7,6 +7,7 @@
  * 人数を変えると座れる卓だけに絞り直す。満席のときは「いま座れる卓はありません」と次に空く目安。
  * 入れる口は walk-in.ts の1か所（予約なしの来店の口ができたら差し替える）。動きは BEHAVIOR.md。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useMemo, useState } from 'react'
 import { Armchair, LogIn, Minus, Plus } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
@@ -20,8 +21,7 @@ import styles from './front-desk.module.css'
 const MAX_GUESTS = 100
 
 function hm(value: number | Date): string {
-  const day = typeof value === 'number' ? new Date(value) : value
-  return `${pad2(day.getHours())}:${pad2(day.getMinutes())}`
+  return polishFormatDate(value, { style: 'time' })
 }
 
 /** 満席のとき、人数が入る卓がいちばん早く空く時刻（今の予約の終わり）。 */

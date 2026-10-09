@@ -12,6 +12,7 @@
  * 出ることを確かめるための見本なので、作り物の名前は置かない）。
  * 選ぶ中身が無いときは空き枠の代わりにその旨を出す。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import type { BookingAvailabilitySlot, BookingMenu, BookingStaff } from '@/lib/api'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import styles from './settings.module.css'
@@ -39,8 +40,7 @@ function daysFrom(date: string): string[] {
 }
 
 function formatJpDay(date: string): string {
-  const d = new Date(`${date}T00:00:00Z`)
-  return `${d.getUTCMonth() + 1}月${d.getUTCDate()}日（${WEEKDAY_JP[d.getUTCDay()]}）`
+  return polishFormatDate(date, { style: 'day' })
 }
 
 function priceLabel(menu: Pick<BookingMenu, 'price_mode' | 'base_price'>): string {

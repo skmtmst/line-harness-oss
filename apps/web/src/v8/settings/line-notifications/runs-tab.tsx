@@ -67,7 +67,7 @@ const STATUS: Record<EcNotificationRun['status'], { label: string; tone: 'good' 
   failed: { label: '送れなかった', tone: 'danger' },
 }
 
-const JST = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit', hourCycle: 'h23' })
+
 
 /** 「10/1 21:30」。オフセットの無い古い行は既に日本時間として読む（今の部品と同じ決まり）。 */
 function shortJst(value: string | null | undefined): string {

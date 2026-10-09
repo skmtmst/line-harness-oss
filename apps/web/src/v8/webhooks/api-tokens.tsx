@@ -76,12 +76,7 @@ export function tokenDate(value: string | null): string {
 }
 
 export function tokenUsedAt(value: string | null): string {
-  if (!value) return 'まだ使っていません'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`
+  return polishFormatDate(value, { style: 'list', fallback: value ? '—' : 'まだ使っていません' })
 }
 
 export default function WebhooksApiTokensV8() {

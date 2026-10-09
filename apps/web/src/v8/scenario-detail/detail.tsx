@@ -13,6 +13,7 @@
  * 閲覧のみの人には、変える操作のボタンを置かない（オーナー決定 2026-10-06）。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
 
 import Link from 'next/link'
@@ -177,35 +178,16 @@ const ON_COMPLETE_SENTENCE: Record<OnCompleteMode, string> = {
   move: '次のシナリオへ移す',
 }
 
-const jstParts = (iso: string | null | undefined) => {
-  if (!iso) return null
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return null
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('ja-JP', {
-      timeZone: 'Asia/Tokyo',
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-    })
-      .formatToParts(d)
-      .map((p) => [p.type, p.value]),
-  )
-  return parts as Record<string, string>
-}
+
 
 /** ①の箱「保存済み 10月1日 14:02」。 */
 function formatSavedAt(iso: string | null | undefined): string {
-  const p = jstParts(iso)
-  return p ? `${p.month}月${p.day}日 ${p.hour}:${p.minute}` : ''
+  return polishFormatDate(iso, { style: 'detail', fallback: '' })
 }
 
 /** 競合の帯「〇〇 が 14:02 に保存しました」。 */
 function formatClock(iso: string | null | undefined): string {
-  const p = jstParts(iso)
-  return p ? `${p.hour}:${p.minute}` : '少し前'
+  return polishFormatDate(iso, { style: 'time', fallback: '少し前' })
 }
 
 /** 行の札。絵は「テキスト・カルーセル・質問・テンプレート」の短い名前。 */

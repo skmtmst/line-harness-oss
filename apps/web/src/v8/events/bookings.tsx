@@ -9,6 +9,7 @@
  * 行の操作は絵どおり行に直接出す（承認する／断る・キャンセルにする／参加済／無断・予約に繰上げ・待ち順を変える）。
  */
 
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Check, Download, Send } from 'lucide-react'
@@ -58,19 +59,7 @@ const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as const
 
 /** 開催回の選び口の表示（板：`10/12（月）14:00`）。曜日は日付から作る。 */
 function formatOccurrence(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return iso
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    month: 'numeric',
-    day: 'numeric',
-    weekday: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')}（${get('weekday')}）${get('hour')}:${get('minute')}`
+  return polishFormatDate(iso, { style: 'detail', fallback: iso })
 }
 
 function participationSub(applicant: EventOccurrenceApplicant): string {

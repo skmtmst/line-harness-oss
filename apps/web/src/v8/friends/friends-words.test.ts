@@ -18,8 +18,8 @@ describe('友だち一覧の言葉', () => {
 
   it('受信の時刻は記録の文字のまま（時差を足さない）', () => {
     const year = new Date().getFullYear()
-    expect(monthDayTime(`${year}-08-14T07:58:00.000Z`)).toBe('8月14日 7:58')
-    expect(monthDayTime('2020-01-02T10:05:00')).toBe('2020年1月2日 10:05')
+    expect(monthDayTime(`${year}-08-14T07:58:00.000Z`)).toBe('08/14 07:58')
+    expect(monthDayTime('2020-01-02T10:05:00')).toBe('2020/01/02')
     expect(monthDayTime('壊れた値')).toBe('—')
   })
 

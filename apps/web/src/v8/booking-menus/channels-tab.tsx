@@ -1,5 +1,6 @@
 'use client'
 
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchApi } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -35,24 +36,16 @@ const CHANNEL_LABEL: Record<string, { name: string; sub: string; how: string }> 
 }
 
 function formatReadAt(value: string | null): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${date.getMonth() + 1}/${date.getDate()} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+  return polishFormatDate(value, { style: 'list' })
 }
 
 function formatConflictRange(conflict: BookingConflict): string {
-  const starts = new Date(conflict.startsAt)
-  if (Number.isNaN(starts.getTime())) return ''
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', weekday: 'short' }).formatToParts(starts)
-  const part = (kind: Intl.DateTimeFormatPartTypes) => parts.find((value) => value.type === kind)?.value ?? ''
-  return `${conflict.staffName}さんの ${part('month')}/${part('day')}（${part('weekday')}） ${formatConflictTime(conflict.startsAt)}`
+  const day = polishFormatDate(conflict.startsAt, { style: 'day', fallback: '' })
+  return day ? `${conflict.staffName}さんの ${day} ${formatConflictTime(conflict.startsAt)}` : ''
 }
 
 function formatConflictTime(value: string): string {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date)
+  return polishFormatDate(value, { style: 'time' })
 }
 
 function StaffStatusChip({ status }: { status: BookingChannelStaff['status'] }) {

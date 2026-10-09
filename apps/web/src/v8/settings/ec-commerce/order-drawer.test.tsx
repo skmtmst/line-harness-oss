@@ -36,7 +36,7 @@ it('注文1件の口を読み、4つの段を時刻つきの行で出す', async
   for (const title of ['注文の内容', 'この注文に届いた出来事', '成果・マイル・スコア', '発送後に届く案内']) expect(screen.getByRole('heading', { name: title })).toBeTruthy()
   expect(screen.getByText('鹿肉ドライ 1kg ×1')).toBeTruthy()
   expect(screen.getByText('マイル +75')).toBeTruthy()
-  expect(screen.getByText('10/12 10:00 予定')).toBeTruthy()
+  expect(screen.getByText('10月12日（月）10:00 予定')).toBeTruthy()
   // 済んだ出来事は1行だけ（理由もやり直しも出さない）
   expect(screen.queryByRole('button', { name: 'もう一度やる' })).toBeNull()
   expect(screen.queryByText(/処理済み/)).toBeNull()

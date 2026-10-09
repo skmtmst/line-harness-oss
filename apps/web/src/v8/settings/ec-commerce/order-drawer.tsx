@@ -40,7 +40,7 @@ function shortTime(value: string | null): string {
 
 /** 日本時間の「10/4」。 */
 function shortDay(value: string): string {
-  return polishFormatDate(value, { style: 'list', fallback: '—' })
+  return polishFormatDate(value, { style: 'detail' })
 }
 
 function money(currency: string, amount: number | null): string | null {

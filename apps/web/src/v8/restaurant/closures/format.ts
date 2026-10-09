@@ -3,6 +3,7 @@
  *
  * 日付は店舗の暦日（YYYY-MM-DD）のまま扱う。時刻の重なりだけ、店舗のタイムゾーンで UTC に直して比べる。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import type { RestaurantClosure, RestaurantClosureInput, RestaurantClosureKind } from '@line-crm/shared'
 import type { RestaurantChannelCloseTask } from '@line-crm/shared'
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
@@ -54,14 +55,12 @@ export function weekdayOf(value: string): number {
 
 /** 「10月20日（火）」 */
 export function dayTitle(value: string): string {
-  const { m, d } = parse(value)
-  return `${m}月${d}日（${WEEKDAY[weekdayOf(value)]}）`
+  return polishFormatDate(value, { style: 'day' })
 }
 
 /** 「10月20日」 */
 export function dayShort(value: string): string {
-  const { m, d } = parse(value)
-  return `${m}月${d}日`
+  return polishFormatDate(value, { style: 'day' })
 }
 
 /** 1日なら「10月20日（火）」、期間なら「10月20日（火）〜22日（木）」（月をまたぐと月も書く）。 */
@@ -243,7 +242,7 @@ export function timeOptions(withEnd = false): string[] {
 
 /** 予約の時刻「12:00」（店舗のタイムゾーン）。 */
 export function clock(iso: string, timezone: string): string {
-  return new Intl.DateTimeFormat('ja-JP', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(iso))
+  return polishFormatDate(iso, { style: 'time', timeZone: timezone })
 }
 
 /** 予約の暦日（店舗のタイムゾーン）。 */

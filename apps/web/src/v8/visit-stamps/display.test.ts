@@ -36,7 +36,7 @@ describe('来店スタンプの見せ方', () => {
   it('倍率の名前と中身（期間の終わりはその日を含めて見せる）', () => {
     const m = { multiplier: 2, weekdays: [2], startMinute: 1020, endMinute: 1140, from: '2025-12-31T15:00:00.000Z', to: '2026-03-31T15:00:00.000Z' }
     expect(multiplierName(m)).toBe('2倍デー')
-    expect(multiplierDetail(m)).toBe('毎週 火曜 17:00〜19:00 ・ 1/1〜3/31')
+    expect(multiplierDetail(m)).toBe('毎週 火曜 17:00〜19:00 ・ 01/01〜03/31')
     expect(multiplierName({ multiplier: 1.5, from: '2026-01-01T00:00:00Z' })).toBe('1.5倍の期間')
     expect(multiplierDetail({ multiplier: 3 })).toBe('いつでも')
   })

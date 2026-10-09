@@ -72,8 +72,8 @@ export const RULE_LABELS = {
   countOrders: '入金済みの注文（キャンセル・返金は除く）',
 } as const
 
-const JST = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: false })
-const JST_TIME = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: 'numeric', minute: '2-digit', hour12: false })
+
+
 
 /** 「9/30 10:12」（日本時間）。 */
 export function shortDateTime(value: string | null | undefined): string {

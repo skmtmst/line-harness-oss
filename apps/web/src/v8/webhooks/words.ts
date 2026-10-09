@@ -95,14 +95,7 @@ export function isHttpsUrl(value: string): boolean {
   }
 }
 
-const SHORT = new Intl.DateTimeFormat('ja-JP', {
-  timeZone: 'Asia/Tokyo',
-  month: 'numeric',
-  day: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-})
+
 
 /** 「9/30 10:12」（日本時間）。表の狭い列で使う。読めない値は「—」。 */
 export function shortDateTime(value: string | null | undefined): string {

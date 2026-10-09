@@ -1,5 +1,6 @@
 'use client'
 
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Eye, UserPlus, X } from 'lucide-react'
 import Link from 'next/link'
@@ -700,10 +701,7 @@ function shortWhen(value: string | null | undefined, now: number): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
   if (Math.abs(now - date.getTime()) < 10 * 60 * 1000) return 'いま'
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: '2-digit' }).formatToParts(date)
-  const month = parts.find((part) => part.type === 'month')?.value ?? ''
-  const day = parts.find((part) => part.type === 'day')?.value ?? ''
-  return `${month}/${day}`
+  return polishFormatDate(value, { style: 'list-day', now })
 }
 
 /** 担当のLINEアカウントの短い言い方（全部なら「すべて」）。 */

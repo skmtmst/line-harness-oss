@@ -8,6 +8,7 @@
  * 取り消すは確かめの窓（台帳側の CancelReservationDialog）を通し、変更するは今の変更の窓へ移る。
  * 閲覧のみ（canWrite=false）には 取り消す・変更する を置かない（閉じるだけ）。動きは BEHAVIOR.md。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useState } from 'react'
 import { Pencil } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -43,10 +44,9 @@ function historyText(history: History): string {
   if (history.state === 'loading') return 'これまでの来店を読んでいます…'
   if (history.state === 'none') return 'これまでの来店：連絡先が無いので数えられません'
   if (history.state === 'error') return 'これまでの来店を読めませんでした'
-  if (history.count === 0) return 'これまでの来店 0回（はじめて）'
-  const last = history.last ? new Date(history.last) : null
-  const lastText = last && !Number.isNaN(last.getTime()) ? `・前回 ${last.getMonth() + 1}/${last.getDate()}` : ''
-  return `これまでの来店 ${history.count} 回${lastText}`
+  if (history.count === 0) return 'これまでの来店 0 回（はじめて）'
+  const last = polishFormatDate(history.last, { style: 'list-day', fallback: '' })
+  return `これまでの来店 ${history.count.toLocaleString('ja-JP')} 回${last ? `・前回 ${last}` : ''}`
 }
 
 export default function ReservationDetailDialog({ reservation, accountId, tables, courses, busy, canWrite, onClose, onCancel, onRestore, onEdit }: {

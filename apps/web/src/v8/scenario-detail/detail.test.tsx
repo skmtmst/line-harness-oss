@@ -178,7 +178,7 @@ describe('V8 シナリオ配信の編集', () => {
     for (const name of ['配信結果を見る', 'まとめて下見', 'まとめてテストを送る', '設定を変える', '一時停止する', 'このシナリオを削除する', 'キャンセル', '複製する', '保存する']) {
       expect(screen.getAllByRole(name === '配信結果を見る' ? 'link' : 'button', { name }).length, name).toBeGreaterThan(0)
     }
-    expect(screen.getByText('保存済み 10月1日 14:02')).toBeTruthy()
+    expect(screen.getByText('保存済み 10月1日（木）14:02')).toBeTruthy()
     expect(screen.getByText('友だち追加のとき')).toBeTruthy()
     expect(screen.getByText('送っています')).toBeTruthy()
     expect(screen.getByText('何もしない（一時停止）')).toBeTruthy()

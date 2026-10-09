@@ -21,7 +21,7 @@ export function monthDay(iso: string): string {
 
 /** 「9/30 10:12」。画像の詳細の「作成」に使う。 */
 export function monthDayTime(iso: string): string {
-  return polishFormatDate(iso, { style: 'list', fallback: '—' })
+  return polishFormatDate(iso, { style: 'detail' })
 }
 
 /**

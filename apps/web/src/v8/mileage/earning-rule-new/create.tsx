@@ -9,6 +9,7 @@
  * 聞く項目・保存の口・送る形・失敗の扱いは今の作る画面（app/mileage/earning-rules/new/v8-earning-rule-new.tsx）と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeftRight, Check, Hourglass, RefreshCw, Share2, TriangleAlert, User, Zap } from 'lucide-react'
@@ -62,7 +63,7 @@ function conflictWho(data: unknown): { who: string | null; at: string | null } {
   const raw = typeof record.updatedAt === 'string' ? record.updatedAt : null
   const date = raw ? new Date(raw) : null
   const at = date && !Number.isNaN(date.getTime())
-    ? new Intl.DateTimeFormat('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' }).format(date)
+    ? polishFormatDate(date, { style: 'time' })
     : null
   return { who, at }
 }

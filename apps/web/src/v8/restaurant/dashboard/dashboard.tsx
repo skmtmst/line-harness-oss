@@ -8,6 +8,7 @@
  * → 今日の予約の表（来店の印）｜右：予約サイト・グルメ媒体・Google の口コミ・Instagram の新着。
  * 全店の一覧（前の店舗ダッシュボード `CHz31`）は `?view=stores` で残す。動きは BEHAVIOR.md。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useMemo, useState } from 'react'
 import { Armchair, Bell, CalendarCheck, Check, Plus, Star, Users } from 'lucide-react'
 import { DashboardPage, DashboardRow } from '@/components/templates/dashboard-page'
@@ -44,9 +45,9 @@ function headDescription(hours: ReturnType<typeof useStoreToday>['hours'], updat
   const periods = hours?.find((day) => day.weekday === now.getDay())?.periods ?? null
   const open = hours === null ? null : periods && periods.length > 0 ? periods.map((p) => `${p.opensAt}〜${p.closesAt}`).join('・') : '休み'
   return [
-    `${now.getMonth() + 1}月${now.getDate()}日（${week}）`,
+    polishFormatDate(now, { style: 'day' }),
     open ? `営業 ${open}` : null,
-    updatedAt ? `更新 ${pad2(updatedAt.getHours())}:${pad2(updatedAt.getMinutes())}` : null,
+    updatedAt ? `更新 ${polishFormatDate(updatedAt, { style: 'time' })}` : null,
   ].filter(Boolean).join(' ・ ')
 }
 
