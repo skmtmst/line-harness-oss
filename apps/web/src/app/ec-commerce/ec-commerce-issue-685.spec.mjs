@@ -92,7 +92,6 @@ async function stubUnrelatedApis(page) {
     '**/admin/version',
     '**/api/public/brand',
     '**/api/inbox/unanswered/count',
-    '**/api/settings/features*',
     '**/api/nen-members/overview',
     '**/api/accounts/health-summary',
     '**/api/ec-commerce/identity-candidates*',
@@ -113,6 +112,12 @@ async function stubUnrelatedApis(page) {
  */
 async function openEc(page, waitFor = 'domcontentloaded') {
   await stubUnrelatedApis(page)
+  await page.route('**/api/staff/me', (route) => route.fulfill({ json: {
+    success: true, data: { id: 'owner-1', name: '管理者', role: 'owner', permissionKeys: [] },
+  } }))
+  await page.route('**/api/settings/features*', (route) => route.fulfill({ json: {
+    success: true, data: { features: {}, sidebarOrder: null, sidebarItemOrder: null, parentChildMode: false, specializedFeatureKeys: [], version: 1 },
+  } }))
   await page.route('**/api/auth/session', (route) => route.fulfill({
     json: {
       success: true,
@@ -176,15 +181,18 @@ function accountOf(route) {
   return new URL(route.request().url()).searchParams.get('lineAccountId')
 }
 
-/* 3枚のKPIが「—件」なら、集計の数字は画面から消えている。 */
+/* V8の集計は「すべて」の件数と下段の「今日」。一覧由来のKPIは取得済みなら残す。 */
 async function expectNoOverviewNumbers(page) {
-  await expect(page.getByText('—件', { exact: true })).toHaveCount(3)
-  await expect(page.getByText('内訳は未取得', { exact: true })).toBeVisible()
-  await expect(page.getByText('到着時間は測定できません', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'すべて', exact: true })).toBeVisible()
+  await expect(page.getByText(/今日 —件/)).toBeVisible()
 }
 
+const overviewNumbers = (page, count) => page.getByRole('button', { name: `すべて ${count}`, exact: true })
+
 async function switchAccount(page, accountId) {
-  await page.getByLabel('LINEアカウント').selectOption(accountId)
+  await page.getByRole('button', { name: 'アカウントを切り替える', exact: true }).click()
+  await page.getByRole('menu', { name: 'LINEアカウントの切り替え', exact: true })
+    .getByRole('menuitemradio', { name: accountId === ACCOUNT_A ? '本店' : '支店', exact: true }).click()
 }
 
 test('21件目の商品、未知種別、サーバ検索を実際の画面操作で確認する', async ({ page }) => {
@@ -205,20 +213,12 @@ test('21件目の商品、未知種別、サーバ検索を実際の画面操作
   await expect(page.getByText('商品1 × 1')).toBeVisible()
   await page.getByRole('button', { name: '次のページ' }).click()
   await expect(page.getByText('商品21 × 1')).toBeVisible()
-  /*
-   * ページ全体から `ec.partner.custom_event` を探す(.first())のは、
-   * (a) 意図しない別要素に当たる余地があり、(b) 再描画の途中と競合する。
-   * 21件目の行そのものを掴み、その行の「いつ・何が届いたか」欄(種別)に
-   * 生キーが出ていることを表明する(司令塔ご指摘、2026-09-10)。
-   * `／ ec.partner.custom_event` という区切り文字込みで探すのは、
-   * 「したこと」欄の `未対応の出来事（ec.partner.custom_event）` という
-   * 別セルの表示ともこの行では一致してしまう(strict mode違反で発覚)ため。
-   */
+  // V8では区切り記号を置かず、同じ行の最初のセルに出来事の生キーを出す。
   const row21 = page.locator('tr').filter({ hasText: '商品21 × 1' })
-  await expect(row21.getByText('／ ec.partner.custom_event', { exact: false })).toBeVisible()
+  await expect(row21.getByRole('cell').first().getByText('ec.partner.custom_event', { exact: true })).toBeVisible()
   await expect(page.getByText('ECの出来事', { exact: true })).toHaveCount(0)
 
-  await page.getByRole('searchbox', { name: '取り込みの記録を検索' }).fill('商品21')
+  await page.getByRole('searchbox', { name: '取り込みの記録を探す' }).fill('商品21')
   await expect.poll(() => requestUrls.some((url) => new URL(url).searchParams.get('query') === '商品21')).toBe(true)
   await expect(page.getByText('商品21 × 1')).toBeVisible()
 })
@@ -240,7 +240,8 @@ test('集計だけ失敗しても一覧を残し、画面の再読み込み操�
   await expect(page.getByText('商品1 × 1')).toBeVisible()
   await expect(page.getByText('集計だけを読み込めませんでした。一覧は取得できた範囲で表示しています。')).toBeVisible()
   await page.getByRole('button', { name: '集計をもう一度読む' }).click()
-  await expect(page.getByText('直近24時間の平均 30秒（21件）')).toBeVisible()
+  await expect(overviewNumbers(page, 21)).toBeVisible()
+  await expect(page.getByText(/今日 21件/)).toBeVisible()
 })
 
 /*
@@ -267,12 +268,12 @@ test('アカウントを切り替えて集計が500になっても、前のア�
   }))
 
   await openEc(page)
-  await expect(page.getByText('111件', { exact: true }).first()).toBeVisible()
+  await expect(overviewNumbers(page, 111)).toBeVisible()
   await expect(page.getByText('商品1 × 1')).toBeVisible()
 
   await switchAccount(page, ACCOUNT_B)
   await expect(page.getByText('集計だけを読み込めませんでした。一覧は取得できた範囲で表示しています。')).toBeVisible()
-  await expect(page.getByText('111件', { exact: true })).toHaveCount(0)
+  await expect(overviewNumbers(page, 111)).toHaveCount(0)
   await expectNoOverviewNumbers(page)
   /* 一覧はBの取得ぶんへ入れ替わっている。 */
   await expect(page.getByText('商品77 × 1')).toBeVisible()
@@ -281,8 +282,8 @@ test('アカウントを切り替えて集計が500になっても、前のア�
   /* 取得済みの値を残してよいのは、同じアカウントの取り直しだけ。 */
   overviewFailsForB = false
   await page.getByRole('button', { name: '集計をもう一度読む' }).click()
-  await expect(page.getByText('7件', { exact: true }).first()).toBeVisible()
-  await expect(page.getByText('111件', { exact: true })).toHaveCount(0)
+  await expect(overviewNumbers(page, 7)).toBeVisible()
+  await expect(overviewNumbers(page, 111)).toHaveCount(0)
 })
 
 test('アカウントを切り替えて集計が403になっても、前のアカウントの数字を残さない', async ({ page }) => {
@@ -303,11 +304,11 @@ test('アカウントを切り替えて集計が403になっても、前のア�
   }))
 
   await openEc(page)
-  await expect(page.getByText('111件', { exact: true }).first()).toBeVisible()
+  await expect(overviewNumbers(page, 111)).toBeVisible()
 
   await switchAccount(page, ACCOUNT_B)
   await expect(page.getByText('集計を表示する権限がありません。一覧は取得できた範囲で表示しています。')).toBeVisible()
-  await expect(page.getByText('111件', { exact: true })).toHaveCount(0)
+  await expect(overviewNumbers(page, 111)).toHaveCount(0)
   await expectNoOverviewNumbers(page)
   /* 権限が無いので取り直しは出さない。 */
   await expect(page.getByRole('button', { name: '集計をもう一度読む' })).toHaveCount(0)
@@ -330,18 +331,18 @@ test('切替後に届いた前のアカウントの遅い返事を、新しい�
 
   await openEc(page)
   /* Aの返事はまだ届いていない。 */
-  await expect(page.getByLabel('LINEアカウント')).toBeVisible()
-  await expect(page.getByText('111件', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'アカウントを切り替える', exact: true })).toBeVisible()
+  await expect(overviewNumbers(page, 111)).toHaveCount(0)
 
   await switchAccount(page, ACCOUNT_B)
-  await expect(page.getByText('7件', { exact: true }).first()).toBeVisible()
+  await expect(overviewNumbers(page, 7)).toBeVisible()
   await expect(page.getByText('商品77 × 1')).toBeVisible()
 
   /* Aの遅い返事が届いたあとも、Bの値のまま。 */
   await page.waitForTimeout(4000)
-  await expect(page.getByText('111件', { exact: true })).toHaveCount(0)
+  await expect(overviewNumbers(page, 111)).toHaveCount(0)
   await expect(page.getByText('商品1 × 1')).toHaveCount(0)
-  await expect(page.getByText('7件', { exact: true }).first()).toBeVisible()
+  await expect(overviewNumbers(page, 7)).toBeVisible()
   await expect(page.getByText('商品77 × 1')).toBeVisible()
 })
 
@@ -382,7 +383,7 @@ test('Aで再試行の応答を待つ間にBへ切り替えても、Bの一覧�
   })
 
   await openEc(page)
-  await expect(page.getByText('111件', { exact: true }).first()).toBeVisible()
+  await expect(overviewNumbers(page, 111)).toBeVisible()
   // #641: 「もう一度やる」は行の「・・・」メニューの中にある
   await page.getByRole('button', { name: 'この行のその他操作' }).click()
   await page.getByRole('menuitem', { name: 'もう一度やる' }).click()
@@ -396,14 +397,14 @@ test('Aで再試行の応答を待つ間にBへ切り替えても、Bの一覧�
   await switchAccount(page, ACCOUNT_B)
   /* Bの一覧・集計は遅延なしで返るので、読み込み中で固まらず短時間で表示されるはず。 */
   await expect(page.getByText('商品77 × 1')).toBeVisible({ timeout: 1500 })
-  await expect(page.getByText('7件', { exact: true }).first()).toBeVisible({ timeout: 1500 })
+  await expect(overviewNumbers(page, 7)).toBeVisible({ timeout: 1500 })
   await expect(page.getByText('取り込みの記録を読み込めませんでした')).toHaveCount(0)
 
   /* Aの遅い再試行応答が届いたあとも、Bの表示は崩れない。 */
   await page.waitForTimeout(2500)
   expect(retryResolved).toBe(true)
   await expect(page.getByText('商品77 × 1')).toBeVisible()
-  await expect(page.getByText('7件', { exact: true }).first()).toBeVisible()
-  await expect(page.getByText('111件', { exact: true })).toHaveCount(0)
+  await expect(overviewNumbers(page, 7)).toBeVisible()
+  await expect(overviewNumbers(page, 111)).toHaveCount(0)
   await expect(page.getByText('商品1 × 1')).toHaveCount(0)
 })
