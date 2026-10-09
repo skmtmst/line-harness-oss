@@ -12,6 +12,7 @@ import Radio from '@/components/shared/radio'
 import { focusFormField } from '@/lib/use-field-validation'
 import Button from '@/components/shared/button'
 import { RowMenu } from '@/components/shared/row-actions'
+import { collectUncountedListRows } from '@/components/shared/collect-list-rows'
 import BulkBar from '@/components/shared/bulk-bar'
 import Checkbox from '@/components/shared/checkbox'
 import Chip from '@/components/shared/chip'
@@ -108,6 +109,9 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
   const [searchInput, setSearchInput] = useState(entry.q ?? '')
   const [searchQuery, setSearchQuery] = useState(entry.q ?? '')
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([])
+  const [allPhotoRows, setAllPhotoRows] = useState<Array<Record<string, unknown>> | null>(null)
+  const [allPhotosError, setAllPhotosError] = useState('')
+  const [allPhotosLoading, setAllPhotosLoading] = useState(false)
   const [reviewing, setReviewing] = useState<string | null>(null)
   // 審査・見送りの口は owner/admin だけ。staff は見るだけ（Jn95h）。
   const [canEdit, setCanEdit] = useState(false)
@@ -129,6 +133,9 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
 
   const load = useCallback(async () => {
     const sequence = ++loadSequence.current
+    setAllPhotoRows(null)
+    setAllPhotosError('')
+    setAllPhotosLoading(false)
     if (!accountId) {
       setPhotos([])
       setReviewMetrics(null)
@@ -387,6 +394,38 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
     setReasonError(''); setReasonFieldError('')
     setResubmitInvite(true)
     setWatchSubmitter(false)
+  }
+
+  const readAllPhotos = useCallback(async () => {
+    if (!accountId) return
+    const sequence = loadSequence.current
+    setAllPhotosLoading(true)
+    setAllPhotosError('')
+    try {
+      const rows = await collectUncountedListRows(PHOTO_PAGE_SIZE, async (offset) => {
+        const response = await fetchApi<PhotoPageResponse>(photoPagePath(accountId, offset, searchQuery))
+        if (!response.success) throw new Error('load_failed')
+        return response.data.map(photo => ({ ...photo, id: text(photo.id) }))
+      })
+      if (sequence === loadSequence.current) setAllPhotoRows(rows)
+    } catch {
+      if (sequence === loadSequence.current) setAllPhotosError('すべての写真を読み込めませんでした。')
+    } finally {
+      if (sequence === loadSequence.current) setAllPhotosLoading(false)
+    }
+  }, [accountId, searchQuery])
+
+  useEffect(() => {
+    if (loading || selectedPhotoIds.length === 0 || allPhotoRows || allPhotosLoading || allPhotosError) return
+    if (!hasMorePhotos) setAllPhotoRows(photos)
+    else void readAllPhotos()
+  }, [loading, selectedPhotoIds.length, allPhotoRows, allPhotosLoading, allPhotosError, hasMorePhotos, photos, readAllPhotos])
+
+  const selectAllPendingPhotos = () => {
+    if (!allPhotoRows) return
+    setPhotos(allPhotoRows)
+    setHasMorePhotos(false)
+    setSelectedPhotoIds(allPhotoRows.filter(photo => text(photo.status) === 'pending').map(photo => text(photo.id)))
   }
 
   const pendingPhotos = photos.filter((photo) => text(photo.status) === 'pending')
@@ -653,6 +692,11 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
           reasonCounts={reasonCounts}
           selectedPhotoIds={selectedPhotoIds}
           selectedPendingCount={selectedPendingPhotos.length}
+          totalPendingCount={allPhotoRows?.filter(photo => text(photo.status) === 'pending').length}
+          allPhotosLoading={allPhotosLoading}
+          allPhotosError={allPhotosError}
+          onRetryAllPhotos={() => void readAllPhotos()}
+          onSelectAllPending={selectAllPendingPhotos}
           selectedPhotosAreLowRisk={selectedPhotosAreLowRisk}
           bulkReviewing={bulkReviewing}
           onSearchInput={setSearchInput}
@@ -694,6 +738,11 @@ type ReviewListV8Props = {
   reasonCounts: Array<[string, number]>
   selectedPhotoIds: string[]
   selectedPendingCount: number
+  totalPendingCount?: number
+  allPhotosLoading: boolean
+  allPhotosError: string
+  onRetryAllPhotos: () => void
+  onSelectAllPending: () => void
   selectedPhotosAreLowRisk: boolean
   bulkReviewing: boolean
   onSearchInput: (next: string) => void
@@ -824,7 +873,7 @@ function ReviewListV8(props: ReviewListV8Props) {
 
       {status === 'pending' && canEdit ? (
         <div className={styles.bulkRow}>
-          <BulkBar count={props.selectedPendingCount} unit="枚" hint="審査待ちの写真だけをまとめて処理します">
+          <BulkBar count={props.selectedPendingCount} total={props.totalPendingCount} onSelectAll={props.onSelectAllPending} onClear={props.onClearSelection} unit="枚" hint={props.allPhotosLoading ? '全ページの写真を確認しています…' : props.allPhotosError ? <><span role="alert">{props.allPhotosError}</span><Button size="compact" onClick={props.onRetryAllPhotos}>もう一度読み込む</Button></> : '審査待ちの写真だけをまとめて処理します'}>
             <Button variant="secondary" disabled={props.bulkReviewing} onClick={props.onBulkReturn}>
               まとめて見送り
             </Button>
