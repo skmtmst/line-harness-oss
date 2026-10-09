@@ -343,7 +343,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
       <Notice tone="info" icon={<Armchair size={16} />} message="ここは「席（卓）」に対して受ける予約の枠です。担当スタッフなど「人」に対して受ける予約は、予約設定（メニュー・受付枠・担当スタッフ）で決めます。" />
       <DetailColumns variant="restaurant-inventory" asideLabel="この時間帯の卓を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={(
         <div className={styles.sideColumn}>
-          <Card layout="vertical" padding="spacious" gap="tight" surface="inset" aria-labelledby="rs-tables-title">
+          <Card layout="vertical" padding="spacious" gap="tight" surface="standard" aria-labelledby="rs-tables-title">
             <CardHeader size="stacked" titleId="rs-tables-title" title={selected ? `${selected.time} の卓` : '卓の埋まりぐあい'} meta="赤＝埋まっている・白＝空き・灰＝停止中" />
             <ul className={styles.tablesGrid}>
               {gridTables.map((item) => {
@@ -378,7 +378,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
         </div>
       )}>
         <div className={styles.mainColumn}>
-          <Card layout="vertical" padding="spacious" gap="tight" surface="inset" aria-labelledby="rs-alloc-title">
+          <Card layout="vertical" padding="spacious" gap="tight" surface="standard" aria-labelledby="rs-alloc-title">
             <CardHeader size="stacked" titleId="rs-alloc-title" title="席と枠の配分（卓とつながる）" meta="総数は「座席・卓管理」の稼働中の卓から自動で決まります。ここで入れた配分を全部の時間帯に入れ、時間帯ごとに直すときは下の表の行を押します。" />
             <div className={styles.totalLine}>
               <Armchair size={16} aria-hidden="true" className={styles.totalIcon} />
@@ -404,7 +404,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
             </div>
             <p className={`${styles.note} ${allocInvalid ? styles.noteInvalid : ''}`}>OTA・LINE・当日の合計が総数を超えると保存できません。予約媒体へは書き戻しません（検証中）</p>
           </Card>
-          <Card layout="vertical" padding="spacious" gap="tight" surface="inset" aria-labelledby="rs-stock-title">
+          <Card layout="vertical" padding="spacious" gap="tight" surface="standard" aria-labelledby="rs-stock-title">
             <div className={styles.sectionHeadRow}>
               <CardHeader size="stacked" titleId="rs-stock-title" title={`時間帯ごとの在庫（${dayLabel(date)}）`} meta="予約台帳の予約から、埋まっている卓と空きを出します。行を押すと右に卓の埋まりぐあいが出ます" />
               <span className={styles.datePicker}><DateField aria-label="在庫の日付" value={date} disabled={busy} onChange={changeDate} /></span>
@@ -473,7 +473,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
               </DataTable>
             )}
           </Card>
-          <Card layout="vertical" padding="spacious" gap="tight" surface="inset" aria-labelledby="rs-hours-title">
+          <Card layout="vertical" padding="spacious" gap="tight" surface="standard" aria-labelledby="rs-hours-title">
             {selected && !conflict ? (
               <Card layout="vertical" padding="default" gap="tight" surface="inset" aria-label={`${selected.time} の配分だけ直す`}>
                 <h3 className={styles.sectionTitle}>{`行を押したとき：${selected.time} の配分だけ直す`}</h3>

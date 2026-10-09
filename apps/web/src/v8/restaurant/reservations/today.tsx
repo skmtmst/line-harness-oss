@@ -241,7 +241,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
         </DataTable>
         </div>
         <div className={styles.side}>
-          <Card frame="inset" layout="vertical" padding="default" className={styles.sideCard} aria-labelledby="rs-next-title">
+          <Card frame="raised" layout="vertical" padding="default" className={styles.sideCard} aria-labelledby="rs-next-title">
             <h3 id="rs-next-title" className={styles.sideTitle}>次の予約</h3>
             {next ? (
               <>
@@ -259,7 +259,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
               <p className={styles.sideText}>この日の残りの予約はありません。</p>
             )}
           </Card>
-          <Card frame="inset" layout="vertical" padding="default" className={styles.sideCard} aria-labelledby="rs-care-title">
+          <Card frame="raised" layout="vertical" padding="default" className={styles.sideCard} aria-labelledby="rs-care-title">
             <h3 id="rs-care-title" className={styles.sideTitle}>{isToday ? '今日 気をつけること' : '気をつけること'}</h3>
             <p className={styles.sideText}>
               {pending.length > 0
@@ -277,7 +277,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
               </p>
             ) : null}
           </Card>
-          <Card frame="inset" layout="vertical" padding="default" className={styles.sideCard} aria-labelledby="rs-break-title">
+          <Card frame="raised" layout="vertical" padding="default" className={styles.sideCard} aria-labelledby="rs-break-title">
             <h3 id="rs-break-title" className={styles.sideTitle}>{`${dayShort(day)}の内訳`}</h3>
             <p className={styles.breakRow}><span>予約</span><strong>{`${bookings.length} 件・${guests} 名`}</strong></p>
             <p className={styles.breakRow}><span>LINE から</span><strong>{`${lineCount} 件`}</strong></p>
@@ -285,7 +285,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
             <p className={styles.breakRow}><span>電話</span><strong>{`${phoneCount} 件`}</strong></p>
             <p className={styles.breakRow}><span>押さえ</span><strong>{`${holds.length} 枠${holds.length > 0 ? `（${holds.map((item) => (item.table_id ? tableById.get(item.table_id)?.code : null) ?? '未配席').join('・')}）` : ''}`}</strong></p>
           </Card>
-          <Card frame="inset" layout="vertical" padding="default" className={styles.sideCard} aria-labelledby="rs-links-title">
+          <Card frame="raised" layout="vertical" padding="default" className={styles.sideCard} aria-labelledby="rs-links-title">
             <h3 id="rs-links-title" className={styles.sideTitle}>つながる先</h3>
             <Link className={styles.sideLink} href="/restaurant-test/inventory">予約枠・在庫 → 時間帯ごとの空き</Link>
             <Link className={styles.sideLink} href="/restaurant-test/tables">座席・卓管理 → 卓の結合・停止</Link>

@@ -160,7 +160,8 @@
   padding: var(--tpl-an-card-pad);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
-  box-shadow: var(--tpl-an-ring);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
 }
 .side > .card {
   flex: none;
@@ -562,7 +563,9 @@
   gap: var(--tpl-an-hours-gap);
   padding: var(--tpl-an-hours-pad);
   border-radius: var(--radius-card);
-  box-shadow: var(--tpl-an-ring);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
 }
 .hoursTitle {
   margin: 0;
@@ -621,7 +624,9 @@
   flex-shrink: 0;
   padding: var(--tpl-an-flow-pad);
   border-radius: var(--radius-card);
-  box-shadow: var(--tpl-an-ring);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
 }
 .flowLabel {
   min-width: 0;
@@ -744,7 +749,8 @@
   padding: var(--tpl-an-card-pad);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
-  box-shadow: var(--tpl-an-ring);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
 }
 .reportHead {
   display: flex;
@@ -916,7 +922,9 @@
   flex-shrink: 0;
   padding: var(--tpl-an-flow-pad);
   border-radius: var(--radius-card);
-  box-shadow: var(--tpl-an-ring);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
 }
 .sectionHead {
   display: flex;
@@ -993,7 +1001,9 @@
   min-width: 0;
   padding: var(--tpl-an-flow-pad);
   border-radius: var(--radius-card);
-  box-shadow: var(--tpl-an-ring);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
 }
 .funnelStep {
   display: flex;
@@ -1095,7 +1105,9 @@
   flex-shrink: 0;
   padding: var(--tpl-an-flow-pad);
   border-radius: var(--radius-card);
-  box-shadow: var(--tpl-an-ring);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
 }
 .funnelSide > p {
   align-self: stretch;

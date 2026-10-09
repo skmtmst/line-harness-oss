@@ -118,7 +118,7 @@ export default function ReviewV8({ webinar, editor, registrations, ctaCount, onP
 
   return <div data-webinar-pane="review" data-design-node="XCUNf">
     <div className="space-y-3">
-      <section className="border-hairline bg-canvas rounded-card border p-4" aria-label="公開前の確認">
+      <section className="content-card bg-canvas rounded-card border p-4" aria-label="公開前の確認">
         <div className="flex items-center gap-2"><h2 className="text-ink text-base font-semibold">公開前の確認</h2><HelpTip label="公開前の確認の説明">公開に必要な設定と、公開ページ・通知のテスト結果を確認します。公開すると、その時点の保存版を使います。</HelpTip>{validationState === 'ready' ? <span className="text-ink-secondary text-xs tabular-nums">{passed}/{total}</span> : null}</div>
         {validationState === 'error' ? <Notice tone="info" action={<Button onClick={loadValidation}>もう一度読み込む</Button>}>公開前検査を読み込めませんでした。このままでは公開できません。</Notice> : null}
         <ul className="divide-hairline mt-3 divide-y">
@@ -130,7 +130,7 @@ export default function ReviewV8({ webinar, editor, registrations, ctaCount, onP
         {testNotice ? <p className="text-ink-secondary mt-2 text-xs" role="status">{testNotice}</p> : null}
         {publishError ? <p className="text-danger mt-2 text-xs" role="alert">{publishError}</p> : null}
       </section>
-      <section className="border-hairline bg-canvas rounded-card border p-4" aria-label="設定のまとめ"><h2 className="text-ink text-base font-semibold">設定のまとめ</h2><dl className="divide-hairline mt-3 divide-y">{rows.map(([label, value]) => <div key={label} className="flex items-baseline justify-between gap-4 py-3 text-xs"><dt className="text-ink-faint shrink-0">{label}</dt><dd className="text-ink min-w-0 text-right">{value}</dd></div>)}</dl></section>
+      <section className="content-card bg-canvas rounded-card border p-4" aria-label="設定のまとめ"><h2 className="text-ink text-base font-semibold">設定のまとめ</h2><dl className="divide-hairline mt-3 divide-y">{rows.map(([label, value]) => <div key={label} className="flex items-baseline justify-between gap-4 py-3 text-xs"><dt className="text-ink-faint shrink-0">{label}</dt><dd className="text-ink min-w-0 text-right">{value}</dd></div>)}</dl></section>
     </div>
     <aside aria-label="公開ページでの見え方">
       <h2 className="text-ink text-base font-semibold">公開ページでの見え方</h2>

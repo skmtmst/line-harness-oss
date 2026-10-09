@@ -250,7 +250,7 @@ function AccountMigrationV7({ m }: { m: ReturnType<typeof useUidMigration> }) {
         ラベルと入力の間は8px、入力の高さは40pxでそろえる。
         移行元・移行先の選び欄は欄いっぱいに広げる（部品の size="full" を使う）。
       */}
-      <section data-selects-wide className="bg-canvas rounded-card border-hairline border p-4">
+      <section data-selects-wide className="bg-canvas rounded-card content-card border p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <label className="text-ink-secondary block min-w-0 flex-1 text-xs font-semibold">
             <span className="mb-2 block">移行元</span>
@@ -322,7 +322,7 @@ function AccountMigrationV7({ m }: { m: ReturnType<typeof useUidMigration> }) {
         onFilterChange={(nextClassification, nextPendingOnly) => onFilterChange(active.id, nextClassification, nextPendingOnly)}
         onPageChange={(nextPage) => onPageChange(active.id, nextPage)}
       /> : (
-        <section className="bg-canvas rounded-card border-hairline overflow-hidden border">
+        <section className="bg-canvas rounded-card content-card overflow-hidden border">
           {/*
             空の案内も、ほかと同じカード（白地・枠・角丸）の中に出す。
             灰色の地だけの枠をカードの間に直接置くと、下の履歴カードと
@@ -606,7 +606,7 @@ function ActiveMigration({
       <KpiCard variant="v6" title="要確認・競合" value={active.counts.review + active.counts.conflict} unit="件" detail="すべて判断が必要" />
       <KpiCard variant="v6" title="未一致" value={active.counts.unmatched} unit="件" detail="除外（新規作成は取り込みで）" />
     </div>
-    <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
+    <div className="bg-canvas rounded-card content-card overflow-hidden border">
       {/*
         FRIEND-15: 見出し・説明・バッジは run.status で連動させる。
         完了履歴へ「実データはまだ変更していません」は出さない。

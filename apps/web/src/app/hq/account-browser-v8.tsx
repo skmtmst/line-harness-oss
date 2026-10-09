@@ -325,7 +325,7 @@ export default function AccountBrowser({
               return (
                 <article
                   key={account.id}
-                  className={warned ? 'flex flex-col gap-3 rounded-card border border-status-warn bg-canvas p-4' : 'flex flex-col gap-3 rounded-card border border-hairline bg-canvas p-4'}
+                  className={warned ? 'flex flex-col gap-3 rounded-card border content-card bg-canvas p-4' : 'flex flex-col gap-3 rounded-card border content-card bg-canvas p-4'}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <AccountName account={account} />

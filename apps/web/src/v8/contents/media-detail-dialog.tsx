@@ -455,7 +455,7 @@ export default function MediaDetailDialog({
             )}
           </div>
 
-          <section className="border-hairline rounded-card border bg-canvas p-4">
+          <section className="content-card rounded-card border bg-canvas p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="text-ink text-sm font-bold">この{item.kind === 'image' ? '画像' : 'メディア'}を差し替える</h3>
@@ -508,7 +508,7 @@ export default function MediaDetailDialog({
         </div>
 
         <aside className="space-y-4">
-          <section className="border-hairline rounded-card border bg-canvas p-4">
+          <section className="content-card rounded-card border bg-canvas p-4">
             <h3 className="text-ink text-sm font-bold">ファイルのこと</h3>
             <dl className="mt-4 space-y-3 text-xs">
               {[
@@ -529,7 +529,7 @@ export default function MediaDetailDialog({
             </dl>
           </section>
 
-          <section className="border-hairline rounded-card border bg-canvas p-4">
+          <section className="content-card rounded-card border bg-canvas p-4">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-ink text-sm font-bold">利用の期限・同意</h3>
               {canManage && !termsEditing ? (
@@ -589,7 +589,7 @@ export default function MediaDetailDialog({
             ) : null}
           </section>
 
-          <section className="border-hairline rounded-card border bg-canvas p-4">
+          <section className="content-card rounded-card border bg-canvas p-4">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-ink text-sm font-bold">使われている場所</h3>
               {/* R34: 未確認の0件は「0か所」にしない。件数は「—」で出す。 */}
@@ -680,7 +680,7 @@ export default function MediaDetailDialog({
           </section>
 
           {impact && impact.versions.length > 0 ? (
-            <section className="border-hairline rounded-card border bg-canvas p-4">
+            <section className="content-card rounded-card border bg-canvas p-4">
               <h3 className="text-ink text-sm font-bold">版と元ファイル</h3>
               <p className="text-ink-faint mt-1 text-xs leading-5">
                 第1版は登録時の元ファイルです。差し替えても各版は残り、ここから取り戻せます。

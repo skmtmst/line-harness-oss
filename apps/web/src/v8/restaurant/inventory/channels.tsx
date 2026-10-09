@@ -174,7 +174,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
     <div data-design-node="hQQlt" className={styles.channels}>
       {message ? <Notice role="status" tone={message.tone === 'success' ? 'success' : 'danger'} message={message.text} /> : null}
       <div className={styles.channelCards}>
-        <Card layout="vertical" padding="default" gap="tight" surface="inset" className={styles.card} aria-labelledby="rs-intake-title">
+        <Card layout="vertical" padding="default" gap="tight" surface="standard" className={styles.card} aria-labelledby="rs-intake-title">
           <CardHeader size="stacked" titleId="rs-intake-title" title="取り込みアドレス（メール転送）" />
           <p className={styles.cardText}>予約媒体から店に届く「予約のお知らせメール」を、このアドレスへ転送すると自動で台帳に入ります。</p>
           <div className={styles.addressBox}>
@@ -190,7 +190,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
             <Button href="/restaurant-test/reservations"><FlaskConical size={15} aria-hidden="true" />試しに受け取る</Button>
           </div>
         </Card>
-        <Card layout="vertical" padding="default" gap="tight" surface="inset" className={styles.card} aria-labelledby="rs-today-title">
+        <Card layout="vertical" padding="default" gap="tight" surface="standard" className={styles.card} aria-labelledby="rs-today-title">
           <CardHeader size="stacked" titleId="rs-today-title" title="今日の取り込み" />
           <p className={styles.cardText}>{`${dayLabelParen(date)}0:00〜いま`}</p>
           <div className={styles.todayStats}>
@@ -244,7 +244,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
         </tbody>
       </DataTable>
       {canEdit ? (
-        <Card layout="vertical" padding="default" gap="tight" surface="inset" className={styles.card} aria-labelledby="rs-unread-title">
+        <Card layout="vertical" padding="default" gap="tight" surface="standard" className={styles.card} aria-labelledby="rs-unread-title">
           <CardHeader size="stacked" titleId="rs-unread-title" title={`読めなかったもの ${total} 件`} />
           <p className={styles.cardText}>形が変わったメールや、店の情報が合わないメールは、捨てずにここに残ります。</p>
           {emails.length === 0 ? (

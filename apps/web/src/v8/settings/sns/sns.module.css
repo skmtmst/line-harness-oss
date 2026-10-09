@@ -13,8 +13,11 @@
   flex-direction: column;
   gap: var(--tpl-e1-sns-card-gap);
   padding: var(--tpl-e1-sns-card-pad);
-  border: 1px solid var(--color-hairline);
+
   border-radius: var(--tpl-e1-radius-l);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
 }
 
 /* 段の頭：題（15/700）と説明（12）の縦並び、間は2 */

@@ -345,7 +345,7 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
         0 件のときは出さない——常に空の枠があると、誰も見なくなる。
       */}
       {available && (overview?.skippedReasons?.length ?? 0) > 0 && (
-        <div className="border-hairline rounded-card border p-4" data-testid="webinar-skip-reasons">
+        <div className="content-card rounded-card border p-4" data-testid="webinar-skip-reasons">
           <p className="text-ink text-xs font-medium">見送りの内訳</p>
           <ul className="mt-2 space-y-1">
             {overview!.skippedReasons.map((reason) => (

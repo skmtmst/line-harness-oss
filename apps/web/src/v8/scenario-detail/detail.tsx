@@ -390,7 +390,7 @@ function FormSection({
   return (
     <section
       data-design-node={node}
-      className="bg-canvas border-hairline rounded-card border p-4"
+      className="bg-canvas content-card rounded-card border p-4"
     >
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <div className="min-w-0">
@@ -2088,7 +2088,7 @@ export default function ScenarioDetailV8({
           afterSend={stepForm.afterSend}
         />
 
-        <div className="bg-canvas border-hairline rounded-card border p-4">
+        <div className="bg-canvas content-card rounded-card border p-4">
           <h4 className="text-ink text-sm font-bold">設定内容</h4>
           <dl className="mt-3 space-y-2 text-xs">
             <div className="flex items-baseline justify-between gap-3">

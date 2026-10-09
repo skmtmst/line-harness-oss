@@ -259,7 +259,7 @@ export default function CreatePage({
       <div data-design="Body" className={aside ? 'flex flex-col gap-4 xl:flex-row' : undefined}>
         <div
           data-design="Left"
-          className={`bg-canvas border-hairline border ${
+          className={`bg-canvas content-card border ${
             v6 ? 'rounded-card space-y-3 p-[18px]' : 'rounded-card space-y-5 p-6'
           } ${aside ? 'min-w-0 flex-1' : 'max-w-2xl'}`}
         >
@@ -366,7 +366,7 @@ export function AsideCard({
   children: ReactNode
 }) {
   return (
-    <section className="bg-canvas rounded-card border-hairline border p-4">
+    <section className="bg-canvas rounded-card content-card border p-4">
       <h2 className="text-ink text-sm font-semibold">{title}</h2>
       {note && <p className="text-ink-faint mt-0.5 text-xs">{note}</p>}
       <div className="mt-3">{children}</div>

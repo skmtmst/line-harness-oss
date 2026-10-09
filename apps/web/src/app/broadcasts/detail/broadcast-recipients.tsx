@@ -213,7 +213,7 @@ export default function BroadcastRecipients({
 
   const pending = summary.pending
   return (
-    <section aria-label="宛先" className="bg-canvas rounded-card border-hairline space-y-4 border p-5">
+    <section aria-label="宛先" className="bg-canvas rounded-card content-card space-y-4 border p-5">
       <div className="flex flex-wrap items-center gap-2">
         <Chip tone="ok">届いた {formatNumber(summary.sent)}</Chip>
         <Chip tone="danger">失敗 {formatNumber((summary.failedTemporary + summary.failedPermanent))}</Chip>

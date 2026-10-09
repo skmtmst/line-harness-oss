@@ -548,7 +548,7 @@ export default function VideoV8({
       </div>
 
       <aside className="min-w-0" aria-label="公開ページでの見え方">
-        <div className="border-hairline bg-canvas rounded-card border p-4">
+        <div className="content-card bg-canvas rounded-card border p-4">
           <h2 className="text-ink text-base font-bold">公開ページでの見え方</h2>
           <p className="text-ink mt-2 truncate text-sm font-semibold">{webinar.title}</p>
           <span className="bg-ink mt-2 flex aspect-video w-full items-center justify-center rounded-control" aria-hidden="true">

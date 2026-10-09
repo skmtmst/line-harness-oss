@@ -189,7 +189,7 @@ export function StatTilesSkeleton({ count = 4 }: { count?: number }) {
   return (
     <div aria-hidden="true" className="flex flex-col gap-4 sm:flex-row">
       {Array.from({ length: count }, (_, index) => (
-        <div key={index} className="flex-1 rounded-card border border-hairline bg-canvas px-4 py-3">
+        <div key={index} className="flex-1 rounded-card border content-card bg-canvas px-4 py-3">
           <Skeleton height={12} width={64} />
           <div className="mt-2">
             <Skeleton height={28} width={96} />

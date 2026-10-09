@@ -381,7 +381,7 @@ export default function TriggerEditor({
           条件そのものの編集は詳細画面の「対象」から開くので、ここでは
           読むだけにして場所を案内する。
         */}
-        <section className="border-hairline rounded-card border px-4 py-3">
+        <section className="content-card rounded-card border px-4 py-3">
           <p className="text-ink text-sm font-bold">開始する友だちの条件</p>
           <p className="text-ink-secondary mt-2 text-sm">
             {usableCondition
@@ -402,7 +402,7 @@ export default function TriggerEditor({
           稼働中・停止中は重ねて登録せず、読み終えた人は条件を満たすと
           もう一度始まる。選べないものを選択肢に見せないため、仕様の説明にする。
         */}
-        <div className="border-hairline rounded-card mt-4 border p-4">
+        <div className="content-card rounded-card mt-4 border p-4">
           <p className="text-ink text-sm font-bold">同じ友だちの開始回数</p>
           <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
             同じシナリオへ同時に入れるのは1人1つまでです。稼働中・停止中の人には重ねて開始しません。

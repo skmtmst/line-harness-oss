@@ -266,7 +266,7 @@ export default function AccountDetailV8() {
         ) : null}
         <div className={styles.columns}>
           <div className={styles.main}>
-            <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-basic">
+            <Card surface="standard" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-basic">
               <div className={styles.cardHead}><h3 id="acd-basic" className={styles.cardTitle}>登録の内容</h3></div>
               <Row label="表示名">{account.name}</Row>
               <Row label="チャネルID">{account.channelId}</Row>
@@ -289,7 +289,7 @@ export default function AccountDetailV8() {
               </Row>
             </Card>
 
-            <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-credentials">
+            <Card surface="standard" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-credentials">
               <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-inner-pad)" gap="var(--tpl-acd-card-gap)" className={styles.inner}>
                 <h3 className={styles.cardTitle}>登録の内容（つづき）</h3>
                 <Pair label="友だち数">{friendsLine(account)}</Pair>
@@ -338,7 +338,7 @@ export default function AccountDetailV8() {
             </Card>
 
             {!account.isActive && !account.archivedAt ? (
-              <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-skipped">
+              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-skipped">
                 <div className={styles.cardHead}>
                   <h3 id="acd-skipped" className={styles.cardTitle}>止まっている間に送らなかったもの</h3>
                   {account.inactivatedAt ? (
@@ -369,16 +369,16 @@ export default function AccountDetailV8() {
           </div>
 
           <aside className={styles.side}>
-            <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-cando">
+            <Card surface="standard" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-cando">
               <div className={styles.cardHead}><h3 id="acd-cando" className={styles.cardTitle}>このアカウントでできること</h3></div>
               <p className={styles.bullets}>{CAN_DO}</p>
               <Button href="/?qr=base" className={styles.fit}><QrCode size={14} aria-hidden="true" />友だち追加URLとQRを見る</Button>
             </Card>
-            <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-careful">
+            <Card surface="standard" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-careful">
               <div className={styles.cardHead}><h3 id="acd-careful" className={styles.cardTitle}>気をつけること</h3></div>
               <p className={styles.bullets}>{CAREFUL}</p>
             </Card>
-            <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-links">
+            <Card surface="standard" layout="vertical" contentPadding="var(--tpl-acd-card-pad)" gap="var(--tpl-acd-card-gap)" className={styles.card} aria-labelledby="acd-links">
               <div className={styles.cardHead}><h3 id="acd-links" className={styles.cardTitle}>つながる先</h3></div>
               <p className={styles.links}>
                 {LINKS.map((link, index) => (

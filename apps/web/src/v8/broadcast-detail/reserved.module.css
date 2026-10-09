@@ -105,7 +105,9 @@
   gap: var(--tpl-bd-rs-card-gap);
   padding: var(--tpl-bd-rs-card-pad);
   border-radius: var(--radius-card);
-  box-shadow: var(--tpl-bd-ring);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
 }
 
 .doneHead {

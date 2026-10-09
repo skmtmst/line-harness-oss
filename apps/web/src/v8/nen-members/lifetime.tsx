@@ -137,7 +137,7 @@ export default function LifetimeV8({
         </div>
       ) : null}
 
-      <Card layout="vertical" padding="spacious" surface="inset" spacing="normal" aria-labelledby="nen-lifetime-title">
+      <Card layout="vertical" padding="spacious" surface="standard" spacing="normal" aria-labelledby="nen-lifetime-title">
         <div className={styles.lifetimeHead}>
           <div className={styles.cardHead}>
             <h2 id="nen-lifetime-title" className={styles.cardTitle}>節目（ライフタイム）</h2>

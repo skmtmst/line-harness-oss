@@ -597,7 +597,7 @@ function CustomerNotificationEditor({
     {/* N-337: 狭い幅では見本を下に回す。390pxを無条件に横置きしない。 */}
     <div className={styles.editorGrid}>
       <div className="min-w-0 space-y-4">
-        <section className="rounded-card border border-hairline bg-canvas p-4">
+        <section className="rounded-card border content-card bg-canvas p-4">
           <h2 className="font-bold text-ink">いつ送りますか</h2>
           <div className="mt-3 grid gap-3 md:grid-cols-3">
             <div><p className="text-xs font-semibold text-ink-faint">きっかけ</p><p className="mt-1 rounded-control border border-hairline px-3 py-2.5 text-sm text-ink">{triggerLabel(setting)}</p></div>
@@ -606,7 +606,7 @@ function CustomerNotificationEditor({
           </div>
         </section>
 
-        <section className="rounded-card border border-hairline bg-canvas p-4">
+        <section className="rounded-card border content-card bg-canvas p-4">
           <h2 className="font-bold text-ink">送るもの</h2>
           <div className="mt-3 space-y-4">
             <Field htmlFor="customer-notification-title" label="通知の見出し" error={titleError}><TextField id="customer-notification-title" value={setting.title ?? ''} maxLength={80} ref={titleRef} onChange={(event) => { setTitleError(''); onChange({ title: event.target.value }) }} /></Field>
@@ -619,7 +619,7 @@ function CustomerNotificationEditor({
           </div>
         </section>
 
-        <section className="rounded-card border border-hairline bg-canvas p-4">
+        <section className="rounded-card border content-card bg-canvas p-4">
           <h2 className="font-bold text-ink">ボタン</h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <Field htmlFor="customer-notification-button" label="ボタンの文字"><TextField id="customer-notification-button" value={setting.buttonLabel} maxLength={20} onChange={(event) => onChange({ buttonLabel: event.target.value })} /></Field>
@@ -642,14 +642,14 @@ function CustomerNotificationEditor({
           </div>
         </section>
 
-        <section className="rounded-card border border-hairline bg-canvas p-4">
+        <section className="rounded-card border content-card bg-canvas p-4">
           <h2 className="font-bold text-ink">届かなかったときの決めごと</h2>
           <p className="mt-2 text-sm leading-6 text-ink-secondary">取引メールと対応済み記録は、送信台帳の接続後に設定できます。いまは受信箱から別の手だてで連絡してください。</p>
         </section>
       </div>
 
       <aside className="min-w-0 space-y-3">
-        <section className="rounded-card border border-hairline bg-canvas p-4">
+        <section className="rounded-card border content-card bg-canvas p-4">
           {/* #988 NEXT-06: 実在の人物名を出すと「この人に届く」と誤読される。
               実際の送信先（テスト受信者／注文のお客さま）とは別物の見本だと明記する。 */}
           <p className="mb-2 text-xs font-semibold text-ink-faint">架空の注文による表示例</p>
@@ -659,7 +659,7 @@ function CustomerNotificationEditor({
           <h2 className="text-sm font-bold">これは「お知らせ」です</h2>
           <ul className="mt-2 space-y-2 text-sm leading-5"><li>配信を止めている人にも届きます</li><li>売り込みの文章は入れないでください</li><li>遅れると問い合わせが増えます</li></ul>
         </Notice>
-        <section className="rounded-card border border-hairline bg-canvas p-4 text-sm">
+        <section className="rounded-card border content-card bg-canvas p-4 text-sm">
           <h2 className="font-bold text-ink">つながる先</h2>
           {/* #988 LAY-10拡張: リンク色だけの p をやめ、実際に移動できる Link にする。 */}
           <div className="mt-2 space-y-2">
