@@ -299,6 +299,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
     <CreatePage
       boardId="E7iAYs"
       title={chrome.title}
+      actions={chrome.actions}
       identity={chrome.identity}
       steps={chrome.steps}
       description="いつ LINE で知らせるかと、見た人・見なかった人に何をするかを決めます。"
