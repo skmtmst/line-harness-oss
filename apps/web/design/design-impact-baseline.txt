@@ -115,7 +115,6 @@ shared-button-importer app/line-notifications/page.tsx
 shared-button-importer app/login/page.tsx
 shared-button-importer app/login/two-factor/setup/page.tsx
 shared-button-importer app/mileage/action-score-tab.tsx
-shared-button-importer app/mileage/earning-rules/edit/page.tsx
 shared-button-importer app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx
 shared-button-importer app/mileage/earning-rules/new/v8-earning-rule-new.tsx
 shared-button-importer app/mileage/friends/detail/mileage-adjustment-dialog.tsx
