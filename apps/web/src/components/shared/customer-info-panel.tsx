@@ -6,7 +6,7 @@ import type { FriendField } from '@line-crm/shared'
 import Button from './button'
 import { ReorderHandle, RowMenu, useReorder } from './row-actions'
 import Checkbox from './checkbox'
-import Dialog from './dialog'
+import DisplayItemsDialog from './display-items-dialog'
 import { fixedFieldValue, FIXED_FRIEND_FIELDS } from './fixed-friend-field-values'
 import styles from './customer-info-panel.module.css'
 import AllergyField from './allergy-field'
@@ -64,12 +64,6 @@ export default function CustomerInfoPanel({
     return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi)
   })
   const choices = [{ key: 'names', label: '基本' }, ...[...sorted, ...extraSections].map(({ key, label }) => ({ key, label }))]
-  const reorder = useReorder({
-    items: sorted,
-    idOf: section => section.key,
-    onReorder: change => setOrder(current => [...change.ids, ...current.filter(key => !change.ids.includes(key))]),
-  })
-  const toggle = (key: string, visible: boolean) => setHidden(current => visible ? current.filter(k => k !== key) : [...current, key])
   return <div className={styles.panel} data-customer-info-panel>
     {!hidden.includes('names') ? <section className={styles.section} aria-label="基本">
       <div className={styles.head}>
@@ -79,7 +73,7 @@ export default function CustomerInfoPanel({
       {state === 'loading' ? <p className={styles.note}>情報欄を読み込んでいます…</p>
         : state === 'error' ? <p className={styles.note} role="alert">情報欄を読み込めませんでした <Button variant="text" onClick={onRetry}>もう一度読み込む</Button></p>
         : <dl className={styles.rows}>
-          {FIXED_FRIEND_FIELDS.filter(spec => !hidden.includes(`fixed:${spec.key}`) && fields.some(f => f.fixedKey === spec.key)).map(spec => {
+          {[...FIXED_FRIEND_FIELDS].sort((a,b) => (order.indexOf(`fixed:${a.key}`) < 0 ? 999 : order.indexOf(`fixed:${a.key}`)) - (order.indexOf(`fixed:${b.key}`) < 0 ? 999 : order.indexOf(`fixed:${b.key}`))).filter(spec => !hidden.includes(`fixed:${spec.key}`) && fields.some(f => f.fixedKey === spec.key)).map(spec => {
             const { value, source, derived } = fixedFieldValue(shownFields, spec.key)
             const field = shownFields.find(field => field.fixedKey === spec.key)!
             return <div className={styles.row} key={spec.key}>
@@ -116,18 +110,14 @@ export default function CustomerInfoPanel({
       </section>)}
       {more}
     </div> : null}
-    <Button variant="text" onClick={() => setSettings(true)}>表示項目</Button>
-    <Dialog open={settings} title="表示項目" onCancel={() => setSettings(false)} cancelLabel="閉じる">
-      <div className={styles.options}>
-        {choices.map(choice => <div key={choice.key} className={styles.option} {...reorder.rowProps(choice.key)}>
-          {sections.some(section => section.key === choice.key) ? <ReorderHandle label={choice.label} {...reorder.handleProps(choice.key)} onMove={direction => reorder.moveBy(choice.key, direction)} /> : null}
-          <Checkbox checked={!hidden.includes(choice.key)} onCheckedChange={visible => toggle(choice.key, visible)}>{choice.label}</Checkbox>
-          {sections.some(section => section.key === choice.key) ? <RowMenu label={`${choice.label}の順序`} items={reorder.menuItems(choice.key)} /> : null}
-        </div>)}
-        <div className={styles.basicOptions} role="group" aria-label="基本の表示項目">
-          {FIXED_FRIEND_FIELDS.map(spec => <Checkbox key={spec.key} checked={!hidden.includes(`fixed:${spec.key}`)} onCheckedChange={visible => toggle(`fixed:${spec.key}`, visible)}>{spec.label}</Checkbox>)}
-        </div>
-      </div>
-    </Dialog>
+    {canEdit ? <Button variant="text" onClick={() => setSettings(true)}>表示項目</Button> : null}
+    {settings && canEdit ? <DisplayItemsDialog title="表示項目" items={[
+      ...choices.map(choice => ({...choice, group:'顧客情報の段'})),
+      ...FIXED_FRIEND_FIELDS.map(spec => ({key:`fixed:${spec.key}`,label:spec.label,group:'基本'})),
+    ]} selected={[...choices.map(choice => choice.key),...FIXED_FRIEND_FIELDS.map(spec => `fixed:${spec.key}`)].filter(key => !hidden.includes(key)).sort((a,b) => (order.indexOf(a)<0?999:order.indexOf(a))-(order.indexOf(b)<0?999:order.indexOf(b)))}
+      manageHref="/friend-fields" onCancel={() => setSettings(false)} onConfirm={keys => {
+        const all = [...choices.map(choice => choice.key),...FIXED_FRIEND_FIELDS.map(spec => `fixed:${spec.key}`)]
+        setHidden(all.filter(key => !keys.includes(key))); setOrder(keys); setSettings(false)
+      }} /> : null}
   </div>
 }

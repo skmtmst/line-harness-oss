@@ -15,7 +15,9 @@ import Link from '@/components/shared/list-navigation'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { Eye } from 'lucide-react';
-import type { Scenario, Tag } from '@line-crm/shared';
+import { BASIC_FRIEND_FIELDS, type FriendField, type Folder, type Scenario, type Tag } from '@line-crm/shared';
+import DisplayItemsDialog from '@/components/shared/display-items-dialog';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { api, ApiError, fetchApi, type FriendListItem, type FriendStats, type SupportMarkListItem } from '@/lib/api';
 import { formatNumber } from '@/lib/format';
 import { useAccount } from '@/contexts/account-context';
@@ -83,7 +85,7 @@ type SortMode = 'recent' | 'oldest'
 type ResponseFilter = 'all' | 'unhandled'
 type Notice = { title: string; message: string } | null
 type LoadStatus = 'loading' | 'ready' | 'error'
-type Column = 'support' | 'scenario' | 'latest' | 'tags' | 'source' | 'last'
+type Column = string
 
 const COLUMNS: Array<{ key: Column; label: string }> = [
   { key: 'support', label: '対応・担当' },
@@ -149,6 +151,9 @@ export default function FriendsListV8() {
   const directQuery = (searchParams.get('q') ?? '').trim()
 
   const [friends, setFriends] = useState<FriendListItem[]>([])
+  const [fieldDefinitions, setFieldDefinitions] = useState<FriendField[]>([])
+  const [fieldFolders, setFieldFolders] = useState<Folder[]>([])
+  const [fieldsReady, setFieldsReady] = useState(false)
   const [fieldNames, setFieldNames] = useState<string[]>([])
   const [allTags, setAllTags] = useState<Tag[]>([])
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
@@ -193,7 +198,7 @@ export default function FriendsListV8() {
   useEffect(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('friends.visibleColumns') ?? 'null') as unknown
-      if (Array.isArray(stored)) setVisible(new Set(stored.filter((key): key is Column => COLUMNS.some((column) => column.key === key))))
+      if (Array.isArray(stored)) setVisible(new Set(stored.filter((key): key is Column => typeof key === 'string' && (COLUMNS.some(column => column.key === key) || BASIC_FRIEND_FIELDS.some(field => key === `fixed:${field.key}`) || /^field:[a-zA-Z0-9_-]{1,128}$/.test(key)))))
     } catch {
       // 壊れた保存値は既定の列で開く。
     } finally {
@@ -204,6 +209,23 @@ export default function FriendsListV8() {
     if (!columnsReady) return
     try { localStorage.setItem('friends.visibleColumns', JSON.stringify([...visible])) } catch { /* 保存できなくても一覧は動く */ }
   }, [columnsReady, visible])
+
+  const narrow = useNarrowViewport()
+  const maxColumns = narrow ? 4 : 7
+  const columnItems = useMemo(() => [
+    ...COLUMNS.map(column => ({...column, group:'いつもの項目'})),
+    ...BASIC_FRIEND_FIELDS.map(field => ({key:`fixed:${field.key}`,label:field.label,group:'基本'})),
+    ...fieldDefinitions.filter(field => !field.fixedKey && field.status !== 'archived').map(field => ({key:`field:${field.id}`,label:field.name,group:`お店が作った情報欄 / ${fieldFolders.find(folder => folder.id === field.folderId)?.name ?? '未分類'}`})),
+  ], [fieldDefinitions, fieldFolders])
+  const displayColumns = [...visible].map(key => columnItems.find(column => column.key === key)).filter((column): column is typeof columnItems[number] => Boolean(column)).slice(0,maxColumns)
+  const requestedFieldColumns = displayColumns.filter(column => column.key.startsWith('fixed:') || column.key.startsWith('field:')).map(column => column.key).join('|')
+  useEffect(() => {
+    if (!fieldsReady) return
+    setVisible(current => {
+      const kept = [...current].filter(key => columnItems.some(column => column.key === key))
+      return kept.length === current.size ? current : new Set(kept)
+    })
+  }, [fieldsReady, columnItems])
 
   /* ── 数の帯（今の FriendKpis と同じ口・同じ守り） ── */
   const [stats, setStats] = useState<FriendStats | null>(null)
@@ -307,10 +329,12 @@ export default function FriendsListV8() {
   const fieldsEnabled = featureVisibility.enabled('friend_fields')
   useEffect(() => {
     let cancelled = false
-    setFieldNames([])
+    setFieldNames([]); setFieldDefinitions([]); setFieldFolders([]); setFieldsReady(false)
     if (!selectedAccountId || !fieldsEnabled) return
-    void api.friendFields.list(selectedAccountId).then(response => {
-      if (!cancelled && response.success) setFieldNames(response.data.map(field => field.name))
+    void Promise.all([api.friendFields.list(selectedAccountId), api.folders.list('friend_field', selectedAccountId)]).then(([response, folders]) => {
+      if (cancelled) return
+      if (response.success) {setFieldNames(response.data.map(field => field.name)); setFieldDefinitions(response.data); setFieldsReady(true)}
+      if (folders.success) setFieldFolders(folders.data)
     }).catch(() => { if (!cancelled) setOptionsFailed(true) })
     return () => { cancelled = true }
   }, [selectedAccountId, fieldsEnabled])
@@ -360,6 +384,7 @@ export default function FriendsListV8() {
         audienceId: audienceId || undefined,
         search: searchSubmitted || undefined,
         includeChatStatus: true,
+        fieldColumns: requestedFieldColumns ? requestedFieldColumns.split('|') : undefined,
         sort: sortMode,
         handled: responseFilter === 'unhandled' ? 'unhandled' : undefined,
         operatorId: operatorId || undefined,
@@ -408,6 +433,7 @@ export default function FriendsListV8() {
         audienceId: audienceId || undefined,
         search: searchSubmitted || undefined,
         includeChatStatus: true,
+        fieldColumns: requestedFieldColumns ? requestedFieldColumns.split('|') : undefined,
         sort: sortMode,
         handled: responseFilter === 'unhandled' ? 'unhandled' : undefined,
         operatorId: operatorId || undefined,
@@ -436,7 +462,7 @@ export default function FriendsListV8() {
       setLoadStatus('error')
       setRefreshing(false)
     }
-  }, [advanced, attentionOnly, audienceId, operatorId, page, pageSize, responseFilter, scenarioId, scoreMax, scoreMin, scoredOnly, searchSubmitted, selectedAccountId, selectedTagId, sortMode])
+  }, [advanced, attentionOnly, audienceId, operatorId, page, pageSize, responseFilter, scenarioId, scoreMax, scoreMin, scoredOnly, searchSubmitted, selectedAccountId, selectedTagId, sortMode, requestedFieldColumns])
 
   useEffect(() => void loadOptions(), [loadOptions])
   useEffect(() => void loadMarks(), [loadMarks])
@@ -692,31 +718,8 @@ export default function FriendsListV8() {
         ) : null}
         <span className={styles.spacer} />
         {selectedCount > 0 ? <span className={styles.selectedCount}>{selectedCount} 件選択中</span> : null}
-        <span className={styles.columnsBox}>
-          <button ref={columnsButtonRef} type="button" aria-expanded={columnsOpen} onClick={() => setColumnsOpen((current) => !current)} className={styles.textButton}>
-            <Columns3 size={16} aria-hidden="true" />
-            表示項目を編集
-          </button>
-          <MenuPortal open={columnsOpen} align="end" getAnchor={() => columnsButtonRef.current} onClose={() => setColumnsOpen(false)}>
-            <div className={styles.columnsMenu}>
-              {COLUMNS.map((column, saveFieldIndex) => (
-                <div key={column.key} className={styles.columnsItem}>
-                  <SaveErrorField names={[`COLUMNS.${saveFieldIndex}.key`,"key","column.key","visible"]}><Checkbox
-                    checked={visible.has(column.key)}
-                    onCheckedChange={(checked) => setVisible((previous) => {
-                      const next = new Set(previous)
-                      if (checked) next.add(column.key)
-                      else next.delete(column.key)
-                      return next
-                    })}
-                  >
-                    {column.label}
-                  </Checkbox></SaveErrorField>
-                </div>
-              ))}
-            </div>
-          </MenuPortal>
-        </span>
+        {!readOnly ? <Button variant="text" onClick={() => setColumnsOpen(true)}><Columns3 size={16} aria-hidden="true" />表示項目を編集</Button> : null}
+        {columnsOpen && !readOnly ? <DisplayItemsDialog items={columnItems} selected={[...visible]} maxSelected={maxColumns} manageHref="/friend-fields" onCancel={() => setColumnsOpen(false)} onConfirm={keys => {setVisible(new Set(keys));setColumnsOpen(false)}} /> : null}
         <SaveErrorField names={["pageSize","limit","page_size"]}><Select
           aria-label="表示件数"
           width={98}
@@ -760,7 +763,7 @@ export default function FriendsListV8() {
     </ListToolbarFrame>
   )
 
-  const colCount = 4 + [...visible].length
+  const colCount = 4 + displayColumns.length
   const table = (
     <div className={refreshing ? `${styles.tableWrap} ${styles.refreshing}` : styles.tableWrap} aria-busy={loadStatus === 'loading' || refreshing || undefined}>
       <DataTable className={styles.table} data-design="V8FriendTable">
@@ -768,12 +771,7 @@ export default function FriendsListV8() {
           <col className={styles.colCheck} />
           <col className={styles.colStar} />
           <col />
-          {visible.has('support') ? <col className={styles.colSupport} /> : null}
-          {visible.has('scenario') ? <col className={styles.colScenario} data-cell-collapse="narrow" /> : null}
-          {visible.has('latest') ? <col className={styles.colLatest} /> : null}
-          {visible.has('tags') ? <col className={styles.colTags} /> : null}
-          {visible.has('source') ? <col className={styles.colSource} data-cell-collapse="narrow" /> : null}
-          {visible.has('last') ? <col className={styles.colLast} /> : null}
+          {displayColumns.map(column => <col key={column.key} />)}
           <col className={styles.colMenu} />
         </colgroup>
         <thead>
@@ -789,8 +787,8 @@ export default function FriendsListV8() {
             <Th colSpan={2} className={styles.thFriend}>
               <span className={styles.thFriendInner}><Star size={14} aria-label="注目" className={styles.thStar} />友だち</span>
             </Th>
-            {COLUMNS.filter((column) => visible.has(column.key)).map((column) => (
-              <Th key={column.key} className={styles.th} collapseAt={column.key === 'scenario' || column.key === 'source' ? 'narrow' : undefined}>{column.label}</Th>
+            {displayColumns.map((column) => (
+              <Th key={column.key} className={styles.th}>{column.label}</Th>
             ))}
             <Th className={styles.thMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
@@ -831,8 +829,9 @@ export default function FriendsListV8() {
                 <Td className={styles.td}>
                   <FolderDotName><RowNameLink href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className={styles.friendName}>{friend.displayName}</RowNameLink></FolderDotName>
                 </Td>
-                {visible.has('support') ? (
-                  <Td className={styles.td}>
+                {displayColumns.map(column => {
+                  if (column.key === 'support') return (
+                  <Td key={column.key} className={styles.td}>
                     <div className={styles.supportCell}>
                       <span className={styles.statusRow}>
                         <StatusPill tone={SUPPORT_STATUS_TONES[friend.chatStatus ?? 'resolved']}>{status.label}</StatusPill>
@@ -841,12 +840,12 @@ export default function FriendsListV8() {
                       <span className={styles.sub}>{`担当：${friend.operator?.name ?? '担当なし'}`}</span>
                     </div>
                   </Td>
-                ) : null}
-                {visible.has('scenario') ? (
-                  <Td className={`${styles.td} ${styles.fixedContent}`} collapseAt="narrow"><span className={styles.cellText} title={friend.activeScenario?.name}>{friend.activeScenario?.name ?? emptyValue('none')}</span></Td>
-                ) : null}
-                {visible.has('latest') ? (
-                  <Td className={styles.td}>
+                  )
+                  if (column.key === 'scenario') return (
+                  <Td key={column.key} className={`${styles.td} ${styles.fixedContent}`}><span className={styles.cellText} title={friend.activeScenario?.name}>{friend.activeScenario?.name ?? emptyValue('none')}</span></Td>
+                  )
+                  if (column.key === 'latest') return (
+                  <Td key={column.key} className={styles.td}>
                     {latest ? (
                       <div className={styles.twoLine}>
                         <span className={styles.cellText} title={latest.content}>{messageWord(latest)}</span>
@@ -854,22 +853,25 @@ export default function FriendsListV8() {
                       </div>
                     ) : <span className={styles.cellText}>受信なし</span>}
                   </Td>
-                ) : null}
-                {visible.has('tags') ? (
-                  <Td className={`${styles.td} ${styles.fixedContent}`}>
+                  )
+                  if (column.key === 'tags') return (
+                  <Td key={column.key} className={`${styles.td} ${styles.fixedContent}`}>
                     <div className={styles.tags} title={friend.tags.map((tag) => tag.name).join('・') || undefined}>
                       <TagOverflow>{friend.tags.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="sm" />)}</TagOverflow>
 
                       {friend.tags.length === 0 ? <span className={styles.faint}>—</span> : null}
                     </div>
                   </Td>
-                ) : null}
-                {visible.has('source') ? (
-                  <Td className={`${styles.td} ${styles.fixedContent}`} collapseAt="narrow"><span className={styles.cellText} title={friend.firstTrackedLinkName || '不明'}>{friend.firstTrackedLinkName || '不明'}</span></Td>
-                ) : null}
-                {visible.has('last') ? (
-                  <Td className={`${styles.td} ${styles.fixedContent}`}><span className={styles.cellText} title={monthDayTime(lastContact)}>{monthDay(lastContact)}</span></Td>
-                ) : null}
+                  )
+                  if (column.key === 'source') return (
+                  <Td key={column.key} className={`${styles.td} ${styles.fixedContent}`}><span className={styles.cellText} title={friend.firstTrackedLinkName || '不明'}>{friend.firstTrackedLinkName || '不明'}</span></Td>
+                  )
+                  if (column.key === 'last') return (
+                  <Td key={column.key} className={`${styles.td} ${styles.fixedContent}`}><span className={styles.cellText} title={monthDayTime(lastContact)}>{monthDay(lastContact)}</span></Td>
+                  )
+                  const value = friend.fieldValues?.[column.key]
+                  return <Td key={column.key} className={styles.td}><span className={styles.cellText} title={value ?? undefined}>{value ?? '未設定'}</span></Td>
+                })}
                 <Td className={styles.tdMenu}>
                   <div className={styles.menuBox}>
                     <FriendRowMenu

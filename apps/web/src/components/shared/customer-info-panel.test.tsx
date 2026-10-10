@@ -27,13 +27,14 @@ test('birthday takes priority, fallback age and source match the displayed value
   expect(fixedFieldValue(fields,'age').source).toContain('回答フォーム『登録』から 10/08 10:12')
   expect(fixedFieldValue(fields.filter(f=>f.fixedKey!=='birthday'),'age')).toEqual({value:'18',derived:false,source:'手で入れた'})
 })
-test('seven visible basics, view-only edits hidden, shared display preferences persist',()=>{
-  const props={friendId:'f',fields,state:'ready' as const,canEdit:false,sections:[{key:'tags',label:'タグ',content:<p>VIP</p>}]}
+test('eight visible basics, shared display preferences persist only after save',()=>{
+  const props={friendId:'f',fields,state:'ready' as const,canEdit:true,sections:[{key:'tags',label:'タグ',content:<p>VIP</p>}]}
   const first=render(<CustomerInfoPanel {...props}/>)
   for(const spec of FIXED_FRIEND_FIELDS) expect(screen.getByText(spec.label)).toBeTruthy()
-  expect(screen.queryByText('編集する')).toBeNull()
+  expect(screen.getByRole('button',{name:'編集'})).toBeTruthy()
   fireEvent.click(screen.getByRole('button',{name:'表示項目'}))
   fireEvent.click(screen.getByRole('checkbox',{name:'タグ'}))
+  fireEvent.click(screen.getByRole('button',{name:'保存する'}))
   expect(JSON.parse(localStorage.getItem('chat.friendInfoSections.v4')!).hidden).toContain('tags')
   first.unmount()
   render(<CustomerInfoPanel {...props} canEdit/>)
@@ -49,12 +50,12 @@ test('failed fetch is shown with retry instead of unregistered values',()=>{
 })
 
 test('個々の基本欄と追加の節を隠せ、閉じても別画面へ設定を引き継ぐ', () => {
-  const props = { friendId: 'f', fields, state: 'ready' as const, canEdit: false, sections: [], extraSections: [{ key: 'forms', label: 'フォーム回答', content: <p>回答履歴</p> }] };
+  const props = { friendId: 'f', fields, state: 'ready' as const, canEdit: true, sections: [], extraSections: [{ key: 'forms', label: 'フォーム回答', content: <p>回答履歴</p> }] };
   const first = render(<CustomerInfoPanel {...props} />);
   fireEvent.click(screen.getByRole('button', { name: '表示項目' }));
   fireEvent.click(screen.getByRole('checkbox', { name: 'メール' }));
   fireEvent.click(screen.getByRole('checkbox', { name: 'フォーム回答' }));
-  fireEvent.click(screen.getByRole('button', { name: '閉じる' }));
+  fireEvent.click(screen.getByRole('button', { name: '保存する' }));
   first.unmount();
   render(<CustomerInfoPanel {...props} />);
   expect(screen.queryByText('メール')).toBeNull();
@@ -83,12 +84,18 @@ test('基本の編集は取消で送らず、失敗では値を保ち、保存�
 
 test('既存の並びを保ち、上下キーの変更を保存する。顧客の値は手元へ保存しない', () => {
   localStorage.setItem('chat.friendInfoSections.v4', JSON.stringify({ order: ['tags', 'support'], hidden: [] }));
-  render(<CustomerInfoPanel friendId="f" fields={fields} state="ready" canEdit={false} sections={[
+  render(<CustomerInfoPanel friendId="f" fields={fields} state="ready" canEdit sections={[
     { key: 'support', label: '対応', content: '対応内容' }, { key: 'tags', label: 'タグ', content: 'タグ内容' },
   ]} />);
   fireEvent.click(screen.getByRole('button', { name: '表示項目' }));
   fireEvent.keyDown(screen.getByRole('button', { name: /対応.*並び/ }), { key: 'ArrowUp' });
+  fireEvent.click(screen.getByRole('button', { name: '保存する' }));
   const saved = localStorage.getItem('chat.friendInfoSections.v4')!;
-  expect(JSON.parse(saved).order).toEqual(['support', 'tags']);
+  expect(JSON.parse(saved).order.slice(0,2)).toEqual(['support', 'tags']);
   expect(saved).not.toContain('山田花子');
 });
+
+test('閲覧のみでは基本の編集と表示項目の変更を出さない',()=>{
+ render(<CustomerInfoPanel friendId="f" fields={fields} state="ready" canEdit={false} sections={[]}/>);
+ expect(screen.queryByRole('button',{name:'編集'})).toBeNull();expect(screen.queryByRole('button',{name:'表示項目'})).toBeNull();
+})

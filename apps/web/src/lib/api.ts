@@ -3136,6 +3136,7 @@ export type FriendListParams = {
    * handled を付与。L-step 風友だちリスト UI 用。デフォルトは false。
    */
   includeChatStatus?: boolean
+  fieldColumns?: string[]
   /** 並び替え。`oldest` で created_at ASC、未指定 / `recent` で DESC. */
   sort?: 'recent' | 'oldest'
   /** `unhandled` で「最新が未返信の incoming」だけに絞る (サーバ側 SQL filter). */
@@ -3903,6 +3904,7 @@ export type FriendScoreDetail = {
 }
 /** Friend list items, optionally hydrated with chat status (when ?includeChatStatus=true) */
 export type FriendListItem = FriendWithTags & Partial<{
+  fieldValues: Record<string, string | null>
   latestIncomingMessage: { content: string; messageType: string; createdAt: string } | null
   latestOutgoingAt: string | null
   activeScenario: { name: string; status: string } | null
@@ -6413,6 +6415,7 @@ export const api = {
       if (params?.search) query.search = params.search
       if (params?.includeTags === false) query.includeTags = 'false'
       if (params?.includeChatStatus) query.includeChatStatus = 'true'
+      if (params?.fieldColumns?.length) query.fieldColumns = JSON.stringify(params.fieldColumns)
       if (params?.sort) query.sort = params.sort
       if (params?.handled) query.handled = params.handled
       if (params?.operatorId) query.operatorId = params.operatorId
