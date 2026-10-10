@@ -12,7 +12,7 @@ function findCheck(validation: WebinarPublishValidation | null, key: string) {
 /** 最終確認の「アクション」行。視聴後アクションの検査結果をそのまま出す。 */
 export function reviewActionSummaryText(validation: WebinarPublishValidation | null): string {
   const check = findCheck(validation, 'action_dependencies')
-  if (!check) return '—（未取得）'
+  if (!check) return '—'
   return check.detail || check.label
 }
 
@@ -23,7 +23,7 @@ export function reviewTestSummaryBody(
 ): string {
   if (!validation) {
     return validationState === 'error'
-      ? '公開前検査を取得できませんでした。左の段からもう一度読み込んでください。'
+      ? '公開前検査を読み込めませんでした。左の段からもう一度読み込んでください。'
       : '公開前検査を読み込んでいます。'
   }
   const pending: string[] = []

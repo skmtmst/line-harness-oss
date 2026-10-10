@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 const PAGE = readUiSource(path.join(__dirname, 'page.tsx'), 'utf8')
 const EDIT = readUiSource(path.join(__dirname, 'edit/page.tsx'), 'utf8')
 const PARTICIPANTS = fs.readFileSync(path.join(__dirname, 'edit/participants-v8.tsx'), 'utf8')
-const REVIEW = fs.readFileSync(path.join(__dirname, 'edit/review-v8.tsx'), 'utf8')
+const REVIEW = fs.readFileSync(path.join(__dirname, '../../v8/webinar-edit/review.tsx'), 'utf8')
 const ANALYTICS = fs.readFileSync(path.join(__dirname, 'edit/analytics-v8.tsx'), 'utf8')
 const PUBLISHED = fs.readFileSync(path.join(__dirname, 'published/page.tsx'), 'utf8')
 const API = fs.readFileSync(path.join(__dirname, '../../lib/api.ts'), 'utf8')
