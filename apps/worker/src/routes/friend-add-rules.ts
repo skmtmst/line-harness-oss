@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
   archiveFriendAddRule,
+  restoreFriendAddRule,
   createFriendAddRuleDraft,
   deleteFriendAddRuleFolder,
   ensureFriendAddFallbackRules,
@@ -1147,6 +1148,7 @@ friendAddRules.get('/api/friend-add-rules', requireRole('owner', 'admin', 'staff
         limit,
         search,
         folderName: folder,
+        highlightId: c.req.query('highlight'),
       }),
       loadOptions(c.env.DB, accountId),
       /*
@@ -1809,6 +1811,36 @@ friendAddRules.post('/api/friend-add-rules/:id/stop', requireRole('owner', 'admi
     }
     throw error;
   }
+});
+
+friendAddRules.post('/api/friend-add-rules/:id/unarchive', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+  const accountId = accountIdFrom(c);
+  if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+  if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: 'Not found' }, 404);
+  const body = await c.req.json<{ expectedVersion?: number }>().catch(() => ({} as { expectedVersion?: number }));
+  if (!Number.isInteger(body.expectedVersion) || body.expectedVersion! < 1) return inputError(c, { success: false, error: '版番号が必要です' }, 422, ['expectedVersion']);
+  const current = await getFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: c.req.param('id'), includeArchived: true });
+  if (!current) return c.json({ success: false, error: 'Not found' }, 404);
+  const restored = await restoreFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: current.id, expectedVersion: body.expectedVersion! });
+  if (!restored) return c.json({ success: false, code: 'VERSION_CONFLICT', error: '状態が変わっています。一覧を読み直してください' }, 409);
+  return c.json({ success: true, data: { id: restored.id, status: restored.status, version: restored.lock_version } });
+});
+
+friendAddRules.post('/api/friend-add-rules/:id/duplicate', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+  const accountId = accountIdFrom(c);
+  const key = c.req.header('Idempotency-Key');
+  if (!accountId || !key || key.length < 16 || key.length > 200) return c.json({ success: false, error: 'アカウントと操作の鍵が必要です' }, 400);
+  if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: 'Not found' }, 404);
+  const current = await getFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: c.req.param('id'), includeArchived: true });
+  if (!current) return c.json({ success: false, error: 'Not found' }, 404);
+  const body = await c.req.json<{ expectedVersion?: number }>().catch(() => ({} as { expectedVersion?: number }));
+  if (!Number.isInteger(body.expectedVersion) || body.expectedVersion! < 1) return inputError(c, { success: false, error: '版番号が必要です' }, 422, ['expectedVersion']);
+  if (body.expectedVersion !== current.lock_version) return c.json({ success: false, code: 'VERSION_CONFLICT', error: '一覧を読み直してください' }, 409);
+  const definition = parseSnapshot(current.definition_snapshot);
+  const created = await createFriendAddRuleDraft(c.env.DB, { lineAccountId: accountId,
+    friendKind: current.friend_kind, name: `${current.name}（複製）`, folderName: current.folder_name,
+    priority: current.priority, definition, idempotencyKey: key });
+  return c.json({ success: true, data: { id: created.id, status: 'draft' } }, 201);
 });
 
 friendAddRules.delete('/api/friend-add-rules/:id', requireRole('owner', 'admin'), async (c) => {
