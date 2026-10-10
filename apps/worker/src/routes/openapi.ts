@@ -2553,6 +2553,24 @@ const spec = {
         responses: { '200': { description: 'Friend with tags' }, '404': { description: 'Not found' } },
       },
     },
+    '/api/friends/{id}/data': {
+      delete: {
+        tags: ['Friends'], summary: 'お客さまの依頼で友だちの顧客データと書類を削除（B-215）',
+        description: '書込可能なオーナー・管理者だけ。友だちのアカウントの所属を照合し、R2・DB・完了監査を再試行可能に削除する。成功済みの再実行はreplayed=true。同時実行は409。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'X-Confirm-Irreversible', in: 'header', required: true, schema: { type: 'string', enum: ['delete-friend-data'] } },
+        ],
+        responses: {
+          '200': { description: '削除完了または成功済みの再実行。data.deleted=true、data.replayedはboolean' },
+          '403': { description: 'スタッフ・閲覧のみ・未認証は実行不可' },
+          '404': { description: '対象が無いか、アカウントが範囲外' },
+          '409': { description: 'deletion_in_progress または deletion_schema_approval_required（保存対象の保護にmigration承認が必要）' },
+          '428': { description: '確認ヘッダーが無いか不一致' },
+          '503': { description: 'deletion_retry_required。同じ対象で再試行する' },
+        },
+      },
+    },
     '/api/friends/{id}/form-submissions': {
       get: {
         tags: ['Friends'],
@@ -8493,6 +8511,24 @@ const spec = {
       },
     },
     '/api/forms/{id}/submissions/{submissionId}': {
+      delete: {
+        tags: ['Forms'], summary: '個別の回答と添付を削除（B-215）',
+        description: '書込可能なオーナー・管理者だけ。回答とアカウントの所属を照合し、R2・DB・完了監査を再試行可能に削除する。成功済みの再実行はreplayed=true。同時実行は409。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'submissionId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'X-Confirm-Irreversible', in: 'header', required: true, schema: { type: 'string', enum: ['delete-form-response'] } },
+        ],
+        responses: {
+          '200': { description: '削除完了または成功済みの再実行。data.deleted=true、data.replayedはboolean' },
+          '403': { description: 'スタッフ・閲覧のみ・未認証は実行不可' },
+          '404': { description: '対象が無いか、所属・フォーム・アカウントが範囲外' },
+          '409': { description: 'deletion_in_progress または deletion_schema_approval_required（保存対象の保護にmigration承認が必要）' },
+          '428': { description: '確認ヘッダーが無いか不一致' },
+          '503': { description: 'deletion_retry_required。同じ対象で再試行する' },
+        },
+      },
       get: {
         tags: ['Forms'], summary: 'フォーム回答1件と後処理の済んだ工程を読み直す',
         description: '所有者・管理者・スタッフの閲覧範囲とフォームとの一致を確認する。試し回答は404。過去の工程で日時が不明ならcompletedAtはnull。',

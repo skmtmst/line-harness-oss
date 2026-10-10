@@ -141,6 +141,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/liff/visit-stamps/qr/redeem',
   'POST /api/visit-stamps/cards/{id}/staff-qr',
   'POST /api/visit-stamps/cards/{id}/storefront-qr',
+  'DELETE /api/forms/{id}/submissions/{submissionId}',
+  'DELETE /api/friends/{id}/data',
   'GET /api/booking/admin/board',
   'PATCH /api/booking/admin/board/{id}',
   'POST /api/tags/{id}/restore',
